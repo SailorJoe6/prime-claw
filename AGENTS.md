@@ -15,7 +15,7 @@ bd sync               # Sync with git
 ## What this repo is
 
 This is the **builder repo** for prime-claw. Read [VISION.md](VISION.md) and
-[PLAN.md](PLAN.md) before substantive work. Build order is manual-first:
+[LONG_RANGE_PLAN.md](LONG_RANGE_PLAN.md) before substantive work. Build order is manual-first:
 phase skills → episode mechanics → conversation/episode boundary →
 upgrade command → orchestrator LAST.
 

@@ -4,7 +4,7 @@
 
 - [../VISION.md](../VISION.md) — the agent hierarchy, three-horizon context
   model, and why prime-agent.
-- [../PLAN.md](../PLAN.md) — the manual-first, long-range build order.
+- [../LONG_RANGE_PLAN.md](../LONG_RANGE_PLAN.md) — the manual-first, long-range build order.
 
 ## Lineage (prior art, distilled)
 

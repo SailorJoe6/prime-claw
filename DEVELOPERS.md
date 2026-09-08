@@ -13,7 +13,7 @@ For contributors working on the prime-claw builder repo.
 
 ## Layout
 
-- `VISION.md` / `PLAN.md` — founding vision and long-range plan
+- `VISION.md` / `LONG_RANGE_PLAN.md` — founding vision and long-range plan
 - `docs/` — design docs; `docs/lineage/` — distilled prior-art notes
 - `scripts/` — `apply-*` (mutate), `check-*` (readiness), `validate-*`
   (acceptance), `run-*` (smoke), plus helpers

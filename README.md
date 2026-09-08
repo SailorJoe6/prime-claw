@@ -6,7 +6,7 @@ org built on the prime-agent harness.
 
 - [VISION.md](VISION.md) — what prime-claw is, the agent hierarchy, the
   three-horizon context model, and why prime-agent.
-- [PLAN.md](PLAN.md) — the long-range, manual-first build order.
+- [LONG_RANGE_PLAN.md](LONG_RANGE_PLAN.md) — the long-range, manual-first build order.
 - [docs/](docs/README.md) — design docs and lineage notes.
 
 ## What this repo is (and is not)
@@ -19,7 +19,7 @@ repo constructs.
 
 ## Status
 
-Founding skeleton. See [PLAN.md](PLAN.md) Phase 0.
+Founding skeleton. See [LONG_RANGE_PLAN.md](LONG_RANGE_PLAN.md) Phase 0.
 
 ## Lineage
 

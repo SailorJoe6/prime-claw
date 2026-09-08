@@ -14,7 +14,7 @@ manual driving, then the loop.
 ## Phase 0 — Builder repo skeleton (this initiation)
 
 - [x] git repo, beads, directory scaffold
-- [ ] VISION.md, PLAN.md, README.md, AGENTS.md, DEVELOPERS.md
+- [ ] VISION.md, LONG_RANGE_PLAN.md, README.md, AGENTS.md, DEVELOPERS.md
 - [ ] docs/lineage/ — distilled notes from nemo-setup, openclaw-setup,
       zbrain, ralph-pva
 - [ ] gbrain source registration (`gbrain sources add prime-claw --path ...`)
