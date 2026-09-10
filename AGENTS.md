@@ -12,19 +12,12 @@ bd close <id>         # Complete work
 bd sync               # Sync with git
 ```
 
-## Project origin
-
-prime-claw was ideated and launched in prime-agent session
-`01a08280-3390-77da-b221-eb109497e65d` (transcript:
-`~/.prime/agent/sessions/01a08280-3390-77da-b221-eb109497e65d.jsonl`).
-The reasoning and rejected alternatives behind the design are curated in
-[docs/founding-decisions.md](docs/founding-decisions.md) — read that first;
-consult the raw transcript only when more detail is needed.
-
 ## What this repo is
 
 This is the **builder repo** for prime-claw. Read [VISION.md](VISION.md) and
-[LONG_RANGE_PLAN.md](LONG_RANGE_PLAN.md) before substantive work. Build order is manual-first:
+[LONG_RANGE_PLAN.md](LONG_RANGE_PLAN.md) before substantive work. The reasoning
+behind the design (and the origin session id) is in
+[docs/founding-decisions.md](docs/founding-decisions.md). Build order is manual-first:
 phase skills → episode mechanics → conversation/episode boundary →
 upgrade command → orchestrator LAST.
 
