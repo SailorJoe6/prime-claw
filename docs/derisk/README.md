@@ -9,7 +9,7 @@ verdicts stand on. Spec: [.ralph/plans/SPECIFICATION.md](../../.ralph/plans/SPEC
 
 | Unknown | Verdict doc | Status |
 |---|---|---|
-| U1 — prime-agent in a fresh OpenShell sandbox (HARD GATE) | `U1.md` | in progress — Slice 1 evidence collected; verdict written in Slice 3 |
+| U1 — prime-agent in a fresh OpenShell sandbox (HARD GATE) | [U1.md](U1.md) | in progress — R-U1-1/-2/-5 proven (Slice 1); verdict written in Slice 3 |
 | U2 — gbrain brain stack in the sandbox | `U2.md` | pending (Slice 4) |
 | U3 — episode spawn/reap mechanics | `U3.md` | pending (Slice 5) |
 

@@ -53,6 +53,11 @@ of the sandbox itself, so it is proven at birth.
 **Capability delivered:** the prime-agent daemon installs and runs healthily
 inside the sandbox; a session starts with a working persistent Python REPL.
 
+- **Prerequisite (discovered in Slice 1):** the deny-by-default policy blocks
+  all installs. First add an explicit `network_policies` entry to
+  `policies/phase1-sandbox.yaml` for prime-agent's install channel (e.g. the
+  npm registry or the prime-agent distribution endpoint), bound to the exact
+  installing binary path in-sandbox.
 - `scripts/apply-phase1-prime-agent.sh` — install prime-agent in-sandbox.
 - `scripts/check-phase1-prime-agent.sh` — daemon health.
 - `scripts/validate-phase1-prime-agent.py` — session start; REPL state
