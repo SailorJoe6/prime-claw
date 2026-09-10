@@ -18,8 +18,7 @@ manual driving, then the loop.
 - [ ] docs/lineage/ — distilled notes from nemo-setup, openclaw-setup,
       zbrain, ralph-pva
 - [ ] gbrain source registration (`gbrain sources add prime-claw --path ...`)
-- [ ] Remote (gitlab joeb1knoobie/prime-claw) — deferred until skeleton is
-      reviewed
+- [x] Remote (github SailorJoe6/prime-claw) — created and pushed
 
 ## Phase 1 — prime-agent-native phase skills
 
@@ -30,12 +29,12 @@ prime-agent-native form. Same proven workflow structure; new substrate.
   of writing for an amnesiac successor.
 - Skills are REPL-aware: they know state can persist through compaction and
   are deliberate about what earns living-doc status.
-- Joe has already been hand-building prime-agent-flavored skills in other
+- Existing hand-built prime-agent-flavored skills already live in other
   repos — pull those in as the starting point rather than inventing
   parallel versions.
 
-Done when: the four skills exist and Joe has manually driven at least one
-real feature through them in a real project conversation.
+Done when: the four skills exist and the operator has manually driven at
+least one real feature through them in a real project conversation.
 
 ## Phase 2 — Episode mechanics
 
@@ -71,8 +70,8 @@ documented with evidence.
 ## Phase 4 — `upgrade-this-to-prime-agent` command
 
 A command that converts a project previously managed by Ralph codex/claude
-skills to prime-agent skills — eliminating the manual copy-paste Joe has
-been doing. prime-claw dogfoods this on itself and on the ralph repo.
+skills to prime-agent skills — eliminating the manual copy-paste that
+converting each project previously required. prime-claw dogfoods this on itself and on the ralph repo.
 
 Done when: running the command in the ralph repo (and one other) replaces
 manual skill copy-paste, verified by diff.

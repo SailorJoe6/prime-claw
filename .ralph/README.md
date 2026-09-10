@@ -4,7 +4,7 @@ This directory holds the Ralph-style planning layout prime-claw uses, with
 prime-agent-native skills.
 
 - `skills/<phase>/SKILL.md` — the seven phase skills, imported verbatim from
-  `~/gitlab_local/ralph-pva/.ralph/skills` (Joe's hand-built prime-agent set)
+  `~/gitlab_local/ralph-pva/.ralph/skills` (a hand-built prime-agent-native set)
   as the Phase 1 starting point. They will diverge as prime-claw validates
   them by manual driving.
 - `plans/` — created on demand by the design/plan skills. The design and

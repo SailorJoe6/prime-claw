@@ -85,5 +85,5 @@ reproducible references. Notably includes `deps/gbrain`, `deps/gstack`,
 **`deps/prime-ralph`** plus **`templates/prime-agent/`**: the prime-agent
 integration had already begun here. prime-claw completes that thread.
 
-Forks live on **GitLab** (`joeb1knoobie/...`) — the expected home for a
-prime-claw remote.
+The prior-art forks live on **GitLab** (`joeb1knoobie/...`). prime-claw's
+own remote is on **GitHub** (`SailorJoe6/prime-claw`).

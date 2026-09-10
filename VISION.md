@@ -11,11 +11,10 @@ agent hierarchy that mirrors how its operator actually works: one universal mind
 contexts, conversation threads that incubate ideas, and Ralph-style build
 episodes that spin up when a conversation decides to ship.
 
-**Who it's for.** Outward-facing, prime-claw is a claw for any **thought
-worker who runs multiple parallel projects**. It helps that person create by
-becoming a **factory** for whatever their work produces — a software
-factory, a content factory, a business factory, or anything else that fits
-its agentic capabilities. The hierarchy below (universal → project →
+prime-claw is a claw for any **thought worker who runs multiple
+parallel projects**. It helps that person create by becoming a **factory**
+for whatever their work produces — a software factory, a content factory, a
+business factory, or anything else that fits its agentic capabilities. The hierarchy below (universal → project →
 conversation → episode) is domain-agnostic; "a project" is any long-running
 effort with its own context, and "an episode" is any focused burst of
 production within it.
@@ -27,7 +26,7 @@ on prime-agent:
 |---|---|---|
 | **zbrain** | a basic claw built on gbrain + gstack-browser in an always-on container, cron schedules, crude channel scraping | generic chassis; no prime-agent core |
 | **ralph-pva** | first-iteration PVA on the zbrain chassis; the "home it can call its own" pattern with a symlinked brain repo | built on the zbrain runtime, not prime-agent |
-| **openclaw-setup** / **nemo-setup** | the sandboxing blueprint: NemoClaw orchestration → OpenShell security boundary → agent in a Docker sandbox, with the apply/check/validate/test engineering discipline and requirements traceability | orchestrates OpenClaw/Hermes, which are letting Joe down; not prime-agent |
+| **openclaw-setup** / **nemo-setup** | the sandboxing blueprint: NemoClaw orchestration → OpenShell security boundary → agent in a Docker sandbox, with the apply/check/validate/test engineering discipline and requirements traceability | orchestrates OpenClaw/Hermes, not prime-agent |
 
 prime-claw keeps the sandboxing discipline and the PVA ambition, and
 replaces the harness at the heart with prime-agent.
