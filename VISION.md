@@ -130,6 +130,12 @@ The REPL's ability to keep state live through compaction — *or not* — is a
 real flexibility gain: it lets prime-claw be selective about what earns a
 place in living docs, targeting exactly these three horizons.
 
+A companion design doc, [docs/information-architecture.md](docs/information-architecture.md),
+governs the orthogonal question: when something becomes durable, *which
+store* owns it (brain vs. docs vs. harness vs. beads vs. reports). Horizons
+govern context lifetime; the information architecture governs durable-store
+routing.
+
 ## The conversation → episode transition
 
 The trigger is well established and inherited from Ralph: **the moment the

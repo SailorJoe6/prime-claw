@@ -23,5 +23,10 @@ prime-claw builds on four prior projects. Read these before designing:
 
 ## Design docs
 
+- [information-architecture.md](information-architecture.md) — the
+  multi-store routing layer: which store owns a durable fact (brain vs. docs
+  vs. harness vs. beads vs. reports), the two-level routing split, and the
+  report guard. Orthogonal to the three-horizon context model.
+
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)
