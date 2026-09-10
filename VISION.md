@@ -5,19 +5,27 @@
 
 ## What prime-claw is
 
-prime-claw is a **persistent personal engineering org**, built on the
+prime-claw is a **persistent virtual personal assistant**, built on the
 prime-agent harness. It is not a tool and not a loop. It is an always-on
-agent hierarchy that mirrors how its operator (a serial creator of new
-things) actually works: one universal mind at the top, long-lived project
+agent hierarchy that mirrors how its operator actually works: one universal mind at the top, long-lived project
 contexts, conversation threads that incubate ideas, and Ralph-style build
 episodes that spin up when a conversation decides to ship.
+
+**Who it's for.** Outward-facing, prime-claw is a claw for any **thought
+worker who runs multiple parallel projects**. It helps that person create by
+becoming a **factory** for whatever their work produces — a software
+factory, a content factory, a business factory, or anything else that fits
+its agentic capabilities. The hierarchy below (universal → project →
+conversation → episode) is domain-agnostic; "a project" is any long-running
+effort with its own context, and "an episode" is any focused burst of
+production within it.
 
 prime-claw is the successor to three prior projects, unified and re-based
 on prime-agent:
 
 | Prior project | What it contributed | Why it falls short |
 |---|---|---|
-| **zbrain** | gbrain + gstack-browser in an always-on container, cron schedules, crude channel scraping | generic chassis; no prime-agent core |
+| **zbrain** | a basic claw built on gbrain + gstack-browser in an always-on container, cron schedules, crude channel scraping | generic chassis; no prime-agent core |
 | **ralph-pva** | first-iteration PVA on the zbrain chassis; the "home it can call its own" pattern with a symlinked brain repo | built on the zbrain runtime, not prime-agent |
 | **openclaw-setup** / **nemo-setup** | the sandboxing blueprint: NemoClaw orchestration → OpenShell security boundary → agent in a Docker sandbox, with the apply/check/validate/test engineering discipline and requirements traceability | orchestrates OpenClaw/Hermes, which are letting Joe down; not prime-agent |
 
@@ -60,9 +68,9 @@ prime-claw is organized as four nested tiers. Each tier has a natural home
 in prime-agent and a natural scope of concern.
 
 ```
-OPERATOR (Joe — serial creator, many projects at once)
+OPERATOR (a thought worker running many parallel projects)
   └── UNIVERSAL AGENT — always on, gbrain-equipped, knows the whole universe
-        └── PROJECT CONTEXT — one per software project (git folder + beads + gbrain source)
+        └── PROJECT CONTEXT — one per project (git folder + beads + gbrain source)
               └── CONVERSATION — a long-lived thread inside a project
                     └── EPISODE — a Ralph-style build loop, spawned on demand
 ```

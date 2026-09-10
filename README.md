@@ -1,8 +1,13 @@
 # prime-claw
 
 **Builder repo** for the prime-claw sandbox: the scripts, docs, plans, and
-tooling used to construct and iterate on a persistent personal engineering
-org built on the prime-agent harness.
+tooling used to construct and iterate on a **persistent virtual personal
+assistant** built on the prime-agent harness.
+
+prime-claw is a claw for any thought worker who runs multiple parallel
+projects. It helps them create by becoming a **factory** for whatever their
+work produces — software, content, business, or anything else that fits its
+agentic capabilities.
 
 - [VISION.md](VISION.md) — what prime-claw is, the agent hierarchy, the
   three-horizon context model, and why prime-agent.
@@ -11,11 +16,10 @@ org built on the prime-agent harness.
 
 ## What this repo is (and is not)
 
-This repo **builds** prime-claw. It is analogous to `openclaw-setup` and
-`nemo-setup`: a control directory of build tooling, design docs, and
-verification gates. It is **not** the claw itself — the claw's runtime home
-(a sandboxed container the prime-agent daemon owns) is the product this
-repo constructs.
+This repo **builds** prime-claw. It is a control directory of build tooling, 
+design docs, and verification gates. It is **not** the claw itself — the claw's 
+runtime home (a sandboxed container the prime-agent daemon owns) is the product 
+this repo constructs.
 
 ## Status
 
