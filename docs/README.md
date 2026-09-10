@@ -21,6 +21,12 @@ prime-claw builds on four prior projects. Read these before designing:
 - [lineage/ralph-pva.md](lineage/ralph-pva.md) — the first-iteration PVA
   and the "home it can call its own" pattern.
 
+## Founding record
+
+- [founding-decisions.md](founding-decisions.md) — the *why* behind the
+  project: decisions, rejected alternatives, and the original session ID.
+  Read this first when the reasoning matters, not just the conclusions.
+
 ## Design docs
 
 - [information-architecture.md](information-architecture.md) — the

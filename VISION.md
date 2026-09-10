@@ -2,6 +2,8 @@
 
 > Status: DRAFT — founding vision, written at project initiation.
 > Source: a design conversation between Joe and prime-agent, 2026-09-08.
+> The *why* behind this vision (decisions + rejected alternatives) is in
+> [docs/founding-decisions.md](docs/founding-decisions.md).
 
 ## What prime-claw is
 
