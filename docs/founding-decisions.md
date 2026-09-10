@@ -246,9 +246,8 @@ which folders, how the brain links in — is a deferred secondary concern.)
 
 ## Original session
 
-This project was ideated and launched in prime-agent session:
-
-    01a08280-3390-77da-b221-eb109497e65d
+This project was ideated and launched in the prime-agent session named
+**prime-claw** (session id `01a08280-3390-77da-b221-eb109497e65d`).
 
 Transcript: `~/.prime/agent/sessions/01a08280-3390-77da-b221-eb109497e65d.jsonl`
 
