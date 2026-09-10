@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: Apache-2.0
+# prime-claw Phase 1 sandbox policy (R-U1-5: deny-by-default egress).
+#
+# Deliberately minimal: exactly ONE benign allowed endpoint (example.com:443,
+# curl only) exists solely so scripts/validate-phase1-sandbox.py can prove the
+# "policy-allowed egress succeeds" half of R-U1-5. Everything else is denied
+# by default. Later slices add real endpoints (model API hosts via providers
+# in Slice 3, etc.) as explicit named entries here.
+
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    - /lib
+    - /etc
+    - /proc/self
+    - /dev/urandom
+  read_write:
+    - /sandbox
+    - /tmp
+    - /dev/null
+
+landlock:
+  compatibility: best_effort
+
+network_policies:
+  # Egress-proof canary. NOT a real dependency: exists so the validator can
+  # show that declared egress works while undeclared egress is refused.
+  egress_canary:
+    name: egress-canary-example-com
+    endpoints:
+      - { host: example.com, port: 443 }
+    binaries:
+      - path: /usr/bin/curl
