@@ -95,3 +95,18 @@ spike order or slice boundaries. Spec says *what*; the planning phase
 (EXECUTION_PLAN.md) decides *how* and in what order, including how the
 individual proofs bundle into vertical slices.
 **Implements:** SPECIFICATION scope discipline; REQUIREMENTS grouping only.
+
+## D11 — The credential proof uses this prime-agent instance's own credentials
+
+The credentialed service in U1 is not a throwaway API: the sandboxed
+prime-agent must run on **the same credentials as the operator's host
+prime-agent instance** (anthropic [default], openai, openai-codex,
+amazon-bedrock, from `~/.prime/agent/auth.json` + `models.json` +
+`settings.json`), delivered exclusively through the OpenShell provider model.
+Copying those configs for this purpose is operator-authorized. Because
+prime-agent natively reads credentials from `auth.json` on disk while
+OpenShell injects placeholders through the environment, the spike must
+determine and document the consumption path (env-var auth vs. placeholder
+values in config); the finding is itself part of the evidence. Real values
+still never touch sandbox disk.
+**Implements:** R-U1-6, R-X-5.
