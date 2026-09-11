@@ -23,7 +23,7 @@ def cfg(**over):
         "image": "prime-claw-brain:0.1.0",
         "gateway": {"name": "openshell", "endpoint": "https://localhost:17670",
                     "forbidden": ["nemoclaw"]},
-        "policy_file": "policies/phase1-sandbox.yaml",
+        "policy_file": "policies/runtime.yaml",
         "provider_name": "prime-claw-ai-gateway",
         "model": "anthropic.kimi-k3",
         "ai_gateway_host": "ai-gateway.zende.sk",
@@ -184,18 +184,15 @@ def test_status_bad_component_exit1(monkeypatch, tmp_path, capsys):
     assert "BAD" in out and "recover" in out
 
 
-# --- not-implemented stubs -----------------------------------------------------
+# --- all verbs implemented (Slice 6 removed the last stub) --------------------
 
-def test_stub_verbs_return2_and_dry_run(tmp_path, capsys):
-    # Verbs not yet implemented as of Slice 2. `build` and `status` ARE live
-    # (Slice 2 / Slice 1); the rest remain explicit stubs until their slice.
-    for v in ("destroy",):
-        rc = pc.VERBS[v](cfg(), Args(dry_run=True))
-        assert rc == 2, v
-    err = capsys.readouterr().err
-    assert "not yet implemented" in err
-    assert pc.VERBS["build"] is pc.cmd_build  # implemented in Slice 2
-    assert pc.VERBS["create"] is pc.cmd_create  # implemented in Slice 3a
-    assert pc.VERBS["converge"] is pc.cmd_converge  # implemented in Slice 3b
-    assert pc.VERBS["validate"] is pc.cmd_validate  # implemented in Slice 4
-    assert pc.VERBS["recover"] is pc.cmd_recover    # implemented in Slice 5
+def test_all_verbs_implemented():
+    # As of Slice 6 every verb is wired to a real handler; no _not_implemented
+    # stubs remain in the dispatch table.
+    assert pc.VERBS["status"] is pc.cmd_status      # Slice 1
+    assert pc.VERBS["build"] is pc.cmd_build        # Slice 2
+    assert pc.VERBS["create"] is pc.cmd_create      # Slice 3a
+    assert pc.VERBS["converge"] is pc.cmd_converge  # Slice 3b
+    assert pc.VERBS["validate"] is pc.cmd_validate  # Slice 4
+    assert pc.VERBS["recover"] is pc.cmd_recover    # Slice 5
+    assert pc.VERBS["destroy"] is pc.cmd_destroy    # Slice 6

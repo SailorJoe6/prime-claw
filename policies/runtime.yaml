@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# prime-claw Phase 1 sandbox policy (R-U1-5: deny-by-default egress).
+# prime-claw runtime sandbox policy (deny-by-default egress). Phase 2 consolidation of phase1-sandbox.yaml.
 #
 # Deliberately minimal: exactly ONE benign allowed endpoint (example.com:443,
 # curl only) exists solely so scripts/validate-phase1-sandbox.py can prove the

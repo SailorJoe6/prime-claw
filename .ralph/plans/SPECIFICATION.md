@@ -49,7 +49,7 @@ Two explicit drivers from the design interview:
   `openshell policy set --wait` hot-reloads policy.
 - The spike tooling is real and committed but fragmented:
   `scripts/apply-phase1-{sandbox,prime-agent,providers,brain,spawn}.sh`,
-  `check-phase1-*.sh`, `validate-phase1-*.py`, `policies/phase1-sandbox.yaml`,
+  `check-phase1-*.sh`, `validate-phase1-*.py`, `policies/runtime.yaml`,
   `docker/phase1-brain.Dockerfile`.
 - Known sharp edges Phase 1 hit that the foundation must engineer out:
   - **Recreate wipes `/sandbox`** (prime-agent install, brain PGDATA,

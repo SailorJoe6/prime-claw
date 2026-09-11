@@ -11,16 +11,16 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-sandbox.sh"
+     "scripts/archive/phase1/apply-phase1-sandbox.sh"
     ],
     "check": [
-     "scripts/check-phase1-sandbox.sh"
+     "scripts/archive/phase1/check-phase1-sandbox.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-sandbox.py"
+     "scripts/archive/phase1/validate-phase1-sandbox.py"
     ],
     "tests": [
-     "tests/test_phase1_sandbox.py"
+     "scripts/archive/phase1/tests/test_phase1_sandbox.py"
     ]
    },
    "evidence": "docs/derisk/evidence/",
@@ -33,16 +33,16 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-sandbox.sh"
+     "scripts/archive/phase1/apply-phase1-sandbox.sh"
     ],
     "check": [
-     "scripts/check-phase1-sandbox.sh"
+     "scripts/archive/phase1/check-phase1-sandbox.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-sandbox.py"
+     "scripts/archive/phase1/validate-phase1-sandbox.py"
     ],
     "tests": [
-     "tests/test_phase1_sandbox.py"
+     "scripts/archive/phase1/tests/test_phase1_sandbox.py"
     ]
    },
    "evidence": "docs/derisk/evidence/",
@@ -55,17 +55,17 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "policies/phase1-sandbox.yaml",
-     "scripts/apply-phase1-sandbox.sh"
+     "policies/runtime.yaml",
+     "scripts/archive/phase1/apply-phase1-sandbox.sh"
     ],
     "check": [
-     "scripts/check-phase1-sandbox.sh"
+     "scripts/archive/phase1/check-phase1-sandbox.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-sandbox.py"
+     "scripts/archive/phase1/validate-phase1-sandbox.py"
     ],
     "tests": [
-     "tests/test_phase1_sandbox.py"
+     "scripts/archive/phase1/tests/test_phase1_sandbox.py"
     ]
    },
    "evidence": "docs/derisk/evidence/",
@@ -79,16 +79,16 @@
    "slice": 2,
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-prime-agent.sh"
+     "scripts/archive/phase1/apply-phase1-prime-agent.sh"
     ],
     "check": [
-     "scripts/check-phase1-prime-agent.sh"
+     "scripts/archive/phase1/check-phase1-prime-agent.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-prime-agent.py"
+     "scripts/archive/phase1/validate-phase1-prime-agent.py"
     ],
     "tests": [
-     "tests/test_phase1_prime_agent.py"
+     "scripts/archive/phase1/tests/test_phase1_prime_agent.py"
     ]
    },
    "verdict_doc": "docs/derisk/U1.md (written in Slice 3)",
@@ -102,16 +102,16 @@
    "slice": 2,
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-prime-agent.sh"
+     "scripts/archive/phase1/apply-phase1-prime-agent.sh"
     ],
     "check": [
-     "scripts/check-phase1-prime-agent.sh"
+     "scripts/archive/phase1/check-phase1-prime-agent.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-prime-agent.py"
+     "scripts/archive/phase1/validate-phase1-prime-agent.py"
     ],
     "tests": [
-     "tests/test_phase1_prime_agent.py"
+     "scripts/archive/phase1/tests/test_phase1_prime_agent.py"
     ]
    },
    "verdict_doc": "docs/derisk/U1.md (written in Slice 3)",
@@ -125,14 +125,14 @@
    "slice": 3,
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-providers.sh"
+     "scripts/archive/phase1/apply-phase1-providers.sh"
     ],
     "check": [],
     "validate": [
-     "scripts/validate-phase1-credentials.py"
+     "scripts/archive/phase1/validate-phase1-credentials.py"
     ],
     "tests": [
-     "tests/test_phase1_credentials.py"
+     "scripts/archive/phase1/tests/test_phase1_credentials.py"
     ]
    },
    "verdict_doc": "docs/derisk/U1.md",
@@ -145,31 +145,31 @@
    "status": "met",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-sandbox.sh",
-     "scripts/apply-phase1-prime-agent.sh",
-     "scripts/apply-phase1-providers.sh",
-     "scripts/apply-phase1-brain.sh",
-     "scripts/apply-phase1-spawn.sh"
+     "scripts/archive/phase1/apply-phase1-sandbox.sh",
+     "scripts/archive/phase1/apply-phase1-prime-agent.sh",
+     "scripts/archive/phase1/apply-phase1-providers.sh",
+     "scripts/archive/phase1/apply-phase1-brain.sh",
+     "scripts/archive/phase1/apply-phase1-spawn.sh"
     ],
     "check": [
-     "scripts/check-phase1-sandbox.sh",
-     "scripts/check-phase1-prime-agent.sh",
-     "scripts/check-phase1-brain.sh",
-     "scripts/check-phase1-spawn.sh"
+     "scripts/archive/phase1/check-phase1-sandbox.sh",
+     "scripts/archive/phase1/check-phase1-prime-agent.sh",
+     "scripts/archive/phase1/check-phase1-brain.sh",
+     "scripts/archive/phase1/check-phase1-spawn.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-sandbox.py",
-     "scripts/validate-phase1-prime-agent.py",
-     "scripts/validate-phase1-credentials.py",
-     "scripts/validate-phase1-brain.py",
-     "scripts/validate-phase1-spawn.py"
+     "scripts/archive/phase1/validate-phase1-sandbox.py",
+     "scripts/archive/phase1/validate-phase1-prime-agent.py",
+     "scripts/archive/phase1/validate-phase1-credentials.py",
+     "scripts/archive/phase1/validate-phase1-brain.py",
+     "scripts/archive/phase1/validate-phase1-spawn.py"
     ],
     "tests": [
-     "tests/test_phase1_sandbox.py",
-     "tests/test_phase1_prime_agent.py",
-     "tests/test_phase1_credentials.py",
-     "tests/test_phase1_brain.py",
-     "tests/test_phase1_spawn.py"
+     "scripts/archive/phase1/tests/test_phase1_sandbox.py",
+     "scripts/archive/phase1/tests/test_phase1_prime_agent.py",
+     "scripts/archive/phase1/tests/test_phase1_credentials.py",
+     "scripts/archive/phase1/tests/test_phase1_brain.py",
+     "scripts/archive/phase1/tests/test_phase1_spawn.py"
     ]
    },
    "verdict_doc": "docs/derisk/{U1,U2,U3}.md"
@@ -181,7 +181,7 @@
    "status": "met",
    "proven_by": {
     "tests": [
-     "tests/test_phase1_sandbox.py"
+     "scripts/archive/phase1/tests/test_phase1_sandbox.py"
     ]
    },
    "verdict_doc": "n/a"
@@ -193,17 +193,17 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-brain.sh",
-     "docker/phase1-brain.Dockerfile"
+     "scripts/archive/phase1/apply-phase1-brain.sh",
+     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
     ],
     "check": [
-     "scripts/check-phase1-brain.sh"
+     "scripts/archive/phase1/check-phase1-brain.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-brain.py"
+     "scripts/archive/phase1/validate-phase1-brain.py"
     ],
     "tests": [
-     "tests/test_phase1_brain.py"
+     "scripts/archive/phase1/tests/test_phase1_brain.py"
     ]
    },
    "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
@@ -216,17 +216,17 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-brain.sh",
-     "docker/phase1-brain.Dockerfile"
+     "scripts/archive/phase1/apply-phase1-brain.sh",
+     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
     ],
     "check": [
-     "scripts/check-phase1-brain.sh"
+     "scripts/archive/phase1/check-phase1-brain.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-brain.py"
+     "scripts/archive/phase1/validate-phase1-brain.py"
     ],
     "tests": [
-     "tests/test_phase1_brain.py"
+     "scripts/archive/phase1/tests/test_phase1_brain.py"
     ]
    },
    "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
@@ -239,17 +239,17 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-brain.sh",
-     "docker/phase1-brain.Dockerfile"
+     "scripts/archive/phase1/apply-phase1-brain.sh",
+     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
     ],
     "check": [
-     "scripts/check-phase1-brain.sh"
+     "scripts/archive/phase1/check-phase1-brain.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-brain.py"
+     "scripts/archive/phase1/validate-phase1-brain.py"
     ],
     "tests": [
-     "tests/test_phase1_brain.py"
+     "scripts/archive/phase1/tests/test_phase1_brain.py"
     ]
    },
    "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
@@ -262,17 +262,17 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-brain.sh",
-     "docker/phase1-brain.Dockerfile"
+     "scripts/archive/phase1/apply-phase1-brain.sh",
+     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
     ],
     "check": [
-     "scripts/check-phase1-brain.sh"
+     "scripts/archive/phase1/check-phase1-brain.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-brain.py"
+     "scripts/archive/phase1/validate-phase1-brain.py"
     ],
     "tests": [
-     "tests/test_phase1_brain.py"
+     "scripts/archive/phase1/tests/test_phase1_brain.py"
     ]
    },
    "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
@@ -285,17 +285,17 @@
    "status": "documented-non-blocking",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-brain.sh",
-     "docker/phase1-brain.Dockerfile"
+     "scripts/archive/phase1/apply-phase1-brain.sh",
+     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
     ],
     "check": [
-     "scripts/check-phase1-brain.sh"
+     "scripts/archive/phase1/check-phase1-brain.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-brain.py"
+     "scripts/archive/phase1/validate-phase1-brain.py"
     ],
     "tests": [
-     "tests/test_phase1_brain.py"
+     "scripts/archive/phase1/tests/test_phase1_brain.py"
     ]
    },
    "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
@@ -308,17 +308,17 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-brain.sh",
-     "docker/phase1-brain.Dockerfile"
+     "scripts/archive/phase1/apply-phase1-brain.sh",
+     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
     ],
     "check": [
-     "scripts/check-phase1-brain.sh"
+     "scripts/archive/phase1/check-phase1-brain.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-brain.py"
+     "scripts/archive/phase1/validate-phase1-brain.py"
     ],
     "tests": [
-     "tests/test_phase1_brain.py"
+     "scripts/archive/phase1/tests/test_phase1_brain.py"
     ]
    },
    "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
@@ -331,16 +331,16 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-spawn.sh"
+     "scripts/archive/phase1/apply-phase1-spawn.sh"
     ],
     "check": [
-     "scripts/check-phase1-spawn.sh"
+     "scripts/archive/phase1/check-phase1-spawn.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-spawn.py"
+     "scripts/archive/phase1/validate-phase1-spawn.py"
     ],
     "tests": [
-     "tests/test_phase1_spawn.py"
+     "scripts/archive/phase1/tests/test_phase1_spawn.py"
     ]
    },
    "evidence": "docs/derisk/evidence/phase1-spawn-20260911T190138Z.json",
@@ -353,16 +353,16 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-spawn.sh"
+     "scripts/archive/phase1/apply-phase1-spawn.sh"
     ],
     "check": [
-     "scripts/check-phase1-spawn.sh"
+     "scripts/archive/phase1/check-phase1-spawn.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-spawn.py"
+     "scripts/archive/phase1/validate-phase1-spawn.py"
     ],
     "tests": [
-     "tests/test_phase1_spawn.py"
+     "scripts/archive/phase1/tests/test_phase1_spawn.py"
     ]
    },
    "evidence": "docs/derisk/evidence/phase1-spawn-20260911T190138Z.json",
@@ -375,16 +375,16 @@
    "status": "proven",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-spawn.sh"
+     "scripts/archive/phase1/apply-phase1-spawn.sh"
     ],
     "check": [
-     "scripts/check-phase1-spawn.sh"
+     "scripts/archive/phase1/check-phase1-spawn.sh"
     ],
     "validate": [
-     "scripts/validate-phase1-spawn.py"
+     "scripts/archive/phase1/validate-phase1-spawn.py"
     ],
     "tests": [
-     "tests/test_phase1_spawn.py"
+     "scripts/archive/phase1/tests/test_phase1_spawn.py"
     ]
    },
    "evidence": "docs/derisk/evidence/phase1-spawn-20260911T190138Z.json",
@@ -449,14 +449,14 @@
    "status": "met",
    "proven_by": {
     "apply": [
-     "scripts/apply-phase1-providers.sh"
+     "scripts/archive/phase1/apply-phase1-providers.sh"
     ],
     "check": [],
     "validate": [
-     "scripts/validate-phase1-credentials.py"
+     "scripts/archive/phase1/validate-phase1-credentials.py"
     ],
     "tests": [
-     "tests/test_phase1_credentials.py"
+     "scripts/archive/phase1/tests/test_phase1_credentials.py"
     ]
    },
    "verdict_doc": "docs/derisk/U1.md"
@@ -464,19 +464,24 @@
   {
    "id": "R2-A-1",
    "priority": "GATE",
-   "summary": "Single operator entry point bin/prime-claw with lifecycle verbs (status live; create/converge/build/validate/recover/destroy stubbed for later slices).",
-   "status": "in-progress (Slice 1: CLI + status)",
+   "summary": "Single operator entry point bin/prime-claw owns the sandbox lifecycle: status, create, converge, build, validate, recover, destroy.",
+   "status": "met (Slices 1-6; all verbs implemented; destroy confirm-gated + idempotent)",
    "phase": 2,
    "slice": 1,
    "proven_by": {
     "apply": [],
-    "check": [],
-    "validate": [],
+    "check": [
+     "bin/prime-claw"
+    ],
+    "validate": [
+     "bin/prime-claw"
+    ],
     "tests": [
-     "tests/test_runtime_status.py"
+     "tests/test_runtime_status.py",
+     "tests/test_runtime_destroy.py"
     ]
    },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+   "verdict_doc": "docs/runbook.md"
   },
   {
    "id": "R2-A-3",
@@ -576,11 +581,11 @@
      "bin/prime-claw"
     ],
     "validate": [
-     "scripts/validate-phase1-credentials.py",
-     "scripts/validate-phase1-brain.py",
-     "scripts/validate-phase1-prime-agent.py",
-     "scripts/validate-phase1-spawn.py",
-     "scripts/validate-phase1-sandbox.py"
+     "scripts/archive/phase1/validate-phase1-credentials.py",
+     "scripts/archive/phase1/validate-phase1-brain.py",
+     "scripts/archive/phase1/validate-phase1-prime-agent.py",
+     "scripts/archive/phase1/validate-phase1-spawn.py",
+     "scripts/archive/phase1/validate-phase1-sandbox.py"
     ],
     "tests": [
      "tests/test_runtime_validate.py"
@@ -720,11 +725,11 @@
      "bin/prime-claw"
     ],
     "validate": [
-     "scripts/validate-phase1-credentials.py",
-     "scripts/validate-phase1-brain.py",
-     "scripts/validate-phase1-prime-agent.py",
-     "scripts/validate-phase1-spawn.py",
-     "scripts/validate-phase1-sandbox.py"
+     "scripts/archive/phase1/validate-phase1-credentials.py",
+     "scripts/archive/phase1/validate-phase1-brain.py",
+     "scripts/archive/phase1/validate-phase1-prime-agent.py",
+     "scripts/archive/phase1/validate-phase1-spawn.py",
+     "scripts/archive/phase1/validate-phase1-sandbox.py"
     ],
     "tests": [
      "tests/test_runtime_validate.py"
@@ -745,11 +750,11 @@
      "bin/prime-claw"
     ],
     "validate": [
-     "scripts/validate-phase1-credentials.py",
-     "scripts/validate-phase1-brain.py",
-     "scripts/validate-phase1-prime-agent.py",
-     "scripts/validate-phase1-spawn.py",
-     "scripts/validate-phase1-sandbox.py"
+     "scripts/archive/phase1/validate-phase1-credentials.py",
+     "scripts/archive/phase1/validate-phase1-brain.py",
+     "scripts/archive/phase1/validate-phase1-prime-agent.py",
+     "scripts/archive/phase1/validate-phase1-spawn.py",
+     "scripts/archive/phase1/validate-phase1-sandbox.py"
     ],
     "tests": [
      "tests/test_runtime_recover.py"
@@ -770,11 +775,11 @@
      "bin/prime-claw"
     ],
     "validate": [
-     "scripts/validate-phase1-credentials.py",
-     "scripts/validate-phase1-brain.py",
-     "scripts/validate-phase1-prime-agent.py",
-     "scripts/validate-phase1-spawn.py",
-     "scripts/validate-phase1-sandbox.py"
+     "scripts/archive/phase1/validate-phase1-credentials.py",
+     "scripts/archive/phase1/validate-phase1-brain.py",
+     "scripts/archive/phase1/validate-phase1-prime-agent.py",
+     "scripts/archive/phase1/validate-phase1-spawn.py",
+     "scripts/archive/phase1/validate-phase1-sandbox.py"
     ],
     "tests": [
      "tests/test_runtime_recover.py"
@@ -795,17 +800,57 @@
      "bin/prime-claw"
     ],
     "validate": [
-     "scripts/validate-phase1-credentials.py",
-     "scripts/validate-phase1-brain.py",
-     "scripts/validate-phase1-prime-agent.py",
-     "scripts/validate-phase1-spawn.py",
-     "scripts/validate-phase1-sandbox.py"
+     "scripts/archive/phase1/validate-phase1-credentials.py",
+     "scripts/archive/phase1/validate-phase1-brain.py",
+     "scripts/archive/phase1/validate-phase1-prime-agent.py",
+     "scripts/archive/phase1/validate-phase1-spawn.py",
+     "scripts/archive/phase1/validate-phase1-sandbox.py"
     ],
     "tests": [
      "tests/test_runtime_recover.py"
     ]
    },
    "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
+  },
+  {
+   "id": "R2-X-4",
+   "priority": "GATE",
+   "phase": 2,
+   "slice": 6,
+   "summary": "Traceability: requirements-inventory traces every Phase 2 requirement to validator(s); pytest covers the lifecycle tooling.",
+   "status": "met (Slice 6; tests/test_inventory_integrity.py re-gates proven_by paths)",
+   "proven_by": {
+    "check": [
+     "bin/prime-claw"
+    ],
+    "validate": [
+     "bin/prime-claw"
+    ],
+    "tests": [
+     "tests/test_inventory_integrity.py"
+    ]
+   },
+   "verdict_doc": "config/requirements-inventory.json; tests/test_inventory_integrity.py"
+  },
+  {
+   "id": "R2-X-6",
+   "priority": "NICE",
+   "phase": 2,
+   "slice": 6,
+   "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
+   "status": "documented (Slice 6; no host forward by design)",
+   "proven_by": {
+    "check": [
+     "bin/prime-claw"
+    ],
+    "validate": [
+     "bin/prime-claw"
+    ],
+    "tests": [
+     "tests/test_inventory_integrity.py"
+    ]
+   },
+   "verdict_doc": "docs/runbook.md (Host Postgres exposure constraint)"
   }
  ],
  "phase2": {}

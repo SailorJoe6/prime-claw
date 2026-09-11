@@ -8,7 +8,7 @@
       "nemoclaw"
     ]
   },
-  "policy_file": "policies/phase1-sandbox.yaml",
+  "policy_file": "policies/runtime.yaml",
   "provider_name": "prime-claw-ai-gateway",
   "model": "anthropic.kimi-k3",
   "ai_gateway_host": "ai-gateway.zende.sk",

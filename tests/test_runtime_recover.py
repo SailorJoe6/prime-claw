@@ -17,7 +17,7 @@ def cfg(**over):
     c = {"sandbox_name": "prime-claw", "image": "prime-claw-brain:0.1.0",
          "gateway": "openshell", "provider_name": "prime-claw-ai-gateway",
          "model": "anthropic.kimi-k3", "ai_gateway_host": "ai-gateway.zende.sk",
-         "policy_file": "policies/phase1-sandbox.yaml"}
+         "policy_file": "policies/runtime.yaml"}
     c.update(over); return c
 
 

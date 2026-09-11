@@ -16,7 +16,7 @@ pc = SourceFileLoader("primeclaw", BIN).load_module()
 def cfg(**over):
     c = {"sandbox_name": "prime-claw", "image": "prime-claw-brain:0.1.0",
          "provider_name": "prime-claw-ai-gateway", "model": "anthropic.kimi-k3",
-         "ai_gateway_host": "ai-gateway.zende.sk", "policy_file": "policies/phase1-sandbox.yaml"}
+         "ai_gateway_host": "ai-gateway.zende.sk", "policy_file": "policies/runtime.yaml"}
     c.update(over); return c
 
 

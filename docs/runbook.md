@@ -7,7 +7,7 @@ codified in `bin/prime-claw recover` (Slice 5), not tribal.
 Verbs: `status` (read-only expected-vs-actual) · `build` (image) ·
 `create` (fresh bring-up, destructive) · `converge` (idempotent repair of an
 existing sandbox) · `validate` (green/red acceptance gate) · `recover` (this
-file) · `destroy` (Slice 6).
+file) · `destroy` (confirmed teardown).
 
 The single entry point is `bin/prime-claw`. `--dry-run` is global and precedes
 the verb.
@@ -31,7 +31,32 @@ flip).
 | 4 | **cold-daemon** | The prime-agent daemon isn't running (no `/tmp/prime-agent-*/daemon.sock`) -> spawn times out. | `bin/prime-claw converge` — `stage_prime_agent` auto-starts the daemon (`--mode daemon --offline`) with a socket-wait. |
 | 5 | **drift** | Sandbox/policy/provider drifted from expected; `status` shows a mismatch. | `bin/prime-claw converge`. |
 
+## Teardown
+
+`bin/prime-claw destroy` is the safe, confirm-gated teardown (Slice 6):
+
+- **Non-destructive by default**: without `--yes` it prints what it *would*
+  delete and exits 0 without mutating. `--dry-run destroy` is read-only.
+- **`bin/prime-claw destroy --yes`**: deletes the OpenShell sandbox container.
+- **`bin/prime-claw destroy --yes --image`**: also removes the recorded
+  container image (`config/runtime.json: image`) via `docker rmi` and clears the
+  build stamp so a later `create` rebuilds cleanly.
+- **Idempotent**: an already-absent sandbox/image is a no-op.
+- **Scope**: only the sandbox container (and, with `--image`, the local image).
+  It never touches the gateway, the providers, or `config/`.
+
+Rebuild from scratch afterwards with `bin/prime-claw create` (fresh bring-up).
+
 ### Notes / hazards
+- **Host Postgres exposure (R2-X-6, NICE — documented constraint)**: the
+  in-sandbox Postgres listens on `localhost:5433` **inside the sandbox only**
+  (`listen_addresses=localhost`, `unix_socket_directories=/sandbox`,
+  `PGDATA=/sandbox/pgdata`). It is **not** forwarded to the host. This is
+  intentional: the brain is reachable from the agent/processes inside the
+  sandbox (gbrain over the `/sandbox` socket or `localhost:5433`), and the
+  OpenShell network policy is deny-by-default egress, so there is no host-side
+  port to expose. Host access, when needed, is via `bin/prime-claw` / `openshell
+  sandbox exec`, not a forwarded port.
 - **cold-daemon nuance**: an unclean daemon kill leaves a stale
   `/tmp/prime-agent-*/daemon.sock` **and** a `daemon.sock.lock` directory;
   the supervisor refuses to start (`ELOCKED`) until both are removed. The

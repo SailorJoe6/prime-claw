@@ -40,7 +40,7 @@ lifecycle. Target layout (refined as slices land):
 - `scripts/runtime/` — the stage + verb implementations it orchestrates
   (consolidated from `scripts/apply-phase1-*.sh` / `check-phase1-*.sh`).
 - `scripts/lib/` — shared helpers (existing `npm-onload.js`, new shared shell/py).
-- `policies/runtime.yaml` — consolidated policy (from `phase1-sandbox.yaml`).
+- `policies/runtime.yaml` — consolidated policy (from `runtime.yaml`).
 - `docker/runtime.Dockerfile` — the runtime image (from `phase1-brain.Dockerfile`).
 - `config/runtime.json` — non-secret, parameterized config (gateway host/paths,
   model IDs, image tag, sandbox name) with env-var overrides (R2-X-2).
@@ -81,7 +81,7 @@ Make the runtime image build reproducible and idempotent.
   dry-run).
 - Inventory: R2-B-1, R2-X-5.
 
-### Slice 3 — Create + converge (the repeatable core) ✅ DONE (2026-09-11) — 3a create + runtime stages; 3b converge. Policy consolidation phase1-sandbox.yaml→runtime.yaml deferred to Slice 6 (Phase 1 tests still reference the old path; retire it there with the Phase 1 scripts).
+### Slice 3 — Create + converge (the repeatable core) ✅ DONE (2026-09-11) — 3a create + runtime stages; 3b converge. Policy consolidation runtime.yaml→runtime.yaml deferred to Slice 6 (Phase 1 tests still reference the old path; retire it there with the Phase 1 scripts).
 
 The heart of Phase 2: sandbox create-with-providers, prime-agent, brain, and
 baseline layout as idempotent stages orchestrated by `converge`.
@@ -93,7 +93,7 @@ baseline layout as idempotent stages orchestrated by `converge`.
   re-staging) → policy apply.
 - `bin/prime-claw converge` — re-run all stages against an existing sandbox;
   refreshes policy without needless recreate; lands in the same known-good state.
-- Consolidate `policies/phase1-sandbox.yaml` → `policies/runtime.yaml`.
+- Consolidate `policies/runtime.yaml` → `policies/runtime.yaml`.
 - Value: one command from fresh (or degraded) to fully-running, no manual steps.
 - Tests: `tests/test_runtime_converge.py` (stage idempotency, ordering, dry-run).
 - Inventory: R2-A-2, R2-B-2..5, R2-X-1, R2-X-2.
@@ -126,13 +126,11 @@ Codify the Phase 1-discovered recovery moves; prove degrade-and-recover.
 - Tests: `tests/test_runtime_recover.py`.
 - Inventory: R2-C-3, R2-C-4, R2-C-5.
 
-### Slice 6 — Destroy + consolidation + close-out
+### Slice 6 — Destroy + consolidation + close-out  ⏳ IN PROGRESS (6a destroy+consolidation landing; 6b archive/close-out pending)
 
 Safe teardown, remove the superseded Phase 1 scripts, finish the record.
-- `bin/prime-claw destroy [--yes]`: safe, confirmed teardown of the sandbox (and,
-  optionally, the image) — non-destructive by default, explicit confirm to mutate.
-- Remove the consolidated `*-phase1-*` scripts/tests/policies/docker now covered
-  by the lifecycle; keep one obvious path. Update `docs/derisk/` references.
+- [x] `bin/prime-claw destroy [--yes] [--image]`: safe, confirmed teardown — non-destructive by default (prints plan, exits 0), `--yes` mutates, idempotent (absent = no-op), `--image` also removes the recorded image + clears the build stamp. Tests: `tests/test_runtime_destroy.py`.
+- [x] Retired the superseded Phase 1 `apply/check/validate` scripts + `test_phase1_*` + `phase1-brain.Dockerfile` to `scripts/archive/phase1/` (with a README); consolidated `policies/phase1-sandbox.yaml` → **`policies/runtime.yaml`**; added `tests/test_inventory_integrity.py` to re-gate `proven_by` paths.
 - Final inventory trace (all R2-* to validators), LONG_RANGE_PLAN Phase 2
   checkboxes, close bead `prime-claw-qcd` with links.
 - Value: teardown is safe and the repo carries one obvious runtime path.

@@ -877,6 +877,57 @@ def detect_degradations(cfg, args):
     return sigs
 
 
+def cmd_destroy(cfg, args) -> int:
+    """Safe teardown of the sandbox (and optionally the image).
+
+    Non-destructive by default: without --yes (and not --dry-run) it prints what
+    it WOULD do and asks for confirmation, exiting 0 without mutating. Idempotent:
+    absent sandbox/image are no-ops. Never touches the gateway, providers, or
+    config — only the sandbox container and, with --image, the local image.
+    """
+    name = cfg["sandbox_name"]
+    image = cfg.get("image", "")
+    drop_image = getattr(args, "image", False)
+    # probe current state
+    code, phase, sj = probe_sandbox(cfg)
+    sandbox_present = sj is not None
+    image_present = _docker_image_exists(image) if (drop_image and image) else False
+    plan = []
+    plan.append(("sandbox", name, sandbox_present))
+    if drop_image:
+        plan.append(("image", image, image_present))
+    if args.dry_run:
+        for kind, target, present in plan:
+            state = "delete" if present else "absent (no-op)"
+            print(f"dry_run: {state} {kind} {target}")
+        return 0
+    if not getattr(args, "yes", False):
+        print("destroy: DRY — nothing deleted. Re-run with --yes to confirm teardown of:")
+        for kind, target, present in plan:
+            state = "" if present else " (already absent)"
+            print(f"  - {kind}: {target}{state}")
+        return 0
+    for kind, target, present in plan:
+        if not present:
+            print(f"destroy: {kind} {target} already absent; skipping")
+            continue
+        if kind == "sandbox":
+            c, out = run([OPENSHELL, "sandbox", "delete", target], timeout=180)
+        else:  # image
+            c, out = run(["docker", "rmi", target], timeout=120)
+        if c != 0:
+            print(f"error: destroy failed for {kind} {target}: {out.strip()[:200]}", file=sys.stderr)
+            return c
+        print(f"destroy: deleted {kind} {target}")
+    # clear the recorded image stamp so a later create rebuilds cleanly
+    if drop_image:
+        stamp = os.path.join(REPO_ROOT, "docker", "runtime", ".build-stamp.json")
+        if os.path.exists(stamp):
+            os.remove(stamp)
+            print("destroy: cleared build stamp docker/runtime/.build-stamp.json")
+    return 0
+
+
 def cmd_recover(cfg, args) -> int:
     """Detect known degradations and recover; then re-validate. Safe-by-default."""
     if getattr(args, "dry_run", False):
@@ -947,6 +998,7 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--signature", help="known failure signature to recover from")
         if v == "destroy":
             sp.add_argument("--yes", action="store_true", help="confirm destructive teardown")
+            sp.add_argument("--image", action="store_true", help="also remove the recorded container image")
     return ap
 
 
@@ -957,7 +1009,7 @@ VERBS = {
     "build": cmd_build,
     "validate": cmd_validate,
     "recover": cmd_recover,
-    "destroy": _not_implemented("destroy"),
+    "destroy": cmd_destroy,
 }
 
 
