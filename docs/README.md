@@ -36,3 +36,9 @@ prime-claw builds on four prior projects. Read these before designing:
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)
+
+## Runtime (Phase 2)
+
+- [sandbox-runtime.md](sandbox-runtime.md) — the sandbox lifecycle: verbs,
+  stages, repo layout, and operating guarantees.
+- [runbook.md](runbook.md) — operations: failure signature → recovery command.

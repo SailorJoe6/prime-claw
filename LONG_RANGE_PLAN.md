@@ -89,6 +89,12 @@ re-based on prime-agent.
 Done when: a prime-agent daemon runs healthily inside the secured sandbox —
 reachable, deny-by-default egress proven, reproducible from the runbook.
 
+**✅ COMPLETE (2026-09-11).** Built `bin/prime-claw` (verbs: status, build,
+create, converge, validate, recover, destroy) over native OpenShell primitives;
+live degrade-and-recover proven. Reference: `docs/sandbox-runtime.md`;
+operations: `docs/runbook.md`. Plan set archived to
+`.ralph/plans/archive/phase2-runtime/`. Unblocks Phase 3 (`prime-claw-zwg`).
+
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 
 The riskiest integration, done as early as possible and deliberately thin but

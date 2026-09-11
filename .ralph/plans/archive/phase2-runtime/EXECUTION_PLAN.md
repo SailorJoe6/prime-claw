@@ -1,5 +1,8 @@
 # EXECUTION PLAN — Phase 2: Sandbox Runtime Foundation
 
+> **PHASE 2 COMPLETE (2026-09-11).** All six slices landed; this plan set is archived to `.ralph/plans/archive/phase2-runtime/`. Runtime reference: `docs/sandbox-runtime.md`; operations: `docs/runbook.md`. Unblocks Phase 3 (`prime-claw-zwg`).
+
+
 > Index: [SPECIFICATION.md](SPECIFICATION.md) · [REQUIREMENTS.md](REQUIREMENTS.md) · [DECISIONS.md](DECISIONS.md)
 > Status: ACCEPTED (2026-09-11). Operator confirmed slice order (status-first)
 > and Slice 6 retirement of the consolidated `*-phase1-*` scripts.
@@ -126,13 +129,14 @@ Codify the Phase 1-discovered recovery moves; prove degrade-and-recover.
 - Tests: `tests/test_runtime_recover.py`.
 - Inventory: R2-C-3, R2-C-4, R2-C-5.
 
-### Slice 6 — Destroy + consolidation + close-out  ⏳ IN PROGRESS (6a destroy+consolidation landing; 6b archive/close-out pending)
+### Slice 6 — Destroy + consolidation + close-out  ✅ DONE (6a destroy+consolidation; 6b close-out)
 
 Safe teardown, remove the superseded Phase 1 scripts, finish the record.
 - [x] `bin/prime-claw destroy [--yes] [--image]`: safe, confirmed teardown — non-destructive by default (prints plan, exits 0), `--yes` mutates, idempotent (absent = no-op), `--image` also removes the recorded image + clears the build stamp. Tests: `tests/test_runtime_destroy.py`.
 - [x] Retired the superseded Phase 1 `apply/check/validate` scripts + `test_phase1_*` + `phase1-brain.Dockerfile` to `scripts/archive/phase1/` (with a README); consolidated `policies/phase1-sandbox.yaml` → **`policies/runtime.yaml`**; added `tests/test_inventory_integrity.py` to re-gate `proven_by` paths.
-- Final inventory trace (all R2-* to validators), LONG_RANGE_PLAN Phase 2
-  checkboxes, close bead `prime-claw-qcd` with links.
+- [x] Final inventory trace (all R2-* to validators; `tests/test_inventory_integrity.py`),
+  spec converted to `docs/sandbox-runtime.md`, LONG_RANGE_PLAN Phase 2 marked done,
+  plan set archived, bead `prime-claw-qcd` closed (unblocks `prime-claw-zwg`).
 - Value: teardown is safe and the repo carries one obvious runtime path.
 - Tests: `tests/test_runtime_destroy.py`.
 - Inventory: R2-A-1 (destroy), R2-X-4, R2-X-6 (host-PG-exposure decision documented).
