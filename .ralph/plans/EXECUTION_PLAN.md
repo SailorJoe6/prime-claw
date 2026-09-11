@@ -223,3 +223,27 @@ untouched). **Joe is fixing this in the zbrain repo directly.** Once fixed,
 `$ZBRAIN_SRC/templates` (it already prefers a real `templates/` when present).
 
 Slice status: Slices 1–4 done — U1 GO (f7k), U2 GO (6r8). Slices 1–5 done — U1 GO (f7k), U2 GO (6r8), U3 GO (tcf). Next: Slice 6 gate close-out.
+
+---
+
+## 📌 Handoff note (2026-09-11) — Slice 5 (U3) DONE → Slice 6 next
+
+Slice 5 (U3 episode spawn/reap) completed 2026-09-11, commit `a18756c`, pushed.
+Validator `scripts/validate-phase1-spawn.py` exit 0, two consecutive GO runs.
+Bead `prime-claw-tcf` CLOSED. **All three Phase 1 unknowns are GO** (U1 f7k, U2
+6r8, U3 tcf). 52/52 suite green. `prime-claw-qcd` (Phase 2) is now unblocked.
+
+**Next: Slice 6 (gate close-out)** — no new spike; it finalizes the record:
+`config/requirements-inventory.json` complete, all three verdict docs final,
+LONG_RANGE_PLAN.md Phase 1 checkboxes updated, beads closed with verdict links,
+final commit + push. Then Phase 1 is formally done.
+
+Key gotchas for re-runs / Phase 2+ (full detail in `docs/derisk/U3.md`):
+`prime-agent daemon create/kill` are NOT public CLI commands — clean spawn/reap
+uses the daemon client RPC (`DaemonClient` over `/tmp/prime-agent-*/daemon.sock`);
+`prime-agent create <name>` is interactive (positional = first message); session
+names are unique per parent (validator uses a timestamp suffix + finally-reap);
+cold-daemon create can transiently fail (validator retries with a socket-wait);
+model auth reuses the Slice-3 bridge (`ANTHROPIC_API_KEY=$api_key` placeholder +
+`models.json` baseUrl → AI Gateway, re-staged after the recreate), default model
+`anthropic.kimi-k3` (host default `claude-opus-4-7` is disabled on the gateway).
