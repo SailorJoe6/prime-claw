@@ -180,24 +180,19 @@ auditable.
 
 ---
 
-## ⛔ BLOCKED (2026-09-11) — Slice 3 / R-U1-6 GATE track
+## ✅ BLOCKER RESOLVED (2026-09-11) — Slice 3 / R-U1-6 GATE track PASSES
 
-**Blocker.** The Zendesk AI Gateway (`ai-gateway.zende.sk`) is behind an
-istio-envoy mesh that returns `403 RBAC: access denied` to ANY request
-arriving through the OpenShell L7 MITM proxy — including a bare credentialess
-`GET /`. Host-direct calls succeed (200) with the identical key, URL, and
-headers across HTTP/1.1 + HTTP/2, `x-api-key` or `Authorization: Bearer`, and
-explicit `:443` authority; no mTLS is required. The only remaining
-differentiator is the OpenShell proxy's egress identity. OpenShell's
-credential-injection model REQUIRES L7 MITM to rewrite the placeholder, and it
-has no TLS-passthrough enforcement mode (only `enforce`/`audit`) — a direct
-conflict with this gateway's mesh RBAC. Evidence:
-`docs/derisk/evidence/phase1-credentials-blocker-20260911T171531Z.json`.
+The "istio RBAC rejects OpenShell proxy" blocker above was a **misdiagnosis**:
+the 403s were caused by a GlobalProtect VPN disconnect/reconnect on the
+operator's Mac (confirmed by the operator), not by the gateway's mesh policy.
+kubectl inspection of `authorizationpolicy/ai-gateway-nacl` shows an ALLOW for
+the path, and a plain Docker container from the same Mac also succeeds — so
+source-IP/proxy-identity is not the gate.
 
-**Unblock condition (operator decision required, R-X-4):** either
-(A) Zendesk platform authorizes the OpenShell proxy's egress to the gateway's
-istio RBAC, or (B) the operator accepts an alternative credential path that
-does not violate R-X-5 (no real credential material on sandbox disk). Until
-then the AI Gateway GATE track cannot be proven. The openai-codex track (real
-api.openai.com) is unaffected and could be proven independently if the
-operator wants a partial R-U1-6.
+After VPN recovery, R-U1-6 passed all four sub-conditions:
+(a) sandbox env holds opaque placeholders only; (b) the sandboxed prime-agent
+made a real `anthropic.kimi-k3` model call through the proxy (via the
+`ANTHROPIC_API_KEY=$api_key` env bridge + `models.json` baseUrl; no auth.json
+in-sandbox); (c) no credential material on sandbox disk; (d) fail-closed on an
+unresolvable placeholder (HTTP 500). Evidence:
+`docs/derisk/evidence/phase1-credentials-PASS-*.json`. See `docs/derisk/U1.md`.
