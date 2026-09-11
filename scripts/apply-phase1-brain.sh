@@ -78,6 +78,11 @@ printf '[3/5] recreating sandbox %s from %s ...\n' "$SANDBOX_NAME" "$IMAGE_TAG"
 # that wedges the phase at Error; delete+recreate is the supported path.)
 "$OPENSHELL_BIN" sandbox delete "$SANDBOX_NAME" >/dev/null 2>&1 || true
 create_args=(sandbox create --name "$SANDBOX_NAME" --from "$IMAGE_TAG" --no-tty --detach)
+# Attach the AI Gateway credential provider at create time so its injected
+# placeholder env (api_key) is present in the sandbox main process (provider
+# env is injected at create, not per-exec; a post-hoc attach needs a restart).
+GATEWAY_PROVIDER="${PRIME_CLAW_AI_GATEWAY_PROVIDER:-prime-claw-ai-gateway}"
+"$OPENSHELL_BIN" provider get "$GATEWAY_PROVIDER" >/dev/null 2>&1 && create_args+=(--provider "$GATEWAY_PROVIDER") || true
 [[ -f "$POLICY_FILE" ]] && create_args+=(--policy "$POLICY_FILE")
 if [[ -d "$HOST_BRAIN_DIR" ]]; then
   create_args+=(--upload "$HOST_BRAIN_DIR:$SB_BRAIN_DIR")
@@ -116,5 +121,24 @@ createdb -h localhost -p $PGPORT -U $PGU $PGD 2>/dev/null || true
 psql -h localhost -p $PGPORT -U $PGU -d $PGD -tc 'CREATE EXTENSION IF NOT EXISTS vector;' \
   | head -1"
 
+printf '[6/6] wiring gbrain embeddings to the AI Gateway (L7 placeholder) ...\n'
+sx "export HOME=/sandbox
+cd $SB_BRAIN_DIR
+# Point gbrain's OpenAI-compatible embedding base URL at the AI Gateway /v1 and
+# bridge the OpenShell-injected placeholder (api_key) to OPENAI_API_KEY. The real
+# key is substituted at L7 by the gateway provider; it never touches sandbox disk.
+python3 - <<'PY'
+import json,os
+p='.gbrain/config.json'
+c=json.load(open(p)) if os.path.exists(p) else {}
+c.setdefault('engine','postgres')
+c.setdefault('database_url','postgresql://gbrain:gbrain@localhost:5433/gbrain')
+c.setdefault('embedding_model','openai:text-embedding-3-large')
+c.setdefault('embedding_dimensions',1536)
+c['provider_base_urls']={'openai':'https://ai-gateway.zende.sk/v1'}
+json.dump(c,open(p,'w'),indent=2)
+print('gbrain config: provider_base_urls.openai -> AI Gateway /v1')
+PY
+"
 printf 'apply-phase1-brain: done (sandbox=%s image=%s PGDATA=%s brain=%s)\n' \
   "$SANDBOX_NAME" "$IMAGE_TAG" "$PGDATA" "$SB_BRAIN_DIR"

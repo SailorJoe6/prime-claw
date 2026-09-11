@@ -1,7 +1,7 @@
 {
   "spike": "phase1-brain",
   "captured_at": "2026-09-11T18:13:31.713970+00:00",
-  "requirement": "U2 (R-U2-1..5)",
+  "requirement": "U2 (R-U2-1..6)",
   "verdict": "GO",
   "approach": "D15: brain stack baked into a custom sandbox IMAGE at docker-build time (as root), not installed into the running container. openshell sandbox create --from <image>.",
   "image": {
@@ -22,7 +22,8 @@
     "R-U2-2 brain repo folder in-sandbox": "PASS -- /sandbox/brain (12 entries) via openshell --upload of /Users/jlanders/gitlab_local/brain (.git filtered by gitignore; read/serve only)",
     "R-U2-3 Postgres 16 + pgvector in-sandbox, agent-owned": "PASS -- PostgreSQL 16.15, pgvector 0.6.0, owner=sandbox",
     "R-U2-4 gbrain serves from in-sandbox PG": "PASS -- put/get/search round-trip; doctor 'Connected'; keyword search works (semantic degrades without embedding key, expected)",
-    "R-U2-5 host localhost:5433 exposure": "NICE/non-blocking -- mechanism = openshell sandbox create --forward; host:5433 currently held by reference brain-daemon"
+    "R-U2-5 host localhost:5433 exposure": "NICE/non-blocking -- mechanism = openshell sandbox create --forward; host:5433 currently held by reference brain-daemon",
+    "R-U2-6 gbrain embeds via AI Gateway (L7)": "PASS -- gbrain put writes a 1536-dim embedding to content_chunks via the AI Gateway; semantic `query` returns ranked results. OPENAI_API_KEY holds only the openshell:resolve:env placeholder; the prime-claw-ai-gateway provider substitutes the real shared gateway key at L7. Config: provider_base_urls.openai=https://ai-gateway.zende.sk/v1 (+OPENAI_BASE_URL), embedding_model openai:text-embedding-3-large."
   },
   "pgvector_version_note": "in-sandbox pgvector 0.6.0 vs reference brain-daemon 0.8.2. gbrain warns HALFVEC unavailable (<0.7) but 'functionality otherwise identical' (VECTOR(1536) fallback). Adequate for the spike; pin 0.8.x via PGDG if HALFVEC needed later.",
   "artifacts": {
@@ -30,5 +31,6 @@
     "check": "scripts/check-phase1-brain.sh",
     "validate": "scripts/validate-phase1-brain.py",
     "tests": "tests/test_phase1_brain.py"
-  }
+  },
+  "embedding_root_cause": "Sandboxed gbrain embed returned 'Forbidden' while identical curl/node fetches returned 200. Cause = OpenShell egress policy, not the gateway: gbrain is a compiled Bun binary; Bun fetch runs under the bun binary identity, which was not in model_ai_gateway.binaries. Fix: bind /usr/local/bin/bun (+/usr/local/bin/gbrain) to the endpoint. Also: provider env is injected at sandbox create, not per-exec -- post-hoc attach needs a restart (apply script attaches at create)."
 }

@@ -30,6 +30,7 @@
 | R-U2-3 | GATE | Postgres 16 with the **pgvector** extension runs inside the sandbox (matching the `brain-daemon-ralph-pva` extension set). |
 | R-U2-4 | GATE | gbrain serves the brain from the in-sandbox Postgres + brain repo: search and query return expected content. |
 | R-U2-5 | NICE | Postgres is reachable from the host at `localhost:5433` (or an OpenShell service-forwarding equivalent is documented). Non-blocking. |
+| R-U2-6 | GATE | gbrain embeds content via the AI Gateway through OpenShell L7 placeholder substitution (the embedding key never touches sandbox disk); semantic/vector search runs in-sandbox. |
 
 Long-run context (not a Phase 1 deliverable): this sandbox replaces
 `brain-daemon-ralph-pva`. Out of scope: testing gbrain's source-isolation

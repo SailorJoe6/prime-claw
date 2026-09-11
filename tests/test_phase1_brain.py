@@ -75,3 +75,19 @@ def test_validator_covers_all_ru2():
     for req in ["R-U2-1", "R-U2-2", "R-U2-3", "R-U2-4", "R-U2-5"]:
         assert req in s, "missing %s" % req
     assert "pgvector" in s and "postgres" in s.lower()
+
+
+def test_policy_binds_bun_and_gbrain_to_gateway():
+    """R-U2-6: gbrain runs as a Bun binary; the L7 policy keys the credentialed
+    gateway endpoint per calling binary, so bun + gbrain must be bound."""
+    s = read(os.path.join(REPO, "policies", "phase1-sandbox.yaml"))
+    i = s.find("model_ai_gateway")
+    block = s[i:i+700]
+    assert "/usr/local/bin/bun" in block, "bun binary not bound to gateway endpoint"
+    assert "/usr/local/bin/gbrain" in block, "gbrain binary not bound to gateway endpoint"
+
+
+def test_validator_has_embedding_gate():
+    """R-U2-6 embedding gate is part of the validator."""
+    s = read(VALIDATE)
+    assert "R-U2-6" in s and "OPENAI_BASE_URL" in s and "vector_dims" in s

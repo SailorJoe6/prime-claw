@@ -71,6 +71,10 @@ network_policies:
     binaries:
       - path: /usr/bin/curl
       - path: /usr/bin/node
+      # gbrain is a compiled Bun binary; its fetch runs under the bun runtime,
+      # so the L7 policy keys the gateway endpoint to the bun binary too.
+      - path: /usr/local/bin/bun
+      - path: /usr/local/bin/gbrain
 
   # Slice 2 kernel bootstrap: prime-agent's persistent Python REPL needs uv +
   # a managed Python 3.11. uv installer: astral.sh (script) then GitHub
