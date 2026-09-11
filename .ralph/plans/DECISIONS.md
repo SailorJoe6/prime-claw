@@ -110,3 +110,36 @@ determine and document the consumption path (env-var auth vs. placeholder
 values in config); the finding is itself part of the evidence. Real values
 still never touch sandbox disk.
 **Implements:** R-U1-6, R-X-5.
+
+## D12 — Host inference is gateway-fronted; "same credentials" = one gateway key, not provider-native endpoints (2026-09-11)
+
+**Decision.** Corrects the working assumption behind early Slice 3 probing.
+Studying all three host configs together (`auth.json` + `models.json` +
+`settings.json`) shows the host prime-agent instance does NOT call
+provider-native endpoints. `models.json` overrides every provider's `baseUrl`
+to a single internal gateway:
+
+| provider | host baseUrl |
+|---|---|
+| openai | `https://ai-gateway.zende.sk/v1` |
+| amazon-bedrock | `https://ai-gateway.zende.sk/bedrock` |
+| anthropic (default) | `https://ai-gateway.zende.sk/anthropic` |
+
+anthropic / openai / amazon-bedrock share **one** gateway API key (identical
+value in `auth.json`). `openai-codex` is a **separate** OAuth credential
+against the real `api.openai.com` — the exception, not the rule. Default model
+`anthropic.kimi-k3` routes to the gateway's `/anthropic` path.
+
+**Consequence for R-U1-6.** "Same credentials" means: one OpenShell provider
+carrying the gateway key + an endpoint profile for `ai-gateway.zende.sk`
+(`/anthropic`, `/v1`, `/bedrock`), plus carrying the `models.json` baseUrl
+overrides into the sandbox so prime-agent targets the gateway. The earlier
+Slice 3 work that probed `api.anthropic.com` / `api.openai.com` and used the
+`claude-code` / `codex` provider profiles (whose endpoint bindings are pinned
+to the native hosts) tested the wrong endpoints — that is why the "anthropic
+resolution anomaly" was unexplainable. The codex leg resolving was the
+genuinely-host-bound exception, not the rule.
+
+**Implements:** R-U1-6 (corrected), supersedes the implicit native-endpoint
+assumption in D11. Config copying of `models.json`/`settings.json` remains
+operator-authorized per D11.

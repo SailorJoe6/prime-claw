@@ -68,21 +68,30 @@ inside the sandbox; a session starts with a working persistent Python REPL.
 ## Slice 3 — Credentialed prime-agent through the proxy  → U1 VERDICT
 
 **Capability delivered:** the sandboxed prime-agent runs on the operator's own
-host-instance credentials (D11: anthropic default, openai, openai-codex,
-amazon-bedrock), delivered exclusively through OpenShell providers; real model
-calls succeed; no credential material touches sandbox disk.
+host-instance credentials (D11, corrected by D12), delivered exclusively
+through OpenShell providers; real model calls succeed; no credential material
+touches sandbox disk.
 
-- Determine and document the consumption path: prime-agent natively reads
-  `~/.prime/agent/auth.json` from disk; OpenShell injects placeholders via
-  environment. Find the working path (env-var auth, or placeholder values in
-  config resolved by the proxy at request time) and document the finding.
-- `scripts/apply-phase1-providers.sh` — create OpenShell providers from the
-  authorized config copies; attach to the sandbox with the minimum endpoint
-  policy.
+**Corrected target (D12):** the host instance is gateway-fronted — all
+providers route to `https://ai-gateway.zende.sk` (`/anthropic`, `/v1`,
+`/bedrock`), sharing ONE gateway API key; the default model `anthropic.kimi-k3`
+hits the gateway's `/anthropic` path. openai-codex (OAuth → real
+api.openai.com) is the separate exception. Slice 3 targets the **gateway
+endpoint**, not provider-native hosts.
+
+- Carry the `models.json` baseUrl overrides into the sandbox (config copying
+  is operator-authorized) so prime-agent targets `ai-gateway.zende.sk`.
+- Determine and document the consumption path: how prime-agent combines the
+  `models.json` baseUrl with the credential, and how the OpenShell-injected
+  placeholder (generic env name, e.g. `api_key`) maps to what prime-agent
+  reads (env-var bridge vs config-resolved placeholder).
+- `scripts/apply-phase1-providers.sh` — create ONE OpenShell provider carrying
+  the gateway key, with an endpoint profile for `ai-gateway.zende.sk`; attach
+  to the sandbox with the minimum endpoint policy (the gateway host only).
 - `scripts/validate-phase1-credentials.py` — (a) agent env holds placeholders
-  only; (b) a real model call from the sandboxed prime-agent succeeds;
-  (c) sandbox-disk scan finds no credential material; (d) fail-closed on an
-  unresolvable placeholder.
+  only; (b) a real model call from the sandboxed prime-agent succeeds (default
+  `anthropic.kimi-k3` via the gateway); (c) sandbox-disk scan finds no
+  credential material; (d) fail-closed on an unresolvable placeholder.
 - **`docs/derisk/U1.md`** — the hard-gate verdict: GO / GO-with-constraints /
   NO-GO. A NO-GO triggers the stop rule.
 
