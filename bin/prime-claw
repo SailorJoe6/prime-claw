@@ -17,7 +17,7 @@ Credential isolation: real credential values never touch this process's args,
 the repo, logs, or sandbox disk; only OpenShell providers hold them (R2-X-1).
 """
 from __future__ import annotations
-import argparse, hashlib, json, os, shutil, subprocess, sys
+import argparse, base64, hashlib, json, os, shutil, subprocess, sys
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_CONFIG = os.path.join(REPO_ROOT, "config", "runtime.json")
@@ -298,6 +298,255 @@ def cmd_build(cfg, args) -> int:
     return 0
 
 
+
+# --------------------------------------------------------------------------
+# Slice 3 — runtime stages (create / converge). Migrated from the Phase 1
+# apply-phase1-*.sh scripts into idempotent stages orchestrated here.
+# Native OpenShell primitives only (D2-1). Credential isolation holds: provider
+# env injects at CREATE; real keys are read from host config in-process and
+# never written to the repo, logs, or sandbox disk (R2-X-1).
+# --------------------------------------------------------------------------
+
+def _cfg_get(cfg, key, envvar, default):
+    return os.environ.get(envvar) or cfg.get(key) or default
+
+
+def stage_policy(cfg, args) -> int:
+    name = cfg["sandbox_name"]; pf = cfg["policy_file"]
+    if not os.path.isabs(pf):
+        pf = os.path.join(REPO_ROOT, pf)
+    if args.dry_run:
+        print(f"dry_run: openshell policy set {name} --policy {pf} --wait"); return 0
+    if not os.path.exists(pf):
+        print(f"error: policy file not found: {pf}", file=sys.stderr); return 1
+    code, out = run([OPENSHELL, "policy", "set", name, "--policy", pf, "--wait"], timeout=120)
+    if code != 0:
+        print(f"error: policy set failed: {out.strip()[:200]}", file=sys.stderr); return code
+    print(f"policy: converged to {pf}")
+    return 0
+
+
+def _host_gateway_key(cfg):
+    auth_json = os.path.expanduser(_cfg_get(cfg, "host_auth_json", "PRIME_CLAW_HOST_AUTH_JSON",
+                                            "~/.prime/agent/auth.json"))
+    provider = _cfg_get(cfg, "host_auth_provider", "PRIME_CLAW_HOST_AUTH_PROVIDER", "anthropic")
+    if not os.path.exists(auth_json):
+        raise FileNotFoundError(f"host auth config not found: {auth_json}")
+    d = json.load(open(auth_json))
+    key = d.get(provider, {}).get("key")
+    if not key:
+        raise KeyError(f"no key for provider {provider!r} in {auth_json}")
+    return key
+
+
+ZD_PROFILE_YAML = """id: {profile_id}
+display_name: AI Gateway (prime-claw)
+description: Internal AI gateway fronting inference (shared API key, x-api-key header)
+category: inference
+credentials:
+- name: api_key
+  description: Shared AI Gateway API key
+  env_vars:
+  - AI_GATEWAY_API_KEY
+  required: true
+  auth_style: header
+  header_name: x-api-key
+  query_param: ''
+endpoints:
+- host: {host}
+  port: {port}
+  protocol: rest
+  access: read-write
+  enforcement: enforce
+binaries: []
+inference_capable: true
+discovery:
+  credentials:
+  - api_key
+"""
+
+
+def stage_provider(cfg, args) -> int:
+    name = cfg["provider_name"]
+    host = _cfg_get(cfg, "ai_gateway_host", "PRIME_CLAW_AI_GATEWAY_HOST", "ai-gateway.zende.sk")
+    port = _cfg_get(cfg, "ai_gateway_port", "PRIME_CLAW_AI_GATEWAY_PORT", 443)
+    profile = _cfg_get(cfg, "ai_gateway_profile", "PRIME_CLAW_AI_GATEWAY_PROFILE", "zd-ai-gateway")
+    if args.dry_run:
+        print(f"dry_run: ensure provider {name} (profile {profile}, endpoint {host}:{port}); "
+              f"credential read from host auth.json, never committed"); return 0
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tf:
+        tf.write(ZD_PROFILE_YAML.format(profile_id=profile, host=host, port=port)); pf = tf.name
+    try:
+        code, out = run([OPENSHELL, "provider", "profile", "import", "--file", pf], timeout=60)
+        if code != 0:
+            print(f"error: profile import failed: {out.strip()[:200]}", file=sys.stderr); return code
+    finally:
+        os.unlink(pf)
+    key = _host_gateway_key(cfg)
+    try:
+        code, _ = run([OPENSHELL, "provider", "get", name], timeout=30)
+        if code == 0:
+            run([OPENSHELL, "provider", "update", name, "--credential", "api_key=" + key], timeout=60)
+            print(f"provider: refreshed credential on {name}")
+        else:
+            code, out = run([OPENSHELL, "provider", "create", "--name", name,
+                             "--type", profile, "--credential", "api_key=" + key], timeout=60)
+            if code != 0:
+                print(f"error: provider create failed: {out.strip()[:200]}", file=sys.stderr); return code
+            print(f"provider: created {name}")
+    finally:
+        del key
+    return 0
+
+
+def stage_sandbox(cfg, args, force_fresh: bool = False) -> int:
+    name = cfg["sandbox_name"]; image = cfg["image"]; pf = cfg["policy_file"]
+    if not os.path.isabs(pf): pf = os.path.join(REPO_ROOT, pf)
+    host_brain = os.path.expanduser(_cfg_get(cfg, "host_brain_dir", "PRIME_CLAW_HOST_BRAIN_DIR",
+                                             "~/gitlab_local/brain"))
+    sb_brain = _cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain")
+    if args.dry_run:
+        verb = "delete+recreate" if force_fresh else "create-if-absent"
+        print(f"dry_run: {verb} sandbox {name} --from {image} --provider {cfg['provider_name']} "
+              f"--policy {pf} --upload {host_brain}:{sb_brain}"); return 0
+    exists = probe_sandbox(cfg)[2] is not None
+    if exists and not force_fresh:
+        print(f"sandbox: {name} exists; converging policy (no recreate)")
+        return stage_policy(cfg, args)
+    if exists and force_fresh:
+        run([OPENSHELL, "sandbox", "delete", name], timeout=120)  # supported path; not docker restart
+    cmd = [OPENSHELL, "sandbox", "create", "--name", name, "--from", image, "--no-tty", "--detach"]
+    code, _ = run([OPENSHELL, "provider", "get", cfg["provider_name"]], timeout=30)
+    if code == 0: cmd += ["--provider", cfg["provider_name"]]
+    if os.path.exists(pf): cmd += ["--policy", pf]
+    if os.path.isdir(host_brain): cmd += ["--upload", host_brain + ":" + sb_brain]
+    else: print(f"note: host brain dir {host_brain} not found; skipping upload")
+    code, out = run(cmd, timeout=300)
+    if code != 0:
+        print(f"error: sandbox create failed: {out.strip()[:200]}", file=sys.stderr); return code
+    print(f"sandbox: created {name} from {image}")
+    return stage_policy(cfg, args)
+
+
+def stage_prime_agent(cfg, args) -> int:
+    name = cfg["sandbox_name"]
+    version = _cfg_get(cfg, "prime_agent_version", "PRIME_AGENT_VERSION", "0.9.3")
+    onload = os.path.join(REPO_ROOT, "scripts", "lib", "npm-onload.js")
+    if args.dry_run:
+        print(f"dry_run: install prime-agent@{version} (npm prefix /sandbox/.npm-global), "
+              f"npm-onload %2F workaround, bootstrap Python kernel"); return 0
+    if not os.path.exists(onload):
+        print(f"error: npm-onload.js not found: {onload}", file=sys.stderr); return 1
+    b64 = base64.b64encode(open(onload, "rb").read()).decode()
+    code, out = sandbox_exec(cfg, "mkdir -p /sandbox/.prime-claw && echo " + b64 + " | base64 -d > /sandbox/.prime-claw/npm-onload.js", timeout=60)
+    if code != 0: print("error: onload stage: " + out.strip()[:160], file=sys.stderr); return code
+    install = (
+        "export PATH=/sandbox/.npm-global/bin:$PATH\n"
+        "installed_v=\"$(prime-agent --version 2>&1 | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+' | head -1)\"\n"
+        "if command -v prime-agent >/dev/null 2>&1 && [ \"$installed_v\" = \"" + version + "\" ]; then\n"
+        "  echo 'prime-agent " + version + " already installed; skipping'\n"
+        "else\n"
+        "  export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n"
+        "  export NPM_CONFIG_PREFIX=/sandbox/.npm-global PRIME_AGENT_VERSION=\"" + version + "\"\n"
+        "  export PRIME_AGENT_INSTALLER_PLAIN=1 PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL=0\n"
+        "  curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh\n"
+        "fi\n"
+        "prime-agent --version 2>&1 | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+' | head -1\n")
+    code, out = sandbox_exec(cfg, install, timeout=1800)
+    if code != 0: print("error: prime-agent install: " + out.strip()[-300:], file=sys.stderr); return code
+    print("prime-agent: " + (out.strip().splitlines()[-1] if out.strip() else version))
+    js = "import { ensureKernelPython } from '/sandbox/.npm-global/lib/node_modules/prime-agent/dist/core/kernel/bootstrap.js'; console.log('kernel_python=' + (await ensureKernelPython()));"
+    kernel = ("export PATH=/sandbox/.npm-global/bin:$PATH\n"
+              "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n"
+              "export PRIME_AGENT_INSTALL_UV=1\n"
+              "node --input-type=module -e '" + js + "'\n")
+    code, out = sandbox_exec(cfg, kernel, timeout=1200)
+    if code != 0: print("error: kernel bootstrap: " + out.strip()[-300:], file=sys.stderr); return code
+    print("prime-agent: kernel bootstrapped")
+    return 0
+
+
+def stage_brain(cfg, args) -> int:
+    name = cfg["sandbox_name"]
+    pgdata = _cfg_get(cfg, "pgdata", "PRIME_CLAW_PGDATA", "/sandbox/pgdata")
+    pgport = _cfg_get(cfg, "pgport", "PRIME_CLAW_PGPORT", "5433")
+    pgu = _cfg_get(cfg, "postgres_user", "POSTGRES_USER", "gbrain")
+    pgd = _cfg_get(cfg, "postgres_db", "POSTGRES_DB", "gbrain")
+    sb_brain = _cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain")
+    if args.dry_run:
+        print(f"dry_run: initdb+start Postgres 16 (PGDATA={pgdata} port={pgport}), createdb {pgd}, CREATE EXTENSION vector, wire gbrain embeddings"); return 0
+    brain = (
+        "export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH\n"
+        "mkdir -p " + pgdata + " && chmod 700 " + pgdata + "\n"
+        "if [ ! -s " + pgdata + "/PG_VERSION ]; then initdb -D " + pgdata + " -U " + pgu + " --auth=trust >/dev/null; fi\n"
+        "pg_ctl -D " + pgdata + " -l /sandbox/pg.log -w start "
+        "-o '-c listen_addresses=localhost -p " + pgport + " -c unix_socket_directories=/sandbox' "
+        "|| pg_ctl -D " + pgdata + " status\n"
+        "psql -h localhost -p " + pgport + " -U " + pgu + " -d postgres -tc 'select version();' | head -1\n"
+        "createdb -h localhost -p " + pgport + " -U " + pgu + " " + pgd + " 2>/dev/null || true\n"
+        "psql -h localhost -p " + pgport + " -U " + pgu + " -d " + pgd + " -tc 'CREATE EXTENSION IF NOT EXISTS vector;' | head -1\n")
+    code, out = sandbox_exec(cfg, brain, timeout=300)
+    if code != 0: print("error: brain stage (postgres): " + out.strip()[-300:], file=sys.stderr); return code
+    print("brain: postgres up")
+    wire_py = (
+        "import json,os\n"
+        "p='" + sb_brain + "/.gbrain/config.json'\n"
+        "os.makedirs(os.path.dirname(p),exist_ok=True)\n"
+        "c=json.load(open(p)) if os.path.exists(p) else {}\n"
+        "c.setdefault('engine','postgres')\n"
+        "c.setdefault('database_url','postgresql://" + pgu + ":" + pgu + "@localhost:" + pgport + "/" + pgd + "')\n"
+        "c.setdefault('embedding_model','openai:text-embedding-3-large')\n"
+        "c.setdefault('embedding_dimensions',1536)\n"
+        "c['provider_base_urls']={'openai':'https://ai-gateway.zende.sk/v1'}\n"
+        "json.dump(c,open(p,'w'),indent=2)\n"
+        "print('wired')\n")
+    wb64 = base64.b64encode(wire_py.encode()).decode()
+    code, out = sandbox_exec(cfg, "export HOME=/sandbox; echo " + wb64 + " | base64 -d | python3", timeout=60)
+    if code != 0: print("error: brain stage (gbrain wiring): " + out.strip()[-300:], file=sys.stderr); return code
+    print("brain: gbrain embeddings wired to AI Gateway (placeholder)")
+    return 0
+
+
+def stage_spawn(cfg, args) -> int:
+    name = cfg["sandbox_name"]
+    d = _cfg_get(cfg, "spawn_project_dir", "PRIME_CLAW_SPAWN_PROJECT_DIR", "/sandbox/episode-target")
+    if args.dry_run:
+        print(f"dry_run: git-init spawn project at {d} inside {name}"); return 0
+    script = (
+        "DIR=\"" + d + "\"\n"
+        "if [ -d \"$DIR/.git\" ]; then echo \"spawn project already present at $DIR\"; exit 0; fi\n"
+        "mkdir -p \"$DIR\" && cd \"$DIR\"\n"
+        "git init -q\n"
+        "git config user.email \"prime-claw-spike@local\"; git config user.name \"prime-claw spike\"\n"
+        "printf \"# Episode Target\\n\\nSpawn/reap spike project (R-U3-1).\\n\" > README.md\n"
+        "printf \"print(\\\"episode-target alive\\\")\\n\" > main.py\n"
+        "git add -A && git commit -qm \"episode target init\"\n"
+        "echo \"created: $(git -C \"$DIR\" rev-parse --short HEAD)\"\n")
+    code, out = sandbox_exec(cfg, script, timeout=120)
+    if code != 0: print("error: spawn target: " + out.strip()[-300:], file=sys.stderr); return code
+    print("spawn: " + (out.strip().splitlines()[-1] if out.strip() else d))
+    return 0
+
+
+def cmd_create(cfg, args) -> int:
+    if args.dry_run:
+        print("dry_run: create = build -> provider -> sandbox(fresh) -> prime-agent -> brain -> spawn -> policy")
+    for label, fn in [("build", cmd_build),
+                      ("provider", stage_provider),
+                      ("sandbox", lambda c, a: stage_sandbox(c, a, force_fresh=True)),
+                      ("prime-agent", stage_prime_agent),
+                      ("brain", stage_brain),
+                      ("spawn", stage_spawn),
+                      ("policy", stage_policy)]:
+        rc = fn(cfg, args)
+        if rc != 0:
+            print(f"error: create failed at stage '{label}' (exit {rc})", file=sys.stderr)
+            return rc
+    if not args.dry_run:
+        print(f"create: done (sandbox={cfg['sandbox_name']} image={cfg['image']})")
+    return 0
+
 def _not_implemented(verb):
     def _run(cfg, args):
         print(f"prime-claw {verb}: not yet implemented (see EXECUTION_PLAN.md).", file=sys.stderr)
@@ -327,7 +576,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 VERBS = {
     "status": cmd_status,
-    "create": _not_implemented("create"),
+    "create": cmd_create,
     "converge": _not_implemented("converge"),
     "build": cmd_build,
     "validate": _not_implemented("validate"),

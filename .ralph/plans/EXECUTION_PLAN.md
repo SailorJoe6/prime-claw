@@ -81,7 +81,7 @@ Make the runtime image build reproducible and idempotent.
   dry-run).
 - Inventory: R2-B-1, R2-X-5.
 
-### Slice 3 — Create + converge (the repeatable core)
+### Slice 3 — Create + converge (the repeatable core) — 3a (create + runtime stages) DONE 2026-09-11; 3b (converge + policy consolidation) PENDING
 
 The heart of Phase 2: sandbox create-with-providers, prime-agent, brain, and
 baseline layout as idempotent stages orchestrated by `converge`.

@@ -579,6 +579,125 @@
     ]
    },
    "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 2)"
+  },
+  {
+   "id": "R2-A-2",
+   "priority": "GATE",
+   "summary": "create + converge: fresh->fully-running in one command; converge re-runs all stages on existing sandbox to the same known-good state.",
+   "status": "in-progress (Slice 3a: create + stages; converge lands in 3b)",
+   "phase": 2,
+   "slice": 3,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_converge.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+  },
+  {
+   "id": "R2-B-2",
+   "priority": "GATE",
+   "summary": "Provider stage: create/refresh the AI Gateway credential provider on the gateway; attached at sandbox CREATE (env injects at create).",
+   "status": "met (Slice 3a)",
+   "phase": 2,
+   "slice": 3,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_converge.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+  },
+  {
+   "id": "R2-B-3",
+   "priority": "GATE",
+   "summary": "prime-agent stage: install pinned version + npm-onload %2F workaround + bootstrap Python kernel (idempotent).",
+   "status": "met (Slice 3a)",
+   "phase": 2,
+   "slice": 3,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_converge.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+  },
+  {
+   "id": "R2-B-4",
+   "priority": "GATE",
+   "summary": "Brain stage: initdb + start sandbox-owned Postgres 16, createdb + pgvector, wire gbrain embeddings to AI Gateway via L7 placeholder.",
+   "status": "met (Slice 3a)",
+   "phase": 2,
+   "slice": 3,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_converge.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+  },
+  {
+   "id": "R2-B-5",
+   "priority": "GATE",
+   "summary": "Baseline layout stage: in-sandbox episode spawn target (git project), idempotent.",
+   "status": "met (Slice 3a)",
+   "phase": 2,
+   "slice": 3,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_converge.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+  },
+  {
+   "id": "R2-X-1",
+   "priority": "GATE",
+   "summary": "Credential isolation: provider key read from host auth.json in-process; never written to repo/logs/sandbox disk; profile temp file cleaned up.",
+   "status": "met (Slice 3a)",
+   "phase": 2,
+   "slice": 3,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_converge.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+  },
+  {
+   "id": "R2-X-2",
+   "priority": "GATE",
+   "summary": "Configurability: stage inputs (gateway host/port, provider, paths, versions) via config/runtime.json + PRIME_CLAW_* env overrides, not hardcoded.",
+   "status": "in-progress (Slice 3a: stage inputs parameterized)",
+   "phase": 2,
+   "slice": 3,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_converge.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
   }
  ],
  "phase2": {}
