@@ -189,6 +189,121 @@
     ]
    },
    "verdict_doc": "n/a"
+  },
+  {
+   "id": "R-U2-1",
+   "priority": "GATE",
+   "summary": "gbrain CLI installs and operates inside the sandbox.",
+   "status": "proven",
+   "proven_by": {
+    "apply": [
+     "scripts/apply-phase1-brain.sh",
+     "docker/phase1-brain.Dockerfile"
+    ],
+    "check": [
+     "scripts/check-phase1-brain.sh"
+    ],
+    "validate": [
+     "scripts/validate-phase1-brain.py"
+    ],
+    "tests": [
+     "tests/test_phase1_brain.py"
+    ]
+   },
+   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+   "verdict_doc": "docs/derisk/U2.md"
+  },
+  {
+   "id": "R-U2-2",
+   "priority": "GATE",
+   "summary": "Brain repo folder available in-sandbox (mechanism documented: openshell --upload).",
+   "status": "proven",
+   "proven_by": {
+    "apply": [
+     "scripts/apply-phase1-brain.sh",
+     "docker/phase1-brain.Dockerfile"
+    ],
+    "check": [
+     "scripts/check-phase1-brain.sh"
+    ],
+    "validate": [
+     "scripts/validate-phase1-brain.py"
+    ],
+    "tests": [
+     "tests/test_phase1_brain.py"
+    ]
+   },
+   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+   "verdict_doc": "docs/derisk/U2.md"
+  },
+  {
+   "id": "R-U2-3",
+   "priority": "GATE",
+   "summary": "Postgres 16 + pgvector runs in-sandbox, owned by the agent (PGDATA in /sandbox, no root/sudo).",
+   "status": "proven",
+   "proven_by": {
+    "apply": [
+     "scripts/apply-phase1-brain.sh",
+     "docker/phase1-brain.Dockerfile"
+    ],
+    "check": [
+     "scripts/check-phase1-brain.sh"
+    ],
+    "validate": [
+     "scripts/validate-phase1-brain.py"
+    ],
+    "tests": [
+     "tests/test_phase1_brain.py"
+    ]
+   },
+   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+   "verdict_doc": "docs/derisk/U2.md"
+  },
+  {
+   "id": "R-U2-4",
+   "priority": "GATE",
+   "summary": "gbrain serves search/query from in-sandbox Postgres + brain repo.",
+   "status": "proven",
+   "proven_by": {
+    "apply": [
+     "scripts/apply-phase1-brain.sh",
+     "docker/phase1-brain.Dockerfile"
+    ],
+    "check": [
+     "scripts/check-phase1-brain.sh"
+    ],
+    "validate": [
+     "scripts/validate-phase1-brain.py"
+    ],
+    "tests": [
+     "tests/test_phase1_brain.py"
+    ]
+   },
+   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+   "verdict_doc": "docs/derisk/U2.md"
+  },
+  {
+   "id": "R-U2-5",
+   "priority": "NICE",
+   "summary": "Postgres reachable from host at localhost:5433 (or documented forward). Non-blocking.",
+   "status": "documented-non-blocking",
+   "proven_by": {
+    "apply": [
+     "scripts/apply-phase1-brain.sh",
+     "docker/phase1-brain.Dockerfile"
+    ],
+    "check": [
+     "scripts/check-phase1-brain.sh"
+    ],
+    "validate": [
+     "scripts/validate-phase1-brain.py"
+    ],
+    "tests": [
+     "tests/test_phase1_brain.py"
+    ]
+   },
+   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+   "verdict_doc": "docs/derisk/U2.md"
   }
  ]
 }

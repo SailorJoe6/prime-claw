@@ -1,0 +1,4 @@
+  File "<string>", line 1
+    import json,sys; [print(m.get(Source),-
+                           ^
+SyntaxError: '(' was never closed

@@ -113,14 +113,25 @@ endpoint**, not provider-native hosts.
 sandbox: brain repo folder present, Postgres 16 + pgvector running in-sandbox,
 gbrain CLI answering search/query with expected content.
 
-- `scripts/apply-phase1-brain.sh` — bring the brain repo folder in-sandbox
-  (mount or equivalent — the spike determines and documents the mechanism);
-  install Postgres 16 + pgvector and the gbrain CLI.
-- `scripts/check-phase1-brain.sh` — Postgres up, pgvector loaded, gbrain
-  connected.
+**Approach (D15):** build the brain stack into a **custom sandbox image**, not a
+runtime install. The sandbox runs as uid 998 with no root, so installing
+Postgres/pgvector into the live container is the wrong pattern; the environment
+belongs to the image build. `openshell sandbox create --from` does not build a
+Dockerfile itself in v0.0.116 — we `docker build` with the gateway's engine,
+then `--from <image>`.
+
+- `docker/phase1-brain.Dockerfile` — `FROM
+  ghcr.io/nvidia/openshell-community/sandboxes/base:latest`; `apt-get install`
+  `postgresql-16` + `postgresql-16-pgvector` (PGDG) and the gbrain CLI, as root.
+- `scripts/apply-phase1-brain.sh` — `docker build -t prime-claw-brain:<ver>` +
+  recreate the sandbox `--from` that image, `--upload` the brain repo folder to
+  `/sandbox/brain` (R-U2-2 mechanism), start Postgres 16 in-sandbox as the
+  `sandbox` user.
+- `scripts/check-phase1-brain.sh` — Postgres up, pgvector loaded, brain folder
+  present, gbrain connected.
 - `scripts/validate-phase1-brain.py` — search/query return expected content;
-  attempt host `localhost:5433` exposure (or OpenShell service-forwarding
-  equivalent) and document the result either way (R-U2-5 is non-blocking).
+  attempt host `localhost:5433` exposure (or OpenShell `--forward` equivalent)
+  and document the result either way (R-U2-5 is non-blocking).
 - **`docs/derisk/U2.md`** — verdict. Note: the long-run goal (this sandbox
   replaces `brain-daemon-ralph-pva`) is context, not a Phase 1 deliverable.
 - Update stale beads description on `prime-claw-6r8` (still describes the old
@@ -128,6 +139,7 @@ gbrain CLI answering search/query with expected content.
 
 **Proves:** R-U2-1..5 · **Verdict:** `docs/derisk/U2.md` ·
 **Beads:** closes `prime-claw-6r8` on GO / GO-with-constraints.
+
 
 ## Slice 5 — Episode spawn/reap mechanics  → U3 VERDICT
 

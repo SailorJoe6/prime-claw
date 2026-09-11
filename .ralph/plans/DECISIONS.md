@@ -185,3 +185,37 @@ never written to any tracked file, log, or transcript.
 
 **Implements:** R-X-5; shapes the Slice 3 apply script and the eventual
 productized config surface.
+
+## D15 — Brain stack goes into the container IMAGE, not a runtime install (2026-09-11)
+
+**Decision.** Slice 4 builds the brain stack into a **custom OpenShell sandbox
+image** (`docker build` as root, then `openshell sandbox create --from
+<image>`), rather than installing Postgres/pgvector/gbrain into the running
+container at spike time.
+
+**Why (user direction, correcting an earlier wrong turn).** An attempt to
+rootless-install Postgres + pgvector into the live `base` container (via
+conda-forge / micromamba, because the sandbox runs as uid 998 with no root/sudo
+so `apt` is unusable) was the wrong pattern: it puts the environment definition
+*inside* the runtime instead of in the container definition. The environment a
+sandbox needs belongs to the image build, not to the running container.
+
+**How (v0.0.116 reality).** `openshell sandbox create --from` no longer builds a
+local Dockerfile itself (run.rs `resolve_from`): you `docker build -t <image>`
+with the gateway's container engine, then pass the image reference. So Slice 4:
+1. `Dockerfile` `FROM ghcr.io/nvidia/openshell-community/sandboxes/base:latest`
+   (the proven base that already runs the prime-agent daemon) that
+   `apt-get install`s `postgresql-16` + `postgresql-16-pgvector` (PGDG) and the
+   gbrain CLI, **as root**, at build time.
+2. `docker build -t prime-claw-brain:<ver>` locally (same Docker daemon the
+   gateway uses).
+3. `openshell sandbox create --from prime-claw-brain:<ver> --upload
+   <brain-repo>:/sandbox/brain` for the brain repo folder (R-U2-2 mechanism:
+   `--upload`, not a runtime copy).
+
+**Consequence.** The apt/conda egress channel added to
+`policies/phase1-sandbox.yaml` for the abandoned runtime-install approach is
+removed — package downloads happen on the host during `docker build`, not from
+inside the sandbox. R-U2-3 wording "runs inside the sandbox" is satisfied by
+the image containing Postgres 16 + pgvector; versions still recorded in
+evidence.
