@@ -139,50 +139,46 @@
    "evidence": "docs/derisk/evidence/phase1-credentials-PASS-20260911T173411Z.json"
   },
   {
-   "id": "R-U2-1..5",
-   "priority": "GATE (R-U2-5 NICE)",
-   "summary": "gbrain brain stack in-sandbox: CLI, brain repo folder, Postgres 16 + pgvector, serving search/query; host :5433 exposure nice-to-have.",
-   "status": "pending",
-   "slice": 4,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": []
-   },
-   "verdict_doc": "docs/derisk/U2.md (written in Slice 4)"
-  },
-  {
-   "id": "R-U3-1..3",
-   "priority": "GATE (R-U3-3 NICE)",
-   "summary": "Episode spawn/reap: in-sandbox git project; CLI session baseline; agent-driven spawn documented (race workaround only if race manifests).",
-   "status": "pending",
-   "slice": 5,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": []
-   },
-   "verdict_doc": "docs/derisk/U3.md (written in Slice 5)"
-  },
-  {
    "id": "R-X-1",
    "priority": "GATE",
    "summary": "Committed re-runnable apply/check/validate/test artifacts per spike.",
-   "status": "in-progress (established for Slice 1; extended by each slice)",
+   "status": "met",
    "proven_by": {
+    "apply": [
+     "scripts/apply-phase1-sandbox.sh",
+     "scripts/apply-phase1-prime-agent.sh",
+     "scripts/apply-phase1-providers.sh",
+     "scripts/apply-phase1-brain.sh",
+     "scripts/apply-phase1-spawn.sh"
+    ],
+    "check": [
+     "scripts/check-phase1-sandbox.sh",
+     "scripts/check-phase1-prime-agent.sh",
+     "scripts/check-phase1-brain.sh",
+     "scripts/check-phase1-spawn.sh"
+    ],
+    "validate": [
+     "scripts/validate-phase1-sandbox.py",
+     "scripts/validate-phase1-prime-agent.py",
+     "scripts/validate-phase1-credentials.py",
+     "scripts/validate-phase1-brain.py",
+     "scripts/validate-phase1-spawn.py"
+    ],
     "tests": [
-     "tests/test_phase1_sandbox.py"
+     "tests/test_phase1_sandbox.py",
+     "tests/test_phase1_prime_agent.py",
+     "tests/test_phase1_credentials.py",
+     "tests/test_phase1_brain.py",
+     "tests/test_phase1_spawn.py"
     ]
    },
-   "verdict_doc": "docs/derisk/ (per-unknown verdict docs)"
+   "verdict_doc": "docs/derisk/{U1,U2,U3}.md"
   },
   {
    "id": "R-X-2",
    "priority": "GATE",
-   "summary": "This inventory traces every requirement to validators and verdict docs.",
-   "status": "in-progress (scaffolded; completed in Slice 6)",
+   "summary": "This inventory traces every requirement to its validator(s) and verdict document.",
+   "status": "met",
    "proven_by": {
     "tests": [
      "tests/test_phase1_sandbox.py"
@@ -393,6 +389,77 @@
    },
    "evidence": "docs/derisk/evidence/phase1-spawn-20260911T190138Z.json",
    "verdict_doc": "docs/derisk/U3.md"
+  },
+  {
+   "id": "R-X-3",
+   "priority": "GATE",
+   "summary": "docs/derisk/ holds one verdict document per unknown (U1,U2,U3): what was proven, evidence, versions, verdict, constraint list.",
+   "status": "met",
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": []
+   },
+   "verdict_doc": "docs/derisk/{U1,U2,U3}.md"
+  },
+  {
+   "id": "R-X-4",
+   "priority": "GATE",
+   "summary": "Hard NO-GO protocol: stop all agentic execution, alert operator, wait for decision. (No hard NO-GO occurred; protocol documented, never invoked.)",
+   "status": "met",
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": []
+   },
+   "verdict_doc": ".ralph/plans/SPECIFICATION.md"
+  },
+  {
+   "id": "R-X-5",
+   "priority": "GATE",
+   "summary": "Credential isolation preserved: no Keychain/browser-store access; no credential values in repo/logs/artifacts; only non-secret gateway config committed (D14).",
+   "status": "met",
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": []
+   },
+   "verdict_doc": "docs/derisk/U1.md"
+  },
+  {
+   "id": "R-X-6",
+   "priority": "GATE",
+   "summary": "All work landed: committed, pushed; beads prime-claw-f7k/6r8/tcf closed with verdict links.",
+   "status": "met",
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": []
+   },
+   "verdict_doc": "docs/derisk/{U1,U2,U3}.md"
+  },
+  {
+   "id": "R-X-7",
+   "priority": "NICE",
+   "summary": "Inference/credential setup configurable, not hardcoded (D14): provider/endpoint/baseUrl/credential shape parameterized (apply-phase1-providers.sh).",
+   "status": "met",
+   "proven_by": {
+    "apply": [
+     "scripts/apply-phase1-providers.sh"
+    ],
+    "check": [],
+    "validate": [
+     "scripts/validate-phase1-credentials.py"
+    ],
+    "tests": [
+     "tests/test_phase1_credentials.py"
+    ]
+   },
+   "verdict_doc": "docs/derisk/U1.md"
   }
  ]
 }

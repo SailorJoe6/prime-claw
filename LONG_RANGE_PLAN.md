@@ -62,6 +62,15 @@ before building anything. Each unknown gets a documented go/no-go.
 Done when: each unknown has a documented go/no-go with evidence. A hard
 no-go on any forces a spec/decision revision before proceeding.
 
+**✅ PHASE 1 COMPLETE (2026-09-11).** All three unknowns returned **GO** with
+committed, re-runnable spikes and evidence. Verdicts: U1 → `docs/derisk/U1.md`
+(prime-agent in sandbox), U2 → `docs/derisk/U2.md` (brain stack in sandbox,
+image-baked, embedding gate), U3 → `docs/derisk/U3.md` (episode spawn/reap).
+Traceability: `config/requirements-inventory.json` (R-U1-1..6, R-U2-1..6,
+R-U3-1..3, R-X-1..7 all proven/met). No hard NO-GO occurred. Beads
+`prime-claw-f7k` / `prime-claw-6r8` / `prime-claw-tcf` closed. Phase 2
+(`prime-claw-qcd`) unblocked.
+
 ## Phase 2 — Sandbox runtime foundation
 
 Stand up the prime-claw container: the place the claw runs and is free to
