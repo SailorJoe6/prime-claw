@@ -50,6 +50,28 @@ network_policies:
       - { host: pub-728493de92a943e2a9b2d17b4719f318.r2.dev, port: 443 }
     binaries:
       - path: /usr/bin/curl
+  # Slice 3: credentialed model endpoints (R-U1-6). These are the hosts the
+  # attached OpenShell providers inject real credentials for at L7. Declared as
+  # inspected `protocol: rest` endpoints (required: provider-credentialed
+  # endpoints reject L4/tls-skip modes) so the proxy can rewrite the placeholder
+  # env values (openshell:..._api_key etc.) into real auth on the wire. The
+  # sandbox process only ever holds placeholders; real keys never touch disk.
+  # Binaries: curl (the validator's direct probe) + node (prime-agent runtime).
+  model_anthropic:
+    name: model-anthropic-credentialed
+    endpoints:
+      - { host: api.anthropic.com, port: 443, protocol: rest, access: read-write }
+    binaries:
+      - path: /usr/bin/curl
+      - path: /usr/bin/node
+  model_openai:
+    name: model-openai-credentialed
+    endpoints:
+      - { host: api.openai.com, port: 443, protocol: rest, access: read-write }
+    binaries:
+      - path: /usr/bin/curl
+      - path: /usr/bin/node
+
   # Slice 2 kernel bootstrap: prime-agent's persistent Python REPL needs uv +
   # a managed Python 3.11. uv installer: astral.sh (script) then GitHub
   # releases (binary). uv then pulls python-build-standalone from GitHub and
