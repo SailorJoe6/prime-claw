@@ -208,3 +208,19 @@ made a real `anthropic.kimi-k3` model call through the proxy (via the
 in-sandbox); (c) no credential material on sandbox disk; (d) fail-closed on an
 unresolvable placeholder (HTTP 500). Evidence:
 `docs/derisk/evidence/phase1-credentials-PASS-*.json`. See `docs/derisk/U1.md`.
+
+---
+
+## 📌 Handoff note (2026-09-11) — zbrain templates/ being fixed upstream
+
+During Slice 4 the spike hit an upstream break: zbrain deleted `templates/`
+(commit `a68893077`) while `src/core/bootstrap/assets.ts` still imports
+`templates/bootstrap/*`, so a fresh zbrain checkout could not compile gbrain.
+The spike worked around it by restoring `templates/` from git history
+(`d337920c1`) into the staged build context only (the zbrain working tree was
+untouched). **Joe is fixing this in the zbrain repo directly.** Once fixed,
+`scripts/apply-phase1-brain.sh` can drop the git-history restore and just copy
+`$ZBRAIN_SRC/templates` (it already prefers a real `templates/` when present).
+
+Slice status: Slices 1–4 done — U1 GO (f7k), U2 GO (6r8). Next: Slice 5 = U3
+(episode spawn/reap, bead prime-claw-tcf, P0), then Slice 6 gate close-out.
