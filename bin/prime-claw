@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+"""prime-claw — single operator entry point for the prime-claw OpenShell sandbox.
+
+Phase 2 (sandbox runtime foundation): one reliable, repeatable lifecycle built
+from native OpenShell primitives. Verbs:
+
+  status    Read-only actual-vs-expected health of every component.
+  create    Fresh bring-up to a fully-running runtime (idempotent).   [Slice 3]
+  converge  Re-run all stages to the same known-good state.           [Slice 3]
+  build     Build the runtime image reproducibly.                     [Slice 2]
+  validate  End-to-end acceptance gate.                               [Slice 4]
+  recover   Codified recovery for known degradations.                 [Slice 5]
+  destroy   Safe teardown (confirmed).                                [Slice 6]
+
+Config: config/runtime.json (non-secret), overridable via PRIME_CLAW_* env vars.
+Credential isolation: real credential values never touch this process's args,
+the repo, logs, or sandbox disk; only OpenShell providers hold them (R2-X-1).
+"""
+from __future__ import annotations
+import argparse, json, os, subprocess, sys
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_CONFIG = os.path.join(REPO_ROOT, "config", "runtime.json")
+OPENSHELL = os.environ.get("OPENSHELL_BIN", "openshell")
+
+
+def load_config(path: str | None) -> dict:
+    p = path or os.environ.get("PRIME_CLAW_CONFIG") or DEFAULT_CONFIG
+    with open(p) as f:
+        return json.load(f)
+
+
+def run(cmd: list[str], timeout: int = 30) -> tuple[int, str]:
+    """Run a command, return (exit_code, combined_output). Never raises."""
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, (r.stdout or "") + (r.stderr or "")
+    except FileNotFoundError:
+        return 127, f"command not found: {cmd[0]}"
+    except subprocess.TimeoutExpired:
+        return 124, f"timeout after {timeout}s: {' '.join(cmd)}"
+
+
+def openshell_json(args: list[str], timeout: int = 30):
+    code, out = run([OPENSHELL, *args, "--output", "json"], timeout=timeout)
+    if code != 0:
+        return None, out
+    try:
+        return json.loads(out), ""
+    except json.JSONDecodeError as e:
+        return None, f"json parse error: {e}: {out[:200]}"
+
+
+# --------------------------------------------------------------------------
+# Component probes (read-only). Each returns (ok: bool|None, detail: str).
+# ok=None means "unknown / not applicable" (e.g. sandbox absent).
+# --------------------------------------------------------------------------
+
+def probe_gateway(cfg) -> tuple[bool, str]:
+    data, err = openshell_json(["gateway", "list"])
+    if data is None:
+        return False, f"gateway list failed: {err.strip()[:120]}"
+    active = next((g for g in data if g.get("active")), None)
+    if not active:
+        return False, "no active gateway"
+    want = cfg["gateway"]["name"]
+    forbidden = cfg["gateway"].get("forbidden", [])
+    name = active.get("name")
+    if name in forbidden:
+        return False, f"active gateway is FORBIDDEN {name!r} ({active.get('endpoint')}); re-pin {want!r}"
+    if name != want:
+        return False, f"active gateway {name!r} != expected {want!r}"
+    return True, f"{name} ({active.get('endpoint')})"
+
+
+def probe_sandbox(cfg) -> tuple[bool | None, str, dict | None]:
+    data, err = openshell_json(["sandbox", "get", cfg["sandbox_name"]])
+    if data is None:
+        return None, f"sandbox {cfg['sandbox_name']!r} not found", None
+    phase = data.get("phase", "?")
+    ok = phase == "Ready"
+    return ok, f"{cfg['sandbox_name']} phase={phase} rev={data.get('current_policy_version')}", data
+
+
+def probe_provider(cfg) -> tuple[bool, str]:
+    data, err = openshell_json(["provider", "list"])
+    if data is None:
+        return False, f"provider list failed: {err.strip()[:120]}"
+    want = cfg["provider_name"]
+    names = [p.get("name") for p in data]
+    if want in names:
+        return True, f"{want} attached"
+    return False, f"provider {want!r} NOT attached (have: {', '.join(names) or 'none'})"
+
+
+def sandbox_exec(cfg, script: str, timeout: int = 30) -> tuple[int, str]:
+    return run([OPENSHELL, "sandbox", "exec", "-n", cfg["sandbox_name"],
+                "--timeout", str(timeout), "--no-tty", "--", "bash", "-lc", script],
+               timeout=timeout + 10)
+
+
+def probe_in_sandbox(cfg, sandbox_present: bool):
+    """In-sandbox probes. Each returns (name, ok|None, detail)."""
+    if not sandbox_present:
+        na = lambda n: (n, None, "sandbox absent")
+        return [na("postgres"), na("gbrain"), na("prime-agent daemon"), na("model (gateway)")]
+    out = []
+    code, pg = sandbox_exec(cfg, "pgrep -x postgres >/dev/null 2>&1 && echo up || echo down")
+    out.append(("postgres", "up" in pg, pg.strip()[:80] or "no output"))
+    code, gb = sandbox_exec(cfg, "command -v gbrain >/dev/null 2>&1 && echo present || echo missing")
+    out.append(("gbrain", "present" in gb, gb.strip()[:80] or "no output"))
+    code, dm = sandbox_exec(cfg, "ls /tmp/prime-agent-*/daemon.sock >/dev/null 2>&1 && echo live || echo absent")
+    out.append(("prime-agent daemon", "live" in dm, dm.strip()[:80] or "no output"))
+    # Model reachability via the credentialed gateway is proven by `validate`
+    # (a real call), not status; here we only check the provider placeholder env
+    # is configured to be injected (non-secret): presence of the provider above.
+    out.append(("model (gateway)", None, "proven by `validate`"))
+    return out
+
+
+def cmd_status(cfg, args) -> int:
+    print(f"prime-claw status  (sandbox={cfg['sandbox_name']}, image={cfg['image']})")
+    print("=" * 64)
+    checks = []  # (name, ok|None, detail)
+
+    g_ok, g_det = probe_gateway(cfg)
+    checks.append(("gateway", g_ok, g_det))
+
+    s_ok, s_det, s_data = probe_sandbox(cfg)
+    checks.append(("sandbox", s_ok, s_det))
+    # Image is not exposed by `openshell sandbox get`; record expected (captured
+    # at create in Slice 3). Report expected here for visibility.
+    checks.append(("image", None, f"expected {cfg['image']} (recorded at create; openshell does not report it)"))
+
+    p_ok, p_det = probe_provider(cfg)
+    checks.append(("provider", p_ok, p_det))
+
+    for name, ok, det in probe_in_sandbox(cfg, bool(s_ok)):
+        checks.append((name, ok, det))
+
+    width = max(len(n) for n, _, _ in checks)
+    n_bad = 0
+    for name, ok, det in checks:
+        mark = "OK " if ok is True else ("???" if ok is None else "BAD")
+        if ok is False:
+            n_bad += 1
+        print(f"  [{mark}] {name.ljust(width)}  {det}")
+    print("=" * 64)
+    if n_bad:
+        print(f"status: {n_bad} component(s) BAD — see docs/runbook.md / `prime-claw recover`")
+        return 1
+    print("status: all checked components healthy (or n/a)")
+    return 0
+
+
+def _not_implemented(verb):
+    def _run(cfg, args):
+        print(f"prime-claw {verb}: not yet implemented (see EXECUTION_PLAN.md).", file=sys.stderr)
+        if args.dry_run:
+            print(f"dry_run: would run stage(s) for `{verb}` against sandbox "
+                  f"{cfg['sandbox_name']!r} (image {cfg['image']}).")
+        return 2
+    return _run
+
+
+def build_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(prog="prime-claw",
+        description="Single operator entry point for the prime-claw OpenShell sandbox.")
+    ap.add_argument("--config", help="path to runtime.json (default config/runtime.json)")
+    ap.add_argument("--dry-run", action="store_true", help="print intended actions; do not mutate")
+    sub = ap.add_subparsers(dest="verb", required=True)
+    for v in ("status", "create", "converge", "build", "validate", "recover", "destroy"):
+        sp = sub.add_parser(v)
+        if v == "recover":
+            sp.add_argument("--signature", help="known failure signature to recover from")
+        if v == "destroy":
+            sp.add_argument("--yes", action="store_true", help="confirm destructive teardown")
+    return ap
+
+
+VERBS = {
+    "status": cmd_status,
+    "create": _not_implemented("create"),
+    "converge": _not_implemented("converge"),
+    "build": _not_implemented("build"),
+    "validate": _not_implemented("validate"),
+    "recover": _not_implemented("recover"),
+    "destroy": _not_implemented("destroy"),
+}
+
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
+    cfg = load_config(args.config)
+    return VERBS[args.verb](cfg, args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

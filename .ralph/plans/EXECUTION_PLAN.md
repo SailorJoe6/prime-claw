@@ -51,7 +51,7 @@ removed in the final consolidation slice so one obvious path remains.
 
 ## Vertical slices
 
-### Slice 1 — `bin/prime-claw` skeleton + `status` (the observable foundation)
+### Slice 1 — `bin/prime-claw` skeleton + `status` (the observable foundation) ✅ DONE (2026-09-11)
 
 Build the entry point and the read-only backbone first, so every later slice is
 diagnosable from day one.

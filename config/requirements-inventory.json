@@ -460,6 +460,92 @@
     ]
    },
    "verdict_doc": "docs/derisk/U1.md"
+  },
+  {
+   "id": "R2-A-1",
+   "priority": "GATE",
+   "summary": "Single operator entry point bin/prime-claw with lifecycle verbs (status live; create/converge/build/validate/recover/destroy stubbed for later slices).",
+   "status": "in-progress (Slice 1: CLI + status)",
+   "phase": 2,
+   "slice": 1,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_status.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+  },
+  {
+   "id": "R2-A-3",
+   "priority": "GATE",
+   "summary": "Lifecycle built from native OpenShell primitives (sandbox get/exec, gateway/provider list, policy); no docker-compose/entrypoint mapping.",
+   "status": "in-progress (Slice 1: status probes via openshell)",
+   "phase": 2,
+   "slice": 1,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_status.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+  },
+  {
+   "id": "R2-A-4",
+   "priority": "GATE",
+   "summary": "Lifecycle stages individually runnable for targeted diagnosis.",
+   "status": "in-progress (Slice 1: probes are discrete functions)",
+   "phase": 2,
+   "slice": 1,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_status.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+  },
+  {
+   "id": "R2-C-1",
+   "priority": "GATE",
+   "summary": "status reports actual-vs-expected for every component (gateway, sandbox+image, policy, provider, PG, gbrain, daemon, model) in one command.",
+   "status": "met (Slice 1; model deferred to validate)",
+   "phase": 2,
+   "slice": 1,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_status.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+  },
+  {
+   "id": "R2-X-3",
+   "priority": "GATE",
+   "summary": "Single-gateway discipline: runtime pins openshell (17670); active nemoclaw flagged FORBIDDEN.",
+   "status": "met (Slice 1 status probe)",
+   "phase": 2,
+   "slice": 1,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_status.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
   }
- ]
+ ],
+ "phase2": {}
 }

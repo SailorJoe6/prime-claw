@@ -1,0 +1,18 @@
+{
+  "sandbox_name": "prime-claw",
+  "image": "prime-claw-brain:0.1.0",
+  "gateway": {
+    "name": "openshell",
+    "endpoint": "https://localhost:17670",
+    "forbidden": [
+      "nemoclaw"
+    ]
+  },
+  "policy_file": "policies/phase1-sandbox.yaml",
+  "provider_name": "prime-claw-ai-gateway",
+  "model": "anthropic.kimi-k3",
+  "ai_gateway_host": "ai-gateway.zende.sk",
+  "versions": {
+    "openshell_min": "0.0.116"
+  }
+}
