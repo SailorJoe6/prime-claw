@@ -75,29 +75,47 @@
       "id": "R-U1-3",
       "priority": "GATE",
       "summary": "prime-agent daemon installs and runs healthily in-sandbox.",
-      "status": "pending",
+      "status": "proven",
       "slice": 2,
       "proven_by": {
-        "apply": [],
-        "check": [],
-        "validate": [],
-        "tests": []
+        "apply": [
+          "scripts/apply-phase1-prime-agent.sh"
+        ],
+        "check": [
+          "scripts/check-phase1-prime-agent.sh"
+        ],
+        "validate": [
+          "scripts/validate-phase1-prime-agent.py"
+        ],
+        "tests": [
+          "tests/test_phase1_prime_agent.py"
+        ]
       },
-      "verdict_doc": "docs/derisk/U1.md (written in Slice 3)"
+      "verdict_doc": "docs/derisk/U1.md (written in Slice 3)",
+      "evidence": "docs/derisk/evidence/"
     },
     {
       "id": "R-U1-4",
       "priority": "GATE",
       "summary": "In-sandbox prime-agent session starts with a working persistent Python REPL.",
-      "status": "pending",
+      "status": "proven",
       "slice": 2,
       "proven_by": {
-        "apply": [],
-        "check": [],
-        "validate": [],
-        "tests": []
+        "apply": [
+          "scripts/apply-phase1-prime-agent.sh"
+        ],
+        "check": [
+          "scripts/check-phase1-prime-agent.sh"
+        ],
+        "validate": [
+          "scripts/validate-phase1-prime-agent.py"
+        ],
+        "tests": [
+          "tests/test_phase1_prime_agent.py"
+        ]
       },
-      "verdict_doc": "docs/derisk/U1.md (written in Slice 3)"
+      "verdict_doc": "docs/derisk/U1.md (written in Slice 3)",
+      "evidence": "docs/derisk/evidence/"
     },
     {
       "id": "R-U1-6",

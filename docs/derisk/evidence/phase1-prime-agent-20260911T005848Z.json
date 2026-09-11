@@ -1,0 +1,26 @@
+{
+  "spike": "phase1-prime-agent",
+  "sandbox": "prime-claw",
+  "captured_at": "2026-09-11T00:58:46.300486+00:00",
+  "requirements": [
+    "R-U1-3",
+    "R-U1-4"
+  ],
+  "check_gate": {
+    "exit": 0,
+    "output": "pa_path=/sandbox/.npm-global/bin/prime-agent\npa_version=0.9.3\nkernel_python=present\nonload=present"
+  },
+  "daemon_first_probe": {
+    "exit": 0,
+    "socket": "/tmp/prime-agent-998/daemon.sock"
+  },
+  "daemon_second_probe_alive": true,
+  "repl_state_proof": {
+    "exit": 0,
+    "set_expression": "pc_marker = 40 + 1",
+    "read_expression": "pc_marker + 1",
+    "read_result": "42"
+  },
+  "result": "PASS",
+  "failures": []
+}

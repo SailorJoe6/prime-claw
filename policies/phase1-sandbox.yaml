@@ -34,3 +34,48 @@ network_policies:
       - { host: example.com, port: 443 }
     binaries:
       - path: /usr/bin/curl
+
+  # Slice 2: prime-agent install channel. The documented installer resolves a
+  # versioned tarball from Prime Intellect's R2 release bucket (README: "Do
+  # not use the inherited npm package as the Prime Agent install path").
+  # Two legs, bound to the binary that actually holds the sockets:
+  #   1. /usr/bin/curl fetches install.sh (app.primeintellect.ai) and the
+  #      release tarball + SHA256SUMS (R2 bucket).
+  #   2. The release package has npm runtime dependencies, so the installer's
+  #      `npm install -g` leg (node binary) needs registry.npmjs.org.
+  prime_agent_release:
+    name: prime-agent-release-channel
+    endpoints:
+      - { host: app.primeintellect.ai, port: 443 }
+      - { host: pub-728493de92a943e2a9b2d17b4719f318.r2.dev, port: 443 }
+    binaries:
+      - path: /usr/bin/curl
+  # Slice 2 kernel bootstrap: prime-agent's persistent Python REPL needs uv +
+  # a managed Python 3.11. uv installer: astral.sh (script) then GitHub
+  # releases (binary). uv then pulls python-build-standalone from GitHub and
+  # packages from pypi/files.pythonhosted.org. uv lands at
+  # /sandbox/.local/bin/uv — bind that path (and curl for the installer).
+  kernel_bootstrap:
+    name: kernel-bootstrap-uv-python
+    endpoints:
+      - { host: astral.sh, port: 443 }
+      - { host: github.com, port: 443 }
+      - { host: api.github.com, port: 443 }
+      - { host: objects.githubusercontent.com, port: 443 }
+      - { host: release-assets.githubusercontent.com, port: 443 }
+      - { host: pypi.org, port: 443 }
+      - { host: files.pythonhosted.org, port: 443 }
+    binaries:
+      - path: /usr/bin/curl
+      - path: /usr/local/bin/uv
+
+  prime_agent_npm_deps:
+    name: prime-agent-npm-runtime-deps
+    # registry.npmjs.org: npm runtime deps of the release package.
+    # R2 bucket: the release tarball references bundled component tarballs
+    # (prime-agent-core/-ai) by URL; npm (node) fetches those directly.
+    endpoints:
+      - { host: registry.npmjs.org, port: 443 }
+      - { host: pub-728493de92a943e2a9b2d17b4719f318.r2.dev, port: 443 }
+    binaries:
+      - path: /usr/bin/node

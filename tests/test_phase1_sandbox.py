@@ -45,15 +45,27 @@ def test_policy_schema_version(policy):
     assert policy["version"] == 1
 
 
-def test_policy_deny_by_default_has_exactly_one_canary(policy):
-    """Only the egress canary may be declared. Real endpoints are added by
-    later slices as explicit, reviewable entries."""
+def test_policy_deny_by_default_canary_stays_minimal(policy):
+    """The egress canary is the R-U1-5 proof endpoint: exactly one benign
+    host, curl only. Later slices add real entries alongside it (Slice 2's
+    install channels); the canary itself must not grow."""
     net = policy.get("network_policies", {})
-    assert set(net) == {"egress_canary"}
+    assert "egress_canary" in net
     canary = net["egress_canary"]
     assert canary["endpoints"] == [{"host": "example.com", "port": 443}]
     paths = [b["path"] for b in canary["binaries"]]
-    assert paths and all(p.startswith("/") for p in paths)
+    assert paths == ["/usr/bin/curl"]
+
+
+def test_policy_every_entry_is_named_and_scoped(policy):
+    """Every network entry must be named (reviewable) and binary-scoped —
+    no unbound host allow-listing."""
+    for key, entry in policy.get("network_policies", {}).items():
+        assert entry.get("name"), key
+        assert entry["binaries"], key
+        for b in entry["binaries"]:
+            assert b["path"].startswith("/"), (key, b)
+        assert entry["endpoints"], key
 
 
 def test_policy_filesystem_scope(policy):
