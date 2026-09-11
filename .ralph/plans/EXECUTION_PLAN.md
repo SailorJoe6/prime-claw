@@ -88,6 +88,15 @@ endpoint**, not provider-native hosts.
 - `scripts/apply-phase1-providers.sh` — create ONE OpenShell provider carrying
   the gateway key, with an endpoint profile for `ai-gateway.zende.sk`; attach
   to the sandbox with the minimum endpoint policy (the gateway host only).
+  **Configurable (D14 / R-X-7):** the script reads a parameterized config
+  (gateway host, paths, model IDs, credential reference) rather than embedding
+  the operator's values, so another operator can point at the gateway with
+  their own key or a different auth shape. **No secrets in the repo (D14 /
+  R-X-5):** the gateway host/paths/model IDs may be committed; the key/OAuth
+  values are read from the operator's host config at apply time and never
+  written to any tracked file.
+  *(Optional, D13: a second provider for the openai-codex OAuth track → real
+  api.openai.com. NICE, not required for the verdict.)*
 - `scripts/validate-phase1-credentials.py` — (a) agent env holds placeholders
   only; (b) a real model call from the sandboxed prime-agent succeeds (default
   `anthropic.kimi-k3` via the gateway); (c) sandbox-disk scan finds no

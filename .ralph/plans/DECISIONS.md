@@ -143,3 +143,45 @@ genuinely-host-bound exception, not the rule.
 **Implements:** R-U1-6 (corrected), supersedes the implicit native-endpoint
 assumption in D11. Config copying of `models.json`/`settings.json` remains
 operator-authorized per D11.
+
+## D13 — Credential scope: AI Gateway is primary; openai-codex is a separate, optional track (2026-09-11)
+
+**Decision.** The operator's host has TWO distinct credential tracks, and they
+are not interchangeable:
+
+1. **AI Gateway track (PRIMARY).** openai / amazon-bedrock / anthropic all
+   route through `https://ai-gateway.zende.sk` sharing ONE gateway API key
+   (D12). This is the credential set Slice 3 must prove end-to-end. The
+   default model (`anthropic.kimi-k3`) is on this track.
+2. **openai-codex track (SECONDARY / optional).** A separate OAuth credential
+   against the real `api.openai.com`. It does NOT use the shared gateway key
+   or the AI Gateway. Nice-to-have for parity, but NOT required for the R-U1-6
+   verdict.
+
+**Implements:** refines R-U1-6 / D12. The GATE is the AI Gateway track; the
+codex track is recorded as NICE and may land as a documented constraint.
+
+## D14 — Configurable inference + no secrets in the repo (2026-09-11)
+
+**Decision.** The end solution must be **configurable**, not hardcoded to the
+operator's setup:
+
+- Anyone at Zendesk repeating this work must be able to point their sandbox at
+  the Zendesk AI Gateway via config (baseUrl + their own gateway key), not by
+  editing code.
+- Anyone with a different auth shape (openai-codex OAuth, provider-native
+  keys, another gateway, etc.) must be able to configure theirs the same way.
+- Concretely: provider/endpoint/baseUrl/credential *shape* lives in
+  parameterized config (a template + per-operator values supplied at apply
+  time); the apply scripts read that config rather than embedding one
+  operator's values.
+
+**Hard rule (restating R-X-5).** The operator's specific AI Gateway
+*configuration* (host, paths, model IDs) MAY live in this repo — it is not
+secret. The operator's *credential values* (the gateway key, OAuth tokens)
+MUST NEVER be committed — they live only in the OpenShell provider store /
+gateway, are read from the operator's host config at apply time, and are
+never written to any tracked file, log, or transcript.
+
+**Implements:** R-X-5; shapes the Slice 3 apply script and the eventual
+productized config surface.
