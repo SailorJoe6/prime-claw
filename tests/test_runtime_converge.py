@@ -108,6 +108,9 @@ def _exec_recorder(monkeypatch):
     calls = []
     def fake_exec(c, script, timeout=30):
         calls.append(script)
+        # Slice 5 added a daemon-ensure step to stage_prime_agent; report it up.
+        if "daemon-catalog-entry" in script or "DAEMON_UP" in script:
+            return (0, "DAEMON_UP")
         return (0, "ok")
     return calls, fake_exec
 
@@ -118,7 +121,7 @@ def test_prime_agent_stage_runs_install_and_kernel(tmp_path, monkeypatch):
     rc = pc.stage_prime_agent(cfg(tmp_path), Args())
     assert rc == 0
     assert any("install.sh" in c for c in calls)          # install leg
-    assert any("ensureKernelPython" in c for c in calls)  # kernel bootstrap
+    assert any("pc-kernel.mjs" in c for c in calls)        # kernel bootstrap (JS base64-staged)
     assert any("npm-onload.js" in c for c in calls)       # %2F workaround staged
 
 

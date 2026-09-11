@@ -1,0 +1,20 @@
+{
+  "verb": "recover",
+  "sandbox": "prime-claw",
+  "captured_at": "2026-09-11T22:15:46.816617+00:00",
+  "demonstrated_signature": "cold-daemon",
+  "result": "RECOVERED",
+  "cycle": [
+    "degrade: pkill daemon-catalog-entry (daemon process killed; stale daemon.sock + daemon.sock.lock left)",
+    "detect: bin/prime-claw recover -> cold-daemon",
+    "recover: converge re-ran stages; stage_prime_agent cleaned the stale lock and restarted the daemon",
+    "validate: bin/prime-claw validate -> PASS (all 15 checks)"
+  ],
+  "real_fixes_found": [
+    "stage_provider: create/update-first, import profile only when provider absent (import lints id and FAILS when the profile is already registered -> was breaking converge/recover)",
+    "stage_prime_agent: kernel bootstrap via `node file` (single-quoted `node -e` was mangled by npm-onload NODE_OPTIONS arg rewriting -> SyntaxError)",
+    "stage_prime_agent: ensure the daemon is running + clean the stale daemon.sock/.lock lock (unclean kill leaves the lock -> ELOCKED); daemon auto-exits when it holds no session",
+    "_daemon_socket_present: detect a LIVE daemon (pgrep daemon-catalog-entry[.]js, excluding the probe's own bash), not just the stale socket file",
+    "stage_prime_agent: return 0 (the daemon-ensure insert had consumed it -> converge misreported the stage failed)"
+  ]
+}

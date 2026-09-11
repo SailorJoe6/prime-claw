@@ -374,30 +374,36 @@ def stage_provider(cfg, args) -> int:
     if args.dry_run:
         print(f"dry_run: ensure provider {name} (profile {profile}, endpoint {host}:{port}); "
               f"credential read from host auth.json, never committed"); return 0
-    import tempfile
-    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tf:
-        tf.write(ZD_PROFILE_YAML.format(profile_id=profile, host=host, port=port)); pf = tf.name
-    try:
-        code, out = run([OPENSHELL, "provider", "profile", "import", "--file", pf], timeout=60)
-        if code != 0:
-            print(f"error: profile import failed: {out.strip()[:200]}", file=sys.stderr); return code
-    finally:
-        os.unlink(pf)
     key = _host_gateway_key(cfg)
     try:
         code, _ = run([OPENSHELL, "provider", "get", name], timeout=30)
         if code == 0:
+            # Provider exists: refresh the credential. The profile is already
+            # registered (the provider references it), so no import needed.
             run([OPENSHELL, "provider", "update", name, "--credential", "api_key=" + key], timeout=60)
             print(f"provider: refreshed credential on {name}")
-        else:
-            code, out = run([OPENSHELL, "provider", "create", "--name", name,
-                             "--type", profile, "--credential", "api_key=" + key], timeout=60)
-            if code != 0:
-                print(f"error: provider create failed: {out.strip()[:200]}", file=sys.stderr); return code
-            print(f"provider: created {name}")
+            return 0
+        # Provider does not exist: ensure the profile is registered, then create.
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tf:
+            tf.write(ZD_PROFILE_YAML.format(profile_id=profile, host=host, port=port)); pf = tf.name
+        try:
+            code, out = run([OPENSHELL, "provider", "profile", "import", "--file", pf], timeout=60)
+            # Tolerate "already registered" (the import lints the id and errors
+            # if it already exists); the profile just needs to be present.
+            if code != 0 and "already" not in out.lower():
+                print(f"error: profile import failed: {out.strip()[:200]}", file=sys.stderr); return code
+        finally:
+            os.unlink(pf)
+        code, out = run([OPENSHELL, "provider", "create", "--name", name,
+                         "--type", profile, "--credential", "api_key=" + key], timeout=60)
+        if code != 0:
+            print(f"error: provider create failed: {out.strip()[:200]}", file=sys.stderr); return code
+        print(f"provider: created {name}")
     finally:
         del key
     return 0
+
 
 
 def stage_sandbox(cfg, args, force_fresh: bool = False) -> int:
@@ -456,14 +462,39 @@ def stage_prime_agent(cfg, args) -> int:
     code, out = sandbox_exec(cfg, install, timeout=1800)
     if code != 0: print("error: prime-agent install: " + out.strip()[-300:], file=sys.stderr); return code
     print("prime-agent: " + (out.strip().splitlines()[-1] if out.strip() else version))
-    js = "import { ensureKernelPython } from '/sandbox/.npm-global/lib/node_modules/prime-agent/dist/core/kernel/bootstrap.js'; console.log('kernel_python=' + (await ensureKernelPython()));"
+    js = ("import { ensureKernelPython } from "
+          "'/sandbox/.npm-global/lib/node_modules/prime-agent/dist/core/kernel/bootstrap.js'; "
+          "console.log('kernel_python=' + (await ensureKernelPython()));")
+    # Write the JS to a file via base64 and run `node file` (robust quoting):
+    # a single-quoted `node -e '...'` gets its quotes mangled by the npm-onload
+    # NODE_OPTIONS arg rewriting, producing a SyntaxError.
+    js64 = base64.b64encode(js.encode()).decode()
     kernel = ("export PATH=/sandbox/.npm-global/bin:$PATH\n"
               "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n"
               "export PRIME_AGENT_INSTALL_UV=1\n"
-              "node --input-type=module -e '" + js + "'\n")
+              "echo " + js64 + " | base64 -d > /tmp/pc-kernel.mjs\n"
+              "node /tmp/pc-kernel.mjs\n")
     code, out = sandbox_exec(cfg, kernel, timeout=1200)
     if code != 0: print("error: kernel bootstrap: " + out.strip()[-300:], file=sys.stderr); return code
     print("prime-agent: kernel bootstrapped")
+    # Ensure the episode daemon is running (cold-daemon recovery): start it
+    # detached if absent and wait for the socket. The daemon auto-exits when
+    # idle unless it is hosting a session, so this must be part of converge.
+    ensure_daemon = (
+        "export HOME=/sandbox PATH=/sandbox/.npm-global/bin:$PATH\n"
+        "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n"
+        "if ! pgrep -af 'daemon-catalog-entry[.]js' 2>/dev/null | grep -qv 'bash -c'; then\n"
+        "  rm -rf /tmp/prime-agent-*/daemon.sock /tmp/prime-agent-*/daemon.sock.lock\n"
+        "  nohup prime-agent --mode daemon --offline >/sandbox/.prime-claw/daemon.log 2>&1 &\n"
+        "fi\n"
+        "for i in $(seq 1 15); do\n"
+        "  S=$(ls /tmp/prime-agent-*/daemon.sock 2>/dev/null | head -1); [ -n \"$S\" ] && break; sleep 1\n"
+        "done\n"
+        "pgrep -af 'daemon-catalog-entry[.]js' 2>/dev/null | grep -v 'bash -c' | grep -q node && echo DAEMON_UP || echo DAEMON_DOWN\n")
+    code, out = sandbox_exec(cfg, ensure_daemon, timeout=60)
+    if "DAEMON_UP" not in out:
+        print("error: daemon did not start: " + out.strip()[-200:], file=sys.stderr); return 1
+    print("prime-agent: daemon running")
     return 0
 
 
@@ -778,6 +809,120 @@ def cmd_validate(cfg, args) -> int:
     print("== validate: %s ==" % ("PASS" if not failures else "FAIL (%d)" % len(failures)))
     return 0 if not failures else 1
 
+
+# --------------------------------------------------------------------------
+# Slice 5 — recover (the operability slice). Codifies the Phase 1-discovered
+# recovery moves and proves a degrade-and-recover cycle (see docs/runbook.md).
+# Safe-by-default: only mutates when a degradation is actually detected, and
+# (except vpn-flap's gateway restart) the recovery is just `converge`.
+# --------------------------------------------------------------------------
+RECOVERY_PLAN = {
+    "vpn-flap":     "restart the openshell gateway (brew services start openshell), then converge",
+    "gateway-flip": "create the sandbox on the ACTIVE gateway (config.gateway), then converge",
+    "recreate-wipe":"/sandbox was wiped by a recreate -> converge re-installs prime-agent + brain",
+    "cold-daemon":  "converge (stage_prime_agent auto-starts the daemon with a socket-wait)",
+    "none":         "no degradation detected; nothing to do",
+}
+
+
+def _gateway_sandbox_names(cfg):
+    code, out = run([OPENSHELL, "gateway", "list", "--output", "json"], timeout=30)
+    if code != 0:
+        return None
+    try:
+        gws = json.loads(out).get("items", [])
+    except json.JSONDecodeError:
+        return None
+    for g in gws:
+        if g.get("name") == cfg.get("gateway"):
+            return [s.get("name") for s in g.get("sandboxes", [])], g.get("cluster_ready")
+    return [], None
+
+
+def _daemon_socket_present(cfg):
+    # The socket FILE can outlive the daemon (a kill leaves it behind), so
+    # "present" must mean a live daemon process, not just the file.
+    # pgrep -f would match this probe's own bash command line (the pattern is
+    # in it), so match the daemon-catalog-entry.js file and exclude our shell.
+    code, out = sandbox_exec(
+        cfg,
+        "pgrep -af 'daemon-catalog-entry[.]js' 2>/dev/null | grep -v 'bash -c' | grep -q node "
+        "&& echo LIVE || echo DEAD",
+        timeout=30)
+    return "LIVE" in out
+
+
+def detect_degradations(cfg, args):
+    """Detect known degradations. Returns a list of signatures (empty = healthy)."""
+    sigs = []
+    phase, label, data = probe_sandbox(cfg)
+    if data is not None:
+        # Sandbox exists under our pinned gateway. Check for a recreate-wipe
+        # (prime-agent gone from /sandbox) and a cold daemon.
+        code, out = sandbox_exec(cfg, "test -x /sandbox/.npm-global/bin/prime-agent && echo ok", timeout=30)
+        if "ok" not in out:
+            sigs.append("recreate-wipe")
+        elif not _daemon_socket_present(cfg):
+            sigs.append("cold-daemon")
+        return sigs
+    # Sandbox absent from our gateway -> distinguish vpn-flap (gateway down,
+    # container survived) from gateway-flip (active_gateway moved).
+    listed = _gateway_sandbox_names(cfg)
+    if listed is None or (isinstance(listed, tuple) and listed[0] is None):
+        sigs.append("vpn-flap")            # gateway list itself failed -> gateway down
+    elif isinstance(listed, tuple) and cfg["sandbox_name"] in listed[0]:
+        sigs.append("vpn-flap")            # container survived on the gw, just not registered
+    else:
+        sigs.append("gateway-flip")        # container gone everywhere we can see
+    return sigs
+
+
+def cmd_recover(cfg, args) -> int:
+    """Detect known degradations and recover; then re-validate. Safe-by-default."""
+    if getattr(args, "dry_run", False):
+        print("dry_run: recover = detect degradations (vpn-flap / gateway-flip / "
+              "recreate-wipe / cold-daemon), restart the gateway if down, converge, "
+              "re-validate.")
+        return 0
+    name = cfg["sandbox_name"]
+    force = [s.strip() for s in str(getattr(args, "signature", "") or "").split(",") if s.strip()]
+    sigs = force or detect_degradations(cfg, args)
+    if not sigs:
+        print(f"recover: no degradation detected on sandbox '{name}'.")
+        return 0
+    print(f"recover: degradations detected: {', '.join(sigs)}")
+    for s_ in sigs:
+        print(f"  - {s_}: {RECOVERY_PLAN.get(s_, 'converge')}")
+
+    # vpn-flap: the gateway daemon is down; restart it before converging.
+    if "vpn-flap" in sigs:
+        print("recover: restarting openshell gateway (brew services start openshell) ...")
+        run(["brew", "services", "start", "openshell"], timeout=60)
+        _sleep(5)
+        listed = _gateway_sandbox_names(cfg)
+        ready = isinstance(listed, tuple) and listed[1]
+        if not ready:
+            print("recover: gateway still not cluster_ready after restart.", file=sys.stderr)
+            print("recover: check VPN/network (GlobalProtect) and re-run.", file=sys.stderr)
+            return 1
+
+    # gateway-flip: the sandbox is absent under the active gateway -> recreate it.
+    if "gateway-flip" in sigs:
+        print(f"recover: sandbox absent under gateway '{cfg.get('gateway')}'; recreating "
+              f"(active_gateway flip).")
+        rc = stage_sandbox(cfg, args, force_fresh=True)
+        if rc != 0:
+            return rc
+
+    # recreate-wipe / cold-daemon (and the follow-through for the above): converge.
+    print("recover: converging ...")
+    rc = cmd_converge(cfg, args)
+    if rc != 0:
+        print("recover: converge failed; see errors above.", file=sys.stderr)
+        return rc
+    print("recover: converge done. Run 'bin/prime-claw validate' to confirm green.")
+    return 0
+
 def _not_implemented(verb):
     def _run(cfg, args):
         print(f"prime-claw {verb}: not yet implemented (see EXECUTION_PLAN.md).", file=sys.stderr)
@@ -811,7 +956,7 @@ VERBS = {
     "converge": cmd_converge,
     "build": cmd_build,
     "validate": cmd_validate,
-    "recover": _not_implemented("recover"),
+    "recover": cmd_recover,
     "destroy": _not_implemented("destroy"),
 }
 

@@ -189,7 +189,7 @@ def test_status_bad_component_exit1(monkeypatch, tmp_path, capsys):
 def test_stub_verbs_return2_and_dry_run(tmp_path, capsys):
     # Verbs not yet implemented as of Slice 2. `build` and `status` ARE live
     # (Slice 2 / Slice 1); the rest remain explicit stubs until their slice.
-    for v in ("recover", "destroy"):
+    for v in ("destroy",):
         rc = pc.VERBS[v](cfg(), Args(dry_run=True))
         assert rc == 2, v
     err = capsys.readouterr().err
@@ -198,3 +198,4 @@ def test_stub_verbs_return2_and_dry_run(tmp_path, capsys):
     assert pc.VERBS["create"] is pc.cmd_create  # implemented in Slice 3a
     assert pc.VERBS["converge"] is pc.cmd_converge  # implemented in Slice 3b
     assert pc.VERBS["validate"] is pc.cmd_validate  # implemented in Slice 4
+    assert pc.VERBS["recover"] is pc.cmd_recover    # implemented in Slice 5

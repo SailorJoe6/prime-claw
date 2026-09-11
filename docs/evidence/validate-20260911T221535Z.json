@@ -1,0 +1,108 @@
+{
+  "verb": "validate",
+  "sandbox": "prime-claw",
+  "captured_at": "2026-09-11T22:15:35.827448+00:00",
+  "result": "PASS",
+  "versions": {
+    "openshell_cli": "openshell 0.0.116",
+    "image": "prime-claw-brain:0.1.0",
+    "image_inputs_sha256": "76f4707842efebcfcad89b00af383b9fea2fa5ccad3f0010a8c1bad37d554429",
+    "prime_agent": "0.9.3",
+    "gbrain": "0.49.0",
+    "postgres": "PostgreSQL 16.15",
+    "pgvector": "0.6"
+  },
+  "checks": [
+    {
+      "id": "sandbox-present",
+      "gate": true,
+      "pass": true,
+      "detail": "phase=True"
+    },
+    {
+      "id": "egress-canary-allowed",
+      "gate": true,
+      "pass": true,
+      "detail": "example.com http=200"
+    },
+    {
+      "id": "egress-undeclared-refused",
+      "gate": true,
+      "pass": true,
+      "detail": "undeclared host refused (curl_exit=56 http=000)"
+    },
+    {
+      "id": "daemon-socket",
+      "gate": true,
+      "pass": true,
+      "detail": "/tmp/prime-agent-998/daemon.sock"
+    },
+    {
+      "id": "daemon-persists",
+      "gate": true,
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "persistent-repl",
+      "gate": true,
+      "pass": true,
+      "detail": "state=42"
+    },
+    {
+      "id": "no-key-in-env",
+      "gate": true,
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "no-key-on-disk",
+      "gate": true,
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "credentialed-model-call",
+      "gate": true,
+      "pass": true,
+      "detail": "model=anthropic.kimi-k3 via ai-gateway.zende.sk"
+    },
+    {
+      "id": "gbrain-cli",
+      "gate": true,
+      "pass": true,
+      "detail": "v0.49.0"
+    },
+    {
+      "id": "postgres-16",
+      "gate": true,
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "brain-search-roundtrip",
+      "gate": true,
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "brain-embedding-via-gateway",
+      "gate": true,
+      "pass": true,
+      "detail": "dims=1536"
+    },
+    {
+      "id": "spawn-target",
+      "gate": true,
+      "pass": true,
+      "detail": "857e8c2"
+    },
+    {
+      "id": "spawn-reap-rpc",
+      "gate": true,
+      "pass": true,
+      "detail": "id=597ace715c24 cwd=/sandbox/episode-target kill=True reaped=True"
+    }
+  ],
+  "failures": []
+}

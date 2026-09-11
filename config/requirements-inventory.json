@@ -736,7 +736,7 @@
    "id": "R2-C-3",
    "priority": "NICE",
    "summary": "validate is re-runnable and non-destructive (read-only probes; spawn uses a timestamped name and reaps in finally).",
-   "status": "met (Slice 4)",
+   "status": "met (Slice 5; live degrade-and-recover PASS)",
    "phase": 2,
    "slice": 4,
    "proven_by": {
@@ -745,17 +745,55 @@
      "bin/prime-claw"
     ],
     "validate": [
-     "scripts/validate-phase1-credentials.py",
-     "scripts/validate-phase1-brain.py",
-     "scripts/validate-phase1-prime-agent.py",
-     "scripts/validate-phase1-spawn.py",
-     "scripts/validate-phase1-sandbox.py"
+     "bin/prime-claw validate"
     ],
     "tests": [
-     "tests/test_runtime_validate.py"
+     "tests/test_runtime_recover.py"
     ]
    },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 4)"
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
+  },
+  {
+   "id": "R2-C-4",
+   "priority": "GATE",
+   "summary": "recover is safe-by-default: detects degradations and only mutates to recover; healthy sandbox is a no-op.",
+   "status": "met (Slice 5; tested)",
+   "phase": 2,
+   "slice": 5,
+   "proven_by": {
+    "apply": [],
+    "check": [
+     "bin/prime-claw"
+    ],
+    "validate": [
+     "bin/prime-claw validate"
+    ],
+    "tests": [
+     "tests/test_runtime_recover.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
+  },
+  {
+   "id": "R2-C-5",
+   "priority": "GATE",
+   "summary": "Demonstrated degrade-and-recover: induced cold-daemon, recover, validate green. (Found+fixed provider-idempotency, kernel-bootstrap, daemon-ensure, and stale-lock bugs.)",
+   "status": "met (Slice 5; live PASS, docs/evidence/recover-*.json)",
+   "phase": 2,
+   "slice": 5,
+   "proven_by": {
+    "apply": [],
+    "check": [
+     "bin/prime-claw"
+    ],
+    "validate": [
+     "bin/prime-claw validate"
+    ],
+    "tests": [
+     "tests/test_runtime_recover.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
   }
  ],
  "phase2": {}

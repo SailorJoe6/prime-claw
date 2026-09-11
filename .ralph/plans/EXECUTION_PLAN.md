@@ -111,7 +111,7 @@ End-to-end acceptance as a first-class verb, with recorded versions.
 - Tests: `tests/test_runtime_validate.py`.
 - Inventory: R2-C-2, R2-X-5.
 
-### Slice 5 — Recover + runbook (the operability slice)
+### Slice 5 — Recover + runbook (the operability slice) ✅ DONE (2026-09-11, live degrade-and-recover PASS)
 
 Codify the Phase 1-discovered recovery moves; prove degrade-and-recover.
 - `bin/prime-claw recover [--signature S]`: detects/handles the known
