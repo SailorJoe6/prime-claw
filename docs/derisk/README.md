@@ -1,8 +1,8 @@
 # docs/derisk — Phase 1 de-risk verdicts and evidence
 
 One verdict document per load-bearing unknown, plus the raw evidence the
-verdicts stand on. Spec: [.ralph/plans/SPECIFICATION.md](../../.ralph/plans/SPECIFICATION.md)
-· Requirements: [.ralph/plans/REQUIREMENTS.md](../../.ralph/plans/REQUIREMENTS.md)
+verdicts stand on. Spec: [.ralph/plans/SPECIFICATION.md](../../.ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md)
+· Requirements: [.ralph/plans/REQUIREMENTS.md](../../.ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md)
 · Traceability: [config/requirements-inventory.json](../../config/requirements-inventory.json)
 
 ## Verdict documents

@@ -2,7 +2,7 @@
  "version": 1,
  "project": "prime-claw",
  "phase": "1 \u2014 de-risk gate",
- "spec": ".ralph/plans/REQUIREMENTS.md",
+ "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
  "requirements": [
   {
    "id": "R-U1-1",
@@ -414,7 +414,7 @@
     "validate": [],
     "tests": []
    },
-   "verdict_doc": ".ralph/plans/SPECIFICATION.md"
+   "verdict_doc": ".ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md"
   },
   {
    "id": "R-X-5",
