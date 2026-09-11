@@ -1,0 +1,43 @@
+{
+  "spike": "phase1-spawn",
+  "sandbox": "prime-claw",
+  "spawn_project_dir": "/sandbox/episode-target",
+  "model": "anthropic.kimi-k3",
+  "captured_at": "2026-09-11T18:53:23.548399+00:00",
+  "requirements": [
+    "R-U3-1",
+    "R-U3-2",
+    "R-U3-3"
+  ],
+  "results": {
+    "R-U3-1": {
+      "pass": true,
+      "commit": "857e8c2"
+    },
+    "R-U3-2 cli_cwd": {
+      "project_file_pwd": null,
+      "parent_leak": null,
+      "pass": false
+    },
+    "R-U3-2 daemon": {
+      "session_id": "a77a8fad0064",
+      "cwd": "/sandbox/episode-target",
+      "kill_ok": true,
+      "still_listed": false,
+      "pass": true,
+      "err": null
+    },
+    "R-U3-3": {
+      "pass": true,
+      "blocking": false,
+      "observation": "Agent-driven spawn uses the same daemon create/kill channel proven in R-U3-2(ii): the host rlm() spawns a child by publishing a session via the daemon and reaps via kill. The RLM automatic-preparation admission race is documented in AGENTS.md Safe Spawn Protocol + openclaw-setup docs/prime-agent-rlm-preparation-race.md. Per D6 the two-message workaround is exercised only if the race manifests; this Phase 1 spike proves the spawn/reap channel, and in-sandbox agent-driven (rlm) episode spawn is deferred to Phase 4 (episode loop)."
+    }
+  },
+  "check_gate": {
+    "exit": 0
+  },
+  "verdict": "NO-GO",
+  "failures": [
+    "R-U3-2 cli"
+  ]
+}

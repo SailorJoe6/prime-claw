@@ -1,0 +1,39 @@
+{
+  "spike": "phase1-spawn",
+  "sandbox": "prime-claw",
+  "spawn_project_dir": "/sandbox/episode-target",
+  "captured_at": "2026-09-11T18:44:34.891922+00:00",
+  "requirements": [
+    "R-U3-1",
+    "R-U3-2",
+    "R-U3-3"
+  ],
+  "results": {
+    "R-U3-1": {
+      "pass": "857e8c2",
+      "commit": [
+        "857e8c2",
+        "episode target init"
+      ]
+    },
+    "R-U3-2 create": {
+      "exit": 1,
+      "session_id": null,
+      "raw": ""
+    },
+    "R-U3-3": {
+      "pass": true,
+      "blocking": false,
+      "observation": "Agent-driven spawn is the host prime-agent RLM mechanism (rlm() -> child handle via the daemon). The daemon create/kill CLI used for R-U3-2 is the same spawn/reap channel an in-sandbox parent drives. The RLM automatic-preparation admission race (lost initial task when a session_start extension starts a child turn first) is documented in AGENTS.md Safe Spawn Protocol + openclaw-setup docs/prime-agent-rlm-preparation-race.md; per D6 the two-message workaround is exercised only if the race manifests. This Phase 1 spike drives the CLI baseline; in-sandbox agent-driven child spawn is deferred to Phase 4 (episode loop) where the orchestrator runs in-sandbox."
+    }
+  },
+  "check_gate": {
+    "exit": 0,
+    "output": "pa=present\ngitproj=present\ncommit=857e8c2"
+  },
+  "verdict": "NO-GO",
+  "failures": [
+    "R-U3-2 (no session id)",
+    "R-U3-2 cwd"
+  ]
+}

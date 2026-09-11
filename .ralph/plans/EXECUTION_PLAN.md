@@ -141,7 +141,7 @@ then `--from <image>`.
 **Beads:** closes `prime-claw-6r8` on GO / GO-with-constraints.
 
 
-## Slice 5 — Episode spawn/reap mechanics  → U3 VERDICT
+## Slice 5 — Episode spawn/reap mechanics  → U3 VERDICT ✅ GO
 
 **Capability delivered:** the episode-spawn mechanics are verified and
 documented, with the CLI-driven baseline proven and the agent-driven path
@@ -222,5 +222,4 @@ untouched). **Joe is fixing this in the zbrain repo directly.** Once fixed,
 `scripts/apply-phase1-brain.sh` can drop the git-history restore and just copy
 `$ZBRAIN_SRC/templates` (it already prefers a real `templates/` when present).
 
-Slice status: Slices 1–4 done — U1 GO (f7k), U2 GO (6r8). Next: Slice 5 = U3
-(episode spawn/reap, bead prime-claw-tcf, P0), then Slice 6 gate close-out.
+Slice status: Slices 1–4 done — U1 GO (f7k), U2 GO (6r8). Slices 1–5 done — U1 GO (f7k), U2 GO (6r8), U3 GO (tcf). Next: Slice 6 gate close-out.
