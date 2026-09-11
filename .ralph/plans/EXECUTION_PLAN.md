@@ -98,7 +98,7 @@ baseline layout as idempotent stages orchestrated by `converge`.
 - Tests: `tests/test_runtime_converge.py` (stage idempotency, ordering, dry-run).
 - Inventory: R2-A-2, R2-B-2..5, R2-X-1, R2-X-2.
 
-### Slice 4 — Validate + version recording (the acceptance gate)
+### Slice 4 — Validate + version recording (the acceptance gate) ✅ DONE (2026-09-11, live PASS)
 
 End-to-end acceptance as a first-class verb, with recorded versions.
 - `bin/prime-claw validate` orchestrates the acceptance suite (consolidated from

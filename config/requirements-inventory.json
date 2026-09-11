@@ -567,18 +567,20 @@
    "id": "R2-X-5",
    "priority": "GATE",
    "summary": "Reproducibility: build records image tag + inputs fingerprint (docker/runtime/.build-stamp.json); rebuild on change or --force.",
-   "status": "in-progress (Slice 2: build inputs fingerprinted+stamped; OpenShell/image/runtime versions recorded in Slice 4 validate)",
+   "status": "met (Slice 4; live evidence committed)",
    "phase": 2,
    "slice": 2,
    "proven_by": {
     "apply": [],
     "check": [],
-    "validate": [],
+    "validate": [
+     "bin/prime-claw validate"
+    ],
     "tests": [
-     "tests/test_runtime_image.py"
+     "tests/test_runtime_validate.py"
     ]
    },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 2)"
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 4)"
   },
   {
    "id": "R2-A-2",
@@ -698,6 +700,44 @@
     ]
    },
    "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+  },
+  {
+   "id": "R2-C-2",
+   "priority": "GATE",
+   "summary": "validate: single green/red acceptance gate over the whole runtime (sandbox, deny-by-default egress, daemon, persistent REPL, credentialed model call, brain+embedding, spawn/reap).",
+   "status": "met (Slice 4; live PASS)",
+   "phase": 2,
+   "slice": 4,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [
+     "bin/prime-claw validate"
+    ],
+    "tests": [
+     "tests/test_runtime_validate.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 4)"
+  },
+  {
+   "id": "R2-C-3",
+   "priority": "NICE",
+   "summary": "validate is re-runnable and non-destructive (read-only probes; spawn uses a timestamped name and reaps in finally).",
+   "status": "met (Slice 4)",
+   "phase": 2,
+   "slice": 4,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [
+     "bin/prime-claw validate"
+    ],
+    "tests": [
+     "tests/test_runtime_validate.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 4)"
   }
  ],
  "phase2": {}

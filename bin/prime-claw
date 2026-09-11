@@ -17,7 +17,7 @@ Credential isolation: real credential values never touch this process's args,
 the repo, logs, or sandbox disk; only OpenShell providers hold them (R2-X-1).
 """
 from __future__ import annotations
-import argparse, base64, hashlib, json, os, shutil, subprocess, sys
+import argparse, base64, hashlib, json, os, re, shutil, subprocess, sys, time
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_CONFIG = os.path.join(REPO_ROOT, "config", "runtime.json")
@@ -576,6 +576,208 @@ def cmd_converge(cfg, args) -> int:
         print(f"converge: done (sandbox={name} converged to known-good state)")
     return 0
 
+
+# --------------------------------------------------------------------------
+# Slice 4 — validate (the acceptance gate) + version recording.
+# Consolidates scripts/validate-phase1-*.py into a single green/red verb and
+# records OpenShell/image/prime-agent/PG/pgvector/gbrain versions into a
+# committed evidence file so the runtime is re-validatable (R2-X-5).
+# --------------------------------------------------------------------------
+import re
+from datetime import datetime, timezone
+
+EVIDENCE_DIR = os.path.join(REPO_ROOT, "docs", "evidence")
+KEY_PREFIX_DEFAULT = "zdai_"
+_sleep = time.sleep  # injectable; tests stub to avoid real backoff
+
+
+def _redact(s: str) -> str:
+    s = re.sub(r"(openshell:resolve:env:v[0-9]+_)[A-Za-z0-9_]+", r"\1<ph>", s)
+    s = re.sub(r"(zdai_[A-Za-z0-9_-]{4})[A-Za-z0-9_-]+", r"\1<redacted>", s)
+    return s
+
+
+def _curl_probe(cfg, url, timeout=40):
+    code, out = sandbox_exec(
+        cfg,
+        "curl -sS -o /dev/null -w 'PC_HTTP=%{http_code}' --max-time 20 " + url + "; echo PC_EXIT=$?",
+        timeout=timeout)
+    m = re.search(r"PC_HTTP=(\d+)", out); e = re.search(r"PC_EXIT=(\d+)", out)
+    return {"http": m.group(1) if m else None, "exit": int(e.group(1)) if e else None,
+            "tail": _redact(out.strip().splitlines()[-1] if out.strip() else "")}
+
+
+def _validate_versions(cfg):
+    """Collect versions for the re-validatability record. Best-effort."""
+    v = {}
+    code, out = run([OPENSHELL, "--version"], timeout=15)
+    v["openshell_cli"] = out.strip().splitlines()[-1] if out.strip() else None
+    v["image"] = cfg.get("image")
+    stamp = os.path.join(REPO_ROOT, "docker", "runtime", ".build-stamp.json")
+    if os.path.exists(stamp):
+        try: v["image_inputs_sha256"] = json.load(open(stamp)).get("inputs_sha256")
+        except Exception: v["image_inputs_sha256"] = None
+    code, out = sandbox_exec(cfg, "echo prime-agent --version > /sandbox/.pc-ver.sh; export PATH=/sandbox/.npm-global/bin:$PATH; prime-agent --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1", timeout=60)
+    v["prime_agent"] = out.strip() or None
+    code, out = sandbox_exec(cfg, "echo gbrain --version >> /sandbox/.pc-ver.sh; export HOME=/sandbox; gbrain --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1", timeout=60)
+    v["gbrain"] = out.strip() or None
+    code, out = sandbox_exec(cfg, "echo psql-version >> /sandbox/.pc-ver.sh; export PATH=/usr/lib/postgresql/16/bin:$PATH; psql -h localhost -p 5433 -U gbrain -d postgres -tc 'select version();' 2>&1 | grep -oE 'PostgreSQL [0-9.]+' | head -1", timeout=60)
+    v["postgres"] = out.strip() or None
+    code, out = sandbox_exec(cfg, "echo pgvector >> /sandbox/.pc-ver.sh; export PATH=/usr/lib/postgresql/16/bin:$PATH; psql -h localhost -p 5433 -U gbrain -d gbrain -tc \"SELECT extversion FROM pg_extension WHERE extname='vector';\" 2>&1 | grep -oE '[0-9]+\\.[0-9]+' | head -1", timeout=60)
+    v["pgvector"] = out.strip() or None
+    return v
+
+
+def _validate_checks(cfg, args):
+    """Run the acceptance suite. Returns (checks, failures)."""
+    model = cfg.get("model", "anthropic.kimi-k3")
+    gw = cfg.get("ai_gateway_host", "ai-gateway.zende.sk")
+    provider = cfg.get("provider_name", "prime-claw-ai-gateway")
+    key_prefix = os.environ.get("PRIME_CLAW_KEY_PREFIX", KEY_PREFIX_DEFAULT)
+    spawn_dir = os.environ.get("PRIME_CLAW_SPAWN_PROJECT_DIR", "/sandbox/episode-target")
+    checks = []   # (id, gate, ok, detail)
+
+    # 1. sandbox present + Running.
+    phase, label, data = probe_sandbox(cfg)
+    checks.append(("sandbox-present", True, bool(phase and str(phase) not in ("absent", "Error")),
+                   "phase=%s" % phase))
+
+    # 2. deny-by-default egress: canary allowed, undeclared refused.
+    allowed = _curl_probe(cfg, "https://example.com/")
+    checks.append(("egress-canary-allowed", True, allowed["exit"] == 0 and allowed["http"] == "200",
+                   "example.com http=%s" % allowed["http"]))
+    denied = _curl_probe(cfg, os.environ.get("PRIME_CLAW_DENY_PROBE_URL", "https://example.org/"))
+    refused = denied["exit"] not in (0, None) and denied["http"] == "000" and "403" in denied["tail"]
+    checks.append(("egress-undeclared-refused", True, refused,
+                   "undeclared host refused (curl_exit=%s http=%s)" % (denied["exit"], denied["http"])))
+
+    # 3. prime-agent daemon healthy + persistent across exec.
+    code, out = sandbox_exec(cfg, "ls /tmp/prime-agent-*/daemon.sock 2>/dev/null | head -1", timeout=30)
+    sock = out.strip().splitlines()[-1] if out.strip() else ""
+    checks.append(("daemon-socket", True, bool(sock), sock or "missing"))
+    code, out = sandbox_exec(cfg, "export PATH=/sandbox/.npm-global/bin:$PATH; prime-agent status 2>/dev/null | grep -q daemon.sock && echo A=yes || echo A=no", timeout=30)
+    checks.append(("daemon-persists", True, "A=yes" in out, ""))
+
+    # 4. persistent REPL holds state (two-turn set/read).
+    js = ("import { ReplKernelManager } from '/sandbox/.npm-global/lib/node_modules/prime-agent/dist/core/kernel/repl-manager.js';\n"
+          "const k = new ReplKernelManager({ sessionId: 'pc-validate-repl', cwd: '/sandbox' });\n"
+          "await k.start();\n"
+          "await k.execute('pc_v = 40 + 1');\n"
+          "const r = await k.execute('pc_v + 1');\n"
+          "console.log('REPL_VAL=' + (r.result ?? '').trim());\n"
+          "await k.shutdown?.();\n")
+    b64 = base64.b64encode(js.encode()).decode()
+    code, out = sandbox_exec(cfg, "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"; echo " + b64 + " | base64 -d > /tmp/pc-repl.mjs; node /tmp/pc-repl.mjs 2>&1 | grep REPL_VAL", timeout=300)
+    m = re.search(r"REPL_VAL=(\S+)", out)
+    checks.append(("persistent-repl", True, bool(m and m.group(1) == "42"),
+                   "state=%s" % (m.group(1) if m else None)))
+
+    # 5. credentialed model call via the provider (placeholder; no key on disk).
+    code, out = sandbox_exec(cfg, "env | grep -oE '" + key_prefix + "[A-Za-z0-9_-]+' || true", timeout=30)
+    checks.append(("no-key-in-env", True, out.strip() == "", ""))
+    code, out = sandbox_exec(cfg, "grep -rIlE '" + key_prefix + "' /sandbox 2>/dev/null || true", timeout=60)
+    checks.append(("no-key-on-disk", True, out.strip() == "", ""))
+    bcall = ("export HOME=/sandbox PATH=/sandbox/.npm-global/bin:$PATH "
+             "NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n"
+             "export ANTHROPIC_API_KEY=\"$api_key\"\n"
+             "prime-agent -p --no-tools --no-session --model " + model + " \"Reply with exactly: AGENT_OK\" "
+             "2>&1 | grep -viE \"undici|trace-warnings\"\n")
+    code, out = sandbox_exec(cfg, bcall, timeout=150)
+    checks.append(("credentialed-model-call", True, "AGENT_OK" in _redact(out),
+                   "model=%s via %s" % (model, gw)))
+
+    # 6. brain serving: gbrain CLI + PG16 + pgvector + search round-trip + embedding.
+    code, out = sandbox_exec(cfg, "export HOME=/sandbox; gbrain --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1", timeout=30)
+    checks.append(("gbrain-cli", True, bool(out.strip()), "v%s" % out.strip()))
+    code, out = sandbox_exec(cfg, "export PATH=/usr/lib/postgresql/16/bin:$PATH; psql -h localhost -p 5433 -U gbrain -d postgres -tc 'select version();' 2>&1 | grep -c 'PostgreSQL 16'", timeout=30)
+    checks.append(("postgres-16", True, out.strip().startswith("1"), ""))
+    seed = ("export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH; cd /sandbox/brain && "
+            "printf '# Validator Probe\\n\\nprime-claw validate probe pgvector sandbox.\\n' | gbrain put validator-probe >/dev/null 2>&1; "
+            "gbrain search 'validator probe pgvector sandbox' 2>&1 | grep -c 'validator-probe'")
+    code, out = sandbox_exec(cfg, seed, timeout=90)
+    checks.append(("brain-search-roundtrip", True, bool(re.search(r"^\s*[1-9][0-9]*\s*$", out.strip().splitlines()[-1] if out.strip() else "")), ""))
+    emb = ("export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH; cd /sandbox/brain && "
+           "export OPENAI_API_KEY=\"$api_key\" OPENAI_BASE_URL=https://" + gw + "/v1; "
+           "printf '# EmbVal\\n\\nvalidate embedding probe.\\n' | gbrain put embval >/dev/null 2>&1; "
+           "psql -h localhost -p 5433 -U gbrain -d gbrain -tc 'SELECT vector_dims(embedding) FROM content_chunks WHERE embedding IS NOT NULL ORDER BY id DESC LIMIT 1;' 2>&1 | tr -d ' \\n'")
+    code, out = sandbox_exec(cfg, emb, timeout=150)
+    dims = out.strip().splitlines()[-1] if out.strip() else ""
+    checks.append(("brain-embedding-via-gateway", True, dims == "1536", "dims=%s" % dims))
+
+    # 7. spawn/reap via DaemonClient RPC (cwd scoped; reaped cleanly).
+    code, out = sandbox_exec(cfg, "git -C " + spawn_dir + " rev-parse --short HEAD 2>&1 | head -1", timeout=30)
+    checks.append(("spawn-target", True, code == 0 and bool(out.strip()), out.strip()))
+    rpc = ("import { DaemonClient } from '/sandbox/.npm-global/lib/node_modules/prime-agent/dist/modes/daemon/daemon-client.js';\n"
+           "const sock = process.argv[2], proj = process.argv[3], model = process.argv[4], name = process.argv[5];\n"
+           "const c = new DaemonClient(sock); let sid;\n"
+           "try { await c.connect();\n"
+           "  const cr = await c.request({ type: 'create', name, config: { cwd: proj, model, noSession: true } });\n"
+           "  if (!cr || cr.success === false) { console.log('RPC_ERR=' + (cr && cr.error)); }\n"
+           "  else { sid = (cr.data && cr.data.activeSessionId) || cr.activeSessionId; console.log('CREATED=' + sid);\n"
+           "    const st = await c.request({ type: 'get_state', activeSessionId: sid });\n"
+           "    console.log('CWD=' + ((st && st.data && st.data.cwd) || st.cwd));\n"
+           "    const kl = await c.request({ type: 'kill', activeSessionId: sid });\n"
+           "    console.log('KILL=' + (kl && kl.success !== false));\n"
+           "    const ls = await c.request({ type: 'list' });\n"
+           "    console.log('STILL=' + JSON.stringify(ls).includes(sid)); } }\n"
+           "catch (e) { console.log('RPC_ERR=' + ((e && e.message) || e)); }\n"
+           "finally { try { if (sid) await c.request({ type: 'kill', activeSessionId: sid }); } catch (e2) {} if (c.close) c.close(); }\n")
+    rb64 = base64.b64encode(rpc.encode()).decode()
+    name = "pc-val-" + datetime.now(timezone.utc).strftime("%H%M%S")
+    rshell = ("export HOME=/sandbox PATH=/sandbox/.npm-global/bin:$PATH NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\" ANTHROPIC_API_KEY=\"$api_key\"\n"
+              "prime-agent status >/dev/null 2>&1 || (nohup prime-agent --mode daemon --offline >/sandbox/.prime-claw/daemon.log 2>&1 & sleep 6)\n"
+              "echo " + rb64 + " | base64 -d > /tmp/pc-rpc.mjs\n"
+              "for i in 1 2 3 4 5; do S=$(ls /tmp/prime-agent-*/daemon.sock 2>/dev/null | head -1); [ -n \"$S\" ] && break; sleep 2; done\n"
+              "node /tmp/pc-rpc.mjs \"$S\" " + spawn_dir + " " + model + " " + name + " 2>&1 | grep -E 'CREATED=|CWD=|KILL=|STILL=|RPC_ERR='\n")
+    sid = cwd = None; kill = False; still = True
+    for _ in range(4):
+        code, out = sandbox_exec(cfg, rshell, timeout=120)
+        def _kv(o, k):
+            for ln in o.splitlines():
+                if ln.startswith(k + "="): return ln.split("=", 1)[1].strip()
+            return None
+        sid = _kv(out, "CREATED"); cwd = _kv(out, "CWD")
+        kill = _kv(out, "KILL") == "true"; still = _kv(out, "STILL") == "true"
+        if sid and sid != "undefined": break
+        _sleep(3)
+    checks.append(("spawn-reap-rpc", True,
+                   bool(sid and sid != "undefined" and cwd == spawn_dir and kill and not still),
+                   "id=%s cwd=%s kill=%s reaped=%s" % (sid, cwd, kill, not still)))
+
+    failures = [cid for (cid, gate, ok, d) in checks if gate and not ok]
+    return checks, failures
+
+
+def cmd_validate(cfg, args) -> int:
+    """End-to-end acceptance gate. Exit 0 = all GATE checks pass."""
+    if getattr(args, "dry_run", False):
+        print("dry_run: validate = sandbox-present, egress deny-by-default, daemon, "
+              "persistent REPL, credentialed model call, brain (CLI/PG/pgvector/"
+              "search/embedding), spawn/reap RPC; record versions -> docs/evidence/")
+        return 0
+    name = cfg["sandbox_name"]
+    phase, label, data = probe_sandbox(cfg)
+    if data is None:
+        print(f"error: sandbox {name} absent; run 'prime-claw create' first", file=sys.stderr)
+        return 1
+    print(f"validate: {name} (image={cfg.get('image')})")
+    versions = _validate_versions(cfg)
+    checks, failures = _validate_checks(cfg, args)
+    for cid, gate, ok, d in checks:
+        print("  [%s] %s%s" % ("PASS" if ok else "FAIL", cid, (" -- " + d) if d else ""))
+    os.makedirs(EVIDENCE_DIR, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ev = {"verb": "validate", "sandbox": name, "captured_at": datetime.now(timezone.utc).isoformat(),
+          "result": "PASS" if not failures else "FAIL", "versions": versions,
+          "checks": [{"id": c, "gate": g, "pass": o, "detail": d} for (c, g, o, d) in checks],
+          "failures": failures}
+    path = os.path.join(EVIDENCE_DIR, "validate-%s.json" % stamp)
+    with open(path, "w") as fh:
+        fh.write(json.dumps(ev, indent=2) + "\n")
+    print("evidence -> " + os.path.relpath(path, REPO_ROOT))
+    print("== validate: %s ==" % ("PASS" if not failures else "FAIL (%d)" % len(failures)))
+    return 0 if not failures else 1
+
 def _not_implemented(verb):
     def _run(cfg, args):
         print(f"prime-claw {verb}: not yet implemented (see EXECUTION_PLAN.md).", file=sys.stderr)
@@ -608,7 +810,7 @@ VERBS = {
     "create": cmd_create,
     "converge": cmd_converge,
     "build": cmd_build,
-    "validate": _not_implemented("validate"),
+    "validate": cmd_validate,
     "recover": _not_implemented("recover"),
     "destroy": _not_implemented("destroy"),
 }
