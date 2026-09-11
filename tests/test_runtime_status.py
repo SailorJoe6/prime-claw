@@ -187,8 +187,11 @@ def test_status_bad_component_exit1(monkeypatch, tmp_path, capsys):
 # --- not-implemented stubs -----------------------------------------------------
 
 def test_stub_verbs_return2_and_dry_run(tmp_path, capsys):
-    for v in ("create", "converge", "build", "validate", "recover", "destroy"):
+    # Verbs not yet implemented as of Slice 2. `build` and `status` ARE live
+    # (Slice 2 / Slice 1); the rest remain explicit stubs until their slice.
+    for v in ("create", "converge", "validate", "recover", "destroy"):
         rc = pc.VERBS[v](cfg(), Args(dry_run=True))
-        assert rc == 2
+        assert rc == 2, v
     err = capsys.readouterr().err
     assert "not yet implemented" in err
+    assert pc.VERBS["build"] is pc.cmd_build  # implemented in Slice 2

@@ -68,7 +68,7 @@ diagnosable from day one.
 - Tests: `tests/test_runtime_status.py` (CLI parsing, probe shaping, dry-run).
 - Inventory: R2-A-1, R2-A-3, R2-A-4, R2-C-1 (partial), R2-X-3.
 
-### Slice 2 — Image stage (reproducible build)
+### Slice 2 — Image stage (reproducible build) ✅ DONE (2026-09-11)
 
 Make the runtime image build reproducible and idempotent.
 - Migrate `docker/phase1-brain.Dockerfile` → `docker/runtime.Dockerfile`;

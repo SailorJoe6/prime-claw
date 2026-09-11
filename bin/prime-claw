@@ -17,7 +17,7 @@ Credential isolation: real credential values never touch this process's args,
 the repo, logs, or sandbox disk; only OpenShell providers hold them (R2-X-1).
 """
 from __future__ import annotations
-import argparse, json, os, subprocess, sys
+import argparse, hashlib, json, os, shutil, subprocess, sys
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_CONFIG = os.path.join(REPO_ROOT, "config", "runtime.json")
@@ -153,6 +153,151 @@ def cmd_status(cfg, args) -> int:
     return 0
 
 
+
+# --------------------------------------------------------------------------
+# Slice 2 — image stage (R2-B-1, R2-X-5). Reproducible, idempotent build of
+# docker/runtime.Dockerfile. Credential isolation holds: no secrets are staged.
+# --------------------------------------------------------------------------
+
+DOCKER = os.environ.get("DOCKER_BIN", "docker")
+TEMPLATES_FALLBACK_COMMIT = "d337920c1"  # zbrain templates/ restore (U2 upstream break)
+GBRAIN_REQUIRED = ("package.json", "bun.lock", "tsconfig.json", "src")
+GBRAIN_OPTIONAL_DIRS = ("admin", "skills")  # copied if present, else empty dir staged
+
+
+def _zbrain_src() -> str:
+    return os.environ.get("PRIME_CLAW_ZBRAIN_SRC") or os.path.expanduser("~/zbrain")
+
+
+def _ctx_dir() -> str:
+    return os.path.join(REPO_ROOT, "docker", "runtime", "gbrain")
+
+
+def stage_gbrain_context(zbrain_src: str, ctx: str, dry_run: bool = False) -> dict:
+    """Stage the gbrain build context from the operator's zbrain checkout.
+
+    Prefers a real `$ZBRAIN_SRC/templates`; restores templates from pinned git
+    history only as a fallback (the zbrain fork deleted templates/ upstream while
+    src still embeds it — see docs/derisk/U2.md). Returns a manifest describing
+    what was staged. Never stages credentials.
+    """
+    zbrain_src = os.path.expanduser(zbrain_src)
+    for req in GBRAIN_REQUIRED:
+        if not os.path.exists(os.path.join(zbrain_src, req)):
+            raise FileNotFoundError(
+                f"zbrain checkout missing {req!r} at {zbrain_src} "
+                "(set PRIME_CLAW_ZBRAIN_SRC)")
+    manifest = {"zbrain_src": zbrain_src, "templates": None, "copied": []}
+    if dry_run:
+        manifest["templates"] = ("real" if os.path.isdir(os.path.join(zbrain_src, "templates"))
+                                 else f"fallback:{TEMPLATES_FALLBACK_COMMIT}")
+        return manifest
+
+    shutil.rmtree(ctx, ignore_errors=True)
+    os.makedirs(ctx, exist_ok=True)
+    for f in ("package.json", "bun.lock", "tsconfig.json"):
+        shutil.copy(os.path.join(zbrain_src, f), ctx)
+    shutil.copytree(os.path.join(zbrain_src, "src"), os.path.join(ctx, "src"))
+    manifest["copied"] = ["package.json", "bun.lock", "tsconfig.json", "src"]
+    for d in GBRAIN_OPTIONAL_DIRS:
+        src = os.path.join(zbrain_src, d)
+        if os.path.isdir(src):
+            shutil.copytree(src, os.path.join(ctx, d))
+        else:
+            os.makedirs(os.path.join(ctx, d), exist_ok=True)
+        manifest["copied"].append(d)
+    # templates: prefer the real checkout, else restore from pinned git history.
+    tpl = os.path.join(zbrain_src, "templates")
+    if os.path.isdir(tpl):
+        shutil.copytree(tpl, os.path.join(ctx, "templates"))
+        manifest["templates"] = "real"
+    else:
+        code, out = run(["git", "-C", zbrain_src, "archive", TEMPLATES_FALLBACK_COMMIT, "templates"])
+        if code != 0:
+            raise RuntimeError(f"templates restore failed: {out.strip()[:160]}")
+        import tarfile, io as _io
+        with tarfile.open(fileobj=_io.BytesIO(out.encode() if isinstance(out, str) else out)) as tf:
+            tf.extractall(ctx)
+        manifest["templates"] = f"fallback:{TEMPLATES_FALLBACK_COMMIT}"
+    return manifest
+
+
+def _build_inputs_fingerprint(cfg) -> str:
+    """Fingerprint of build inputs: Dockerfile + required zbrain sources +
+    templates mode. A change invalidates the skip and forces a rebuild."""
+    h = hashlib.sha256()
+    df = os.path.join(REPO_ROOT, "docker", "runtime.Dockerfile")
+    with open(df, "rb") as f:
+        h.update(f.read())
+    z = _zbrain_src()
+    for rel in ("package.json", "bun.lock", "tsconfig.json"):
+        p = os.path.join(z, rel)
+        h.update(rel.encode())
+        if os.path.exists(p):
+            with open(p, "rb") as f:
+                h.update(f.read())
+    h.update(("templates:real" if os.path.isdir(os.path.join(z, "templates"))
+              else f"templates:fallback:{TEMPLATES_FALLBACK_COMMIT}").encode())
+    return h.hexdigest()
+
+
+def _stamp_path() -> str:
+    return os.path.join(REPO_ROOT, "docker", "runtime", ".build-stamp.json")
+
+
+def _docker_image_exists(tag: str) -> bool:
+    code, _ = run([DOCKER, "image", "inspect", tag], timeout=30)
+    return code == 0
+
+
+def cmd_build(cfg, args) -> int:
+    tag = cfg["image"]
+    df = os.path.join(REPO_ROOT, "docker", "runtime.Dockerfile")
+    ctx = _ctx_dir()
+    zsrc = _zbrain_src()
+    force = getattr(args, "force", False)
+
+    if args.dry_run:
+        man = stage_gbrain_context(zsrc, ctx, dry_run=True)
+        print(f"dry_run: would stage gbrain context from {zsrc} (templates={man['templates']})")
+        print(f"dry_run: would run: {DOCKER} build -f {df} -t {tag} {os.path.join(REPO_ROOT,'docker')}")
+        print("host_credential_access: prohibited")
+        return 0
+
+    # Idempotency: skip if image exists, inputs unchanged, and not --force.
+    fp = _build_inputs_fingerprint(cfg)
+    stamp = {}
+    if os.path.exists(_stamp_path()):
+        try:
+            stamp = json.load(open(_stamp_path()))
+        except Exception:
+            stamp = {}
+    if (not force and _docker_image_exists(tag)
+            and stamp.get("image") == tag and stamp.get("inputs_sha256") == fp):
+        print(f"build: image {tag} up to date (inputs unchanged); skipping. Use --force to rebuild.")
+        return 0
+
+    print(f"[1/2] staging gbrain build context from {zsrc} ...")
+    try:
+        man = stage_gbrain_context(zsrc, ctx, dry_run=False)
+    except (FileNotFoundError, RuntimeError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(f"      templates: {man['templates']}")
+
+    print(f"[2/2] building image {tag} ...")
+    code = subprocess.call([DOCKER, "build", "-f", df, "-t", tag,
+                            os.path.join(REPO_ROOT, "docker")])
+    if code != 0:
+        print(f"error: docker build failed (exit {code})", file=sys.stderr)
+        return code
+    json.dump({"image": tag, "inputs_sha256": fp, "templates": man["templates"],
+               "built_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()},
+              open(_stamp_path(), "w"), indent=2)
+    print(f"build: done (image={tag})")
+    return 0
+
+
 def _not_implemented(verb):
     def _run(cfg, args):
         print(f"prime-claw {verb}: not yet implemented (see EXECUTION_PLAN.md).", file=sys.stderr)
@@ -171,6 +316,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="verb", required=True)
     for v in ("status", "create", "converge", "build", "validate", "recover", "destroy"):
         sp = sub.add_parser(v)
+        if v == "build":
+            sp.add_argument("--force", action="store_true", help="rebuild even if inputs unchanged")
         if v == "recover":
             sp.add_argument("--signature", help="known failure signature to recover from")
         if v == "destroy":
@@ -182,7 +329,7 @@ VERBS = {
     "status": cmd_status,
     "create": _not_implemented("create"),
     "converge": _not_implemented("converge"),
-    "build": _not_implemented("build"),
+    "build": cmd_build,
     "validate": _not_implemented("validate"),
     "recover": _not_implemented("recover"),
     "destroy": _not_implemented("destroy"),

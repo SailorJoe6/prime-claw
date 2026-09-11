@@ -545,6 +545,40 @@
     ]
    },
    "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+  },
+  {
+   "id": "R2-B-1",
+   "priority": "GATE",
+   "summary": "Image stage: bin/prime-claw build builds the runtime image reproducibly + idempotently from docker/runtime.Dockerfile (staged gbrain context; prefers real $ZBRAIN_SRC/templates, git-history fallback only).",
+   "status": "met (Slice 2: staging real-path smoke-verified; build tested offline)",
+   "phase": 2,
+   "slice": 2,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_image.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 2)"
+  },
+  {
+   "id": "R2-X-5",
+   "priority": "GATE",
+   "summary": "Reproducibility: build records image tag + inputs fingerprint (docker/runtime/.build-stamp.json); rebuild on change or --force.",
+   "status": "in-progress (Slice 2: build inputs fingerprinted+stamped; OpenShell/image/runtime versions recorded in Slice 4 validate)",
+   "phase": 2,
+   "slice": 2,
+   "proven_by": {
+    "apply": [],
+    "check": [],
+    "validate": [],
+    "tests": [
+     "tests/test_runtime_image.py"
+    ]
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 2)"
   }
  ],
  "phase2": {}
