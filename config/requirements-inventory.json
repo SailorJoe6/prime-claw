@@ -584,7 +584,7 @@
    "id": "R2-A-2",
    "priority": "GATE",
    "summary": "create + converge: fresh->fully-running in one command; converge re-runs all stages on existing sandbox to the same known-good state.",
-   "status": "in-progress (Slice 3a: create + stages; converge lands in 3b)",
+   "status": "met (Slice 3a+3b: create + converge; live E2E against the gateway deferred to Slice 4 validate)",
    "phase": 2,
    "slice": 3,
    "proven_by": {
@@ -686,7 +686,7 @@
    "id": "R2-X-2",
    "priority": "GATE",
    "summary": "Configurability: stage inputs (gateway host/port, provider, paths, versions) via config/runtime.json + PRIME_CLAW_* env overrides, not hardcoded.",
-   "status": "in-progress (Slice 3a: stage inputs parameterized)",
+   "status": "met (Slice 3: stage inputs parameterized via config/runtime.json + PRIME_CLAW_* overrides)",
    "phase": 2,
    "slice": 3,
    "proven_by": {

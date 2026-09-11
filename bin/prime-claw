@@ -547,6 +547,35 @@ def cmd_create(cfg, args) -> int:
         print(f"create: done (sandbox={cfg['sandbox_name']} image={cfg['image']})")
     return 0
 
+
+def cmd_converge(cfg, args) -> int:
+    """Re-run all runtime stages against the EXISTING sandbox to converge it to
+    the known-good state. Unlike create, it does NOT delete/recreate the sandbox:
+    the sandbox stage converges policy only when the sandbox already exists.
+    Use after drift or a partial failure; use create for a fresh bring-up."""
+    name = cfg["sandbox_name"]
+    if not args.dry_run and probe_sandbox(cfg)[2] is None:
+        print(f"error: sandbox {name} absent; use 'prime-claw create' for fresh bring-up",
+              file=sys.stderr)
+        return 1
+    if args.dry_run:
+        print("dry_run: converge = build -> provider -> sandbox(converge, no recreate) "
+              "-> prime-agent -> brain -> spawn -> policy")
+    for label, fn in [("build", cmd_build),
+                      ("provider", stage_provider),
+                      ("sandbox", lambda c, a: stage_sandbox(c, a, force_fresh=False)),
+                      ("prime-agent", stage_prime_agent),
+                      ("brain", stage_brain),
+                      ("spawn", stage_spawn),
+                      ("policy", stage_policy)]:
+        rc = fn(cfg, args)
+        if rc != 0:
+            print(f"error: converge failed at stage '{label}' (exit {rc})", file=sys.stderr)
+            return rc
+    if not args.dry_run:
+        print(f"converge: done (sandbox={name} converged to known-good state)")
+    return 0
+
 def _not_implemented(verb):
     def _run(cfg, args):
         print(f"prime-claw {verb}: not yet implemented (see EXECUTION_PLAN.md).", file=sys.stderr)
@@ -577,7 +606,7 @@ def build_parser() -> argparse.ArgumentParser:
 VERBS = {
     "status": cmd_status,
     "create": cmd_create,
-    "converge": _not_implemented("converge"),
+    "converge": cmd_converge,
     "build": cmd_build,
     "validate": _not_implemented("validate"),
     "recover": _not_implemented("recover"),

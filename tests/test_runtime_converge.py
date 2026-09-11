@@ -177,3 +177,61 @@ def test_create_dry_run_no_side_effects(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(pc, "stage_policy", lambda c, a: 0)
     rc = pc.cmd_create(cfg(tmp_path), Args(dry_run=True))
     assert rc == 0 and "dry_run" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# Slice 3b — converge
+# --------------------------------------------------------------------------
+
+def test_converge_verb_is_implemented():
+    assert pc.VERBS["converge"] is pc.cmd_converge
+
+
+def _stub_stages(monkeypatch, order):
+    def rec(label):
+        def f(c, a): order.append(label); return 0
+        return f
+    monkeypatch.setattr(pc, "cmd_build", rec("build"))
+    monkeypatch.setattr(pc, "stage_provider", rec("provider"))
+    monkeypatch.setattr(pc, "stage_sandbox",
+        lambda c, a, force_fresh=False: order.append("sandbox") or 0)
+    monkeypatch.setattr(pc, "stage_prime_agent", rec("prime-agent"))
+    monkeypatch.setattr(pc, "stage_brain", rec("brain"))
+    monkeypatch.setattr(pc, "stage_spawn", rec("spawn"))
+    monkeypatch.setattr(pc, "stage_policy", rec("policy"))
+
+
+def test_converge_runs_all_stages_no_recreate(tmp_path, monkeypatch):
+    monkeypatch.setattr(pc, "probe_sandbox", lambda c: (True, "Ready", {"phase": "Ready"}))
+    order = []
+    _stub_stages(monkeypatch, order)
+    rc = pc.cmd_converge(cfg(tmp_path), Args())
+    assert rc == 0
+    assert order == ["build", "provider", "sandbox", "prime-agent", "brain", "spawn", "policy"]
+
+
+def test_converge_errors_when_sandbox_absent(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(pc, "probe_sandbox", lambda c: (None, "absent", None))
+    rc = pc.cmd_converge(cfg(tmp_path), Args())
+    assert rc == 1
+    assert "use 'prime-claw create'" in capsys.readouterr().err
+
+
+def test_converge_dry_run_skips_presence_check(tmp_path, monkeypatch, capsys):
+    # Dry-run must not require the sandbox to exist and must not probe it.
+    monkeypatch.setattr(pc, "probe_sandbox",
+        lambda c: (_ for _ in ()).throw(AssertionError("must not probe on dry-run")))
+    order = []
+    _stub_stages(monkeypatch, order)
+    rc = pc.cmd_converge(cfg(tmp_path), Args(dry_run=True))
+    assert rc == 0 and "no recreate" in capsys.readouterr().out
+
+
+def test_converge_stops_on_stage_failure(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(pc, "probe_sandbox", lambda c: (True, "Ready", {"phase": "Ready"}))
+    monkeypatch.setattr(pc, "cmd_build", lambda c, a: 0)
+    monkeypatch.setattr(pc, "stage_provider", lambda c, a: 0)
+    monkeypatch.setattr(pc, "stage_sandbox", lambda c, a, force_fresh=False: 9)  # fail
+    rc = pc.cmd_converge(cfg(tmp_path), Args())
+    assert rc == 9
+    assert "stage 'sandbox'" in capsys.readouterr().err
