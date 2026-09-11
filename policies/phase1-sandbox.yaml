@@ -57,17 +57,17 @@ network_policies:
   # env values (openshell:..._api_key etc.) into real auth on the wire. The
   # sandbox process only ever holds placeholders; real keys never touch disk.
   # Binaries: curl (the validator's direct probe) + node (prime-agent runtime).
-  model_anthropic:
-    name: model-anthropic-credentialed
+  # Slice 3 (corrected, D12/D13/D14): the host instance is gateway-fronted.
+  # ALL inference goes to the shared AI Gateway ai-gateway.zende.sk
+  # (/anthropic, /v1, /bedrock), not provider-native hosts. This is the ONLY
+  # credentialed egress. The sandbox process only ever holds the opaque
+  # placeholder; the real gateway key is substituted at L7 behind this
+  # inspected rest endpoint. Binaries: curl (validator probe) + node
+  # (prime-agent runtime).
+  model_ai_gateway:
+    name: model-ai-gateway-credentialed
     endpoints:
-      - { host: api.anthropic.com, port: 443, protocol: rest, access: read-write }
-    binaries:
-      - path: /usr/bin/curl
-      - path: /usr/bin/node
-  model_openai:
-    name: model-openai-credentialed
-    endpoints:
-      - { host: api.openai.com, port: 443, protocol: rest, access: read-write }
+      - { host: ai-gateway.zende.sk, port: 443, protocol: rest, access: read-write }
     binaries:
       - path: /usr/bin/curl
       - path: /usr/bin/node

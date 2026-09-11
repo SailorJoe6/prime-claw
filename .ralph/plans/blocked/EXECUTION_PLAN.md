@@ -177,3 +177,27 @@ auditable.
 | R-X-3 | 3, 4, 5 (verdict docs) |
 | R-X-4 | all (operating rule) |
 | R-X-2, R-X-6 | 6 |
+
+---
+
+## ⛔ BLOCKED (2026-09-11) — Slice 3 / R-U1-6 GATE track
+
+**Blocker.** The Zendesk AI Gateway (`ai-gateway.zende.sk`) is behind an
+istio-envoy mesh that returns `403 RBAC: access denied` to ANY request
+arriving through the OpenShell L7 MITM proxy — including a bare credentialess
+`GET /`. Host-direct calls succeed (200) with the identical key, URL, and
+headers across HTTP/1.1 + HTTP/2, `x-api-key` or `Authorization: Bearer`, and
+explicit `:443` authority; no mTLS is required. The only remaining
+differentiator is the OpenShell proxy's egress identity. OpenShell's
+credential-injection model REQUIRES L7 MITM to rewrite the placeholder, and it
+has no TLS-passthrough enforcement mode (only `enforce`/`audit`) — a direct
+conflict with this gateway's mesh RBAC. Evidence:
+`docs/derisk/evidence/phase1-credentials-blocker-20260911T171531Z.json`.
+
+**Unblock condition (operator decision required, R-X-4):** either
+(A) Zendesk platform authorizes the OpenShell proxy's egress to the gateway's
+istio RBAC, or (B) the operator accepts an alternative credential path that
+does not violate R-X-5 (no real credential material on sandbox disk). Until
+then the AI Gateway GATE track cannot be proven. The openai-codex track (real
+api.openai.com) is unaffected and could be proven independently if the
+operator wants a partial R-U1-6.
