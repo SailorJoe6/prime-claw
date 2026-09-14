@@ -4,10 +4,14 @@ Beads: `prime-claw-zwg` (P1). Index: [SPECIFICATION.md](SPECIFICATION.md). Requi
 
 Each decision lists the requirement IDs it satisfies.
 
-## D3a-A — Self-contained container (brain lives inside the sandbox)
+## D3a-A — Self-contained container; prime-agent is the mode-(a) harness-as-controller
 **Decision:** The brain is cloned into the sandbox and indexed by the in-sandbox
-gbrain+Postgres. The claw does **not** act as a thin client to an external brain over
-MCP/HTTP for this phase.
+gbrain+Postgres. prime-agent **is the mode-(a) harness-as-controller**: it drives the
+gbrain CLI directly, manages/administers the in-sandbox brain database, and (in later
+slices) manages the collection channels and signal sweep. It does **not** act as a thin
+MCP client of an external brain for this phase. Mode (b) — prime-agent as a participant
+MCP client of a gbrain — is supported as a secondary goal (we intend to add prime-agent as
+a first-class upstream harness, which spans both modes), but is NOT the tracer bullet.
 **Satisfies:** R3a-1, R3a-2.
 **Rationale:** Operator direction — "prime-claw should evolve to completely replace
 gbrain/zbrain's container; the brain lives in it." A self-contained container keeps
@@ -77,6 +81,21 @@ scope.
 **Rationale:** Operator's chosen bar — thin but whole, proving both directions of the
 brain loop without yet owning the full write/sync-back machinery.
 
+## D3a-H — Prefer upstream gbrain; fork only to upstream a prime-agent harness PR, then retire
+**Decision:** Build prime-claw against **upstream `garrytan/gbrain`** (not zbrain's stripped
+fork). To add prime-agent as a first-class upstream harness (spanning mode a controller and
+mode b participant), we will **fork gbrain solely to author the PR**, monitor upstream, and
+**retire the fork once the PR is accepted/merged**. Walk-up project config (zbrain's delta)
+is NOT needed in the single-brain container (GBRAIN_HOME/env suffices); zbrain's claw-skill
+"strip" is unnecessary because unused skills are simply omitted. A Slice-0 spike must PROVE
+upstream gbrain runs correctly under prime-agent-as-controller in the sandbox; if it reveals
+a hard, inelegant blocker, the documented fallback is a maintained thin fork.
+**Satisfies:** R3a-8, R3a-9, R3a-2.
+**Rationale:** prime-claw's goal is prime-agent-as-controller of a gbrain; that capability
+belongs upstream so anyone's prime-agent gets a brain. A permanent fork is a maintenance
+burden whose original justifications (OpenClaw-only, hard-coded taxonomy, walk-up config) are
+now obsolete upstream.
+
 ## Decision → Requirement traceability matrix
 
 | Decision | Requirements |
@@ -88,6 +107,7 @@ brain loop without yet owning the full write/sync-back machinery.
 | D3a-E | R3a-8, R3a-11 |
 | D3a-F | R3a-9 |
 | D3a-G | R3a-3, R3a-4, R3a-6 |
+| D3a-H | R3a-2, R3a-8, R3a-9 |
 
 GATE requirements R3a-1..7, R3a-9..11 are covered by at least one decision.
 (R3a-5 lifecycle integration and R3a-6 acceptance gate are realized directly by the

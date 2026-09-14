@@ -29,6 +29,14 @@ Priority: **GATE** = must hold for the slice to be accepted; **NICE** = desired,
   proves R3a-1..4 green and records evidence (page count, the write receipt) under
   `docs/evidence/`.
 
+- **R3a-0 (GATE) — Slice-0 upstream-gbrain spike.** Before the rest of the slice, prove in
+  real code that **upstream `garrytan/gbrain`** runs correctly in the OpenShell sandbox with
+  **prime-agent as the mode-(a) harness-as-controller** (drives the gbrain CLI + manages the
+  in-sandbox DB). The spike also surfaces whether any prime-agent-vs-other-harness difference
+  is too big to overcome elegantly (deciding D3a-H's fallback). Verdict GO = build on
+  upstream (fork only to author the prime-agent-harness PR, then retire it); verdict NO-GO =
+  documented thin-fork fallback. Mode (b) participant-MCP is secondary; not required for GO.
+
 ## Non-functional / constraints
 
 - **R3a-7 (GATE) — Credential isolation.** Inference auth stays on the host L7 provider;

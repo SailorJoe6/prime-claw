@@ -50,24 +50,32 @@ long-run goal is that prime-claw **fully replaces zbrain as the brain container*
   instance repo (a future `prime-pva`, replacing `ralph-pva`) will hold Joe's brain config
   and personal skills. prime-claw itself must stay generic.
 - **Novel surface.** Two distinct subsystems, held separate:
-  - **gbrain (knowledge CLI):** CLI/sync/embeddings/sources/links are exhaustively tested
-    upstream (zbrain ~1,626 tests) and now multi-harness + schema-pack. gbrain's harness
-    install path (NOT "recipes" — in gbrain parlance a *recipe* is a channel-connection
-    guide; the harness install has no one-word name) makes gbrain the core brain of a CLI
-    coding agent via: auto-loaded instructions (AGENTS.md/CLAUDE.md) + skill files +
-    a **stdio MCP server** (`<harness> mcp add gbrain -- gbrain serve --surface verbs`) +
-    a native scheduler. gbrain ships this install for `claude-code | codex | opencode |
-    openclaw | ...` but **not prime-agent**.
-  - **prime-agent fits that harness model with NO blockers** (capability-verified against
-    the install path): it auto-loads AGENTS.md/CLAUDE.md by default, discovers
-    `.agents/skills/`, has a scheduler (`prime-agent schedule`), sessions for
-    cross-conversation recall verification, AND supports stdio MCP servers
-    (`prime-agent mcp add gbrain -- gbrain serve --surface verbs`). So prime-agent is a
-    conventional CLI coding-agent harness from gbrain's perspective; the only gap is a
-    registered `prime-agent` harness adapter (upstream has a `HARNESS_ADAPTERS` extension
-    point + a `generic`/`manual` fallback that works today). Whether prime-claw builds on
-    upstream gbrain (preferred — contribute a prime-agent adapter) or zbrain's fork is an
-    OPEN fork-vs-upstream decision resolved by the Slice-0 spike (open question 5).
+  - **gbrain (knowledge CLI) — TWO DISTINCT RELATIONSHIPS (do not conflate):**
+    - **Mode (a) harness-as-controller** — the agent IS the claw. It owns and drives the
+      gbrain: drives the **gbrain CLI** directly (`sync`, `extract`, `embed`, `agent run`,
+      `autopilot`, `jobs work`, `maintain`, `dream`, `capture`), **manages/administers the
+      brain's database** (init, engine, migrations, backups), manages the **collection
+      channels** (gbrain `recipes/`) and launches the **signal sweep**. This is the
+      zbrain/ralph-pva pattern and gbrain's `BOOTSTRAP_FOR_AGENTS.md` path.
+    - **Mode (b) agent-as-participant** — an agent (mostly a coding agent) **connects to** an
+      *existing* gbrain over **MCP** (`<harness> mcp add gbrain -- gbrain serve`, or hosted
+      `gbrain serve --http` + OAuth) to be informed and participate. It does NOT own or
+      administer the brain. This is `connect-coding-agent.md` / `INSTALL_FOR_AGENTS.md` /
+      `gbrain connect`.
+    - **OUR GOAL (the whole point of prime-claw):** prime-agent is the **mode-(a)
+      harness-as-controller** — the core claw that drives, manages, and maintains the
+      gbrain (CLI + DB + channels + sweep). Mode (a) is the priority. Because we are
+      contemplating adding prime-agent as a first-class upstream harness, we should also
+      support **mode (b)** (prime-agent as a participant client of a gbrain) — but (b) is
+      secondary to (a).
+    - gbrain's harness install path (NOT "recipes" — a *recipe* is a channel-connection
+      guide) makes gbrain the core brain of a CLI agent via auto-loaded instructions
+      (AGENTS.md/CLAUDE.md) + skill files + a stdio MCP server + a native scheduler.
+      gbrain ships this for `claude-code | codex | opencode | openclaw | ...` but **not
+      prime-agent**. prime-agent fits the harness model with no capability blockers
+      (auto-loads AGENTS.md/CLAUDE.md, discovers `.agents/skills/`, has `schedule`,
+      sessions, and stdio MCP) — so an upstream prime-agent harness adapter appears
+      feasible; the Slice-0 spike proves it in real code.
   - **gstack browse (web scraping):** the container proxy-shim + host-bridge are
     **zbrain-local inventions, never upstreamed** (3c ports them). prime-claw does NOT
     re-test them; it ports + integrates them against stock upstream gstack browse.
@@ -158,12 +166,18 @@ git operation **out of scope for 3a** (lands with the full skill port in 3b).
    validated against.)
 4. **Exact validate surface** — which checks are gate vs. nice (page count > 0, a known-fact
    query, the write receipt, embedding freshness).
-5. **gbrain: fork vs upstream (de-risk spike).** Does prime-claw build on **upstream
-   `garrytan/gbrain`** (v0.50+, multi-harness, schema packs — adding prime-agent as a new
-   harness) or on **zbrain's stripped fork** (which still uniquely carries walk-up
-   project-scoped config + the claw-skill strip)? Resolved by a Slice-0 spike: prove whether
-   upstream gbrain + prime-agent runs correctly in the sandbox. Hypothesis = upstream;
-   fallback = thin fork. (This is gbrain only — the browse shim/bridge question is settled:
-   they are ours, ported at 3c.)
+5. **gbrain: upstream-vs-fork (Slice-0 spike — the strategy is decided; the spike proves
+   feasibility).** **Strategy (settled):** we WANT to use **upstream `garrytan/gbrain`** as
+   prime-claw's driven brain (mode a) rather than maintain zbrain's stripped fork. Upstream
+   is multi-harness + schema-pack; zbrain's walk-up-config delta is NOT needed in a
+   single-brain container (GBRAIN_HOME/env suffices); zbrain's "strip" is unnecessary because
+   unused claw skills can simply be omitted. **To add prime-agent as a first-class upstream
+   harness we will fork gbrain solely to author the PR, then monitor upstream and RETIRE the
+   fork once the PR is accepted/merged.** The Slice-0 spike's job is to PROVE (in real code,
+   not analysis) that upstream gbrain + prime-agent-as-controller runs correctly in the
+   OpenShell sandbox, and to surface any prime-agent-vs-other-harness differences too big to
+   overcome elegantly. Preliminary investigation suggests there are none, but the spike
+   decides. If the spike finds a hard blocker, the documented fallback is a maintained thin
+   fork. (gbrain only — the browse shim/bridge are zbrain-local, ported at 3c.)
 
 These are planning concerns, not spec blockers — the WHAT is settled above.
