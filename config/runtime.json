@@ -14,5 +14,8 @@
   "ai_gateway_host": "ai-gateway.zende.sk",
   "versions": {
     "openshell_min": "0.0.116"
-  }
+  },
+  "gbrain_source": "upstream",
+  "gbrain_upstream_src": "~/gbrain",
+  "gbrain_zbrain_src": "~/zbrain"
 }

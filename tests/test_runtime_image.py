@@ -163,3 +163,84 @@ def test_build_dry_run_no_side_effects(tmp_path, monkeypatch, capsys):
 
 def test_build_verb_is_implemented():
     assert pc.VERBS["build"] is pc.cmd_build
+
+
+# --- Slice 0 (R3a-0): gbrain source selection (upstream default, zbrain fallback) ---
+
+def test_gbrain_source_defaults_to_upstream(monkeypatch):
+    monkeypatch.delenv("PRIME_CLAW_GBRAIN_SOURCE", raising=False)
+    assert pc._gbrain_source() == "upstream"
+    assert pc._gbrain_source({}) == "upstream"
+
+
+def test_gbrain_src_upstream_default_path(monkeypatch):
+    monkeypatch.delenv("PRIME_CLAW_GBRAIN_SOURCE", raising=False)
+    monkeypatch.delenv("PRIME_CLAW_GBRAIN_UPSTREAM_SRC", raising=False)
+    assert pc._gbrain_src() == os.path.expanduser("~/gbrain")
+
+
+def test_gbrain_source_env_overrides_to_zbrain(monkeypatch):
+    monkeypatch.setenv("PRIME_CLAW_GBRAIN_SOURCE", "zbrain")
+    monkeypatch.setenv("PRIME_CLAW_ZBRAIN_SRC", "/tmp/zb")
+    assert pc._gbrain_source() == "zbrain"
+    assert pc._gbrain_src() == "/tmp/zb"
+
+
+def test_gbrain_source_config_selects_zbrain_fallback(monkeypatch):
+    monkeypatch.delenv("PRIME_CLAW_GBRAIN_SOURCE", raising=False)
+    monkeypatch.setenv("PRIME_CLAW_ZBRAIN_SRC", "/tmp/zbcfg")
+    c = cfg(tmp_path=None if False else __import__("pathlib").Path("/tmp"), gbrain_source="zbrain")
+    assert pc._gbrain_source(c) == "zbrain"
+    assert pc._gbrain_src(c) == "/tmp/zbcfg"
+
+
+def test_gbrain_upstream_src_config_override(monkeypatch):
+    monkeypatch.delenv("PRIME_CLAW_GBRAIN_SOURCE", raising=False)
+    monkeypatch.delenv("PRIME_CLAW_GBRAIN_UPSTREAM_SRC", raising=False)
+    c = {"gbrain_upstream_src": "/opt/gb"}
+    assert pc._gbrain_src(c) == "/opt/gb"
+
+
+def test_fingerprint_differs_between_sources(tmp_path, monkeypatch):
+    """Switching upstream<->zbrain must invalidate the build-idempotency skip."""
+    monkeypatch.setattr(pc, "REPO_ROOT", str(tmp_path))
+    os.makedirs(os.path.join(tmp_path, "docker"), exist_ok=True)
+    open(os.path.join(tmp_path, "docker", "runtime.Dockerfile"), "w").write("FROM a\n")
+    z = make_zbrain(tmp_path)
+    monkeypatch.setenv("PRIME_CLAW_ZBRAIN_SRC", str(z))
+    monkeypatch.setenv("PRIME_CLAW_GBRAIN_UPSTREAM_SRC", str(z))  # same dir, different source key
+    c = cfg(tmp_path)
+    monkeypatch.delenv("PRIME_CLAW_GBRAIN_SOURCE", raising=False)
+    f_up = pc._build_inputs_fingerprint({**c, "gbrain_source": "upstream"})
+    f_zb = pc._build_inputs_fingerprint({**c, "gbrain_source": "zbrain"})
+    assert f_up != f_zb
+
+
+def test_build_dry_run_reports_upstream_source(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("PRIME_CLAW_GBRAIN_SOURCE", raising=False)
+    monkeypatch.setenv("PRIME_CLAW_GBRAIN_UPSTREAM_SRC", str(make_zbrain(tmp_path)))
+    monkeypatch.setattr(pc, "REPO_ROOT", str(tmp_path))
+    os.makedirs(os.path.join(tmp_path, "docker"), exist_ok=True)
+    open(os.path.join(tmp_path, "docker", "runtime.Dockerfile"), "w").write("FROM a\n")
+    rc = pc.cmd_build(cfg(tmp_path), Args(dry_run=True))
+    out = capsys.readouterr().out
+    assert rc == 0 and "source=upstream" in out
+
+
+def test_stage_stages_postinstall_script_when_present(tmp_path):
+    """Upstream gbrain runs `bun run scripts/postinstall.ts` on bun install; the
+    build must stage that script or the frozen-lockfile install fails (R3a-0)."""
+    z = make_zbrain(tmp_path, templates=True)
+    (z / "scripts").mkdir(exist_ok=True)
+    (z / "scripts" / "postinstall.ts").write_text("// postinstall\n")
+    ctx = str(tmp_path / "ctx")
+    pc.stage_gbrain_context(str(z), ctx)
+    assert os.path.exists(os.path.join(ctx, "scripts", "postinstall.ts"))
+
+
+def test_stage_ok_without_postinstall_script(tmp_path):
+    """A source without scripts/postinstall.ts (e.g. the zbrain fallback) still stages."""
+    z = make_zbrain(tmp_path, templates=True)  # no scripts/ dir
+    ctx = str(tmp_path / "ctx")
+    pc.stage_gbrain_context(str(z), ctx)
+    assert os.path.isdir(os.path.join(ctx, "src"))

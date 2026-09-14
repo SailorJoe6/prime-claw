@@ -851,6 +851,28 @@
     ]
    },
    "verdict_doc": "docs/runbook.md (Host Postgres exposure constraint)"
+  },
+  {
+   "id": "R3a-0",
+   "priority": "GATE",
+   "summary": "Slice-0 spike: upstream garrytan/gbrain runs in the OpenShell sandbox under prime-agent-as-controller (build, init, sync, embed, get, search all green; controller leg gated on an environmental OpenShell credential fault, not gbrain).",
+   "status": "proven",
+   "proven_by": {
+    "apply": [
+     "bin/prime-claw"
+    ],
+    "check": [
+     "config/runtime.json"
+    ],
+    "validate": [
+     "docs/derisk/3a-slice0.md"
+    ],
+    "tests": [
+     "tests/test_runtime_image.py"
+    ]
+   },
+   "evidence": "docs/derisk/3a-slice0.md",
+   "verdict_doc": "docs/derisk/3a-slice0.md"
   }
  ],
  "phase2": {}

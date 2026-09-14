@@ -163,10 +163,36 @@ DOCKER = os.environ.get("DOCKER_BIN", "docker")
 TEMPLATES_FALLBACK_COMMIT = "d337920c1"  # zbrain templates/ restore (U2 upstream break)
 GBRAIN_REQUIRED = ("package.json", "bun.lock", "tsconfig.json", "src")
 GBRAIN_OPTIONAL_DIRS = ("admin", "skills")  # copied if present, else empty dir staged
+# Slice 0 (R3a-0): gbrain build source. Default UPSTREAM garrytan/gbrain; zbrain
+# fork kept only as a documented fallback (NO-GO revert path). D3a-H.
+GBRAIN_SOURCE_DEFAULT = "upstream"
+GBRAIN_SOURCE_ENV = "PRIME_CLAW_GBRAIN_SOURCE"          # upstream | zbrain
+GBRAIN_UPSTREAM_SRC_ENV = "PRIME_CLAW_GBRAIN_UPSTREAM_SRC"
+GBRAIN_UPSTREAM_SRC_DEFAULT = "~/gbrain"                # local garrytan/gbrain checkout
+GBRAIN_ZBRAIN_SRC_ENV = "PRIME_CLAW_ZBRAIN_SRC"         # legacy fork path (fallback)
+
+
+def _gbrain_source(cfg=None) -> str:
+    """Resolve which gbrain to build: 'upstream' (default) or 'zbrain' (fallback)."""
+    cfg = cfg or {}
+    return (os.environ.get(GBRAIN_SOURCE_ENV)
+            or cfg.get("gbrain_source")
+            or GBRAIN_SOURCE_DEFAULT)
 
 
 def _zbrain_src() -> str:
-    return os.environ.get("PRIME_CLAW_ZBRAIN_SRC") or os.path.expanduser("~/zbrain")
+    return os.environ.get(GBRAIN_ZBRAIN_SRC_ENV) or os.path.expanduser("~/zbrain")
+
+
+def _gbrain_src(cfg=None) -> str:
+    """Resolve the on-disk gbrain checkout path for the selected source."""
+    if _gbrain_source(cfg) == "zbrain":
+        return _zbrain_src()
+    cfg = cfg or {}
+    return os.path.expanduser(
+        os.environ.get(GBRAIN_UPSTREAM_SRC_ENV)
+        or cfg.get("gbrain_upstream_src")
+        or GBRAIN_UPSTREAM_SRC_DEFAULT)
 
 
 def _ctx_dir() -> str:
@@ -199,6 +225,14 @@ def stage_gbrain_context(zbrain_src: str, ctx: str, dry_run: bool = False) -> di
         shutil.copy(os.path.join(zbrain_src, f), ctx)
     shutil.copytree(os.path.join(zbrain_src, "src"), os.path.join(ctx, "src"))
     manifest["copied"] = ["package.json", "bun.lock", "tsconfig.json", "src"]
+    # Upstream garrytan/gbrain runs `bun run scripts/postinstall.ts` on
+    # `bun install` (a no-op when gbrain is not yet on PATH). Stage that one
+    # script so the frozen-lockfile install does not fail on a missing file.
+    pi = os.path.join(zbrain_src, "scripts", "postinstall.ts")
+    if os.path.exists(pi):
+        os.makedirs(os.path.join(ctx, "scripts"), exist_ok=True)
+        shutil.copy(pi, os.path.join(ctx, "scripts", "postinstall.ts"))
+        manifest["copied"].append("scripts/postinstall.ts")
     for d in GBRAIN_OPTIONAL_DIRS:
         src = os.path.join(zbrain_src, d)
         if os.path.isdir(src):
@@ -229,7 +263,8 @@ def _build_inputs_fingerprint(cfg) -> str:
     df = os.path.join(REPO_ROOT, "docker", "runtime.Dockerfile")
     with open(df, "rb") as f:
         h.update(f.read())
-    z = _zbrain_src()
+    h.update(f"source:{_gbrain_source(cfg)}".encode())
+    z = _gbrain_src(cfg)
     for rel in ("package.json", "bun.lock", "tsconfig.json"):
         p = os.path.join(z, rel)
         h.update(rel.encode())
@@ -254,12 +289,13 @@ def cmd_build(cfg, args) -> int:
     tag = cfg["image"]
     df = os.path.join(REPO_ROOT, "docker", "runtime.Dockerfile")
     ctx = _ctx_dir()
-    zsrc = _zbrain_src()
+    gsource = _gbrain_source(cfg)
+    zsrc = _gbrain_src(cfg)
     force = getattr(args, "force", False)
 
     if args.dry_run:
         man = stage_gbrain_context(zsrc, ctx, dry_run=True)
-        print(f"dry_run: would stage gbrain context from {zsrc} (templates={man['templates']})")
+        print(f"dry_run: would stage gbrain context from {zsrc} (source={gsource}, templates={man['templates']})")
         print(f"dry_run: would run: {DOCKER} build -f {df} -t {tag} {os.path.join(REPO_ROOT,'docker')}")
         print("host_credential_access: prohibited")
         return 0
@@ -277,7 +313,7 @@ def cmd_build(cfg, args) -> int:
         print(f"build: image {tag} up to date (inputs unchanged); skipping. Use --force to rebuild.")
         return 0
 
-    print(f"[1/2] staging gbrain build context from {zsrc} ...")
+    print(f"[1/2] staging gbrain build context from {zsrc} (source={gsource}) ...")
     try:
         man = stage_gbrain_context(zsrc, ctx, dry_run=False)
     except (FileNotFoundError, RuntimeError) as e:
