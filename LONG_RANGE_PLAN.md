@@ -26,7 +26,7 @@ channels, then the orchestrator.** The Ralph/skills work is one workstream
 | **0. Builder repo skeleton** | Repo, beads, docs scaffold, gbrain source, GitHub remote | — |
 | **1. De-risk gate (spike)** | Documented go/no-go on the load-bearing unknowns | R-series |
 | **2. Sandbox runtime foundation** | prime-agent daemon running secured inside an OpenShell sandbox | runtime risk |
-| **3. Tracer bullet: end-to-end working claw** | Sandboxed prime-agent + gbrain + routing layer, persists a fact correctly | integration risk (highest) |
+| **3. Tracer bullet: end-to-end working claw** | Sandboxed prime-agent (gbrain mode-(a) controller) + routing layer, persists a fact correctly. Split into 3a–3e; 3a opens with an upstream-gbrain spike | integration risk (highest) |
 | **4. The episode loop** | Ralph-style design→plan→execute→handoff, manually driven, on the proven runtime | workflow risk |
 | **5. Communication channels** | Telegram/Slack as project contexts & conversation threads | adoption/UX risk |
 | **6. The orchestrator** | Always-on universal agent, heartbeat-driven, spawns conversations & episodes | autonomy risk |
@@ -101,6 +101,34 @@ The riskiest integration, done as early as possible and deliberately thin but
 *whole*: a prime-agent session inside the sandbox, connected to gbrain, that
 holds a conversation and persists a durable fact to the brain via the
 information-architecture routing layer.
+
+**The goal:** prime-agent is the **mode-(a) harness-as-controller** — the core
+claw that drives, manages, and maintains the gbrain (drives the gbrain CLI,
+administers its database, manages collection channels + the signal sweep).
+Mode (b) — prime-agent as a participant MCP client of an existing gbrain — is
+supported as a secondary goal (we intend to add prime-agent as a first-class
+upstream gbrain harness, spanning both modes), but (a) is the priority.
+
+**gbrain strategy:** build on **upstream `garrytan/gbrain`**, not zbrain's
+stripped fork. Fork gbrain only to author a prime-agent-harness PR, monitor
+upstream, and retire the fork once it merges. (zbrain's walk-up-config and
+claw-skill-strip deltas are not needed here.)
+
+**Sub-phases** (split for risk isolation):
+
+- **3a — tracer bullet.** Brain cloned in → in-sandbox gbrain+PG index → cited
+  read/query → one routed write (test artifact, sandbox-local). **Opens with a
+  Slice-0 spike (a go/no-go gate):** prove in real code that upstream gbrain
+  runs under prime-agent-as-controller in the OpenShell sandbox. GO = upstream
+  path; NO-GO = documented thin-fork fallback. ⚠️ may pivot the gbrain choice.
+- **3b — whole-brain migration + generic memory skills** (port memorize/query/
+  ingest/maintain/brain-commit as prime-agent-native skills; wire the IA
+  routing layer; create the operator instance repo `prime-pva`).
+- **3c — browse proxy-shim** (port zbrain's local `browse-proxy-shim` +
+  `browse-host-bridge` + cookie-jar companion against stock upstream gstack
+  browse; credentials never enter the container).
+- **3d — channels** (collect → triage → ingest pipelines).
+- **3e — scheduling** (`prime-agent schedule` replaces `brain.cron`).
 
 Done when: the operator talks to a sandboxed prime-agent and it remembers
 something — routed to the correct store per docs/information-architecture.md.

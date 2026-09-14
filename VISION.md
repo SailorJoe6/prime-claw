@@ -26,7 +26,7 @@ on prime-agent:
 
 | Prior project | What it contributed | Why it falls short |
 |---|---|---|
-| **zbrain** | a basic claw built on gbrain + gstack-browser in an always-on container, cron schedules, crude channel scraping | generic chassis; no prime-agent core |
+| **zbrain** | a basic claw built on gbrain + gstack-browser in an always-on container, cron schedules, crude channel scraping | generic chassis; no prime-agent core. (Also a *fork* of upstream gbrain/gstack whose deltas — OpenClaw-only harness support, hard-coded taxonomy, walk-up config — are now largely obsolete upstream.) |
 | **ralph-pva** | first-iteration PVA on the zbrain chassis; the "home it can call its own" pattern with a symlinked brain repo | built on the zbrain runtime, not prime-agent |
 | **openclaw-setup** / **nemo-setup** | the sandboxing blueprint: NemoClaw orchestration → OpenShell security boundary → agent in a Docker sandbox, with the apply/check/validate/test engineering discipline and requirements traceability | orchestrates OpenClaw/Hermes, not prime-agent |
 
@@ -62,6 +62,28 @@ hierarchy below possible natively rather than approximated:
   skills, and subagent specs — the agent edits its own operating
   instructions as it learns. Local (session-scoped) by default, global
   (cross-session) on request.
+
+## Relationship to gbrain and gstack
+
+prime-claw's brain is **gbrain**, and its web-scraping layer is **gstack
+browse** — consumed from **upstream**, not from zbrain's forks.
+
+- **gbrain.** prime-agent is the **mode-(a) harness-as-controller**: the claw
+  that owns, drives, and maintains the gbrain (its CLI, database, collection
+  channels, and signal sweep). gbrain also supports a **mode-(b)
+  agent-as-participant** relationship (an agent connects to an existing brain
+  over MCP to be informed); prime-claw prioritizes (a) but supports both.
+  Because no upstream harness adapter exists for prime-agent yet, prime-claw
+  intends to **contribute one upstream** — forking gbrain only to author the
+  PR, then retiring the fork once it merges. This makes prime-claw a
+  participant in the gbrain ecosystem, not merely a consumer of a fork.
+- **gstack browse.** Web scraping reuses the host-side gstack browse plus the
+  container **proxy-shim / host-bridge** pair (a zbrain-local invention, never
+  upstreamed) that keeps credentials out of the container. prime-claw ports
+  that shim against stock upstream gstack browse.
+
+These choices are validated by a de-risk spike before Phase 3 commits to them
+(see LONG_RANGE_PLAN.md Phase 3 / Slice-0).
 
 ## The hierarchy
 
