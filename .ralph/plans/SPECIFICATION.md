@@ -51,11 +51,23 @@ long-run goal is that prime-claw **fully replaces zbrain as the brain container*
   and personal skills. prime-claw itself must stay generic.
 - **Novel surface.** Two distinct subsystems, held separate:
   - **gbrain (knowledge CLI):** CLI/sync/embeddings/sources/links are exhaustively tested
-    upstream (zbrain ~1,626 tests) and now multi-harness + schema-pack. The genuinely new,
-    untested surface is the **prime-agent harness integration** — gbrain ships wiring for
-    `claude-code | codex | opencode | openclaw | cursor | gemini | hermes` but **not**
-    prime-agent. Whether prime-claw builds on upstream gbrain or zbrain's fork is an OPEN
-    fork-vs-upstream decision (see D3a-E note + open question 5).
+    upstream (zbrain ~1,626 tests) and now multi-harness + schema-pack. gbrain's harness
+    install path (NOT "recipes" — in gbrain parlance a *recipe* is a channel-connection
+    guide; the harness install has no one-word name) makes gbrain the core brain of a CLI
+    coding agent via: auto-loaded instructions (AGENTS.md/CLAUDE.md) + skill files +
+    a **stdio MCP server** (`<harness> mcp add gbrain -- gbrain serve --surface verbs`) +
+    a native scheduler. gbrain ships this install for `claude-code | codex | opencode |
+    openclaw | ...` but **not prime-agent**.
+  - **prime-agent fits that harness model with NO blockers** (capability-verified against
+    the install path): it auto-loads AGENTS.md/CLAUDE.md by default, discovers
+    `.agents/skills/`, has a scheduler (`prime-agent schedule`), sessions for
+    cross-conversation recall verification, AND supports stdio MCP servers
+    (`prime-agent mcp add gbrain -- gbrain serve --surface verbs`). So prime-agent is a
+    conventional CLI coding-agent harness from gbrain's perspective; the only gap is a
+    registered `prime-agent` harness adapter (upstream has a `HARNESS_ADAPTERS` extension
+    point + a `generic`/`manual` fallback that works today). Whether prime-claw builds on
+    upstream gbrain (preferred — contribute a prime-agent adapter) or zbrain's fork is an
+    OPEN fork-vs-upstream decision resolved by the Slice-0 spike (open question 5).
   - **gstack browse (web scraping):** the container proxy-shim + host-bridge are
     **zbrain-local inventions, never upstreamed** (3c ports them). prime-claw does NOT
     re-test them; it ports + integrates them against stock upstream gstack browse.
