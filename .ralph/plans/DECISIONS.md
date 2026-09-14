@@ -96,6 +96,20 @@ belongs upstream so anyone's prime-agent gets a brain. A permanent fork is a mai
 burden whose original justifications (OpenClaw-only, hard-coded taxonomy, walk-up config) are
 now obsolete upstream.
 
+## D3a-I — Sandbox prime-agent model config mirrors the host (verbatim copy + 2-model fallback)
+**Decision:** `stage_prime_agent` copies the operator's host `~/.prime/agent/models.json`
+**verbatim** into the sandbox (`/sandbox/.prime/agent/models.json`). This is a deliberate
+**feature**: whatever the user has configured for prime-agent locally is what they get inside
+the container. The host file contains **no secrets** (base URLs + model metadata only;
+credentials live in `~/.prime/agent/auth.json`, which is never copied). **Fallback** when no
+readable host config exists: a built-in default registering exactly the two current models —
+`anthropic.kimi-k3` and `anthropic.glm-5.2` — against the configured AI gateway, so a fresh
+operator still gets a working model. The source path is overridable via `host_models_json` /
+`PRIME_CLAW_HOST_MODELS_JSON`. **Rationale:** Slice 0 showed the container failed model
+resolution without this file (fell back to an unauthorized catalog default → "Connection
+error"); copying the host file both fixes that and removes config drift between host and
+sandbox. Satisfies R3a-13.
+
 ## Decision → Requirement traceability matrix
 
 | Decision | Requirements |
@@ -104,6 +118,7 @@ now obsolete upstream.
 | D3a-B | R3a-1, R3a-4 |
 | D3a-C | R3a-3, R3a-4, R3a-8 |
 | D3a-D | R3a-7 |
+| D3a-I | R3a-13 |
 | D3a-E | R3a-8, R3a-11 |
 | D3a-F | R3a-9 |
 | D3a-G | R3a-3, R3a-4, R3a-6 |

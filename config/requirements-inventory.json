@@ -873,6 +873,28 @@
    },
    "evidence": "docs/derisk/3a-slice0.md",
    "verdict_doc": "docs/derisk/3a-slice0.md"
+  },
+  {
+   "id": "R3a-13",
+   "priority": "GATE",
+   "summary": "Sandbox prime-agent model config mirrors host: copy ~/.prime/agent/models.json verbatim (no secrets), fallback to built-in Kimi-K3+GLM default.",
+   "status": "proven",
+   "proven_by": {
+    "apply": [
+     "bin/prime-claw"
+    ],
+    "check": [
+     "config/runtime.json"
+    ],
+    "validate": [
+     "docs/derisk/3a-slice0.md"
+    ],
+    "tests": [
+     "tests/test_runtime_image.py"
+    ]
+   },
+   "evidence": "docs/derisk/3a-slice0.md",
+   "verdict_doc": "docs/derisk/3a-slice0.md"
   }
  ],
  "phase2": {}

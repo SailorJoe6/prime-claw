@@ -53,6 +53,14 @@ Priority: **GATE** = must hold for the slice to be accepted; **NICE** = desired,
 - **R3a-12 (NICE) — Embedding freshness.** The in-sandbox index has working embeddings
   (not keyword-only). May be deferred if the embedding provider path is non-trivial
   (see open question 2).
+- **R3a-13 (GATE) — prime-agent model config mirrors the host.** `stage_prime_agent`
+  copies the operator's host `~/.prime/agent/models.json` **verbatim** into the sandbox
+  (feature: the container gets whatever the user has configured locally). The host file
+  holds **no secrets** (base URLs + model metadata only; credentials stay in `auth.json`,
+  never copied). **Fallback** when no readable host config exists: a built-in default
+  registering exactly the two current models — `anthropic.kimi-k3` and `anthropic.glm-5.2`
+  — against the configured AI gateway, so a fresh operator still gets a working model.
+  Override path via `host_models_json` / `PRIME_CLAW_HOST_MODELS_JSON`.
 
 ## Out of scope (recorded for traceability)
 

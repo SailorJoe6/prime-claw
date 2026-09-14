@@ -471,6 +471,43 @@ def stage_sandbox(cfg, args, force_fresh: bool = False) -> int:
     return stage_policy(cfg, args)
 
 
+def _prime_agent_models_json(cfg) -> str:
+    """Return the models.json content to stage into the sandbox's prime-agent config.
+
+    FEATURE (R3a-13): copy the operator's host prime-agent models.json VERBATIM so the
+    container mirrors the user's local config. The host file holds NO secrets (base URLs
+    + model metadata only; credentials live in auth.json, which is never copied).
+
+    FALLBACK when no readable host config exists: a built-in default registering exactly
+    the two current models (Kimi-K3 + GLM) against the configured AI gateway, so a fresh
+    operator with no prior prime-agent setup still gets a working model.
+    """
+    host_models = os.path.expanduser(_cfg_get(
+        cfg, "host_models_json", "PRIME_CLAW_HOST_MODELS_JSON", "~/.prime/agent/models.json"))
+    if os.path.exists(host_models):
+        try:
+            with open(host_models) as f:
+                return f.read()
+        except OSError:
+            pass  # fall through to the built-in default
+    gw_host = _cfg_get(cfg, "ai_gateway_host", "PRIME_CLAW_AI_GATEWAY_HOST", "ai-gateway.zende.sk")
+    model_id = _cfg_get(cfg, "model", "PRIME_CLAW_MODEL", "anthropic.kimi-k3")
+    fallback = {"providers": {
+        "openai": {"baseUrl": "https://" + gw_host + "/v1"},
+        "amazon-bedrock": {"baseUrl": "https://" + gw_host + "/bedrock"},
+        "anthropic": {"baseUrl": "https://" + gw_host + "/anthropic",
+                      "models": [
+                          {"id": model_id, "name": "Kimi K3", "reasoning": True,
+                           "input": ["text", "image"], "contextWindow": 1000000,
+                           "cost": {"input": 3.0, "output": 15.0, "cacheRead": 0.3, "cacheWrite": 0}},
+                          {"id": "anthropic.glm-5.2", "name": "GLM 5.2", "reasoning": True,
+                           "input": ["text"], "contextWindow": 1000000,
+                           "cost": {"input": 1.4, "output": 4.4, "cacheRead": 0.14, "cacheWrite": 0}},
+                      ]},
+    }}
+    return json.dumps(fallback)
+
+
 def stage_prime_agent(cfg, args) -> int:
     name = cfg["sandbox_name"]
     version = _cfg_get(cfg, "prime_agent_version", "PRIME_AGENT_VERSION", "0.9.3")
@@ -498,24 +535,14 @@ def stage_prime_agent(cfg, args) -> int:
     code, out = sandbox_exec(cfg, install, timeout=1800)
     if code != 0: print("error: prime-agent install: " + out.strip()[-300:], file=sys.stderr); return code
     print("prime-agent: " + (out.strip().splitlines()[-1] if out.strip() else version))
-    # Slice 0 (R3a-0): register the gateway model + base URL so prime-agent can resolve
-    # anthropic.kimi-k3 against the AI gateway instead of defaulting to api.anthropic.com
-    # (which the deny-by-default policy blocks) or to an unauthorized catalog default.
-    # No secrets here: model metadata + base URL only; the credential stays a placeholder
-    # injected at L7. Mirrors the host's ~/.prime/agent/models.json.
-    gw_host = _cfg_get(cfg, "ai_gateway_host", "PRIME_CLAW_AI_GATEWAY_HOST", "ai-gateway.zende.sk")
-    model_id = _cfg_get(cfg, "model", "PRIME_CLAW_MODEL", "anthropic.kimi-k3")
-    models_doc = {"providers": {
-        "openai": {"baseUrl": "https://" + gw_host + "/v1"},
-        "amazon-bedrock": {"baseUrl": "https://" + gw_host + "/bedrock"},
-        "anthropic": {"baseUrl": "https://" + gw_host + "/anthropic",
-                      "models": [{"id": model_id, "name": model_id.split(".")[-1],
-                                  "reasoning": True, "input": ["text", "image"],
-                                  "contextWindow": 1000000,
-                                  "cost": {"input": 3.0, "output": 15.0,
-                                           "cacheRead": 0.3, "cacheWrite": 0}}]},
-    }}
-    m64 = base64.b64encode(json.dumps(models_doc).encode()).decode()
+    # Slice 0 (R3a-0 / R3a-13): register the gateway model + base URL so prime-agent can
+    # resolve anthropic.kimi-k3 against the AI gateway instead of defaulting to
+    # api.anthropic.com (blocked by the deny-by-default policy) or an unauthorized
+    # catalog default. FEATURE: copy the operator's host prime-agent models.json
+    # verbatim (container mirrors the user's local config). FALLBACK when no host
+    # config exists: a built-in default with exactly Kimi-K3 + GLM. No secrets in
+    # either path (metadata + base URLs only); credentials stay L7-injected placeholders.
+    m64 = base64.b64encode(_prime_agent_models_json(cfg).encode()).decode()
     code, out = sandbox_exec(cfg, "mkdir -p /sandbox/.prime/agent && echo " + m64 + " | base64 -d > /sandbox/.prime/agent/models.json", timeout=60)
     if code != 0: print("error: prime-agent models.json stage: " + out.strip()[:160], file=sys.stderr); return code
     js = ("import { ensureKernelPython } from "

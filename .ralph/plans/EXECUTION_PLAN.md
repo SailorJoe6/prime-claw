@@ -53,7 +53,7 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 
 | Slice | Capability delivered | Requirements | Gate? |
 |---|---|---|---|
-| **S0** | Upstream-gbrain spike: prime-agent-as-controller drives **upstream garrytan/gbrain** in-sandbox | R3a-0 | **GO/NO-GO** |
+| **S0** | Upstream-gbrain spike: prime-agent-as-controller drives **upstream garrytan/gbrain** in-sandbox (+ models.json mirror) | R3a-0, R3a-13 | **GO/NO-GO** |
 | **S1** | git+github push plumbing: image git, custom github push profile, clone brain w/ `.git` into sandbox | R3a-1, R3a-5(part), R3a-7 | — |
 | **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source) | R3a-2, R3a-12 | — |
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
@@ -96,6 +96,10 @@ difference too big to overcome elegantly.
 - If GO: image pins upstream gbrain; `stage_gbrain_context` reads an upstream ref; config key
   `gbrain_source` (default upstream, fallback zbrain) added to `config/runtime.json`.
 - Tests: offline coverage that the build-context staging selects upstream vs. fallback correctly.
+- **Also delivered (R3a-13):** `stage_prime_agent` copies the host `~/.prime/agent/models.json`
+  verbatim into the sandbox (fallback: built-in Kimi-K3 + GLM default) so the sandboxed agent
+  resolves `anthropic.kimi-k3` against the AI gateway. This was the fix that made the controller
+  leg pass.
 
 ---
 

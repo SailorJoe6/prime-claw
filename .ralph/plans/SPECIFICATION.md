@@ -97,6 +97,12 @@ harness:
    routed per `docs/information-architecture.md` (brain = canonical store for domain
    facts), via `gbrain put` + `gbrain sync --source brain`.
 
+The sandboxed prime-agent **mirrors the operator's local model config**: `stage_prime_agent`
+copies the host `~/.prime/agent/models.json` verbatim (it holds no secrets), falling back to a
+built-in default (Kimi-K3 + GLM against the configured AI gateway) when no host config exists
+(R3a-13). This is what lets the agent resolve `anthropic.kimi-k3` against the gateway instead
+of an unauthorized catalog default.
+
 The write is a **test artifact**. Two acceptable forms (operator's call at execution):
 (a) an easily-deleted page (markdown is source-of-truth, so deletion is trivial), or
 (b) a keep-worthy stub such as a `projects/` page describing prime-claw itself. The write

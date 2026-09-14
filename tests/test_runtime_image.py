@@ -246,23 +246,47 @@ def test_stage_ok_without_postinstall_script(tmp_path):
     assert os.path.isdir(os.path.join(ctx, "src"))
 
 
-def test_prime_agent_stage_writes_models_json(tmp_path, monkeypatch):
-    """stage_prime_agent must register the gateway model + base URL (anthropic.kimi-k3
-    -> ai-gateway) so the sandboxed agent resolves the model instead of falling back to
-    api.anthropic.com / an unauthorized catalog default (R3a-0 controller leg)."""
+def _capture_models_json(monkeypatch):
     import base64 as _b, json as _j
     written = {}
     def fake_exec(cfg, script, timeout=30):
         if "models.json" in script and "base64 -d" in script:
             payload = script.split("echo ",1)[1].split(" | base64",1)[0].strip()
-            written["models"] = _j.loads(_b.b64decode(payload).decode())
+            written["models"] = _b.b64decode(payload.encode()).decode()
         return 0, "ok"
     monkeypatch.setattr(pc, "sandbox_exec", fake_exec)
     monkeypatch.setattr(pc, "REPO_ROOT", os.path.join(REPO))
+    return written
+
+
+def test_models_json_copies_host_verbatim(tmp_path, monkeypatch):
+    """R3a-13: when the operator's host prime-agent models.json exists, it is copied
+    VERBATIM into the sandbox (container mirrors the user's local config)."""
+    host_cfg = tmp_path / "models.json"
+    sentinel = {"providers": {"anthropic": {"baseUrl": "https://x.example/anthropic",
+                "models": [{"id": "anthropic.custom-9", "name": "Custom", "reasoning": True,
+                            "input": ["text"], "contextWindow": 1, "cost": {"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}
+    host_cfg.write_text(__import__("json").dumps(sentinel))
+    monkeypatch.setenv("PRIME_CLAW_HOST_MODELS_JSON", str(host_cfg))
+    written = _capture_models_json(monkeypatch)
     class A: dry_run=False; force=False
-    c = {"sandbox_name":"prime-claw","ai_gateway_host":"ai-gateway.zende.sk","model":"anthropic.kimi-k3"}
-    pc.stage_prime_agent(c, A())  # later stages fail under the stub; we only assert the models.json write
-    m = written["models"]
+    pc.stage_prime_agent({"sandbox_name":"prime-claw"}, A())
+    import json as _j
+    assert _j.loads(written["models"]) == sentinel  # verbatim, including the custom model
+
+
+def test_models_json_fallback_when_no_host_config(tmp_path, monkeypatch):
+    """R3a-13 fallback: no host config -> built-in default with exactly Kimi-K3 + GLM,
+    base URLs from the configured gateway host. No secrets."""
+    monkeypatch.setenv("PRIME_CLAW_HOST_MODELS_JSON", str(tmp_path / "absent.json"))
+    written = _capture_models_json(monkeypatch)
+    class A: dry_run=False; force=False
+    pc.stage_prime_agent({"sandbox_name":"prime-claw","ai_gateway_host":"ai-gateway.zende.sk","model":"anthropic.kimi-k3"}, A())
+    import json as _j
+    m = _j.loads(written["models"])
+    ids = {mod["id"] for mod in m["providers"]["anthropic"]["models"]}
+    assert ids == {"anthropic.kimi-k3", "anthropic.glm-5.2"}
     assert m["providers"]["anthropic"]["baseUrl"] == "https://ai-gateway.zende.sk/anthropic"
     assert m["providers"]["openai"]["baseUrl"] == "https://ai-gateway.zende.sk/v1"
-    assert any(mod["id"]=="anthropic.kimi-k3" for mod in m["providers"]["anthropic"]["models"])
+    # no secret-shaped fields
+    assert "key" not in written["models"].lower() and "token" not in written["models"].lower()
