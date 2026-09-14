@@ -13,51 +13,46 @@
 | `gbrain sync --source brain` imports + **embeds** a fixture page | ✅ PASS | "1 file(s) imported, 1 chunks, **1 pages embedded**"; `vector_dims(embedding)=1536` |
 | `gbrain get` retrieves the page | ✅ PASS | round-trip content returned |
 | `gbrain search` (semantic, via AI-gateway embeddings) returns it | ✅ PASS | score 0.8778 on the known-fact token |
-| prime-agent invokes gbrain CLI (mode-a controller) | ⚠️ BLOCKED* | "Connection error" — prime-agent's model call, not gbrain |
+| prime-agent invokes gbrain CLI (mode-a controller) | ✅ PASS | ran `gbrain search`, returned cited answer "the mascot planet is Cobalt (`projects/prime-claw`)" |
 | Walk-up config needed? | ✅ NO | `GBRAIN_HOME` env suffices (zbrain fork delta not needed) |
 
-\* Blocked by the environmental credential fault below, NOT by any gbrain/harness capability gap.
+\* Resolved: the controller leg needed two non-obvious wirings (below), then passed.
 
-## Environmental blocker (owner action / infra, NOT a NO-GO for gbrain)
+## Two non-obvious wirings the controller leg needed (both fixed in `stage_prime_agent`/`stage_brain`)
 
-The OpenShell L7 credential injection into the sandbox is **unstable on this box**:
+1. **Model registration (`models.json`).** prime-agent in the container did not know the model id
+   `anthropic.kimi-k3` nor the AI-gateway base URL, so it fell back to a catalog default
+   (`claude-opus-4-7`) → the gateway rejected it → "Connection error". The host works because
+   `~/.prime/agent/models.json` registers `anthropic.kimi-k3` against `…/anthropic`. Fix: 
+   `stage_prime_agent` now writes `/sandbox/.prime/agent/models.json` (metadata + base URL only;
+   no secrets) from `ai_gateway_host` + `model` config. After this, `prime-agent -p --model
+   anthropic.kimi-k3 …` drives gbrain and returns a cited answer. **Validated green.**
+2. **Credential stability (environmental, shelved).** The sandbox→gateway L7 path 403s when the
+   host is **off the VPN** (the gateway does source-network RBAC); with the VPN up it is stable
+   (50/50 consecutive 200s across both anthropic + embeddings routes, container and host alike).
+   Joe: this is expected when the VPN is down; only revisit if it recurs while the VPN is up.
 
-- The **host** AI-gateway key works directly for both routes (anthropic `/anthropic/v1/messages`
-  and embeddings `/v1/embeddings` → HTTP 200), confirmed repeatedly.
-- The **sandbox** (through the OpenShell L7 proxy) flaps between **200 and 403 "RBAC: access denied"**.
-- Mechanism (diagnosed): the sandbox's injected placeholder embeds a **credential version**
-  (`openshell:resolve:env:v<N>_api_key`); every `openshell provider update` bumps the provider
-  resource version, **orphaning the running sandbox's placeholder**. A gateway restart
-  (`brew services restart openshell`) clears a stale cached credential, but the fresh key then
-  takes **~80s to propagate** to the sandbox (stale 403s during that window, then 200).
-- Net: with a freshly-restarted gateway + a fresh sandbox created against a known-good key +
-  a short settle wait, both credentialed routes work; but the window is fragile and the
-  credential appears to be re-rotated/reverted by some host-side process afterward.
+## Validator status after Slice 0
 
-**Impact on the spike:** the gbrain **round-trip is fully proven** (init/sync/embed/get/search all
-green when the credential is live). The **prime-agent controller leg** could not be held green
-end-to-end because prime-agent's own anthropic model call needs the same gateway credential that
-keeps flapping. This is a Phase-2 credential-wiring/infra concern, not an upstream-gbrain concern.
-
-## Follow-ups (not blockers for the GO)
-
-1. **Stabilize the AI-gateway credential for the sandbox** (OpenShell provider refresh semantics;
-   why the placeholder orphans on update; whether a host process re-rotates the key). This is
-   required for S1–S4 regardless of gbrain choice.
-2. Re-run the prime-agent controller leg once the credential is stable; no code change to gbrain
-   is anticipated.
+`bin/prime-claw validate`: **14/15 PASS** including `credentialed-model-call` (anthropic.kimi-k3)
+and `brain-embedding-via-gateway` (dims=1536). The single remaining FAIL, `brain-search-roundtrip`,
+is a **Slice-2** item: the probe does `cd /sandbox/brain` and expects a served brain initialised
+there; Slice 0 used a separate fixture source (`/sandbox/brain-src`). S2 (index serving) makes
+`/sandbox/brain` the real served brain and will turn this green.
 
 ## Code changes (Slice 0)
 
 - `bin/prime-claw`: generalised gbrain build-source selection — `_gbrain_source()` /
   `_gbrain_src()` with `gbrain_source` config (default `upstream`, `zbrain` fallback),
   `PRIME_CLAW_GBRAIN_SOURCE` / `PRIME_CLAW_GBRAIN_UPSTREAM_SRC` overrides; `stage_gbrain_context`
-  now also stages `scripts/postinstall.ts` (upstream `bun install` runs it); build fingerprint
-  keys on the selected source so switching invalidates the idempotency skip.
+  also stages `scripts/postinstall.ts` (upstream `bun install` runs it); build fingerprint keys on
+  the selected source; `stage_prime_agent` writes `models.json` (gateway model + base URL).
 - `config/runtime.json`: `gbrain_source=upstream`, `gbrain_upstream_src=~/gbrain`,
   `gbrain_zbrain_src=~/zbrain`.
-- Tests: `tests/test_runtime_image.py` +9 (source selection, fingerprint invalidation,
-  postinstall staging). Suite 75 → **84 green**.
+- Tests: `tests/test_runtime_image.py` +10 (source selection, fingerprint invalidation,
+  postinstall staging, models.json staging). Suite 75 → **85 green**.
 
-**Image now builds upstream gbrain v0.50.0.0 by default.** zbrain fallback retained via
-`gbrain_source=zbrain` (the NO-GO revert path, unused).
+**Image builds upstream gbrain v0.50.0.0 by default.** zbrain fallback retained via
+`gbrain_source=zbrain` (the NO-GO revert path, unused). **Slice 0 verdict: GO** — upstream gbrain
+under prime-agent-as-controller is proven end-to-end (build → init → sync → embed → search →
+cited read by the sandboxed prime-agent).

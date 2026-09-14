@@ -244,3 +244,25 @@ def test_stage_ok_without_postinstall_script(tmp_path):
     ctx = str(tmp_path / "ctx")
     pc.stage_gbrain_context(str(z), ctx)
     assert os.path.isdir(os.path.join(ctx, "src"))
+
+
+def test_prime_agent_stage_writes_models_json(tmp_path, monkeypatch):
+    """stage_prime_agent must register the gateway model + base URL (anthropic.kimi-k3
+    -> ai-gateway) so the sandboxed agent resolves the model instead of falling back to
+    api.anthropic.com / an unauthorized catalog default (R3a-0 controller leg)."""
+    import base64 as _b, json as _j
+    written = {}
+    def fake_exec(cfg, script, timeout=30):
+        if "models.json" in script and "base64 -d" in script:
+            payload = script.split("echo ",1)[1].split(" | base64",1)[0].strip()
+            written["models"] = _j.loads(_b.b64decode(payload).decode())
+        return 0, "ok"
+    monkeypatch.setattr(pc, "sandbox_exec", fake_exec)
+    monkeypatch.setattr(pc, "REPO_ROOT", os.path.join(REPO))
+    class A: dry_run=False; force=False
+    c = {"sandbox_name":"prime-claw","ai_gateway_host":"ai-gateway.zende.sk","model":"anthropic.kimi-k3"}
+    pc.stage_prime_agent(c, A())  # later stages fail under the stub; we only assert the models.json write
+    m = written["models"]
+    assert m["providers"]["anthropic"]["baseUrl"] == "https://ai-gateway.zende.sk/anthropic"
+    assert m["providers"]["openai"]["baseUrl"] == "https://ai-gateway.zende.sk/v1"
+    assert any(mod["id"]=="anthropic.kimi-k3" for mod in m["providers"]["anthropic"]["models"])

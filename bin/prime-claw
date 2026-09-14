@@ -498,6 +498,26 @@ def stage_prime_agent(cfg, args) -> int:
     code, out = sandbox_exec(cfg, install, timeout=1800)
     if code != 0: print("error: prime-agent install: " + out.strip()[-300:], file=sys.stderr); return code
     print("prime-agent: " + (out.strip().splitlines()[-1] if out.strip() else version))
+    # Slice 0 (R3a-0): register the gateway model + base URL so prime-agent can resolve
+    # anthropic.kimi-k3 against the AI gateway instead of defaulting to api.anthropic.com
+    # (which the deny-by-default policy blocks) or to an unauthorized catalog default.
+    # No secrets here: model metadata + base URL only; the credential stays a placeholder
+    # injected at L7. Mirrors the host's ~/.prime/agent/models.json.
+    gw_host = _cfg_get(cfg, "ai_gateway_host", "PRIME_CLAW_AI_GATEWAY_HOST", "ai-gateway.zende.sk")
+    model_id = _cfg_get(cfg, "model", "PRIME_CLAW_MODEL", "anthropic.kimi-k3")
+    models_doc = {"providers": {
+        "openai": {"baseUrl": "https://" + gw_host + "/v1"},
+        "amazon-bedrock": {"baseUrl": "https://" + gw_host + "/bedrock"},
+        "anthropic": {"baseUrl": "https://" + gw_host + "/anthropic",
+                      "models": [{"id": model_id, "name": model_id.split(".")[-1],
+                                  "reasoning": True, "input": ["text", "image"],
+                                  "contextWindow": 1000000,
+                                  "cost": {"input": 3.0, "output": 15.0,
+                                           "cacheRead": 0.3, "cacheWrite": 0}}]},
+    }}
+    m64 = base64.b64encode(json.dumps(models_doc).encode()).decode()
+    code, out = sandbox_exec(cfg, "mkdir -p /sandbox/.prime/agent && echo " + m64 + " | base64 -d > /sandbox/.prime/agent/models.json", timeout=60)
+    if code != 0: print("error: prime-agent models.json stage: " + out.strip()[:160], file=sys.stderr); return code
     js = ("import { ensureKernelPython } from "
           "'/sandbox/.npm-global/lib/node_modules/prime-agent/dist/core/kernel/bootstrap.js'; "
           "console.log('kernel_python=' + (await ensureKernelPython()));")
