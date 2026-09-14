@@ -49,12 +49,16 @@ long-run goal is that prime-claw **fully replaces zbrain as the brain container*
   *their* brain. Joe's brain (`~/gitlab_local/brain`) is the proving instance. A separate
   instance repo (a future `prime-pva`, replacing `ralph-pva`) will hold Joe's brain config
   and personal skills. prime-claw itself must stay generic.
-- **Novel surface.** gbrain's CLI, sync, embeddings, sources, links — and its browse
-  proxy-shim/host-bridge — are already exhaustively tested (zbrain: ~1,626 tests; browse
-  shim/bridge have dedicated tests). prime-claw must **reuse** that proven capability, not
-  re-test it. The genuinely new, untested surface is the **prime-agent harness
-  integration**: gbrain ships wiring for `claude-code | codex | opencode | openclaw` but
-  **not** prime-agent. That is what this phase proves.
+- **Novel surface.** Two distinct subsystems, held separate:
+  - **gbrain (knowledge CLI):** CLI/sync/embeddings/sources/links are exhaustively tested
+    upstream (zbrain ~1,626 tests) and now multi-harness + schema-pack. The genuinely new,
+    untested surface is the **prime-agent harness integration** — gbrain ships wiring for
+    `claude-code | codex | opencode | openclaw | cursor | gemini | hermes` but **not**
+    prime-agent. Whether prime-claw builds on upstream gbrain or zbrain's fork is an OPEN
+    fork-vs-upstream decision (see D3a-E note + open question 5).
+  - **gstack browse (web scraping):** the container proxy-shim + host-bridge are
+    **zbrain-local inventions, never upstreamed** (3c ports them). prime-claw does NOT
+    re-test them; it ports + integrates them against stock upstream gstack browse.
 - **Self-contained container (Decision D-A).** The brain lives *inside* the sandbox:
   cloned in, indexed by the in-sandbox gbrain+PG. Not a thin client to an external brain.
 
@@ -84,8 +88,13 @@ git operation **out of scope for 3a** (lands with the full skill port in 3b).
 - **3b — whole-brain migration + generic memory skills**: port `memorize`, `gbrain-query`,
   `gbrain-ingest`, `gbrain-maintain`, `brain-commit`, `_brain-filing-rules` as
   prime-agent-native `.agents/skills/`; wire the IA routing layer; migrate the full brain.
-- **3c — browse proxy-shim**: recreate container `$B` → `browse-proxy-shim` → host
-  `browse-host-bridge` → token-injected host daemon (reuse zbrain's tested components).
+- **3c — browse proxy-shim**: port zbrain's own `browse-proxy-shim` + `browse-host-bridge`
+  + cookie-jar `companion/` into the sandbox path, consuming **stock upstream gstack browse**
+  as the host-side plugin host. NOTE: the shim/bridge are **zbrain-local inventions, never
+  upstreamed** (verified: untracked in `~/gstack`, which is upstream `garrytan/gstack`).
+  zbrain's *core-browser* fork deltas were retired into gstack's plugin framework
+  (2026-09-01), but the shim/bridge pair is ours to carry forward — this is a **port**, not
+  an upstream reuse. The plugin-framework core-browser changes ARE upstream-consumed.
 - **3d — channels**: collect → triage → ingest pipelines (Slack/Zoom/Google/Notion/Gmail/
   Workday/Cerebro/ZIG).
 - **3e — scheduling**: `prime-agent schedule` replacing `brain.cron` (autopilot/dream/
@@ -137,5 +146,12 @@ git operation **out of scope for 3a** (lands with the full skill port in 3b).
    validated against.)
 4. **Exact validate surface** — which checks are gate vs. nice (page count > 0, a known-fact
    query, the write receipt, embedding freshness).
+5. **gbrain: fork vs upstream (de-risk spike).** Does prime-claw build on **upstream
+   `garrytan/gbrain`** (v0.50+, multi-harness, schema packs — adding prime-agent as a new
+   harness) or on **zbrain's stripped fork** (which still uniquely carries walk-up
+   project-scoped config + the claw-skill strip)? Resolved by a Slice-0 spike: prove whether
+   upstream gbrain + prime-agent runs correctly in the sandbox. Hypothesis = upstream;
+   fallback = thin fork. (This is gbrain only — the browse shim/bridge question is settled:
+   they are ours, ported at 3c.)
 
 These are planning concerns, not spec blockers — the WHAT is settled above.

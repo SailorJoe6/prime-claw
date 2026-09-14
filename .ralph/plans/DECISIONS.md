@@ -48,13 +48,17 @@ latter was never a requirement. Claw-unique identity applies only at *write* sur
 (GitHub/Gmail/Slack/Telegram), not inference.
 
 ## D3a-E — Reuse proven gbrain capability; test only the delta
-**Decision:** Do not author tests that re-prove gbrain CLI/sync/embedding or the browse
-shim (already covered upstream). prime-claw tests target: brain clone wiring, in-sandbox
-index integration, the prime-agent-harness read/query/write loop, and the validate gate.
+**Decision:** Do not author tests that re-prove gbrain CLI/sync/embedding (covered upstream).
+prime-claw tests target: brain clone wiring, in-sandbox index integration, the
+prime-agent-harness read/query/write loop, and the validate gate. **Correction:** the browse
+proxy-shim/host-bridge are **zbrain-local, never upstreamed** — 3c ports them and tests the
+port+integration (not as 'reuse of upstream-tested components'); the gbrain-vs-browse fork
+questions are separate, and the gbrain fork-vs-upstream choice is deferred to a Slice-0 spike
+(open question 5).
 **Satisfies:** R3a-8, R3a-11.
-**Rationale:** zbrain maintains ~1,626 CLI tests plus dedicated browse-shim/bridge tests.
-Re-testing them adds cost with no information. The information-bearing tests are the
-prime-agent integration and the lifecycle wiring.
+**Rationale:** zbrain maintains ~1,626 CLI tests. Re-testing them adds cost with no
+information. The information-bearing tests are the prime-agent integration and the lifecycle
+wiring.
 
 ## D3a-F — Generic platform; instance concerns stay out
 **Decision:** prime-claw carries no operator-specific taxonomy, values, or personal skills.
