@@ -17,7 +17,7 @@ Credential isolation: real credential values never touch this process's args,
 the repo, logs, or sandbox disk; only OpenShell providers hold them (R2-X-1).
 """
 from __future__ import annotations
-import argparse, base64, hashlib, json, os, re, shutil, subprocess, sys, time
+import argparse, base64, hashlib, json, os, re, shutil, subprocess, sys, tempfile, time
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_CONFIG = os.path.join(REPO_ROOT, "config", "runtime.json")
@@ -414,9 +414,25 @@ def stage_provider(cfg, args) -> int:
     try:
         code, _ = run([OPENSHELL, "provider", "get", name], timeout=30)
         if code == 0:
-            # Provider exists: refresh the credential. The profile is already
-            # registered (the provider references it), so no import needed.
+            # Provider exists: refresh the credential ONLY if it changed. Every provider
+            # update bumps a resource version that re-keys the SANDBOX's placeholder set —
+            # and a running sandbox still holds the OLD placeholders, so a needless update
+            # breaks the sandbox's OTHER credentialed endpoints (e.g. github git push) until
+            # recreate. Skip when unchanged (Slice 1 finding, R3a-5/7).
+            import hashlib as _hl
+            state = os.path.join(REPO_ROOT, ".prime-claw-ai-gateway-key.sha256")
+            digest = _hl.sha256(key.encode()).hexdigest()
+            prior = ""
+            try:
+                prior = open(state).read().strip()
+            except OSError:
+                pass
+            if prior == digest:
+                print(f"provider: ai-gateway key unchanged; leaving {name} as-is")
+                return 0
             run([OPENSHELL, "provider", "update", name, "--credential", "api_key=" + key], timeout=60)
+            with open(state, "w") as sf:
+                sf.write(digest)
             print(f"provider: refreshed credential on {name}")
             return 0
         # Provider does not exist: ensure the profile is registered, then create.
@@ -435,6 +451,9 @@ def stage_provider(cfg, args) -> int:
                          "--type", profile, "--credential", "api_key=" + key], timeout=60)
         if code != 0:
             print(f"error: provider create failed: {out.strip()[:200]}", file=sys.stderr); return code
+        import hashlib as _hl
+        with open(os.path.join(REPO_ROOT, ".prime-claw-ai-gateway-key.sha256"), "w") as sf:
+            sf.write(_hl.sha256(key.encode()).hexdigest())
         print(f"provider: created {name}")
     finally:
         del key
@@ -442,16 +461,126 @@ def stage_provider(cfg, args) -> int:
 
 
 
+GITHUB_PUSH_PROFILE_YAML = """id: {profile_id}
+display_name: GitHub (push-capable, prime-claw)
+description: GitHub Git+API access INCLUDING push (git-receive-pack); the builtin github
+  profile is fetch-only (allows POST only to git-upload-pack). prime-claw needs push so the
+  agent can write brain updates back to the repo from inside the sandbox (Slice 1, R3a-1/7).
+category: source_control
+credentials:
+- name: api_token
+  description: GitHub token (read host-side via `gh auth token`; never stored in the sandbox)
+  env_vars:
+  - GITHUB_TOKEN
+  - GH_TOKEN
+  required: true
+  auth_style: bearer
+  header_name: authorization
+  query_param: ''
+endpoints:
+- host: api.github.com
+  port: 443
+  protocol: rest
+  access: read-write
+  enforcement: enforce
+- host: github.com
+  port: 443
+  protocol: rest
+  enforcement: enforce
+  rules:
+  - allow: {{ method: GET, path: '**' }}
+  - allow: {{ method: HEAD, path: '**' }}
+  - allow: {{ method: OPTIONS, path: '**' }}
+  - allow: {{ method: POST, path: '/**/git-upload-pack' }}
+  - allow: {{ method: POST, path: '/**/git-receive-pack' }}
+binaries:
+- /usr/bin/git
+inference_capable: false
+discovery:
+  credentials:
+  - api_token
+"""
+
+
+def _host_github_token(cfg) -> str:
+    """Read the host GitHub token for the brain repo. Source: `gh auth token` (the operator's
+    gh CLI login), which is a normal CLI interface — NOT a Keychain/browser-store read. The
+    real token stays host-side; only an OpenShell placeholder enters the sandbox (R-X-5)."""
+    code, out = run(["gh", "auth", "token"], timeout=30)
+    tok = out.strip().splitlines()[0].strip() if code == 0 and out.strip() else ""
+    if not tok:
+        raise RuntimeError("no host GitHub token: `gh auth token` returned nothing "
+                           "(run `gh auth login` on the host)")
+    return tok
+
+
+def stage_github_provider(cfg, args) -> int:
+    """Ensure the push-capable github provider exists with a fresh host-side token (Slice 1).
+    Mirrors stage_provider but for the github-push profile. The token is read host-side and
+    handed to OpenShell, which injects it at L7; the sandbox only ever holds a placeholder."""
+    name = _cfg_get(cfg, "github_provider_name", "PRIME_CLAW_GITHUB_PROVIDER", "prime-claw-github")
+    profile = _cfg_get(cfg, "github_profile", "PRIME_CLAW_GITHUB_PROFILE", "github-push")
+    if args.dry_run:
+        print(f"dry_run: ensure github provider {name} (profile {profile}, push-capable); "
+              f"token read host-side via `gh auth token`, never on sandbox disk"); return 0
+    try:
+        tok = _host_github_token(cfg)
+    except RuntimeError as e:
+        print(f"error: {e}", file=sys.stderr); return 1
+    try:
+        code, _ = run([OPENSHELL, "provider", "get", name], timeout=30)
+        if code == 0:
+            # Refresh ONLY when the token actually changed. Every `provider update` bumps the
+            # resource version and re-keys the sandbox's placeholder credential; a running
+            # sandbox still holds the OLD placeholder, so a needless update breaks its git
+            # auth until recreate. Skip the update when the token is unchanged (R3a-5/7).
+            import hashlib as _hl
+            state = os.path.join(REPO_ROOT, ".prime-claw-github-token.sha256")
+            digest = _hl.sha256(tok.encode()).hexdigest()
+            prior = ""
+            try:
+                prior = open(state).read().strip()
+            except OSError:
+                pass
+            if prior == digest:
+                print(f"provider: github token unchanged; leaving {name} as-is")
+                return 0
+            run([OPENSHELL, "provider", "update", name, "--credential", "api_token=" + tok], timeout=60)
+            with open(state, "w") as sf:
+                sf.write(digest)
+            print(f"provider: refreshed credential on {name}")
+            return 0
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tf:
+            tf.write(GITHUB_PUSH_PROFILE_YAML.format(profile_id=profile)); pf = tf.name
+        try:
+            code, out = run([OPENSHELL, "provider", "profile", "import", "--file", pf], timeout=60)
+            if code != 0 and "already" not in out.lower():
+                print(f"error: github profile import failed: {out.strip()[:200]}", file=sys.stderr); return code
+        finally:
+            os.unlink(pf)
+        code, out = run([OPENSHELL, "provider", "create", "--name", name,
+                         "--type", profile, "--credential", "api_token=" + tok], timeout=60)
+        if code != 0:
+            print(f"error: github provider create failed: {out.strip()[:200]}", file=sys.stderr); return code
+        import hashlib as _hl
+        with open(os.path.join(REPO_ROOT, ".prime-claw-github-token.sha256"), "w") as sf:
+            sf.write(_hl.sha256(tok.encode()).hexdigest())
+        print(f"provider: created {name}")
+    finally:
+        del tok
+    return 0
+
+
 def stage_sandbox(cfg, args, force_fresh: bool = False) -> int:
     name = cfg["sandbox_name"]; image = cfg["image"]; pf = cfg["policy_file"]
     if not os.path.isabs(pf): pf = os.path.join(REPO_ROOT, pf)
-    host_brain = os.path.expanduser(_cfg_get(cfg, "host_brain_dir", "PRIME_CLAW_HOST_BRAIN_DIR",
-                                             "~/gitlab_local/brain"))
     sb_brain = _cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain")
+    gh_provider = _cfg_get(cfg, "github_provider_name", "PRIME_CLAW_GITHUB_PROVIDER", "prime-claw-github")
     if args.dry_run:
         verb = "delete+recreate" if force_fresh else "create-if-absent"
         print(f"dry_run: {verb} sandbox {name} --from {image} --provider {cfg['provider_name']} "
-              f"--policy {pf} --upload {host_brain}:{sb_brain}"); return 0
+              f"--provider {gh_provider} --policy {pf} (brain arrives via stage_brain_clone git clone, "
+              f"not --upload)"); return 0
     exists = probe_sandbox(cfg)[2] is not None
     if exists and not force_fresh:
         print(f"sandbox: {name} exists; converging policy (no recreate)")
@@ -459,11 +588,16 @@ def stage_sandbox(cfg, args, force_fresh: bool = False) -> int:
     if exists and force_fresh:
         run([OPENSHELL, "sandbox", "delete", name], timeout=120)  # supported path; not docker restart
     cmd = [OPENSHELL, "sandbox", "create", "--name", name, "--from", image, "--no-tty", "--detach"]
-    code, _ = run([OPENSHELL, "provider", "get", cfg["provider_name"]], timeout=30)
-    if code == 0: cmd += ["--provider", cfg["provider_name"]]
+    # Attach BOTH providers at create time (fresh sandboxes accept multiple --provider flags).
+    # The ai-gateway provider injects the inference key; the github-push provider injects the
+    # brain-repo token. Both are L7-swapped placeholders; no real credential on sandbox disk.
+    for prov in (cfg["provider_name"], gh_provider):
+        code, _ = run([OPENSHELL, "provider", "get", prov], timeout=30)
+        if code == 0: cmd += ["--provider", prov]
+        else: print(f"note: provider {prov} not found; sandbox created without it", file=sys.stderr)
     if os.path.exists(pf): cmd += ["--policy", pf]
-    if os.path.isdir(host_brain): cmd += ["--upload", host_brain + ":" + sb_brain]
-    else: print(f"note: host brain dir {host_brain} not found; skipping upload")
+    # Slice 1 (D3a-B/Q1): the brain enters via git clone WITH .git (stage_brain_clone), NOT a
+    # host-dir --upload (which would drop .git and defeat push-back). Upload removed.
     code, out = run(cmd, timeout=300)
     if code != 0:
         print(f"error: sandbox create failed: {out.strip()[:200]}", file=sys.stderr); return code
@@ -581,6 +715,48 @@ def stage_prime_agent(cfg, args) -> int:
     return 0
 
 
+def stage_brain_clone(cfg, args) -> int:
+    """Clone the operator's brain repo into the sandbox WITH .git, push-capable, credential-safe
+    (Slice 1, R3a-1/5/7, D3a-B/Q1). HTTPS with the placeholder token ($api_token, injected by the
+    attached github-push provider) swapped to the real token at L7. Idempotent: fetch+ff if already
+    cloned. No token on disk beyond the placeholder.
+
+    KNOWN ISSUE (fresh-create cold-start, see docs/derisk/3a-slice1.md): on a freshly created
+    sandbox the github-push credential injection is not live immediately, and a git clone attempted
+    during that window fails AND leaves the credential path failing until the sandbox is recreated.
+    Retrying within the same sandbox does NOT recover it. The reliable path today is `converge`
+    against an already-running (settled) sandbox. A proper readiness gate is follow-up work."""
+    repo = _cfg_get(cfg, "brain_repo", "PRIME_CLAW_BRAIN_REPO", "JLandersZen/brain")
+    branch = _cfg_get(cfg, "brain_branch", "PRIME_CLAW_BRAIN_BRANCH", "main")
+    sb_brain = _cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain")
+    gh_host = _cfg_get(cfg, "github_host", "PRIME_CLAW_GITHUB_HOST", "github.com")
+    url = f"https://x-access-token:${{api_token}}@{gh_host}/{repo}.git"
+    if args.dry_run:
+        print(f"dry_run: clone {repo}@{branch} -> {sb_brain} (placeholder auth, L7 swap); "
+              f"idempotent fetch --ff-only if already cloned"); return 0
+    script = f"""
+set -e
+if [ -d {sb_brain}/.git ]; then
+  echo "brain: already cloned at {sb_brain}; fetching + fast-forwarding"
+  git -C {sb_brain} remote set-url origin '{url}'
+  git -C {sb_brain} fetch origin {branch} 2>&1 | tail -2
+  git -C {sb_brain} merge --ff-only origin/{branch} 2>&1 | tail -2 || echo "brain: ff skipped (local state)"
+else
+  echo "brain: cloning {repo}@{branch} -> {sb_brain}"
+  rm -rf {sb_brain}
+  git clone --branch {branch} '{url}' {sb_brain} 2>&1 | tail -2
+fi
+git -C {sb_brain} config user.email "prime-claw@sandbox"
+git -C {sb_brain} config user.name "prime-claw"
+echo "brain: HEAD=$(git -C {sb_brain} rev-parse --short HEAD 2>/dev/null) remote-set"
+"""
+    code, out = sandbox_exec(cfg, script, timeout=180)
+    if code != 0:
+        print("error: brain clone stage: " + out.strip()[:200], file=sys.stderr); return code
+    print(out.strip().splitlines()[-1] if out.strip() else "brain: cloned")
+    return 0
+
+
 def stage_brain(cfg, args) -> int:
     name = cfg["sandbox_name"]
     pgdata = _cfg_get(cfg, "pgdata", "PRIME_CLAW_PGDATA", "/sandbox/pgdata")
@@ -645,11 +821,13 @@ def stage_spawn(cfg, args) -> int:
 
 def cmd_create(cfg, args) -> int:
     if args.dry_run:
-        print("dry_run: create = build -> provider -> sandbox(fresh) -> prime-agent -> brain -> spawn -> policy")
+        print("dry_run: create = build -> provider -> github-provider -> sandbox(fresh) -> prime-agent -> brain-clone -> brain -> spawn -> policy")
     for label, fn in [("build", cmd_build),
                       ("provider", stage_provider),
+                      ("github-provider", stage_github_provider),
                       ("sandbox", lambda c, a: stage_sandbox(c, a, force_fresh=True)),
                       ("prime-agent", stage_prime_agent),
+                      ("brain-clone", stage_brain_clone),
                       ("brain", stage_brain),
                       ("spawn", stage_spawn),
                       ("policy", stage_policy)]:
@@ -673,12 +851,14 @@ def cmd_converge(cfg, args) -> int:
               file=sys.stderr)
         return 1
     if args.dry_run:
-        print("dry_run: converge = build -> provider -> sandbox(converge, no recreate) "
-              "-> prime-agent -> brain -> spawn -> policy")
+        print("dry_run: converge = build -> provider -> github-provider -> sandbox(converge, no recreate) "
+              "-> prime-agent -> brain-clone -> brain -> spawn -> policy")
     for label, fn in [("build", cmd_build),
                       ("provider", stage_provider),
+                      ("github-provider", stage_github_provider),
                       ("sandbox", lambda c, a: stage_sandbox(c, a, force_fresh=False)),
                       ("prime-agent", stage_prime_agent),
+                      ("brain-clone", stage_brain_clone),
                       ("brain", stage_brain),
                       ("spawn", stage_spawn),
                       ("policy", stage_policy)]:

@@ -290,3 +290,109 @@ def test_models_json_fallback_when_no_host_config(tmp_path, monkeypatch):
     assert m["providers"]["openai"]["baseUrl"] == "https://ai-gateway.zende.sk/v1"
     # no secret-shaped fields
     assert "key" not in written["models"].lower() and "token" not in written["models"].lower()
+
+
+# ---- Slice 1: github push provider + brain clone (R3a-1/5/7) ----
+
+def test_github_provider_dry_run(tmp_path, capsys):
+    class A: dry_run=True
+    rc = pc.stage_github_provider(cfg(tmp_path), A())
+    out = capsys.readouterr().out
+    assert rc == 0 and "github provider" in out and "gh auth token" in out
+
+
+def test_github_provider_creates_with_gh_token(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(pc, "run", lambda cmd, timeout=30: (calls.append(cmd) or (1, "")) if cmd[1:3]==["provider","get"] else (calls.append(cmd) or (0, "ok")))
+    monkeypatch.setattr(pc, "_host_github_token", lambda c: "gho_testtoken")
+    class A: dry_run=False
+    rc = pc.stage_github_provider(cfg(tmp_path), A())
+    assert rc == 0
+    joined = [" ".join(c) for c in calls]
+    assert any("profile" in j and "import" in j for j in joined)
+    assert any("create" in j and "prime-claw-github" in j and "github-push" in j for j in joined)
+    # token handed to provider create, never persisted by us
+    assert any("api_token=gho_testtoken" in j for j in joined)
+
+
+def test_github_provider_refreshes_existing(tmp_path, monkeypatch):
+    # Token CHANGED (no matching state hash) -> update fires.
+    monkeypatch.setattr(pc, "REPO_ROOT", str(tmp_path))  # state file lives here; absent -> treat as changed
+    calls = []
+    def fake(cmd, timeout=30):
+        calls.append(cmd)
+        return (0, "ok")  # provider get succeeds -> update path
+    monkeypatch.setattr(pc, "run", fake)
+    monkeypatch.setattr(pc, "_host_github_token", lambda c: "gho_abc")
+    class A: dry_run=False
+    rc = pc.stage_github_provider(cfg(tmp_path), A())
+    joined = [" ".join(c) for c in calls]
+    assert rc == 0 and any("update" in j and "api_token=gho_abc" in j for j in joined)
+    assert not any("create" in j for j in joined)
+
+
+def test_github_provider_skips_update_when_token_unchanged(tmp_path, monkeypatch):
+    """Resource-version bumps re-key the sandbox placeholder and break a running sandbox's
+    git auth; the update must be skipped when the token hash matches the recorded state."""
+    import hashlib as _hl, os as _os
+    monkeypatch.setattr(pc, "REPO_ROOT", str(tmp_path))
+    (_os.path.join(str(tmp_path), ".prime-claw-github-token.sha256"))
+    with open(_os.path.join(str(tmp_path), ".prime-claw-github-token.sha256"), "w") as f:
+        f.write(_hl.sha256(b"gho_same").hexdigest())
+    calls = []
+    monkeypatch.setattr(pc, "run", lambda cmd, timeout=30: (calls.append(cmd), (0, "ok"))[1])
+    monkeypatch.setattr(pc, "_host_github_token", lambda c: "gho_same")
+    class A: dry_run=False
+    rc = pc.stage_github_provider(cfg(tmp_path), A())
+    joined = [" ".join(c) for c in calls]
+    assert rc == 0
+    assert not any("update" in j for j in joined) and not any("create" in j for j in joined)
+
+
+def test_brain_clone_dry_run(tmp_path, capsys):
+    class A: dry_run=True
+    rc = pc.stage_brain_clone(cfg(tmp_path), A())
+    out = capsys.readouterr().out
+    assert rc == 0 and "JLandersZen/brain" in out and "/sandbox/brain" in out and "placeholder" in out
+
+
+def test_brain_clone_fresh_clone_branch(tmp_path, monkeypatch):
+    seen = {}
+    def fake_exec(cfg, script, timeout=30):
+        seen["script"] = script
+        # simulate .git absent -> clone path
+        return 0, "brain: HEAD=abc123 remote-set"
+    monkeypatch.setattr(pc, "sandbox_exec", fake_exec)
+    class A: dry_run=False
+    rc = pc.stage_brain_clone(cfg(tmp_path), A())
+    assert rc == 0
+    s = seen["script"]
+    assert "git clone --branch main" in s and "https://x-access-token:${api_token}@github.com/JLandersZen/brain.git" in s
+    assert "if [ -d /sandbox/brain/.git ]" in s  # idempotency guard present
+
+
+def test_brain_clone_idempotent_fetch_branch(tmp_path, monkeypatch):
+    seen = {}
+    def fake_exec(cfg, script, timeout=30):
+        seen["script"] = script
+        return 0, "brain: already cloned; fetching"
+    monkeypatch.setattr(pc, "sandbox_exec", fake_exec)
+    class A: dry_run=False
+    rc = pc.stage_brain_clone(cfg(tmp_path), A())
+    s = seen["script"]
+    # the script handles both branches; verify the fetch/ff path exists for the already-cloned case
+    assert "git -C /sandbox/brain fetch origin main" in s
+    assert "merge --ff-only origin/main" in s
+    assert "remote set-url origin" in s
+
+
+def test_brain_clone_config_override(tmp_path, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(pc, "sandbox_exec", lambda c, s, timeout=30: (seen.setdefault("s", s), 0, "")[1:])
+    class A: dry_run=False
+    c = cfg(tmp_path, brain_repo="acme/knowledge", brain_branch="trunk", sb_brain_dir="/data/kb")
+    rc = pc.stage_brain_clone(c, A())
+    s = seen["s"]
+    assert rc == 0 and "acme/knowledge" in s and "trunk" in s and "/data/kb" in s
+
+

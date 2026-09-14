@@ -152,14 +152,16 @@ def test_create_runs_stages_in_order(tmp_path, monkeypatch):
         return f
     monkeypatch.setattr(pc, "cmd_build", rec("build"))
     monkeypatch.setattr(pc, "stage_provider", rec("provider"))
+    monkeypatch.setattr(pc, "stage_github_provider", rec("github-provider"))
     monkeypatch.setattr(pc, "stage_sandbox", lambda c, a, force_fresh=False: order.append("sandbox") or 0)
     monkeypatch.setattr(pc, "stage_prime_agent", rec("prime-agent"))
+    monkeypatch.setattr(pc, "stage_brain_clone", rec("brain-clone"))
     monkeypatch.setattr(pc, "stage_brain", rec("brain"))
     monkeypatch.setattr(pc, "stage_spawn", rec("spawn"))
     monkeypatch.setattr(pc, "stage_policy", rec("policy"))
     rc = pc.cmd_create(cfg(tmp_path), Args())
     assert rc == 0
-    assert order == ["build", "provider", "sandbox", "prime-agent", "brain", "spawn", "policy"]
+    assert order == ["build", "provider", "github-provider", "sandbox", "prime-agent", "brain-clone", "brain", "spawn", "policy"]
 
 
 def test_create_stops_on_first_stage_failure(tmp_path, monkeypatch, capsys):
@@ -196,9 +198,11 @@ def _stub_stages(monkeypatch, order):
         return f
     monkeypatch.setattr(pc, "cmd_build", rec("build"))
     monkeypatch.setattr(pc, "stage_provider", rec("provider"))
+    monkeypatch.setattr(pc, "stage_github_provider", rec("github-provider"))
     monkeypatch.setattr(pc, "stage_sandbox",
         lambda c, a, force_fresh=False: order.append("sandbox") or 0)
     monkeypatch.setattr(pc, "stage_prime_agent", rec("prime-agent"))
+    monkeypatch.setattr(pc, "stage_brain_clone", rec("brain-clone"))
     monkeypatch.setattr(pc, "stage_brain", rec("brain"))
     monkeypatch.setattr(pc, "stage_spawn", rec("spawn"))
     monkeypatch.setattr(pc, "stage_policy", rec("policy"))
@@ -210,7 +214,7 @@ def test_converge_runs_all_stages_no_recreate(tmp_path, monkeypatch):
     _stub_stages(monkeypatch, order)
     rc = pc.cmd_converge(cfg(tmp_path), Args())
     assert rc == 0
-    assert order == ["build", "provider", "sandbox", "prime-agent", "brain", "spawn", "policy"]
+    assert order == ["build", "provider", "github-provider", "sandbox", "prime-agent", "brain-clone", "brain", "spawn", "policy"]
 
 
 def test_converge_errors_when_sandbox_absent(tmp_path, monkeypatch, capsys):

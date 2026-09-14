@@ -76,6 +76,28 @@ network_policies:
       - path: /usr/local/bin/bun
       - path: /usr/local/bin/gbrain
 
+  # Slice 1 (R3a-1/7): credentialed github.com for git clone/fetch/push of the brain
+  # repo. The attached github-push provider injects the real token at L7; the sandbox
+  # only ever holds a placeholder. Declared as its own inspected `rest` rule keyed to
+  # /usr/bin/git (separate from kernel_bootstrap's L4 github access, which serves curl/
+  # uv and must stay unauthenticated to avoid a mixed-mode policy violation). Push needs
+  # git-receive-pack, which the builtin github profile forbids; the custom github-push
+  # profile allows it.
+  github_brain:
+    name: github-brain-push
+    endpoints:
+      - { host: github.com, port: 443, protocol: rest, access: read-write }
+      - { host: api.github.com, port: 443, protocol: rest, access: read-write }
+    # git carries the placeholder token (L7 swaps to the real credential). uv + curl are here
+    # ONLY so the kernel-bootstrap python download (github.com/.../releases/...) is reachable:
+    # they never send the placeholder, so the L7 swap never fires for them and they traverse
+    # unauthenticated. OpenShell requires credentialed-endpoint hosts be L7 in every rule, so
+    # github.com cannot also appear as L4 in kernel_bootstrap.
+    binaries:
+      - path: /usr/bin/git
+      - path: /usr/local/bin/uv
+      - path: /usr/bin/curl
+
   # Slice 2 kernel bootstrap: prime-agent's persistent Python REPL needs uv +
   # a managed Python 3.11. uv installer: astral.sh (script) then GitHub
   # releases (binary). uv then pulls python-build-standalone from GitHub and
@@ -83,10 +105,14 @@ network_policies:
   # /sandbox/.local/bin/uv — bind that path (and curl for the installer).
   kernel_bootstrap:
     name: kernel-bootstrap-uv-python
+    # github.com + api.github.com are here as L4 for the uv python-build-standalone
+    # download (uv fetches https://github.com/astral-sh/python-build-standalone/releases/...).
+    # They are keyed to curl/uv (download tooling), which NEVER carries the github credential:
+    # the credentialed github access for git clone/push is the SEPARATE github_brain rule keyed
+    # to /usr/bin/git only. OpenShell keys credential injection per-binary, so uv/curl on
+    # github.com stay unauthenticated while git gets the L7 token swap.
     endpoints:
       - { host: astral.sh, port: 443 }
-      - { host: github.com, port: 443 }
-      - { host: api.github.com, port: 443 }
       - { host: objects.githubusercontent.com, port: 443 }
       - { host: release-assets.githubusercontent.com, port: 443 }
       - { host: pypi.org, port: 443 }
