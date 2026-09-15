@@ -45,10 +45,27 @@ for targeted diagnosis:
 
 - **policy** — apply `policies/runtime.yaml`.
 - **provider** — attach the AI-gateway provider (create/update-first; import
-  the profile only when the provider is absent).
-- **sandbox** — create-if-absent (or delete+recreate with `force_fresh`).
+  the profile only when the provider is absent). Refreshes the credential only
+  when it changed (sha256 in `.prime-claw-ai-gateway-key.sha256`, gitignored) —
+  every `provider update` re-keys sandbox placeholders, which breaks running
+  sandboxes' credentialed endpoints until recreate (D3a-J).
+- **github-provider** — attach the push-capable GitHub provider
+  (`prime-claw-github`, custom `github-push` profile adding
+  `POST /**/git-receive-pack`; the builtin `github` profile is fetch-only).
+  Token read host-side via `gh auth token`; same conditional-refresh discipline
+  (`.prime-claw-github-token.sha256`). The sandbox only ever holds the
+  `openshell:resolve:env:..._api_token` placeholder (D3a-B/J).
+- **sandbox** — create-if-absent (or delete+recreate with `force_fresh`);
+  attaches BOTH providers at create. The brain is NOT `--upload`ed (that would
+  drop `.git`); it arrives via `brain-clone`.
 - **prime-agent** — install/configure prime-agent + daemon + persistent REPL
   in-sandbox; ensures the daemon runs and cleans stale sockets.
+- **brain-clone** — clone the operator's brain repo into the sandbox
+  (default `/sandbox/brain`) WITH `.git` over HTTPS using the `${api_token}`
+  placeholder; idempotent (fetch + fast-forward when already cloned). The URL
+  is **double-quoted** in the stage script so bash expands `${api_token}` —
+  single-quoting passes the literal string to git and every attempt 401s
+  (Slice 1 root cause; regression-tested).
 - **brain** — bring up Postgres 16 + pgvector + gbrain in-sandbox
   (initdb-if-absent, agent-owned PGDATA).
 - **spawn** — stage the non-secret runtime layout (`models.json`, npm-onload,

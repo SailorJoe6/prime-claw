@@ -37,6 +37,14 @@ prime-claw builds on four prior projects. Read these before designing:
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)
 
+## De-risk evidence (Phase 3)
+
+- [derisk/3a-slice0.md](derisk/3a-slice0.md) — Slice 0 spike verdict (GO):
+  upstream gbrain builds/runs in-sandbox; models.json mirroring (R3a-13).
+- [derisk/3a-slice1.md](derisk/3a-slice1.md) — Slice 1: push-capable
+  credential-safe brain clone, and the shell-quoting root cause of the
+  fresh-create 401s (a cautionary bisect tale).
+
 ## Runtime (Phase 2)
 
 - [sandbox-runtime.md](sandbox-runtime.md) — the sandbox lifecycle: verbs,

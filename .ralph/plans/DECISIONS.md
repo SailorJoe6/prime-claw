@@ -19,16 +19,27 @@ deny-by-default egress intact and makes the claw's knowledge local and fast. Thi
 (MCP to an external brain) was considered and rejected for the hosting goal (it leaves the
 brain outside the container and requires an egress hole).
 
-## D3a-B — Brain enters via git clone (read-mostly)
+## D3a-B — Brain enters via git clone WITH `.git`, push-capable through a custom L7 profile
 **Decision:** The brain enters the sandbox by cloning the operator's brain repo
-(`~/gitlab_local/brain`, the `brain` gbrain source). Writes remain in ralph-pva until the
-ingest/memorize skills port (3b+); 3a is read + one routed test write into the sandbox
-clone only.
-**Satisfies:** R3a-1, R3a-4.
-**Rationale:** Markdown is the source of truth; the gbrain DB is a derived, rebuildable
-index. Cloning the repo gives searchable content with no credential carriage. The exact
-credential-safe clone mechanism (bind-mount vs in-sandbox clone vs staged copy) is an
-open planning question (SPEC §7.1), not a spec-level commitment.
+(`~/gitlab_local/brain`, GitHub `JLandersZen/brain`, branch `main`, private) **with `.git`**,
+and the sandbox can **push back** (commit + push round-trip verified, Slice 1). Writes remain
+in ralph-pva until the ingest/memorize skills port (3b+); 3a is read + one routed test write
+into the sandbox clone only.
+**Satisfies:** R3a-1, R3a-4, R3a-7.
+**Resolved mechanism (Slice 1, was SPEC §7.1 open question):** in-sandbox HTTPS clone using the
+placeholder token `${api_token}`, swapped to the real token at L7 by a **custom `github-push`
+provider profile** (the builtin `github` profile is fetch-only — it allows `POST` only to
+`/**/git-upload-pack`; `github-push` adds `POST /**/git-receive-pack` + read-write
+`api.github.com`). Token read host-side via `gh auth token`; sandbox disk holds only the
+placeholder (`openshell:resolve:env:..._api_token`); `.git/config` contains zero real token.
+The host-dir `--upload` path was **removed** from `stage_sandbox` (it drops `.git`, defeating
+push-back); `stage_sandbox` now attaches **both** providers at create (`--provider` repeatable).
+**Policy consequence:** once a credentialed github provider is attached, OpenShell requires
+EVERY `github.com` rule to be L7 (`protocol: rest`) — so `github.com`/`api.github.com` moved out
+of the L4 `kernel_bootstrap` rule into a single credentialed `github_brain` rule keyed to
+`/usr/bin/git` + `/usr/local/bin/uv` + `/usr/bin/curl` (uv/curl keep the kernel-bootstrap
+python-build-standalone download reachable; they never send the placeholder, so the swap never
+fires for them).
 
 ## D3a-C — prime-agent is the harness (the novel surface)
 **Decision:** The brain is consumed by **prime-agent** running in the sandbox, using
@@ -110,15 +121,28 @@ resolution without this file (fell back to an unauthorized catalog default → "
 error"); copying the host file both fixes that and removes config drift between host and
 sandbox. Satisfies R3a-13.
 
+## D3a-J — Conditional provider credential refresh (skip when unchanged)
+**Decision:** `stage_provider` (ai-gateway) and `stage_github_provider` refresh the stored
+credential ONLY when it changed, tracked by a sha256 hash in
+`.prime-claw-{ai-gateway-key,github-token}.sha256` (gitignored; hash only, never the secret).
+**Satisfies:** R3a-5, R3a-7.
+**Rationale (Slice 1 finding):** every `openshell provider update` bumps a resource version
+that re-keys the SANDBOX's placeholder set, and a running sandbox still holds the OLD
+placeholders — so a needless update breaks the sandbox's credentialed endpoints (inference AND
+git push) until recreate. Idempotent converge requires skipping no-op updates. Operational
+corollary: if an operator rotates a token, re-sync provider + hash file together (the next
+`create`/`converge` handles this automatically since the hash no longer matches).
+
 ## Decision → Requirement traceability matrix
 
 | Decision | Requirements |
 |----------|--------------|
 | D3a-A | R3a-1, R3a-2 |
-| D3a-B | R3a-1, R3a-4 |
+| D3a-B | R3a-1, R3a-4, R3a-7 |
 | D3a-C | R3a-3, R3a-4, R3a-8 |
 | D3a-D | R3a-7 |
 | D3a-I | R3a-13 |
+| D3a-J | R3a-5, R3a-7 |
 | D3a-E | R3a-8, R3a-11 |
 | D3a-F | R3a-9 |
 | D3a-G | R3a-3, R3a-4, R3a-6 |

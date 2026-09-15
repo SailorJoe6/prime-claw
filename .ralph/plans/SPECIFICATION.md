@@ -159,19 +159,17 @@ git operation **out of scope for 3a** (lands with the full skill port in 3b).
 
 ## 7. Open questions (to resolve during planning)
 
-1. **Brain-clone mechanism in the sandbox.** `git clone` needs the repo reachable from the
-   sandbox: a read-only bind-mount of the host clone, an in-sandbox `git clone` over SSH
-   (needs git+SSH but no credential on disk if the host's ssh-agent/HTTPS is mediated), or a
-   `git archive`/copy staged in. Decide the credential-safe clone path. (Browse-style host
-   mediation is the precedent for "capability without credentials in the container.")
-2. **Embeddings provider for the in-sandbox index.** gbrain defaults to ZeroEntropy/OpenAI
-   for embeddings; inside the sandbox, does embedding ride the same AI-gateway L7 provider,
-   or a local model, or is the tracer index keyword-only (`--no-embed`) for 3a?
-3. **Which brain for the tracer read/query proof** — the full real brain, or a small
-   curated slice? (Affects clone time, index size, and what a "correct cited answer" can be
-   validated against.)
-4. **Exact validate surface** — which checks are gate vs. nice (page count > 0, a known-fact
-   query, the write receipt, embedding freshness).
+1. **Brain-clone mechanism in the sandbox.** ~~open~~ **RESOLVED (Q1, Slice 1, D3a-B):**
+   in-sandbox HTTPS `git clone` WITH `.git`, push-capable, via the custom `github-push` L7
+   provider profile (placeholder `${api_token}` swapped at L7; no credential on disk).
+   In-sandbox SSH clone was considered and rejected. See `docs/derisk/3a-slice1.md`.
+2. **Embeddings provider for the in-sandbox index.** ~~open~~ **RESOLVED (Q2):** embeddings
+   ride the same AI-gateway L7 provider — `provider_base_urls.openai=https://ai-gateway.zende.sk/v1`,
+   `embedding_model=openai:text-embedding-3-large`, dims 1536 (Slice 0 proven; R3a-12).
+3. **Which brain for the tracer read/query proof** ~~open~~ **RESOLVED (Q3):** the FULL real
+   brain (`~/gitlab_local/brain`, GitHub `JLandersZen/brain`, branch `main`, private).
+4. **Exact validate surface** ~~open~~ **RESOLVED (Q4, D3a-G):** GATE = brain cloned with
+   `.git` + pages>0 + cited query + one routed write receipt + push-back round-trip.
 5. **gbrain: upstream-vs-fork (Slice-0 spike — the strategy is decided; the spike proves
    feasibility).** **Strategy (settled):** we WANT to use **upstream `garrytan/gbrain`** as
    prime-claw's driven brain (mode a) rather than maintain zbrain's stripped fork. Upstream

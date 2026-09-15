@@ -16,6 +16,15 @@ verdicts stand on. Spec: [.ralph/plans/SPECIFICATION.md](../../.ralph/plans/arch
 Verdict taxonomy: **GO** / **GO with documented constraints** / **NO-GO**.
 A hard NO-GO stops all agentic execution and waits for the operator (R-X-4).
 
+## Phase 3a slice verdicts
+
+Phase 3a (tracer bullet) records one verdict doc per executed slice:
+
+| Slice | Verdict doc | Status |
+|---|---|---|
+| S0 — upstream-gbrain spike (R3a-0, R3a-13) | [3a-slice0.md](3a-slice0.md) | GO |
+| S1 — brain into the sandbox, push-capable (R3a-1, R3a-5 part, R3a-7) | [3a-slice1.md](3a-slice1.md) | COMPLETE — root-caused the fresh-create 401s to a shell-quoting bug (double-quote the `${api_token}` URL), not an OpenShell defect |
+
 ## Evidence
 
 `evidence/` holds machine-generated JSON artifacts produced by

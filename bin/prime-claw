@@ -733,7 +733,7 @@ def stage_brain_clone(cfg, args) -> int:
     url = f"https://x-access-token:${{api_token}}@{gh_host}/{repo}.git"
     if args.dry_run:
         print(f"dry_run: clone {repo}@{branch} -> {sb_brain} (placeholder auth, L7 swap; "
-              f"retry on transient cold-start 401s); idempotent fetch --ff-only if already cloned")
+              f"brief retry rides out genuine L7 injection delay); idempotent fetch --ff-only if already cloned")
         return 0
     script = f"""
 set -e
@@ -759,7 +759,7 @@ echo "brain: HEAD=$(git -C {sb_brain} rev-parse --short HEAD 2>/dev/null) remote
         if code == 0:
             break
         if attempt < attempts:
-            print(f"brain: clone attempt {attempt}/{attempts} failed (transient cold-start 401?); "
+            print(f"brain: clone attempt {attempt}/{attempts} failed; "
                   f"retrying in {delay}s ...")
             _sleep(delay)
     if code != 0:

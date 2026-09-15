@@ -45,7 +45,12 @@ fail; results flip over time) were all noise from ONE mundane bug:
 The "recovery after minutes" observations were simply manual clones succeeding on sandboxes
 where the stage had failed.
 
-Fix: double-quote the URL in `git clone` and `git remote set-url` (commit `TBD`). Retry budget
+**Lesson (recorded so we don't re-learn it):** when a scripted stage fails but the "same"
+command run by hand succeeds, diff the EXACT bytes each path sends (here: shell quoting of an
+interpolated URL) before theorizing about the platform. Time-varying bisect results are a
+strong smell that the variable under test isn't the real variable.
+
+Fix: double-quote the URL in `git clone` and `git remote set-url` (commit `2bfcc03`). Retry budget
 reduced to a sane 3x10s (genuine per-sandbox L7 injection cold-start, if any, is seconds-scale).
 Regression test: `test_brain_clone_url_double_quoted_for_placeholder_expansion` asserts the
 generated script double-quotes the URL so `${api_token}` expands.
