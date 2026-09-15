@@ -24,6 +24,7 @@ Phase 3a (tracer bullet) records one verdict doc per executed slice:
 |---|---|---|
 | S0 — upstream-gbrain spike (R3a-0, R3a-13) | [3a-slice0.md](3a-slice0.md) | GO |
 | S1 — brain into the sandbox, push-capable (R3a-1, R3a-5 part, R3a-7) | [3a-slice1.md](3a-slice1.md) | COMPLETE — root-caused the fresh-create 401s to a shell-quoting bug (double-quote the `${api_token}` URL), not an OpenShell defect |
+| S2 — in-sandbox index serving (R3a-2, R3a-12) | [3a-slice2.md](3a-slice2.md) | COMPLETE — brain-index stage; 1057 pages / 3029 embeddings; validate 16/16; validate false-pass fixed |
 
 ## Evidence
 

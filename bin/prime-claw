@@ -790,9 +790,16 @@ def stage_brain(cfg, args) -> int:
     code, out = sandbox_exec(cfg, brain, timeout=300)
     if code != 0: print("error: brain stage (postgres): " + out.strip()[-300:], file=sys.stderr); return code
     print("brain: postgres up")
+    # gbrain resolves config from $HOME/.gbrain/config.json ONLY (GBRAIN_HOME honored; there is
+    # no cwd walk-up — that was the zbrain fork delta, unneeded here per Slice 0). The config is
+    # gbrain's own state, NOT brain content, so it lives at /sandbox/.gbrain/, never inside the
+    # cloned repo. openai_api_key holds the L7 placeholder ($api_key env injected by the
+    # ai-gateway provider); the proxy swaps it for the real key on the wire, so no real
+    # credential touches disk. The placeholder value is refreshed on every run so a provider
+    # rotation + recreate rewrites it.
     wire_py = (
         "import json,os\n"
-        "p='" + sb_brain + "/.gbrain/config.json'\n"
+        "p='/sandbox/.gbrain/config.json'\n"
         "os.makedirs(os.path.dirname(p),exist_ok=True)\n"
         "c=json.load(open(p)) if os.path.exists(p) else {}\n"
         "c.setdefault('engine','postgres')\n"
@@ -800,12 +807,79 @@ def stage_brain(cfg, args) -> int:
         "c.setdefault('embedding_model','openai:text-embedding-3-large')\n"
         "c.setdefault('embedding_dimensions',1536)\n"
         "c['provider_base_urls']={'openai':'https://ai-gateway.zende.sk/v1'}\n"
+        "k=os.environ.get('api_key','')\n"
+        "assert k.startswith('openshell:'), 'api_key placeholder missing from sandbox env'\n"
+        "c['openai_api_key']=k\n"
         "json.dump(c,open(p,'w'),indent=2)\n"
         "print('wired')\n")
     wb64 = base64.b64encode(wire_py.encode()).decode()
     code, out = sandbox_exec(cfg, "export HOME=/sandbox; echo " + wb64 + " | base64 -d | python3", timeout=60)
     if code != 0: print("error: brain stage (gbrain wiring): " + out.strip()[-300:], file=sys.stderr); return code
-    print("brain: gbrain embeddings wired to AI Gateway (placeholder)")
+    print("brain: gbrain config at /sandbox/.gbrain (embeddings via AI Gateway, placeholder key)")
+    return 0
+
+
+def stage_brain_index(cfg, args) -> int:
+    """Slice 2 (R3a-2, R3a-12): build + serve the in-sandbox gbrain index over the cloned
+    brain. Applies the gbrain schema to in-sandbox PG (init --migrate-only; init itself was
+    validated in Slice 0 and is idempotent, but migrate-only skips the config rewrite and
+    interactive noise), registers the brain repo as the `brain` source, then
+    `gbrain sync --source brain` to import + EMBED (embeddings ride the ai-gateway L7 using
+    the placeholder key in /sandbox/.gbrain/config.json — Slice 0 proved this path).
+
+    Idempotent: init --migrate-only and sources add are safe to re-run; sync is incremental
+    (bookmark by git commit). Files with malformed frontmatter in the brain repo would block
+    the sync bookmark, so after a sync attempt the stage runs `gbrain sync --skip-failed`
+    (a no-op when nothing failed) to acknowledge unparseable files and advance past them;
+    repair belongs to the brain's own triage workflows, not this runtime. Extract (link/
+    timeline edges) is left to sync's default post-import step; on large first imports it is
+    deferred (sync prints "run 'gbrain extract --stale'") — not required for R3a-2 serving.
+    """
+    name = cfg["sandbox_name"]
+    pgu = _cfg_get(cfg, "postgres_user", "POSTGRES_USER", "gbrain")
+    pgd = _cfg_get(cfg, "postgres_db", "POSTGRES_DB", "gbrain")
+    pgport = _cfg_get(cfg, "pgport", "PRIME_CLAW_PGPORT", "5433")
+    sb_brain = _cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain")
+    emodel = _cfg_get(cfg, "embedding_model", "PRIME_CLAW_EMBEDDING_MODEL", "openai:text-embedding-3-large")
+    edims = _cfg_get(cfg, "embedding_dimensions", "PRIME_CLAW_EMBEDDING_DIMENSIONS", "1536")
+    dburl = "postgresql://" + pgu + ":" + pgu + "@localhost:" + pgport + "/" + pgd
+    if args.dry_run:
+        print(f"dry_run: gbrain init --migrate-only + sources add brain --path {sb_brain} + "
+              f"sync --source brain (import+embed via gateway; model {emodel}, dims {edims})")
+        return 0
+    # pipefail everywhere: `gbrain ... | tail` must surface gbrain's exit code, not tail's.
+    env = ("set -o pipefail\n"
+           "export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH\n")
+    code, out = sandbox_exec(cfg, env +
+        "gbrain init --migrate-only --url " + dburl + " --non-interactive "
+        "--embedding-model " + emodel + " --embedding-dimensions " + edims + " 2>&1 | tail -2", timeout=180)
+    if code != 0:
+        print("error: brain-index stage (schema migrate): " + out.strip()[-300:], file=sys.stderr)
+        return code
+    print("brain-index: schema applied")
+    code, out = sandbox_exec(cfg, env +
+        "gbrain sources add brain --path " + sb_brain + " --force 2>&1 | tail -2", timeout=120)
+    # sources add exits non-zero when the source already exists; tolerate that exact case.
+    if code != 0 and "already" not in out.lower():
+        print("error: brain-index stage (sources add): " + out.strip()[-300:], file=sys.stderr)
+        return code
+    print("brain-index: source 'brain' registered -> " + sb_brain)
+    # Import + embed. Generous timeout: a full first sync of ~1k pages embeds ~2.7k chunks
+    # through the gateway (~10-20 min observed; batch-size 40). Incremental re-runs are fast.
+    # The stage gates on pages>0 in PG afterward, so a silently-failed sync can't pass.
+    sync_cmd = ("gbrain sync --source brain 2>&1 | tail -6\n"
+                "gbrain sync --source brain --skip-failed 2>&1 | tail -2\n"
+                "N=$(psql -h localhost -p " + pgport + " -U " + pgu + " -d " + pgd +
+                " -tc 'SELECT count(*) FROM pages;' | tr -d ' \\n')\n"
+                "echo \"brain-index pages=$N\"\n"
+                "[ \"${N:-0}\" -gt 0 ]\n")
+    code, out = sandbox_exec(cfg, env + sync_cmd, timeout=2400)
+    if code != 0:
+        print("error: brain-index stage (sync): " + out.strip()[-400:], file=sys.stderr)
+        return code
+    print("brain-index: sync complete")
+    for line in out.strip().splitlines()[-6:]:
+        print("  " + line)
     return 0
 
 
@@ -832,7 +906,7 @@ def stage_spawn(cfg, args) -> int:
 
 def cmd_create(cfg, args) -> int:
     if args.dry_run:
-        print("dry_run: create = build -> provider -> github-provider -> sandbox(fresh) -> prime-agent -> brain-clone -> brain -> spawn -> policy")
+        print("dry_run: create = build -> provider -> github-provider -> sandbox(fresh) -> prime-agent -> brain-clone -> brain -> brain-index -> spawn -> policy")
     for label, fn in [("build", cmd_build),
                       ("provider", stage_provider),
                       ("github-provider", stage_github_provider),
@@ -840,6 +914,7 @@ def cmd_create(cfg, args) -> int:
                       ("prime-agent", stage_prime_agent),
                       ("brain-clone", stage_brain_clone),
                       ("brain", stage_brain),
+                      ("brain-index", stage_brain_index),
                       ("spawn", stage_spawn),
                       ("policy", stage_policy)]:
         rc = fn(cfg, args)
@@ -863,7 +938,7 @@ def cmd_converge(cfg, args) -> int:
         return 1
     if args.dry_run:
         print("dry_run: converge = build -> provider -> github-provider -> sandbox(converge, no recreate) "
-              "-> prime-agent -> brain-clone -> brain -> spawn -> policy")
+              "-> prime-agent -> brain-clone -> brain -> brain-index -> spawn -> policy")
     for label, fn in [("build", cmd_build),
                       ("provider", stage_provider),
                       ("github-provider", stage_github_provider),
@@ -871,6 +946,7 @@ def cmd_converge(cfg, args) -> int:
                       ("prime-agent", stage_prime_agent),
                       ("brain-clone", stage_brain_clone),
                       ("brain", stage_brain),
+                      ("brain-index", stage_brain_index),
                       ("spawn", stage_spawn),
                       ("policy", stage_policy)]:
         rc = fn(cfg, args)
@@ -996,15 +1072,16 @@ def _validate_checks(cfg, args):
     checks.append(("gbrain-cli", True, bool(out.strip()), "v%s" % out.strip()))
     code, out = sandbox_exec(cfg, "export PATH=/usr/lib/postgresql/16/bin:$PATH; psql -h localhost -p 5433 -U gbrain -d postgres -tc 'select version();' 2>&1 | grep -c 'PostgreSQL 16'", timeout=30)
     checks.append(("postgres-16", True, out.strip().startswith("1"), ""))
-    seed = ("export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH; cd /sandbox/brain && "
+    seed = ("export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH; "
             "printf '# Validator Probe\\n\\nprime-claw validate probe pgvector sandbox.\\n' | gbrain put validator-probe >/dev/null 2>&1; "
             "gbrain search 'validator probe pgvector sandbox' 2>&1 | grep -c 'validator-probe'")
     code, out = sandbox_exec(cfg, seed, timeout=90)
     checks.append(("brain-search-roundtrip", True, bool(re.search(r"^\s*[1-9][0-9]*\s*$", out.strip().splitlines()[-1] if out.strip() else "")), ""))
-    emb = ("export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH; cd /sandbox/brain && "
-           "export OPENAI_API_KEY=\"$api_key\" OPENAI_BASE_URL=https://" + gw + "/v1; "
+    emb = ("export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH; "
            "printf '# EmbVal\\n\\nvalidate embedding probe.\\n' | gbrain put embval >/dev/null 2>&1; "
-           "psql -h localhost -p 5433 -U gbrain -d gbrain -tc 'SELECT vector_dims(embedding) FROM content_chunks WHERE embedding IS NOT NULL ORDER BY id DESC LIMIT 1;' 2>&1 | tr -d ' \\n'")
+           "psql -h localhost -p 5433 -U gbrain -d gbrain -tc \"SELECT vector_dims(c.embedding) FROM content_chunks c JOIN pages p ON p.id=c.page_id WHERE p.slug='embval' AND c.embedding IS NOT NULL LIMIT 1;\" 2>&1 | tr -d ' \\n'")
+    # hermetic: gbrain reads /sandbox/.gbrain/config.json (placeholder key + gateway base URL);
+    # the psql check gates on the row this probe just wrote (slug='embval'), never on stale rows.
     code, out = sandbox_exec(cfg, emb, timeout=150)
     dims = out.strip().splitlines()[-1] if out.strip() else ""
     checks.append(("brain-embedding-via-gateway", True, dims == "1536", "dims=%s" % dims))

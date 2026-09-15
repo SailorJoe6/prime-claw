@@ -162,6 +162,15 @@ run against in-sandbox PG with **working embeddings** via the AI gateway.
 **Exit.** `gbrain search "<known term>" --source brain` inside the sandbox returns a real brain
 page from in-sandbox PG; `validate` can read a page count > 0; embeddings populate (R3a-12).
 
+**Status (2026-09-15): COMPLETE.** New `brain-index` stage (init --migrate-only → sources add →
+sync import+embed → skip-failed → pages>0 gate, pipefail throughout). gbrain config moved to the
+canonical `/sandbox/.gbrain/config.json` with the L7 placeholder key — fixing a latent false-pass
+in validate (no cwd walk-up exists upstream; the embedding check now gates on the probe's own row).
+Fresh create: 1057 pages, 3029/3029 chunks embedded (dims 1536), semantic search + hybrid query
+live. `validate` 16/16 PASS (evidence `docs/evidence/validate-20260915T170708Z.json`). Full verdict
++ operational findings (VPN-down RBAC 403 signature → bead prime-claw-z56; npm registry race;
+4 malformed-frontmatter brain files) in `docs/derisk/3a-slice2.md`.
+
 ---
 
 ## Slice 3 — Cited read/query from the sandboxed prime-agent (R3a-3)

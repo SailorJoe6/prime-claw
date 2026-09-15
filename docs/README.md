@@ -44,6 +44,9 @@ following the openclaw-setup pattern.)
 - [derisk/3a-slice1.md](derisk/3a-slice1.md) — Slice 1: push-capable
   credential-safe brain clone, and the shell-quoting root cause of the
   fresh-create 401s (a cautionary bisect tale).
+- [derisk/3a-slice2.md](derisk/3a-slice2.md) — Slice 2: in-sandbox index
+  serving (brain-index stage, 1057 pages + 3029 embeddings), the validate
+  false-pass fix, and the VPN-down RBAC-403 signature.
 
 ## Runtime (Phase 2)
 

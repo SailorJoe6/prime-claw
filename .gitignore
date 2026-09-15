@@ -31,3 +31,6 @@ docker/runtime/.build-stamp.json
 # prime-claw: hash of the last-set github provider token (not the token itself)
 .prime-claw-github-token.sha256
 .prime-claw-ai-gateway-key.sha256
+
+# handoff-chain extension: transient chain marker (never commit runtime state)
+.prime/agent/state/

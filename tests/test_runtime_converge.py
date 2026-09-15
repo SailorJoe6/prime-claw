@@ -157,11 +157,12 @@ def test_create_runs_stages_in_order(tmp_path, monkeypatch):
     monkeypatch.setattr(pc, "stage_prime_agent", rec("prime-agent"))
     monkeypatch.setattr(pc, "stage_brain_clone", rec("brain-clone"))
     monkeypatch.setattr(pc, "stage_brain", rec("brain"))
+    monkeypatch.setattr(pc, "stage_brain_index", rec("brain-index"))
     monkeypatch.setattr(pc, "stage_spawn", rec("spawn"))
     monkeypatch.setattr(pc, "stage_policy", rec("policy"))
     rc = pc.cmd_create(cfg(tmp_path), Args())
     assert rc == 0
-    assert order == ["build", "provider", "github-provider", "sandbox", "prime-agent", "brain-clone", "brain", "spawn", "policy"]
+    assert order == ["build", "provider", "github-provider", "sandbox", "prime-agent", "brain-clone", "brain", "brain-index", "spawn", "policy"]
 
 
 def test_create_stops_on_first_stage_failure(tmp_path, monkeypatch, capsys):
@@ -204,6 +205,7 @@ def _stub_stages(monkeypatch, order):
     monkeypatch.setattr(pc, "stage_prime_agent", rec("prime-agent"))
     monkeypatch.setattr(pc, "stage_brain_clone", rec("brain-clone"))
     monkeypatch.setattr(pc, "stage_brain", rec("brain"))
+    monkeypatch.setattr(pc, "stage_brain_index", rec("brain-index"))
     monkeypatch.setattr(pc, "stage_spawn", rec("spawn"))
     monkeypatch.setattr(pc, "stage_policy", rec("policy"))
 
@@ -214,7 +216,7 @@ def test_converge_runs_all_stages_no_recreate(tmp_path, monkeypatch):
     _stub_stages(monkeypatch, order)
     rc = pc.cmd_converge(cfg(tmp_path), Args())
     assert rc == 0
-    assert order == ["build", "provider", "github-provider", "sandbox", "prime-agent", "brain-clone", "brain", "spawn", "policy"]
+    assert order == ["build", "provider", "github-provider", "sandbox", "prime-agent", "brain-clone", "brain", "brain-index", "spawn", "policy"]
 
 
 def test_converge_errors_when_sandbox_absent(tmp_path, monkeypatch, capsys):
@@ -242,3 +244,87 @@ def test_converge_stops_on_stage_failure(tmp_path, monkeypatch, capsys):
     rc = pc.cmd_converge(cfg(tmp_path), Args())
     assert rc == 9
     assert "stage 'sandbox'" in capsys.readouterr().err
+
+
+# --- Slice 2: brain-index stage (R3a-2, R3a-12) ---------------------------------
+
+def test_brain_config_lives_at_sandbox_home_not_repo(tmp_path, monkeypatch):
+    """gbrain resolves config from $HOME/.gbrain ONLY (no cwd walk-up — that was the
+    zbrain fork delta). stage_brain must write /sandbox/.gbrain/config.json, never
+    inside the cloned repo, and must wire the placeholder api_key from the sandbox env."""
+    calls, fx = _exec_recorder(monkeypatch)
+    monkeypatch.setattr(pc, "sandbox_exec", fx)
+    rc = pc.stage_brain(cfg(tmp_path), Args())
+    assert rc == 0
+    wire = [c for c in calls if "base64 -d | python3" in c]
+    assert wire, "no config-wiring step found"
+    decoded = base64.b64decode(wire[0].split("echo ")[1].split(" |")[0]).decode()
+    assert "/sandbox/.gbrain/config.json" in decoded
+    assert "/sandbox/brain/.gbrain" not in decoded
+    assert "provider_base_urls" in decoded and "ai-gateway.zende.sk/v1" in decoded
+    assert "openai_api_key" in decoded and "api_key" in decoded  # placeholder from env
+
+
+def test_brain_index_stage_sequence(tmp_path, monkeypatch):
+    """stage_brain_index: migrate schema -> sources add (idempotent) -> sync (import+embed)
+    -> skip-failed -> pages>0 gate. pipefail so gbrain failures aren't masked by tail."""
+    calls, fx = _exec_recorder(monkeypatch)
+    monkeypatch.setattr(pc, "sandbox_exec", fx)
+    rc = pc.stage_brain_index(cfg(tmp_path), Args())
+    assert rc == 0
+    joined = "\n".join(calls)
+    assert "gbrain init --migrate-only" in joined
+    assert "postgresql://gbrain:gbrain@localhost:5433/gbrain" in joined
+    assert "--embedding-model openai:text-embedding-3-large" in joined
+    assert "--embedding-dimensions 1536" in joined
+    assert "sources add brain --path /sandbox/brain --force" in joined
+    assert "gbrain sync --source brain" in joined
+    assert "--skip-failed" in joined
+    assert "set -o pipefail" in joined
+    assert "SELECT count(*) FROM pages" in joined  # pages>0 gate
+
+
+def test_brain_index_stage_dry_run(tmp_path, capsys):
+    rc = pc.stage_brain_index(cfg(tmp_path), Args(dry_run=True))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "dry_run" in out and "sources add brain" in out and "sync --source brain" in out
+
+
+def test_brain_index_sync_failure_propagates(tmp_path, monkeypatch, capsys):
+    """A failing sync (e.g. DB unreachable) must fail the stage, not be masked by tail."""
+    def fail_exec(c, script, timeout=30):
+        if "gbrain sync" in script:
+            return (1, "GBRAIN_DB_ACCESS no_url")
+        return (0, "ok")
+    monkeypatch.setattr(pc, "sandbox_exec", fail_exec)
+    rc = pc.stage_brain_index(cfg(tmp_path), Args())
+    assert rc == 1
+    assert "brain-index stage (sync)" in capsys.readouterr().err
+
+
+def test_brain_index_sources_add_idempotent(tmp_path, monkeypatch):
+    """`sources add` failing with 'already exists' must NOT fail the stage."""
+    def fx(c, script, timeout=30):
+        if "sources add" in script:
+            return (1, 'source "brain" already exists')
+        return (0, "ok")
+    monkeypatch.setattr(pc, "sandbox_exec", fx)
+    rc = pc.stage_brain_index(cfg(tmp_path), Args())
+    assert rc == 0
+
+
+def test_create_and_converge_include_brain_index(tmp_path, monkeypatch):
+    order = []
+    def rec(label):
+        def f(c, a): order.append(label); return 0
+        return f
+    for name in ("cmd_build", "stage_provider", "stage_github_provider", "stage_prime_agent",
+                 "stage_brain_clone", "stage_brain", "stage_brain_index", "stage_spawn", "stage_policy"):
+        monkeypatch.setattr(pc, name, rec(name))
+    monkeypatch.setattr(pc, "stage_sandbox", lambda c, a, force_fresh=False: order.append("sandbox") or 0)
+    rc = pc.cmd_create(cfg(tmp_path), Args())
+    assert rc == 0
+    assert order == ["cmd_build", "stage_provider", "stage_github_provider", "sandbox",
+                     "stage_prime_agent", "stage_brain_clone", "stage_brain",
+                     "stage_brain_index", "stage_spawn", "stage_policy"]

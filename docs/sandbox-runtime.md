@@ -68,6 +68,12 @@ for targeted diagnosis:
   (Slice 1 root cause; regression-tested).
 - **brain** — bring up Postgres 16 + pgvector + gbrain in-sandbox
   (initdb-if-absent, agent-owned PGDATA).
+- **brain-index** — build + serve the gbrain index over the cloned brain:
+  `init --migrate-only` (schema), `sources add brain` (idempotent), `sync
+  --source brain` (import + embed via the ai-gateway L7 placeholder key),
+  `sync --skip-failed` (advance past unparseable brain files), then a
+  pages>0 gate. `set -o pipefail` on all piped gbrain calls. Config lives at
+  `/sandbox/.gbrain/config.json` (the ONLY location gbrain reads).
 - **spawn** — stage the non-secret runtime layout (`models.json`, npm-onload,
   spawn target).
 
