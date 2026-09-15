@@ -1,901 +1,970 @@
 {
- "version": 1,
- "project": "prime-claw",
- "phase": "1 \u2014 de-risk gate",
- "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
- "requirements": [
-  {
-   "id": "R-U1-1",
-   "priority": "GATE",
-   "summary": "Fresh OpenShell sandbox dedicated to prime-agent, built directly on OpenShell (no NemoClaw recipe).",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-sandbox.sh"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-sandbox.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-sandbox.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_sandbox.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/",
-   "verdict_doc": "docs/derisk/U1.md (written in Slice 3)"
-  },
-  {
-   "id": "R-U1-2",
-   "priority": "GATE",
-   "summary": "OpenShell toolchain at latest release; exact versions recorded in spike evidence.",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-sandbox.sh"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-sandbox.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-sandbox.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_sandbox.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/",
-   "verdict_doc": "docs/derisk/U1.md (written in Slice 3)"
-  },
-  {
-   "id": "R-U1-5",
-   "priority": "GATE",
-   "summary": "Deny-by-default egress proven: disallowed egress fails; policy-allowed egress succeeds.",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "policies/runtime.yaml",
-     "scripts/archive/phase1/apply-phase1-sandbox.sh"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-sandbox.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-sandbox.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_sandbox.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/",
-   "verdict_doc": "docs/derisk/U1.md (written in Slice 3)"
-  },
-  {
-   "id": "R-U1-3",
-   "priority": "GATE",
-   "summary": "prime-agent daemon installs and runs healthily in-sandbox.",
-   "status": "proven",
-   "slice": 2,
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-prime-agent.sh"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-prime-agent.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-prime-agent.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_prime_agent.py"
-    ]
-   },
-   "verdict_doc": "docs/derisk/U1.md (written in Slice 3)",
-   "evidence": "docs/derisk/evidence/"
-  },
-  {
-   "id": "R-U1-4",
-   "priority": "GATE",
-   "summary": "In-sandbox prime-agent session starts with a working persistent Python REPL.",
-   "status": "proven",
-   "slice": 2,
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-prime-agent.sh"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-prime-agent.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-prime-agent.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_prime_agent.py"
-    ]
-   },
-   "verdict_doc": "docs/derisk/U1.md (written in Slice 3)",
-   "evidence": "docs/derisk/evidence/"
-  },
-  {
-   "id": "R-U1-6",
-   "priority": "GATE",
-   "summary": "Credential injection proven end-to-end via OpenShell providers using the operator's host-instance credentials; placeholders only in env; real model call succeeds; nothing on sandbox disk; fail-closed.",
-   "status": "proven",
-   "slice": 3,
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-providers.sh"
-    ],
-    "check": [],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-credentials.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_credentials.py"
-    ]
-   },
-   "verdict_doc": "docs/derisk/U1.md",
-   "evidence": "docs/derisk/evidence/phase1-credentials-PASS-20260911T173411Z.json"
-  },
-  {
-   "id": "R-X-1",
-   "priority": "GATE",
-   "summary": "Committed re-runnable apply/check/validate/test artifacts per spike.",
-   "status": "met",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-sandbox.sh",
-     "scripts/archive/phase1/apply-phase1-prime-agent.sh",
-     "scripts/archive/phase1/apply-phase1-providers.sh",
-     "scripts/archive/phase1/apply-phase1-brain.sh",
-     "scripts/archive/phase1/apply-phase1-spawn.sh"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-sandbox.sh",
-     "scripts/archive/phase1/check-phase1-prime-agent.sh",
-     "scripts/archive/phase1/check-phase1-brain.sh",
-     "scripts/archive/phase1/check-phase1-spawn.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-sandbox.py",
-     "scripts/archive/phase1/validate-phase1-prime-agent.py",
-     "scripts/archive/phase1/validate-phase1-credentials.py",
-     "scripts/archive/phase1/validate-phase1-brain.py",
-     "scripts/archive/phase1/validate-phase1-spawn.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_sandbox.py",
-     "scripts/archive/phase1/tests/test_phase1_prime_agent.py",
-     "scripts/archive/phase1/tests/test_phase1_credentials.py",
-     "scripts/archive/phase1/tests/test_phase1_brain.py",
-     "scripts/archive/phase1/tests/test_phase1_spawn.py"
-    ]
-   },
-   "verdict_doc": "docs/derisk/{U1,U2,U3}.md"
-  },
-  {
-   "id": "R-X-2",
-   "priority": "GATE",
-   "summary": "This inventory traces every requirement to its validator(s) and verdict document.",
-   "status": "met",
-   "proven_by": {
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_sandbox.py"
-    ]
-   },
-   "verdict_doc": "n/a"
-  },
-  {
-   "id": "R-U2-1",
-   "priority": "GATE",
-   "summary": "gbrain CLI installs and operates inside the sandbox.",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-brain.sh",
-     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-brain.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-brain.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_brain.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
-   "verdict_doc": "docs/derisk/U2.md"
-  },
-  {
-   "id": "R-U2-2",
-   "priority": "GATE",
-   "summary": "Brain repo folder available in-sandbox (mechanism documented: openshell --upload).",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-brain.sh",
-     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-brain.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-brain.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_brain.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
-   "verdict_doc": "docs/derisk/U2.md"
-  },
-  {
-   "id": "R-U2-3",
-   "priority": "GATE",
-   "summary": "Postgres 16 + pgvector runs in-sandbox, owned by the agent (PGDATA in /sandbox, no root/sudo).",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-brain.sh",
-     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-brain.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-brain.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_brain.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
-   "verdict_doc": "docs/derisk/U2.md"
-  },
-  {
-   "id": "R-U2-4",
-   "priority": "GATE",
-   "summary": "gbrain serves search/query from in-sandbox Postgres + brain repo.",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-brain.sh",
-     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-brain.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-brain.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_brain.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
-   "verdict_doc": "docs/derisk/U2.md"
-  },
-  {
-   "id": "R-U2-5",
-   "priority": "NICE",
-   "summary": "Postgres reachable from host at localhost:5433 (or documented forward). Non-blocking.",
-   "status": "documented-non-blocking",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-brain.sh",
-     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-brain.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-brain.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_brain.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
-   "verdict_doc": "docs/derisk/U2.md"
-  },
-  {
-   "id": "R-U2-6",
-   "priority": "GATE",
-   "summary": "gbrain embeds via the AI Gateway through OpenShell L7 placeholder substitution; semantic search runs in-sandbox; key never on disk.",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-brain.sh",
-     "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-brain.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-brain.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_brain.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
-   "verdict_doc": "docs/derisk/U2.md"
-  },
-  {
-   "id": "R-U3-1",
-   "priority": "GATE",
-   "summary": "A git project exists in-sandbox as a committed folder (spawn target /sandbox/episode-target).",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-spawn.sh"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-spawn.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-spawn.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_spawn.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/phase1-spawn-20260911T190138Z.json",
-   "verdict_doc": "docs/derisk/U3.md"
-  },
-  {
-   "id": "R-U3-2",
-   "priority": "GATE",
-   "summary": "prime-agent session started via CLI with CWD scoped to the project; daemon spawn returns a session with cwd=project and kill reaps it cleanly.",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-spawn.sh"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-spawn.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-spawn.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_spawn.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/phase1-spawn-20260911T190138Z.json",
-   "verdict_doc": "docs/derisk/U3.md"
-  },
-  {
-   "id": "R-U3-3",
-   "priority": "NICE",
-   "summary": "Agent-driven spawn = same daemon create/kill channel as rlm(); RLM automatic-preparation race documented (workaround deferred per D6).",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-spawn.sh"
-    ],
-    "check": [
-     "scripts/archive/phase1/check-phase1-spawn.sh"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-spawn.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_spawn.py"
-    ]
-   },
-   "evidence": "docs/derisk/evidence/phase1-spawn-20260911T190138Z.json",
-   "verdict_doc": "docs/derisk/U3.md"
-  },
-  {
-   "id": "R-X-3",
-   "priority": "GATE",
-   "summary": "docs/derisk/ holds one verdict document per unknown (U1,U2,U3): what was proven, evidence, versions, verdict, constraint list.",
-   "status": "met",
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": []
-   },
-   "verdict_doc": "docs/derisk/{U1,U2,U3}.md"
-  },
-  {
-   "id": "R-X-4",
-   "priority": "GATE",
-   "summary": "Hard NO-GO protocol: stop all agentic execution, alert operator, wait for decision. (No hard NO-GO occurred; protocol documented, never invoked.)",
-   "status": "met",
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": []
-   },
-   "verdict_doc": ".ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md"
-  },
-  {
-   "id": "R-X-5",
-   "priority": "GATE",
-   "summary": "Credential isolation preserved: no Keychain/browser-store access; no credential values in repo/logs/artifacts; only non-secret gateway config committed (D14).",
-   "status": "met",
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": []
-   },
-   "verdict_doc": "docs/derisk/U1.md"
-  },
-  {
-   "id": "R-X-6",
-   "priority": "GATE",
-   "summary": "All work landed: committed, pushed; beads prime-claw-f7k/6r8/tcf closed with verdict links.",
-   "status": "met",
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": []
-   },
-   "verdict_doc": "docs/derisk/{U1,U2,U3}.md"
-  },
-  {
-   "id": "R-X-7",
-   "priority": "NICE",
-   "summary": "Inference/credential setup configurable, not hardcoded (D14): provider/endpoint/baseUrl/credential shape parameterized (apply-phase1-providers.sh).",
-   "status": "met",
-   "proven_by": {
-    "apply": [
-     "scripts/archive/phase1/apply-phase1-providers.sh"
-    ],
-    "check": [],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-credentials.py"
-    ],
-    "tests": [
-     "scripts/archive/phase1/tests/test_phase1_credentials.py"
-    ]
-   },
-   "verdict_doc": "docs/derisk/U1.md"
-  },
-  {
-   "id": "R2-A-1",
-   "priority": "GATE",
-   "summary": "Single operator entry point bin/prime-claw owns the sandbox lifecycle: status, create, converge, build, validate, recover, destroy.",
-   "status": "met (Slices 1-6; all verbs implemented; destroy confirm-gated + idempotent)",
-   "phase": 2,
-   "slice": 1,
-   "proven_by": {
-    "apply": [],
-    "check": [
-     "bin/prime-claw"
-    ],
-    "validate": [
-     "bin/prime-claw"
-    ],
-    "tests": [
-     "tests/test_runtime_status.py",
-     "tests/test_runtime_destroy.py"
-    ]
-   },
-   "verdict_doc": "docs/runbook.md"
-  },
-  {
-   "id": "R2-A-3",
-   "priority": "GATE",
-   "summary": "Lifecycle built from native OpenShell primitives (sandbox get/exec, gateway/provider list, policy); no docker-compose/entrypoint mapping.",
-   "status": "in-progress (Slice 1: status probes via openshell)",
-   "phase": 2,
-   "slice": 1,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_status.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
-  },
-  {
-   "id": "R2-A-4",
-   "priority": "GATE",
-   "summary": "Lifecycle stages individually runnable for targeted diagnosis.",
-   "status": "in-progress (Slice 1: probes are discrete functions)",
-   "phase": 2,
-   "slice": 1,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_status.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
-  },
-  {
-   "id": "R2-C-1",
-   "priority": "GATE",
-   "summary": "status reports actual-vs-expected for every component (gateway, sandbox+image, policy, provider, PG, gbrain, daemon, model) in one command.",
-   "status": "met (Slice 1; model deferred to validate)",
-   "phase": 2,
-   "slice": 1,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_status.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
-  },
-  {
-   "id": "R2-X-3",
-   "priority": "GATE",
-   "summary": "Single-gateway discipline: runtime pins openshell (17670); active nemoclaw flagged FORBIDDEN.",
-   "status": "met (Slice 1 status probe)",
-   "phase": 2,
-   "slice": 1,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_status.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
-  },
-  {
-   "id": "R2-B-1",
-   "priority": "GATE",
-   "summary": "Image stage: bin/prime-claw build builds the runtime image reproducibly + idempotently from docker/runtime.Dockerfile (staged gbrain context; prefers real $ZBRAIN_SRC/templates, git-history fallback only).",
-   "status": "met (Slice 2: staging real-path smoke-verified; build tested offline)",
-   "phase": 2,
-   "slice": 2,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_image.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 2)"
-  },
-  {
-   "id": "R2-X-5",
-   "priority": "GATE",
-   "summary": "Reproducibility: build records image tag + inputs fingerprint (docker/runtime/.build-stamp.json); rebuild on change or --force.",
-   "status": "met (Slice 4; live evidence committed)",
-   "phase": 2,
-   "slice": 2,
-   "proven_by": {
-    "apply": [],
-    "check": [
-     "bin/prime-claw"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-credentials.py",
-     "scripts/archive/phase1/validate-phase1-brain.py",
-     "scripts/archive/phase1/validate-phase1-prime-agent.py",
-     "scripts/archive/phase1/validate-phase1-spawn.py",
-     "scripts/archive/phase1/validate-phase1-sandbox.py"
-    ],
-    "tests": [
-     "tests/test_runtime_validate.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 4)"
-  },
-  {
-   "id": "R2-A-2",
-   "priority": "GATE",
-   "summary": "create + converge: fresh->fully-running in one command; converge re-runs all stages on existing sandbox to the same known-good state.",
-   "status": "met (Slice 3a+3b: create + converge; live E2E against the gateway deferred to Slice 4 validate)",
-   "phase": 2,
-   "slice": 3,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_converge.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
-  },
-  {
-   "id": "R2-B-2",
-   "priority": "GATE",
-   "summary": "Provider stage: create/refresh the AI Gateway credential provider on the gateway; attached at sandbox CREATE (env injects at create).",
-   "status": "met (Slice 3a)",
-   "phase": 2,
-   "slice": 3,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_converge.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
-  },
-  {
-   "id": "R2-B-3",
-   "priority": "GATE",
-   "summary": "prime-agent stage: install pinned version + npm-onload %2F workaround + bootstrap Python kernel (idempotent).",
-   "status": "met (Slice 3a)",
-   "phase": 2,
-   "slice": 3,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_converge.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
-  },
-  {
-   "id": "R2-B-4",
-   "priority": "GATE",
-   "summary": "Brain stage: initdb + start sandbox-owned Postgres 16, createdb + pgvector, wire gbrain embeddings to AI Gateway via L7 placeholder.",
-   "status": "met (Slice 3a)",
-   "phase": 2,
-   "slice": 3,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_converge.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
-  },
-  {
-   "id": "R2-B-5",
-   "priority": "GATE",
-   "summary": "Baseline layout stage: in-sandbox episode spawn target (git project), idempotent.",
-   "status": "met (Slice 3a)",
-   "phase": 2,
-   "slice": 3,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_converge.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
-  },
-  {
-   "id": "R2-X-1",
-   "priority": "GATE",
-   "summary": "Credential isolation: provider key read from host auth.json in-process; never written to repo/logs/sandbox disk; profile temp file cleaned up.",
-   "status": "met (Slice 3a)",
-   "phase": 2,
-   "slice": 3,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_converge.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
-  },
-  {
-   "id": "R2-X-2",
-   "priority": "GATE",
-   "summary": "Configurability: stage inputs (gateway host/port, provider, paths, versions) via config/runtime.json + PRIME_CLAW_* env overrides, not hardcoded.",
-   "status": "met (Slice 3: stage inputs parameterized via config/runtime.json + PRIME_CLAW_* overrides)",
-   "phase": 2,
-   "slice": 3,
-   "proven_by": {
-    "apply": [],
-    "check": [],
-    "validate": [],
-    "tests": [
-     "tests/test_runtime_converge.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
-  },
-  {
-   "id": "R2-C-2",
-   "priority": "GATE",
-   "summary": "validate: single green/red acceptance gate over the whole runtime (sandbox, deny-by-default egress, daemon, persistent REPL, credentialed model call, brain+embedding, spawn/reap).",
-   "status": "met (Slice 4; live PASS)",
-   "phase": 2,
-   "slice": 4,
-   "proven_by": {
-    "apply": [],
-    "check": [
-     "bin/prime-claw"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-credentials.py",
-     "scripts/archive/phase1/validate-phase1-brain.py",
-     "scripts/archive/phase1/validate-phase1-prime-agent.py",
-     "scripts/archive/phase1/validate-phase1-spawn.py",
-     "scripts/archive/phase1/validate-phase1-sandbox.py"
-    ],
-    "tests": [
-     "tests/test_runtime_validate.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 4)"
-  },
-  {
-   "id": "R2-C-3",
-   "priority": "NICE",
-   "summary": "validate is re-runnable and non-destructive (read-only probes; spawn uses a timestamped name and reaps in finally).",
-   "status": "met (Slice 5; live degrade-and-recover PASS)",
-   "phase": 2,
-   "slice": 4,
-   "proven_by": {
-    "apply": [],
-    "check": [
-     "bin/prime-claw"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-credentials.py",
-     "scripts/archive/phase1/validate-phase1-brain.py",
-     "scripts/archive/phase1/validate-phase1-prime-agent.py",
-     "scripts/archive/phase1/validate-phase1-spawn.py",
-     "scripts/archive/phase1/validate-phase1-sandbox.py"
-    ],
-    "tests": [
-     "tests/test_runtime_recover.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
-  },
-  {
-   "id": "R2-C-4",
-   "priority": "GATE",
-   "summary": "recover is safe-by-default: detects degradations and only mutates to recover; healthy sandbox is a no-op.",
-   "status": "met (Slice 5; tested)",
-   "phase": 2,
-   "slice": 5,
-   "proven_by": {
-    "apply": [],
-    "check": [
-     "bin/prime-claw"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-credentials.py",
-     "scripts/archive/phase1/validate-phase1-brain.py",
-     "scripts/archive/phase1/validate-phase1-prime-agent.py",
-     "scripts/archive/phase1/validate-phase1-spawn.py",
-     "scripts/archive/phase1/validate-phase1-sandbox.py"
-    ],
-    "tests": [
-     "tests/test_runtime_recover.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
-  },
-  {
-   "id": "R2-C-5",
-   "priority": "GATE",
-   "summary": "Demonstrated degrade-and-recover: induced cold-daemon, recover, validate green. (Found+fixed provider-idempotency, kernel-bootstrap, daemon-ensure, and stale-lock bugs.)",
-   "status": "met (Slice 5; live PASS, docs/evidence/recover-*.json)",
-   "phase": 2,
-   "slice": 5,
-   "proven_by": {
-    "apply": [],
-    "check": [
-     "bin/prime-claw"
-    ],
-    "validate": [
-     "scripts/archive/phase1/validate-phase1-credentials.py",
-     "scripts/archive/phase1/validate-phase1-brain.py",
-     "scripts/archive/phase1/validate-phase1-prime-agent.py",
-     "scripts/archive/phase1/validate-phase1-spawn.py",
-     "scripts/archive/phase1/validate-phase1-sandbox.py"
-    ],
-    "tests": [
-     "tests/test_runtime_recover.py"
-    ]
-   },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
-  },
-  {
-   "id": "R2-X-4",
-   "priority": "GATE",
-   "phase": 2,
-   "slice": 6,
-   "summary": "Traceability: requirements-inventory traces every Phase 2 requirement to validator(s); pytest covers the lifecycle tooling.",
-   "status": "met (Slice 6; tests/test_inventory_integrity.py re-gates proven_by paths)",
-   "proven_by": {
-    "check": [
-     "bin/prime-claw"
-    ],
-    "validate": [
-     "bin/prime-claw"
-    ],
-    "tests": [
-     "tests/test_inventory_integrity.py"
-    ]
-   },
-   "verdict_doc": "config/requirements-inventory.json; tests/test_inventory_integrity.py"
-  },
-  {
-   "id": "R2-X-6",
-   "priority": "NICE",
-   "phase": 2,
-   "slice": 6,
-   "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
-   "status": "documented (Slice 6; no host forward by design)",
-   "proven_by": {
-    "check": [
-     "bin/prime-claw"
-    ],
-    "validate": [
-     "bin/prime-claw"
-    ],
-    "tests": [
-     "tests/test_inventory_integrity.py"
-    ]
-   },
-   "verdict_doc": "docs/runbook.md (Host Postgres exposure constraint)"
-  },
-  {
-   "id": "R3a-0",
-   "priority": "GATE",
-   "summary": "Slice-0 spike: upstream garrytan/gbrain runs in the OpenShell sandbox under prime-agent-as-controller (build, init, sync, embed, get, search all green; controller leg gated on an environmental OpenShell credential fault, not gbrain).",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "bin/prime-claw"
-    ],
-    "check": [
-     "config/runtime.json"
-    ],
-    "validate": [
-     "docs/derisk/3a-slice0.md"
-    ],
-    "tests": [
-     "tests/test_runtime_image.py"
-    ]
-   },
-   "evidence": "docs/derisk/3a-slice0.md",
-   "verdict_doc": "docs/derisk/3a-slice0.md"
-  },
-  {
-   "id": "R3a-13",
-   "priority": "GATE",
-   "summary": "Sandbox prime-agent model config mirrors host: copy ~/.prime/agent/models.json verbatim (no secrets), fallback to built-in Kimi-K3+GLM default.",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "bin/prime-claw"
-    ],
-    "check": [
-     "config/runtime.json"
-    ],
-    "validate": [
-     "docs/derisk/3a-slice0.md"
-    ],
-    "tests": [
-     "tests/test_runtime_image.py"
-    ]
-   },
-   "evidence": "docs/derisk/3a-slice0.md",
-   "verdict_doc": "docs/derisk/3a-slice0.md"
-  }
- ],
- "phase2": {}
+  "version": 1,
+  "project": "prime-claw",
+  "phase": "1 \u2014 de-risk gate",
+  "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
+  "requirements": [
+    {
+      "id": "R-U1-1",
+      "priority": "GATE",
+      "summary": "Fresh OpenShell sandbox dedicated to prime-agent, built directly on OpenShell (no NemoClaw recipe).",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-sandbox.sh"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-sandbox.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-sandbox.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_sandbox.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/",
+      "verdict_doc": "docs/derisk/U1.md (written in Slice 3)"
+    },
+    {
+      "id": "R-U1-2",
+      "priority": "GATE",
+      "summary": "OpenShell toolchain at latest release; exact versions recorded in spike evidence.",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-sandbox.sh"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-sandbox.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-sandbox.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_sandbox.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/",
+      "verdict_doc": "docs/derisk/U1.md (written in Slice 3)"
+    },
+    {
+      "id": "R-U1-5",
+      "priority": "GATE",
+      "summary": "Deny-by-default egress proven: disallowed egress fails; policy-allowed egress succeeds.",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "policies/runtime.yaml",
+          "scripts/archive/phase1/apply-phase1-sandbox.sh"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-sandbox.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-sandbox.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_sandbox.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/",
+      "verdict_doc": "docs/derisk/U1.md (written in Slice 3)"
+    },
+    {
+      "id": "R-U1-3",
+      "priority": "GATE",
+      "summary": "prime-agent daemon installs and runs healthily in-sandbox.",
+      "status": "proven",
+      "slice": 2,
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-prime-agent.sh"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-prime-agent.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-prime-agent.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_prime_agent.py"
+        ]
+      },
+      "verdict_doc": "docs/derisk/U1.md (written in Slice 3)",
+      "evidence": "docs/derisk/evidence/"
+    },
+    {
+      "id": "R-U1-4",
+      "priority": "GATE",
+      "summary": "In-sandbox prime-agent session starts with a working persistent Python REPL.",
+      "status": "proven",
+      "slice": 2,
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-prime-agent.sh"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-prime-agent.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-prime-agent.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_prime_agent.py"
+        ]
+      },
+      "verdict_doc": "docs/derisk/U1.md (written in Slice 3)",
+      "evidence": "docs/derisk/evidence/"
+    },
+    {
+      "id": "R-U1-6",
+      "priority": "GATE",
+      "summary": "Credential injection proven end-to-end via OpenShell providers using the operator's host-instance credentials; placeholders only in env; real model call succeeds; nothing on sandbox disk; fail-closed.",
+      "status": "proven",
+      "slice": 3,
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-providers.sh"
+        ],
+        "check": [],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-credentials.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_credentials.py"
+        ]
+      },
+      "verdict_doc": "docs/derisk/U1.md",
+      "evidence": "docs/derisk/evidence/phase1-credentials-PASS-20260911T173411Z.json"
+    },
+    {
+      "id": "R-X-1",
+      "priority": "GATE",
+      "summary": "Committed re-runnable apply/check/validate/test artifacts per spike.",
+      "status": "met",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-sandbox.sh",
+          "scripts/archive/phase1/apply-phase1-prime-agent.sh",
+          "scripts/archive/phase1/apply-phase1-providers.sh",
+          "scripts/archive/phase1/apply-phase1-brain.sh",
+          "scripts/archive/phase1/apply-phase1-spawn.sh"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-sandbox.sh",
+          "scripts/archive/phase1/check-phase1-prime-agent.sh",
+          "scripts/archive/phase1/check-phase1-brain.sh",
+          "scripts/archive/phase1/check-phase1-spawn.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-sandbox.py",
+          "scripts/archive/phase1/validate-phase1-prime-agent.py",
+          "scripts/archive/phase1/validate-phase1-credentials.py",
+          "scripts/archive/phase1/validate-phase1-brain.py",
+          "scripts/archive/phase1/validate-phase1-spawn.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_sandbox.py",
+          "scripts/archive/phase1/tests/test_phase1_prime_agent.py",
+          "scripts/archive/phase1/tests/test_phase1_credentials.py",
+          "scripts/archive/phase1/tests/test_phase1_brain.py",
+          "scripts/archive/phase1/tests/test_phase1_spawn.py"
+        ]
+      },
+      "verdict_doc": "docs/derisk/{U1,U2,U3}.md"
+    },
+    {
+      "id": "R-X-2",
+      "priority": "GATE",
+      "summary": "This inventory traces every requirement to its validator(s) and verdict document.",
+      "status": "met",
+      "proven_by": {
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_sandbox.py"
+        ]
+      },
+      "verdict_doc": "n/a"
+    },
+    {
+      "id": "R-U2-1",
+      "priority": "GATE",
+      "summary": "gbrain CLI installs and operates inside the sandbox.",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-brain.sh",
+          "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-brain.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-brain.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_brain.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+      "verdict_doc": "docs/derisk/U2.md"
+    },
+    {
+      "id": "R-U2-2",
+      "priority": "GATE",
+      "summary": "Brain repo folder available in-sandbox (mechanism documented: openshell --upload).",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-brain.sh",
+          "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-brain.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-brain.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_brain.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+      "verdict_doc": "docs/derisk/U2.md"
+    },
+    {
+      "id": "R-U2-3",
+      "priority": "GATE",
+      "summary": "Postgres 16 + pgvector runs in-sandbox, owned by the agent (PGDATA in /sandbox, no root/sudo).",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-brain.sh",
+          "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-brain.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-brain.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_brain.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+      "verdict_doc": "docs/derisk/U2.md"
+    },
+    {
+      "id": "R-U2-4",
+      "priority": "GATE",
+      "summary": "gbrain serves search/query from in-sandbox Postgres + brain repo.",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-brain.sh",
+          "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-brain.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-brain.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_brain.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+      "verdict_doc": "docs/derisk/U2.md"
+    },
+    {
+      "id": "R-U2-5",
+      "priority": "NICE",
+      "summary": "Postgres reachable from host at localhost:5433 (or documented forward). Non-blocking.",
+      "status": "documented-non-blocking",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-brain.sh",
+          "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-brain.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-brain.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_brain.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+      "verdict_doc": "docs/derisk/U2.md"
+    },
+    {
+      "id": "R-U2-6",
+      "priority": "GATE",
+      "summary": "gbrain embeds via the AI Gateway through OpenShell L7 placeholder substitution; semantic search runs in-sandbox; key never on disk.",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-brain.sh",
+          "scripts/archive/phase1/docker/phase1-brain.Dockerfile"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-brain.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-brain.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_brain.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/phase1-brain-20260911T181331Z.json",
+      "verdict_doc": "docs/derisk/U2.md"
+    },
+    {
+      "id": "R-U3-1",
+      "priority": "GATE",
+      "summary": "A git project exists in-sandbox as a committed folder (spawn target /sandbox/episode-target).",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-spawn.sh"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-spawn.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-spawn.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_spawn.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/phase1-spawn-20260911T190138Z.json",
+      "verdict_doc": "docs/derisk/U3.md"
+    },
+    {
+      "id": "R-U3-2",
+      "priority": "GATE",
+      "summary": "prime-agent session started via CLI with CWD scoped to the project; daemon spawn returns a session with cwd=project and kill reaps it cleanly.",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-spawn.sh"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-spawn.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-spawn.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_spawn.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/phase1-spawn-20260911T190138Z.json",
+      "verdict_doc": "docs/derisk/U3.md"
+    },
+    {
+      "id": "R-U3-3",
+      "priority": "NICE",
+      "summary": "Agent-driven spawn = same daemon create/kill channel as rlm(); RLM automatic-preparation race documented (workaround deferred per D6).",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-spawn.sh"
+        ],
+        "check": [
+          "scripts/archive/phase1/check-phase1-spawn.sh"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-spawn.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_spawn.py"
+        ]
+      },
+      "evidence": "docs/derisk/evidence/phase1-spawn-20260911T190138Z.json",
+      "verdict_doc": "docs/derisk/U3.md"
+    },
+    {
+      "id": "R-X-3",
+      "priority": "GATE",
+      "summary": "docs/derisk/ holds one verdict document per unknown (U1,U2,U3): what was proven, evidence, versions, verdict, constraint list.",
+      "status": "met",
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": []
+      },
+      "verdict_doc": "docs/derisk/{U1,U2,U3}.md"
+    },
+    {
+      "id": "R-X-4",
+      "priority": "GATE",
+      "summary": "Hard NO-GO protocol: stop all agentic execution, alert operator, wait for decision. (No hard NO-GO occurred; protocol documented, never invoked.)",
+      "status": "met",
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": []
+      },
+      "verdict_doc": ".ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md"
+    },
+    {
+      "id": "R-X-5",
+      "priority": "GATE",
+      "summary": "Credential isolation preserved: no Keychain/browser-store access; no credential values in repo/logs/artifacts; only non-secret gateway config committed (D14).",
+      "status": "met",
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": []
+      },
+      "verdict_doc": "docs/derisk/U1.md"
+    },
+    {
+      "id": "R-X-6",
+      "priority": "GATE",
+      "summary": "All work landed: committed, pushed; beads prime-claw-f7k/6r8/tcf closed with verdict links.",
+      "status": "met",
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": []
+      },
+      "verdict_doc": "docs/derisk/{U1,U2,U3}.md"
+    },
+    {
+      "id": "R-X-7",
+      "priority": "NICE",
+      "summary": "Inference/credential setup configurable, not hardcoded (D14): provider/endpoint/baseUrl/credential shape parameterized (apply-phase1-providers.sh).",
+      "status": "met",
+      "proven_by": {
+        "apply": [
+          "scripts/archive/phase1/apply-phase1-providers.sh"
+        ],
+        "check": [],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-credentials.py"
+        ],
+        "tests": [
+          "scripts/archive/phase1/tests/test_phase1_credentials.py"
+        ]
+      },
+      "verdict_doc": "docs/derisk/U1.md"
+    },
+    {
+      "id": "R2-A-1",
+      "priority": "GATE",
+      "summary": "Single operator entry point bin/prime-claw owns the sandbox lifecycle: status, create, converge, build, validate, recover, destroy.",
+      "status": "met (Slices 1-6; all verbs implemented; destroy confirm-gated + idempotent)",
+      "phase": 2,
+      "slice": 1,
+      "proven_by": {
+        "apply": [],
+        "check": [
+          "bin/prime-claw"
+        ],
+        "validate": [
+          "bin/prime-claw"
+        ],
+        "tests": [
+          "tests/test_runtime_status.py",
+          "tests/test_runtime_destroy.py"
+        ]
+      },
+      "verdict_doc": "docs/runbook.md"
+    },
+    {
+      "id": "R2-A-3",
+      "priority": "GATE",
+      "summary": "Lifecycle built from native OpenShell primitives (sandbox get/exec, gateway/provider list, policy); no docker-compose/entrypoint mapping.",
+      "status": "in-progress (Slice 1: status probes via openshell)",
+      "phase": 2,
+      "slice": 1,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_status.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+    },
+    {
+      "id": "R2-A-4",
+      "priority": "GATE",
+      "summary": "Lifecycle stages individually runnable for targeted diagnosis.",
+      "status": "in-progress (Slice 1: probes are discrete functions)",
+      "phase": 2,
+      "slice": 1,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_status.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+    },
+    {
+      "id": "R2-C-1",
+      "priority": "GATE",
+      "summary": "status reports actual-vs-expected for every component (gateway, sandbox+image, policy, provider, PG, gbrain, daemon, model) in one command.",
+      "status": "met (Slice 1; model deferred to validate)",
+      "phase": 2,
+      "slice": 1,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_status.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+    },
+    {
+      "id": "R2-X-3",
+      "priority": "GATE",
+      "summary": "Single-gateway discipline: runtime pins openshell (17670); active nemoclaw flagged FORBIDDEN.",
+      "status": "met (Slice 1 status probe)",
+      "phase": 2,
+      "slice": 1,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_status.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+    },
+    {
+      "id": "R2-B-1",
+      "priority": "GATE",
+      "summary": "Image stage: bin/prime-claw build builds the runtime image reproducibly + idempotently from docker/runtime.Dockerfile (staged gbrain context; prefers real $ZBRAIN_SRC/templates, git-history fallback only).",
+      "status": "met (Slice 2: staging real-path smoke-verified; build tested offline)",
+      "phase": 2,
+      "slice": 2,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_image.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 2)"
+    },
+    {
+      "id": "R2-X-5",
+      "priority": "GATE",
+      "summary": "Reproducibility: build records image tag + inputs fingerprint (docker/runtime/.build-stamp.json); rebuild on change or --force.",
+      "status": "met (Slice 4; live evidence committed)",
+      "phase": 2,
+      "slice": 2,
+      "proven_by": {
+        "apply": [],
+        "check": [
+          "bin/prime-claw"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-credentials.py",
+          "scripts/archive/phase1/validate-phase1-brain.py",
+          "scripts/archive/phase1/validate-phase1-prime-agent.py",
+          "scripts/archive/phase1/validate-phase1-spawn.py",
+          "scripts/archive/phase1/validate-phase1-sandbox.py"
+        ],
+        "tests": [
+          "tests/test_runtime_validate.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 4)"
+    },
+    {
+      "id": "R2-A-2",
+      "priority": "GATE",
+      "summary": "create + converge: fresh->fully-running in one command; converge re-runs all stages on existing sandbox to the same known-good state.",
+      "status": "met (Slice 3a+3b: create + converge; live E2E against the gateway deferred to Slice 4 validate)",
+      "phase": 2,
+      "slice": 3,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_converge.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+    },
+    {
+      "id": "R2-B-2",
+      "priority": "GATE",
+      "summary": "Provider stage: create/refresh the AI Gateway credential provider on the gateway; attached at sandbox CREATE (env injects at create).",
+      "status": "met (Slice 3a)",
+      "phase": 2,
+      "slice": 3,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_converge.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+    },
+    {
+      "id": "R2-B-3",
+      "priority": "GATE",
+      "summary": "prime-agent stage: install pinned version + npm-onload %2F workaround + bootstrap Python kernel (idempotent).",
+      "status": "met (Slice 3a)",
+      "phase": 2,
+      "slice": 3,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_converge.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+    },
+    {
+      "id": "R2-B-4",
+      "priority": "GATE",
+      "summary": "Brain stage: initdb + start sandbox-owned Postgres 16, createdb + pgvector, wire gbrain embeddings to AI Gateway via L7 placeholder.",
+      "status": "met (Slice 3a)",
+      "phase": 2,
+      "slice": 3,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_converge.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+    },
+    {
+      "id": "R2-B-5",
+      "priority": "GATE",
+      "summary": "Baseline layout stage: in-sandbox episode spawn target (git project), idempotent.",
+      "status": "met (Slice 3a)",
+      "phase": 2,
+      "slice": 3,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_converge.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+    },
+    {
+      "id": "R2-X-1",
+      "priority": "GATE",
+      "summary": "Credential isolation: provider key read from host auth.json in-process; never written to repo/logs/sandbox disk; profile temp file cleaned up.",
+      "status": "met (Slice 3a)",
+      "phase": 2,
+      "slice": 3,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_converge.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+    },
+    {
+      "id": "R2-X-2",
+      "priority": "GATE",
+      "summary": "Configurability: stage inputs (gateway host/port, provider, paths, versions) via config/runtime.json + PRIME_CLAW_* env overrides, not hardcoded.",
+      "status": "met (Slice 3: stage inputs parameterized via config/runtime.json + PRIME_CLAW_* overrides)",
+      "phase": 2,
+      "slice": 3,
+      "proven_by": {
+        "apply": [],
+        "check": [],
+        "validate": [],
+        "tests": [
+          "tests/test_runtime_converge.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+    },
+    {
+      "id": "R2-C-2",
+      "priority": "GATE",
+      "summary": "validate: single green/red acceptance gate over the whole runtime (sandbox, deny-by-default egress, daemon, persistent REPL, credentialed model call, brain+embedding, spawn/reap).",
+      "status": "met (Slice 4; live PASS)",
+      "phase": 2,
+      "slice": 4,
+      "proven_by": {
+        "apply": [],
+        "check": [
+          "bin/prime-claw"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-credentials.py",
+          "scripts/archive/phase1/validate-phase1-brain.py",
+          "scripts/archive/phase1/validate-phase1-prime-agent.py",
+          "scripts/archive/phase1/validate-phase1-spawn.py",
+          "scripts/archive/phase1/validate-phase1-sandbox.py"
+        ],
+        "tests": [
+          "tests/test_runtime_validate.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 4)"
+    },
+    {
+      "id": "R2-C-3",
+      "priority": "NICE",
+      "summary": "validate is re-runnable and non-destructive (read-only probes; spawn uses a timestamped name and reaps in finally).",
+      "status": "met (Slice 5; live degrade-and-recover PASS)",
+      "phase": 2,
+      "slice": 4,
+      "proven_by": {
+        "apply": [],
+        "check": [
+          "bin/prime-claw"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-credentials.py",
+          "scripts/archive/phase1/validate-phase1-brain.py",
+          "scripts/archive/phase1/validate-phase1-prime-agent.py",
+          "scripts/archive/phase1/validate-phase1-spawn.py",
+          "scripts/archive/phase1/validate-phase1-sandbox.py"
+        ],
+        "tests": [
+          "tests/test_runtime_recover.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
+    },
+    {
+      "id": "R2-C-4",
+      "priority": "GATE",
+      "summary": "recover is safe-by-default: detects degradations and only mutates to recover; healthy sandbox is a no-op.",
+      "status": "met (Slice 5; tested)",
+      "phase": 2,
+      "slice": 5,
+      "proven_by": {
+        "apply": [],
+        "check": [
+          "bin/prime-claw"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-credentials.py",
+          "scripts/archive/phase1/validate-phase1-brain.py",
+          "scripts/archive/phase1/validate-phase1-prime-agent.py",
+          "scripts/archive/phase1/validate-phase1-spawn.py",
+          "scripts/archive/phase1/validate-phase1-sandbox.py"
+        ],
+        "tests": [
+          "tests/test_runtime_recover.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
+    },
+    {
+      "id": "R2-C-5",
+      "priority": "GATE",
+      "summary": "Demonstrated degrade-and-recover: induced cold-daemon, recover, validate green. (Found+fixed provider-idempotency, kernel-bootstrap, daemon-ensure, and stale-lock bugs.)",
+      "status": "met (Slice 5; live PASS, docs/evidence/recover-*.json)",
+      "phase": 2,
+      "slice": 5,
+      "proven_by": {
+        "apply": [],
+        "check": [
+          "bin/prime-claw"
+        ],
+        "validate": [
+          "scripts/archive/phase1/validate-phase1-credentials.py",
+          "scripts/archive/phase1/validate-phase1-brain.py",
+          "scripts/archive/phase1/validate-phase1-prime-agent.py",
+          "scripts/archive/phase1/validate-phase1-spawn.py",
+          "scripts/archive/phase1/validate-phase1-sandbox.py"
+        ],
+        "tests": [
+          "tests/test_runtime_recover.py"
+        ]
+      },
+      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
+    },
+    {
+      "id": "R2-X-4",
+      "priority": "GATE",
+      "phase": 2,
+      "slice": 6,
+      "summary": "Traceability: requirements-inventory traces every Phase 2 requirement to validator(s); pytest covers the lifecycle tooling.",
+      "status": "met (Slice 6; tests/test_inventory_integrity.py re-gates proven_by paths)",
+      "proven_by": {
+        "check": [
+          "bin/prime-claw"
+        ],
+        "validate": [
+          "bin/prime-claw"
+        ],
+        "tests": [
+          "tests/test_inventory_integrity.py"
+        ]
+      },
+      "verdict_doc": "config/requirements-inventory.json; tests/test_inventory_integrity.py"
+    },
+    {
+      "id": "R2-X-6",
+      "priority": "NICE",
+      "phase": 2,
+      "slice": 6,
+      "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
+      "status": "documented (Slice 6; no host forward by design)",
+      "proven_by": {
+        "check": [
+          "bin/prime-claw"
+        ],
+        "validate": [
+          "bin/prime-claw"
+        ],
+        "tests": [
+          "tests/test_inventory_integrity.py"
+        ]
+      },
+      "verdict_doc": "docs/runbook.md (Host Postgres exposure constraint)"
+    },
+    {
+      "id": "R3a-0",
+      "priority": "GATE",
+      "summary": "Slice-0 spike: upstream garrytan/gbrain runs in the OpenShell sandbox under prime-agent-as-controller (build, init, sync, embed, get, search all green; controller leg gated on an environmental OpenShell credential fault, not gbrain).",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "bin/prime-claw"
+        ],
+        "check": [
+          "config/runtime.json"
+        ],
+        "validate": [
+          "docs/derisk/3a-slice0.md"
+        ],
+        "tests": [
+          "tests/test_runtime_image.py"
+        ]
+      },
+      "evidence": "docs/derisk/3a-slice0.md",
+      "verdict_doc": "docs/derisk/3a-slice0.md"
+    },
+    {
+      "id": "R3a-13",
+      "priority": "GATE",
+      "summary": "Sandbox prime-agent model config mirrors host: copy ~/.prime/agent/models.json verbatim (no secrets), fallback to built-in Kimi-K3+GLM default.",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "bin/prime-claw"
+        ],
+        "check": [
+          "config/runtime.json"
+        ],
+        "validate": [
+          "docs/derisk/3a-slice0.md"
+        ],
+        "tests": [
+          "tests/test_runtime_image.py"
+        ]
+      },
+      "evidence": "docs/derisk/3a-slice0.md",
+      "verdict_doc": "docs/derisk/3a-slice0.md"
+    },
+    {
+      "id": "R3a-1",
+      "priority": "GATE",
+      "summary": "Brain repo cloned into sandbox at /sandbox/brain WITH .git via github-push L7 provider (placeholder-only credential); idempotent fetch+ff on converge.",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "bin/prime-claw"
+        ],
+        "check": [
+          "config/runtime.json",
+          "policies/runtime.yaml"
+        ],
+        "validate": [
+          "docs/derisk/3a-slice1.md"
+        ],
+        "tests": [
+          "tests/test_runtime_image.py"
+        ]
+      },
+      "evidence": "docs/derisk/3a-slice1.md",
+      "verdict_doc": "docs/derisk/3a-slice1.md"
+    },
+    {
+      "id": "R3a-5",
+      "priority": "GATE",
+      "summary": "Lifecycle: create/converge wire github-provider + brain-clone stages; conditional credential refresh (skip when hash unchanged) avoids placeholder re-keying churn.",
+      "status": "partial",
+      "proven_by": {
+        "apply": [
+          "bin/prime-claw"
+        ],
+        "check": [
+          "config/runtime.json"
+        ],
+        "validate": [
+          "docs/derisk/3a-slice1.md"
+        ],
+        "tests": [
+          "tests/test_runtime_image.py",
+          "tests/test_runtime_converge.py"
+        ]
+      },
+      "evidence": "docs/derisk/3a-slice1.md",
+      "verdict_doc": "docs/derisk/3a-slice1.md"
+    },
+    {
+      "id": "R3a-7",
+      "priority": "GATE",
+      "summary": "Credential isolation: github token read host-side (gh auth token), L7-injected; sandbox holds placeholder only; .git/config contains zero real token (verified).",
+      "status": "proven",
+      "proven_by": {
+        "apply": [
+          "bin/prime-claw",
+          "policies/runtime.yaml"
+        ],
+        "check": [
+          "config/runtime.json"
+        ],
+        "validate": [
+          "docs/derisk/3a-slice1.md"
+        ],
+        "tests": [
+          "tests/test_runtime_image.py"
+        ]
+      },
+      "evidence": "docs/derisk/3a-slice1.md",
+      "verdict_doc": "docs/derisk/3a-slice1.md"
+    }
+  ],
+  "phase2": {}
 }

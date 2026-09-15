@@ -396,3 +396,45 @@ def test_brain_clone_config_override(tmp_path, monkeypatch):
     assert rc == 0 and "acme/knowledge" in s and "trunk" in s and "/data/kb" in s
 
 
+def test_brain_clone_retries_transient_401(tmp_path, monkeypatch):
+    """Slice 1 cold-start finding: fresh-sandbox clones can 401 for the first few minutes, then
+    recover. The stage retries the clone itself on a bounded schedule (a failed attempt does NOT
+    permanently poison the sandbox; ls-remote is not predictive). Fail twice, then succeed."""
+    calls = []
+    def fake_exec(c, s, timeout=30):
+        calls.append(s)
+        return (0, "") if len(calls) >= 3 else (128, "remote: Invalid username or token")
+    monkeypatch.setattr(pc, "sandbox_exec", fake_exec)
+    monkeypatch.setattr(pc, "_sleep", lambda s: None)
+    class A: dry_run=False
+    rc = pc.stage_brain_clone(cfg(tmp_path), A())
+    assert rc == 0 and len(calls) == 3
+
+
+def test_brain_clone_gives_up_after_bounded_attempts(tmp_path, monkeypatch):
+    """If the credential path never comes live within the bounded retry budget, fail clearly."""
+    calls = []
+    def fake_exec(c, s, timeout=30):
+        calls.append(s); return (128, "remote: Invalid username or token")
+    monkeypatch.setattr(pc, "sandbox_exec", fake_exec)
+    monkeypatch.setattr(pc, "_sleep", lambda s: None)
+    class A: dry_run=False
+    rc = pc.stage_brain_clone(cfg(tmp_path, brain_clone_attempts=3), A())
+    assert rc == 128 and len(calls) == 3
+
+
+
+def test_brain_clone_url_double_quoted_for_placeholder_expansion(tmp_path, monkeypatch):
+    """Regression (Slice 1 root cause): the clone/remote URL embeds ${api_token}, which must be
+    expanded by the in-sandbox bash. If the script single-quotes the URL, bash passes the literal
+    string '${api_token}' to git and every attempt 401s. Assert the generated script wraps the
+    URL in double quotes."""
+    seen = {}
+    monkeypatch.setattr(pc, "sandbox_exec", lambda c, s, timeout=30: (seen.setdefault("s", s), 0, "")[1:])
+    class A: dry_run=False
+    rc = pc.stage_brain_clone(cfg(tmp_path), A())
+    s = seen["s"]
+    assert rc == 0
+    assert "git clone --branch main \"https://x-access-token:${api_token}@" in s
+    assert "remote set-url origin \"https://x-access-token:${api_token}@" in s
+    assert "'https://x-access-token:${api_token}" not in s  # single-quoted form = the bug

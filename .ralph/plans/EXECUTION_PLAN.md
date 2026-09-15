@@ -132,13 +132,12 @@ on sandbox disk.
 **Exit.** A fresh `create`+`converge` leaves `/sandbox/brain` cloned with `.git`; `git -C
 /sandbox/brain remote -v` reachable through the credentialed endpoint; no token on disk.
 
-**Status (2026-09-14): capability PROVEN on a settled sandbox; fresh-`create` clone BLOCKED by
-an OpenShell per-sandbox credential-injection cold-start that poisons the git POST path on a
-failed first attempt. See `docs/derisk/3a-slice1.md` for the full diagnosis and follow-up
-options. Push-back to the real private brain verified (commit + push round-trip, credential-safe).
-Reliable path today: let the sandbox settle, then clone via `converge` — provided no failed clone
-already poisoned it. Remaining work: a credential-readiness gate (or OpenShell-side fix) so a
-fresh `create` lands the clone deterministically.**
+**Status (2026-09-14): COMPLETE.** Fresh `create` lands `/sandbox/brain` cloned with `.git`
+deterministically. The fresh-create blocker turned out to be a shell-quoting bug in
+`stage_brain_clone` (single-quoted URL prevented `${api_token}` expansion), not an OpenShell
+defect — full root cause in `docs/derisk/3a-slice1.md`. Push-capable github provider
+(`github-push` profile), conditional credential refresh on both providers, single L7
+credentialed `github_brain` policy rule, clone/fetch-ff idempotent, no token on disk.
 
 ---
 

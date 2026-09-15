@@ -1,7 +1,7 @@
 # Phase 3a Slice 1 — Brain into the sandbox, push-capable (R3a-1, R3a-5 partial, R3a-7)
 
-**Status: CAPABILITY PROVEN on a settled sandbox; fresh-`create` clone blocked by an OpenShell
-credential-injection cold-start bug (documented below).**
+**Status: COMPLETE. Fresh `create` lands the brain deterministically; the blocker was a
+shell-quoting bug in `stage_brain_clone` (see root cause below), not an OpenShell defect.**
 
 ## What works (proven, with evidence)
 
@@ -30,32 +30,30 @@ credential-injection cold-start bug (documented below).**
   (ai-gateway) and `stage_github_provider` now skip the update when the credential hash is
   unchanged (state in `.prime-claw-{ai-gateway-key,github-token}.sha256`, gitignored, hash only).
 
-## The blocker: OpenShell per-sandbox credential cold-start + poison-on-failed-attempt
+## Root cause of the fresh-`create` clone failure (SOLVED 2026-09-14)
 
-Reproduced consistently this session:
+The "OpenShell credential cold-start / poison-on-failed-attempt" hypothesis in the earlier
+version of this doc was **wrong**. Hours of bisection (fresh sandboxes clone fine immediately;
+`ls-remote` succeeds while clone fails; failed sandboxes recover; single-stage knockouts all
+fail; results flip over time) were all noise from ONE mundane bug:
 
-1. A **freshly created** sandbox's github credential injection is not live immediately.
-2. A `git clone` (POST `git-receive-pack`/`git-upload-pack`) attempted in that window returns
-   `401 Invalid username or token` — **and thereafter every clone from that sandbox keeps
-   failing**, even minutes later, even after a cheap authenticated `curl` GET to the same host
-   returns a real response (404) proving the swap fires for curl.
-3. A sandbox whose first clone is **not** attempted during the cold-start window clones fine
-   (observed succeeding at t+6s when the provider already existed and the sandbox had settled,
-   and a `pc-coldtest` sandbox left alone ~180s cloned on the first try).
-4. A `curl` GET "warm-up" before the clone does NOT reliably prevent the failure — the poison
-   appears to be keyed to the first **git POST**, not to whether any prior authenticated request
-   succeeded. (The earlier apparent warm-then-clone success was a timing coincidence.)
+**`stage_brain_clone`'s shell script single-quoted the clone URL**
+(`git clone --branch main 'https://x-access-token:${api_token}@github.com/...'`). Inside
+`bash -lc`, single quotes prevent parameter expansion, so git received the LITERAL string
+`${api_token}` as the password and every attempt 401'd. Every manual probe used double quotes
+(expand correctly), which is why manual clones always worked while the stage always failed.
+The "recovery after minutes" observations were simply manual clones succeeding on sandboxes
+where the stage had failed.
 
-**Net:** retry inside `stage_brain_clone` cannot fix it (each failed attempt re-poisons), and a
-pre-clone curl warm is not a reliable gate. The reliable path today is: create the sandbox, let
-it settle, then clone (e.g. via `converge`) — but only if no failed clone already poisoned it.
+Fix: double-quote the URL in `git clone` and `git remote set-url` (commit `TBD`). Retry budget
+reduced to a sane 3x10s (genuine per-sandbox L7 injection cold-start, if any, is seconds-scale).
+Regression test: `test_brain_clone_url_double_quoted_for_placeholder_expansion` asserts the
+generated script double-quotes the URL so `${api_token}` expands.
 
-**Hypothesis for follow-up:** the L7 proxy caches a per-(sandbox, host) credential-resolution
-failure for git's smart-HTTP POST and does not re-resolve until some TTL or sandbox restart.
-Needs either (a) an OpenShell-side fix/flag for credential readiness, or (b) a reliable
-readiness probe that exercises the exact git POST handshake (not curl), or (c) delaying the
-first clone until injection is confirmed live by a successful `git ls-remote` (a GET+POST pair
-that is itself safe to retry — UNTESTED whether a failed `ls-remote` also poisons).
+**Verified end-to-end**: fresh `bin/prime-claw destroy` + `bin/prime-claw create` lands
+`/sandbox/brain` cloned with `.git` (HEAD `8adf9d4`), placeholder-only remote URL, zero real
+token in `.git/config`; `converge` is idempotent (providers skip update when unchanged, brain
+fetch+ff). Push-back round-trip verified earlier (commit + push, reverted).
 
 ## Files changed (Slice 1)
 

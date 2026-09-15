@@ -721,36 +721,47 @@ def stage_brain_clone(cfg, args) -> int:
     attached github-push provider) swapped to the real token at L7. Idempotent: fetch+ff if already
     cloned. No token on disk beyond the placeholder.
 
-    KNOWN ISSUE (fresh-create cold-start, see docs/derisk/3a-slice1.md): on a freshly created
-    sandbox the github-push credential injection is not live immediately, and a git clone attempted
-    during that window fails AND leaves the credential path failing until the sandbox is recreated.
-    Retrying within the same sandbox does NOT recover it. The reliable path today is `converge`
-    against an already-running (settled) sandbox. A proper readiness gate is follow-up work."""
+    The clone URL embeds the L7 placeholder literally (${api_token}); it MUST be
+    double-quoted in the shell script so bash expands it — single quotes pass the literal
+    string to git and every attempt 401s (Slice 1 root cause, docs/derisk/3a-slice1.md).
+    A bounded retry (default 3 x 10s) rides out any genuine per-sandbox L7 injection
+    cold-start on fresh sandboxes."""
     repo = _cfg_get(cfg, "brain_repo", "PRIME_CLAW_BRAIN_REPO", "JLandersZen/brain")
     branch = _cfg_get(cfg, "brain_branch", "PRIME_CLAW_BRAIN_BRANCH", "main")
     sb_brain = _cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain")
     gh_host = _cfg_get(cfg, "github_host", "PRIME_CLAW_GITHUB_HOST", "github.com")
     url = f"https://x-access-token:${{api_token}}@{gh_host}/{repo}.git"
     if args.dry_run:
-        print(f"dry_run: clone {repo}@{branch} -> {sb_brain} (placeholder auth, L7 swap); "
-              f"idempotent fetch --ff-only if already cloned"); return 0
+        print(f"dry_run: clone {repo}@{branch} -> {sb_brain} (placeholder auth, L7 swap; "
+              f"retry on transient cold-start 401s); idempotent fetch --ff-only if already cloned")
+        return 0
     script = f"""
 set -e
 if [ -d {sb_brain}/.git ]; then
   echo "brain: already cloned at {sb_brain}; fetching + fast-forwarding"
-  git -C {sb_brain} remote set-url origin '{url}'
+  git -C {sb_brain} remote set-url origin "{url}"
   git -C {sb_brain} fetch origin {branch} 2>&1 | tail -2
   git -C {sb_brain} merge --ff-only origin/{branch} 2>&1 | tail -2 || echo "brain: ff skipped (local state)"
 else
   echo "brain: cloning {repo}@{branch} -> {sb_brain}"
   rm -rf {sb_brain}
-  git clone --branch {branch} '{url}' {sb_brain} 2>&1 | tail -2
+  git clone --branch {branch} "{url}" {sb_brain} 2>&1 | tail -2
 fi
 git -C {sb_brain} config user.email "prime-claw@sandbox"
 git -C {sb_brain} config user.name "prime-claw"
 echo "brain: HEAD=$(git -C {sb_brain} rev-parse --short HEAD 2>/dev/null) remote-set"
 """
-    code, out = sandbox_exec(cfg, script, timeout=180)
+    attempts = int(_cfg_get(cfg, "brain_clone_attempts", "PRIME_CLAW_BRAIN_CLONE_ATTEMPTS", 3))
+    delay = float(_cfg_get(cfg, "brain_clone_retry_delay", "PRIME_CLAW_BRAIN_CLONE_RETRY_DELAY", 10))
+    code, out = 1, ""
+    for attempt in range(1, attempts + 1):
+        code, out = sandbox_exec(cfg, script, timeout=180)
+        if code == 0:
+            break
+        if attempt < attempts:
+            print(f"brain: clone attempt {attempt}/{attempts} failed (transient cold-start 401?); "
+                  f"retrying in {delay}s ...")
+            _sleep(delay)
     if code != 0:
         print("error: brain clone stage: " + out.strip()[:200], file=sys.stderr); return code
     print(out.strip().splitlines()[-1] if out.strip() else "brain: cloned")
