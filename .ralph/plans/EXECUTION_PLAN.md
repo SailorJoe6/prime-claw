@@ -1,6 +1,6 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** IN EXECUTION — Slices 0–3 complete; Slice 4 next
+**Status:** PREPARED — Slices 0–3 complete; Slice 4A home-embedding cutover is highest-priority next (do not execute until a later instruction)
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
 **Date:** 2026-09-11
@@ -18,9 +18,11 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
   `config/requirements-inventory.json` entry with a **real `proven_by` path** (integrity-gated).
 - **Per-slice exit ritual.** Each slice ends: `pytest` green → `git commit` → `git pull --rebase`
   → `bd sync` → `git push` → `git status` clean & up-to-date. Bead notes updated.
-- **Credential isolation (R-X-5/R2-X-1).** No real credential ever on sandbox disk. Inference rides the host-selected OpenShell provider (currently openai-codex OAuth);
-  embeddings ride the AI-gateway provider; git push rides a **github provider** whose
-  token stays host-side and is swapped at L7. The sandbox holds only placeholders.
+- **Credential isolation (R-X-5/R2-X-1).** No real credential ever on sandbox disk.
+  Inference rides the host-selected OpenShell provider (currently openai-codex OAuth); git
+  push rides a **github provider** whose token stays host-side and is swapped at L7.
+  Embeddings use only the unauthenticated home-network Qwen service (D3a-L); literal `dummy`
+  is a non-secret compatibility value, not a credential. No corporate embedding fallback.
 - **Single-gateway:** `openshell` (17670) only; `nemoclaw` forbidden.
 - **`--dry-run` is global** and precedes the verb.
 
@@ -35,19 +37,21 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
   OpenShell swaps to the real bearer at L7. **Requires:** add `git` to the image; clone with
   `.git`. No token on sandbox disk. In-sandbox `git clone` over SSH is rejected (private repo
   would need a token in-container).
-- **Q2 embeddings → AI gateway (this box), NOT local/Ollama.** Joe clarified: this box embeds
-  via the **AI gateway** (`openai:text-embedding-3-large`, `OPENAI_BASE_URL=https://ai-gateway
-  .zende.sk/v1`), matching the existing brain-daemon. (His *other* box uses local models; not
-  relevant here.) So in-sandbox embeddings ride the **same AI-gateway L7 provider** as inference.
-  `stage_brain` already wires `provider_base_urls.openai = ai-gateway.zende.sk/v1`; the policy
-  already keys that endpoint to the `gbrain`/`bun` binaries. Remaining work: ensure the placeholder
-  key is present and a real `gbrain sync`/`embed` round-trips. **R3a-12 (embedding freshness)
-  stays in-scope** (not deferred) since the path already exists.
+- **Q2 embeddings → SUPERSEDED by D3a-L: home Qwen only.** Slice 0–2 proved the former
+  corporate AI-gateway path (`text-embedding-3-large`, 1536 dimensions), but monthly budget
+  exhaustion makes it operationally unsuitable. The operator's home-network OpenAI-compatible
+  `Qwen3-Embedding-8B` service is now the sole accepted configuration: native 4096 dimensions,
+  1000-second timeout, unauthenticated (`dummy` only for clients requiring a nonempty value).
+  Live probes: dimensions unset → HTTP 200 / 4096 values; explicit 1536 or 4096 → HTTP 400
+  because the deployment does not support the `dimensions` parameter. A full re-embed is
+  mandatory because the vector space changes. Build a parallel 4096-dimension database/index,
+  validate, then cut over; never mutate the current 1536 database in place. The private base URL
+  stays in ignored local config/env and must not appear in tracked artifacts.
 - **Q3 brain content → FULL real brain** (`~/gitlab_local/brain`, GitHub `JLandersZen/brain`,
   branch `main`). A cited answer is only meaningful against real content.
 - **Q4 validate surface → GATE =** brain present (with `.git`) + index page count > 0 +
-  known-fact cited query green + one routed-write receipt + push-back proven. **NICE =**
-  embedding freshness metric.
+  known-fact cited query green + one routed-write receipt + push-back proven + the complete
+  Qwen index at 4096 dimensions. Embedding freshness is a **GATE**, not NICE.
 
 ## Slice map
 
@@ -55,9 +59,10 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 |---|---|---|---|
 | **S0** | Upstream-gbrain spike: prime-agent-as-controller drives **upstream garrytan/gbrain** in-sandbox (+ models.json mirror) | R3a-0, R3a-13 | **GO/NO-GO** |
 | **S1** | git+github push plumbing: image git, custom github push profile, clone brain w/ `.git` into sandbox | R3a-1, R3a-5(part), R3a-7 | — |
-| **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source) | R3a-2, R3a-12 | — |
+| **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source); historical 1536 embedding proof later superseded | R3a-2 | — |
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
-| **S4** | One routed write + push-back round-trip | R3a-4 | — |
+| **S4A** | Non-destructive cutover to home `Qwen3-Embedding-8B`, native 4096 dimensions | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **NEXT / GATE** |
+| **S4B** | One routed write + push-back round-trip | R3a-4 | blocked on S4A |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
 ---
@@ -141,7 +146,7 @@ credentialed `github_brain` policy rule, clone/fetch-ff idempotent, no token on 
 
 ---
 
-## Slice 2 — In-sandbox index serving (R3a-2, R3a-12)
+## Slice 2 — In-sandbox index serving (R3a-2; historical embedding proof superseded)
 
 **Goal.** In-sandbox gbrain+PG+pgvector index the cloned brain as the `brain` source; queries
 run against in-sandbox PG with **working embeddings** via the AI gateway.
@@ -160,7 +165,7 @@ run against in-sandbox PG with **working embeddings** via the AI gateway.
 (`provider_base_urls`, `embedding_model`, placeholder key) asserted.
 
 **Exit.** `gbrain search "<known term>" --source brain` inside the sandbox returns a real brain
-page from in-sandbox PG; `validate` can read a page count > 0; embeddings populate (R3a-12).
+page from in-sandbox PG; `validate` can read a page count > 0; embeddings populate (the then-current R3a-12, superseded by D3a-L).
 
 **Status (2026-09-15): COMPLETE.** New `brain-index` stage (init --migrate-only → sources add →
 sync import+embed → skip-failed → pages>0 gate, pipefail throughout). gbrain config moved to the
@@ -170,6 +175,9 @@ Fresh create: 1057 pages, 3029/3029 chunks embedded (dims 1536), semantic search
 live. `validate` 16/16 PASS (evidence `docs/evidence/validate-20260915T170708Z.json`). Full verdict
 + operational findings (VPN-down RBAC 403 signature → bead prime-claw-z56; npm registry race;
 4 malformed-frontmatter brain files) in `docs/derisk/3a-slice2.md`.
+**Historical note (2026-09-16):** this proves index-serving mechanics, but its corporate
+AI-gateway / OpenAI / 1536-dimension embedding result no longer satisfies R3a-12. D3a-L and
+Slice 4A require a complete home-Qwen 4096-dimension rebuild before acceptance.
 
 ---
 
@@ -203,7 +211,58 @@ helper twice and correctly answered with all expected harness components plus ci
 
 ---
 
-## Slice 4 — One routed write + push-back round-trip (R3a-4)
+## Slice 4A — Home Qwen embedding cutover (R3a-12, R3a-14) — HIGHEST PRIORITY NEXT
+
+**Preparation status (2026-09-16): READY, NOT STARTED.** The operator explicitly requested
+that this plan/spec/docs update land now and implementation wait for a later instruction.
+Do not mutate either brain database while preparing this slice.
+
+**Goal.** Make the operator's home-network OpenAI-compatible
+`Qwen3-Embedding-8B` service the only embedding path. Rebuild the full in-sandbox brain in a
+parallel 4096-dimension database/index, validate it, then cut over without modifying the
+current 1536-dimension database in place.
+
+**Locked inputs.** Model `Qwen3-Embedding-8B`; native dimension 4096; timeout 1000 seconds;
+endpoint unauthenticated; literal `dummy` permitted only as a non-secret client-compatibility
+value. The private base URL is operator-local data and must enter through ignored local config
+or `PRIME_CLAW_*` environment, never a tracked file, log, evidence artifact, or test fixture.
+
+**Approach.**
+
+1. **Configuration contract.** Add generic keys/env overrides for embedding base URL, model,
+   dimensions, timeout, and non-secret compatibility value. Remove AI-gateway embeddings from
+   create/converge/validate; inference remains independently host-selected through Codex.
+2. **Deny-by-default egress.** Render or apply an operator-local policy fragment granting only
+   the configured host/port to the gbrain/Bun runtime. Do not add the raw private endpoint to
+   tracked `policies/runtime.yaml`. No OpenShell credential provider is required.
+3. **Parallel build.** Create a new Postgres database/index (working name
+   `gbrain_qwen4096`) with pgvector 4096-dimensional storage. Point a temporary gbrain config at
+   it, register `/sandbox/brain` as source `brain`, and run a full sync/embed. Keep the existing
+   1536-dimension database untouched and queryable as rollback.
+4. **Acceptance before cutover.** Require page count parity, chunk count parity, every chunk
+   embedded at 4096 dimensions, zero mixed/null/stale vectors, exact-page retrieval, and
+   semantic search over known fixtures. Prove no request reached the corporate AI gateway.
+5. **Cutover and recovery.** Only after those checks pass, atomically switch the canonical
+   sandbox gbrain config to the new database. Retain the old database until Slice 5 closes;
+   recovery is a config switch back, not an in-place schema reversal.
+
+**Tests (offline).** Local-config/env resolution without a committed private endpoint; policy
+fragment rendering and binary scoping; 4096-dimension configuration; parallel DB naming and
+no in-place mutation; full-rebuild command construction; acceptance count/dimension gates;
+AI-gateway embedding absence; rollback config switch. All network/database boundaries are
+monkeypatched.
+
+**Evidence.** Record sanitized configuration (model/dimensions/timeout only), old/new database
+identifiers, page/chunk parity, vector dimensions, semantic query proof, corporate-gateway
+non-use, cutover result, and rollback readiness. Never record the private endpoint.
+
+**Exit.** Fresh create/converge uses only Qwen embeddings; the full brain is current at 4096
+dimensions; semantic retrieval passes; the old 1536 database remains intact for rollback; no
+corporate embedding credential/provider/path is required. Only then unblock Slice 4B.
+
+---
+
+## Slice 4B — One routed write + push-back round-trip (R3a-4)
 
 **Goal.** The agent writes **one** durable fact into the in-sandbox brain, routed per
 `docs/information-architecture.md` (brain = canonical store for domain facts), via
@@ -213,8 +272,8 @@ real repo (credential-safe, Slice 1 plumbing).
 **Approach.**
 
 - The write is a **test artifact**: a keep-worthy `projects/` stub describing prime-claw itself
-  (markdown is source-of-truth, so trivially deletable). Operator confirms the exact slug at
-  execution.
+  (markdown is source-of-truth, so trivially deletable). The operator confirmed exact slug
+  `projects/prime-claw` on 2026-09-16.
 - The agent creates the page (`gbrain put projects/prime-claw` + body), syncs the index
   (`gbrain sync --source brain`), commits in the in-sandbox clone, and **pushes** via the
   Slice 1 credentialed endpoint. Receipt = page slug + commit sha + push result.
@@ -236,7 +295,7 @@ evidence; the requirements inventory is updated and integrity-gated.
 - Extend `cmd_validate` / `probe_in_sandbox` with brain checks: **brain present** (with `.git`),
   **index page count > 0**, **known-fact cited query green**, **write receipt present**,
   **push-back proven** (remote contains the write commit). Record to `docs/evidence/validate-<utc>.json`.
-- Add `R3a-0..12` entries to `config/requirements-inventory.json` with real `proven_by` paths.
+- Add `R3a-0..14` entries to `config/requirements-inventory.json` with real `proven_by` paths.
 - **Housekeeping:** fix the stale `R2-A-3`/`R2-A-4` statuses (Phase 2 closed them; still marked
   `in-progress`).
 
@@ -253,10 +312,10 @@ committed; `bd` notes updated; Phase 3a bead ready to close.
 - **Custom github profile is the main new mechanism** (push not in builtin). If profile import +
   provider swap proves unreliable, fallback: host-mediated push (agent stages commits; a host-side
   step pushes) — but that weakens the "agent pushes from inside" goal, so prefer the L7 profile.
-- **AI-gateway embeddings for gbrain** depend on the gateway exposing `text-embedding-3-large`;
-  it already does for the host brain-daemon, so this is reuse, not new surface. If the gateway
-  ever lacks an embeddings route, the NICE fallback is keyword-only (`--no-embed`) — but that is
-  not expected.
+- **Home embedding reachability and 4096-dimension rebuild are the next risk.** The endpoint
+  is proven from the host, but sandbox policy/reachability and a complete parallel re-index are
+  not yet proven. Do not fall back to the corporate gateway or keyword-only acceptance. Preserve
+  the old 1536 database until the new index passes every gate.
 - **Recreate wipes `/sandbox`** → re-run `converge`; the brain re-clones (idempotent) on converge.
 - **Generic platform (R3a-9):** all brain repo/branch/path/model values are config-driven; no
   operator-specific taxonomy or values hardcoded.

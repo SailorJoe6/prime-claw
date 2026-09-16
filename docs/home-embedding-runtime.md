@@ -1,0 +1,60 @@
+# Home-network embedding runtime
+
+> **Status:** Required next configuration; implementation deliberately not started.
+> **Decision:** D3a-L · **Requirements:** R3a-12, R3a-14 · **Plan:** Phase 3a Slice 4A
+
+## Required state
+
+prime-claw uses the operator's home-network OpenAI-compatible embedding service as its
+**only** embedding provider:
+
+- model: `Qwen3-Embedding-8B`
+- output: native 4096 dimensions
+- request timeout: 1000 seconds
+- authentication: none; literal `dummy` is permitted only for OpenAI clients that require a
+  nonempty API-key field and is not a credential
+
+The corporate AI gateway is not an embedding fallback. Prime Agent inference remains a
+separate, host-selected concern (currently isolated OpenAI Codex OAuth).
+
+The private endpoint address is operator-local configuration. It must enter through an
+ignored local file or `PRIME_CLAW_*` environment and must never be committed, printed in
+evidence, or copied into a generic policy fixture.
+
+## Why this is a rebuild, not a config flip
+
+The current sandbox index is historical Slice 2 state: 3,029 chunks embedded with an OpenAI
+model at 1536 dimensions. The home service returns 4096-dimensional Qwen vectors.
+
+Compatibility probes established:
+
+| Request | Result |
+|---|---|
+| dimensions omitted | HTTP 200; 4096 values |
+| `dimensions: 1536` | HTTP 400; deployment does not support Matryoshka dimensions |
+| `dimensions: 4096` | HTTP 400; `dimensions` must be omitted |
+
+Vector spaces from different models cannot be mixed, even at equal width. Every chunk must
+therefore be re-embedded. The dimension change also requires a new pgvector schema/index.
+
+## Non-destructive cutover
+
+Slice 4A must:
+
+1. Leave the current 1536-dimension database untouched.
+2. Create a parallel 4096-dimension Postgres database/index.
+3. Full-sync the canonical `/sandbox/brain` clone using only the home Qwen service.
+4. Gate on page/chunk parity, 4096 dimensions for every chunk, zero stale/null/mixed vectors,
+   exact retrieval, and semantic search.
+5. Switch the canonical gbrain config only after validation.
+6. Retain the old database as rollback until Phase 3a acceptance closes.
+
+Deny-by-default network policy must allow only the locally configured embedding host/port to
+the gbrain/Bun runtime. It must not provision an embedding credential provider.
+
+## Current operational status
+
+No database migration or page write was applied during planning. The attempted
+`projects/prime-claw` write stopped on corporate gateway rate limiting and rolled back
+cleanly: the page is absent, the brain Git clone is clean, and no commit or push occurred.
+Slice 4B remains blocked until Slice 4A passes.

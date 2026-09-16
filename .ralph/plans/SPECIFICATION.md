@@ -1,8 +1,8 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** Specification (design interview complete; ready to plan)
+**Status:** IN EXECUTION — Slices 0–3 complete; home-embedding cutover is the highest-priority next step
 **Beads:** `prime-claw-zwg` (P1)
-**Date:** 2026-09-11
+**Date:** 2026-09-11 · **Embedding decision revised:** 2026-09-16
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
 
 This document is the summary and index for the work. It is accompanied by:
@@ -31,14 +31,17 @@ real credential, only opaque placeholders enter the sandbox, and L7 swaps real v
 the boundary. The concrete provider/model is now host-config-driven, not fixed to the AI
 Gateway. Per operator direction on 2026-09-16, the current acceptance target (until further
 notice) is the verbatim host default `openai-codex/gpt-5.6-sol` (ChatGPT-5.6 Sol, thinking
-`high`) using the host's OAuth. `prime-claw-ai-gateway` remains attached for gbrain
-embeddings. The claw never possesses real LLM credentials (R-X-5 / R2-X-1 / R3a-13).
+`high`) using the host's OAuth. Embeddings are a separate concern: the sole accepted
+configuration is now the operator's home-network OpenAI-compatible
+`Qwen3-Embedding-8B` service at its native 4096 dimensions. Corporate AI-gateway embeddings
+are superseded and must not be a runtime fallback. The claw never possesses real LLM
+credentials (R-X-5 / R2-X-1 / R3a-13/R3a-14).
 
-**What does not exist yet:** anything in the sandbox *uses* the brain. There is no brain
-content in the container, no gbrain index over real content, no prime-agent skill that
-reads/writes the brain, and no proof that a conversation with the sandboxed prime-agent
-can draw on (or add to) a knowledge base. Phase 2 proved the *container*; Phase 3a proves
-the *brain-hosting claw*.
+**Execution state (2026-09-16):** Slices 0–3 now clone the real brain, serve its in-sandbox
+index, and let a sandboxed Prime Agent answer with citations. The historical index uses the
+superseded corporate OpenAI embedding path at 1536 dimensions. What does not exist yet is the
+required home-Qwen 4096-dimension index and the routed write/push proof. Phase 2 proved the
+*container*; Phase 3a is finishing the *brain-hosting claw*.
 
 ## 2. The strategic frame (why this phase, this shape)
 
@@ -109,7 +112,7 @@ placeholders before network I/O (R3a-13). The old Kimi/GLM catalog remains only 
 when host config is absent; it is not the current acceptance target.
 
 The write is a **test artifact**: a keep-worthy `projects/prime-claw` page describing
-prime-claw itself (exact slug pending operator confirmation at Slice 4 execution). The agent
+prime-claw itself (the operator confirmed exact slug `projects/prime-claw` on 2026-09-16). The agent
 writes and re-indexes it in-sandbox, commits it in the clone, and pushes it to the real brain
 repo through the Slice 1 GitHub L7 provider. Acceptance records page slug + commit SHA + push
 result; no credential reaches sandbox disk (resolved Q4 / D3a-G).
@@ -132,8 +135,6 @@ result; no credential reaches sandbox disk (resolved Q4 / D3a-G).
   brief/collect sweeps). `brain.cron` is **not** ported — prime-agent scheduling obsoletes it.
 - **The automated episode loop** (Phase 4), comms channels (Phase 5), orchestrator
   (Phase 6) — unchanged from LONG_RANGE_PLAN.
-- **Write-back to the real brain repo** (git push from the sandbox) — 3a writes are
-  sandbox-local only.
 - **The instance repo** (`prime-pva`) — created at 3b, not 3a.
 
 ## 5. How it will be when the work is done
@@ -143,6 +144,8 @@ result; no credential reaches sandbox disk (resolved Q4 / D3a-G).
 - A fresh `bin/prime-claw create && bin/prime-claw validate` (or a new acceptance check)
   proves: brain present, index serving, a cited query answered, one routed write landed.
 - `validate` evidence records the brain page count and the write receipt.
+- The complete brain index uses only home-network `Qwen3-Embedding-8B` vectors at 4096
+  dimensions, with no mixed/stale/null vectors and no corporate embedding fallback.
 - The prime-agent session in the sandbox can answer "what do we know about X?" from the
   brain and "remember Y" with a correct, cited, IA-routed write — **all inside the
   container**, credentials host-only.
@@ -168,9 +171,16 @@ result; no credential reaches sandbox disk (resolved Q4 / D3a-G).
    in-sandbox HTTPS `git clone` WITH `.git`, push-capable, via the custom `github-push` L7
    provider profile (placeholder `${api_token}` swapped at L7; no credential on disk).
    In-sandbox SSH clone was considered and rejected. See `docs/derisk/3a-slice1.md`.
-2. **Embeddings provider for the in-sandbox index.** ~~open~~ **RESOLVED (Q2):** embeddings
-   ride the same AI-gateway L7 provider — `provider_base_urls.openai=https://ai-gateway.zende.sk/v1`,
-   `embedding_model=openai:text-embedding-3-large`, dims 1536 (Slice 0 proven; R3a-12).
+2. **Embeddings provider for the in-sandbox index.** ~~AI gateway / 1536-dim OpenAI~~
+   **SUPERSEDED (operator decision 2026-09-16; D3a-L):** the only accepted embedding
+   configuration is the operator's home-network OpenAI-compatible service using
+   `Qwen3-Embedding-8B`, native 4096 dimensions, and a 1000-second request timeout. The
+   endpoint accepts unauthenticated requests; `dummy` is a non-secret client compatibility
+   value only. The service rejects the OpenAI `dimensions` parameter, so it cannot emit 1536
+   dimensions. Because model vector spaces are not interchangeable, all chunks require a full
+   re-embed even if dimensions could match. The transition must build and validate a parallel
+   4096-dimension database/index before cutover; no in-place mutation of the current 1536 index.
+   The endpoint address is operator-local configuration and must not be committed to this repo.
 3. **Which brain for the tracer read/query proof** ~~open~~ **RESOLVED (Q3):** the FULL real
    brain (`~/gitlab_local/brain`, GitHub `JLandersZen/brain`, branch `main`, private).
 4. **Exact validate surface** ~~open~~ **RESOLVED (Q4, D3a-G):** GATE = brain cloned with

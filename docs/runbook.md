@@ -83,3 +83,16 @@ Rebuild from scratch afterwards with `bin/prime-claw create` (fresh bring-up).
 Slice 5's acceptance evidence is a live degrade-and-recover cycle (see
 `docs/evidence/recover-<utc>.json`): a known degradation is induced,
 `bin/prime-claw recover` runs, and `bin/prime-claw validate` returns green.
+
+
+## Embedding budget exhausted / HTTP 429 (Phase 3a transition)
+
+**Signature:** corporate AI-gateway embedding requests retry and end with `Too Many Requests`.
+
+**Do not:** repeatedly retry, accept keyword-only mode, mutate the existing 1536-dimension
+index, or restore the corporate gateway as an embedding fallback.
+
+**Required recovery:** stop the write and execute the prepared Slice 4A plan in a later
+implementation session: build and validate the parallel home-Qwen 4096-dimension index, then
+cut over. Until Slice 4A passes, Slice 4B routed writes remain blocked. See
+[home-embedding-runtime.md](home-embedding-runtime.md).

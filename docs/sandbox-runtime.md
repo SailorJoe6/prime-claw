@@ -1,5 +1,12 @@
 # Sandbox runtime lifecycle (Phase 2)
 
+> **Embedding transition (2026-09-16):** the implemented Slice 2 runtime still contains the
+> historical corporate AI-gateway / 1536-dimension index. D3a-L supersedes that configuration.
+> The highest-priority next step is the non-destructive home `Qwen3-Embedding-8B` 4096-dimension
+> cutover in [home-embedding-runtime.md](home-embedding-runtime.md). It is required but **not
+> implemented yet**; do not treat the historical gateway path as an accepted fallback.
+
+
 One reliable, repeatable OpenShell sandbox lifecycle behind a single operator
 entry point, `bin/prime-claw` (Python 3, stdlib only). This page is the
 **reference** for the runtime: what the verbs do, the repo layout, and the

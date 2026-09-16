@@ -85,12 +85,13 @@ schema/config into it is the exact mistake the IA doc's two-level split forbids.
 
 ## D3a-G — Acceptance = read/query + one routed write
 **Decision:** 3a is accepted when a fresh sandbox serves a cited answer from the brain
-**and** lands one correctly-routed durable write (a test artifact: easily deleted, or a
-keep-worthy prime-claw `projects/` stub). Write-back (git push) to the real repo is out of
-scope.
+**and** lands one correctly-routed durable write as a keep-worthy prime-claw `projects/`
+stub. The sandbox commits and pushes that page to the real brain repo through the GitHub L7
+provider; the receipt records slug, commit SHA, push result, and credential isolation.
 **Satisfies:** R3a-3, R3a-4, R3a-6.
 **Rationale:** Operator's chosen bar — thin but whole, proving both directions of the
-brain loop without yet owning the full write/sync-back machinery.
+brain loop including durable source-of-truth push-back. The operator confirmed the exact
+`projects/prime-claw` slug before Slice 4 execution on 2026-09-16.
 
 ## D3a-H — Prefer upstream gbrain; fork only to upstream a prime-agent harness PR, then retire
 **Decision:** Build prime-claw against **upstream `garrytan/gbrain`** (not zbrain's stripped
@@ -141,20 +142,21 @@ corollary: if an operator rotates a token, re-sync provider + hash file together
 | D3a-D | R3a-7 |
 | D3a-I | R3a-13 |
 | D3a-J | R3a-5, R3a-7 |
+| D3a-L | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 |
 | D3a-E | R3a-8, R3a-11 |
 | D3a-F | R3a-9 |
 | D3a-G | R3a-3, R3a-4, R3a-6 |
 | D3a-H | R3a-2, R3a-8, R3a-9 |
 
-GATE requirements R3a-1..7, R3a-9..11 are covered by at least one decision.
-(R3a-5 lifecycle integration and R3a-6 acceptance gate are realized directly by the
-slice's implementation; R3a-12 embedding freshness is NICE and may defer.)
+GATE requirements R3a-1..14 are covered by at least one decision or the slice's direct
+implementation. R3a-12 and R3a-14 are mandatory before the routed write resumes; embedding
+freshness may not defer or fall back to keyword-only acceptance.
 
 ## D3a-K — Current acceptance model is host-default ChatGPT-5.6 Sol via isolated Codex OAuth (2026-09-16)
 **Decision:** Until further notice, conversational acceptance runs use the operator's
 mirrored host default: `openai-codex/gpt-5.6-sol` (ChatGPT-5.6 Sol, thinking `high`). Kimi
-and GLM are currently unavailable to the operator and must not be used for acceptance. The
-AI-gateway provider remains attached for gbrain embeddings.
+and GLM are currently unavailable to the operator and must not be used for acceptance.
+Embedding configuration is independent and governed by D3a-L.
 
 Host openai-codex `auth.json` values are provisioned into OpenShell's builtin `codex`
 provider (`access_token`, `refresh_token`, `account_id`). Sandbox `auth.json` contains a
@@ -169,3 +171,28 @@ refresh remains host-side in lifecycle stages.
 **Satisfies:** R3a-3, R3a-7, R3a-13.
 **Evidence:** `docs/evidence/cited-query-20260916T164509Z.json`; offline header-rewrite and
 config-projection tests in `tests/test_runtime_converge.py`.
+
+## D3a-L — Home-network Qwen embeddings are the sole embedding configuration (2026-09-16)
+**Decision:** Replace the corporate AI-gateway embedding path with the operator's
+home-network OpenAI-compatible `Qwen3-Embedding-8B` service as the **only** supported
+embedding configuration. Use the model's native 4096-dimensional output and a 1000-second
+request timeout. Do not retain the corporate gateway as an embedding fallback.
+
+The live compatibility probe established that requests with `dimensions: 1536` and
+`dimensions: 4096` both return HTTP 400 because this deployment does not support the
+OpenAI `dimensions` parameter; omitting it returns HTTP 200 with 4096 values. Even a
+same-width output would still require full re-embedding because Qwen and OpenAI vectors
+belong to different vector spaces.
+
+The cutover is non-destructive: create a parallel 4096-dimension Postgres database/index,
+fully sync and embed the canonical brain clone, validate counts and semantic retrieval, and
+only then point the sandbox at it. Keep the current 1536-dimension database intact as rollback
+until Phase 3a acceptance. The private endpoint address belongs in ignored operator-local
+configuration or environment, not tracked files. The endpoint is unauthenticated; a client
+may send literal `dummy` only when a nonempty API-key field is required. No OpenShell
+credential provider is needed, but deny-by-default policy must allow only the configured
+host/port for the gbrain runtime.
+
+**Satisfies:** R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14.
+**Supersedes:** Q2's AI-gateway / `text-embedding-3-large` / 1536-dimension runtime choice.
+Slice 0–2 evidence remains valid historical proof, not the accepted final configuration.

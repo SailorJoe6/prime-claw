@@ -55,4 +55,6 @@ following the openclaw-setup pattern.)
 
 - [sandbox-runtime.md](sandbox-runtime.md) — the sandbox lifecycle: verbs,
   stages, repo layout, and operating guarantees.
+- [home-embedding-runtime.md](home-embedding-runtime.md) — required next
+  embedding configuration and the non-destructive 1536→4096 Qwen cutover contract.
 - [runbook.md](runbook.md) — operations: failure signature → recovery command.

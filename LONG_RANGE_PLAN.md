@@ -97,6 +97,12 @@ operations: `docs/runbook.md`. Plan set archived to
 
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 
+**Current status (2026-09-16):** Phase 3a Slices 0–3 are complete. The highest-priority
+next step is the prepared, not-yet-started non-destructive cutover to the operator's
+home-network `Qwen3-Embedding-8B` service at native 4096 dimensions (Slice 4A). The routed
+`projects/prime-claw` write + Git push-back follows as Slice 4B. Corporate AI-gateway
+embeddings are superseded and are not a fallback.
+
 The riskiest integration, done as early as possible and deliberately thin but
 *whole*: a prime-agent session inside the sandbox, connected to gbrain, that
 holds a conversation and persists a durable fact to the brain via the
@@ -117,7 +123,7 @@ claw-skill-strip deltas are not needed here.)
 **Sub-phases** (split for risk isolation):
 
 - **3a — tracer bullet.** Brain cloned in → in-sandbox gbrain+PG index → cited
-  read/query → one routed write (test artifact, sandbox-local). **Opens with a
+  read/query → home-Qwen 4096-dimension cutover → one routed write + push-back. **Opened with a
   Slice-0 spike (a go/no-go gate):** prove in real code that upstream gbrain
   runs under prime-agent-as-controller in the OpenShell sandbox. GO = upstream
   path; NO-GO = documented thin-fork fallback. ⚠️ may pivot the gbrain choice.

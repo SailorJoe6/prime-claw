@@ -926,7 +926,7 @@
   {
    "id": "R3a-5",
    "priority": "GATE",
-   "summary": "Lifecycle: create/converge wire github-provider + brain-clone stages; conditional credential refresh (skip when hash unchanged) avoids placeholder re-keying churn. Slice 2 added brain-index (index build wired into create/converge). Slice 3 added codex-provider, attach-missing without recreate, placeholder auth/config mirror, daemon restart, and brain-query stages.",
+   "summary": "Lifecycle: create/converge wire github-provider + brain-clone stages; conditional credential refresh (skip when hash unchanged) avoids placeholder re-keying churn. Slice 2 added brain-index (index build wired into create/converge). Slice 3 added codex-provider, attach-missing without recreate, placeholder auth/config mirror, daemon restart, and brain-query stages. Home-Qwen-only embedding lifecycle cutover remains pending in Slice 4A.",
    "status": "partial",
    "proven_by": {
     "apply": [
@@ -951,7 +951,7 @@
   {
    "id": "R3a-7",
    "priority": "GATE",
-   "summary": "Credential isolation: github token read host-side (gh auth token), L7-injected; sandbox holds placeholder only; .git/config contains zero real token (verified). OpenAI Codex OAuth remains host-side; sandbox auth holds synthetic/openshell placeholders only (Slice 3 proven).",
+   "summary": "Credential isolation: github token read host-side (gh auth token), L7-injected; sandbox holds placeholder only; .git/config contains zero real token (verified). OpenAI Codex OAuth remains host-side; sandbox auth holds synthetic/openshell placeholders only (Slice 3 proven). Target home embedding endpoint is unauthenticated; dummy is non-secret and no embedding provider credential is allowed.",
    "status": "proven",
    "proven_by": {
     "apply": [
@@ -998,25 +998,12 @@
   },
   {
    "id": "R3a-12",
-   "priority": "NICE",
-   "summary": "Embedding freshness: 3029/3029 chunks embedded (dims 1536) via AI-gateway L7 placeholder key; live query-time embedding on search/query (no salvage fallback).",
-   "status": "proven",
-   "proven_by": {
-    "apply": [
-     "bin/prime-claw"
-    ],
-    "check": [
-     "config/runtime.json"
-    ],
-    "validate": [
-     "docs/derisk/3a-slice2.md"
-    ],
-    "tests": [
-     "tests/test_runtime_converge.py"
-    ]
-   },
-   "evidence": "docs/evidence/validate-20260915T170708Z.json",
-   "verdict_doc": "docs/derisk/3a-slice2.md"
+   "priority": "GATE",
+   "summary": "Home embedding freshness: only Qwen3-Embedding-8B at native 4096 dimensions; full single-vector-space re-embed; no null/stale/mixed vectors, keyword-only acceptance, or corporate AI-gateway fallback.",
+   "status": "pending (Slice 4A; historical 1536-dimension proof superseded by D3a-L)",
+   "proven_by": {},
+   "evidence": "not yet produced \u2014 see .ralph/plans/EXECUTION_PLAN.md Slice 4A",
+   "verdict_doc": "docs/home-embedding-runtime.md"
   },
   {
    "id": "R3a-3",
@@ -1041,6 +1028,15 @@
    },
    "evidence": "docs/evidence/cited-query-20260916T164509Z.json",
    "verdict_doc": "docs/derisk/3a-slice3.md"
+  },
+  {
+   "id": "R3a-14",
+   "priority": "GATE",
+   "summary": "Non-destructive 4096-dimension cutover: build/validate a parallel Qwen database/index, keep the 1536 database intact for rollback, use ignored local endpoint config, and grant only exact gbrain egress.",
+   "status": "pending (Slice 4A \u2014 highest-priority next step)",
+   "proven_by": {},
+   "evidence": "not yet produced \u2014 see .ralph/plans/EXECUTION_PLAN.md Slice 4A",
+   "verdict_doc": "docs/home-embedding-runtime.md"
   }
  ],
  "phase2": {}

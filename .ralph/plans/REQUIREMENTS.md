@@ -20,7 +20,7 @@ Priority: **GATE** = must hold for the slice to be accepted; **NICE** = desired,
   in-sandbox brain via `gbrain put <type/slug>` + `gbrain sync --source brain`, routed per
   `docs/information-architecture.md` (brain = canonical store). The write is a test
   artifact: either easily deleted (markdown is source-of-truth) or a keep-worthy stub
-  (the planned `projects/prime-claw` page, pending operator confirmation). The agent commits
+  (the operator-approved `projects/prime-claw` page). The agent commits
   and pushes the change from the sandbox clone to the real brain repo through the Slice 1
   GitHub L7 provider. Receipt = page slug + commit SHA + push result.
 - **R3a-5 (GATE) — Lifecycle integration.** Brain clone + index are wired into
@@ -51,9 +51,11 @@ Priority: **GATE** = must hold for the slice to be accepted; **NICE** = desired,
 - **R3a-10 (GATE) — Single-gateway discipline.** `openshell` (17670) only.
 - **R3a-11 (GATE) — Offline tests.** New pytest coverage monkeypatches sandbox/exec
   boundaries (no live sandbox needed for the unit suite).
-- **R3a-12 (NICE) — Embedding freshness.** The in-sandbox index has working embeddings
-  (not keyword-only). May be deferred if the embedding provider path is non-trivial
-  (see open question 2).
+- **R3a-12 (GATE) — Home embedding freshness.** The in-sandbox index uses only the
+  operator's home-network OpenAI-compatible `Qwen3-Embedding-8B` service at its native
+  4096 dimensions. Every current chunk is embedded in that one vector space: no mixed-model
+  vectors, NULL/stale embeddings, keyword-only acceptance, or corporate AI-gateway fallback.
+  A full re-embed is mandatory because Qwen and the former OpenAI model are not interchangeable.
 - **R3a-13 (GATE) — prime-agent config mirrors the host, credentials remain isolated.**
   `stage_prime_agent` copies the operator's host `~/.prime/agent/models.json` **and**
   `~/.prime/agent/settings.json` verbatim into the sandbox (feature: the container uses
@@ -70,6 +72,15 @@ Priority: **GATE** = must hold for the slice to be accepted; **NICE** = desired,
   must not be used by acceptance while the current host default is available. Override
   paths via `host_models_json` / `PRIME_CLAW_HOST_MODELS_JSON` and
   `host_settings_json` / `PRIME_CLAW_HOST_SETTINGS_JSON`.
+- **R3a-14 (GATE) — Non-destructive 4096-dimension cutover.** Build the Qwen index in a
+  parallel Postgres database/index from the canonical brain clone, validate page/chunk counts,
+  4096-dimensional vectors, semantic retrieval, and fresh lifecycle rebuild, then switch the
+  sandbox configuration. Keep the former 1536-dimension database untouched as rollback until
+  Phase 3a acceptance. The endpoint URL is supplied through ignored operator-local config or
+  `PRIME_CLAW_*` environment, never hardcoded or committed; the service is unauthenticated and
+  any required `dummy` API-key value is explicitly non-secret. Sandbox policy grants only the
+  configured host/port to the gbrain runtime. Corporate AI-gateway embedding credentials and
+  routes are not provisioned as fallback.
 
 ## Out of scope (recorded for traceability)
 
