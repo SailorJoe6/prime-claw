@@ -6,6 +6,7 @@ For contributors working on the prime-claw builder repo.
 
 - Git, Bash, standard Unix utilities
 - Python 3 + pytest (for the script/test layer)
+- Node.js 22.8 or newer (required by prime-agent and extension tests)
 - beads CLI (`bd`)
 - prime-agent (the harness this project builds on)
 - Optional: gbrain CLI (for brain/source work)

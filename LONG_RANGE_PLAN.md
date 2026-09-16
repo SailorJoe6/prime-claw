@@ -149,7 +149,11 @@ loop last.
 
 - **4a — phase skills.** The seven imported prime-agent-native skills
   (`.ralph/skills/`) are the starting point; refine them by manual driving.
-  Handoff triggers targeted compaction (`compact.run(focus_hint)`).
+  Handoff triggers targeted compaction (`compact.run(focus_hint)`). Dogfooding
+  established one stable transition, now implemented and regression-tested as
+  native `/handoff` → focused compaction → execute; see
+  [docs/handoff-chain.md](docs/handoff-chain.md). This is the first codified
+  seam, not completion of 4a or the episode orchestrator.
 - **4b — episode mechanics.** A spawnable, reapable episode child (CWD =
   project root); invocation-tier state in its REPL; living-doc updates flow
   back so the next episode is past-design-aware. (Note: the safe two-message
