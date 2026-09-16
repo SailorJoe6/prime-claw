@@ -1,6 +1,6 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** IN EXECUTION — Slices 0–3 complete; home-embedding cutover is the highest-priority next step
+**Status:** IN EXECUTION — Slices 0–3 complete; home-embedding preflight complete; parallel build/cutover next
 **Beads:** `prime-claw-zwg` (P1)
 **Date:** 2026-09-11 · **Embedding decision revised:** 2026-09-16
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
@@ -40,8 +40,10 @@ credentials (R-X-5 / R2-X-1 / R3a-13/R3a-14).
 **Execution state (2026-09-16):** Slices 0–3 now clone the real brain, serve its in-sandbox
 index, and let a sandboxed Prime Agent answer with citations. The historical index uses the
 superseded corporate OpenAI embedding path at 1536 dimensions. What does not exist yet is the
-required home-Qwen 4096-dimension index and the routed write/push proof. Phase 2 proved the
-*container*; Phase 3a is finishing the *brain-hosting claw*.
+required home-Qwen 4096-dimension index and the routed write/push proof. Slice 4A.1 now
+validates the operator-local endpoint contract and renders the exact-host candidate policy
+without entering the sandbox or touching Postgres. The parallel build/cutover remains next.
+Phase 2 proved the *container*; Phase 3a is finishing the *brain-hosting claw*.
 
 ## 2. The strategic frame (why this phase, this shape)
 

@@ -1,6 +1,6 @@
 # Home-network embedding runtime
 
-> **Status:** Required next configuration; implementation deliberately not started.
+> **Status:** Slice 4A.1 preflight complete; parallel build/cutover not started.
 > **Decision:** D3a-L · **Requirements:** R3a-12, R3a-14 · **Plan:** Phase 3a Slice 4A
 
 ## Required state
@@ -37,6 +37,42 @@ Compatibility probes established:
 Vector spaces from different models cannot be mixed, even at equal width. Every chunk must
 therefore be re-embedded. The dimension change also requires a new pgvector schema/index.
 
+## Configuration and policy preflight
+
+Slice 4A.1 adds a non-mutating preflight. It validates the locked Qwen contract and renders
+the exact home endpoint into an ignored, mode-0600 local policy. It does not call OpenShell,
+enter the sandbox, or touch Postgres.
+
+Put the endpoint in `.prime-claw/runtime.local.json` (ignored by Git):
+
+```json
+{
+  "embedding_base_url": "http://<home-embedding-host>:<port>/v1"
+}
+```
+
+Then restrict the file and run the preflight:
+
+```bash
+chmod 600 .prime-claw/runtime.local.json
+bin/prime-claw --dry-run embedding-preflight
+bin/prime-claw embedding-preflight
+```
+
+The command reports only the model, dimensions, timeout, candidate/legacy database names,
+and `endpoint=operator-local (redacted)`. It writes
+`.prime-claw/runtime-policy.local.yaml`, also mode 0600 and ignored. That candidate policy:
+
+- grants the configured host/port only to `/usr/local/bin/gbrain` and
+  `/usr/local/bin/bun`;
+- removes gbrain/Bun from the corporate AI-gateway rule;
+- leaves inference and GitHub routes unchanged.
+
+The tracked policy deliberately retains historical gbrain/Bun corporate access until the
+actual cutover. This keeps ordinary pre-cutover `converge` safe for the still-canonical 1536
+index. The rendered candidate policy removes it, and a later Slice 4A step applies that policy
+only with the parallel Qwen build.
+
 ## Non-destructive cutover
 
 Slice 4A must:
@@ -54,7 +90,12 @@ the gbrain/Bun runtime. It must not provision an embedding credential provider.
 
 ## Current operational status
 
-No database migration or page write was applied during planning. The attempted
-`projects/prime-claw` write stopped on corporate gateway rate limiting and rolled back
-cleanly: the page is absent, the brain Git clone is clean, and no commit or push occurred.
-Slice 4B remains blocked until Slice 4A passes.
+The operator-local endpoint config and rendered candidate policy now pass preflight. No
+OpenShell policy was applied, no database migration/re-index was started, and the canonical
+1536-dimension database remains untouched. The candidate database is only named in config;
+it does not exist yet.
+
+The attempted `projects/prime-claw` write stopped on corporate gateway rate limiting and
+rolled back cleanly: the page is absent, the brain Git clone is clean, and no commit or push
+occurred. Slice 4A.2 (parallel build and acceptance gates) is next. Slice 4B remains blocked
+until the full Slice 4A cutover passes.

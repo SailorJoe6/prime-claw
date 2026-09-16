@@ -97,9 +97,10 @@ operations: `docs/runbook.md`. Plan set archived to
 
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 
-**Current status (2026-09-16):** Phase 3a Slices 0–3 are complete. The highest-priority
-next step is the prepared, not-yet-started non-destructive cutover to the operator's
-home-network `Qwen3-Embedding-8B` service at native 4096 dimensions (Slice 4A). The routed
+**Current status (2026-09-16):** Phase 3a Slices 0–3 are complete. Slice 4A.1's
+non-mutating local configuration and exact-host policy preflight is complete. The
+highest-priority next step is the parallel home-network `Qwen3-Embedding-8B` build,
+validation, and non-destructive cutover at native 4096 dimensions (Slice 4A.2). The routed
 `projects/prime-claw` write + Git push-back follows as Slice 4B. Corporate AI-gateway
 embeddings are superseded and are not a fallback.
 

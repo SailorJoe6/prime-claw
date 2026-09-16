@@ -1,0 +1,90 @@
+{
+  "verb": "embedding-preflight",
+  "slice": "3a-4A.1",
+  "captured_at": "2026-09-16T19:15:26.210387+00:00",
+  "result": "PASS",
+  "configuration": {
+    "model": "Qwen3-Embedding-8B",
+    "dimensions": 4096,
+    "timeout_seconds": 1000,
+    "timeout_ms": 1000000,
+    "authentication": "none",
+    "compatibility_value": "dummy (non-secret)",
+    "candidate_database": "gbrain_qwen4096",
+    "legacy_database": "gbrain",
+    "endpoint": "operator-local (redacted)"
+  },
+  "checks": [
+    {
+      "id": "local-config-private",
+      "pass": true,
+      "detail": "ignored; mode 0600"
+    },
+    {
+      "id": "candidate-policy-private",
+      "pass": true,
+      "detail": "ignored; mode 0600"
+    },
+    {
+      "id": "candidate-policy-endpoint-match",
+      "pass": true,
+      "detail": "configured host/port matched; value omitted"
+    },
+    {
+      "id": "candidate-policy-binary-scope",
+      "pass": true,
+      "detail": "exactly /usr/local/bin/bun and /usr/local/bin/gbrain"
+    },
+    {
+      "id": "candidate-policy-no-corporate-embedding-route",
+      "pass": true,
+      "detail": "gbrain/Bun absent from candidate corporate gateway rule"
+    },
+    {
+      "id": "operator-output-redacted",
+      "pass": true,
+      "detail": "endpoint URL and host absent"
+    },
+    {
+      "id": "preflight-external-calls",
+      "pass": true,
+      "detail": "no network, sandbox, OpenShell, or database operation"
+    },
+    {
+      "id": "canonical-database-unchanged",
+      "pass": true,
+      "detail": "read-only snapshot: pages=1059 chunks=3031 embedded=3031 min_dims=1536 max_dims=1536"
+    },
+    {
+      "id": "candidate-database-absent",
+      "pass": true,
+      "detail": "read-only pg_database count=0"
+    },
+    {
+      "id": "pre-cutover-create-isolation",
+      "pass": true,
+      "detail": "dry-run uses legacy OpenAI/1536 index settings; Qwen target and private endpoint absent"
+    },
+    {
+      "id": "focused-offline-tests",
+      "pass": true,
+      "detail": "14 passed"
+    },
+    {
+      "id": "full-offline-suite",
+      "pass": true,
+      "detail": "126 passed"
+    }
+  ],
+  "commands": [
+    "bin/prime-claw --dry-run embedding-preflight",
+    "bin/prime-claw embedding-preflight",
+    "python3 -m pytest tests/test_embedding_preflight.py -q",
+    "python3 -m pytest tests/ -q",
+    "bin/prime-claw --dry-run create"
+  ],
+  "notes": [
+    "No endpoint address is recorded.",
+    "This evidence proves preflight only; it does not claim the Qwen database build or cutover."
+  ]
+}

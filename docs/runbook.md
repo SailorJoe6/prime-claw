@@ -85,6 +85,21 @@ Slice 5's acceptance evidence is a live degrade-and-recover cycle (see
 `bin/prime-claw recover` runs, and `bin/prime-claw validate` returns green.
 
 
+## Home embedding preflight fails (Slice 4A)
+
+**Signature:** `error: embedding preflight:` followed by a missing endpoint, locked setting,
+policy drift, or non-ignored output-path error.
+
+1. Put only `embedding_base_url` in `.prime-claw/runtime.local.json`, then `chmod 600` it.
+2. Keep model `Qwen3-Embedding-8B`, dimensions `4096`, timeout `1000`, compatibility value
+   `dummy`, and different candidate/legacy database names.
+3. Run `bin/prime-claw --dry-run embedding-preflight`, then
+   `bin/prime-claw embedding-preflight`.
+4. Do not paste the private endpoint into logs, issues, evidence, tracked config, or policy.
+
+Preflight failure is non-destructive. Do not work around it by re-enabling corporate
+embeddings or changing the canonical 1536 database.
+
 ## Embedding budget exhausted / HTTP 429 (Phase 3a transition)
 
 **Signature:** corporate AI-gateway embedding requests retry and end with `Too Many Requests`.

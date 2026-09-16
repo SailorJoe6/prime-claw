@@ -968,7 +968,8 @@
     ],
     "tests": [
      "tests/test_runtime_image.py",
-     "tests/test_runtime_converge.py"
+     "tests/test_runtime_converge.py",
+     "tests/test_embedding_preflight.py"
     ]
    },
    "evidence": "docs/evidence/cited-query-20260916T164509Z.json",
@@ -1033,10 +1034,23 @@
    "id": "R3a-14",
    "priority": "GATE",
    "summary": "Non-destructive 4096-dimension cutover: build/validate a parallel Qwen database/index, keep the 1536 database intact for rollback, use ignored local endpoint config, and grant only exact gbrain egress.",
-   "status": "pending (Slice 4A \u2014 highest-priority next step)",
-   "proven_by": {},
-   "evidence": "not yet produced \u2014 see .ralph/plans/EXECUTION_PLAN.md Slice 4A",
-   "verdict_doc": "docs/home-embedding-runtime.md"
+   "status": "partial (Slice 4A.1 preflight complete; parallel build/cutover pending)",
+   "proven_by": {
+    "apply": [
+     "bin/prime-claw",
+     "config/runtime.json",
+     "policies/runtime.yaml"
+    ],
+    "validate": [
+     "docs/derisk/3a-slice4a.md",
+     "docs/evidence/embedding-preflight-20260916T191526Z.json"
+    ],
+    "tests": [
+     "tests/test_embedding_preflight.py"
+    ]
+   },
+   "evidence": "docs/evidence/embedding-preflight-20260916T191526Z.json",
+   "verdict_doc": "docs/derisk/3a-slice4a.md"
   }
  ],
  "phase2": {}

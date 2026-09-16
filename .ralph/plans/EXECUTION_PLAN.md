@@ -1,6 +1,6 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** PREPARED — Slices 0–3 complete; Slice 4A home-embedding cutover is highest-priority next (do not execute until a later instruction)
+**Status:** IN EXECUTION — Slices 0–3 complete; Slice 4A.1 preflight complete; Slice 4A.2 parallel build/validation is next
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
 **Date:** 2026-09-11
@@ -61,7 +61,7 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 | **S1** | git+github push plumbing: image git, custom github push profile, clone brain w/ `.git` into sandbox | R3a-1, R3a-5(part), R3a-7 | — |
 | **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source); historical 1536 embedding proof later superseded | R3a-2 | — |
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
-| **S4A** | Non-destructive cutover to home `Qwen3-Embedding-8B`, native 4096 dimensions | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **NEXT / GATE** |
+| **S4A** | Non-destructive cutover to home `Qwen3-Embedding-8B`, native 4096 dimensions | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **IN PROGRESS** — 4A.1 preflight complete; 4A.2 next |
 | **S4B** | One routed write + push-back round-trip | R3a-4 | blocked on S4A |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
@@ -213,9 +213,12 @@ helper twice and correctly answered with all expected harness components plus ci
 
 ## Slice 4A — Home Qwen embedding cutover (R3a-12, R3a-14) — HIGHEST PRIORITY NEXT
 
-**Preparation status (2026-09-16): READY, NOT STARTED.** The operator explicitly requested
-that this plan/spec/docs update land now and implementation wait for a later instruction.
-Do not mutate either brain database while preparing this slice.
+**Execution status (2026-09-16): IN PROGRESS.** The operator later invoked `/execute`.
+Bounded objective 4A.1 is complete: ignored local config merge, strict locked-setting
+validation, private-endpoint-safe candidate policy rendering, and `embedding-preflight`.
+The preflight makes no network, sandbox, or database call. Read-only live checks after it
+confirmed the canonical database remains 1536-dimensional and the candidate database does
+not exist. Slice 4A.2 (parallel database/config build and acceptance gates) is next.
 
 **Goal.** Make the operator's home-network OpenAI-compatible
 `Qwen3-Embedding-8B` service the only embedding path. Rebuild the full in-sandbox brain in a
@@ -229,13 +232,16 @@ or `PRIME_CLAW_*` environment, never a tracked file, log, evidence artifact, or 
 
 **Approach.**
 
-1. **Configuration contract.** Add generic keys/env overrides for embedding base URL, model,
-   dimensions, timeout, and non-secret compatibility value. Remove AI-gateway embeddings from
-   create/converge/validate; inference remains independently host-selected through Codex.
-2. **Deny-by-default egress.** Render or apply an operator-local policy fragment granting only
-   the configured host/port to the gbrain/Bun runtime. Do not add the raw private endpoint to
-   tracked `policies/runtime.yaml`. No OpenShell credential provider is required.
-3. **Parallel build.** Create a new Postgres database/index (working name
+1. **Configuration contract — 4A.1 COMPLETE.** Generic tracked keys + `PRIME_CLAW_*`
+   overrides cover base URL, exact model, dimensions, timeout, non-secret compatibility value,
+   candidate/legacy database names, and ignored local paths. The base URL has no tracked default.
+   `embedding-preflight` reports only sanitized values. The historical index stage explicitly
+   ignores target settings, preventing an ordinary pre-cutover converge from mutating it.
+2. **Deny-by-default egress — 4A.1 RENDER COMPLETE / APPLY PENDING.** The ignored mode-0600
+   candidate policy grants only the configured host/port to gbrain/Bun and removes those
+   binaries from the corporate route. The tracked policy stays pre-cutover-compatible until
+   4A.2 applies the candidate with the new build. No OpenShell credential provider is required.
+3. **Parallel build — 4A.2 NEXT.** Create a new Postgres database/index (working name
    `gbrain_qwen4096`) with pgvector 4096-dimensional storage. Point a temporary gbrain config at
    it, register `/sandbox/brain` as source `brain`, and run a full sync/embed. Keep the existing
    1536-dimension database untouched and queryable as rollback.
@@ -246,11 +252,12 @@ or `PRIME_CLAW_*` environment, never a tracked file, log, evidence artifact, or 
    sandbox gbrain config to the new database. Retain the old database until Slice 5 closes;
    recovery is a config switch back, not an in-place schema reversal.
 
-**Tests (offline).** Local-config/env resolution without a committed private endpoint; policy
-fragment rendering and binary scoping; 4096-dimension configuration; parallel DB naming and
-no in-place mutation; full-rebuild command construction; acceptance count/dimension gates;
-AI-gateway embedding absence; rollback config switch. All network/database boundaries are
-monkeypatched.
+**Tests (offline).** 4A.1 has 14 focused tests for local-config/env resolution, strict
+Qwen/4096/1000s settings, endpoint validation/redaction, exact policy host/port and binary
+scoping, 0600 output, dry-run, Git ignores, zero command/sandbox/DB calls, parallel DB naming,
+and proof the historical index ignores target settings. 4A.2 must add full-rebuild command,
+acceptance count/dimension, corporate-route absence, atomic cutover, and rollback tests. All
+network/database boundaries remain monkeypatched.
 
 **Evidence.** Record sanitized configuration (model/dimensions/timeout only), old/new database
 identifiers, page/chunk parity, vector dimensions, semantic query proof, corporate-gateway

@@ -2,9 +2,10 @@
 
 > **Embedding transition (2026-09-16):** the implemented Slice 2 runtime still contains the
 > historical corporate AI-gateway / 1536-dimension index. D3a-L supersedes that configuration.
-> The highest-priority next step is the non-destructive home `Qwen3-Embedding-8B` 4096-dimension
-> cutover in [home-embedding-runtime.md](home-embedding-runtime.md). It is required but **not
-> implemented yet**; do not treat the historical gateway path as an accepted fallback.
+> Slice 4A.1 now provides the non-mutating home `Qwen3-Embedding-8B` configuration/policy
+> preflight. The parallel 4096-dimension build, validation, and cutover remain next; do not
+> treat the historical gateway path as an accepted fallback. See
+> [home-embedding-runtime.md](home-embedding-runtime.md).
 
 
 One reliable, repeatable OpenShell sandbox lifecycle behind a single operator
@@ -21,6 +22,8 @@ operating guarantees. For observed-failure → recovery mapping, see
 | `policies/runtime.yaml` | The single runtime sandbox policy (deny-by-default egress). |
 | `docker/runtime.Dockerfile` | The sandbox image (brain stack baked at build time). |
 | `config/runtime.json` | Runtime config (sandbox/image/gateway/policy/provider). |
+| `.prime-claw/runtime.local.json` | Ignored mode-0600 operator-local home embedding endpoint overlay. |
+| `.prime-claw/runtime-policy.local.yaml` | Ignored mode-0600 candidate policy rendered by `embedding-preflight`. |
 | `config/requirements-inventory.json` | Requirement → validator traceability. |
 | `docs/runbook.md` | Operations: failure signature → recovery command. |
 | `docs/evidence/` | Recorded validate/recover runs. |
@@ -39,6 +42,7 @@ operating guarantees. For observed-failure → recovery mapping, see
 |------|--------------|---------|
 | `status` | Read-only actual-vs-expected report for every component (gateway, sandbox+image, policy rev, provider, Postgres, gbrain, prime-agent daemon, model reachability). | no |
 | `build` | Builds `docker/runtime.Dockerfile` into the image. Idempotent via an input fingerprint + build stamp; `--force` rebuilds. | image |
+| `embedding-preflight` | Validates the locked Qwen/4096/1000s parallel-database contract and renders a redacted, exact-host local policy. Makes no network, sandbox, or database call. | ignored local policy only |
 | `create` | Fresh bring-up. Destructive: deletes any existing sandbox, creates from the image with providers attached **at create**, then converges. | sandbox |
 | `converge` | Idempotent repair of an existing sandbox: re-runs every stage in place (policy, provider env, prime-agent install, brain, spawn target) with **no** needless recreate. Fixes drift. | in place |
 | `validate` | Green/red acceptance gate: daemon healthy, deny-by-default egress, credentialed model call, brain serving, spawn/reap. Records versions to `docs/evidence/validate-<utc>.json`. | evidence |
@@ -50,7 +54,9 @@ operating guarantees. For observed-failure → recovery mapping, see
 `create` and `converge` run the same idempotent stages, individually runnable
 for targeted diagnosis:
 
-- **policy** — apply `policies/runtime.yaml`.
+- **embedding-preflight** *(standalone; not yet part of create/converge)* — merge ignored local
+  endpoint config, validate the locked home-Qwen contract, and render the candidate policy.
+- **policy** — apply `policies/runtime.yaml` (historical policy until the later cutover step).
 - **provider** — attach the AI-gateway provider (create/update-first; import
   the profile only when the provider is absent). Refreshes the credential only
   when it changed (sha256 in `.prime-claw-ai-gateway-key.sha256`, gitignored) —
@@ -66,8 +72,10 @@ for targeted diagnosis:
   into OpenShell's builtin `codex` provider (host-side only), with the same
   conditional-refresh/hash discipline (`.prime-claw-codex-oauth.sha256`).
 - **sandbox** — create-if-absent (or delete+recreate with `force_fresh`);
-  attaches all three providers (AI gateway for embeddings, GitHub for brain
-  clone/push, Codex for current inference). On in-place converge, attaches any
+  attaches all three providers (historical AI gateway, GitHub for brain
+  clone/push, Codex for current inference). The AI-gateway attachment remains temporarily so
+  pre-cutover converge cannot break the canonical 1536 index; it is not an accepted embedding
+  fallback after cutover. On in-place converge, attaches any
   missing provider without wiping `/sandbox`. The brain is NOT `--upload`ed.
 - **prime-agent** — install/configure prime-agent + persistent REPL; mirror host
   `models.json` + `settings.json` verbatim; write a placeholder-only Codex auth

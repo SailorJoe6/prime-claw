@@ -71,10 +71,18 @@ network_policies:
     binaries:
       - path: /usr/bin/curl
       - path: /usr/bin/node
-      # gbrain is a compiled Bun binary; its fetch runs under the bun runtime,
-      # so the L7 policy keys the gateway endpoint to the bun binary too.
+      # Historical Slice 2 access. The Slice 4A local-policy renderer removes
+      # these two lines before adding the exact home endpoint. Keeping them in
+      # the tracked base until cutover prevents an ordinary pre-cutover
+      # `converge` from breaking the still-canonical 1536-dimension index.
       - path: /usr/local/bin/bun
       - path: /usr/local/bin/gbrain
+
+  # Slice 4A (D3a-L): rendered at preflight into an ignored operator-local
+  # policy. The private host/port never enters this tracked template. The rule
+  # grants only gbrain/Bun access; it is unauthenticated and separate from the
+  # corporate model gateway above.
+  # PRIME_CLAW_HOME_EMBEDDING_POLICY
 
   # Slice 3 (R3a-3/R3a-13): the operator's CURRENT Prime Agent default is
   # openai-codex/gpt-5.6-sol. OAuth values remain in the host OpenShell `codex`

@@ -14,6 +14,9 @@ __pycache__/
 # Local state
 /tmp/
 *.log
+# Operator-local home embedding endpoint + rendered exact-host policy
+.prime-claw/runtime.local.json
+.prime-claw/runtime-policy.local.yaml
 
 # Beads / Dolt files (added by bd init)
 .dolt/
