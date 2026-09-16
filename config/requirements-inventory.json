@@ -1001,7 +1001,7 @@
    "id": "R3a-12",
    "priority": "GATE",
    "summary": "Home embedding freshness: only Qwen3-Embedding-8B at native 4096 dimensions; full single-vector-space re-embed; no null/stale/mixed vectors, keyword-only acceptance, or corporate AI-gateway fallback.",
-   "status": "pending (Slice 4A; historical 1536-dimension proof superseded by D3a-L)",
+   "status": "blocked (external DGX Spark outage; partial Qwen candidate preserved, no cutover)",
    "proven_by": {},
    "evidence": "not yet produced \u2014 see .ralph/plans/EXECUTION_PLAN.md Slice 4A",
    "verdict_doc": "docs/home-embedding-runtime.md"
@@ -1034,7 +1034,7 @@
    "id": "R3a-14",
    "priority": "GATE",
    "summary": "Non-destructive 4096-dimension cutover: build/validate a parallel Qwen database/index, keep the 1536 database intact for rollback, use ignored local endpoint config, and grant only exact gbrain egress.",
-   "status": "partial (Slice 4A.1 preflight complete; parallel build/cutover pending)",
+   "status": "blocked (4A.1 complete; 4A.2a partial candidate preserved after external DGX Spark crash)",
    "proven_by": {
     "apply": [
      "bin/prime-claw",
@@ -1043,14 +1043,15 @@
     ],
     "validate": [
      "docs/derisk/3a-slice4a.md",
-     "docs/evidence/embedding-preflight-20260916T191526Z.json"
+     "docs/evidence/embedding-preflight-20260916T191526Z.json",
+     "docs/evidence/embedding-build-interrupted-20260916T234215Z.json"
     ],
     "tests": [
      "tests/test_embedding_preflight.py",
      "tests/test_embedding_candidate_build.py"
     ]
    },
-   "evidence": "docs/evidence/embedding-preflight-20260916T191526Z.json",
+   "evidence": "docs/evidence/embedding-build-interrupted-20260916T234215Z.json",
    "verdict_doc": "docs/derisk/3a-slice4a.md"
   }
  ],

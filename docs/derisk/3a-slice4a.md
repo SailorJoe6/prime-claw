@@ -1,9 +1,10 @@
 # Phase 3a Slice 4A — home-Qwen embedding cutover
 
-**Status:** IN PROGRESS — 4A.1 complete; 4A.2 next  
-**Decision:** D3a-L  
-**Requirements:** R3a-12, R3a-14  
+**Status:** BLOCKED — 4A.1 complete; 4A.2a partial candidate preserved after external DGX Spark crash
+**Decision:** D3a-L
+**Requirements:** R3a-12, R3a-14
 **Evidence:** [`docs/evidence/embedding-preflight-20260916T191526Z.json`](../evidence/embedding-preflight-20260916T191526Z.json)
+**Interrupted-build evidence:** [`docs/evidence/embedding-build-interrupted-20260916T234215Z.json`](../evidence/embedding-build-interrupted-20260916T234215Z.json)
 
 ## 4A.1 result — configuration and policy preflight
 
@@ -37,3 +38,25 @@ this objective created no page and performed no write.
 `GBRAIN_AI_EMBED_TIMEOUT_MS=1000000` (and the query timeout), full-sync with the exact model ID,
 gate parity/dimensions/freshness/retrieval/corporate non-use, and only then switch the canonical
 config and policy atomically. The legacy database remains untouched for rollback.
+## 4A.2a interrupted build — external hardware blocker
+
+The isolated candidate build was started from implementation commit `e92abf4`. The operator
+reported that the DGX Spark hosting the embedding model crashed and stopped serving. The build
+was stopped rather than waiting on the 1,000-second request timeout. No gbrain process remains.
+
+Preserved candidate state is partial and **not accepted**: 350 `brain` pages, 1,140 chunks,
+1,140 embeddings, all currently 4096-dimensional in a `vector(4096)` column, no unsupported
+HNSW index, and no source bookmark. The missing bookmark correctly prevents the partial import
+from passing the build gate.
+
+The tracked historical policy was restored. A separate read-only fingerprint confirmed the
+canonical config, schema, page/chunk/vector/model state, source bookmark, embedding config, and
+migration version are unchanged. No canonical cutover occurred and the legacy database remains
+intact.
+
+**Unblock condition:** the DGX Spark is healthy and `Qwen3-Embedding-8B` again passes the
+operator-local compatibility probe. Resume with `bin/prime-claw embedding-build`; the isolated
+candidate database is intentionally preserved for a safe full-sync resume. Do not drop or
+mutate the legacy database.
+
+Sanitized machine evidence: [`embedding-build-interrupted-20260916T234215Z.json`](../evidence/embedding-build-interrupted-20260916T234215Z.json).

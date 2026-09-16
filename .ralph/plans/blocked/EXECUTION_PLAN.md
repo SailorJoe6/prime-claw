@@ -1,8 +1,8 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** IN EXECUTION — Slices 0–3 and 4A.1 complete; Slice 4A.2a isolated candidate build is being executed
+**Status:** BLOCKED — Slice 4A.2a paused after DGX Spark crash; partial candidate preserved, canonical unchanged
 **Beads:** `prime-claw-zwg` (P1)
-**Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
+**Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](../REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](../DECISIONS.md)
 **Date:** 2026-09-11
 
 This plan implements the Phase 3a spec as **vertical slices** (Cockburn elephant-carpaccio):
@@ -220,6 +220,16 @@ The preflight makes no network, sandbox, or database call. Read-only live checks
 confirmed the canonical database remains 1536-dimensional and the candidate database does
 not exist. Slice 4A.2a now implements the isolated build path; its live full sync is the
 current bounded objective. Slice 4A.2b validation and atomic cutover remain separate.
+
+**External blocker (2026-09-16).** The DGX Spark hosting the home embedding model crashed and
+stopped serving during the live build. Work is paused at the operator's request. The build
+process is stopped, the tracked historical policy is restored, and the partial
+`gbrain_qwen4096` database is preserved at 350 source pages / 1,140 embedded chunks, all 4096d,
+with no source bookmark. The canonical fingerprint is unchanged and no cutover occurred.
+Unblock only when the operator confirms the DGX Spark is healthy and the exact model again
+passes its compatibility probe; then move this plan/spec back to `.ralph/plans/` and resume
+with `bin/prime-claw embedding-build`. Evidence:
+`docs/evidence/{blocked_ev_path.name}`.
 
 **Goal.** Make the operator's home-network OpenAI-compatible
 `Qwen3-Embedding-8B` service the only embedding path. Rebuild the full in-sandbox brain in a

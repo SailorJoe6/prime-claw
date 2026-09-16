@@ -1,6 +1,6 @@
 # Home-network embedding runtime
 
-> **Status:** Slice 4A.1 complete; Slice 4A.2a isolated build command ready; build/cutover not yet complete.
+> **Status:** BLOCKED — DGX Spark outage paused Slice 4A.2a; partial candidate preserved; no cutover.
 > **Decision:** D3a-L · **Requirements:** R3a-12, R3a-14 · **Plan:** Phase 3a Slice 4A
 
 ## Required state
@@ -121,8 +121,11 @@ the gbrain/Bun runtime. It must not provision an embedding credential provider.
 ## Current operational status
 
 The operator-local endpoint config and rendered candidate policy pass preflight. The isolated
-candidate-build path is implemented and offline-tested, but this document does not claim a
-completed live build or cutover. The canonical 1536-dimension database remains untouched.
+candidate-build path is implemented and offline-tested. A live build reached 350 source pages
+and 1,140 fully embedded 4096-dimensional chunks before the DGX Spark crashed. That partial
+candidate has no source bookmark and is not accepted. The process is stopped, the historical
+policy is restored, the canonical fingerprint is unchanged, and no cutover occurred. Resume
+only after the operator confirms the exact home model is serving again.
 
 The attempted `projects/prime-claw` write stopped on corporate gateway rate limiting and
 rolled back cleanly: the page is absent, the brain Git clone is clean, and no commit or push

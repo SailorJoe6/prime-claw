@@ -97,12 +97,13 @@ operations: `docs/runbook.md`. Plan set archived to
 
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 
-**Current status (2026-09-16):** Phase 3a Slices 0–3 are complete. Slice 4A.1's
-non-mutating local configuration and exact-host policy preflight is complete. The
-highest-priority next step is the parallel home-network `Qwen3-Embedding-8B` build,
-validation, and non-destructive cutover at native 4096 dimensions (Slice 4A.2). The routed
-`projects/prime-claw` write + Git push-back follows as Slice 4B. Corporate AI-gateway
-embeddings are superseded and are not a fallback.
+**Current status (2026-09-16): BLOCKED EXTERNALLY.** Phase 3a Slices 0–3 and Slice 4A.1
+are complete. Slice 4A.2a's isolated build path is implemented, but the live build is paused
+because the DGX Spark serving `Qwen3-Embedding-8B` crashed. A partial 4096-dimensional
+candidate database is preserved; the historical policy is restored; the canonical database
+is unchanged; no cutover occurred. Resume only after the operator confirms the home model is
+serving again. The routed `projects/prime-claw` write + Git push-back remains blocked behind
+Slice 4A. Corporate AI-gateway embeddings are superseded and are not a fallback.
 
 The riskiest integration, done as early as possible and deliberately thin but
 *whole*: a prime-agent session inside the sandbox, connected to gbrain, that

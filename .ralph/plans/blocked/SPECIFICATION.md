@@ -1,14 +1,20 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** IN EXECUTION — Slices 0–3 complete; home-embedding preflight complete; parallel build/cutover next
+**Status:** BLOCKED — external DGX Spark outage paused Slice 4A.2a; partial candidate preserved, no cutover
 **Beads:** `prime-claw-zwg` (P1)
 **Date:** 2026-09-11 · **Embedding decision revised:** 2026-09-16
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
 
+
+> **Current external blocker (2026-09-16):** the DGX Spark serving the sole accepted home
+> embedding model crashed during the isolated candidate build. Work is paused until the
+> operator confirms service recovery. The partial candidate is preserved; the historical
+> policy is restored; the canonical database/config are unchanged; no cutover occurred.
+
 This document is the summary and index for the work. It is accompanied by:
 
-- **[REQUIREMENTS.md](REQUIREMENTS.md)** — the specific requirements discovered during discussion.
-- **[DECISIONS.md](DECISIONS.md)** — design decisions, each traced to the requirement(s) it satisfies.
+- **[REQUIREMENTS.md](../REQUIREMENTS.md)** — the specific requirements discovered during discussion.
+- **[DECISIONS.md](../DECISIONS.md)** — design decisions, each traced to the requirement(s) it satisfies.
 
 This is a specification of *what* must change and *why*. It is not an execution plan; that comes later.
 

@@ -26,7 +26,7 @@ Phase 3a (tracer bullet) records one verdict doc per executed slice:
 | S1 — brain into the sandbox, push-capable (R3a-1, R3a-5 part, R3a-7) | [3a-slice1.md](3a-slice1.md) | COMPLETE — root-caused the fresh-create 401s to a shell-quoting bug (double-quote the `${api_token}` URL), not an OpenShell defect |
 | S2 — in-sandbox index serving (R3a-2, R3a-12) | [3a-slice2.md](3a-slice2.md) | COMPLETE — brain-index stage; 1057 pages / 3029 embeddings; validate 16/16; validate false-pass fixed |
 | S3 — cited read/query from sandboxed prime-agent (R3a-3, R3a-13 update) | [3a-slice3.md](3a-slice3.md) | COMPLETE — ChatGPT-5.6 Sol called brain-query and cited `resources/the-anatomy-of-an-agent-harness`; OAuth stayed placeholder-isolated |
-| S4A — home-Qwen 4096 cutover (R3a-12, R3a-14) | [3a-slice4a.md](3a-slice4a.md) | IN PROGRESS — 4A.1 config/policy preflight complete; parallel build/cutover next |
+| S4A — home-Qwen 4096 cutover (R3a-12, R3a-14) | [3a-slice4a.md](3a-slice4a.md) | BLOCKED — DGX Spark crashed during 4A.2a; partial candidate preserved, canonical unchanged, no cutover |
 
 ## Evidence
 

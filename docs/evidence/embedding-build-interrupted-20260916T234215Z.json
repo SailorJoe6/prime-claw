@@ -1,0 +1,43 @@
+{
+  "verb": "embedding-build",
+  "slice": "3a-4A.2a",
+  "captured_at": "2026-09-16T23:42:15.909175+00:00",
+  "result": "BLOCKED_EXTERNAL_HARDWARE",
+  "implementation_commit": "e92abf4",
+  "trigger": "operator reported the DGX Spark embedding host crashed and the model stopped serving",
+  "candidate": {
+    "database": "gbrain_qwen4096",
+    "preserved": true,
+    "pages_source_brain": 350,
+    "chunks_source_brain": 1140,
+    "embedded_chunks_source_brain": 1140,
+    "min_dimensions": 4096,
+    "max_dimensions": 4096,
+    "column_type": "vector(4096)",
+    "hnsw_index_count": 0,
+    "source_bookmark_set": false
+  },
+  "safety": {
+    "build_process_stopped": true,
+    "sandbox_gbrain_processes": 0,
+    "historical_policy_restored": true,
+    "canonical_fingerprint_unchanged": true,
+    "canonical_cutover_performed": false,
+    "legacy_database_mutated": false,
+    "private_endpoint_recorded": false
+  },
+  "tests": {
+    "focused_candidate": 21,
+    "full_tracked": 147,
+    "status": "PASS"
+  },
+  "resume": {
+    "condition": "DGX Spark is healthy and the exact home embedding model serves a compatibility probe again",
+    "command": "bin/prime-claw embedding-build",
+    "behavior": "resume isolated candidate database; do not drop or rebuild legacy gbrain"
+  },
+  "notes": [
+    "The process was terminated after the operator reported the hardware crash; there was no normal CLI exit receipt.",
+    "Partial candidate state is not acceptance evidence and must pass the full build bookmark/freshness gates after resume."
+  ]
+}
