@@ -20,8 +20,9 @@ Priority: **GATE** = must hold for the slice to be accepted; **NICE** = desired,
   in-sandbox brain via `gbrain put <type/slug>` + `gbrain sync --source brain`, routed per
   `docs/information-architecture.md` (brain = canonical store). The write is a test
   artifact: either easily deleted (markdown is source-of-truth) or a keep-worthy stub
-  (e.g. a `projects/` page for prime-claw). Lands in the sandbox clone only; push-back to
-  the real repo is out of scope.
+  (the planned `projects/prime-claw` page, pending operator confirmation). The agent commits
+  and pushes the change from the sandbox clone to the real brain repo through the Slice 1
+  GitHub L7 provider. Receipt = page slug + commit SHA + push result.
 - **R3a-5 (GATE) — Lifecycle integration.** Brain clone + index are wired into
   `bin/prime-claw` (a stage and/or verb), idempotent and re-runnable, so a fresh
   `create`/`converge` yields a brain-hosting sandbox without manual steps.
@@ -75,6 +76,5 @@ Priority: **GATE** = must hold for the slice to be accepted; **NICE** = desired,
 - Porting the full memory/collect/triage/ingest skill set (3b).
 - Browse proxy-shim recreation (3c). Channels (3d). Scheduling via `prime-agent schedule`
   (3e). `brain.cron` is not ported at all.
-- Write-back (git push) from the sandbox clone to the real brain repo.
 - The operator instance repo (`prime-pva`) — created at 3b.
 - Episode loop, comms channels, orchestrator (Phases 4–6).

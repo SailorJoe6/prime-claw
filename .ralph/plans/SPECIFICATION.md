@@ -108,11 +108,11 @@ local account-id parser; the preload rewrites outbound auth/account headers to O
 placeholders before network I/O (R3a-13). The old Kimi/GLM catalog remains only a fallback
 when host config is absent; it is not the current acceptance target.
 
-The write is a **test artifact**. Two acceptable forms (operator's call at execution):
-(a) an easily-deleted page (markdown is source-of-truth, so deletion is trivial), or
-(b) a keep-worthy stub such as a `projects/` page describing prime-claw itself. The write
-round-trips only into the **in-sandbox clone**; pushing back to the real brain repo is a
-git operation **out of scope for 3a** (lands with the full skill port in 3b).
+The write is a **test artifact**: a keep-worthy `projects/prime-claw` page describing
+prime-claw itself (exact slug pending operator confirmation at Slice 4 execution). The agent
+writes and re-indexes it in-sandbox, commits it in the clone, and pushes it to the real brain
+repo through the Slice 1 GitHub L7 provider. Acceptance records page slug + commit SHA + push
+result; no credential reaches sandbox disk (resolved Q4 / D3a-G).
 
 ## 4. Explicitly out of scope for 3a (later slices)
 
