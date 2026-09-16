@@ -1,0 +1,37 @@
+{
+  "slice": "3a-slice3",
+  "requirement": "R3a-3",
+  "captured_at": "2026-09-16T16:45:09.964172+00:00",
+  "result": "PASS",
+  "runtime": {
+    "sandbox": "prime-claw",
+    "prime_agent": "0.9.3",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "thinking_level": "high",
+    "transport": "sse"
+  },
+  "host_config_mirror": {
+    "settings_sha256": "f2ace1d6e119997f703fd39fd49675146795b51d3404004a6c00703977e23483",
+    "models_sha256": "e58d1dd41e2c94645aed248f57efaff08dca818e6383e18deda780b604f942f6",
+    "sandbox_hashes_match_host": true,
+    "sandbox_auth_access_is_synthetic": true,
+    "sandbox_auth_refresh_is_openshell_placeholder": true,
+    "sandbox_auth_account_is_openshell_placeholder": true,
+    "real_oauth_on_sandbox_disk": false
+  },
+  "question": "According to the operator's brain, what is an agent harness and what does it include? Answer briefly and cite the brain source.",
+  "retrieval": {
+    "helper": "/sandbox/.prime-claw/bin/brain-query",
+    "search_then_get": true,
+    "final_source_slug": "resources/the-anatomy-of-an-agent-harness",
+    "citation_token": "[Brain: resources/the-anatomy-of-an-agent-harness]"
+  },
+  "answer": "An **agent harness** is all code, configuration, and execution logic around the model that turns it into an agent.\n\nIt includes:\n- System prompts\n- Tools, skills, and MCPs\n- Infrastructure such as filesystems, sandboxes, and browsers\n- Orchestration such as subagents, handoffs, and model routing\n- Hooks or middleware for compaction, continuation, and checks\n\n[Brain: resources/the-anatomy-of-an-agent-harness]",
+  "assertions": {
+    "prime_agent_invoked_helper": true,
+    "answer_cites_expected_slug": true,
+    "answer_says_harness_wraps_model": true,
+    "answer_lists_system_prompts_tools_infrastructure_orchestration_hooks": true
+  }
+}

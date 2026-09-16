@@ -26,11 +26,13 @@ recover, destroy). The sandbox image (`docker/runtime.Dockerfile` →
 - **Postgres 16 + pgvector 0.6**, agent-owned `PGDATA=/sandbox/pgdata`, listening on
   `localhost:5433` inside the sandbox only (no host forward; deny-by-default egress).
 
-Inference auth is settled and **unchanged** by this phase: the host OpenShell provider
-(`prime-claw-ai-gateway` → `ai-gateway.zende.sk`, model `anthropic.kimi-k3`) holds the
-real credential host-side; only a placeholder enters the sandbox and the L7 proxy swaps
-the real key at the boundary. The claw never possesses LLM credentials (R-X-5 / R2-X-1).
-Per operator direction, this is best practice and is **not** a design variable here.
+Inference **credential isolation** remains settled: a host OpenShell provider holds the
+real credential, only opaque placeholders enter the sandbox, and L7 swaps real values at
+the boundary. The concrete provider/model is now host-config-driven, not fixed to the AI
+Gateway. Per operator direction on 2026-09-16, the current acceptance target (until further
+notice) is the verbatim host default `openai-codex/gpt-5.6-sol` (ChatGPT-5.6 Sol, thinking
+`high`) using the host's OAuth. `prime-claw-ai-gateway` remains attached for gbrain
+embeddings. The claw never possesses real LLM credentials (R-X-5 / R2-X-1 / R3a-13).
 
 **What does not exist yet:** anything in the sandbox *uses* the brain. There is no brain
 content in the container, no gbrain index over real content, no prime-agent skill that
@@ -97,11 +99,14 @@ harness:
    routed per `docs/information-architecture.md` (brain = canonical store for domain
    facts), via `gbrain put` + `gbrain sync --source brain`.
 
-The sandboxed prime-agent **mirrors the operator's local model config**: `stage_prime_agent`
-copies the host `~/.prime/agent/models.json` verbatim (it holds no secrets), falling back to a
-built-in default (Kimi-K3 + GLM against the configured AI gateway) when no host config exists
-(R3a-13). This is what lets the agent resolve `anthropic.kimi-k3` against the gateway instead
-of an unauthorized catalog default.
+The sandboxed prime-agent **mirrors the operator's local config**: `stage_prime_agent`
+copies host `models.json` and `settings.json` verbatim, so provider/model/thinking defaults
+follow the user (currently `openai-codex/gpt-5.6-sol`, thinking `high`). Host `auth.json` is
+never copied: its selected credential is provisioned into OpenShell and sandbox auth is a
+placeholder-only projection. For Codex, a non-secret synthetic JWT satisfies prime-agent's
+local account-id parser; the preload rewrites outbound auth/account headers to OpenShell
+placeholders before network I/O (R3a-13). The old Kimi/GLM catalog remains only a fallback
+when host config is absent; it is not the current acceptance target.
 
 The write is a **test artifact**. Two acceptable forms (operator's call at execution):
 (a) an easily-deleted page (markdown is source-of-truth, so deletion is trivial), or
@@ -170,7 +175,13 @@ git operation **out of scope for 3a** (lands with the full skill port in 3b).
    brain (`~/gitlab_local/brain`, GitHub `JLandersZen/brain`, branch `main`, private).
 4. **Exact validate surface** ~~open~~ **RESOLVED (Q4, D3a-G):** GATE = brain cloned with
    `.git` + pages>0 + cited query + one routed write receipt + push-back round-trip.
-5. **gbrain: upstream-vs-fork (Slice-0 spike — the strategy is decided; the spike proves
+5. **Which prime-agent provider/model proves the conversational slices?** ~~open~~
+   **RESOLVED (Q5, operator direction 2026-09-16, D3a-K):** mirror the host
+   `models.json` + `settings.json` and use its current default:
+   `openai-codex/gpt-5.6-sol` (ChatGPT-5.6 Sol, thinking `high`). Host OAuth remains in
+   the OpenShell `codex` provider; sandbox auth is placeholder-only. Kimi/GLM are not
+   available to the operator now and must not be used by acceptance until further notice.
+6. **gbrain: upstream-vs-fork (Slice-0 spike — the strategy is decided; the spike proves
    feasibility).** **Strategy (settled):** we WANT to use **upstream `garrytan/gbrain`** as
    prime-claw's driven brain (mode a) rather than maintain zbrain's stripped fork. Upstream
    is multi-harness + schema-pack; zbrain's walk-up-config delta is NOT needed in a

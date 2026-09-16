@@ -55,11 +55,19 @@ for targeted diagnosis:
   Token read host-side via `gh auth token`; same conditional-refresh discipline
   (`.prime-claw-github-token.sha256`). The sandbox only ever holds the
   `openshell:resolve:env:..._api_token` placeholder (D3a-B/J).
+- **codex-provider** — mirror the host's current `openai-codex` OAuth bundle
+  into OpenShell's builtin `codex` provider (host-side only), with the same
+  conditional-refresh/hash discipline (`.prime-claw-codex-oauth.sha256`).
 - **sandbox** — create-if-absent (or delete+recreate with `force_fresh`);
-  attaches BOTH providers at create. The brain is NOT `--upload`ed (that would
-  drop `.git`); it arrives via `brain-clone`.
-- **prime-agent** — install/configure prime-agent + daemon + persistent REPL
-  in-sandbox; ensures the daemon runs and cleans stale sockets.
+  attaches all three providers (AI gateway for embeddings, GitHub for brain
+  clone/push, Codex for current inference). On in-place converge, attaches any
+  missing provider without wiping `/sandbox`. The brain is NOT `--upload`ed.
+- **prime-agent** — install/configure prime-agent + persistent REPL; mirror host
+  `models.json` + `settings.json` verbatim; write a placeholder-only Codex auth
+  projection; then deliberately restart the daemon so it inherits the current
+  provider placeholder set. The Codex projection uses a non-secret synthetic JWT
+  for local parsing and rewrites outbound auth/account headers to placeholders
+  in `npm-onload.js`; real OAuth stays at OpenShell L7 (D3a-K).
 - **brain-clone** — clone the operator's brain repo into the sandbox
   (default `/sandbox/brain`) WITH `.git` over HTTPS using the `${api_token}`
   placeholder; idempotent (fetch + fast-forward when already cloned). The URL
@@ -74,14 +82,19 @@ for targeted diagnosis:
   `sync --skip-failed` (advance past unparseable brain files), then a
   pages>0 gate. `set -o pipefail` on all piped gbrain calls. Config lives at
   `/sandbox/.gbrain/config.json` (the ONLY location gbrain reads).
-- **spawn** — stage the non-secret runtime layout (`models.json`, npm-onload,
-  spawn target).
+- **brain-query** — install `/sandbox/.prime-claw/bin/brain-query` plus
+  `/sandbox/AGENTS.md`. The read-only helper runs `gbrain search` then `gbrain get`,
+  bounds the excerpt, and emits `CITE_AS: [Brain: <slug>]`; instructions require
+  citations and treat retrieved content as untrusted data.
+- **spawn** — stage the non-secret spawn target.
 
 ## Operating guarantees (carried from Phase 1)
 
-- **Credential isolation** — credentials enter the sandbox only via OpenShell
-  providers at create; they never touch sandbox disk, logs, or the repo. The
-  gateway key is read in-process from the host `auth.json` and never printed.
+- **Credential isolation** — real credentials enter only OpenShell providers;
+  they never touch sandbox disk, logs, or the repo. Host `auth.json` is read
+  in-process and never copied. Sandbox auth files contain only non-secret adapter
+  values and `openshell:resolve:` placeholders. This applies to gateway keys,
+  GitHub tokens, and openai-codex OAuth.
 - **Configurable shape** — gateway endpoint / provider / baseUrl / credential
   are parameterized via `config/runtime.json` + `PRIME_CLAW_*` env overrides;
   another operator can re-point without code edits.

@@ -1,27 +1,35 @@
 {
- "sandbox_name": "prime-claw",
- "image": "prime-claw-brain:0.1.0",
- "gateway": {
-  "name": "openshell",
-  "endpoint": "https://localhost:17670",
-  "forbidden": [
-   "nemoclaw"
-  ]
- },
- "policy_file": "policies/runtime.yaml",
- "provider_name": "prime-claw-ai-gateway",
- "model": "anthropic.kimi-k3",
- "ai_gateway_host": "ai-gateway.zende.sk",
- "versions": {
-  "openshell_min": "0.0.116"
- },
- "gbrain_source": "upstream",
- "gbrain_upstream_src": "~/gbrain",
- "gbrain_zbrain_src": "~/zbrain",
- "github_provider_name": "prime-claw-github",
- "github_profile": "github-push",
- "github_host": "github.com",
- "brain_repo": "JLandersZen/brain",
- "brain_branch": "main",
- "sb_brain_dir": "/sandbox/brain"
+  "sandbox_name": "prime-claw",
+  "image": "prime-claw-brain:0.1.0",
+  "gateway": {
+    "name": "openshell",
+    "endpoint": "https://localhost:17670",
+    "forbidden": [
+      "nemoclaw"
+    ]
+  },
+  "policy_file": "policies/runtime.yaml",
+  "provider_name": "prime-claw-ai-gateway",
+  "model": "openai-codex/gpt-5.6-sol",
+  "ai_gateway_host": "ai-gateway.zende.sk",
+  "versions": {
+    "openshell_min": "0.0.116"
+  },
+  "gbrain_source": "upstream",
+  "gbrain_upstream_src": "~/gbrain",
+  "gbrain_zbrain_src": "~/zbrain",
+  "github_provider_name": "prime-claw-github",
+  "github_profile": "github-push",
+  "github_host": "github.com",
+  "brain_repo": "JLandersZen/brain",
+  "brain_branch": "main",
+  "sb_brain_dir": "/sandbox/brain",
+  "sb_brain_query_path": "/sandbox/.prime-claw/bin/brain-query",
+  "sb_agents_file": "/sandbox/AGENTS.md",
+  "codex_provider_name": "prime-claw-codex",
+  "codex_profile": "codex",
+  "host_settings_json": "~/.prime/agent/settings.json",
+  "host_models_json": "~/.prime/agent/models.json",
+  "host_auth_json": "~/.prime/agent/auth.json",
+  "host_codex_auth_provider": "openai-codex"
 }

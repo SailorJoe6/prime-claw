@@ -76,6 +76,21 @@ network_policies:
       - path: /usr/local/bin/bun
       - path: /usr/local/bin/gbrain
 
+  # Slice 3 (R3a-3/R3a-13): the operator's CURRENT Prime Agent default is
+  # openai-codex/gpt-5.6-sol. OAuth values remain in the host OpenShell `codex`
+  # provider. The sandbox auth projection contains only a synthetic JWT and opaque
+  # placeholders; npm-onload rewrites outbound headers to those placeholders and L7
+  # swaps the real access token/account id at the boundary.
+  model_openai_codex:
+    name: model-openai-codex-oauth
+    endpoints:
+      - { host: api.openai.com, port: 443, protocol: rest, access: read-write }
+      - { host: auth.openai.com, port: 443, protocol: rest, access: read-write }
+      - { host: chatgpt.com, port: 443, protocol: rest, access: read-write }
+      - { host: ab.chatgpt.com, port: 443, protocol: rest, access: read-write }
+    binaries:
+      - path: /usr/bin/node
+
   # Slice 1 (R3a-1/7): credentialed github.com for git clone/fetch/push of the brain
   # repo. The attached github-push provider injects the real token at L7; the sandbox
   # only ever holds a placeholder. Declared as its own inspected `rest` rule keyed to

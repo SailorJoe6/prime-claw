@@ -47,6 +47,9 @@ following the openclaw-setup pattern.)
 - [derisk/3a-slice2.md](derisk/3a-slice2.md) — Slice 2: in-sandbox index
   serving (brain-index stage, 1057 pages + 3029 embeddings), the validate
   false-pass fix, and the VPN-down RBAC-403 signature.
+- [derisk/3a-slice3.md](derisk/3a-slice3.md) — Slice 3: cited
+  read/query from sandboxed prime-agent, plus host settings mirroring and
+  placeholder-isolated ChatGPT-5.6 Sol / openai-codex OAuth.
 
 ## Runtime (Phase 2)
 

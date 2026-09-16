@@ -1,6 +1,6 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** Execution plan (ready to execute)
+**Status:** IN EXECUTION — Slices 0–3 complete; Slice 4 next
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
 **Date:** 2026-09-11
@@ -18,8 +18,8 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
   `config/requirements-inventory.json` entry with a **real `proven_by` path** (integrity-gated).
 - **Per-slice exit ritual.** Each slice ends: `pytest` green → `git commit` → `git pull --rebase`
   → `bd sync` → `git push` → `git status` clean & up-to-date. Bead notes updated.
-- **Credential isolation (R-X-5/R2-X-1).** No real credential ever on sandbox disk. Inference +
-  embeddings ride the host OpenShell L7 provider; git push rides a **github provider** whose
+- **Credential isolation (R-X-5/R2-X-1).** No real credential ever on sandbox disk. Inference rides the host-selected OpenShell provider (currently openai-codex OAuth);
+  embeddings ride the AI-gateway provider; git push rides a **github provider** whose
   token stays host-side and is swapped at L7. The sandbox holds only placeholders.
 - **Single-gateway:** `openshell` (17670) only; `nemoclaw` forbidden.
 - **`--dry-run` is global** and precedes the verb.
@@ -96,10 +96,10 @@ difference too big to overcome elegantly.
 - If GO: image pins upstream gbrain; `stage_gbrain_context` reads an upstream ref; config key
   `gbrain_source` (default upstream, fallback zbrain) added to `config/runtime.json`.
 - Tests: offline coverage that the build-context staging selects upstream vs. fallback correctly.
-- **Also delivered (R3a-13):** `stage_prime_agent` copies the host `~/.prime/agent/models.json`
-  verbatim into the sandbox (fallback: built-in Kimi-K3 + GLM default) so the sandboxed agent
-  resolves `anthropic.kimi-k3` against the AI gateway. This was the fix that made the controller
-  leg pass.
+- **Also delivered then extended (R3a-13):** Slice 0 copied host `models.json`; Slice 3
+  extended the contract to copy host `settings.json` too and project auth through OpenShell
+  placeholders. Current acceptance follows the host default `openai-codex/gpt-5.6-sol` rather
+  than the now-unavailable Kimi/GLM fallback (D3a-K).
 
 ---
 
@@ -190,6 +190,16 @@ correctly **with a citation** to a brain page.
 **Tests (offline).** the helper's command construction + citation formatting, monkeypatched.
 
 **Exit.** A validated cited answer against a known-fact fixture; evidence captured.
+
+**Status (2026-09-16): COMPLETE.** `stage_brain_query` installs a read-only helper plus
+`/sandbox/AGENTS.md`; the helper performs `gbrain search` → `gbrain get`, emits a bounded
+excerpt and exact `[Brain: <slug>]` token, and treats page content as untrusted data. Per the
+operator's updated requirement, `stage_prime_agent` now mirrors host `settings.json` +
+`models.json`, projects openai-codex auth as synthetic/placeholder-only values, and runs
+ChatGPT-5.6 Sol via the host OpenShell OAuth provider. End-to-end daemon session invoked the
+helper twice and correctly answered with all expected harness components plus citation
+`[Brain: resources/the-anatomy-of-an-agent-harness]`. Evidence: `docs/evidence/cited-query-20260916T164509Z.json`; full validate 16/16 PASS in
+`docs/evidence/validate-20260916T165022Z.json`. Offline suite: 112 green before closeout.
 
 ---
 

@@ -83,12 +83,20 @@ def test_sandbox_create_attaches_provider_at_create(tmp_path, monkeypatch):
     assert "--provider" in cmd and "prime-claw-ai-gateway" in cmd  # provider at CREATE
 
 
-def test_sandbox_existing_no_recreate_on_converge(tmp_path, monkeypatch, capsys):
+def test_sandbox_existing_attaches_providers_without_recreate(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(pc, "probe_sandbox", lambda c: (True, "Ready", {"phase": "Ready"}))
     monkeypatch.setattr(pc, "stage_policy", lambda c, a: 0)
-    monkeypatch.setattr(pc, "run", lambda c, timeout=30: (_ for _ in ()).throw(AssertionError("no create")))
+    calls = []
+    def fake_run(cmd, timeout=30):
+        calls.append(cmd)
+        if cmd[1:4] == ["sandbox", "provider", "attach"]:
+            return (0, "attached")
+        raise AssertionError("unexpected create/delete while converging existing sandbox")
+    monkeypatch.setattr(pc, "run", fake_run)
     rc = pc.stage_sandbox(cfg(tmp_path), Args(), force_fresh=False)
     assert rc == 0
+    attached = [c[-1] for c in calls]
+    assert attached == ["prime-claw-ai-gateway", "prime-claw-github", "prime-claw-codex"]
     assert "no recreate" in capsys.readouterr().out
 
 
@@ -100,6 +108,76 @@ def test_sandbox_force_fresh_deletes_first(tmp_path, monkeypatch):
     pc.stage_sandbox(cfg(tmp_path), Args(), force_fresh=True)
     verbs = [c.split()[2] for c in calls if c.startswith(pc.OPENSHELL + " sandbox")]
     assert "delete" in verbs and "create" in verbs and verbs.index("delete") < verbs.index("create")
+
+
+def test_codex_provider_reads_host_oauth_but_only_openshell_holds_it(tmp_path, monkeypatch):
+    auth = tmp_path / "auth.json"
+    auth.write_text(json.dumps({"openai-codex": {
+        "type": "oauth", "access": "HOST-ACCESS", "refresh": "HOST-REFRESH",
+        "accountId": "HOST-ACCOUNT", "expires": 9999999999999,
+    }}))
+    state = tmp_path / "codex.sha256"
+    monkeypatch.setenv("PRIME_CLAW_HOST_AUTH_JSON", str(auth))
+    monkeypatch.setenv("PRIME_CLAW_CODEX_CREDENTIAL_STATE", str(state))
+    seen = []
+    def fake_run(cmd, timeout=30):
+        seen.append(cmd)
+        if cmd[:3] == [pc.OPENSHELL, "provider", "get"]:
+            return (1, "not found")
+        return (0, "ok")
+    monkeypatch.setattr(pc, "run", fake_run)
+    rc = pc.stage_codex_provider(cfg(tmp_path), Args())
+    assert rc == 0
+    create = next(c for c in seen if c[:3] == [pc.OPENSHELL, "provider", "create"])
+    assert "access_token=HOST-ACCESS" in create
+    assert "refresh_token=HOST-REFRESH" in create
+    assert "account_id=HOST-ACCOUNT" in create
+    assert state.exists() and "HOST-" not in state.read_text()  # hash only
+
+
+def test_prime_agent_mirrors_settings_and_projects_placeholder_only_auth(tmp_path, monkeypatch):
+    settings = tmp_path / "settings.json"
+    settings_text = json.dumps({
+        "defaultProvider": "openai-codex", "defaultModel": "gpt-5.6-sol",
+        "defaultThinkingLevel": "high", "enabledModels": ["openai-codex/*"],
+    }, indent=2) + "\n"
+    settings.write_text(settings_text)
+    models = tmp_path / "models.json"
+    models.write_text('{"providers":{}}\n')
+    monkeypatch.setenv("PRIME_CLAW_HOST_SETTINGS_JSON", str(settings))
+    monkeypatch.setenv("PRIME_CLAW_HOST_MODELS_JSON", str(models))
+    assert pc._prime_agent_settings_json(cfg(tmp_path)) == settings_text
+    assert pc._prime_agent_models_json(cfg(tmp_path)) == models.read_text()
+    script = pc._prime_agent_codex_auth_projection_script()
+    assert "openshell:resolve:" in script
+    assert "access_token" in script and "refresh_token" in script and "account_id" in script
+    assert "HOST-ACCESS" not in script and "HOST-REFRESH" not in script
+    token = pc._codex_synthetic_access_token()
+    assert token.count(".") == 2 and "HOST-" not in token
+
+
+def test_npm_onload_rewrites_synthetic_codex_headers_to_placeholders_offline():
+    preload = os.path.join(REPO, "scripts", "lib", "npm-onload.js")
+    js = r"""
+globalThis.fetch = async (_input, init) => {
+  const h = new Headers(init.headers);
+  console.log(h.get('authorization'));
+  console.log(h.get('chatgpt-account-id'));
+  return {ok:true};
+};
+require(process.argv[1]);
+fetch('https://chatgpt.com/backend-api/codex/responses', {
+  headers: {authorization:'Bearer SYNTHETIC.JWT.VALUE', 'chatgpt-account-id':'synthetic'}
+});
+"""
+    env = dict(os.environ, access_token="openshell:resolve:env:v1_access_token",
+               account_id="openshell:resolve:env:v1_account_id")
+    result = subprocess.run(["node", "-e", js, preload], capture_output=True, text=True, env=env)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        "Bearer openshell:resolve:env:v1_access_token",
+        "openshell:resolve:env:v1_account_id",
+    ]
 
 
 # --- stage: prime-agent / brain / spawn idempotency --------------------------------
@@ -123,6 +201,18 @@ def test_prime_agent_stage_runs_install_and_kernel(tmp_path, monkeypatch):
     assert any("install.sh" in c for c in calls)          # install leg
     assert any("pc-kernel.mjs" in c for c in calls)        # kernel bootstrap (JS base64-staged)
     assert any("npm-onload.js" in c for c in calls)       # %2F workaround staged
+
+
+def test_prime_agent_daemon_restarts_to_inherit_current_placeholders(tmp_path, monkeypatch):
+    calls, fx = _exec_recorder(monkeypatch)
+    monkeypatch.setattr(pc, "sandbox_exec", fx)
+    rc = pc.stage_prime_agent(cfg(tmp_path), Args())
+    assert rc == 0
+    daemon = next(c for c in calls if "daemon-catalog-entry" in c)
+    assert "kill $PIDS" in daemon and "nohup prime-agent --mode daemon" in daemon
+    assert 'ANTHROPIC_API_KEY="$api_key"' in daemon  # gateway fallback; value is placeholder
+    assert "/proc/" not in daemon  # blocked under OpenShell filesystem policy
+    assert "zdai_" not in daemon
 
 
 def test_brain_stage_initdb_and_wiring(tmp_path, monkeypatch):
@@ -319,12 +409,40 @@ def test_create_and_converge_include_brain_index(tmp_path, monkeypatch):
     def rec(label):
         def f(c, a): order.append(label); return 0
         return f
-    for name in ("cmd_build", "stage_provider", "stage_github_provider", "stage_prime_agent",
-                 "stage_brain_clone", "stage_brain", "stage_brain_index", "stage_spawn", "stage_policy"):
+    for name in ("cmd_build", "stage_provider", "stage_github_provider", "stage_codex_provider", "stage_prime_agent",
+                 "stage_brain_clone", "stage_brain", "stage_brain_index", "stage_brain_query",
+                 "stage_spawn", "stage_policy"):
         monkeypatch.setattr(pc, name, rec(name))
     monkeypatch.setattr(pc, "stage_sandbox", lambda c, a, force_fresh=False: order.append("sandbox") or 0)
     rc = pc.cmd_create(cfg(tmp_path), Args())
     assert rc == 0
-    assert order == ["cmd_build", "stage_provider", "stage_github_provider", "sandbox",
+    assert order == ["cmd_build", "stage_provider", "stage_github_provider", "stage_codex_provider", "sandbox",
                      "stage_prime_agent", "stage_brain_clone", "stage_brain",
-                     "stage_brain_index", "stage_spawn", "stage_policy"]
+                     "stage_brain_index", "stage_brain_query", "stage_spawn", "stage_policy"]
+
+
+# --- Slice 3: citation-ready brain-query capability (R3a-3) --------------------
+
+def test_brain_query_stage_installs_helper_and_agents_guidance(tmp_path, monkeypatch):
+    calls, fx = _exec_recorder(monkeypatch)
+    monkeypatch.setattr(pc, "sandbox_exec", fx)
+    rc = pc.stage_brain_query(cfg(tmp_path), Args())
+    assert rc == 0
+    assert len(calls) == 1
+    script = calls[0]
+    assert "/sandbox/.prime-claw/bin/brain-query" in script
+    assert "/sandbox/AGENTS.md" in script
+    assert "chmod 0755" in script
+    # The staged helper and guidance are base64 payloads; the source artifacts
+    # carry the exact search/get construction and citation contract.
+    helper = open(os.path.join(REPO, "scripts", "runtime", "brain_query.py")).read()
+    assert '"search", query, "--source-id", "brain"' in helper
+    assert 'run_gbrain(["get", slug, "--source-id", "brain"])' in helper
+    assert "CITE_AS: [Brain: {slug}]" in helper
+
+
+def test_brain_query_stage_dry_run(tmp_path, capsys):
+    rc = pc.stage_brain_query(cfg(tmp_path), Args(dry_run=True))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "dry_run" in out and "brain-query" in out and "/sandbox/AGENTS.md" in out

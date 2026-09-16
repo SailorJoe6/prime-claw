@@ -53,14 +53,22 @@ Priority: **GATE** = must hold for the slice to be accepted; **NICE** = desired,
 - **R3a-12 (NICE) — Embedding freshness.** The in-sandbox index has working embeddings
   (not keyword-only). May be deferred if the embedding provider path is non-trivial
   (see open question 2).
-- **R3a-13 (GATE) — prime-agent model config mirrors the host.** `stage_prime_agent`
-  copies the operator's host `~/.prime/agent/models.json` **verbatim** into the sandbox
-  (feature: the container gets whatever the user has configured locally). The host file
-  holds **no secrets** (base URLs + model metadata only; credentials stay in `auth.json`,
-  never copied). **Fallback** when no readable host config exists: a built-in default
-  registering exactly the two current models — `anthropic.kimi-k3` and `anthropic.glm-5.2`
-  — against the configured AI gateway, so a fresh operator still gets a working model.
-  Override path via `host_models_json` / `PRIME_CLAW_HOST_MODELS_JSON`.
+- **R3a-13 (GATE) — prime-agent config mirrors the host, credentials remain isolated.**
+  `stage_prime_agent` copies the operator's host `~/.prime/agent/models.json` **and**
+  `~/.prime/agent/settings.json` verbatim into the sandbox (feature: the container uses
+  whatever provider, model, thinking level, enabled-model set, and model metadata the user
+  has configured locally). Host `auth.json` is read host-side only and is **never copied**.
+  The selected provider's real credential is held by an OpenShell provider; sandbox
+  `auth.json` may contain only a non-secret adapter value plus `openshell:resolve:`
+  placeholders. Current acceptance target (operator direction, 2026-09-16, until further
+  notice): host default `openai-codex/gpt-5.6-sol` (ChatGPT-5.6 Sol, thinking `high`) via
+  the host's existing `openai-codex` OAuth. The Codex adapter uses a synthetic JWT for
+  prime-agent's local account-id parser and rewrites outbound auth/account headers to L7
+  placeholders; no real OAuth token or account credential reaches sandbox disk or process
+  memory. **Fallback** when host model/settings files are absent remains configurable and
+  must not be used by acceptance while the current host default is available. Override
+  paths via `host_models_json` / `PRIME_CLAW_HOST_MODELS_JSON` and
+  `host_settings_json` / `PRIME_CLAW_HOST_SETTINGS_JSON`.
 
 ## Out of scope (recorded for traceability)
 
