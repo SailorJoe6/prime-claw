@@ -100,6 +100,28 @@ policy drift, or non-ignored output-path error.
 Preflight failure is non-destructive. Do not work around it by re-enabling corporate
 embeddings or changing the canonical 1536 database.
 
+## Home candidate embedding build fails or is interrupted (Slice 4A.2a)
+
+**Signature:** `error: candidate embedding build failed`, a host-side timeout, or an
+interrupted `embedding-build` process.
+
+A reported build failure restores the tracked historical policy automatically. The candidate
+`gbrain_qwen4096` database may contain partial progress but is isolated from canonical
+`gbrain`. Do not drop either database and do not use `--skip-failed` to acknowledge provider
+errors.
+
+1. If the process was externally interrupted, run `bin/prime-claw converge` to restore the
+   tracked historical policy.
+2. Confirm the canonical config and `vector(1536)` database remain intact with direct read-only
+   `psql`; do not use an ordinary doctor command that may auto-migrate.
+3. Classify the sanitized gbrain failure. Fix only the cause, then rerun
+   `bin/prime-claw embedding-build` to resume the isolated candidate.
+4. Keep `GBRAIN_AI_EMBED_TIMEOUT_MS` and `GBRAIN_QUERY_EMBED_TIMEOUT_MS` at `1000000`, the sync
+   watchdog above 1000 seconds, and the outer timeout above the sync deadline.
+
+The build always restores the historical policy on normal exit, including success. Slice
+4A.2b must explicitly reapply the candidate policy for semantic validation/cutover.
+
 ## Embedding budget exhausted / HTTP 429 (Phase 3a transition)
 
 **Signature:** corporate AI-gateway embedding requests retry and end with `Too Many Requests`.

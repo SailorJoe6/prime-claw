@@ -3,7 +3,8 @@
 > **Embedding transition (2026-09-16):** the implemented Slice 2 runtime still contains the
 > historical corporate AI-gateway / 1536-dimension index. D3a-L supersedes that configuration.
 > Slice 4A.1 now provides the non-mutating home `Qwen3-Embedding-8B` configuration/policy
-> preflight. The parallel 4096-dimension build, validation, and cutover remain next; do not
+> preflight and Slice 4A.2a provides an isolated candidate-build verb. The live 4096-dimension
+> build, validation, and cutover remain incomplete; do not
 > treat the historical gateway path as an accepted fallback. See
 > [home-embedding-runtime.md](home-embedding-runtime.md).
 
@@ -43,6 +44,7 @@ operating guarantees. For observed-failure → recovery mapping, see
 | `status` | Read-only actual-vs-expected report for every component (gateway, sandbox+image, policy rev, provider, Postgres, gbrain, prime-agent daemon, model reachability). | no |
 | `build` | Builds `docker/runtime.Dockerfile` into the image. Idempotent via an input fingerprint + build stamp; `--force` rebuilds. | image |
 | `embedding-preflight` | Validates the locked Qwen/4096/1000s parallel-database contract and renders a redacted, exact-host local policy. Makes no network, sandbox, or database call. | ignored local policy only |
+| `embedding-build` | Temporarily applies the candidate policy, builds/resumes only `gbrain_qwen4096` through a separate `GBRAIN_HOME`, gates fresh 4096-dimensional Qwen chunks and canonical non-mutation, then restores the historical policy. Never cuts over canonical config. | candidate DB/config; temporary policy |
 | `create` | Fresh bring-up. Destructive: deletes any existing sandbox, creates from the image with providers attached **at create**, then converges. | sandbox |
 | `converge` | Idempotent repair of an existing sandbox: re-runs every stage in place (policy, provider env, prime-agent install, brain, spawn target) with **no** needless recreate. Fixes drift. | in place |
 | `validate` | Green/red acceptance gate: daemon healthy, deny-by-default egress, credentialed model call, brain serving, spawn/reap. Records versions to `docs/evidence/validate-<utc>.json`. | evidence |
@@ -56,6 +58,9 @@ for targeted diagnosis:
 
 - **embedding-preflight** *(standalone; not yet part of create/converge)* — merge ignored local
   endpoint config, validate the locked home-Qwen contract, and render the candidate policy.
+- **embedding-build** *(standalone; not part of create/converge)* — apply the ignored candidate
+  policy only for an isolated, pinned full sync into `gbrain_qwen4096`, gate vector/schema and
+  canonical fingerprints, then restore the tracked historical policy.
 - **policy** — apply `policies/runtime.yaml` (historical policy until the later cutover step).
 - **provider** — attach the AI-gateway provider (create/update-first; import
   the profile only when the provider is absent). Refreshes the credential only

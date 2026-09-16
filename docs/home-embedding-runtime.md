@@ -1,6 +1,6 @@
 # Home-network embedding runtime
 
-> **Status:** Slice 4A.1 preflight complete; parallel build/cutover not started.
+> **Status:** Slice 4A.1 complete; Slice 4A.2a isolated build command ready; build/cutover not yet complete.
 > **Decision:** D3a-L · **Requirements:** R3a-12, R3a-14 · **Plan:** Phase 3a Slice 4A
 
 ## Required state
@@ -73,6 +73,36 @@ actual cutover. This keeps ordinary pre-cutover `converge` safe for the still-ca
 index. The rendered candidate policy removes it, and a later Slice 4A step applies that policy
 only with the parallel Qwen build.
 
+
+## Parallel candidate build
+
+Slice 4A.2a adds `embedding-build`. It is intentionally separate from `create` and
+`converge`:
+
+```bash
+bin/prime-claw --dry-run embedding-build
+bin/prime-claw embedding-build
+```
+
+The command gates upstream gbrain at `0.48.5.0` or newer, then applies the ignored candidate
+policy and builds only `gbrain_qwen4096`. It sets `GBRAIN_HOME` to the parent
+`/sandbox/.prime-claw/qwen-candidate` (upstream appends `.gbrain`), writes the candidate config
+mode 0600, exports both embedding and query-embedding timeouts as `1000000` ms, registers the
+canonical `/sandbox/brain` clone, and performs a pinned single-worker full sync with explicit non-interactive inline-embed consent with pull and
+extraction disabled. It exports the upstream 12,000-second sync hard deadline and a
+1,200-second no-progress watchdog; the outer build timeout is 14,400 seconds.
+
+The build gate requires `vector(4096)`, a source bookmark equal to the pinned brain Git HEAD,
+every candidate chunk stamped with the current text hash/signature and exact Qwen model, and no
+unsupported HNSW index. A separate read-only fingerprint covers the canonical config hash,
+schema, page/chunk/vector/model counts, source bookmark, embedding config, and migration version
+before and after every normal build exit. It does **not** switch `/sandbox/.gbrain/config.json`. It restores the
+tracked historical policy after both success and reported failure so the legacy runtime stays
+queryable between build and validation; after an externally interrupted process, run
+`bin/prime-claw converge` to restore that policy. A partial candidate database is isolated and
+may be resumed by rerunning `embedding-build`; never drop or alter the legacy `gbrain`
+database.
+
 ## Non-destructive cutover
 
 Slice 4A must:
@@ -90,10 +120,9 @@ the gbrain/Bun runtime. It must not provision an embedding credential provider.
 
 ## Current operational status
 
-The operator-local endpoint config and rendered candidate policy now pass preflight. No
-OpenShell policy was applied, no database migration/re-index was started, and the canonical
-1536-dimension database remains untouched. The candidate database is only named in config;
-it does not exist yet.
+The operator-local endpoint config and rendered candidate policy pass preflight. The isolated
+candidate-build path is implemented and offline-tested, but this document does not claim a
+completed live build or cutover. The canonical 1536-dimension database remains untouched.
 
 The attempted `projects/prime-claw` write stopped on corporate gateway rate limiting and
 rolled back cleanly: the page is absent, the brain Git clone is clean, and no commit or push

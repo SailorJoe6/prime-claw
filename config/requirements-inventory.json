@@ -1046,7 +1046,8 @@
      "docs/evidence/embedding-preflight-20260916T191526Z.json"
     ],
     "tests": [
-     "tests/test_embedding_preflight.py"
+     "tests/test_embedding_preflight.py",
+     "tests/test_embedding_candidate_build.py"
     ]
    },
    "evidence": "docs/evidence/embedding-preflight-20260916T191526Z.json",

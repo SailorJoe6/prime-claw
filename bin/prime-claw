@@ -8,7 +8,8 @@ from native OpenShell primitives. Verbs:
   create    Fresh bring-up to a fully-running runtime (idempotent).   [Slice 3]
   converge  Re-run all stages to the same known-good state.           [Slice 3]
   build     Build the runtime image reproducibly.                     [Slice 2]
-  embedding-preflight  Validate local Qwen config + render local policy. [Slice 4A]
+  embedding-preflight  Validate local Qwen config + render local policy. [Slice 4A.1]
+  embedding-build  Build the isolated parallel Qwen index; no cutover. [Slice 4A.2a]
   validate  End-to-end acceptance gate.                               [Slice 4]
   recover   Codified recovery for known degradations.                 [Slice 5]
   destroy   Safe teardown (confirmed).                                [Slice 6]
@@ -59,7 +60,9 @@ def run(cmd: list[str], timeout: int = 30) -> tuple[int, str]:
     except FileNotFoundError:
         return 127, f"command not found: {cmd[0]}"
     except subprocess.TimeoutExpired:
-        return 124, f"timeout after {timeout}s: {' '.join(cmd)}"
+        # Never echo full argv: sandbox scripts can carry encoded operator-local
+        # configuration even when no credential is present.
+        return 124, f"timeout after {timeout}s: {cmd[0]}"
 
 
 def openshell_json(args: list[str], timeout: int = 30):
@@ -423,11 +426,32 @@ def _embedding_settings(cfg: dict) -> dict:
 
     database = str(_cfg_get(cfg, "embedding_database", "PRIME_CLAW_EMBEDDING_DATABASE", "gbrain_qwen4096"))
     legacy_database = str(_cfg_get(cfg, "embedding_legacy_database", "PRIME_CLAW_EMBEDDING_LEGACY_DATABASE", "gbrain"))
-    for key, value in (("embedding_database", database), ("embedding_legacy_database", legacy_database)):
+    canonical_database = str(_cfg_get(cfg, "postgres_db", "POSTGRES_DB", "gbrain"))
+    for key, value in (("embedding_database", database),
+                       ("embedding_legacy_database", legacy_database),
+                       ("postgres_db", canonical_database)):
         if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
             raise ValueError(f"{key} must be a simple PostgreSQL identifier")
-    if database == legacy_database:
-        raise ValueError("embedding_database must differ from embedding_legacy_database")
+    if legacy_database != canonical_database:
+        raise ValueError("embedding_legacy_database must equal the resolved canonical postgres_db")
+    if database == canonical_database:
+        raise ValueError("embedding_database must differ from the resolved canonical postgres_db")
+    candidate_home = str(_cfg_get(
+        cfg, "embedding_candidate_home", "PRIME_CLAW_EMBEDDING_CANDIDATE_HOME",
+        "/sandbox/.prime-claw/qwen-candidate"))
+    normalized_home = os.path.normpath(candidate_home)
+    if (normalized_home != candidate_home
+            or not candidate_home.startswith("/sandbox/.prime-claw/")
+            or candidate_home.endswith("/.gbrain")):
+        raise ValueError("embedding_candidate_home must be a normalized parent under /sandbox/.prime-claw")
+    sync_max_runtime_seconds = int(_cfg_get(
+        cfg, "embedding_sync_max_runtime_seconds", "PRIME_CLAW_EMBEDDING_SYNC_MAX_RUNTIME_SECONDS", 12000))
+    sync_stall_abort_seconds = int(_cfg_get(
+        cfg, "embedding_sync_stall_abort_seconds", "PRIME_CLAW_EMBEDDING_SYNC_STALL_ABORT_SECONDS", 1200))
+    if sync_stall_abort_seconds <= timeout_seconds:
+        raise ValueError("embedding sync stall timeout must exceed the per-request embedding timeout")
+    if sync_max_runtime_seconds <= sync_stall_abort_seconds:
+        raise ValueError("embedding sync max runtime must exceed the stall timeout")
 
     return {
         "base_url": base_url.rstrip("/"),
@@ -442,6 +466,10 @@ def _embedding_settings(cfg: dict) -> dict:
         "api_key": api_key,
         "database": database,
         "legacy_database": legacy_database,
+        "canonical_database": canonical_database,
+        "candidate_home": candidate_home,
+        "sync_max_runtime_seconds": sync_max_runtime_seconds,
+        "sync_stall_abort_seconds": sync_stall_abort_seconds,
     }
 
 
@@ -544,6 +572,228 @@ def cmd_embedding_preflight(cfg, args) -> int:
         settings["model"], settings["dimensions"], settings["timeout_seconds"],
         settings["database"], settings["legacy_database"]))
     print("  endpoint=operator-local (redacted) auth=none")
+    return 0
+
+
+def _redact_embedding_output(output: str, settings: dict) -> str:
+    """Remove operator-local endpoint material before any CLI output is printed."""
+    redacted = output.replace(settings["base_url"], "[home-embedding-endpoint]")
+    return redacted.replace(settings["policy_host"], "[home-embedding-host]")
+
+
+def _parse_gbrain_version(output: str) -> tuple[int, int, int, int] | None:
+    match = re.search(r"(?<![0-9])(\d+)\.(\d+)\.(\d+)\.(\d+)(?![0-9])", output)
+    return tuple(int(part) for part in match.groups()) if match else None
+
+
+def _canonical_embedding_fingerprint(cfg: dict, settings: dict) -> tuple[int, str]:
+    """Read-only fingerprint of legacy config, schema, content, and migration state."""
+    pgu = str(_cfg_get(cfg, "postgres_user", "POSTGRES_USER", "gbrain"))
+    pgport = str(_cfg_get(cfg, "pgport", "PRIME_CLAW_PGPORT", "5433"))
+    database = settings["legacy_database"]
+    sql = (
+        "SELECT concat_ws('|',"
+        "(SELECT format_type(a.atttypid,a.atttypmod) FROM pg_attribute a "
+        " JOIN pg_class c ON c.oid=a.attrelid WHERE c.relname='content_chunks' "
+        " AND a.attname='embedding' AND a.attnum>0),"
+        "(SELECT count(*)::text FROM pages),"
+        "(SELECT count(*)::text FROM content_chunks),"
+        "(SELECT count(embedding)::text FROM content_chunks),"
+        "(SELECT count(*)::text FROM content_chunks WHERE embedding IS NULL),"
+        "(SELECT COALESCE(min(vector_dims(embedding)),0)::text FROM content_chunks),"
+        "(SELECT COALESCE(max(vector_dims(embedding)),0)::text FROM content_chunks),"
+        "(SELECT COALESCE(string_agg(model||'='||n,',' ORDER BY model),'') FROM "
+        " (SELECT model,count(*)::text n FROM content_chunks GROUP BY model) models),"
+        "(SELECT COALESCE(last_commit,'')||'@'||COALESCE(local_path,'') FROM sources WHERE id='brain'),"
+        "(SELECT COALESCE(string_agg(key||'='||value,',' ORDER BY key),'') FROM config "
+        " WHERE key IN ('embedding_model','embedding_dimensions','version')));"
+    )
+    q = shlex.quote
+    script = (
+        "set -euo pipefail\n"
+        "export PATH=/usr/lib/postgresql/16/bin:$PATH\n"
+        "CFG=$(sha256sum /sandbox/.gbrain/config.json | awk '{print $1}')\n"
+        "DB=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " +
+        q(database) + " -Atc " + q(sql) + ")\n"
+        'printf "%s|%s\\n" "$CFG" "$DB"\n'
+    )
+    code, out = sandbox_exec(cfg, script, timeout=60)
+    return code, out.strip()
+
+
+def _restore_historical_embedding_policy(cfg: dict, settings: dict) -> int:
+    """Restore tracked policy with endpoint-safe error reporting."""
+    policy_path = _policy_path(cfg, "policy_file", "policies/runtime.yaml")
+    code, out = run([OPENSHELL, "policy", "set", cfg["sandbox_name"],
+                     "--policy", policy_path, "--wait"], timeout=120)
+    if code != 0:
+        safe = _redact_embedding_output(out.strip()[-300:], settings)
+        print("error: historical policy restore failed: " + safe, file=sys.stderr)
+        return code
+    print("policy: restored historical runtime policy")
+    return 0
+
+
+def _candidate_build_script(cfg: dict, settings: dict) -> str:
+    """Return the sandbox-only parallel Qwen database build script.
+
+    ``GBRAIN_HOME`` is deliberately the parent directory; upstream gbrain appends
+    ``.gbrain``. The private endpoint rides only in a base64-encoded config payload
+    and is never interpolated into shell syntax or operator output.
+    """
+    pgu = str(_cfg_get(cfg, "postgres_user", "POSTGRES_USER", "gbrain"))
+    pgport = str(_cfg_get(cfg, "pgport", "PRIME_CLAW_PGPORT", "5433"))
+    sb_brain = str(_cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain"))
+    candidate_home = settings["candidate_home"]
+    database = settings["database"]
+    dburl = "postgresql://" + pgu + ":" + pgu + "@localhost:" + pgport + "/" + database
+    candidate_config = {
+        "engine": "postgres",
+        "database_url": dburl,
+        "embedding_model": settings["model_ref"],
+        "embedding_dimensions": settings["dimensions"],
+        "provider_base_urls": {"openai": settings["base_url"]},
+        "openai_api_key": settings["api_key"],
+    }
+    config_b64 = base64.b64encode((json.dumps(candidate_config, indent=2) + "\n").encode()).decode()
+    q = shlex.quote
+    config_dir = candidate_home + "/.gbrain"
+    config_path = config_dir + "/config.json"
+    column_sql = (
+        "SELECT format_type(a.atttypid,a.atttypmod) "
+        "FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid "
+        "WHERE c.relname='content_chunks' AND a.attname='embedding' AND a.attnum>0;"
+    )
+    env = (
+        "set -euo pipefail\n"
+        "export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH\n"
+        "export GBRAIN_HOME=" + q(candidate_home) + "\n"
+        "export GBRAIN_AI_EMBED_TIMEOUT_MS=" + q(str(settings["timeout_ms"])) + "\n"
+        "export GBRAIN_QUERY_EMBED_TIMEOUT_MS=" + q(str(settings["timeout_ms"])) + "\n"
+        "export GBRAIN_SYNC_MAX_RUNTIME_SECONDS=" + q(str(settings["sync_max_runtime_seconds"])) + "\n"
+        "export GBRAIN_SYNC_STALL_ABORT_SECONDS=" + q(str(settings["sync_stall_abort_seconds"])) + "\n"
+        "export GBRAIN_DATABASE_URL=" + q(dburl) + "\n"
+        "export DATABASE_URL=" + q(dburl) + "\n"
+        "export GBRAIN_EMBEDDING_MODEL=" + q(settings["model_ref"]) + "\n"
+        "export GBRAIN_EMBEDDING_DIMENSIONS=" + q(str(settings["dimensions"])) + "\n"
+        "export OPENAI_API_KEY=" + q(settings["api_key"]) + "\n"
+    )
+    setup = (
+        "mkdir -p " + q(config_dir) + " && chmod 700 " + q(candidate_home) + " " + q(config_dir) + "\n"
+        "printf %s " + q(config_b64) + " | base64 -d > " + q(config_path + ".tmp") + "\n"
+        "chmod 600 " + q(config_path + ".tmp") + " && mv -f " + q(config_path + ".tmp") + " " + q(config_path) + "\n"
+        "export OPENAI_BASE_URL=$(python3 -c " + q(
+            "import json; print(json.load(open('" + config_path + "'))['provider_base_urls']['openai'])") + ")\n"
+        "EXISTS=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d postgres -Atc " +
+        q("SELECT count(*) FROM pg_database WHERE datname='" + database + "';") + ")\n"
+        '[ "$EXISTS" = 1 ] || createdb -h localhost -p ' + q(pgport) + " -U " + q(pgu) + " " + q(database) + "\n"
+        "psql -v ON_ERROR_STOP=1 -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -c 'CREATE EXTENSION IF NOT EXISTS vector;' >/dev/null\n"
+        "gbrain init --migrate-only --non-interactive\n"
+        "SOURCE_PATH=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc \"SELECT COALESCE(local_path,'') FROM sources WHERE id='brain';\")\n"
+        "if [ -z \"$SOURCE_PATH\" ]; then gbrain sources add brain --path " + q(sb_brain) +
+        "; else [ \"$SOURCE_PATH\" = " + q(sb_brain) + " ]; fi\n"
+    )
+    sync = (
+        "BRAIN_HEAD=$(git -C " + q(sb_brain) + " rev-parse HEAD)\n"
+        "gbrain sync --source brain --full --no-pull --no-extract --workers 1 --yes 2>&1\n"
+        "P=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc \"SELECT count(*) FROM pages WHERE source_id='brain';\")\n"
+        "C=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc \"SELECT count(*) FROM content_chunks c JOIN pages p ON p.id=c.page_id WHERE p.source_id='brain';\")\n"
+        "BAD=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc \"SELECT count(*) FROM content_chunks c JOIN pages p ON p.id=c.page_id WHERE p.source_id='brain' AND (c.embedding IS NULL OR vector_dims(c.embedding)<>" + str(settings["dimensions"]) + " OR c.model<>'" + settings["model_ref"] + "' OR c.embedded_at IS NULL OR c.embedded_text_hash IS DISTINCT FROM md5(c.chunk_text) OR p.embedding_signature IS DISTINCT FROM '" + settings["model_ref"] + ":" + str(settings["dimensions"]) + "');\")\n"
+        "COLTYPE=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) + " -Atc " + q(column_sql) + ")\n"
+        "HNSW=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc \"SELECT count(*) FROM pg_indexes WHERE tablename='content_chunks' AND indexname='idx_chunks_embedding';\")\n"
+        "LAST_COMMIT=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc \"SELECT COALESCE(last_commit,'') FROM sources WHERE id='brain';\")\n"
+        'echo "candidate-build head=$BRAIN_HEAD bookmark=$LAST_COMMIT pages=$P chunks=$C bad=$BAD column=$COLTYPE hnsw=$HNSW"\n'
+        '[ "${P:-0}" -gt 0 ] && [ "${C:-0}" -gt 0 ] && [ "$BAD" = 0 ] && [ "$COLTYPE" = "vector(' + str(settings["dimensions"]) + ')" ] && [ "$HNSW" = 0 ]\n'
+        '[ "$LAST_COMMIT" = "$BRAIN_HEAD" ]\n'
+    )
+    return env + setup + sync
+
+def cmd_embedding_build(cfg, args) -> int:
+    """Build the home-Qwen index in a parallel DB; never cut over canonical config."""
+    try:
+        settings = _embedding_settings(cfg)
+        rendered, policy_path = _render_home_embedding_policy(cfg, settings)
+        script = _candidate_build_script(cfg, settings)
+        build_timeout = int(_cfg_get(
+            cfg, "embedding_build_timeout_seconds", "PRIME_CLAW_EMBEDDING_BUILD_TIMEOUT_SECONDS", 14400))
+        if build_timeout <= settings["sync_max_runtime_seconds"]:
+            raise ValueError("embedding build timeout must exceed the gbrain sync max runtime")
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: embedding build preflight: {exc}", file=sys.stderr)
+        return 1
+
+    if args.dry_run:
+        print("dry_run: embedding-build = version gate -> ignored candidate policy apply -> "
+              "parallel DB/config/schema -> full brain sync; canonical config/DB untouched")
+        print("  model=%s dimensions=%s timeout_seconds=%s database=%s legacy_database=%s" % (
+            settings["model"], settings["dimensions"], settings["timeout_seconds"],
+            settings["database"], settings["legacy_database"]))
+        print("  endpoint=operator-local (redacted) auth=none")
+        return 0
+
+    # Gate the upstream behavior that omits the unsupported wire `dimensions`
+    # field for a Qwen model configured at its native 4096 width.
+    code, version_out = sandbox_exec(cfg, "gbrain --version", timeout=60)
+    version = _parse_gbrain_version(version_out)
+    if code != 0 or version is None or version < (0, 48, 5, 0):
+        safe = _redact_embedding_output(version_out.strip()[-200:], settings)
+        print("error: embedding build requires upstream gbrain >= 0.48.5.0" +
+              ((": " + safe) if safe else ""), file=sys.stderr)
+        return 1
+
+    fingerprint_code, fingerprint_before = _canonical_embedding_fingerprint(cfg, settings)
+    if fingerprint_code != 0 or not fingerprint_before:
+        print("error: could not fingerprint canonical embedding state before build", file=sys.stderr)
+        return fingerprint_code or 1
+
+    _write_private_file(policy_path, rendered)
+    code, out = run([OPENSHELL, "policy", "set", cfg["sandbox_name"],
+                     "--policy", policy_path, "--wait"], timeout=120)
+    if code != 0:
+        safe = _redact_embedding_output(out.strip()[-300:], settings)
+        restore = _restore_historical_embedding_policy(cfg, settings)
+        after_code, fingerprint_after = _canonical_embedding_fingerprint(cfg, settings)
+        print("error: candidate embedding policy apply failed: " + safe, file=sys.stderr)
+        if after_code != 0 or fingerprint_after != fingerprint_before:
+            print("error: canonical embedding fingerprint could not be proven unchanged", file=sys.stderr)
+        if restore != 0:
+            print("error: run `prime-claw converge` before retrying", file=sys.stderr)
+        return code
+
+    print("embedding-build: candidate policy applied; starting isolated Qwen sync")
+    code, out = sandbox_exec(cfg, script, timeout=build_timeout)
+    safe = _redact_embedding_output(out, settings)
+    # Restore first on every normal exit, then independently prove that no
+    # canonical config/schema/content/migration state changed—even on failure.
+    restore = _restore_historical_embedding_policy(cfg, settings)
+    after_code, fingerprint_after = _canonical_embedding_fingerprint(cfg, settings)
+    fingerprint_ok = after_code == 0 and fingerprint_after == fingerprint_before
+    if code != 0:
+        print("error: candidate embedding build failed: " + safe.strip()[-800:], file=sys.stderr)
+        if not fingerprint_ok:
+            print("error: canonical embedding fingerprint could not be proven unchanged", file=sys.stderr)
+        if restore != 0:
+            print("error: run `prime-claw converge` before retrying", file=sys.stderr)
+        return code
+    if not fingerprint_ok:
+        print("error: candidate build completed but canonical embedding state changed or "
+              "could not be re-read", file=sys.stderr)
+        return after_code or 1
+    if restore != 0:
+        print("error: candidate build succeeded but historical policy restore failed; "
+              "run `prime-claw converge`", file=sys.stderr)
+        return restore
+    print("embedding-build: parallel Qwen database complete; canonical config not switched")
+    print("  canonical_unchanged=true")
+    for line in safe.strip().splitlines()[-8:]:
+        print("  " + line)
     return 0
 
 
@@ -1789,7 +2039,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--config", help="path to runtime.json (default config/runtime.json)")
     ap.add_argument("--dry-run", action="store_true", help="print intended actions; do not mutate")
     sub = ap.add_subparsers(dest="verb", required=True)
-    for v in ("status", "create", "converge", "build", "embedding-preflight", "validate", "recover", "destroy"):
+    for v in ("status", "create", "converge", "build", "embedding-preflight", "embedding-build", "validate", "recover", "destroy"):
         sp = sub.add_parser(v)
         if v == "build":
             sp.add_argument("--force", action="store_true", help="rebuild even if inputs unchanged")
@@ -1807,6 +2057,7 @@ VERBS = {
     "converge": cmd_converge,
     "build": cmd_build,
     "embedding-preflight": cmd_embedding_preflight,
+    "embedding-build": cmd_embedding_build,
     "validate": cmd_validate,
     "recover": cmd_recover,
     "destroy": cmd_destroy,

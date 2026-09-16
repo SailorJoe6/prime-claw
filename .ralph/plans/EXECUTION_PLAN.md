@@ -1,6 +1,6 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** IN EXECUTION — Slices 0–3 complete; Slice 4A.1 preflight complete; Slice 4A.2 parallel build/validation is next
+**Status:** IN EXECUTION — Slices 0–3 and 4A.1 complete; Slice 4A.2a isolated candidate build is being executed
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
 **Date:** 2026-09-11
@@ -218,7 +218,8 @@ Bounded objective 4A.1 is complete: ignored local config merge, strict locked-se
 validation, private-endpoint-safe candidate policy rendering, and `embedding-preflight`.
 The preflight makes no network, sandbox, or database call. Read-only live checks after it
 confirmed the canonical database remains 1536-dimensional and the candidate database does
-not exist. Slice 4A.2 (parallel database/config build and acceptance gates) is next.
+not exist. Slice 4A.2a now implements the isolated build path; its live full sync is the
+current bounded objective. Slice 4A.2b validation and atomic cutover remain separate.
 
 **Goal.** Make the operator's home-network OpenAI-compatible
 `Qwen3-Embedding-8B` service the only embedding path. Rebuild the full in-sandbox brain in a
@@ -241,11 +242,18 @@ or `PRIME_CLAW_*` environment, never a tracked file, log, evidence artifact, or 
    candidate policy grants only the configured host/port to gbrain/Bun and removes those
    binaries from the corporate route. The tracked policy stays pre-cutover-compatible until
    4A.2 applies the candidate with the new build. No OpenShell credential provider is required.
-3. **Parallel build — 4A.2 NEXT.** Create a new Postgres database/index (working name
-   `gbrain_qwen4096`) with pgvector 4096-dimensional storage. Point a temporary gbrain config at
-   it, register `/sandbox/brain` as source `brain`, and run a full sync/embed. Keep the existing
-   1536-dimension database untouched and queryable as rollback.
-4. **Acceptance before cutover.** Require page count parity, chunk count parity, every chunk
+3. **Parallel build — 4A.2a IMPLEMENTED / LIVE SYNC PENDING.** `embedding-build` gates the
+   upstream version that omits native-Qwen wire dimensions, applies the ignored candidate
+   policy, creates/resumes only `gbrain_qwen4096`, and uses a separate `GBRAIN_HOME` parent at
+   `/sandbox/.prime-claw/qwen-candidate`. It writes a mode-0600 Qwen config, exports
+   `GBRAIN_AI_EMBED_TIMEOUT_MS=1000000` and `GBRAIN_QUERY_EMBED_TIMEOUT_MS=1000000`, sets the
+   sync deadline/watchdog above the request timeout, and runs a pinned single-worker full sync with explicit non-interactive inline-embed consent
+   with pull/extraction disabled. It never switches canonical config. It snapshots the canonical
+   config/schema/content/bookmark/migration fingerprint and gates the candidate on a Git-HEAD-
+   matching source bookmark plus current-text/signature 4096-dimensional Qwen chunks with exact
+   scans (no unsupported HNSW). Success and failure both restore the tracked historical policy;
+   the legacy database is never dropped or altered.
+4. **Acceptance before cutover — 4A.2b AFTER BUILD.** Require page count parity, chunk count parity, every chunk
    embedded at 4096 dimensions, zero mixed/null/stale vectors, exact-page retrieval, and
    semantic search over known fixtures. Prove no request reached the corporate AI gateway.
 5. **Cutover and recovery.** Only after those checks pass, atomically switch the canonical
@@ -255,8 +263,10 @@ or `PRIME_CLAW_*` environment, never a tracked file, log, evidence artifact, or 
 **Tests (offline).** 4A.1 has 14 focused tests for local-config/env resolution, strict
 Qwen/4096/1000s settings, endpoint validation/redaction, exact policy host/port and binary
 scoping, 0600 output, dry-run, Git ignores, zero command/sandbox/DB calls, parallel DB naming,
-and proof the historical index ignores target settings. 4A.2 must add full-rebuild command,
-acceptance count/dimension, corporate-route absence, atomic cutover, and rollback tests. All
+and proof the historical index ignores target settings. 4A.2a adds 21 offline tests for
+candidate-home confinement, config/database isolation, Qwen/timeouts, no-extract sync, version
+gating, sanitized dry-run/output, candidate policy application, failure restore, and CLI wiring.
+4A.2b must add parity/freshness/retrieval, atomic cutover, and rollback tests. All
 network/database boundaries remain monkeypatched.
 
 **Evidence.** Record sanitized configuration (model/dimensions/timeout only), old/new database
