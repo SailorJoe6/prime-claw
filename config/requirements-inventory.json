@@ -1098,6 +1098,24 @@
    },
    "evidence": "docs/evidence/portable-defaults-20260917T184315Z.json",
    "verdict_doc": "docs/derisk/3a-slice4p.md"
+  },
+  {
+   "id": "R3a-16",
+   "priority": "GATE",
+   "summary": "Every operator must explicitly configure their own brain_repo through ignored local config or PRIME_CLAW_BRAIN_REPO; no tracked, fallback, public starter, or example brain exists; missing or malformed setup fails before mutation.",
+   "status": "planned (Slice 4R; bead prime-claw-zwg.2)",
+   "phase": "3a",
+   "slice": "4R",
+   "proven_by": {
+    "apply": [],
+    "check": [
+     ".ralph/plans/REQUIREMENTS.md",
+     ".ralph/plans/DECISIONS.md"
+    ],
+    "validate": [],
+    "tests": []
+   },
+   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md"
   }
  ],
  "phase2": {}

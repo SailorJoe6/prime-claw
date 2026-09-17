@@ -1,15 +1,16 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — portable-default Slice 4P complete; generic gateway-profile Slice 4B next; optional local-Qwen ready after preflight
+**Status:** ACTIVE — Slice 4P complete; mandatory operator brain-repo correction (4R) next; 4B follows; optional local-Qwen ready after preflight
 **Beads:** `prime-claw-zwg` (P1)
-**Date:** 2026-09-11 · **Provider defaults revised:** 2026-09-17
+**Date:** 2026-09-11 · **Provider defaults and operator brain-repo contract revised:** 2026-09-17
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
 
 
 > **Spark recovery confirmed (2026-09-17):** the operator reports the DGX Spark is alive and
 > ready. No build has restarted. Before resuming the optional home-Qwen profile, rerun the exact
 > model compatibility/preflight gate, then continue the preserved isolated candidate. Portable-
-> default Slice 4P is complete; generic gateway-profile Slice 4B is next. The canonical database/config are unchanged;
+> default Slice 4P is complete; mandatory brain-repo setup correction 4R is next and gates 4B.
+> The canonical database/config are unchanged;
 > no cutover occurred.
 
 This document is the summary and index for the work. It is accompanied by:
@@ -42,6 +43,12 @@ concerns: inference `anthropic.kimi-k3` (GLM supported as an alternative) and em
 home-network `Qwen3-Embedding-8B`/4096 embedding profile are valid independent overrides,
 not tracked prerequisites. The claw never possesses real LLM credentials
 (R-X-5 / R2-X-1 / R3a-13/R3a-15).
+
+Brain content has deliberately **no no-config default**. Every operator must explicitly configure
+`brain_repo` through ignored local config or `PRIME_CLAW_BRAIN_REPO`; there is no public starter
+or example brain. Repository-dependent commands must reject missing or malformed configuration
+before mutation. Joe's private repository is only the historical proving instance, never a
+tracked platform value (R3a-9/R3a-16; D3a-N).
 
 **Execution state (2026-09-16):** Slices 0–3 now clone the real brain, serve its in-sandbox
 index, and let a sandboxed Prime Agent answer with citations. That 1536-dimensional
@@ -101,7 +108,8 @@ long-run goal is that prime-claw **fully replaces zbrain as the brain container*
 A single end-to-end slice proving prime-claw can host a brain, with prime-agent as the
 harness:
 
-1. **Brain in.** `git clone` the operator's brain repo into the sandbox at a known path.
+1. **Brain in.** After an explicit per-operator `brain_repo` setup gate, `git clone` that
+   repository into the sandbox at a known path. No shared/default/example brain is inferred.
 2. **Index.** In-sandbox gbrain + Postgres index the cloned brain (sync the `brain`
    source), with embeddings.
 3. **Read/query.** From a conversation with the sandboxed prime-agent, the operator asks a
@@ -158,8 +166,9 @@ result; no credential reaches sandbox disk (resolved Q4 / D3a-G).
 - The prime-agent session in the sandbox can answer "what do we know about X?" from the
   brain and "remember Y" with a correct, cited, IA-routed write — **all inside the
   container**, credentials host-only.
-- Everything is generic (no Joe-specific values hardcoded — R2-X-2/D14 hold): the brain
-  repo URL/path is configurable, so any operator points it at *their* brain.
+- Everything is generic (no Joe-specific values hardcoded — R2-X-2/D14 hold): every operator
+  must explicitly point `brain_repo` at *their* brain through ignored local config or environment;
+  missing setup fails before mutation and there is no tracked/public fallback.
 
 ## 6. Hard rules (carried, binding)
 
@@ -186,8 +195,9 @@ result; no credential reaches sandbox disk (resolved Q4 / D3a-G).
    Explicit configuration may select another provider independently. The operator's home
    `Qwen3-Embedding-8B`/4096 profile remains an optional ignored-local override with its
    non-destructive parallel rebuild contract; it is not a tracked prerequisite.
-3. **Which brain for the tracer read/query proof** ~~open~~ **RESOLVED (Q3):** the FULL real
-   brain (`~/gitlab_local/brain`, GitHub `JLandersZen/brain`, branch `main`, private).
+3. **Which brain for the tracer read/query proof** ~~open~~ **RESOLVED (Q3):** the operator's
+   explicitly configured full real brain. Joe's historical proving instance was the private
+   `JLandersZen/brain` repository on `main`; that identity is not a tracked default (D3a-N).
 4. **Exact validate surface** ~~open~~ **RESOLVED (Q4, D3a-G):** GATE = brain cloned with
    `.git` + pages>0 + cited query + one routed write receipt + push-back round-trip.
 5. **Which prime-agent provider/model proves the conversational slices?** **REVISED

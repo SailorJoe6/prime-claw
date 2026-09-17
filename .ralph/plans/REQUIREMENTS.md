@@ -47,9 +47,9 @@ hold when that optional profile is selected; **NICE** = desired, may slip.
 - **R3a-8 (GATE) — Reuse, don't re-test.** Do not re-test gbrain's CLI/sync/embedding or
   the browse shim — already proven upstream (zbrain ~1,626 tests). Tests cover only the
   prime-agent-harness integration and the clone/index/validate wiring.
-- **R3a-9 (GATE) — Generic platform.** No operator-specific values hardcoded; the brain
-  repo path/URL is configurable (`config/runtime.json` + `PRIME_CLAW_*`). The brain's
-  entity taxonomy is NOT encoded in prime-claw (IA two-level split).
+- **R3a-9 (GATE) — Generic platform.** No operator-specific values are hardcoded. Brain
+  repository identity is operator-owned configuration, never a tracked default or code fallback;
+  the brain's entity taxonomy is NOT encoded in prime-claw (IA two-level split).
 - **R3a-10 (GATE) — Single-gateway discipline.** `openshell` (17670) only.
 - **R3a-11 (GATE) — Offline tests.** New pytest coverage monkeypatches sandbox/exec
   boundaries (no live sandbox needed for the unit suite).
@@ -84,6 +84,14 @@ hold when that optional profile is selected; **NICE** = desired, may slip.
   and embeddings `openai:text-embedding-3-large` at 1536 dimensions. Explicit host/local/env
   configuration overrides inference and embeddings independently. Tracked config must require
   neither a DGX/private endpoint nor Codex OAuth, and tests must prove this precedence.
+- **R3a-16 (GATE) — Explicit per-operator brain repository is mandatory.** Prime-claw has
+  no tracked, fallback, public starter, or example brain repository. Every operator must set
+  `brain_repo` through ignored local configuration or `PRIME_CLAW_BRAIN_REPO` before any
+  repository-dependent lifecycle, validation, recovery, embedding-build, write, or push action.
+  Missing or malformed configuration fails before mutation with a clear error naming both setup
+  paths. Joe's `JLandersZen/brain` is a proving-instance value only and must live in ignored local
+  config; historical evidence may name it but active defaults, code fallbacks, and generic tests
+  may not. `brain_branch` may retain the non-personal default `main`.
 
 ## Out of scope (recorded for traceability)
 

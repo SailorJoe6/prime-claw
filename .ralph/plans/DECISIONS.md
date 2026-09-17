@@ -20,9 +20,10 @@ deny-by-default egress intact and makes the claw's knowledge local and fast. Thi
 brain outside the container and requires an egress hole).
 
 ## D3a-B — Brain enters via git clone WITH `.git`, push-capable through a custom L7 profile
-**Decision:** The brain enters the sandbox by cloning the operator's brain repo
-(`~/gitlab_local/brain`, GitHub `JLandersZen/brain`, branch `main`, private) **with `.git`**,
-and the sandbox can **push back** (commit + push round-trip verified, Slice 1). Writes remain
+**Decision:** The brain enters the sandbox by cloning the operator's explicitly configured
+brain repo **with `.git`**, and the sandbox can **push back**. Joe's private
+`JLandersZen/brain` repository on `main` was the Slice 1 proving instance, not a platform default.
+Writes remain
 in ralph-pva until the ingest/memorize skills port (3b+); 3a is read + one routed test write
 into the sandbox clone only.
 **Satisfies:** R3a-1, R3a-4, R3a-7.
@@ -77,10 +78,11 @@ information. The information-bearing tests are the prime-agent integration and t
 wiring.
 
 ## D3a-F — Generic platform; instance concerns stay out
-**Decision:** prime-claw carries no operator-specific taxonomy, values, or personal skills.
-The brain repo path is configurable. Joe's personal skills and the `prime-pva` instance
-repo are created at 3b, not here.
-**Satisfies:** R3a-9.
+**Decision:** prime-claw carries no operator-specific taxonomy, values, repository identity,
+or personal skills. Every operator must explicitly configure their brain repository outside
+tracked defaults. Joe's personal skills and the `prime-pva` instance repo are created at 3b,
+not here.
+**Satisfies:** R3a-9, R3a-16.
 **Rationale:** prime-claw = the zbrain role (generic platform). Baking one operator's
 schema/config into it is the exact mistake the IA doc's two-level split forbids.
 
@@ -218,3 +220,20 @@ in parallel rather than mixing vectors.
 or a developer's private OAuth setup would make the checked-in defaults unusable for the
 average operator. The gateway path was already proven in Slices 0–2; the remaining work is to
 restore it as the tracked default and make local overrides explicit and independently testable.
+
+## D3a-N — Brain repository identity is mandatory operator configuration (2026-09-17)
+**Decision:** prime-claw ships with no tracked brain repository, no code fallback repository,
+and no public starter/example brain. Every operator must set `brain_repo` through the ignored
+operator-local runtime file or `PRIME_CLAW_BRAIN_REPO`. Repository-dependent commands fail
+before mutation when the value is absent or malformed, and the error names both supported setup
+paths. A neutral branch default such as `main` is allowed; repository identity is not.
+
+Joe's `JLandersZen/brain` remains valid historical acceptance evidence and his personal ignored
+configuration value, but it must be removed from active tracked config, fallback code, and generic
+test defaults. This correction is Slice 4R / bead `prime-claw-zwg.2` and gates Slice 4B.
+
+**Satisfies:** R3a-1, R3a-5, R3a-9, R3a-16.
+**Rationale:** A reusable brain-hosting platform cannot silently clone or write to one operator's
+private repository. Unlike model providers, brain content has no meaningful shared default.
+Mandatory explicit setup prevents accidental access, makes ownership clear, and preserves the
+platform/instance boundary.

@@ -1,9 +1,9 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — Slice 4P complete; generic gateway-profile Slice 4B next; optional local-Qwen remains ready after preflight
+**Status:** ACTIVE — Slice 4P complete; mandatory operator brain-repo correction 4R is NEXT and gates 4B; optional local-Qwen remains ready after preflight
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
-**Date:** 2026-09-11 · **Provider defaults revised:** 2026-09-17
+**Date:** 2026-09-11 · **Provider defaults and brain-repo contract revised:** 2026-09-17
 
 This plan implements the Phase 3a spec as **vertical slices** (Cockburn elephant-carpaccio):
 each slice ends in a *working capability + passing tests + committed & pushed*, and retires a
@@ -46,8 +46,9 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
   local 4096-dimensional override with a 1000-second timeout and parallel rebuild contract;
   its private endpoint never enters tracked config. Every selected profile must be one fresh
   vector space; changing profiles requires a full non-destructive re-embed.
-- **Q3 brain content → FULL real brain** (`~/gitlab_local/brain`, GitHub `JLandersZen/brain`,
-  branch `main`). A cited answer is only meaningful against real content.
+- **Q3 brain content → each operator's explicitly configured FULL real brain.** Joe's historical
+  proving instance is the private `JLandersZen/brain` repository on `main`; D3a-N forbids it as a
+  tracked default or code fallback. There is no public starter/example brain.
 - **Q4 validate surface → GATE =** brain present (with `.git`) + index page count > 0 +
   known-fact cited query green + one routed-write receipt + push-back proven + a complete,
   fresh index for the selected embedding profile. Embedding freshness is a **GATE**, not NICE.
@@ -60,9 +61,10 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 | **S1** | git+github push plumbing: image git, custom github push profile, clone brain w/ `.git` into sandbox | R3a-1, R3a-5(part), R3a-7 | — |
 | **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source); AI-gateway/1536 embedding proof (portable-default basis) | R3a-2 | — |
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
-| **S4P** | Portable no-config defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **COMPLETE** — 177 tests + hermetic dry-run PASS |
+| **S4P** | Portable no-config provider defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **COMPLETE** — 177 tests + hermetic provider-default dry-run PASS |
+| **S4R** | Require explicit per-operator brain repository; remove personal tracked/fallback repo identity | R3a-1, R3a-5, R3a-9, R3a-16 | **NEXT / REQUIRED BEFORE S4B** — bead `prime-claw-zwg.2` |
 | **S4A** | Optional operator-local home `Qwen3-Embedding-8B`/4096 override, non-destructive | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **READY TO RESUME AFTER PREFLIGHT** — partial candidate preserved; Spark recovery confirmed |
-| **S4B** | One routed write + push-back round-trip | R3a-4 | **NEXT** — gateway profile; local-Qwen is optional |
+| **S4B** | One routed write + push-back round-trip to the explicitly configured operator repo | R3a-4, R3a-16 | **BLOCKED ON S4R** — gateway profile; local-Qwen is optional |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
 ---
@@ -128,8 +130,10 @@ on sandbox disk.
 - **Clone stage:** new `stage_brain_clone(cfg, args)` in `bin/prime-claw` — in-sandbox
   `git clone <repo> <sb_brain_dir>` over HTTPS using a placeholder `http.extraHeader` that the
   L7 proxy swaps; idempotent (skip if already cloned, else `git fetch`/`pull --ff-only`).
-  Config keys: `brain_repo` (default `JLandersZen/brain`), `brain_branch` (default `main`),
-  `sb_brain_dir` (default `/sandbox/brain`), all `PRIME_CLAW_*`-overridable.
+  Config keys: `brain_repo`, `brain_branch` (neutral default `main`), and `sb_brain_dir`
+  (default `/sandbox/brain`), all `PRIME_CLAW_*`-overridable. **Portability correction D3a-N:**
+  Slice 1 originally tracked Joe's proving repository as `brain_repo`; Slice 4R must remove that
+  tracked/code fallback and make repository identity mandatory operator-local configuration.
 - Wire `stage_brain_clone` into `create`/`converge` before `stage_brain` (index needs content).
 
 **Tests (offline).** stage dry-run text; config override resolution; idempotency branch
@@ -235,6 +239,35 @@ suite passed 177. Verdict: [3a-slice4p.md](../../docs/derisk/3a-slice4p.md); mac
 
 ---
 
+## Slice 4R — Mandatory explicit operator brain repository (R3a-1, R3a-5, R3a-9, R3a-16)
+
+**Status: NEXT / PLANNED ONLY.** Bead `prime-claw-zwg.2` is open for a future `/execute`.
+No implementation or runtime mutation is part of this planning update.
+
+**Goal.** Preserve the platform/instance boundary by requiring every operator to configure their
+own brain repository. Prime-claw must never infer, ship, or fall back to Joe's private repository
+or to a public starter/example brain.
+
+**Approach.**
+
+1. Remove `brain_repo` from tracked runtime defaults and remove every code fallback repository.
+2. Accept repository identity only from ignored local runtime configuration or
+   `PRIME_CLAW_BRAIN_REPO`; retain `main` only as a neutral branch default.
+3. Add one pre-mutation setup gate used by repository-dependent lifecycle, recovery, candidate
+   build, validation, write, and push paths. `status` reports the missing setup without mutation.
+4. The error must say that `brain_repo` is required and name both supported setup paths. It must
+   not suggest or synthesize a public/example repository.
+5. Move Joe's `JLandersZen/brain` value to his ignored local configuration. Historical evidence
+   may retain the proving-instance name; generic tests and active defaults may not.
+6. Add offline tests proving absent/malformed values fail before provider, sandbox, network, or
+   database calls, and that local/environment overrides reach clone/fetch/push correctly.
+
+**Exit.** A fresh checkout cannot run a repository-dependent command until the operator supplies
+their own repository. With explicit configuration, the existing clone/index/write/push lifecycle
+works unchanged. Inventory R3a-16 is proven and Slice 4B becomes ready.
+
+---
+
 ## Slice 4A — Optional home-Qwen embedding override (R3a-12, R3a-14)
 
 **Execution status (revised 2026-09-17): READY TO RESUME AFTER PREFLIGHT.** Bounded
@@ -242,7 +275,7 @@ objective 4A.1 is complete: ignored local config merge, strict locked-setting va
 private-endpoint-safe candidate policy rendering, and `embedding-preflight`. Slice 4A.2a's
 isolated build path is implemented; its live sync stopped when the Spark crashed. The operator
 now confirms the Spark is alive and ready. No build has restarted. Slice 4P is complete and
-Slice 4B is the tracked next objective; 4A.2a may resume as an explicitly selected local-profile task
+Slice 4R is the tracked next objective and gates 4B; 4A.2a may resume as an explicitly selected local-profile task
 only after the exact-model compatibility/preflight gate passes.
 
 **Recovered external blocker.** The build process remains stopped, the tracked gateway/default
@@ -323,7 +356,7 @@ real repo (credential-safe, Slice 1 plumbing).
 
 **Approach.**
 
-- Run the generic acceptance on the fresh portable gateway profile after Slice 4P. A local-Qwen
+- Run the generic acceptance on the fresh portable gateway profile after required Slice 4R. A local-Qwen
   acceptance rerun is optional and waits for Slice 4A; it is not a prerequisite for S4B.
 - The write is a **test artifact**: a keep-worthy `projects/` stub describing prime-claw itself
   (markdown is source-of-truth, so trivially deletable). The operator confirmed exact slug
@@ -335,7 +368,8 @@ real repo (credential-safe, Slice 1 plumbing).
 **Tests (offline).** the put/sync/commit/push command construction; IA routing decision recorded.
 
 **Exit.** The `projects/prime-claw` page exists in the in-sandbox brain, is queryable (Slice 3
-path), and the commit is pushed to `JLandersZen/brain` — with no credential on sandbox disk.
+path), and the commit is pushed to the operator's explicitly configured brain repository — with no
+credential on sandbox disk.
 
 ---
 
@@ -372,5 +406,9 @@ committed; `bd` notes updated; Phase 3a bead ready to close.
   the Spark. Never auto-switch vector spaces or accept keyword-only retrieval; preserve each
   prior database until its replacement profile passes every gate.
 - **Recreate wipes `/sandbox`** → re-run `converge`; the brain re-clones (idempotent) on converge.
-- **Generic platform (R3a-9):** all brain repo/branch/path/model values are config-driven; no
-  operator-specific taxonomy or values hardcoded.
+- **Generic platform (R3a-9/R3a-16):** brain repository identity is mandatory ignored-local or
+  environment configuration. No operator repository, taxonomy, or personal value is a tracked
+  default or fallback, and there is deliberately no public/example brain.
+- **Known status compatibility defect:** the installed OpenShell CLI does not accept `--output
+  json` for `sandbox provider list`, so the current provider status probe fails despite a healthy
+  sandbox. Track and fix this independently before final acceptance; do not conflate it with R3a-16.
