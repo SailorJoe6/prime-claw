@@ -1,32 +1,34 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 /**
  * handoff-chain — deterministic handoff -> execute chaining for Ralph loops.
  *
- * The operator's observed pattern: /handoff is only ever invoked when another
- * execute phase follows (100% repeatable). This extension makes the chain
- * deterministic:
+ * The operator's observed pattern: /handoff is only invoked when another
+ * execute phase follows. This extension makes that one transition
+ * deterministic while leaving the canonical workflow text customizable:
  *
- *   1. Registers a native /handoff command that does EXACTLY what the
- *      markdown-skill slash command did — loads the canonical
- *      .ralph/skills/handoff/SKILL.md and gives it to the agent as its
- *      prompt — plus one additive step: writing a chain marker file.
- *   2. After any compaction, if the marker exists, consumes it and injects
- *      the target skill's canonical markdown (.ralph/skills/<name>/SKILL.md)
- *      as the next prompt.
+ *   1. Native /handoff loads .ralph/skills/handoff/SKILL.md, appends any
+ *      trailing command text as operator compaction guidance, and records
+ *      pending state under the current Prime Agent session ID.
+ *   2. After that session compacts, its pending state is consumed and the
+ *      canonical .ralph/skills/execute/SKILL.md is injected exactly once.
  *
- * The canonical skill markdown stays in .ralph/skills/ and is LOADED, never
- * duplicated here, so per-project customization is preserved. The LLM never
- * writes or routes the marker — both sides of the chain are code.
+ * User arguments never select a skill or become part of a filesystem path.
+ * The canonical skill markdown stays in .ralph/skills/ and is loaded rather
+ * than duplicated here. The LLM never creates, routes, or consumes state.
  */
 
-const STATE_DIR = join(".prime", "agent", "state");
-const MARKER_NAME = "chain-next";
+const LEGACY_MARKER = join(".prime", "agent", "state", "chain-next");
+const GUIDANCE_TAG = "operator-compaction-guidance";
 
-function markerPath(cwd: string): string {
-  return join(cwd, STATE_DIR, MARKER_NAME);
+function sessionId(ctx: ExtensionContext): string {
+  return ctx.sessionManager.getSessionId();
+}
+
+function removeLegacyMarker(cwd: string): void {
+  rmSync(join(cwd, LEGACY_MARKER), { force: true });
 }
 
 function skillMarkdown(cwd: string, name: string): { path: string; body: string } | null {
@@ -35,39 +37,61 @@ function skillMarkdown(cwd: string, name: string): { path: string; body: string 
   return { path, body: readFileSync(path, "utf8") };
 }
 
-function injectSkill(pi: ExtensionAPI, cwd: string, name: string): boolean {
+function injectSkill(pi: ExtensionAPI, cwd: string, name: string, guidance = ""): boolean {
   const skill = skillMarkdown(cwd, name);
   if (!skill) return false;
-  pi.sendUserMessage(`<skill name="${name}" location="${skill.path}">
+  const wrappedSkill = `<skill name="${name}" location="${skill.path}">
 References are relative to ${dirname(skill.path)}.
 
 ${skill.body}
-</skill>`);
+</skill>`;
+  const guidanceBlock = guidance
+    ? `\n\n<${GUIDANCE_TAG}>\n${guidance}\n</${GUIDANCE_TAG}>`
+    : "";
+  pi.sendUserMessage(`${wrappedSkill}${guidanceBlock}`);
   return true;
 }
 
 export default function handoffChain(pi: ExtensionAPI): void {
+  // One extension runtime may be shared across root and RLM child sessions, so
+  // closure state must still be keyed by Prime Agent's stable session UUID.
+  const pendingExecuteBySession = new Set<string>();
+
   pi.registerCommand("handoff", {
-    description: "Ralph handoff phase — compact context, then chain into the next skill (default: execute)",
+    description: "Ralph handoff phase — optional trailing text supplies compaction guidance; execute always follows",
     handler: async (args, ctx) => {
-      const next = args.trim() || "execute";
-      const marker = markerPath(ctx.cwd);
-      mkdirSync(dirname(marker), { recursive: true });
-      writeFileSync(marker, next);
-      if (!injectSkill(pi, ctx.cwd, "handoff")) {
-        rmSync(marker, { force: true });
-        ctx.ui.notify("handoff-chain: .ralph/skills/handoff/SKILL.md not found", "warning");
+      removeLegacyMarker(ctx.cwd);
+      const currentSession = sessionId(ctx);
+      pendingExecuteBySession.add(currentSession);
+      try {
+        if (!injectSkill(pi, ctx.cwd, "handoff", args.trim())) {
+          pendingExecuteBySession.delete(currentSession);
+          ctx.ui.notify("handoff-chain: .ralph/skills/handoff/SKILL.md not found", "warning");
+        }
+      } catch (error) {
+        pendingExecuteBySession.delete(currentSession);
+        throw error;
       }
     },
   });
 
+  pi.on("session_start", (_event, ctx) => {
+    // The Phase 4a.1 project-wide marker has no trustworthy session owner.
+    // Never consume it. A new/reloaded runtime also starts with no pending chain.
+    removeLegacyMarker(ctx.cwd);
+    pendingExecuteBySession.delete(sessionId(ctx));
+  });
+
   pi.on("session_compact", (_event, ctx) => {
-    const marker = markerPath(ctx.cwd);
-    if (!existsSync(marker)) return;
-    const next = readFileSync(marker, "utf8").trim() || "execute";
-    rmSync(marker, { force: true });
-    if (!injectSkill(pi, ctx.cwd, next)) {
-      ctx.ui.notify(`handoff-chain: .ralph/skills/${next}/SKILL.md not found`, "warning");
+    removeLegacyMarker(ctx.cwd);
+    if (!pendingExecuteBySession.delete(sessionId(ctx))) return;
+    if (!injectSkill(pi, ctx.cwd, "execute")) {
+      ctx.ui.notify("handoff-chain: .ralph/skills/execute/SKILL.md not found", "warning");
     }
+  });
+
+  pi.on("session_shutdown", (_event, ctx) => {
+    removeLegacyMarker(ctx.cwd);
+    pendingExecuteBySession.delete(sessionId(ctx));
   });
 }

@@ -37,5 +37,5 @@ docker/runtime/.build-stamp.json
 .prime-claw-ai-gateway-key.sha256
 .prime-claw-codex-oauth.sha256
 
-# handoff-chain extension: transient chain marker (never commit runtime state)
+# handoff-chain extension: legacy transient state (never commit runtime state)
 .prime/agent/state/

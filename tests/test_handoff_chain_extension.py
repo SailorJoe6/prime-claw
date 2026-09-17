@@ -66,3 +66,12 @@ def test_prime_agent_rpc_loads_native_handoff_command():
 def test_handoff_skill_has_only_one_slash_command_surface():
     """The native /handoff command must not compete with /skill:handoff."""
     assert not (REPO / ".agents" / "skills" / "handoff").exists()
+
+
+def test_handoff_skill_routes_operator_guidance_into_compaction_focus():
+    """The canonical workflow must consume, not reinterpret, command arguments."""
+    skill = (REPO / ".ralph" / "skills" / "handoff" / "SKILL.md").read_text()
+    assert "<operator-compaction-guidance>" in skill
+    assert "await compact.run(focus_hint)" in skill
+    assert "It is guidance only; it never selects the next phase." in skill
+    assert "Canonical `execute` always follows" in skill

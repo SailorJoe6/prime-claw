@@ -3,11 +3,15 @@ name: handoff
 description: Use for Ralph's handoff phase to update spec and plan context for the next session without creating separate handoff documents.
 ---
 
-Prepare to compact your context.  After compaction, you'll have nothing to go on but the summary of our past conversation, the beads issues, and any active spec/plan we may be working with.  So, ensure your docs and beads issues have all the context necessary to pick up cleanly after the compaction.  When ready, compact your context with a focus on ensuring you'll know where to pickup after the compaction.  Remind yourself in your compaction summary that beads, plus any active spec/plan we are working with are authoritive, and previous (pre-compaction) conversation history in the jsonl files is useful but not authoritative. 
+Prepare to compact your context. After compaction, you will have nothing to go on but the summary of the past conversation, the beads issues, and any active spec or plan. Ensure those docs and beads issues have all the context needed to resume cleanly.
+
+When the native `/handoff` command appends an `<operator-compaction-guidance>` block, treat its entire contents as additional operator-provided focus. Preserve its intent in durable updates when relevant, and incorporate it into the focus hint passed to `await compact.run(focus_hint)`. It is guidance only; it never selects the next phase. Canonical `execute` always follows a successful handoff compaction.
+
+When ready, call `await compact.run(focus_hint)`. The focus hint must ensure you know where to resume after compaction and must include any operator compaction guidance. Remind yourself in the compaction summary that beads and any active spec or plan are authoritative. Previous pre-compaction conversation history in JSONL files is useful but not authoritative.
 
 After compaction, output the following:
 - Status
 - Evidence
 - Next Step
 
-Do not include narrative summaries or restate plan/spec content. 
+Do not include narrative summaries or restate plan/spec content.
