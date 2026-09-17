@@ -1,6 +1,6 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** BLOCKED — Slice 4A.2a paused after DGX Spark crash; partial candidate preserved, canonical unchanged
+**Status:** BLOCKED for live local-Qwen acceptance — portability requirements revised; tracked AI-gateway defaults are pending
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](../REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](../DECISIONS.md)
 **Date:** 2026-09-11
@@ -19,10 +19,11 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 - **Per-slice exit ritual.** Each slice ends: `pytest` green → `git commit` → `git pull --rebase`
   → `bd sync` → `git push` → `git status` clean & up-to-date. Bead notes updated.
 - **Credential isolation (R-X-5/R2-X-1).** No real credential ever on sandbox disk.
-  Inference rides the host-selected OpenShell provider (currently openai-codex OAuth); git
-  push rides a **github provider** whose token stays host-side and is swapped at L7.
-  Embeddings use only the unauthenticated home-network Qwen service (D3a-L); literal `dummy`
-  is a non-secret compatibility value, not a credential. No corporate embedding fallback.
+  Explicit user provider choices ride matching OpenShell providers; git push uses a **github
+  provider** whose token stays host-side and is swapped at L7. With no preferred config,
+  inference and embeddings both use the Zendesk AI Gateway: Kimi K3 inference and
+  `text-embedding-3-large`/1536 embeddings (D3a-M). Home Qwen and Codex are independent local
+  overrides. Literal `dummy` in the home profile is non-secret compatibility data.
 - **Single-gateway:** `openshell` (17670) only; `nemoclaw` forbidden.
 - **`--dry-run` is global** and precedes the verb.
 
@@ -37,21 +38,18 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
   OpenShell swaps to the real bearer at L7. **Requires:** add `git` to the image; clone with
   `.git`. No token on sandbox disk. In-sandbox `git clone` over SSH is rejected (private repo
   would need a token in-container).
-- **Q2 embeddings → SUPERSEDED by D3a-L: home Qwen only.** Slice 0–2 proved the former
-  corporate AI-gateway path (`text-embedding-3-large`, 1536 dimensions), but monthly budget
-  exhaustion makes it operationally unsuitable. The operator's home-network OpenAI-compatible
-  `Qwen3-Embedding-8B` service is now the sole accepted configuration: native 4096 dimensions,
-  1000-second timeout, unauthenticated (`dummy` only for clients requiring a nonempty value).
-  Live probes: dimensions unset → HTTP 200 / 4096 values; explicit 1536 or 4096 → HTTP 400
-  because the deployment does not support the `dimensions` parameter. A full re-embed is
-  mandatory because the vector space changes. Build a parallel 4096-dimension database/index,
-  validate, then cut over; never mutate the current 1536 database in place. The private base URL
-  stays in ignored local config/env and must not appear in tracked artifacts.
+- **Q2 embeddings → REVISED by D3a-L/M: portable gateway default, explicit overrides.**
+  No-config installs use the previously proven Zendesk AI Gateway
+  `openai:text-embedding-3-large` profile at 1536 dimensions. An operator may explicitly select
+  another provider/model/dimension. Joe's home `Qwen3-Embedding-8B` profile remains an optional
+  local 4096-dimensional override with a 1000-second timeout and parallel rebuild contract;
+  its private endpoint never enters tracked config. Every selected profile must be one fresh
+  vector space; changing profiles requires a full non-destructive re-embed.
 - **Q3 brain content → FULL real brain** (`~/gitlab_local/brain`, GitHub `JLandersZen/brain`,
   branch `main`). A cited answer is only meaningful against real content.
 - **Q4 validate surface → GATE =** brain present (with `.git`) + index page count > 0 +
-  known-fact cited query green + one routed-write receipt + push-back proven + the complete
-  Qwen index at 4096 dimensions. Embedding freshness is a **GATE**, not NICE.
+  known-fact cited query green + one routed-write receipt + push-back proven + a complete,
+  fresh index for the selected embedding profile. Embedding freshness is a **GATE**, not NICE.
 
 ## Slice map
 
@@ -61,8 +59,9 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 | **S1** | git+github push plumbing: image git, custom github push profile, clone brain w/ `.git` into sandbox | R3a-1, R3a-5(part), R3a-7 | — |
 | **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source); historical 1536 embedding proof later superseded | R3a-2 | — |
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
-| **S4A** | Non-destructive cutover to home `Qwen3-Embedding-8B`, native 4096 dimensions | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **IN PROGRESS** — 4A.1 preflight complete; 4A.2 next |
-| **S4B** | One routed write + push-back round-trip | R3a-4 | blocked on S4A |
+| **S4P** | Portable no-config defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **NEXT / IMPLEMENTATION PENDING** — does not require Spark |
+| **S4A** | Optional operator-local home `Qwen3-Embedding-8B`/4096 override, non-destructive | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **BLOCKED EXTERNALLY** — partial candidate preserved; Spark unavailable |
+| **S4B** | One routed write + push-back round-trip | R3a-4 | blocked on selected-profile acceptance |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
 ---
@@ -103,8 +102,9 @@ difference too big to overcome elegantly.
 - Tests: offline coverage that the build-context staging selects upstream vs. fallback correctly.
 - **Also delivered then extended (R3a-13):** Slice 0 copied host `models.json`; Slice 3
   extended the contract to copy host `settings.json` too and project auth through OpenShell
-  placeholders. Current acceptance follows the host default `openai-codex/gpt-5.6-sol` rather
-  than the now-unavailable Kimi/GLM fallback (D3a-K).
+  placeholders. The 2026-09-16 acceptance run followed the explicit host
+  `openai-codex/gpt-5.6-sol` override (D3a-K); D3a-M now requires Kimi K3 via the Zendesk AI
+  Gateway when no preferred host config exists.
 
 ---
 
@@ -176,8 +176,9 @@ live. `validate` 16/16 PASS (evidence `docs/evidence/validate-20260915T170708Z.j
 + operational findings (VPN-down RBAC 403 signature → bead prime-claw-z56; npm registry race;
 4 malformed-frontmatter brain files) in `docs/derisk/3a-slice2.md`.
 **Historical note (2026-09-16):** this proves index-serving mechanics, but its corporate
-AI-gateway / OpenAI / 1536-dimension embedding result no longer satisfies R3a-12. D3a-L and
-Slice 4A require a complete home-Qwen 4096-dimension rebuild before acceptance.
+AI-gateway / OpenAI / 1536-dimension embedding result is now the basis of the portable default
+profile under D3a-M. S4P must restore that as the tracked no-config behavior and prove fresh
+profile selection. D3a-L/S4A retain home-Qwen as an optional local override.
 
 ---
 
@@ -211,7 +212,25 @@ helper twice and correctly answered with all expected harness components plus ci
 
 ---
 
-## Slice 4A — Home Qwen embedding cutover (R3a-12, R3a-14) — HIGHEST PRIORITY NEXT
+## Slice 4P — Portable AI-gateway defaults (R3a-12, R3a-13, R3a-15) — NEXT
+
+**Goal.** Make a fresh clone usable without personal hardware or developer-specific OAuth.
+When no preferred config exists, select Zendesk AI Gateway `anthropic.kimi-k3` for inference
+and `openai:text-embedding-3-large`/1536 for embeddings. Keep GLM as a supported inference
+alternative. Explicit host/local/env choices override inference and embeddings independently.
+
+**Implementation pending.** Change tracked defaults/profile selection so Qwen, a private base
+URL, and Codex OAuth are never required by the no-config path. Preserve the existing local-Qwen
+preflight/build as an explicit optional profile. Add offline precedence tests covering no-config,
+host inference override, local embedding override, independent overrides, and credential/policy
+selection. Reconcile create/converge/validate and documentation with the selected profile.
+
+**Exit.** Dry-run and offline tests prove the portable defaults and precedence; fresh
+create/converge use the gateway profile unless the operator explicitly selected otherwise.
+
+---
+
+## Slice 4A — Optional home-Qwen embedding override (R3a-12, R3a-14)
 
 **Execution status (2026-09-16): IN PROGRESS.** The operator later invoked `/execute`.
 Bounded objective 4A.1 is complete: ignored local config merge, strict locked-setting
@@ -221,18 +240,19 @@ confirmed the canonical database remains 1536-dimensional and the candidate data
 not exist. Slice 4A.2a now implements the isolated build path; its live full sync is the
 current bounded objective. Slice 4A.2b validation and atomic cutover remain separate.
 
-**External blocker (2026-09-16).** The DGX Spark hosting the home embedding model crashed and
+**External blocker (2026-09-16, optional local profile only).** The DGX Spark hosting the home embedding model crashed and
 stopped serving during the live build. Work is paused at the operator's request. The build
 process is stopped, the tracked historical policy is restored, and the partial
 `gbrain_qwen4096` database is preserved at 350 source pages / 1,140 embedded chunks, all 4096d,
 with no source bookmark. The canonical fingerprint is unchanged and no cutover occurred.
-Unblock only when the operator confirms the DGX Spark is healthy and the exact model again
-passes its compatibility probe; then move this plan/spec back to `.ralph/plans/` and resume
-with `bin/prime-claw embedding-build`. Evidence:
-`docs/evidence/{blocked_ev_path.name}`.
+Do not resume this profile until the operator confirms the DGX Spark is healthy and the exact
+model again passes its compatibility probe. This blocker does not prevent Slice 4P from
+implementing portable tracked defaults. Resume 4A later with `bin/prime-claw embedding-build`.
+Evidence:
+`docs/evidence/embedding-build-interrupted-20260916T234215Z.json`.
 
-**Goal.** Make the operator's home-network OpenAI-compatible
-`Qwen3-Embedding-8B` service the only embedding path. Rebuild the full in-sandbox brain in a
+**Goal.** Support the operator's explicitly selected home-network OpenAI-compatible
+`Qwen3-Embedding-8B` override without changing the portable default. Rebuild the full in-sandbox brain in a
 parallel 4096-dimension database/index, validate it, then cut over without modifying the
 current 1536-dimension database in place.
 
@@ -283,9 +303,11 @@ network/database boundaries remain monkeypatched.
 identifiers, page/chunk parity, vector dimensions, semantic query proof, corporate-gateway
 non-use, cutover result, and rollback readiness. Never record the private endpoint.
 
-**Exit.** Fresh create/converge uses only Qwen embeddings; the full brain is current at 4096
+**Exit.** When the home-Qwen profile is explicitly selected, create/converge uses only its embeddings; the full brain is current at 4096
 dimensions; semantic retrieval passes; the old 1536 database remains intact for rollback; no
-corporate embedding credential/provider/path is required. Only then unblock Slice 4B.
+corporate embedding credential/provider/path is used by that local profile. The tracked
+Zendesk AI-gateway default remains available for operators who did not select the override.
+Only then unblock Joe's Slice 4B acceptance run.
 
 ---
 
@@ -339,10 +361,11 @@ committed; `bd` notes updated; Phase 3a bead ready to close.
 - **Custom github profile is the main new mechanism** (push not in builtin). If profile import +
   provider swap proves unreliable, fallback: host-mediated push (agent stages commits; a host-side
   step pushes) — but that weakens the "agent pushes from inside" goal, so prefer the L7 profile.
-- **Home embedding reachability and 4096-dimension rebuild are the next risk.** The endpoint
-  is proven from the host, but sandbox policy/reachability and a complete parallel re-index are
-  not yet proven. Do not fall back to the corporate gateway or keyword-only acceptance. Preserve
-  the old 1536 database until the new index passes every gate.
+- **Provider-profile portability is the next unblocked risk.** Tracked no-config behavior must
+  select Zendesk AI Gateway Kimi + OpenAI/1536 while explicit inference/embedding overrides stay
+  independent. Joe's optional home-Qwen reachability and complete 4096 rebuild remain blocked on
+  the Spark. Never auto-switch vector spaces or accept keyword-only retrieval; preserve each
+  prior database until its replacement profile passes every gate.
 - **Recreate wipes `/sandbox`** → re-run `converge`; the brain re-clones (idempotent) on converge.
 - **Generic platform (R3a-9):** all brain repo/branch/path/model values are config-driven; no
   operator-specific taxonomy or values hardcoded.

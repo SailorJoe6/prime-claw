@@ -1,6 +1,6 @@
 # Decisions — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-Beads: `prime-claw-zwg` (P1). Index: [SPECIFICATION.md](SPECIFICATION.md). Requirements: [REQUIREMENTS.md](REQUIREMENTS.md).
+Beads: `prime-claw-zwg` (P1). Index: [SPECIFICATION.md](blocked/SPECIFICATION.md). Requirements: [REQUIREMENTS.md](REQUIREMENTS.md).
 
 Each decision lists the requirement IDs it satisfies.
 
@@ -54,9 +54,10 @@ point of the tracer bullet.
 ## D3a-D — Inference credential isolation unchanged; concrete provider follows host
 **Decision:** The host OpenShell provider holds the real credential; only a placeholder
 enters the sandbox; L7 swaps it at the boundary. The claw never possesses real LLM
-credentials. The earlier concrete Kimi/AI-gateway target is superseded by D3a-K: acceptance
-now follows the mirrored host default (`openai-codex/gpt-5.6-sol` until further notice).
-**Satisfies:** R3a-7, R3a-13.
+credentials. Provider selection follows explicit user configuration when present. D3a-M
+defines the portable no-config defaults; D3a-K records the operator-specific Codex acceptance
+proof and does not redefine repository defaults.
+**Satisfies:** R3a-7, R3a-13, R3a-15.
 **Rationale:** This isolation is best practice and already proven in Phase 2. A literal
 "copy auth.json into the container" approach and a dedicated claw inference identity remain
 **rejected**. Mirroring user config means mirroring non-secret selection/config plus a
@@ -139,8 +140,10 @@ corollary: if an operator rotates a token, re-sync provider + hash file together
 | D3a-A | R3a-1, R3a-2 |
 | D3a-B | R3a-1, R3a-4, R3a-7 |
 | D3a-C | R3a-3, R3a-4, R3a-8 |
-| D3a-D | R3a-7 |
+| D3a-D | R3a-7, R3a-13, R3a-15 |
 | D3a-I | R3a-13 |
+| D3a-K | R3a-3, R3a-7, R3a-13 |
+| D3a-M | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 |
 | D3a-J | R3a-5, R3a-7 |
 | D3a-L | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 |
 | D3a-E | R3a-8, R3a-11 |
@@ -148,15 +151,17 @@ corollary: if an operator rotates a token, re-sync provider + hash file together
 | D3a-G | R3a-3, R3a-4, R3a-6 |
 | D3a-H | R3a-2, R3a-8, R3a-9 |
 
-GATE requirements R3a-1..14 are covered by at least one decision or the slice's direct
-implementation. R3a-12 and R3a-14 are mandatory before the routed write resumes; embedding
-freshness may not defer or fall back to keyword-only acceptance.
+GATE requirements R3a-1..15 are covered by at least one decision or the slice's direct
+implementation. R3a-12 freshness is mandatory for whichever embedding profile is selected;
+R3a-14 is conditional on selecting the local-Qwen override. Keyword-only acceptance remains
+forbidden.
 
-## D3a-K — Current acceptance model is host-default ChatGPT-5.6 Sol via isolated Codex OAuth (2026-09-16)
-**Decision:** Until further notice, conversational acceptance runs use the operator's
-mirrored host default: `openai-codex/gpt-5.6-sol` (ChatGPT-5.6 Sol, thinking `high`). Kimi
-and GLM are currently unavailable to the operator and must not be used for acceptance.
-Embedding configuration is independent and governed by D3a-L.
+## D3a-K — Operator override acceptance used ChatGPT-5.6 Sol via isolated Codex OAuth (2026-09-16)
+**Decision:** The 2026-09-16 conversational acceptance run follows the operator's explicit
+mirrored host choice: `openai-codex/gpt-5.6-sol` (ChatGPT-5.6 Sol, thinking `high`). This is
+proof that explicit provider/model overrides and credential isolation work; it is not the
+portable repository default. D3a-M defines no-config defaults. Embedding selection is
+independent and governed by D3a-L/M.
 
 Host openai-codex `auth.json` values are provisioned into OpenShell's builtin `codex`
 provider (`access_token`, `refresh_token`, `account_id`). Sandbox `auth.json` contains a
@@ -172,27 +177,40 @@ refresh remains host-side in lifecycle stages.
 **Evidence:** `docs/evidence/cited-query-20260916T164509Z.json`; offline header-rewrite and
 config-projection tests in `tests/test_runtime_converge.py`.
 
-## D3a-L — Home-network Qwen embeddings are the sole embedding configuration (2026-09-16)
-**Decision:** Replace the corporate AI-gateway embedding path with the operator's
-home-network OpenAI-compatible `Qwen3-Embedding-8B` service as the **only** supported
-embedding configuration. Use the model's native 4096-dimensional output and a 1000-second
-request timeout. Do not retain the corporate gateway as an embedding fallback.
+## D3a-L — Home-network Qwen is an optional operator embedding override (revised 2026-09-17)
+**Decision:** Preserve the operator's home-network OpenAI-compatible
+`Qwen3-Embedding-8B` service as an explicit local override, not the repository default. The
+profile uses native 4096-dimensional output and a 1000-second request timeout. Selecting it
+requires a full non-destructive parallel rebuild because Qwen and the default OpenAI model use
+different vector spaces.
 
-The live compatibility probe established that requests with `dimensions: 1536` and
-`dimensions: 4096` both return HTTP 400 because this deployment does not support the
-OpenAI `dimensions` parameter; omitting it returns HTTP 200 with 4096 values. Even a
-same-width output would still require full re-embedding because Qwen and OpenAI vectors
-belong to different vector spaces.
-
-The cutover is non-destructive: create a parallel 4096-dimension Postgres database/index,
-fully sync and embed the canonical brain clone, validate counts and semantic retrieval, and
-only then point the sandbox at it. Keep the current 1536-dimension database intact as rollback
-until Phase 3a acceptance. The private endpoint address belongs in ignored operator-local
-configuration or environment, not tracked files. The endpoint is unauthenticated; a client
-may send literal `dummy` only when a nonempty API-key field is required. No OpenShell
-credential provider is needed, but deny-by-default policy must allow only the configured
-host/port for the gbrain runtime.
+Compatibility evidence remains unchanged: this deployment returns HTTP 400 when either 1536
+or 4096 is sent in the OpenAI `dimensions` field and returns 4096 values when the field is
+omitted. Build and validate a parallel database before switching an operator who selected the
+profile. Keep the default/previous 1536-dimensional database for rollback. The private
+endpoint remains ignored operator-local data; literal `dummy` is non-secret compatibility
+data. Policy grants only the exact configured host/port.
 
 **Satisfies:** R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14.
-**Supersedes:** Q2's AI-gateway / `text-embedding-3-large` / 1536-dimension runtime choice.
-Slice 0–2 evidence remains valid historical proof, not the accepted final configuration.
+**Superseded aspect:** The 2026-09-16 wording made home Qwen the sole supported configuration.
+D3a-M restores portable AI-gateway defaults while retaining this profile as an override.
+
+## D3a-M — Portable Zendesk AI-gateway defaults; explicit user config wins (2026-09-17)
+**Decision:** A fresh clone with no preferred provider configuration defaults both model
+concerns to the Zendesk AI Gateway:
+
+- inference: `anthropic.kimi-k3` (default); `anthropic.glm-5.2` is a supported alternative;
+- embeddings: `openai:text-embedding-3-large`, 1536 dimensions (the proven pre-Spark path).
+
+Explicit host/local/environment configuration overrides inference and embeddings independently.
+Joe's DGX/Qwen profile and Codex OAuth model are valid operator overrides, but neither may be a
+tracked prerequisite or no-config default. Credential isolation remains unchanged: real gateway
+or OAuth credentials stay in OpenShell and only placeholders enter the sandbox. Each selected
+embedding profile must remain internally fresh and single-vector-space; profile changes rebuild
+in parallel rather than mixing vectors.
+
+**Satisfies:** R3a-5, R3a-7, R3a-12, R3a-13, R3a-15.
+**Rationale:** prime-claw is a reusable builder project. Requiring uncommon personal hardware
+or a developer's private OAuth setup would make the checked-in defaults unusable for the
+average operator. The gateway path was already proven in Slices 0–2; the remaining work is to
+restore it as the tracked default and make local overrides explicit and independently testable.

@@ -122,14 +122,15 @@ errors.
 The build always restores the historical policy on normal exit, including success. Slice
 4A.2b must explicitly reapply the candidate policy for semantic validation/cutover.
 
-## Embedding budget exhausted / HTTP 429 (Phase 3a transition)
+## Default AI-gateway embedding budget exhausted / HTTP 429
 
-**Signature:** corporate AI-gateway embedding requests retry and end with `Too Many Requests`.
+**Signature:** Zendesk AI-gateway embedding requests retry and end with `Too Many Requests`.
 
-**Do not:** repeatedly retry, accept keyword-only mode, mutate the existing 1536-dimension
-index, or restore the corporate gateway as an embedding fallback.
+**Do not:** repeatedly retry, accept keyword-only mode, mutate an existing index in place, or
+silently switch providers/vector spaces. The gateway remains the portable no-config default;
+an outage or quota error must be visible.
 
-**Required recovery:** stop the write and execute the prepared Slice 4A plan in a later
-implementation session: build and validate the parallel home-Qwen 4096-dimension index, then
-cut over. Until Slice 4A passes, Slice 4B routed writes remain blocked. See
-[home-embedding-runtime.md](home-embedding-runtime.md).
+**Recovery:** stop the write and restore provider capacity/quota. An operator who has explicitly
+configured another embedding profile may use its documented non-destructive parallel rebuild,
+but prime-claw must never auto-select personal hardware as fallback. Joe's home-Qwen override
+is currently paused on the DGX Spark outage. See [home-embedding-runtime.md](home-embedding-runtime.md).

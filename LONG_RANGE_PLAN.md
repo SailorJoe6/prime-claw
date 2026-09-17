@@ -97,13 +97,14 @@ operations: `docs/runbook.md`. Plan set archived to
 
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 
-**Current status (2026-09-16): BLOCKED EXTERNALLY.** Phase 3a Slices 0–3 and Slice 4A.1
-are complete. Slice 4A.2a's isolated build path is implemented, but the live build is paused
-because the DGX Spark serving `Qwen3-Embedding-8B` crashed. A partial 4096-dimensional
-candidate database is preserved; the historical policy is restored; the canonical database
-is unchanged; no cutover occurred. Resume only after the operator confirms the home model is
-serving again. The routed `projects/prime-claw` write + Git push-back remains blocked behind
-Slice 4A. Corporate AI-gateway embeddings are superseded and are not a fallback.
+**Current status (revised 2026-09-17):** Phase 3a Slices 0–3 and Slice 4A.1 are complete.
+A new portability gate (R3a-15 / Slice 4P) requires checked-in no-config defaults to use
+Zendesk AI Gateway for both concerns: Kimi K3 inference and
+`text-embedding-3-large`/1536 embeddings; explicit operator choices override each independently.
+Implementation is pending and does not require the Spark. Joe's optional local-Qwen Slice 4A.2a
+remains externally blocked because the DGX Spark crashed; its partial 4096-dimensional candidate
+is preserved, the historical policy is restored, the canonical database is unchanged, and no
+cutover occurred. The routed write/push acceptance remains blocked on Joe's selected profile.
 
 The riskiest integration, done as early as possible and deliberately thin but
 *whole*: a prime-agent session inside the sandbox, connected to gbrain, that
@@ -125,7 +126,7 @@ claw-skill-strip deltas are not needed here.)
 **Sub-phases** (split for risk isolation):
 
 - **3a — tracer bullet.** Brain cloned in → in-sandbox gbrain+PG index → cited
-  read/query → home-Qwen 4096-dimension cutover → one routed write + push-back. **Opened with a
+  read/query → portable AI-gateway defaults + optional home-Qwen profile → one routed write + push-back. **Opened with a
   Slice-0 spike (a go/no-go gate):** prove in real code that upstream gbrain
   runs under prime-agent-as-controller in the OpenShell sandbox. GO = upstream
   path; NO-GO = documented thin-fork fallback. ⚠️ may pivot the gbrain choice.

@@ -1,10 +1,17 @@
-# Phase 3a Slice 4A — home-Qwen embedding cutover
+# Phase 3a Slice 4A — optional home-Qwen embedding override
 
-**Status:** BLOCKED — 4A.1 complete; 4A.2a partial candidate preserved after external DGX Spark crash
+**Status:** BLOCKED for this operator override — 4A.1 complete; 4A.2a partial candidate preserved after external DGX Spark crash
 **Decision:** D3a-L
 **Requirements:** R3a-12, R3a-14
 **Evidence:** [`docs/evidence/embedding-preflight-20260916T191526Z.json`](../evidence/embedding-preflight-20260916T191526Z.json)
 **Interrupted-build evidence:** [`docs/evidence/embedding-build-interrupted-20260916T234215Z.json`](../evidence/embedding-build-interrupted-20260916T234215Z.json)
+
+## Requirement revision (2026-09-17)
+
+This Qwen/4096 path is now an explicit operator-local override, not the repository default.
+D3a-M/R3a-15 require fresh installs with no preferred config to use Zendesk AI Gateway
+`text-embedding-3-large`/1536 embeddings and Kimi K3 inference. This verdict continues to
+track Joe's selected local profile and its non-destructive safety contract.
 
 ## 4A.1 result — configuration and policy preflight
 

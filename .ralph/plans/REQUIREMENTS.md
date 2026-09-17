@@ -1,9 +1,11 @@
 # Requirements — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-Beads: `prime-claw-zwg` (P1). Index: [SPECIFICATION.md](SPECIFICATION.md). Decisions: [DECISIONS.md](DECISIONS.md).
+Beads: `prime-claw-zwg` (P1). Index:
+[SPECIFICATION.md](blocked/SPECIFICATION.md). Decisions: [DECISIONS.md](DECISIONS.md).
 
 Each requirement has an ID for traceability from [DECISIONS.md](DECISIONS.md). Prefix `R3a-`.
-Priority: **GATE** = must hold for the slice to be accepted; **NICE** = desired, may slip.
+Priority: **GATE** = must hold for the slice to be accepted; **CONDITIONAL GATE** = must
+hold when that optional profile is selected; **NICE** = desired, may slip.
 
 ## Functional
 
@@ -51,36 +53,37 @@ Priority: **GATE** = must hold for the slice to be accepted; **NICE** = desired,
 - **R3a-10 (GATE) — Single-gateway discipline.** `openshell` (17670) only.
 - **R3a-11 (GATE) — Offline tests.** New pytest coverage monkeypatches sandbox/exec
   boundaries (no live sandbox needed for the unit suite).
-- **R3a-12 (GATE) — Home embedding freshness.** The in-sandbox index uses only the
-  operator's home-network OpenAI-compatible `Qwen3-Embedding-8B` service at its native
-  4096 dimensions. Every current chunk is embedded in that one vector space: no mixed-model
-  vectors, NULL/stale embeddings, keyword-only acceptance, or corporate AI-gateway fallback.
-  A full re-embed is mandatory because Qwen and the former OpenAI model are not interchangeable.
-- **R3a-13 (GATE) — prime-agent config mirrors the host, credentials remain isolated.**
-  `stage_prime_agent` copies the operator's host `~/.prime/agent/models.json` **and**
-  `~/.prime/agent/settings.json` verbatim into the sandbox (feature: the container uses
-  whatever provider, model, thinking level, enabled-model set, and model metadata the user
-  has configured locally). Host `auth.json` is read host-side only and is **never copied**.
-  The selected provider's real credential is held by an OpenShell provider; sandbox
-  `auth.json` may contain only a non-secret adapter value plus `openshell:resolve:`
-  placeholders. Current acceptance target (operator direction, 2026-09-16, until further
-  notice): host default `openai-codex/gpt-5.6-sol` (ChatGPT-5.6 Sol, thinking `high`) via
-  the host's existing `openai-codex` OAuth. The Codex adapter uses a synthetic JWT for
-  prime-agent's local account-id parser and rewrites outbound auth/account headers to L7
-  placeholders; no real OAuth token or account credential reaches sandbox disk or process
-  memory. **Fallback** when host model/settings files are absent remains configurable and
-  must not be used by acceptance while the current host default is available. Override
-  paths via `host_models_json` / `PRIME_CLAW_HOST_MODELS_JSON` and
-  `host_settings_json` / `PRIME_CLAW_HOST_SETTINGS_JSON`.
-- **R3a-14 (GATE) — Non-destructive 4096-dimension cutover.** Build the Qwen index in a
-  parallel Postgres database/index from the canonical brain clone, validate page/chunk counts,
-  4096-dimensional vectors, semantic retrieval, and fresh lifecycle rebuild, then switch the
-  sandbox configuration. Keep the former 1536-dimension database untouched as rollback until
-  Phase 3a acceptance. The endpoint URL is supplied through ignored operator-local config or
-  `PRIME_CLAW_*` environment, never hardcoded or committed; the service is unauthenticated and
-  any required `dummy` API-key value is explicitly non-secret. Sandbox policy grants only the
-  configured host/port to the gbrain runtime. Corporate AI-gateway embedding credentials and
-  routes are not provisioned as fallback.
+- **R3a-12 (GATE) — Selected embedding-profile freshness.** The in-sandbox index uses one
+  explicitly selected embedding profile and one vector space: no mixed-model vectors,
+  NULL/stale embeddings, or keyword-only acceptance. The repository default is Zendesk AI
+  Gateway `openai:text-embedding-3-large` at 1536 dimensions. An explicit operator override
+  may select another provider/model/dimension (including home `Qwen3-Embedding-8B` at native
+  4096), but changing vector spaces requires a full non-destructive re-embed before cutover.
+- **R3a-13 (GATE) — prime-agent config mirrors explicit user choice; credentials remain
+  isolated.** Explicit host `models.json` and `settings.json` are mirrored verbatim and take
+  precedence, while host `auth.json` is never copied. The selected provider's real credential
+  stays in OpenShell; sandbox auth contains only non-secret adapter data and placeholders. With
+  no existing preferred host config, the portable inference default is Zendesk AI Gateway
+  `anthropic.kimi-k3`; `anthropic.glm-5.2` remains a supported gateway alternative. The
+  2026-09-16 cited-query proof used the operator's explicit `openai-codex/gpt-5.6-sol`
+  override and remains valid evidence of override/credential isolation, not the repo default.
+  Override paths remain available through `host_models_json` /
+  `PRIME_CLAW_HOST_MODELS_JSON` and `host_settings_json` /
+  `PRIME_CLAW_HOST_SETTINGS_JSON`.
+- **R3a-14 (CONDITIONAL GATE) — Non-destructive local-Qwen override cutover.** When an
+  operator explicitly selects the home-Qwen profile, build it in a parallel Postgres
+  database/index from the canonical brain clone, validate page/chunk counts, 4096-dimensional
+  vectors, freshness and semantic retrieval, then switch only that operator's runtime. Keep
+  the default/previous 1536-dimension database untouched as rollback. The private endpoint
+  enters only through ignored local config or `PRIME_CLAW_*`, never tracked defaults, logs, or
+  evidence. Policy grants only its exact host/port. This optional profile must not remove or
+  redefine the portable Zendesk AI-gateway default.
+- **R3a-15 (GATE) — Portable tracked defaults with explicit override precedence.** A clone of
+  prime-claw with no existing preferred provider configuration defaults both concerns to the
+  Zendesk AI Gateway: inference `anthropic.kimi-k3` (GLM allowed as an explicit alternative)
+  and embeddings `openai:text-embedding-3-large` at 1536 dimensions. Explicit host/local/env
+  configuration overrides inference and embeddings independently. Tracked config must require
+  neither a DGX/private endpoint nor Codex OAuth, and tests must prove this precedence.
 
 ## Out of scope (recorded for traceability)
 

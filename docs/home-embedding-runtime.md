@@ -1,12 +1,14 @@
 # Home-network embedding runtime
 
-> **Status:** BLOCKED — DGX Spark outage paused Slice 4A.2a; partial candidate preserved; no cutover.
-> **Decision:** D3a-L · **Requirements:** R3a-12, R3a-14 · **Plan:** Phase 3a Slice 4A
+> **Status:** OPTIONAL PROFILE BLOCKED — DGX Spark outage paused Slice 4A.2a; partial candidate preserved; no cutover.
+> **Decision:** D3a-L/M · **Requirements:** R3a-12, R3a-14, R3a-15 · **Plan:** Phase 3a Slices 4P/4A
 
-## Required state
+## Portable default versus this optional profile
 
-prime-claw uses the operator's home-network OpenAI-compatible embedding service as its
-**only** embedding provider:
+The checked-in no-config default must use Zendesk AI Gateway
+`openai:text-embedding-3-large` at 1536 dimensions. That portability correction is a new
+requirement and is not implemented yet. An operator may explicitly override the default with
+the home-network OpenAI-compatible profile documented here:
 
 - model: `Qwen3-Embedding-8B`
 - output: native 4096 dimensions
@@ -14,8 +16,10 @@ prime-claw uses the operator's home-network OpenAI-compatible embedding service 
 - authentication: none; literal `dummy` is permitted only for OpenAI clients that require a
   nonempty API-key field and is not a credential
 
-The corporate AI gateway is not an embedding fallback. Prime Agent inference remains a
-separate, host-selected concern (currently isolated OpenAI Codex OAuth).
+The gateway is the portable default, not a fallback from this profile. Embedding and inference
+are selected independently. With no preferred inference config, the portable inference default
+is Zendesk AI Gateway `anthropic.kimi-k3` (GLM supported); explicit host config may choose
+another model such as Codex.
 
 The private endpoint address is operator-local configuration. It must enter through an
 ignored local file or `PRIME_CLAW_*` environment and must never be committed, printed in
@@ -23,8 +27,9 @@ evidence, or copied into a generic policy fixture.
 
 ## Why this is a rebuild, not a config flip
 
-The current sandbox index is historical Slice 2 state: 3,029 chunks embedded with an OpenAI
-model at 1536 dimensions. The home service returns 4096-dimensional Qwen vectors.
+The current canonical sandbox index is the previously proven AI-gateway/OpenAI 1536-dimensional
+state and is the basis of the portable default. The optional home service returns
+4096-dimensional Qwen vectors.
 
 Compatibility probes established:
 
@@ -68,10 +73,10 @@ and `endpoint=operator-local (redacted)`. It writes
 - removes gbrain/Bun from the corporate AI-gateway rule;
 - leaves inference and GitHub routes unchanged.
 
-The tracked policy deliberately retains historical gbrain/Bun corporate access until the
-actual cutover. This keeps ordinary pre-cutover `converge` safe for the still-canonical 1536
-index. The rendered candidate policy removes it, and a later Slice 4A step applies that policy
-only with the parallel Qwen build.
+The tracked policy retains gbrain/Bun AI-gateway access because that is the portable default.
+The rendered local candidate policy removes it only while building or validating the explicitly
+selected home profile. A later cutover must change only that operator's selected runtime; it
+must not erase the tracked gateway default.
 
 
 ## Parallel candidate build
@@ -103,9 +108,9 @@ queryable between build and validation; after an externally interrupted process,
 may be resumed by rerunning `embedding-build`; never drop or alter the legacy `gbrain`
 database.
 
-## Non-destructive cutover
+## Non-destructive optional-profile cutover
 
-Slice 4A must:
+When the operator selects the home profile, Slice 4A must:
 
 1. Leave the current 1536-dimension database untouched.
 2. Create a parallel 4096-dimension Postgres database/index.
@@ -127,7 +132,8 @@ candidate has no source bookmark and is not accepted. The process is stopped, th
 policy is restored, the canonical fingerprint is unchanged, and no cutover occurred. Resume
 only after the operator confirms the exact home model is serving again.
 
-The attempted `projects/prime-claw` write stopped on corporate gateway rate limiting and
-rolled back cleanly: the page is absent, the brain Git clone is clean, and no commit or push
-occurred. Slice 4A.2 (parallel build and acceptance gates) is next. Slice 4B remains blocked
-until the full Slice 4A cutover passes.
+The attempted `projects/prime-claw` write stopped on gateway rate limiting and rolled back
+cleanly: the page is absent, the brain Git clone is clean, and no commit or push occurred.
+Slice 4P must implement portable tracked defaults. Joe's Slice 4A.2 local-Qwen build remains
+paused until the Spark is healthy; his Slice 4B acceptance remains blocked on that selected
+profile.

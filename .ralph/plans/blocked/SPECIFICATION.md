@@ -1,15 +1,16 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** BLOCKED — external DGX Spark outage paused Slice 4A.2a; partial candidate preserved, no cutover
+**Status:** PARTIALLY BLOCKED — portable-default Slice 4P is ready; DGX outage pauses only local-Qwen Slice 4A.2a
 **Beads:** `prime-claw-zwg` (P1)
-**Date:** 2026-09-11 · **Embedding decision revised:** 2026-09-16
+**Date:** 2026-09-11 · **Provider defaults revised:** 2026-09-17
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
 
 
-> **Current external blocker (2026-09-16):** the DGX Spark serving the sole accepted home
-> embedding model crashed during the isolated candidate build. Work is paused until the
-> operator confirms service recovery. The partial candidate is preserved; the historical
-> policy is restored; the canonical database/config are unchanged; no cutover occurred.
+> **Current external blocker (2026-09-16):** the DGX Spark serving this operator's selected home
+> embedding override crashed during the isolated candidate build. Work on that profile is
+> paused until the operator confirms service recovery. Portable-default Slice 4P is independent
+> and ready. The partial candidate is preserved; the historical policy is restored; the
+> canonical database/config are unchanged; no cutover occurred.
 
 This document is the summary and index for the work. It is accompanied by:
 
@@ -34,21 +35,21 @@ recover, destroy). The sandbox image (`docker/runtime.Dockerfile` →
 
 Inference **credential isolation** remains settled: a host OpenShell provider holds the
 real credential, only opaque placeholders enter the sandbox, and L7 swaps real values at
-the boundary. The concrete provider/model is now host-config-driven, not fixed to the AI
-Gateway. Per operator direction on 2026-09-16, the current acceptance target (until further
-notice) is the verbatim host default `openai-codex/gpt-5.6-sol` (ChatGPT-5.6 Sol, thinking
-`high`) using the host's OAuth. Embeddings are a separate concern: the sole accepted
-configuration is now the operator's home-network OpenAI-compatible
-`Qwen3-Embedding-8B` service at its native 4096 dimensions. Corporate AI-gateway embeddings
-are superseded and must not be a runtime fallback. The claw never possesses real LLM
-credentials (R-X-5 / R2-X-1 / R3a-13/R3a-14).
+the boundary. Explicit user configuration controls provider/model when present. With no
+preferred config, the portable repository defaults use the Zendesk AI Gateway for both
+concerns: inference `anthropic.kimi-k3` (GLM supported as an alternative) and embeddings
+`openai:text-embedding-3-large` at 1536 dimensions. The operator's Codex inference and
+home-network `Qwen3-Embedding-8B`/4096 embedding profile are valid independent overrides,
+not tracked prerequisites. The claw never possesses real LLM credentials
+(R-X-5 / R2-X-1 / R3a-13/R3a-15).
 
 **Execution state (2026-09-16):** Slices 0–3 now clone the real brain, serve its in-sandbox
-index, and let a sandboxed Prime Agent answer with citations. The historical index uses the
-superseded corporate OpenAI embedding path at 1536 dimensions. What does not exist yet is the
-required home-Qwen 4096-dimension index and the routed write/push proof. Slice 4A.1 now
-validates the operator-local endpoint contract and renders the exact-host candidate policy
-without entering the sandbox or touching Postgres. The parallel build/cutover remains next.
+index, and let a sandboxed Prime Agent answer with citations. That 1536-dimensional
+AI-gateway index is now the intended portable default profile, though tracked default selection
+still needs correction under R3a-15. For this operator's explicit local override, Slice 4A.1
+validates the home-Qwen endpoint contract and 4A.2 has a preserved partial 4096-dimensional
+candidate. Its live completion remains paused on the DGX Spark outage. The routed write/push
+proof also remains outstanding.
 Phase 2 proved the *container*; Phase 3a is finishing the *brain-hosting claw*.
 
 ## 2. The strategic frame (why this phase, this shape)
@@ -110,14 +111,13 @@ harness:
    routed per `docs/information-architecture.md` (brain = canonical store for domain
    facts), via `gbrain put` + `gbrain sync --source brain`.
 
-The sandboxed prime-agent **mirrors the operator's local config**: `stage_prime_agent`
-copies host `models.json` and `settings.json` verbatim, so provider/model/thinking defaults
-follow the user (currently `openai-codex/gpt-5.6-sol`, thinking `high`). Host `auth.json` is
-never copied: its selected credential is provisioned into OpenShell and sandbox auth is a
-placeholder-only projection. For Codex, a non-secret synthetic JWT satisfies prime-agent's
-local account-id parser; the preload rewrites outbound auth/account headers to OpenShell
-placeholders before network I/O (R3a-13). The old Kimi/GLM catalog remains only a fallback
-when host config is absent; it is not the current acceptance target.
+The sandboxed prime-agent **mirrors explicit operator config**: host `models.json` and
+`settings.json` take precedence when present. Host `auth.json` is never copied; selected real
+credentials remain in OpenShell and sandbox auth is placeholder-only. For a Codex override, a
+non-secret synthetic JWT satisfies local parsing and the preload rewrites outbound headers to
+OpenShell placeholders (R3a-13). When no preferred host config exists, the tracked portable
+fallback must select Zendesk AI Gateway `anthropic.kimi-k3`; GLM remains available as an
+alternative. The earlier Codex cited-query run is override evidence, not the repo default.
 
 The write is a **test artifact**: a keep-worthy `projects/prime-claw` page describing
 prime-claw itself (the operator confirmed exact slug `projects/prime-claw` on 2026-09-16). The agent
@@ -152,8 +152,9 @@ result; no credential reaches sandbox disk (resolved Q4 / D3a-G).
 - A fresh `bin/prime-claw create && bin/prime-claw validate` (or a new acceptance check)
   proves: brain present, index serving, a cited query answered, one routed write landed.
 - `validate` evidence records the brain page count and the write receipt.
-- The complete brain index uses only home-network `Qwen3-Embedding-8B` vectors at 4096
-  dimensions, with no mixed/stale/null vectors and no corporate embedding fallback.
+- The complete brain index uses one fresh selected vector space with no mixed/stale/null
+  vectors. The no-config default is Zendesk AI Gateway `openai:text-embedding-3-large` at
+  1536 dimensions; home Qwen/4096 is an explicit local override.
 - The prime-agent session in the sandbox can answer "what do we know about X?" from the
   brain and "remember Y" with a correct, cited, IA-routed write — **all inside the
   container**, credentials host-only.
@@ -179,26 +180,21 @@ result; no credential reaches sandbox disk (resolved Q4 / D3a-G).
    in-sandbox HTTPS `git clone` WITH `.git`, push-capable, via the custom `github-push` L7
    provider profile (placeholder `${api_token}` swapped at L7; no credential on disk).
    In-sandbox SSH clone was considered and rejected. See `docs/derisk/3a-slice1.md`.
-2. **Embeddings provider for the in-sandbox index.** ~~AI gateway / 1536-dim OpenAI~~
-   **SUPERSEDED (operator decision 2026-09-16; D3a-L):** the only accepted embedding
-   configuration is the operator's home-network OpenAI-compatible service using
-   `Qwen3-Embedding-8B`, native 4096 dimensions, and a 1000-second request timeout. The
-   endpoint accepts unauthenticated requests; `dummy` is a non-secret client compatibility
-   value only. The service rejects the OpenAI `dimensions` parameter, so it cannot emit 1536
-   dimensions. Because model vector spaces are not interchangeable, all chunks require a full
-   re-embed even if dimensions could match. The transition must build and validate a parallel
-   4096-dimension database/index before cutover; no in-place mutation of the current 1536 index.
-   The endpoint address is operator-local configuration and must not be committed to this repo.
+2. **Embeddings provider for the in-sandbox index.** **REVISED (operator portability
+   requirement 2026-09-17; D3a-L/M):** the no-config repository default is the previously
+   proven Zendesk AI Gateway `openai:text-embedding-3-large` profile at 1536 dimensions.
+   Explicit configuration may select another provider independently. The operator's home
+   `Qwen3-Embedding-8B`/4096 profile remains an optional ignored-local override with its
+   non-destructive parallel rebuild contract; it is not a tracked prerequisite.
 3. **Which brain for the tracer read/query proof** ~~open~~ **RESOLVED (Q3):** the FULL real
    brain (`~/gitlab_local/brain`, GitHub `JLandersZen/brain`, branch `main`, private).
 4. **Exact validate surface** ~~open~~ **RESOLVED (Q4, D3a-G):** GATE = brain cloned with
    `.git` + pages>0 + cited query + one routed write receipt + push-back round-trip.
-5. **Which prime-agent provider/model proves the conversational slices?** ~~open~~
-   **RESOLVED (Q5, operator direction 2026-09-16, D3a-K):** mirror the host
-   `models.json` + `settings.json` and use its current default:
-   `openai-codex/gpt-5.6-sol` (ChatGPT-5.6 Sol, thinking `high`). Host OAuth remains in
-   the OpenShell `codex` provider; sandbox auth is placeholder-only. Kimi/GLM are not
-   available to the operator now and must not be used by acceptance until further notice.
+5. **Which prime-agent provider/model proves the conversational slices?** **REVISED
+   (operator portability requirement 2026-09-17; D3a-K/M):** explicit host model/settings
+   win. With none, default inference is Zendesk AI Gateway `anthropic.kimi-k3`; GLM is a
+   supported alternative. The 2026-09-16 Codex run remains valid proof of an explicit
+   `openai-codex/gpt-5.6-sol` override and OAuth isolation, not the checked-in default.
 6. **gbrain: upstream-vs-fork (Slice-0 spike — the strategy is decided; the spike proves
    feasibility).** **Strategy (settled):** we WANT to use **upstream `garrytan/gbrain`** as
    prime-claw's driven brain (mode a) rather than maintain zbrain's stripped fork. Upstream

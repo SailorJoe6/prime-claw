@@ -52,12 +52,12 @@ following the openclaw-setup pattern.)
   false-pass fix, and the VPN-down RBAC-403 signature.
 - [derisk/3a-slice3.md](derisk/3a-slice3.md) — Slice 3: cited
   read/query from sandboxed prime-agent, plus host settings mirroring and
-  placeholder-isolated ChatGPT-5.6 Sol / openai-codex OAuth.
+  placeholder-isolated ChatGPT-5.6 Sol / openai-codex OAuth as an explicit operator override.
 
 ## Runtime (Phase 2)
 
 - [sandbox-runtime.md](sandbox-runtime.md) — the sandbox lifecycle: verbs,
   stages, repo layout, and operating guarantees.
-- [home-embedding-runtime.md](home-embedding-runtime.md) — required next
-  embedding configuration and the non-destructive 1536→4096 Qwen cutover contract.
+- [home-embedding-runtime.md](home-embedding-runtime.md) — portable AI-gateway embedding
+  default plus the optional, non-destructive 1536→4096 home-Qwen override contract.
 - [runbook.md](runbook.md) — operations: failure signature → recovery command.

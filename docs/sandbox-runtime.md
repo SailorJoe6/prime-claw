@@ -1,11 +1,11 @@
 # Sandbox runtime lifecycle (Phase 2)
 
-> **Embedding transition (2026-09-16):** the implemented Slice 2 runtime still contains the
-> historical corporate AI-gateway / 1536-dimension index. D3a-L supersedes that configuration.
-> Slice 4A.1 now provides the non-mutating home `Qwen3-Embedding-8B` configuration/policy
-> preflight and Slice 4A.2a provides an isolated candidate-build verb. The live 4096-dimension
-> build, validation, and cutover remain incomplete; do not
-> treat the historical gateway path as an accepted fallback. See
+> **Provider-profile transition (revised 2026-09-17):** Zendesk AI Gateway is the required
+> no-config default for both inference and embeddings: Kimi K3 inference and
+> `text-embedding-3-large`/1536 embeddings. The current runtime already proves that embedding
+> path, but tracked default/profile selection still needs correction under R3a-15. Slice 4A's
+> home `Qwen3-Embedding-8B`/4096 machinery is retained as an explicit operator-local override;
+> its live build is paused on the DGX Spark outage. See
 > [home-embedding-runtime.md](home-embedding-runtime.md).
 
 
@@ -79,8 +79,9 @@ for targeted diagnosis:
 - **sandbox** — create-if-absent (or delete+recreate with `force_fresh`);
   attaches all three providers (historical AI gateway, GitHub for brain
   clone/push, Codex for current inference). The AI-gateway attachment remains temporarily so
-  pre-cutover converge cannot break the canonical 1536 index; it is not an accepted embedding
-  fallback after cutover. On in-place converge, attaches any
+  ordinary gateway-default converge can serve the canonical 1536 index. An explicit local
+  profile may temporarily replace gbrain/Bun egress during its isolated build. On in-place
+  converge, attaches any
   missing provider without wiping `/sandbox`. The brain is NOT `--upload`ed.
 - **prime-agent** — install/configure prime-agent + persistent REPL; mirror host
   `models.json` + `settings.json` verbatim; write a placeholder-only Codex auth

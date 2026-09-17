@@ -877,8 +877,8 @@
   {
    "id": "R3a-13",
    "priority": "GATE",
-   "summary": "Sandbox prime-agent mirrors host models.json + settings.json verbatim; host auth.json is never copied. Current host-default openai-codex/gpt-5.6-sol works via synthetic/placeholder-only auth projection and OpenShell L7 OAuth.",
-   "status": "proven",
+   "summary": "Explicit host model/settings overrides are mirrored with credentials isolated; absent preferred config, portable inference defaults to Zendesk AI Gateway anthropic.kimi-k3 (GLM supported).",
+   "status": "partial (explicit Codex override proven; portable no-config Kimi default implementation pending)",
    "proven_by": {
     "apply": [
      "bin/prime-claw",
@@ -926,7 +926,7 @@
   {
    "id": "R3a-5",
    "priority": "GATE",
-   "summary": "Lifecycle: create/converge wire github-provider + brain-clone stages; conditional credential refresh (skip when hash unchanged) avoids placeholder re-keying churn. Slice 2 added brain-index (index build wired into create/converge). Slice 3 added codex-provider, attach-missing without recreate, placeholder auth/config mirror, daemon restart, and brain-query stages. Home-Qwen-only embedding lifecycle cutover remains pending in Slice 4A.",
+   "summary": "Lifecycle: create/converge wire github-provider + brain clone/index/query stages and conditional credential refresh. Portable AI-gateway default profile selection is pending in Slice 4P; optional local-Qwen lifecycle remains isolated in Slice 4A.",
    "status": "partial",
    "proven_by": {
     "apply": [
@@ -1000,16 +1000,24 @@
   {
    "id": "R3a-12",
    "priority": "GATE",
-   "summary": "Home embedding freshness: only Qwen3-Embedding-8B at native 4096 dimensions; full single-vector-space re-embed; no null/stale/mixed vectors, keyword-only acceptance, or corporate AI-gateway fallback.",
-   "status": "blocked (external DGX Spark outage; partial Qwen candidate preserved, no cutover)",
-   "proven_by": {},
-   "evidence": "not yet produced \u2014 see .ralph/plans/EXECUTION_PLAN.md Slice 4A",
-   "verdict_doc": "docs/home-embedding-runtime.md"
+   "summary": "Selected embedding-profile freshness: default Zendesk AI Gateway openai:text-embedding-3-large/1536; explicit overrides allowed only with a complete single-vector-space rebuild; no null/stale/mixed vectors or keyword-only acceptance.",
+   "status": "partial (historical gateway/1536 proof exists; portable default selection pending; optional Qwen override blocked on Spark)",
+   "proven_by": {
+    "validate": [
+     "docs/derisk/3a-slice2.md",
+     "docs/evidence/validate-20260915T170708Z.json"
+    ],
+    "tests": [
+     "tests/test_runtime_validate.py"
+    ]
+   },
+   "evidence": "docs/evidence/validate-20260915T170708Z.json",
+   "verdict_doc": "docs/derisk/3a-slice2.md"
   },
   {
    "id": "R3a-3",
    "priority": "GATE",
-   "summary": "Cited read/query: sandboxed prime-agent invokes brain-query (gbrain search then get) and answers correctly with an exact brain page citation. Proven using mirrored host default openai-codex/gpt-5.6-sol.",
+   "summary": "Cited read/query: sandboxed prime-agent invokes brain-query (gbrain search then get) and answers correctly with an exact brain page citation. Proven using the operator explicit openai-codex/gpt-5.6-sol override.",
    "status": "proven",
    "proven_by": {
     "apply": [
@@ -1033,7 +1041,7 @@
   {
    "id": "R3a-14",
    "priority": "GATE",
-   "summary": "Non-destructive 4096-dimension cutover: build/validate a parallel Qwen database/index, keep the 1536 database intact for rollback, use ignored local endpoint config, and grant only exact gbrain egress.",
+   "summary": "Conditional local-Qwen override: parallel non-destructive 4096-dimensional build/cutover with private ignored endpoint and exact egress; must not replace portable AI-gateway defaults.",
    "status": "blocked (4A.1 complete; 4A.2a partial candidate preserved after external DGX Spark crash)",
    "proven_by": {
     "apply": [
@@ -1053,6 +1061,15 @@
    },
    "evidence": "docs/evidence/embedding-build-interrupted-20260916T234215Z.json",
    "verdict_doc": "docs/derisk/3a-slice4a.md"
+  },
+  {
+   "id": "R3a-15",
+   "priority": "GATE",
+   "summary": "Portable no-config defaults: Zendesk AI Gateway anthropic.kimi-k3 inference and openai:text-embedding-3-large/1536 embeddings; explicit host/local/env overrides win independently; no DGX or Codex prerequisite.",
+   "status": "pending implementation (requirement added 2026-09-17)",
+   "proven_by": {},
+   "evidence": "not yet produced \u2014 see .ralph/plans/blocked/EXECUTION_PLAN.md Slice 4P",
+   "verdict_doc": ".ralph/plans/blocked/SPECIFICATION.md"
   }
  ],
  "phase2": {}
