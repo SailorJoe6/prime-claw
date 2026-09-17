@@ -1,0 +1,114 @@
+{
+  "verb": "portable-defaults-offline-acceptance",
+  "slice": "3a-4P",
+  "captured_at": "2026-09-17T19:07:52.483466+00:00",
+  "result": "PASS",
+  "configuration": {
+    "inference_source": "tracked-default",
+    "inference_provider": "anthropic",
+    "inference_model": "anthropic.kimi-k3",
+    "embedding_profile": "gateway",
+    "embedding_model": "openai:text-embedding-3-large",
+    "embedding_dimensions": 1536,
+    "required_providers": [
+      "prime-claw-ai-gateway",
+      "prime-claw-github"
+    ],
+    "codex_required": false,
+    "private_endpoint_required": false
+  },
+  "checks": [
+    {
+      "id": "tracked-defaults-portable",
+      "pass": true,
+      "detail": "runtime.json selects Kimi inference and gateway OpenAI/1536 embeddings"
+    },
+    {
+      "id": "independent-precedence",
+      "pass": true,
+      "detail": "environment/operator-local/valid host inference and home embedding selections resolve independently"
+    },
+    {
+      "id": "conditional-provider-lifecycle",
+      "pass": true,
+      "detail": "no-config dry-run stages gateway + GitHub and does not stage/read Codex OAuth"
+    },
+    {
+      "id": "least-privilege-policy",
+      "pass": true,
+      "detail": "effective policy includes only routes/binaries required by resolved profiles"
+    },
+    {
+      "id": "migration-safety",
+      "pass": true,
+      "detail": "existing config mismatch and populated vector-width mismatch fail before config mutation/migrate/sync"
+    },
+    {
+      "id": "selected-profile-freshness-gate",
+      "pass": true,
+      "detail": "validate gates selected database/model/dimensions plus null/mixed/stale whole-source vectors"
+    },
+    {
+      "id": "pre-mutation-exact-state-guard",
+      "pass": true,
+      "detail": "populated config/database must match model, dimensions, vector width, hashes, signatures, and non-NULL embeddings before config write/migrate/sync"
+    },
+    {
+      "id": "profile-aware-validation",
+      "pass": true,
+      "detail": "candidate policy is applied temporarily; state/bookmark gate precedes gbrain mutation; home probes use candidate GBRAIN_HOME/DB; canonical policy restore is guaranteed and gated"
+    },
+    {
+      "id": "managed-provider-reconciliation",
+      "pass": true,
+      "detail": "converge attaches selected and detaches stale prime-claw-managed providers only; status compares actual attachments"
+    },
+    {
+      "id": "reviewed-command-boundaries",
+      "pass": true,
+      "detail": "model/provider tokens constrained; shell args quoted; SQL literals escaped and NULL-safe"
+    },
+    {
+      "id": "credential-isolation",
+      "pass": true,
+      "detail": "host auth is never copied; Codex projection exists only for explicit Codex selection and is removed otherwise"
+    },
+    {
+      "id": "focused-offline-tests",
+      "pass": true,
+      "detail": "27 passed"
+    },
+    {
+      "id": "canonical-offline-suite",
+      "pass": true,
+      "detail": "177 passed, 10 deprecation warnings"
+    },
+    {
+      "id": "hermetic-create-dry-run",
+      "pass": true,
+      "detail": "exit 0; selected anthropic/anthropic.kimi-k3 + gateway openai:text-embedding-3-large/1536; providers gateway + GitHub"
+    },
+    {
+      "id": "independent-diff-review",
+      "pass": true,
+      "detail": "read-only subagent review found no unresolved high-severity issue after fixes"
+    }
+  ],
+  "commands": [
+    "pytest -q tests/test_portable_provider_defaults.py",
+    "pytest -q tests",
+    "bin/prime-claw --config <temporary-hermetic-runtime.json> --dry-run create",
+    "git diff --check"
+  ],
+  "input_sha256": {
+    "bin/prime-claw": "66d5874e9c5c23407b2f5c71c559cfece8c1143b6009469d6e1ceee6bbc9f2dc",
+    "config/runtime.json": "03107ea1faf8429e1f78c0f423705de2dbf029ee5db48f67a5eceaab1add5854",
+    "policies/runtime.yaml": "d98afc38d3b4e400fb41706d7b29d704c894e2ce7dbaaa8af64bf8d32db85242",
+    "tests/test_portable_provider_defaults.py": "015e3fb51053d659ccd7fe27c562232d44d2a7e42dd0aa9d18b57e5e9be8b0cf"
+  },
+  "notes": [
+    "No network, live sandbox, database mutation, credential read, or Qwen build was performed.",
+    "This proves Slice 4P implementation and offline/dry-run selection. Generic live routed-write acceptance remains Slice 4B.",
+    "No private endpoint value is recorded."
+  ]
+}

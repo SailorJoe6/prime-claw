@@ -252,6 +252,7 @@ def test_candidate_build_rejects_canonical_fingerprint_drift(tmp_path, monkeypat
 
 def test_historical_policy_restore_redacts_private_endpoint(tmp_path, monkeypatch, capsys):
     settings = pc._embedding_settings(cfg(tmp_path))
+    monkeypatch.setattr(pc, "_write_private_file", lambda *a, **k: None)
     monkeypatch.setattr(pc, "run", lambda *a, **k: (7, "failed " + FAKE_BASE_URL))
     assert pc._restore_historical_embedding_policy(cfg(tmp_path), settings) == 7
     output = capsys.readouterr().err

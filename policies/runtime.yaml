@@ -64,6 +64,7 @@ network_policies:
   # placeholder; the real gateway key is substituted at L7 behind this
   # inspected rest endpoint. Binaries: curl (validator probe) + node
   # (prime-agent runtime).
+  # PRIME_CLAW_GATEWAY_POLICY_BEGIN
   model_ai_gateway:
     name: model-ai-gateway-credentialed
     endpoints:
@@ -77,6 +78,7 @@ network_policies:
       # `converge` from breaking the still-canonical 1536-dimension index.
       - path: /usr/local/bin/bun
       - path: /usr/local/bin/gbrain
+  # PRIME_CLAW_GATEWAY_POLICY_END
 
   # Slice 4A (D3a-L): rendered at preflight into an ignored operator-local
   # policy. The private host/port never enters this tracked template. The rule
@@ -84,11 +86,9 @@ network_policies:
   # corporate model gateway above.
   # PRIME_CLAW_HOME_EMBEDDING_POLICY
 
-  # Slice 3 (R3a-3/R3a-13): the operator's CURRENT Prime Agent default is
-  # openai-codex/gpt-5.6-sol. OAuth values remain in the host OpenShell `codex`
-  # provider. The sandbox auth projection contains only a synthetic JWT and opaque
-  # placeholders; npm-onload rewrites outbound headers to those placeholders and L7
-  # swaps the real access token/account id at the boundary.
+  # Explicit openai-codex overrides use host-side OpenShell OAuth. The sandbox
+  # auth projection contains only a synthetic JWT and opaque placeholders.
+  # PRIME_CLAW_CODEX_POLICY_BEGIN
   model_openai_codex:
     name: model-openai-codex-oauth
     endpoints:
@@ -98,6 +98,7 @@ network_policies:
       - { host: ab.chatgpt.com, port: 443, protocol: rest, access: read-write }
     binaries:
       - path: /usr/bin/node
+  # PRIME_CLAW_CODEX_POLICY_END
 
   # Slice 1 (R3a-1/7): credentialed github.com for git clone/fetch/push of the brain
   # repo. The attached github-push provider injects the real token at L7; the sandbox

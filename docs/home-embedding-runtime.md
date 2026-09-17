@@ -104,7 +104,7 @@ schema, page/chunk/vector/model counts, source bookmark, embedding config, and m
 before and after every normal build exit. It does **not** switch
 `/sandbox/.gbrain/config.json`. It restores the tracked gateway/default policy after both success and reported failure so the legacy runtime stays
 queryable between build and validation; after an externally interrupted process, run
-`bin/prime-claw converge` to restore that policy. A partial candidate database is isolated and
+`PRIME_CLAW_EMBEDDING_PROFILE=gateway bin/prime-claw converge` to restore that policy. A partial candidate database is isolated and
 may be resumed by rerunning `embedding-build`; never drop or alter the legacy `gbrain`
 database.
 
@@ -119,6 +119,11 @@ When the operator selects the home profile, Slice 4A must:
    exact retrieval, and semantic search.
 5. Switch the canonical gbrain config only after validation.
 6. Retain the old database as rollback until Phase 3a acceptance closes.
+
+While `home-qwen` is selected but not cut over, ordinary `create`/`converge` fail closed before
+mutation. Profile-aware validation temporarily applies the candidate policy, uses the candidate
+`GBRAIN_HOME` and candidate database (never canonical gbrain with candidate SQL), and restores
+the canonical gateway policy in a guaranteed cleanup path. Restore failure is a gate failure.
 
 Deny-by-default network policy must allow only the locally configured embedding host/port to
 the gbrain/Bun runtime. It must not provision an embedding credential provider.
@@ -135,6 +140,6 @@ the exact-model compatibility/preflight gate before resuming the candidate.
 
 The attempted `projects/prime-claw` write stopped on gateway rate limiting and rolled back
 cleanly: the page is absent, the brain Git clone is clean, and no commit or push occurred.
-Slice 4P must implement portable tracked defaults, after which generic Slice 4B can use the
-gateway profile. Joe's Slice 4A.2 local-Qwen build is ready to resume after preflight, but it
+Slice 4P implements the portable tracked defaults; generic Slice 4B can now use the gateway
+profile. Joe's Slice 4A.2 local-Qwen build is ready to resume after preflight, but it
 remains independent and does not block portable acceptance.

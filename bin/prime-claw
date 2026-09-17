@@ -49,6 +49,10 @@ def load_config(path: str | None) -> dict:
             if not isinstance(overlay, dict):
                 raise ValueError("operator-local config must be a JSON object")
             cfg.update(overlay)
+            # Internal provenance only. Selection precedence needs to distinguish a
+            # checked-in default from an explicit operator-local override without
+            # persisting the local values anywhere else.
+            cfg["_local_override_keys"] = sorted(overlay)
     return cfg
 
 
@@ -107,14 +111,26 @@ def probe_sandbox(cfg) -> tuple[bool | None, str, dict | None]:
 
 
 def probe_provider(cfg) -> tuple[bool, str]:
-    data, err = openshell_json(["provider", "list"])
+    data, err = openshell_json([
+        "sandbox", "provider", "list", cfg["sandbox_name"]])
     if data is None:
-        return False, f"provider list failed: {err.strip()[:120]}"
-    want = cfg["provider_name"]
-    names = [p.get("name") for p in data]
-    if want in names:
-        return True, f"{want} attached"
-    return False, f"provider {want!r} NOT attached (have: {', '.join(names) or 'none'})"
+        return False, f"sandbox provider list failed: {err.strip()[:120]}"
+    try:
+        required = list(_resolve_runtime_profiles(cfg)["provider_names"])
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return False, f"profile selection failed: {exc}"
+    names = [item.get("name") if isinstance(item, dict) else str(item) for item in data]
+    missing = [name for name in required if name not in names]
+    stale = [name for name in _managed_provider_names(cfg)
+             if name in names and name not in required]
+    if not missing and not stale:
+        return True, "required providers attached: " + ", ".join(required)
+    details = []
+    if missing:
+        details.append("missing: " + ", ".join(missing))
+    if stale:
+        details.append("stale managed attachments: " + ", ".join(stale))
+    return False, "; ".join(details)
 
 
 def sandbox_exec(cfg, script: str, timeout: int = 30) -> tuple[int, str]:
@@ -371,10 +387,315 @@ def _cfg_get(cfg, key, envvar, default):
     return os.environ.get(envvar) or cfg.get(key) or default
 
 
+PORTABLE_INFERENCE_PROVIDER = "anthropic"
+PORTABLE_INFERENCE_MODEL = "anthropic.kimi-k3"
+PORTABLE_EMBEDDING_PROFILE = "gateway"
+HOME_EMBEDDING_PROFILE = "home-qwen"
+
+
+def _safe_selector_token(value: str, label: str) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9_.:-]+", value):
+        raise ValueError(f"{label} contains unsupported characters")
+    return value
+
+
+def _model_parts(selector: str) -> tuple[str, str]:
+    """Normalize and validate a Prime Agent model selector."""
+    if "/" in selector:
+        provider, model = selector.split("/", 1)
+    elif selector.startswith("anthropic."):
+        provider, model = "anthropic", selector
+    elif selector.startswith("openai-codex."):
+        provider, model = "openai-codex", selector
+    else:
+        provider, model = PORTABLE_INFERENCE_PROVIDER, selector
+    provider = _safe_selector_token(provider, "inference provider")
+    model = _safe_selector_token(model, "inference model")
+    if provider not in ("anthropic", "openai-codex"):
+        raise ValueError(f"unsupported inference provider: {provider}")
+    return provider, model
+
+
+def _gateway_models_text(cfg: dict) -> str:
+    """Built-in, non-secret Kimi/GLM model catalog for the portable gateway."""
+    gw_host = _cfg_get(cfg, "ai_gateway_host", "PRIME_CLAW_AI_GATEWAY_HOST",
+                       "ai-gateway.zende.sk")
+    default_model = _cfg_get(
+        cfg, "fallback_gateway_model", "PRIME_CLAW_FALLBACK_GATEWAY_MODEL",
+        PORTABLE_INFERENCE_MODEL)
+    return json.dumps({"providers": {
+        "openai": {"baseUrl": "https://" + gw_host + "/v1"},
+        "amazon-bedrock": {"baseUrl": "https://" + gw_host + "/bedrock"},
+        "anthropic": {"baseUrl": "https://" + gw_host + "/anthropic",
+                      "models": [
+                          {"id": default_model, "name": "Kimi K3", "reasoning": True,
+                           "input": ["text", "image"], "contextWindow": 1000000,
+                           "cost": {"input": 3.0, "output": 15.0,
+                                    "cacheRead": 0.3, "cacheWrite": 0}},
+                          {"id": "anthropic.glm-5.2", "name": "GLM 5.2", "reasoning": True,
+                           "input": ["text"], "contextWindow": 1000000,
+                           "cost": {"input": 1.4, "output": 4.4,
+                                    "cacheRead": 0.14, "cacheWrite": 0}},
+                      ]},
+    }})
+
+
+def _valid_host_inference_pair(cfg: dict) -> dict[str, str] | None:
+    """Return an atomic, usable host models/settings preference or None."""
+    settings_path = os.path.expanduser(_cfg_get(
+        cfg, "host_settings_json", "PRIME_CLAW_HOST_SETTINGS_JSON",
+        "~/.prime/agent/settings.json"))
+    models_path = os.path.expanduser(_cfg_get(
+        cfg, "host_models_json", "PRIME_CLAW_HOST_MODELS_JSON",
+        "~/.prime/agent/models.json"))
+    try:
+        settings_text = open(settings_path).read()
+        models_text = open(models_path).read()
+        settings = json.loads(settings_text)
+        models = json.loads(models_text)
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(settings, dict) or not isinstance(models, dict):
+        return None
+    provider = str(settings.get("defaultProvider", ""))
+    model = str(settings.get("defaultModel", ""))
+    if not provider or not model:
+        return None
+    try:
+        _safe_selector_token(provider, "inference provider")
+        _safe_selector_token(model, "inference model")
+    except ValueError:
+        return None
+    providers = models.get("providers", {})
+    if not isinstance(providers, dict):
+        return None
+    # openai-codex is built into Prime Agent and need not be declared in models.json.
+    if provider != "openai-codex":
+        declared = providers.get(provider)
+        if not isinstance(declared, dict):
+            return None
+        declared_models = declared.get("models")
+        if not isinstance(declared_models, list) or not declared_models:
+            return None
+        ids = {str(item.get("id")) for item in declared_models if isinstance(item, dict)}
+        if model not in ids:
+            return None
+    gw_host = str(_cfg_get(cfg, "ai_gateway_host", "PRIME_CLAW_AI_GATEWAY_HOST",
+                           "ai-gateway.zende.sk"))
+    base_url = providers.get(provider, {}).get("baseUrl", "") if provider in providers else ""
+    gateway = bool(base_url and urlsplit(str(base_url)).hostname == gw_host)
+    if provider == "openai-codex":
+        gateway = False
+    elif provider != "anthropic" or not gateway:
+        # The current lifecycle has explicit credential/policy adapters only for
+        # the Zendesk gateway and Codex. Do not mirror an unusable preference.
+        return None
+    return {"provider": provider, "model": model,
+            "selector": provider + "/" + model, "source": "host-settings",
+            "settings_text": settings_text, "models_text": models_text,
+            "gateway": gateway}
+
+
+def _inference_selection(cfg: dict) -> dict[str, object]:
+    """Resolve inference precedence atomically: env/local > valid host pair > default."""
+    local_keys = set(cfg.get("_local_override_keys", []))
+    env_selector = os.environ.get("PRIME_CLAW_MODEL")
+    if env_selector:
+        selector, source = env_selector, "environment"
+    elif "model" in local_keys:
+        selector, source = str(cfg["model"]), "operator-local"
+    else:
+        host = _valid_host_inference_pair(cfg)
+        if host is not None:
+            return host
+        selector = str(cfg.get("model") or
+                       PORTABLE_INFERENCE_PROVIDER + "/" + PORTABLE_INFERENCE_MODEL)
+        source = "tracked-default"
+
+    provider, model = _model_parts(selector)
+    settings = json.dumps({
+        "defaultProvider": provider,
+        "defaultModel": model,
+        "defaultThinkingLevel": "high",
+        "enabledModels": [provider + "/*"],
+    })
+    gateway = provider == "anthropic"
+    return {"provider": provider, "model": model,
+            "selector": provider + "/" + model, "source": source,
+            "settings_text": settings, "models_text": _gateway_models_text(cfg),
+            "gateway": gateway}
+
+
+def _embedding_profile(cfg: dict) -> str:
+    """Resolve embedding profile independently from inference selection."""
+    local_keys = set(cfg.get("_local_override_keys", []))
+    profile = os.environ.get("PRIME_CLAW_EMBEDDING_PROFILE")
+    if not profile and os.environ.get("PRIME_CLAW_EMBEDDING_BASE_URL"):
+        profile = HOME_EMBEDDING_PROFILE
+    if not profile and "embedding_profile" in local_keys:
+        profile = str(cfg.get("embedding_profile"))
+    if not profile and "embedding_base_url" in local_keys:
+        # Backward-compatible operator-local Qwen selection: the existing ignored
+        # file contains only the private endpoint.
+        profile = HOME_EMBEDDING_PROFILE
+    if not profile:
+        profile = str(cfg.get("embedding_profile") or PORTABLE_EMBEDDING_PROFILE)
+    if profile not in (PORTABLE_EMBEDDING_PROFILE, HOME_EMBEDDING_PROFILE):
+        raise ValueError("embedding_profile must be gateway or home-qwen")
+    return profile
+
+
+def _gateway_provider_name(cfg: dict) -> str:
+    return str(os.environ.get("PRIME_CLAW_PROVIDER_NAME")
+               or os.environ.get("PRIME_CLAW_PROVIDER")
+               or cfg.get("provider_name") or "prime-claw-ai-gateway")
+
+
+def _gateway_embedding_settings(cfg: dict) -> dict[str, object]:
+    provider = str(_cfg_get(
+        cfg, "gateway_embedding_provider", "PRIME_CLAW_GATEWAY_EMBEDDING_PROVIDER", "openai"))
+    model = str(_cfg_get(
+        cfg, "gateway_embedding_model", "PRIME_CLAW_GATEWAY_EMBEDDING_MODEL",
+        "openai:text-embedding-3-large"))
+    dimensions = int(_cfg_get(
+        cfg, "gateway_embedding_dimensions", "PRIME_CLAW_GATEWAY_EMBEDDING_DIMENSIONS", 1536))
+    if provider != "openai":
+        raise ValueError("gateway_embedding_provider must be openai")
+    if (not model.startswith("openai:")
+            or not re.fullmatch(r"[A-Za-z0-9_.:/-]+", model)
+            or dimensions <= 0):
+        raise ValueError("gateway embedding model/dimensions are invalid")
+    host = str(_cfg_get(cfg, "ai_gateway_host", "PRIME_CLAW_AI_GATEWAY_HOST",
+                        "ai-gateway.zende.sk"))
+    if not re.fullmatch(r"[A-Za-z0-9.-]+", host):
+        raise ValueError("ai_gateway_host must be a hostname")
+    database = str(_cfg_get(cfg, "postgres_db", "POSTGRES_DB", "gbrain"))
+    return {"profile": PORTABLE_EMBEDDING_PROFILE, "provider": provider,
+            "model": model, "dimensions": dimensions, "database": database,
+            "base_url": "https://" + host + "/v1"}
+
+
+def _sql_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _embedding_state_guard_script(cfg: dict, embedding: dict,
+                                  allow_empty: bool, require_bookmark: bool) -> str:
+    """Read-only guard for config/vector-space compatibility and freshness."""
+    pgu = str(_cfg_get(cfg, "postgres_user", "POSTGRES_USER", "gbrain"))
+    pgport = str(_cfg_get(cfg, "pgport", "PRIME_CLAW_PGPORT", "5433"))
+    database = str(embedding["database"])
+    for label, value in (("postgres_user", pgu), ("postgres_db", database)):
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
+            raise ValueError(f"{label} must be a simple PostgreSQL identifier")
+    model = str(embedding.get("model_ref", embedding.get("model")))
+    dimensions = int(embedding["dimensions"])
+    base_url = str(embedding["base_url"])
+    dburl = "postgresql://" + pgu + ":" + pgu + "@localhost:" + pgport + "/" + database
+    if embedding["profile"] == HOME_EMBEDDING_PROFILE:
+        config_path = str(embedding["candidate_home"]) + "/.gbrain/config.json"
+    else:
+        config_path = "/sandbox/.gbrain/config.json"
+    expected = base64.b64encode(json.dumps({
+        "database_url": dburl,
+        "embedding_model": model,
+        "embedding_dimensions": dimensions,
+        "provider_base_url": base_url,
+    }, sort_keys=True).encode()).decode()
+    config_check = (
+        "import base64,json,sys; "
+        "want=json.loads(base64.b64decode(sys.argv[1])); "
+        "c=json.load(open(sys.argv[2])); "
+        "got={'database_url':c.get('database_url'),'embedding_model':c.get('embedding_model'),"
+        "'embedding_dimensions':int(c.get('embedding_dimensions',0)),"
+        "'provider_base_url':(c.get('provider_base_urls') or {}).get('openai')}; "
+        "sys.exit(0 if got==want else 3)"
+    )
+    model_sql = _sql_literal(model)
+    signature_sql = _sql_literal(model + ":" + str(dimensions))
+    q = shlex.quote
+    script = (
+        "set -euo pipefail\nexport PATH=/usr/lib/postgresql/16/bin:$PATH\n"
+        "T=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc \"SELECT to_regclass('public.content_chunks');\")\n"
+        "if [ -z \"$T\" ]; then " + ("echo 'embedding-state empty'; exit 0" if allow_empty else "echo 'embedding-state missing schema'; exit 4") + "; fi\n"
+        "N=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc 'SELECT count(*) FROM content_chunks;')\n"
+        "if [ \"$N\" = 0 ]; then " + ("echo 'embedding-state empty'; exit 0" if allow_empty else "echo 'embedding-state empty'; exit 5") + "; fi\n"
+        "python3 -c " + q(config_check) + " " + q(expected) + " " + q(config_path) +
+        " || { echo 'embedding-state config mismatch'; exit 6; }\n"
+        "V=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc \"SELECT format_type(a.atttypid,a.atttypmod) FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid WHERE c.relname='content_chunks' AND a.attname='embedding' AND a.attnum>0;\")\n"
+        "[ \"$V\" = \"vector(" + str(dimensions) + ")\" ] || { echo 'embedding-state vector width mismatch'; exit 7; }\n"
+        "BAD=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc " + q("SELECT count(*) FROM content_chunks c JOIN pages p ON p.id=c.page_id WHERE c.embedding IS NULL OR vector_dims(c.embedding)<>" + str(dimensions) + " OR c.model IS DISTINCT FROM " + model_sql + " OR c.embedded_at IS NULL OR c.embedded_text_hash IS DISTINCT FROM md5(c.chunk_text) OR p.embedding_signature IS DISTINCT FROM " + signature_sql + ";") + ")\n"
+        "[ \"$BAD\" = 0 ] || { echo \"embedding-state stale-or-mixed chunks=$N bad=$BAD\"; exit 8; }\n"
+    )
+    if require_bookmark:
+        brain = str(_cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain"))
+        script += (
+            "HEAD=$(git -C " + q(brain) + " rev-parse HEAD)\n"
+            "BOOKMARK=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+            " -Atc " + q("SELECT COALESCE(last_commit,'') FROM sources WHERE id='brain';") + ")\n"
+            "[ \"$BOOKMARK\" = \"$HEAD\" ] || { echo 'embedding-state source bookmark mismatch'; exit 9; }\n"
+        )
+    script += "echo \"embedding-state exact chunks=$N bad=$BAD column=$V\"\n"
+    return script
+
+
+def _resolve_runtime_profiles(cfg: dict) -> dict[str, object]:
+    """Single source of truth for independent inference/embedding selection."""
+    inference = _inference_selection(cfg)
+    profile = _embedding_profile(cfg)
+    embedding = (_gateway_embedding_settings(cfg) if profile == PORTABLE_EMBEDDING_PROFILE
+                 else {**_embedding_settings(cfg), "profile": HOME_EMBEDDING_PROFILE})
+    gateway_required = bool(inference.get("gateway") or profile == PORTABLE_EMBEDDING_PROFILE)
+    codex_required = inference["provider"] == "openai-codex"
+    provider_names = []
+    if gateway_required:
+        provider_names.append(_gateway_provider_name(cfg))
+    provider_names.append(str(_cfg_get(
+        cfg, "github_provider_name", "PRIME_CLAW_GITHUB_PROVIDER", "prime-claw-github")))
+    if codex_required:
+        provider_names.append(str(_cfg_get(
+            cfg, "codex_provider_name", "PRIME_CLAW_CODEX_PROVIDER", "prime-claw-codex")))
+    return {"inference": inference, "embedding": embedding,
+            "gateway_required": gateway_required, "codex_required": codex_required,
+            "provider_names": provider_names}
+
+
+def _managed_provider_names(cfg: dict) -> list[str]:
+    return [
+        _gateway_provider_name(cfg),
+        str(_cfg_get(cfg, "github_provider_name", "PRIME_CLAW_GITHUB_PROVIDER",
+                     "prime-claw-github")),
+        str(_cfg_get(cfg, "codex_provider_name", "PRIME_CLAW_CODEX_PROVIDER",
+                     "prime-claw-codex")),
+    ]
+
+
+def _requires_codex_provider(cfg: dict) -> bool:
+    return bool(_resolve_runtime_profiles(cfg)["codex_required"])
+
+
 HOME_EMBEDDING_POLICY_MARKER = "  # PRIME_CLAW_HOME_EMBEDDING_POLICY"
 HOME_EMBEDDING_MODEL = "Qwen3-Embedding-8B"
 HOME_EMBEDDING_DIMENSIONS = 4096
 HOME_EMBEDDING_TIMEOUT_SECONDS = 1000
+
+
+def _home_cfg_get(cfg: dict, home_key: str, legacy_key: str,
+                  home_env: str, legacy_env: str, default):
+    """Read home-Qwen settings; explicit legacy local keys remain compatible."""
+    env_value = os.environ.get(home_env) or os.environ.get(legacy_env)
+    if env_value:
+        return env_value
+    local_keys = set(cfg.get("_local_override_keys", []))
+    if home_key in local_keys:
+        return cfg.get(home_key)
+    if legacy_key in local_keys:
+        return cfg.get(legacy_key)
+    return cfg.get(home_key) or cfg.get(legacy_key) or default
 
 
 def _locked_int(value, key: str, expected: int) -> int:
@@ -408,19 +729,29 @@ def _embedding_settings(cfg: dict) -> dict:
             or parsed.username or parsed.password or parsed.query or parsed.fragment):
         raise ValueError("home embedding endpoint must be an http(s) base URL without credentials, query, or fragment")
 
-    provider = str(_cfg_get(cfg, "embedding_provider", "PRIME_CLAW_EMBEDDING_PROVIDER", "openai"))
-    model = str(_cfg_get(cfg, "embedding_model", "PRIME_CLAW_EMBEDDING_MODEL", HOME_EMBEDDING_MODEL))
+    provider = str(_home_cfg_get(
+        cfg, "home_embedding_provider", "embedding_provider",
+        "PRIME_CLAW_HOME_EMBEDDING_PROVIDER", "PRIME_CLAW_EMBEDDING_PROVIDER", "openai"))
+    model = str(_home_cfg_get(
+        cfg, "home_embedding_model", "embedding_model",
+        "PRIME_CLAW_HOME_EMBEDDING_MODEL", "PRIME_CLAW_EMBEDDING_MODEL", HOME_EMBEDDING_MODEL))
     if provider != "openai":
         raise ValueError("embedding_provider must be openai for the OpenAI-compatible home service")
     if model != HOME_EMBEDDING_MODEL:
         raise ValueError(f"embedding_model must be {HOME_EMBEDDING_MODEL}")
     dimensions = _locked_int(
-        _cfg_get(cfg, "embedding_dimensions", "PRIME_CLAW_EMBEDDING_DIMENSIONS", HOME_EMBEDDING_DIMENSIONS),
+        _home_cfg_get(cfg, "home_embedding_dimensions", "embedding_dimensions",
+                      "PRIME_CLAW_HOME_EMBEDDING_DIMENSIONS", "PRIME_CLAW_EMBEDDING_DIMENSIONS",
+                      HOME_EMBEDDING_DIMENSIONS),
         "embedding_dimensions", HOME_EMBEDDING_DIMENSIONS)
     timeout_seconds = _locked_int(
-        _cfg_get(cfg, "embedding_timeout_seconds", "PRIME_CLAW_EMBEDDING_TIMEOUT_SECONDS", HOME_EMBEDDING_TIMEOUT_SECONDS),
+        _home_cfg_get(cfg, "home_embedding_timeout_seconds", "embedding_timeout_seconds",
+                      "PRIME_CLAW_HOME_EMBEDDING_TIMEOUT_SECONDS", "PRIME_CLAW_EMBEDDING_TIMEOUT_SECONDS",
+                      HOME_EMBEDDING_TIMEOUT_SECONDS),
         "embedding_timeout_seconds", HOME_EMBEDDING_TIMEOUT_SECONDS)
-    api_key = str(_cfg_get(cfg, "embedding_api_key", "PRIME_CLAW_EMBEDDING_API_KEY", "dummy"))
+    api_key = str(_home_cfg_get(
+        cfg, "home_embedding_api_key", "embedding_api_key",
+        "PRIME_CLAW_HOME_EMBEDDING_API_KEY", "PRIME_CLAW_EMBEDDING_API_KEY", "dummy"))
     if api_key != "dummy":
         raise ValueError("embedding_api_key must be literal non-secret dummy")
 
@@ -523,6 +854,74 @@ def _render_home_embedding_policy(cfg: dict, settings: dict | None = None) -> tu
                         HOME_EMBEDDING_POLICY_MARKER + "\n" + rule), destination
 
 
+def _drop_marked_policy_block(text: str, marker: str) -> str:
+    begin = "  # PRIME_CLAW_" + marker + "_POLICY_BEGIN"
+    end = "  # PRIME_CLAW_" + marker + "_POLICY_END"
+    if text.count(begin) != 1 or text.count(end) != 1:
+        raise ValueError("tracked policy marker drifted: " + marker.lower())
+    start = text.index(begin)
+    stop = text.index(end, start) + len(end)
+    if stop < len(text) and text[stop] == "\n":
+        stop += 1
+    return text[:start] + text[stop:]
+
+
+def _render_effective_runtime_policy(cfg: dict, profiles: dict | None = None) -> tuple[str, str]:
+    """Render least-privilege policy from the same resolved runtime profiles."""
+    profiles = profiles or _resolve_runtime_profiles(cfg)
+    if profiles["embedding"]["profile"] == HOME_EMBEDDING_PROFILE:
+        text, _ = _render_home_embedding_policy(cfg, profiles["embedding"])
+    else:
+        text = open(_policy_path(cfg, "policy_file", "policies/runtime.yaml")).read()
+
+    if not profiles["gateway_required"]:
+        text = _drop_marked_policy_block(text, "GATEWAY")
+    else:
+        begin = text.index("  # PRIME_CLAW_GATEWAY_POLICY_BEGIN")
+        end = text.index("  # PRIME_CLAW_GATEWAY_POLICY_END", begin)
+        block = text[begin:end]
+        gateway_host = str(_cfg_get(
+            cfg, "ai_gateway_host", "PRIME_CLAW_AI_GATEWAY_HOST", "ai-gateway.zende.sk"))
+        if not re.fullmatch(r"[A-Za-z0-9.-]+", gateway_host):
+            raise ValueError("ai_gateway_host must be a hostname")
+        block = block.replace("host: ai-gateway.zende.sk", "host: " + gateway_host)
+        if not bool(profiles["inference"].get("gateway")):
+            block = block.replace("      - path: /usr/bin/curl\n", "")
+            block = block.replace("      - path: /usr/bin/node\n", "")
+        if profiles["embedding"]["profile"] != PORTABLE_EMBEDDING_PROFILE:
+            block = block.replace("      - path: /usr/local/bin/bun\n", "")
+            block = block.replace("      - path: /usr/local/bin/gbrain\n", "")
+        text = text[:begin] + block + text[end:]
+    if not profiles["codex_required"]:
+        text = _drop_marked_policy_block(text, "CODEX")
+    destination = _policy_path(
+        cfg, "active_policy_file", ".prime-claw/runtime-policy.active.yaml")
+    return text, destination
+
+
+def _render_candidate_runtime_policy(cfg: dict, settings: dict) -> tuple[str, str]:
+    """Render home candidate egress plus only the selected inference routes."""
+    inference = _inference_selection(cfg)
+    profiles = {
+        "inference": inference,
+        "embedding": {**settings, "profile": HOME_EMBEDDING_PROFILE},
+        "gateway_required": bool(inference.get("gateway")),
+        "codex_required": inference["provider"] == "openai-codex",
+        "provider_names": [],
+    }
+    text, _ = _render_effective_runtime_policy(cfg, profiles)
+    destination = _policy_path(
+        cfg, "embedding_policy_file", ".prime-claw/runtime-policy.local.yaml")
+    return text, destination
+
+
+def _effective_policy_path(cfg: dict, dry_run: bool) -> str:
+    text, destination = _render_effective_runtime_policy(cfg)
+    if not dry_run:
+        _write_private_file(destination, text)
+    return destination
+
+
 def _assert_ignored_repo_path(path: str) -> None:
     try:
         inside = os.path.commonpath((REPO_ROOT, os.path.abspath(path))) == os.path.abspath(REPO_ROOT)
@@ -559,7 +958,7 @@ def cmd_embedding_preflight(cfg, args) -> int:
     """Validate home-Qwen settings and render policy without network/DB mutation."""
     try:
         settings = _embedding_settings(cfg)
-        rendered, destination = _render_home_embedding_policy(cfg, settings)
+        rendered, destination = _render_candidate_runtime_policy(cfg, settings)
         if not args.dry_run:
             _write_private_file(destination, rendered)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -622,15 +1021,35 @@ def _canonical_embedding_fingerprint(cfg: dict, settings: dict) -> tuple[int, st
 
 
 def _restore_historical_embedding_policy(cfg: dict, settings: dict) -> int:
-    """Restore tracked policy with endpoint-safe error reporting."""
-    policy_path = _policy_path(cfg, "policy_file", "policies/runtime.yaml")
+    """Restore the canonical gateway policy with endpoint-safe reporting."""
+    restore_cfg = dict(cfg)
+    restore_cfg["embedding_profile"] = PORTABLE_EMBEDDING_PROFILE
+    restore_cfg["_local_override_keys"] = [
+        key for key in cfg.get("_local_override_keys", [])
+        if key not in ("embedding_profile", "embedding_base_url")]
+    try:
+        inference = _inference_selection(restore_cfg)
+        gateway_embedding = _gateway_embedding_settings(restore_cfg)
+        restore_profiles = {
+            "inference": inference,
+            "embedding": gateway_embedding,
+            "gateway_required": True,
+            "codex_required": inference["provider"] == "openai-codex",
+            "provider_names": [],
+        }
+        policy_text, policy_path = _render_effective_runtime_policy(
+            restore_cfg, restore_profiles)
+        _write_private_file(policy_path, policy_text)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        print("error: canonical policy render failed: " + str(exc), file=sys.stderr)
+        return 1
     code, out = run([OPENSHELL, "policy", "set", cfg["sandbox_name"],
                      "--policy", policy_path, "--wait"], timeout=120)
     if code != 0:
         safe = _redact_embedding_output(out.strip()[-300:], settings)
         print("error: historical policy restore failed: " + safe, file=sys.stderr)
         return code
-    print("policy: restored historical runtime policy")
+    print("policy: restored canonical gateway runtime policy")
     return 0
 
 
@@ -703,7 +1122,7 @@ def _candidate_build_script(cfg: dict, settings: dict) -> str:
         "C=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
         " -Atc \"SELECT count(*) FROM content_chunks c JOIN pages p ON p.id=c.page_id WHERE p.source_id='brain';\")\n"
         "BAD=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
-        " -Atc \"SELECT count(*) FROM content_chunks c JOIN pages p ON p.id=c.page_id WHERE p.source_id='brain' AND (c.embedding IS NULL OR vector_dims(c.embedding)<>" + str(settings["dimensions"]) + " OR c.model<>'" + settings["model_ref"] + "' OR c.embedded_at IS NULL OR c.embedded_text_hash IS DISTINCT FROM md5(c.chunk_text) OR p.embedding_signature IS DISTINCT FROM '" + settings["model_ref"] + ":" + str(settings["dimensions"]) + "');\")\n"
+        " -Atc \"SELECT count(*) FROM content_chunks c JOIN pages p ON p.id=c.page_id WHERE p.source_id='brain' AND (c.embedding IS NULL OR vector_dims(c.embedding)<>" + str(settings["dimensions"]) + " OR c.model IS DISTINCT FROM '" + settings["model_ref"] + "' OR c.embedded_at IS NULL OR c.embedded_text_hash IS DISTINCT FROM md5(c.chunk_text) OR p.embedding_signature IS DISTINCT FROM '" + settings["model_ref"] + ":" + str(settings["dimensions"]) + "');\")\n"
         "COLTYPE=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) + " -Atc " + q(column_sql) + ")\n"
         "HNSW=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
         " -Atc \"SELECT count(*) FROM pg_indexes WHERE tablename='content_chunks' AND indexname='idx_chunks_embedding';\")\n"
@@ -719,7 +1138,7 @@ def cmd_embedding_build(cfg, args) -> int:
     """Build the home-Qwen index in a parallel DB; never cut over canonical config."""
     try:
         settings = _embedding_settings(cfg)
-        rendered, policy_path = _render_home_embedding_policy(cfg, settings)
+        rendered, policy_path = _render_candidate_runtime_policy(cfg, settings)
         script = _candidate_build_script(cfg, settings)
         build_timeout = int(_cfg_get(
             cfg, "embedding_build_timeout_seconds", "PRIME_CLAW_EMBEDDING_BUILD_TIMEOUT_SECONDS", 14400))
@@ -798,9 +1217,12 @@ def cmd_embedding_build(cfg, args) -> int:
 
 
 def stage_policy(cfg, args) -> int:
-    name = cfg["sandbox_name"]; pf = cfg["policy_file"]
-    if not os.path.isabs(pf):
-        pf = os.path.join(REPO_ROOT, pf)
+    name = cfg["sandbox_name"]
+    try:
+        pf = _effective_policy_path(cfg, args.dry_run)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: effective policy: {exc}", file=sys.stderr)
+        return 1
     if args.dry_run:
         print(f"dry_run: openshell policy set {name} --policy {pf} --wait"); return 0
     if not os.path.exists(pf):
@@ -853,7 +1275,7 @@ discovery:
 
 
 def stage_provider(cfg, args) -> int:
-    name = cfg["provider_name"]
+    name = _gateway_provider_name(cfg)
     host = _cfg_get(cfg, "ai_gateway_host", "PRIME_CLAW_AI_GATEWAY_HOST", "ai-gateway.zende.sk")
     port = _cfg_get(cfg, "ai_gateway_port", "PRIME_CLAW_AI_GATEWAY_PORT", 443)
     profile = _cfg_get(cfg, "ai_gateway_profile", "PRIME_CLAW_AI_GATEWAY_PROFILE", "zd-ai-gateway")
@@ -880,7 +1302,13 @@ def stage_provider(cfg, args) -> int:
             if prior == digest:
                 print(f"provider: ai-gateway key unchanged; leaving {name} as-is")
                 return 0
-            run([OPENSHELL, "provider", "update", name, "--credential", "api_key=" + key], timeout=60)
+            update_code, update_out = run(
+                [OPENSHELL, "provider", "update", name, "--credential", "api_key=" + key],
+                timeout=60)
+            if update_code != 0:
+                print(f"error: ai-gateway provider update failed (exit {update_code})",
+                      file=sys.stderr)
+                return update_code
             with open(state, "w") as sf:
                 sf.write(digest)
             print(f"provider: refreshed credential on {name}")
@@ -1074,7 +1502,13 @@ def stage_github_provider(cfg, args) -> int:
             if prior == digest:
                 print(f"provider: github token unchanged; leaving {name} as-is")
                 return 0
-            run([OPENSHELL, "provider", "update", name, "--credential", "api_token=" + tok], timeout=60)
+            update_code, update_out = run(
+                [OPENSHELL, "provider", "update", name, "--credential", "api_token=" + tok],
+                timeout=60)
+            if update_code != 0:
+                print(f"error: github provider update failed (exit {update_code})",
+                      file=sys.stderr)
+                return update_code
             with open(state, "w") as sf:
                 sf.write(digest)
             print(f"provider: refreshed credential on {name}")
@@ -1101,12 +1535,15 @@ def stage_github_provider(cfg, args) -> int:
 
 
 def stage_sandbox(cfg, args, force_fresh: bool = False) -> int:
-    name = cfg["sandbox_name"]; image = cfg["image"]; pf = cfg["policy_file"]
-    if not os.path.isabs(pf): pf = os.path.join(REPO_ROOT, pf)
+    name = cfg["sandbox_name"]; image = cfg["image"]
+    try:
+        pf = _effective_policy_path(cfg, args.dry_run)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: effective policy: {exc}", file=sys.stderr)
+        return 1
     sb_brain = _cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain")
-    gh_provider = _cfg_get(cfg, "github_provider_name", "PRIME_CLAW_GITHUB_PROVIDER", "prime-claw-github")
-    codex_provider = _cfg_get(cfg, "codex_provider_name", "PRIME_CLAW_CODEX_PROVIDER", "prime-claw-codex")
-    providers = (cfg["provider_name"], gh_provider, codex_provider)
+    profiles = _resolve_runtime_profiles(cfg)
+    providers = tuple(profiles["provider_names"])
     if args.dry_run:
         verb = "delete+recreate" if force_fresh else "create-if-absent/attach-missing"
         provider_flags = " ".join("--provider " + p for p in providers)
@@ -1123,14 +1560,21 @@ def stage_sandbox(cfg, args, force_fresh: bool = False) -> int:
             if code != 0 and "already" not in out.lower():
                 print(f"error: attach provider {prov}: {out.strip()[:200]}", file=sys.stderr)
                 return code
-        print(f"sandbox: {name} exists; providers attached; converging policy (no recreate)")
+        for prov in _managed_provider_names(cfg):
+            if prov in providers:
+                continue
+            code, out = run([OPENSHELL, "sandbox", "provider", "detach", name, prov], timeout=60)
+            if code != 0 and not any(word in out.lower() for word in ("not attached", "not found")):
+                print(f"error: detach stale managed provider {prov}: " +
+                      out.strip()[:200], file=sys.stderr)
+                return code
+        print(f"sandbox: {name} exists; provider attachments reconciled; converging policy (no recreate)")
         return stage_policy(cfg, args)
     if exists and force_fresh:
         run([OPENSHELL, "sandbox", "delete", name], timeout=120)  # supported path; not docker restart
     cmd = [OPENSHELL, "sandbox", "create", "--name", name, "--from", image, "--no-tty", "--detach"]
-    # Attach all providers at create time. The ai-gateway key serves gbrain embeddings;
-    # github serves clone/push; codex carries the operator's current OAuth. Every credential
-    # remains host-side; the sandbox receives only L7-resolved placeholders.
+    # Attach only providers required by the selected inference/embedding profiles.
+    # Every real credential remains host-side; the sandbox receives only placeholders.
     for prov in providers:
         code, _ = run([OPENSHELL, "provider", "get", prov], timeout=30)
         if code == 0: cmd += ["--provider", prov]
@@ -1146,69 +1590,14 @@ def stage_sandbox(cfg, args, force_fresh: bool = False) -> int:
 
 
 def _prime_agent_models_json(cfg) -> str:
-    """Return the models.json content to stage into the sandbox's prime-agent config.
-
-    FEATURE (R3a-13): copy the operator's host prime-agent models.json VERBATIM so the
-    container mirrors the user's local config. The host file holds NO secrets (base URLs
-    + model metadata only; credentials live in auth.json, which is never copied).
-
-    FALLBACK when no readable host config exists: a built-in default registering exactly
-    the two current models (Kimi-K3 + GLM) against the configured AI gateway, so a fresh
-    operator with no prior prime-agent setup still gets a working model.
-    """
-    host_models = os.path.expanduser(_cfg_get(
-        cfg, "host_models_json", "PRIME_CLAW_HOST_MODELS_JSON", "~/.prime/agent/models.json"))
-    if os.path.exists(host_models):
-        try:
-            with open(host_models) as f:
-                return f.read()
-        except OSError:
-            pass  # fall through to the built-in default
-    gw_host = _cfg_get(cfg, "ai_gateway_host", "PRIME_CLAW_AI_GATEWAY_HOST", "ai-gateway.zende.sk")
-    model_id = _cfg_get(cfg, "fallback_gateway_model", "PRIME_CLAW_FALLBACK_GATEWAY_MODEL", "anthropic.kimi-k3")
-    fallback = {"providers": {
-        "openai": {"baseUrl": "https://" + gw_host + "/v1"},
-        "amazon-bedrock": {"baseUrl": "https://" + gw_host + "/bedrock"},
-        "anthropic": {"baseUrl": "https://" + gw_host + "/anthropic",
-                      "models": [
-                          {"id": model_id, "name": "Kimi K3", "reasoning": True,
-                           "input": ["text", "image"], "contextWindow": 1000000,
-                           "cost": {"input": 3.0, "output": 15.0, "cacheRead": 0.3, "cacheWrite": 0}},
-                          {"id": "anthropic.glm-5.2", "name": "GLM 5.2", "reasoning": True,
-                           "input": ["text"], "contextWindow": 1000000,
-                           "cost": {"input": 1.4, "output": 4.4, "cacheRead": 0.14, "cacheWrite": 0}},
-                      ]},
-    }}
-    return json.dumps(fallback)
+    """Return the atomically selected non-secret Prime Agent model catalog."""
+    return str(_inference_selection(cfg)["models_text"])
 
 
 def _prime_agent_settings_json(cfg) -> str:
-    """Mirror the operator's non-secret prime-agent settings.json verbatim.
+    """Return settings paired with the same inference selection as models.json."""
+    return str(_inference_selection(cfg)["settings_text"])
 
-    This carries the user's selected provider/model/thinking defaults. Credentials are
-    projected separately as OpenShell placeholders; host auth.json is never copied.
-    """
-    host_settings = os.path.expanduser(_cfg_get(
-        cfg, "host_settings_json", "PRIME_CLAW_HOST_SETTINGS_JSON",
-        "~/.prime/agent/settings.json",
-    ))
-    if os.path.exists(host_settings):
-        try:
-            with open(host_settings) as f:
-                return f.read()
-        except OSError:
-            pass
-    selector = _cfg_get(cfg, "model", "PRIME_CLAW_MODEL", "openai-codex/gpt-5.6-sol")
-    if "/" in selector:
-        provider, model_id = selector.split("/", 1)
-    else:
-        provider, model_id = "openai-codex", selector
-    return json.dumps({
-        "defaultProvider": provider,
-        "defaultModel": model_id,
-        "defaultThinkingLevel": "high",
-        "enabledModels": [provider + "/*"],
-    })
 
 
 def _codex_synthetic_access_token() -> str:
@@ -1274,8 +1663,9 @@ def stage_prime_agent(cfg, args) -> int:
     # and settings.json verbatim, including their current default provider/model. auth.json
     # is input to host-side provider provisioning only; for openai-codex the sandbox gets a
     # synthetic JWT + OpenShell placeholders, never real OAuth material.
-    models_text = _prime_agent_models_json(cfg)
-    settings_text = _prime_agent_settings_json(cfg)
+    inference = _inference_selection(cfg)
+    models_text = str(inference["models_text"])
+    settings_text = str(inference["settings_text"])
     m64 = base64.b64encode(models_text.encode()).decode()
     s64 = base64.b64encode(settings_text.encode()).decode()
     config_script = (
@@ -1287,11 +1677,7 @@ def stage_prime_agent(cfg, args) -> int:
     if code != 0:
         print("error: prime-agent config mirror stage: " + out.strip()[:200], file=sys.stderr)
         return code
-    try:
-        selected_provider = json.loads(settings_text).get("defaultProvider", "")
-    except json.JSONDecodeError as exc:
-        print(f"error: host settings.json is invalid: {exc}", file=sys.stderr)
-        return 1
+    selected_provider = str(inference["provider"])
     if selected_provider == "openai-codex":
         auth_script = _prime_agent_codex_auth_projection_script()
         a64 = base64.b64encode(auth_script.encode()).decode()
@@ -1303,6 +1689,13 @@ def stage_prime_agent(cfg, args) -> int:
         )
         if code != 0:
             print("error: prime-agent codex auth projection: " + out.strip()[-300:], file=sys.stderr)
+            return code
+    else:
+        # A prior explicit Codex selection may have left placeholder-only auth.
+        # Remove it when the selected inference profile no longer needs Codex.
+        code, out = sandbox_exec(cfg, "rm -f /sandbox/.prime/agent/auth.json", timeout=30)
+        if code != 0:
+            print("error: remove stale codex auth projection: " + out.strip()[-200:], file=sys.stderr)
             return code
     js = ("import { ensureKernelPython } from "
           "'/sandbox/.npm-global/lib/node_modules/prime-agent/dist/core/kernel/bootstrap.js'; "
@@ -1333,8 +1726,9 @@ def stage_prime_agent(cfg, args) -> int:
         "[ -z \"$PIDS\" ] || kill $PIDS 2>/dev/null || true\n"
         "for i in 1 2 3 4 5; do pgrep -f 'daemon-catalog-entry[.]js' >/dev/null 2>&1 || break; sleep 1; done\n"
         "rm -rf /tmp/prime-agent-*/daemon.sock /tmp/prime-agent-*/daemon.sock.lock\n"
-        "[ -z \"${api_key:-}\" ] || export ANTHROPIC_API_KEY=\"$api_key\"\n"
-        "nohup prime-agent --mode daemon --offline >/sandbox/.prime-claw/daemon.log 2>&1 &\n"
+        + ("[ -z \"${api_key:-}\" ] || export ANTHROPIC_API_KEY=\"$api_key\"\n"
+           if bool(inference.get("gateway")) else "")
+        + "nohup prime-agent --mode daemon --offline >/sandbox/.prime-claw/daemon.log 2>&1 &\n"
         "for i in $(seq 1 20); do\n"
         "  S=$(ls /tmp/prime-agent-*/daemon.sock 2>/dev/null | head -1); [ -n \"$S\" ] && break; sleep 1\n"
         "done\n"
@@ -1406,8 +1800,9 @@ def stage_brain(cfg, args) -> int:
     pgu = _cfg_get(cfg, "postgres_user", "POSTGRES_USER", "gbrain")
     pgd = _cfg_get(cfg, "postgres_db", "POSTGRES_DB", "gbrain")
     sb_brain = _cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain")
+    embedding = _gateway_embedding_settings(cfg)
     if args.dry_run:
-        print(f"dry_run: initdb+start Postgres 16 (PGDATA={pgdata} port={pgport}), createdb {pgd}, CREATE EXTENSION vector, wire gbrain embeddings"); return 0
+        print(f"dry_run: initdb+start Postgres 16 (PGDATA={pgdata} port={pgport}), createdb {pgd}, CREATE EXTENSION vector, wire gbrain embeddings (profile=gateway model={embedding['model']} dims={embedding['dimensions']})"); return 0
     brain = (
         "export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH\n"
         "mkdir -p " + pgdata + " && chmod 700 " + pgdata + "\n"
@@ -1421,6 +1816,17 @@ def stage_brain(cfg, args) -> int:
     code, out = sandbox_exec(cfg, brain, timeout=300)
     if code != 0: print("error: brain stage (postgres): " + out.strip()[-300:], file=sys.stderr); return code
     print("brain: postgres up")
+    try:
+        guard = _embedding_state_guard_script(
+            cfg, embedding, allow_empty=True, require_bookmark=False)
+    except (TypeError, ValueError) as exc:
+        print(f"error: brain embedding guard: {exc}", file=sys.stderr)
+        return 1
+    code, out = sandbox_exec(cfg, guard, timeout=90)
+    if code != 0:
+        print("error: canonical embedding state mismatch; use a parallel rebuild/cutover: " +
+              out.strip()[-240:], file=sys.stderr)
+        return code
     # gbrain resolves config from $HOME/.gbrain/config.json ONLY (GBRAIN_HOME honored; there is
     # no cwd walk-up — that was the zbrain fork delta, unneeded here per Slice 0). The config is
     # gbrain's own state, NOT brain content, so it lives at /sandbox/.gbrain/, never inside the
@@ -1433,11 +1839,17 @@ def stage_brain(cfg, args) -> int:
         "p='/sandbox/.gbrain/config.json'\n"
         "os.makedirs(os.path.dirname(p),exist_ok=True)\n"
         "c=json.load(open(p)) if os.path.exists(p) else {}\n"
-        "c.setdefault('engine','postgres')\n"
-        "c.setdefault('database_url','postgresql://" + pgu + ":" + pgu + "@localhost:" + pgport + "/" + pgd + "')\n"
-        "c.setdefault('embedding_model','openai:text-embedding-3-large')\n"
-        "c.setdefault('embedding_dimensions',1536)\n"
-        "c['provider_base_urls']={'openai':'https://ai-gateway.zende.sk/v1'}\n"
+        "want_model=" + repr(str(embedding["model"])) + "\n"
+        "want_dims=" + repr(int(embedding["dimensions"])) + "\n"
+        "for key,want in (('embedding_model',want_model),('embedding_dimensions',want_dims)):\n"
+        " existing=c.get(key)\n"
+        " if existing is not None and str(existing)!=str(want):\n"
+        "  raise SystemExit('embedding profile mismatch: '+key+'='+str(existing)+' expected '+str(want)+'; use parallel rebuild/cutover')\n"
+        "c['engine']='postgres'\n"
+        "c['database_url']='postgresql://" + pgu + ":" + pgu + "@localhost:" + pgport + "/" + pgd + "'\n"
+        "c['embedding_model']=want_model\n"
+        "c['embedding_dimensions']=want_dims\n"
+        "c['provider_base_urls']={'openai':" + repr(str(embedding["base_url"])) + "}\n"
         "k=os.environ.get('api_key','')\n"
         "assert k.startswith('openshell:'), 'api_key placeholder missing from sandbox env'\n"
         "c['openai_api_key']=k\n"
@@ -1471,28 +1883,42 @@ def stage_brain_index(cfg, args) -> int:
     pgd = _cfg_get(cfg, "postgres_db", "POSTGRES_DB", "gbrain")
     pgport = _cfg_get(cfg, "pgport", "PRIME_CLAW_PGPORT", "5433")
     sb_brain = _cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain")
-    # Historical canonical index only. Slice 4A target settings deliberately use
-    # separate generic embedding_* keys; an ordinary pre-cutover converge must
-    # never apply Qwen/4096 to this 1536-dimension database in place.
-    emodel = _cfg_get(cfg, "legacy_embedding_model", "PRIME_CLAW_LEGACY_EMBEDDING_MODEL", "openai:text-embedding-3-large")
-    edims = _cfg_get(cfg, "legacy_embedding_dimensions", "PRIME_CLAW_LEGACY_EMBEDDING_DIMENSIONS", "1536")
+    # Canonical gateway profile only. Home-Qwen remains a parallel candidate until
+    # its separate acceptance/cutover. Never mutate a populated vector space in place.
+    embedding = _gateway_embedding_settings(cfg)
+    emodel = str(embedding["model"])
+    edims = str(embedding["dimensions"])
     dburl = "postgresql://" + pgu + ":" + pgu + "@localhost:" + pgport + "/" + pgd
     if args.dry_run:
         print(f"dry_run: gbrain init --migrate-only + sources add brain --path {sb_brain} + "
               f"sync --source brain (import+embed via gateway; model {emodel}, dims {edims})")
         return 0
+    # Repeat the read-only exact-profile guard so direct stage use is also safe.
+    try:
+        guard = _embedding_state_guard_script(
+            cfg, embedding, allow_empty=True, require_bookmark=False)
+    except (TypeError, ValueError) as exc:
+        print(f"error: brain-index embedding guard: {exc}", file=sys.stderr)
+        return 1
+    code, out = sandbox_exec(cfg, guard, timeout=90)
+    if code != 0:
+        print("error: brain-index embedding state mismatch; use a parallel rebuild/cutover: " +
+              out.strip()[-240:], file=sys.stderr)
+        return code
     # pipefail everywhere: `gbrain ... | tail` must surface gbrain's exit code, not tail's.
     env = ("set -o pipefail\n"
            "export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH\n")
     code, out = sandbox_exec(cfg, env +
-        "gbrain init --migrate-only --url " + dburl + " --non-interactive "
-        "--embedding-model " + emodel + " --embedding-dimensions " + edims + " 2>&1 | tail -2", timeout=180)
+        "gbrain init --migrate-only --url " + shlex.quote(dburl) + " --non-interactive "
+        "--embedding-model " + shlex.quote(emodel) + " --embedding-dimensions " +
+        shlex.quote(edims) + " 2>&1 | tail -2", timeout=180)
     if code != 0:
         print("error: brain-index stage (schema migrate): " + out.strip()[-300:], file=sys.stderr)
         return code
     print("brain-index: schema applied")
     code, out = sandbox_exec(cfg, env +
-        "gbrain sources add brain --path " + sb_brain + " --force 2>&1 | tail -2", timeout=120)
+        "gbrain sources add brain --path " + shlex.quote(sb_brain) +
+        " --force 2>&1 | tail -2", timeout=120)
     # sources add exits non-zero when the source already exists; tolerate that exact case.
     if code != 0 and "already" not in out.lower():
         print("error: brain-index stage (sources add): " + out.strip()[-300:], file=sys.stderr)
@@ -1597,21 +2023,58 @@ def stage_spawn(cfg, args) -> int:
     return 0
 
 
+
+def _provider_stage_entries(cfg: dict):
+    profiles = _resolve_runtime_profiles(cfg)
+    stages = []
+    if profiles["gateway_required"]:
+        stages.append(("provider", stage_provider))
+    stages.append(("github-provider", stage_github_provider))
+    if profiles["codex_required"]:
+        stages.append(("codex-provider", stage_codex_provider))
+    return stages
+
+
+def _lifecycle_profile_gate(cfg: dict, dry_run: bool) -> tuple[int, dict]:
+    """Fail closed before mutation when an uncut-over home index is selected."""
+    try:
+        profiles = _resolve_runtime_profiles(cfg)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: runtime profile selection: {exc}", file=sys.stderr)
+        return 1, {}
+    inf = profiles["inference"]
+    emb = profiles["embedding"]
+    print("profiles: inference=%s/%s source=%s embeddings=%s model=%s dims=%s" % (
+        inf["provider"], inf["model"], inf["source"], emb["profile"],
+        emb.get("model_ref", emb.get("model")), emb["dimensions"]))
+    if emb["profile"] == HOME_EMBEDDING_PROFILE and not dry_run:
+        print("error: home-qwen is selected but its parallel candidate has not been cut over; "
+              "run embedding-preflight, embedding-build, and the Slice 4A acceptance/cutover "
+              "before create/converge", file=sys.stderr)
+        return 1, profiles
+    return 0, profiles
+
+
 def cmd_create(cfg, args) -> int:
+    gate, profiles = _lifecycle_profile_gate(cfg, args.dry_run)
+    if gate != 0:
+        return gate
+    provider_stages = _provider_stage_entries(cfg)
+    labels = ["build", *[name for name, _ in provider_stages], "sandbox(fresh)",
+              "prime-agent", "brain-clone", "brain", "brain-index", "brain-query",
+              "spawn", "policy"]
     if args.dry_run:
-        print("dry_run: create = build -> provider -> github-provider -> codex-provider -> sandbox(fresh) -> prime-agent -> brain-clone -> brain -> brain-index -> brain-query -> spawn -> policy")
-    for label, fn in [("build", cmd_build),
-                      ("provider", stage_provider),
-                      ("github-provider", stage_github_provider),
-                      ("codex-provider", stage_codex_provider),
-                      ("sandbox", lambda c, a: stage_sandbox(c, a, force_fresh=True)),
-                      ("prime-agent", stage_prime_agent),
-                      ("brain-clone", stage_brain_clone),
-                      ("brain", stage_brain),
-                      ("brain-index", stage_brain_index),
-                      ("brain-query", stage_brain_query),
-                      ("spawn", stage_spawn),
-                      ("policy", stage_policy)]:
+        print("dry_run: create = " + " -> ".join(labels))
+    stages = [("build", cmd_build), *provider_stages,
+              ("sandbox", lambda c, a: stage_sandbox(c, a, force_fresh=True)),
+              ("prime-agent", stage_prime_agent),
+              ("brain-clone", stage_brain_clone),
+              ("brain", stage_brain),
+              ("brain-index", stage_brain_index),
+              ("brain-query", stage_brain_query),
+              ("spawn", stage_spawn),
+              ("policy", stage_policy)]
+    for label, fn in stages:
         rc = fn(cfg, args)
         if rc != 0:
             print(f"error: create failed at stage '{label}' (exit {rc})", file=sys.stderr)
@@ -1622,30 +2085,31 @@ def cmd_create(cfg, args) -> int:
 
 
 def cmd_converge(cfg, args) -> int:
-    """Re-run all runtime stages against the EXISTING sandbox to converge it to
-    the known-good state. Unlike create, it does NOT delete/recreate the sandbox:
-    the sandbox stage converges policy only when the sandbox already exists.
-    Use after drift or a partial failure; use create for a fresh bring-up."""
+    """Converge an existing sandbox without recreating or mixing vector spaces."""
+    gate, profiles = _lifecycle_profile_gate(cfg, args.dry_run)
+    if gate != 0:
+        return gate
     name = cfg["sandbox_name"]
     if not args.dry_run and probe_sandbox(cfg)[2] is None:
         print(f"error: sandbox {name} absent; use 'prime-claw create' for fresh bring-up",
               file=sys.stderr)
         return 1
+    provider_stages = _provider_stage_entries(cfg)
+    labels = ["build", *[label for label, _ in provider_stages],
+              "sandbox(converge, no recreate)", "prime-agent", "brain-clone", "brain",
+              "brain-index", "brain-query", "spawn", "policy"]
     if args.dry_run:
-        print("dry_run: converge = build -> provider -> github-provider -> codex-provider -> sandbox(converge, no recreate) "
-              "-> prime-agent -> brain-clone -> brain -> brain-index -> brain-query -> spawn -> policy")
-    for label, fn in [("build", cmd_build),
-                      ("provider", stage_provider),
-                      ("github-provider", stage_github_provider),
-                      ("codex-provider", stage_codex_provider),
-                      ("sandbox", lambda c, a: stage_sandbox(c, a, force_fresh=False)),
-                      ("prime-agent", stage_prime_agent),
-                      ("brain-clone", stage_brain_clone),
-                      ("brain", stage_brain),
-                      ("brain-index", stage_brain_index),
-                      ("brain-query", stage_brain_query),
-                      ("spawn", stage_spawn),
-                      ("policy", stage_policy)]:
+        print("dry_run: converge = " + " -> ".join(labels))
+    stages = [("build", cmd_build), *provider_stages,
+              ("sandbox", lambda c, a: stage_sandbox(c, a, force_fresh=False)),
+              ("prime-agent", stage_prime_agent),
+              ("brain-clone", stage_brain_clone),
+              ("brain", stage_brain),
+              ("brain-index", stage_brain_index),
+              ("brain-query", stage_brain_query),
+              ("spawn", stage_spawn),
+              ("policy", stage_policy)]
+    for label, fn in stages:
         rc = fn(cfg, args)
         if rc != 0:
             print(f"error: converge failed at stage '{label}' (exit {rc})", file=sys.stderr)
@@ -1707,13 +2171,33 @@ def _validate_versions(cfg):
 
 
 def _validate_checks(cfg, args):
-    """Run the acceptance suite. Returns (checks, failures)."""
-    model = cfg.get("model", "openai-codex/gpt-5.6-sol")
+    """Run the acceptance suite against the same resolved runtime profiles."""
+    profiles = _resolve_runtime_profiles(cfg)
+    inference = profiles["inference"]
+    embedding = profiles["embedding"]
+    model = str(inference["selector"])
     gw = cfg.get("ai_gateway_host", "ai-gateway.zende.sk")
     provider = cfg.get("provider_name", "prime-claw-ai-gateway")
     key_prefix = os.environ.get("PRIME_CLAW_KEY_PREFIX", KEY_PREFIX_DEFAULT)
     spawn_dir = os.environ.get("PRIME_CLAW_SPAWN_PROJECT_DIR", "/sandbox/episode-target")
     checks = []   # (id, gate, ok, detail)
+
+    # Fail closed before any gbrain put/search mutation. Gateway validation uses
+    # canonical HOME; home-Qwen validation uses its isolated candidate GBRAIN_HOME.
+    try:
+        state_guard = _embedding_state_guard_script(
+            cfg, embedding, allow_empty=False, require_bookmark=True)
+    except (TypeError, ValueError) as exc:
+        checks.append(("selected-embedding-state", True, False, str(exc)))
+        return checks, ["selected-embedding-state"]
+    code, state_out = sandbox_exec(cfg, state_guard, timeout=90)
+    state_ok = code == 0
+    checks.append(("selected-embedding-state", True, state_ok,
+                   _redact_embedding_output(state_out.strip()[-240:], embedding)
+                   if embedding["profile"] == HOME_EMBEDDING_PROFILE
+                   else state_out.strip()[-240:]))
+    if not state_ok:
+        return checks, ["selected-embedding-state"]
 
     # 1. sandbox present + Running.
     phase, label, data = probe_sandbox(cfg)
@@ -1755,13 +2239,15 @@ def _validate_checks(cfg, args):
     checks.append(("no-key-in-env", True, out.strip() == "", ""))
     code, out = sandbox_exec(cfg, "grep -rIlE '" + key_prefix + "' /sandbox 2>/dev/null || true", timeout=60)
     checks.append(("no-key-on-disk", True, out.strip() == "", ""))
-    auth_env = "" if model.startswith("openai-codex/") else "export ANTHROPIC_API_KEY=\"$api_key\"\n"
+    auth_env = ("export ANTHROPIC_API_KEY=\"$api_key\"\n"
+                if bool(inference.get("gateway")) else "")
     bcall = ("export HOME=/sandbox PATH=/sandbox/.npm-global/bin:$PATH "
              "NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n" + auth_env +
-             "prime-agent -p --no-tools --no-session --model " + model + " \"Reply with exactly: AGENT_OK\" "
+             "prime-agent -p --no-tools --no-session --model " + shlex.quote(model) + " \"Reply with exactly: AGENT_OK\" "
              "2>&1 | grep -viE \"undici|trace-warnings\"\n")
     code, out = sandbox_exec(cfg, bcall, timeout=180)
-    route = "openai-codex OAuth via chatgpt.com" if model.startswith("openai-codex/") else "AI gateway " + gw
+    route = ("openai-codex OAuth via chatgpt.com" if inference["provider"] == "openai-codex"
+             else ("AI gateway " + gw if inference.get("gateway") else str(inference["provider"])))
     checks.append(("credentialed-model-call", True, "AGENT_OK" in _redact(out),
                    "model=%s via %s" % (model, route)))
 
@@ -1770,22 +2256,53 @@ def _validate_checks(cfg, args):
     checks.append(("gbrain-cli", True, bool(out.strip()), "v%s" % out.strip()))
     code, out = sandbox_exec(cfg, "export PATH=/usr/lib/postgresql/16/bin:$PATH; psql -h localhost -p 5433 -U gbrain -d postgres -tc 'select version();' 2>&1 | grep -c 'PostgreSQL 16'", timeout=30)
     checks.append(("postgres-16", True, out.strip().startswith("1"), ""))
-    seed = ("export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH; "
-            "printf '# Validator Probe\\n\\nprime-claw validate probe pgvector sandbox.\\n' | gbrain put validator-probe >/dev/null 2>&1; "
+    gbrain_home = (" export GBRAIN_HOME=" + shlex.quote(str(embedding["candidate_home"])) + ";"
+                   if embedding["profile"] == HOME_EMBEDDING_PROFILE else "")
+    seed = ("export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH;" + gbrain_home + " "
+            "printf '# Validator Probe\n\nprime-claw validate probe pgvector sandbox.\n' | gbrain put validator-probe >/dev/null 2>&1; "
             "gbrain search 'validator probe pgvector sandbox' 2>&1 | grep -c 'validator-probe'")
+
     code, out = sandbox_exec(cfg, seed, timeout=90)
     checks.append(("brain-search-roundtrip", True, bool(re.search(r"^\s*[1-9][0-9]*\s*$", out.strip().splitlines()[-1] if out.strip() else "")), ""))
-    emb = ("export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH; "
-           "printf '# EmbVal\\n\\nvalidate embedding probe.\\n' | gbrain put embval >/dev/null 2>&1; "
-           "psql -h localhost -p 5433 -U gbrain -d gbrain -tc \"SELECT vector_dims(c.embedding) FROM content_chunks c JOIN pages p ON p.id=c.page_id WHERE p.slug='embval' AND c.embedding IS NOT NULL LIMIT 1;\" 2>&1 | tr -d ' \\n'")
-    # hermetic: gbrain reads /sandbox/.gbrain/config.json (placeholder key + gateway base URL);
-    # the psql check gates on the row this probe just wrote (slug='embval'), never on stale rows.
+    selected_db = str(embedding["database"])
+    selected_dims = int(embedding["dimensions"])
+    selected_model = str(embedding.get("model_ref", embedding.get("model")))
+    pgport = str(_cfg_get(cfg, "pgport", "PRIME_CLAW_PGPORT", "5433"))
+    pgu = str(_cfg_get(cfg, "postgres_user", "POSTGRES_USER", "gbrain"))
+    emb = ("export HOME=/sandbox PATH=/usr/lib/postgresql/16/bin:$PATH;" + gbrain_home + " "
+           "printf '# EmbVal\n\nvalidate embedding probe.\n' | gbrain put embval >/dev/null 2>&1; "
+           "psql -h localhost -p " + shlex.quote(pgport) + " -U " + shlex.quote(pgu) +
+           " -d " + shlex.quote(selected_db) +
+           " -tc \"SELECT vector_dims(c.embedding) FROM content_chunks c JOIN pages p ON p.id=c.page_id WHERE p.slug='embval' AND c.embedding IS NOT NULL LIMIT 1;\" 2>&1 | tr -d ' \n'")
     code, out = sandbox_exec(cfg, emb, timeout=150)
     dims = out.strip().splitlines()[-1] if out.strip() else ""
-    checks.append(("brain-embedding-via-gateway", True, dims == "1536", "dims=%s" % dims))
+    checks.append(("brain-embedding-selected-profile", True,
+                   code == 0 and dims == str(selected_dims),
+                   "profile=%s model=%s dims=%s" %
+                   (embedding["profile"], selected_model, dims)))
+
+    fresh_sql = (
+        "SELECT concat(count(*),'|',count(*) FILTER (WHERE c.embedding IS NULL OR "
+        "vector_dims(c.embedding)<>" + str(selected_dims) + " OR c.model IS DISTINCT FROM " +
+        _sql_literal(selected_model) + " OR c.embedded_at IS NULL OR "
+        "c.embedded_text_hash IS DISTINCT FROM md5(c.chunk_text) OR "
+        "p.embedding_signature IS DISTINCT FROM " + _sql_literal(selected_model + ":" + str(selected_dims)) +
+        ")) FROM content_chunks c JOIN pages p ON p.id=c.page_id WHERE p.source_id='brain';")
+    freshness = ("export PATH=/usr/lib/postgresql/16/bin:$PATH; psql -h localhost -p " +
+                 shlex.quote(pgport) + " -U " + shlex.quote(pgu) + " -d " +
+                 shlex.quote(selected_db) + " -Atc " + shlex.quote(fresh_sql))
+    code, out = sandbox_exec(cfg, freshness, timeout=60)
+    match = re.search(r"(\d+)\|(\d+)", out)
+    total = int(match.group(1)) if match else 0
+    bad = int(match.group(2)) if match else -1
+    checks.append(("selected-embedding-freshness", True,
+                   code == 0 and total > 0 and bad == 0,
+                   "profile=%s model=%s dims=%s chunks=%s bad=%s" %
+                   (embedding["profile"], selected_model, selected_dims, total, bad)))
+
 
     # 7. spawn/reap via DaemonClient RPC (cwd scoped; reaped cleanly).
-    code, out = sandbox_exec(cfg, "git -C " + spawn_dir + " rev-parse --short HEAD 2>&1 | head -1", timeout=30)
+    code, out = sandbox_exec(cfg, "git -C " + shlex.quote(spawn_dir) + " rev-parse --short HEAD 2>&1 | head -1", timeout=30)
     checks.append(("spawn-target", True, code == 0 and bool(out.strip()), out.strip()))
     rpc = ("import { DaemonClient } from '/sandbox/.npm-global/lib/node_modules/prime-agent/dist/modes/daemon/daemon-client.js';\n"
            "const sock = process.argv[2], proj = process.argv[3], model = process.argv[4], name = process.argv[5];\n"
@@ -1804,11 +2321,12 @@ def _validate_checks(cfg, args):
            "finally { try { if (sid) await c.request({ type: 'kill', activeSessionId: sid }); } catch (e2) {} if (c.close) c.close(); }\n")
     rb64 = base64.b64encode(rpc.encode()).decode()
     name = "pc-val-" + datetime.now(timezone.utc).strftime("%H%M%S")
-    rshell = ("export HOME=/sandbox PATH=/sandbox/.npm-global/bin:$PATH NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\" ANTHROPIC_API_KEY=\"$api_key\"\n"
+    rpc_auth = " ANTHROPIC_API_KEY=\"$api_key\"" if inference.get("gateway") else ""
+    rshell = ("export HOME=/sandbox PATH=/sandbox/.npm-global/bin:$PATH NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"" + rpc_auth + "\n"
               "prime-agent status >/dev/null 2>&1 || (nohup prime-agent --mode daemon --offline >/sandbox/.prime-claw/daemon.log 2>&1 & sleep 6)\n"
               "echo " + rb64 + " | base64 -d > /tmp/pc-rpc.mjs\n"
               "for i in 1 2 3 4 5; do S=$(ls /tmp/prime-agent-*/daemon.sock 2>/dev/null | head -1); [ -n \"$S\" ] && break; sleep 2; done\n"
-              "node /tmp/pc-rpc.mjs \"$S\" " + spawn_dir + " " + model + " " + name + " 2>&1 | grep -E 'CREATED=|CWD=|KILL=|STILL=|RPC_ERR='\n")
+              "node /tmp/pc-rpc.mjs \"$S\" " + shlex.quote(spawn_dir) + " " + shlex.quote(model) + " " + shlex.quote(name) + " 2>&1 | grep -E 'CREATED=|CWD=|KILL=|STILL=|RPC_ERR='\n")
     sid = cwd = None; kill = False; still = True
     for _ in range(4):
         code, out = sandbox_exec(cfg, rshell, timeout=120)
@@ -1842,7 +2360,49 @@ def cmd_validate(cfg, args) -> int:
         return 1
     print(f"validate: {name} (image={cfg.get('image')})")
     versions = _validate_versions(cfg)
-    checks, failures = _validate_checks(cfg, args)
+    checks = []
+    failures = []
+    profiles = _resolve_runtime_profiles(cfg)
+    home_settings = (profiles["embedding"]
+                     if profiles["embedding"]["profile"] == HOME_EMBEDDING_PROFILE else None)
+    candidate_policy_attempted = False
+    candidate_policy_ready = False
+    try:
+        if home_settings is not None:
+            try:
+                rendered, candidate_policy = _render_candidate_runtime_policy(
+                    cfg, home_settings)
+                _write_private_file(candidate_policy, rendered)
+                candidate_policy_attempted = True
+                code, out = run([OPENSHELL, "policy", "set", name,
+                                 "--policy", candidate_policy, "--wait"], timeout=120)
+                candidate_policy_ready = code == 0
+                detail = ("temporary home candidate policy applied" if code == 0 else
+                          "candidate policy apply failed (exit %s): %s" % (
+                              code, _redact_embedding_output(out.strip()[-160:], home_settings)))
+                checks.append(("candidate-policy-applied", True,
+                               candidate_policy_ready, detail))
+                if not candidate_policy_ready:
+                    failures.append("candidate-policy-applied")
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                candidate_policy_attempted = True
+                checks.append(("candidate-policy-applied", True, False,
+                               "candidate policy render failed: " + str(exc)))
+                failures.append("candidate-policy-applied")
+        if home_settings is None or candidate_policy_ready:
+            runtime_checks, runtime_failures = _validate_checks(cfg, args)
+            checks.extend(runtime_checks)
+            failures.extend(runtime_failures)
+    finally:
+        if home_settings is not None and candidate_policy_attempted:
+            restore = _restore_historical_embedding_policy(cfg, home_settings)
+            restored = restore == 0
+            checks.append(("candidate-policy-restored", True, restored,
+                           "canonical gateway policy restored" if restored
+                           else "canonical policy restore failed (exit %s)" % restore))
+            if not restored:
+                failures.append("candidate-policy-restored")
+    failures = list(dict.fromkeys(failures))
     for cid, gate, ok, d in checks:
         print("  [%s] %s%s" % ("PASS" if ok else "FAIL", cid, (" -- " + d) if d else ""))
     os.makedirs(EVIDENCE_DIR, exist_ok=True)

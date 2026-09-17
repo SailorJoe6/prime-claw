@@ -97,16 +97,15 @@ operations: `docs/runbook.md`. Plan set archived to
 
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 
-**Current status (revised 2026-09-17):** Phase 3a Slices 0–3 and Slice 4A.1 are complete.
-A new portability gate (R3a-15 / Slice 4P) requires checked-in no-config defaults to use
-Zendesk AI Gateway for both concerns: Kimi K3 inference and
-`text-embedding-3-large`/1536 embeddings; explicit operator choices override each independently.
-Implementation is pending and does not require the Spark. On 2026-09-17 the operator confirmed
-the DGX Spark is alive and ready again. Joe's optional local-Qwen Slice 4A.2a is therefore ready
-to resume after its exact-model compatibility/preflight gate; no build has restarted. Its partial
+**Current status (revised 2026-09-17):** Phase 3a Slices 0–3, Slice 4A.1, and the
+portable-default gate (R3a-15 / Slice 4P) are complete. Checked-in no-config defaults use Zendesk
+AI Gateway for both concerns: Kimi K3 inference and `text-embedding-3-large`/1536 embeddings;
+valid host, operator-local, and environment choices override each independently. Generic routed
+write/push acceptance (Slice 4B) is next on that gateway profile. On 2026-09-17 the operator
+confirmed the DGX Spark is alive and ready again. Joe's optional local-Qwen Slice 4A.2a may resume
+after its exact-model compatibility/preflight gate; no build has restarted. Its partial
 4096-dimensional candidate is preserved, the tracked gateway/default policy is restored, the
-canonical database is unchanged, and no cutover occurred. Generic routed write/push acceptance
-proceeds on the portable gateway profile after Slice 4P.
+canonical database is unchanged, and no cutover occurred.
 
 The riskiest integration, done as early as possible and deliberately thin but
 *whole*: a prime-agent session inside the sandbox, connected to gbrain, that

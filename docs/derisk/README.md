@@ -24,8 +24,9 @@ Phase 3a (tracer bullet) records one verdict doc per executed slice:
 |---|---|---|
 | S0 — upstream-gbrain spike (R3a-0, R3a-13) | [3a-slice0.md](3a-slice0.md) | GO |
 | S1 — brain into the sandbox, push-capable (R3a-1, R3a-5 part, R3a-7) | [3a-slice1.md](3a-slice1.md) | COMPLETE — root-caused the fresh-create 401s to a shell-quoting bug (double-quote the `${api_token}` URL), not an OpenShell defect |
-| S2 — in-sandbox index serving (R3a-2, R3a-12 gateway branch) | [3a-slice2.md](3a-slice2.md) | COMPLETE — AI-gateway/1536 profile proof; revised no-config selection remains pending in S4P |
-| S3 — cited read/query from sandboxed prime-agent (R3a-3, R3a-13 override branch) | [3a-slice3.md](3a-slice3.md) | COMPLETE — explicit ChatGPT-5.6 Sol override called brain-query with isolated OAuth; no-config Kimi behavior remains pending in S4P |
+| S2 — in-sandbox index serving (R3a-2, R3a-12 gateway branch) | [3a-slice2.md](3a-slice2.md) | COMPLETE — AI-gateway/1536 profile proof; selected as the no-config default by S4P |
+| S3 — cited read/query from sandboxed prime-agent (R3a-3, R3a-13 override branch) | [3a-slice3.md](3a-slice3.md) | COMPLETE — explicit ChatGPT-5.6 Sol override called brain-query with isolated OAuth; S4P preserves it as an explicit override |
+| S4P — portable provider defaults (R3a-12, R3a-13, R3a-15) | [3a-slice4p.md](3a-slice4p.md) | COMPLETE — Kimi + gateway OpenAI/1536 default, independent overrides, conditional providers/policy, fail-closed migration; 177 tests |
 | S4A — optional home-Qwen 4096 override (R3a-12, R3a-14) | [3a-slice4a.md](3a-slice4a.md) | READY TO RESUME AFTER PREFLIGHT — Spark recovery confirmed; partial candidate preserved, canonical unchanged, no cutover |
 
 ## Evidence

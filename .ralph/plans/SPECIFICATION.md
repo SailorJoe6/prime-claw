@@ -1,6 +1,6 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — portable-default Slice 4P is next; optional local-Qwen Slice 4A.2a is ready to resume after preflight
+**Status:** ACTIVE — portable-default Slice 4P complete; generic gateway-profile Slice 4B next; optional local-Qwen ready after preflight
 **Beads:** `prime-claw-zwg` (P1)
 **Date:** 2026-09-11 · **Provider defaults revised:** 2026-09-17
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
@@ -9,7 +9,7 @@
 > **Spark recovery confirmed (2026-09-17):** the operator reports the DGX Spark is alive and
 > ready. No build has restarted. Before resuming the optional home-Qwen profile, rerun the exact
 > model compatibility/preflight gate, then continue the preserved isolated candidate. Portable-
-> default Slice 4P remains the tracked next slice. The canonical database/config are unchanged;
+> default Slice 4P is complete; generic gateway-profile Slice 4B is next. The canonical database/config are unchanged;
 > no cutover occurred.
 
 This document is the summary and index for the work. It is accompanied by:
@@ -45,8 +45,7 @@ not tracked prerequisites. The claw never possesses real LLM credentials
 
 **Execution state (2026-09-16):** Slices 0–3 now clone the real brain, serve its in-sandbox
 index, and let a sandboxed Prime Agent answer with citations. That 1536-dimensional
-AI-gateway index is now the intended portable default profile, though tracked default selection
-still needs correction under R3a-15. For this operator's explicit local override, Slice 4A.1
+AI-gateway index is the implemented portable default profile under R3a-15. For this operator's explicit local override, Slice 4A.1
 validates the home-Qwen endpoint contract and 4A.2 has a preserved partial 4096-dimensional
 candidate. The Spark outage is cleared by operator confirmation; 4A.2a may resume only after
 its compatibility/preflight gate. The routed write/push

@@ -878,7 +878,7 @@
    "id": "R3a-13",
    "priority": "GATE",
    "summary": "Explicit host model/settings overrides are mirrored with credentials isolated; absent preferred config, portable inference defaults to Zendesk AI Gateway anthropic.kimi-k3 (GLM supported).",
-   "status": "partial (explicit Codex override proven; portable no-config Kimi default implementation pending)",
+   "status": "proven (valid explicit host pair and portable Kimi fallback; credentials remain isolated)",
    "proven_by": {
     "apply": [
      "bin/prime-claw",
@@ -890,15 +890,17 @@
     ],
     "validate": [
      "docs/derisk/3a-slice0.md",
-     "docs/derisk/3a-slice3.md"
+     "docs/derisk/3a-slice3.md",
+     "docs/derisk/3a-slice4p.md"
     ],
     "tests": [
      "tests/test_runtime_image.py",
-     "tests/test_runtime_converge.py"
+     "tests/test_runtime_converge.py",
+     "tests/test_portable_provider_defaults.py"
     ]
    },
-   "evidence": "docs/evidence/validate-20260916T165022Z.json",
-   "verdict_doc": "docs/derisk/3a-slice3.md"
+   "evidence": "docs/evidence/portable-defaults-20260917T184315Z.json",
+   "verdict_doc": "docs/derisk/3a-slice4p.md"
   },
   {
    "id": "R3a-1",
@@ -926,8 +928,8 @@
   {
    "id": "R3a-5",
    "priority": "GATE",
-   "summary": "Lifecycle: create/converge wire github-provider + brain clone/index/query stages and conditional credential refresh. Portable AI-gateway default profile selection is pending in Slice 4P; optional local-Qwen lifecycle remains isolated in Slice 4A.",
-   "status": "partial",
+   "summary": "Lifecycle: create/converge resolve profiles once, stage only required credential providers, attach them, and wire brain clone/index/query without mixing vector spaces.",
+   "status": "proven (portable-profile implementation and prior live lifecycle proof; generic live write acceptance follows S4B)",
    "proven_by": {
     "apply": [
      "bin/prime-claw"
@@ -938,14 +940,16 @@
     "validate": [
      "docs/derisk/3a-slice1.md",
      "docs/derisk/3a-slice2.md",
-     "docs/derisk/3a-slice3.md"
+     "docs/derisk/3a-slice3.md",
+     "docs/derisk/3a-slice4p.md"
     ],
     "tests": [
      "tests/test_runtime_image.py",
-     "tests/test_runtime_converge.py"
+     "tests/test_runtime_converge.py",
+     "tests/test_portable_provider_defaults.py"
     ]
    },
-   "evidence": "docs/derisk/3a-slice3.md",
+   "evidence": "docs/evidence/portable-defaults-20260917T184315Z.json",
    "verdict_doc": "docs/derisk/3a-slice1.md"
   },
   {
@@ -964,12 +968,14 @@
     ],
     "validate": [
      "docs/derisk/3a-slice1.md",
-     "docs/derisk/3a-slice3.md"
+     "docs/derisk/3a-slice3.md",
+     "docs/derisk/3a-slice4p.md"
     ],
     "tests": [
      "tests/test_runtime_image.py",
      "tests/test_runtime_converge.py",
-     "tests/test_embedding_preflight.py"
+     "tests/test_embedding_preflight.py",
+     "tests/test_portable_provider_defaults.py"
     ]
    },
    "evidence": "docs/evidence/cited-query-20260916T164509Z.json",
@@ -1001,17 +1007,23 @@
    "id": "R3a-12",
    "priority": "GATE",
    "summary": "Selected embedding-profile freshness: default Zendesk AI Gateway openai:text-embedding-3-large/1536; explicit overrides allowed only with a complete single-vector-space rebuild; no null/stale/mixed vectors or keyword-only acceptance.",
-   "status": "partial (historical gateway/1536 proof exists; portable default selection pending; optional Qwen override ready to resume after preflight)",
+   "status": "proven for portable gateway default (selection + fail-closed migration + whole-source freshness gate); optional Qwen conditional gate pending",
    "proven_by": {
     "validate": [
      "docs/derisk/3a-slice2.md",
-     "docs/evidence/validate-20260915T170708Z.json"
+     "docs/evidence/validate-20260915T170708Z.json",
+     "docs/derisk/3a-slice4p.md"
     ],
     "tests": [
-     "tests/test_runtime_validate.py"
+     "tests/test_runtime_validate.py",
+     "tests/test_portable_provider_defaults.py"
+    ],
+    "apply": [
+     "bin/prime-claw",
+     "config/runtime.json"
     ]
    },
-   "evidence": "docs/evidence/validate-20260915T170708Z.json",
+   "evidence": "docs/evidence/portable-defaults-20260917T184315Z.json",
    "verdict_doc": "docs/derisk/3a-slice2.md"
   },
   {
@@ -1066,10 +1078,26 @@
    "id": "R3a-15",
    "priority": "GATE",
    "summary": "Portable no-config defaults: Zendesk AI Gateway anthropic.kimi-k3 inference and openai:text-embedding-3-large/1536 embeddings; explicit host/local/env overrides win independently; no DGX or Codex prerequisite.",
-   "status": "pending implementation (requirement added 2026-09-17)",
-   "proven_by": {},
-   "evidence": "not yet produced \u2014 see .ralph/plans/EXECUTION_PLAN.md Slice 4P",
-   "verdict_doc": ".ralph/plans/SPECIFICATION.md"
+   "status": "proven (offline profile/lifecycle/policy/migration tests + hermetic create dry-run)",
+   "proven_by": {
+    "apply": [
+     "bin/prime-claw",
+     "config/runtime.json",
+     "policies/runtime.yaml"
+    ],
+    "validate": [
+     "docs/derisk/3a-slice4p.md",
+     "docs/evidence/portable-defaults-20260917T184315Z.json"
+    ],
+    "tests": [
+     "tests/test_portable_provider_defaults.py",
+     "tests/test_runtime_converge.py",
+     "tests/test_runtime_image.py",
+     "tests/test_runtime_validate.py"
+    ]
+   },
+   "evidence": "docs/evidence/portable-defaults-20260917T184315Z.json",
+   "verdict_doc": "docs/derisk/3a-slice4p.md"
   }
  ],
  "phase2": {}

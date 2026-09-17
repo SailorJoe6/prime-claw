@@ -15,7 +15,9 @@ pc = SourceFileLoader("primeclaw", BIN).load_module()
 
 def cfg(**over):
     c = {"sandbox_name": "prime-claw", "image": "prime-claw-brain:0.1.0",
-         "provider_name": "prime-claw-ai-gateway", "model": "anthropic.kimi-k3",
+         "provider_name": "prime-claw-ai-gateway", "model": "anthropic/anthropic.kimi-k3",
+         "host_settings_json": "/nonexistent/prime-claw-settings.json",
+         "host_models_json": "/nonexistent/prime-claw-models.json",
          "ai_gateway_host": "ai-gateway.zende.sk", "policy_file": "policies/runtime.yaml"}
     c.update(over); return c
 
@@ -63,7 +65,8 @@ def _healthy_exec(c, script, timeout=30):
     # Egress probes.
     if "example.com" in s: return (0, "PC_HTTP=200\nPC_EXIT=0")
     if "example.org" in s: return (0, "PC_HTTP=000\nPC_EXIT=56\nCONNECT tunnel failed, response 403")
-    # Brain checks.
+    # Brain checks (whole-source freshness before the single-row dimensions probe).
+    if "FILTER" in s and "embedding_signature" in s: return (0, "3031|0")
     if "vector_dims" in s: return (0, "1536")
     if "gbrain search" in s: return (0, "1")
     if "gbrain --version" in s: return (0, "1.2.3")

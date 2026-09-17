@@ -16,6 +16,9 @@ pc = SourceFileLoader("primeclaw", BIN).load_module()
 def cfg(tmp_path, **over):
     c = {"sandbox_name": "prime-claw", "image": "prime-claw-brain:0.1.0",
          "provider_name": "prime-claw-ai-gateway", "policy_file": "policies/runtime.yaml",
+         "active_policy_file": str(tmp_path / "runtime-policy.active.yaml"),
+         "host_settings_json": str(tmp_path / "missing-settings.json"),
+         "host_models_json": str(tmp_path / "missing-models.json"),
          "ai_gateway_host": "ai-gateway.zende.sk"}
     c.update(over); return c
 
@@ -91,12 +94,16 @@ def test_sandbox_existing_attaches_providers_without_recreate(tmp_path, monkeypa
         calls.append(cmd)
         if cmd[1:4] == ["sandbox", "provider", "attach"]:
             return (0, "attached")
+        if cmd[1:4] == ["sandbox", "provider", "detach"]:
+            return (0, "detached")
         raise AssertionError("unexpected create/delete while converging existing sandbox")
     monkeypatch.setattr(pc, "run", fake_run)
     rc = pc.stage_sandbox(cfg(tmp_path), Args(), force_fresh=False)
     assert rc == 0
-    attached = [c[-1] for c in calls]
-    assert attached == ["prime-claw-ai-gateway", "prime-claw-github", "prime-claw-codex"]
+    attached = [c[-1] for c in calls if c[3] == "attach"]
+    detached = [c[-1] for c in calls if c[3] == "detach"]
+    assert attached == ["prime-claw-ai-gateway", "prime-claw-github"]
+    assert detached == ["prime-claw-codex"]
     assert "no recreate" in capsys.readouterr().out
 
 
@@ -416,7 +423,7 @@ def test_create_and_converge_include_brain_index(tmp_path, monkeypatch):
     monkeypatch.setattr(pc, "stage_sandbox", lambda c, a, force_fresh=False: order.append("sandbox") or 0)
     rc = pc.cmd_create(cfg(tmp_path), Args())
     assert rc == 0
-    assert order == ["cmd_build", "stage_provider", "stage_github_provider", "stage_codex_provider", "sandbox",
+    assert order == ["cmd_build", "stage_provider", "stage_github_provider", "sandbox",
                      "stage_prime_agent", "stage_brain_clone", "stage_brain",
                      "stage_brain_index", "stage_brain_query", "stage_spawn", "stage_policy"]
 

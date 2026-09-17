@@ -1,6 +1,6 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — Slice 4P portable AI-gateway defaults next; optional local-Qwen live validation remains blocked
+**Status:** ACTIVE — Slice 4P complete; generic gateway-profile Slice 4B next; optional local-Qwen remains ready after preflight
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
 **Date:** 2026-09-11 · **Provider defaults revised:** 2026-09-17
@@ -60,9 +60,9 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 | **S1** | git+github push plumbing: image git, custom github push profile, clone brain w/ `.git` into sandbox | R3a-1, R3a-5(part), R3a-7 | — |
 | **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source); AI-gateway/1536 embedding proof (portable-default basis) | R3a-2 | — |
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
-| **S4P** | Portable no-config defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **NEXT / IMPLEMENTATION PENDING** — does not require Spark |
+| **S4P** | Portable no-config defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **COMPLETE** — 177 tests + hermetic dry-run PASS |
 | **S4A** | Optional operator-local home `Qwen3-Embedding-8B`/4096 override, non-destructive | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **READY TO RESUME AFTER PREFLIGHT** — partial candidate preserved; Spark recovery confirmed |
-| **S4B** | One routed write + push-back round-trip | R3a-4 | after S4P gateway-default acceptance; local-Qwen is optional |
+| **S4B** | One routed write + push-back round-trip | R3a-4 | **NEXT** — gateway profile; local-Qwen is optional |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
 ---
@@ -167,7 +167,7 @@ run against in-sandbox PG with **working embeddings** via the AI gateway.
 
 **Exit.** `gbrain search "<known term>" --source brain` inside the sandbox returns a real brain
 page from in-sandbox PG; `validate` can read a page count > 0; embeddings populate (the
-AI-gateway/1536 branch of revised R3a-12; profile-default selection remains for S4P).
+AI-gateway/1536 branch of revised R3a-12; Slice 4P now selects it by default).
 
 **Status (2026-09-15): COMPLETE.** New `brain-index` stage (init --migrate-only → sources add →
 sync import+embed → skip-failed → pages>0 gate, pipefail throughout). gbrain config moved to the
@@ -179,7 +179,7 @@ live. `validate` 16/16 PASS (evidence `docs/evidence/validate-20260915T170708Z.j
 4 malformed-frontmatter brain files) in `docs/derisk/3a-slice2.md`.
 **Historical note (2026-09-16):** this proves index-serving mechanics, but its corporate
 AI-gateway / OpenAI / 1536-dimension embedding result is now the basis of the portable default
-profile under D3a-M. S4P must restore that as the tracked no-config behavior and prove fresh
+profile under D3a-M. S4P restores that as the tracked no-config behavior and proves fresh
 profile selection. D3a-L/S4A retain home-Qwen as an optional local override.
 
 ---
@@ -214,21 +214,24 @@ helper twice and correctly answered with all expected harness components plus ci
 
 ---
 
-## Slice 4P — Portable AI-gateway defaults (R3a-12, R3a-13, R3a-15) — NEXT
+## Slice 4P — Portable AI-gateway defaults (R3a-12, R3a-13, R3a-15) — COMPLETE
 
 **Goal.** Make a fresh clone usable without personal hardware or developer-specific OAuth.
 When no preferred config exists, select Zendesk AI Gateway `anthropic.kimi-k3` for inference
 and `openai:text-embedding-3-large`/1536 for embeddings. Keep GLM as a supported inference
 alternative. Explicit host/local/env choices override inference and embeddings independently.
 
-**Implementation pending.** Change tracked defaults/profile selection so Qwen, a private base
-URL, and Codex OAuth are never required by the no-config path. Preserve the existing local-Qwen
-preflight/build as an explicit optional profile. Add offline precedence tests covering no-config,
-host inference override, local embedding override, independent overrides, and credential/policy
-selection. Reconcile create/converge/validate and documentation with the selected profile.
+**Status (2026-09-17): COMPLETE.** Tracked defaults now select Kimi plus gateway
+OpenAI/1536. A single resolver applies independent env/local/valid-host precedence to lifecycle
+stages, provider attachments, Prime Agent config, effective policy, brain index settings, status,
+and validation. Codex credentials/routes are conditional. Home-Qwen selection remains explicit
+and fails closed before ordinary lifecycle mutation until its parallel candidate is accepted.
+Embedding config/vector-width mismatches stop before migration or sync.
 
-**Exit.** Dry-run and offline tests prove the portable defaults and precedence; fresh
-create/converge use the gateway profile unless the operator explicitly selected otherwise.
+**Exit evidence.** Hermetic create dry-run selected Kimi + gateway OpenAI/1536 and only gateway
++ GitHub providers. `tests/test_portable_provider_defaults.py` passed 27 tests; the canonical
+suite passed 177. Verdict: [3a-slice4p.md](../../docs/derisk/3a-slice4p.md); machine evidence:
+[portable-defaults-20260917T184315Z.json](../../docs/evidence/portable-defaults-20260917T184315Z.json).
 
 ---
 
@@ -238,8 +241,8 @@ create/converge use the gateway profile unless the operator explicitly selected 
 objective 4A.1 is complete: ignored local config merge, strict locked-setting validation,
 private-endpoint-safe candidate policy rendering, and `embedding-preflight`. Slice 4A.2a's
 isolated build path is implemented; its live sync stopped when the Spark crashed. The operator
-now confirms the Spark is alive and ready. No build has restarted. Slice 4P remains the tracked
-next objective; 4A.2a may resume afterward (or as an explicitly selected local-profile task)
+now confirms the Spark is alive and ready. No build has restarted. Slice 4P is complete and
+Slice 4B is the tracked next objective; 4A.2a may resume as an explicitly selected local-profile task
 only after the exact-model compatibility/preflight gate passes.
 
 **Recovered external blocker.** The build process remains stopped, the tracked gateway/default

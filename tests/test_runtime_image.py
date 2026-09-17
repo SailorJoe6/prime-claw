@@ -263,11 +263,15 @@ def test_models_json_copies_host_verbatim(tmp_path, monkeypatch):
     """R3a-13: when the operator's host prime-agent models.json exists, it is copied
     VERBATIM into the sandbox (container mirrors the user's local config)."""
     host_cfg = tmp_path / "models.json"
-    sentinel = {"providers": {"anthropic": {"baseUrl": "https://x.example/anthropic",
+    sentinel = {"providers": {"anthropic": {"baseUrl": "https://ai-gateway.zende.sk/anthropic",
                 "models": [{"id": "anthropic.custom-9", "name": "Custom", "reasoning": True,
                             "input": ["text"], "contextWindow": 1, "cost": {"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}
     host_cfg.write_text(__import__("json").dumps(sentinel))
+    host_settings = tmp_path / "settings.json"
+    host_settings.write_text(__import__("json").dumps({
+        "defaultProvider": "anthropic", "defaultModel": "anthropic.custom-9"}))
     monkeypatch.setenv("PRIME_CLAW_HOST_MODELS_JSON", str(host_cfg))
+    monkeypatch.setenv("PRIME_CLAW_HOST_SETTINGS_JSON", str(host_settings))
     written = _capture_models_json(monkeypatch)
     class A: dry_run=False; force=False
     pc.stage_prime_agent({"sandbox_name":"prime-claw"}, A())
@@ -278,10 +282,11 @@ def test_models_json_copies_host_verbatim(tmp_path, monkeypatch):
 def test_models_json_fallback_when_no_host_config(tmp_path, monkeypatch):
     """R3a-13 fallback: no host config -> built-in default with exactly Kimi-K3 + GLM,
     base URLs from the configured gateway host. No secrets."""
-    monkeypatch.setenv("PRIME_CLAW_HOST_MODELS_JSON", str(tmp_path / "absent.json"))
+    monkeypatch.setenv("PRIME_CLAW_HOST_MODELS_JSON", str(tmp_path / "absent-models.json"))
+    monkeypatch.setenv("PRIME_CLAW_HOST_SETTINGS_JSON", str(tmp_path / "absent-settings.json"))
     written = _capture_models_json(monkeypatch)
     class A: dry_run=False; force=False
-    pc.stage_prime_agent({"sandbox_name":"prime-claw","ai_gateway_host":"ai-gateway.zende.sk","model":"anthropic.kimi-k3"}, A())
+    pc.stage_prime_agent({"sandbox_name":"prime-claw","ai_gateway_host":"ai-gateway.zende.sk","model":"anthropic/anthropic.kimi-k3"}, A())
     import json as _j
     m = _j.loads(written["models"])
     ids = {mod["id"] for mod in m["providers"]["anthropic"]["models"]}

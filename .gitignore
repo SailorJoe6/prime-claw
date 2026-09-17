@@ -17,6 +17,7 @@ __pycache__/
 # Operator-local home embedding endpoint + rendered exact-host policy
 .prime-claw/runtime.local.json
 .prime-claw/runtime-policy.local.yaml
+.prime-claw/runtime-policy.active.yaml
 
 # Beads / Dolt files (added by bd init)
 .dolt/

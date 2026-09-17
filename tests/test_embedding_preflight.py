@@ -42,10 +42,14 @@ def cfg(tmp_path, **over):
 def test_runtime_config_has_safe_defaults_but_no_private_endpoint():
     tracked = json.load(open(os.path.join(REPO, "config", "runtime.json")))
     assert "embedding_base_url" not in tracked
-    assert tracked["embedding_model"] == "Qwen3-Embedding-8B"
-    assert tracked["embedding_dimensions"] == 4096
-    assert tracked["embedding_timeout_seconds"] == 1000
-    assert tracked["embedding_api_key"] == "dummy"
+    assert tracked["embedding_profile"] == "gateway"
+    assert tracked["gateway_embedding_model"] == "openai:text-embedding-3-large"
+    assert tracked["gateway_embedding_dimensions"] == 1536
+    assert tracked["home_embedding_model"] == "Qwen3-Embedding-8B"
+    assert tracked["home_embedding_dimensions"] == 4096
+    assert tracked["home_embedding_timeout_seconds"] == 1000
+    assert tracked["home_embedding_api_key"] == "dummy"
+    assert tracked["model"] == "anthropic/anthropic.kimi-k3"
     assert tracked["embedding_database"] != tracked["embedding_legacy_database"]
 
 

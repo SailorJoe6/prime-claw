@@ -25,7 +25,10 @@ def cfg(**over):
                     "forbidden": ["nemoclaw"]},
         "policy_file": "policies/runtime.yaml",
         "provider_name": "prime-claw-ai-gateway",
-        "model": "anthropic.kimi-k3",
+        "github_provider_name": "prime-claw-github",
+        "host_settings_json": "/nonexistent/prime-claw-settings.json",
+        "host_models_json": "/nonexistent/prime-claw-models.json",
+        "model": "anthropic/anthropic.kimi-k3",
         "ai_gateway_host": "ai-gateway.zende.sk",
     }
     c.update(over)
@@ -123,16 +126,17 @@ def test_probe_sandbox_absent(monkeypatch):
 
 
 def test_probe_provider_attached(monkeypatch):
-    data = [{"name": "prime-claw-ai-gateway", "type": "zd-ai-gateway"}]
+    data = [{"name": "prime-claw-ai-gateway", "type": "zd-ai-gateway"},
+            {"name": "prime-claw-github", "type": "github-push"}]
     monkeypatch.setattr(pc, "openshell_json", lambda a, timeout=30: (data, ""))
     ok, det = pc.probe_provider(cfg())
-    assert ok is True and "attached" in det
+    assert ok is True and "required providers attached" in det
 
 
 def test_probe_provider_missing(monkeypatch):
     monkeypatch.setattr(pc, "openshell_json", lambda a, timeout=30: ([{"name": "other"}], ""))
     ok, det = pc.probe_provider(cfg())
-    assert ok is False and "NOT attached" in det
+    assert ok is False and "missing:" in det
 
 
 # --- in-sandbox probes -------------------------------------------------------
