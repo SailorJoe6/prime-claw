@@ -1,7 +1,7 @@
 # Requirements — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
 Beads: `prime-claw-zwg` (P1). Index:
-[SPECIFICATION.md](blocked/SPECIFICATION.md). Decisions: [DECISIONS.md](DECISIONS.md).
+[SPECIFICATION.md](SPECIFICATION.md). Decisions: [DECISIONS.md](DECISIONS.md).
 
 Each requirement has an ID for traceability from [DECISIONS.md](DECISIONS.md). Prefix `R3a-`.
 Priority: **GATE** = must hold for the slice to be accepted; **CONDITIONAL GATE** = must

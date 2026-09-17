@@ -103,8 +103,10 @@ Zendesk AI Gateway for both concerns: Kimi K3 inference and
 `text-embedding-3-large`/1536 embeddings; explicit operator choices override each independently.
 Implementation is pending and does not require the Spark. Joe's optional local-Qwen Slice 4A.2a
 remains externally blocked because the DGX Spark crashed; its partial 4096-dimensional candidate
-is preserved, the historical policy is restored, the canonical database is unchanged, and no
-cutover occurred. The routed write/push acceptance remains blocked on Joe's selected profile.
+is preserved, the tracked gateway/default policy is restored, the canonical database is
+unchanged, and no
+cutover occurred. Generic routed write/push acceptance proceeds on the portable gateway profile
+after Slice 4P; only an optional local-Qwen acceptance rerun waits for the Spark.
 
 The riskiest integration, done as early as possible and deliberately thin but
 *whole*: a prime-agent session inside the sandbox, connected to gbrain, that

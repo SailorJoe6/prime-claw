@@ -1,6 +1,6 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** PARTIALLY BLOCKED — portable-default Slice 4P is ready; DGX outage pauses only local-Qwen Slice 4A.2a
+**Status:** ACTIVE — portable-default Slice 4P is next; DGX outage pauses only optional local-Qwen Slice 4A.2a
 **Beads:** `prime-claw-zwg` (P1)
 **Date:** 2026-09-11 · **Provider defaults revised:** 2026-09-17
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
@@ -9,13 +9,13 @@
 > **Current external blocker (2026-09-16):** the DGX Spark serving this operator's selected home
 > embedding override crashed during the isolated candidate build. Work on that profile is
 > paused until the operator confirms service recovery. Portable-default Slice 4P is independent
-> and ready. The partial candidate is preserved; the historical policy is restored; the
+> and ready. The partial candidate is preserved; the tracked gateway/default policy is restored; the
 > canonical database/config are unchanged; no cutover occurred.
 
 This document is the summary and index for the work. It is accompanied by:
 
-- **[REQUIREMENTS.md](../REQUIREMENTS.md)** — the specific requirements discovered during discussion.
-- **[DECISIONS.md](../DECISIONS.md)** — design decisions, each traced to the requirement(s) it satisfies.
+- **[REQUIREMENTS.md](REQUIREMENTS.md)** — the specific requirements discovered during discussion.
+- **[DECISIONS.md](DECISIONS.md)** — design decisions, each traced to the requirement(s) it satisfies.
 
 This is a specification of *what* must change and *why*. It is not an execution plan; that comes later.
 

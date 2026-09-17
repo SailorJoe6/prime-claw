@@ -1,9 +1,9 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** BLOCKED for live local-Qwen acceptance — portability requirements revised; tracked AI-gateway defaults are pending
+**Status:** ACTIVE — Slice 4P portable AI-gateway defaults next; optional local-Qwen live validation remains blocked
 **Beads:** `prime-claw-zwg` (P1)
-**Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](../REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](../DECISIONS.md)
-**Date:** 2026-09-11
+**Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
+**Date:** 2026-09-11 · **Provider defaults revised:** 2026-09-17
 
 This plan implements the Phase 3a spec as **vertical slices** (Cockburn elephant-carpaccio):
 each slice ends in a *working capability + passing tests + committed & pushed*, and retires a
@@ -16,7 +16,8 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 - **apply/check/validate/test.** Every capability gets a `bin/prime-claw` stage (idempotent),
   pytest coverage (offline, monkeypatched `pc.*`), a `validate` check where user-facing, and a
   `config/requirements-inventory.json` entry with a **real `proven_by` path** (integrity-gated).
-- **Per-slice exit ritual.** Each slice ends: `pytest` green → `git commit` → `git pull --rebase`
+- **Per-slice exit ritual.** Each slice ends: canonical `pytest -q tests` green →
+  `git commit` → `git pull --rebase`
   → `bd sync` → `git push` → `git status` clean & up-to-date. Bead notes updated.
 - **Credential isolation (R-X-5/R2-X-1).** No real credential ever on sandbox disk.
   Explicit user provider choices ride matching OpenShell providers; git push uses a **github
@@ -57,11 +58,11 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 |---|---|---|---|
 | **S0** | Upstream-gbrain spike: prime-agent-as-controller drives **upstream garrytan/gbrain** in-sandbox (+ models.json mirror) | R3a-0, R3a-13 | **GO/NO-GO** |
 | **S1** | git+github push plumbing: image git, custom github push profile, clone brain w/ `.git` into sandbox | R3a-1, R3a-5(part), R3a-7 | — |
-| **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source); historical 1536 embedding proof later superseded | R3a-2 | — |
+| **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source); AI-gateway/1536 embedding proof (portable-default basis) | R3a-2 | — |
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
 | **S4P** | Portable no-config defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **NEXT / IMPLEMENTATION PENDING** — does not require Spark |
 | **S4A** | Optional operator-local home `Qwen3-Embedding-8B`/4096 override, non-destructive | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **BLOCKED EXTERNALLY** — partial candidate preserved; Spark unavailable |
-| **S4B** | One routed write + push-back round-trip | R3a-4 | blocked on selected-profile acceptance |
+| **S4B** | One routed write + push-back round-trip | R3a-4 | after S4P gateway-default acceptance; local-Qwen is optional |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
 ---
@@ -146,7 +147,7 @@ credentialed `github_brain` policy rule, clone/fetch-ff idempotent, no token on 
 
 ---
 
-## Slice 2 — In-sandbox index serving (R3a-2; historical embedding proof superseded)
+## Slice 2 — In-sandbox index serving (R3a-2; portable gateway/1536 basis)
 
 **Goal.** In-sandbox gbrain+PG+pgvector index the cloned brain as the `brain` source; queries
 run against in-sandbox PG with **working embeddings** via the AI gateway.
@@ -165,7 +166,8 @@ run against in-sandbox PG with **working embeddings** via the AI gateway.
 (`provider_base_urls`, `embedding_model`, placeholder key) asserted.
 
 **Exit.** `gbrain search "<known term>" --source brain` inside the sandbox returns a real brain
-page from in-sandbox PG; `validate` can read a page count > 0; embeddings populate (the then-current R3a-12, superseded by D3a-L).
+page from in-sandbox PG; `validate` can read a page count > 0; embeddings populate (the
+AI-gateway/1536 branch of revised R3a-12; profile-default selection remains for S4P).
 
 **Status (2026-09-15): COMPLETE.** New `brain-index` stage (init --migrate-only → sources add →
 sync import+embed → skip-failed → pages>0 gate, pipefail throughout). gbrain config moved to the
@@ -232,17 +234,17 @@ create/converge use the gateway profile unless the operator explicitly selected 
 
 ## Slice 4A — Optional home-Qwen embedding override (R3a-12, R3a-14)
 
-**Execution status (2026-09-16): IN PROGRESS.** The operator later invoked `/execute`.
-Bounded objective 4A.1 is complete: ignored local config merge, strict locked-setting
-validation, private-endpoint-safe candidate policy rendering, and `embedding-preflight`.
-The preflight makes no network, sandbox, or database call. Read-only live checks after it
-confirmed the canonical database remains 1536-dimensional and the candidate database does
-not exist. Slice 4A.2a now implements the isolated build path; its live full sync is the
-current bounded objective. Slice 4A.2b validation and atomic cutover remain separate.
+**Execution status (revised 2026-09-17): PAUSED / BLOCKED.** Bounded objective 4A.1 is
+complete: ignored local config merge, strict locked-setting validation,
+private-endpoint-safe candidate policy rendering, and `embedding-preflight`. Slice 4A.2a's
+isolated build path is implemented, but its live sync stopped when the Spark crashed. It is
+not the current objective; Slice 4P is next. Slice 4A.2b validation and optional-profile
+cutover remain separate and paused.
 
-**External blocker (2026-09-16, optional local profile only).** The DGX Spark hosting the home embedding model crashed and
+**External blocker (2026-09-16, optional local profile only).** The DGX Spark hosting the
+home embedding model crashed and
 stopped serving during the live build. Work is paused at the operator's request. The build
-process is stopped, the tracked historical policy is restored, and the partial
+process is stopped, the tracked gateway/default policy is restored, and the partial
 `gbrain_qwen4096` database is preserved at 350 source pages / 1,140 embedded chunks, all 4096d,
 with no source bookmark. The canonical fingerprint is unchanged and no cutover occurred.
 Do not resume this profile until the operator confirms the DGX Spark is healthy and the exact
@@ -266,7 +268,7 @@ or `PRIME_CLAW_*` environment, never a tracked file, log, evidence artifact, or 
 1. **Configuration contract — 4A.1 COMPLETE.** Generic tracked keys + `PRIME_CLAW_*`
    overrides cover base URL, exact model, dimensions, timeout, non-secret compatibility value,
    candidate/legacy database names, and ignored local paths. The base URL has no tracked default.
-   `embedding-preflight` reports only sanitized values. The historical index stage explicitly
+   `embedding-preflight` reports only sanitized values. The gateway/1536 index stage explicitly
    ignores target settings, preventing an ordinary pre-cutover converge from mutating it.
 2. **Deny-by-default egress — 4A.1 RENDER COMPLETE / APPLY PENDING.** The ignored mode-0600
    candidate policy grants only the configured host/port to gbrain/Bun and removes those
@@ -281,7 +283,8 @@ or `PRIME_CLAW_*` environment, never a tracked file, log, evidence artifact, or 
    with pull/extraction disabled. It never switches canonical config. It snapshots the canonical
    config/schema/content/bookmark/migration fingerprint and gates the candidate on a Git-HEAD-
    matching source bookmark plus current-text/signature 4096-dimensional Qwen chunks with exact
-   scans (no unsupported HNSW). Success and failure both restore the tracked historical policy;
+   scans (no unsupported HNSW). Success and failure both restore the tracked gateway/default
+   policy;
    the legacy database is never dropped or altered.
 4. **Acceptance before cutover — 4A.2b AFTER BUILD.** Require page count parity, chunk count parity, every chunk
    embedded at 4096 dimensions, zero mixed/null/stale vectors, exact-page retrieval, and
@@ -293,7 +296,7 @@ or `PRIME_CLAW_*` environment, never a tracked file, log, evidence artifact, or 
 **Tests (offline).** 4A.1 has 14 focused tests for local-config/env resolution, strict
 Qwen/4096/1000s settings, endpoint validation/redaction, exact policy host/port and binary
 scoping, 0600 output, dry-run, Git ignores, zero command/sandbox/DB calls, parallel DB naming,
-and proof the historical index ignores target settings. 4A.2a adds 21 offline tests for
+and proof the gateway/1536 index ignores local-Qwen target settings. 4A.2a adds 21 offline tests for
 candidate-home confinement, config/database isolation, Qwen/timeouts, no-extract sync, version
 gating, sanitized dry-run/output, candidate policy application, failure restore, and CLI wiring.
 4A.2b must add parity/freshness/retrieval, atomic cutover, and rollback tests. All
@@ -307,7 +310,8 @@ non-use, cutover result, and rollback readiness. Never record the private endpoi
 dimensions; semantic retrieval passes; the old 1536 database remains intact for rollback; no
 corporate embedding credential/provider/path is used by that local profile. The tracked
 Zendesk AI-gateway default remains available for operators who did not select the override.
-Only then unblock Joe's Slice 4B acceptance run.
+Only then may Joe run a separate acceptance pass on the local-Qwen profile. Generic Slice 4B
+uses the portable gateway profile after Slice 4P and is not blocked by the Spark.
 
 ---
 
@@ -320,6 +324,8 @@ real repo (credential-safe, Slice 1 plumbing).
 
 **Approach.**
 
+- Run the generic acceptance on the fresh portable gateway profile after Slice 4P. A local-Qwen
+  acceptance rerun is optional and waits for Slice 4A; it is not a prerequisite for S4B.
 - The write is a **test artifact**: a keep-worthy `projects/` stub describing prime-claw itself
   (markdown is source-of-truth, so trivially deletable). The operator confirmed exact slug
   `projects/prime-claw` on 2026-09-16.
@@ -344,7 +350,7 @@ evidence; the requirements inventory is updated and integrity-gated.
 - Extend `cmd_validate` / `probe_in_sandbox` with brain checks: **brain present** (with `.git`),
   **index page count > 0**, **known-fact cited query green**, **write receipt present**,
   **push-back proven** (remote contains the write commit). Record to `docs/evidence/validate-<utc>.json`.
-- Add `R3a-0..14` entries to `config/requirements-inventory.json` with real `proven_by` paths.
+- Add `R3a-0..15` entries to `config/requirements-inventory.json` with real `proven_by` paths.
 - **Housekeeping:** fix the stale `R2-A-3`/`R2-A-4` statuses (Phase 2 closed them; still marked
   `in-progress`).
 

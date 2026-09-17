@@ -951,7 +951,7 @@
   {
    "id": "R3a-7",
    "priority": "GATE",
-   "summary": "Credential isolation: github token read host-side (gh auth token), L7-injected; sandbox holds placeholder only; .git/config contains zero real token (verified). OpenAI Codex OAuth remains host-side; sandbox auth holds synthetic/openshell placeholders only (Slice 3 proven). Target home embedding endpoint is unauthenticated; dummy is non-secret and no embedding provider credential is allowed.",
+   "summary": "Credential isolation: GitHub, Zendesk AI-gateway inference/embedding, and any Codex override keep real credentials host-side in OpenShell; sandbox config contains placeholders only. The optional home-Qwen endpoint is unauthenticated and uses no credential provider.",
    "status": "proven",
    "proven_by": {
     "apply": [
@@ -1040,7 +1040,7 @@
   },
   {
    "id": "R3a-14",
-   "priority": "GATE",
+   "priority": "CONDITIONAL GATE",
    "summary": "Conditional local-Qwen override: parallel non-destructive 4096-dimensional build/cutover with private ignored endpoint and exact egress; must not replace portable AI-gateway defaults.",
    "status": "blocked (4A.1 complete; 4A.2a partial candidate preserved after external DGX Spark crash)",
    "proven_by": {
@@ -1068,8 +1068,8 @@
    "summary": "Portable no-config defaults: Zendesk AI Gateway anthropic.kimi-k3 inference and openai:text-embedding-3-large/1536 embeddings; explicit host/local/env overrides win independently; no DGX or Codex prerequisite.",
    "status": "pending implementation (requirement added 2026-09-17)",
    "proven_by": {},
-   "evidence": "not yet produced \u2014 see .ralph/plans/blocked/EXECUTION_PLAN.md Slice 4P",
-   "verdict_doc": ".ralph/plans/blocked/SPECIFICATION.md"
+   "evidence": "not yet produced \u2014 see .ralph/plans/EXECUTION_PLAN.md Slice 4P",
+   "verdict_doc": ".ralph/plans/SPECIFICATION.md"
   }
  ],
  "phase2": {}

@@ -74,8 +74,9 @@ an unrelated manual bulk embed against the same PG. Fixes:
 - **R3a-2 (in-sandbox index serving)** — PROVEN: `gbrain search`/`query` run against in-sandbox PG
   (`localhost:5433`), 1057 pages served, no host dependency at query time (other than the
   gateway-mediated embedding call).
-- **R3a-12 (embedding freshness)** — PROVEN: 3029 chunks embedded via the AI gateway (dims 1536),
-  query-time embedding live.
+- **R3a-12 (embedding freshness, gateway/1536 branch)** — PROVEN for this selected profile:
+  3029 chunks embedded via the AI gateway (dims 1536), query-time embedding live. Revised
+  no-config profile selection and precedence remain pending in Slice 4P.
 - **R3a-5 (lifecycle integration)** — advanced: `brain-index` is wired into `create`/`converge`,
   idempotent, dry-run aware, offline-tested.
 

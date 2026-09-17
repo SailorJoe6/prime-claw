@@ -1,6 +1,6 @@
 # Decisions — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-Beads: `prime-claw-zwg` (P1). Index: [SPECIFICATION.md](blocked/SPECIFICATION.md). Requirements: [REQUIREMENTS.md](REQUIREMENTS.md).
+Beads: `prime-claw-zwg` (P1). Index: [SPECIFICATION.md](SPECIFICATION.md). Requirements: [REQUIREMENTS.md](REQUIREMENTS.md).
 
 Each decision lists the requirement IDs it satisfies.
 
@@ -109,22 +109,26 @@ belongs upstream so anyone's prime-agent gets a brain. A permanent fork is a mai
 burden whose original justifications (OpenClaw-only, hard-coded taxonomy, walk-up config) are
 now obsolete upstream.
 
-## D3a-I — Sandbox prime-agent non-secret config mirrors the host
-**Decision:** `stage_prime_agent` copies the operator's host `models.json` **and**
-`settings.json` verbatim into `/sandbox/.prime/agent/`. This carries model metadata plus the
-user's current default provider/model/thinking level and enabled-model set. Host `auth.json`
-is never copied. If host config is absent, a configurable built-in fallback remains, but it
-is not the acceptance target while the host default is available. Source paths are
-overridable via `host_{models,settings}_json` / `PRIME_CLAW_HOST_{MODELS,SETTINGS}_JSON`.
-**Rationale:** The container must behave like the user's local Prime Agent rather than drift
-to a stale project-pinned model. Slice 0 proved models.json was necessary; Slice 3 proved
-settings.json is equally necessary when the user's selected provider changed. Satisfies
-R3a-13.
+## D3a-I — Sandbox prime-agent non-secret config mirrors an existing user preference
+**Decision:** When the operator already has valid host `models.json` and `settings.json` with
+an explicit default provider/model, `stage_prime_agent` copies them verbatim into
+`/sandbox/.prime/agent/`. That existing preference takes precedence and carries its model
+metadata, thinking level, and enabled-model set. Host `auth.json` is never copied. When the
+host files are absent or do not name a usable preferred model, D3a-M's portable Kimi/AI-gateway
+default is the acceptance target. Source paths are overridable via
+`host_{models,settings}_json` / `PRIME_CLAW_HOST_{MODELS,SETTINGS}_JSON`.
+**Rationale:** The container must respect a user's existing Prime Agent choice without making
+one developer's configuration the repository default. Slice 0 proved models.json was
+necessary; Slice 3 proved settings.json is equally necessary when the user's selected provider
+changed. D3a-M supersedes the old rule that any available host default automatically defined
+portable acceptance. Satisfies R3a-13 and R3a-15.
 
 ## D3a-J — Conditional provider credential refresh (skip when unchanged)
 **Decision:** `stage_provider` (ai-gateway), `stage_github_provider`, and `stage_codex_provider` refresh the stored
 credential ONLY when it changed, tracked by a sha256 hash in
 `.prime-claw-{ai-gateway-key,github-token,codex-oauth}.sha256` (gitignored; hash only, never the secret).
+Under D3a-M, only credential stages required by the selected profiles run; Codex is
+conditional on an explicit override and is not part of the no-config default.
 **Satisfies:** R3a-5, R3a-7.
 **Rationale (Slice 1 finding):** every `openshell provider update` bumps a resource version
 that re-keys the SANDBOX's placeholder set, and a running sandbox still holds the OLD
@@ -141,7 +145,7 @@ corollary: if an operator rotates a token, re-sync provider + hash file together
 | D3a-B | R3a-1, R3a-4, R3a-7 |
 | D3a-C | R3a-3, R3a-4, R3a-8 |
 | D3a-D | R3a-7, R3a-13, R3a-15 |
-| D3a-I | R3a-13 |
+| D3a-I | R3a-13, R3a-15 |
 | D3a-K | R3a-3, R3a-7, R3a-13 |
 | D3a-M | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 |
 | D3a-J | R3a-5, R3a-7 |

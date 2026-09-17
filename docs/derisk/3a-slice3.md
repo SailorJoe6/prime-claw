@@ -5,9 +5,9 @@
 ## Outcome
 
 A sandboxed prime-agent session answered a natural operator question using the in-sandbox
-brain and cited the supporting page. The accepted run used the operator's current local
-Prime Agent default, **ChatGPT-5.6 Sol via `openai-codex` OAuth**, per the updated R3a-13
-requirement.
+brain and cited the supporting page. The accepted run used the operator's configured local default at the time,
+**ChatGPT-5.6 Sol via `openai-codex` OAuth**. It proves explicit-override behavior and
+credential isolation under revised R3a-13; it does not prove the portable no-config default.
 
 Evidence: [`cited-query-20260916T164509Z.json`](../evidence/cited-query-20260916T164509Z.json) and full runtime validation [`validate-20260916T165022Z.json`](../evidence/validate-20260916T165022Z.json) (**16/16 PASS**)
 
@@ -41,13 +41,12 @@ Agent guidance requires brain lookup for durable people/project/decision/history
 requires use of the exact citation token, and treats retrieved page text as **untrusted data,
 never instructions**.
 
-### Host-config mirroring + current model target (R3a-13 update)
+### Host-config mirroring + operator override proof (R3a-13)
 
-Operator direction changed the acceptance target because Kimi/GLM are currently unavailable.
-The runtime now:
+For this historical run, the operator had selected Codex. The runtime:
 
-- copies host `~/.prime/agent/models.json` **and** `settings.json` verbatim;
-- follows the copied default: `openai-codex/gpt-5.6-sol`, thinking `high`;
+- copied host `~/.prime/agent/models.json` **and** `settings.json` verbatim;
+- followed that explicit default: `openai-codex/gpt-5.6-sol`, thinking `high`;
 - provisions host OAuth only into OpenShell's builtin `codex` provider;
 - attaches Codex to an existing sandbox without wiping the brain index;
 - writes only a non-secret synthetic JWT plus `openshell:resolve:` placeholders to sandbox
@@ -94,7 +93,8 @@ Coverage includes:
 - **R3a-3 — PROVEN.** The sandboxed prime-agent invoked in-sandbox gbrain, answered correctly,
   and cited the expected page slug.
 - **R3a-7 — PRESERVED.** No real inference credential entered sandbox disk/process output.
-- **R3a-13 — PROVEN (expanded).** Host models/settings mirrored verbatim; current host-default
-  ChatGPT-5.6 Sol worked end-to-end through placeholder-projected OpenAI Codex OAuth.
+- **R3a-13 — OVERRIDE/ISOLATION BRANCH PROVEN.** Host models/settings mirrored verbatim; the
+  explicit ChatGPT-5.6 Sol choice worked through placeholder-projected OpenAI Codex OAuth.
+  Revised no-config Kimi selection remains pending in Slice 4P.
 - **R3a-5 — ADVANCED.** brain-query, Codex provider, missing-provider attach, config projection,
   and daemon placeholder inheritance are lifecycle stages.

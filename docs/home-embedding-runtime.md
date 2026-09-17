@@ -101,8 +101,8 @@ The build gate requires `vector(4096)`, a source bookmark equal to the pinned br
 every candidate chunk stamped with the current text hash/signature and exact Qwen model, and no
 unsupported HNSW index. A separate read-only fingerprint covers the canonical config hash,
 schema, page/chunk/vector/model counts, source bookmark, embedding config, and migration version
-before and after every normal build exit. It does **not** switch `/sandbox/.gbrain/config.json`. It restores the
-tracked historical policy after both success and reported failure so the legacy runtime stays
+before and after every normal build exit. It does **not** switch
+`/sandbox/.gbrain/config.json`. It restores the tracked gateway/default policy after both success and reported failure so the legacy runtime stays
 queryable between build and validation; after an externally interrupted process, run
 `bin/prime-claw converge` to restore that policy. A partial candidate database is isolated and
 may be resumed by rerunning `embedding-build`; never drop or alter the legacy `gbrain`
@@ -134,6 +134,6 @@ only after the operator confirms the exact home model is serving again.
 
 The attempted `projects/prime-claw` write stopped on gateway rate limiting and rolled back
 cleanly: the page is absent, the brain Git clone is clean, and no commit or push occurred.
-Slice 4P must implement portable tracked defaults. Joe's Slice 4A.2 local-Qwen build remains
-paused until the Spark is healthy; his Slice 4B acceptance remains blocked on that selected
-profile.
+Slice 4P must implement portable tracked defaults, after which generic Slice 4B can use the
+gateway profile. Joe's Slice 4A.2 local-Qwen build and any separate acceptance rerun on that
+profile remain paused until the Spark is healthy; they do not block portable acceptance.

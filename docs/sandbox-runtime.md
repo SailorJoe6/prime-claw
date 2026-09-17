@@ -44,7 +44,7 @@ operating guarantees. For observed-failure → recovery mapping, see
 | `status` | Read-only actual-vs-expected report for every component (gateway, sandbox+image, policy rev, provider, Postgres, gbrain, prime-agent daemon, model reachability). | no |
 | `build` | Builds `docker/runtime.Dockerfile` into the image. Idempotent via an input fingerprint + build stamp; `--force` rebuilds. | image |
 | `embedding-preflight` | Validates the locked Qwen/4096/1000s parallel-database contract and renders a redacted, exact-host local policy. Makes no network, sandbox, or database call. | ignored local policy only |
-| `embedding-build` | Temporarily applies the candidate policy, builds/resumes only `gbrain_qwen4096` through a separate `GBRAIN_HOME`, gates fresh 4096-dimensional Qwen chunks and canonical non-mutation, then restores the historical policy. Never cuts over canonical config. | candidate DB/config; temporary policy |
+| `embedding-build` | Temporarily applies the candidate policy, builds/resumes only `gbrain_qwen4096` through a separate `GBRAIN_HOME`, gates fresh 4096-dimensional Qwen chunks and canonical non-mutation, then restores the tracked gateway/default policy. Never cuts over canonical config. | candidate DB/config; temporary policy |
 | `create` | Fresh bring-up. Destructive: deletes any existing sandbox, creates from the image with providers attached **at create**, then converges. | sandbox |
 | `converge` | Idempotent repair of an existing sandbox: re-runs every stage in place (policy, provider env, prime-agent install, brain, spawn target) with **no** needless recreate. Fixes drift. | in place |
 | `validate` | Green/red acceptance gate: daemon healthy, deny-by-default egress, credentialed model call, brain serving, spawn/reap. Records versions to `docs/evidence/validate-<utc>.json`. | evidence |
@@ -60,8 +60,8 @@ for targeted diagnosis:
   endpoint config, validate the locked home-Qwen contract, and render the candidate policy.
 - **embedding-build** *(standalone; not part of create/converge)* — apply the ignored candidate
   policy only for an isolated, pinned full sync into `gbrain_qwen4096`, gate vector/schema and
-  canonical fingerprints, then restore the tracked historical policy.
-- **policy** — apply `policies/runtime.yaml` (historical policy until the later cutover step).
+  canonical fingerprints, then restore the tracked gateway/default policy.
+- **policy** — apply `policies/runtime.yaml` (portable gateway/default policy; a selected local profile may use an ignored overlay).
 - **provider** — attach the AI-gateway provider (create/update-first; import
   the profile only when the provider is absent). Refreshes the credential only
   when it changed (sha256 in `.prime-claw-ai-gateway-key.sha256`, gitignored) —
@@ -73,22 +73,23 @@ for targeted diagnosis:
   Token read host-side via `gh auth token`; same conditional-refresh discipline
   (`.prime-claw-github-token.sha256`). The sandbox only ever holds the
   `openshell:resolve:env:..._api_token` placeholder (D3a-B/J).
-- **codex-provider** — mirror the host's current `openai-codex` OAuth bundle
-  into OpenShell's builtin `codex` provider (host-side only), with the same
-  conditional-refresh/hash discipline (`.prime-claw-codex-oauth.sha256`).
-- **sandbox** — create-if-absent (or delete+recreate with `force_fresh`);
-  attaches all three providers (historical AI gateway, GitHub for brain
-  clone/push, Codex for current inference). The AI-gateway attachment remains temporarily so
-  ordinary gateway-default converge can serve the canonical 1536 index. An explicit local
-  profile may temporarily replace gbrain/Bun egress during its isolated build. On in-place
-  converge, attaches any
-  missing provider without wiping `/sandbox`. The brain is NOT `--upload`ed.
-- **prime-agent** — install/configure prime-agent + persistent REPL; mirror host
-  `models.json` + `settings.json` verbatim; write a placeholder-only Codex auth
-  projection; then deliberately restart the daemon so it inherits the current
-  provider placeholder set. The Codex projection uses a non-secret synthetic JWT
-  for local parsing and rewrites outbound auth/account headers to placeholders
-  in `npm-onload.js`; real OAuth stays at OpenShell L7 (D3a-K).
+- **codex-provider** — pre-S4P implementation mirrors the host's `openai-codex` OAuth bundle
+  into OpenShell's builtin `codex` provider (host-side only), with conditional-refresh/hash
+  discipline (`.prime-claw-codex-oauth.sha256`). Slice 4P makes this stage conditional on an
+  explicit Codex override; it is not part of the no-config default.
+- **sandbox** — create-if-absent (or delete+recreate with `force_fresh`). Before S4P, it
+  attaches all three implemented providers: AI gateway, GitHub, and Codex. Slice 4P must attach
+  only the credential providers required by the selected inference and embedding profiles;
+  the no-config path needs AI gateway + GitHub, not Codex. An explicit local profile may
+  temporarily replace gbrain/Bun egress during its isolated build. On in-place converge,
+  attaches any missing selected provider without wiping `/sandbox`. The brain is NOT
+  `--upload`ed.
+- **prime-agent** — install/configure prime-agent + persistent REPL and restart the daemon so
+  it inherits the selected provider placeholders. Before S4P, the stage mirrors host
+  `models.json` + `settings.json` and writes a placeholder-only Codex auth projection. Slice
+  4P must use portable Kimi/AI-gateway config when no preferred host setting exists and write
+  the Codex projection only for an explicit Codex override. Real credentials always remain at
+  OpenShell L7 (D3a-K/M).
 - **brain-clone** — clone the operator's brain repo into the sandbox
   (default `/sandbox/brain`) WITH `.git` over HTTPS using the `${api_token}`
   placeholder; idempotent (fetch + fast-forward when already cloned). The URL

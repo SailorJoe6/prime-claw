@@ -31,10 +31,10 @@ flip).
 | 4 | **cold-daemon** | The prime-agent daemon isn't running (no `/tmp/prime-agent-*/daemon.sock`) -> spawn times out. | `bin/prime-claw converge` — `stage_prime_agent` auto-starts the daemon (`--mode daemon --offline`) with a socket-wait. |
 | 5 | **drift** | Sandbox/policy/provider drifted from expected; `status` shows a mismatch. | `bin/prime-claw converge`. |
 | 6 | **brain-clone-401** | `create`/`converge` fails at stage `brain-clone` with `remote: Invalid username or token` (exit 128). | First check the stage script class of bug: the clone URL must expand `${api_token}` in-sandbox (double-quoted — see `docs/derisk/3a-slice1.md` for the Slice-1 root cause). If the code is right, verify the provider token is current: `gh auth token` vs the provider (`openshell provider get prime-claw-github`); a rotated token re-syncs automatically on the next run via the conditional-refresh hash (`.prime-claw-github-token.sha256`). Worst case: `destroy` + `create` for a clean placeholder binding. |
-| 7 | **credentialed-endpoints-dead-after-converge** | After a `converge`, the sandbox's credentialed calls (inference and/or git push) suddenly 401/403 even though nothing "changed". | Cause: a `provider update` bumped the provider's resource version, re-keying the placeholder set, while the running sandbox still holds the OLD placeholders. Recovery: `bin/prime-claw destroy` + `create` (binds fresh placeholders). Prevention is built in: all three credential provider stages skip no-op updates (D3a-J); if you rotate a credential by hand, run `converge` then recreate. |
+| 7 | **credentialed-endpoints-dead-after-converge** | After a `converge`, the sandbox's credentialed calls (inference and/or git push) suddenly 401/403 even though nothing "changed". | Cause: a `provider update` bumped the provider's resource version, re-keying the placeholder set, while the running sandbox still holds the OLD placeholders. Recovery: `bin/prime-claw destroy` + `create` (binds fresh placeholders). Prevention is built in: each selected credential-provider stage skips no-op updates (D3a-J); before Slice 4P the implementation stages all three. If you rotate a credential by hand, run `converge` then recreate. |
 | 8 | **vpn-down-rbac-403** | Sandbox credentialed calls (embed, inference, clone) fail with `403 RBAC: access denied` (body from istio-envoy, no rate-limit headers) while the SAME real key returns 200 from the host. | The host VPN (GlobalProtect) is down — corporate policy forces re-login ~daily. Check `zetup vpn status`; connect with `zetup vpn connect` (Okta push). No provider/sandbox changes needed; placeholders are unaffected. Diagnose this FIRST before touching providers ( bead prime-claw-z56 ports the ensure-vpn auto-check). |
 | 9 | **daemon-no-provider-auth** | Daemon RPC can create a session, but `prompt_and_wait` fails preflight with `No API key found for <provider>`. | The daemon was started before the current provider placeholders/config were staged. Run `bin/prime-claw converge`; `stage_prime_agent` now deliberately restarts the daemon so it inherits the current placeholder environment. Do not inspect `/proc/<pid>/environ` — OpenShell blocks it. |
-| 10 | **codex-placeholder-adapter-failure** | `openai-codex` fails locally with `Failed to extract accountId from token`, or remote calls 401 despite valid host OAuth. | Run `converge` and verify: host `settings.json` selects `openai-codex/gpt-5.6-sol`; sandbox `settings.json` hash matches host; sandbox auth access is synthetic and refresh/accountId begin `openshell:resolve:`; `prime-claw-codex` is attached; `npm-onload.js` is staged. Never copy the real host auth file to the sandbox. |
+| 10 | **codex-placeholder-adapter-failure** | An explicitly selected `openai-codex` model fails locally with `Failed to extract accountId from token`, or remote calls 401 despite valid host OAuth. | Run `converge` and verify: host `settings.json` selects the intended `openai-codex` model; sandbox `settings.json` hash matches host; sandbox auth access is synthetic and refresh/accountId begin `openshell:resolve:`; `prime-claw-codex` is attached; `npm-onload.js` is staged. Never copy the real host auth file to the sandbox. |
 
 ## Teardown
 
@@ -105,13 +105,13 @@ embeddings or changing the canonical 1536 database.
 **Signature:** `error: candidate embedding build failed`, a host-side timeout, or an
 interrupted `embedding-build` process.
 
-A reported build failure restores the tracked historical policy automatically. The candidate
+A reported build failure restores the tracked gateway/default policy automatically. The candidate
 `gbrain_qwen4096` database may contain partial progress but is isolated from canonical
 `gbrain`. Do not drop either database and do not use `--skip-failed` to acknowledge provider
 errors.
 
 1. If the process was externally interrupted, run `bin/prime-claw converge` to restore the
-   tracked historical policy.
+   tracked gateway/default policy.
 2. Confirm the canonical config and `vector(1536)` database remain intact with direct read-only
    `psql`; do not use an ordinary doctor command that may auto-migrate.
 3. Classify the sanitized gbrain failure. Fix only the cause, then rerun
@@ -119,7 +119,7 @@ errors.
 4. Keep `GBRAIN_AI_EMBED_TIMEOUT_MS` and `GBRAIN_QUERY_EMBED_TIMEOUT_MS` at `1000000`, the sync
    watchdog above 1000 seconds, and the outer timeout above the sync deadline.
 
-The build always restores the historical policy on normal exit, including success. Slice
+The build always restores the tracked gateway/default policy on normal exit, including success. Slice
 4A.2b must explicitly reapply the candidate policy for semantic validation/cutover.
 
 ## Default AI-gateway embedding budget exhausted / HTTP 429
