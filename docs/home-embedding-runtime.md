@@ -1,6 +1,6 @@
 # Home-network embedding runtime
 
-> **Status:** OPTIONAL PROFILE BLOCKED — DGX Spark outage paused Slice 4A.2a; partial candidate preserved; no cutover.
+> **Status:** OPTIONAL PROFILE READY TO RESUME AFTER PREFLIGHT — Spark recovery confirmed; partial candidate preserved; no cutover.
 > **Decision:** D3a-L/M · **Requirements:** R3a-12, R3a-14, R3a-15 · **Plan:** Phase 3a Slices 4P/4A
 
 ## Portable default versus this optional profile
@@ -129,11 +129,12 @@ The operator-local endpoint config and rendered candidate policy pass preflight.
 candidate-build path is implemented and offline-tested. A live build reached 350 source pages
 and 1,140 fully embedded 4096-dimensional chunks before the DGX Spark crashed. That partial
 candidate has no source bookmark and is not accepted. The process is stopped, the historical
-policy is restored, the canonical fingerprint is unchanged, and no cutover occurred. Resume
-only after the operator confirms the exact home model is serving again.
+policy is restored, the canonical fingerprint is unchanged, and no cutover occurred. On
+2026-09-17 the operator confirmed the Spark is alive and ready. No build has restarted; rerun
+the exact-model compatibility/preflight gate before resuming the candidate.
 
 The attempted `projects/prime-claw` write stopped on gateway rate limiting and rolled back
 cleanly: the page is absent, the brain Git clone is clean, and no commit or push occurred.
 Slice 4P must implement portable tracked defaults, after which generic Slice 4B can use the
-gateway profile. Joe's Slice 4A.2 local-Qwen build and any separate acceptance rerun on that
-profile remain paused until the Spark is healthy; they do not block portable acceptance.
+gateway profile. Joe's Slice 4A.2 local-Qwen build is ready to resume after preflight, but it
+remains independent and does not block portable acceptance.

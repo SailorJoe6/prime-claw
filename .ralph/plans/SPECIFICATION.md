@@ -1,16 +1,16 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — portable-default Slice 4P is next; DGX outage pauses only optional local-Qwen Slice 4A.2a
+**Status:** ACTIVE — portable-default Slice 4P is next; optional local-Qwen Slice 4A.2a is ready to resume after preflight
 **Beads:** `prime-claw-zwg` (P1)
 **Date:** 2026-09-11 · **Provider defaults revised:** 2026-09-17
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
 
 
-> **Current external blocker (2026-09-16):** the DGX Spark serving this operator's selected home
-> embedding override crashed during the isolated candidate build. Work on that profile is
-> paused until the operator confirms service recovery. Portable-default Slice 4P is independent
-> and ready. The partial candidate is preserved; the tracked gateway/default policy is restored; the
-> canonical database/config are unchanged; no cutover occurred.
+> **Spark recovery confirmed (2026-09-17):** the operator reports the DGX Spark is alive and
+> ready. No build has restarted. Before resuming the optional home-Qwen profile, rerun the exact
+> model compatibility/preflight gate, then continue the preserved isolated candidate. Portable-
+> default Slice 4P remains the tracked next slice. The canonical database/config are unchanged;
+> no cutover occurred.
 
 This document is the summary and index for the work. It is accompanied by:
 
@@ -48,7 +48,8 @@ index, and let a sandboxed Prime Agent answer with citations. That 1536-dimensio
 AI-gateway index is now the intended portable default profile, though tracked default selection
 still needs correction under R3a-15. For this operator's explicit local override, Slice 4A.1
 validates the home-Qwen endpoint contract and 4A.2 has a preserved partial 4096-dimensional
-candidate. Its live completion remains paused on the DGX Spark outage. The routed write/push
+candidate. The Spark outage is cleared by operator confirmation; 4A.2a may resume only after
+its compatibility/preflight gate. The routed write/push
 proof also remains outstanding.
 Phase 2 proved the *container*; Phase 3a is finishing the *brain-hosting claw*.
 

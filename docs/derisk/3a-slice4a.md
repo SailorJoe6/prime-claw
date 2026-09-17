@@ -1,6 +1,6 @@
 # Phase 3a Slice 4A — optional home-Qwen embedding override
 
-**Status:** BLOCKED for this operator override — 4A.1 complete; 4A.2a partial candidate preserved after external DGX Spark crash
+**Status:** READY TO RESUME AFTER PREFLIGHT — 4A.1 complete; 4A.2a partial candidate preserved; Spark recovery confirmed
 **Decision:** D3a-L
 **Requirements:** R3a-12, R3a-14
 **Evidence:** [`docs/evidence/embedding-preflight-20260916T191526Z.json`](../evidence/embedding-preflight-20260916T191526Z.json)
@@ -45,7 +45,7 @@ this objective created no page and performed no write.
 `GBRAIN_AI_EMBED_TIMEOUT_MS=1000000` (and the query timeout), full-sync with the exact model ID,
 gate parity/dimensions/freshness/retrieval/corporate non-use, and only then switch the canonical
 config and policy atomically. The legacy database remains untouched for rollback.
-## 4A.2a interrupted build — external hardware blocker
+## 4A.2a interrupted build — external hardware blocker recovered
 
 The isolated candidate build was started from implementation commit `e92abf4`. The operator
 reported that the DGX Spark hosting the embedding model crashed and stopped serving. The build
@@ -61,9 +61,10 @@ canonical config, schema, page/chunk/vector/model state, source bookmark, embedd
 migration version are unchanged. No canonical cutover occurred and the legacy database remains
 intact.
 
-**Unblock condition:** the DGX Spark is healthy and `Qwen3-Embedding-8B` again passes the
-operator-local compatibility probe. Resume with `bin/prime-claw embedding-build`; the isolated
-candidate database is intentionally preserved for a safe full-sync resume. Do not drop or
-mutate the legacy database.
+**Recovery update (2026-09-17):** the operator confirms the DGX Spark is alive and ready.
+No build has restarted. First rerun the operator-local compatibility/preflight probe for the
+exact `Qwen3-Embedding-8B` service; if it passes, resume with
+`bin/prime-claw embedding-build`. The isolated candidate database is intentionally preserved
+for a safe full-sync resume. Do not drop or mutate the legacy database.
 
 Sanitized machine evidence: [`embedding-build-interrupted-20260916T234215Z.json`](../evidence/embedding-build-interrupted-20260916T234215Z.json).

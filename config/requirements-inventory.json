@@ -1001,7 +1001,7 @@
    "id": "R3a-12",
    "priority": "GATE",
    "summary": "Selected embedding-profile freshness: default Zendesk AI Gateway openai:text-embedding-3-large/1536; explicit overrides allowed only with a complete single-vector-space rebuild; no null/stale/mixed vectors or keyword-only acceptance.",
-   "status": "partial (historical gateway/1536 proof exists; portable default selection pending; optional Qwen override blocked on Spark)",
+   "status": "partial (historical gateway/1536 proof exists; portable default selection pending; optional Qwen override ready to resume after preflight)",
    "proven_by": {
     "validate": [
      "docs/derisk/3a-slice2.md",
@@ -1042,7 +1042,7 @@
    "id": "R3a-14",
    "priority": "CONDITIONAL GATE",
    "summary": "Conditional local-Qwen override: parallel non-destructive 4096-dimensional build/cutover with private ignored endpoint and exact egress; must not replace portable AI-gateway defaults.",
-   "status": "blocked (4A.1 complete; 4A.2a partial candidate preserved after external DGX Spark crash)",
+   "status": "ready to resume after preflight (4A.1 complete; 4A.2a partial candidate preserved; Spark recovery operator-confirmed)",
    "proven_by": {
     "apply": [
      "bin/prime-claw",

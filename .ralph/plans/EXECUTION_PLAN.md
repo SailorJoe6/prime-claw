@@ -61,7 +61,7 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 | **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source); AI-gateway/1536 embedding proof (portable-default basis) | R3a-2 | — |
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
 | **S4P** | Portable no-config defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **NEXT / IMPLEMENTATION PENDING** — does not require Spark |
-| **S4A** | Optional operator-local home `Qwen3-Embedding-8B`/4096 override, non-destructive | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **BLOCKED EXTERNALLY** — partial candidate preserved; Spark unavailable |
+| **S4A** | Optional operator-local home `Qwen3-Embedding-8B`/4096 override, non-destructive | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **READY TO RESUME AFTER PREFLIGHT** — partial candidate preserved; Spark recovery confirmed |
 | **S4B** | One routed write + push-back round-trip | R3a-4 | after S4P gateway-default acceptance; local-Qwen is optional |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
@@ -234,23 +234,19 @@ create/converge use the gateway profile unless the operator explicitly selected 
 
 ## Slice 4A — Optional home-Qwen embedding override (R3a-12, R3a-14)
 
-**Execution status (revised 2026-09-17): PAUSED / BLOCKED.** Bounded objective 4A.1 is
-complete: ignored local config merge, strict locked-setting validation,
+**Execution status (revised 2026-09-17): READY TO RESUME AFTER PREFLIGHT.** Bounded
+objective 4A.1 is complete: ignored local config merge, strict locked-setting validation,
 private-endpoint-safe candidate policy rendering, and `embedding-preflight`. Slice 4A.2a's
-isolated build path is implemented, but its live sync stopped when the Spark crashed. It is
-not the current objective; Slice 4P is next. Slice 4A.2b validation and optional-profile
-cutover remain separate and paused.
+isolated build path is implemented; its live sync stopped when the Spark crashed. The operator
+now confirms the Spark is alive and ready. No build has restarted. Slice 4P remains the tracked
+next objective; 4A.2a may resume afterward (or as an explicitly selected local-profile task)
+only after the exact-model compatibility/preflight gate passes.
 
-**External blocker (2026-09-16, optional local profile only).** The DGX Spark hosting the
-home embedding model crashed and
-stopped serving during the live build. Work is paused at the operator's request. The build
-process is stopped, the tracked gateway/default policy is restored, and the partial
-`gbrain_qwen4096` database is preserved at 350 source pages / 1,140 embedded chunks, all 4096d,
-with no source bookmark. The canonical fingerprint is unchanged and no cutover occurred.
-Do not resume this profile until the operator confirms the DGX Spark is healthy and the exact
-model again passes its compatibility probe. This blocker does not prevent Slice 4P from
-implementing portable tracked defaults. Resume 4A later with `bin/prime-claw embedding-build`.
-Evidence:
+**Recovered external blocker.** The build process remains stopped, the tracked gateway/default
+policy is restored, and the partial `gbrain_qwen4096` database is preserved at 350 source pages /
+1,140 embedded chunks, all 4096d, with no source bookmark. The canonical fingerprint is
+unchanged and no cutover occurred. Resume safely with compatibility/preflight first, then
+`bin/prime-claw embedding-build`; never drop or mutate either database. Evidence:
 `docs/evidence/embedding-build-interrupted-20260916T234215Z.json`.
 
 **Goal.** Support the operator's explicitly selected home-network OpenAI-compatible
