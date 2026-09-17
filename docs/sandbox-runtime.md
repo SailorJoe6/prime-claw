@@ -22,7 +22,7 @@ operating guarantees. For observed-failure → recovery mapping, see
 | `policies/runtime.yaml` | The single runtime sandbox policy (deny-by-default egress). |
 | `docker/runtime.Dockerfile` | The sandbox image (brain stack baked at build time). |
 | `config/runtime.json` | Runtime config (sandbox/image/gateway/policy/provider). |
-| `.prime-claw/runtime.local.json` | Ignored mode-0600 operator-local home embedding endpoint overlay. |
+| `.prime-claw/runtime.local.json` | Ignored mode-0600 operator-local brain repository and optional home-embedding overlay. |
 | `.prime-claw/runtime-policy.local.yaml` | Ignored mode-0600 candidate policy rendered by `embedding-preflight`. |
 | `.prime-claw/runtime-policy.active.yaml` | Ignored mode-0600 least-privilege policy rendered from the selected profiles. |
 | `config/requirements-inventory.json` | Requirement → validator traceability. |
@@ -35,7 +35,24 @@ operating guarantees. For observed-failure → recovery mapping, see
 
     bin/prime-claw --dry-run create
 
-`--config <path>` overrides `config/runtime.json`.
+`--config <path>` overrides `config/runtime.json`, but repository identity still must come
+from the ignored local overlay or `PRIME_CLAW_BRAIN_REPO`.
+
+## Required operator brain repository
+
+Prime-claw intentionally ships with no brain repository. Before `status`, `create`, `converge`,
+`validate`, `recover`, or `embedding-build`, configure the GitHub `owner/repository` slug by one
+of these methods:
+
+1. Add `"brain_repo": "owner/repository"` to the ignored
+   `.prime-claw/runtime.local.json` object and keep the file mode `0600`.
+2. Set `PRIME_CLAW_BRAIN_REPO=owner/repository`. The environment wins when both are present.
+
+Do not include `https://`, credentials, or a trailing `.git`. There is no public starter or
+example brain. A missing or malformed value fails before provider, sandbox, network, or database
+work. `build`, `destroy`, and `embedding-preflight` remain available because they do not consume
+brain repository content. `status` reports the missing setup as `brain-repository BAD` without
+probing runtime components.
 
 ## Verbs
 

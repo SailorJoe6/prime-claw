@@ -30,6 +30,10 @@ def cfg(**over):
         "host_models_json": "/nonexistent/prime-claw-models.json",
         "model": "anthropic/anthropic.kimi-k3",
         "ai_gateway_host": "ai-gateway.zende.sk",
+        "brain_repo": "operator/brain",
+        "_local_override_keys": ["brain_repo"],
+         "_local_config_path": os.path.realpath(os.path.join(
+             REPO, ".prime-claw", "runtime.local.json")),
     }
     c.update(over)
     return c

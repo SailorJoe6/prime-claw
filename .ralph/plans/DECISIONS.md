@@ -153,11 +153,12 @@ corollary: if an operator rotates a token, re-sync provider + hash file together
 | D3a-J | R3a-5, R3a-7 |
 | D3a-L | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 |
 | D3a-E | R3a-8, R3a-11 |
-| D3a-F | R3a-9 |
+| D3a-F | R3a-9, R3a-16 |
 | D3a-G | R3a-3, R3a-4, R3a-6 |
 | D3a-H | R3a-2, R3a-8, R3a-9 |
+| D3a-N | R3a-1, R3a-5, R3a-9, R3a-16 |
 
-GATE requirements R3a-1..15 are covered by at least one decision or the slice's direct
+GATE requirements R3a-1..16 are covered by at least one decision or the slice's direct
 implementation. R3a-12 freshness is mandatory for whichever embedding profile is selected;
 R3a-14 is conditional on selecting the local-Qwen override. Keyword-only acceptance remains
 forbidden.

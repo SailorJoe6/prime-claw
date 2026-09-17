@@ -17,7 +17,10 @@ def cfg(**over):
     c = {"sandbox_name": "prime-claw", "image": "prime-claw-brain:0.1.0",
          "gateway": "openshell", "provider_name": "prime-claw-ai-gateway",
          "model": "anthropic.kimi-k3", "ai_gateway_host": "ai-gateway.zende.sk",
-         "policy_file": "policies/runtime.yaml"}
+         "policy_file": "policies/runtime.yaml", "brain_repo": "operator/brain",
+         "_local_override_keys": ["brain_repo"],
+         "_local_config_path": os.path.realpath(os.path.join(
+             REPO, ".prime-claw", "runtime.local.json"))}
     c.update(over); return c
 
 

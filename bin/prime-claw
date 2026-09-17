@@ -19,7 +19,7 @@ Credential isolation: real credential values never touch this process's args,
 the repo, logs, or sandbox disk; only OpenShell providers hold them (R2-X-1).
 """
 from __future__ import annotations
-import argparse, base64, hashlib, json, os, re, shlex, shutil, subprocess, sys, tempfile, time
+import argparse, base64, hashlib, json, math, os, posixpath, re, shlex, shutil, subprocess, sys, tempfile, time
 from urllib.parse import urlsplit
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,12 +32,18 @@ def load_config(path: str | None) -> dict:
 
     The local file is opt-in through ``local_config_file`` in the tracked config
     or ``PRIME_CLAW_LOCAL_CONFIG``. A custom ``--config`` without either key is
-    therefore hermetic. Environment-specific values (notably the private home
-    embedding endpoint) never need to enter the tracked JSON.
+    therefore hermetic. Operator-specific values (notably brain repository
+    identity and the private home embedding endpoint) never enter tracked JSON.
     """
     p = path or os.environ.get("PRIME_CLAW_CONFIG") or DEFAULT_CONFIG
     with open(p) as f:
         cfg = json.load(f)
+    if not isinstance(cfg, dict):
+        raise ValueError("runtime config must be a JSON object")
+    # Internal provenance is derived here. Never trust matching keys supplied by
+    # a tracked/custom base config or by the overlay itself.
+    cfg.pop("_local_override_keys", None)
+    cfg.pop("_local_config_path", None)
     local = os.environ.get("PRIME_CLAW_LOCAL_CONFIG") or cfg.get("local_config_file")
     if local:
         local = os.path.expanduser(local)
@@ -48,11 +54,14 @@ def load_config(path: str | None) -> dict:
                 overlay = json.load(f)
             if not isinstance(overlay, dict):
                 raise ValueError("operator-local config must be a JSON object")
+            reserved = sorted(key for key in overlay if str(key).startswith("_"))
+            if reserved:
+                raise ValueError("operator-local config contains reserved internal keys")
             cfg.update(overlay)
-            # Internal provenance only. Selection precedence needs to distinguish a
-            # checked-in default from an explicit operator-local override without
-            # persisting the local values anywhere else.
+            # Internal provenance only. Repository selection additionally checks
+            # that this was the canonical ignored operator-local path.
             cfg["_local_override_keys"] = sorted(overlay)
+            cfg["_local_config_path"] = os.path.realpath(local)
     return cfg
 
 
@@ -161,7 +170,13 @@ def probe_in_sandbox(cfg, sandbox_present: bool):
 def cmd_status(cfg, args) -> int:
     print(f"prime-claw status  (sandbox={cfg['sandbox_name']}, image={cfg['image']})")
     print("=" * 64)
-    checks = []  # (name, ok|None, detail)
+    repo = _require_brain_repo(cfg, "status")
+    if repo is None:
+        print("  [BAD] brain-repository  explicit operator setup required")
+        print("=" * 64)
+        print("status: 1 component(s) BAD — configure brain_repo before runtime probes")
+        return 1
+    checks = [("brain-repository", True, "configured via " + repo["source"])]
 
     g_ok, g_det = probe_gateway(cfg)
     checks.append(("gateway", g_ok, g_det))
@@ -385,6 +400,130 @@ def cmd_build(cfg, args) -> int:
 
 def _cfg_get(cfg, key, envvar, default):
     return os.environ.get(envvar) or cfg.get(key) or default
+
+
+BRAIN_REPO_ENV = "PRIME_CLAW_BRAIN_REPO"
+BRAIN_REPO_LOCAL_CONFIG = ".prime-claw/runtime.local.json"
+BRAIN_REPO_PATTERN = re.compile(
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9._-]{1,100}"
+)
+BRAIN_BRANCH_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,254}")
+BRAIN_PATH_PATTERN = re.compile(r"/[A-Za-z0-9._/-]+")
+HOST_LABEL_PATTERN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
+
+
+def _brain_repo_selection(cfg: dict) -> dict[str, str]:
+    """Return an explicit operator-owned GitHub repository selection.
+
+    Repository identity may come only from the environment or from the canonical
+    ignored operator-local overlay. Internal provenance is derived by
+    ``load_config`` and cannot be supplied by tracked/custom base configuration.
+    """
+    env_value = os.environ.get(BRAIN_REPO_ENV)
+    local_keys = set(cfg.get("_local_override_keys", []))
+    canonical_local = os.path.realpath(os.path.join(REPO_ROOT, BRAIN_REPO_LOCAL_CONFIG))
+    if env_value is not None:
+        raw, source = env_value, BRAIN_REPO_ENV
+    elif ("brain_repo" in local_keys
+          and cfg.get("_local_config_path") == canonical_local):
+        raw, source = cfg.get("brain_repo"), BRAIN_REPO_LOCAL_CONFIG
+    else:
+        raise ValueError(
+            "brain_repo is required; set PRIME_CLAW_BRAIN_REPO=owner/repository "
+            "or add {\"brain_repo\": \"owner/repository\"} to "
+            ".prime-claw/runtime.local.json"
+        )
+    if not isinstance(raw, str) or raw != raw.strip() or not raw:
+        raise ValueError(
+            "brain_repo must be a GitHub owner/repository slug; configure it with "
+            "PRIME_CLAW_BRAIN_REPO or .prime-claw/runtime.local.json"
+        )
+    _, separator, repository = raw.partition("/")
+    if (not separator or not BRAIN_REPO_PATTERN.fullmatch(raw)
+            or repository in (".", "..") or repository.lower().endswith(".git")):
+        raise ValueError(
+            "brain_repo must be a GitHub owner/repository slug without .git; "
+            "configure it with PRIME_CLAW_BRAIN_REPO or "
+            ".prime-claw/runtime.local.json"
+        )
+    return {"repo": raw, "source": source}
+
+
+def _brain_repository_settings(cfg: dict) -> dict[str, object]:
+    """Resolve and validate all settings used by the clone stage."""
+    selected = _brain_repo_selection(cfg)
+    branch = (os.environ["PRIME_CLAW_BRAIN_BRANCH"]
+              if "PRIME_CLAW_BRAIN_BRANCH" in os.environ
+              else cfg.get("brain_branch", "main"))
+    sb_brain = (os.environ["PRIME_CLAW_SB_BRAIN_DIR"]
+                if "PRIME_CLAW_SB_BRAIN_DIR" in os.environ
+                else cfg.get("sb_brain_dir", "/sandbox/brain"))
+    github_host = (os.environ["PRIME_CLAW_GITHUB_HOST"]
+                   if "PRIME_CLAW_GITHUB_HOST" in os.environ
+                   else cfg.get("github_host", "github.com"))
+    raw_attempts = (os.environ["PRIME_CLAW_BRAIN_CLONE_ATTEMPTS"]
+                    if "PRIME_CLAW_BRAIN_CLONE_ATTEMPTS" in os.environ
+                    else cfg.get("brain_clone_attempts", 3))
+    raw_delay = (os.environ["PRIME_CLAW_BRAIN_CLONE_RETRY_DELAY"]
+                 if "PRIME_CLAW_BRAIN_CLONE_RETRY_DELAY" in os.environ
+                 else cfg.get("brain_clone_retry_delay", 10))
+
+    if (not isinstance(branch, str) or branch != branch.strip()
+            or not BRAIN_BRANCH_PATTERN.fullmatch(branch)
+            or ".." in branch or "//" in branch or "@{" in branch
+            or branch.endswith(("/", "."))
+            or any(part.startswith(".") or part.endswith(".lock")
+                   for part in branch.split("/"))):
+        raise ValueError(
+            "brain_branch must be a safe git branch name; configure it with "
+            "PRIME_CLAW_BRAIN_BRANCH or operator-local runtime config"
+        )
+    if (not isinstance(sb_brain, str) or sb_brain != sb_brain.strip()
+            or not BRAIN_PATH_PATTERN.fullmatch(sb_brain)
+            or posixpath.normpath(sb_brain) != sb_brain
+            or len([part for part in sb_brain.split("/") if part]) < 2):
+        raise ValueError(
+            "sb_brain_dir must be a normalized absolute sandbox path with at least "
+            "two components"
+        )
+    if (not isinstance(github_host, str) or github_host != github_host.strip()
+            or len(github_host) > 253
+            or any(not HOST_LABEL_PATTERN.fullmatch(label)
+                   for label in github_host.split("."))):
+        raise ValueError(
+            "github_host must be a DNS hostname without a scheme, port, or path"
+        )
+    if isinstance(raw_attempts, int) and not isinstance(raw_attempts, bool):
+        attempts = raw_attempts
+    elif isinstance(raw_attempts, str) and re.fullmatch(r"[0-9]+", raw_attempts):
+        attempts = int(raw_attempts)
+    else:
+        raise ValueError("brain_clone_attempts must be an integer from 1 to 20")
+    if not 1 <= attempts <= 20:
+        raise ValueError("brain_clone_attempts must be an integer from 1 to 20")
+    try:
+        if isinstance(raw_delay, bool):
+            raise ValueError
+        delay = float(raw_delay)
+    except (TypeError, ValueError):
+        raise ValueError(
+            "brain_clone_retry_delay must be a finite number from 0 to 300 seconds"
+        ) from None
+    if not math.isfinite(delay) or not 0 <= delay <= 300:
+        raise ValueError(
+            "brain_clone_retry_delay must be a finite number from 0 to 300 seconds"
+        )
+    return {**selected, "branch": branch, "sb_brain": sb_brain,
+            "github_host": github_host, "attempts": attempts, "delay": delay}
+
+
+def _require_brain_repo(cfg: dict, action: str) -> dict[str, object] | None:
+    """Fail a repository-dependent action before it can touch external state."""
+    try:
+        return _brain_repository_settings(cfg)
+    except (TypeError, ValueError) as exc:
+        print(f"error: {action}: {exc}", file=sys.stderr)
+        return None
 
 
 PORTABLE_INFERENCE_PROVIDER = "anthropic"
@@ -1136,6 +1275,8 @@ def _candidate_build_script(cfg: dict, settings: dict) -> str:
 
 def cmd_embedding_build(cfg, args) -> int:
     """Build the home-Qwen index in a parallel DB; never cut over canonical config."""
+    if _require_brain_repo(cfg, "embedding-build") is None:
+        return 1
     try:
         settings = _embedding_settings(cfg)
         rendered, policy_path = _render_candidate_runtime_policy(cfg, settings)
@@ -1751,33 +1892,40 @@ def stage_brain_clone(cfg, args) -> int:
     string to git and every attempt 401s (Slice 1 root cause, docs/derisk/3a-slice1.md).
     A bounded retry (default 3 x 10s) rides out any genuine per-sandbox L7 injection
     cold-start on fresh sandboxes."""
-    repo = _cfg_get(cfg, "brain_repo", "PRIME_CLAW_BRAIN_REPO", "JLandersZen/brain")
-    branch = _cfg_get(cfg, "brain_branch", "PRIME_CLAW_BRAIN_BRANCH", "main")
-    sb_brain = _cfg_get(cfg, "sb_brain_dir", "PRIME_CLAW_SB_BRAIN_DIR", "/sandbox/brain")
-    gh_host = _cfg_get(cfg, "github_host", "PRIME_CLAW_GITHUB_HOST", "github.com")
+    selection = _require_brain_repo(cfg, "brain clone")
+    if selection is None:
+        return 1
+    repo = selection["repo"]
+    branch = selection["branch"]
+    sb_brain = selection["sb_brain"]
+    gh_host = selection["github_host"]
     url = f"https://x-access-token:${{api_token}}@{gh_host}/{repo}.git"
+    q_branch = shlex.quote(branch)
+    q_sb_brain = shlex.quote(sb_brain)
+    q_sb_git = shlex.quote(sb_brain + "/.git")
+    q_remote_ref = shlex.quote("origin/" + branch)
     if args.dry_run:
         print(f"dry_run: clone {repo}@{branch} -> {sb_brain} (placeholder auth, L7 swap; "
               f"brief retry rides out genuine L7 injection delay); idempotent fetch --ff-only if already cloned")
         return 0
     script = f"""
 set -e
-if [ -d {sb_brain}/.git ]; then
+if [ -d {q_sb_git} ]; then
   echo "brain: already cloned at {sb_brain}; fetching + fast-forwarding"
-  git -C {sb_brain} remote set-url origin "{url}"
-  git -C {sb_brain} fetch origin {branch} 2>&1 | tail -2
-  git -C {sb_brain} merge --ff-only origin/{branch} 2>&1 | tail -2 || echo "brain: ff skipped (local state)"
+  git -C {q_sb_brain} remote set-url origin "{url}"
+  git -C {q_sb_brain} fetch origin {q_branch} 2>&1 | tail -2
+  git -C {q_sb_brain} merge --ff-only {q_remote_ref} 2>&1 | tail -2 || echo "brain: ff skipped (local state)"
 else
   echo "brain: cloning {repo}@{branch} -> {sb_brain}"
-  rm -rf {sb_brain}
-  git clone --branch {branch} "{url}" {sb_brain} 2>&1 | tail -2
+  rm -rf -- {q_sb_brain}
+  git clone --branch {q_branch} "{url}" {q_sb_brain} 2>&1 | tail -2
 fi
-git -C {sb_brain} config user.email "prime-claw@sandbox"
-git -C {sb_brain} config user.name "prime-claw"
-echo "brain: HEAD=$(git -C {sb_brain} rev-parse --short HEAD 2>/dev/null) remote-set"
+git -C {q_sb_brain} config user.email "prime-claw@sandbox"
+git -C {q_sb_brain} config user.name "prime-claw"
+echo "brain: HEAD=$(git -C {q_sb_brain} rev-parse --short HEAD 2>/dev/null) remote-set"
 """
-    attempts = int(_cfg_get(cfg, "brain_clone_attempts", "PRIME_CLAW_BRAIN_CLONE_ATTEMPTS", 3))
-    delay = float(_cfg_get(cfg, "brain_clone_retry_delay", "PRIME_CLAW_BRAIN_CLONE_RETRY_DELAY", 10))
+    attempts = selection["attempts"]
+    delay = selection["delay"]
     code, out = 1, ""
     for attempt in range(1, attempts + 1):
         code, out = sandbox_exec(cfg, script, timeout=180)
@@ -2056,6 +2204,8 @@ def _lifecycle_profile_gate(cfg: dict, dry_run: bool) -> tuple[int, dict]:
 
 
 def cmd_create(cfg, args) -> int:
+    if _require_brain_repo(cfg, "create") is None:
+        return 1
     gate, profiles = _lifecycle_profile_gate(cfg, args.dry_run)
     if gate != 0:
         return gate
@@ -2086,6 +2236,8 @@ def cmd_create(cfg, args) -> int:
 
 def cmd_converge(cfg, args) -> int:
     """Converge an existing sandbox without recreating or mixing vector spaces."""
+    if _require_brain_repo(cfg, "converge") is None:
+        return 1
     gate, profiles = _lifecycle_profile_gate(cfg, args.dry_run)
     if gate != 0:
         return gate
@@ -2348,6 +2500,8 @@ def _validate_checks(cfg, args):
 
 def cmd_validate(cfg, args) -> int:
     """End-to-end acceptance gate. Exit 0 = all GATE checks pass."""
+    if _require_brain_repo(cfg, "validate") is None:
+        return 1
     if getattr(args, "dry_run", False):
         print("dry_run: validate = sandbox-present, egress deny-by-default, daemon, "
               "persistent REPL, credentialed model call, brain (CLI/PG/pgvector/"
@@ -2539,6 +2693,8 @@ def cmd_destroy(cfg, args) -> int:
 
 def cmd_recover(cfg, args) -> int:
     """Detect known degradations and recover; then re-validate. Safe-by-default."""
+    if _require_brain_repo(cfg, "recover") is None:
+        return 1
     if getattr(args, "dry_run", False):
         print("dry_run: recover = detect degradations (vpn-flap / gateway-flip / "
               "recreate-wipe / cold-daemon), restart the gateway if down, converge, "

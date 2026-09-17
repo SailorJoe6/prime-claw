@@ -1103,19 +1103,33 @@
    "id": "R3a-16",
    "priority": "GATE",
    "summary": "Every operator must explicitly configure their own brain_repo through ignored local config or PRIME_CLAW_BRAIN_REPO; no tracked, fallback, public starter, or example brain exists; missing or malformed setup fails before mutation.",
-   "status": "planned (Slice 4R; bead prime-claw-zwg.2)",
+   "status": "proven (offline fail-before-boundary, provenance, validation, and clone-path tests; operator-local dry-run PASS)",
    "phase": "3a",
    "slice": "4R",
    "proven_by": {
-    "apply": [],
-    "check": [
-     ".ralph/plans/REQUIREMENTS.md",
-     ".ralph/plans/DECISIONS.md"
+    "apply": [
+     "bin/prime-claw",
+     "config/runtime.json"
     ],
-    "validate": [],
-    "tests": []
+    "check": [
+     "docs/sandbox-runtime.md",
+     "docs/runbook.md"
+    ],
+    "validate": [
+     "docs/derisk/3a-slice4r.md"
+    ],
+    "tests": [
+     "tests/test_brain_repo_config.py",
+     "tests/test_runtime_image.py",
+     "tests/test_runtime_converge.py",
+     "tests/test_runtime_validate.py",
+     "tests/test_runtime_recover.py",
+     "tests/test_runtime_status.py",
+     "tests/test_embedding_candidate_build.py"
+    ]
    },
-   "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md"
+   "evidence": "docs/derisk/3a-slice4r.md",
+   "verdict_doc": "docs/derisk/3a-slice4r.md"
   }
  ],
  "phase2": {}

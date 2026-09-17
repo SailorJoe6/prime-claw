@@ -100,9 +100,11 @@ operations: `docs/runbook.md`. Plan set archived to
 **Current status (revised 2026-09-17):** Phase 3a Slices 0–3, Slice 4A.1, and the
 portable-default gate (R3a-15 / Slice 4P) are complete. Checked-in no-config defaults use Zendesk
 AI Gateway for both concerns: Kimi K3 inference and `text-embedding-3-large`/1536 embeddings;
-valid host, operator-local, and environment choices override each independently. Generic routed
-write/push acceptance (Slice 4B) is next on that gateway profile. On 2026-09-17 the operator
-confirmed the DGX Spark is alive and ready again. Joe's optional local-Qwen Slice 4A.2a may resume
+valid host, operator-local, and environment choices override each independently. Mandatory
+Slice 4R is complete: the personal tracked/fallback brain repository is removed and every operator
+must configure their own repository before mutation. Generic routed write/push acceptance (Slice
+4B) is next. On 2026-09-17 the operator confirmed the DGX Spark is alive and
+ready again. Joe's optional local-Qwen Slice 4A.2a may resume
 after its exact-model compatibility/preflight gate; no build has restarted. Its partial
 4096-dimensional candidate is preserved, the tracked gateway/default policy is restored, the
 canonical database is unchanged, and no cutover occurred.

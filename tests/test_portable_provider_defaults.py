@@ -27,6 +27,10 @@ def hermetic_cfg(tmp_path, **over):
         "host_models_json": str(tmp_path / "missing-models.json"),
         "host_auth_json": str(tmp_path / "missing-auth.json"),
         "active_policy_file": str(tmp_path / "runtime-policy.active.yaml"),
+        "brain_repo": "operator/brain",
+        "_local_override_keys": ["brain_repo"],
+         "_local_config_path": os.path.realpath(os.path.join(
+             REPO, ".prime-claw", "runtime.local.json")),
     })
     cfg.update(over)
     return cfg
@@ -46,10 +50,10 @@ def codex_host_pair(tmp_path, cfg):
 
 
 def home_override(cfg):
-    cfg.update({
-        "embedding_base_url": "http://embedding.test.invalid:7997/v1",
-        "_local_override_keys": ["embedding_base_url"],
-    })
+    cfg["embedding_base_url"] = "http://embedding.test.invalid:7997/v1"
+    cfg["_local_override_keys"] = sorted(set(
+        cfg.get("_local_override_keys", []) + ["embedding_base_url"]
+    ))
     return cfg
 
 
@@ -60,6 +64,7 @@ def test_tracked_defaults_are_portable_and_contain_no_private_endpoint(tmp_path)
     assert tracked["gateway_embedding_model"] == "openai:text-embedding-3-large"
     assert tracked["gateway_embedding_dimensions"] == 1536
     assert "embedding_base_url" not in tracked
+    assert "brain_repo" not in tracked
     assert "openai-codex/gpt" not in json.dumps(tracked)
 
 

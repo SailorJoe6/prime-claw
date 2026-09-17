@@ -38,6 +38,10 @@ def cfg(tmp_path, **over):
         "embedding_legacy_database": "gbrain",
         "embedding_candidate_home": "/sandbox/.prime-claw/qwen-candidate",
         "embedding_build_timeout_seconds": 14400,
+        "brain_repo": "operator/brain",
+        "_local_override_keys": ["brain_repo"],
+         "_local_config_path": os.path.realpath(os.path.join(
+             REPO, ".prime-claw", "runtime.local.json")),
     }
     c.update(over)
     return c

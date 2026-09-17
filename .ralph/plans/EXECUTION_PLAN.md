@@ -1,6 +1,6 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — Slice 4P complete; mandatory operator brain-repo correction 4R is NEXT and gates 4B; optional local-Qwen remains ready after preflight
+**Status:** ACTIVE — Slices 4P and 4R complete; generic routed write/push Slice 4B is NEXT; optional local-Qwen remains ready after preflight
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
 **Date:** 2026-09-11 · **Provider defaults and brain-repo contract revised:** 2026-09-17
@@ -62,9 +62,9 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 | **S2** | In-sandbox index serving (gbrain+PG over the clone, `brain` source); AI-gateway/1536 embedding proof (portable-default basis) | R3a-2 | — |
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
 | **S4P** | Portable no-config provider defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **COMPLETE** — 177 tests + hermetic provider-default dry-run PASS |
-| **S4R** | Require explicit per-operator brain repository; remove personal tracked/fallback repo identity | R3a-1, R3a-5, R3a-9, R3a-16 | **NEXT / REQUIRED BEFORE S4B** — bead `prime-claw-zwg.2` |
+| **S4R** | Require explicit per-operator brain repository; remove personal tracked/fallback repo identity | R3a-1, R3a-5, R3a-9, R3a-16 | **COMPLETE** — 228 tests + operator-local dry-run PASS; bead `prime-claw-zwg.2` |
 | **S4A** | Optional operator-local home `Qwen3-Embedding-8B`/4096 override, non-destructive | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **READY TO RESUME AFTER PREFLIGHT** — partial candidate preserved; Spark recovery confirmed |
-| **S4B** | One routed write + push-back round-trip to the explicitly configured operator repo | R3a-4, R3a-16 | **BLOCKED ON S4R** — gateway profile; local-Qwen is optional |
+| **S4B** | One routed write + push-back round-trip to the explicitly configured operator repo | R3a-4, R3a-16 | **NEXT** — bead `prime-claw-zwg.4`; gateway profile; local-Qwen is optional |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
 ---
@@ -241,8 +241,8 @@ suite passed 177. Verdict: [3a-slice4p.md](../../docs/derisk/3a-slice4p.md); mac
 
 ## Slice 4R — Mandatory explicit operator brain repository (R3a-1, R3a-5, R3a-9, R3a-16)
 
-**Status: NEXT / PLANNED ONLY.** Bead `prime-claw-zwg.2` is open for a future `/execute`.
-No implementation or runtime mutation is part of this planning update.
+**Status: COMPLETE (2026-09-17).** Bead `prime-claw-zwg.2` implemented the explicit
+operator setup gate without mutating the live sandbox, providers, databases, or indexes.
 
 **Goal.** Preserve the platform/instance boundary by requiring every operator to configure their
 own brain repository. Prime-claw must never infer, ship, or fall back to Joe's private repository
@@ -262,9 +262,11 @@ or to a public starter/example brain.
 6. Add offline tests proving absent/malformed values fail before provider, sandbox, network, or
    database calls, and that local/environment overrides reach clone/fetch/push correctly.
 
-**Exit.** A fresh checkout cannot run a repository-dependent command until the operator supplies
-their own repository. With explicit configuration, the existing clone/index/write/push lifecycle
-works unchanged. Inventory R3a-16 is proven and Slice 4B becomes ready.
+**Exit evidence.** A fresh checkout cannot run a repository-dependent command until the operator
+supplies their own repository. Ignored-local and environment selections reach the existing clone
+path; malformed settings fail before external boundaries. Proven by 50 focused tests, 228 canonical
+tests, and an operator-local create dry-run. Verdict:
+[3a-slice4r.md](../../docs/derisk/3a-slice4r.md). Inventory R3a-16 is proven; Slice 4B is ready.
 
 ---
 
@@ -275,8 +277,8 @@ objective 4A.1 is complete: ignored local config merge, strict locked-setting va
 private-endpoint-safe candidate policy rendering, and `embedding-preflight`. Slice 4A.2a's
 isolated build path is implemented; its live sync stopped when the Spark crashed. The operator
 now confirms the Spark is alive and ready. No build has restarted. Slice 4P is complete and
-Slice 4R is the tracked next objective and gates 4B; 4A.2a may resume as an explicitly selected local-profile task
-only after the exact-model compatibility/preflight gate passes.
+Slice 4R is complete and Slice 4B is the tracked next objective; 4A.2a may resume as an
+explicitly selected local-profile task only after the exact-model compatibility/preflight gate passes.
 
 **Recovered external blocker.** The build process remains stopped, the tracked gateway/default
 policy is restored, and the partial `gbrain_qwen4096` database is preserved at 350 source pages /
@@ -349,6 +351,8 @@ uses the portable gateway profile after Slice 4P and is not blocked by the Spark
 
 ## Slice 4B — One routed write + push-back round-trip (R3a-4)
 
+**Status: NEXT.** Bead `prime-claw-zwg.4` is open.
+
 **Goal.** The agent writes **one** durable fact into the in-sandbox brain, routed per
 `docs/information-architecture.md` (brain = canonical store for domain facts), via
 `gbrain put <type/slug>` + `gbrain sync --source brain`, and the change **pushes back** to the
@@ -383,7 +387,7 @@ evidence; the requirements inventory is updated and integrity-gated.
 - Extend `cmd_validate` / `probe_in_sandbox` with brain checks: **brain present** (with `.git`),
   **index page count > 0**, **known-fact cited query green**, **write receipt present**,
   **push-back proven** (remote contains the write commit). Record to `docs/evidence/validate-<utc>.json`.
-- Add `R3a-0..15` entries to `config/requirements-inventory.json` with real `proven_by` paths.
+- Add `R3a-0..16` entries to `config/requirements-inventory.json` with real `proven_by` paths.
 - **Housekeeping:** fix the stale `R2-A-3`/`R2-A-4` statuses (Phase 2 closed them; still marked
   `in-progress`).
 
@@ -400,11 +404,10 @@ committed; `bd` notes updated; Phase 3a bead ready to close.
 - **Custom github profile is the main new mechanism** (push not in builtin). If profile import +
   provider swap proves unreliable, fallback: host-mediated push (agent stages commits; a host-side
   step pushes) — but that weakens the "agent pushes from inside" goal, so prefer the L7 profile.
-- **Provider-profile portability is the next unblocked risk.** Tracked no-config behavior must
-  select Zendesk AI Gateway Kimi + OpenAI/1536 while explicit inference/embedding overrides stay
-  independent. Joe's optional home-Qwen reachability and complete 4096 rebuild remain blocked on
-  the Spark. Never auto-switch vector spaces or accept keyword-only retrieval; preserve each
-  prior database until its replacement profile passes every gate.
+- **Routed write/push is the next unblocked risk.** Provider defaults and explicit brain-repository
+  setup are now proven. Joe's optional home-Qwen complete 4096 rebuild remains separate and may
+  resume only after exact-model preflight. Never auto-switch vector spaces or accept keyword-only
+  retrieval; preserve each prior database until its replacement profile passes every gate.
 - **Recreate wipes `/sandbox`** → re-run `converge`; the brain re-clones (idempotent) on converge.
 - **Generic platform (R3a-9/R3a-16):** brain repository identity is mandatory ignored-local or
   environment configuration. No operator repository, taxonomy, or personal value is a tracked

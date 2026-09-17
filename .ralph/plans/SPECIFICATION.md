@@ -1,6 +1,6 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — Slice 4P complete; mandatory operator brain-repo correction (4R) next; 4B follows; optional local-Qwen ready after preflight
+**Status:** ACTIVE — Slices 4P and 4R complete; generic routed write/push Slice 4B next; optional local-Qwen ready after preflight
 **Beads:** `prime-claw-zwg` (P1)
 **Date:** 2026-09-11 · **Provider defaults and operator brain-repo contract revised:** 2026-09-17
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
@@ -9,7 +9,7 @@
 > **Spark recovery confirmed (2026-09-17):** the operator reports the DGX Spark is alive and
 > ready. No build has restarted. Before resuming the optional home-Qwen profile, rerun the exact
 > model compatibility/preflight gate, then continue the preserved isolated candidate. Portable-
-> default Slice 4P is complete; mandatory brain-repo setup correction 4R is next and gates 4B.
+> default Slice 4P and mandatory brain-repo setup correction 4R are complete; Slice 4B is next.
 > The canonical database/config are unchanged;
 > no cutover occurred.
 
@@ -50,9 +50,10 @@ or example brain. Repository-dependent commands must reject missing or malformed
 before mutation. Joe's private repository is only the historical proving instance, never a
 tracked platform value (R3a-9/R3a-16; D3a-N).
 
-**Execution state (2026-09-16):** Slices 0–3 now clone the real brain, serve its in-sandbox
-index, and let a sandboxed Prime Agent answer with citations. That 1536-dimensional
-AI-gateway index is the implemented portable default profile under R3a-15. For this operator's explicit local override, Slice 4A.1
+**Execution state (2026-09-17):** Slices 0–3 now clone the real brain, serve its in-sandbox
+index, and let a sandboxed Prime Agent answer with citations. Slice 4R removes repository identity
+from tracked defaults and enforces explicit operator setup before repository-dependent actions.
+That 1536-dimensional AI-gateway index is the implemented portable default profile under R3a-15. For this operator's explicit local override, Slice 4A.1
 validates the home-Qwen endpoint contract and 4A.2 has a preserved partial 4096-dimensional
 candidate. The Spark outage is cleared by operator confirmation; 4A.2a may resume only after
 its compatibility/preflight gate. The routed write/push

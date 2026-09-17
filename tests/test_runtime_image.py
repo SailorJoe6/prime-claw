@@ -13,7 +13,10 @@ pc = SourceFileLoader("primeclaw", BIN).load_module()
 
 
 def cfg(tmp_path, **over):
-    c = {"sandbox_name": "prime-claw", "image": "prime-claw-brain:0.1.0"}
+    c = {"sandbox_name": "prime-claw", "image": "prime-claw-brain:0.1.0",
+         "brain_repo": "operator/brain", "_local_override_keys": ["brain_repo"],
+         "_local_config_path": os.path.realpath(os.path.join(
+             REPO, ".prime-claw", "runtime.local.json"))}
     c.update(over)
     return c
 
@@ -358,7 +361,7 @@ def test_brain_clone_dry_run(tmp_path, capsys):
     class A: dry_run=True
     rc = pc.stage_brain_clone(cfg(tmp_path), A())
     out = capsys.readouterr().out
-    assert rc == 0 and "JLandersZen/brain" in out and "/sandbox/brain" in out and "placeholder" in out
+    assert rc == 0 and "operator/brain" in out and "/sandbox/brain" in out and "placeholder" in out
 
 
 def test_brain_clone_fresh_clone_branch(tmp_path, monkeypatch):
@@ -372,7 +375,7 @@ def test_brain_clone_fresh_clone_branch(tmp_path, monkeypatch):
     rc = pc.stage_brain_clone(cfg(tmp_path), A())
     assert rc == 0
     s = seen["script"]
-    assert "git clone --branch main" in s and "https://x-access-token:${api_token}@github.com/JLandersZen/brain.git" in s
+    assert "git clone --branch main" in s and "https://x-access-token:${api_token}@github.com/operator/brain.git" in s
     assert "if [ -d /sandbox/brain/.git ]" in s  # idempotency guard present
 
 

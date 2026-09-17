@@ -18,7 +18,10 @@ def cfg(**over):
          "provider_name": "prime-claw-ai-gateway", "model": "anthropic/anthropic.kimi-k3",
          "host_settings_json": "/nonexistent/prime-claw-settings.json",
          "host_models_json": "/nonexistent/prime-claw-models.json",
-         "ai_gateway_host": "ai-gateway.zende.sk", "policy_file": "policies/runtime.yaml"}
+         "ai_gateway_host": "ai-gateway.zende.sk", "policy_file": "policies/runtime.yaml",
+         "brain_repo": "operator/brain", "_local_override_keys": ["brain_repo"],
+         "_local_config_path": os.path.realpath(os.path.join(
+             REPO, ".prime-claw", "runtime.local.json"))}
     c.update(over); return c
 
 

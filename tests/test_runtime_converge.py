@@ -19,7 +19,10 @@ def cfg(tmp_path, **over):
          "active_policy_file": str(tmp_path / "runtime-policy.active.yaml"),
          "host_settings_json": str(tmp_path / "missing-settings.json"),
          "host_models_json": str(tmp_path / "missing-models.json"),
-         "ai_gateway_host": "ai-gateway.zende.sk"}
+         "ai_gateway_host": "ai-gateway.zende.sk", "brain_repo": "operator/brain",
+         "_local_override_keys": ["brain_repo"],
+         "_local_config_path": os.path.realpath(os.path.join(
+             REPO, ".prime-claw", "runtime.local.json"))}
     c.update(over); return c
 
 

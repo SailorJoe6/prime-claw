@@ -22,6 +22,23 @@ the two failures converge alone can't fix (a down gateway, an active-gateway
 flip). Exception: an unaccepted `home-qwen` selection fails ordinary lifecycle commands closed;
 use the explicit canonical-profile recovery command in the Slice 4A section below.
 
+## Required one-time brain repository setup
+
+A fresh checkout has no brain repository by design. Add your GitHub `owner/repository` slug to
+the ignored `.prime-claw/runtime.local.json` object:
+
+```json
+{
+  "brain_repo": "owner/repository"
+}
+```
+
+Keep the file at mode `0600`. If it already contains operator-local settings, merge this key
+instead of replacing the file. For one-shot or managed environments, set
+`PRIME_CLAW_BRAIN_REPO=owner/repository`; it has precedence over the local file. URLs, values
+ending in `.git`, and multi-segment paths are rejected. Missing or malformed setup fails before
+runtime mutation and names both supported configuration paths.
+
 ## Provider-profile selection
 
 With no usable preference, inference is `anthropic.kimi-k3` and embeddings are
@@ -47,6 +64,7 @@ bin/prime-claw --dry-run create
 
 | # | Signature | How you notice | Recovery |
 |---|-----------|----------------|----------|
+| 0 | **brain-repository-not-configured** | `status` reports `brain-repository BAD`, or a repository-dependent command exits before any provider/sandbox action and names `PRIME_CLAW_BRAIN_REPO` plus `.prime-claw/runtime.local.json`. | Configure your own GitHub `owner/repository` slug using one of the two setup paths above. Do not add a tracked fallback or public/example brain. |
 | 1 | **vpn-flap** | GlobalProtect VPN drops -> the openshell gateway daemon (17670) dies and the sandbox container is killed. `status` shows the sandbox absent; `openshell gateway list` fails. | `brew services start openshell`, then `bin/prime-claw converge`. `recover` does both. |
 | 2 | **gateway-flip** | `active_gateway` in `~/.openshell/config.yaml` was flipped off `openshell` (e.g. by a NemoClaw tool). The sandbox is absent under the active gateway. | Re-pin `active_gateway: openshell`, then `bin/prime-claw recover` (recreates on the active gateway + converge). **Never** point prime-claw at the `nemoclaw` gateway. |
 | 3 | **recreate-wipe** | A sandbox recreate wipes `/sandbox` -> prime-agent and the brain are gone even though the sandbox shows Ready. | `bin/prime-claw converge` (re-installs both). `recover` detects the missing install and converges. |

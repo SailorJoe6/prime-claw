@@ -53,6 +53,8 @@ following the openclaw-setup pattern.)
 - [derisk/3a-slice3.md](derisk/3a-slice3.md) — Slice 3: cited
   read/query from sandboxed prime-agent, plus host settings mirroring and
   placeholder-isolated ChatGPT-5.6 Sol / openai-codex OAuth as an explicit operator override.
+- [derisk/3a-slice4r.md](derisk/3a-slice4r.md) — Slice 4R: mandatory explicit
+  per-operator brain repository setup, provenance hardening, and pre-mutation gates.
 
 ## Runtime (Phase 2)
 

@@ -38,7 +38,6 @@
   "github_provider_name": "prime-claw-github",
   "github_profile": "github-push",
   "github_host": "github.com",
-  "brain_repo": "JLandersZen/brain",
   "brain_branch": "main",
   "sb_brain_dir": "/sandbox/brain",
   "sb_brain_query_path": "/sandbox/.prime-claw/bin/brain-query",
