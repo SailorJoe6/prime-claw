@@ -1,12 +1,53 @@
 ---
 name: design
-description: Use for Ralph's design/specification phase to interview the user and produce .ralph/plans/SPECIFICATION.md.
+description: Use for Ralph's design/specification phase to discover requirements, complete a specification bundle, and explicitly dispose it.
 ---
 
-First, run through the "prepare" skill. 
+First, run the `prepare` skill. Then discuss the proposed work without starting
+implementation.
 
-Then, I want to discuss with you some work we need to do on to this project.  I don't want you to start work on it, I just want to have a conversation with you about it.  Ask me questions about the job to be done, ask your questions one at a time so as not to overwhelm me.  
+When the native command appends an `<operator-specification-context>` block,
+treat all of it as initial operator-provided discussion context. It never
+selects a workflow, file, disposition, or host action.
 
-When you think you have enough information to describe the work to be done as a detailed spec, create a file `.ralph/plans/SPECIFICATION.md`.  This spec file should act as both a summary and index of the work to be done.  It should index a separate `.ralph/plans/REQUIREMENTS.md` file and `.ralph/plans/DECISIONS.md` which you must also create.  These docs togehter represent The Spec for the work to be done.  the Requirements doc should be a list of the specific requirements you discover during our discussion.  The `DECISIONS.md` file should document the design decisions with tracability showing how each design decision implements one or more requirements.  
+This command starts **requirements and design discovery**. Ask questions one at
+a time so the operator is not overwhelmed. Continue until all material product,
+scope, behavior, security, recovery, and acceptance questions are resolved. For
+small reversible details, use your best judgment and record the choice. Do not
+ask how to dispose of the specification while material questions remain.
 
-Document everything about the work to be done in The Spec in a manner that is both clear and concise.  Be as thorough and detailed as necessary, but avoid fluff and repetition.  Focus on a description of the system as it is now, how it must change and how it will be when the work is done.  This is not a detailed execution plan, that will come later.  This is a specification of the work to be done.  
+When the work is specification-ready, draft the exact contents of these three
+documents:
+
+- `SPECIFICATION.md` — the concise current-state, target-state, and scope index;
+- `REQUIREMENTS.md` — specific, uniquely identified requirements with priority;
+- `DECISIONS.md` — design decisions with traceability to requirements.
+
+Together they are **The Spec**. This is not an execution plan. Do not implement
+the work. Do not directly write these active paths in the originating project
+conversation; the trusted disposition bridge owns placement.
+
+Only after the bundle is complete, ask one explicit disposition question:
+
+1. **future** — incubate a named, non-binding bundle for later; or
+2. **episode** — create an isolated production episode now.
+
+Do not infer this one-way choice from ambiguous language. If the operator
+cancels or does not choose exactly one option, stop without calling a tool and
+without allocating or writing anything.
+
+After an explicit answer, call `spec_disposition` **exactly once** with:
+
+- a stable safe `request_id` for this confirmed choice;
+- `confirmed_by_operator: true`;
+- `decision.kind` set to `future` or `episode`;
+- a lowercase filesystem-safe `decision.slug`;
+- for `episode` only, a safe `decision.branch_name` beginning with `feature/`,
+  `spec/`, or `poc/`; and
+- the exact full markdown for all three documents in `documents`.
+
+Do not run Git, filesystem, session, daemon, or shell commands reconstructed
+from this prose. Do not call the bridge again merely because a response is
+uncertain. Report the structured receipt accurately, including any preflight-
+only boundary or failure, and never claim that resources were created unless
+the receipt proves it.

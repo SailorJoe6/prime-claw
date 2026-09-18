@@ -1,6 +1,8 @@
 # Specification — Worktree-isolated specification episodes
 
-> **Status:** specification only; implementation has not started.
+> **Status:** implementation in progress; Slice 1 native commands and trusted
+> disposition preflight are implemented under `prime-claw-h6w.2`; real future
+> and episode mutation paths remain planned.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)

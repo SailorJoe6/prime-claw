@@ -1,6 +1,7 @@
 # Execution Plan — Worktree-isolated specification episodes
 
-> **Status:** approved specification; planning complete; implementation not started.
+> **Status:** implementation in progress; Slice 1 (`prime-claw-h6w.2`) is
+> implemented and validated; Slices 2–8 remain open.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -12,6 +13,18 @@
 > tests, current documentation and requirement traceability, an updated bead,
 > and a commit pushed from this episode worktree. This plan does not authorize
 > implementation outside this branch/worktree or automatic merge/cleanup.
+
+## 0. Execution progress
+
+| Slice | Bead | Status | Evidence |
+|---|---|---|---|
+| 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; full pytest suite |
+| 2–8 | `prime-claw-h6w.3`–`.9` | Not started | Dependency-ordered below |
+
+Slice 1 intentionally leaves the two legacy skill aliases in place until both
+real disposition paths are proven in Slice 4. Its receipt is preflight-only and
+makes no project checkout, Git ref/worktree, remote, daemon, or session
+mutation.
 
 ## 1. Planning audit
 
@@ -236,9 +249,12 @@ Git, filesystem, or session mutation occurs yet.
   interview-first rule, the exact three-document bundle contract, the explicit
   disposition question, and the single `spec_disposition` call. The tool refuses
   ambiguous or absent disposition.
-- Register `spec_disposition` with a TypeBox discriminated schema and sequential
-  execution. Initially implement `preflight` receipts behind both variants so
-  the complete cross-turn bridge is testable without mutation.
+- Register `spec_disposition` with a closed TypeBox-compatible schema, a
+  provider-portable enum discriminator plus trusted cross-field validation,
+  and sequential execution. Avoid `Type.Union`/`Type.Literal`, which Prime
+  Agent 0.9.5 documents as incompatible with Google tool schemas. Initially
+  implement `preflight` receipts behind both variants so the complete
+  cross-turn bridge is testable without project mutation.
 - Test command registration through the real Prime Agent RPC loader, byte-for-
   byte canonical markdown loading, multi-turn tool availability, schema/name/
   containment failures, cancellation as a no-op, session-key isolation, atomic

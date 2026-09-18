@@ -1,7 +1,7 @@
 {
  "version": 1,
  "project": "prime-claw",
- "phase": "1 \u2014 de-risk gate",
+ "phase": "1 — de-risk gate",
  "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
  "requirements": [
   {
@@ -837,7 +837,7 @@
    "priority": "NICE",
    "phase": 2,
    "slice": 6,
-   "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
+   "summary": "Host exposure of sandboxed Postgres on localhost:5433 — documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
    "status": "documented (Slice 6; no host forward by design)",
    "proven_by": {
     "check": [
@@ -1130,6 +1130,126 @@
    },
    "evidence": "docs/derisk/3a-slice4r.md",
    "verdict_doc": "docs/derisk/3a-slice4r.md"
+  },
+  {
+   "id": "R-WE-5",
+   "priority": "GATE",
+   "summary": "Project-local native /design and /spec-it-out commands load fixed canonical workflow markdown from .ralph/skills without duplicating it.",
+   "status": "proven (Slice 1 native loader and canonical-body tests)",
+   "phase": "4",
+   "slice": 1,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".ralph/skills/design/SKILL.md",
+     ".ralph/skills/spec-it-out/SKILL.md"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-7",
+   "priority": "GATE",
+   "summary": "/design begins material discovery while /spec-it-out formalizes substantially developed conversation context.",
+   "status": "implemented (Slice 1 workflow contract; final dogfood pending)",
+   "phase": "4",
+   "slice": 1,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".ralph/skills/design/SKILL.md",
+     ".ralph/skills/spec-it-out/SKILL.md"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-8",
+   "priority": "GATE",
+   "summary": "Both workflows complete material questions and the exact three-document bundle before asking for disposition.",
+   "status": "implemented (Slice 1 workflow contract; final dogfood pending)",
+   "phase": "4",
+   "slice": 1,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".ralph/skills/design/SKILL.md",
+     ".ralph/skills/spec-it-out/SKILL.md"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-9",
+   "priority": "GATE",
+   "summary": "The operator explicitly selects future or episode; ambiguous or cancelled disposition performs no bridge call.",
+   "status": "implemented (Slice 1 workflow and confirmation validation; final dogfood pending)",
+   "phase": "4",
+   "slice": 1,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".ralph/skills/design/SKILL.md",
+     ".ralph/skills/spec-it-out/SKILL.md"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-34",
+   "priority": "GATE",
+   "summary": "A structured model-callable bridge validates and durably deduplicates explicit disposition preflight exactly once across turns and restart.",
+   "status": "partially proven (Slice 1 bridge/preflight; real future and episode automation land in Slices 2-4)",
+   "phase": "4",
+   "slice": 1,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".ralph/skills/design/SKILL.md",
+     ".ralph/skills/spec-it-out/SKILL.md"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
   }
  ],
  "phase2": {}
