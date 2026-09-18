@@ -1,102 +1,119 @@
-# Requirements — Phase 3a: Tracer Bullet (a brain-hosting claw)
+# Requirements — Worktree-isolated specification episodes
 
-Beads: `prime-claw-zwg` (P1). Index:
-[SPECIFICATION.md](SPECIFICATION.md). Decisions: [DECISIONS.md](DECISIONS.md).
+> **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
+> **Decisions:** [DECISIONS.md](DECISIONS.md)
+> **Beads:** `prime-claw-h6w.1`
 
-Each requirement has an ID for traceability from [DECISIONS.md](DECISIONS.md). Prefix `R3a-`.
-Priority: **GATE** = must hold for the slice to be accepted; **CONDITIONAL GATE** = must
-hold when that optional profile is selected; **NICE** = desired, may slip.
+Priority meanings: **GATE** is required for acceptance; **NICE** may follow only
+if it does not weaken a gate.
 
-## Functional
+## Hierarchy and scope
 
-- **R3a-1 (GATE) — Brain present in-sandbox.** The operator's brain repo is cloned into
-  the sandbox at a known, configurable path (default `/sandbox/brain`), reachable by the
-  in-sandbox prime-agent. Content only — no credentials carried in.
-- **R3a-2 (GATE) — In-sandbox index serving.** The in-sandbox gbrain + Postgres + pgvector
-  index the cloned brain as the `brain` source; `gbrain` queries run against in-sandbox PG
-  (`localhost:5433`), no host dependency at query time.
-- **R3a-3 (GATE) — Cited read/query.** From a conversation with the sandboxed prime-agent,
-  an operator question is answered correctly **with a citation** to a brain page. Proves
-  search + retrieval inside the container.
-- **R3a-4 (GATE) — One routed write.** The agent writes one durable fact into the
-  in-sandbox brain via `gbrain put <type/slug>` + `gbrain sync --source brain`, routed per
-  `docs/information-architecture.md` (brain = canonical store). The write is a test
-  artifact: either easily deleted (markdown is source-of-truth) or a keep-worthy stub
-  (the operator-approved `projects/prime-claw` page). The agent commits
-  and pushes the change from the sandbox clone to the real brain repo through the Slice 1
-  GitHub L7 provider. Receipt = page slug + commit SHA + push result.
-- **R3a-5 (GATE) — Lifecycle integration.** Brain clone + index are wired into
-  `bin/prime-claw` (a stage and/or verb), idempotent and re-runnable, so a fresh
-  `create`/`converge` yields a brain-hosting sandbox without manual steps.
-- **R3a-6 (GATE) — Acceptance gate.** `bin/prime-claw validate` (or a dedicated check)
-  proves R3a-1..4 green and records evidence (page count, the write receipt) under
-  `docs/evidence/`.
+- **R-WE-1 (GATE) — Canonical project context.** A `PROJECT_CONTEXT` is
+  physically anchored by the project's canonical/default-branch checkout.
+- **R-WE-2 (GATE) — Long-lived conversations.** Multiple durable
+  `PROJECT_CONVERSATION` sessions may be rooted in the canonical checkout and
+  coordinated by the `UNIVERSAL_AGENT`.
+- **R-WE-3 (GATE) — Isolated specification episodes.** Specification-level
+  production work uses a dedicated feature branch, Git worktree, and durable
+  worktree-rooted Prime Agent session.
+- **R-WE-4 (GATE) — Logical owner.** Every episode records the originating
+  project conversation as its durable logical coordinator, independent of the
+  runtime parent/sibling representation.
 
-- **R3a-0 (GATE) — Slice-0 upstream-gbrain spike.** Before the rest of the slice, prove in
-  real code that **upstream `garrytan/gbrain`** runs correctly in the OpenShell sandbox with
-  **prime-agent as the mode-(a) harness-as-controller** (drives the gbrain CLI + manages the
-  in-sandbox DB). The spike also surfaces whether any prime-agent-vs-other-harness difference
-  is too big to overcome elegantly (deciding D3a-H's fallback). Verdict GO = build on
-  upstream (fork only to author the prime-agent-harness PR, then retire it); verdict NO-GO =
-  documented thin-fork fallback. Mode (b) participant-MCP is secondary; not required for GO.
+## Command and interview behavior
 
-## Non-functional / constraints
+- **R-WE-5 (GATE) — Native entry points.** Project-local native `/design` and
+  `/spec-it-out` commands load and inject their canonical workflow markdown
+  from `.ralph/skills/` without duplicating it.
+- **R-WE-6 (GATE) — One exposed route.** After the native commands are proven,
+  duplicate `.agents/skills/design` and `.agents/skills/spec-it-out` exposure is
+  removed.
+- **R-WE-7 (GATE) — Semantic distinction.** `/design` performs material
+  discovery; `/spec-it-out` formalizes substantially developed conversation
+  context.
+- **R-WE-8 (GATE) — Interview first.** Both workflows resolve all material open
+  questions and reach specification-ready state before asking how to dispose of
+  the specification.
+- **R-WE-9 (GATE) — Explicit disposition.** The operator explicitly chooses
+  future incubation or immediate episode creation; the system never infers a
+  one-way allocation decision from ambiguous text.
 
-- **R3a-7 (GATE) — Credential isolation.** Inference auth stays on the host L7 provider;
-  no real LLM credentials on sandbox disk. The brain clone carries no secrets.
-- **R3a-8 (GATE) — Reuse, don't re-test.** Do not re-test gbrain's CLI/sync/embedding or
-  the browse shim — already proven upstream (zbrain ~1,626 tests). Tests cover only the
-  prime-agent-harness integration and the clone/index/validate wiring.
-- **R3a-9 (GATE) — Generic platform.** No operator-specific values are hardcoded. Brain
-  repository identity is operator-owned configuration, never a tracked default or code fallback;
-  the brain's entity taxonomy is NOT encoded in prime-claw (IA two-level split).
-- **R3a-10 (GATE) — Single-gateway discipline.** `openshell` (17670) only.
-- **R3a-11 (GATE) — Offline tests.** New pytest coverage monkeypatches sandbox/exec
-  boundaries (no live sandbox needed for the unit suite).
-- **R3a-12 (GATE) — Selected embedding-profile freshness.** The in-sandbox index uses one
-  explicitly selected embedding profile and one vector space: no mixed-model vectors,
-  NULL/stale embeddings, or keyword-only acceptance. The repository default is Zendesk AI
-  Gateway `openai:text-embedding-3-large` at 1536 dimensions. An explicit operator override
-  may select another provider/model/dimension (including home `Qwen3-Embedding-8B` at native
-  4096), but changing vector spaces requires a full non-destructive re-embed before cutover.
-- **R3a-13 (GATE) — prime-agent config mirrors explicit user choice; credentials remain
-  isolated.** Explicit host `models.json` and `settings.json` are mirrored verbatim and take
-  precedence, while host `auth.json` is never copied. The selected provider's real credential
-  stays in OpenShell; sandbox auth contains only non-secret adapter data and placeholders. With
-  no existing preferred host config, the portable inference default is Zendesk AI Gateway
-  `anthropic.kimi-k3`; `anthropic.glm-5.2` remains a supported gateway alternative. The
-  2026-09-16 cited-query proof used the operator's explicit `openai-codex/gpt-5.6-sol`
-  override and remains valid evidence of override/credential isolation, not the repo default.
-  Override paths remain available through `host_models_json` /
-  `PRIME_CLAW_HOST_MODELS_JSON` and `host_settings_json` /
-  `PRIME_CLAW_HOST_SETTINGS_JSON`.
-- **R3a-14 (CONDITIONAL GATE) — Non-destructive local-Qwen override cutover.** When an
-  operator explicitly selects the home-Qwen profile, build it in a parallel Postgres
-  database/index from the canonical brain clone, validate page/chunk counts, 4096-dimensional
-  vectors, freshness and semantic retrieval, then switch only that operator's runtime. Keep
-  the default/previous 1536-dimension database untouched as rollback. The private endpoint
-  enters only through ignored local config or `PRIME_CLAW_*`, never tracked defaults, logs, or
-  evidence. Policy grants only its exact host/port. This optional profile must not remove or
-  redefine the portable Zendesk AI-gateway default.
-- **R3a-15 (GATE) — Portable tracked defaults with explicit override precedence.** A clone of
-  prime-claw with no existing preferred provider configuration defaults both concerns to the
-  Zendesk AI Gateway: inference `anthropic.kimi-k3` (GLM allowed as an explicit alternative)
-  and embeddings `openai:text-embedding-3-large` at 1536 dimensions. Explicit host/local/env
-  configuration overrides inference and embeddings independently. Tracked config must require
-  neither a DGX/private endpoint nor Codex OAuth, and tests must prove this precedence.
-- **R3a-16 (GATE) — Explicit per-operator brain repository is mandatory.** Prime-claw has
-  no tracked, fallback, public starter, or example brain repository. Every operator must set
-  `brain_repo` through ignored local configuration or `PRIME_CLAW_BRAIN_REPO` before any
-  repository-dependent lifecycle, validation, recovery, embedding-build, write, or push action.
-  Missing or malformed configuration fails before mutation with a clear error naming both setup
-  paths. Joe's `JLandersZen/brain` is a proving-instance value only and must live in ignored local
-  config; historical evidence may name it but active defaults, code fallbacks, and generic tests
-  may not. `brain_branch` may retain the non-personal default `main`.
+## Future incubation
 
-## Out of scope (recorded for traceability)
+- **R-WE-10 (GATE) — No premature resources.** Future incubation creates no
+  branch, worktree, or episode session.
+- **R-WE-11 (GATE) — Named future bundle.** Incubated work is written as a
+  non-binding `SPECIFICATION.md`, `REQUIREMENTS.md`, and `DECISIONS.md` bundle
+  under `.ralph/plans/future/<idea-slug>/`.
+- **R-WE-12 (GATE) — Safe names.** Future names are filesystem-safe,
+  collision-resistant, and do not overwrite existing content without explicit
+  approval.
+- **R-WE-13 (NICE) — Later promotion.** A future bundle can later be promoted
+  through the same episode-creation mechanism with its context retained.
 
-- Porting the full memory/collect/triage/ingest skill set (3b).
-- Browse proxy-shim recreation (3c). Channels (3d). Scheduling via `prime-agent schedule`
-  (3e). `brain.cron` is not ported at all.
-- The operator instance repo (`prime-pva`) — created at 3b.
-- Episode loop, comms channels, orchestrator (Phases 4–6).
+## Episode creation
+
+- **R-WE-14 (GATE) — Durable location.** Worktrees use a configurable durable
+  root; the intended sandbox defaults are `/sandbox/projects/<project>` for the
+  canonical checkout and `/sandbox/worktrees/<project>/<episode>` for episodes.
+- **R-WE-15 (GATE) — Safe Git creation.** Branch and worktree creation is
+  non-interactive, validates repository state and destinations, and never
+  overwrites or deletes existing resources.
+- **R-WE-16 (GATE) — Conversation inheritance.** The promoted episode receives
+  the relevant source conversation rather than only a generic task summary.
+- **R-WE-17 (GATE) — Correct root.** The episode's persisted CWD is the new
+  worktree; project-local skills, extensions, settings, and context are
+  discovered there.
+- **R-WE-18 (GATE) — Returned identity.** Episode creation returns and durably
+  records active/stable session IDs, name, session file, model, branch,
+  worktree, project, and owner conversation identity.
+- **R-WE-19 (GATE) — Coordinator remains live.** Episode creation does not
+  replace or strand the owning project conversation; it can observe and message
+  the live episode as a sibling or equivalent reachable session.
+- **R-WE-20 (GATE) — Exactly-once task admission.** Substantive episode work is
+  delivered exactly once despite the known automatic-preparation race.
+- **R-WE-21 (GATE) — Prepare and verify.** The episode verifies CWD and branch,
+  runs the project `prepare` workflow, and writes its active specification in
+  its own checkout before implementation.
+- **R-WE-22 (GATE) — Recoverable partial failure.** Failures report created
+  resources and safe recovery actions; rollback never removes pre-existing or
+  dirty resources.
+
+## Coordination and lifetime
+
+- **R-WE-23 (GATE) — Durable coordination.** Ownership and episode identity
+  survive REPL-variable loss, compaction, kernel restart, and session resume.
+- **R-WE-24 (GATE) — Full PR lifetime.** The episode remains resumable through
+  planning, implementation, PR creation, review fixes, and rebasing.
+- **R-WE-25 (GATE) — Bidirectional collaboration.** Owner and episode can
+  exchange decisions, progress, review requests, and completion reports.
+
+## Completion and cleanup
+
+- **R-WE-26 (GATE) — Complete archive set.** Completion archives
+  `SPECIFICATION.md`, `REQUIREMENTS.md`, `DECISIONS.md`, and
+  `EXECUTION_PLAN.md` under a unique `.ralph/plans/archive/<episode-slug>/`.
+- **R-WE-27 (GATE) — Archive is a claim, not authorization.** The owner treats
+  the archive as the first readiness signal and independently verifies docs,
+  beads, tests, CI, PR feedback, push state, and merge readiness.
+- **R-WE-28 (GATE) — Owner-controlled merge.** The owning project conversation
+  decides whether and when to merge or abandon the episode.
+- **R-WE-29 (GATE) — Post-merge cleanup.** Session retirement and worktree
+  removal occur only after merge or explicit abandonment and only after dirty-
+  state safety checks.
+
+## Concurrency, security, and verification
+
+- **R-WE-30 (GATE) — Concurrent episodes.** Unique identities and atomic shared
+  metadata updates permit multiple active episodes without checkout collisions.
+- **R-WE-31 (GATE) — Input safety.** Untrusted/model-derived names cannot escape
+  configured roots or become unchecked shell fragments.
+- **R-WE-32 (GATE) — Credential isolation.** Episode automation preserves the
+  OpenShell L7 credential boundary and does not read Keychain or browser secret
+  stores.
+- **R-WE-33 (GATE) — Evidence-backed tests.** Tests cover command registration,
+  canonical markdown loading, interview/disposition ordering, both disposition
+  paths, collisions, partial failures, identity persistence, sibling messaging,
+  archive readiness, and safe cleanup; one real dogfood run proves the complete
+  promoted path.
