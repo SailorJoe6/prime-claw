@@ -1231,7 +1231,7 @@
    "id": "R-WE-34",
    "priority": "GATE",
    "summary": "A structured model-callable bridge validates and durably deduplicates explicit disposition preflight exactly once across turns and restart.",
-   "status": "partially proven (Slice 1 bridge/preflight; real future and episode automation land in Slices 2-4)",
+   "status": "partially proven (Slices 1-2 bridge plus real future automation; episode automation remains Slices 3-4)",
    "phase": "4",
    "slice": 1,
    "proven_by": {
@@ -1245,6 +1245,236 @@
     ],
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-1",
+   "priority": "GATE",
+   "summary": "Project conversation mutation is anchored to the validated primary canonical/default-branch checkout.",
+   "status": "proven for future incubation (Slice 2 canonical/default/remote checks)",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-2",
+   "priority": "GATE",
+   "summary": "Multiple project conversation sessions can safely share the canonical checkout through serialized future mutation.",
+   "status": "proven for future incubation (Slice 2 multi-session/process tests)",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-10",
+   "priority": "GATE",
+   "summary": "Future incubation allocates no branch, additional worktree, daemon resource, or episode session.",
+   "status": "proven (Slice 2 future success/failure allocation assertions)",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-11",
+   "priority": "GATE",
+   "summary": "Future incubation creates the exact named SPECIFICATION, REQUIREMENTS, and DECISIONS bundle.",
+   "status": "proven (Slice 2 exact bundle and remote-tree tests)",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-12",
+   "priority": "GATE",
+   "summary": "Future names are safe and existing paths/content are never overwritten implicitly.",
+   "status": "proven (Slice 1 validation + Slice 2 collision and ownership tests)",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-31",
+   "priority": "GATE",
+   "summary": "Model-derived future names stay within the fixed plans root and Git arguments remain arrays/literal pathspecs.",
+   "status": "partially proven (Slices 1-2 future path; episode destination validation remains)",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-32",
+   "priority": "GATE",
+   "summary": "Future automation preserves credential isolation and uses only configured Git transport.",
+   "status": "partially proven (Slice 2 future path; full episode lifecycle remains)",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-33",
+   "priority": "GATE",
+   "summary": "Automated evidence covers safe future disposition behavior and failures.",
+   "status": "partially proven (Slices 1-2; episode, coordination, readiness, cleanup, and dogfood remain)",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-35",
+   "priority": "GATE",
+   "summary": "Future mutation uses a project lock and repeats canonical, remote, status, containment, and collision checks under lock.",
+   "status": "proven (Slice 2 lock, dirt, collision, ambiguity, and OS-process tests)",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-36",
+   "priority": "GATE",
+   "summary": "Future mutation commits and pushes only its exact bundle, leaves clean success, and preserves exact recoverable failure state.",
+   "status": "proven (Slice 2 private-index/CAS, push, race, fault, and recovery tests)",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
      "tests/test_specification_episodes_extension.py"
     ]
    },

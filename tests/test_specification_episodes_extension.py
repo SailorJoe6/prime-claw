@@ -1,4 +1,4 @@
-"""Acceptance bridge for native specification commands and disposition preflight."""
+"""Acceptance bridge for specification commands and future-incubation automation."""
 
 import json
 import re
@@ -87,8 +87,24 @@ def test_slice1_requirements_are_traced_without_overclaiming_later_mutations():
         assert all((REPO / path).exists() for paths in referenced.values() for path in paths)
 
 
+
+def test_slice2_future_requirements_are_traced():
+    inventory = json.loads((REPO / "config" / "requirements-inventory.json").read_text())
+    entries = {item["id"]: item for item in inventory["requirements"]}
+    expected = {
+        "R-WE-1", "R-WE-2", "R-WE-10", "R-WE-11", "R-WE-12",
+        "R-WE-31", "R-WE-32", "R-WE-33", "R-WE-35", "R-WE-36",
+    }
+    assert expected <= entries.keys()
+    assert entries["R-WE-10"]["status"].startswith("proven")
+    assert entries["R-WE-35"]["status"].startswith("proven")
+    assert entries["R-WE-36"]["status"].startswith("proven")
+    for requirement_id in expected:
+        referenced = entries[requirement_id]["proven_by"]
+        assert all((REPO / path).exists() for paths in referenced.values() for path in paths)
+
 def test_legacy_skill_aliases_remain_until_both_real_dispositions_are_proven():
-    # R-WE-6 is intentionally Slice 4. Removing these in preflight-only Slice 1
-    # would strand operators before future and episode mutation paths exist.
+    # R-WE-6 is intentionally Slice 4. Future mutation is proven in Slice 2,
+    # but removing aliases before the episode path exists would strand operators.
     assert (REPO / ".agents" / "skills" / "design").exists()
     assert (REPO / ".agents" / "skills" / "spec-it-out").exists()

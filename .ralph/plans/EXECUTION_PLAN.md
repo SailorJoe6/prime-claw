@@ -1,7 +1,8 @@
 # Execution Plan — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 (`prime-claw-h6w.2`) is
-> implemented and validated; Slices 2–8 remain open.
+> **Status:** implementation in progress; Slices 1–2
+> (`prime-claw-h6w.2`–`.3`) are implemented and validated; Slices 3–8 remain
+> open.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -18,8 +19,9 @@
 
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
-| 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed) |
-| 2–8 | `prime-claw-h6w.3`–`.9` | Not started | Dependency-ordered below |
+| 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed at Slice 1) |
+| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Implemented and validated | locked private-index/CAS transaction; 50/50 Node tests; `pytest -q tests` (237 passed) |
+| 3–8 | `prime-claw-h6w.4`–`.9` | Not started | Dependency-ordered below |
 
 Slice 1 evidence names the exact active-suite command. It does not claim a
 literal repository-root `pytest -q` run: owner review observed that command
@@ -154,16 +156,24 @@ Under the project lock, the future path:
 2. fails before writing if any unrelated tracked or untracked dirt exists;
 3. creates only `.ralph/plans/future/<slug>/{SPECIFICATION,REQUIREMENTS,DECISIONS}.md`
    with exclusive collision checks;
-4. stages those exact pathspecs and proves the staged set equals the allowlist;
-5. commits with the disposition ID in the receipt, then pushes the checked
-   default branch to its configured upstream; and
-6. rechecks that the canonical checkout is clean before reporting success.
+4. builds a transaction-private index from the recorded base, stages only
+   literal owned paths there, and proves its tree equals the allowlist;
+5. creates the exact commit with Git plumbing, compare-and-swap advances the
+   checked default ref, then reconciles only owned paths into the primary index;
+6. queries the actual remote OID, pushes without force only from the recorded
+   remote base, and verifies the resulting remote OID; and
+7. rechecks exact commit paths/content and a clean canonical checkout before
+   reporting success.
 
-A rejected push, remote race, commit failure, or crash records the exact local
-commit/files/status. It does not absorb, reset, rebase, or commit another
-conversation's work. `recover` may continue or safely remove only byte-identical
-uncommitted files created by that transaction; otherwise it stops for the
-operator.
+The private-index/CAS path prevents a non-cooperative primary-index writer from
+entering the future commit. It intentionally does not invoke ordinary
+`git commit` hooks; exact construction and post-commit verification are the
+trusted host contract. A rejected push, remote race, commit failure, or crash
+records the exact local commit/files/status. It does not absorb, reset, rebase,
+or commit another conversation's work. An ordinary retry only reports recovery
+state. An explicitly operator-approved `recovery_action` may inspect, continue,
+or safely remove only byte-identical uncommitted files created by that
+transaction; otherwise it stops for the operator.
 
 ### 2.5 Promoted episode transaction
 

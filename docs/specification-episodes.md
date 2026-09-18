@@ -101,24 +101,86 @@ The registered tool also requests Prime Agent's `sequential` execution mode.
 Atomic exclusive creation remains the durable concurrency boundary if calls race
 outside that runner contract.
 
-## Current safety boundary
+## Slice 2: serialized future incubation
 
-Slice 1 is intentionally **preflight only**. A successful receipt says:
+A confirmed `future` disposition now executes a real canonical-checkout
+transaction. The tool acquires the atomic project lock at
+`<GIT_COMMON_DIR>/prime-claw/locks/project-mutation.lock/` and repeats all
+repository, default-branch, upstream, remote-OID, status, containment, and
+collision checks while holding it. A held, empty, or corrupt lock is treated as
+owned or ambiguous and is never stolen.
+
+A fresh transaction requires all three views to agree before any bundle write:
+local `HEAD`, its configured upstream tracking ref, and the actual remote
+default ref queried with `git ls-remote`. It also requires an entirely clean
+tracked, staged, and untracked checkout. It then exclusively creates only:
 
 ```text
-status: preflight-ready
-phase: validated
-product_resource_mutation_performed: false
-control_state_kind: local-git-common-dir-receipt
-control_state_writes_performed: [<files created by this invocation>]
-implementation_boundary: slice-1-preflight-only
+.ralph/plans/future/<safe-slug>/
+├── SPECIFICATION.md
+├── REQUIREMENTS.md
+└── DECISIONS.md
 ```
 
-The filesystem changes are explicit local control-state request/receipt files
-under Git's common directory. Slice 1 does **not** change project checkout
-files, Git refs, branches, worktrees, sessions, daemon state, or remotes. It
-does not yet incubate the future bundle or create the episode. Those mutation
-paths begin in Slices 2 and 3.
+The host builds the commit through a transaction-private Git index initialized
+from the recorded base commit. Only the three literal owned pathspecs enter that
+index. `git write-tree` and `git commit-tree` create the exact commit, and
+`git update-ref <default-ref> <new> <recorded-base>` advances the local branch
+with compare-and-swap semantics. The primary index is then reconciled with only
+the owned paths. This plumbing path intentionally does not run ordinary
+`git commit` hooks; its contract is deterministic exact-path construction plus
+post-commit path/content verification. Any unrelated primary-index or worktree
+change detected before push turns the operation into a recoverable failure, and
+the owned commit is not pushed.
+
+Push is non-forcing and targets the configured default upstream explicitly.
+The tool queries the actual remote OID before and after push, verifies the
+commit parent, exact three-path diff, exact document contents, clean checkout,
+and remote commit before reporting `verified-success`. It creates no branch,
+additional worktree, daemon resource, or episode session.
+
+### Transaction records and explicit recovery
+
+The immutable Slice 1 intent receipt stays immutable. Slice 2 adds separately
+replaceable, fsync-and-rename transaction state:
+
+```text
+<GIT_COMMON_DIR>/prime-claw/
+├── future-transactions/<disposition-id>.json
+├── future-attempts/<owner-and-request-hash>.json
+├── indexes/<disposition-id>.index       # present only while needed
+└── future-mutation-blocked.json          # present after owned partial mutation
+```
+
+Receipts contain hashes and paths, never document bodies. They record base,
+local, upstream, and remote OIDs; owned/staged/dirty paths; commit identity;
+phase; failure; and the next safe action. A partial product mutation creates the
+project blocker so a later conversation cannot accidentally push or commit on
+top of unresolved work. Independently, every new transaction requires local
+`HEAD` to equal both upstream and the queried remote before mutation.
+
+An ordinary retry of interrupted or failed work performs no product mutation
+and returns `recovery-required`. Recovery is explicit and operator-confirmed by
+reusing the exact disposition input with one of these optional actions:
+
+- `inspect` — reconcile and report current state without product mutation;
+- `continue` — continue only after the journal and byte-identical owned bundle
+  prove identity; or
+- `remove-owned-uncommitted` — only before a commit/ref advance, unstage exact
+  owned paths and remove exact byte-identical owned files.
+
+Recovery never resets, rebases, force-pushes, steals a lock, removes mismatched
+content, or absorbs unrelated dirt. Once a commit object exists, removal is
+forbidden. A rejected push or remote race preserves the exact local commit and
+requires explicit reconciliation.
+
+## Current safety boundary
+
+The `future` path is now a real locked write/commit/push transaction as described
+above. The `episode` path remains preflight-only and allocates no branch,
+worktree, session, or daemon resource until Slice 3. Its receipt continues to
+report `implementation_boundary: slice-1-preflight-only` and no product-resource
+mutation.
 
 The legacy `.agents/skills/design` and `.agents/skills/spec-it-out` aliases also
 remain temporarily. The approved plan removes them only after both real
@@ -126,12 +188,17 @@ disposition paths are proven in Slice 4.
 
 ## Failure and recovery
 
-Validation, repository inspection, cancellation, or Git errors before receipt
-creation produce no control state. If a request pointer was durably created but
-a later receipt write is interrupted, retrying the same request may safely
-complete the missing receipt. A changed request cannot reuse that pointer.
-Never delete a conflicting or corrupt receipt as generic recovery; preserve it
-for explicit diagnosis.
+Validation errors before durable identity creation produce no control state.
+After request identity exists, every future attempt has a durable attempt record.
+Lock contention, dirt, collisions, commit construction failure, cancellation,
+push rejection, remote race, and lock-release ambiguity are distinguished.
+Failures after owned file or ref mutation preserve a mutable transaction journal
+and a project-wide recovery blocker. They do not claim success.
+
+Only explicit recovery can continue or remove owned uncommitted state. Removal
+requires exact document bytes, exact allowed directory entries, unchanged base
+`HEAD`, and no unrelated staged or dirty path. Once a commit exists, removal is
+forbidden; the operator must inspect and reconcile the preserved commit.
 
 ## Verification
 
@@ -142,11 +209,18 @@ node --experimental-strip-types --test tests/specification_episodes_extension.te
 pytest -q tests/test_specification_episodes_extension.py
 ```
 
-The Node suite uses temporary repositories and proves registration, canonical
-loading, structured validation, both disposition variants, canonical/default-
-branch source checks, argument-array Git, product-resource non-mutation, durable
-replay across checkout-state change, changed-input collision, session
-isolation, concurrent convergence, cancellation, and corrupt-evidence handling.
+The Node suite uses temporary repositories, isolated session files, and local
+bare remotes. The live dogfood episode branch, worktree, session, and owner
+conversation are inspection-only evidence and are never fault, recovery,
+retirement, abandonment, or cleanup fixtures. The suite proves registration,
+canonical loading, structured validation,
+both disposition variants, canonical/default-branch source checks, argument-
+array Git, exact future commits, actual remote verification, clean success,
+tracked/untracked/staged dirt refusal, path collision, request/session isolation,
+real OS-process serialization, lock ambiguity, every durable transaction boundary,
+commit/push/cancellation faults, remote races, private-index isolation,
+explicit continuation/removal recovery,
+no episode allocation, and corrupt-evidence handling.
 The pytest bridge loads the real extension through the installed Prime Agent
 RPC loader and checks the two native command surfaces. Prime Agent 0.9.5 RPC has
 no public tool-list or direct tool-invocation command, so schema/execution tests

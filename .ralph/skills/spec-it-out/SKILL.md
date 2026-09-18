@@ -50,6 +50,13 @@ After an explicit answer, call `spec_disposition` **exactly once** with:
 
 Do not run Git, filesystem, session, daemon, or shell commands reconstructed
 from this prose. Do not call the bridge again merely because a response is
-uncertain. Report the structured receipt accurately, including any preflight-
-only boundary or failure, and never claim that resources were created unless
-the receipt proves it.
+uncertain. Report the structured receipt accurately, including any episode
+preflight-only boundary, future success, or failure, and never claim that
+resources were created unless the receipt proves it.
+
+If a future receipt says `recovery-required` or `failed`, stop and show its
+exact state and `next_safe_action`. Never recover automatically. Only after the
+operator explicitly selects one recovery action may you call `spec_disposition`
+exactly once more with the same decision and byte-identical documents, a new
+stable `request_id`, and `recovery_action` set to `inspect`, `continue`, or
+`remove-owned-uncommitted`. Do not offer removal after a commit exists.

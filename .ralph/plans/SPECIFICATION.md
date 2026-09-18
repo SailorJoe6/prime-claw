@@ -1,8 +1,8 @@
 # Specification — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 native commands and trusted
-> disposition preflight are implemented under `prime-claw-h6w.2`; real future
-> and episode mutation paths remain planned.
+> **Status:** implementation in progress; Slice 1 native commands/preflight and
+> Slice 2 serialized future incubation are implemented under
+> `prime-claw-h6w.2`–`.3`; episode allocation and later lifecycle paths remain.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -49,6 +49,9 @@ merge, and cleanup.
   **not** inherit the source transcript and therefore does not satisfy episode
   conversation inheritance by itself.
 - Prime Agent sessions can observe and message sibling top-level sessions.
+- The `future` bridge now serializes canonical-checkout mutation, constructs an
+  exact private-index commit, pushes and verifies the actual remote, and
+  preserves explicit recovery state without allocating episode resources.
 - Git worktrees provide independent checkout and index state while sharing the
   repository's object database and refs.
 - The execute workflow archives completed planning documents, but its current
@@ -299,11 +302,12 @@ This specification episode itself is the first manual proof:
 
 The POC proves the desired runtime topology and manual behavior. It also proves
 that `rlm.create_session(cwd=...)` is not the inheritance mechanism: that API
-creates a fresh sibling without the source transcript. The remaining gap is a
-stable extension-facing bridge that composes the proven fork and daemon-create
-operations with durable ownership registration and exactly-once task delivery,
-including partial-failure recovery. That integration is an implementation item
-to resolve and regression-test rather than an assumption to hide.
+creates a fresh sibling without the source transcript. The stable bridge and
+its serialized future-incubation path now exist. The remaining integration gap
+is the episode path that composes the proven fork and daemon-create operations
+with durable ownership registration and exactly-once task delivery, including
+partial-failure recovery. That work remains an implementation item rather than
+an assumption to hide.
 
 ## 12. Acceptance outcomes
 
