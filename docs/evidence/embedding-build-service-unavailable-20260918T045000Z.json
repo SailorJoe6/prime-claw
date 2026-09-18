@@ -1,0 +1,87 @@
+{
+  "verb": "embedding-build",
+  "slice": "3a-4A.2a",
+  "captured_at": "2026-09-18T04:50:00.098939+00:00",
+  "result": "BLOCKED_EXTERNAL_SERVICE",
+  "preflight": {
+    "exact_model": "Qwen3-Embedding-8B",
+    "omitted_dimensions": {
+      "http_status": 200,
+      "returned_dimensions": 4096
+    },
+    "explicit_4096": {
+      "http_status": 400
+    },
+    "explicit_1536": {
+      "http_status": 400
+    },
+    "config_dry_run": "PASS",
+    "config_live": "PASS"
+  },
+  "build": {
+    "started_at": "2026-09-18T01:25:10.752359+00:00",
+    "duration_seconds": 12007.316,
+    "exit_code": 143,
+    "termination": "gbrain sync hard deadline sent SIGTERM",
+    "deadline_seconds": 12000,
+    "progress_report": "128/710 files processed in resumed run: 89 imported, 39 skipped with errors",
+    "retry_observed": true
+  },
+  "post_failure_probe": {
+    "host_exact_service_http_status": 503,
+    "classification": "service unavailable"
+  },
+  "candidate": {
+    "database": "gbrain_qwen4096",
+    "preserved": true,
+    "pages_source_brain": 439,
+    "chunks_source_brain": 1459,
+    "embedded_chunks_source_brain": 1459,
+    "bad_or_stale_chunks": 0,
+    "min_dimensions": 4096,
+    "max_dimensions": 4096,
+    "column_type": "vector(4096)",
+    "hnsw_index_count": 0,
+    "source_bookmark_set": false
+  },
+  "canonical": {
+    "database": "gbrain",
+    "pages_source_brain": 1059,
+    "chunks_source_brain": 3031,
+    "embedded_chunks_source_brain": 3031,
+    "min_dimensions": 1536,
+    "max_dimensions": 1536,
+    "column_type": "vector(1536)",
+    "source_bookmark": "5a477eaa5b311b9b45324591dd308e83ddcd1ded",
+    "config_database": "gbrain",
+    "config_model": "openai:text-embedding-3-large",
+    "config_dimensions": 1536
+  },
+  "failure_ledger": {
+    "open_qwen_embedding_forbidden_rows": 707,
+    "open_malformed_frontmatter_rows": 3,
+    "note": "ledger is persistent full-sync state; run-local stderr reported 39 errors before deadline"
+  },
+  "safety": {
+    "sandbox_gbrain_processes": 0,
+    "canonical_policy_restore_reported": true,
+    "canonical_state_matches_pre_run_baseline": true,
+    "canonical_cutover_performed": false,
+    "legacy_database_mutated": false,
+    "private_endpoint_recorded": false,
+    "heartbeat_cancelled": true
+  },
+  "tooling_finding": {
+    "sync_stall_abort_seconds": 1200,
+    "observed_effect": "did not terminate the --full import.files path",
+    "hard_deadline_seconds": 12000,
+    "hard_deadline_effect": "terminated safely",
+    "root_cause": "upstream full-sync import path is not interrupted by the incremental sync stall watchdog; external Qwen service failed after initial preflight"
+  },
+  "tests": {
+    "focused_preflight_and_candidate": 35,
+    "status": "PASS",
+    "canonical": 228
+  },
+  "unblock_condition": "Operator restores stable exact Qwen service; verify host and in-sandbox 200/4096 probes, then correct the full-sync no-progress watchdog gap before resuming exactly one isolated build."
+}

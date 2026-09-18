@@ -155,10 +155,17 @@ errors.
    fail closed while `home-qwen` is selected but not accepted/cut over.
 2. Confirm the canonical config and `vector(1536)` database remain intact with direct read-only
    `psql`; do not use an ordinary doctor command that may auto-migrate.
-3. Classify the sanitized gbrain failure. Fix only the cause, then rerun
-   `bin/prime-claw embedding-build` to resume the isolated candidate.
-4. Keep `GBRAIN_AI_EMBED_TIMEOUT_MS` and `GBRAIN_QUERY_EMBED_TIMEOUT_MS` at `1000000`, the sync
-   watchdog above 1000 seconds, and the outer timeout above the sync deadline.
+3. Classify the sanitized gbrain failure. HTTP 503 from a fresh exact-model probe is an external
+   service blocker; do not retry until the operator restores stable service.
+4. Before a new live resume, verify both host and in-sandbox probes return HTTP 200 with exactly
+   4096 values when `dimensions` is omitted.
+5. Keep `GBRAIN_AI_EMBED_TIMEOUT_MS` and `GBRAIN_QUERY_EMBED_TIMEOUT_MS` at `1000000`, and keep
+   the outer timeout above the sync deadline.
+
+The 2026-09-18 resume exposed a fail-fast gap: upstream gbrain's `--full` `import.files` path did
+not honor `GBRAIN_SYNC_STALL_ABORT_SECONDS=1200`; only the 12,000-second hard deadline stopped the
+run. Correct and test that gap before another live resume. Do not mistake retry log activity for
+successful embedding progress.
 
 The build always restores the tracked gateway/default policy on normal exit, including success. Slice
 4A.2b must explicitly reapply the candidate policy for semantic validation/cutover.

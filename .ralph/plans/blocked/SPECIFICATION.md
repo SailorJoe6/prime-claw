@@ -1,23 +1,24 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — Slices 4P and 4R complete; operator-required local-Qwen Slice 4A build is IN PROGRESS; Slice 4B follows
+**Status:** BLOCKED — Slice 4A candidate preserved safely; exact Qwen service became unavailable during the resumed build; Slice 4B remains deferred
 **Beads:** `prime-claw-zwg` (P1)
 **Date:** 2026-09-11 · **Slice 4A execution updated:** 2026-09-18
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
 
 
-> **Qwen build resumed (2026-09-18):** the exact-model compatibility gate passed: an omitted
-> dimensions request returned 4096 values while explicit 4096 and 1536 requests were rejected as
-> required. Both sanitized local preflights passed, and the isolated candidate build resumed from
-> its preserved partial state. Slice 4A remains the highest priority for this operator; acceptance
-> and cutover have not started. Slice 4B remains
-> technically independent on the portable gateway profile, but is deferred until 4A because this
-> operator requires local Qwen. The canonical database/config are unchanged; no cutover occurred.
+> **Qwen service blocker (2026-09-18):** initial exact-model compatibility and sanitized
+> preflight passed, and one isolated build resumed. The service failed during sustained work; the
+> hard deadline stopped the run safely and a fresh exact-model host probe returned HTTP 503. The
+> candidate is preserved at 439 pages / 1,459 current 4096d chunks without a bookmark. Canonical
+> `gbrain` remains unchanged at 1,059 pages / 3,031 1536d chunks; policy restoration succeeded and
+> no cutover occurred. Unblock only after stable service is restored and the discovered full-sync
+> no-progress watchdog gap is corrected. Slice 4B remains technically independent but deferred.
+
 
 This document is the summary and index for the work. It is accompanied by:
 
-- **[REQUIREMENTS.md](REQUIREMENTS.md)** — the specific requirements discovered during discussion.
-- **[DECISIONS.md](DECISIONS.md)** — design decisions, each traced to the requirement(s) it satisfies.
+- **[REQUIREMENTS.md](../REQUIREMENTS.md)** — the specific requirements discovered during discussion.
+- **[DECISIONS.md](../DECISIONS.md)** — design decisions, each traced to the requirement(s) it satisfies.
 
 This is a specification of *what* must change and *why*. It is not an execution plan; that comes later.
 
@@ -56,9 +57,10 @@ index, and let a sandboxed Prime Agent answer with citations. Slice 4R removes r
 from tracked defaults and enforces explicit operator setup before repository-dependent actions.
 That 1536-dimensional AI-gateway index is the implemented portable default profile under R3a-15. For this operator's explicit local override, Slice 4A.1
 validates the home-Qwen endpoint contract and 4A.2 has a preserved partial 4096-dimensional
-candidate. The exact-model compatibility and sanitized configuration preflights passed on
-2026-09-18, and the isolated candidate build resumed under a monitored background process.
-Because this operator requires local Qwen, completing and accepting Slice 4A remains the task; the routed write/push proof follows in Slice 4B.
+candidate. The 2026-09-18 resumed build advanced it to 439 pages / 1,459 current 4096d chunks,
+then stopped safely at the hard deadline after sustained embedding failures; a post-stop exact-model
+probe returned HTTP 503. Because this operator requires local Qwen, Slice 4A is blocked until the
+service is stable and the full-sync fail-fast gap is corrected; the routed write/push proof follows in Slice 4B.
 Phase 2 proved the *container*; Phase 3a is finishing the *brain-hosting claw*.
 
 ## 2. The strategic frame (why this phase, this shape)

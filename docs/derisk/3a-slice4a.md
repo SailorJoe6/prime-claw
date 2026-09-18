@@ -1,10 +1,11 @@
 # Phase 3a Slice 4A — optional home-Qwen embedding override
 
-**Status:** READY TO RESUME AFTER PREFLIGHT — 4A.1 complete; 4A.2a partial candidate preserved; Spark recovery confirmed
+**Status:** BLOCKED — 4A.1 complete; resumed 4A.2a stopped safely when the exact Qwen service became unavailable again
 **Decision:** D3a-L
 **Requirements:** R3a-12, R3a-14
 **Evidence:** [`docs/evidence/embedding-preflight-20260916T191526Z.json`](../evidence/embedding-preflight-20260916T191526Z.json)
 **Interrupted-build evidence:** [`docs/evidence/embedding-build-interrupted-20260916T234215Z.json`](../evidence/embedding-build-interrupted-20260916T234215Z.json)
+**Failed-resume evidence:** [`docs/evidence/embedding-build-service-unavailable-20260918T045000Z.json`](../evidence/embedding-build-service-unavailable-20260918T045000Z.json)
 
 ## Requirement revision (2026-09-17)
 
@@ -68,3 +69,27 @@ exact `Qwen3-Embedding-8B` service; if it passes, resume with
 for a safe full-sync resume. Do not drop or mutate the legacy database.
 
 Sanitized machine evidence: [`embedding-build-interrupted-20260916T234215Z.json`](../evidence/embedding-build-interrupted-20260916T234215Z.json).
+
+
+## 4A.2a resumed build — blocked again by external service
+
+On 2026-09-18 the exact compatibility gate initially passed: an omitted `dimensions` request
+returned 4096 values, and explicit 4096/1536 requests returned HTTP 400 as required. Both
+sanitized configuration preflights and 35 focused offline tests passed. One isolated build was
+resumed from the preserved candidate.
+
+The service then failed during sustained work. The resumed run imported 89 more files before
+recording 39 embedding errors and reaching the 12,000-second hard deadline. A fresh host-side
+exact-model probe after the safe stop returned HTTP 503. The hard deadline sent SIGTERM, the
+command restored the canonical gateway policy, and no gbrain process remained.
+
+The candidate is still partial and unaccepted: 439 pages and 1,459 chunks/embeddings, all current
+4096-dimensional rows with zero detected stale/null/mixed vectors, but no source bookmark. The
+canonical database/config remain at 1,059 pages, 3,031 1536-dimensional chunks, the original
+source bookmark, and `openai:text-embedding-3-large`; no cutover occurred.
+
+The run also exposed a watchdog contract gap: `GBRAIN_SYNC_STALL_ABORT_SECONDS=1200` does not
+interrupt upstream gbrain's `--full` `import.files` path. Only the 12,000-second hard deadline
+bounded this run. Before another live resume, correct that fail-fast gap and require both host and
+in-sandbox exact-model probes to return 200/4096. The external unblock condition is a stable exact
+Qwen service. Sanitized evidence is linked above; the private endpoint is absent.

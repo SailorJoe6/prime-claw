@@ -97,15 +97,14 @@ operations: `docs/runbook.md`. Plan set archived to
 
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 
-**Current status (revised 2026-09-18):** Phase 3a Slices 0–3 and portable-default Slice 4P
-are complete. Mandatory Slice 4R is also complete: every operator must explicitly configure their
-brain repository. Checked-in no-config defaults remain Zendesk AI Gateway Kimi K3 inference plus
-`text-embedding-3-large`/1536 embeddings, with independent explicit overrides. For Joe's required
-local profile, the exact `Qwen3-Embedding-8B` compatibility and sanitized configuration preflights
-passed and the preserved isolated 4096-dimensional candidate build resumed. Acceptance and atomic
-cutover have not started; the canonical 1536 database remains unchanged for rollback. Slice 4A is
-the active P0 and operator-ordering gate; generic routed write/push Slice 4B remains technically
-independent but is deferred until 4A is accepted.
+**Current status (revised 2026-09-18): BLOCKED.** Phase 3a Slices 0–3, portable-default
+Slice 4P, and mandatory repository-setup Slice 4R are complete. For Joe's required local profile,
+one isolated `Qwen3-Embedding-8B` build resumed after a passing exact-model probe, then the service
+failed under sustained work. The hard deadline stopped safely; a post-stop probe returned HTTP 503.
+The partial candidate is preserved at 439 pages / 1,459 current 4096-dimensional chunks without a
+bookmark. Canonical gateway/1536 state is unchanged and no cutover occurred. Unblock Slice 4A only
+after stable service is restored and the discovered full-sync no-progress watchdog gap is fixed.
+Generic routed write/push Slice 4B remains technically independent but deferred by operator order.
 
 The riskiest integration, done as early as possible and deliberately thin but
 *whole*: a prime-agent session inside the sandbox, connected to gbrain, that

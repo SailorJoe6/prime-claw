@@ -1,13 +1,13 @@
 # Home-network embedding runtime
 
-> **Status:** OPTIONAL PROFILE READY TO RESUME AFTER PREFLIGHT — Spark recovery confirmed; partial candidate preserved; no cutover.
+> **Status:** OPERATOR-REQUIRED PROFILE BLOCKED — resumed candidate preserved; exact Qwen service unavailable again; no cutover.
 > **Decision:** D3a-L/M · **Requirements:** R3a-12, R3a-14, R3a-15 · **Plan:** Phase 3a Slices 4P/4A
 
 ## Portable default versus this optional profile
 
-The checked-in no-config default must use Zendesk AI Gateway
-`openai:text-embedding-3-large` at 1536 dimensions. That portability correction is a new
-requirement and is not implemented yet. An operator may explicitly override the default with
+The checked-in no-config default uses Zendesk AI Gateway
+`openai:text-embedding-3-large` at 1536 dimensions. That portable profile is implemented and
+remains available to other operators. An operator may explicitly override the default with
 the home-network OpenAI-compatible profile documented here:
 
 - model: `Qwen3-Embedding-8B`
@@ -130,16 +130,22 @@ the gbrain/Bun runtime. It must not provision an embedding credential provider.
 
 ## Current operational status
 
-The operator-local endpoint config and rendered candidate policy pass preflight. The isolated
-candidate-build path is implemented and offline-tested. A live build reached 350 source pages
-and 1,140 fully embedded 4096-dimensional chunks before the DGX Spark crashed. That partial
-candidate has no source bookmark and is not accepted. The process is stopped, the historical
-policy is restored, the canonical fingerprint is unchanged, and no cutover occurred. On
-2026-09-17 the operator confirmed the Spark is alive and ready. No build has restarted; rerun
-the exact-model compatibility/preflight gate before resuming the candidate.
+The operator-required local profile is blocked on the exact Qwen service. A 2026-09-18
+compatibility probe initially passed and one isolated build resumed. It advanced the preserved
+candidate to 439 pages and 1,459 fully embedded 4096-dimensional chunks, then sustained embedding
+requests failed. The 12,000-second hard deadline stopped the run safely; a post-failure exact-model
+host probe returned HTTP 503.
 
-The attempted `projects/prime-claw` write stopped on gateway rate limiting and rolled back
-cleanly: the page is absent, the brain Git clone is clean, and no commit or push occurred.
-Slice 4P implements the portable tracked defaults; generic Slice 4B can now use the gateway
-profile. Joe's Slice 4A.2 local-Qwen build is ready to resume after preflight, but it
-remains independent and does not block portable acceptance.
+The candidate has zero detected stale/null/mixed stored vectors but no source bookmark and is not
+accepted. The canonical `gbrain` database/config remain unchanged at 1,059 pages and 3,031
+1536-dimensional chunks, the gateway policy was restored, and no cutover occurred.
+
+Before resuming again:
+
+1. Restore and confirm the exact Qwen service is stable.
+2. Correct the discovered fail-fast gap: the upstream `--full` `import.files` path did not honor
+   the configured 1,200-second no-progress watchdog, although the hard deadline worked.
+3. Require both host and in-sandbox exact-model probes to return HTTP 200 with 4096 values.
+4. Resume exactly one isolated build; never drop or modify either database.
+
+Evidence: [`embedding-build-service-unavailable-20260918T045000Z.json`](evidence/embedding-build-service-unavailable-20260918T045000Z.json).
