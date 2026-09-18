@@ -100,21 +100,25 @@ OPERATOR (a thought worker running many parallel projects)
 
 - **Universal agent.** Top of the hierarchy. Always on. Has gbrain (the
   universal/default source) and knows of every project. Never implements.
-  Reaches out to check incoming channels on a schedule. Plans and executes
-  on extremely long-horizon tasks.
-- **Project context.** One per project. Physical form: a git-tracked
-  folder, its own beads issues, its own documentation, registered as a
-  gbrain source. The boundary between the universal agent and a project is
-  "a github/gitlab-tracked project folder."
+  Reaches out to check incoming channels on a schedule, manages the canonical
+  checkouts that physically anchor project contexts, and plans and executes on
+  extremely long-horizon tasks.
+- **Project context.** One per project. Physical form: the canonical/default-
+  branch checkout of a git-tracked project in the universal agent's runtime
+  home, with its own beads issues, documentation, and registered gbrain source.
+  The boundary between the universal agent and a project is "a
+  github/gitlab-tracked project folder."
 - **Conversation.** A long-lived prime-agent session whose CWD is the
-  project root. Conversational context clarity comes from CWD scoping.
-  Within a project, any one conversation further constrains its focus to
-  one aspect of the project. Some conversations stay pure brainstorm for
-  weeks. Some become builds.
-- **Episode.** A short-lived prime-agent child agent that runs a Ralph-style
-  design → plan → execute → handoff cycle for one feature, holds
-  invocation-tier state in its own REPL, updates the project's living docs,
-  and is reaped when done.
+  project's canonical checkout. Conversational context clarity comes from CWD
+  scoping. A project can have many sibling conversations, each focused on one
+  aspect of the project. Some conversations stay pure brainstorm for weeks;
+  specification-level work is delegated to episodes.
+- **Episode.** A temporary prime-agent session, logically owned by the project
+  conversation that created it, with its own feature branch and git worktree.
+  It runs a Ralph-style design → plan → execute → handoff cycle for one
+  specification, holds invocation-tier state in its own REPL, updates the
+  project's living docs, stays available through the PR and review lifecycle,
+  and is reaped after merge or explicit abandonment.
 
 ### Communication channels map onto the hierarchy
 
@@ -162,19 +166,32 @@ routing.
 
 ## The conversation → episode transition
 
-The trigger is well established and inherited from Ralph: **the moment the
-operator invokes `/spec-it-out` inside any brainstorming conversation.**
+The transition starts when the operator invokes `/design` or `/spec-it-out`
+inside a project conversation. `/design` is for work that still needs
+requirements discovery; `/spec-it-out` is for work whose design is already
+substantially present in the conversation. In either case, the interview runs
+to completion before any episode infrastructure is allocated.
 
-What the episode inherits: the full conversation, within the confines of
-the spec-it-out skill. After the specification and planning phases
-complete, those living docs constrain the context for execution. Whatever
-remains to be figured out will be figured out by manually driving the
-skills first. Automated loops are the last thing to build, after the rest
-is validated by manual driving.
+Once all material questions are answered and the work is specification-ready,
+the operator chooses its disposition. Work that is worth preserving but not
+ready for implementation is written under `.ralph/plans/future/` and remains
+part of the project conversation. Work approved to proceed crosses the episode
+boundary: prime-claw creates a feature branch and isolated git worktree, carries
+the relevant conversation into a durable worktree-rooted session, and records
+the originating conversation as its logical owner and coordinator.
 
-The hard problem at this boundary is *what context crosses*: too little and
-the episode is past-design-blind; too much and the context-rot problem is
+After the specification and planning phases complete, those living docs
+constrain execution. An episode remains available through implementation, PR
+review, updates, and rebasing. Archiving its completed plan is the episode's
+claim that it is ready for owner review; the owning conversation verifies the
+work, decides whether to merge, and reaps the session and worktree only after
+merge or explicit abandonment.
+
+The hard problem at this boundary remains *what context crosses*: too little
+and the episode is past-design-blind; too much and the context-rot problem is
 recreated one level up. This is learned by doing, not designed in advance.
+Automated orchestration remains last, after the manually driven boundary is
+validated.
 
 ## The handoff → compaction insight
 

@@ -156,22 +156,33 @@ loop last.
   native `/handoff` → focused compaction → execute; see
   [docs/handoff-chain.md](docs/handoff-chain.md). This is the first codified
   seam, not completion of 4a or the episode orchestrator.
-- **4b — episode mechanics.** A spawnable, reapable episode child (CWD =
-  project root); invocation-tier state in its REPL; living-doc updates flow
-  back so the next episode is past-design-aware. (Note: the safe two-message
-  spawn protocol may be unnecessary if we drive manually — a spawned episode
-  may just start with "run prepare, then do X." Decide from evidence, not up
-  front.)
-- **4c — conversation → episode boundary.** `/spec-it-out` is the trigger.
-  Learn what context crosses the boundary: too little = past-design-blind;
-  too much = rot recreated one level up.
+- **4b — episode mechanics.** A spawnable, reapable episode session with a
+  dedicated feature branch and git worktree as its CWD; invocation-tier state
+  in its REPL; a durable identity linking it to its owning project
+  conversation; living-doc updates flow back so the next episode is
+  past-design-aware. The episode stays resumable through implementation, PR
+  review, updates, and rebasing, then its owner reaps the session and worktree
+  after merge or explicit abandonment. (Note: the safe two-message spawn
+  protocol may be unnecessary if we drive manually — decide from evidence,
+  not up front.)
+- **4c — conversation → episode boundary.** `/design` and `/spec-it-out`
+  initiate the boundary with different starting assumptions, but both finish
+  their interview before asking whether to incubate the specification under
+  `.ralph/plans/future/` or promote it into a worktree-isolated episode. Learn
+  what context crosses the promoted boundary: too little = past-design-blind;
+  too much = rot recreated one level up. Manually prove that the owning
+  conversation can retain the returned session identity, coordinate the
+  episode through its PR lifecycle, recognize archived plans as a readiness
+  claim, decide whether to merge, and clean up safely.
 - **4d — `upgrade-this-to-prime-agent` command.** Convert a Ralph
   codex/claude-skills project to prime-agent skills without manual
   copy-paste; dogfood on the ralph repo.
 
-Done when: a brainstorm conversation has transitioned via `/spec-it-out` into
-an episode that shipped a real feature on the sandboxed runtime, with the
-context-crossing decision documented — all manually driven.
+Done when: a project conversation has completed a `/design` or
+`/spec-it-out` interview, made the explicit future-versus-episode disposition,
+and—when promoted—coordinated a worktree-rooted episode that shipped a real
+feature on the sandboxed runtime through merge and safe cleanup, with the
+context-crossing and ownership decisions documented — all manually driven.
 
 ## Phase 5 — Communication channels
 
