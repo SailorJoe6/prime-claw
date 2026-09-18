@@ -95,7 +95,8 @@ not approve a gate solely because the episode reports success. A decision is one
 of:
 
 - **approve** — record the evidence and authorize the next transition;
-- **revise** — return structured blocking or advisory findings to the episode;
+- **revise** — adjudicate and durably incorporate findings before returning the
+  same phase or slice to execution;
 - **escalate** — pause automation and call the human with a complete decision
   packet; or
 - **abandon** — enter the explicit safe-abandonment path when authorized.
@@ -104,6 +105,24 @@ Findings need stable identities, severity, evidence, affected requirement or
 slice, and acceptance condition. Re-review occurs against a new exact commit and
 records whether each prior finding is satisfied, improved, unchanged, rejected
 with evidence, or superseded.
+
+An accepted material finding is product knowledge, not transient reviewer
+conversation. Before revision begins, the conversation and episode shall trace
+it into the authoritative artifacts appropriate to its meaning:
+
+- a missing or changed behavioral invariant updates `REQUIREMENTS.md`;
+- a changed architectural or safety choice updates `DECISIONS.md` and its
+  requirement traceability;
+- scope, state-machine, or acceptance changes update `SPECIFICATION.md`;
+- implementation and verification work updates `EXECUTION_PLAN.md` and the
+  active slice bead; and
+- the immutable EXPERT report remains linked as evidence with its reviewed
+  commit and finding IDs.
+
+A finding already covered by an existing requirement or decision need not create
+duplicate product prose, but the plan and bead must link it to that authority and
+record its concrete regression acceptance. No failed gate may depend only on a
+transcript, ephemeral message, or external report path.
 
 ## 6. EXPERT reviewer model
 
@@ -152,6 +171,20 @@ a finding to the EXPERT's satisfaction is successful intervention even if the
 next review discovers a different issue. Meaningful but incomplete progress also
 does not count as stagnation.
 
+A failed gate remains on the same specification, plan, or execution slice. The
+conversation first sends the adjudicated findings with an instruction to update
+the authoritative specification bundle, execution plan, and bead as applicable,
+but not to implement yet. It verifies that the resulting durable artifacts name
+the findings, controlling requirements and decisions, exact reviewed commit,
+acceptance conditions, and intended same-slice revision.
+
+Only after that durable update does the conversation start the revision
+iteration through a controlled compaction boundary. The preferred first-release
+path invokes the native `/handoff` with explicit guidance naming the failed gate,
+finding IDs, acceptance conditions, and same phase or slice. Here `/handoff`
+means “prepare the next execute iteration”; it does not imply approval or
+advancement to the next numbered slice.
+
 Two consecutive revisions with no meaningful improvement trigger human
 escalation. The conversation shall reset the stagnation count after meaningful
 progress. The escalation packet must show the finding history, exact commits,
@@ -168,10 +201,12 @@ The conversation shall advance an episode through the episode runtime's real
 registered commands and structured host interfaces. It must not imitate a custom
 slash command by pasting its underlying skill text.
 
-For example, after an approved slice or approved plan, the conversation invokes
-the episode's native `/handoff` through its Prime Agent command/prompt path. The
-command owns handoff preparation and compaction; the project-local extension
-then injects canonical `execute` exactly once after successful compaction.
+For an approved gate, the conversation invokes native `/handoff` to prepare and
+start the next approved phase or slice. For a failed gate, it invokes native
+`/handoff` only after the findings are durably incorporated, with guidance that
+starts another execute iteration for the same phase or slice. The command owns
+handoff preparation and compaction; the project-local extension then injects
+canonical `execute` exactly once after successful compaction.
 
 Every transition requires:
 
@@ -179,8 +214,18 @@ Every transition requires:
 - a unique admission/transition identity;
 - an accepted-command receipt;
 - observation of the expected persisted boundary, such as compaction;
+- inspection of the resulting compaction summary;
+- proof that the summary identifies the correct approved next phase or failed-
+  gate revision, relevant finding IDs, and authoritative durable artifacts;
 - confirmation that the next phase was injected or entered exactly once; and
 - recoverable handling of accepted-but-uncertain or interrupted operations.
+
+Auto-compaction is not an authoritative handoff. The controller must prevent,
+pause, supersede, or otherwise race-proof auto-compaction while a review gate is
+being adjudicated. If auto-compaction races with late findings or produces a
+stale primer, the conversation must not advance on that summary. It shall finish
+persisting the findings and run a controlled guided handoff whose verified
+summary supersedes the stale one.
 
 Messages used for collaboration are not interchangeable with command dispatch.
 Simultaneous TUI observation must remain safe, and operator steering takes
@@ -253,6 +298,8 @@ Acceptance requires automated tests and concurrent dogfood runs proving that a
 conversation can create and autonomously drive one episode through the entire
 lifecycle while another conversation does the same in the same project. Tests
 must show independent evidence review, fresh project-scoped EXPERT invocations,
-risk-triggered reviews, stagnation escalation, unavailable-EXPERT escalation,
-exactly-once native transitions, restart recovery, operator interruption, safe
-merge authorization, and terminal cleanup without cross-episode interference.
+risk-triggered reviews, durable finding incorporation, same-slice revision,
+stagnation escalation, unavailable-EXPERT escalation, controlled compaction
+summary verification, auto-compaction race recovery, exactly-once native
+transitions, restart recovery, operator interruption, safe merge authorization,
+and terminal cleanup without cross-episode interference.

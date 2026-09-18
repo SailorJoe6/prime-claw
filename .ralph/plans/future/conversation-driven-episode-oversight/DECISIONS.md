@@ -131,3 +131,24 @@
 **Satisfies:** R-CO-7, R-CO-10, R-CO-24, R-CO-26, R-CO-31, R-CO-34, R-CO-38, R-CO-41, R-CO-42, R-CO-43.
 
 **Rationale:** The system's value is safe autonomous coordination under real concurrency. Happy-path unit tests cannot prove that contract.
+
+## D-CO-17 — Persist findings before a guided same-gate handoff
+
+**Decision:** A failed gate does not immediately resume implementation. The
+conversation first has the episode encode accepted material findings into the
+authoritative requirements, decisions, specification, execution plan, and bead
+as applicable. After verifying that durable state, it invokes native `/handoff`
+with explicit same-gate revision guidance, inspects the resulting compaction
+summary, and only then permits canonical `execute` to begin the revision.
+Auto-compaction cannot substitute for or authorize this transition.
+
+**Satisfies:** R-CO-9, R-CO-12, R-CO-15, R-CO-16, R-CO-44, R-CO-45,
+R-CO-46, R-CO-47, R-CO-48, R-CO-49.
+
+**Rationale:** In the Slice 2 POC, EXPERT findings were persisted while an
+auto-compaction was in flight. The later compaction summary omitted every
+finding and incorrectly named Slice 3 as next, even though the episode
+subsequently received the findings and revised Slice 2. The outcome was correct
+by message timing, not by a trustworthy primer. Product knowledge from review
+must outlive transcripts, and a verified guided handoff must establish the next
+execution context.

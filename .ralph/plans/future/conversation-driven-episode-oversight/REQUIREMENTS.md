@@ -53,6 +53,9 @@ explicit extension and must not weaken a gate.
 - **R-CO-27 (GATE) — Progress reset.** Meaningful improvement resets the consecutive-stagnation counter.
 - **R-CO-28 (GATE) — Complete escalation packet.** Human escalation includes exact commits, findings, attempts, evidence, tests, EXPERT reports, and requested disposition.
 - **R-CO-29 (GATE) — Immediate safety escalation.** Missing authority/credentials, unsafe merge or cleanup ambiguity, and material scope/safety changes pause for the human.
+- **R-CO-44 (GATE) — Durable material findings.** Every accepted material EXPERT or owner finding is persisted before revision with stable ID, reviewed commit, evidence, controlling requirement/decision, and acceptance condition; transcript or report-only findings are insufficient.
+- **R-CO-45 (GATE) — Authoritative artifact incorporation.** Findings update requirements and decisions when they expose missing or changed product invariants, update specification scope/state/acceptance when applicable, and always update the execution plan and active bead with concrete regression work. Existing authority may be linked instead of duplicated.
+- **R-CO-46 (GATE) — Same-gate revision.** A failed review remains on the same specification, plan, or slice. Implementation does not resume and later work does not start until finding incorporation is verified.
 
 ## Commands and phase progression
 
@@ -61,6 +64,9 @@ explicit extension and must not weaken a gate.
 - **R-CO-32 (GATE) — Handoff chain.** Approved work advances through native `/handoff`, successful compaction, and exactly one canonical `execute` injection.
 - **R-CO-33 (GATE) — One vertical slice.** Each execute phase performs one bounded vertical slice and stops for review.
 - **R-CO-34 (GATE) — Operator precedence.** TUI observation is safe and operator steering/pause takes precedence over autonomous advancement.
+- **R-CO-47 (GATE) — Guided revision handoff.** After durable finding incorporation, a failed gate advances to its next same-gate execute iteration through native `/handoff` guidance naming the findings and acceptance conditions; handoff does not imply approval or numbered-slice advancement.
+- **R-CO-48 (GATE) — Verified compaction primer.** The conversation verifies that the resulting compaction summary names the correct next phase or same-gate revision, finding IDs, and authoritative artifacts before allowing execute to proceed.
+- **R-CO-49 (GATE) — Auto-compaction race safety.** Auto-compaction cannot authorize progression. The controller prevents, pauses, supersedes, or recovers any compaction that races with gate adjudication or omits late findings, then establishes a verified controlled primer.
 
 ## Merge, cleanup, and safety
 
