@@ -1,9 +1,9 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — Slices 4P and 4R complete; generic routed write/push Slice 4B is NEXT; optional local-Qwen remains ready after preflight
+**Status:** ACTIVE — Slices 4P and 4R complete; operator-required local-Qwen Slice 4A is NEXT; Slice 4B is blocked on 4A by operator ordering
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
-**Date:** 2026-09-11 · **Provider defaults and brain-repo contract revised:** 2026-09-17
+**Date:** 2026-09-11 · **Provider, brain-repo, and operator-local Qwen ordering revised:** 2026-09-17
 
 This plan implements the Phase 3a spec as **vertical slices** (Cockburn elephant-carpaccio):
 each slice ends in a *working capability + passing tests + committed & pushed*, and retires a
@@ -63,8 +63,8 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
 | **S4P** | Portable no-config provider defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **COMPLETE** — 177 tests + hermetic provider-default dry-run PASS |
 | **S4R** | Require explicit per-operator brain repository; remove personal tracked/fallback repo identity | R3a-1, R3a-5, R3a-9, R3a-16 | **COMPLETE** — 228 tests + operator-local dry-run PASS; bead `prime-claw-zwg.2` |
-| **S4A** | Optional operator-local home `Qwen3-Embedding-8B`/4096 override, non-destructive | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **READY TO RESUME AFTER PREFLIGHT** — partial candidate preserved; Spark recovery confirmed |
-| **S4B** | One routed write + push-back round-trip to the explicitly configured operator repo | R3a-4, R3a-16 | **NEXT** — bead `prime-claw-zwg.4`; gateway profile; local-Qwen is optional |
+| **S4A** | Operator-required local `Qwen3-Embedding-8B`/4096 profile, non-destructive build and cutover | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **NEXT / P0** — bead `prime-claw-zwg.5`; service healthy; exact preflight first; partial candidate preserved |
+| **S4B** | One routed write + push-back round-trip to the explicitly configured operator repo | R3a-4, R3a-16 | **BLOCKED ON S4A BY OPERATOR ORDERING** — bead `prime-claw-zwg.4`; generic gateway path remains technically independent |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
 ---
@@ -266,21 +266,21 @@ or to a public starter/example brain.
 supplies their own repository. Ignored-local and environment selections reach the existing clone
 path; malformed settings fail before external boundaries. Proven by 50 focused tests, 228 canonical
 tests, and an operator-local create dry-run. Verdict:
-[3a-slice4r.md](../../docs/derisk/3a-slice4r.md). Inventory R3a-16 is proven; Slice 4B is ready.
+[3a-slice4r.md](../../docs/derisk/3a-slice4r.md). Inventory R3a-16 is proven; Slice 4A is the operator-priority gate before 4B.
 
 ---
 
-## Slice 4A — Optional home-Qwen embedding override (R3a-12, R3a-14)
+## Slice 4A — Operator-local home-Qwen override (required for this operator; R3a-12, R3a-14)
 
-**Execution status (revised 2026-09-17): READY TO RESUME AFTER PREFLIGHT.** Bounded
+**Execution status (revised 2026-09-17): NEXT / P0 (`prime-claw-zwg.5`).** Bounded
 objective 4A.1 is complete: ignored local config merge, strict locked-setting validation,
 private-endpoint-safe candidate policy rendering, and `embedding-preflight`. Slice 4A.2a's
 isolated build path is implemented; its live sync stopped when the Spark crashed. The operator
-now confirms the Spark is alive and ready. No build has restarted. Slice 4P is complete and
-Slice 4R is complete and Slice 4B is the tracked next objective; 4A.2a may resume as an
-explicitly selected local-profile task only after the exact-model compatibility/preflight gate passes.
+now confirms the exact embedding service is healthy again. No preflight or build has restarted.
+Because this operator requires local Qwen, finish and accept 4A before starting 4B. Resume only
+after the exact-model compatibility/preflight gate passes.
 
-**Recovered external blocker.** The build process remains stopped, the tracked gateway/default
+**Service recovered; acceptance still pending.** The build process remains stopped, the tracked gateway/default
 policy is restored, and the partial `gbrain_qwen4096` database is preserved at 350 source pages /
 1,140 embedded chunks, all 4096d, with no source bookmark. The canonical fingerprint is
 unchanged and no cutover occurred. Resume safely with compatibility/preflight first, then
@@ -344,14 +344,16 @@ non-use, cutover result, and rollback readiness. Never record the private endpoi
 dimensions; semantic retrieval passes; the old 1536 database remains intact for rollback; no
 corporate embedding credential/provider/path is used by that local profile. The tracked
 Zendesk AI-gateway default remains available for operators who did not select the override.
-Only then may Joe run a separate acceptance pass on the local-Qwen profile. Generic Slice 4B
-uses the portable gateway profile after Slice 4P and is not blocked by the Spark.
+The generic Slice 4B gateway path remains technically independent. For this operator, however,
+local Qwen is required, so successful 4A acceptance and cutover now block starting 4B.
 
 ---
 
 ## Slice 4B — One routed write + push-back round-trip (R3a-4)
 
-**Status: NEXT.** Bead `prime-claw-zwg.4` is open.
+**Status: BLOCKED ON SLICE 4A BY OPERATOR ORDERING.** Bead `prime-claw-zwg.4` depends on
+P0 bead `prime-claw-zwg.5`. This is not a generic platform dependency: the gateway profile could
+run 4B, but this operator requires the local-Qwen profile to be accepted first.
 
 **Goal.** The agent writes **one** durable fact into the in-sandbox brain, routed per
 `docs/information-architecture.md` (brain = canonical store for domain facts), via
@@ -360,8 +362,8 @@ real repo (credential-safe, Slice 1 plumbing).
 
 **Approach.**
 
-- Run the generic acceptance on the fresh portable gateway profile after required Slice 4R. A local-Qwen
-  acceptance rerun is optional and waits for Slice 4A; it is not a prerequisite for S4B.
+- After Slice 4A accepts and cuts over the operator's local-Qwen profile, run the routed-write
+  acceptance on that selected profile. Preserve the portable gateway path as the generic default.
 - The write is a **test artifact**: a keep-worthy `projects/` stub describing prime-claw itself
   (markdown is source-of-truth, so trivially deletable). The operator confirmed exact slug
   `projects/prime-claw` on 2026-09-16.
@@ -404,9 +406,9 @@ committed; `bd` notes updated; Phase 3a bead ready to close.
 - **Custom github profile is the main new mechanism** (push not in builtin). If profile import +
   provider swap proves unreliable, fallback: host-mediated push (agent stages commits; a host-side
   step pushes) — but that weakens the "agent pushes from inside" goal, so prefer the L7 profile.
-- **Routed write/push is the next unblocked risk.** Provider defaults and explicit brain-repository
-  setup are now proven. Joe's optional home-Qwen complete 4096 rebuild remains separate and may
-  resume only after exact-model preflight. Never auto-switch vector spaces or accept keyword-only
+- **Local-Qwen completion is the next operator-priority risk.** Provider defaults and explicit
+  brain-repository setup are proven. The exact service is operator-confirmed healthy, but resume
+  only after exact-model preflight. Never auto-switch vector spaces or accept keyword-only
   retrieval; preserve each prior database until its replacement profile passes every gate.
 - **Recreate wipes `/sandbox`** → re-run `converge`; the brain re-clones (idempotent) on converge.
 - **Generic platform (R3a-9/R3a-16):** brain repository identity is mandatory ignored-local or
