@@ -1,0 +1,133 @@
+# Decisions — Conversation-driven episode oversight
+
+> **Status:** incubated future decisions.
+> **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
+> **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
+
+## D-CO-1 — Conversations, not project contexts, own episodes
+
+**Decision:** `PROJECT_CONTEXT` remains the managed canonical Git boundary. The `UNIVERSAL_AGENT` launches `PROJECT_CONVERSATION` agents inside it, and each conversation creates and drives its own episode.
+
+**Satisfies:** R-CO-1, R-CO-2, R-CO-3.
+
+**Rationale:** The current POC is one conversation coordinating one durable worktree episode. Adding a mandatory context agent would insert an unproven control layer.
+
+## D-CO-2 — Automate the complete lifecycle
+
+**Decision:** The overseer covers disposition through merge or abandonment and cleanup rather than automating only the execute loop.
+
+**Satisfies:** R-CO-3, R-CO-4, R-CO-35, R-CO-36, R-CO-37.
+
+**Rationale:** The difficult judgment and recovery boundaries occur before, during, and after execution. A partial controller would leave the most important ownership transitions implicit.
+
+## D-CO-3 — Grant authority only after manual proof
+
+**Decision:** The conversation ultimately has autonomous gate and transition authority, while the operator retains interrupt and takeover control. Release proceeds through staged dogfood after repeated manual runs.
+
+**Satisfies:** R-CO-4, R-CO-5, R-CO-34, R-CO-41, R-CO-42.
+
+**Rationale:** The operator is currently teaching the workflow by driving it. The purpose of the POC is to discover safe evidence and decision contracts before removing per-gate confirmation.
+
+## D-CO-4 — Narrow the first release to one episode per conversation
+
+**Decision:** One conversation drives at most one active episode initially, while many project conversations and their episodes operate concurrently. Multiple episodes per conversation remain a planned extension.
+
+**Satisfies:** R-CO-6, R-CO-7, R-CO-8, R-CO-38.
+
+**Rationale:** Worktrees exist to permit broad project concurrency. Limiting owner cardinality simplifies the first state machine without weakening concurrency across users or conversations.
+
+## D-CO-5 — Persist an evidence-bound oversight state machine
+
+**Decision:** Store episode identity, phase, reviewed commits, findings, approvals, command receipts, escalation, and terminal state durably with atomic idempotent transitions.
+
+**Satisfies:** R-CO-9, R-CO-10, R-CO-11, R-CO-12, R-CO-16.
+
+**Rationale:** Compaction, restarts, and daemon recovery are normal. Neither transcript interpretation nor live Python objects are safe lifecycle authorities.
+
+## D-CO-6 — The conversation independently owns gate decisions
+
+**Decision:** The episode supplies a commit-bound evidence packet; the conversation verifies it and records approve, revise, escalate, or abandon with structured findings.
+
+**Satisfies:** R-CO-11, R-CO-13, R-CO-14, R-CO-15, R-CO-17.
+
+**Rationale:** Self-reported completion is useful routing information but cannot be the approval mechanism. Stable findings also make revision progress measurable.
+
+## D-CO-7 — Make EXPERT expertise project-scoped but invocations fresh
+
+**Decision:** Version an EXPERT profile with the project, then create a clean, short-lived reviewer for each gate using the strongest operator-authorized model.
+
+**Satisfies:** R-CO-18, R-CO-19, R-CO-20.
+
+**Rationale:** Project-scoped knowledge lets the architect role evolve with the codebase. Fresh invocations avoid context rot, cross-episode contamination, serialization bottlenecks, and attachment to prior approvals.
+
+## D-CO-8 — Keep the EXPERT advisory and independent
+
+**Decision:** EXPERT reviewers are read-only, review exact commits, return structured reports to the conversation, and possess no episode or lifecycle mutation authority.
+
+**Satisfies:** R-CO-21, R-CO-38, R-CO-39, R-CO-40.
+
+**Rationale:** The conversation must adjudicate multiple sources of evidence. Allowing a reviewer to steer or edit the subject would weaken independence and blur ownership.
+
+## D-CO-9 — Require EXPERT review at core gates and risky slices
+
+**Decision:** Specifications, plans, and final merge candidates always receive EXPERT review. Slice review is triggered by the enumerated risk, novelty, breadth, evidence, disagreement, and failure conditions.
+
+**Satisfies:** R-CO-22, R-CO-23, R-CO-35.
+
+**Rationale:** Mandatory architectural gates address correlated blind spots. Risk-based slice review controls model cost without treating routine, well-proven work like high-risk change.
+
+## D-CO-10 — Fail closed when the EXPERT is unavailable
+
+**Decision:** Required EXPERT unavailability pauses the controller and calls the human; the default model is not a silent substitute.
+
+**Satisfies:** R-CO-20, R-CO-24, R-CO-28.
+
+**Rationale:** A fallback with similar capabilities would falsely claim the independent high-capability review the gate requires.
+
+## D-CO-11 — Escalate stagnation, not discovery
+
+**Decision:** Two consecutive revisions with no meaningful improvement call the human. Meaningful progress resets the counter, and a new finding after a successful fix is evidence that review is working rather than a failure.
+
+**Satisfies:** R-CO-25, R-CO-26, R-CO-27, R-CO-28, R-CO-29.
+
+**Rationale:** Counting findings would punish thorough review. Counting consecutive non-improvement detects a stuck loop while allowing iterative hardening.
+
+## D-CO-12 — Dispatch real commands through the episode runtime
+
+**Decision:** The conversation checks the episode command catalog and invokes custom commands through Prime Agent's command/prompt path with unique admission and receipts. Collaboration messages do not substitute for command execution.
+
+**Satisfies:** R-CO-30, R-CO-31, R-CO-32, R-CO-34.
+
+**Rationale:** The POC remotely invoked the registered `/handoff`; its extension prepared compaction and injected canonical `execute`. Pasting the handoff skill would bypass the behavior under test.
+
+## D-CO-13 — Review one bounded slice before advancing
+
+**Decision:** Each execute phase completes one vertical slice and stops. The conversation verifies the pushed commit and required evidence before authorizing another native `/handoff`.
+
+**Satisfies:** R-CO-13, R-CO-17, R-CO-23, R-CO-32, R-CO-33.
+
+**Rationale:** Bounded slices create frequent inspectable checkpoints and keep correction costs low. Approval tied to a commit prevents post-review drift.
+
+## D-CO-14 — Bind merge authorization to the final reviewed commit
+
+**Decision:** The conversation may merge autonomously only after complete readiness and mandatory EXPERT review of the exact candidate. Any candidate change reopens the gate.
+
+**Satisfies:** R-CO-16, R-CO-35, R-CO-36.
+
+**Rationale:** “The branch was approved” is unsafe when the branch can move. Commit-bound authority makes the merge decision reproducible.
+
+## D-CO-15 — Clean up only after terminal disposition
+
+**Decision:** Retire the episode and remove its worktree only after verified merge or explicit abandonment, while preserving durable oversight evidence.
+
+**Satisfies:** R-CO-37, R-CO-38, R-CO-39.
+
+**Rationale:** Review fixes and rebases require the episode root. Terminal evidence is still needed after the physical worktree is gone.
+
+## D-CO-16 — Prove concurrency, recovery, and intervention before release
+
+**Decision:** Acceptance requires automated coverage and disposable concurrent dogfood, including restart recovery, operator interruption, EXPERT failure, stagnation, exactly-once transitions, merge, cleanup, and cross-episode isolation.
+
+**Satisfies:** R-CO-7, R-CO-10, R-CO-24, R-CO-26, R-CO-31, R-CO-34, R-CO-38, R-CO-41, R-CO-42, R-CO-43.
+
+**Rationale:** The system's value is safe autonomous coordination under real concurrency. Happy-path unit tests cannot prove that contract.
