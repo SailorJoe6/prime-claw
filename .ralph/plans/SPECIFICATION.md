@@ -1,15 +1,16 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — Slices 4P and 4R complete; operator-required local-Qwen Slice 4A is NEXT; Slice 4B follows
+**Status:** ACTIVE — Slices 4P and 4R complete; operator-required local-Qwen Slice 4A build is IN PROGRESS; Slice 4B follows
 **Beads:** `prime-claw-zwg` (P1)
-**Date:** 2026-09-11 · **Provider, brain-repo, and operator-local Qwen ordering revised:** 2026-09-17
+**Date:** 2026-09-11 · **Slice 4A execution updated:** 2026-09-18
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
 
 
-> **Qwen service recovery and ordering confirmed (2026-09-17):** the operator reports the exact
-> Spark-hosted embedding service is healthy again. No preflight or build has restarted. Slice 4A
-> is now the highest priority for this operator: rerun the exact-model compatibility/preflight
-> gate, resume and accept the preserved isolated candidate, then cut over safely. Slice 4B remains
+> **Qwen build resumed (2026-09-18):** the exact-model compatibility gate passed: an omitted
+> dimensions request returned 4096 values while explicit 4096 and 1536 requests were rejected as
+> required. Both sanitized local preflights passed, and the isolated candidate build resumed from
+> its preserved partial state. Slice 4A remains the highest priority for this operator; acceptance
+> and cutover have not started. Slice 4B remains
 > technically independent on the portable gateway profile, but is deferred until 4A because this
 > operator requires local Qwen. The canonical database/config are unchanged; no cutover occurred.
 
@@ -55,9 +56,9 @@ index, and let a sandboxed Prime Agent answer with citations. Slice 4R removes r
 from tracked defaults and enforces explicit operator setup before repository-dependent actions.
 That 1536-dimensional AI-gateway index is the implemented portable default profile under R3a-15. For this operator's explicit local override, Slice 4A.1
 validates the home-Qwen endpoint contract and 4A.2 has a preserved partial 4096-dimensional
-candidate. The exact Spark-hosted embedding service is now operator-confirmed healthy, but
-no preflight or build has restarted. Because this operator requires local Qwen, completing and
-accepting Slice 4A is the next task; the routed write/push proof follows in Slice 4B.
+candidate. The exact-model compatibility and sanitized configuration preflights passed on
+2026-09-18, and the isolated candidate build resumed under a monitored background process.
+Because this operator requires local Qwen, completing and accepting Slice 4A remains the task; the routed write/push proof follows in Slice 4B.
 Phase 2 proved the *container*; Phase 3a is finishing the *brain-hosting claw*.
 
 ## 2. The strategic frame (why this phase, this shape)

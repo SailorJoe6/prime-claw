@@ -1,9 +1,9 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — Slices 4P and 4R complete; operator-required local-Qwen Slice 4A is NEXT; Slice 4B is blocked on 4A by operator ordering
+**Status:** ACTIVE — Slices 4P and 4R complete; operator-required local-Qwen Slice 4A build is IN PROGRESS; Slice 4B is blocked on 4A by operator ordering
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
-**Date:** 2026-09-11 · **Provider, brain-repo, and operator-local Qwen ordering revised:** 2026-09-17
+**Date:** 2026-09-11 · **Slice 4A execution updated:** 2026-09-18
 
 This plan implements the Phase 3a spec as **vertical slices** (Cockburn elephant-carpaccio):
 each slice ends in a *working capability + passing tests + committed & pushed*, and retires a
@@ -63,7 +63,7 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
 | **S4P** | Portable no-config provider defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **COMPLETE** — 177 tests + hermetic provider-default dry-run PASS |
 | **S4R** | Require explicit per-operator brain repository; remove personal tracked/fallback repo identity | R3a-1, R3a-5, R3a-9, R3a-16 | **COMPLETE** — 228 tests + operator-local dry-run PASS; bead `prime-claw-zwg.2` |
-| **S4A** | Operator-required local `Qwen3-Embedding-8B`/4096 profile, non-destructive build and cutover | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **NEXT / P0** — bead `prime-claw-zwg.5`; service healthy; exact preflight first; partial candidate preserved |
+| **S4A** | Operator-required local `Qwen3-Embedding-8B`/4096 profile, non-destructive build and cutover | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **IN PROGRESS / P0** — bead `prime-claw-zwg.5`; exact compatibility/preflight passed; isolated build resumed |
 | **S4B** | One routed write + push-back round-trip to the explicitly configured operator repo | R3a-4, R3a-16 | **BLOCKED ON S4A BY OPERATOR ORDERING** — bead `prime-claw-zwg.4`; generic gateway path remains technically independent |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
@@ -272,20 +272,20 @@ tests, and an operator-local create dry-run. Verdict:
 
 ## Slice 4A — Operator-local home-Qwen override (required for this operator; R3a-12, R3a-14)
 
-**Execution status (revised 2026-09-17): NEXT / P0 (`prime-claw-zwg.5`).** Bounded
-objective 4A.1 is complete: ignored local config merge, strict locked-setting validation,
-private-endpoint-safe candidate policy rendering, and `embedding-preflight`. Slice 4A.2a's
-isolated build path is implemented; its live sync stopped when the Spark crashed. The operator
-now confirms the exact embedding service is healthy again. No preflight or build has restarted.
-Because this operator requires local Qwen, finish and accept 4A before starting 4B. Resume only
-after the exact-model compatibility/preflight gate passes.
+**Execution status (revised 2026-09-18): IN PROGRESS / P0 (`prime-claw-zwg.5`).** Bounded
+objective 4A.1 is complete. On 2026-09-18 the exact-model compatibility gate passed: an omitted
+`dimensions` request returned 4096 values, while explicit 4096 and 1536 requests both returned
+HTTP 400 as required. Dry-run and live sanitized `embedding-preflight` passed; 35 focused offline
+tests passed. The isolated `embedding-build` then resumed under a monitored background process.
+Acceptance and cutover have not started. Because this operator requires local Qwen, finish and
+accept 4A before starting 4B.
 
-**Service recovered; acceptance still pending.** The build process remains stopped, the tracked gateway/default
-policy is restored, and the partial `gbrain_qwen4096` database is preserved at 350 source pages /
+**Build resumed; acceptance still pending.** Immediately before resume, the tracked gateway/default
+policy was restored and the partial `gbrain_qwen4096` database remained at 350 source pages /
 1,140 embedded chunks, all 4096d, with no source bookmark. The canonical fingerprint is
-unchanged and no cutover occurred. Resume safely with compatibility/preflight first, then
-`bin/prime-claw embedding-build`; never drop or mutate either database. Evidence:
-`docs/evidence/embedding-build-interrupted-20260916T234215Z.json`.
+unchanged and no cutover occurred. The resumed build is monitored by an agent-owned heartbeat;
+do not start a second build, drop either database, or treat partial counts as acceptance. Baseline
+evidence: `docs/evidence/embedding-build-interrupted-20260916T234215Z.json`.
 
 **Goal.** Support the operator's explicitly selected home-network OpenAI-compatible
 `Qwen3-Embedding-8B` override without changing the portable default. Rebuild the full in-sandbox brain in a

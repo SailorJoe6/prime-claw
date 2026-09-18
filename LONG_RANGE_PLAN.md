@@ -97,17 +97,15 @@ operations: `docs/runbook.md`. Plan set archived to
 
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 
-**Current status (revised 2026-09-17):** Phase 3a Slices 0–3, Slice 4A.1, and the
-portable-default gate (R3a-15 / Slice 4P) are complete. Checked-in no-config defaults use Zendesk
-AI Gateway for both concerns: Kimi K3 inference and `text-embedding-3-large`/1536 embeddings;
-valid host, operator-local, and environment choices override each independently. Mandatory
-Slice 4R is complete: the personal tracked/fallback brain repository is removed and every operator
-must configure their own repository before mutation. Generic routed write/push acceptance (Slice
-4B) is next. On 2026-09-17 the operator confirmed the DGX Spark is alive and
-ready again. Joe's optional local-Qwen Slice 4A.2a may resume
-after its exact-model compatibility/preflight gate; no build has restarted. Its partial
-4096-dimensional candidate is preserved, the tracked gateway/default policy is restored, the
-canonical database is unchanged, and no cutover occurred.
+**Current status (revised 2026-09-18):** Phase 3a Slices 0–3 and portable-default Slice 4P
+are complete. Mandatory Slice 4R is also complete: every operator must explicitly configure their
+brain repository. Checked-in no-config defaults remain Zendesk AI Gateway Kimi K3 inference plus
+`text-embedding-3-large`/1536 embeddings, with independent explicit overrides. For Joe's required
+local profile, the exact `Qwen3-Embedding-8B` compatibility and sanitized configuration preflights
+passed and the preserved isolated 4096-dimensional candidate build resumed. Acceptance and atomic
+cutover have not started; the canonical 1536 database remains unchanged for rollback. Slice 4A is
+the active P0 and operator-ordering gate; generic routed write/push Slice 4B remains technically
+independent but is deferred until 4A is accepted.
 
 The riskiest integration, done as early as possible and deliberately thin but
 *whole*: a prime-agent session inside the sandbox, connected to gbrain, that
