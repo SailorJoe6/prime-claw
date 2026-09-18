@@ -1,27 +1,27 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** ACTIVE — Slice 4A service and watchdog gates recovered; exact probes precede one isolated resume; Slice 4B remains deferred
+**Status:** BLOCKED — Slice 4A stopped safely during incomplete DGX thermal recovery; no inference traffic until operator clearance; Slice 4B remains deferred
 **Beads:** `prime-claw-zwg` (P1)
 **Date:** 2026-09-11 · **Slice 4A execution updated:** 2026-09-18
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
 
 
-> **Qwen service recovered (2026-09-18):** the operator fixed the Spark thermal-containment
-> latch retry and confirmed the hardened service is ready. The preserved candidate remains at
-> 439 pages / 1,459 current 4096d chunks without a bookmark; canonical state is unchanged. The
-> prime-claw-owned durable-progress watchdog now uses a dedicated process group, whole-group
-> TERM/KILL liveness, a durable database watermark, bounded progress queries, and a parent-visible
-> stall result. Independent review found no remaining high/medium issues; executable regressions
-> and all 231 canonical tests pass. Host and in-sandbox exact-model probes both returned HTTP 200
-> with exactly 4096 values; the canonical policy was restored and zero sync processes existed at
-> the pre-start gate. Exactly one isolated resume is now authorized. No acceptance or cutover has
-> started.
+> **Qwen thermal recovery blocker (2026-09-18):** after both 200/4096 resume probes passed,
+> exactly one isolated build advanced the preserved candidate to 952 pages / 2,863 valid 4096d
+> chunks. The operator then reported that thermal containment remained active, admission was still
+> recovering, Flash was cycling, and the embedding container had exited. At the operator's request,
+> prime-claw immediately stopped all inference traffic. Buffered output showed an
+> `upstream_unavailable` failure and gbrain internal retry waits of about 71 and 47 seconds; the
+> prime-claw durable-progress watchdog did not fire. The build exited 143, canonical policy/state
+> were restored unchanged, zero gbrain processes remain, and the heartbeat is cancelled. Do not
+> probe or restart until the operator explicitly clears the DGX engine transition. No acceptance
+> or cutover has started.
 
 
 This document is the summary and index for the work. It is accompanied by:
 
-- **[REQUIREMENTS.md](REQUIREMENTS.md)** — the specific requirements discovered during discussion.
-- **[DECISIONS.md](DECISIONS.md)** — design decisions, each traced to the requirement(s) it satisfies.
+- **[REQUIREMENTS.md](../REQUIREMENTS.md)** — the specific requirements discovered during discussion.
+- **[DECISIONS.md](../DECISIONS.md)** — design decisions, each traced to the requirement(s) it satisfies.
 
 This is a specification of *what* must change and *why*. It is not an execution plan; that comes later.
 

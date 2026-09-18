@@ -1,6 +1,6 @@
 # Phase 3a Slice 4A — optional home-Qwen embedding override
 
-**Status:** IN PROGRESS — 4A.1 complete; service and watchdog gates recovered; exact probes precede one 4A.2a resume
+**Status:** BLOCKED — 4A.1 complete; one safe resume stopped during incomplete DGX thermal recovery; no inference traffic until operator clearance
 **Decision:** D3a-L
 **Requirements:** R3a-12, R3a-14
 **Evidence:** [`docs/evidence/embedding-preflight-20260916T191526Z.json`](../evidence/embedding-preflight-20260916T191526Z.json)
@@ -135,3 +135,18 @@ read-only gate found zero gbrain processes, canonical state unchanged at 1,059 p
 1536-dimensional chunks, and the candidate preserved at 439 pages / 1,459 valid 4096-dimensional
 chunks without a bookmark. Evidence:
 [`embedding-resume-preflight-20260918T135418Z.json`](../evidence/embedding-resume-preflight-20260918T135418Z.json).
+
+
+## Thermal recovery cycle — operator-stopped safely
+
+The safe-resume probes passed and one isolated build advanced the candidate to 952 pages / 2,863
+valid 4096-dimensional chunks. The operator then reported the DGX engine transition remained in
+thermal containment rather than reaching a clean recovery. Prime-claw immediately terminated the
+candidate sync group and sent no further inference probes. Buffered output revealed one
+`upstream_unavailable` failure and gbrain internal retry waits of approximately 71 and 47 seconds;
+the prime-claw durable-progress watchdog did not fire.
+
+The build exited 143. Canonical policy/config/database are restored unchanged, zero gbrain
+processes remain, the heartbeat is cancelled, and no cutover occurred. Do not probe or restart
+until explicit operator clearance. Evidence:
+[`embedding-build-thermal-recovery-paused-20260918T141240Z.json`](../evidence/embedding-build-thermal-recovery-paused-20260918T141240Z.json).

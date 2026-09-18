@@ -1,0 +1,63 @@
+{
+  "artifact": "prime-claw Phase 3a Slice 4A operator-paused thermal recovery build",
+  "timestamp_utc": "2026-09-18T14:12:40.624377+00:00",
+  "result": "BLOCKED_SAFE",
+  "operator_action": "Stopped all inference traffic at operator request while DGX engine transition was cycling",
+  "build": {
+    "started_at_utc": "2026-09-18T13:55:13.585572+00:00",
+    "exit_code": 143,
+    "duration_seconds": 1001.281,
+    "watchdog_fired": false,
+    "operator_terminated": true,
+    "last_import_progress": {
+      "processed": 517,
+      "total": 621,
+      "percent": 83,
+      "imported": 513,
+      "skipped": 4,
+      "errors": 4
+    }
+  },
+  "observed_sanitized_failure": {
+    "classification": "upstream_unavailable",
+    "cause_surface": "temporary name-resolution failure to the internal embedding backend during incomplete engine transition",
+    "gbrain_embed_retry_wait_ms": [
+      70958,
+      46919
+    ],
+    "retry_attempts_observed": [
+      "1/5",
+      "2/5"
+    ]
+  },
+  "post_stop_state": {
+    "active_gbrain_processes": 0,
+    "heartbeat_cancelled": true,
+    "canonical_policy_restored": true,
+    "canonical": {
+      "pages": 1059,
+      "chunks": 3031,
+      "embeddings": 3031,
+      "dimensions": 1536,
+      "bookmark": "5a477eaa5b311b9b45324591dd308e83ddcd1ded",
+      "column": "vector(1536)",
+      "config_model": "openai:text-embedding-3-large"
+    },
+    "candidate": {
+      "pages": 952,
+      "chunks": 2863,
+      "embeddings": 2863,
+      "bad_vectors": 0,
+      "bookmark": "",
+      "column": "vector(4096)",
+      "hnsw_indexes": 0
+    }
+  },
+  "safety": {
+    "additional_inference_probes_after_pause_request": 0,
+    "database_dropped": false,
+    "cutover_started": false,
+    "private_endpoint_recorded": false,
+    "credentials_accessed": false
+  }
+}

@@ -1,6 +1,6 @@
 # Home-network embedding runtime
 
-> **Status:** OPERATOR-REQUIRED PROFILE IN PROGRESS — service and watchdog gates recovered; exact probes precede one resumed build; no cutover.
+> **Status:** OPERATOR-REQUIRED PROFILE BLOCKED — build stopped during incomplete DGX thermal recovery; no inference traffic until operator clearance; no cutover.
 > **Decision:** D3a-L/M · **Requirements:** R3a-12, R3a-14, R3a-15 · **Plan:** Phase 3a Slices 4P/4A
 
 ## Portable default versus this optional profile
@@ -134,21 +134,19 @@ the gbrain/Bun runtime. It must not provision an embedding credential provider.
 
 ## Current operational status
 
-The operator found and fixed the service-side thermal-control cause. Sustained embedding work had
-reached the real 80°C admission threshold. The first graceful sleep timed out while requests were
-active; after cooling to about 60°C, the positive containment latch correctly remained set, but its
-retry path passed current healthy state instead of the latched sleep action. A slower resource
-snapshot then retained `thermal_admission_denied` for up to 180 seconds after the latch fix.
+The candidate full-sync watchdog and both host and in-sandbox 200/4096 probes passed. Exactly one
+isolated build then advanced the candidate to 952 pages / 2,863 valid 4096-dimensional chunks.
+During the run, the operator observed that DGX thermal containment remained active: admission was
+still recovering, Flash was cycling, proxy ownership was stale after the embedding container
+exited, and service watchdog sleep attempts could not complete the engine transition.
 
-After that window, an exact `Qwen3-Embedding-8B` probe with omitted dimensions returned HTTP 200
-and 4096 values. The earlier candidate remains partial and unaccepted at 439 pages / 1,459 current
-4096-dimensional chunks without a source bookmark. Canonical `gbrain` remains unchanged at 1,059
-pages / 3,031 1536-dimensional chunks; no cutover occurred.
+At the operator's request, prime-claw stopped all inference traffic. Buffered gbrain output showed
+an `upstream_unavailable` error followed by internal retry waits of about 71 and 47 seconds. This
+was gbrain retry behavior; the prime-claw 1,200-second durable-progress watchdog did not fire. The
+build exited 143. Zero gbrain processes remain, the canonical gateway policy and 1,059-page /
+3,031-chunk 1536-dimensional database are unchanged, and the partial candidate has no bookmark.
+The agent heartbeat is cancelled and no cutover occurred.
 
-Prime-claw's durable candidate-DB progress watchdog now covers upstream `gbrain sync --full`,
-including the `import.files` path that the upstream stall knob does not interrupt. Its executable
-regressions and the 231-test canonical suite pass. After host plus in-sandbox 200/4096 probes,
-resume exactly one isolated build. Never drop or modify either database.
-
-Historical failure evidence:
-[`embedding-build-service-unavailable-20260918T045000Z.json`](evidence/embedding-build-service-unavailable-20260918T045000Z.json).
+Do not send host or sandbox inference probes and do not restart embeddings until the operator
+explicitly confirms the DGX engine transition is stable. Evidence:
+[`embedding-build-thermal-recovery-paused-20260918T141240Z.json`](evidence/embedding-build-thermal-recovery-paused-20260918T141240Z.json).

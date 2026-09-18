@@ -97,16 +97,14 @@ operations: `docs/runbook.md`. Plan set archived to
 
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 
-**Current status (revised 2026-09-18): ACTIVE.** Phase 3a Slices 0–3, portable-default
-Slice 4P, and mandatory repository-setup Slice 4R are complete. For Joe's required local profile,
-the failed Qwen resume remains safely preserved at 439 pages / 1,459 current 4096-dimensional
-chunks without a bookmark; canonical gateway/1536 state is unchanged. The operator fixed the
-Spark thermal-containment latch retry, its 180-second resource-snapshot window cleared, and an
-exact-model probe now returns HTTP 200 / 4096 values. Slice 4A has validated a prime-claw-owned
-full-sync durable-progress watchdog with whole-process-group cleanup and false-success prevention.
-The operator confirmed the hardened service is ready; host and in-sandbox exact-model probes now
-gate one isolated resume. Acceptance and cutover remain pending; generic routed write/push Slice
-4B is deferred by operator order.
+**Current status (revised 2026-09-18): BLOCKED SAFELY.** Phase 3a Slices 0–3, portable-default
+Slice 4P, and mandatory repository-setup Slice 4R are complete. The validated watchdog and both
+200/4096 resume probes preceded exactly one isolated Qwen build. It advanced the candidate to 952
+pages / 2,863 valid 4096-dimensional chunks, then the operator reported incomplete DGX thermal
+recovery and requested an immediate traffic stop. Buffered output showed `upstream_unavailable`
+and gbrain retry backoff; the prime-claw watchdog did not fire. The build exited 143, zero gbrain
+processes remain, canonical gateway/1536 policy and database are unchanged, and no cutover occurred.
+Do not probe or restart until operator clearance. Slice 4B remains deferred by operator order.
 
 The riskiest integration, done as early as possible and deliberately thin but
 *whole*: a prime-agent session inside the sandbox, connected to gbrain, that

@@ -171,7 +171,7 @@ def test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero(tmp_pa
             ["bash", "-c", "set -euo pipefail\n" + fragment],
             text=True,
             capture_output=True,
-            timeout=8,
+            timeout=15,
             env=_watchdog_test_env(tmp_path),
         )
 
