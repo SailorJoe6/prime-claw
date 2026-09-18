@@ -38,6 +38,12 @@ if it does not weaken a gate.
 - **R-WE-9 (GATE) — Explicit disposition.** The operator explicitly chooses
   future incubation or immediate episode creation; the system never infers a
   one-way allocation decision from ambiguous text.
+- **R-WE-34 (GATE) — Stable multi-turn automation bridge.** After the skill-
+  guided interview and disposition answer, the model invokes one explicit,
+  structured, model-callable bridge into trusted host automation. It does not
+  reconstruct Git, filesystem, session, or daemon shell commands from prose;
+  tests prove the chosen disposition reaches its automation exactly once across
+  turns.
 
 ## Future incubation
 
@@ -50,7 +56,17 @@ if it does not weaken a gate.
   collision-resistant, and do not overwrite existing content without explicit
   approval.
 - **R-WE-13 (NICE) — Later promotion.** A future bundle can later be promoted
-  through the same episode-creation mechanism with its context retained.
+  through the same episode-creation mechanism with its complete applicable
+  conversation branch retained.
+- **R-WE-35 (GATE) — Serialized canonical mutation.** The future-write path
+  acquires a project-scoped mutation lock, rechecks repository state under that
+  lock, and detects unrelated dirty state before writing, staging, or committing
+  in the canonical checkout.
+- **R-WE-36 (GATE) — Owned commit and clean success.** Future disposition stages
+  only its new bundle, never commits another conversation's changes, and leaves
+  the bundle committed and pushed with a clean canonical checkout on success.
+  If it cannot, it reports the exact durable/dirty/commit/push state and recovery
+  action without claiming success.
 
 ## Episode creation
 
@@ -60,8 +76,11 @@ if it does not weaken a gate.
 - **R-WE-15 (GATE) — Safe Git creation.** Branch and worktree creation is
   non-interactive, validates repository state and destinations, and never
   overwrites or deletes existing resources.
-- **R-WE-16 (GATE) — Conversation inheritance.** The promoted episode receives
-  the relevant source conversation rather than only a generic task summary.
+- **R-WE-16 (GATE) — Exact conversation inheritance.** The first implementation
+  forks the complete active source conversation branch into the promoted
+  episode. A generic handoff summary, selected subset, or fresh session does not
+  satisfy this gate. Selective or compacted inheritance is a possible later
+  refinement only, with separate requirements and operator approval.
 - **R-WE-17 (GATE) — Correct root.** The episode's persisted CWD is the new
   worktree; project-local skills, extensions, settings, and context are
   discovered there.
@@ -113,7 +132,8 @@ if it does not weaken a gate.
   OpenShell L7 credential boundary and does not read Keychain or browser secret
   stores.
 - **R-WE-33 (GATE) — Evidence-backed tests.** Tests cover command registration,
-  canonical markdown loading, interview/disposition ordering, both disposition
-  paths, collisions, partial failures, identity persistence, sibling messaging,
-  archive readiness, and safe cleanup; one real dogfood run proves the complete
-  promoted path.
+  canonical markdown loading, interview/disposition ordering, the multi-turn
+  automation bridge, complete-branch transcript inheritance, both disposition
+  paths, shared-checkout locking and dirty-state ownership, collisions, partial
+  failures, identity persistence, sibling messaging, archive readiness, and safe
+  cleanup; one real dogfood run proves the complete promoted path.

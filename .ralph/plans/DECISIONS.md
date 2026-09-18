@@ -37,10 +37,12 @@ a child.
 
 **Satisfies:** R-WE-4, R-WE-18, R-WE-19, R-WE-23, R-WE-25, R-WE-28.
 
-**Rationale:** `rlm.create_session` produces reachable top-level siblings and
-returns useful IDs, while RLM children have different lifecycle APIs. Product
-ownership should remain stable if Prime Agent's internal family representation
-changes or a coordinator restarts.
+**Rationale:** The POC used `SessionManager.forkFrom(...)` to persist the
+conversation branch and daemon `create(sessionPath=...)` to activate it as a
+reachable top-level sibling. `rlm.create_session(cwd=...)` can also create a
+sibling, but creates a fresh transcript and is therefore not the episode-
+inheritance mechanism. Product ownership must remain stable if Prime Agent's
+internal family representation changes or a coordinator restarts.
 
 ## D-WE-4 — Native commands wrap canonical skills
 
@@ -71,26 +73,37 @@ clear, operator-controlled promotion boundary.
 
 **Decision:** Incubated work goes under
 `.ralph/plans/future/<idea-slug>/` with specification, requirements, and
-decisions documents, and allocates no episode infrastructure.
+decisions documents, and allocates no episode infrastructure. Because project
+conversations share the canonical checkout, the trusted write path serializes
+mutation with a project lock, rejects unrelated dirty state, stages only its own
+bundle, and commits and pushes it. Success requires a clean checkout; failure
+reports the exact state without absorbing another conversation's changes.
 
-**Satisfies:** R-WE-10, R-WE-11, R-WE-12, R-WE-13.
+**Satisfies:** R-WE-10, R-WE-11, R-WE-12, R-WE-13, R-WE-35, R-WE-36.
 
 **Rationale:** Conversation history is enough for raw ideas; the future folder
 preserves ideas worth durable treatment without implying approval to execute.
-Named subfolders permit several candidates concurrently.
+Named subfolders permit several candidates concurrently. The POC observed
+unrelated plan changes appearing in the shared canonical checkout, so ordinary
+`git add`/`commit` from one conversation is not an adequate ownership boundary.
 
 ## D-WE-7 — Promoted episodes inherit conversation and keep the owner alive
 
-**Decision:** Episode creation carries relevant source-conversation context into
-a new durable worktree-rooted session while leaving the project conversation
-active as coordinator. A generic handoff summary alone does not satisfy the
-initial contract.
+**Decision:** Episode creation forks the complete active conversation branch with
+`SessionManager.forkFrom(sourceSessionFile, worktreePath)`, then activates that
+persisted session through daemon `create(sessionPath=...)`, while leaving the
+project conversation active as coordinator. A generic handoff summary, selected
+subset, or fresh sibling does not satisfy the initial contract. Selective or
+pre-compacted inheritance is deferred as a possible deliberate refinement, not
+an implementation alternative for this gate.
 
 **Satisfies:** R-WE-16, R-WE-17, R-WE-18, R-WE-19, R-WE-21, R-WE-25.
 
 **Rationale:** The founding Vision explicitly requires past-design awareness at
-the conversation-to-episode boundary. The POC demonstrates a full inherited
-transcript and live sibling collaboration.
+the conversation-to-episode boundary. The POC demonstrates complete active-
+branch inheritance and live sibling collaboration. It also distinguishes the
+successful fork-plus-daemon path from `rlm.create_session(cwd=...)`, which
+creates a fresh session without transcript inheritance.
 
 ## D-WE-8 — Separate publication from substantive admission
 
@@ -162,6 +175,25 @@ failure semantics for implementation and regression testing.
 
 **Satisfies:** R-WE-18, R-WE-19, R-WE-21, R-WE-33.
 
-**Rationale:** The POC proves that the desired topology works. It does not yet
-prove that a public, stable extension interface can perform every step
-atomically. Evidence-backed planning distinguishes those claims.
+**Rationale:** The POC proves that the desired topology works through
+`SessionManager.forkFrom(...)` plus daemon `create(sessionPath=...)`. It does
+not yet prove that a public, stable extension-facing interface composes every
+step, owns partial-failure recovery, and admits the task exactly once. Evidence-
+backed planning distinguishes those claims.
+
+## D-WE-14 — Bridge the multi-turn workflow to trusted automation explicitly
+
+**Decision:** The native command injects canonical interview workflow text, but
+its final disposition is executed only through a stable, structured,
+model-callable host capability. That capability owns locking, Git, filesystem,
+session, daemon, metadata, and recovery mechanics. The planner may choose its
+precise extension interface, but the model must not synthesize equivalent shell
+commands from prose and the bridge must be testable across turns.
+
+**Satisfies:** R-WE-5, R-WE-8, R-WE-9, R-WE-15, R-WE-20, R-WE-22, R-WE-34,
+R-WE-35, R-WE-36.
+
+**Rationale:** Slash-command invocation and final operator disposition are
+separated by an open-ended interview. An injected prompt alone cannot retain a
+trusted callback. An explicit capability preserves deterministic mechanics and
+an exactly-once contract without constraining planning to an unproven API shape.

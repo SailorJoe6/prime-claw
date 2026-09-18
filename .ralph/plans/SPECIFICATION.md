@@ -38,8 +38,14 @@ merge, and cleanup.
 - Prime Agent project-local TypeScript extensions can register native slash
   commands and inject canonical skill markdown. `handoff-chain.ts` proves this
   pattern for `/handoff`.
-- Prime Agent can create durable depth-0 sessions with an explicit CWD and
-  returns their active/session IDs, name, session file, and model.
+- `SessionManager.forkFrom(sourceSessionFile, targetCwd)` can persist a new
+  session branch with the complete active source conversation and the worktree
+  as its CWD, but does not by itself activate that session in the daemon.
+- The daemon `create(sessionPath=...)` operation can activate the persisted fork
+  as a durable top-level sibling and returns its runtime identity.
+- `rlm.create_session(cwd=...)` can create a fresh durable sibling, but it does
+  **not** inherit the source transcript and therefore does not satisfy episode
+  conversation inheritance by itself.
 - Prime Agent sessions can observe and message sibling top-level sessions.
 - Git worktrees provide independent checkout and index state while sharing the
   repository's object database and refs.
@@ -107,10 +113,23 @@ choose exactly one disposition:
    `.ralph/plans/future/<idea-slug>/`; create no branch, worktree, or episode
    session.
 2. **Create an episode now.** Allocate the branch, worktree, and durable
-   worktree-rooted session, carry the relevant conversation into it, and write
-   the active specification bundle there.
+   worktree-rooted session, carry the complete active conversation branch into
+   it, and write the active specification bundle there.
 
 Cancellation or failure shall not silently choose either disposition.
+
+### 4.5 Multi-turn disposition bridge
+
+Command invocation, interview, and disposition occur across multiple turns. The
+native command may inject the canonical workflow text, but the operator's final
+disposition answer must cross a stable, explicit bridge into deterministic,
+trusted host automation. The model shall invoke that bridge with structured,
+validated inputs; it shall not reconstruct or improvise Git, filesystem, session,
+or daemon shell commands from workflow prose. The implementation plan may choose
+the precise interface—for example, a model-callable capability registered beside
+the native command—but it must define one durable contract for both disposition
+paths and test that the final multi-turn answer reaches the intended automation
+exactly once.
 
 ## 5. Future-plan behavior
 
@@ -125,8 +144,17 @@ The future disposition shall create:
 
 Future bundles are durable, explicitly non-binding candidates. They remain in
 the `PROJECT_CONVERSATION`; they do not allocate episode resources. A later
-promotion path must be able to use a future bundle plus relevant conversation
-context as input to the same episode-creation mechanism.
+promotion path must be able to use a future bundle plus its complete applicable
+conversation branch as input to the same episode-creation mechanism.
+
+Because multiple project conversations share the canonical checkout, the trusted
+future-write path shall acquire a project-scoped mutation lock before inspecting
+or changing it. Under that lock it shall detect unrelated dirty state and refuse
+to stage or commit another conversation's changes. It shall add only the new
+future-bundle paths, commit and push that bundle durably, and leave the canonical
+checkout clean on success. If dirty state, a concurrent update, commit failure,
+or push/rebase conflict prevents that outcome, it shall report the exact state
+and recovery action instead of claiming success or absorbing unrelated changes.
 
 Names must be deterministic, filesystem-safe, and collision-resistant. Existing
 future content must not be overwritten without explicit operator approval.
@@ -141,19 +169,29 @@ For the immediate episode disposition, deterministic automation shall:
 3. Verify that neither the target branch nor worktree path would be overwritten.
 4. Create the feature branch and durable worktree without using an interactive
    shell prompt.
-5. Create a durable worktree-rooted Prime Agent top-level session that carries
-   the relevant source conversation. The originating conversation and episode
-   may be runtime siblings; logical ownership is recorded separately.
-6. Retain the returned `active_session_id`, stable `session_id`, session name,
+5. Persist a worktree-rooted fork with
+   `SessionManager.forkFrom(sourceSessionFile, worktreePath)`. The fork must
+   contain the complete active conversation branch, not a summary or selected
+   subset, and record the worktree as its CWD.
+6. Activate the persisted fork as a durable top-level sibling through daemon
+   `create(sessionPath=<forkedSessionFile>)`. A fresh
+   `rlm.create_session(cwd=...)` is not a substitute because it does not inherit
+   the transcript.
+7. Retain the returned `active_session_id`, stable `session_id`, session name,
    session file, worktree path, branch, source conversation ID, and project
    identity in durable episode metadata.
-7. Deliver the task exactly once, accounting for the known automatic-
+8. Deliver the task exactly once, accounting for the known automatic-
    preparation admission race. Initial publication and substantive task
    delivery must not be conflated.
-8. Have the episode verify its CWD and branch, run `prepare`, and write the
+9. Have the episode verify its CWD and branch, run `prepare`, and write the
    active specification bundle in its own `.ralph/plans/`.
-9. Leave the owning conversation active and able to observe, message, and
-   resume coordination with the episode.
+10. Leave the owning conversation active and able to observe, message, and
+    resume coordination with the episode.
+
+Complete active-branch inheritance is the initial acceptance contract and the
+behavior proved by this POC. Selective or pre-compacted inheritance may be
+explored later only as an explicit refinement with its own requirements and
+operator approval; it is not an alternative way to satisfy this specification.
 
 If any step fails, automation must report the exact partial state and either
 roll back only resources it created safely or leave an explicit recovery
@@ -219,8 +257,9 @@ Git metadata mutations. Any additional episode registry must use atomic updates
 or its own lock.
 
 `PROJECT_CONVERSATION` sessions share the canonical checkout. Their default role
-is discussion, incubation, and coordination. A later policy may permit tightly
-bounded canonical-checkout edits, but specification-level tracked-file work must
+is discussion, incubation, and coordination. Future-plan disposition is the one
+specified tracked-file mutation there: it must use the serialized, ownership-
+aware commit protocol in §5. Other specification-level tracked-file work must
 use an episode.
 
 ## 10. Trust and security boundaries
@@ -249,21 +288,28 @@ This specification episode itself is the first manual proof:
   `a29d878ba19d`.
 - Worktree: `/Users/jlanders/code/.prime-worktrees/prime-claw/poc-spec-it-out-episode`.
 - Branch: `poc/spec-it-out-worktree-episode`.
-- The episode sees the complete inherited conversation, is reported by Prime
-  Agent as a live top-level sibling, was directly messaged by its owner, and
-  has independently verified its CWD and branch.
+- The source session file was forked with
+  `SessionManager.forkFrom(sourceSessionFile, worktreePath)`, preserving the
+  complete active conversation and changing the persisted CWD to the worktree.
+- The fork was activated as a live top-level sibling through daemon
+  `create(sessionPath=<forkedSessionFile>)`; the owner then delivered the task
+  directly. The episode independently verified its CWD and branch.
 
-The POC proves the desired runtime topology and manual behavior. It does not yet
-prove a single public extension API that atomically performs transcript fork,
-sibling activation, durable ownership registration, and task delivery. That
-mechanism is an implementation item to resolve and regression-test rather than
-an assumption to hide.
+The POC proves the desired runtime topology and manual behavior. It also proves
+that `rlm.create_session(cwd=...)` is not the inheritance mechanism: that API
+creates a fresh sibling without the source transcript. The remaining gap is a
+stable extension-facing bridge that composes the proven fork and daemon-create
+operations with durable ownership registration and exactly-once task delivery,
+including partial-failure recovery. That integration is an implementation item
+to resolve and regression-test rather than an assumption to hide.
 
 ## 12. Acceptance outcomes
 
 Implementation is accepted when automated tests and one real dogfood run show
 that both commands preserve canonical workflow text, complete their interview
-before the disposition gate, create no worktree for future incubation, and
-create an isolated, durable, coordinator-owned episode when promoted. The
-promoted episode must remain operable through the simulated PR lifecycle and be
-cleaned up only after the owner verifies completion.
+before the disposition gate, and cross the explicit multi-turn bridge exactly
+once. Future incubation must serialize the shared-checkout write, commit and
+push only its bundle, allocate no worktree, and leave a clean checkout on
+success. Promotion must fork the complete active conversation branch, activate
+an isolated durable coordinator-owned sibling, and remain operable through the
+simulated PR lifecycle. Cleanup occurs only after the owner verifies completion.
