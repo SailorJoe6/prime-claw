@@ -288,9 +288,18 @@ test("commit-object failure requires explicit recovery and supports safe removal
   ));
   assert.equal(removed.status, "recovered-clean", JSON.stringify(removed, null, 2));
   assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), false);
-  assert.equal(existsSync(join(f.cwd, ".ralph/plans/future")), false);
+  assert.equal(existsSync(join(f.cwd, ".ralph/plans/future")), true);
+  assert.deepEqual(readdirSync(join(f.cwd, ".ralph/plans/future")), []);
   assert.equal(existsSync(join(f.cwd, ".git/prime-claw/future-mutation-blocked.json")), false);
   assert.equal((await run("git", ["-C", f.cwd, "status", "--porcelain"])).stdout, "");
+  const staleReceiptRetry = resultDetails(await tool.execute(
+    "stale-receipt",
+    params({ request_id: "request-stale-receipt", recovery_action: "continue" }),
+    undefined, undefined, f.ctx,
+  ));
+  assert.equal(staleReceiptRetry.status, "failed");
+  assert.match(staleReceiptRetry.error, /explicitly removed|does not support implicit recovery|directory is absent.*refusing automatic recreation/i);
+  assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), false);
 
   const continuationParams = params({
     request_id: "request-cont0001",
@@ -642,6 +651,23 @@ test("every durable future mutation boundary resumes only through explicit recov
 });
 
 
+test("removal-consumption control-directory symlink fails before external writes", async (t) => {
+  const f = await fixture(t);
+  const external = mkdtempSync(join(tmpdir(), "prime-claw-consumed-external-"));
+  t.after(() => rmSync(external, { recursive: true, force: true }));
+  mkdirSync(join(f.cwd, ".git/prime-claw"), { recursive: true });
+  symlinkSync(external, join(f.cwd, ".git/prime-claw/future-ownership-consumed"));
+  await assert.rejects(
+    f.tools.get("spec_disposition").execute(
+      "consumed-symlink", params(), undefined, undefined, f.ctx,
+    ),
+    /control directory must not be a symlink/i,
+  );
+  assert.deepEqual(readdirSync(external), []);
+  assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), false);
+});
+
+
 test("Git control-root symlink escape fails before receipt writes", async (t) => {
   const f = await fixture(t);
   const outside = join(f.root, "outside-control");
@@ -734,6 +760,189 @@ test("recovery refuses an unrelated clean local descendant after uncertain remot
   assert.match(recovered.error, /recovery state diverged|HEAD .*moved away|not the owned future commit/i);
   assert.equal((await run("git", ["-C", f.cwd, "rev-parse", "HEAD"])).stdout.trim(), descendant);
   assert.equal((await run("git", ["--git-dir", f.remote, "rev-parse", "HEAD"])).stdout.trim(), uncertain.commit_sha);
+});
+
+
+test("consumed removal authority cannot delete a later byte-identical replacement", async (t) => {
+  const f = await fixture(t);
+  f.setExecInterceptor(async ({ args, invoke }) => {
+    if (args.includes("commit-tree")) return { stdout: "", stderr: "stop before commit", code: 71, killed: false };
+    return invoke();
+  });
+  const tool = f.tools.get("spec_disposition");
+  const failed = resultDetails(await tool.execute("stop", params(), undefined, undefined, f.ctx));
+  const removed = resultDetails(await tool.execute(
+    "remove-once",
+    params({ request_id: "request-remove-once", recovery_action: "remove-owned-uncommitted" }),
+    undefined, undefined, f.ctx,
+  ));
+  assert.equal(removed.status, "recovered-clean");
+  assert.equal(existsSync(removed.ownership_consumed_path), true);
+
+  const target = join(f.cwd, ".ralph/plans/future/safe-idea");
+  mkdirSync(target, { recursive: true });
+  const input = params();
+  for (const [name, key] of [
+    ["SPECIFICATION.md", "specification_markdown"],
+    ["REQUIREMENTS.md", "requirements_markdown"],
+    ["DECISIONS.md", "decisions_markdown"],
+  ]) writeFileSync(join(target, name), input.documents[key]);
+
+  const transaction = JSON.parse(readFileSync(failed.transaction_path, "utf8"));
+  transaction.status = "failed"; // Mutable journal state cannot revive consumed authority.
+  writeFileSync(failed.transaction_path, `${JSON.stringify(transaction, null, 2)}\n`);
+  const repeated = resultDetails(await tool.execute(
+    "remove-again",
+    params({ request_id: "request-remove-again", recovery_action: "remove-owned-uncommitted" }),
+    undefined, undefined, f.ctx,
+  ));
+  assert.equal(repeated.status, "failed");
+  assert.match(repeated.error, /removal authority.*already consumed/i);
+  assert.equal(readFileSync(join(target, "SPECIFICATION.md"), "utf8"), input.documents.specification_markdown);
+});
+
+
+test("commit-bearing recovery fails closed when immutable directory ownership evidence is missing", async (t) => {
+  const f = await fixture(t);
+  f.setSpecificationFault((phase) => {
+    if (phase === "commit-object-created") throw new Error("stop after owned commit object");
+  });
+  const tool = f.tools.get("spec_disposition");
+  const failed = resultDetails(await tool.execute("commit-stop", params(), undefined, undefined, f.ctx));
+  assert.equal(failed.status, "failed");
+  assert.match(failed.commit_object_sha, /^[0-9a-f]{40,64}$/);
+  const transaction = JSON.parse(readFileSync(failed.transaction_path, "utf8"));
+  const ownershipPath = transaction.ownership_receipt_path;
+  rmSync(ownershipPath);
+  f.setSpecificationFault(null);
+  const recovery = resultDetails(await tool.execute(
+    "missing-ownership",
+    params({ request_id: "request-missing-ownership", recovery_action: "continue" }),
+    undefined, undefined, f.ctx,
+  ));
+  assert.equal(recovery.status, "failed");
+  assert.match(recovery.error, /records a commit.*ownership receipt is missing/i);
+  assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), true);
+  assert.equal(existsSync(join(f.cwd, ".git/prime-claw/future-mutation-blocked.json")), true);
+});
+
+
+test("ASTRA-01 removal preserves a pre-existing byte-identical bundle without ownership proof", async (t) => {
+  const f = await fixture(t);
+  const input = params();
+  const target = join(f.cwd, ".ralph/plans/future/safe-idea");
+  mkdirSync(target, { recursive: true });
+  for (const [name, key] of [
+    ["SPECIFICATION.md", "specification_markdown"],
+    ["REQUIREMENTS.md", "requirements_markdown"],
+    ["DECISIONS.md", "decisions_markdown"],
+  ]) writeFileSync(join(target, name), input.documents[key]);
+  const beforeStatus = (await run("git", ["-C", f.cwd, "status", "--porcelain=v1"])).stdout;
+  const tool = f.tools.get("spec_disposition");
+  const failed = resultDetails(await tool.execute("preexisting", input, undefined, undefined, f.ctx));
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.product_resource_mutation_performed, false);
+  const removal = resultDetails(await tool.execute(
+    "remove-nonowned",
+    { ...input, request_id: "request-remove-nonowned", recovery_action: "remove-owned-uncommitted" },
+    undefined, undefined, f.ctx,
+  ));
+  assert.equal(removal.status, "failed");
+  assert.match(removal.error, /without immutable proof/i);
+  assert.equal(existsSync(target), true);
+  assert.equal(readFileSync(join(target, "SPECIFICATION.md"), "utf8"), input.documents.specification_markdown);
+  assert.equal((await run("git", ["-C", f.cwd, "status", "--porcelain=v1"])).stdout, beforeStatus);
+});
+
+test("ASTRA-02 push pins the owned commit when local HEAD advances concurrently", async (t) => {
+  const f = await fixture(t);
+  let raced = false;
+  f.setExecInterceptor(async ({ args, invoke }) => {
+    if (!raced && args.includes("push")) {
+      raced = true;
+      writeFileSync(join(f.cwd, "other-conversation.txt"), "not authorized to publish\n");
+      await run("git", ["-C", f.cwd, "add", "other-conversation.txt"]);
+      await run("git", ["-C", f.cwd, "commit", "-qm", "other conversation unpublished work"]);
+    }
+    return invoke();
+  });
+  const result = resultDetails(await f.tools.get("spec_disposition").execute(
+    "race-push", params(), undefined, undefined, f.ctx,
+  ));
+  assert.equal(raced, true);
+  assert.equal(result.status, "failed");
+  const remoteHead = (await run("git", ["--git-dir", f.remote, "rev-parse", "HEAD"])).stdout.trim();
+  assert.equal(remoteHead, result.commit_sha, "remote may advance only to the pinned owned commit");
+  const remoteOther = await run("git", ["--git-dir", f.remote, "show", "HEAD:other-conversation.txt"]);
+  assert.notEqual(remoteOther.code, 0, "unrelated local descendant was published");
+});
+
+test("ASTRA-03 malformed verified-success journal fails closed and remains preserved", async (t) => {
+  const f = await fixture(t);
+  f.setSpecificationFault((phase) => {
+    if (phase === "journal-created") throw new Error("stop before mutation");
+  });
+  const tool = f.tools.get("spec_disposition");
+  const first = resultDetails(await tool.execute("stop", params(), undefined, undefined, f.ctx));
+  const journal = JSON.parse(readFileSync(first.transaction_path, "utf8"));
+  journal.status = "verified-success";
+  writeFileSync(first.transaction_path, `${JSON.stringify(journal, null, 2)}\n`);
+  f.setSpecificationFault(null);
+  const replay = resultDetails(await tool.execute(
+    "corrupt-replay", params({ request_id: "request-corrupt-success" }), undefined, undefined, f.ctx,
+  ));
+  assert.equal(replay.status, "failed");
+  assert.equal(replay.corrupt_success_journal_preserved, true);
+  assert.match(replay.error, /missing required success invariants/i);
+  assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), false);
+  assert.equal(JSON.parse(readFileSync(first.transaction_path, "utf8")).status, "verified-success");
+});
+
+test("ASTRA-04 successful replay separates historical success from current dirty state", async (t) => {
+  const f = await fixture(t);
+  const tool = f.tools.get("spec_disposition");
+  const first = resultDetails(await tool.execute("first", params(), undefined, undefined, f.ctx));
+  assert.equal(first.status, "verified-success");
+  writeFileSync(join(f.cwd, "other-wip.txt"), "other conversation WIP\n");
+  const replay = resultDetails(await tool.execute(
+    "dirty-replay", params({ request_id: "request-replay-dirty" }), undefined, undefined, f.ctx,
+  ));
+  assert.equal(replay.status, "verified-success");
+  assert.equal(replay.historical_checkout_clean, true);
+  assert.equal(replay.checkout_clean, false);
+  assert.equal(replay.current_checkout_clean, false);
+  assert.ok(replay.current_status_paths.includes("other-wip.txt"));
+});
+
+test("ASTRA-05 removal preserves a concurrent unowned directory entry", async (t) => {
+  const f = await fixture(t);
+  const target = join(f.cwd, ".ralph/plans/future/safe-idea");
+  const sentinel = join(target, "other-conversation-work.txt");
+  f.setExecInterceptor(async ({ args, invoke }) => {
+    if (args.includes("commit-tree")) return { stdout: "", stderr: "stop before commit", code: 70, killed: false };
+    return invoke();
+  });
+  const tool = f.tools.get("spec_disposition");
+  const failed = resultDetails(await tool.execute("stop", params(), undefined, undefined, f.ctx));
+  assert.equal(failed.status, "failed");
+  let injected = false;
+  f.setExecInterceptor(async ({ args, invoke }) => {
+    if (!injected && args.includes("diff") && args.includes("--cached")) {
+      injected = true;
+      writeFileSync(sentinel, "another conversation owns this\n");
+    }
+    return invoke();
+  });
+  const removal = resultDetails(await tool.execute(
+    "remove-race",
+    params({ request_id: "request-removal-race", recovery_action: "remove-owned-uncommitted" }),
+    undefined, undefined, f.ctx,
+  ));
+  assert.equal(injected, true);
+  assert.equal(removal.status, "failed");
+  assert.equal(existsSync(sentinel), true);
+  assert.equal(readFileSync(sentinel, "utf8"), "another conversation owns this\n");
+  assert.match(removal.error, /not empty|ENOTEMPTY/i);
 });
 
 

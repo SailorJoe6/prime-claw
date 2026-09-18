@@ -134,10 +134,12 @@ change detected before push turns the operation into a recoverable failure, and
 the owned commit is not pushed.
 
 Push is non-forcing and targets the configured default upstream explicitly.
-The tool queries the actual remote OID before and after push, verifies the
-commit parent, exact three-path diff, exact document contents, clean checkout,
-and remote commit before reporting `verified-success`. It creates no branch,
-additional worktree, daemon resource, or episode session.
+Its source refspec is the already verified owned commit OID, never moving
+`HEAD`, so a concurrent local descendant cannot be published. The tool queries
+the actual remote OID before and after push, verifies the commit parent, exact
+three-path diff, exact document contents, clean checkout, and remote commit
+before reporting `verified-success`. It creates no branch, additional worktree,
+daemon resource, or episode session.
 
 ### Transaction records and explicit recovery
 
@@ -148,8 +150,10 @@ replaceable, fsync-and-rename transaction state:
 <GIT_COMMON_DIR>/prime-claw/
 ├── future-transactions/<disposition-id>.json
 ├── future-attempts/<owner-and-request-hash>.json
-├── indexes/<disposition-id>.index       # present only while needed
-└── future-mutation-blocked.json          # present after owned partial mutation
+├── future-ownership/<disposition-id>.json # immutable proof of exclusive mkdir
+├── future-ownership-consumed/<disposition-id>.json # single-use removal tombstone
+├── indexes/<disposition-id>.index         # present only while needed
+└── future-mutation-blocked.json            # present after owned partial mutation
 ```
 
 Receipts contain hashes and paths, never document bodies. They record base,
@@ -166,13 +170,36 @@ reusing the exact disposition input with one of these optional actions:
 - `inspect` — reconcile and report current state without product mutation;
 - `continue` — continue only after the journal and byte-identical owned bundle
   prove identity; or
-- `remove-owned-uncommitted` — only before a commit/ref advance, unstage exact
-  owned paths and remove exact byte-identical owned files.
+- `remove-owned-uncommitted` — only before a commit/ref advance and only with
+  an immutable create-only receipt proving this transaction exclusively created
+  the directory; unstage and unlink exact byte-identical owned files one by one,
+  then remove the directory only if it is empty.
 
-Recovery never resets, rebases, force-pushes, steals a lock, removes mismatched
-content, or absorbs unrelated dirt. Once a commit object exists, removal is
-forbidden. A rejected push or remote race preserves the exact local commit and
-requires explicit reconciliation.
+A failed precondition, matching bytes, or a mutable transaction field never
+establishes deletion ownership. Immediately before the first destructive unlink,
+recovery durably consumes that authority with a create-only tombstone, so the
+receipt cannot later delete a replacement at the reused path even if mutable
+journal state changes. Both ownership control directories pass the same
+non-symlink Git-common-dir containment checks before any receipt write. A
+historical ownership receipt cannot authorize
+automatic recreation after its directory has been removed, while a
+commit-bearing transaction with a missing ownership receipt fails closed.
+Concurrent unowned
+entries make the final non-recursive owned-directory removal fail and remain
+preserved. The shared `.ralph/plans/future` parent is retained because its prior
+absence is not exclusive creation proof. Recovery never
+resets, rebases, force-pushes, steals a lock, removes mismatched content, or
+absorbs unrelated dirt. Once a commit object exists, removal is forbidden. A
+rejected push or remote race preserves the exact local commit and requires
+explicit reconciliation.
+
+A replayed `verified-success` journal is not trusted by status alone. The tool
+validates its phase, commit/base OIDs, exact commit paths and contents, document
+hashes, immutable ownership receipt, and actual remote reachability before
+returning historical success. The result labels historical cleanliness
+separately and reports `checkout_clean`, current status paths, and current
+HEAD/upstream/remote observations from the replay. Malformed success state is
+preserved and fails closed without clearing recovery blockers.
 
 ## Current safety boundary
 
@@ -219,8 +246,17 @@ array Git, exact future commits, actual remote verification, clean success,
 tracked/untracked/staged dirt refusal, path collision, request/session isolation,
 real OS-process serialization, lock ambiguity, every durable transaction boundary,
 commit/push/cancellation faults, remote races, private-index isolation,
-explicit continuation/removal recovery,
-no episode allocation, and corrupt-evidence handling.
+explicit continuation/removal recovery, immutable and single-use deletion
+authority, stale-receipt path reuse, missing ownership evidence, ownership-
+consumption control-path symlinks, concurrent-entry preservation, pinned-commit
+push, verified-success corruption, historical-versus-current replay state, no
+episode allocation, and corrupt-evidence handling.
+
+Final local revision evidence: the repository Node suite passed 58/58; the five
+preserved Astra counterexamples passed 5/5 against the current extension; and
+the exact active suite `pytest -q tests` passed 237 tests with 11 warnings. Two
+watchdog timing tests each failed once during earlier full-suite attempts and
+passed immediately in isolation; the final exact full-suite rerun was green.
 The pytest bridge loads the real extension through the installed Prime Agent
 RPC loader and checks the two native command surfaces. Prime Agent 0.9.5 RPC has
 no public tool-list or direct tool-invocation command, so schema/execution tests

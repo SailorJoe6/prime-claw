@@ -1439,7 +1439,7 @@
    "id": "R-WE-35",
    "priority": "GATE",
    "summary": "Future mutation uses a project lock and repeats canonical, remote, status, containment, and collision checks under lock.",
-   "status": "proven (Slice 2 lock, dirt, collision, ambiguity, and OS-process tests)",
+   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1462,7 +1462,99 @@
    "id": "R-WE-36",
    "priority": "GATE",
    "summary": "Future mutation commits and pushes only its exact bundle, leaves clean success, and preserves exact recoverable failure state.",
-   "status": "proven (Slice 2 private-index/CAS, push, race, fault, and recovery tests)",
+   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-69",
+   "priority": "GATE",
+   "summary": "Deletion requires create-only exclusive-directory proof; commit-bearing recovery without it fails closed; authority is consumed once; ownership control paths are non-symlink-contained.",
+   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-70",
+   "priority": "GATE",
+   "summary": "Recovery unlinks individually verified owned files, removes only an empty target non-recursively, preserves concurrent entries, and retains the shared parent.",
+   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-71",
+   "priority": "GATE",
+   "summary": "Future publication pushes the pinned verified owned commit OID so a concurrently advanced local HEAD descendant remains unpublished.",
+   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "check": [
+     "docs/specification-episodes.md"
+    ],
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/helpers/spec_disposition_worker.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-72",
+   "priority": "GATE",
+   "summary": "Success replay validates journal/base/commit/content/hashes/ownership/actual remote evidence, preserves corrupt state, and separates historical from current repository facts.",
+   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {

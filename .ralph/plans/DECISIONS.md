@@ -197,3 +197,48 @@ R-WE-35, R-WE-36.
 separated by an open-ended interview. An injected prompt alone cannot retain a
 trusted callback. An explicit capability preserves deterministic mechanics and
 an exactly-once contract without constraining planning to an unproven API shape.
+
+
+## D-WE-15 — Derive destructive and publication authority from immutable identity
+
+**Decision:** Future recovery derives deletion authority from a create-only
+receipt written only after exclusive directory creation, consumes deletion
+authority durably as a single-use capability before the first unlink, removes
+owned files individually, and removes directories only when empty. Publication
+names the
+verified owned commit OID directly. Replayed success is evidence-validated and
+separates historical success facts from current repository observations.
+
+**Satisfies:** R-WE-22, R-WE-35, R-WE-36, R-WE-69, R-WE-70, R-WE-71,
+R-WE-72.
+
+**Rationale:** Mutable status labels, matching bytes, moving refs, and
+check-then-recursive-delete windows are observations rather than authority. The
+Astra counterexamples against `6a0d4e4` showed that treating them as authority
+could delete unowned work, publish an unrelated descendant, or claim stale
+success. Immutable transaction identity plus final primitive-level checks makes
+those races fail closed.
+
+**Consequences:**
+
+- Failed preconditions never synthesize ownership. Commit-bearing recovery with
+  missing ownership evidence stops rather than inferring authority from files.
+- Removal authority is consumed durably before unlink. Neither path reuse nor a
+  mutable journal reset can reactivate it, and historical proof cannot authorize
+  automatic recreation.
+- Ownership and consumption records use validated, non-symlink control
+  directories under the Git common directory. A static child symlink fails
+  before an external receipt write or product mutation.
+- Recovery unlinks verified files individually and removes only the empty owned
+  target non-recursively. It preserves concurrent entries and the unproven
+  shared future-plan parent.
+- Push names the verified commit OID directly rather than moving `HEAD`. A
+  concurrent local `HEAD` descendant remains unpublished.
+- `verified-success` replay validates the full historical chain—journal, base,
+  commit, content, ownership, and actual remote—before clearing a blocker.
+  Corrupt evidence remains preserved. Historical cleanliness and fresh current
+  repository observations are separate fields.
+
+These are durable architectural decisions, not test-specific patches. The
+original five Astra assertions and the adjacent ownership-consumption regressions
+remain required Slice 2 evidence.

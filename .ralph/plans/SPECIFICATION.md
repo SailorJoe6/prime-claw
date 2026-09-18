@@ -1,8 +1,8 @@
 # Specification — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 native commands/preflight and
-> Slice 2 serialized future incubation are implemented under
-> `prime-claw-h6w.2`–`.3`; episode allocation and later lifecycle paths remain.
+> **Status:** implementation in progress; Slice 1 is validated; the Slice 2
+> safety revision is implemented and locally validated under `prime-claw-h6w.3`,
+> pending fresh owner/EXPERT acceptance; later paths remain unstarted.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -163,6 +163,45 @@ and recovery action instead of claiming success or absorbing unrelated changes.
 
 Names must be deterministic, filesystem-safe, and collision-resistant. Existing
 future content must not be overwritten without explicit operator approval.
+
+### 5.1 Astra-derived future-transaction safety invariants
+
+The owner/EXPERT review of `6a0d4e4` established these non-negotiable
+invariants for the future path:
+
+1. **Creation proof is deletion authority.** A failed precondition,
+   byte-identical content, expected path, or mutable journal claim does not prove
+   ownership. Removal requires a create-only transaction receipt written only
+   after exclusive target-directory creation. A commit-bearing recovery without
+   that receipt fails closed.
+2. **Deletion authority is single-use.** Immediately before the first unlink,
+   recovery writes a create-only consumed-authority tombstone in a validated,
+   non-symlink Git control directory. A completed removal, later path reuse, or
+   mutable journal reset cannot revive the old receipt. A historical receipt
+   also cannot authorize automatic target recreation.
+3. **Removal uses narrow primitives.** Each expected regular file is checked and
+   unlinked individually. The owned target directory is removed
+   non-recursively only when empty. Concurrent unowned entries survive and make
+   recovery fail closed. The shared `.ralph/plans/future` parent is retained
+   without separate exclusive-creation proof.
+4. **Publication names immutable identity.** Push uses the already verified
+   owned commit OID as its source refspec, never moving `HEAD`. If another local
+   writer advances `HEAD`, that descendant is not published and the transaction
+   reports the resulting divergence.
+5. **Success labels are evidence, not authority.** A replayed
+   `verified-success` record revalidates journal
+   phase and OIDs, commit parent, exact paths and contents, document hashes,
+   immutable ownership evidence, and actual remote reachability before clearing
+   a blocker or reporting historical success. Malformed success state is
+   preserved and fails closed.
+6. **Historical and current state stay distinct.** Historical clean success may
+   remain true while the present checkout is dirty or has advanced. Replay must
+   report current checkout cleanliness, status paths, HEAD, upstream, and remote
+   separately and must never expose stale historical cleanliness as current.
+
+These invariants require runnable repository regressions for the original five
+Astra assertions plus stale-receipt path reuse, missing ownership evidence, and
+ownership-control-directory symlink containment.
 
 ## 6. Episode-creation behavior
 

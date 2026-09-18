@@ -13,6 +13,7 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  rmdirSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -734,6 +735,93 @@ function transactionImmutableMatches(
     );
 }
 
+function validateFutureOwnershipReceipt(
+  path: string,
+  expected: {
+    dispositionId: string;
+    payloadFingerprint: string;
+    ownerSessionId: string;
+    repositoryRoot: string;
+    baseHead: string;
+    targetDirectory: string;
+  },
+): Record<string, unknown> {
+  const receipt = readDurableJson(path);
+  if (
+    receipt.version !== 1
+    || receipt.kind !== "future-directory-ownership"
+    || receipt.disposition_id !== expected.dispositionId
+    || receipt.payload_fingerprint !== expected.payloadFingerprint
+    || receipt.owner_session_id !== expected.ownerSessionId
+    || receipt.repository_root !== expected.repositoryRoot
+    || receipt.base_head !== expected.baseHead
+    || receipt.target_directory !== expected.targetDirectory
+    || receipt.directory_created_exclusively !== true
+  ) {
+    throw new Error(`future directory ownership receipt does not match transaction identity: ${path}`);
+  }
+  return receipt;
+}
+
+async function validateVerifiedFutureSuccess(
+  pi: ExtensionAPI,
+  cwd: string,
+  state: CanonicalState,
+  transaction: Record<string, unknown>,
+  expected: {
+    dispositionId: string;
+    payloadFingerprint: string;
+    ownerSessionId: string;
+    repositoryRoot: string;
+    baseHead: string;
+    targetDirectory: string;
+    ownershipPath: string;
+    ownedPaths: string[];
+    documents: DispositionParams["documents"];
+  },
+): Promise<string> {
+  const commit = transaction.commit_sha;
+  if (
+    transaction.status !== "verified-success"
+    || transaction.phase !== "pushed-and-clean"
+    || typeof commit !== "string"
+    || !GIT_OID.test(commit)
+    || transaction.verified_head !== commit
+    || transaction.verified_upstream_head !== commit
+    || transaction.verified_remote_head !== commit
+    || transaction.checkout_clean !== true
+    || transaction.episode_resources_allocated !== false
+    || transaction.ownership_receipt_path !== expected.ownershipPath
+  ) {
+    throw new Error("verified-success journal is missing required success invariants");
+  }
+  validateFutureOwnershipReceipt(expected.ownershipPath, {
+    dispositionId: expected.dispositionId,
+    payloadFingerprint: expected.payloadFingerprint,
+    ownerSessionId: expected.ownerSessionId,
+    repositoryRoot: expected.repositoryRoot,
+    baseHead: expected.baseHead,
+    targetDirectory: expected.targetDirectory,
+  });
+  const hashes = object(transaction.document_hashes, "verified future document hashes");
+  const expectedHashes: Record<string, string> = {
+    "SPECIFICATION.md": sha256(expected.documents.specification_markdown),
+    "REQUIREMENTS.md": sha256(expected.documents.requirements_markdown),
+    "DECISIONS.md": sha256(expected.documents.decisions_markdown),
+  };
+  if (Object.entries(expectedHashes).some(([name, hash]) => hashes[name] !== hash)) {
+    throw new Error("verified-success journal document hashes do not match the disposition bundle");
+  }
+  const parent = (await git(pi, cwd, ["rev-parse", `${commit}^`], undefined)).trim();
+  if (parent !== expected.baseHead) throw new Error("verified future commit parent does not match recorded base");
+  await validateCommitBundle(pi, cwd, commit, expected.ownedPaths, expected.documents);
+  const remoteOid = await remoteRefOid(pi, cwd, state.remote, state.remoteBranch);
+  if (remoteOid !== commit && !(await gitIsAncestor(pi, cwd, commit, remoteOid))) {
+    throw new Error(`verified future commit ${commit} is not durable on actual remote ${remoteOid}`);
+  }
+  return remoteOid;
+}
+
 async function reconcileFutureState(
   pi: ExtensionAPI,
   cwd: string,
@@ -889,6 +977,14 @@ async function executeFutureTransaction(
   ];
   const lockPath = join(ensureControlDirectory(base.state.commonDir, "locks"), "project-mutation.lock");
   const indexPath = join(controlRoot, "indexes", `${dispositionId}.index`);
+  const ownershipPath = join(
+    ensureControlDirectory(base.state.commonDir, "future-ownership"),
+    `${dispositionId}.json`,
+  );
+  const ownershipConsumedPath = join(
+    ensureControlDirectory(base.state.commonDir, "future-ownership-consumed"),
+    `${dispositionId}.json`,
+  );
   const relativeDir = join(".ralph", "plans", "future", params.decision.slug);
   const documentEntries: Array<[string, string]> = [
     ["SPECIFICATION.md", params.documents.specification_markdown],
@@ -913,6 +1009,18 @@ async function executeFutureTransaction(
     transaction_path: transactionPath,
     ...value,
   });
+
+  let productMutated = false;
+  let ownershipProven = false;
+  let ownershipCreated = false;
+  let ownershipConsumedCreated = false;
+  let lockReleaseError: string | null = null;
+  const controlWrites = (...paths: string[]) => [
+    ...initialControlWrites,
+    ...(ownershipCreated ? [ownershipPath] : []),
+    ...(ownershipConsumedCreated ? [ownershipConsumedPath] : []),
+    ...paths,
+  ];
 
   writeAttempt({ status: "waiting-for-lock", phase: transaction?.phase ?? "validated", observed_at: new Date().toISOString() });
   let lock: ProjectLock;
@@ -939,12 +1047,10 @@ async function executeFutureTransaction(
       preflight_receipt_path: base.receiptPath,
       product_resource_mutation_performed: false,
       next_safe_action: "retry only after the recorded owner releases the lock; never steal an ambiguous lock",
-      control_state_writes_performed: [...initialControlWrites, attemptPath],
+      control_state_writes_performed: controlWrites(attemptPath),
     };
   }
 
-  let productMutated = Boolean(transaction?.product_resource_mutation_performed);
-  let lockReleaseError: string | null = null;
   try {
     const state = await inspectCanonicalRepository(pi, cwd, signal);
     if (state.commonDir !== base.state.commonDir) throw new Error("Git common directory changed while acquiring project lock");
@@ -960,20 +1066,93 @@ async function executeFutureTransaction(
     if (transaction && !transactionImmutableMatches(
       transaction, dispositionId, payloadFingerprint, params, sessionId, cwd,
     )) throw new Error(`future transaction collision at ${transactionPath}`);
+    if (transaction?.ownership_receipt_path !== undefined && transaction.ownership_receipt_path !== ownershipPath) {
+      throw new Error("future transaction ownership-receipt path does not match the derived control path");
+    }
+    if (existsSync(ownershipPath)) {
+      const ownershipBase = typeof transaction?.base_head === "string" ? transaction.base_head : state.head;
+      validateFutureOwnershipReceipt(ownershipPath, {
+        dispositionId,
+        payloadFingerprint,
+        ownerSessionId: sessionId,
+        repositoryRoot: cwd,
+        baseHead: ownershipBase,
+        targetDirectory: relativeDir,
+      });
+      ownershipProven = true;
+    }
 
     if (transaction?.status === "verified-success") {
+      const observed = await reconcileFutureState(pi, cwd, transaction, ownedPaths, params.documents);
+      const successBase = typeof transaction.base_head === "string" ? transaction.base_head : "";
+      try {
+        if (!GIT_OID.test(successBase)) throw new Error("verified-success journal has an invalid base object ID");
+        await validateVerifiedFutureSuccess(pi, cwd, state, transaction, {
+          dispositionId,
+          payloadFingerprint,
+          ownerSessionId: sessionId,
+          repositoryRoot: cwd,
+          baseHead: successBase,
+          targetDirectory: relativeDir,
+          ownershipPath,
+          ownedPaths,
+          documents: params.documents,
+        });
+      } catch (error) {
+        const failure = errorMessage(error);
+        writeAttempt({
+          status: "corrupt-success",
+          phase: "success-validation-failed",
+          error: failure,
+          next_safe_action: "preserve the journal and inspect; never clear blockers or claim success",
+          observed_at: new Date().toISOString(),
+        });
+        return {
+          ...observed,
+          status: "failed",
+          phase: "success-validation-failed",
+          error: failure,
+          corrupt_success_journal_preserved: true,
+          checkout_clean: state.status.length === 0,
+          current_checkout_clean: state.status.length === 0,
+          current_status_paths: porcelainPaths(state.status),
+          preflight_receipt_path: base.receiptPath,
+          transaction_path: transactionPath,
+          attempt_path: attemptPath,
+          deduplicated: false,
+          recovery_action_required: true,
+          control_state_writes_performed: controlWrites(attemptPath),
+        };
+      }
       if (existsSync(blockerPath) && readDurableJson(blockerPath).disposition_id === dispositionId) {
         rmSync(blockerPath);
       }
       writeAttempt({ status: "deduplicated-success", phase: "verified-success", observed_at: new Date().toISOString() });
+      const { checkout_clean: historicalCheckoutClean, ...historical } = transaction;
       return {
-        ...transaction,
+        ...historical,
+        historical_checkout_clean: historicalCheckoutClean,
+        checkout_clean: state.status.length === 0,
+        current_checkout_clean: state.status.length === 0,
+        current_status_paths: porcelainPaths(state.status),
+        current_head: state.head,
+        current_upstream_head: state.upstreamHead,
+        current_remote_head: observed.observed_remote_head,
         preflight_receipt_path: base.receiptPath,
         transaction_path: transactionPath,
         attempt_path: attemptPath,
         deduplicated: true,
-        control_state_writes_performed: [...initialControlWrites, attemptPath],
+        control_state_writes_performed: controlWrites(attemptPath),
       };
+    }
+
+    if (
+      transaction
+      && !ownershipProven
+      && (typeof transaction.commit_sha === "string" || typeof transaction.commit_object_sha === "string")
+    ) {
+      productMutated = true;
+      throw new Error("future transaction records a commit but its immutable directory ownership receipt is missing");
     }
 
     if (transaction && !params.recovery_action) {
@@ -997,7 +1176,7 @@ async function executeFutureTransaction(
         recovery_action_required: true,
         next_safe_action: nextSafeAction,
         deduplicated: true,
-        control_state_writes_performed: [...initialControlWrites, attemptPath],
+        control_state_writes_performed: controlWrites(attemptPath),
       };
     }
 
@@ -1011,13 +1190,18 @@ async function executeFutureTransaction(
         transaction_path: transactionPath,
         attempt_path: attemptPath,
         deduplicated: true,
-        control_state_writes_performed: [...initialControlWrites, attemptPath],
+        control_state_writes_performed: controlWrites(attemptPath),
       };
     }
 
     const futureRoot = ensureFutureRoot(cwd, false);
     const targetDir = join(futureRoot, params.decision.slug);
     const baseHead = typeof transaction?.base_head === "string" ? transaction.base_head : state.head;
+    productMutated = ownershipProven && (
+      existsSync(targetDir)
+      || typeof transaction?.commit_sha === "string"
+      || typeof transaction?.commit_object_sha === "string"
+    );
     if (transaction?.private_index_path !== undefined && transaction.private_index_path !== indexPath) {
       throw new Error("future transaction private-index path does not match the derived control path");
     }
@@ -1031,6 +1215,23 @@ async function executeFutureTransaction(
 
     if (params.recovery_action === "remove-owned-uncommitted") {
       if (!transaction) throw new Error("no interrupted future transaction exists to remove");
+      if (transaction.status !== "failed" && transaction.status !== "running") {
+        throw new Error("removal authority is not live for this completed or retired transaction");
+      }
+      if (existsSync(ownershipConsumedPath)) {
+        throw new Error("removal authority for this transaction was already consumed");
+      }
+      if (!productMutated || !ownershipProven || !existsSync(ownershipPath)) {
+        throw new Error("refusing removal without immutable proof that this transaction created the future directory");
+      }
+      validateFutureOwnershipReceipt(ownershipPath, {
+        dispositionId,
+        payloadFingerprint,
+        ownerSessionId: sessionId,
+        repositoryRoot: cwd,
+        baseHead,
+        targetDirectory: relativeDir,
+      });
       if (typeof transaction.commit_sha === "string" || typeof transaction.commit_object_sha === "string") {
         throw new Error("cannot remove a future transaction after a commit object exists; inspect and reconcile the commit");
       }
@@ -1045,6 +1246,21 @@ async function executeFutureTransaction(
         throw new Error(`cannot remove while unrelated staged paths exist: ${staged.join(", ")}`);
       }
       if (staged.length) await git(pi, cwd, ["restore", "--staged", "--", ...ownedPaths], undefined);
+      ownershipConsumedCreated = createDurableJson(ownershipConsumedPath, {
+        version: 1,
+        kind: "future-directory-ownership-consumed",
+        disposition_id: dispositionId,
+        payload_fingerprint: payloadFingerprint,
+        owner_session_id: sessionId,
+        repository_root: cwd,
+        target_directory: relativeDir,
+        ownership_receipt_sha256: sha256(readFileSync(ownershipPath, "utf8")),
+        consumed_for: "remove-owned-uncommitted",
+        consumed_at: new Date().toISOString(),
+      });
+      if (!ownershipConsumedCreated) {
+        throw new Error("removal authority for this transaction was already consumed");
+      }
       for (const [name, content] of documentEntries) {
         validateFutureTargetDirectory(futureRoot, targetDir);
         const path = join(targetDir, name);
@@ -1053,10 +1269,9 @@ async function executeFutureTransaction(
         rmSync(path);
       }
       validateFutureTargetDirectory(futureRoot, targetDir);
-      if (existsSync(targetDir)) rmSync(targetDir, { recursive: true, force: false });
-      if (transaction.future_root_preexisting === false && existsSync(futureRoot) && readdirSync(futureRoot).length === 0) {
-        rmSync(futureRoot, { recursive: true, force: false });
-      }
+      if (existsSync(targetDir)) rmdirSync(targetDir);
+      // Keep the shared future-plan parent. Its earlier absence is an observation,
+      // not transaction-specific proof that this transaction exclusively created it.
       removeOwnedPrivateIndex(indexPath, transaction);
       const after = await inspectCanonicalRepository(pi, cwd, undefined);
       if (after.status.length !== 0 || after.head !== baseHead) {
@@ -1068,6 +1283,7 @@ async function executeFutureTransaction(
         phase: "owned-uncommitted-removed",
         product_resource_mutation_performed: false,
         recovery_action: "remove-owned-uncommitted",
+        ownership_consumed_path: ownershipConsumedPath,
         recovered_at: new Date().toISOString(),
         next_safe_action: "submit a new explicitly confirmed future disposition if incubation is still desired",
       };
@@ -1080,7 +1296,7 @@ async function executeFutureTransaction(
         transaction_path: transactionPath,
         attempt_path: attemptPath,
         deduplicated: false,
-        control_state_writes_performed: [...initialControlWrites, transactionPath, attemptPath],
+        control_state_writes_performed: controlWrites(transactionPath, attemptPath),
       };
     }
 
@@ -1089,6 +1305,14 @@ async function executeFutureTransaction(
     }
     if (!transaction && params.recovery_action) {
       throw new Error("no interrupted future transaction exists to recover");
+    }
+    if (transaction && productMutated && transaction.ownership_receipt_path === undefined) {
+      transaction = {
+        ...transaction,
+        ownership_receipt_path: ownershipPath,
+        product_resource_mutation_performed: true,
+      };
+      replaceDurableJson(transactionPath, transaction);
     }
 
     if (transaction) {
@@ -1190,11 +1414,34 @@ async function executeFutureTransaction(
       : commitSha;
 
     if (!commitObjectSha) {
+      if (!existsSync(targetDir) && ownershipProven) {
+        throw new Error("immutable ownership receipt exists but its directory is absent; refusing automatic recreation");
+      }
       if (!existsSync(targetDir)) {
         ensureFutureRoot(cwd, true);
         mkdirSync(targetDir, { mode: 0o700 });
         productMutated = true;
-        transaction = { ...transaction, phase: "directory-created", product_resource_mutation_performed: true };
+        ownershipCreated = createDurableJson(ownershipPath, {
+          version: 1,
+          kind: "future-directory-ownership",
+          disposition_id: dispositionId,
+          payload_fingerprint: payloadFingerprint,
+          owner_session_id: sessionId,
+          repository_root: cwd,
+          base_head: baseHead,
+          target_directory: relativeDir,
+          directory_created_exclusively: true,
+          created_at: new Date().toISOString(),
+        });
+        if (!ownershipCreated) {
+          throw new Error(`future directory ownership receipt already exists: ${ownershipPath}`);
+        }
+        transaction = {
+          ...transaction,
+          phase: "directory-created",
+          product_resource_mutation_performed: true,
+          ownership_receipt_path: ownershipPath,
+        };
         replaceDurableJson(transactionPath, transaction);
         await testFault(pi, "directory-created");
       } else if (!productMutated) {
@@ -1315,7 +1562,7 @@ async function executeFutureTransaction(
       await git(
         pi,
         cwd,
-        ["push", "--porcelain", beforePush.remote, `HEAD:refs/heads/${beforePush.remoteBranch}`],
+        ["push", "--porcelain", beforePush.remote, `${commitSha}:refs/heads/${beforePush.remoteBranch}`],
         signal,
       );
       await testFault(pi, "push-returned");
@@ -1374,7 +1621,7 @@ async function executeFutureTransaction(
       transaction_path: transactionPath,
       attempt_path: attemptPath,
       deduplicated: false,
-      control_state_writes_performed: [...initialControlWrites, transactionPath, attemptPath],
+      control_state_writes_performed: controlWrites(transactionPath, attemptPath),
     };
   } catch (error) {
     const failure = errorMessage(error);
@@ -1438,7 +1685,7 @@ async function executeFutureTransaction(
       transaction_path: transactionPath,
       attempt_path: attemptPath,
       deduplicated: false,
-      control_state_writes_performed: [...initialControlWrites, transactionPath, attemptPath, ...(productMutated ? [blockerPath] : [])],
+      control_state_writes_performed: controlWrites(transactionPath, attemptPath, ...(productMutated ? [blockerPath] : [])),
     };
   } finally {
     try {

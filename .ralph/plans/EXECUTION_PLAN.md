@@ -1,8 +1,8 @@
 # Execution Plan — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slices 1–2
-> (`prime-claw-h6w.2`–`.3`) are implemented and validated; Slices 3–8 remain
-> open.
+> **Status:** implementation in progress; Slice 1 is validated; the Slice 2
+> (`prime-claw-h6w.3`) safety revision is implemented and locally validated,
+> pending fresh owner/EXPERT acceptance; Slices 3–8 remain unstarted.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -20,7 +20,7 @@
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
 | 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed at Slice 1) |
-| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Implemented and validated | locked private-index/CAS transaction; 50/50 Node tests; `pytest -q tests` (237 passed) |
+| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Revision implemented; owner/EXPERT re-review pending | Astra 5/5; Node 58/58; `pytest -q tests` 237 passed, 11 warnings; independent read-only audit APPROVE |
 | 3–8 | `prime-claw-h6w.4`–`.9` | Not started | Dependency-ordered below |
 
 Slice 1 evidence names the exact active-suite command. It does not claim a
@@ -100,6 +100,7 @@ calls. Keep runtime-only control state beneath:
 <GIT_COMMON_DIR>/prime-claw/
 ├── locks/project-mutation.lock/
 ├── dispositions/<disposition-id>.json
+├── future-ownership/<disposition-id>.json
 ├── episodes/<episode-id>.json
 └── tasks/<episode-id>.json
 ```
@@ -107,7 +108,10 @@ calls. Keep runtime-only control state beneath:
 This location is shared by the canonical checkout and all of its worktrees,
 survives session/kernel/extension restarts, does not dirty any checkout, and is
 local to the runtime whose sessions/worktrees it describes. Writes use an
-atomic create-or-rename protocol. A project-scoped lock uses atomic directory
+atomic create-or-rename protocol. Future directory deletion authority comes
+only from a separate immutable create-only ownership receipt written after an
+exclusive successful `mkdir`; a failed precondition or mutable journal field
+cannot establish ownership. A project-scoped lock uses atomic directory
 creation, includes diagnostic owner/time metadata, and is never silently
 stolen. Stale-lock recovery is explicit.
 
@@ -160,10 +164,12 @@ Under the project lock, the future path:
    literal owned paths there, and proves its tree equals the allowlist;
 5. creates the exact commit with Git plumbing, compare-and-swap advances the
    checked default ref, then reconciles only owned paths into the primary index;
-6. queries the actual remote OID, pushes without force only from the recorded
-   remote base, and verifies the resulting remote OID; and
+6. queries the actual remote OID, pushes the pinned owned commit OID (never
+   moving `HEAD`) without force only from the recorded remote base, and verifies
+   the resulting remote OID; and
 7. rechecks exact commit paths/content and a clean canonical checkout before
-   reporting success.
+   reporting success; replay separately validates complete historical success
+   evidence and reports current cleanliness/HEAD/upstream/remote observations.
 
 The private-index/CAS path prevents a non-cooperative primary-index writer from
 entering the future commit. It intentionally does not invoke ordinary
@@ -172,8 +178,29 @@ trusted host contract. A rejected push, remote race, commit failure, or crash
 records the exact local commit/files/status. It does not absorb, reset, rebase,
 or commit another conversation's work. An ordinary retry only reports recovery
 state. An explicitly operator-approved `recovery_action` may inspect, continue,
-or safely remove only byte-identical uncommitted files created by that
-transaction; otherwise it stops for the operator.
+or safely unlink only byte-identical uncommitted files after immutable proof
+that the transaction exclusively created their target directory. Removal
+consumes that authority with a create-only tombstone before the first unlink, so
+path reuse cannot revive it. Target removal is non-recursive and succeeds only
+when empty, preserving any concurrent
+unowned entry. The shared future-plan parent remains unless separately proven
+owned. Otherwise recovery stops for the operator.
+
+#### Astra safety evidence retained in Slice 2
+
+| Review insight | Required mechanism | Permanent regression |
+|---|---|---|
+| ASTRA-01: failed preconditions and matching bytes can masquerade as ownership | Create-only exclusive-directory receipt; commit-bearing recovery requires it | Pre-existing identical bundle survives removal; missing receipt fails closed |
+| Follow-up: a valid old receipt can outlive successful removal and path reuse | Create-only consumed-authority tombstone written before unlink; live-status gate; no automatic recreation | Byte-identical replacement survives repeated removal even after mutable journal reset |
+| Follow-up: tombstone control path can itself escape through a child symlink | Derive ownership and consumption directories with validated Git-common-dir containment | Static child-symlink test proves no external write and no bundle mutation |
+| ASTRA-02: recursive cleanup has a check/delete race | Per-file verification/unlink plus non-recursive empty-target removal; retain shared parent | Concurrent injected entry survives and leaves recoverable failure state |
+| ASTRA-03: `HEAD` can advance after commit verification | Push `<owned-commit-oid>:<default-ref>` rather than `HEAD:<default-ref>` | Remote receives owned commit and excludes concurrent local descendant |
+| ASTRA-04a: a mutable success label can bypass missing evidence | Validate phase/OIDs, parent, exact commit bundle, hashes, ownership receipt, and actual remote before clearing blockers | Malformed `verified-success` journal is preserved and rejected |
+| ASTRA-04b: replay can confuse historical cleanliness with current dirt | Return separately named historical facts and fresh checkout/status/HEAD/upstream/remote observations | Dirty replay reports current `checkout_clean: false` while retaining historical success |
+
+The five original Astra counterexamples must run against the current extension,
+not only the pinned reviewed blob. The adjacent follow-up regressions above are
+part of the same Slice 2 acceptance boundary and cannot be deferred.
 
 ### 2.5 Promoted episode transaction
 
@@ -509,6 +536,11 @@ private transcript text.
 | Lock held or ownership ambiguous | Fail closed; report owner/time/recovery; never steal automatically |
 | Canonical checkout dirty | No write/stage/commit; exact paths/status reported |
 | Future write/commit/push interrupted | Journal exact owned files/commit and clean/dirty/ahead state; explicit recover only |
+| Pre-existing byte-identical future bundle | Collision only; no immutable ownership receipt exists, so recovery cannot delete it |
+| Removed target path is later reused | Create-only consumption tombstone makes deletion authority single-use; preserve the replacement even if mutable journal state changes |
+| Concurrent entry appears during owned removal | Unlink only proven files; non-recursive directory removal fails and preserves the new entry |
+| Local HEAD advances before push | Push the pinned owned commit OID, never moving `HEAD`; unrelated descendant remains unpublished |
+| Success journal malformed or replay checkout dirty | Validate full historical commit/remote/content evidence; preserve malformed state; report current cleanliness separately |
 | Branch or worktree collision | Preserve existing resource; create nothing at that identity |
 | Failure after creating an owned resource | Journal it; remove only when identity and pristine state prove safe, otherwise preserve |
 | Fork mismatch or incomplete branch | Do not activate; preserve fork evidence and recovery state |
@@ -544,6 +576,7 @@ private transcript text.
 | R-WE-33 | every slice; final dogfood 8 |
 | R-WE-34 | 1 and 4 |
 | R-WE-35, R-WE-36 | 2 |
+| R-WE-69, R-WE-70, R-WE-71, R-WE-72 | 2 |
 
 A generated inventory assertion must show every R-WE ID exactly once in the
 requirements source and at least one `proven_by` path after its owning slice.
@@ -568,6 +601,7 @@ concurrency coverage in earlier slices.
 | D-WE-12 validated trusted host mechanics | §§2.1–2.6; all mutating slices |
 | D-WE-13 POC is evidence, not integration proof | audit; Slices 3–4 and 8 |
 | D-WE-14 explicit model-to-host bridge | §§2.1–2.2; Slices 1 and 4 |
+| D-WE-15 immutable destructive/publication authority | §§2.2, 2.4, 6; Slice 2 |
 
 ## 8. Completion boundary
 

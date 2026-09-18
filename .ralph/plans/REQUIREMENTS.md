@@ -67,6 +67,30 @@ if it does not weaken a gate.
   the bundle committed and pushed with a clean canonical checkout on success.
   If it cannot, it reports the exact durable/dirty/commit/push state and recovery
   action without claiming success.
+- **R-WE-69 (GATE) — Proven deletion ownership.** Recovery may delete a future
+  bundle only when immutable transaction-specific evidence proves that this
+  transaction exclusively created its directory. Failed preconditions,
+  byte-identical contents, and mutable journal fields do not grant ownership;
+  historical ownership evidence does not authorize automatic recreation after
+  the directory has been removed, and removal authority is durably single-use so
+  it cannot delete a later replacement at the reused path. Commit-bearing
+  recovery without the receipt fails closed. Both the ownership receipt and its
+  consumed-authority tombstone live beneath validated, non-symlink Git control
+  directories and may not write through an escaping child path.
+- **R-WE-70 (GATE) — Race-safe owned removal.** Recovery unlinks only individually
+  verified owned files and removes the proven target directory non-recursively.
+  A concurrent unowned entry is preserved and makes directory removal fail
+  closed; the shared future-plan parent is retained without exclusive proof.
+- **R-WE-71 (GATE) — Pinned publication.** Future publication pushes the verified
+  owned commit OID, not moving `HEAD`, so a concurrent local descendant cannot
+  be published by the transaction.
+- **R-WE-72 (GATE) — Verified replay truth.** A replayed `verified-success`
+  record validates its journal phase and OIDs, commit parent, exact paths and
+  contents, document
+  hashes, immutable ownership evidence, and actual remote reachability before
+  clearing blockers or reporting historical success. Malformed success state is
+  preserved and fails closed. Historical cleanliness is labeled separately from
+  current checkout cleanliness, status paths, HEAD, upstream, and remote.
 
 ## Episode creation
 

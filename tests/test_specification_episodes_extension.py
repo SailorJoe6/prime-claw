@@ -94,11 +94,12 @@ def test_slice2_future_requirements_are_traced():
     expected = {
         "R-WE-1", "R-WE-2", "R-WE-10", "R-WE-11", "R-WE-12",
         "R-WE-31", "R-WE-32", "R-WE-33", "R-WE-35", "R-WE-36",
+        "R-WE-69", "R-WE-70", "R-WE-71", "R-WE-72",
     }
     assert expected <= entries.keys()
     assert entries["R-WE-10"]["status"].startswith("proven")
-    assert entries["R-WE-35"]["status"].startswith("proven")
-    assert entries["R-WE-36"]["status"].startswith("proven")
+    for requirement_id in {"R-WE-35", "R-WE-36", "R-WE-69", "R-WE-70", "R-WE-71", "R-WE-72"}:
+        assert entries[requirement_id]["status"].startswith("proven")
     for requirement_id in expected:
         referenced = entries[requirement_id]["proven_by"]
         assert all((REPO / path).exists() for paths in referenced.values() for path in paths)
