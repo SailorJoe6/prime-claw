@@ -295,8 +295,11 @@ The pre-start read-only gate found zero gbrain processes, unchanged canonical st
 preserved 439-page / 1,459-chunk candidate. Evidence:
 `docs/evidence/embedding-resume-preflight-20260918T135418Z.json`.
 
-**Next bounded objective.** Start exactly one isolated candidate build and monitor it. Never drop
-either database. Acceptance and atomic cutover remain separate later gates.
+**One isolated build is active.** `bin/prime-claw embedding-build` started once at
+2026-09-18T13:55:13Z (host PID 63246). Agent-owned heartbeat
+`21c6013f-1b1a-45e8-aaf5-bbc55e7f2edd` monitors the existing handle every ten minutes and must
+never start a second build. Never drop either database. Acceptance and atomic cutover remain
+separate later gates.
 
 
 **Goal.** Support the operator's explicitly selected home-network OpenAI-compatible
