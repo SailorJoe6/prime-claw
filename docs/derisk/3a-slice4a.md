@@ -124,3 +124,14 @@ durable progress, normal completion, and parent-signal cleanup. The focused suit
 the canonical suite passed 231. Independent review found no remaining high/medium issue. Evidence:
 [`embedding-watchdog-20260918T135055Z.json`](../evidence/embedding-watchdog-20260918T135055Z.json).
 No live probe, build, acceptance, or cutover was performed by this validation step.
+
+
+## Safe-resume preflight — pass
+
+After watchdog commit `5891bfe` was pushed, both the host and in-sandbox exact-model probes returned
+HTTP 200 with exactly 4096 values while omitting `dimensions`. The ignored candidate policy was
+applied only for the sandbox probe and the canonical gateway policy was restored. The final
+read-only gate found zero gbrain processes, canonical state unchanged at 1,059 pages / 3,031
+1536-dimensional chunks, and the candidate preserved at 439 pages / 1,459 valid 4096-dimensional
+chunks without a bookmark. Evidence:
+[`embedding-resume-preflight-20260918T135418Z.json`](../evidence/embedding-resume-preflight-20260918T135418Z.json).

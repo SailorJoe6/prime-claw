@@ -289,10 +289,14 @@ normal completion, and parent-signal cleanup. Focused tests pass 24/24 and the c
 passes 231/231. Independent review found no remaining high/medium issues. Evidence:
 `docs/evidence/embedding-watchdog-20260918T135055Z.json`.
 
-**Next bounded objective.** Land the reviewed watchdog fix, then require host and in-sandbox
-exact-model probes to return HTTP 200 with exactly 4096 values while preserving/restoring the
-canonical policy. If both pass and no sync process exists, resume exactly one isolated candidate
-build. Never drop either database. Acceptance and atomic cutover remain separate later gates.
+**Resume preflight PASS.** Watchdog commit `5891bfe` is pushed. Host and in-sandbox exact-model
+probes both returned HTTP 200 with exactly 4096 values; the canonical gateway policy was restored.
+The pre-start read-only gate found zero gbrain processes, unchanged canonical state, and the
+preserved 439-page / 1,459-chunk candidate. Evidence:
+`docs/evidence/embedding-resume-preflight-20260918T135418Z.json`.
+
+**Next bounded objective.** Start exactly one isolated candidate build and monitor it. Never drop
+either database. Acceptance and atomic cutover remain separate later gates.
 
 
 **Goal.** Support the operator's explicitly selected home-network OpenAI-compatible

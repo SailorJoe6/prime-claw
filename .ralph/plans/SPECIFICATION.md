@@ -12,8 +12,10 @@
 > prime-claw-owned durable-progress watchdog now uses a dedicated process group, whole-group
 > TERM/KILL liveness, a durable database watermark, bounded progress queries, and a parent-visible
 > stall result. Independent review found no remaining high/medium issues; executable regressions
-> and all 231 canonical tests pass. Host and in-sandbox exact-model probes are the remaining gates
-> before exactly one isolated resume. No acceptance or cutover has started.
+> and all 231 canonical tests pass. Host and in-sandbox exact-model probes both returned HTTP 200
+> with exactly 4096 values; the canonical policy was restored and zero sync processes existed at
+> the pre-start gate. Exactly one isolated resume is now authorized. No acceptance or cutover has
+> started.
 
 
 This document is the summary and index for the work. It is accompanied by:

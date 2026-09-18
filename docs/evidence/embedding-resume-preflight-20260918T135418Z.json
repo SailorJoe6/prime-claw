@@ -1,0 +1,48 @@
+{
+  "artifact": "prime-claw Phase 3a Slice 4A safe resume preflight",
+  "timestamp_utc": "2026-09-18T13:54:18.297395+00:00",
+  "result": "PASS",
+  "watchdog_commit": "5891bfe",
+  "watchdog_commit_pushed": true,
+  "exact_model": "Qwen3-Embedding-8B",
+  "dimensions_field": "omitted",
+  "host_probe": {
+    "status": 200,
+    "dimensions": 4096,
+    "ok": true
+  },
+  "in_sandbox_probe": {
+    "policy_applied": true,
+    "status": 200,
+    "dimensions": 4096,
+    "ok": true,
+    "policy_restored": true
+  },
+  "prestart_state": {
+    "active_gbrain_processes": 0,
+    "canonical": {
+      "pages": 1059,
+      "chunks": 3031,
+      "embeddings": 3031,
+      "dimensions": 1536,
+      "bookmark": "5a477eaa5b311b9b45324591dd308e83ddcd1ded",
+      "column": "vector(1536)",
+      "config_model": "openai:text-embedding-3-large"
+    },
+    "candidate": {
+      "pages": 439,
+      "chunks": 1459,
+      "embeddings": 1459,
+      "bad_vectors": 0,
+      "bookmark": "",
+      "column": "vector(4096)",
+      "hnsw_indexes": 0
+    }
+  },
+  "safety": {
+    "canonical_policy_restored": true,
+    "private_endpoint_recorded": false,
+    "credentials_accessed": false,
+    "build_started": false
+  }
+}
