@@ -1,6 +1,6 @@
 # Home-network embedding runtime
 
-> **Status:** OPERATOR-REQUIRED PROFILE BLOCKED — resumed candidate preserved; exact Qwen service unavailable again; no cutover.
+> **Status:** OPERATOR-REQUIRED PROFILE IN PROGRESS — service and watchdog gates recovered; exact probes precede one resumed build; no cutover.
 > **Decision:** D3a-L/M · **Requirements:** R3a-12, R3a-14, R3a-15 · **Plan:** Phase 3a Slices 4P/4A
 
 ## Portable default versus this optional profile
@@ -94,8 +94,12 @@ policy and builds only `gbrain_qwen4096`. It sets `GBRAIN_HOME` to the parent
 `/sandbox/.prime-claw/qwen-candidate` (upstream appends `.gbrain`), writes the candidate config
 mode 0600, exports both embedding and query-embedding timeouts as `1000000` ms, registers the
 canonical `/sandbox/brain` clone, and performs a pinned single-worker full sync with explicit non-interactive inline-embed consent with pull and
-extraction disabled. It exports the upstream 12,000-second sync hard deadline and a
-1,200-second no-progress watchdog; the outer build timeout is 14,400 seconds.
+extraction disabled. It exports the upstream 12,000-second sync hard deadline and adds a prime-claw-owned
+1,200-second durable-progress watchdog around the `--full` import path; the outer build timeout is
+14,400 seconds. The watchdog tracks candidate-only page/chunk/embedding counts plus the latest
+`embedded_at`, bounds each PostgreSQL progress query, and owns the sync in a separate process
+group. A stall always returns 124—even if the leader exits 0 on TERM—and TERM/KILL cleanup covers
+signal-ignoring descendants.
 
 The build gate requires `vector(4096)`, a source bookmark equal to the pinned brain Git HEAD,
 every candidate chunk stamped with the current text hash/signature and exact Qwen model, and no
@@ -130,22 +134,21 @@ the gbrain/Bun runtime. It must not provision an embedding credential provider.
 
 ## Current operational status
 
-The operator-required local profile is blocked on the exact Qwen service. A 2026-09-18
-compatibility probe initially passed and one isolated build resumed. It advanced the preserved
-candidate to 439 pages and 1,459 fully embedded 4096-dimensional chunks, then sustained embedding
-requests failed. The 12,000-second hard deadline stopped the run safely; a post-failure exact-model
-host probe returned HTTP 503.
+The operator found and fixed the service-side thermal-control cause. Sustained embedding work had
+reached the real 80°C admission threshold. The first graceful sleep timed out while requests were
+active; after cooling to about 60°C, the positive containment latch correctly remained set, but its
+retry path passed current healthy state instead of the latched sleep action. A slower resource
+snapshot then retained `thermal_admission_denied` for up to 180 seconds after the latch fix.
 
-The candidate has zero detected stale/null/mixed stored vectors but no source bookmark and is not
-accepted. The canonical `gbrain` database/config remain unchanged at 1,059 pages and 3,031
-1536-dimensional chunks, the gateway policy was restored, and no cutover occurred.
+After that window, an exact `Qwen3-Embedding-8B` probe with omitted dimensions returned HTTP 200
+and 4096 values. The earlier candidate remains partial and unaccepted at 439 pages / 1,459 current
+4096-dimensional chunks without a source bookmark. Canonical `gbrain` remains unchanged at 1,059
+pages / 3,031 1536-dimensional chunks; no cutover occurred.
 
-Before resuming again:
+Prime-claw's durable candidate-DB progress watchdog now covers upstream `gbrain sync --full`,
+including the `import.files` path that the upstream stall knob does not interrupt. Its executable
+regressions and the 231-test canonical suite pass. After host plus in-sandbox 200/4096 probes,
+resume exactly one isolated build. Never drop or modify either database.
 
-1. Restore and confirm the exact Qwen service is stable.
-2. Correct the discovered fail-fast gap: the upstream `--full` `import.files` path did not honor
-   the configured 1,200-second no-progress watchdog, although the hard deadline worked.
-3. Require both host and in-sandbox exact-model probes to return HTTP 200 with 4096 values.
-4. Resume exactly one isolated build; never drop or modify either database.
-
-Evidence: [`embedding-build-service-unavailable-20260918T045000Z.json`](evidence/embedding-build-service-unavailable-20260918T045000Z.json).
+Historical failure evidence:
+[`embedding-build-service-unavailable-20260918T045000Z.json`](evidence/embedding-build-service-unavailable-20260918T045000Z.json).

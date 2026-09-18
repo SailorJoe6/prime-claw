@@ -1,6 +1,6 @@
 # Phase 3a Slice 4A — optional home-Qwen embedding override
 
-**Status:** BLOCKED — 4A.1 complete; resumed 4A.2a stopped safely when the exact Qwen service became unavailable again
+**Status:** IN PROGRESS — 4A.1 complete; service and watchdog gates recovered; exact probes precede one 4A.2a resume
 **Decision:** D3a-L
 **Requirements:** R3a-12, R3a-14
 **Evidence:** [`docs/evidence/embedding-preflight-20260916T191526Z.json`](../evidence/embedding-preflight-20260916T191526Z.json)
@@ -93,3 +93,34 @@ interrupt upstream gbrain's `--full` `import.files` path. Only the 12,000-second
 bounded this run. Before another live resume, correct that fail-fast gap and require both host and
 in-sandbox exact-model probes to return 200/4096. The external unblock condition is a stable exact
 Qwen service. Sanitized evidence is linked above; the private endpoint is absent.
+
+
+## External service recovery and safe resume gate
+
+The operator traced the external failure to the DGX Spark thermal-control path. Sustained work
+correctly crossed the 80°C admission threshold. The first graceful sleep timed out under active
+requests; after cooling to about 60°C, containment remained latched as designed, but its retry
+passed current healthy state instead of the latched sleep action. After that fix, the slower
+resource snapshot retained `thermal_admission_denied` for up to 180 seconds. All immediate probes
+inside that window returned `thermal_cooldown`/HTTP 503; a delayed probe returned HTTP 200 with
+4096 values.
+
+The external blocker is cleared. Before one live resume, prime-claw is adding its own durable
+candidate-DB progress watchdog around upstream `gbrain sync --full`, because the upstream stall
+knob does not interrupt `import.files`. Acceptance and cutover remain pending.
+
+
+## Candidate full-sync watchdog — validated
+
+The operator gave the restart cue after hardening the embedding service. Before any live probe or
+resume, prime-claw closed the upstream `import.files` fail-fast gap. Candidate sync now runs in a
+`setsid` process group. A candidate-only database watermark tracks page count, chunk count,
+non-null embeddings, and `max(embedded_at)` with bounded PostgreSQL calls. A stall sends TERM to
+the complete group, checks complete-group liveness, escalates to KILL, and records a parent-visible
+sentinel so a leader that exits 0 on TERM still yields exit 124. HUP/INT/TERM also reap the group.
+
+Executable regressions cover a TERM-ignoring descendant, false-success prevention, timer reset on
+durable progress, normal completion, and parent-signal cleanup. The focused suite passed 24 tests;
+the canonical suite passed 231. Independent review found no remaining high/medium issue. Evidence:
+[`embedding-watchdog-20260918T135055Z.json`](../evidence/embedding-watchdog-20260918T135055Z.json).
+No live probe, build, acceptance, or cutover was performed by this validation step.

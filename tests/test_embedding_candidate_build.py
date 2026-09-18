@@ -8,6 +8,12 @@ import inspect
 import json
 import os
 import re
+import shlex
+import signal
+import subprocess
+import sys
+import threading
+import time
 from importlib.machinery import SourceFileLoader
 
 import pytest
@@ -78,6 +84,172 @@ def test_candidate_database_cannot_diverge_from_actual_canonical_identity(tmp_pa
 def test_candidate_home_is_confined_parent_not_final_dot_gbrain(tmp_path, bad):
     with pytest.raises(ValueError):
         pc._embedding_settings(cfg(tmp_path, embedding_candidate_home=bad))
+
+
+def test_candidate_full_sync_has_durable_progress_watchdog(tmp_path):
+    settings = pc._embedding_settings(cfg(tmp_path))
+    script = pc._candidate_build_script(cfg(tmp_path), settings)
+
+    # Upstream's GBRAIN_SYNC_STALL_ABORT_SECONDS does not interrupt the
+    # `--full` import.files path. prime-claw must independently watch durable
+    # candidate DB progress and terminate the one sync process when it stalls.
+    assert "setsid gbrain sync --source brain --full --no-pull --no-extract --workers 1 --yes 2>&1 &" in script
+    assert "SYNC_PID=$!" in script
+    assert "candidate-progress-watchdog" in script
+    assert "count(c.embedding)" in script
+    assert "max(c.embedded_at)" in script
+    assert "LAST_PROGRESS_AT" in script
+    assert 'kill -"$1" -- "-$SYNC_PID"' in script
+    assert 'kill -0 -- "-$SYNC_PID"' in script
+    assert "candidate_sync_group_alive" in script
+    assert "signal_candidate_sync TERM" in script
+    assert "signal_candidate_sync KILL" in script
+    assert 'wait "$SYNC_PID"' in script
+    assert "WATCHDOG_PID=$!" in script
+    assert "trap handle_candidate_signal HUP INT TERM" in script
+    assert "GBRAIN_SYNC_STALL_ABORT_SECONDS=1200" in script
+    syntax = subprocess.run(["bash", "-n"], input=script, text=True, capture_output=True)
+    assert syntax.returncode == 0, syntax.stderr
+
+
+def _watchdog_test_env(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    setsid = bin_dir / "setsid"
+    setsid.write_text(
+        f"#!{sys.executable}\n"
+        "import os, sys\n"
+        "os.setsid()\n"
+        "os.execvp(sys.argv[1], sys.argv[1:])\n"
+    )
+    setsid.chmod(0o755)
+    env = os.environ.copy()
+    env["PATH"] = str(bin_dir) + os.pathsep + env["PATH"]
+    return env
+
+
+def _pid_exists(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def _wait_pid_gone(pid, timeout=2):
+    deadline = time.time() + timeout
+    while _pid_exists(pid) and time.time() < deadline:
+        time.sleep(0.02)
+    return not _pid_exists(pid)
+
+
+def test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero(tmp_path):
+    leader_pid_file = tmp_path / "sync.pid"
+    descendant_pid_file = tmp_path / "descendant.pid"
+    progress_file = tmp_path / "progress"
+    progress_file.write_text("steady")
+    descendant = (
+        "trap '' HUP INT TERM; "
+        f"echo $$ > {shlex.quote(str(descendant_pid_file))}; "
+        "while :; do sleep 1; done"
+    )
+    worker = (
+        "bash -c " + shlex.quote(descendant) + " & "
+        f"echo $$ > {shlex.quote(str(leader_pid_file))}; "
+        "trap 'exit 0' TERM; while :; do sleep 1; done"
+    )
+    fragment = pc._candidate_progress_watchdog_script(
+        "bash -c " + shlex.quote(worker),
+        "cat " + shlex.quote(str(progress_file)),
+        stall_seconds=1,
+        poll_seconds=1,
+        term_grace_seconds=1,
+    )
+
+    try:
+        result = subprocess.run(
+            ["bash", "-c", "set -euo pipefail\n" + fragment],
+            text=True,
+            capture_output=True,
+            timeout=8,
+            env=_watchdog_test_env(tmp_path),
+        )
+
+        assert result.returncode == 124
+        assert "candidate-progress-watchdog" in result.stderr
+        leader_pid = int(leader_pid_file.read_text())
+        descendant_pid = int(descendant_pid_file.read_text())
+        assert _wait_pid_gone(leader_pid)
+        assert _wait_pid_gone(descendant_pid)
+    finally:
+        if leader_pid_file.exists():
+            try:
+                os.killpg(int(leader_pid_file.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+def test_candidate_progress_watchdog_resets_and_signal_cleanup_reaps_group(tmp_path):
+    pid_file = tmp_path / "sync.pid"
+    progress_file = tmp_path / "progress"
+    progress_file.write_text("0")
+    worker = f"echo $$ > {shlex.quote(str(pid_file))}; trap 'exit 143' TERM; sleep 3"
+    fragment = pc._candidate_progress_watchdog_script(
+        "bash -c " + shlex.quote(worker),
+        "cat " + shlex.quote(str(progress_file)),
+        stall_seconds=2,
+        poll_seconds=1,
+        term_grace_seconds=1,
+    )
+    timers = [
+        threading.Timer(0.5, progress_file.write_text, args=("1",)),
+        threading.Timer(1.5, progress_file.write_text, args=("2",)),
+    ]
+    for timer in timers:
+        timer.start()
+    try:
+        result = subprocess.run(
+            ["bash", "-c", "set -euo pipefail\n" + fragment],
+            text=True,
+            capture_output=True,
+            timeout=8,
+            env=_watchdog_test_env(tmp_path),
+        )
+    finally:
+        for timer in timers:
+            timer.cancel()
+    assert result.returncode == 0, result.stderr
+    assert not _pid_exists(int(pid_file.read_text()))
+
+    # A signal to the waiting parent must also terminate and reap the isolated
+    # sync process group instead of leaving it reparented in the sandbox.
+    signal_pid_file = tmp_path / "signal-sync.pid"
+    signal_worker = (
+        f"echo $$ > {shlex.quote(str(signal_pid_file))}; "
+        "trap 'exit 143' TERM; while :; do sleep 1; done"
+    )
+    signal_fragment = pc._candidate_progress_watchdog_script(
+        "bash -c " + shlex.quote(signal_worker),
+        "printf steady",
+        stall_seconds=30,
+        poll_seconds=1,
+        term_grace_seconds=1,
+    )
+    proc = subprocess.Popen(
+        ["bash", "-c", "set -euo pipefail\n" + signal_fragment],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=_watchdog_test_env(tmp_path),
+    )
+    deadline = time.time() + 3
+    while not signal_pid_file.exists() and time.time() < deadline:
+        time.sleep(0.02)
+    assert signal_pid_file.exists()
+    proc.terminate()
+    _stdout, stderr = proc.communicate(timeout=6)
+    assert proc.returncode == 143, stderr
+    assert not _pid_exists(int(signal_pid_file.read_text()))
 
 
 def test_candidate_script_isolated_config_database_model_and_timeouts(tmp_path):

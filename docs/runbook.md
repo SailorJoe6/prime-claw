@@ -155,10 +155,13 @@ errors.
    fail closed while `home-qwen` is selected but not accepted/cut over.
 2. Confirm the canonical config and `vector(1536)` database remain intact with direct read-only
    `psql`; do not use an ordinary doctor command that may auto-migrate.
-3. Classify the sanitized gbrain failure. HTTP 503 from a fresh exact-model probe is an external
-   service blocker; do not retry until the operator restores stable service.
-4. Before a new live resume, verify both host and in-sandbox probes return HTTP 200 with exactly
-   4096 values when `dimensions` is omitted.
+3. Classify the sanitized gbrain failure. HTTP 503 with `thermal_cooldown` is an external service
+   blocker. After the fast latch clears, the resource snapshot may retain
+   `thermal_admission_denied` for up to 180 seconds; wait for that window and probe again rather
+   than starting a build during false denial.
+4. Before a new live resume, verify the prime-claw durable-progress watchdog tests pass, then
+   verify both host and in-sandbox probes return HTTP 200 with exactly 4096 values when
+   `dimensions` is omitted. A watchdog stall exits 124 and must leave no process-group descendant.
 5. Keep `GBRAIN_AI_EMBED_TIMEOUT_MS` and `GBRAIN_QUERY_EMBED_TIMEOUT_MS` at `1000000`, and keep
    the outer timeout above the sync deadline.
 

@@ -1,8 +1,8 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** BLOCKED — Slice 4A stopped safely after the exact Qwen service failed; Slice 4B remains blocked on 4A by operator ordering
+**Status:** ACTIVE — Slice 4A service and fail-fast gates recovered; exact probes precede one isolated resume; Slice 4B remains blocked on 4A by operator ordering
 **Beads:** `prime-claw-zwg` (P1)
-**Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](../REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](../DECISIONS.md)
+**Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](DECISIONS.md)
 **Date:** 2026-09-11 · **Slice 4A execution updated:** 2026-09-18
 
 This plan implements the Phase 3a spec as **vertical slices** (Cockburn elephant-carpaccio):
@@ -63,7 +63,7 @@ pivot the gbrain choice (upstream vs. thin fork) before any real brain content i
 | **S3** | Cited read/query from the sandboxed prime-agent | R3a-3 | — |
 | **S4P** | Portable no-config provider defaults: Zendesk AI Gateway Kimi inference + OpenAI 1536 embeddings; explicit overrides win | R3a-5, R3a-7, R3a-12, R3a-13, R3a-15 | **COMPLETE** — 177 tests + hermetic provider-default dry-run PASS |
 | **S4R** | Require explicit per-operator brain repository; remove personal tracked/fallback repo identity | R3a-1, R3a-5, R3a-9, R3a-16 | **COMPLETE** — 228 tests + operator-local dry-run PASS; bead `prime-claw-zwg.2` |
-| **S4A** | Operator-required local `Qwen3-Embedding-8B`/4096 profile, non-destructive build and cutover | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **BLOCKED / P0** — bead `prime-claw-zwg.5`; exact service returned HTTP 503 after resumed build; candidate preserved |
+| **S4A** | Operator-required local `Qwen3-Embedding-8B`/4096 profile, non-destructive build and cutover | R3a-2, R3a-5, R3a-7, R3a-9, R3a-12, R3a-14 | **IN PROGRESS / P0** — bead `prime-claw-zwg.5`; service recovered; durable-progress watchdog fix precedes one resume |
 | **S4B** | One routed write + push-back round-trip to the explicitly configured operator repo | R3a-4, R3a-16 | **BLOCKED ON S4A BY OPERATOR ORDERING** — bead `prime-claw-zwg.4`; generic gateway path remains technically independent |
 | **S5** | Acceptance gate + evidence + inventory + housekeeping | R3a-6 | acceptance |
 
@@ -234,8 +234,8 @@ Embedding config/vector-width mismatches stop before migration or sync.
 
 **Exit evidence.** Hermetic create dry-run selected Kimi + gateway OpenAI/1536 and only gateway
 + GitHub providers. `tests/test_portable_provider_defaults.py` passed 27 tests; the canonical
-suite passed 177. Verdict: [3a-slice4p.md](../../../docs/derisk/3a-slice4p.md); machine evidence:
-[portable-defaults-20260917T184315Z.json](../../../docs/evidence/portable-defaults-20260917T184315Z.json).
+suite passed 177. Verdict: [3a-slice4p.md](../../docs/derisk/3a-slice4p.md); machine evidence:
+[portable-defaults-20260917T184315Z.json](../../docs/evidence/portable-defaults-20260917T184315Z.json).
 
 ---
 
@@ -266,27 +266,33 @@ or to a public starter/example brain.
 supplies their own repository. Ignored-local and environment selections reach the existing clone
 path; malformed settings fail before external boundaries. Proven by 50 focused tests, 228 canonical
 tests, and an operator-local create dry-run. Verdict:
-[3a-slice4r.md](../../../docs/derisk/3a-slice4r.md). Inventory R3a-16 is proven; Slice 4A is the operator-priority gate before 4B.
+[3a-slice4r.md](../../docs/derisk/3a-slice4r.md). Inventory R3a-16 is proven; Slice 4A is the operator-priority gate before 4B.
 
 ---
 
 ## Slice 4A — Operator-local home-Qwen override (required for this operator; R3a-12, R3a-14)
 
-**Execution status (revised 2026-09-18): BLOCKED / P0 (`prime-claw-zwg.5`).** Initial
-exact-model compatibility, both sanitized preflights, and 35 focused tests passed. One isolated
-build resumed, imported 89 additional files, then sustained embedding requests failed. The
-12,000-second hard deadline sent SIGTERM after 39 run-local errors; policy restoration succeeded.
-A fresh host exact-model probe then returned HTTP 503. The candidate is preserved at 439 pages /
-1,459 current 4096d chunks with zero detected stale/null/mixed stored vectors, but no source
-bookmark. Canonical `gbrain` remains unchanged at 1,059 pages / 3,031 1536d chunks with the
-original bookmark and gateway configuration; no cutover occurred.
+**Execution status (revised 2026-09-18): IN PROGRESS / P0 (`prime-claw-zwg.5`).** The
+failed resume remains safely preserved at 439 pages / 1,459 current 4096d chunks without a source
+bookmark; canonical gateway/1536 state is unchanged. The operator found the external root cause:
+thermal admission correctly tripped at 80°C, the first graceful sleep timed out under active
+requests, and the retry incorrectly passed current healthy state instead of the latched sleep
+action. After that fix, a slower resource snapshot retained `thermal_admission_denied` for up to
+180 seconds. A delayed exact-model probe now returns HTTP 200 with 4096 values.
 
-**Exact blocker and unblock condition.** The external exact Qwen service must be restored and
-stable. Before another live build, fix and offline-test the discovered fail-fast gap: upstream
-`gbrain sync --full` did not honor `GBRAIN_SYNC_STALL_ABORT_SECONDS=1200` for the `import.files`
-path, so only the hard deadline bounded the run. Then require both host and in-sandbox probes to
-return HTTP 200 / 4096 values and resume exactly one isolated build. Never drop either database.
-Evidence: `docs/evidence/embedding-build-service-unavailable-20260918T045000Z.json`.
+**Restart cue received.** Joe confirmed the hardened service is ready. The prime-claw watchdog
+fix is validated: candidate sync runs in a dedicated process group; TERM grace and KILL use
+whole-group liveness; durable progress includes `max(embedded_at)`; PostgreSQL progress probes are
+bounded; and a parent-visible sentinel forces exit 124 even when a stalled leader exits 0 on TERM.
+Executable tests cover a TERM-ignoring descendant, false-success prevention, progress reset,
+normal completion, and parent-signal cleanup. Focused tests pass 24/24 and the canonical suite
+passes 231/231. Independent review found no remaining high/medium issues. Evidence:
+`docs/evidence/embedding-watchdog-20260918T135055Z.json`.
+
+**Next bounded objective.** Land the reviewed watchdog fix, then require host and in-sandbox
+exact-model probes to return HTTP 200 with exactly 4096 values while preserving/restoring the
+canonical policy. If both pass and no sync process exists, resume exactly one isolated candidate
+build. Never drop either database. Acceptance and atomic cutover remain separate later gates.
 
 
 **Goal.** Support the operator's explicitly selected home-network OpenAI-compatible
@@ -408,10 +414,9 @@ committed; `bd` notes updated; Phase 3a bead ready to close.
 - **Custom github profile is the main new mechanism** (push not in builtin). If profile import +
   provider swap proves unreliable, fallback: host-mediated push (agent stages commits; a host-side
   step pushes) — but that weakens the "agent pushes from inside" goal, so prefer the L7 profile.
-- **Local-Qwen completion is blocked.** Provider defaults and explicit brain-repository setup are
-  proven, but the exact service returned HTTP 503 after the resumed build. Restore stable service,
-  fix the full-sync no-progress watchdog gap, and pass host plus in-sandbox exact-model probes
-  before another resume. Never auto-switch vector spaces or accept keyword-only
+- **Local-Qwen completion is active again.** The thermal containment retry is fixed and a delayed
+  exact-model probe passes. Fix the full-sync durable-progress watchdog gap, then pass host plus
+  in-sandbox exact-model probes before one isolated resume. Never auto-switch vector spaces or accept keyword-only
   retrieval; preserve each prior database until its replacement profile passes every gate.
 - **Recreate wipes `/sandbox`** → re-run `converge`; the brain re-clones (idempotent) on converge.
 - **Generic platform (R3a-9/R3a-16):** brain repository identity is mandatory ignored-local or

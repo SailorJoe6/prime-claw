@@ -97,14 +97,16 @@ operations: `docs/runbook.md`. Plan set archived to
 
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 
-**Current status (revised 2026-09-18): BLOCKED.** Phase 3a Slices 0–3, portable-default
+**Current status (revised 2026-09-18): ACTIVE.** Phase 3a Slices 0–3, portable-default
 Slice 4P, and mandatory repository-setup Slice 4R are complete. For Joe's required local profile,
-one isolated `Qwen3-Embedding-8B` build resumed after a passing exact-model probe, then the service
-failed under sustained work. The hard deadline stopped safely; a post-stop probe returned HTTP 503.
-The partial candidate is preserved at 439 pages / 1,459 current 4096-dimensional chunks without a
-bookmark. Canonical gateway/1536 state is unchanged and no cutover occurred. Unblock Slice 4A only
-after stable service is restored and the discovered full-sync no-progress watchdog gap is fixed.
-Generic routed write/push Slice 4B remains technically independent but deferred by operator order.
+the failed Qwen resume remains safely preserved at 439 pages / 1,459 current 4096-dimensional
+chunks without a bookmark; canonical gateway/1536 state is unchanged. The operator fixed the
+Spark thermal-containment latch retry, its 180-second resource-snapshot window cleared, and an
+exact-model probe now returns HTTP 200 / 4096 values. Slice 4A has validated a prime-claw-owned
+full-sync durable-progress watchdog with whole-process-group cleanup and false-success prevention.
+The operator confirmed the hardened service is ready; host and in-sandbox exact-model probes now
+gate one isolated resume. Acceptance and cutover remain pending; generic routed write/push Slice
+4B is deferred by operator order.
 
 The riskiest integration, done as early as possible and deliberately thin but
 *whole*: a prime-agent session inside the sandbox, connected to gbrain, that

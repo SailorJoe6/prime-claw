@@ -1,0 +1,44 @@
+{
+  "artifact": "prime-claw Phase 3a Slice 4A candidate full-sync watchdog validation",
+  "timestamp_utc": "2026-09-18T13:50:55.682761+00:00",
+  "result": "PASS",
+  "live_embedding_restart_started": false,
+  "implementation": {
+    "process_group": "setsid-owned candidate sync; TERM then group-liveness grace then KILL",
+    "durable_progress": "candidate source pages|chunks|non-null embeddings|max(embedded_at)",
+    "progress_query_bounds": "5-second PostgreSQL connect and statement timeout",
+    "stall_result": "parent-visible sentinel forces exit 124 even if sync exits 0 on TERM",
+    "signal_cleanup": "HUP/INT/TERM terminate and reap the complete candidate sync group"
+  },
+  "checks": [
+    {
+      "command": "pytest -q tests/test_embedding_candidate_build.py",
+      "result": "24 passed"
+    },
+    {
+      "command": "pytest -q tests",
+      "result": "231 passed, 11 deprecation warnings"
+    },
+    {
+      "command": "python3 -m py_compile bin/prime-claw",
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS"
+    }
+  ],
+  "executable_regressions": [
+    "stall forces nonzero even when leader exits 0 on TERM",
+    "TERM-ignoring descendant is killed by process-group fallback",
+    "durable progress changes reset the timer",
+    "normal completion preserves zero exit",
+    "parent TERM reaps the sync group"
+  ],
+  "safety": {
+    "canonical_database_mutated": false,
+    "candidate_database_mutated": false,
+    "private_endpoint_recorded": false,
+    "credentials_accessed": false
+  }
+}

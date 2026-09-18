@@ -1192,6 +1192,66 @@ def _restore_historical_embedding_policy(cfg: dict, settings: dict) -> int:
     return 0
 
 
+def _candidate_progress_watchdog_script(
+        sync_command: str, progress_command: str, stall_seconds: int,
+        poll_seconds: int, term_grace_seconds: int = 30) -> str:
+    """Run one sync in its own process group and bound missing durable progress."""
+    if stall_seconds <= 0 or poll_seconds <= 0 or term_grace_seconds <= 0:
+        raise ValueError("candidate progress watchdog intervals must be positive")
+    q = shlex.quote
+    return (
+        "command -v setsid >/dev/null\n"
+        "progress_snapshot() { " + progress_command + "; }\n"
+        "SYNC_STALL_SECONDS=" + q(str(stall_seconds)) + "\n"
+        "SYNC_POLL_SECONDS=" + q(str(poll_seconds)) + "\n"
+        "SYNC_TERM_GRACE_SECONDS=" + q(str(term_grace_seconds)) + "\n"
+        "LAST_PROGRESS=$(progress_snapshot)\n"
+        "LAST_PROGRESS_AT=$(date +%s)\n"
+        "WATCHDOG_STATE=$(mktemp /tmp/prime-claw-candidate-watchdog.XXXXXX)\n"
+        "setsid " + sync_command + " &\n"
+        "SYNC_PID=$!\n"
+        "signal_candidate_sync() { kill -\"$1\" -- \"-$SYNC_PID\" 2>/dev/null || true; }\n"
+        "candidate_sync_group_alive() { kill -0 -- \"-$SYNC_PID\" 2>/dev/null; }\n"
+        "terminate_candidate_sync() {\n"
+        "  signal_candidate_sync TERM\n"
+        "  for _ in $(seq 1 \"$SYNC_TERM_GRACE_SECONDS\"); do candidate_sync_group_alive || break; sleep 1; done\n"
+        "  if candidate_sync_group_alive; then signal_candidate_sync KILL; fi\n"
+        "  return 0\n"
+        "}\n"
+        "(\n"
+        "  while kill -0 \"$SYNC_PID\" 2>/dev/null; do\n"
+        "    sleep \"$SYNC_POLL_SECONDS\"\n"
+        "    CURRENT_PROGRESS=$(progress_snapshot 2>/dev/null || true)\n"
+        "    NOW=$(date +%s)\n"
+        "    if [ -n \"$CURRENT_PROGRESS\" ] && [ \"$CURRENT_PROGRESS\" != \"$LAST_PROGRESS\" ]; then\n"
+        "      LAST_PROGRESS=\"$CURRENT_PROGRESS\"\n"
+        "      LAST_PROGRESS_AT=$NOW\n"
+        "    elif [ $((NOW - LAST_PROGRESS_AT)) -ge \"$SYNC_STALL_SECONDS\" ]; then\n"
+        "      printf stalled > \"$WATCHDOG_STATE\"\n"
+        "      echo \"[prime-claw candidate-progress-watchdog] no durable candidate DB progress for ${SYNC_STALL_SECONDS}s; terminating isolated sync\" >&2\n"
+        "      terminate_candidate_sync\n"
+        "      exit 0\n"
+        "    fi\n"
+        "  done\n"
+        ") &\n"
+        "WATCHDOG_PID=$!\n"
+        "cleanup_candidate_watchdog() { kill \"$WATCHDOG_PID\" 2>/dev/null || true; wait \"$WATCHDOG_PID\" 2>/dev/null || true; rm -f \"$WATCHDOG_STATE\"; }\n"
+        "handle_candidate_signal() { terminate_candidate_sync; cleanup_candidate_watchdog; wait \"$SYNC_PID\" 2>/dev/null || true; exit 143; }\n"
+        "trap cleanup_candidate_watchdog EXIT\n"
+        "trap handle_candidate_signal HUP INT TERM\n"
+        "set +e\n"
+        "wait \"$SYNC_PID\"\n"
+        "SYNC_RC=$?\n"
+        "set -e\n"
+        "WATCHDOG_RESULT=$(cat \"$WATCHDOG_STATE\" 2>/dev/null || true)\n"
+        "terminate_candidate_sync\n"
+        "cleanup_candidate_watchdog\n"
+        "trap - EXIT HUP INT TERM\n"
+        "[ \"$WATCHDOG_RESULT\" != stalled ] || exit 124\n"
+        "[ \"$SYNC_RC\" -eq 0 ] || exit \"$SYNC_RC\"\n"
+    )
+
+
 def _candidate_build_script(cfg: dict, settings: dict) -> str:
     """Return the sandbox-only parallel Qwen database build script.
 
@@ -1253,9 +1313,31 @@ def _candidate_build_script(cfg: dict, settings: dict) -> str:
         "if [ -z \"$SOURCE_PATH\" ]; then gbrain sources add brain --path " + q(sb_brain) +
         "; else [ \"$SOURCE_PATH\" = " + q(sb_brain) + " ]; fi\n"
     )
+    progress_sql = (
+        "SELECT concat_ws('|',"
+        "(SELECT count(*) FROM pages WHERE source_id='brain'),"
+        "(SELECT count(*) FROM content_chunks c JOIN pages p ON p.id=c.page_id "
+        " WHERE p.source_id='brain'),"
+        "(SELECT count(c.embedding) FROM content_chunks c JOIN pages p ON p.id=c.page_id "
+        " WHERE p.source_id='brain'),"
+        "(SELECT COALESCE(max(c.embedded_at)::text,'') FROM content_chunks c "
+        " JOIN pages p ON p.id=c.page_id WHERE p.source_id='brain'));"
+    )
+    progress_poll_seconds = max(5, min(60, settings["sync_stall_abort_seconds"] // 4))
+    progress_command = (
+        "PGCONNECT_TIMEOUT=5 PGOPTIONS=" + q("-c statement_timeout=5000") +
+        " psql -h localhost -p " + q(pgport) + " -U " + q(pgu) +
+        " -d " + q(database) + " -Atc " + q(progress_sql)
+    )
+    watchdog_script = _candidate_progress_watchdog_script(
+        "gbrain sync --source brain --full --no-pull --no-extract --workers 1 --yes 2>&1",
+        progress_command,
+        settings["sync_stall_abort_seconds"],
+        progress_poll_seconds,
+    )
     sync = (
         "BRAIN_HEAD=$(git -C " + q(sb_brain) + " rev-parse HEAD)\n"
-        "gbrain sync --source brain --full --no-pull --no-extract --workers 1 --yes 2>&1\n"
+        + watchdog_script +
         "P=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
         " -Atc \"SELECT count(*) FROM pages WHERE source_id='brain';\")\n"
         "C=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
