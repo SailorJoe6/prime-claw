@@ -1,6 +1,6 @@
 # Phase 3a Slice 4A — optional home-Qwen embedding override
 
-**Status:** BLOCKED — 4A.1 complete; one safe resume stopped during incomplete DGX thermal recovery; no inference traffic until operator clearance
+**Status:** BLOCKED — 4A.1 complete; fresh post-clearance host probe returned HTTP 502; no sandbox probe or restart
 **Decision:** D3a-L
 **Requirements:** R3a-12, R3a-14
 **Evidence:** [`docs/evidence/embedding-preflight-20260916T191526Z.json`](../evidence/embedding-preflight-20260916T191526Z.json)
@@ -150,3 +150,20 @@ The build exited 143. Canonical policy/config/database are restored unchanged, z
 processes remain, the heartbeat is cancelled, and no cutover occurred. Do not probe or restart
 until explicit operator clearance. Evidence:
 [`embedding-build-thermal-recovery-paused-20260918T141240Z.json`](../evidence/embedding-build-thermal-recovery-paused-20260918T141240Z.json).
+
+
+## Operator clearance after thermal recovery
+
+Joe explicitly confirmed the DGX service is ready again. No inference traffic occurred while the
+slice was blocked. Resume remains gated on fresh bounded host and in-sandbox exact-model 200/4096
+probes, canonical policy restoration, and zero preexisting sync processes. Only one isolated build
+may resume from the preserved 952-page / 2,863-chunk candidate.
+
+
+## Post-clearance resume preflight — HTTP 502
+
+After the operator reported the service ready again, the required single bounded host exact-model
+probe returned HTTP 502 with zero values. Prime-claw did not retry, did not apply candidate policy,
+did not run the sandbox probe, and did not start another build. Both databases remain preserved
+and no cutover occurred. Evidence:
+[`embedding-resume-preflight-http502-20260918T152548Z.json`](../evidence/embedding-resume-preflight-http502-20260918T152548Z.json).

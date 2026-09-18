@@ -1,6 +1,6 @@
 # Execution Plan — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** BLOCKED — Slice 4A stopped safely during incomplete DGX thermal recovery; no inference traffic until operator clearance; Slice 4B remains blocked on 4A
+**Status:** BLOCKED — fresh post-clearance host exact-model probe returned HTTP 502; no sandbox probe or restart; Slice 4B remains blocked on 4A
 **Beads:** `prime-claw-zwg` (P1)
 **Spec:** [SPECIFICATION.md](SPECIFICATION.md) · **Requirements:** [REQUIREMENTS.md](../REQUIREMENTS.md) · **Decisions:** [DECISIONS.md](../DECISIONS.md)
 **Date:** 2026-09-11 · **Slice 4A execution updated:** 2026-09-18
@@ -295,21 +295,16 @@ The pre-start read-only gate found zero gbrain processes, unchanged canonical st
 preserved 439-page / 1,459-chunk candidate. Evidence:
 `docs/evidence/embedding-resume-preflight-20260918T135418Z.json`.
 
-**Operator stop / external blocker.** The single build started at 13:55:13Z and advanced the
-candidate to 952 pages / 2,863 valid 4096d chunks. Joe then reported the DGX transition was not a
-clean recovery: thermal containment remained active, admission was `recovering`, Flash repeatedly
-started without becoming healthy, proxy ownership still named Embedding after its container
-exited, and watchdog sleep attempts failed while the engine transition remained incomplete.
-Prime-claw sent TERM to the candidate sync group immediately. The build exited 143; its buffered
-output showed `upstream_unavailable` plus gbrain retry waits of about 71 and 47 seconds. The
-prime-claw durable-progress watchdog did not fire. Canonical policy/config/database are restored
-unchanged, zero gbrain processes remain, the candidate is preserved without a bookmark, and the
-agent heartbeat is cancelled. Evidence:
-`docs/evidence/embedding-build-thermal-recovery-paused-20260918T141240Z.json`.
+**Post-clearance preflight failed safely.** The required single bounded host exact-model probe
+returned HTTP 502 with zero values. Prime-claw did not retry, did not apply the candidate policy,
+did not run the sandbox probe, and did not start a build. Zero gbrain processes remain; canonical
+policy/config/database are unchanged; the 952-page / 2,863-chunk candidate remains preserved
+without a bookmark. Evidence:
+`docs/evidence/embedding-resume-preflight-http502-20260918T152548Z.json`.
 
-**Unblock condition.** Do not send host or sandbox inference probes and do not restart embeddings
-until Joe explicitly confirms the DGX engine transition is stable. On that cue, start with one
-bounded exact-model preflight; never drop either database or cut over early.
+**Unblock condition.** Do not send further host or sandbox inference probes and do not restart
+embeddings until Joe explicitly clears the HTTP 502 condition. On that cue, begin with one bounded
+host exact-model probe. Never drop either database or cut over early.
 
 
 **Goal.** Support the operator's explicitly selected home-network OpenAI-compatible

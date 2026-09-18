@@ -1,6 +1,6 @@
 # Home-network embedding runtime
 
-> **Status:** OPERATOR-REQUIRED PROFILE BLOCKED — build stopped during incomplete DGX thermal recovery; no inference traffic until operator clearance; no cutover.
+> **Status:** OPERATOR-REQUIRED PROFILE BLOCKED — fresh post-clearance host probe returned HTTP 502; no sandbox probe or restart; no cutover.
 > **Decision:** D3a-L/M · **Requirements:** R3a-12, R3a-14, R3a-15 · **Plan:** Phase 3a Slices 4P/4A
 
 ## Portable default versus this optional profile
@@ -134,19 +134,15 @@ the gbrain/Bun runtime. It must not provision an embedding credential provider.
 
 ## Current operational status
 
-The candidate full-sync watchdog and both host and in-sandbox 200/4096 probes passed. Exactly one
-isolated build then advanced the candidate to 952 pages / 2,863 valid 4096-dimensional chunks.
-During the run, the operator observed that DGX thermal containment remained active: admission was
-still recovering, Flash was cycling, proxy ownership was stale after the embedding container
-exited, and service watchdog sleep attempts could not complete the engine transition.
+The earlier isolated build stopped safely during incomplete DGX thermal recovery after advancing
+the candidate to 952 pages / 2,863 valid 4096-dimensional chunks. After the operator next reported
+the service ready, prime-claw ran exactly one bounded host exact-model probe with `dimensions`
+omitted. It returned HTTP 502 with zero values.
 
-At the operator's request, prime-claw stopped all inference traffic. Buffered gbrain output showed
-an `upstream_unavailable` error followed by internal retry waits of about 71 and 47 seconds. This
-was gbrain retry behavior; the prime-claw 1,200-second durable-progress watchdog did not fire. The
-build exited 143. Zero gbrain processes remain, the canonical gateway policy and 1,059-page /
-3,031-chunk 1536-dimensional database are unchanged, and the partial candidate has no bookmark.
-The agent heartbeat is cancelled and no cutover occurred.
+Prime-claw did not retry, apply candidate policy, run the sandbox probe, or start another build.
+Zero gbrain processes remain. The canonical gateway policy and 1,059-page / 3,031-chunk
+1536-dimensional database are unchanged; the candidate has no bookmark; no cutover occurred.
 
-Do not send host or sandbox inference probes and do not restart embeddings until the operator
-explicitly confirms the DGX engine transition is stable. Evidence:
-[`embedding-build-thermal-recovery-paused-20260918T141240Z.json`](evidence/embedding-build-thermal-recovery-paused-20260918T141240Z.json).
+Do not send further host or sandbox inference probes and do not restart embeddings until the
+operator explicitly clears the HTTP 502 condition. Evidence:
+[`embedding-resume-preflight-http502-20260918T152548Z.json`](evidence/embedding-resume-preflight-http502-20260918T152548Z.json).

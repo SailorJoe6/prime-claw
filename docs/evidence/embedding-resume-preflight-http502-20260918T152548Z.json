@@ -1,0 +1,38 @@
+{
+  "artifact": "prime-claw Phase 3a Slice 4A post-clearance resume preflight",
+  "timestamp_utc": "2026-09-18T15:25:48.160474+00:00",
+  "result": "BLOCKED_SAFE",
+  "host_exact_model_probe": {
+    "status": 502,
+    "dimensions": 0,
+    "ok": false
+  },
+  "dimensions_field": "omitted",
+  "in_sandbox_probe_attempted": false,
+  "embedding_build_started": false,
+  "preflight_state": {
+    "active_gbrain_processes": 0,
+    "canonical": {
+      "pages": 1059,
+      "chunks": 3031,
+      "embeddings": 3031,
+      "dimensions": 1536,
+      "bookmark": "5a477eaa5b311b9b45324591dd308e83ddcd1ded",
+      "config_model": "openai:text-embedding-3-large"
+    },
+    "candidate": {
+      "pages": 952,
+      "chunks": 2863,
+      "embeddings": 2863,
+      "bad_vectors": 0,
+      "bookmark": "",
+      "dimensions": 4096
+    }
+  },
+  "safety": {
+    "candidate_policy_applied": false,
+    "canonical_policy_unchanged": true,
+    "private_endpoint_recorded": false,
+    "credentials_accessed": false
+  }
+}

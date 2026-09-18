@@ -1,21 +1,17 @@
 # Specification — Phase 3a: Tracer Bullet (a brain-hosting claw)
 
-**Status:** BLOCKED — Slice 4A stopped safely during incomplete DGX thermal recovery; no inference traffic until operator clearance; Slice 4B remains deferred
+**Status:** BLOCKED — fresh post-clearance host exact-model probe returned HTTP 502; no sandbox probe or restart; Slice 4B remains deferred
 **Beads:** `prime-claw-zwg` (P1)
 **Date:** 2026-09-11 · **Slice 4A execution updated:** 2026-09-18
 **Supersedes / draws on:** zbrain parked spec `.ralph/plans/future/prime-agent-in-brain-container/` (bead `zbrain-t6m`) — its container-install mechanics informed Phase 2; its unresolved harness-mapping blocker is what prime-claw exists to solve.
 
 
-> **Qwen thermal recovery blocker (2026-09-18):** after both 200/4096 resume probes passed,
-> exactly one isolated build advanced the preserved candidate to 952 pages / 2,863 valid 4096d
-> chunks. The operator then reported that thermal containment remained active, admission was still
-> recovering, Flash was cycling, and the embedding container had exited. At the operator's request,
-> prime-claw immediately stopped all inference traffic. Buffered output showed an
-> `upstream_unavailable` failure and gbrain internal retry waits of about 71 and 47 seconds; the
-> prime-claw durable-progress watchdog did not fire. The build exited 143, canonical policy/state
-> were restored unchanged, zero gbrain processes remain, and the heartbeat is cancelled. Do not
-> probe or restart until the operator explicitly clears the DGX engine transition. No acceptance
-> or cutover has started.
+> **Post-clearance preflight blocker (2026-09-18):** after Joe reported the service ready, the
+> required single bounded host exact-model probe returned HTTP 502 with zero embedding values.
+> Prime-claw did not retry, did not apply the candidate policy, did not run the sandbox probe, and
+> did not start a build. Zero gbrain processes remain; canonical state is unchanged; the candidate
+> remains preserved at 952 pages / 2,863 valid 4096d chunks without a bookmark. Do not probe or
+> restart until the operator clears the HTTP 502 condition. No acceptance or cutover has started.
 
 
 This document is the summary and index for the work. It is accompanied by:
