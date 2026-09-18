@@ -18,8 +18,15 @@
 
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
-| 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; full pytest suite |
+| 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed) |
 | 2–8 | `prime-claw-h6w.3`–`.9` | Not started | Dependency-ordered below |
+
+Slice 1 evidence names the exact active-suite command. It does not claim a
+literal repository-root `pytest -q` run: owner review observed that command
+collecting archived Phase 1 tests whose archived relative script paths are no
+longer present (242 passed, 36 failed, 10 collection/setup errors). That is a
+pre-existing archived-test collection condition, not a Slice 1 implementation
+failure or cleanup task.
 
 Slice 1 intentionally leaves the two legacy skill aliases in place until both
 real disposition paths are proven in Slice 4. Its receipt is preflight-only and
