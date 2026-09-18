@@ -68,8 +68,8 @@
     "canonical_state_matches_pre_run_baseline": true,
     "canonical_cutover_performed": false,
     "legacy_database_mutated": false,
-    "private_endpoint_recorded": false,
-    "heartbeat_cancelled": true
+    "heartbeat_cancelled": true,
+    "private_endpoint_in_committed_artifacts": false
   },
   "tooling_finding": {
     "sync_stall_abort_seconds": 1200,
