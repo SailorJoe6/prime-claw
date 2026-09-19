@@ -1,10 +1,11 @@
 # Execution Plan — Worktree-isolated specification episodes
 
 > **Status:** implementation in progress; Slice 1 is validated; candidate
-> `44b92f8` failed its fresh owner/formal EXPERT gate. Owner transition
-> `33137bdb-e96e-4337-92df-1cdd860f9fa6` authorizes one bounded same-Slice-2
-> revision from authority commit `94ec1967966769e7e6f31141e192f411605d182c`.
-> Slice 2 remains open; Slices 3–8 are blocked.
+> `44b92f8` failed its fresh owner/formal EXPERT gate. ASTRA-10/11 remediation
+> is pushed at `e0cf297a5b047bad8811cb199969af89493d9430`. Owner transition
+> `a40489d7-38c1-4170-8b5e-c6f9c660f8b0` authorizes exactly the next bounded
+> ASTRA-17/24 same-Slice-2 task from that clean boundary. Slice 2 remains open;
+> ASTRA-25 and Slices 3–8 remain blocked.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -383,6 +384,17 @@ clean full extension suite passes 57/57 in 1,199.95 seconds. An earlier loaded
 run's two failures both passed in isolation and in the clean full rerun.
 ASTRA-17/24 and ASTRA-25 remain; no combined candidate or acceptance claim
 exists yet.
+
+Next authorized task: transition `a40489d7-38c1-4170-8b5e-c6f9c660f8b0`
+resumes `prime-claw-h6w.3` from clean commit
+`e0cf297a5b047bad8811cb199969af89493d9430` and implements ASTRA-17/24 only.
+Reconcile every uncertain post-rename barrier outcome across fresh resume under
+broad R-WE-86/R-WE-93 and D-WE-20/D-WE-21. Preserve ASTRA-10/11 and all
+accepted Slice 2 behavior; do not narrow same-UID authority. Fault, restart,
+race, mount, symlink, and destructive coverage uses disposable fixtures. This
+is an intermediate boundary: ASTRA-25 stays pending, Slice 3 stays blocked, and
+the task stops after durable evidence, bead update, commit/push, and exact
+clean local/upstream/actual-remote identity.
 
 ### 2.5 Promoted episode transaction
 

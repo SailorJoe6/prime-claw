@@ -1,10 +1,11 @@
 # Specification — Worktree-isolated specification episodes
 
 > **Status:** implementation in progress; Slice 1 is validated; candidate
-> `44b92f8` failed its fresh owner/formal EXPERT gate. Owner transition
-> `33137bdb-e96e-4337-92df-1cdd860f9fa6` authorizes one bounded same-Slice-2
-> revision from authority commit `94ec1967966769e7e6f31141e192f411605d182c`.
-> Slice 2 remains open; later paths are blocked.
+> `44b92f8` failed its fresh owner/formal EXPERT gate. ASTRA-10/11 remediation
+> is pushed at `e0cf297a5b047bad8811cb199969af89493d9430`. Owner transition
+> `a40489d7-38c1-4170-8b5e-c6f9c660f8b0` authorizes exactly the next bounded
+> ASTRA-17/24 same-Slice-2 task from that clean boundary. Slice 2 remains open;
+> ASTRA-25 and later paths remain blocked.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -421,8 +422,17 @@ anchor and retired witness at exact receipt paths, and never unlink/rmdir a
 checked probe name. Losing concurrent directory publication retains its private
 allocation and reports that path; TypeScript callers stop instead of silently
 discarding retained state. Final-leaf and late-directory substitution tests
-preserve both incarnations. This is focused implementation evidence only;
-ASTRA-17/24 and ASTRA-25 remain before the combined candidate gate.
+preserve both incarnations. This is focused implementation evidence only.
+
+Transition `a40489d7-38c1-4170-8b5e-c6f9c660f8b0` now authorizes exactly one
+bounded ASTRA-17/24 task from clean commit `e0cf297a5b047bad8811cb199969af89493d9430`:
+reconcile uncertain post-rename barrier outcomes across fresh resume under the
+existing broad R-WE-86/R-WE-93 and D-WE-20/D-WE-21 authority. Preserve the
+ASTRA-10/11 remediation and all accepted Slice 2 behavior. Do not narrow
+same-UID authority to cooperating invocations. ASTRA-25 remains pending and is
+not part of this intermediate boundary. Use disposable fixtures, then update
+evidence and bead notes, commit and push, prove clean local/upstream/actual-
+remote identity, report the partial packet, and stop. Slice 3 remains blocked.
 
 ## 6. Episode-creation behavior
 
