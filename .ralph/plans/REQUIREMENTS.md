@@ -155,6 +155,66 @@ if it does not weaken a gate.
   separate diagnostics and preserves the exact persisted success and blocker
   evidence; generic failure normalization is forbidden.
 
+- **R-WE-85 (GATE) — Allocation-unique live object authority.** Current
+  destructive authority must use an allocation identity or enforceable exclusion
+  that cannot confuse a recycled inode with the transaction-created object across
+  helper restart. Timestamp fields and rename stability are not uniqueness proof.
+  Unsupported platform/filesystem combinations reject before control or product
+  mutation. Native acceptance rapidly unlinks/recreates a real helper-created
+  file, uses fresh helper processes, and proves snapshot and retirement reject
+  every distinct allocation even when the recorded tuple collides.
+- **R-WE-86 (GATE) — Retirement cannot relocate an unauthorized replacement.**
+  File authority must never leave a late directory substitution or hardlink-dirty
+  replacement retired under a file destination with its public name absent.
+  The final mutation uses enforceable exclusion or conflict-safe no-replace
+  restoration that preserves both objects and reports their exact locations.
+  Permanent native tests substitute an unowned directory and dirty through a
+  hardlink immediately before the real retirement rename.
+- **R-WE-87 (GATE) — Object-bound one-way retirement state.** The consumed
+  manifest is staged, published, and validated as the exact approved object and
+  bytes before the first retirement. Once any consumed/partial state exists,
+  public recovery permits only inspection or exact retirement resume; `continue`
+  and all file-creation paths reject without mutation. Permanent tests replace
+  the manifest staging leaf and attempt continuation after every partial edge.
+- **R-WE-88 (GATE) — Continuous lock and control-use authority.** Project lock
+  authority remains valid through every product/control mutation, ref advance,
+  and push. Loss stops before the next mutation. Failed-acquisition cleanup cannot
+  relocate a replacement lock or free another owner's canonical name; failure
+  after helper success remains recoverable; every retention destination,
+  including quarantine, stays incarnation-bound. Permanent tests cover all four
+  ASTRA-19 boundaries and preserve every competing object.
+- **R-WE-89 (GATE) — Raw canonical proof and exact Git object types.** Before
+  semantic validation, every proof and receipt rejects duplicate decoded JSON
+  names at every nesting depth, including escaped-key collisions. Every recorded
+  Git identity has the exact unpeeled object type and relationship required by
+  its field; annotated tags are not commits. Historical timestamps are
+  calendar-valid RFC3339 values. Rejection preserves exact journal/blocker bytes.
+- **R-WE-90 (GATE) — Schema-gated recovery routing.** Mutable recovery is entered
+  only after a complete known mutable-state schema validates. Recognizable v2
+  success evidence with a missing, changed, or conflicting discriminator enters
+  preservation-only handling under ordinary replay and every explicit recovery
+  action; it cannot be normalized or overwritten.
+- **R-WE-91 (GATE) — Exact blocker authority and idempotent final outcome.** The
+  blocker object semantically approved for cleanup is the exact identity/hash
+  passed into retirement; rereading cannot authorize a replacement. Final
+  cleanup has a durable idempotent outcome protocol. A lost response reconciles
+  the approved object and either safely preserves/re-establishes the active
+  blocker or recognizes completed success without overwriting a new blocker.
+  Fresh-success and replay cases cover replacement and response-loss boundaries.
+- **R-WE-92 (GATE) — Retirement-topology capability preflight.** Before any
+  control or product mutation, preflight proves the actual source/destination
+  mount relation and required rename capability for every supported retirement
+  path, including nested mounts. Unsupported layouts reject before mutation.
+  Native two-volume coverage proves a separate-Git-dir layout cannot reach a
+  post-manifest `EXDEV` failure.
+- **R-WE-93 (GATE) — Namespace durability contract.** Supported filesystems have
+  an explicit file/directory ordering and flush contract for every acknowledged
+  create, exchange, retirement, restoration, and failure-cleanup edge. Each
+  durable progress claim includes all required source/destination directory
+  barriers. Syscall-order and restart/fault tests cover metadata persistence and
+  unsupported flush behavior; SIGKILL evidence is never described as power-loss
+  proof, and hardware/filesystem limits are explicit.
+
 ## Episode creation
 
 - **R-WE-14 (GATE) — Durable location.** Worktrees use a configurable durable

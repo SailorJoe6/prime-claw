@@ -1,8 +1,8 @@
 # Specification — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; the same-Slice-2
-> revision for ASTRA-05–09 is implemented under `prime-claw-h6w.3` and awaits
-> final validation plus fresh owner/EXPERT acceptance; later paths are blocked.
+> **Status:** implementation in progress; Slice 1 is validated; Slice 2 candidate
+> `3fe649b` passed baseline suites but failed its fresh owner/EXPERT gate on
+> ASTRA-16–24. This revision incorporates authority only; later paths are blocked.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -277,7 +277,7 @@ This section remains the immutable failed-gate authority. The owner subsequently
 verified authority commit `5d4be4a` and authorized one controlled same-Slice-2
 implementation handoff. Slice 3 remains unauthorized.
 
-### 5.4 Required implementation shape after `5d4be4a`
+### 5.4 Partial implementation shape in candidate `3fe649b`
 
 The same-Slice-2 revision satisfies the acceptance matrix only when all of the
 following hold together:
@@ -309,6 +309,41 @@ following hold together:
 Permanent safe-outcome regressions retain the supplied ASTRA-10–15 boundaries,
 and native identity tests execute on macOS plus an actual Linux filesystem.
 Fresh owner and formal EXPERT acceptance remain required before Slice 2 closes.
+Candidate `3fe649b` passed the recorded repository suites, but the gate below
+proves that these mechanisms do not satisfy the broader safety contract.
+
+### 5.5 Failed `3fe649b` gate: ASTRA-16 through ASTRA-24
+
+The authoritative reviewed range is `5d4be4a..3fe649b`. The owner independently
+confirmed combined Node 80/80, exact active `pytest -q tests` 252 passed with 11
+warnings, static/inventory/diff checks, all 62 report links, and all 1,654
+artifact-manifest entries. These are real progress, not approval. Slice 2 remains
+open, and this documentation does not authorize implementation or Slice 3.
+
+| Finding | Failed invariant | Exact permanent acceptance condition |
+|---|---|---|
+| ASTRA-16 | Linux device/inode/birthtime/mount identity can collide for a distinct rapid reallocation and fresh helpers accept/retire it | Provide allocation-unique identity or enforceable exclusion across restart, or reject the combination before mutation; retain native rapid unlink/recreate tests using real helper creation and fresh-process snapshot/retirement |
+| ASTRA-17 | A late unowned directory or hardlink-dirtied file is relocated into quarantine under file authority | Enforce the object/exclusion boundary or restore conflict-safely without relocating the replacement; preserve both objects and exact locations; permanently inject both substitutions at the native rename boundary |
+| ASTRA-18 | A replaced staging leaf can publish a foreign consumed manifest, and `continue` can recreate partially retired files and poison resume | Bind staged/published manifest identity and bytes before retirement; treat consumed state as one-way and permit only inspect/exact resume; test foreign publication and no-mutation continuation at every partial edge |
+| ASTRA-19 | Failed cleanup can retire another lock; mutation continues after lock loss; post-helper validation strands a lock; bound quarantine can be replaced | Carry actual lock/control/quarantine authority through every mutation/ref/push/use/cleanup boundary; preserve competitors without freeing their canonical name; permanently test all four boundaries |
+| ASTRA-20 | Annotated tags and duplicate/escaped JSON keys pass the closed proof; timestamps need not be calendar-valid | Reject duplicate decoded names before semantic parsing at every depth; validate unpeeled exact Git types/relationships and calendar-valid RFC3339; preserve exact evidence on rejection |
+| ASTRA-21 | Missing/changed v2 success discriminator routes into mutable recovery and overwrites journal/blocker | Gate mutable recovery on a complete known mutable schema; route recognizable malformed success to preservation-only handling under replay and every recovery action |
+| ASTRA-22 | Blocker approval and retirement can bind different objects, and response loss can remove the active blocker while reporting failure | Pass exact approved blocker identity/hash into a durable idempotent cleanup protocol; reconcile uncertain outcomes without overwriting replacements; test fresh/replay replacement and response loss |
+| ASTRA-23 | Preflight accepts a separate-mount layout whose required retirement rename fails with `EXDEV` after manifest publication | Prove actual source/destination mount and rename capability before mutation or reject; retain native nested/two-volume preflight-negative coverage |
+| ASTRA-24 | Acknowledged create/exchange/retention paths omit required namespace fsync barriers | Specify and implement ordering/flush barriers for every supported create, exchange, retirement, restore, and failure cleanup; retain syscall-order and restart/fault tests and never equate SIGKILL with power-loss proof |
+
+Stable authority mappings are R-WE-85 through R-WE-93 and D-WE-20 through
+D-WE-22. The gate also reopens broad claims for R-WE-69/70/72/73/74/76/78–82/84
+and D-WE-17–19. R-WE-71, the reviewed R-WE-75 coherence contract, R-WE-77,
+and the reviewed R-WE-83 remote predicate/order remain satisfied.
+
+Authoritative preserved evidence:
+
+- formal report: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-astra-review.md` (SHA-256 `2a24312e58a3703921fcb04e9151572eee05947bdd703fa459250beff63587dd`)
+- owner gate: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md`
+- artifact manifest: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json`
+- invocation tree: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json`
+- cleanup receipt: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json`
 
 ## 6. Episode-creation behavior
 

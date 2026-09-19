@@ -360,12 +360,75 @@ between historical validation and final observation preserves the blocker; and
 faults after success write or during final cleanup preserve exact success bytes
 and use separate diagnostics.
 
-**Evidence and implementation status:** The formal report
-`/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md`
-and owner gate
-`/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md`
-are authoritative for ASTRA-10–15. Candidate `14e5cfa` does not fully implement
-D-WE-15 or D-WE-16. The controlled post-`5d4be4a` same-Slice-2 candidate now
-implements D-WE-17–19 with permanent ASTRA-10–15 regressions and native
-macOS/Linux identity evidence. Final exact suites and fresh owner/EXPERT
-acceptance remain required; Slice 3 is not authorized.
+## D-WE-20 — Require allocation-unique authority and a proven retirement topology
+
+**Decision:** A metadata tuple is not destructive authority unless the supported
+platform proves it allocation-unique for the full helper-restart interval.
+Otherwise an enforceable live exclusion is required. Platform admission also
+proves the actual source/destination mount and rename capabilities needed by
+retirement; unsupported identity or topology combinations reject before any
+control or product mutation.
+
+**Satisfies:** R-WE-69, R-WE-70, R-WE-73, R-WE-81, R-WE-85, R-WE-86,
+R-WE-92.
+
+**Rationale:** ASTRA-16 reproduced natural Linux inode/birthtime tuple reuse and
+fresh-helper acceptance of a distinct allocation. ASTRA-17 showed that a
+pre-rename directory substitution or hardlink write can still be relocated.
+ASTRA-23 showed that accepted separate mounts can fail with `EXDEV` only after
+manifest publication. Rename stability and matching `st_dev` do not prove these
+contracts.
+
+**Acceptance:** Native rapid allocation-reuse, final directory/hardlink
+substitution, nested-mount, and two-volume tests pass on every supported
+combination. Unsupported combinations reject before durable mutation.
+
+## D-WE-21 — Make recovery and final cleanup one-way durable state machines
+
+**Decision:** Manifest publication, retirement progress, lock use, quarantine,
+and blocker cleanup are explicit one-way state machines. Every transition is
+bound to the exact approved object and continuous authority through the mutation,
+has a durable idempotent outcome, and is reconciled after an uncertain response.
+A consumed state forbids continuation. Namespace durability barriers are part of
+the transition contract, not an implementation detail.
+
+**Satisfies:** R-WE-22, R-WE-35, R-WE-69, R-WE-70, R-WE-74, R-WE-78,
+R-WE-80, R-WE-84, R-WE-87, R-WE-88, R-WE-91, R-WE-93.
+
+**Rationale:** ASTRA-18 published foreign manifest bytes and let continuation
+poison partial retirement. ASTRA-19 found lock/quarantine authority gaps at
+cleanup, use, and post-helper boundaries. ASTRA-22 separated blocker approval
+from retirement and exposed response loss. ASTRA-24 found missing namespace
+flush barriers on acknowledged transitions.
+
+**Acceptance:** Permanent tests cover foreign manifest publication, every
+partial-state recovery action, lock loss before each product/ref/push boundary,
+failed cleanup replacement, post-helper failure, quarantine replacement, blocker
+replacement and response loss, plus syscall-order/restart durability traces.
+
+## D-WE-22 — Validate raw success evidence before routing or semantic use
+
+**Decision:** Evidence is parsed with duplicate-key rejection before any routing.
+Known mutable recovery and recognizable success evidence have disjoint exact
+schemas. Git identities are validated as unpeeled exact object types and required
+relationships; timestamps are calendar-valid. Malformed recognizable success
+always enters preservation-only handling under every action.
+
+**Satisfies:** R-WE-72, R-WE-76, R-WE-78, R-WE-82, R-WE-84, R-WE-89,
+R-WE-90.
+
+**Rationale:** ASTRA-20 accepted annotated tags and duplicate/escaped raw keys.
+ASTRA-21 showed that corrupting the success discriminator routes a v2 proof into
+legacy mutable normalization.
+
+**Acceptance:** Raw duplicate-key, escaped-collision, annotated-tag, invalid-time,
+and success-discriminator matrices all reject while preserving exact journal and
+blocker bytes under ordinary replay and every recovery action.
+
+**Evidence and implementation status:** The `3fe649b` formal report
+`/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-astra-review.md`
+and adjacent owner gate are authoritative for ASTRA-16–24. The artifact manifest,
+invocation tree, and cleanup receipt remain beside them. Candidate `3fe649b`
+passed its baseline suites but failed this gate. D-WE-17–19 are only partially
+implemented; D-WE-20–22 are accepted design authority and are not implemented.
+Slice 2 remains open and Slice 3 is not authorized.

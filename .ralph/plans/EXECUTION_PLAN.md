@@ -1,8 +1,9 @@
 # Execution Plan — Worktree-isolated specification episodes
 
 > **Status:** implementation in progress; Slice 1 is validated; Slice 2 candidate
-> `14e5cfa` failed on ASTRA-10–15, and the owner-authorized post-`5d4be4a`
-> same-Slice-2 revision is in final validation. Slice 2 remains open; Slices 3–8 are blocked.
+> `3fe649b` passed baseline validation but failed its fresh owner/EXPERT gate on
+> ASTRA-16–24. This revision incorporates authority only. Slice 2 remains open;
+> Slices 3–8 are blocked.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -20,7 +21,7 @@
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
 | 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed at Slice 1) |
-| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Post-`5d4be4a` ASTRA-10–15 candidate in final validation | Prior ASTRA-05–09 regressions retained; ASTRA-10–15 mechanisms and permanent cases implemented; fresh owner/EXPERT gate still required |
+| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | **REVISE** at `3fe649b`; documentation-only ASTRA-16–24 incorporation | Baseline 80/80 and 252-pass suites are retained evidence; nine new owner-reproduced blockers require separately authorized same-Slice-2 work |
 | 3–8 | `prime-claw-h6w.4`–`.9` | Not started | Dependency-ordered below |
 
 Slice 1 evidence names the exact active-suite command. It does not claim a
@@ -246,7 +247,7 @@ Accepted authority for, and status of, the post-`5d4be4a` same-Slice-2 revision:
 | ASTRA-14 contradicted remote durability | R-WE-72/83; D-WE-19 | Final accepted remote OID still contains the success commit before blocker cleanup; stable rollback fails closed |
 | ASTRA-15 newly persisted success overwrite | R-WE-78/84; D-WE-19 | Preservation begins with durable success write; all later injected failures preserve exact journal/blocker and write diagnostics separately |
 
-Implemented response in the controlled post-`5d4be4a` revision:
+Implemented narrow response in the controlled post-`5d4be4a` revision (later gate-blocked by ASTRA-16–24):
 
 | Authority | Mechanism | Permanent evidence |
 |---|---|---|
@@ -266,6 +267,10 @@ Latest candidate validation evidence:
 - independent postfix audit after all four findings were fixed: **PASS**;
 - exact active `pytest -q tests`: **252 passed, 11 warnings** in 1163.71s.
 
+These baseline checks and the internal postfix audit do not approve the candidate;
+the later owner/formal ASTRA-16–24 gate below is authoritative and returned
+**REVISE**.
+
 Authoritative reports:
 
 - `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md` (SHA-256 `6e1a89865c5008e43ef3c7cb857b0d0b4711f887485bb9cc98b5339df77e0362`)
@@ -274,9 +279,40 @@ Authoritative reports:
 - postfix re-audit after all four fixes: `/Users/jlanders/.prime/agent/session-artifacts/01a0b638-b392-778e-8c04-c5307740fc42/sub-60e46749/postfix-audit.md` (PASS; SHA-256 `87c9cbe1f654d0709e00956217eac33178710b90e09f260cba2986c525425316`)
 
 The PROJECT_CONVERSATION verified `5d4be4a` and admitted a controlled native
-handoff for this same-Slice-2 revision. Implementation now follows the matrix
-above. Slice 3 stays unstarted, and this revision must stop for a fresh owner and
-formal EXPERT gate after exact-suite, audit, commit, and push evidence.
+handoff for this same-Slice-2 revision. Candidate `3fe649b` completed the matrix
+above and passed its baseline suites, but the fresh gate below proves the broad
+claims incomplete. Slice 3 remains unstarted.
+
+#### Failed `3fe649b` owner/EXPERT gate: ASTRA-16–24
+
+| Finding | Stable authority | Required permanent acceptance |
+|---|---|---|
+| ASTRA-16 Linux allocation reuse | R-WE-69/70/73/81/85; D-WE-18/20 | Allocation-unique authority or live exclusion across restart; native rapid reuse with real helper creation and fresh-process validation/retirement; unsupported combinations reject pre-mutation |
+| ASTRA-17 unauthorized retirement relocation | R-WE-22/69/70/73/86; D-WE-17/20 | Late directory and hardlink-dirty replacements remain at their public locations or are conflict-restored with both exact locations reported |
+| ASTRA-18 foreign manifest and continuation poisoning | R-WE-22/69/70/74/80/87; D-WE-17/21 | Exact staged/published manifest identity+bytes; consumed state permits inspect/exact resume only; foreign publication and every partial continuation are no-mutation failures |
+| ASTRA-19 lock/control use-boundary loss | R-WE-22/35/74/80/88; D-WE-17/21 | Continuous authority before every product/ref/push boundary; exact cleanup, post-helper recovery, and bound quarantine preserve canonical competitors |
+| ASTRA-20 raw proof/type gaps | R-WE-72/76/78/82/89; D-WE-19/22 | Reject annotated tags, raw duplicate/escaped keys at every depth, and invalid timestamps while preserving exact evidence |
+| ASTRA-21 corrupt success discriminator | R-WE-72/78/82/84/90; D-WE-19/22 | Complete-schema routing; recognizable malformed success is preservation-only under replay and all recovery actions |
+| ASTRA-22 blocker authority/response loss | R-WE-72/74/78/80/84/91; D-WE-19/21 | Retire the exact approved blocker under a durable idempotent outcome protocol; reconcile response loss without overwriting a replacement |
+| ASTRA-23 unsupported retirement topology | R-WE-22/81/92; D-WE-18/20 | Prove actual source/destination rename capability before mutation or reject; native nested/two-volume coverage never reaches post-manifest `EXDEV` |
+| ASTRA-24 namespace durability | R-WE-22/69/80/93; D-WE-17/21 | Explicit supported-filesystem ordering and all directory flush barriers; syscall-order/restart coverage; no power-loss claims from SIGKILL |
+
+The gate reopens broad acceptance claims for R-WE-69/70/72/73/74/76/78–82/84
+and D-WE-17–19. R-WE-71, reviewed R-WE-75, R-WE-77, and the reviewed R-WE-83
+remote predicate/order remain satisfied. D-WE-20–22 are accepted authority only,
+not implementation.
+
+Preserved authoritative evidence:
+
+- formal report: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-astra-review.md` (SHA-256 `2a24312e58a3703921fcb04e9151572eee05947bdd703fa459250beff63587dd`)
+- owner gate: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md`
+- artifact manifest: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json`
+- invocation tree: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json`
+- cleanup receipt: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json`
+
+No implementation, handoff, compaction, or Slice 3 work is authorized by this
+incorporation. The PROJECT_CONVERSATION must verify the pushed documentation
+boundary before any further same-Slice-2 execution.
 
 ### 2.5 Promoted episode transaction
 
@@ -658,7 +694,8 @@ private transcript text.
 | R-WE-35, R-WE-36 | 2 |
 | R-WE-69, R-WE-70, R-WE-71, R-WE-72 | 2 |
 | R-WE-73, R-WE-74, R-WE-75, R-WE-76, R-WE-77, R-WE-78 | 2 revision gate |
-| R-WE-79, R-WE-80, R-WE-81, R-WE-82, R-WE-83, R-WE-84 | post-`5d4be4a` same-Slice-2 implementation and final acceptance gate |
+| R-WE-79, R-WE-80, R-WE-81, R-WE-82, R-WE-83, R-WE-84 | partial mechanisms in `3fe649b`; owner adjudication in §2.4 |
+| R-WE-85, R-WE-86, R-WE-87, R-WE-88, R-WE-89, R-WE-90, R-WE-91, R-WE-92, R-WE-93 | next separately authorized same-Slice-2 revision gate (ASTRA-16–24) |
 
 A generated inventory assertion must show every R-WE ID exactly once in the
 requirements source and at least one `proven_by` path after its owning slice.
@@ -687,7 +724,10 @@ concurrency coverage in earlier slices.
 | D-WE-16 revalidate identity/containment/type/observation at use | §§2.2, 2.4, 6; not fully implemented at `14e5cfa` |
 | D-WE-17 final-syscall object/control/lock authority | §§2.2, 2.4; post-`5d4be4a` same-Slice-2 candidate |
 | D-WE-18 platform-real incarnation model | §§2.2, 2.4; post-`5d4be4a` same-Slice-2 candidate |
-| D-WE-19 closed durable success proof | §§2.2, 2.4; post-`5d4be4a` same-Slice-2 candidate |
+| D-WE-19 closed durable success proof | §§2.2, 2.4; partial at `3fe649b` |
+| D-WE-20 allocation-unique authority and retirement topology | §§2.2, 2.4; ASTRA-16/17/23 authority only |
+| D-WE-21 one-way durable recovery/control lifecycle | §§2.2, 2.4; ASTRA-18/19/22/24 authority only |
+| D-WE-22 raw proof validation before routing | §§2.2, 2.4; ASTRA-20/21 authority only |
 
 ## 8. Completion boundary
 

@@ -151,7 +151,7 @@ replaceable, fsync-and-rename transaction state:
 ├── future-attempts/<owner-and-request-hash>.json
 ├── future-ownership/<disposition-id>.json # immutable proof of exclusive mkdir
 ├── future-ownership-consumed/<disposition-id>.json # single-use removal tombstone
-├── indexes/<disposition-id>.index         # present only while needed
+├── indexes/<disposition-id>.index         # retained success/tree evidence; pre-commit removal retires it
 └── future-mutation-blocked.json            # present after owned partial mutation
 ```
 
@@ -310,8 +310,10 @@ post-`5d4be4a` same-Slice-2 revision documented below. Slice 3 is not authorized
 
 ## Same-Slice-2 ASTRA-10–15 implementation
 
-The controlled revision after authority commit `5d4be4a` implements the six
-accepted blockers without entering Slice 3:
+The controlled revision after authority commit `5d4be4a` implements narrow
+mechanisms for the six accepted blockers without entering Slice 3. Candidate
+`3fe649b` later failed its broader ASTRA-16–24 gate, so the descriptions below
+are implementation facts, not claims that the safety contract is proven:
 
 - **Final-syscall preservation (R-WE-79, D-WE-17).** Product and control leaves
   are atomically retired from their public name into
@@ -377,6 +379,43 @@ docker run --rm --user 0 --network none --read-only -e TMPDIR=/work \
   --mount type=volume,dst=/work -w /repo --entrypoint /usr/bin/python3 \
   prime-claw-brain:0.1.0 -c "import runpy; d=runpy.run_path('/repo/tests/test_specification_episode_fs_identity.py'); d['test_native_identity_survives_create_restart_and_retirement'](); d['test_native_identity_rejects_same_byte_replacement_after_restart'](); d['test_native_control_replace_exchanges_and_retains_prior_incarnation']()"
 ```
+
+## Fresh `3fe649b` gate: REVISE on ASTRA-16–24
+
+Candidate `3fe649b` passed combined Node 80/80 and exact active `pytest -q tests`
+252 passed with 11 warnings. The owner independently reproduced nine material
+boundaries that those suites do not cover. Slice 2 therefore remains open:
+
+- **ASTRA-16 / R-WE-85:** natural Linux inode/birthtime reuse can alias a
+  distinct allocation across fresh helpers.
+- **ASTRA-17 / R-WE-86:** a late unowned directory or hardlink-dirtied file can
+  be relocated under file retirement authority.
+- **ASTRA-18 / R-WE-87:** a foreign manifest staging replacement can be
+  published, and `continue` can poison partial retirement resume.
+- **ASTRA-19 / R-WE-88:** lock authority is not continuous through cleanup/use,
+  post-helper failure can strand a lock, and quarantine replacement is adopted.
+- **ASTRA-20 / R-WE-89:** annotated tags and raw duplicate/escaped JSON keys can
+  pass the proof path.
+- **ASTRA-21 / R-WE-90:** corrupt success discriminators can route v2 evidence
+  into mutable normalization.
+- **ASTRA-22 / R-WE-91:** blocker approval/retirement can bind different objects,
+  and response loss can remove the active blocker while reporting failure.
+- **ASTRA-23 / R-WE-92:** preflight accepts a cross-mount topology whose required
+  retirement rename fails with `EXDEV` after manifest publication.
+- **ASTRA-24 / R-WE-93:** acknowledged namespace transitions omit required
+  directory durability barriers.
+
+D-WE-20–22 define the next design authority: allocation-unique/exclusion-based
+retirement with topology preflight; continuous one-way durable recovery/control
+state machines; and raw canonical proof validation before routing. They are not
+implemented. No implementation, handoff, compaction, or Slice 3 work is
+currently authorized.
+
+Preserved authority and evidence:
+
+- formal report: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-astra-review.md` (SHA-256 `2a24312e58a3703921fcb04e9151572eee05947bdd703fa459250beff63587dd`)
+- owner gate: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md`
+- artifact manifest, invocation tree, and cleanup receipt in the same `slice2-3fe649b` directory
 
 ## Verification
 
