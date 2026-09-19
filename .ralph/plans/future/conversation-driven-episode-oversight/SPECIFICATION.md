@@ -74,7 +74,7 @@ the conversation. It shall identify at least:
 - exact artifact and commit under review;
 - last accepted phase or slice;
 - outstanding findings and their disposition;
-- EXPERT invocations and reports;
+- EXPERT invocations, delegated descendants, reports, and cleanup state;
 - revision attempts and stagnation count;
 - native commands admitted and their receipts;
 - the owner-side liveness watch, last observation, expected report or gate, and
@@ -173,6 +173,24 @@ The EXPERT is advisory and read-only by default. It reviews an exact commit,
 returns structured findings to the owning conversation, and terminates. It does
 not steer the episode, mutate its worktree, approve a gate, merge, or clean up.
 The conversation adjudicates the report and retains lifecycle authority.
+
+The owning conversation also owns the complete EXPERT invocation lifecycle. It
+records the reviewer and any descendants, exact review identity, artifact
+location, deadline, and cleanup state. After the report and runnable evidence
+are copied to durable owner-controlled storage and independently checked, the
+conversation explicitly retires the reviewer and its delegated descendants and
+verifies that they no longer appear as live or idle invocation resources. A
+runtime `completed`, `idle`, or `child-exited` label is not enough to delete a
+review whose report has not been preserved or whose failure has not been
+adjudicated.
+
+Failure, cancellation, timeout, missed reply, and bootstrap/admission races use
+the same bounded teardown path. If usable artifacts exist, they are preserved
+before teardown; otherwise the durable review record explains the failure. An
+interrupted or failed deletion remains `cleanup-pending`, is retried
+idempotently after owner restart, and cannot silently accumulate orphaned
+reviewers. Recursive cleanup is scoped to the exact invocation tree and must not
+delete another conversation's reviewer or any episode resource.
 
 EXPERT review is mandatory for:
 
@@ -340,3 +358,8 @@ include a long-running episode that is not falsely declared stale, an episode
 that finishes without reporting, owner restart or compaction while its watch is
 active, active-session replacement, and exactly one recovery poll that discovers
 and verifies the missed result without advancing from a runtime status alone.
+EXPERT lifecycle tests must cover successful review, failure, timeout,
+cancellation, missed reply, bootstrap/admission race, nested reviewer descendants,
+and owner restart between artifact preservation and deletion. Every case must
+end with durable evidence or a durable failure record and no orphaned live or
+idle EXPERT resource outside an explicit `cleanup-pending` retry state.

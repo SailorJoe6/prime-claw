@@ -49,6 +49,9 @@ explicit extension and must not weaken a gate.
 - **R-CO-22 (GATE) — Mandatory artifact reviews.** EXPERT review is required for every completed specification, completed plan, and final pre-merge candidate.
 - **R-CO-23 (GATE) — Risk-triggered slice review.** EXPERT review is required for slice security, credentials, concurrency, distributed state, destructive recovery, durable migrations, public compatibility, broad diffs, disputed evidence, reviewer disagreement, novel mechanisms, or repeated failure.
 - **R-CO-24 (GATE) — Unavailable expert escalation.** A required or triggered EXPERT that cannot run pauses automation and calls the human; there is no silent fallback or waiver.
+- **R-CO-54 (GATE) — Owned EXPERT invocation lifecycle.** The conversation durably records every EXPERT reviewer and delegated descendant, exact review identity, artifact location, deadline, and cleanup state from admission through retirement.
+- **R-CO-55 (GATE) — Preserve then retire.** After preserving and checking the report and runnable evidence—or durably adjudicating failure, cancellation, timeout, missed reply, or admission race—the conversation explicitly retires the exact reviewer tree and verifies that no live or idle invocation resource remains; runtime status alone cannot authorize premature deletion.
+- **R-CO-56 (GATE) — Idempotent orphan recovery.** Interrupted teardown remains durably `cleanup-pending`, retries after owner restart, recursively removes only the exact EXPERT invocation tree, and never deletes an episode or another conversation's reviewer.
 
 ## Revision and human escalation
 
@@ -85,4 +88,4 @@ explicit extension and must not weaken a gate.
 
 - **R-CO-41 (GATE) — Manual-first evidence.** Autonomous release remains gated on operator acceptance of repeated manual oversight runs and recorded lessons.
 - **R-CO-42 (GATE) — Staged autonomy.** Adoption progresses from passive reporting through suggested decisions and operator-confirmed transitions to disposable autonomous dogfood.
-- **R-CO-43 (GATE) — End-to-end proof.** Tests and concurrent dogfood prove full lifecycle, fresh EXPERT review, triggers, escalation, command recovery, restart recovery, owner-watch recovery of a missing report without false-stale interruption, operator interruption, merge, cleanup, and non-interference.
+- **R-CO-43 (GATE) — End-to-end proof.** Tests and concurrent dogfood prove full lifecycle, fresh EXPERT review, trigger and escalation behavior, report preservation followed by orphan-free recursive EXPERT retirement across failures and restart, command recovery, owner-watch recovery of a missing report without false-stale interruption, operator interruption, merge, cleanup, and non-interference.

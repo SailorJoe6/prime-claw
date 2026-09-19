@@ -177,3 +177,27 @@ messages are best-effort collaboration signals, and long-running work can be
 quiet for many minutes. An owner-controlled long poll provides liveness without
 interrupting valid work and preserves the rule that only independently verified,
 durable evidence can advance a gate.
+
+
+## D-CO-19 — Preserve each EXPERT result, then retire its invocation tree
+
+**Decision:** The owning conversation tracks every fresh EXPERT invocation and
+all reviewer-delegated descendants as one cleanup scope. Once it has preserved
+and checked the report, runnable evidence, exact candidate identity, and
+invocation metadata—or recorded why the review failed—it explicitly deletes the
+reviewer tree and verifies roster absence. Success, failure, cancellation,
+timeout, missed reply, and admission races share this teardown protocol.
+Interrupted teardown is durable `cleanup-pending` work and retries idempotently
+after restart. A runtime status such as `completed` or `idle` neither substitutes
+for artifact preservation nor excuses cleanup.
+
+**Satisfies:** R-CO-9, R-CO-10, R-CO-19, R-CO-21, R-CO-24, R-CO-38,
+R-CO-54, R-CO-55, R-CO-56.
+
+**Rationale:** Manual Slice 2 reviews showed that an EXPERT can finish useful
+work—or exit during the bootstrap/admission race—while its subagent remains
+listed as idle. Repeated gates would otherwise accumulate stale reviewers,
+confuse liveness inspection, consume runtime resources, and risk acting on the
+wrong invocation. Artifact-first recursive teardown preserves auditability while
+making “fresh, short-lived reviewer” an enforceable lifecycle rather than a
+prompt convention.
