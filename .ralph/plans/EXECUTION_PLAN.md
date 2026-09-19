@@ -1,8 +1,8 @@
 # Execution Plan — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; revised Slice 2
-> candidate `ae31587` failed owner/EXPERT acceptance on ASTRA-05–09 (including
-> ASTRA-06b and ASTRA-08b) and remains in revision; Slices 3–8 are blocked.
+> **Status:** implementation in progress; Slice 1 is validated; the same-Slice-2
+> revision for ASTRA-05–09 (including ASTRA-06b and ASTRA-08b) is implemented
+> and awaits final validation plus fresh owner/EXPERT acceptance; Slices 3–8 are blocked.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -20,7 +20,7 @@
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
 | 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed at Slice 1) |
-| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | REVISE after owner gate on `ae31587` | Prior suites green, but owner reproduced ASTRA-05/06/07/08/09 at 0/5 and ASTRA-06b/08b at 0/2; another same-Slice-2 execute iteration is required |
+| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Revised implementation and independent audit approved; fresh owner/EXPERT gate pending | All seven preserved counterexamples plus removal-boundary, control-leaf, remote-bracket, historical-inode, and terminal-evidence regressions are permanent; final active-suite evidence is being recorded |
 | 3–8 | `prime-claw-h6w.4`–`.9` | Not started | Dependency-ordered below |
 
 Slice 1 evidence names the exact active-suite command. It does not claim a
@@ -160,8 +160,9 @@ Under the project lock, the future path:
 2. fails before writing if any unrelated tracked or untracked dirt exists;
 3. creates only `.ralph/plans/future/<slug>/{SPECIFICATION,REQUIREMENTS,DECISIONS}.md`
    with exclusive collision checks;
-4. builds a transaction-private index from the recorded base, stages only
-   literal owned paths there, and proves its tree equals the allowlist;
+4. constructs the exact tree directly from the recorded base with `hash-object`
+   and `mktree`, using only mode-`100644` blobs, so no pathname-raceable Git
+   index participates; it writes a create-only construction-evidence receipt;
 5. creates the exact commit with Git plumbing, compare-and-swap advances the
    checked default ref, then reconciles only owned paths into the primary index;
 6. queries the actual remote OID, pushes the pinned owned commit OID (never
@@ -171,29 +172,32 @@ Under the project lock, the future path:
    reporting success; replay separately validates complete historical success
    evidence and reports current cleanliness/HEAD/upstream/remote observations.
 
-The private-index/CAS path prevents a non-cooperative primary-index writer from
-entering the future commit. It intentionally does not invoke ordinary
+The exact-tree/CAS path prevents a non-cooperative primary-index writer from
+entering the future commit and removes private-index path races entirely. It
+intentionally does not invoke ordinary
 `git commit` hooks; exact construction and post-commit verification are the
 trusted host contract. A rejected push, remote race, commit failure, or crash
 records the exact local commit/files/status. It does not absorb, reset, rebase,
 or commit another conversation's work. An ordinary retry only reports recovery
 state. An explicitly operator-approved `recovery_action` may inspect, continue,
-or safely unlink only byte-identical uncommitted files after immutable proof
-that the transaction exclusively created their target directory. Removal
-consumes that authority with a create-only tombstone before the first unlink, so
-path reuse cannot revive it. Target removal is non-recursive and succeeds only
-when empty, preserving any concurrent
-unowned entry. The shared future-plan parent remains unless separately proven
-owned. Otherwise recovery stops for the operator.
+or safely unlink only exact uncommitted regular-file objects after immutable
+create-only file and bundle receipts prove their incarnations. A checked-in
+Python helper uses `dir_fd`, `O_NOFOLLOW`, held directory descriptors, and
+randomized quarantine names. Directory identity guards later file mutation but
+never grants destructive authority: every product directory is retained. The
+helper writes the tombstone in the genuine held control directory, quarantines
+and revalidates exact owned files inside one held target FD, and unlinks only
+those names. Path reuse and check/delete races cannot redirect deletion.
+Otherwise recovery stops for the operator.
 
 #### Astra safety evidence retained in Slice 2
 
 | Review insight | Required mechanism | Permanent regression |
 |---|---|---|
-| ASTRA-01: failed preconditions and matching bytes can masquerade as ownership | Create-only exclusive-directory receipt; commit-bearing recovery requires it | Pre-existing identical bundle survives removal; missing receipt fails closed |
+| ASTRA-01: failed preconditions and matching bytes can masquerade as ownership | Delete only objects proven by create-only file descriptors/receipts; never delete product directories; commit-bearing recovery fails closed | Pre-existing identical bundle survives removal; missing receipt fails closed |
 | Follow-up: a valid old receipt can outlive successful removal and path reuse | Create-only consumed-authority tombstone written before unlink; live-status gate; no automatic recreation | Byte-identical replacement survives repeated removal even after mutable journal reset |
 | Follow-up: tombstone control path can itself escape through a child symlink | Derive ownership and consumption directories with validated Git-common-dir containment | Static child-symlink test proves no external write and no bundle mutation |
-| ASTRA-02: recursive cleanup has a check/delete race | Per-file verification/unlink plus non-recursive empty-target removal; retain shared parent | Concurrent injected entry survives and leaves recoverable failure state |
+| ASTRA-02: recursive cleanup has a check/delete race | Per-file quarantine/revalidation/unlink through one held target FD; always retain target and shared parent | Concurrent injected entries and every directory incarnation survive |
 | ASTRA-03: `HEAD` can advance after commit verification | Push `<owned-commit-oid>:<default-ref>` rather than `HEAD:<default-ref>` | Remote receives owned commit and excludes concurrent local descendant |
 | ASTRA-04a: a mutable success label can bypass missing evidence | Validate phase/OIDs, parent, exact commit bundle, hashes, ownership receipt, and actual remote before clearing blockers | Malformed `verified-success` journal is preserved and rejected |
 | ASTRA-04b: replay can confuse historical cleanliness with current dirt | Return separately named historical facts and fresh checkout/status/HEAD/upstream/remote observations | Dirty replay reports current `checkout_clean: false` while retaining historical success |
@@ -202,34 +206,43 @@ The five original Astra counterexamples must run against the current extension,
 not only the pinned reviewed blob. The adjacent follow-up regressions above are
 part of the same Slice 2 acceptance boundary and cannot be deferred.
 
-#### Failed `ae31587` gate: next same-Slice-2 acceptance
+#### Implemented response to the failed `ae31587` gate
 
-Reviewed commit `ae31587` is not accepted. The next controlled Slice 2 execute
-iteration must investigate and satisfy this matrix without entering Slice 3:
+Reviewed commit `ae31587` remains rejected evidence. The controlled same-Slice-2
+iteration implemented the full acceptance matrix without entering Slice 3:
 
-| Finding | Mechanism to investigate | Permanent regression acceptance |
+| Finding | Implemented mechanism | Permanent regression |
 |---|---|---|
-| ASTRA-05 | Bind creation authority to actual directory object identity, with portable fail-closed behavior | Rename original and place identical replacement at path; removal preserves replacement and exact status |
-| ASTRA-06 | Re-establish tombstone-child containment at the mutation boundary or use a non-following directory-relative primitive | Late consumption-child swap produces no external entry and no product deletion |
-| ASTRA-06b | Derive/revalidate every destructively accessed control child, especially `indexes`, beneath real Git common state | Static and swapped `indexes` symlinks fail before external read/delete; sentinel survives |
-| ASTRA-07 | Build one fresh post-validation observation and derive all `current_*` output from it | Deterministic concurrent dirt appears in status paths and both current clean flags are false |
-| ASTRA-08 | Validate every present OID and required equality/lineage relationship under a closed success schema | Malformed or inconsistent commit identities preserve evidence/blocker and reject success |
-| ASTRA-08b | Route pre-branch and in-branch malformed-success failures through one preservation-only path | Early invalid ownership path leaves transaction bytes and blocker unchanged; diagnostics are separate |
-| ASTRA-09 | Verify private-index and commit-tree object type/mode at construction, pre-push, and replay | Symlink swap at private-index add fails before push; remote has no `120000` bundle entries |
+| ASTRA-05 | Immutable BigInt filesystem-incarnation identities bind the created directory and exact three files; recovery revalidates them at the destructive boundary | Directory and same-name file replacements preserve the replacement and exact status |
+| ASTRA-06 | The consumption child is freshly revalidated after the final await; durable JSON writes reject parents that resolve through symlinks | Late consumption-child swap creates no external entry and no product deletion |
+| ASTRA-06b | Index observation and deletion freshly derive `indexes` beneath real Git common state before access | Static and late-swapped `indexes` symlinks preserve external sentinels and product state |
+| ASTRA-07 | One latest successful reconciliation supplies every current status/ref/remote field | Injected concurrent dirt appears and current cleanliness is false |
+| ASTRA-08 | All retained OIDs, equality/lineage relations, parent/tree/hash/bundle/remote evidence are validated before success | Table-driven malformed and mismatched identities preserve evidence and reject success |
+| ASTRA-08b | Verified-success has a preservation-only branch plus outer-catch guard | Early invalid ownership path preserves exact transaction and blocker bytes; diagnostics remain separate |
+| ASTRA-09 | Index-free exact-tree construction plus commit/replay validation requires exact `100644 blob` entries and bytes | Filesystem symlink swap fails before publication; remote stays at base with no `120000` entry |
 
-Evidence is immutable and external to the repository:
+Immutable source evidence remains external:
 
 - formal EXPERT report: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md`
-- owner gate: adjacent `slice2-ae31587-owner-gate.md`
-- adjacent `slice2-ae31587-new-counterexamples.test.mjs` and owner log (0/5)
-- adjacent `slice2-ae31587-additional-counterexamples.test.mjs` and owner log
-  (0/2)
+- adjacent owner gate, two runnable counterexample files, and owner logs
+  (original result: 0/5 plus 0/2)
 
-Passing the prior Node/pytest/original-Astra suites is necessary but insufficient.
-All seven counterexamples must be incorporated as repository regressions and pass
-before owner/EXPERT acceptance. Until the owner verifies this documentation-only
-incorporation and invokes the controlled native `/handoff`, no implementation
-work begins.
+The seven counterexamples now live permanently in
+`tests/specification_episodes_astra_regressions.test.mjs`. Additional cases
+cover same-name replacement, late `indexes` swaps, all retained success OIDs,
+exact blocker preservation, historical/live inode separation, and local/remote
+observation brackets. Direct Python helper regressions inject replacements at
+product-file and control-leaf quarantine boundaries. The independent final
+implementation audit returned APPROVE for ASTRA-05, ASTRA-06/06b, ASTRA-07,
+ASTRA-08/08b, ASTRA-09, R-WE-69–78, and D-WE-15–16.
+
+Final revision evidence:
+
+- combined Node suites: 73 passed, 0 failed;
+- exact active suite `pytest -q tests`: 241 passed, 11 importlib deprecation warnings, 0 failed (624.32s).
+
+Fresh owner/formal EXPERT acceptance remains required before Slice 2 can close.
+Slice 3 stays unstarted.
 
 ### 2.5 Promoted episode transaction
 
@@ -566,14 +579,14 @@ private transcript text.
 | Canonical checkout dirty | No write/stage/commit; exact paths/status reported |
 | Future write/commit/push interrupted | Journal exact owned files/commit and clean/dirty/ahead state; explicit recover only |
 | Pre-existing byte-identical future bundle | Collision only; no immutable ownership receipt exists, so recovery cannot delete it |
-| Owned directory is renamed/replaced before first removal | Object-bound identity fails closed before unlink; preserve replacement and exact status |
+| Owned directory is renamed/replaced before first file removal | Guard identity fails closed; no directory incarnation is ever deleted |
 | Removed target path is later reused | Consumed authority stays single-use; preserve replacement even if mutable journal state changes |
-| Concurrent entry appears during owned removal | Unlink only proven files; non-recursive directory removal fails and preserves the new entry |
+| Concurrent entry appears during owned removal | Exact-entry-set validation fails before unlink and preserves the directory and entry |
 | Static or late-swapped control child redirects access | Revalidate every destructive control read/write/delete at use; no external access or product deletion |
 | Local HEAD advances before push | Push the pinned owned commit OID, never moving `HEAD`; unrelated descendant remains unpublished |
 | Reconciliation observes newer dirt or Git state | Derive all `current_*` fields from one coherent latest observation or fail closed |
 | Success journal has malformed/inconsistent identity | Validate every OID/relationship; preserve exact journal and blocker; separate diagnostics |
-| Private index/commit contains non-regular mode | Reject before push; remote and replayed bundle must contain approved regular-file modes only |
+| Constructed tree/commit contains non-regular mode | Index-free builder emits only exact `100644 blob` entries; reject any mismatch before push and during replay |
 | Branch or worktree collision | Preserve existing resource; create nothing at that identity |
 | Failure after creating an owned resource | Journal it; remove only when identity and pristine state prove safe, otherwise preserve |
 | Fork mismatch or incomplete branch | Do not activate; preserve fork evidence and recovery state |

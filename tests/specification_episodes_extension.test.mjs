@@ -287,19 +287,24 @@ test("commit-object failure requires explicit recovery and supports safe removal
     undefined, undefined, f.ctx,
   ));
   assert.equal(removed.status, "recovered-clean", JSON.stringify(removed, null, 2));
-  assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), false);
+  assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), true);
+  assert.deepEqual(readdirSync(join(f.cwd, ".ralph/plans/future/safe-idea")), []);
   assert.equal(existsSync(join(f.cwd, ".ralph/plans/future")), true);
-  assert.deepEqual(readdirSync(join(f.cwd, ".ralph/plans/future")), []);
+  assert.deepEqual(readdirSync(join(f.cwd, ".ralph/plans/future")), ["safe-idea"]);
   assert.equal(existsSync(join(f.cwd, ".git/prime-claw/future-mutation-blocked.json")), false);
   assert.equal((await run("git", ["-C", f.cwd, "status", "--porcelain"])).stdout, "");
+  const recoveredJournalBytes = readFileSync(removed.transaction_path);
   const staleReceiptRetry = resultDetails(await tool.execute(
     "stale-receipt",
     params({ request_id: "request-stale-receipt", recovery_action: "continue" }),
     undefined, undefined, f.ctx,
   ));
   assert.equal(staleReceiptRetry.status, "failed");
-  assert.match(staleReceiptRetry.error, /explicitly removed|does not support implicit recovery|directory is absent.*refusing automatic recreation/i);
-  assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), false);
+  assert.deepEqual(readFileSync(removed.transaction_path), recoveredJournalBytes);
+  assert.equal(existsSync(join(f.cwd, ".git/prime-claw/future-mutation-blocked.json")), false);
+  assert.match(staleReceiptRetry.error, /removal authority.*consumed|explicitly removed|does not support implicit recovery/i);
+  assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), true);
+  assert.deepEqual(readdirSync(join(f.cwd, ".ralph/plans/future/safe-idea")), []);
 
   const continuationParams = params({
     request_id: "request-cont0001",
@@ -307,6 +312,8 @@ test("commit-object failure requires explicit recovery and supports safe removal
   });
   const failedAgain = resultDetails(await tool.execute("fault-2", continuationParams, undefined, undefined, f.ctx));
   assert.equal(failedAgain.status, "failed");
+  const continuedBlocker = JSON.parse(readFileSync(join(f.cwd, ".git/prime-claw/future-mutation-blocked.json"), "utf8"));
+  assert.equal(continuedBlocker.disposition_id, failedAgain.disposition_id);
   failCommitTree = false;
   const continued = resultDetails(await tool.execute(
     "continue",
@@ -481,7 +488,10 @@ test("two OS processes serialize future bundles without cross-commit or lost wor
     ], { encoding: "utf8" });
     return JSON.parse(result.stdout);
   }));
-  assert.ok(first.every((details) => ["verified-success", "lock-contention"].includes(details.status)));
+  assert.ok(
+    first.every((details) => ["verified-success", "lock-contention"].includes(details.status)),
+    JSON.stringify(first, null, 2),
+  );
   assert.ok(first.some((details) => details.status === "verified-success"));
 
   for (let index = 0; index < first.length; index += 1) {
@@ -848,7 +858,7 @@ test("ASTRA-01 removal preserves a pre-existing byte-identical bundle without ow
     undefined, undefined, f.ctx,
   ));
   assert.equal(removal.status, "failed");
-  assert.match(removal.error, /without immutable proof/i);
+  assert.match(removal.error, /without immutable.*proof/i);
   assert.equal(existsSync(target), true);
   assert.equal(readFileSync(join(target, "SPECIFICATION.md"), "utf8"), input.documents.specification_markdown);
   assert.equal((await run("git", ["-C", f.cwd, "status", "--porcelain=v1"])).stdout, beforeStatus);
@@ -942,7 +952,7 @@ test("ASTRA-05 removal preserves a concurrent unowned directory entry", async (t
   assert.equal(removal.status, "failed");
   assert.equal(existsSync(sentinel), true);
   assert.equal(readFileSync(sentinel, "utf8"), "another conversation owns this\n");
-  assert.match(removal.error, /not empty|ENOTEMPTY/i);
+  assert.match(removal.error, /identity changed|filesystem object|not empty|ENOTEMPTY/i);
 });
 
 

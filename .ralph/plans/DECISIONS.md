@@ -201,11 +201,12 @@ an exactly-once contract without constraining planning to an unproven API shape.
 
 ## D-WE-15 — Derive destructive and publication authority from immutable identity
 
-**Decision:** Future recovery derives deletion authority from evidence bound to
-both the transaction and the actual directory object exclusively created by it,
-not from pathname or byte equality. It consumes that authority durably as a
-single-use capability before the first unlink, removes owned regular files
-individually, and removes only an empty proven target non-recursively.
+**Decision:** Future recovery derives deletion authority only from immutable
+receipts for regular-file objects created through `O_EXCL` descriptors, never
+from a directory pathname or identity. Directory identity remains a mutation
+guard. Recovery consumes file authority durably, quarantines each exact file
+inside one held target descriptor, revalidates it, and unlinks only that name.
+Every product-directory incarnation is retained.
 Publication names the verified owned commit OID directly. Replayed success is
 evidence-validated and separates historical facts from current observations.
 
@@ -222,11 +223,12 @@ authority must remain attached to the created object through its use boundary.
 
 - Failed preconditions never synthesize ownership. Commit-bearing recovery with
   missing or stale object identity stops rather than inferring authority.
-- Rename-and-replace invalidates removal even when replacement bytes match.
+- Rename-and-replace invalidates file mutation authority even when bytes match;
+  directories are never removed under any receipt.
 - Removal authority is consumed durably before unlink. Neither later path reuse
   nor a mutable journal reset can reactivate it.
-- Recovery unlinks verified regular files individually, removes only an empty
-  proven target, and preserves concurrent entries and the shared future parent.
+- Recovery validates and quarantines exact owned files through a held target FD.
+  It preserves every directory, replacement, concurrent entry, and shared parent.
 - Push names the verified commit OID rather than moving `HEAD`; a concurrent
   local descendant remains unpublished.
 
@@ -234,10 +236,11 @@ authority must remain attached to the created object through its use boundary.
 
 **Decision:** Validation that grants authority or supports a current-state claim
 must occur at the boundary where that authority or claim is used. Control-state
-writes re-establish non-symlink Git-common-dir containment at mutation. Private
-index and commit validation proves regular-file tree modes as well as path and
-bytes. Success replay validates every recorded OID/relationship and returns one
-coherent fresh post-validation current-state observation.
+writes and destructive operations use held directory descriptors, `O_NOFOLLOW`,
+and quarantine-before-unlink. Commit construction avoids a pathname-based
+private index and proves exact regular-file tree modes, paths, and bytes. Success
+replay validates every recorded OID/relationship before collecting one coherent
+fresh current-state observation.
 
 **Satisfies:** R-WE-35, R-WE-36, R-WE-69, R-WE-72, R-WE-74, R-WE-75,
 R-WE-76, R-WE-77, R-WE-78.
@@ -253,11 +256,14 @@ at-use failure class across filesystem, Git, and result-reporting boundaries.
 
 **Consequences:**
 
-- Every destructively accessed control child, including tombstone and `indexes`
-  directories, is revalidated at use. Static or swapped symlinks cause no
-  external read/write/delete and no product deletion.
-- Index and committed-tree entries must use approved regular-file modes. Symlink
-  mode `120000` is rejected before push and during replay verification.
+- Security-sensitive product and control operations descend from held directory
+  descriptors with non-following opens. Removal quarantines the exact entry,
+  revalidates it, and unlinks only the quarantine name. Static or swapped
+  children cause no external mutation or product deletion.
+- Commit construction hashes trusted bytes and rebuilds the base tree directly;
+  it does not expose a pathname-raceable private Git index. Constructed and
+  committed entries must be exact `100644 blob` objects; mode `120000` is
+  rejected before push and during replay.
 - Every present commit/OID field is syntactically and relationally validated.
   All malformed-success paths are preservation-only: the transaction journal
   and blocker remain exact while separate attempt evidence records diagnostics.

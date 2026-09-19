@@ -170,24 +170,18 @@ reusing the exact disposition input with one of these optional actions:
 - `inspect` — reconcile and report current state without product mutation;
 - `continue` — continue only after the journal and byte-identical owned bundle
   prove identity; or
-- `remove-owned-uncommitted` — only before a commit/ref advance and only with
-  an immutable create-only receipt proving this transaction exclusively created
-  the directory; unstage and unlink exact byte-identical owned files one by one,
-  then remove the directory only if it is empty.
+- `remove-owned-uncommitted` — only before a commit/ref advance and only for
+  regular-file objects proven by immutable create-only descriptor receipts;
+  quarantine, revalidate, and unlink those files through one held target FD.
+  Product directories are never removed.
 
 A failed precondition, matching bytes, or a mutable transaction field never
 establishes deletion ownership. Immediately before the first destructive unlink,
-recovery durably consumes that authority with a create-only tombstone, so the
-receipt cannot later delete a replacement at the reused path even if mutable
-journal state changes. Both ownership control directories pass the same
-non-symlink Git-common-dir containment checks before any receipt write. A
-historical ownership receipt cannot authorize
-automatic recreation after its directory has been removed, while a
-commit-bearing transaction with a missing ownership receipt fails closed.
-Concurrent unowned
-entries make the final non-recursive owned-directory removal fail and remain
-preserved. The shared `.ralph/plans/future` parent is retained because its prior
-absence is not exclusive creation proof. Recovery never
+recovery durably consumes that authority with a create-only tombstone. Control
+operations remain non-symlink-contained beneath the Git common directory.
+Directory identity guards later file mutation but grants no deletion authority.
+Every target-directory incarnation, concurrent unowned entry, and the shared
+`.ralph/plans/future` parent remains in place. Recovery never
 resets, rebases, force-pushes, steals a lock, removes mismatched content, or
 absorbs unrelated dirt. Once a commit object exists, removal is forbidden. A
 rejected push or remote race preserves the exact local commit and requires
@@ -227,74 +221,87 @@ requires exact document bytes, exact allowed directory entries, unchanged base
 `HEAD`, and no unrelated staged or dirty path. Once a commit exists, removal is
 forbidden; the operator must inspect and reconcile the preserved commit.
 
-## Known failed gate for `ae31587`
+## Failed `ae31587` gate and same-Slice-2 hardening
 
-The fresh owner and formal Astra EXPERT reviews rejected candidate `ae31587`.
-The original ASTRA-01–04 reproductions are materially improved, but seven new
-assertions fail across five findings:
+The owner and formal Astra EXPERT reviews rejected candidate `ae31587`. That
+report remains the immutable source evidence. The controlled revision adds:
 
-- **ASTRA-05 (P1):** a path-bound creation receipt deletes a byte-identical
-  replacement directory before first removal. Future recovery must bind to the
-  actual created directory incarnation and preserve rename-and-replace state.
-- **ASTRA-06 / ASTRA-06b (P1, two assertions):** a late swap of
-  `future-ownership-consumed` redirects a tombstone write, while a static
-  `indexes` symlink redirects private-index deletion to an external file. Every
-  destructively accessed control child must be revalidated beneath real Git
-  common state at the exact read/write/delete boundary.
-- **ASTRA-07 (P2/GATE):** replay discards a newer dirty reconciliation and
-  returns older clean fields. All `current_*` fields must come from one coherent
-  latest observation.
-- **ASTRA-08 / ASTRA-08b (P2/GATE, two assertions):** malformed
-  `commit_object_sha` is
-  accepted, and an early invalid ownership path causes the outer catch to
-  overwrite exact corrupt-success evidence. Every recorded identity must be
-  validated, and every malformed-success path must preserve the transaction
-  journal and blocker while writing diagnostics separately.
-- **ASTRA-09 (P2/GATE):** a staging race publishes mode-`120000` symlinks whose
-  blob text matches the Markdown. Index, commit, remote, and replay verification
-  must enforce approved regular-file tree modes.
+- **Object-bound removal authority (ASTRA-05).** A checked-in Python helper
+  opens repository components with `dir_fd` and `O_NOFOLLOW`. Directory identity
+  is guard-only and never authorizes deletion. Per-file and final bundle receipts
+  bind exact `O_EXCL`-created file objects. Recovery holds the target FD,
+  quarantines and revalidates only those files, and unlinks only randomized
+  names. Every directory and same-name replacement survives.
+- **Mutation-bound control containment (ASTRA-06 / ASTRA-06b).** Durable JSON,
+  lock, tombstone, construction-evidence, and cleanup operations descend from
+  the real Git common directory through held non-following descriptors. Git no
+  longer opens a pathname-based private index: exact trees are constructed from
+  trusted document bytes, while the `indexes` child stores only bounded durable
+  evidence. Static and late swaps cannot redirect external reads/writes/deletes.
+- **Coherent replay observations (ASTRA-07).** Historical validation completes
+  first. One final reconciliation brackets local state and queries the actual
+  remote both before and after that bracket; any change fails closed. It supplies
+  every `current_*` field and timestamps only after the last Git query.
+  Historical success does not depend on current working-tree inode identity.
+- **Complete preservation-only success validation (ASTRA-08 / ASTRA-08b).** The
+  verified-success branch runs before generic ownership/path checks. It
+  validates every retained OID, required equality/lineage relationship, commit
+  parent, private tree, hashes, immutable receipts, exact bundle, and actual
+  remote state. Any failure preserves exact transaction and blocker bytes;
+  diagnostics go only to the attempt receipt. An outer-catch guard enforces the
+  same rule if later diagnostics or blocker handling fail.
+- **Regular Git object modes (ASTRA-09).** The helper hashes trusted document
+  bytes and recursively rebuilds the recorded base tree with `mktree`, adding
+  only exact mode-`100644` blobs. The constructed tree, commit, pre-push commit,
+  and replayed commit receive exact path/mode/type/content validation. A
+  filesystem symlink swap fails before ref advance or push.
 
-The durable authority is specification §5.1–5.2, R-WE-69–78, D-WE-15–16, and
-execution-plan §2.4/§6. Formal immutable evidence is:
+The permanent suite
+`tests/specification_episodes_astra_regressions.test.mjs` preserves all seven
+owner counterexamples and adds same-name file replacement, late `indexes` swap,
+table-driven retained-OID validation, exact blocker preservation, post-validation
+current-state collection, and local/remote stability brackets. Python helper
+regressions inject replacements at the actual file/control quarantine boundary
+and prove fail-closed restoration plus consumed evidence. Every fixture uses a
+temporary repository, disposable Git common state, and a local bare remote.
+
+Formal source evidence:
 
 `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md`
 
-The adjacent owner gate, two runnable counterexample files, and two owner logs
-record 0/5 and 0/2. Slice 2 remains in revision; no lifecycle transition or
-Slice 3 work is authorized.
+Slice 2 remains in progress until fresh owner/EXPERT acceptance. Slice 3 is not
+authorized.
 
 ## Verification
 
 Run the focused acceptance suite:
 
 ```bash
-node --experimental-strip-types --test tests/specification_episodes_extension.test.mjs
+node --experimental-strip-types --test tests/specification_episodes_extension.test.mjs tests/specification_episodes_astra_regressions.test.mjs
 pytest -q tests/test_specification_episodes_extension.py
 ```
 
-The Node suite uses temporary repositories, isolated session files, and local
+The Node suites use temporary repositories, isolated session files, and local
 bare remotes. The live dogfood episode branch, worktree, session, and owner
 conversation are inspection-only evidence and are never fault, recovery,
-retirement, abandonment, or cleanup fixtures. The prior suite covers registration,
+retirement, abandonment, or cleanup fixtures. Together they cover registration,
 canonical loading, structured validation,
 both disposition variants, canonical/default-branch source checks, argument-
 array Git, exact future commits, actual remote verification, clean success,
 tracked/untracked/staged dirt refusal, path collision, request/session isolation,
 real OS-process serialization, lock ambiguity, every durable transaction boundary,
-commit/push/cancellation faults, remote races, private-index isolation,
+commit/push/cancellation faults, remote races, index-free exact-tree isolation,
 explicit continuation/removal recovery, immutable and single-use deletion
 authority, stale-receipt path reuse, missing ownership evidence, ownership-
 consumption control-path symlinks, concurrent-entry preservation, pinned-commit
 push, verified-success corruption, historical-versus-current replay state, no
 episode allocation, and corrupt-evidence handling.
 
-Necessary but insufficient evidence for `ae31587`: the repository Node suite
-passed 58/58; the five preserved original Astra counterexamples passed 5/5; and
-the exact active suite `pytest -q tests` passed 237 tests with 11 warnings. Two
-watchdog timing tests each failed once during earlier full-suite attempts and
-passed immediately in isolation; the final exact full-suite rerun was green.
-Those results do not cover the seven failing assertions above and do not satisfy
-the Slice 2 owner gate.
+The rejected `ae31587` evidence (Node 58/58, original Astra 5/5, and
+`pytest -q tests` 237 passed) remains historical only. The current revision must
+pass the combined existing/permanent-Astra Node suites, the exact active command
+`pytest -q tests`, `git diff --check`, and fresh owner/EXPERT review. Local test
+counts below are updated only from final completed commands.
 The pytest bridge loads the real extension through the installed Prime Agent
 RPC loader and checks the two native command surfaces. Prime Agent 0.9.5 RPC has
 no public tool-list or direct tool-invocation command, so schema/execution tests

@@ -67,16 +67,16 @@ if it does not weaken a gate.
   the bundle committed and pushed with a clean canonical checkout on success.
   If it cannot, it reports the exact durable/dirty/commit/push state and recovery
   action without claiming success.
-- **R-WE-69 (GATE) — Proven deletion ownership.** Recovery may delete a future
-  bundle only when immutable transaction-specific evidence proves that this
-  transaction created the actual directory object currently at the path. Failed
-  preconditions, pathname reuse, byte-identical contents, and mutable journal
-  fields do not grant ownership. Removal authority is durably single-use;
-  commit-bearing recovery without valid ownership evidence fails closed.
-- **R-WE-70 (GATE) — Race-safe owned removal.** Recovery revalidates and unlinks
-  only individually verified owned regular files, removes the proven target
-  directory non-recursively only when empty, preserves concurrent unowned
-  entries, and retains the shared future-plan parent without exclusive proof.
+- **R-WE-69 (GATE) — Proven deletion ownership.** Recovery may delete only
+  regular-file objects whose create-only descriptors and immutable receipts
+  prove this transaction created them. Directory identity remains a mutation
+  guard but never grants rename, quarantine, or deletion authority. Removal
+  authority is durably single-use; commit-bearing recovery fails closed.
+- **R-WE-70 (GATE) — Race-safe owned removal.** Recovery opens the target once
+  without following links, validates every owned file, atomically quarantines
+  each exact file inside that held directory, revalidates it, and unlinks only
+  its randomized name. Product directories, concurrent replacements, unowned
+  entries, and the shared future-plan parent are always retained.
 - **R-WE-71 (GATE) — Pinned publication.** Future publication pushes the verified
   owned commit OID, not moving `HEAD`, so a concurrent local descendant cannot
   be published by the transaction.
@@ -87,15 +87,16 @@ if it does not weaken a gate.
   clearing blockers or reporting historical success. Malformed success state is
   preserved and fails closed. All current checkout/status/HEAD/upstream/remote
   fields come from one coherent fresh post-validation observation.
-- **R-WE-73 (GATE) — Directory-object identity.** Refining R-WE-69, ownership
-  evidence binds to the actual exclusively created directory object, not merely
-  its pathname and contents. Rename-and-replace invalidates removal authority
-  and preserves the replacement plus repository status.
+- **R-WE-73 (GATE) — Directory identity is guard-only.** Refining R-WE-69,
+  recorded directory identity must match at later file creation and removal
+  entry, but can never authorize deletion of a directory. Rename-and-replace
+  invalidates file mutation authority and every directory incarnation survives.
 - **R-WE-74 (GATE) — Mutation-bound control containment.** Refining R-WE-69,
-  every control child used for a destructive read, write, or delete—including
-  tombstones and private indexes—is derived and revalidated beneath real Git
-  common state at the use boundary. Static or swapped child symlinks fail before
-  external access and preserve both external sentinels and product resources.
+  every authority-bearing control read/write/delete descends from the real Git
+  common directory through held `dir_fd` handles and `O_NOFOLLOW`; deletion
+  quarantines the exact entry before unlink. Git tree construction uses no
+  pathname-based private index. Static or swapped children cause no external
+  access and preserve sentinels and product resources.
 - **R-WE-75 (GATE) — Coherent current replay observation.** Refining R-WE-72,
   replay derives every `current_*` field from one fresh observation made after
   historical evidence validation/reconciliation, or fails closed if coherence
@@ -104,10 +105,11 @@ if it does not weaken a gate.
   every present recorded commit/OID field is syntactically valid and satisfies
   its required equality or lineage relationship. Any malformed or inconsistent
   identity preserves the journal and blocker and rejects success.
-- **R-WE-77 (GATE) — Regular-file index and tree modes.** Refining R-WE-36 and
-  R-WE-72, the private index, constructed commit, pushed commit, and replayed
-  commit contain only approved regular-file modes for the three documents.
-  Path/blob-byte equality cannot make a mode-`120000` symlink entry valid.
+- **R-WE-77 (GATE) — Regular-file construction and tree modes.** Refining
+  R-WE-36 and R-WE-72, commit construction must not depend on a pathname-
+  raceable private index. The exact constructed tree, commit, pushed commit,
+  and replayed commit contain only approved regular-file modes for the three
+  documents. Path/blob-byte equality cannot make mode `120000` valid.
 
 - **R-WE-78 (GATE) — Preservation-only corrupt-success handling.** Refining
   R-WE-72, every malformed `verified-success` condition, including failures

@@ -1,8 +1,8 @@
 # Specification — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; revised Slice 2
-> candidate `ae31587` failed fresh owner/EXPERT acceptance on ASTRA-05–09 and
-> remains in revision under `prime-claw-h6w.3`; later paths remain unstarted.
+> **Status:** implementation in progress; Slice 1 is validated; the same-Slice-2
+> revision for ASTRA-05–09 is implemented under `prime-claw-h6w.3` and awaits
+> final validation plus fresh owner/EXPERT acceptance; later paths are blocked.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -50,7 +50,7 @@ merge, and cleanup.
   conversation inheritance by itself.
 - Prime Agent sessions can observe and message sibling top-level sessions.
 - The `future` bridge now serializes canonical-checkout mutation, constructs an
-  exact private-index commit, pushes and verifies the actual remote, and
+  exact index-free Git tree/commit, pushes and verifies the actual remote, and
   preserves explicit recovery state without allocating episode resources.
 - Git worktrees provide independent checkout and index state while sharing the
   repository's object database and refs.
@@ -184,13 +184,15 @@ non-negotiable invariants for the future path:
    the real Git common directory. A completed removal, path reuse, static or
    swapped control-child symlink, or mutable journal reset cannot revive or
    redirect authority. Historical proof cannot authorize automatic recreation.
-3. **Removal and publication preserve object types.** Each expected target is
-   revalidated and unlinked individually, and the owned directory is removed
-   non-recursively only when empty. Concurrent unowned entries survive. The
-   shared future parent remains without separate creation proof. Private-index
-   and committed-tree verification must prove each document is a regular-file
-   entry with an approved regular-file mode, not only matching path/blob bytes;
-   mode `120000` symlink entries must never be pushed.
+3. **Removal and publication preserve object types.** Security-sensitive
+   filesystem operations descend from held directory descriptors with
+   `O_NOFOLLOW`. Directory identity is a mutation guard, never deletion
+   authority: product directories are always retained. Recovery quarantines and
+   revalidates only exact `O_EXCL`-created file objects inside the held target,
+   then unlinks only randomized names. Replacements and unowned entries survive.
+   Commit construction bypasses a pathname-raceable private index and
+   builds an exact tree from approved mode-`100644` blobs; mode `120000` can
+   never be published.
 4. **Publication names immutable identity.** Push uses the already verified
    owned commit OID as its source refspec, never moving `HEAD`. If another local
    writer advances `HEAD`, that descendant is not published and the transaction
@@ -210,39 +212,34 @@ non-negotiable invariants for the future path:
    checkout cleanliness, status paths, HEAD, upstream, and remote; it never
    mixes an older clean snapshot with newer reconciliation evidence.
 
-### 5.2 Failed gate at `ae31587`
+### 5.2 Failed `ae31587` gate and implemented revision
 
-The fresh owner gate for reviewed commit `ae31587` is **REVISE**. The original
-ASTRA-01–04 counterexamples pass, but the following adjacent gaps are accepted
-product knowledge and keep Slice 2 blocked:
+The fresh owner/EXPERT gate for reviewed commit `ae31587` remains immutable
+**REVISE** evidence. The controlled same-Slice-2 revision implements each gap
+without authorizing Slice 3:
 
-| Finding | Durable gap | Mechanisms to investigate | Permanent regression acceptance |
-|---|---|---|---|
-| ASTRA-05 | Creation receipt is path-bound rather than bound to the actual created directory object | Capture and later revalidate stable directory identity without trusting path/bytes alone; fail closed where portable identity cannot be proven | Rename owned directory, create byte-identical replacement at the original path, request first removal; replacement and repository status remain unchanged |
-| ASTRA-06 | A validated consumption-control child can be swapped to a symlink before the tombstone write | Mutation-bound containment revalidation and/or directory-handle-relative exclusive creation that cannot follow a swapped child | Deterministic late child swap creates no external entry and deletes no product path |
-| ASTRA-06b | A static `indexes` control-child symlink can redirect private-index inspection/deletion to an external file | Derive and revalidate every destructively accessed control child beneath real Git common state; do not trust journal path/hash alone | Static and swapped `indexes` symlinks fail before external read/delete and preserve the sentinel |
-| ASTRA-07 | Replay returns old locked-state cleanliness after reconciliation observed newer dirt | Produce one fresh post-validation observation and derive every `current_*` field from it, or fail closed | Inject dirt between locked inspection and reconciliation; result reports it and current cleanliness is false |
-| ASTRA-08 | Replay validates `commit_sha` while accepting malformed `commit_object_sha` | Closed success-record schema plus validation of every OID and equality/lineage relationship | Malform or mismatch each recorded commit identity; preserve journal, retain blocker, and reject success |
-| ASTRA-08b | An invalid ownership-receipt path throws before protected replay validation and the outer catch overwrites exact corrupt evidence | Route all malformed-success failures to observation/attempt records only; transaction journal is read-only during investigation | Corrupt an early-checked success path; reject success while preserving journal bytes and blocker exactly |
-| ASTRA-09 | Blob-byte validation accepts private-index/commit symlink entries | Inspect index/tree mode and object type before commit, before push, and in replay; accept only project-approved regular-file modes | Swap documents to symlinks at private-index add; fail before push and prove remote has no mode-`120000` bundle entry |
+| Finding | Implemented mechanism | Permanent repository acceptance |
+|---|---|---|
+| ASTRA-05 | Directory identity guards file mutation but never authorizes directory deletion; create-only file receipts bind exact file objects to BigInt incarnation tuples and recovery uses one held target FD | Every directory incarnation survives; directory replacement and same-name byte-identical file replacement fail before file unlink and preserve exact status |
+| ASTRA-06 | Tombstone paths are freshly derived beneath the real Git common directory after the final awaited boundary; durable writes reject symlink-resolved parents | A late `future-ownership-consumed` swap creates no external entry and deletes no product path |
+| ASTRA-06b | Git no longer writes a pathname-based private index; construction evidence and cleanup use a held, non-following `indexes` descriptor | Static and late-swapped `indexes` symlinks cause no external write/delete and preserve sentinels |
+| ASTRA-07 | Historical validation precedes a final observation that brackets local and actual-remote reads and rejects any change | Late local dirt/refs are reported together; a remote change inside the bracket fails closed |
+| ASTRA-08 | A closed success validator checks every retained OID, equality/lineage relation, commit parent, private tree, hashes, ownership receipts, bundle, and actual remote state | Malformed and mismatched identities reject success without exposing them as verified facts |
+| ASTRA-08b | Verified-success routing occurs before ordinary ownership/path checks; the branch and outer catch both preserve the journal and blocker and write only separate attempt diagnostics | Early invalid ownership paths leave transaction and blocker bytes unchanged |
+| ASTRA-09 | Exact-tree construction hashes trusted document bytes directly as mode-`100644` blobs; tree, commit, pre-push, and replay validate type/mode/content | Filesystem symlink swap fails before ref advance/push; remote remains at base with no mode-`120000` entry |
 
-Authoritative evidence remains external and unchanged:
+The original evidence remains external and unchanged:
 
 - formal EXPERT report: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md`
 - owner gate: the adjacent `slice2-ae31587-owner-gate.md`
-- runnable counterexamples: the adjacent
-  `slice2-ae31587-new-counterexamples.test.mjs`
-- owner reproduction: the adjacent
-  `slice2-ae31587-owner-counterexamples.log` (0/5 passing)
-- additional runnable counterexamples: the adjacent
-  `slice2-ae31587-additional-counterexamples.test.mjs`
-- additional owner reproduction: the adjacent
-  `slice2-ae31587-owner-additional-counterexamples.log` (0/2 passing)
+- adjacent primary and additional runnable counterexamples and their owner logs
+  (original result: 0/5 plus 0/2)
 
-Repository regressions implementing ASTRA-05, ASTRA-06, ASTRA-06b,
-ASTRA-07, ASTRA-08, ASTRA-08b, and ASTRA-09 are required before Slice 2 can
-return to owner/EXPERT acceptance. Passing prior suites cannot compensate for
-these counterexamples.
+The seven counterexamples are preserved in
+`tests/specification_episodes_astra_regressions.test.mjs`, with added coverage
+for same-name file replacement, late `indexes` swap, every retained OID, and
+exact blocker preservation. Passing local validation returns Slice 2 only to
+fresh owner/EXPERT acceptance; it does not start Slice 3.
 
 ## 6. Episode-creation behavior
 
