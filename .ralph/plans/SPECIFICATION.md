@@ -434,6 +434,27 @@ not part of this intermediate boundary. Use disposable fixtures, then update
 evidence and bead notes, commit and push, prove clean local/upstream/actual-
 remote identity, report the partial packet, and stop. Slice 3 remains blocked.
 
+The bounded implementation uses each manifest-bound quarantine destination as
+the durable reconciliation discriminator for product files, deterministic
+control records, and tree evidence. Fresh resume validates the destination
+before consulting or moving the public name. An exact retired object completes
+idempotently; an invalid retired object restores no-replace when the public name
+is absent; a concurrent public occupant preserves both exact locations. Product
+and tree-evidence conflicts fail with both locations reported. For deterministic
+control retirement only, an exact approved retired object plus a newer canonical
+record is response-loss success with `canonical_replacement` reported, preserving
+R-WE-91 without moving the newer record. A restored foreign object is
+prevalidated and never cycled back into quarantine. Post-rename validation still catches substitution
+and dirty-hardlink races. Rename and restoration flush source then destination
+parents. Fresh-process disposable tests interrupt before both parent barriers
+and before validation, interrupt both restore barriers, and cover directory,
+dirty-hardlink, exact-owned, conflict, control, and tree-evidence outcomes.
+Post-fix evidence is exact combined Node 93/93, focused helper/identity Python
+48 passed with 2 platform skips, retirement fault selection 11 passed with 1
+platform skip, and inventory 2/2. Final independent trace audit PASS is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0b638-b392-778e-8c04-c5307740fc42/sub-bd380039/astra17-24-trace-audit.md` (SHA-256 `2e3d07827dfe8f77f102b2392a8f1b2e9db801eb0299d3450930b774872f3380`). This remains intermediate ASTRA-17/24
+evidence; ASTRA-25 and owner/formal acceptance remain pending.
+
 ## 6. Episode-creation behavior
 
 For the immediate episode disposition, deterministic automation shall:

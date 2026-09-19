@@ -23,7 +23,7 @@
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
 | 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed at Slice 1) |
-| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Owner-authorized bounded revision from `94ec196` | Transition `33137bdb-e96e-4337-92df-1cdd860f9fa6` closes ASTRA-10/11/17/24/25 only; fresh owner/EXPERT review follows one pushed candidate |
+| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | ASTRA-17/24 bounded revision in progress from clean `e0cf297` | Transition `a40489d7-38c1-4170-8b5e-c6f9c660f8b0` implements ASTRA-17/24 only; ASTRA-25 and final owner/EXPERT acceptance remain pending |
 | 3–8 | `prime-claw-h6w.4`–`.9` | Not started | Dependency-ordered below |
 
 Slice 1 evidence names the exact active-suite command. It does not claim a
@@ -395,6 +395,29 @@ race, mount, symlink, and destructive coverage uses disposable fixtures. This
 is an intermediate boundary: ASTRA-25 stays pending, Slice 3 stays blocked, and
 the task stops after durable evidence, bead update, commit/push, and exact
 clean local/upstream/actual-remote identity.
+
+Implementation progress: product-file, deterministic control, and tree-evidence
+retirement now reconcile from the manifest-bound destination before consulting
+or moving a public name. Exact retired objects complete idempotently after
+response/barrier loss. Invalid retired objects restore no-replace when the
+public name is free; occupied public names preserve and report both locations.
+Product and tree conflicts fail. An exact retired control record plus a newer
+canonical record remains the R-WE-91 response-loss success case and reports
+`canonical_replacement` without moving either object. Prevalidation prevents a restored foreign object from cycling back into
+quarantine, while post-rename validation still closes substitution and
+hardlink-write races. Source and destination parents are flushed in order after
+rename and restore. Disposable fresh-process tests interrupt before each parent
+barrier and before validation for directory and dirty-hardlink substitution,
+interrupt both restoration barriers, cover exact-owned resume and public-name
+conflict, and apply the same model to control and tree evidence. This is focused
+ASTRA-17/24 evidence only, not ASTRA-25 or final Slice 2 acceptance. Post-fix
+validation passes the exact combined Node suites 93/93 in 1,302.58 seconds,
+the focused helper/identity selection 48 passed with 2 platform skips, the
+retirement fault selection 11 passed with 1 platform skip, and inventory 2/2.
+Independent review first returned REVISE at `/Users/jlanders/.prime/agent/session-artifacts/01a0b638-b392-778e-8c04-c5307740fc42/sub-2f983c02/astra17-24-final-code-audit.md` (SHA-256
+`4ba275583c7460080c964bde61c536c1c5f1e21ab731d712ecb906c621fc7924`) for order-insensitive crash traces; persistent pre-exit
+traces closed the finding. Final read-only audit PASS is `/Users/jlanders/.prime/agent/session-artifacts/01a0b638-b392-778e-8c04-c5307740fc42/sub-bd380039/astra17-24-trace-audit.md`
+(SHA-256 `2e3d07827dfe8f77f102b2392a8f1b2e9db801eb0299d3450930b774872f3380`).
 
 ### 2.5 Promoted episode transaction
 

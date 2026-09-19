@@ -194,23 +194,22 @@ def test_astra_10_control_restore_is_atomic_no_clobber():
     with tempfile.TemporaryDirectory(prefix="prime-claw-control-removal-") as raw_root:
         root = Path(raw_root).resolve(); control = root / "control"; control.mkdir()
         leaf = control / "state.json"; original = b'{"owned":true}\n'; leaf.write_bytes(original)
-        original_preserve = module.preserve_entry
+        original_rename = module.rename_exclusive_between
         injected = False
-        def replace_after_retire(source_fd, source, quarantine_fd, prefix):
+        def replace_after_retire(source_fd, source, quarantine_fd, retired):
             nonlocal injected
-            retired = original_preserve(source_fd, source, quarantine_fd, prefix)
+            original_rename(source_fd, source, quarantine_fd, retired)
             if source == "state.json":
                 injected = True
                 os.rename(retired, f"{retired}-owned", src_dir_fd=quarantine_fd, dst_dir_fd=quarantine_fd)
                 qfd = os.open(retired, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=quarantine_fd); os.write(qfd, b"replacement\n"); os.close(qfd)
                 dfd = os.open(source, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=source_fd); os.write(dfd, b"concurrent destination\n"); os.close(dfd)
-            return retired
-        module.preserve_entry = replace_after_retire
+        module.rename_exclusive_between = replace_after_retire
         try:
             try: module.remove_control(str(root), "control/state.json", hashlib.sha256(original).hexdigest(), _fd_identity(module, leaf))
-            except RuntimeError as error: assert "occupied" in str(error) or "no-clobber" in str(error)
+            except RuntimeError as error: assert "conflict preserved" in str(error)
             else: raise AssertionError("control mismatch unexpectedly succeeded")
-        finally: module.preserve_entry = original_preserve
+        finally: module.rename_exclusive_between = original_rename
         assert injected and leaf.read_bytes() == b"concurrent destination\n"
         quarantine = root / "prime-claw/quarantine"
         assert any(path.read_bytes() == original for path in quarantine.iterdir() if path.is_file())

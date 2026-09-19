@@ -545,9 +545,42 @@ The helper returns its exact relative path; TypeScript control/future callers
 stop and surface that resource instead of reporting clean success. No checked
 staging pathname is removed. Disposable tests substitute foreign content at
 retired, product, and anchor leaf edges and late empty directories at losing
-publication, and prove that all incarnations survive. These focused results do
-not close Slice 2: ASTRA-17/24 and ASTRA-25 remain, followed by the combined
-candidate validation and fresh owner/formal gate.
+publication, and prove that all incarnations survive.
+
+### Current bounded revision: ASTRA-17/24 rename/barrier reconciliation
+
+Product-file, deterministic control-record, and tree-evidence retirement use the
+manifest-bound quarantine destination as durable state. A fresh process checks
+that destination first. If it contains the exact approved object and the public
+name is absent, retirement completes idempotently after flushing both parent
+directories. If the retired object is invalid and the public name is absent, it
+is restored with an atomic no-replace rename and both parents are flushed. If a
+public occupant exists, neither object moves. Product and tree-evidence paths
+fail with both exact locations. Deterministic control retirement preserves its
+existing R-WE-91 response-loss rule: an exact approved retired record plus a
+newer canonical record returns success with `canonical_replacement`, and moves
+neither object. Public prevalidation prevents a previously restored foreign
+object from cycling back into quarantine; destination validation after the real rename
+still catches a last-moment directory substitution or hardlink write.
+
+The supported durability claim is namespace ordering and fresh-process
+reconciliation on filesystems admitted by preflight: source-parent fsync then
+destination-parent fsync after each cross-directory rename or restoration.
+Injected process exit before either parent barrier, before validation, and
+during either restoration barrier is restart/fault evidence only. It is not a
+physical power-loss or storage-hardware guarantee.
+
+Permanent disposable tests cover directory and dirty-hardlink replacement at
+all three post-rename edges, both restore barriers, exact-owned resume, public
+conflict preservation, and analogous control and tree-evidence retirement. The
+live episode and owner resources are never fixtures. These focused results do
+not close Slice 2: ASTRA-25 remains pending, followed by combined candidate
+validation and a fresh owner/formal gate. The existing broad same-UID authority
+is not narrowed by this implementation. Post-fix validation passes the exact
+combined Node suites 93/93 in 1,302.58 seconds, focused helper/identity Python
+48 passed with 2 platform skips, retirement fault selection 11 passed with 1
+platform skip, and inventory 2/2. Final independent read-only audit PASS is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0b638-b392-778e-8c04-c5307740fc42/sub-bd380039/astra17-24-trace-audit.md` (SHA-256 `2e3d07827dfe8f77f102b2392a8f1b2e9db801eb0299d3450930b774872f3380`).
 
 ## Verification
 

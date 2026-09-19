@@ -153,15 +153,74 @@ def preserve_entry(source_fd: int, source: str, quarantine_fd: int, prefix: str)
     return target
 
 
-def preserve_entry_named(source_fd: int, name: str, quarantine_fd: int, destination: str) -> str:
-    """Retire or resume one exact entry at a manifest-bound destination."""
-    if entry_exists(source_fd, name):
-        rename_exclusive_between(source_fd, name, quarantine_fd, destination)
+def preserve_entry_named(source_fd: int, name: str, quarantine_fd: int, destination: str, expected_identity: dict[str, Any], expected_sha256: str) -> str:
+    """Retire or reconcile one exact manifest-bound regular file."""
+
+    def validate_expected(container_fd: int, child: str, label: str) -> None:
+        fd = -1
+        try:
+            fd = os.open(child, FILE_READ_FLAGS, dir_fd=container_fd)
+            if not stat.S_ISREG(os.fstat(fd).st_mode): fail(f"{label} is not regular: {child}")
+            if not matches_fd(fd, expected_identity): fail(f"{label} incarnation changed: {child}")
+            if hashlib.sha256(read_fd(fd)).hexdigest() != expected_sha256: fail(f"{label} hash changed: {child}")
+        finally:
+            if fd >= 0: os.close(fd)
+
+    def flush_retirement() -> None:
         os.fsync(source_fd)
         os.fsync(quarantine_fd)
-    if not entry_exists(quarantine_fd, destination):
-        fail(f"retirement evidence is missing: {destination}")
-    return destination
+
+    def flush_restoration() -> None:
+        os.fsync(quarantine_fd)
+        os.fsync(source_fd)
+
+    def reconcile(cause: Exception | None = None) -> str:
+        public_exists = entry_exists(source_fd, name)
+        try:
+            validate_expected(quarantine_fd, destination, "retired evidence")
+        except Exception as validation_error:
+            if public_exists:
+                fail(f"evidence retirement conflict preserved public {name} and quarantine {destination}: {validation_error}")
+            try:
+                restore_exclusive(quarantine_fd, destination, source_fd, name)
+                flush_restoration()
+            except Exception as restore_error:
+                public_after = entry_exists(source_fd, name)
+                quarantine_after = entry_exists(quarantine_fd, destination)
+                fail(
+                    f"evidence restoration barrier uncertain for public {name} (present={public_after}) "
+                    f"and quarantine {destination} (present={quarantine_after}): {restore_error}"
+                )
+            fail(f"unauthorized evidence restored to public {name} from quarantine {destination}: {validation_error}")
+        flush_retirement()
+        if entry_exists(source_fd, name):
+            fail(f"evidence retirement conflict preserved public {name} and exact quarantine {destination}")
+        if cause is not None:
+            fail(
+                f"evidence retirement outcome reconciled at quarantine {destination} after uncertain "
+                f"namespace barrier; retry from durable state: {cause}"
+            )
+        return destination
+
+    if entry_exists(quarantine_fd, destination):
+        return reconcile()
+    if not entry_exists(source_fd, name):
+        fail(f"retirement evidence is missing from public {name} and quarantine {destination}")
+    try:
+        validate_expected(source_fd, name, "public evidence")
+    except Exception:
+        # A prior restoration may have moved the invalid object before either
+        # restoration barrier. Flushing quarantine then public is safe even for
+        # a pre-existing replacement and closes that ambiguous restart state.
+        flush_restoration()
+        raise
+    try:
+        rename_exclusive_between(source_fd, name, quarantine_fd, destination)
+        flush_retirement()
+    except Exception as transition_error:
+        if entry_exists(quarantine_fd, destination): return reconcile(transition_error)
+        raise
+    return reconcile()
 
 
 def restore_exclusive(source_fd: int, source: str, target_fd: int, target: str) -> None:
@@ -372,9 +431,71 @@ def read_control(root: str, rel: str, allow_missing: bool = False, root_identity
 
 def retire_control(root: str, rel: str, expected_sha256: str, expected_identity: dict[str, Any], prefix: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None, quarantine_identity: dict[str, Any] | None = None, retired_name: str | None = None) -> dict[str, Any]:
     root_fd = open_root(root)
-    parent_fd = quarantine_fd = retired_fd = -1
+    parent_fd = quarantine_fd = -1
     destination = retired_name or f"{prefix}-{expected_sha256}-{expected_identity['inode']}"
-    moved = False
+    moved_this_call = False
+
+    def validate_expected(container_fd: int, name: str, label: str) -> None:
+        fd = -1
+        try:
+            fd = os.open(name, FILE_READ_FLAGS, dir_fd=container_fd)
+            if not stat.S_ISREG(os.fstat(fd).st_mode): fail(f"{label} is not regular")
+            if not matches_fd(fd, expected_identity): fail(f"{label} incarnation changed")
+            if hashlib.sha256(read_fd(fd)).hexdigest() != expected_sha256: fail(f"{label} hash changed")
+        finally:
+            if fd >= 0: os.close(fd)
+
+    def flush_retirement() -> None:
+        # Retirement moves public -> quarantine.
+        os.fsync(parent_fd)
+        os.fsync(quarantine_fd)
+
+    def flush_restoration() -> None:
+        # Restoration reverses the rename, so its source is quarantine.
+        os.fsync(quarantine_fd)
+        os.fsync(parent_fd)
+
+    def reconcile_destination(cause: Exception | None = None) -> dict[str, Any]:
+        canonical_exists = entry_exists(parent_fd, name)
+        try:
+            validate_expected(quarantine_fd, destination, "retired control state")
+        except Exception as validation_error:
+            if canonical_exists:
+                fail(
+                    f"control retirement conflict preserved public {rel} and quarantine {destination}: "
+                    f"{validation_error}"
+                )
+            try:
+                restore_exclusive(quarantine_fd, destination, parent_fd, name)
+                flush_restoration()
+            except Exception as restore_error:
+                public_after = entry_exists(parent_fd, name)
+                quarantine_after = entry_exists(quarantine_fd, destination)
+                fail(
+                    f"control restoration barrier uncertain for public {rel} "
+                    f"(present={public_after}) and quarantine {destination} "
+                    f"(present={quarantine_after}): {restore_error}"
+                )
+            fail(
+                f"unauthorized control retirement restored to public {rel} from quarantine "
+                f"{destination}: {validation_error}"
+            )
+        flush_retirement()
+        canonical_exists = entry_exists(parent_fd, name)
+        if cause is not None:
+            fail(
+                f"control retirement outcome reconciled at quarantine {destination} after uncertain "
+                f"namespace barrier; retry from durable state: {cause}"
+            )
+        # An exact retired result is authoritative after response loss. A newer
+        # canonical record is preserved and reported rather than moved/adopted.
+        return {
+            "removed": True,
+            "reconciled": not moved_this_call,
+            "preserved_quarantine": destination,
+            "canonical_replacement": rel if canonical_exists else None,
+        }
+
     try:
         require_identity(root_fd, root_identity, "control root")
         parent_fd, name = open_parent(root_fd, rel)
@@ -383,45 +504,30 @@ def retire_control(root: str, rel: str, expected_sha256: str, expected_identity:
         else:
             quarantine_fd = descend(root_fd, "prime-claw/quarantine")
             require_identity(quarantine_fd, quarantine_identity, "quarantine directory")
-        # A deterministic already-retired object is the authoritative outcome.
-        # Reconcile it before consulting the canonical name so a new canonical
-        # blocker/control record is never moved or adopted after response loss.
-        already_retired = retired_name is not None and entry_exists(quarantine_fd, destination)
-        if not already_retired and entry_exists(parent_fd, name):
-            if retired_name is None:
-                destination = preserve_entry(parent_fd, name, quarantine_fd, prefix)
-            else:
-                rename_exclusive_between(parent_fd, name, quarantine_fd, destination)
-            moved = True
-            os.fsync(parent_fd)
-            os.fsync(quarantine_fd)
-        if not entry_exists(quarantine_fd, destination):
-            fail(f"control retirement evidence is missing: {destination}")
+
+        if entry_exists(quarantine_fd, destination):
+            return reconcile_destination()
+        if not entry_exists(parent_fd, name):
+            fail(f"control retirement evidence is missing from public {rel} and quarantine {destination}")
+
+        # Prevalidation prevents a previously restored foreign object from being
+        # retired again. Post-rename validation below still closes the race.
         try:
-            retired_fd = os.open(destination, FILE_READ_FLAGS, dir_fd=quarantine_fd)
-            if not stat.S_ISREG(os.fstat(retired_fd).st_mode): fail("retired control state is not regular")
-            if not matches_fd(retired_fd, expected_identity): fail("retired control state incarnation changed")
-            if hashlib.sha256(read_fd(retired_fd)).hexdigest() != expected_sha256: fail("retired control state hash changed")
-        except Exception as validation_error:
-            if retired_fd >= 0:
-                os.close(retired_fd)
-                retired_fd = -1
-            if moved:
-                if entry_exists(parent_fd, name):
-                    fail(f"control retirement preserved {destination}; public destination is occupied: {validation_error}")
-                try:
-                    restore_exclusive(quarantine_fd, destination, parent_fd, name)
-                    moved = False
-                    os.fsync(quarantine_fd)
-                    os.fsync(parent_fd)
-                except Exception as restore_error:
-                    fail(f"control retirement preserved {destination}; no-clobber restoration failed: {restore_error}")
+            validate_expected(parent_fd, name, "public control state")
+        except Exception:
+            flush_restoration()
             raise
-        os.fsync(parent_fd)
-        os.fsync(quarantine_fd)
-        return {"removed": True, "reconciled": not moved, "preserved_quarantine": destination}
+        try:
+            rename_exclusive_between(parent_fd, name, quarantine_fd, destination)
+            moved_this_call = True
+            flush_retirement()
+        except Exception as transition_error:
+            if entry_exists(quarantine_fd, destination):
+                return reconcile_destination(transition_error)
+            raise
+        return reconcile_destination()
     finally:
-        for fd in (retired_fd, quarantine_fd, parent_fd, root_fd):
+        for fd in (quarantine_fd, parent_fd, root_fd):
             if fd >= 0:
                 try: os.close(fd)
                 except OSError: pass
@@ -1046,46 +1152,101 @@ def create_json_in_fd(parent_fd: int, name: str, text: str, quarantine_fd: int) 
 
 
 def retire_anchored_file(target_fd: int, quarantine_fd: int, common_fd: int, item: dict[str, Any]) -> str:
-    anchor_parent_fd = anchor_fd = retired_fd = -1
+    anchor_parent_fd = anchor_fd = -1
     destination = item["retired_name"]
-    moved = False
+
+    def validate_expected(container_fd: int, name: str, label: str) -> None:
+        fd = -1
+        try:
+            fd = os.open(name, FILE_READ_FLAGS, dir_fd=container_fd)
+            if not stat.S_ISREG(os.fstat(fd).st_mode): fail(f"{label} is not a regular file: {item['name']}")
+            if not os.path.samestat(os.fstat(fd), os.fstat(anchor_fd)):
+                fail(f"{label} is not the protected allocation: {item['name']}")
+            if not matches_fd(fd, item["identity"]): fail(f"{label} identity mismatch: {item['name']}")
+            if read_fd(fd).decode("utf-8") != item["content"]: fail(f"{label} content changed: {item['name']}")
+        finally:
+            if fd >= 0: os.close(fd)
+
+    def flush_retirement() -> None:
+        os.fsync(target_fd)
+        os.fsync(quarantine_fd)
+
+    def flush_restoration() -> None:
+        os.fsync(quarantine_fd)
+        os.fsync(target_fd)
+
+    def reconcile_destination(cause: Exception | None = None) -> str:
+        public_exists = entry_exists(target_fd, item["name"])
+        try:
+            validate_expected(quarantine_fd, destination, "retired entry")
+        except Exception as validation_error:
+            if public_exists:
+                fail(
+                    f"unauthorized retirement conflict preserved public {item['name']} and "
+                    f"quarantine {destination}: {validation_error}"
+                )
+            try:
+                restore_exclusive(quarantine_fd, destination, target_fd, item["name"])
+                flush_restoration()
+            except Exception as restore_error:
+                public_after = entry_exists(target_fd, item["name"])
+                quarantine_after = entry_exists(quarantine_fd, destination)
+                fail(
+                    f"restoration barrier uncertain for public {item['name']} "
+                    f"(present={public_after}) and quarantine {destination} "
+                    f"(present={quarantine_after}): {restore_error}"
+                )
+            fail(
+                f"unauthorized replacement restored to public {item['name']} from quarantine "
+                f"{destination}: {validation_error}"
+            )
+        if public_exists:
+            fail(
+                f"retirement conflict preserved public {item['name']} and exact quarantine "
+                f"{destination}"
+            )
+        flush_retirement()
+        if entry_exists(target_fd, item["name"]):
+            fail(
+                f"retirement conflict preserved public {item['name']} and exact quarantine "
+                f"{destination}"
+            )
+        if cause is not None:
+            fail(
+                f"retirement outcome reconciled at quarantine {destination} after uncertain "
+                f"namespace barrier; retry from durable state: {cause}"
+            )
+        return destination
+
     try:
         anchor_parent_fd, anchor_name = open_parent(common_fd, item["anchor_path"])
         require_identity(anchor_parent_fd, item.get("anchor_parent_identity"), "file anchor directory")
         anchor_fd = os.open(anchor_name, FILE_READ_FLAGS, dir_fd=anchor_parent_fd)
         if not matches_fd(anchor_fd, item["anchor_identity"]): fail(f"file anchor incarnation changed: {item['name']}")
-        if read_fd(anchor_fd).decode("utf-8") != item["content"]: fail(f"file anchor content changed: {item['name']}")
-        if entry_exists(target_fd, item["name"]):
-            rename_exclusive_between(target_fd, item["name"], quarantine_fd, destination)
-            moved = True
-            os.fsync(target_fd)
-            os.fsync(quarantine_fd)
-        if not entry_exists(quarantine_fd, destination): fail(f"retirement evidence is missing: {destination}")
+
+        if entry_exists(quarantine_fd, destination):
+            return reconcile_destination()
+        if not entry_exists(target_fd, item["name"]):
+            fail(f"retirement evidence is missing from public {item['name']} and quarantine {destination}")
+
+        # Prevalidation prevents a restored foreign entry from cycling back into
+        # quarantine. The same checks repeat after rename to close substitution
+        # and hardlink-write races at the actual mutation boundary.
         try:
-            retired_fd = os.open(destination, FILE_READ_FLAGS, dir_fd=quarantine_fd)
-            if not stat.S_ISREG(os.fstat(retired_fd).st_mode): fail(f"retired entry is not a regular file: {item['name']}")
-            if not os.path.samestat(os.fstat(retired_fd), os.fstat(anchor_fd)):
-                fail(f"retired file is not the protected allocation: {item['name']}")
-            if not matches_fd(retired_fd, item["identity"]): fail(f"retired file identity mismatch: {item['name']}")
-            if read_fd(retired_fd).decode("utf-8") != item["content"]: fail(f"retired file content changed: {item['name']}")
-        except Exception as validation_error:
-            if retired_fd >= 0:
-                os.close(retired_fd)
-                retired_fd = -1
-            if moved:
-                if entry_exists(target_fd, item["name"]):
-                    fail(f"unauthorized replacement retained as {destination}; public destination is occupied: {validation_error}")
-                try:
-                    restore_exclusive(quarantine_fd, destination, target_fd, item["name"])
-                    moved = False
-                    os.fsync(quarantine_fd)
-                    os.fsync(target_fd)
-                except Exception as restore_error:
-                    fail(f"unauthorized replacement retained as {destination}; no-clobber restoration failed: {restore_error}")
+            validate_expected(target_fd, item["name"], "public entry")
+        except Exception:
+            flush_restoration()
             raise
-        return destination
+        try:
+            rename_exclusive_between(target_fd, item["name"], quarantine_fd, destination)
+            flush_retirement()
+        except Exception as transition_error:
+            if entry_exists(quarantine_fd, destination):
+                return reconcile_destination(transition_error)
+            raise
+        return reconcile_destination()
     finally:
-        for fd in (retired_fd, anchor_fd, anchor_parent_fd):
+        for fd in (anchor_fd, anchor_parent_fd):
             if fd >= 0:
                 try: os.close(fd)
                 except OSError: pass
@@ -1135,7 +1296,10 @@ def remove_bundle(data: dict[str, Any]) -> dict[str, Any]:
                 if not stat.S_ISREG(os.fstat(fd).st_mode) or not matches_fd(fd, data["tree_evidence_identity"]): fail("tree evidence incarnation changed")
                 if hashlib.sha256(read_fd(fd)).hexdigest() != data["tree_evidence_sha256"]: fail("tree evidence hash changed")
             finally: os.close(fd)
-        retired_tree = preserve_entry_named(indexes_fd, tree_name, quarantine_fd, tree_destination)
+        retired_tree = preserve_entry_named(
+            indexes_fd, tree_name, quarantine_fd, tree_destination,
+            data["tree_evidence_identity"], data["tree_evidence_sha256"],
+        )
         fd = os.open(retired_tree, FILE_READ_FLAGS, dir_fd=quarantine_fd)
         try:
             if not matches_fd(fd, data["tree_evidence_identity"]): fail("retired tree evidence incarnation changed")

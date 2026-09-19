@@ -202,3 +202,319 @@ def test_platform_preflight_retains_one_bounded_capability_allocation_per_call()
         assert len({result["retained_probes"]["retired"] for result in results}) == 3
         assert len({result["retained_probes"]["anchor"] for result in results}) == 3
         assert {result["retained_probes"]["target_directory"] for result in results} == {None}
+
+
+RETIREMENT_WORKER = REPO / "tests/helpers/specification_episode_retirement_worker.py"
+
+
+def retirement_worker(request):
+    payload = {"helper": str(HELPER), **request}
+    return subprocess.run(
+        [sys.executable, str(RETIREMENT_WORKER)],
+        input=json.dumps(payload), text=True, capture_output=True,
+    )
+
+
+def persisted_barrier_trace(path: Path):
+    return path.read_text().splitlines() if path.exists() else []
+
+
+def product_retirement_fixture(root: Path):
+    repo, common = fixture(root)
+    target = repo / ".ralph/plans/future/candidate"
+    target.mkdir()
+    anchors = common / "prime-claw/future-file-anchors"
+    quarantine = common / "prime-claw/quarantine"
+    directory = call({"operation": "directory-identity", "path": str(target)})["identity"]
+    anchor_parent_identity = call({"operation": "directory-identity", "path": str(anchors)})["identity"]
+    content = "owned-content"
+    created = call({
+        "operation": "create-file", "repo": str(repo), "common_dir": str(common),
+        "path": ".ralph/plans/future/candidate/SPECIFICATION.md", "content": content,
+        "directory_identity": directory, "anchor_path": "prime-claw/future-file-anchors/spec",
+        "anchor_parent_identity": anchor_parent_identity,
+    })
+    item = {
+        "name": "SPECIFICATION.md", "content": content, "identity": created["identity"],
+        "anchor_identity": created["anchor_identity"],
+        "anchor_path": "prime-claw/future-file-anchors/spec",
+        "anchor_parent_identity": anchor_parent_identity, "retired_name": "retired-spec",
+    }
+    base = {
+        "kind": "product", "target": str(target), "quarantine": str(quarantine),
+        "common": str(common), "item": item, "public_name": "SPECIFICATION.md",
+        "retired_name": "retired-spec",
+    }
+    return target, quarantine, anchors, base
+
+
+def test_product_retirement_reconciles_every_uncertain_post_rename_edge_in_fresh_process():
+    for replacement in ("directory", "dirty-hardlink"):
+        for fault_point in ("barrier-1", "barrier-2", "pre-validation"):
+            with tempfile.TemporaryDirectory(prefix="prime-claw-retirement-restart-") as raw:
+                target, quarantine, anchors, base = product_retirement_fixture(Path(raw).resolve())
+                trace_path = Path(raw) / "retirement.trace"
+                crashed = retirement_worker({
+                    **base, "replacement": replacement, "substitute_before_rename": True,
+                    "fault_point": fault_point, "trace_path": str(trace_path),
+                })
+                assert crashed.returncode in {71, 72, 73}, crashed.stdout + crashed.stderr
+                expected_trace = ["public"] if fault_point == "barrier-1" else ["public", "quarantine"]
+                assert persisted_barrier_trace(trace_path) == expected_trace
+                assert not (target / "SPECIFICATION.md").exists()
+                assert (quarantine / "retired-spec").exists()
+
+                resumed = retirement_worker(base)
+                assert resumed.returncode == 1, resumed.stdout + resumed.stderr
+                detail = json.loads(resumed.stdout)
+                assert "restored to public" in detail["error"]
+                assert detail["barrier_trace"] == ["quarantine", "public"]
+                assert (target / "SPECIFICATION.md").exists()
+                assert not (quarantine / "retired-spec").exists()
+                if replacement == "directory":
+                    assert (target / "SPECIFICATION.md/sentinel").read_text() == "unowned-directory"
+                    assert (target / "owned-original").read_text() == "owned-content"
+                else:
+                    assert (target / "SPECIFICATION.md").read_text() == "unowned-dirty"
+                    assert (target / "dirty-link").read_text() == "unowned-dirty"
+                    assert (anchors / "spec").read_text() == "unowned-dirty"
+
+                replay = retirement_worker(base)
+                assert replay.returncode == 1, replay.stdout + replay.stderr
+                assert "public entry" in json.loads(replay.stdout)["error"]
+                assert not (quarantine / "retired-spec").exists()
+
+
+def test_product_restoration_barrier_crash_is_safe_on_next_fresh_process():
+    for replacement in ("directory", "dirty-hardlink"):
+        for fault_point, exit_code in (("barrier-1", 71), ("barrier-2", 72)):
+            with tempfile.TemporaryDirectory(prefix="prime-claw-restoration-restart-") as raw:
+                target, quarantine, _, base = product_retirement_fixture(Path(raw).resolve())
+                crashed = retirement_worker({
+                    **base, "replacement": replacement, "substitute_before_rename": True,
+                    "fault_point": "barrier-1",
+                })
+                assert crashed.returncode == 71
+                trace_path = Path(raw) / "restoration.trace"
+                restore_crashed = retirement_worker({
+                    **base, "fault_stage": "restore", "fault_point": fault_point,
+                    "trace_path": str(trace_path),
+                })
+                assert restore_crashed.returncode == exit_code, restore_crashed.stdout + restore_crashed.stderr
+                expected_trace = ["quarantine"] if fault_point == "barrier-1" else ["quarantine", "public"]
+                assert persisted_barrier_trace(trace_path) == expected_trace
+                assert (target / "SPECIFICATION.md").exists()
+                assert not (quarantine / "retired-spec").exists()
+                replay = retirement_worker(base)
+                assert replay.returncode == 1
+                replay_detail = json.loads(replay.stdout)
+                assert "public entry" in replay_detail["error"]
+                assert replay_detail["barrier_trace"] == ["quarantine", "public"]
+
+
+def test_product_retirement_conflict_preserves_and_reports_both_exact_locations():
+    with tempfile.TemporaryDirectory(prefix="prime-claw-retirement-conflict-") as raw:
+        target, quarantine, _, base = product_retirement_fixture(Path(raw).resolve())
+        crashed = retirement_worker({
+            **base, "replacement": "directory", "substitute_before_rename": True,
+            "fault_point": "barrier-1",
+        })
+        assert crashed.returncode == 71
+        (target / "SPECIFICATION.md").write_text("late-public")
+        resumed = retirement_worker(base)
+        assert resumed.returncode == 1
+        error = json.loads(resumed.stdout)["error"]
+        assert "preserved public SPECIFICATION.md and quarantine retired-spec" in error
+        assert (target / "SPECIFICATION.md").read_text() == "late-public"
+        assert (quarantine / "retired-spec/sentinel").read_text() == "unowned-directory"
+
+
+def control_retirement_fixture(root: Path):
+    control = root / "prime-claw/state"; quarantine = root / "prime-claw/quarantine"
+    control.mkdir(parents=True); quarantine.mkdir(parents=True)
+    rel = "prime-claw/state/blocker.json"; text = '{"blocked":true}\n'
+    call({"operation": "replace-json", "root": str(root), "path": rel, "text": text, "expected_identity": None})
+    observed = call({"operation": "read-file", "root": str(root), "path": rel})
+    base = {
+        "kind": "control", "root": str(root), "rel": rel,
+        "sha256": hashlib.sha256(text.encode()).hexdigest(), "identity": observed["identity"],
+        "public_name": "blocker.json", "retired_name": "retired-blocker",
+    }
+    return control, quarantine, base
+
+
+def test_control_retirement_reconciles_uncertain_barrier_in_fresh_process():
+    for replacement in ("directory", "dirty-hardlink"):
+        for fault_point, exit_code in (("barrier-1", 71), ("barrier-2", 72), ("pre-validation", 73)):
+            with tempfile.TemporaryDirectory(prefix="prime-claw-control-retirement-") as raw:
+                control, quarantine, base = control_retirement_fixture(Path(raw).resolve())
+                trace_path = Path(raw) / "retirement.trace"
+                crashed = retirement_worker({
+                    **base, "replacement": replacement, "substitute_before_rename": True,
+                    "fault_point": fault_point, "trace_path": str(trace_path),
+                })
+                assert crashed.returncode == exit_code, crashed.stdout + crashed.stderr
+                expected_trace = ["public"] if fault_point == "barrier-1" else ["public", "quarantine"]
+                assert persisted_barrier_trace(trace_path) == expected_trace
+                assert not (control / "blocker.json").exists()
+                assert (quarantine / "retired-blocker").exists()
+                resumed = retirement_worker(base)
+                assert resumed.returncode == 1, resumed.stdout + resumed.stderr
+                resumed_detail = json.loads(resumed.stdout)
+                assert "restored to public" in resumed_detail["error"]
+                assert resumed_detail["barrier_trace"] == ["quarantine", "public"]
+                if replacement == "directory":
+                    assert (control / "blocker.json/sentinel").read_text() == "unowned-directory"
+                else:
+                    assert (control / "blocker.json").read_text() == "unowned-dirty"
+                    assert (control / "dirty-link").read_text() == "unowned-dirty"
+                assert not (quarantine / "retired-blocker").exists()
+                replay = retirement_worker(base)
+                assert replay.returncode == 1
+                replay_detail = json.loads(replay.stdout)
+                assert "public control state" in replay_detail["error"]
+                assert replay_detail["barrier_trace"] == ["quarantine", "public"]
+
+
+def test_control_restoration_barriers_resume_in_order_for_all_replacements():
+    for replacement in ("directory", "dirty-hardlink"):
+        for fault_point, exit_code in (("barrier-1", 71), ("barrier-2", 72)):
+            with tempfile.TemporaryDirectory(prefix="prime-claw-control-restore-") as raw:
+                control, quarantine, base = control_retirement_fixture(Path(raw).resolve())
+                assert retirement_worker({
+                    **base, "replacement": replacement, "substitute_before_rename": True,
+                    "fault_point": "barrier-1",
+                }).returncode == 71
+                trace_path = Path(raw) / "restoration.trace"
+                restore_crashed = retirement_worker({
+                    **base, "fault_stage": "restore", "fault_point": fault_point,
+                    "trace_path": str(trace_path),
+                })
+                assert restore_crashed.returncode == exit_code
+                expected_trace = ["quarantine"] if fault_point == "barrier-1" else ["quarantine", "public"]
+                assert persisted_barrier_trace(trace_path) == expected_trace
+                assert (control / "blocker.json").exists() and not (quarantine / "retired-blocker").exists()
+                replay = retirement_worker(base)
+                assert replay.returncode == 1
+                assert json.loads(replay.stdout)["barrier_trace"] == ["quarantine", "public"]
+
+
+def test_control_exact_retirement_preserves_new_canonical_record_after_response_loss():
+    with tempfile.TemporaryDirectory(prefix="prime-claw-control-response-loss-") as raw:
+        control, quarantine, base = control_retirement_fixture(Path(raw).resolve())
+        crashed = retirement_worker({**base, "fault_point": "barrier-1"})
+        assert crashed.returncode == 71
+        (control / "blocker.json").write_text("new canonical blocker\n")
+        resumed = retirement_worker(base)
+        assert resumed.returncode == 0, resumed.stdout + resumed.stderr
+        detail = json.loads(resumed.stdout)
+        assert detail["result"]["canonical_replacement"] == "prime-claw/state/blocker.json"
+        assert detail["barrier_trace"] == ["public", "quarantine"]
+        assert (control / "blocker.json").read_text() == "new canonical blocker\n"
+        assert (quarantine / "retired-blocker").read_text() == '{"blocked":true}\n'
+
+
+def test_exact_owned_retirement_completes_from_fresh_process_after_barrier_crash():
+    for fault_point, exit_code in (("barrier-1", 71), ("barrier-2", 72), ("pre-validation", 73)):
+        with tempfile.TemporaryDirectory(prefix="prime-claw-owned-retirement-restart-") as raw:
+            target, quarantine, _, base = product_retirement_fixture(Path(raw).resolve())
+            crashed = retirement_worker({**base, "fault_point": fault_point})
+            assert crashed.returncode == exit_code, crashed.stdout + crashed.stderr
+            assert not (target / "SPECIFICATION.md").exists()
+            assert (quarantine / "retired-spec").read_text() == "owned-content"
+            resumed = retirement_worker(base)
+            assert resumed.returncode == 0, resumed.stdout + resumed.stderr
+            result = json.loads(resumed.stdout)
+            assert result["ok"] is True and result["result"] == "retired-spec"
+            assert result["barrier_trace"] == ["public", "quarantine"]
+            assert not (target / "SPECIFICATION.md").exists()
+            assert (quarantine / "retired-spec").read_text() == "owned-content"
+
+
+def evidence_retirement_fixture(root: Path):
+    source = root / "indexes"; quarantine = root / "quarantine"
+    source.mkdir(); quarantine.mkdir()
+    public = source / "tree.index"; content = b"tree-evidence\n"; public.write_bytes(content)
+    observed = call({"operation": "read-file", "root": str(root), "path": "indexes/tree.index"})
+    base = {
+        "kind": "evidence", "source": str(source), "quarantine": str(quarantine),
+        "public_name": "tree.index", "retired_name": "retired-tree.index",
+        "identity": observed["identity"], "sha256": hashlib.sha256(content).hexdigest(),
+    }
+    return source, quarantine, base
+
+
+def test_tree_evidence_retirement_reconciles_all_uncertain_edges_in_fresh_process():
+    for replacement in ("directory", "dirty-hardlink"):
+        for fault_point, exit_code in (("barrier-1", 71), ("barrier-2", 72), ("pre-validation", 73)):
+            with tempfile.TemporaryDirectory(prefix="prime-claw-evidence-retirement-") as raw:
+                source, quarantine, base = evidence_retirement_fixture(Path(raw).resolve())
+                trace_path = Path(raw) / "retirement.trace"
+                crashed = retirement_worker({
+                    **base, "replacement": replacement, "substitute_before_rename": True,
+                    "fault_point": fault_point, "trace_path": str(trace_path),
+                })
+                assert crashed.returncode == exit_code, crashed.stdout + crashed.stderr
+                expected_trace = ["public"] if fault_point == "barrier-1" else ["public", "quarantine"]
+                assert persisted_barrier_trace(trace_path) == expected_trace
+                assert not (source / "tree.index").exists()
+                assert (quarantine / "retired-tree.index").exists()
+                resumed = retirement_worker(base)
+                assert resumed.returncode == 1, resumed.stdout + resumed.stderr
+                detail = json.loads(resumed.stdout)
+                assert "restored to public" in detail["error"]
+                assert detail["barrier_trace"] == ["quarantine", "public"]
+                assert (source / "tree.index").exists()
+                assert not (quarantine / "retired-tree.index").exists()
+
+
+def test_tree_evidence_restoration_barriers_resume_in_source_destination_order():
+    for replacement in ("directory", "dirty-hardlink"):
+        for fault_point, exit_code in (("barrier-1", 71), ("barrier-2", 72)):
+            with tempfile.TemporaryDirectory(prefix="prime-claw-evidence-restore-") as raw:
+                source, quarantine, base = evidence_retirement_fixture(Path(raw).resolve())
+                assert retirement_worker({
+                    **base, "replacement": replacement, "substitute_before_rename": True,
+                    "fault_point": "barrier-1",
+                }).returncode == 71
+                trace_path = Path(raw) / "restoration.trace"
+                restore_crashed = retirement_worker({
+                    **base, "fault_stage": "restore", "fault_point": fault_point,
+                    "trace_path": str(trace_path),
+                })
+                assert restore_crashed.returncode == exit_code
+                expected_trace = ["quarantine"] if fault_point == "barrier-1" else ["quarantine", "public"]
+                assert persisted_barrier_trace(trace_path) == expected_trace
+                assert (source / "tree.index").exists() and not (quarantine / "retired-tree.index").exists()
+                replay = retirement_worker(base)
+                assert replay.returncode == 1
+                assert json.loads(replay.stdout)["barrier_trace"] == ["quarantine", "public"]
+
+
+
+def test_control_and_tree_invalid_retirement_conflicts_preserve_both_locations():
+    with tempfile.TemporaryDirectory(prefix="prime-claw-control-conflict-") as raw:
+        control, quarantine, base = control_retirement_fixture(Path(raw).resolve())
+        assert retirement_worker({
+            **base, "replacement": "directory", "substitute_before_rename": True,
+            "fault_point": "barrier-1",
+        }).returncode == 71
+        (control / "blocker.json").write_text("late-control")
+        resumed = retirement_worker(base)
+        assert resumed.returncode == 1
+        assert "conflict preserved public" in json.loads(resumed.stdout)["error"]
+        assert (control / "blocker.json").read_text() == "late-control"
+        assert (quarantine / "retired-blocker/sentinel").read_text() == "unowned-directory"
+
+    with tempfile.TemporaryDirectory(prefix="prime-claw-evidence-conflict-") as raw:
+        source, quarantine, base = evidence_retirement_fixture(Path(raw).resolve())
+        assert retirement_worker({
+            **base, "replacement": "directory", "substitute_before_rename": True,
+            "fault_point": "barrier-1",
+        }).returncode == 71
+        (source / "tree.index").write_text("late-evidence")
+        resumed = retirement_worker(base)
+        assert resumed.returncode == 1
+        assert "conflict preserved public" in json.loads(resumed.stdout)["error"]
+        assert (source / "tree.index").read_text() == "late-evidence"
+        assert (quarantine / "retired-tree.index/sentinel").read_text() == "unowned-directory"

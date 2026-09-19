@@ -2141,7 +2141,7 @@
    "id": "R-WE-86",
    "priority": "GATE",
    "summary": "Final file retirement cannot relocate a late directory or dirty replacement; conflicts preserve both objects and exact public/retained locations.",
-   "status": "REVISE at 44b92f8: ASTRA-17/24 post-rename barrier failure strands an unauthorized directory across fresh replay",
+   "status": "FOCUSED IMPLEMENTATION at pending ASTRA-17/24 partial packet: fresh-process destination-first reconciliation passes; owner/formal acceptance pending and ASTRA-25 remains",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2154,7 +2154,9 @@
      ".prime/agent/helpers/specification-episode-fs.py"
     ],
     "test": [
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episode_retirement_worker.py"
     ]
    },
    "blocking_evidence": [
@@ -2393,7 +2395,7 @@
    "id": "R-WE-93",
    "priority": "GATE",
    "summary": "Every acknowledged namespace transition follows an explicit supported-filesystem ordering and directory-flush durability contract.",
-   "status": "REVISE at 44b92f8: ASTRA-17/24 post-rename barriers and restart reconciliation remain unmet",
+   "status": "FOCUSED IMPLEMENTATION at pending ASTRA-17/24 partial packet: fresh-process destination-first reconciliation passes; owner/formal acceptance pending and ASTRA-25 remains",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2406,7 +2408,9 @@
      ".prime/agent/helpers/specification-episode-fs.py"
     ],
     "test": [
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episode_retirement_worker.py"
     ]
    },
    "blocking_evidence": [

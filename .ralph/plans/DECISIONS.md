@@ -466,6 +466,15 @@ specified edges. The authoritative report is
 `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md`
 (SHA-256 `84c9a0f1fc78ffb0db8ec528dd8765f674d32b9f41207e1d41f1434d7b072e91`),
 with owner gate, artifact manifest, invocation tree, and cleanup receipt beside
-it. The current unqualified same-UID authority wording is unresolved: it is not
-silently narrowed to cooperating invocations. Slice 2 stays open and Slice 3 is
-not authorized.
+it.
+
+Transition `a40489d7-38c1-4170-8b5e-c6f9c660f8b0` now provides focused D-WE-20/21
+implementation evidence for ASTRA-17/24: deterministic destinations are durable
+state discriminators; fresh resume validates destination-first, completes exact
+retirement idempotently, restores invalid objects no-replace, or preserves and
+reports both conflict locations. Product, control, and tree-evidence paths flush
+source then destination parents after rename and restore, with disposable
+fresh-process fault coverage at each post-rename/pre-validation and restore
+barrier. This is not final acceptance. ASTRA-25/D-WE-23 remains pending. The
+current unqualified same-UID authority wording is unresolved and is not silently
+narrowed. Slice 2 stays open and Slice 3 is not authorized.

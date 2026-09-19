@@ -235,6 +235,17 @@ if it does not weaken a gate.
   running-to-removed cleanup. Legitimate writer closure must not be obtained by
   loosening malformed-success preservation or admitting unknown mutable evidence.
 
+**Current focused evidence:** Transition
+`a40489d7-38c1-4170-8b5e-c6f9c660f8b0` implements the ASTRA-17/24 portion of
+R-WE-86/R-WE-93 only. Product-file, deterministic control, and tree-evidence
+retirement reconcile deterministic quarantine destinations across fresh process
+restart. Directory and dirty-hardlink replacements are restored no-replace when
+the public name is absent; conflicts preserve and report both locations. Tests
+interrupt before both parent barriers, before validation, and during both restore
+barriers. This is intermediate implementation evidence pending commit/push and
+owner/formal acceptance. R-WE-94/ASTRA-25 remains pending, and the existing
+unqualified same-UID authority is not narrowed.
+
 ## Episode creation
 
 - **R-WE-14 (GATE) — Durable location.** Worktrees use a configurable durable
