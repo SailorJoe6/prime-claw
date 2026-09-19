@@ -40,6 +40,17 @@ try {
     try { assert.throws(() => acquireProjectLock(lockPath, "disp-astra11", "owner-astra11"), /lock incarnation changed/); }
     finally { child.execFileSync = realExec; syncBuiltinESMExports(); }
     assert.equal(injected, true); assert.equal(JSON.parse(fs.readFileSync(join(lockPath,"owner.json"),"utf8")).token,"another-owner"); assert.equal(fs.existsSync(join(savedLock,"owner.json")),true);
+  } else if (kind === "postvalidate") {
+    const realExec = child.execFileSync; let injected = false;
+    child.execFileSync = (command, args, options) => {
+      const request = typeof options?.input === "string" ? JSON.parse(options.input) : null;
+      if (request?.operation === "validate-lock" && !injected) { injected = true; throw new Error("injected post-helper validation failure"); }
+      return realExec(command, args, options);
+    };
+    syncBuiltinESMExports();
+    try { assert.throws(() => acquireProjectLock(lockPath, "disp-astra19", "owner-astra19"), /post-helper validation failure/); }
+    finally { child.execFileSync = realExec; syncBuiltinESMExports(); }
+    assert.equal(injected, true); assert.equal(fs.existsSync(lockPath), false); assert.equal(fs.existsSync(`${lockPath}.guard`), false);
   } else if (kind === "intercall") {
     ensureControlDirectory(common, "locks");
     const savedLocks = join(root, "observed-locks");
@@ -47,6 +58,18 @@ try {
     assert.throws(() => acquireProjectLock(lockPath,"disp-astra11","owner-astra11"), /lock parent incarnation changed|directory(?: authority)?(?: incarnation)? changed/);
     assert.equal(fs.existsSync(join(savedLocks, "project-mutation.lock")), false);
     assert.equal(fs.existsSync(join(locks, "project-mutation.lock")), false);
+  } else if (kind === "release-response") {
+    const acquired = acquireProjectLock(lockPath,"disp-astra19","owner-astra19");
+    const realExec = child.execFileSync; let injected = false;
+    child.execFileSync = (command, args, options) => {
+      const request = typeof options?.input === "string" ? JSON.parse(options.input) : null;
+      if (request?.operation === "remove-lock" && !injected) { const result = realExec(command,args,options); injected = true; throw new Error("lost lock-release response"); }
+      return realExec(command,args,options);
+    };
+    syncBuiltinESMExports();
+    try { releaseProjectLock(acquired); }
+    finally { child.execFileSync = realExec; syncBuiltinESMExports(); }
+    assert.equal(injected,true); assert.equal(fs.existsSync(lockPath),false); assert.equal(fs.existsSync(`${lockPath}.guard`),false);
   } else if (kind === "release") {
     const savedLock = join(root, "created-lock"); const acquired = acquireProjectLock(lockPath,"disp-astra11","owner-astra11");
     fs.renameSync(lockPath,savedLock); fs.mkdirSync(lockPath); fs.writeFileSync(join(lockPath,"owner.json"),JSON.stringify({token:"another-owner"}));

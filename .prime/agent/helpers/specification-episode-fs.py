@@ -10,13 +10,17 @@ stdin/stdout; no secrets are read.
 from __future__ import annotations
 
 import ctypes
+import errno
+import fcntl
 import hashlib
 import json
 import os
 import secrets
+import socket
 import subprocess
 import stat
 import sys
+import tempfile
 from typing import Any
 
 O_DIRECTORY = getattr(os, "O_DIRECTORY", 0)
@@ -64,6 +68,21 @@ def rename_exclusive(parent_fd: int, source: str, target: str) -> None:
 def fail(message: str) -> None:
     raise RuntimeError(message)
 
+
+def strict_json(text: str) -> Any:
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                fail(f"duplicate decoded JSON key: {key}")
+            result[key] = value
+        return result
+    try:
+        return json.loads(text, object_pairs_hook=unique_object)
+    except (ValueError, TypeError) as error:
+        fail(f"invalid strict JSON: {error}")
+
+
 def components(value: str) -> list[str]:
     parts = value.split("/")
     if not parts or any(part in ("", ".", "..") for part in parts):
@@ -109,13 +128,16 @@ def ensure_path(root_fd: int, rel: str) -> tuple[int, bool]:
     created_any = False
     try:
         for part in components(rel):
+            created = False
             try:
                 os.mkdir(part, 0o700, dir_fd=fd)
                 created_any = True
+                created = True
                 os.fsync(fd)
             except FileExistsError:
                 pass
             nxt = os.open(part, DIR_FLAGS, dir_fd=fd)
+            if created: os.fsync(nxt)
             os.close(fd)
             fd = nxt
         return fd, created_any
@@ -238,7 +260,7 @@ def read_fd(fd: int) -> bytes:
             return b"".join(chunks)
         chunks.append(chunk)
 
-def durable_json(root: str, rel: str, text: str, create_only: bool, expected_identity: dict[str, Any] | None = None, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None) -> dict[str, Any]:
+def durable_json(root: str, rel: str, text: str, create_only: bool, expected_identity: dict[str, Any] | None = None, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None, quarantine_identity: dict[str, Any] | None = None) -> dict[str, Any]:
     root_fd = open_root(root)
     parent_fd = quarantine_fd = -1
     temp = f".prime-claw-{secrets.token_hex(16)}.tmp"
@@ -247,6 +269,10 @@ def durable_json(root: str, rel: str, text: str, create_only: bool, expected_ide
         require_identity(root_fd, root_identity, "control root")
         parent_fd, name = open_parent(root_fd, rel)
         require_identity(parent_fd, parent_identity, "control parent")
+        if quarantine_identity is None: quarantine_fd, _ = ensure_path(root_fd, "prime-claw/quarantine")
+        else:
+            quarantine_fd = descend(root_fd, "prime-claw/quarantine")
+            require_identity(quarantine_fd, quarantine_identity, "quarantine directory")
         fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | O_NOFOLLOW, 0o600, dir_fd=parent_fd)
         temp_created = True
         try:
@@ -269,7 +295,6 @@ def durable_json(root: str, rel: str, text: str, create_only: bool, expected_ide
                 try:
                     if not matches_fd(published_fd, staged_identity): fail("created control state incarnation changed")
                 finally: os.close(published_fd)
-            quarantine_fd, _ = ensure_path(root_fd, "prime-claw/quarantine")
             preserve_entry(parent_fd, temp, quarantine_fd, "json-temp")
             temp_created = False
         else:
@@ -304,11 +329,11 @@ def durable_json(root: str, rel: str, text: str, create_only: bool, expected_ide
                 finally:
                     os.close(retired_fd)
                     os.close(published_fd)
-                quarantine_fd, _ = ensure_path(root_fd, "prime-claw/quarantine")
                 preserve_entry(parent_fd, temp, quarantine_fd, "prior-control")
                 temp_created = False
                 created = True
         os.fsync(parent_fd)
+        if quarantine_fd >= 0: os.fsync(quarantine_fd)
         return {"created": created}
     finally:
         # A still-present exclusive temp is evidence. Never race an unlink.
@@ -345,70 +370,180 @@ def read_control(root: str, rel: str, allow_missing: bool = False, root_identity
         if parent_fd >= 0: os.close(parent_fd)
         os.close(root_fd)
 
-def retire_control(root: str, rel: str, expected_sha256: str, expected_identity: dict[str, Any], prefix: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None) -> dict[str, Any]:
+def retire_control(root: str, rel: str, expected_sha256: str, expected_identity: dict[str, Any], prefix: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None, quarantine_identity: dict[str, Any] | None = None, retired_name: str | None = None) -> dict[str, Any]:
     root_fd = open_root(root)
-    parent_fd = quarantine_fd = -1
-    preserved = ""
-    name = ""
+    parent_fd = quarantine_fd = retired_fd = -1
+    destination = retired_name or f"{prefix}-{expected_sha256}-{expected_identity['inode']}"
+    moved = False
     try:
         require_identity(root_fd, root_identity, "control root")
         parent_fd, name = open_parent(root_fd, rel)
         require_identity(parent_fd, parent_identity, "control parent")
-        fd = os.open(name, FILE_READ_FLAGS, dir_fd=parent_fd)
+        if quarantine_identity is None: quarantine_fd, _ = ensure_path(root_fd, "prime-claw/quarantine")
+        else:
+            quarantine_fd = descend(root_fd, "prime-claw/quarantine")
+            require_identity(quarantine_fd, quarantine_identity, "quarantine directory")
+        # A deterministic already-retired object is the authoritative outcome.
+        # Reconcile it before consulting the canonical name so a new canonical
+        # blocker/control record is never moved or adopted after response loss.
+        already_retired = retired_name is not None and entry_exists(quarantine_fd, destination)
+        if not already_retired and entry_exists(parent_fd, name):
+            if retired_name is None:
+                destination = preserve_entry(parent_fd, name, quarantine_fd, prefix)
+            else:
+                rename_exclusive_between(parent_fd, name, quarantine_fd, destination)
+            moved = True
+            os.fsync(parent_fd)
+            os.fsync(quarantine_fd)
+        if not entry_exists(quarantine_fd, destination):
+            fail(f"control retirement evidence is missing: {destination}")
         try:
-            if not stat.S_ISREG(os.fstat(fd).st_mode): fail("control state is not a regular file")
-            if not matches_fd(fd, expected_identity): fail("control state incarnation changed")
-            if hashlib.sha256(read_fd(fd)).hexdigest() != expected_sha256: fail("control state hash changed")
-        finally:
-            os.close(fd)
-        quarantine_fd, _ = ensure_path(root_fd, "prime-claw/quarantine")
-        preserved = preserve_entry(parent_fd, name, quarantine_fd, prefix)
-        fd = os.open(preserved, FILE_READ_FLAGS, dir_fd=quarantine_fd)
-        try:
-            if not stat.S_ISREG(os.fstat(fd).st_mode): fail("retired control state is not regular")
-            if not matches_fd(fd, expected_identity): fail("retired control state incarnation changed")
-            if hashlib.sha256(read_fd(fd)).hexdigest() != expected_sha256: fail("retired control state hash changed")
-        finally:
-            os.close(fd)
+            retired_fd = os.open(destination, FILE_READ_FLAGS, dir_fd=quarantine_fd)
+            if not stat.S_ISREG(os.fstat(retired_fd).st_mode): fail("retired control state is not regular")
+            if not matches_fd(retired_fd, expected_identity): fail("retired control state incarnation changed")
+            if hashlib.sha256(read_fd(retired_fd)).hexdigest() != expected_sha256: fail("retired control state hash changed")
+        except Exception as validation_error:
+            if retired_fd >= 0:
+                os.close(retired_fd)
+                retired_fd = -1
+            if moved:
+                if entry_exists(parent_fd, name):
+                    fail(f"control retirement preserved {destination}; public destination is occupied: {validation_error}")
+                try:
+                    restore_exclusive(quarantine_fd, destination, parent_fd, name)
+                    moved = False
+                    os.fsync(quarantine_fd)
+                    os.fsync(parent_fd)
+                except Exception as restore_error:
+                    fail(f"control retirement preserved {destination}; no-clobber restoration failed: {restore_error}")
+            raise
         os.fsync(parent_fd)
         os.fsync(quarantine_fd)
-        return {"removed": True, "preserved_quarantine": preserved}
-    except Exception:
-        if preserved:
-            if entry_exists(parent_fd, name):
-                fail(f"control retirement failed; no-clobber restoration preserved {preserved} because destination is occupied")
-            try:
-                restore_exclusive(quarantine_fd, preserved, parent_fd, name)
-                preserved = ""
-            except Exception as restore_error:
-                fail(f"control retirement failed and no-clobber restoration preserved {preserved}: {restore_error}")
-        raise
+        return {"removed": True, "reconciled": not moved, "preserved_quarantine": destination}
     finally:
-        for fd in (quarantine_fd, parent_fd, root_fd):
+        for fd in (retired_fd, quarantine_fd, parent_fd, root_fd):
             if fd >= 0:
                 try: os.close(fd)
                 except OSError: pass
 
 
-def remove_control(root: str, rel: str, expected_sha256: str, expected_identity: dict[str, Any], root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None) -> dict[str, Any]:
-    return retire_control(root, rel, expected_sha256, expected_identity, "control", root_identity, parent_identity)
+def remove_control(root: str, rel: str, expected_sha256: str, expected_identity: dict[str, Any], root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None, quarantine_identity: dict[str, Any] | None = None, retired_name: str | None = None) -> dict[str, Any]:
+    return retire_control(root, rel, expected_sha256, expected_identity, "control", root_identity, parent_identity, quarantine_identity, retired_name)
 
 
 
-def acquire_lock(root: str, rel: str, owner_text: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None) -> dict[str, Any]:
+def broker_request(path: str, token: str, command: str) -> bool:
+    try:
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        client.settimeout(2.0); client.connect(path)
+        client.sendall((json.dumps({"token": token, "command": command}) + "\n").encode("utf-8"))
+        response = b""
+        while not response.endswith(b"\n"):
+            chunk = client.recv(4096)
+            if not chunk: break
+            response += chunk
+        client.close()
+        parsed = strict_json(response.decode("utf-8"))
+        return parsed.get("ok") is True
+    except Exception:
+        return False
+
+
+def lock_broker_path(root: str, token: str, role: str = "primary") -> str:
+    digest = hashlib.sha256((root + "\0" + token + "\0" + role).encode("utf-8")).hexdigest()[:32]
+    base = tempfile.gettempdir()
+    path = os.path.join(base, f"prime-claw-lock-{digest}.sock")
+    if len(path.encode("utf-8")) >= 100: path = f"/tmp/prime-claw-lock-{digest}.sock"
+    return path
+
+
+def start_lock_broker(root_fd: int, token: str, root: str, owner_pid: int, role: str = "primary") -> tuple[str, int]:
+    path = lock_broker_path(root, token, role)
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        server.bind(path); os.chmod(path, 0o600); server.listen(4); server.settimeout(1.0)
+        pid = os.fork()
+        if pid == 0:
+            try:
+                os.setsid()
+                keep = {root_fd, server.fileno()}
+                for fd in range(0, 256):
+                    if fd not in keep:
+                        try: os.close(fd)
+                        except OSError: pass
+                while True:
+                    try: os.kill(owner_pid, 0)
+                    except ProcessLookupError: break
+                    try: connection, _ = server.accept()
+                    except socket.timeout: continue
+                    try:
+                        request = b""
+                        while not request.endswith(b"\n"):
+                            chunk = connection.recv(4096)
+                            if not chunk: break
+                            request += chunk
+                        parsed = strict_json(request.decode("utf-8"))
+                        valid = parsed.get("token") == token and parsed.get("command") in ("ping", "release")
+                        connection.sendall((json.dumps({"ok": valid}) + "\n").encode("utf-8"))
+                        if valid and parsed.get("command") == "release": break
+                    except Exception:
+                        try: connection.sendall(b'{"ok":false}\n')
+                        except Exception: pass
+                    finally: connection.close()
+            finally:
+                try: os.unlink(path)
+                except OSError: pass
+                # Close-on-exit releases only this inherited descriptor copy;
+                # replicated supervisors sharing the original open-file
+                # description retain authority until the last copy exits.
+                try: os.close(root_fd)
+                except OSError: pass
+                os._exit(0)
+        server.close()
+        if not broker_request(path, token, "ping"): fail("project exclusion broker did not become ready")
+        return path, pid
+    except Exception:
+        server.close()
+        try: os.unlink(path)
+        except OSError: pass
+        raise
+
+
+def require_lock_broker(path: str, token: str) -> None:
+    if not broker_request(path, token, "ping"): fail("project exclusion broker authority is unavailable")
+
+
+def require_replicated_lock_authority(primary: str, authority: str, token: str) -> None:
+    if not (broker_request(primary, token, "ping") or broker_request(authority, token, "ping")):
+        fail("replicated project exclusion authority is unavailable")
+
+
+def acquire_lock(root: str, rel: str, owner_text: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None, quarantine_identity: dict[str, Any] | None = None) -> dict[str, Any]:
     root_fd = open_root(root)
-    parent_fd = temp_fd = published_fd = -1
+    parent_fd = temp_fd = published_fd = guard_fd = -1
     temporary = f".prime-claw-lock-create-{secrets.token_hex(16)}"
-    published = False
     try:
         require_identity(root_fd, root_identity, "control root")
+        try: fcntl.flock(root_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError: return {"created": False}
         parent_fd, name = open_parent(root_fd, rel)
         require_identity(parent_fd, parent_identity, "lock parent")
+        guard_name = f"{name}.guard"
+        if entry_exists(parent_fd, name): return {"created": False}
+        try:
+            guard_fd = os.open(guard_name, os.O_RDWR | os.O_CREAT | os.O_EXCL | O_NOFOLLOW, 0o600, dir_fd=parent_fd)
+        except FileExistsError:
+            return {"created": False}
+        data = owner_text.encode("utf-8")
+        view = memoryview(data)
+        while view: view = view[os.write(guard_fd, view):]
+        os.fsync(guard_fd)
+        guard_identity = identity_fd(guard_fd)
+        os.fsync(parent_fd)
         os.mkdir(temporary, 0o700, dir_fd=parent_fd)
         temp_fd = os.open(temporary, DIR_FLAGS, dir_fd=parent_fd)
         owner_fd = os.open("owner.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL | O_NOFOLLOW, 0o600, dir_fd=temp_fd)
         try:
-            data = owner_text.encode("utf-8")
             view = memoryview(data)
             while view: view = view[os.write(owner_fd, view):]
             os.fsync(owner_fd)
@@ -417,55 +552,91 @@ def acquire_lock(root: str, rel: str, owner_text: str, root_identity: dict[str, 
             os.close(owner_fd)
         os.fsync(temp_fd)
         temp_identity = identity_fd(temp_fd)
-        try:
-            rename_exclusive(parent_fd, temporary, name)
-            published = True
-        except FileExistsError:
-            return {"created": False}
+        rename_exclusive(parent_fd, temporary, name)
+        os.fsync(parent_fd)
+        parsed_owner = strict_json(owner_text); token = parsed_owner.get("token"); owner_pid = parsed_owner.get("pid")
+        if not isinstance(token, str) or not isinstance(owner_pid, int) or owner_pid <= 0: fail("lock owner token/pid is invalid")
+        broker_socket, broker_pid = start_lock_broker(root_fd, token, root, owner_pid, "primary")
+        try: authority_socket, authority_pid = start_lock_broker(root_fd, token, root, owner_pid, "authority")
+        except Exception:
+            broker_request(broker_socket, token, "release")
+            raise
         published_fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
         if not matches_fd(published_fd, temp_identity): fail("published lock incarnation changed")
         owner_fd = os.open("owner.json", FILE_READ_FLAGS, dir_fd=published_fd)
         try:
             if not matches_fd(owner_fd, owner_identity): fail("published lock owner incarnation changed")
-            if read_fd(owner_fd).decode("utf-8") != owner_text: fail("published lock owner changed")
-        finally:
-            os.close(owner_fd)
+            if read_fd(owner_fd) != data: fail("published lock owner changed")
+        finally: os.close(owner_fd)
         os.fsync(parent_fd)
-        return {"created": True, "lock_identity": temp_identity, "owner_identity": owner_identity, "owner_sha256": hashlib.sha256(owner_text.encode()).hexdigest()}
+        return {"created": True, "lock_identity": temp_identity, "owner_identity": owner_identity, "guard_identity": guard_identity, "owner_sha256": hashlib.sha256(data).hexdigest(), "broker_socket": broker_socket, "broker_pid": broker_pid, "authority_socket": authority_socket, "authority_pid": authority_pid}
     except Exception:
-        # If our exact incarnation reached the canonical name, retire it while
-        # the parent descriptor and object identity are still authoritative.
-        if published:
-            try:
-                current_fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
-                try: current_is_ours = matches_fd(current_fd, temp_identity)
-                finally: os.close(current_fd)
-                if current_is_ours:
-                    quarantine_fd, _ = ensure_path(root_fd, "prime-claw/quarantine")
-                    retained = preserve_entry(parent_fd, name, quarantine_fd, "failed-lock-acquire")
-                    check_fd = os.open(retained, DIR_FLAGS, dir_fd=quarantine_fd)
-                    try:
-                        if not matches_fd(check_fd, temp_identity): fail("failed lock acquisition retirement mismatch")
-                    finally: os.close(check_fd)
-                    os.close(quarantine_fd)
-            except Exception:
-                pass
+        # The durable guard remains canonical serialization authority. The caller
+        # reconciles its exact token and either publishes a usable handle or
+        # retires only that exact guard+lock state.
         raise
     finally:
-        # Failed temporary/published incarnations are retained as evidence.
-        for fd in (published_fd, temp_fd, parent_fd, root_fd):
+        for fd in (guard_fd, published_fd, temp_fd, parent_fd, root_fd):
             if fd >= 0:
                 try: os.close(fd)
                 except OSError: pass
 
 
-def validate_lock(root: str, rel: str, token: str, lock_identity: dict[str, Any], owner_identity: dict[str, Any], owner_sha256: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None) -> dict[str, Any]:
+def process_alive(pid: int) -> bool:
+    try: os.kill(pid, 0); return True
+    except ProcessLookupError: return False
+    except PermissionError: return True
+
+
+def reconcile_lock(root: str, rel: str, token: str, owner_sha256: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None, allow_inactive: bool = False) -> dict[str, Any]:
     root_fd = open_root(root)
-    parent_fd = lock_fd = -1
+    parent_fd = lock_fd = owner_fd = guard_fd = -1
     try:
         require_identity(root_fd, root_identity, "control root")
         parent_fd, name = open_parent(root_fd, rel)
         require_identity(parent_fd, parent_identity, "lock parent")
+        guard_name = f"{name}.guard"
+        try: guard_fd = os.open(guard_name, FILE_READ_FLAGS, dir_fd=parent_fd)
+        except FileNotFoundError: return {"exists": False}
+        guard_bytes = read_fd(guard_fd)
+        if hashlib.sha256(guard_bytes).hexdigest() != owner_sha256: fail("lock guard bytes do not match acquisition intent")
+        if strict_json(guard_bytes.decode("utf-8")).get("token") != token: fail("lock guard token does not match acquisition intent")
+        try: lock_fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
+        except FileNotFoundError:
+            return {"exists": True, "complete": False, "guard_identity": identity_fd(guard_fd), "owner_sha256": owner_sha256}
+        if sorted(os.listdir(lock_fd)) != ["owner.json"]: fail("lock directory contains unexpected entries")
+        owner_fd = os.open("owner.json", FILE_READ_FLAGS, dir_fd=lock_fd)
+        owner_bytes = read_fd(owner_fd)
+        if owner_bytes != guard_bytes: fail("lock owner and stable guard disagree")
+        broker_socket = lock_broker_path(root, token, "primary"); authority_socket = lock_broker_path(root, token, "authority")
+        primary_live = broker_request(broker_socket, token, "ping"); authority_live = broker_request(authority_socket, token, "ping")
+        abandoned = False
+        if not (primary_live and authority_live):
+            parsed_owner = strict_json(owner_bytes.decode("utf-8")); pid = parsed_owner.get("pid")
+            if not allow_inactive or primary_live or authority_live or not isinstance(pid, int) or process_alive(pid):
+                fail("complete lock does not have its full live replicated authority")
+            abandoned = True
+        return {"exists": True, "complete": True, "abandoned": abandoned, "lock_identity": identity_fd(lock_fd), "owner_identity": identity_fd(owner_fd), "guard_identity": identity_fd(guard_fd), "owner_sha256": owner_sha256, "broker_socket": broker_socket, "authority_socket": authority_socket}
+    finally:
+        for fd in (guard_fd, owner_fd, lock_fd, parent_fd, root_fd):
+            if fd >= 0:
+                try: os.close(fd)
+                except OSError: pass
+
+
+def validate_lock(root: str, rel: str, token: str, lock_identity: dict[str, Any], owner_identity: dict[str, Any], guard_identity: dict[str, Any], owner_sha256: str, broker_socket: str, authority_socket: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None) -> dict[str, Any]:
+    root_fd = open_root(root)
+    parent_fd = lock_fd = guard_fd = -1
+    try:
+        require_replicated_lock_authority(broker_socket, authority_socket, token)
+        require_identity(root_fd, root_identity, "control root")
+        parent_fd, name = open_parent(root_fd, rel)
+        require_identity(parent_fd, parent_identity, "lock parent")
+        guard_fd = os.open(f"{name}.guard", FILE_READ_FLAGS, dir_fd=parent_fd)
+        if not matches_fd(guard_fd, guard_identity): fail("stable lock guard incarnation changed")
+        guard_bytes = read_fd(guard_fd)
+        if hashlib.sha256(guard_bytes).hexdigest() != owner_sha256: fail("stable lock guard bytes changed")
+        if strict_json(guard_bytes.decode("utf-8")).get("token") != token: fail("stable lock guard token changed")
         lock_fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
         if not matches_fd(lock_fd, lock_identity): fail("lock incarnation changed")
         if sorted(os.listdir(lock_fd)) != ["owner.json"]: fail("lock directory contains unexpected entries")
@@ -474,63 +645,113 @@ def validate_lock(root: str, rel: str, token: str, lock_identity: dict[str, Any]
             if not matches_fd(owner_fd, owner_identity): fail("lock owner incarnation changed")
             owner_bytes = read_fd(owner_fd)
         finally: os.close(owner_fd)
-        if hashlib.sha256(owner_bytes).hexdigest() != owner_sha256: fail("lock owner bytes changed")
-        if json.loads(owner_bytes.decode("utf-8")).get("token") != token: fail("lock token changed")
+        if owner_bytes != guard_bytes: fail("lock owner and stable guard disagree")
+        require_replicated_lock_authority(broker_socket, authority_socket, token)
         return {"valid": True}
     finally:
-        for fd in (lock_fd, parent_fd, root_fd):
+        for fd in (guard_fd, lock_fd, parent_fd, root_fd):
             if fd >= 0:
                 try: os.close(fd)
                 except OSError: pass
 
 
-def remove_lock(root: str, rel: str, token: str, lock_identity: dict[str, Any], owner_identity: dict[str, Any], owner_sha256: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None) -> dict[str, Any]:
+def remove_lock(root: str, rel: str, token: str, lock_identity: dict[str, Any], owner_identity: dict[str, Any], guard_identity: dict[str, Any], owner_sha256: str, broker_socket: str, authority_socket: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None, quarantine_identity: dict[str, Any] | None = None, recover_abandoned: bool = False) -> dict[str, Any]:
     root_fd = open_root(root)
-    parent_fd = lock_fd = quarantine_fd = -1
-    preserved = ""
-    name = ""
+    parent_fd = quarantine_fd = -1
+    lock_destination = f"released-lock-{owner_sha256[:16]}-{lock_identity['inode']}"
+    guard_destination = f"released-lock-guard-{owner_sha256[:16]}-{guard_identity['inode']}"
+    lock_moved = guard_moved = retirement_complete = False
+
+    def validate_lock_directory(container_fd: int, name: str) -> None:
+        fd = os.open(name, DIR_FLAGS, dir_fd=container_fd)
+        try:
+            if not matches_fd(fd, lock_identity): fail("lock incarnation changed before release")
+            if sorted(os.listdir(fd)) != ["owner.json"]: fail("lock directory contains unexpected entries")
+            owner_fd = os.open("owner.json", FILE_READ_FLAGS, dir_fd=fd)
+            try:
+                if not matches_fd(owner_fd, owner_identity): fail("lock owner incarnation changed before release")
+                owner_bytes = read_fd(owner_fd)
+            finally: os.close(owner_fd)
+            if hashlib.sha256(owner_bytes).hexdigest() != owner_sha256: fail("lock owner bytes changed before release")
+            if strict_json(owner_bytes.decode("utf-8")).get("token") != token: fail("lock token changed before release")
+        finally: os.close(fd)
+
+    def validate_guard(container_fd: int, name: str) -> None:
+        fd = os.open(name, FILE_READ_FLAGS, dir_fd=container_fd)
+        try:
+            if not matches_fd(fd, guard_identity): fail("stable lock guard incarnation changed before release")
+            guard_bytes = read_fd(fd)
+            if hashlib.sha256(guard_bytes).hexdigest() != owner_sha256: fail("stable lock guard bytes changed before release")
+            if strict_json(guard_bytes.decode("utf-8")).get("token") != token: fail("stable lock guard token changed before release")
+        finally: os.close(fd)
+
     try:
         require_identity(root_fd, root_identity, "control root")
         parent_fd, name = open_parent(root_fd, rel)
+        guard_name = f"{name}.guard"
         require_identity(parent_fd, parent_identity, "lock parent")
-        lock_fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
-        if not matches_fd(lock_fd, lock_identity): fail("lock incarnation changed before release")
-        if sorted(os.listdir(lock_fd)) != ["owner.json"]: fail("lock directory contains unexpected entries")
-        owner_fd = os.open("owner.json", FILE_READ_FLAGS, dir_fd=lock_fd)
-        try:
-            if not matches_fd(owner_fd, owner_identity): fail("lock owner incarnation changed before release")
-            owner_bytes = read_fd(owner_fd)
-        finally:
-            os.close(owner_fd)
-        if hashlib.sha256(owner_bytes).hexdigest() != owner_sha256: fail("lock owner bytes changed before release")
-        owner = json.loads(owner_bytes.decode("utf-8"))
-        if owner.get("token") != token: fail("lock token changed before release")
-        quarantine_fd, _ = ensure_path(root_fd, "prime-claw/quarantine")
-        preserved = preserve_entry(parent_fd, name, quarantine_fd, "released-lock")
-        os.close(lock_fd)
-        lock_fd = os.open(preserved, DIR_FLAGS, dir_fd=quarantine_fd)
-        if not matches_fd(lock_fd, lock_identity): fail("retired lock incarnation mismatch")
-        owner_fd = os.open("owner.json", FILE_READ_FLAGS, dir_fd=lock_fd)
-        try:
-            if not matches_fd(owner_fd, owner_identity): fail("retired lock owner incarnation mismatch")
-            if hashlib.sha256(read_fd(owner_fd)).hexdigest() != owner_sha256: fail("retired lock owner bytes changed")
-        finally:
-            os.close(owner_fd)
-        os.fsync(parent_fd)
-        os.fsync(quarantine_fd)
-        return {"removed": True, "preserved_quarantine": preserved}
-    except Exception:
-        if preserved:
-            if entry_exists(parent_fd, name):
-                fail(f"lock retirement failed; no-clobber restoration preserved {preserved} because destination is occupied")
+        if quarantine_identity is None: quarantine_fd, _ = ensure_path(root_fd, "prime-claw/quarantine")
+        else:
+            quarantine_fd = descend(root_fd, "prime-claw/quarantine")
+            require_identity(quarantine_fd, quarantine_identity, "quarantine directory")
+
+        destinations_complete = entry_exists(quarantine_fd, lock_destination) and entry_exists(quarantine_fd, guard_destination)
+        primary_present = broker_request(broker_socket, token, "ping"); authority_present = broker_request(authority_socket, token, "ping")
+        if not destinations_complete and not (primary_present or authority_present):
+            if not recover_abandoned: fail("project exclusion broker authority is unavailable")
+            validate_lock_directory(parent_fd, name)
+            lock_check = os.open(name, DIR_FLAGS, dir_fd=parent_fd); owner_check = -1
             try:
-                restore_exclusive(quarantine_fd, preserved, parent_fd, name)
-                preserved = ""
-            except Exception as restore_error:
-                fail(f"lock retirement failed and no-clobber restoration preserved {preserved}: {restore_error}")
+                owner_check = os.open("owner.json", FILE_READ_FLAGS, dir_fd=lock_check)
+                parsed_owner = strict_json(read_fd(owner_check).decode("utf-8")); pid = parsed_owner.get("pid")
+                if not isinstance(pid, int) or process_alive(pid): fail("abandoned-lock recovery owner is still live or invalid")
+            finally:
+                if owner_check >= 0: os.close(owner_check)
+                os.close(lock_check)
+        if entry_exists(quarantine_fd, lock_destination):
+            validate_lock_directory(quarantine_fd, lock_destination)
+        else:
+            validate_lock_directory(parent_fd, name)
+            rename_exclusive_between(parent_fd, name, quarantine_fd, lock_destination)
+            lock_moved = True
+            os.fsync(parent_fd); os.fsync(quarantine_fd)
+            try: validate_lock_directory(quarantine_fd, lock_destination)
+            except Exception:
+                if not entry_exists(parent_fd, name): restore_exclusive(quarantine_fd, lock_destination, parent_fd, name)
+                lock_moved = False; os.fsync(quarantine_fd); os.fsync(parent_fd); raise
+
+        if entry_exists(quarantine_fd, guard_destination):
+            validate_guard(quarantine_fd, guard_destination)
+        else:
+            validate_guard(parent_fd, guard_name)
+            rename_exclusive_between(parent_fd, guard_name, quarantine_fd, guard_destination)
+            guard_moved = True
+            os.fsync(parent_fd); os.fsync(quarantine_fd)
+            try: validate_guard(quarantine_fd, guard_destination)
+            except Exception:
+                if not entry_exists(parent_fd, guard_name): restore_exclusive(quarantine_fd, guard_destination, parent_fd, guard_name)
+                guard_moved = False; os.fsync(quarantine_fd); os.fsync(parent_fd); raise
+
+        os.fsync(parent_fd); os.fsync(quarantine_fd)
+        retirement_complete = True
+        primary_released = not primary_present or broker_request(broker_socket, token, "release") or not broker_request(broker_socket, token, "ping")
+        authority_released = not authority_present or broker_request(authority_socket, token, "release") or not broker_request(authority_socket, token, "ping")
+        if not (primary_released and authority_released): fail("project exclusion supervisors did not acknowledge release; deterministic retirement is complete")
+        return {"removed": True, "reconciled": not lock_moved and not guard_moved, "preserved_quarantine": lock_destination, "preserved_guard": guard_destination}
+    except Exception:
+        # Roll back only transitions performed by this response. A retry after a
+        # completed response-loss observes both deterministic destinations and
+        # returns success without touching a replacement canonical lock.
+        if not retirement_complete and guard_moved and not entry_exists(parent_fd, guard_name):
+            try: restore_exclusive(quarantine_fd, guard_destination, parent_fd, guard_name); guard_moved = False
+            except Exception as error: fail(f"lock guard retirement failed and restoration preserved {guard_destination}: {error}")
+        if not retirement_complete and lock_moved and not entry_exists(parent_fd, name):
+            try: restore_exclusive(quarantine_fd, lock_destination, parent_fd, name); lock_moved = False
+            except Exception as error: fail(f"lock retirement failed and restoration preserved {lock_destination}: {error}")
+        if quarantine_fd >= 0: os.fsync(quarantine_fd); os.fsync(parent_fd)
         raise
     finally:
-        for fd in (lock_fd, quarantine_fd, parent_fd, root_fd):
+        for fd in (quarantine_fd, parent_fd, root_fd):
             if fd >= 0:
                 try: os.close(fd)
                 except OSError: pass
@@ -553,12 +774,26 @@ def ensure_directory(repo: str, rel: str, root_identity: dict[str, Any] | None =
                 temporary = f".prime-claw-dir-create-{secrets.token_hex(16)}"
                 os.mkdir(temporary, 0o700, dir_fd=parent_fd)
                 staged_fd = os.open(temporary, DIR_FLAGS, dir_fd=parent_fd)
-                staged_identity = identity_fd(staged_fd)
-                os.close(staged_fd)
-                rename_exclusive(parent_fd, temporary, name)
-                fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
-                if not matches_fd(fd, staged_identity): fail("published directory incarnation changed")
-                created = True
+                try:
+                    staged_identity = identity_fd(staged_fd)
+                    try:
+                        rename_exclusive(parent_fd, temporary, name)
+                    except FileExistsError:
+                        # A concurrent compliant creator won publication. Bind
+                        # its real directory, then remove only this call's still-
+                        # open, allocation-unique empty staging directory.
+                        fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
+                        if os.listdir(staged_fd): fail("private directory staging allocation is not empty")
+                        os.rmdir(temporary, dir_fd=parent_fd)
+                        os.fsync(parent_fd)
+                        created = False
+                    else:
+                        fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
+                        if not matches_fd(fd, staged_identity): fail("published directory incarnation changed")
+                        os.fsync(fd)
+                        os.fsync(parent_fd)
+                        created = True
+                finally: os.close(staged_fd)
         require_identity(fd, expected_identity, "directory")
         return {"created": created, "identity": identity_fd(fd)}
     finally:
@@ -573,14 +808,93 @@ def directory_identity(path: str) -> dict[str, Any]:
     try: return {"identity": identity_fd(fd)}
     finally: os.close(fd)
 
-def platform_preflight(repo: str, common_dir: str) -> dict[str, Any]:
+def open_nearest_directory(path: str) -> int:
+    absolute = os.path.abspath(path)
+    fd = os.open(os.path.sep, DIR_FLAGS)
+    try:
+        parts = [part for part in absolute.split(os.path.sep) if part]
+        if any(part in (".", "..") or "\x00" in part for part in parts): fail("unsafe absolute preflight path")
+        for part in parts:
+            try: nxt = os.open(part, DIR_FLAGS, dir_fd=fd)
+            except FileNotFoundError: return fd
+            os.close(fd); fd = nxt
+        return fd
+    except Exception:
+        os.close(fd); raise
+
+
+def platform_preflight(repo: str, common_dir: str, target_rel: str | None = None, require_retirement: bool = False, quarantine_dir: str | None = None, anchor_dir: str | None = None) -> dict[str, Any]:
     repo_fd = open_root(repo)
     common_fd = open_root(common_dir)
+    target_fd = quarantine_fd = anchor_fd = probe_fd = probe_dir_fd = -1
+    probe_name = probe_retired = probe_anchor = probe_dir_name = None
     try:
-        return {"repo_identity": identity_fd(repo_fd), "common_identity": identity_fd(common_fd)}
+        repo_identity = identity_fd(repo_fd); common_identity = identity_fd(common_fd)
+        target_fd = os.dup(repo_fd)
+        if target_rel is not None:
+            for part in components(target_rel):
+                try: nxt = os.open(part, DIR_FLAGS, dir_fd=target_fd)
+                except FileNotFoundError: break
+                except OSError as error:
+                    if error.errno in (errno.ENOTDIR, errno.ELOOP): break
+                    raise
+                os.close(target_fd); target_fd = nxt
+        target_identity = identity_fd(target_fd)
+        quarantine_identity = common_identity; anchor_identity = common_identity
+        if require_retirement:
+            if not quarantine_dir or not anchor_dir: fail("retirement topology requires actual quarantine and anchor directories")
+            quarantine_fd = open_nearest_directory(quarantine_dir); anchor_fd = open_nearest_directory(anchor_dir)
+            quarantine_identity = identity_fd(quarantine_fd); anchor_identity = identity_fd(anchor_fd)
+            mount = (target_identity["device"], target_identity.get("mount_id"))
+            if any((candidate["device"], candidate.get("mount_id")) != mount for candidate in (quarantine_identity, anchor_identity)):
+                fail("unsupported retirement topology: product, quarantine, and allocation anchors are not on one mount")
+            libc = ctypes.CDLL(None, use_errno=True)
+            if not ((sys.platform == "darwin" and hasattr(libc, "renameatx_np")) or hasattr(libc, "renameat2")):
+                fail("unsupported retirement topology: exclusive descriptor-relative rename is unavailable")
+            # Exercise production directions on disposable, allocation-bound
+            # names: anchor -> product namespace, then product -> quarantine.
+            # All probe names are removed before admission is acknowledged.
+            token = secrets.token_hex(16); probe_dir_name = f".prime-claw-preflight-{token}"
+            probe_name = f"capability-probe-{token}"; probe_anchor = f"preflight-anchor-{token}"; probe_retired = f"preflight-retired-{token}"
+            probe_content = b"prime-claw-retirement-capability-v1\n"
+            moved_to_quarantine = linked_to_product = anchor_created = directory_created = False
+            try:
+                probe_fd = os.open(probe_anchor, os.O_RDWR | os.O_CREAT | os.O_EXCL | O_NOFOLLOW, 0o600, dir_fd=anchor_fd); anchor_created = True
+                os.write(probe_fd, probe_content); os.fsync(probe_fd); os.fsync(anchor_fd)
+                os.mkdir(probe_dir_name, 0o700, dir_fd=target_fd); directory_created = True
+                probe_dir_fd = os.open(probe_dir_name, DIR_FLAGS, dir_fd=target_fd); os.fsync(target_fd)
+                os.link(probe_anchor, probe_name, src_dir_fd=anchor_fd, dst_dir_fd=probe_dir_fd, follow_symlinks=False); linked_to_product = True; os.fsync(probe_dir_fd)
+                rename_exclusive_between(probe_dir_fd, probe_name, quarantine_fd, probe_retired); linked_to_product = False; moved_to_quarantine = True
+                os.fsync(probe_dir_fd); os.fsync(quarantine_fd)
+                retired_fd = os.open(probe_retired, FILE_READ_FLAGS, dir_fd=quarantine_fd)
+                try:
+                    if not matches_fd(retired_fd, identity_fd(probe_fd)) or read_fd(retired_fd) != probe_content: fail("retirement capability probe changed allocation or bytes")
+                finally: os.close(retired_fd)
+            finally:
+                def remove_owned_probe(container_fd: int, name: str) -> None:
+                    check = os.open(name, FILE_READ_FLAGS, dir_fd=container_fd)
+                    try:
+                        if not matches_fd(check, identity_fd(probe_fd)): fail("capability probe name was replaced during cleanup")
+                    finally: os.close(check)
+                    os.unlink(name, dir_fd=container_fd); os.fsync(container_fd)
+                if moved_to_quarantine: remove_owned_probe(quarantine_fd, probe_retired)
+                elif linked_to_product: remove_owned_probe(probe_dir_fd, probe_name)
+                if anchor_created: remove_owned_probe(anchor_fd, probe_anchor)
+                if probe_dir_fd >= 0:
+                    if os.listdir(probe_dir_fd): fail("capability probe directory is not empty after cleanup")
+                    os.close(probe_dir_fd); probe_dir_fd = -1
+                if directory_created: os.rmdir(probe_dir_name, dir_fd=target_fd); os.fsync(target_fd)
+                if probe_fd >= 0: os.close(probe_fd); probe_fd = -1
+        return {"repo_identity": repo_identity, "common_identity": common_identity, "target_identity": target_identity, "quarantine_identity": quarantine_identity, "anchor_identity": anchor_identity, "retirement_supported": True}
+    except Exception:
+        # A source-side probe can only remain if capability proof failed before
+        # its exclusive retirement. Keep it fail-closed for operator inspection.
+        raise
     finally:
-        os.close(common_fd)
-        os.close(repo_fd)
+        if probe_fd >= 0: os.close(probe_fd)
+        if probe_dir_fd >= 0: os.close(probe_dir_fd)
+        for fd in (anchor_fd, quarantine_fd, target_fd, common_fd, repo_fd):
+            if fd >= 0: os.close(fd)
 
 def create_product_directory(repo: str, rel: str) -> dict[str, Any]:
     root_fd = open_root(repo)
@@ -594,6 +908,8 @@ def create_product_directory(repo: str, rel: str) -> dict[str, Any]:
         rename_exclusive(parent_fd, temporary, name)
         published_fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
         if not matches_fd(published_fd, created_identity): fail("published product directory incarnation changed")
+        os.fsync(published_fd)
+        os.fsync(parent_fd)
         return {"identity": created_identity}
     finally:
         # Failed exclusive-create directories are retained; never race an rmdir.
@@ -602,65 +918,146 @@ def create_product_directory(repo: str, rel: str) -> dict[str, Any]:
                 try: os.close(item)
                 except OSError: pass
 
-def create_product_file(repo: str, rel: str, content: str, directory_identity: dict[str, Any]) -> dict[str, Any]:
-    root_fd = open_root(repo)
-    parent_fd = -1
+def create_product_file(data: dict[str, Any]) -> dict[str, Any]:
+    repo_fd = open_root(data["repo"])
+    common_fd = open_root(data["common_dir"])
+    parent_fd = anchor_parent_fd = anchor_fd = published_fd = -1
     try:
-        parent_fd, name = open_parent(root_fd, rel)
-        if not matches_fd(parent_fd, directory_identity): fail("owned directory identity changed before file creation")
-        fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | O_NOFOLLOW, 0o600, dir_fd=parent_fd)
-        try:
-            data = content.encode("utf-8")
-            view = memoryview(data)
-            while view: view = view[os.write(fd, view):]
-            os.fsync(fd)
-            return {"identity": identity_fd(fd)}
-        finally: os.close(fd)
+        require_identity(common_fd, data.get("common_identity"), "Git common directory")
+        parent_fd, name = open_parent(repo_fd, data["path"])
+        if not matches_fd(parent_fd, data["directory_identity"]): fail("owned directory identity changed before file creation")
+        anchor_parent_fd, anchor_name = open_parent(common_fd, data["anchor_path"])
+        require_identity(anchor_parent_fd, data.get("anchor_parent_identity"), "file anchor directory")
+        anchor_fd = os.open(anchor_name, os.O_RDWR | os.O_CREAT | os.O_EXCL | O_NOFOLLOW, 0o600, dir_fd=anchor_parent_fd)
+        content = data["content"].encode("utf-8")
+        view = memoryview(content)
+        while view: view = view[os.write(anchor_fd, view):]
+        os.fsync(anchor_fd)
+        anchor_identity = identity_fd(anchor_fd)
+        os.link(anchor_name, name, src_dir_fd=anchor_parent_fd, dst_dir_fd=parent_fd, follow_symlinks=False)
+        os.fsync(anchor_parent_fd)
+        os.fsync(parent_fd)
+        published_fd = os.open(name, FILE_READ_FLAGS, dir_fd=parent_fd)
+        if not os.path.samestat(os.fstat(published_fd), os.fstat(anchor_fd)):
+            fail("published product file is not the protected anchor allocation")
+        if read_fd(published_fd) != content: fail("published product file content changed")
+        return {"identity": identity_fd(published_fd), "anchor_identity": anchor_identity}
     finally:
-        if parent_fd >= 0: os.close(parent_fd)
-        os.close(root_fd)
+        for fd in (published_fd, anchor_fd, anchor_parent_fd, parent_fd, common_fd, repo_fd):
+            if fd >= 0:
+                try: os.close(fd)
+                except OSError: pass
 
-def snapshot_bundle(repo: str, target_rel: str, directory_identity: dict[str, Any], files: list[dict[str, Any]]) -> dict[str, Any]:
-    root_fd = open_root(repo)
-    target_fd = -1
+def snapshot_bundle(data: dict[str, Any]) -> dict[str, Any]:
+    root_fd = open_root(data["repo"])
+    common_fd = open_root(data["common_dir"])
+    target_fd = anchor_parent_fd = -1
     try:
-        target_fd = descend(root_fd, target_rel)
-        if not matches_fd(target_fd, directory_identity): fail("owned directory identity changed")
+        require_identity(common_fd, data.get("common_identity"), "Git common directory")
+        target_fd = descend(root_fd, data["target_path"])
+        if not matches_fd(target_fd, data["directory_identity"]): fail("owned directory identity changed")
         names = sorted(os.listdir(target_fd))
-        expected_names = sorted(item["name"] for item in files)
+        expected_names = sorted(item["name"] for item in data["files"])
         if names != expected_names: fail("owned bundle entry set changed")
-        for item in files:
-            fd = os.open(item["name"], FILE_READ_FLAGS, dir_fd=target_fd)
+        for item in data["files"]:
+            fd = anchor_fd = -1
             try:
+                fd = os.open(item["name"], FILE_READ_FLAGS, dir_fd=target_fd)
+                anchor_parent_fd, anchor_name = open_parent(common_fd, item["anchor_path"])
+                require_identity(anchor_parent_fd, item.get("anchor_parent_identity"), "file anchor directory")
+                anchor_fd = os.open(anchor_name, FILE_READ_FLAGS, dir_fd=anchor_parent_fd)
                 st = os.fstat(fd)
                 if not stat.S_ISREG(st.st_mode): fail(f"owned bundle file is not regular: {item['name']}")
+                if not os.path.samestat(st, os.fstat(anchor_fd)): fail(f"owned bundle file is not the protected allocation: {item['name']}")
                 if not matches_fd(fd, item["identity"]): fail(f"owned bundle file identity changed: {item['name']}")
                 if read_fd(fd).decode("utf-8") != item["content"]: fail(f"owned bundle content changed: {item['name']}")
-            finally: os.close(fd)
+            finally:
+                for child_fd in (anchor_fd, fd, anchor_parent_fd):
+                    if child_fd >= 0:
+                        try: os.close(child_fd)
+                        except OSError: pass
+                anchor_parent_fd = -1
         return {"directory_identity": identity_fd(target_fd)}
     finally:
-        if target_fd >= 0: os.close(target_fd)
-        os.close(root_fd)
+        for fd in (anchor_parent_fd, target_fd, common_fd, root_fd):
+            if fd >= 0:
+                try: os.close(fd)
+                except OSError: pass
 
 def create_json_in_fd(parent_fd: int, name: str, text: str, quarantine_fd: int) -> bool:
     temp = f".prime-claw-{secrets.token_hex(16)}.tmp"
-    fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | O_NOFOLLOW, 0o600, dir_fd=parent_fd)
+    fd = os.open(temp, os.O_RDWR | os.O_CREAT | os.O_EXCL | O_NOFOLLOW, 0o600, dir_fd=parent_fd)
+    data = text.encode("utf-8")
     try:
-        data = text.encode("utf-8")
         view = memoryview(data)
         while view: view = view[os.write(fd, view):]
         os.fsync(fd)
+        staged_identity = identity_fd(fd)
+        try:
+            os.link(temp, name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd, follow_symlinks=False)
+            os.fsync(parent_fd)
+            published_fd = os.open(name, FILE_READ_FLAGS, dir_fd=parent_fd)
+            try:
+                if not os.path.samestat(os.fstat(fd), os.fstat(published_fd)):
+                    fail("published consumption manifest is not the staged allocation")
+                if not matches_fd(published_fd, staged_identity) or read_fd(published_fd) != data:
+                    fail("published consumption manifest changed")
+            finally: os.close(published_fd)
+            return True
+        except FileExistsError:
+            return False
     finally:
         os.close(fd)
-    try:
-        os.link(temp, name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd, follow_symlinks=False)
-        os.fsync(parent_fd)
-        return True
-    except FileExistsError:
-        return False
-    finally:
-        # Retire the exclusively created temp rather than racing a final unlink.
+        # Retire the exact staged object and durably record both namespaces.
         preserve_entry(parent_fd, temp, quarantine_fd, "consumption-temp")
+        os.fsync(parent_fd)
+        os.fsync(quarantine_fd)
+
+
+def retire_anchored_file(target_fd: int, quarantine_fd: int, common_fd: int, item: dict[str, Any]) -> str:
+    anchor_parent_fd = anchor_fd = retired_fd = -1
+    destination = item["retired_name"]
+    moved = False
+    try:
+        anchor_parent_fd, anchor_name = open_parent(common_fd, item["anchor_path"])
+        require_identity(anchor_parent_fd, item.get("anchor_parent_identity"), "file anchor directory")
+        anchor_fd = os.open(anchor_name, FILE_READ_FLAGS, dir_fd=anchor_parent_fd)
+        if not matches_fd(anchor_fd, item["anchor_identity"]): fail(f"file anchor incarnation changed: {item['name']}")
+        if read_fd(anchor_fd).decode("utf-8") != item["content"]: fail(f"file anchor content changed: {item['name']}")
+        if entry_exists(target_fd, item["name"]):
+            rename_exclusive_between(target_fd, item["name"], quarantine_fd, destination)
+            moved = True
+            os.fsync(target_fd)
+            os.fsync(quarantine_fd)
+        if not entry_exists(quarantine_fd, destination): fail(f"retirement evidence is missing: {destination}")
+        try:
+            retired_fd = os.open(destination, FILE_READ_FLAGS, dir_fd=quarantine_fd)
+            if not stat.S_ISREG(os.fstat(retired_fd).st_mode): fail(f"retired entry is not a regular file: {item['name']}")
+            if not os.path.samestat(os.fstat(retired_fd), os.fstat(anchor_fd)):
+                fail(f"retired file is not the protected allocation: {item['name']}")
+            if not matches_fd(retired_fd, item["identity"]): fail(f"retired file identity mismatch: {item['name']}")
+            if read_fd(retired_fd).decode("utf-8") != item["content"]: fail(f"retired file content changed: {item['name']}")
+        except Exception as validation_error:
+            if retired_fd >= 0:
+                os.close(retired_fd)
+                retired_fd = -1
+            if moved:
+                if entry_exists(target_fd, item["name"]):
+                    fail(f"unauthorized replacement retained as {destination}; public destination is occupied: {validation_error}")
+                try:
+                    restore_exclusive(quarantine_fd, destination, target_fd, item["name"])
+                    moved = False
+                    os.fsync(quarantine_fd)
+                    os.fsync(target_fd)
+                except Exception as restore_error:
+                    fail(f"unauthorized replacement retained as {destination}; no-clobber restoration failed: {restore_error}")
+            raise
+        return destination
+    finally:
+        for fd in (retired_fd, anchor_fd, anchor_parent_fd):
+            if fd >= 0:
+                try: os.close(fd)
+                except OSError: pass
 
 
 def remove_bundle(data: dict[str, Any]) -> dict[str, Any]:
@@ -689,26 +1086,14 @@ def remove_bundle(data: dict[str, Any]) -> dict[str, Any]:
         if any(name not in expected_names for name in actual_names): fail("owned bundle entry set changed before removal")
 
         consumed_created = create_json_in_fd(consumed_fd, data["consumed_name"], data["tombstone_text"], quarantine_fd)
-        if not consumed_created:
-            tombstone_fd = os.open(data["consumed_name"], FILE_READ_FLAGS, dir_fd=consumed_fd)
-            try:
-                if read_fd(tombstone_fd).decode("utf-8") != data["tombstone_text"]: fail("consumed retirement manifest changed")
-            finally: os.close(tombstone_fd)
+        tombstone_fd = os.open(data["consumed_name"], FILE_READ_FLAGS, dir_fd=consumed_fd)
+        try:
+            if read_fd(tombstone_fd).decode("utf-8") != data["tombstone_text"]: fail("consumed retirement manifest changed")
+        finally: os.close(tombstone_fd)
+        os.fsync(consumed_fd)
 
         for item in data["files"]:
-            destination = item["retired_name"]
-            if entry_exists(target_fd, item["name"]):
-                fd = os.open(item["name"], FILE_READ_FLAGS, dir_fd=target_fd)
-                try:
-                    if not stat.S_ISREG(os.fstat(fd).st_mode) or not matches_fd(fd, item["identity"]): fail(f"owned file identity changed: {item['name']}")
-                    if read_fd(fd).decode("utf-8") != item["content"]: fail(f"owned file content changed: {item['name']}")
-                finally: os.close(fd)
-            retired = preserve_entry_named(target_fd, item["name"], quarantine_fd, destination)
-            fd = os.open(retired, FILE_READ_FLAGS, dir_fd=quarantine_fd)
-            try:
-                if not matches_fd(fd, item["identity"]): fail(f"retired file identity mismatch: {item['name']}")
-                if read_fd(fd).decode("utf-8") != item["content"]: fail(f"retired file content changed: {item['name']}")
-            finally: os.close(fd)
+            retired = retire_anchored_file(target_fd, quarantine_fd, common_fd, item)
             preserved.append(retired)
 
         tree_name = data["tree_evidence_name"]
@@ -786,19 +1171,21 @@ def build_tree(data: dict[str, Any]) -> dict[str, Any]:
 def main() -> None:
     data = json.load(sys.stdin)
     op = data["operation"]
-    if op == "create-json": result = durable_json(data["root"], data["path"], data["text"], True, None, data.get("root_identity"), data.get("parent_identity"))
-    elif op == "replace-json": result = durable_json(data["root"], data["path"], data["text"], False, data.get("expected_identity"), data.get("root_identity"), data.get("parent_identity"))
+    if op == "parse-json": result = {"value": strict_json(data["text"])}
+    elif op == "create-json": result = durable_json(data["root"], data["path"], data["text"], True, None, data.get("root_identity"), data.get("parent_identity"), data.get("quarantine_identity"))
+    elif op == "replace-json": result = durable_json(data["root"], data["path"], data["text"], False, data.get("expected_identity"), data.get("root_identity"), data.get("parent_identity"), data.get("quarantine_identity"))
     elif op == "read-file": result = read_control(data["root"], data["path"], bool(data.get("allow_missing", False)), data.get("root_identity"), data.get("parent_identity"))
-    elif op == "remove-file": result = remove_control(data["root"], data["path"], data["sha256"], data["identity"], data.get("root_identity"), data.get("parent_identity"))
-    elif op == "acquire-lock": result = acquire_lock(data["root"], data["path"], data["owner_text"], data.get("root_identity"), data.get("parent_identity"))
-    elif op == "validate-lock": result = validate_lock(data["root"], data["path"], data["token"], data["lock_identity"], data["owner_identity"], data["owner_sha256"], data.get("root_identity"), data.get("parent_identity"))
-    elif op == "remove-lock": result = remove_lock(data["root"], data["path"], data["token"], data["lock_identity"], data["owner_identity"], data["owner_sha256"], data.get("root_identity"), data.get("parent_identity"))
+    elif op == "remove-file": result = remove_control(data["root"], data["path"], data["sha256"], data["identity"], data.get("root_identity"), data.get("parent_identity"), data.get("quarantine_identity"), data.get("retired_name"))
+    elif op == "acquire-lock": result = acquire_lock(data["root"], data["path"], data["owner_text"], data.get("root_identity"), data.get("parent_identity"), data.get("quarantine_identity"))
+    elif op == "reconcile-lock": result = reconcile_lock(data["root"], data["path"], data["token"], data["owner_sha256"], data.get("root_identity"), data.get("parent_identity"), bool(data.get("allow_inactive", False)))
+    elif op == "validate-lock": result = validate_lock(data["root"], data["path"], data["token"], data["lock_identity"], data["owner_identity"], data["guard_identity"], data["owner_sha256"], data["broker_socket"], data["authority_socket"], data.get("root_identity"), data.get("parent_identity"))
+    elif op == "remove-lock": result = remove_lock(data["root"], data["path"], data["token"], data["lock_identity"], data["owner_identity"], data["guard_identity"], data["owner_sha256"], data["broker_socket"], data["authority_socket"], data.get("root_identity"), data.get("parent_identity"), data.get("quarantine_identity"), bool(data.get("recover_abandoned", False)))
     elif op == "ensure-directory": result = ensure_directory(data["repo"], data["path"], data.get("root_identity"), data.get("parent_identity"), data.get("expected_identity"))
     elif op == "directory-identity": result = directory_identity(data["path"])
-    elif op == "platform-preflight": result = platform_preflight(data["repo"], data["common_dir"])
+    elif op == "platform-preflight": result = platform_preflight(data["repo"], data["common_dir"], data.get("target_path"), bool(data.get("require_retirement", False)), data.get("quarantine_dir"), data.get("anchor_dir"))
     elif op == "create-directory": result = create_product_directory(data["repo"], data["path"])
-    elif op == "create-file": result = create_product_file(data["repo"], data["path"], data["content"], data["directory_identity"])
-    elif op == "snapshot-bundle": result = snapshot_bundle(data["repo"], data["target_path"], data["directory_identity"], data["files"])
+    elif op == "create-file": result = create_product_file(data)
+    elif op == "snapshot-bundle": result = snapshot_bundle(data)
     elif op == "remove-bundle": result = remove_bundle(data)
     elif op == "build-tree": result = build_tree(data)
     else: fail(f"unsupported operation: {op}")

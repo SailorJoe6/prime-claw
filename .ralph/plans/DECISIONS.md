@@ -429,6 +429,8 @@ blocker bytes under ordinary replay and every recovery action.
 `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-astra-review.md`
 and adjacent owner gate are authoritative for ASTRA-16–24. The artifact manifest,
 invocation tree, and cleanup receipt remain beside them. Candidate `3fe649b`
-passed its baseline suites but failed this gate. D-WE-17–19 are only partially
-implemented; D-WE-20–22 are accepted design authority and are not implemented.
-Slice 2 remains open and Slice 3 is not authorized.
+passed its baseline suites but failed this gate. The owner-authorized revision
+now implements candidate mechanisms for D-WE-20–22 and strengthens the partial
+D-WE-17–19 paths; permanent macOS/Linux validation is recorded in the execution
+plan and product documentation. Fresh owner and formal EXPERT acceptance remain
+required. Slice 2 stays open and Slice 3 is not authorized.

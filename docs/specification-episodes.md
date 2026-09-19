@@ -417,6 +417,67 @@ Preserved authority and evidence:
 - owner gate: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md`
 - artifact manifest, invocation tree, and cleanup receipt in the same `slice2-3fe649b` directory
 
+## Same-Slice-2 ASTRA-16–24 implementation candidate
+
+The owner-authorized revision after authority commit `1834f6b` implements the
+accepted R-WE-85–93 / D-WE-20–22 mechanisms without entering Slice 3:
+
+- Product files are created from protected same-mount hardlink anchors in Git
+  common state. Fresh helpers validate the public name against the still-live
+  allocation. Retirement moves first, validates the moved object against its
+  anchor and approved bytes, and restores a directory or dirty replacement with
+  atomic no-replace semantics before returning failure.
+- Consumption-manifest publication checks the exact staged and published inode
+  and bytes before retirement. The extension rechecks consumed-state absence at
+  every product, tree, ref, index, and push boundary while the project exclusion
+  broker remains held. Only inspection or exact idempotent retirement resume is
+  admitted after consumption becomes durable.
+- Replicated helper supervisors inherit one OS `flock` on the exact Git-common
+  directory for the full mutation interval. Either supervisor retains authority
+  if the other disappears. Both monitor the owning process, so an owner crash
+  releases kernel authority while leaving ambiguous lock evidence intact;
+  explicit same-disposition/session recovery retires only that exact abandoned
+  lock before reacquiring.
+  A normal contender cannot acquire
+  even while both visible lock names are displaced. The extension also validates
+  the sibling guard, owner, broker liveness, and lock at every mutation and
+  release boundary. Failed caller-handle publication and release reconcile the
+  exact token. Every quarantine consumer receives a bound directory incarnation.
+- Durable evidence is parsed with recursive duplicate decoded-key rejection.
+  Success-like evidence is recognized before discriminators are trusted.
+  Mutable routing requires closed phase/status variants, accumulated evidence,
+  complete typed fields, exact nested observations, and disjoint status
+  invariants; unknown or success-only residue is
+  preservation-only. Verified commits,
+  trees, parents, and publications require unpeeled exact Git types and
+  calendar-valid RFC3339 timestamps.
+- Blocker cleanup carries the single approved bytes/hash/identity into a
+  deterministic retirement outcome. Retrying checks that destination first, so
+  a newly published canonical blocker is neither moved nor adopted.
+- Before creating control directories, preflight compares the nearest actual
+  product, quarantine, and anchor mounts. Disposable allocation-bound probes run
+  in the production directions (anchor to product, then product to quarantine),
+  verify hardlink and descriptor-relative no-replace rename behavior, and remove
+  every probe name before admission. Cross-mount, nested-mount, and unsupported
+  capability layouts reject fail-closed.
+- Every acknowledged directory creation, hardlink publication, exchange,
+  retirement, restoration, and cleanup flushes the affected file/directory and
+  both namespace parents. Tests prove syscall ordering and restart behavior;
+  they do not claim physical power-loss testing.
+
+Permanent coverage is in
+`tests/specification_episodes_astra_regressions.test.mjs`,
+`tests/test_specification_episodes_extension.py`,
+`tests/test_specification_episode_fs_identity.py`, and isolated ASTRA-11/22
+workers. Native Linux coverage uses a network-isolated, read-only-source
+container with disposable volumes and proves rapid allocation churn, fresh
+helper validation, two-mount preflight rejection, late directory/hardlink
+substitution, manifest replacement, blocker reconciliation, and durability
+barriers. The live episode resources are never fault fixtures.
+
+This remains a candidate until fresh owner and formal EXPERT acceptance. Slice 2
+stays `in_progress`; Slice 3 remains blocked.
+
 ## Verification
 
 Run the focused acceptance suite:
@@ -447,6 +508,27 @@ The rejected `ae31587` evidence (Node 58/58, original Astra 5/5, and
 pass the combined existing/permanent-Astra Node suites, the exact active command
 `pytest -q tests`, `git diff --check`, and fresh owner/EXPERT review. Local test
 counts below are updated only from final completed commands.
+
+Current candidate evidence:
+
+- combined existing plus permanent ASTRA Node suites: **93/93 passed** in
+  1,355.90 seconds;
+- exact active `pytest -q tests`: **264 passed, 2 skipped, 11 warnings** in
+  2,199.29 seconds;
+- focused non-bridge Python: **261 passed, 2 skipped**;
+- native Linux arm64/Python 3.12 identity, allocation churn, broker lifecycle,
+  blocker reconciliation, durability, and capability checks: PASS;
+- native Linux nested quarantine and anchor mount rejection: PASS;
+- three consecutive real two-process serialization reruns after concurrent
+  control-directory publication reconciliation: PASS;
+- syntax, inventory integrity, JSON, and `git diff --check`: PASS.
+
+The independent postfix audit's exact-schema counterexamples are closed in the
+appended scoped PASS at
+`astra16-24-final-postfix-audit.md` (SHA-256
+`f424873a10e063b0b3feecf9069628c79827af40d15a7fda855fe0cac1913d8c`). Its
+strict arbitrary-same-UID interpretation remains an explicit owner/formal review
+question; this candidate does not silently narrow R-WE-87/R-WE-88/D-WE-21.
 The pytest bridge loads the real extension through the installed Prime Agent
 RPC loader and checks the two native command surfaces. Prime Agent 0.9.5 RPC has
 no public tool-list or direct tool-invocation command, so schema/execution tests

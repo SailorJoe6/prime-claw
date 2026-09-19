@@ -1,8 +1,9 @@
 # Specification — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; after verified
-> authority commit `1834f6b`, the owner authorized one bounded same-Slice-2
-> revision for ASTRA-16–24. Slice 2 remains open; later paths are blocked.
+> **Status:** implementation in progress; Slice 1 is validated; the authorized
+> ASTRA-16–24 same-Slice-2 implementation candidate has completed repository and
+> native validation. Slice 2 remains open for fresh owner/formal EXPERT review;
+> later paths are blocked.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -344,6 +345,18 @@ Authoritative preserved evidence:
 - artifact manifest: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json`
 - invocation tree: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json`
 - cleanup receipt: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json`
+
+### 5.6 Authorized ASTRA-16–24 candidate
+
+The bounded revision implements R-WE-85–93 and D-WE-20–22 with protected
+same-mount allocation anchors, post-move validation and no-replace restoration,
+one-way manifest routing, a long-lived OS-flock broker plus guard/boundary
+validation, raw strict JSON with a closed mutable schema and unpeeled Git-type
+proof, destination-first blocker reconciliation, actual mount/capability
+rejection, and complete namespace flush
+ordering. Permanent tests exercise the formal counterexample boundaries on
+macOS and disposable native Linux fixtures. This is implementation evidence,
+not owner or EXPERT acceptance; Slice 2 remains open.
 
 ## 6. Episode-creation behavior
 

@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
 
-import specificationEpisodes, { acquireProjectLock, releaseProjectLock } from "../.prime/agent/extensions/specification-episodes.ts";
+import specificationEpisodes, { acquireProjectLock, isKnownMutableFutureTransaction, releaseProjectLock } from "../.prime/agent/extensions/specification-episodes.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -211,7 +211,7 @@ test("ASTRA-07 replay current observations must not predate its own reconciled s
   const f = await fixture(t);
   const tool = f.tools.get("spec_disposition");
   const first = resultDetails(await tool.execute("success", params(), undefined, undefined, f.ctx));
-  assert.equal(first.status, "verified-success");
+  assert.equal(first.status, "verified-success", JSON.stringify(first, null, 2));
   let statusCount = 0;
   let injected = false;
   f.setExecInterceptor(async ({ args, invoke }) => {
@@ -562,10 +562,21 @@ test("ASTRA-11 atomic owner publication refuses a replacement lock incarnation",
   assert.match(result.stdout, /ASTRA11_OWNER_OK/);
 });
 
+test("ASTRA-19 post-helper validation failure reconciles lock and stable guard", async () => {
+  const result = await run("node", ["--experimental-strip-types", "tests/helpers/specification_episodes_astra11_worker.mjs", "postvalidate"], { cwd: resolve(".") });
+  assert.equal(result.code, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /ASTRA11_POSTVALIDATE_OK/);
+});
+
 test("ASTRA-11 inter-call real-directory replacement is never adopted", async () => {
   const result = await run("node", ["--experimental-strip-types", "tests/helpers/specification_episodes_astra11_worker.mjs", "intercall"], { cwd: resolve(".") });
   assert.equal(result.code, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /ASTRA11_INTERCALL_OK/);
+});
+
+test("ASTRA-19 lost lock-release response reconciles the exact completed outcome", async () => {
+  const result = await run("node", ["--experimental-strip-types", "tests/helpers/specification_episodes_astra11_worker.mjs", "release-response"], { cwd: resolve(".") });
+  assert.equal(result.code, 0, result.stderr || result.stdout); assert.match(result.stdout, /ASTRA11_RELEASE-RESPONSE_OK/);
 });
 
 test("ASTRA-11 release preserves a replacement lock and its prior owner", async () => {
@@ -643,4 +654,192 @@ test("ASTRA-15 final cleanup fault occurs after lock release and preserves succe
   assert.equal(readFileSync(failed.transaction_path, "utf8"), successBytes);
   assert.equal(readFileSync(blockerPath, "utf8"), blockerBytes);
   assert.equal(existsSync(join(f.cwd, ".git/prime-claw/locks/project-mutation.lock")), false, "lock must already be retired before final blocker cleanup");
+});
+
+
+test("ASTRA-18 consumed state forbids continuation before product recreation", async (t) => {
+  const f = await fixture(t); const tool = f.tools.get("spec_disposition");
+  const failed = await stoppedBeforeCommit(f);
+  const target = join(f.cwd, ".ralph/plans/future/safe-idea");
+  const before = Object.fromEntries(bundleNames.map(([name]) => [name, readFileSync(join(target, name), "utf8")]));
+  const consumed = join(f.cwd, ".git/prime-claw/future-ownership-consumed", `${failed.disposition_id}.json`);
+  writeFileSync(consumed, JSON.stringify({ version: 2, kind: "future-directory-ownership-consumed", sentinel: "partial" }));
+  const result = resultDetails(await tool.execute("continue-consumed", params({ request_id: "request-consumed-continue", recovery_action: "continue" }), undefined, undefined, f.ctx));
+  assert.equal(result.status, "failed"); assert.equal(result.phase, "consumed-manifest-present");
+  for (const [name, bytes] of Object.entries(before)) assert.equal(readFileSync(join(target, name), "utf8"), bytes);
+});
+
+test("ASTRA-19 broker exclusion survives lock and guard pathname displacement", async (t) => {
+  const f = await fixture(t); const tool = f.tools.get("spec_disposition");
+  let competitorBlocked = false; let competitorError = "";
+  f.setSpecificationFault((phase) => {
+    if (phase === "journal-created" && !competitorBlocked) {
+      const lock = join(f.cwd, ".git/prime-claw/locks/project-mutation.lock"); const guard = `${lock}.guard`;
+      const moved = join(f.root, "lost-first-lock"); const movedGuard = join(f.root, "lost-first-guard");
+      renameSync(lock, moved); renameSync(guard, movedGuard);
+      try { acquireProjectLock(lock, "competitor-disposition", "competitor-session"); }
+      catch (error) { competitorBlocked = true; competitorError = String(error); }
+      finally { renameSync(moved, lock); renameSync(movedGuard, guard); }
+    }
+  });
+  const result = resultDetails(await tool.execute("lock-displacement", params(), undefined, undefined, f.ctx));
+  assert.equal(result.status, "verified-success");
+  assert.equal(competitorBlocked, true, "project broker allowed a second normal owner to acquire");
+  assert.match(competitorError, /project mutation lock is held|secure filesystem helper failed/);
+});
+
+
+test("ASTRA-20 raw duplicate and escaped success keys are rejected without evidence mutation", async (t) => {
+  const cases = [
+    (raw) => raw.replace(/"status"\s*:\s*"verified-success"/, '"status":"failed","status":"verified-success"'),
+    (raw) => raw.replace(/"oid"\s*:\s*"([0-9a-f]+)"/, '"oid":"not-an-oid","o\\u0069d":"$1"'),
+  ];
+  for (const [index, mutate] of cases.entries()) {
+    const f = await fixture(t); const tool = f.tools.get("spec_disposition");
+    const first = resultDetails(await tool.execute(`success-${index}`, params(), undefined, undefined, f.ctx));
+    const raw = readFileSync(first.transaction_path, "utf8"); const corrupted = mutate(raw);
+    assert.notEqual(corrupted, raw); writeFileSync(first.transaction_path, corrupted);
+    const blocker = join(f.cwd, ".git/prime-claw/future-mutation-blocked.json");
+    const blockerBytes = JSON.stringify({ version: 1, disposition_id: first.disposition_id, sentinel: `duplicate-${index}` }); writeFileSync(blocker, blockerBytes);
+    let replayError = null;
+    try { await tool.execute(`duplicate-${index}`, params({ request_id: `request-duplicate-${index}` }), undefined, undefined, f.ctx); }
+    catch (error) { replayError = error; }
+    assert.ok(replayError); assert.match(String(replayError), /duplicate decoded JSON key/);
+    assert.equal(readFileSync(first.transaction_path, "utf8"), corrupted); assert.equal(readFileSync(blocker, "utf8"), blockerBytes);
+  }
+});
+
+test("ASTRA-20 annotated tag and invalid timestamp cannot stand in the closed proof", async (t) => {
+  for (const variant of ["tag", "timestamp"]) {
+    const f = await fixture(t); const tool = f.tools.get("spec_disposition");
+    const first = resultDetails(await tool.execute(`success-${variant}`, params(), undefined, undefined, f.ctx));
+    const journal = JSON.parse(readFileSync(first.transaction_path, "utf8"));
+    if (variant === "tag") {
+      await run("git", ["-C", f.cwd, "tag", "-a", "proof-tag", "-m", "proof", first.commit_sha]);
+      const tag = (await run("git", ["-C", f.cwd, "rev-parse", "proof-tag^{tag}"])).stdout.trim();
+      journal.commit.oid = tag; journal.publication.verified_head = tag; journal.publication.verified_upstream_head = tag; journal.publication.verified_remote_head = tag;
+    } else journal.publication.verified_at = "2026-99-99T99:99:99Z";
+    const corrupted = JSON.stringify(journal); writeFileSync(first.transaction_path, corrupted);
+    const blocker = join(f.cwd, ".git/prime-claw/future-mutation-blocked.json"); const blockerBytes = JSON.stringify({ version: 1, disposition_id: first.disposition_id, sentinel: variant }); writeFileSync(blocker, blockerBytes);
+    const replay = resultDetails(await tool.execute(`replay-${variant}`, params({ request_id: `request-${variant}` }), undefined, undefined, f.ctx));
+    assert.equal(replay.status, "failed"); assert.equal(readFileSync(first.transaction_path, "utf8"), corrupted); assert.equal(readFileSync(blocker, "utf8"), blockerBytes);
+  }
+});
+
+test("ASTRA-21 recognizable success with missing discriminator is preservation-only for every action", async (t) => {
+  const actions = [undefined, "inspect", "continue", "remove-owned-uncommitted"];
+  for (const [index, action] of actions.entries()) {
+    const f = await fixture(t); const tool = f.tools.get("spec_disposition");
+    const first = resultDetails(await tool.execute(`success-route-${index}`, params(), undefined, undefined, f.ctx));
+    const journal = JSON.parse(readFileSync(first.transaction_path, "utf8"));
+    if (index % 2 === 0) delete journal.status;
+    else { journal.version = 1; delete journal.kind; journal.status = "failed"; }
+    const corrupted = JSON.stringify(journal); writeFileSync(first.transaction_path, corrupted);
+    const blocker = join(f.cwd, ".git/prime-claw/future-mutation-blocked.json"); const blockerBytes = JSON.stringify({ version: 1, disposition_id: first.disposition_id, sentinel: `route-${index}` }); writeFileSync(blocker, blockerBytes);
+    const replayParams = params({ request_id: `request-route-${index}`, ...(action ? { recovery_action: action } : {}) });
+    const replay = resultDetails(await tool.execute(`route-${index}`, replayParams, undefined, undefined, f.ctx));
+    assert.equal(replay.status, "failed"); assert.equal(readFileSync(first.transaction_path, "utf8"), corrupted); assert.equal(readFileSync(blocker, "utf8"), blockerBytes);
+  }
+});
+
+
+test("ASTRA-22 blocker replacement after approval is restored and never adopted", async () => {
+  const result = await run("node", ["--experimental-strip-types", "tests/helpers/specification_episodes_astra22_worker.mjs", "replacement"], { cwd: resolve(".") });
+  assert.equal(result.code, 0, result.stderr || result.stdout); assert.match(result.stdout, /ASTRA22_REPLACEMENT_OK/);
+});
+
+test("ASTRA-22 lost blocker-retirement response reconciles the exact durable outcome", async () => {
+  const result = await run("node", ["--experimental-strip-types", "tests/helpers/specification_episodes_astra22_worker.mjs", "response"], { cwd: resolve(".") });
+  assert.equal(result.code, 0, result.stderr || result.stdout); assert.match(result.stdout, /ASTRA22_RESPONSE_OK/);
+});
+
+
+test("ASTRA-22 fresh and replay blocker response loss reconcile to verified success", async (t) => {
+  for (const mode of ["fresh", "replay"]) {
+    const f = await fixture(t); const tool = f.tools.get("spec_disposition"); let injected = false;
+    let first;
+    if (mode === "fresh") {
+      let stopped = false;
+      f.setSpecificationFault((phase) => { if (!stopped && phase === "commit-object-created") { stopped = true; throw new Error("create blocker"); } });
+      first = resultDetails(await tool.execute("create-blocker", params(), undefined, undefined, f.ctx));
+      assert.equal(first.status, "failed"); f.setSpecificationFault(null);
+    } else {
+      first = resultDetails(await tool.execute("create-success", params(), undefined, undefined, f.ctx));
+      assert.equal(first.status, "verified-success");
+      writeFileSync(join(f.cwd, ".git/prime-claw/future-mutation-blocked.json"), JSON.stringify({version:1,disposition_id:first.disposition_id,sentinel:"replay"}));
+    }
+    const blockerPath = join(f.cwd, ".git/prime-claw/future-mutation-blocked.json");
+    const replacement = JSON.stringify({version:1,disposition_id:`replacement-${mode}`,sentinel:"new-canonical"});
+    f.setSpecificationFault((phase) => { if (!injected && phase === "after-success-blocker-retirement") { injected = true; writeFileSync(blockerPath,replacement); throw new Error("lost retirement response"); } });
+    const result = resultDetails(await tool.execute(`response-${mode}`, params({ request_id: `request-response-${mode}`, ...(mode === "fresh" ? { recovery_action: "continue" } : {}) }), undefined, undefined, f.ctx));
+    assert.equal(injected, true); assert.equal(result.status, "verified-success");
+    assert.equal(readFileSync(blockerPath,"utf8"),replacement);
+  }
+});
+
+
+test("ASTRA-18 consumed publication at product ref and push boundaries is one-way", async (t) => {
+  for (const phase of ["journal-created", "commit-object-created", "primary-index-reconciled"]) {
+    const f = await fixture(t); const tool = f.tools.get("spec_disposition");
+    const base = (await run("git", ["rev-parse", "HEAD"], { cwd: f.cwd })).stdout.trim();
+    let injected = false;
+    f.setSpecificationFault((seen) => {
+      if (!injected && seen === phase) {
+        injected = true;
+        const txDir = join(f.cwd, ".git/prime-claw/future-transactions");
+        const tx = JSON.parse(readFileSync(join(txDir, readdirSync(txDir).find((name) => name.endsWith(".json"))), "utf8"));
+        const consumedDir = join(f.cwd, ".git/prime-claw/future-ownership-consumed"); mkdirSync(consumedDir,{recursive:true});
+        writeFileSync(join(consumedDir, `${tx.disposition_id}.json`), JSON.stringify({version:2,kind:"future-directory-ownership-consumed",disposition_id:tx.disposition_id,sentinel:phase}));
+      }
+    });
+    const result = resultDetails(await tool.execute(`consumed-${phase}`, params({request_id:`request-consumed-${phase}`}), undefined, undefined, f.ctx));
+    assert.equal(injected,true); assert.equal(result.status,"failed"); assert.match(String(result.error),/consumed ownership state became durable/);
+    if (phase !== "primary-index-reconciled") assert.equal((await run("git",["rev-parse","HEAD"],{cwd:f.cwd})).stdout.trim(),base);
+    const remote = (await run("git",["ls-remote","--heads","origin","refs/heads/main"],{cwd:f.cwd})).stdout.split(/\s/)[0]; assert.equal(remote,base);
+  }
+});
+
+
+test("ASTRA-21 mutable routing validates closed phase-specific field schemas", () => {
+  const base = { version:1, disposition_id:"disp-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", payload_fingerprint:"a".repeat(64), disposition:"future", slug:"safe-idea", bundle_sha256:"b".repeat(64), owner_session_id:"session-1", owner_session_file:"/tmp/session.jsonl", repository_root:"/tmp/repo", git_common_dir:"/tmp/repo/.git", current_branch:"main", upstream_branch:"origin/main", remote_default_branch:"refs/heads/main", base_head:"c".repeat(40), remote_base_head:"c".repeat(40), future_root_preexisting:false, created_at:"2026-09-19T00:00:00Z", target_directory:".ralph/plans/future/safe-idea", owned_paths:[".ralph/plans/future/safe-idea/SPECIFICATION.md"], status:"running", phase:"journal-created", product_resource_mutation_performed:false, next_safe_action:"continue" };
+  assert.equal(isKnownMutableFutureTransaction(base),true);
+  const corruptions = [
+    {document_hashes:{"SPECIFICATION.md":7}}, {observed_status_paths:[7]}, {created_at:"2026-99-99T99:99:99Z"},
+    {commit_sha:"not-an-oid"}, {commit_sha:"d".repeat(40)}, {observed_commit:[]}, {future_root_preexisting:"false"},
+    {unknown_success_residue:{oid:"d".repeat(40)}}, {error:"phase-inapplicable"},
+  ];
+  for (const corruption of corruptions) assert.equal(isKnownMutableFutureTransaction({...base,...corruption}),false,JSON.stringify(corruption));
+  assert.equal(isKnownMutableFutureTransaction({...base,phase:"exact-tree-built"}),false,"later phase accepted without accumulated evidence");
+  const failed = {...base,status:"failed",error:"stopped",failed_at:"2026-09-19T00:00:00Z",recovery_action_required:false,
+    observed_at:"2026-09-19T00:00:01Z",observed_head:null,observed_upstream_head:null,observed_remote_head:null,
+    observed_status_paths:[],observed_staged_paths:[],observed_target_kind:"missing",observed_target_entries:[],observed_owned_paths:[],observed_owned_files:{},
+    observed_tree_evidence:{exists:false},observed_commit:{exists:false,oid:null},observation_errors:[]};
+  assert.equal(isKnownMutableFutureTransaction(failed),true);
+  assert.equal(isKnownMutableFutureTransaction({...failed,observed_commit:{exists:true,extra:7}}),false,"open nested observation schema accepted");
+  const {recovery_action_required: _recoveryFlag, ...failedWithoutRecoveryFlag} = failed;
+  assert.equal(isKnownMutableFutureTransaction(failedWithoutRecoveryFlag),false,"failed variant without recovery flag accepted");
+  assert.equal(isKnownMutableFutureTransaction({...failed,observation_error:"fallback mixed with full observation"}),false,"hybrid observation variants accepted");
+  assert.equal(isKnownMutableFutureTransaction({...failed,observed_target_kind:"banana"}),false,"invalid observation enum accepted");
+  assert.equal(isKnownMutableFutureTransaction({...failed,observed_tree_evidence:{exists:true,path:"/tmp/evidence",size:-1,sha256:"a".repeat(64)}}),false,"negative observation size accepted");
+  const recovered = {...failed,status:"recovered-clean",phase:"owned-uncommitted-removed",product_resource_mutation_performed:false,
+    recovery_action:"remove-owned-uncommitted",recovered_at:"2026-09-19T00:00:02Z",ownership_consumed_path:"future-ownership-consumed/disp.json",
+    ownership_receipt_path:"future-ownership/disp.json",bundle_ownership_receipt_path:"future-bundle-ownership/disp.json",
+    document_hashes:{"SPECIFICATION.md":"a".repeat(64),"REQUIREMENTS.md":"b".repeat(64),"DECISIONS.md":"c".repeat(64)},
+    tree_evidence_path:"indexes/disp.index",tree_evidence_sha256:"d".repeat(64),constructed_tree:"e".repeat(40)};
+  assert.equal(isKnownMutableFutureTransaction(recovered),true);
+  const {ownership_receipt_path: _receipt, ...recoveredMissing} = recovered;
+  assert.equal(isKnownMutableFutureTransaction(recoveredMissing),false,"incomplete recovered-clean variant accepted");
+});
+
+
+test("ASTRA-19 explicit same-owner recovery retires exact abandoned lock after owner death", async (t) => {
+  const root = fs.realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-abandoned-lock-"))); t.after(() => rmSync(root,{recursive:true,force:true}));
+  mkdirSync(join(root,"prime-claw/locks"),{recursive:true});
+  const lock = join(root,"prime-claw/locks/project.lock");
+  const child = await run("node",["--experimental-strip-types","tests/helpers/specification_episodes_orphan_lock_worker.mjs",lock],{cwd:resolve(".")});
+  assert.equal(child.code,0,child.stderr); assert.match(child.stdout,/ORPHAN_LOCK_READY/);
+  await new Promise((resolveWait) => setTimeout(resolveWait,1200));
+  const recovered = acquireProjectLock(lock,"disp-abandoned","session-abandoned",true);
+  releaseProjectLock(recovered);
+  assert.equal(existsSync(lock),false); assert.equal(existsSync(`${lock}.guard`),false);
 });

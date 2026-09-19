@@ -1,9 +1,9 @@
 # Execution Plan — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; after verified
-> authority commit `1834f6b`, owner transition
-> `eca063c9-561e-4a5b-868c-65a0e13059ec` authorizes one bounded same-Slice-2
-> ASTRA-16–24 revision. Slice 2 remains open; Slices 3–8 are blocked.
+> **Status:** implementation in progress; Slice 1 is validated; the owner-authorized
+> transition `eca063c9-561e-4a5b-868c-65a0e13059ec` produced an ASTRA-16–24
+> same-Slice-2 candidate whose repository/native validation is complete. Slice 2
+> remains open pending fresh owner/formal EXPERT acceptance; Slices 3–8 are blocked.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -319,6 +319,21 @@ cross-mount, inode-reuse, crash, and fault tests use only disposable fixtures or
 isolated containers. After evidence, Bead update, commit, and push, prove local,
 upstream, and actual-remote identity plus a clean worktree, then stop for fresh
 owner and EXPERT review. Slice 3 remains unauthorized.
+
+Implemented candidate response:
+
+| Authority | Candidate mechanism | Permanent evidence |
+|---|---|---|
+| R-WE-85/86; D-WE-20 | Same-mount hardlink allocation anchors; move-then-validate retirement; atomic no-replace restoration | Native rapid allocation churn plus late directory and hardlink-dirty substitution |
+| R-WE-87; D-WE-21 | Staged/published manifest allocation+byte validation; consumed-state gate; idempotent resume | Foreign manifest substitution, partial resume, and public continuation rejection |
+| R-WE-88; D-WE-21 | Replicated owner-monitored OS-flock supervisors on the bound Git-common directory, sibling guard, per-boundary authority validation, exact release reconciliation, bound quarantine | Lock+guard displacement exclusion, post-validation failure, single-supervisor loss, owner-crash exact recovery, lost-release response, replacement cleanup, and quarantine substitution |
+| R-WE-89/90; D-WE-22 | Recursive duplicate-key rejection; success-first closed routing; unpeeled Git types; calendar timestamps | Duplicate/escaped keys, annotated tag, invalid-time, and missing/changed discriminator matrices |
+| R-WE-91; D-WE-21 | Single approved blocker evidence and destination-first deterministic retirement reconciliation | Replacement-after-approval and fresh/replay lost-response-plus-new-canonical tests |
+| R-WE-92; D-WE-20 | Actual product/quarantine/anchor mount comparison plus ephemeral production-direction hardlink and no-replace rename probes | Native Linux two-volume, nested quarantine/anchor mount, and capability-negative coverage |
+| R-WE-93; D-WE-21 | File/new-directory and both-parent namespace flush ordering on every acknowledged edge | macOS/Linux syscall-order and restart/fault tests; no physical power-loss claim |
+
+The candidate is not accepted until exact-suite, clean/pushed identity, fresh
+owner review, and formal EXPERT review all pass.
 
 ### 2.5 Promoted episode transaction
 
@@ -701,7 +716,7 @@ private transcript text.
 | R-WE-69, R-WE-70, R-WE-71, R-WE-72 | 2 |
 | R-WE-73, R-WE-74, R-WE-75, R-WE-76, R-WE-77, R-WE-78 | 2 revision gate |
 | R-WE-79, R-WE-80, R-WE-81, R-WE-82, R-WE-83, R-WE-84 | partial mechanisms in `3fe649b`; owner adjudication in §2.4 |
-| R-WE-85, R-WE-86, R-WE-87, R-WE-88, R-WE-89, R-WE-90, R-WE-91, R-WE-92, R-WE-93 | next separately authorized same-Slice-2 revision gate (ASTRA-16–24) |
+| R-WE-85, R-WE-86, R-WE-87, R-WE-88, R-WE-89, R-WE-90, R-WE-91, R-WE-92, R-WE-93 | validated same-Slice-2 ASTRA-16–24 candidate; fresh owner/formal acceptance pending |
 
 A generated inventory assertion must show every R-WE ID exactly once in the
 requirements source and at least one `proven_by` path after its owning slice.
@@ -731,9 +746,9 @@ concurrency coverage in earlier slices.
 | D-WE-17 final-syscall object/control/lock authority | §§2.2, 2.4; post-`5d4be4a` same-Slice-2 candidate |
 | D-WE-18 platform-real incarnation model | §§2.2, 2.4; post-`5d4be4a` same-Slice-2 candidate |
 | D-WE-19 closed durable success proof | §§2.2, 2.4; partial at `3fe649b` |
-| D-WE-20 allocation-unique authority and retirement topology | §§2.2, 2.4; ASTRA-16/17/23 authority only |
-| D-WE-21 one-way durable recovery/control lifecycle | §§2.2, 2.4; ASTRA-18/19/22/24 authority only |
-| D-WE-22 raw proof validation before routing | §§2.2, 2.4; ASTRA-20/21 authority only |
+| D-WE-20 allocation-unique authority and retirement topology | §§2.2, 2.4; validated ASTRA-16/17/23 candidate; fresh acceptance pending |
+| D-WE-21 one-way durable recovery/control lifecycle | §§2.2, 2.4; validated ASTRA-18/19/22/24 candidate; strict threat-scope owner review pending |
+| D-WE-22 raw proof validation before routing | §§2.2, 2.4; validated ASTRA-20/21 candidate; fresh acceptance pending |
 
 ## 8. Completion boundary
 

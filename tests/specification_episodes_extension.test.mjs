@@ -302,7 +302,7 @@ test("commit-object failure requires explicit recovery and supports safe removal
   assert.equal(staleReceiptRetry.status, "failed");
   assert.deepEqual(readFileSync(removed.transaction_path), recoveredJournalBytes);
   assert.equal(existsSync(join(f.cwd, ".git/prime-claw/future-mutation-blocked.json")), false);
-  assert.match(staleReceiptRetry.error, /removal authority.*consumed|explicitly removed|does not support implicit recovery/i);
+  assert.match(staleReceiptRetry.error, /removal authority.*consumed|explicitly removed|does not support implicit recovery|continuation is forbidden after retirement state exists/i);
   assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), true);
   assert.deepEqual(readdirSync(join(f.cwd, ".ralph/plans/future/safe-idea")), []);
 
@@ -562,12 +562,13 @@ test("token mismatch prevents a false success and preserves the ambiguous lock r
   ));
   assert.equal(failed.status, "failed");
   assert.equal(failed.corrupt_success_journal_preserved, true);
-  assert.match(failed.error, /lock owner bytes changed before release/i);
+  assert.match(failed.error, /lock owner and stable guard disagree|lock owner bytes changed/i);
   const lockDir = join(f.cwd, ".git/prime-claw/locks/project-mutation.lock");
   assert.equal(existsSync(lockDir), true);
   const attempts = readdirSync(join(f.cwd, ".git/prime-claw/future-attempts"));
   const attempt = JSON.parse(readFileSync(join(f.cwd, ".git/prime-claw/future-attempts", attempts[0]), "utf8"));
-  assert.equal(attempt.status, "corrupt-success");
+  assert.equal(attempt.status, "waiting-for-lock");
+  assert.equal(failed.lock_evidence_preserved, true);
 });
 
 
@@ -808,7 +809,7 @@ test("consumed removal authority cannot delete a later byte-identical replacemen
     undefined, undefined, f.ctx,
   ));
   assert.equal(repeated.status, "failed");
-  assert.match(repeated.error, /owned file identity changed|retired file identity mismatch/i);
+  assert.match(repeated.error, /owned file identity changed|retired file identity mismatch|unknown durable future transaction schema|retirement state exists/i);
   assert.equal(readFileSync(join(target, "SPECIFICATION.md"), "utf8"), input.documents.specification_markdown);
 });
 

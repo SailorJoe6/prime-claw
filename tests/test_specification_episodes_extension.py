@@ -35,6 +35,20 @@ def _fd_identity(module, path: Path, directory: bool = False):
         os.close(fd)
 
 
+def _bind_file_anchors(module, common: Path, target: Path, files: list[dict]):
+    anchor_dir = common / "prime-claw/future-file-anchors"
+    anchor_dir.mkdir(parents=True, exist_ok=True)
+    parent_identity = _fd_identity(module, anchor_dir, True)
+    for item in files:
+        anchor = anchor_dir / f"test-{item['name']}"
+        os.link(target / item["name"], anchor)
+        item.update({
+            "anchor_path": f"prime-claw/future-file-anchors/{anchor.name}",
+            "anchor_parent_identity": parent_identity,
+            "anchor_identity": _fd_identity(module, anchor),
+        })
+
+
 def test_directory_creation_rejects_a_post_publication_replacement():
     module = _load_fs_helper("specification_episode_fs")
     with tempfile.TemporaryDirectory(prefix="prime-claw-directory-creation-") as raw_root:
@@ -79,6 +93,7 @@ def test_astra_10_product_retirement_has_no_final_unlink_and_preserves_objects()
             path.write_text(content)
             original_inodes[name] = path.stat().st_ino
             files.append({"name": name, "content": content, "identity": _fd_identity(module, path), "retired_name": f"retired-{name}"})
+        _bind_file_anchors(module, common, target, files)
         index_bytes = b"construction evidence\n"
         tree_evidence_name = "disp-test.index"
         (indexes / tree_evidence_name).write_bytes(index_bytes)
@@ -115,20 +130,21 @@ def test_astra_10_partial_retirement_resumes_from_exact_consumed_manifest():
         for name, content in contents.items():
             path = target / name; path.write_text(content)
             files.append({"name":name,"content":content,"identity":_fd_identity(module,path),"retired_name":f"retired-{name}"})
+        _bind_file_anchors(module, common, target, files)
         evidence = b"tree\n"; evidence_path = indexes / "disp.index"; evidence_path.write_bytes(evidence)
         data = {"repo":str(repo),"common_dir":str(common),"target_path":".ralph/plans/future/candidate","directory_identity":_fd_identity(module,target,True),"files":files,"consumed_name":"disp.json","tombstone_text":"{\"manifest\":true}\n","tree_evidence_name":"disp.index","tree_evidence_retired_name":"retired-tree.index","tree_evidence_sha256":hashlib.sha256(evidence).hexdigest(),"tree_evidence_identity":_fd_identity(module,evidence_path)}
-        original = module.preserve_entry_named; calls = 0
-        def interrupt(source_fd, name, quarantine_fd, destination):
+        original = module.retire_anchored_file; calls = 0
+        def interrupt(target_fd, quarantine_fd, common_fd, item):
             nonlocal calls
             calls += 1
             if calls == 2: raise OSError("injected partial retirement")
-            return original(source_fd,name,quarantine_fd,destination)
-        module.preserve_entry_named = interrupt
+            return original(target_fd, quarantine_fd, common_fd, item)
+        module.retire_anchored_file = interrupt
         try:
             try: module.remove_bundle(data)
             except OSError as error: assert "injected partial" in str(error)
             else: raise AssertionError("partial retirement unexpectedly completed")
-        finally: module.preserve_entry_named = original
+        finally: module.retire_anchored_file = original
         assert (consumed / "disp.json").exists() and not (target / "SPECIFICATION.md").exists()
         resumed = module.remove_bundle(data)
         assert resumed["retirement_complete"] is True and resumed["consumed_created"] is False
@@ -136,53 +152,41 @@ def test_astra_10_partial_retirement_resumes_from_exact_consumed_manifest():
         assert not evidence_path.exists()
 
 
-def test_astra_10_product_restore_is_atomic_no_clobber():
+def test_astra_17_late_directory_substitution_is_restored_to_public_name():
     module = _load_fs_helper("specification_episode_fs_restore")
     with tempfile.TemporaryDirectory(prefix="prime-claw-product-restore-") as raw_root:
-        root = Path(raw_root).resolve()
-        repo = root / "repo"; common = repo / ".git"; target = repo / ".ralph/plans/future/candidate"
-        consumed = common / "prime-claw/future-ownership-consumed"; indexes = common / "prime-claw/indexes"
+        root = Path(raw_root).resolve(); repo = root / "repo"; common = repo / ".git"
+        target = repo / ".ralph/plans/future/candidate"; consumed = common / "prime-claw/future-ownership-consumed"; indexes = common / "prime-claw/indexes"
         for directory in (target, consumed, indexes): directory.mkdir(parents=True, exist_ok=True)
         contents = {"SPECIFICATION.md": "# Spec\n", "REQUIREMENTS.md": "# Requirements\n", "DECISIONS.md": "# Decisions\n"}
         files = []
         for name, content in contents.items():
             path = target / name; path.write_text(content)
             files.append({"name": name, "content": content, "identity": _fd_identity(module, path), "retired_name": f"retired-{name}"})
+        _bind_file_anchors(module, common, target, files)
         index_bytes = b"evidence\n"; (indexes / "disp.index").write_bytes(index_bytes)
-        original_preserve = module.preserve_entry_named
-        injected = False
-        def replace_after_retire(source_fd, source, quarantine_fd, destination):
+        original_rename = module.rename_exclusive_between; injected = False
+        def substitute_at_retirement(source_fd, source, target_fd, destination):
             nonlocal injected
-            retired = original_preserve(source_fd, source, quarantine_fd, destination)
             if not injected and source == "SPECIFICATION.md":
                 injected = True
-                os.rename(retired, f"{retired}-owned", src_dir_fd=quarantine_fd, dst_dir_fd=quarantine_fd)
-                qfd = os.open(retired, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=quarantine_fd)
-                os.write(qfd, b"replacement in quarantine\n"); os.close(qfd)
-                dfd = os.open(source, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=source_fd)
-                os.write(dfd, b"concurrent destination\n"); os.close(dfd)
-            return retired
-        module.preserve_entry_named = replace_after_retire
+                os.rename(source, "SPECIFICATION.md-owned", src_dir_fd=source_fd, dst_dir_fd=source_fd)
+                os.mkdir(source, dir_fd=source_fd)
+                directory_fd = os.open(source, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0), dir_fd=source_fd)
+                child_fd = os.open("UNOWNED.txt", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=directory_fd)
+                os.write(child_fd, b"unowned\n"); os.close(child_fd); os.close(directory_fd)
+            return original_rename(source_fd, source, target_fd, destination)
+        module.rename_exclusive_between = substitute_at_retirement
         try:
             try:
-                module.remove_bundle({
-                    "repo": str(repo), "common_dir": str(common), "target_path": ".ralph/plans/future/candidate",
-                    "directory_identity": _fd_identity(module, target, True), "files": files,
-                    "consumed_name": "disp.json", "tombstone_text": "{}\n", "tree_evidence_name": "disp.index",
-                    "tree_evidence_retired_name": "retired-tree.index", "tree_evidence_sha256": hashlib.sha256(index_bytes).hexdigest(),
-                    "tree_evidence_identity": _fd_identity(module, indexes / "disp.index"),
-                })
-            except RuntimeError as error:
-                assert "identity mismatch" in str(error)
-            else:
-                raise AssertionError("retirement mismatch unexpectedly succeeded")
-        finally:
-            module.preserve_entry_named = original_preserve
+                module.remove_bundle({"repo": str(repo), "common_dir": str(common), "target_path": ".ralph/plans/future/candidate", "directory_identity": _fd_identity(module, target, True), "files": files, "consumed_name": "disp.json", "tombstone_text": "{}\n", "tree_evidence_name": "disp.index", "tree_evidence_retired_name": "retired-tree.index", "tree_evidence_sha256": hashlib.sha256(index_bytes).hexdigest(), "tree_evidence_identity": _fd_identity(module, indexes / "disp.index")})
+            except (RuntimeError, IsADirectoryError) as error:
+                assert "regular file" in str(error) or "protected allocation" in str(error) or "directory" in str(error)
+            else: raise AssertionError("directory substitution unexpectedly retired")
+        finally: module.rename_exclusive_between = original_rename
         assert injected
-        assert (target / "SPECIFICATION.md").read_bytes() == b"concurrent destination\n"
-        quarantine = common / "prime-claw/quarantine"
-        assert any(path.read_bytes() == b"replacement in quarantine\n" for path in quarantine.iterdir() if path.is_file())
-        assert any(path.read_text() == contents["SPECIFICATION.md"] for path in quarantine.iterdir() if path.is_file())
+        assert (target / "SPECIFICATION.md/UNOWNED.txt").read_bytes() == b"unowned\n"
+        assert (target / "SPECIFICATION.md-owned").read_text() == contents["SPECIFICATION.md"]
 
 
 def test_astra_10_control_restore_is_atomic_no_clobber():
@@ -204,7 +208,7 @@ def test_astra_10_control_restore_is_atomic_no_clobber():
         module.preserve_entry = replace_after_retire
         try:
             try: module.remove_control(str(root), "control/state.json", hashlib.sha256(original).hexdigest(), _fd_identity(module, leaf))
-            except RuntimeError as error: assert "no-clobber" in str(error)
+            except RuntimeError as error: assert "occupied" in str(error) or "no-clobber" in str(error)
             else: raise AssertionError("control mismatch unexpectedly succeeded")
         finally: module.preserve_entry = original_preserve
         assert injected and leaf.read_bytes() == b"concurrent destination\n"
@@ -256,7 +260,7 @@ def test_astra_10_control_replace_detects_raced_incarnation_and_preserves_all_ob
         assert b'{"new":true}\n' in all_bytes and b'{"replacement":true}\n' in all_bytes
 
 
-def test_astra_11_postpublication_lock_failure_retires_exact_canonical_lock():
+def test_astra_19_postpublication_lock_failure_reconciles_exact_guard():
     module = _load_fs_helper("specification_episode_fs_lock_postpublish")
     with tempfile.TemporaryDirectory(prefix="prime-claw-lock-postpublish-") as raw_root:
         root = Path(raw_root).resolve(); locks = root / "prime-claw/locks"; locks.mkdir(parents=True)
@@ -268,17 +272,19 @@ def test_astra_11_postpublication_lock_failure_retires_exact_canonical_lock():
             return real_fsync(fd)
         module.os.fsync = fail_parent_fsync
         try:
-            try: module.acquire_lock(str(root), "prime-claw/locks/project.lock", '{"token":"owned"}\n')
+            try: module.acquire_lock(str(root), "prime-claw/locks/project.lock", json.dumps({"token":"owned","pid":os.getpid()})+"\n")
             except OSError as error: assert "injected post-publication" in str(error)
             else: raise AssertionError("post-publication failure unexpectedly succeeded")
         finally: module.os.fsync = real_fsync
-        assert not (locks / "project.lock").exists()
-        quarantine = root / "prime-claw/quarantine"
-        retained = [path for path in quarantine.iterdir() if path.is_dir()]
-        assert len(retained) == 1 and (retained[0] / "owner.json").read_text() == '{"token":"owned"}\n'
+        owner_text = json.dumps({"token":"owned","pid":os.getpid()})+"\n"; owner_sha = hashlib.sha256(owner_text.encode()).hexdigest()
+        reconciled = module.reconcile_lock(str(root), "prime-claw/locks/project.lock", "owned", owner_sha)
+        assert reconciled["exists"] is True and reconciled["complete"] is False
+        guard_rel = "prime-claw/locks/project.lock.guard"; qid = _fd_identity(module, root / "prime-claw/quarantine", True) if (root / "prime-claw/quarantine").exists() else None
+        module.remove_control(str(root), guard_rel, owner_sha, reconciled["guard_identity"], None, None, qid, "failed-lock-guard-test")
+        assert not (locks / "project.lock").exists() and not (locks / "project.lock.guard").exists()
 
 
-def test_astra_11_failure_opening_published_lock_still_retires_it():
+def test_astra_19_failure_opening_published_lock_reconciles_exact_lock_and_guard():
     module = _load_fs_helper("specification_episode_fs_lock_open_failure")
     with tempfile.TemporaryDirectory(prefix="prime-claw-lock-open-failure-") as raw_root:
         root = Path(raw_root).resolve(); locks = root / "prime-claw/locks"; locks.mkdir(parents=True)
@@ -290,13 +296,15 @@ def test_astra_11_failure_opening_published_lock_still_retires_it():
             return real_open(path, flags, *args, **kwargs)
         module.os.open = fail_first_published_open
         try:
-            try: module.acquire_lock(str(root), "prime-claw/locks/project.lock", '{"token":"owned"}\n')
+            try: module.acquire_lock(str(root), "prime-claw/locks/project.lock", json.dumps({"token":"owned","pid":os.getpid()})+"\n")
             except OSError as error: assert "published lock open" in str(error)
             else: raise AssertionError("published-open failure unexpectedly succeeded")
         finally: module.os.open = real_open
-        assert injected and not (locks / "project.lock").exists()
-        retained = [path for path in (root / "prime-claw/quarantine").iterdir() if path.is_dir()]
-        assert len(retained) == 1 and (retained[0] / "owner.json").read_text() == '{"token":"owned"}\n'
+        assert injected and (locks / "project.lock").exists()
+        owner_text = json.dumps({"token":"owned","pid":os.getpid()})+"\n"; owner_sha = hashlib.sha256(owner_text.encode()).hexdigest()
+        reconciled = module.reconcile_lock(str(root), "prime-claw/locks/project.lock", "owned", owner_sha)
+        module.remove_lock(str(root), "prime-claw/locks/project.lock", "owned", reconciled["lock_identity"], reconciled["owner_identity"], reconciled["guard_identity"], owner_sha, reconciled["broker_socket"], reconciled["authority_socket"])
+        assert not (locks / "project.lock").exists()
 
 
 def test_astra_11_control_mkdir_stays_bound_to_held_parent():
@@ -438,3 +446,189 @@ def test_legacy_skill_aliases_remain_until_both_real_dispositions_are_proven():
     # but removing aliases before the episode path exists would strand operators.
     assert (REPO / ".agents" / "skills" / "design").exists()
     assert (REPO / ".agents" / "skills" / "spec-it-out").exists()
+
+
+def test_astra_17_hardlink_dirty_write_is_restored_to_public_name():
+    module = _load_fs_helper("specification_episode_fs_dirty_restore")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-dirty-restore-") as raw_root:
+        root = Path(raw_root).resolve(); repo = root / "repo"; common = repo / ".git"
+        target = repo / ".ralph/plans/future/candidate"; consumed = common / "prime-claw/future-ownership-consumed"; indexes = common / "prime-claw/indexes"
+        for directory in (target, consumed, indexes): directory.mkdir(parents=True, exist_ok=True)
+        contents = {"SPECIFICATION.md": "# Spec\n", "REQUIREMENTS.md": "# Requirements\n", "DECISIONS.md": "# Decisions\n"}
+        files = []
+        for name, content in contents.items():
+            path = target / name; path.write_text(content)
+            files.append({"name": name, "content": content, "identity": _fd_identity(module, path), "retired_name": f"retired-{name}"})
+        _bind_file_anchors(module, common, target, files)
+        alias = root / "outside-alias"; os.link(target / "SPECIFICATION.md", alias)
+        evidence = b"tree\n"; (indexes / "disp.index").write_bytes(evidence)
+        original_rename = module.rename_exclusive_between; injected = False
+        def dirty_at_retirement(source_fd, source, target_fd, destination):
+            nonlocal injected
+            if not injected and source == "SPECIFICATION.md":
+                injected = True; alias.write_text("DIRTY CONCURRENT WORK\n")
+            return original_rename(source_fd, source, target_fd, destination)
+        module.rename_exclusive_between = dirty_at_retirement
+        try:
+            try:
+                module.remove_bundle({"repo": str(repo), "common_dir": str(common), "target_path": ".ralph/plans/future/candidate", "directory_identity": _fd_identity(module, target, True), "files": files, "consumed_name": "disp.json", "tombstone_text": "{}\n", "tree_evidence_name": "disp.index", "tree_evidence_retired_name": "retired-tree.index", "tree_evidence_sha256": hashlib.sha256(evidence).hexdigest(), "tree_evidence_identity": _fd_identity(module, indexes / "disp.index")})
+            except RuntimeError as error: assert "content changed" in str(error)
+            else: raise AssertionError("dirty hardlink content unexpectedly retired")
+        finally: module.rename_exclusive_between = original_rename
+        assert injected and (target / "SPECIFICATION.md").read_text() == "DIRTY CONCURRENT WORK\n"
+        assert alias.read_text() == "DIRTY CONCURRENT WORK\n"
+
+
+def test_astra_18_foreign_consumption_manifest_is_rejected_before_retirement():
+    module = _load_fs_helper("specification_episode_fs_manifest_swap")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-manifest-swap-") as raw_root:
+        root = Path(raw_root).resolve(); repo = root / "repo"; common = repo / ".git"
+        target = repo / ".ralph/plans/future/candidate"; consumed = common / "prime-claw/future-ownership-consumed"; indexes = common / "prime-claw/indexes"
+        for directory in (target, consumed, indexes): directory.mkdir(parents=True, exist_ok=True)
+        files = []
+        for name in ["SPECIFICATION.md", "REQUIREMENTS.md", "DECISIONS.md"]:
+            path = target / name; path.write_text(name + "\n")
+            files.append({"name": name, "content": path.read_text(), "identity": _fd_identity(module, path), "retired_name": f"retired-{name}"})
+        _bind_file_anchors(module, common, target, files)
+        evidence = b"tree\n"; (indexes / "disp.index").write_bytes(evidence)
+        original_link = module.os.link; injected = False
+        def replace_staging(src, dst, *args, **kwargs):
+            nonlocal injected
+            if dst == "disp.json" and not injected:
+                injected = True; source_fd = kwargs["src_dir_fd"]
+                os.rename(src, "saved-approved-manifest", src_dir_fd=source_fd, dst_dir_fd=source_fd)
+                fd = os.open(src, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=source_fd)
+                os.write(fd, b'{"manifest":"FOREIGN"}\n'); os.close(fd)
+            return original_link(src, dst, *args, **kwargs)
+        module.os.link = replace_staging
+        try:
+            try:
+                module.remove_bundle({"repo": str(repo), "common_dir": str(common), "target_path": ".ralph/plans/future/candidate", "directory_identity": _fd_identity(module, target, True), "files": files, "consumed_name": "disp.json", "tombstone_text": '{"manifest":"approved"}\n', "tree_evidence_name": "disp.index", "tree_evidence_retired_name": "retired-tree.index", "tree_evidence_sha256": hashlib.sha256(evidence).hexdigest(), "tree_evidence_identity": _fd_identity(module, indexes / "disp.index")})
+            except RuntimeError as error: assert "staged allocation" in str(error) or "manifest changed" in str(error)
+            else: raise AssertionError("foreign manifest unexpectedly authorized retirement")
+        finally: module.os.link = original_link
+        assert injected and sorted(path.name for path in target.iterdir()) == sorted(item["name"] for item in files)
+
+
+def test_astra_20_strict_json_rejects_duplicate_and_escaped_keys_recursively():
+    module = _load_fs_helper("specification_episode_fs_strict_json")
+    for raw in ['{"version":2,"version":1}', '{"commit":{"oid":"good","o\\u0069d":"bad"}}', '{"a":{"x":1,"x":2}}']:
+        try: module.strict_json(raw)
+        except RuntimeError as error: assert "duplicate decoded JSON key" in str(error)
+        else: raise AssertionError(f"duplicate JSON accepted: {raw}")
+    assert module.strict_json('{"a":{"x":1}}') == {"a": {"x": 1}}
+
+
+def test_astra_24_namespace_operations_fsync_both_published_namespaces():
+    module = _load_fs_helper("specification_episode_fs_durability")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-fsync-") as raw_root:
+        root = Path(raw_root).resolve(); repo = root / "repo"; common = repo / ".git"
+        (repo / ".ralph/plans/future").mkdir(parents=True); anchors = common / "prime-claw/future-file-anchors"; anchors.mkdir(parents=True); (common / "prime-claw/quarantine").mkdir()
+        calls = []; real_fsync = module.os.fsync
+        def traced(fd):
+            st = os.fstat(fd); calls.append((st.st_dev, st.st_ino, stat.S_ISDIR(st.st_mode))); return real_fsync(fd)
+        import stat
+        module.os.fsync = traced
+        try:
+            directory = module.create_product_directory(str(repo), ".ralph/plans/future/candidate")["identity"]
+            common_identity = _fd_identity(module, common, True); anchor_parent_identity = _fd_identity(module, anchors, True)
+            module.create_product_file({"repo": str(repo), "common_dir": str(common), "common_identity": common_identity, "path": ".ralph/plans/future/candidate/SPECIFICATION.md", "content": "x", "directory_identity": directory, "anchor_path": "prime-claw/future-file-anchors/fsync", "anchor_parent_identity": anchor_parent_identity})
+        finally: module.os.fsync = real_fsync
+        dir_keys = {(p.stat().st_dev, p.stat().st_ino) for p in [repo / ".ralph/plans/future", repo / ".ralph/plans/future/candidate", anchors]}
+        synced_dirs = {(dev, ino) for dev, ino, is_dir in calls if is_dir}
+        assert dir_keys <= synced_dirs
+
+
+def test_astra_19_bound_quarantine_replacement_is_not_adopted():
+    module = _load_fs_helper("specification_episode_fs_quarantine_bound")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-quarantine-bound-") as raw_root:
+        root = Path(raw_root).resolve(); control = root / "control"; control.mkdir(); quarantine = root / "prime-claw/quarantine"; quarantine.mkdir(parents=True)
+        leaf = control / "state.json"; leaf.write_text("old")
+        expected_leaf = _fd_identity(module, leaf); expected_quarantine = _fd_identity(module, quarantine, True)
+        saved = root / "saved-quarantine"; quarantine.rename(saved); quarantine.mkdir()
+        try: module.durable_json(str(root), "control/state.json", "new", False, expected_leaf, None, None, expected_quarantine)
+        except RuntimeError as error: assert "quarantine directory incarnation changed" in str(error)
+        else: raise AssertionError("replacement quarantine was adopted")
+        assert leaf.read_text() == "old" and list(quarantine.iterdir()) == []
+
+
+def test_astra_22_control_retirement_reconciles_lost_response_without_touching_replacement():
+    module = _load_fs_helper("specification_episode_fs_control_reconcile")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-control-reconcile-") as raw_root:
+        root = Path(raw_root).resolve(); control = root / "control"; control.mkdir(); quarantine = root / "prime-claw/quarantine"; quarantine.mkdir(parents=True)
+        leaf = control / "blocker.json"; original = b'{"owned":true}\n'; leaf.write_bytes(original)
+        identity = _fd_identity(module, leaf); digest = hashlib.sha256(original).hexdigest(); qid = _fd_identity(module, quarantine, True); destination = "control-approved-outcome"
+        first = module.remove_control(str(root), "control/blocker.json", digest, identity, None, None, qid, destination)
+        assert first["removed"] is True and not leaf.exists()
+        second = module.remove_control(str(root), "control/blocker.json", digest, identity, None, None, qid, destination)
+        assert second["removed"] is True and second["reconciled"] is True
+        leaf.write_text("replacement")
+        third = module.remove_control(str(root), "control/blocker.json", digest, identity, None, None, qid, destination)
+        assert third["reconciled"] is True
+        assert leaf.read_text() == "replacement" and (quarantine / destination).read_bytes() == original
+
+
+def test_astra_22_completed_control_retirement_ignores_new_canonical_replacement():
+    import hashlib, json, os, tempfile
+    with tempfile.TemporaryDirectory() as temp:
+        root = os.path.realpath(temp); state = os.path.join(root,"prime-claw","state"); quarantine = os.path.join(root,"prime-claw","quarantine")
+        os.makedirs(state); os.makedirs(quarantine)
+        target = os.path.join(state,"blocker.json"); approved = b'{"version":1,"disposition_id":"approved"}'
+        with open(target,"wb") as f: f.write(approved)
+        helper = _load_fs_helper("specification_episode_fs_control_replacement_response"); identity = _fd_identity(helper, Path(target)); root_id = _fd_identity(helper, Path(root), True); parent_id = _fd_identity(helper, Path(state), True); quarantine_id = _fd_identity(helper, Path(quarantine), True)
+        kwargs = dict(root=root, rel="prime-claw/state/blocker.json", expected_sha256=hashlib.sha256(approved).hexdigest(), expected_identity=identity, root_identity=root_id, parent_identity=parent_id, quarantine_identity=quarantine_id, retired_name="retired-approved")
+        first = helper.remove_control(**kwargs); assert first["removed"]
+        replacement = b'{"version":1,"disposition_id":"replacement"}'
+        with open(target,"wb") as f: f.write(replacement)
+        second = helper.remove_control(**kwargs)
+        assert second["reconciled"] is True
+        assert open(target,"rb").read() == replacement
+        assert open(os.path.join(quarantine,"retired-approved"),"rb").read() == approved
+
+
+def test_astra_19_broker_exclusion_survives_lock_path_displacement():
+    import json, os, tempfile
+    module = _load_fs_helper("specification_episode_fs_broker_exclusion")
+    with tempfile.TemporaryDirectory() as temp:
+        root = Path(temp).resolve(); locks = root / "prime-claw/locks"; (root / "prime-claw/quarantine").mkdir(parents=True); locks.mkdir(exist_ok=True)
+        owner = json.dumps({"token":"owner","pid":os.getpid()},separators=(",",":")) + "\n"
+        acquired = module.acquire_lock(str(root), "prime-claw/locks/project.lock", owner)
+        assert acquired["created"] is True
+        lock = locks / "project.lock"; guard = locks / "project.lock.guard"; moved = root / "moved-lock"; moved_guard = root / "moved-guard"
+        os.rename(lock,moved); os.rename(guard,moved_guard)
+        contender = module.acquire_lock(str(root), "prime-claw/locks/project.lock", json.dumps({"token":"contender","pid":os.getpid()})+"\n")
+        assert contender["created"] is False
+        os.rename(moved,lock); os.rename(moved_guard,guard)
+        module.remove_lock(str(root), "prime-claw/locks/project.lock", "owner", acquired["lock_identity"], acquired["owner_identity"], acquired["guard_identity"], acquired["owner_sha256"], acquired["broker_socket"], acquired["authority_socket"])
+
+
+def test_astra_19_broker_releases_kernel_authority_when_owner_process_dies():
+    import fcntl, time, sys
+    with tempfile.TemporaryDirectory() as temp:
+        root = Path(temp).resolve(); (root / "prime-claw/locks").mkdir(parents=True); (root / "prime-claw/quarantine").mkdir(parents=True)
+        script = f'''import importlib.util,json,os
+s=importlib.util.spec_from_file_location("broker_owner",{str((REPO / ".prime/agent/helpers/specification-episode-fs.py"))!r});m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+a=m.acquire_lock({str(root)!r},"prime-claw/locks/project.lock",json.dumps({{"token":"dead-owner","pid":os.getpid()}})+"\\n")
+print(a["broker_socket"],flush=True)
+os._exit(0)'''
+        result = subprocess.run([sys.executable,"-c",script],text=True,capture_output=True,check=True)
+        socket_path = result.stdout.strip(); assert socket_path
+        for _ in range(30):
+            if not os.path.exists(socket_path): break
+            time.sleep(0.1)
+        assert not os.path.exists(socket_path), "broker survived its owner process"
+        fd = os.open(root,os.O_RDONLY)
+        try: fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB); fcntl.flock(fd,fcntl.LOCK_UN)
+        finally: os.close(fd)
+        assert (root / "prime-claw/locks/project.lock").exists(), "ambiguous visible evidence was destructively cleaned"
+
+
+def test_astra_19_replicated_authority_survives_one_supervisor_loss():
+    with tempfile.TemporaryDirectory() as temp:
+        root=Path(temp).resolve(); (root/"prime-claw/locks").mkdir(parents=True); (root/"prime-claw/quarantine").mkdir(parents=True)
+        module=_load_fs_helper("specification_episode_fs_replicated_authority"); owner=json.dumps({"token":"replicated","pid":os.getpid()})+"\n"
+        acquired=module.acquire_lock(str(root),"prime-claw/locks/project.lock",owner)
+        assert module.broker_request(acquired["broker_socket"],"replicated","release")
+        module.validate_lock(str(root),"prime-claw/locks/project.lock","replicated",acquired["lock_identity"],acquired["owner_identity"],acquired["guard_identity"],acquired["owner_sha256"],acquired["broker_socket"],acquired["authority_socket"])
+        contender=module.acquire_lock(str(root),"prime-claw/locks/other.lock",json.dumps({"token":"other","pid":os.getpid()})+"\n"); assert contender["created"] is False
+        module.remove_lock(str(root),"prime-claw/locks/project.lock","replicated",acquired["lock_identity"],acquired["owner_identity"],acquired["guard_identity"],acquired["owner_sha256"],acquired["broker_socket"],acquired["authority_socket"])
