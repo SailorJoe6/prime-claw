@@ -1,9 +1,10 @@
 # Specification — Worktree-isolated specification episodes
 
 > **Status:** implementation in progress; Slice 1 is validated; candidate
-> `44b92f8` passed baseline validation but its fresh owner/formal EXPERT gate
-> returned **REVISE**. Failed-gate authority only is incorporated here. Slice 2
-> remains open; later paths are blocked and implementation is not authorized.
+> `44b92f8` failed its fresh owner/formal EXPERT gate. Owner transition
+> `33137bdb-e96e-4337-92df-1cdd860f9fa6` authorizes one bounded same-Slice-2
+> revision from authority commit `94ec1967966769e7e6f31141e192f411605d182c`.
+> Slice 2 remains open; later paths are blocked.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -390,6 +391,29 @@ Preserved authority and lifecycle evidence:
 All 24 report links and all 32 manifest artifacts were owner-verified; post-Astra
 quota and full invocation-tree retirement are recorded by the owner gate and
 cleanup receipt. `prime-claw-h6w.3` remains in progress. Slice 3 is blocked.
+
+### 5.8 Owner-authorized post-`94ec196` same-Slice-2 revision
+
+Transition `33137bdb-e96e-4337-92df-1cdd860f9fa6` authorizes exactly one bounded
+revision of Slice 2 from verified authority commit
+`94ec1967966769e7e6f31141e192f411605d182c`. The implementation scope is:
+
+1. close ASTRA-10 checked-name probe cleanup without deleting a late replacement;
+2. close ASTRA-11 losing-publication and probe replacement-directory cleanup;
+3. close ASTRA-17/24 uncertain post-rename barrier outcomes through durable,
+   fresh-resume reconciliation and no-replace restoration/conflict preservation;
+4. close ASTRA-25 by making every durable writer transition satisfy its exact
+   validator under R-WE-94/D-WE-23, including repeated interrupted recovery and
+   running-to-removed replay.
+
+The current broad R-WE-87/R-WE-88/D-WE-21 same-UID authority is preserved and
+must not be silently narrowed to cooperating invocations. Scoped lifecycle
+caveats remain follow-up evidence, not extra formal blockers unless independently
+proved. Destructive, race, restart, and fault validation uses disposable fixtures;
+the live episode worktree/session/branch and owner conversation are protected.
+After one bounded candidate, update durable evidence and `prime-claw-h6w.3`,
+commit and push, prove clean local/upstream/actual-remote identity, and stop for
+fresh owner and formal EXPERT review. Slice 3 remains unauthorized.
 
 ## 6. Episode-creation behavior
 

@@ -1,9 +1,10 @@
 # Execution Plan — Worktree-isolated specification episodes
 
 > **Status:** implementation in progress; Slice 1 is validated; candidate
-> `44b92f8` passed baseline validation but its fresh owner/formal EXPERT gate
-> returned **REVISE**. This revision incorporates failed-gate authority only.
-> Slice 2 remains open; Slices 3–8 are blocked and implementation is unauthorized.
+> `44b92f8` failed its fresh owner/formal EXPERT gate. Owner transition
+> `33137bdb-e96e-4337-92df-1cdd860f9fa6` authorizes one bounded same-Slice-2
+> revision from authority commit `94ec1967966769e7e6f31141e192f411605d182c`.
+> Slice 2 remains open; Slices 3–8 are blocked.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -21,7 +22,7 @@
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
 | 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed at Slice 1) |
-| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | **REVISE** at `44b92f8`; failed-gate incorporation only | Owner baseline 93/93 and exact pytest 264 passed, 2 skipped; ASTRA-10/11/17/24 remain open and ASTRA-25 is new; same-Slice-2 implementation requires separate authorization |
+| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Owner-authorized bounded revision from `94ec196` | Transition `33137bdb-e96e-4337-92df-1cdd860f9fa6` closes ASTRA-10/11/17/24/25 only; fresh owner/EXPERT review follows one pushed candidate |
 | 3–8 | `prime-claw-h6w.4`–`.9` | Not started | Dependency-ordered below |
 
 Slice 1 evidence names the exact active-suite command. It does not claim a
@@ -354,8 +355,24 @@ Authoritative evidence:
 - artifact manifest, invocation tree, and cleanup receipt beside the reports; hashes are recorded in the specification and product documentation
 
 The owner verified all 24 report links and all 32 manifest artifacts, recorded
-post-Astra quota, retired the full invocation tree, and kept the evidence. Stop at
-this documentation-only boundary. Slice 3 remains unauthorized.
+post-Astra quota, retired the full invocation tree, and kept the evidence.
+
+#### Authorized post-`94ec196` same-Slice-2 revision
+
+Owner transition `33137bdb-e96e-4337-92df-1cdd860f9fa6` authorizes one bounded
+candidate from `94ec1967966769e7e6f31141e192f411605d182c`. Implement only the
+four owner-adjudicated blocker groups: ASTRA-10 checked-name probe cleanup;
+ASTRA-11 late replacement-directory cleanup; ASTRA-17/24 durable uncertain
+post-rename reconciliation across fresh resume; and ASTRA-25 complete
+writer-validator transition closure under R-WE-94/D-WE-23. Preserve the broad
+R-WE-87/R-WE-88/D-WE-21 same-UID authority. Do not convert scoped lifecycle
+follow-ups into formal blockers unless independently proven.
+
+Protect the live worktree/session/branch and owner conversation. Use disposable
+fixtures for destructive, race, restart, and fault tests. The completion boundary
+is one evidence-backed candidate with current plans/inventory/docs and bead,
+committed and pushed, exact clean local/upstream/actual-remote identity, then a
+stop for fresh owner and formal EXPERT review. Slice 3 remains unauthorized.
 
 ### 2.5 Promoted episode transaction
 
