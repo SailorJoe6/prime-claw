@@ -310,10 +310,12 @@ clobber a new destination. ASTRA-11 proved raw recursive cleanup, pathname mkdir
 and split lock-owner publication can escape or adopt another lock incarnation.
 Authority must cover the mutation itself, not only the preceding check.
 
-**Acceptance:** Permanent disposable tests inject replacements at final product
-and control unlink, concurrent restoration destination creation, control mkdir,
-lock-owner publication, helper failure cleanup, and lock release. Every external
-sentinel, prior owner record, and replacement lock survives exactly.
+**Acceptance:** Permanent disposable tests inject replacements at final product,
+control, and preflight-probe unlink; at losing-publication/probe final `rmdir`;
+at concurrent restoration destination creation; and at control mkdir, lock-owner
+publication, helper cleanup, and lock release. Every external sentinel, empty
+replacement directory, prior owner record, and replacement lock survives exactly.
+A prior descriptor check never authorizes later pathname destruction.
 
 ## D-WE-18 — Use a platform-real incarnation model
 
@@ -381,7 +383,10 @@ contracts.
 
 **Acceptance:** Native rapid allocation-reuse, final directory/hardlink
 substitution, nested-mount, and two-volume tests pass on every supported
-combination. Unsupported combinations reject before durable mutation.
+combination. Replacement tests compose rename with each source/destination
+barrier failure and fresh-process resume; unauthorized objects are restored
+no-replace or both conflict locations are retained. Unsupported combinations
+reject before durable mutation.
 
 ## D-WE-21 — Make recovery and final cleanup one-way durable state machines
 
@@ -405,6 +410,9 @@ flush barriers on acknowledged transitions.
 partial-state recovery action, lock loss before each product/ref/push boundary,
 failed cleanup replacement, post-helper failure, quarantine replacement, blocker
 replacement and response loss, plus syscall-order/restart durability traces.
+Retirement traces inject failure at every post-rename/pre-validation barrier and
+prove fresh-process reconciliation
+for both product and analogous control retirement.
 
 ## D-WE-22 — Validate raw success evidence before routing or semantic use
 
@@ -425,12 +433,39 @@ legacy mutable normalization.
 and success-discriminator matrices all reject while preserving exact journal and
 blocker bytes under ordinary replay and every recovery action.
 
-**Evidence and implementation status:** The `3fe649b` formal report
-`/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-astra-review.md`
-and adjacent owner gate are authoritative for ASTRA-16–24. The artifact manifest,
-invocation tree, and cleanup receipt remain beside them. Candidate `3fe649b`
-passed its baseline suites but failed this gate. The owner-authorized revision
-now implements candidate mechanisms for D-WE-20–22 and strengthens the partial
-D-WE-17–19 paths; permanent macOS/Linux validation is recorded in the execution
-plan and product documentation. Fresh owner and formal EXPERT acceptance remain
-required. Slice 2 stays open and Slice 3 is not authorized.
+## D-WE-23 — Close every durable writer-to-validator transition
+
+**Decision:** The durable transaction schema is a state-machine interface shared
+by writers and readers, not only an input filter. Every writer projects an exact
+schema-valid state for its phase/status, and every recovery transition is
+monotonic or names an explicit closed variant. A writer may not rewind phase while
+retaining later-phase evidence, and cleanup may not emit a terminal status that
+its own replay validator rejects.
+
+**Satisfies:** R-WE-22, R-WE-90, R-WE-94.
+
+**Rationale:** ASTRA-25 showed two product-generated contradictions: interrupted
+continuation rewrites `building-exact-tree` while retaining constructed-tree
+fields, and running-to-removed cleanup can omit the observation variant required
+for `recovered-clean`. Both become unknown to the same validator that guards
+recovery, without foreign evidence edits.
+
+**Acceptance:** A generated transition-closure matrix enumerates every persisted
+writer output and validates it immediately and through fresh replay. Permanent
+fault tests interrupt each continuation phase, repeat continuation, and replay
+running-to-removed cleanup. Malformed recognizable success remains
+preservation-only; validator relaxation is not an accepted fix.
+
+**Evidence and implementation status:** Candidate `44b92f8` implemented proposed
+D-WE-20–22 mechanisms but its fresh owner/formal gate returned **REVISE**. ASTRA-10
+and ASTRA-11 regress at new probe/publication cleanup sites; ASTRA-17/24 remain
+open across post-rename barrier failure and fresh replay; ASTRA-25 establishes
+D-WE-23 because product writers emit states rejected by their own validator.
+D-WE-17, D-WE-20, D-WE-21, and D-WE-22 therefore remain partial/unmet at the
+specified edges. The authoritative report is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md`
+(SHA-256 `84c9a0f1fc78ffb0db8ec528dd8765f674d32b9f41207e1d41f1434d7b072e91`),
+with owner gate, artifact manifest, invocation tree, and cleanup receipt beside
+it. The current unqualified same-UID authority wording is unresolved: it is not
+silently narrowed to cooperating invocations. Slice 2 stays open and Slice 3 is
+not authorized.

@@ -1,9 +1,9 @@
 # Specification — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; the authorized
-> ASTRA-16–24 same-Slice-2 implementation candidate has completed repository and
-> native validation. Slice 2 remains open for fresh owner/formal EXPERT review;
-> later paths are blocked.
+> **Status:** implementation in progress; Slice 1 is validated; candidate
+> `44b92f8` passed baseline validation but its fresh owner/formal EXPERT gate
+> returned **REVISE**. Failed-gate authority only is incorporated here. Slice 2
+> remains open; later paths are blocked and implementation is not authorized.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -309,7 +309,7 @@ following hold together:
 
 Permanent safe-outcome regressions retain the supplied ASTRA-10–15 boundaries,
 and native identity tests execute on macOS plus an actual Linux filesystem.
-Fresh owner and formal EXPERT acceptance remain required before Slice 2 closes.
+Owner and formal EXPERT acceptance remain required before Slice 2 closes.
 Candidate `3fe649b` passed the recorded repository suites, but the gate below
 proves that these mechanisms do not satisfy the broader safety contract.
 
@@ -348,15 +348,48 @@ Authoritative preserved evidence:
 
 ### 5.6 Authorized ASTRA-16–24 candidate
 
-The bounded revision implements R-WE-85–93 and D-WE-20–22 with protected
+The bounded revision attempted R-WE-85–93 and D-WE-20–22 mechanisms with protected
 same-mount allocation anchors, post-move validation and no-replace restoration,
 one-way manifest routing, a long-lived OS-flock broker plus guard/boundary
 validation, raw strict JSON with a closed mutable schema and unpeeled Git-type
 proof, destination-first blocker reconciliation, actual mount/capability
-rejection, and complete namespace flush
+rejection, and proposed namespace flush
 ordering. Permanent tests exercise the formal counterexample boundaries on
-macOS and disposable native Linux fixtures. This is implementation evidence,
-not owner or EXPERT acceptance; Slice 2 remains open.
+macOS and disposable native Linux fixtures. This was implementation evidence,
+not acceptance. The fresh `44b92f8` gate below supersedes any broad completion
+claim; Slice 2 remains open.
+
+### 5.7 Failed `44b92f8` owner/EXPERT gate: reopened ASTRA-10/11/17/24 and ASTRA-25
+
+The reviewed range `7f97fcc..44b92f8` passed owner baseline verification (Node
+93/93; exact active pytest 264 passed, 2 skipped, 11 warnings; syntax, inventory,
+and diff checks). Those green suites do not approve the gate. The owner accepted
+four independently reproduced blocker groups:
+
+| Finding | Stable authority | Exact permanent acceptance condition |
+|---|---|---|
+| ASTRA-10 remains open | R-WE-79/R-WE-92; D-WE-17 | Substitute foreign files at every probe/product/control final-unlink edge; no success may delete them after a check-use gap; retain ambiguous probe objects unless authority covers the destructive syscall |
+| ASTRA-11 remains open | R-WE-22/R-WE-80/R-WE-92; D-WE-17 | At losing publication and probe/control final `rmdir`, substitute empty foreign directories; preserve both incarnations and do not report clean success from a prior descriptor check |
+| ASTRA-17/24 remain open | R-WE-86/R-WE-93; D-WE-20/D-WE-21 | Compose directory and hardlink-dirty replacement with failure before each post-rename barrier/validation/restore edge; fresh-process replay restores unauthorized objects no-replace or preserves and reports both conflict locations; cover analogous control retirement |
+| ASTRA-25 new | R-WE-22/R-WE-90/R-WE-94; D-WE-21/D-WE-22/D-WE-23 | Validate every actual persisted writer state immediately and on fresh replay; repeatedly interrupt continuation and replay running-to-removed cleanup; keep transitions monotonic/closed without weakening malformed-success preservation |
+
+Targeted ASTRA-16/20 and narrow ASTRA-23 mechanisms remain material progress.
+ASTRA-18/19/22 support bounded cooperating-invocation behavior, but current
+unqualified same-UID authority remains unproven. No prose here narrows it. The
+owner must separately approve a threat-model change or implementation must meet
+the existing wording.
+
+Preserved authority and lifecycle evidence:
+
+- formal report: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md` (SHA-256 `84c9a0f1fc78ffb0db8ec528dd8765f674d32b9f41207e1d41f1434d7b072e91`)
+- owner gate: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md` (SHA-256 `5a7f85affeefe13df929795922db64258137f779d417ed823fd1534038211ab0`)
+- artifact manifest: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json` (SHA-256 `0db4214eadfc06232423c3921d3f0a22eb0a408d86519d873b25a679c3a65e3a`)
+- invocation tree: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json` (SHA-256 `e7444764858aeaf68dd169c6fb7fee46ec81717067e880727caa2271a911765f`)
+- cleanup receipt: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json` (SHA-256 `1ffc9bf48db29d0f5d6b195832a029211a77ae6914204f2096f1978049436834`)
+
+All 24 report links and all 32 manifest artifacts were owner-verified; post-Astra
+quota and full invocation-tree retirement are recorded by the owner gate and
+cleanup receipt. `prime-claw-h6w.3` remains in progress. Slice 3 is blocked.
 
 ## 6. Episode-creation behavior
 

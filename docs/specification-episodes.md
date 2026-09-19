@@ -419,14 +419,15 @@ Preserved authority and evidence:
 
 ## Same-Slice-2 ASTRA-16–24 implementation candidate
 
-The owner-authorized revision after authority commit `1834f6b` implements the
-accepted R-WE-85–93 / D-WE-20–22 mechanisms without entering Slice 3:
+The owner-authorized revision after authority commit `1834f6b` attempted the
+R-WE-85–93 / D-WE-20–22 mechanisms without entering Slice 3. The owner/formal
+gate below rejects broad completion:
 
 - Product files are created from protected same-mount hardlink anchors in Git
   common state. Fresh helpers validate the public name against the still-live
-  allocation. Retirement moves first, validates the moved object against its
-  anchor and approved bytes, and restores a directory or dirty replacement with
-  atomic no-replace semantics before returning failure.
+  allocation. Retirement attempts move-first validation and no-replace restore,
+  but the `44b92f8` gate proves that a source-parent flush failure immediately
+  after rename can bypass restoration and strand an unauthorized replacement.
 - Consumption-manifest publication checks the exact staged and published inode
   and bytes before retirement. The extension rechecks consumed-state absence at
   every product, tree, ref, index, and push boundary while the project exclusion
@@ -457,13 +458,16 @@ accepted R-WE-85–93 / D-WE-20–22 mechanisms without entering Slice 3:
 - Before creating control directories, preflight compares the nearest actual
   product, quarantine, and anchor mounts. Disposable allocation-bound probes run
   in the production directions (anchor to product, then product to quarantine),
-  verify hardlink and descriptor-relative no-replace rename behavior, and remove
-  every probe name before admission. Cross-mount, nested-mount, and unsupported
-  capability layouts reject fail-closed.
-- Every acknowledged directory creation, hardlink publication, exchange,
-  retirement, restoration, and cleanup flushes the affected file/directory and
-  both namespace parents. Tests prove syscall ordering and restart behavior;
-  they do not claim physical power-loss testing.
+  verify hardlink and descriptor-relative no-replace rename behavior. The
+  candidate then removes probe names by pathname; the `44b92f8` gate proves late
+  file/directory replacements can be deleted while preflight still accepts.
+  Cross-mount and nested-mount negatives remain useful but do not close safe
+  preflight cleanup.
+- The candidate adds file/directory and parent flushes on many transitions.
+  The `44b92f8` gate disproves the broad complete-ordering claim: post-rename
+  source-parent flush failure bypasses restoration, fresh replay does not
+  reconcile the displaced directory, and checked-in ordering coverage reduces
+  some observations to sets. No physical power-loss claim is made.
 
 Permanent coverage is in
 `tests/specification_episodes_astra_regressions.test.mjs`,
@@ -475,8 +479,55 @@ helper validation, two-mount preflight rejection, late directory/hardlink
 substitution, manifest replacement, blocker reconciliation, and durability
 barriers. The live episode resources are never fault fixtures.
 
-This remains a candidate until fresh owner and formal EXPERT acceptance. Slice 2
-stays `in_progress`; Slice 3 remains blocked.
+This candidate failed fresh owner/formal EXPERT acceptance. Slice 2 stays
+`in_progress`; Slice 3 remains blocked.
+
+## `44b92f8` owner/formal gate: REVISE
+
+Owner baseline verification passed Node **93/93** and exact active pytest **264
+passed, 2 skipped, 11 warnings**, plus syntax, inventory, and diff checks. Green
+suites do not approve the gate. The owner accepted four reproduced blocker
+groups:
+
+- **ASTRA-10 / R-WE-79/R-WE-92 / D-WE-17:** preflight checks a probe leaf,
+  closes its binding descriptor, unlinks a late foreign replacement by name, and
+  still accepts. Permanent tests must substitute every final cleanup leaf; no
+  foreign content may be deleted.
+- **ASTRA-11 / R-WE-22/R-WE-80/R-WE-92 / D-WE-17:** losing directory
+  publication and probe cleanup `rmdir` a late empty replacement by name.
+  Permanent tests must substitute at each final `rmdir` and preserve both
+  incarnations.
+- **ASTRA-17/24 / R-WE-86/R-WE-93 / D-WE-20/D-WE-21:** rename followed by
+  barrier failure strands an unauthorized directory across fresh resume.
+  Permanent tests must compose directory/hardlink replacement with every
+  post-rename failure edge and prove fresh-process no-replace restoration or
+  exact conflict preservation, including analogous control retirement.
+- **ASTRA-25 / R-WE-22/R-WE-90/R-WE-94 / D-WE-21/D-WE-22/D-WE-23:** ordinary
+  interrupted recovery emits a journal rejected by its own closed schema.
+  Permanent transition-closure tests must validate every writer output and
+  repeated interrupted recovery plus running-to-removed replay without weakening
+  malformed-success preservation.
+
+Targeted ASTRA-16/20 and narrow ASTRA-23 improvements remain. ASTRA-18/19/22
+show bounded cooperating-invocation behavior, not the current unqualified
+same-UID contract. That threat-model question remains for an explicit owner
+decision; documentation does not silently narrow it. The formal report also
+retains scoped follow-ups, not additional owner-adjudicated blockers: accepted
+broker clients can stall blocking reads and delay owner-death release; authority
+checks are point checks around some mutation gaps; PID reuse, dual-supervisor
+loss, in-flight Git descendants, and physical power loss are not proven.
+
+Preserved evidence:
+
+- formal report: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md` (SHA-256 `84c9a0f1fc78ffb0db8ec528dd8765f674d32b9f41207e1d41f1434d7b072e91`)
+- owner gate: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md` (SHA-256 `5a7f85affeefe13df929795922db64258137f779d417ed823fd1534038211ab0`)
+- artifact manifest: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json` (SHA-256 `0db4214eadfc06232423c3921d3f0a22eb0a408d86519d873b25a679c3a65e3a`)
+- invocation tree: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json` (SHA-256 `e7444764858aeaf68dd169c6fb7fee46ec81717067e880727caa2271a911765f`)
+- cleanup receipt: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json` (SHA-256 `1ffc9bf48db29d0f5d6b195832a029211a77ae6914204f2096f1978049436834`)
+
+The owner verified all 24 report links and all 32 manifest artifacts, recorded
+post-Astra quota, and retired the full invocation tree. Implementation is not
+authorized at this boundary.
 
 ## Verification
 
@@ -504,10 +555,9 @@ push, verified-success corruption, historical-versus-current replay state, no
 episode allocation, and corrupt-evidence handling.
 
 The rejected `ae31587` evidence (Node 58/58, original Astra 5/5, and
-`pytest -q tests` 237 passed) remains historical only. The current revision must
-pass the combined existing/permanent-Astra Node suites, the exact active command
-`pytest -q tests`, `git diff --check`, and fresh owner/EXPERT review. Local test
-counts below are updated only from final completed commands.
+`pytest -q tests` 237 passed) remains historical only. The candidate passed the combined existing/permanent-Astra Node suites, the exact
+active command `pytest -q tests`, and `git diff --check`, but failed fresh
+owner/EXPERT review. Counts below are retained baseline evidence, not acceptance.
 
 Current candidate evidence:
 
@@ -523,12 +573,11 @@ Current candidate evidence:
   control-directory publication reconciliation: PASS;
 - syntax, inventory integrity, JSON, and `git diff --check`: PASS.
 
-The independent postfix audit's exact-schema counterexamples are closed in the
-appended scoped PASS at
-`astra16-24-final-postfix-audit.md` (SHA-256
-`f424873a10e063b0b3feecf9069628c79827af40d15a7fda855fe0cac1913d8c`). Its
-strict arbitrary-same-UID interpretation remains an explicit owner/formal review
-question; this candidate does not silently narrow R-WE-87/R-WE-88/D-WE-21.
+The earlier independent postfix audit's scoped counterexamples were closed, but
+that audit did not approve the candidate. The later owner/formal gate above is
+authoritative and returned **REVISE**. Its new composed counterexamples reopen the
+broad claims listed above. The strict arbitrary-same-UID interpretation remains
+an explicit owner question; no requirement is silently narrowed.
 The pytest bridge loads the real extension through the installed Prime Agent
 RPC loader and checks the two native command surfaces. Prime Agent 0.9.5 RPC has
 no public tool-list or direct tool-invocation command, so schema/execution tests

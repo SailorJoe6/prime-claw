@@ -1818,7 +1818,7 @@
    "id": "R-WE-79",
    "priority": "GATE",
    "summary": "Leaf deletion remains object/exclusion-bound through the final syscall, and restoration is atomic no-replace with quarantine preservation on conflict.",
-   "status": "candidate strengthened with allocation anchors, move-then-validate restoration, and topology preflight; fresh owner/formal acceptance pending",
+   "status": "REVISE at 44b92f8: ASTRA-10 preflight final-unlink replacement deletion remains open",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1848,7 +1848,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -1857,7 +1862,7 @@
    "id": "R-WE-80",
    "priority": "GATE",
    "summary": "Control and lock creation, create-only owner publication, use, cleanup, and release stay bound to one non-following incarnation.",
-   "status": "candidate strengthened with one-way recovery, stable guard authority, bound quarantine, and namespace barriers; fresh owner/formal acceptance pending",
+   "status": "REVISE at 44b92f8: ASTRA-11 losing-publication/probe final-rmdir replacement deletion remains open",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1887,7 +1892,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -2052,7 +2062,7 @@
    "id": "R-WE-22",
    "priority": "GATE",
    "summary": "Partial failures report exact resources and recovery never removes or overwrites pre-existing, replacement, or dirty resources.",
-   "status": "candidate strengthened with one-way recovery, stable guard authority, bound quarantine, and namespace barriers; fresh owner/formal acceptance pending",
+   "status": "REVISE at 44b92f8: ASTRA-11 preservation and ASTRA-25 durable writer/validator closure remain unmet",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2082,7 +2092,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -2091,7 +2106,7 @@
    "id": "R-WE-85",
    "priority": "GATE",
    "summary": "Destructive authority is allocation-unique or continuously excluded across helper restart; recycled inode tuples never authorize a distinct object.",
-   "status": "candidate implementation and permanent evidence complete; fresh owner/formal EXPERT acceptance pending",
+   "status": "partial targeted progress at 44b92f8; broad allocation authority awaits explicit same-UID threat-model decision or proof",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2112,7 +2127,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -2121,7 +2141,7 @@
    "id": "R-WE-86",
    "priority": "GATE",
    "summary": "Final file retirement cannot relocate a late directory or dirty replacement; conflicts preserve both objects and exact public/retained locations.",
-   "status": "candidate implementation and permanent evidence complete; fresh owner/formal EXPERT acceptance pending",
+   "status": "REVISE at 44b92f8: ASTRA-17/24 post-rename barrier failure strands an unauthorized directory across fresh replay",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2142,7 +2162,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -2151,7 +2176,7 @@
    "id": "R-WE-87",
    "priority": "GATE",
    "summary": "The exact consumed manifest is object-bound at publication and creates a one-way state permitting only inspect or exact retirement resume.",
-   "status": "candidate implementation and permanent evidence complete; fresh owner/formal EXPERT acceptance pending",
+   "status": "partial targeted progress at 44b92f8; unqualified same-UID publication/use authority remains unproven",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2173,7 +2198,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -2182,7 +2212,7 @@
    "id": "R-WE-88",
    "priority": "GATE",
    "summary": "Lock/control/quarantine authority remains continuous through every mutation, ref advance, push, cleanup, and caller-handle publication boundary.",
-   "status": "candidate implementation and permanent evidence complete; fresh owner/formal EXPERT acceptance pending",
+   "status": "partial cooperating-invocation progress at 44b92f8; unqualified same-UID authority and lifecycle remain unproven",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2206,7 +2236,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -2215,7 +2250,7 @@
    "id": "R-WE-89",
    "priority": "GATE",
    "summary": "Raw proofs and receipts reject duplicate decoded keys, require exact unpeeled Git object types/relationships, and validate calendar-correct RFC3339.",
-   "status": "candidate implementation and permanent evidence complete; fresh owner/formal EXPERT acceptance pending",
+   "status": "targeted ASTRA-20 mechanism supported at 44b92f8; Slice 2 remains open",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2237,7 +2272,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -2246,7 +2286,7 @@
    "id": "R-WE-90",
    "priority": "GATE",
    "summary": "Recovery routing is schema-gated; recognizable malformed success evidence always receives preservation-only handling under every action.",
-   "status": "candidate implementation and permanent evidence complete; fresh owner/formal EXPERT acceptance pending",
+   "status": "REVISE at 44b92f8: ASTRA-25 product-generated durable states fail their own recovery schema",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2267,7 +2307,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -2276,7 +2321,7 @@
    "id": "R-WE-91",
    "priority": "GATE",
    "summary": "Final blocker cleanup retires the exact approved object through a durable idempotent outcome protocol that safely reconciles response loss.",
-   "status": "candidate implementation and permanent evidence complete; fresh owner/formal EXPERT acceptance pending",
+   "status": "narrow ASTRA-22 mechanism supported at 44b92f8; general uncertain rename/barrier composition remains unaccepted",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2299,7 +2344,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -2308,7 +2358,7 @@
    "id": "R-WE-92",
    "priority": "GATE",
    "summary": "Preflight proves the actual source/destination mount and rename topology needed by retirement or rejects before all durable mutation.",
-   "status": "candidate implementation and permanent evidence complete; fresh owner/formal EXPERT acceptance pending",
+   "status": "REVISE at 44b92f8: mount/capability detection improves but ASTRA-10/11 make preflight cleanup unsafe",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2329,7 +2379,12 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
@@ -2338,7 +2393,7 @@
    "id": "R-WE-93",
    "priority": "GATE",
    "summary": "Every acknowledged namespace transition follows an explicit supported-filesystem ordering and directory-flush durability contract.",
-   "status": "candidate implementation and permanent evidence complete; fresh owner/formal EXPERT acceptance pending",
+   "status": "REVISE at 44b92f8: ASTRA-17/24 post-rename barriers and restart reconciliation remain unmet",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -2359,7 +2414,42 @@
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/slice2-3fe649b-owner-gate.md",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/artifact-manifest.json",
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json",
-    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json"
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-94",
+   "priority": "GATE",
+   "summary": "Every durable writer output satisfies its exact phase/status validator immediately and on fresh replay across normal, interrupted recovery, and removal transitions.",
+   "status": "new authority from ASTRA-25; not implemented; Slice 2 blocked",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     "docs/specification-episodes.md",
+     ".ralph/plans/EXECUTION_PLAN.md"
+    ],
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts"
+    ],
+    "test": [
+     "tests/specification_episodes_astra_regressions.test.mjs",
+     "tests/test_specification_episodes_extension.py"
+    ]
+   },
+   "blocking_evidence": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/slice2-44b92f8-owner-gate.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/artifact-manifest.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/invocation-tree.json",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json"
    ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"

@@ -123,7 +123,9 @@ if it does not weaken a gate.
   syscall. A checked quarantine pathname is not authority after its descriptor
   closes. Where the platform cannot bind an unlink to that leaf, cleanup must
   retain the retired object instead. Rollback/restoration uses atomic no-replace
-  semantics; conflicts preserve both quarantine objects.
+  semantics; conflicts preserve both quarantine objects. Permanent acceptance
+  substitutes a foreign file at every probe/product/control final-unlink edge;
+  success preserves it and reports ambiguity rather than deleting by checked name.
 - **R-WE-80 (GATE) — Control and lock incarnation continuity.** Every control
   directory creation, record replacement, lock creation, create-only owner
   publication, use, failure cleanup, and release is bound to the same
@@ -131,7 +133,10 @@ if it does not weaken a gate.
   the prior object, and post-publication acquisition failure retires an exact
   owned lock before authority is lost. No helper rejection may fall back to raw
   recursive pathname deletion, and no
-  split operation may adopt, overwrite, or remove a replacement lock.
+  split operation may adopt, overwrite, or remove a replacement lock. Losing
+  concurrent-directory publication and every probe/control cleanup permanently
+  substitute an empty foreign directory at the final `rmdir`; the replacement
+  and owned incarnation both survive and success is not reported as clean.
 - **R-WE-81 (GATE) — Supported-platform stable incarnation identity.** Filesystem
   incarnation evidence must remain stable across the transaction's own required
   renames on every supported runtime. Mutable Linux `ctime` must not be relabeled
@@ -169,7 +174,9 @@ if it does not weaken a gate.
   The final mutation uses enforceable exclusion or conflict-safe no-replace
   restoration that preserves both objects and reports their exact locations.
   Permanent native tests substitute an unowned directory and dirty through a
-  hardlink immediately before the real retirement rename.
+  hardlink immediately before the real retirement rename, inject failure after
+  rename and before each required parent barrier, then use a fresh process to
+  restore no-replace or preserve both exact conflict locations.
 - **R-WE-87 (GATE) — Object-bound one-way retirement state.** The consumed
   manifest is staged, published, and validated as the exact approved object and
   bytes before the first retirement. Once any consumed/partial state exists,
@@ -213,7 +220,20 @@ if it does not weaken a gate.
   durable progress claim includes all required source/destination directory
   barriers. Syscall-order and restart/fault tests cover metadata persistence and
   unsupported flush behavior; SIGKILL evidence is never described as power-loss
-  proof, and hardware/filesystem limits are explicit.
+  proof, and hardware/filesystem limits are explicit. Permanent acceptance
+  composes directory and dirty-hardlink replacement with failure at every
+  rename-to-validation-to-restore barrier, including analogous control retirement,
+  and proves fresh-process reconciliation never strands an unauthorized object.
+
+- **R-WE-94 (GATE) — Writer-validator transition closure.** Every durable state
+  emitted by every normal, recovery, interruption, and removal writer must satisfy
+  the exact validator for that state at the instant it is persisted and on fresh
+  replay. Phase/evidence movement is monotonic or uses an explicit closed
+  transition variant; recovery cannot retain later-phase fields while rewinding
+  to an earlier phase. Permanent acceptance enumerates every persisted writer
+  output, interrupts every recovery transition, repeats continuation, and replays
+  running-to-removed cleanup. Legitimate writer closure must not be obtained by
+  loosening malformed-success preservation or admitting unknown mutable evidence.
 
 ## Episode creation
 
