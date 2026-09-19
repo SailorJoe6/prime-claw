@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, lstatSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import fs, { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, lstatSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
 
-import specificationEpisodes from "../.prime/agent/extensions/specification-episodes.ts";
+import specificationEpisodes, { acquireProjectLock, releaseProjectLock } from "../.prime/agent/extensions/specification-episodes.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -327,67 +328,92 @@ test("ASTRA-08 replay must reject a malformed success journal commit identity", 
   const first = resultDetails(await tool.execute("success", params(), undefined, undefined, f.ctx));
   assert.equal(first.status,"verified-success");
   const journal = JSON.parse(readFileSync(first.transaction_path,"utf8"));
-  journal.commit_object_sha = "this-is-not-an-object-id";
+  journal.commit.oid = "this-is-not-an-object-id";
   writeFileSync(first.transaction_path,JSON.stringify(journal));
   const replay = resultDetails(await tool.execute("replay",params({request_id:"request-corrupt-commit"}),undefined,undefined,f.ctx));
-  console.log("ASTRA-08",JSON.stringify({status:replay.status,commit_object_sha:replay.commit_object_sha}));
-  assert.notEqual(replay.status,"verified-success","Malformed commit_object_sha accepted as complete success evidence");
+  console.log("ASTRA-08",JSON.stringify({status:replay.status,commit_oid:journal.commit.oid}));
+  assert.notEqual(replay.status,"verified-success","Malformed commit.oid accepted as complete success evidence");
 });
 
-test("ASTRA-08 every retained success OID is validated and evidence remains immutable", async (t) => {
+test("ASTRA-13 closed v2 success schema rejects every malformed retained field and preserves evidence", async (t) => {
   const f = await fixture(t);
   const tool = f.tools.get("spec_disposition");
-  const first = resultDetails(await tool.execute("success-oids", params(), undefined, undefined, f.ctx));
+  const first = resultDetails(await tool.execute("success-schema", params(), undefined, undefined, f.ctx));
   assert.equal(first.status, "verified-success");
-  const originalBytes = readFileSync(first.transaction_path, "utf8");
-  const original = JSON.parse(originalBytes);
+  const original = JSON.parse(readFileSync(first.transaction_path, "utf8"));
   const blockerPath = join(f.cwd, ".git/prime-claw/future-mutation-blocked.json");
   const blockerBytes = JSON.stringify({ version: 1, disposition_id: first.disposition_id, sentinel: "immutable" });
-  writeFileSync(blockerPath, blockerBytes);
-  const fields = [
-    "base_head", "remote_base_head", "private_tree", "commit_object_sha", "commit_sha",
-    "verified_head", "verified_upstream_head", "verified_remote_head", "remote_oid_before_push",
+  const cases = [
+    ["missing-target-directory", (v) => { delete v.target_directory; }],
+    ["owned-paths-null", (v) => { v.owned_paths = null; }],
+    ["owned-paths-string", (v) => { v.owned_paths = "not-an-array"; }],
+    ["owned-paths-missing", (v) => { delete v.owned_paths; }],
+    ["bad-version", (v) => { v.version = 987654321; }],
+    ["bad-common-dir", (v) => { v.git_common_dir = "/unrelated/git/common"; }],
+    ["bad-session-file", (v) => { v.owner_session_file = "/unrelated/session.jsonl"; }],
+    ["bad-local-branch", (v) => { v.branch.local = "other"; }],
+    ["bad-upstream", (v) => { v.branch.upstream = "origin/other"; }],
+    ["bad-remote", (v) => { v.branch.remote = "other"; }],
+    ["bad-remote-branch", (v) => { v.branch.remote_branch = "other"; }],
+    ["bad-base-oid", (v) => { v.base_head = "not-an-oid"; }],
+    ["bad-commit-oid", (v) => { v.commit.oid = "not-an-oid"; }],
+    ["bad-tree-oid", (v) => { v.commit.tree = "not-an-oid"; }],
+    ["bad-parent-oid", (v) => { v.commit.parent = "not-an-oid"; }],
+    ["bad-publication-head", (v) => { v.publication.verified_head = "not-an-oid"; }],
+    ["bad-publication-upstream", (v) => { v.publication.verified_upstream_head = "not-an-oid"; }],
+    ["bad-publication-remote", (v) => { v.publication.verified_remote_head = "not-an-oid"; }],
+    ["extra-observed-oid", (v) => { v.observed_head = "not-an-oid"; }],
+    ["extra-nested-key", (v) => { v.commit.observed_oid = "not-an-oid"; }],
   ];
-  for (const [index, field] of fields.entries()) {
-    const corrupted = { ...original, [field]: `not-an-object-id-${field}` };
+  for (const [index, [name, mutate]] of cases.entries()) {
+    const corrupted = structuredClone(original); mutate(corrupted);
     const bytes = JSON.stringify(corrupted);
-    writeFileSync(first.transaction_path, bytes);
-    const replay = resultDetails(await tool.execute(`replay-${field}`, params({
-      request_id: `request-oid-${index.toString().padStart(4, "0")}`,
-    }), undefined, undefined, f.ctx));
-    assert.equal(replay.status, "failed", `${field} was accepted as verified success`);
-    assert.equal(readFileSync(first.transaction_path, "utf8"), bytes, `${field} corruption was overwritten`);
-    assert.equal(readFileSync(blockerPath, "utf8"), blockerBytes, `${field} corruption changed the blocker`);
+    writeFileSync(first.transaction_path, bytes); writeFileSync(blockerPath, blockerBytes);
+    const replay = resultDetails(await tool.execute(`schema-${name}`, params({ request_id: `request-schema-${index.toString().padStart(3, "0")}` }), undefined, undefined, f.ctx));
+    assert.equal(replay.status, "failed", `${name} was accepted as verified success`);
+    assert.equal(readFileSync(first.transaction_path, "utf8"), bytes, `${name} corruption was overwritten`);
+    assert.equal(readFileSync(blockerPath, "utf8"), blockerBytes, `${name} changed the blocker`);
   }
-  const immutableMutations = [
-    ["payload_fingerprint", "0".repeat(64)],
-    ["slug", "different-slug"],
-    ["bundle_sha256", "1".repeat(64)],
-    ["owner_session_id", "different-session"],
-    ["repository_root", join(f.root, "different-repository")],
-    ["target_directory", ".ralph/plans/future/different-target"],
-    ["owned_paths", []],
-  ];
-  for (const [index, [field, value]] of immutableMutations.entries()) {
-    const corrupted = { ...original, [field]: value };
-    const bytes = JSON.stringify(corrupted);
-    writeFileSync(first.transaction_path, bytes);
-    const replay = resultDetails(await tool.execute(`replay-immutable-${field}`, params({
-      request_id: `request-immutable-${index.toString().padStart(3, "0")}`,
-    }), undefined, undefined, f.ctx));
-    assert.equal(replay.status, "failed", `${field} collision bypassed preservation-only replay`);
-    assert.equal(readFileSync(first.transaction_path, "utf8"), bytes, `${field} collision overwrote success evidence`);
-    assert.equal(readFileSync(blockerPath, "utf8"), blockerBytes, `${field} collision changed the blocker`);
+});
+
+test("ASTRA-13 receipt graph rejects inconsistent or absent historical nodes", async (t) => {
+  const f = await fixture(t); const tool = f.tools.get("spec_disposition");
+  const first = resultDetails(await tool.execute("success-receipts", params(), undefined, undefined, f.ctx));
+  assert.equal(first.status, "verified-success");
+  const originalJournal = JSON.parse(readFileSync(first.transaction_path, "utf8"));
+  const bundlePath = first.bundle_ownership_receipt_path;
+  const originalBundleBytes = readFileSync(bundlePath, "utf8");
+  const filePath = originalJournal.receipts.files["SPECIFICATION.md"].path;
+  const originalFileBytes = readFileSync(filePath, "utf8");
+  const treeEvidencePath = originalJournal.receipts.tree_evidence.path;
+  const originalTreeEvidenceBytes = readFileSync(treeEvidencePath, "utf8");
+  const blockerPath = join(f.cwd, ".git/prime-claw/future-mutation-blocked.json");
+  const blockerBytes = JSON.stringify({ version: 1, disposition_id: first.disposition_id, sentinel: "receipt-immutable" });
+  const cases = ["bundle-file-identity", "bundle-directory-identity", "missing-creation-receipt", "corrupt-creation-receipt", "missing-tree-evidence", "corrupt-tree-evidence", "tree-evidence-oid"];
+  for (const [index, name] of cases.entries()) {
+    writeFileSync(bundlePath, originalBundleBytes); writeFileSync(filePath, originalFileBytes); writeFileSync(treeEvidencePath, originalTreeEvidenceBytes);
+    const journal = structuredClone(originalJournal);
+    if (name.startsWith("bundle-")) {
+      const bundle = JSON.parse(originalBundleBytes);
+      if (name === "bundle-file-identity") bundle.files["SPECIFICATION.md"].filesystem_identity.inode = "9999999999999";
+      else bundle.directory_identity.inode = "9999999999999";
+      const bytes = JSON.stringify(bundle); writeFileSync(bundlePath, bytes);
+      journal.receipts.bundle.sha256 = createHash("sha256").update(bytes).digest("hex");
+    } else if (name === "missing-creation-receipt") fs.rmSync(filePath);
+    else if (name === "corrupt-creation-receipt") writeFileSync(filePath, "not-json");
+    else if (name === "missing-tree-evidence") fs.rmSync(treeEvidencePath);
+    else if (name === "corrupt-tree-evidence") writeFileSync(treeEvidencePath, "not-json");
+    else {
+      const evidence = JSON.parse(originalTreeEvidenceBytes); evidence.tree = originalJournal.base_head;
+      const bytes = JSON.stringify(evidence); writeFileSync(treeEvidencePath, bytes);
+      journal.receipts.tree_evidence.sha256 = createHash("sha256").update(bytes).digest("hex");
+    }
+    const journalBytes = JSON.stringify(journal); writeFileSync(first.transaction_path, journalBytes); writeFileSync(blockerPath, blockerBytes);
+    const replay = resultDetails(await tool.execute(`receipt-${name}`, params({ request_id: `request-receipt-${index.toString().padStart(3, "0")}` }), undefined, undefined, f.ctx));
+    assert.equal(replay.status, "failed", `${name} was accepted`);
+    assert.equal(readFileSync(first.transaction_path, "utf8"), journalBytes);
+    assert.equal(readFileSync(blockerPath, "utf8"), blockerBytes);
   }
-  const mismatched = { ...original, commit_object_sha: original.base_head };
-  const mismatchBytes = JSON.stringify(mismatched);
-  writeFileSync(first.transaction_path, mismatchBytes);
-  const mismatch = resultDetails(await tool.execute("replay-oid-mismatch", params({
-    request_id: "request-oid-mismatch",
-  }), undefined, undefined, f.ctx));
-  assert.equal(mismatch.status, "failed");
-  assert.equal(readFileSync(first.transaction_path, "utf8"), mismatchBytes);
-  assert.equal(readFileSync(blockerPath, "utf8"), blockerBytes);
 });
 
 test("ASTRA-06b construction evidence cannot follow a late indexes swap", async (t) => {
@@ -397,7 +423,7 @@ test("ASTRA-06b construction evidence cannot follow a late indexes swap", async 
   mkdirSync(outside);
   let injected = false;
   f.setSpecificationFault((phase) => {
-    if (!injected && phase === "before-private-index-build") {
+    if (!injected && phase === "before-exact-tree-build") {
       injected = true;
       renameSync(indexes, join(f.root, "original-index-build"));
       symlinkSync(outside, indexes, "dir");
@@ -406,7 +432,7 @@ test("ASTRA-06b construction evidence cannot follow a late indexes swap", async 
   const result = resultDetails(await f.tools.get("spec_disposition").execute("index-build-swap", params(), undefined, undefined, f.ctx));
   assert.equal(injected, true);
   assert.equal(result.status, "failed");
-  assert.deepEqual(readdirSync(outside), [], "Private-index Git wrote through a swapped control child");
+  assert.deepEqual(readdirSync(outside), [], "Exact-tree construction wrote through a swapped control child");
   assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), true);
 });
 
@@ -415,7 +441,7 @@ test("ASTRA-09 bundle regular-file type must survive exact-tree construction", a
   const remoteBase = (await run("git", ["--git-dir", f.remote, "rev-parse", "HEAD"])).stdout.trim();
   let injected = false;
   f.setSpecificationFault((phase) => {
-    if (!injected && phase === "before-private-index-build") {
+    if (!injected && phase === "before-exact-tree-build") {
       injected = true;
       for (const [name,key] of bundleNames) {
         const path = join(f.cwd,".ralph/plans/future/safe-idea",name);
@@ -509,7 +535,7 @@ test("ASTRA-08b corrupt ownership path in success journal must preserve exact ev
   const first = resultDetails(await tool.execute("success",params(),undefined,undefined,f.ctx));
   assert.equal(first.status,"verified-success");
   const journal = JSON.parse(readFileSync(first.transaction_path,"utf8"));
-  journal.ownership_receipt_path = join(f.root,"not-the-derived-path.json");
+  journal.receipts.directory.path = join(f.root,"not-the-derived-path.json");
   const corrupted = JSON.stringify(journal);
   writeFileSync(first.transaction_path,corrupted);
   const blockerPath = join(f.cwd, ".git/prime-claw/future-mutation-blocked.json");
@@ -521,4 +547,100 @@ test("ASTRA-08b corrupt ownership path in success journal must preserve exact ev
   assert.equal(replay.status,"failed");
   assert.equal(after,corrupted,"Malformed success journal was overwritten instead of preserved");
   assert.equal(readFileSync(blockerPath, "utf8"), blockerBytes, "Malformed success replay changed the recovery blocker");
+});
+
+
+test("ASTRA-11 helper failure never falls back to recursive external lock cleanup", async () => {
+  const result = await run("node", ["--experimental-strip-types", "tests/helpers/specification_episodes_astra11_worker.mjs", "cleanup"], { cwd: resolve(".") });
+  assert.equal(result.code, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /ASTRA11_CLEANUP_OK/);
+});
+
+test("ASTRA-11 atomic owner publication refuses a replacement lock incarnation", async () => {
+  const result = await run("node", ["--experimental-strip-types", "tests/helpers/specification_episodes_astra11_worker.mjs", "owner"], { cwd: resolve(".") });
+  assert.equal(result.code, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /ASTRA11_OWNER_OK/);
+});
+
+test("ASTRA-11 inter-call real-directory replacement is never adopted", async () => {
+  const result = await run("node", ["--experimental-strip-types", "tests/helpers/specification_episodes_astra11_worker.mjs", "intercall"], { cwd: resolve(".") });
+  assert.equal(result.code, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /ASTRA11_INTERCALL_OK/);
+});
+
+test("ASTRA-11 release preserves a replacement lock and its prior owner", async () => {
+  const result = await run("node", ["--experimental-strip-types", "tests/helpers/specification_episodes_astra11_worker.mjs", "release"], { cwd: resolve(".") });
+  assert.equal(result.code, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /ASTRA11_RELEASE_OK/);
+});
+
+test("ASTRA-14 stable newer remote rollback fails final reachability and preserves blocker", async (t) => {
+  const f = await fixture(t); const tool = f.tools.get("spec_disposition");
+  const first = resultDetails(await tool.execute("remote-success", params(), undefined, undefined, f.ctx));
+  assert.equal(first.status, "verified-success");
+  const journal = JSON.parse(readFileSync(first.transaction_path, "utf8"));
+  const journalBytes = readFileSync(first.transaction_path, "utf8");
+  const blockerPath = join(f.cwd, ".git/prime-claw/future-mutation-blocked.json");
+  const blockerBytes = JSON.stringify({ version: 1, disposition_id: first.disposition_id, sentinel: "remote-immutable" });
+  writeFileSync(blockerPath, blockerBytes);
+  const branch = (await run("git", ["-C", f.cwd, "symbolic-ref", "--short", "HEAD"])).stdout.trim();
+  let injected = false;
+  f.setExecInterceptor(async ({ args, invoke }) => {
+    const result = await invoke();
+    if (!injected && args.includes("ls-remote")) {
+      injected = true;
+      const rollback = await run("git", ["--git-dir", f.remote, "update-ref", `refs/heads/${branch}`, journal.base_head, first.commit_sha]);
+      assert.equal(rollback.code, 0, rollback.stderr);
+    }
+    return result;
+  });
+  const replay = resultDetails(await tool.execute("remote-replay", params({ request_id: "request-remote-final" }), undefined, undefined, f.ctx));
+  assert.equal(injected, true); assert.equal(replay.status, "failed");
+  assert.equal(readFileSync(first.transaction_path, "utf8"), journalBytes);
+  assert.equal(readFileSync(blockerPath, "utf8"), blockerBytes);
+});
+
+test("ASTRA-15 post-success-write failure preserves exact newly durable success and blocker", async (t) => {
+  const f = await fixture(t); const tool = f.tools.get("spec_disposition");
+  let failedOnce = false;
+  f.setSpecificationFault((phase) => { if (!failedOnce && phase === "commit-object-created") { failedOnce = true; throw new Error("create recovery blocker"); } });
+  const failed = resultDetails(await tool.execute("initial-failure", params(), undefined, undefined, f.ctx));
+  assert.equal(failed.status, "failed");
+  const blockerPath = join(f.cwd, ".git/prime-claw/future-mutation-blocked.json");
+  const blockerBytes = readFileSync(blockerPath, "utf8");
+  let corruptedBytes = "";
+  f.setSpecificationFault((phase) => {
+    if (phase === "success-journal-written") {
+      const success = JSON.parse(readFileSync(failed.transaction_path, "utf8"));
+      success.commit.oid = "not-an-oid-after-publication";
+      corruptedBytes = JSON.stringify(success);
+      writeFileSync(failed.transaction_path, corruptedBytes);
+      throw new Error("fault after durable success publication");
+    }
+  });
+  const replay = resultDetails(await tool.execute("continue-success", params({ request_id: "request-continue-success", recovery_action: "continue" }), undefined, undefined, f.ctx));
+  assert.equal(replay.status, "failed"); assert.equal(replay.corrupt_success_journal_preserved, true);
+  assert.equal(readFileSync(failed.transaction_path, "utf8"), corruptedBytes);
+  assert.equal(readFileSync(blockerPath, "utf8"), blockerBytes);
+});
+
+test("ASTRA-15 final cleanup fault occurs after lock release and preserves success blocker evidence", async (t) => {
+  const f = await fixture(t); const tool = f.tools.get("spec_disposition");
+  let failedOnce = false;
+  f.setSpecificationFault((phase) => { if (!failedOnce && phase === "commit-object-created") { failedOnce = true; throw new Error("create recovery blocker"); } });
+  const failed = resultDetails(await tool.execute("initial-cleanup-failure", params(), undefined, undefined, f.ctx));
+  const blockerPath = join(f.cwd, ".git/prime-claw/future-mutation-blocked.json");
+  const blockerBytes = readFileSync(blockerPath, "utf8");
+  let successBytes = ""; let injected = false;
+  f.setSpecificationFault((phase) => {
+    if (!injected && phase === "before-success-blocker-cleanup") {
+      injected = true; successBytes = readFileSync(failed.transaction_path, "utf8");
+      throw new Error("fault before final blocker cleanup");
+    }
+  });
+  const replay = resultDetails(await tool.execute("continue-cleanup", params({ request_id: "request-continue-cleanup", recovery_action: "continue" }), undefined, undefined, f.ctx));
+  assert.equal(injected, true); assert.equal(replay.status, "failed"); assert.equal(replay.corrupt_success_journal_preserved, true);
+  assert.equal(readFileSync(failed.transaction_path, "utf8"), successBytes);
+  assert.equal(readFileSync(blockerPath, "utf8"), blockerBytes);
+  assert.equal(existsSync(join(f.cwd, ".git/prime-claw/locks/project-mutation.lock")), false, "lock must already be retired before final blocker cleanup");
 });

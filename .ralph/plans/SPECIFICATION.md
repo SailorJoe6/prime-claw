@@ -177,7 +177,7 @@ non-negotiable invariants for the future path:
    directory at the same path has identical bytes. Commit-bearing recovery
    without valid creation evidence fails closed.
 2. **Destructive authority is single-use and mutation-bound.** Immediately
-   before the first unlink, recovery writes a create-only consumed-authority
+   before the first public-name retirement, recovery writes a create-only consumed-authority
    tombstone. At every control-state read, write, or delete that can grant or use
    destructive authority, it must re-establish that the derived child (including
    `future-ownership-consumed` and `indexes`) is non-symlink-contained beneath
@@ -187,9 +187,10 @@ non-negotiable invariants for the future path:
 3. **Removal and publication preserve object types.** Security-sensitive
    filesystem operations descend from held directory descriptors with
    `O_NOFOLLOW`. Directory identity is a mutation guard, never deletion
-   authority: product directories are always retained. Recovery quarantines and
-   revalidates only exact `O_EXCL`-created file objects inside the held target,
-   then unlinks only randomized names. Replacements and unowned entries survive.
+   authority: product directories are always retained. Recovery retires only
+   exact `O_EXCL`-created file objects into retained Git-common quarantine,
+   revalidates them there, and never unlinks a checked name. Replacements and
+   unowned entries survive.
    Commit construction bypasses a pathname-raceable private index and
    builds an exact tree from approved mode-`100644` blobs; mode `120000` can
    never be published.
@@ -272,8 +273,42 @@ Authoritative evidence:
 - linked runnable final-syscall, control/lock, Linux-identity, state-schema,
   recovery, remote-rollback, and post-success-write evidence beside the reports
 
-This section is documentation authority only. It does not authorize
-implementation, `/handoff`, compaction, or Slice 3.
+This section remains the immutable failed-gate authority. The owner subsequently
+verified authority commit `5d4be4a` and authorized one controlled same-Slice-2
+implementation handoff. Slice 3 remains unauthorized.
+
+### 5.4 Required implementation shape after `5d4be4a`
+
+The same-Slice-2 revision satisfies the acceptance matrix only when all of the
+following hold together:
+
+1. Checked product/control/lock leaves are retired into retained Git-common-dir
+   quarantine evidence rather than unlinked, and restoration is atomic
+   no-replace. Pre-commit multi-object retirement uses a durable exact manifest
+   and deterministic destinations, so interruption resumes idempotently.
+2. Control directories descend from held non-following descriptors; their exact
+   identities are carried across helper calls, and record replacement atomically
+   exchanges and retains the prior object. One helper operation creates a private
+   lock, writes its owner create-only, publishes it exclusively, and returns exact
+   directory/owner identity for later use and retirement. A post-publication
+   acquisition failure retires the still-authoritative lock before descriptor loss.
+3. Version-2 identity records use real macOS birth time or Linux `statx` birth
+   time and mount/device/inode. Unsupported Linux filesystems reject before any
+   control or product write. Ctime is not identity.
+4. A successful transaction is projected into an exact version-2 proof with no
+   inherited recovery/observation fields. Hash edges cross-bind the directory,
+   three file-creation, bundle, and retained exact-tree evidence independently of
+   current checkout inodes; the evidence tree/base/modes bind to the commit graph.
+5. Historical validation is followed by coherent current observation and a
+   final actual-remote reachability proof. The lock is retired, reachability is
+   proved again, and blocker retirement is the last fallible mutation.
+6. Preservation-only mode begins before durable success replacement, so every
+   post-publication or final-cleanup fault keeps exact journal/blocker bytes and
+   writes diagnostics separately.
+
+Permanent safe-outcome regressions retain the supplied ASTRA-10–15 boundaries,
+and native identity tests execute on macOS plus an actual Linux filesystem.
+Fresh owner and formal EXPERT acceptance remain required before Slice 2 closes.
 
 ## 6. Episode-creation behavior
 

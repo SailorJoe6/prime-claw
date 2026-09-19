@@ -1,7 +1,7 @@
 {
  "version": 1,
  "project": "prime-claw",
- "phase": "1 — de-risk gate",
+ "phase": "1 \u2014 de-risk gate",
  "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
  "requirements": [
   {
@@ -837,7 +837,7 @@
    "priority": "NICE",
    "phase": 2,
    "slice": 6,
-   "summary": "Host exposure of sandboxed Postgres on localhost:5433 — documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
+   "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
    "status": "documented (Slice 6; no host forward by design)",
    "proven_by": {
     "check": [
@@ -1324,7 +1324,7 @@
    "id": "R-WE-11",
    "priority": "GATE",
    "summary": "Future incubation creates the exact named SPECIFICATION, REQUIREMENTS, and DECISIONS bundle.",
-   "status": "reopened by owner gate at 14e5cfa; ASTRA-12 self-invalidates creation/removal on the intended Linux identity branch",
+   "status": "candidate implemented with exact v2 receipt/schema and macOS plus native-Linux transaction proof; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1337,7 +1337,10 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/helpers/spec_disposition_worker.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/specification_episodes_astra_regressions.test.mjs",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1418,7 +1421,7 @@
    "id": "R-WE-33",
    "priority": "GATE",
    "summary": "Automated evidence covers safe future disposition behavior and failures.",
-   "status": "partially proven (prior seven narrow regressions are permanent; ASTRA-10–15 exact boundaries are not yet repository regressions)",
+   "status": "candidate adds permanent ASTRA-10\u201315 safe-outcome regressions while retaining ASTRA-05\u201309; exact full-suite evidence pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1432,7 +1435,9 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/specification_episodes_astra_regressions.test.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1442,7 +1447,7 @@
    "id": "R-WE-35",
    "priority": "GATE",
    "summary": "Future mutation uses a project lock and repeats canonical, remote, status, containment, and collision checks under lock.",
-   "status": "reopened by owner gate at 14e5cfa; ASTRA-11 proves lock incarnation/cleanup can defeat serialization",
+   "status": "candidate implements descriptor-bound control creation and atomic identity-bound lock lifecycle; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1457,7 +1462,9 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/specification_episodes_astra_regressions.test.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1467,7 +1474,7 @@
    "id": "R-WE-36",
    "priority": "GATE",
    "summary": "Future mutation commits and pushes only its exact bundle, leaves clean success, and preserves exact recoverable failure state.",
-   "status": "reopened by owner gate at 14e5cfa; ASTRA-12 makes the future capability self-invalidating on the intended Linux branch",
+   "status": "candidate implements index-free exact tree plus platform-real identity and native Linux proof; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1482,7 +1489,9 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/specification_episodes_astra_regressions.test.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1492,7 +1501,7 @@
    "id": "R-WE-69",
    "priority": "GATE",
    "summary": "Recovery deletion authority comes only from immutable receipts for O_EXCL-created regular files; product directories are never deleted.",
-   "status": "blocked by ASTRA-10; final unlink can delete an unowned replacement despite earlier receipts",
+   "status": "candidate implements object-bound public-name retirement into retained quarantine; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1507,7 +1516,9 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/specification_episodes_astra_regressions.test.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1517,7 +1528,7 @@
    "id": "R-WE-70",
    "priority": "GATE",
    "summary": "Recovery quarantines, revalidates, and unlinks only exact owned files through one held target FD; all directories and unowned entries remain.",
-   "status": "blocked by ASTRA-10; final unlink and restoration are not race-safe",
+   "status": "candidate implements non-destructive race-safe retirement and no-clobber restoration; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1532,7 +1543,9 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/specification_episodes_astra_regressions.test.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1566,7 +1579,7 @@
    "id": "R-WE-72",
    "priority": "GATE",
    "summary": "Success replay validates journal/base/commit/content/hashes/ownership/actual remote evidence, preserves corrupt state, and separates historical from current repository facts.",
-   "status": "blocked by ASTRA-13 and ASTRA-14; success proof is incomplete and newer remote evidence can contradict durability",
+   "status": "candidate implements closed v2 proof, historical/final remote reachability, and preservation; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1581,7 +1594,9 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/specification_episodes_astra_regressions.test.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1591,7 +1606,7 @@
    "id": "R-WE-73",
    "priority": "GATE",
    "summary": "Directory identity is a guard for later file mutation, never destructive authority; every directory incarnation survives recovery.",
-   "status": "partially satisfied; directories are retained, but ASTRA-12 invalidates the Linux identity guard",
+   "status": "candidate implements stable macOS birthtime and Linux statx-btime identities with native proof; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1606,7 +1621,9 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/specification_episodes_astra_regressions.test.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1616,7 +1633,7 @@
    "id": "R-WE-74",
    "priority": "GATE",
    "summary": "Every destructively accessed control child is revalidated beneath real Git common state at use; static/swapped symlinks cannot redirect access.",
-   "status": "blocked by ASTRA-11; pathname mkdir, fallback recursive cleanup, and split lock publication escape containment",
+   "status": "candidate implements descriptor-bound control mutation and retained cleanup with no raw recursive fallback; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1631,7 +1648,9 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/specification_episodes_astra_regressions.test.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1665,7 +1684,7 @@
    "id": "R-WE-76",
    "priority": "GATE",
    "summary": "Every success OID and identity relationship is validated; malformed/inconsistent commit identity rejects success.",
-   "status": "blocked by ASTRA-13; retained recovery OIDs and historical receipt relationships escape validation",
+   "status": "candidate validates every retained v2 OID and relationship; mutable recovery observations are projected out; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1679,7 +1698,9 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/specification_episodes_astra_regressions.test.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1714,7 +1735,7 @@
    "id": "R-WE-78",
    "priority": "GATE",
    "summary": "Every malformed-success path preserves transaction-journal bytes and blockers while recording diagnostics separately.",
-   "status": "blocked by ASTRA-13 and ASTRA-15; accepted corrupt evidence clears blockers and newly persisted success can be overwritten",
+   "status": "candidate starts preservation before success publication and preserves exact success/blocker across late faults; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1729,7 +1750,9 @@
     "tests": [
      "tests/specification_episodes_extension.test.mjs",
      "tests/specification_episodes_astra_regressions.test.mjs",
-     "tests/test_specification_episodes_extension.py"
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
     ]
    },
    "verdict_doc": "docs/specification-episodes.md",
@@ -1739,7 +1762,7 @@
    "id": "R-WE-79",
    "priority": "GATE",
    "summary": "Leaf deletion remains object/exclusion-bound through the final syscall, and restoration is atomic no-replace with quarantine preservation on conflict.",
-   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-10",
+   "status": "candidate repository evidence complete: no checked-name unlink, no-clobber restore, and exact manifest-bound partial retirement resume; owner/formal acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1754,7 +1777,13 @@
      ".prime/agent/extensions/specification-episodes.ts",
      ".prime/agent/helpers/specification-episode-fs.py"
     ],
-    "tests": []
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/specification_episodes_astra_regressions.test.mjs",
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
+    ]
    },
    "blocking_evidence": [
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
@@ -1767,7 +1796,7 @@
    "id": "R-WE-80",
    "priority": "GATE",
    "summary": "Control and lock creation, create-only owner publication, use, cleanup, and release stay bound to one non-following incarnation.",
-   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-11",
+   "status": "candidate repository evidence complete: cross-call directory identities, exchange-and-retain records, atomic lock publication, exact post-publication failure retirement, and identity-bound release; owner/formal acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1782,7 +1811,13 @@
      ".prime/agent/extensions/specification-episodes.ts",
      ".prime/agent/helpers/specification-episode-fs.py"
     ],
-    "tests": []
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/specification_episodes_astra_regressions.test.mjs",
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
+    ]
    },
    "blocking_evidence": [
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
@@ -1795,7 +1830,7 @@
    "id": "R-WE-81",
    "priority": "GATE",
    "summary": "Filesystem incarnation semantics survive required mutations on every natively tested supported Linux/macOS runtime; unsupported platforms reject pre-mutation.",
-   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-12",
+   "status": "candidate repository evidence complete: platform-real macOS/Linux identity, unsupported preflight rejection, and native Linux proof pass; owner/formal acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1810,7 +1845,13 @@
      ".prime/agent/extensions/specification-episodes.ts",
      ".prime/agent/helpers/specification-episode-fs.py"
     ],
-    "tests": []
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/specification_episodes_astra_regressions.test.mjs",
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
+    ]
    },
    "blocking_evidence": [
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
@@ -1823,7 +1864,7 @@
    "id": "R-WE-82",
    "priority": "GATE",
    "summary": "Verified success enforces a complete versioned schema, every retained OID, exact immutable shapes, and a cross-bound historical receipt graph.",
-   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-13",
+   "status": "candidate repository evidence complete: exact v2 success schema cross-binds receipts and retained exact-tree evidence to the commit graph; expanded ASTRA-13 passes; owner/formal acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1838,7 +1879,13 @@
      ".prime/agent/extensions/specification-episodes.ts",
      ".prime/agent/helpers/specification-episode-fs.py"
     ],
-    "tests": []
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/specification_episodes_astra_regressions.test.mjs",
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
+    ]
    },
    "blocking_evidence": [
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
@@ -1851,7 +1898,7 @@
    "id": "R-WE-83",
    "priority": "GATE",
    "summary": "The final accepted actual-remote OID still contains the verified success commit before success or blocker cleanup.",
-   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-14",
+   "status": "candidate repository evidence complete: final post-lock actual-remote reachability and ASTRA-14 pass; owner/formal acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1866,7 +1913,13 @@
      ".prime/agent/extensions/specification-episodes.ts",
      ".prime/agent/helpers/specification-episode-fs.py"
     ],
-    "tests": []
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/specification_episodes_astra_regressions.test.mjs",
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
+    ]
    },
    "blocking_evidence": [
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
@@ -1879,7 +1932,7 @@
    "id": "R-WE-84",
    "priority": "GATE",
    "summary": "Preservation-only mode begins before/with durable success publication and preserves exact success/blocker evidence across every later fault.",
-   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-15",
+   "status": "candidate repository evidence complete: preservation begins before durable success publication and ASTRA-15 pass; owner/formal acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1894,7 +1947,13 @@
      ".prime/agent/extensions/specification-episodes.ts",
      ".prime/agent/helpers/specification-episode-fs.py"
     ],
-    "tests": []
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/specification_episodes_astra_regressions.test.mjs",
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
+    ]
    },
    "blocking_evidence": [
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
@@ -1907,7 +1966,7 @@
    "id": "R-WE-22",
    "priority": "GATE",
    "summary": "Partial failures report exact resources and recovery never removes or overwrites pre-existing, replacement, or dirty resources.",
-   "status": "blocked for Slice 2 by ASTRA-10 and ASTRA-11; final unlink/restoration and control/lock cleanup can destroy unowned resources",
+   "status": "candidate implemented with retained quarantine, no-clobber restoration, and preservation-only success evidence; final owner/EXPERT acceptance pending",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1922,7 +1981,13 @@
      ".prime/agent/extensions/specification-episodes.ts",
      ".prime/agent/helpers/specification-episode-fs.py"
     ],
-    "tests": []
+    "tests": [
+     "tests/specification_episodes_extension.test.mjs",
+     "tests/specification_episodes_astra_regressions.test.mjs",
+     "tests/test_specification_episodes_extension.py",
+     "tests/test_specification_episode_fs_identity.py",
+     "tests/helpers/specification_episodes_astra11_worker.mjs"
+    ]
    },
    "blocking_evidence": [
     "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",

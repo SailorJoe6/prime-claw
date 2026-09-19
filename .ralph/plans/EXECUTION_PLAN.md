@@ -1,8 +1,8 @@
 # Execution Plan — Worktree-isolated specification episodes
 
 > **Status:** implementation in progress; Slice 1 is validated; Slice 2 candidate
-> `14e5cfa` failed its fresh owner/EXPERT gate on ASTRA-10–15. This turn is
-> documentation-only incorporation. Slice 2 remains open; Slices 3–8 are blocked.
+> `14e5cfa` failed on ASTRA-10–15, and the owner-authorized post-`5d4be4a`
+> same-Slice-2 revision is in final validation. Slice 2 remains open; Slices 3–8 are blocked.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -20,7 +20,7 @@
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
 | 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed at Slice 1) |
-| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | **REVISE** at `14e5cfa`; documentation-only ASTRA-10–15 incorporation underway | Prior seven narrow cases and green suites are retained; six new owner-reproduced blockers require another same-Slice-2 revision after explicit handoff |
+| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Post-`5d4be4a` ASTRA-10–15 candidate in final validation | Prior ASTRA-05–09 regressions retained; ASTRA-10–15 mechanisms and permanent cases implemented; fresh owner/EXPERT gate still required |
 | 3–8 | `prime-claw-h6w.4`–`.9` | Not started | Dependency-ordered below |
 
 Slice 1 evidence names the exact active-suite command. It does not claim a
@@ -181,14 +181,14 @@ trusted host contract. A rejected push, remote race, commit failure, or crash
 records the exact local commit/files/status. It does not absorb, reset, rebase,
 or commit another conversation's work. An ordinary retry only reports recovery
 state. An explicitly operator-approved `recovery_action` may inspect, continue,
-or safely unlink only exact uncommitted regular-file objects after immutable
-create-only file and bundle receipts prove their incarnations. A checked-in
-Python helper uses `dir_fd`, `O_NOFOLLOW`, held directory descriptors, and
-randomized quarantine names. Directory identity guards later file mutation but
-never grants destructive authority: every product directory is retained. The
-helper writes the tombstone in the genuine held control directory, quarantines
-and revalidates exact owned files inside one held target FD, and unlinks only
-those names. Path reuse and check/delete races cannot redirect deletion.
+or retire only exact uncommitted regular-file objects after immutable create-only
+file and bundle receipts prove their incarnations. A checked-in Python helper
+uses `dir_fd`, `O_NOFOLLOW`, held directory descriptors, and retained randomized
+quarantine evidence. Directory identity guards later file mutation but never
+grants destructive authority: every product directory is retained. The helper
+writes the tombstone in the genuine held control directory, retires and
+revalidates exact owned files from one held target FD into Git-common quarantine,
+and never unlinks a checked name. Path reuse cannot redirect destructive cleanup.
 Otherwise recovery stops for the operator.
 
 #### Astra safety evidence retained in Slice 2
@@ -196,9 +196,9 @@ Otherwise recovery stops for the operator.
 | Review insight | Required mechanism | Permanent regression |
 |---|---|---|
 | ASTRA-01: failed preconditions and matching bytes can masquerade as ownership | Delete only objects proven by create-only file descriptors/receipts; never delete product directories; commit-bearing recovery fails closed | Pre-existing identical bundle survives removal; missing receipt fails closed |
-| Follow-up: a valid old receipt can outlive successful removal and path reuse | Create-only consumed-authority tombstone written before unlink; live-status gate; no automatic recreation | Byte-identical replacement survives repeated removal even after mutable journal reset |
+| Follow-up: a valid old receipt can outlive successful removal and path reuse | Create-only consumed-authority tombstone written before public-name retirement; live-status gate; no automatic recreation | Byte-identical replacement survives repeated removal even after mutable journal reset |
 | Follow-up: tombstone control path can itself escape through a child symlink | Derive ownership and consumption directories with validated Git-common-dir containment | Static child-symlink test proves no external write and no bundle mutation |
-| ASTRA-02: recursive cleanup has a check/delete race | Per-file quarantine/revalidation/unlink through one held target FD; always retain target and shared parent | Concurrent injected entries and every directory incarnation survive |
+| ASTRA-02: recursive cleanup has a check/delete race | Per-file descriptor-bound retirement into retained Git-common quarantine; never unlink checked names; retain target/shared parents | Concurrent entries and every directory incarnation survive; ASTRA-10 final-boundary cases remain permanent |
 | ASTRA-03: `HEAD` can advance after commit verification | Push `<owned-commit-oid>:<default-ref>` rather than `HEAD:<default-ref>` | Remote receives owned commit and excludes concurrent local descendant |
 | ASTRA-04a: a mutable success label can bypass missing evidence | Validate phase/OIDs, parent, exact commit bundle, hashes, ownership receipt, and actual remote before clearing blockers | Malformed `verified-success` journal is preserved and rejected |
 | ASTRA-04b: replay can confuse historical cleanliness with current dirt | Return separately named historical facts and fresh checkout/status/HEAD/upstream/remote observations | Dirty replay reports current `checkout_clean: false` while retaining historical success |
@@ -235,7 +235,7 @@ those inspected paths, but the later authoritative owner/formal EXPERT gate
 independently reproduced ASTRA-10–15 and returned **REVISE**. Broad claims that
 R-WE-69–78 or D-WE-15–16 were collectively proven are withdrawn.
 
-Authority for the next same-Slice-2 revision:
+Accepted authority for, and status of, the post-`5d4be4a` same-Slice-2 revision:
 
 | Finding | Requirements / decision | Required permanent acceptance |
 |---|---|---|
@@ -246,14 +246,37 @@ Authority for the next same-Slice-2 revision:
 | ASTRA-14 contradicted remote durability | R-WE-72/83; D-WE-19 | Final accepted remote OID still contains the success commit before blocker cleanup; stable rollback fails closed |
 | ASTRA-15 newly persisted success overwrite | R-WE-78/84; D-WE-19 | Preservation begins with durable success write; all later injected failures preserve exact journal/blocker and write diagnostics separately |
 
+Implemented response in the controlled post-`5d4be4a` revision:
+
+| Authority | Mechanism | Permanent evidence |
+|---|---|---|
+| R-WE-79 / D-WE-17 | Rename-to-retained-quarantine replaces final unlink; restoration is descriptor-relative no-replace; exact consumed manifest makes partial retirement resumable | Product/control final-boundary, recovery collision, and partial-resume tests |
+| R-WE-80 / D-WE-17 | Control-directory identities cross helper calls; exchange-and-retain record replacement; atomic lock+owner publication; exact post-publication failure retirement; identity-bound release | Real-directory/symlink parent swaps, record replacement, helper rejection, post-publication failure, and lock replacement/release tests |
+| R-WE-81 / D-WE-18 | v2 macOS birthtime or Linux `statx` btime+mount/device/inode; pre-mutation capability check | macOS suite, unsupported-btime negative case, native Linux create/restart/remove/replacement run |
+| R-WE-82 / D-WE-19 | Exact v2 success proof plus receipt and retained-tree-evidence hash/OID graph; mutable failure fields projected out | Table-driven schema/OID/path and directory/file/bundle/tree-evidence corruption cases |
+| R-WE-83 / D-WE-19 | Final coherent actual-remote OID must reach commit; proof repeated after lock retirement | Stable post-history remote rollback regression |
+| R-WE-84 / D-WE-19 | Preservation flag set before durable success replace; attempt-only diagnostics; blocker retirement last | Post-success-write and pre-final-cleanup fault regressions |
+
+Latest candidate validation evidence:
+
+- exact combined Node suites: **80/80 passed**;
+- focused native Python/helper safety cases: **17 passed**;
+- durable mutation-boundary matrix: **11/11 passed**;
+- native Linux arm64/Python 3.12 `statx` create/restart/manifest-retirement/replacement/control-exchange proof: **PASS**;
+- independent postfix audit after all four findings were fixed: **PASS**;
+- exact active `pytest -q tests`: **252 passed, 11 warnings** in 1163.71s.
+
 Authoritative reports:
 
 - `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md` (SHA-256 `6e1a89865c5008e43ef3c7cb857b0d0b4711f887485bb9cc98b5339df77e0362`)
 - `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md`
+- fresh implementation audit: `/Users/jlanders/.prime/agent/session-artifacts/01a0b638-b392-778e-8c04-c5307740fc42/sub-7d8b40a9/final-audit.md` (REVISE; SHA-256 `8b7d5437f2c83eb71e69b2c35f9bad7a94e9e919e2807f7465b36ade0d6025b0`)
+- postfix re-audit after all four fixes: `/Users/jlanders/.prime/agent/session-artifacts/01a0b638-b392-778e-8c04-c5307740fc42/sub-60e46749/postfix-audit.md` (PASS; SHA-256 `87c9cbe1f654d0709e00956217eac33178710b90e09f260cba2986c525425316`)
 
-No implementation may resume until the PROJECT_CONVERSATION verifies this
-documentation commit and authorizes a controlled same-Slice-2 handoff. Slice 3
-stays unstarted.
+The PROJECT_CONVERSATION verified `5d4be4a` and admitted a controlled native
+handoff for this same-Slice-2 revision. Implementation now follows the matrix
+above. Slice 3 stays unstarted, and this revision must stop for a fresh owner and
+formal EXPERT gate after exact-suite, audit, commit, and push evidence.
 
 ### 2.5 Promoted episode transaction
 
@@ -635,7 +658,7 @@ private transcript text.
 | R-WE-35, R-WE-36 | 2 |
 | R-WE-69, R-WE-70, R-WE-71, R-WE-72 | 2 |
 | R-WE-73, R-WE-74, R-WE-75, R-WE-76, R-WE-77, R-WE-78 | 2 revision gate |
-| R-WE-79, R-WE-80, R-WE-81, R-WE-82, R-WE-83, R-WE-84 | next same-Slice-2 revision gate (ASTRA-10–15) |
+| R-WE-79, R-WE-80, R-WE-81, R-WE-82, R-WE-83, R-WE-84 | post-`5d4be4a` same-Slice-2 implementation and final acceptance gate |
 
 A generated inventory assertion must show every R-WE ID exactly once in the
 requirements source and at least one `proven_by` path after its owning slice.
@@ -662,9 +685,9 @@ concurrency coverage in earlier slices.
 | D-WE-14 explicit model-to-host bridge | §§2.1–2.2; Slices 1 and 4 |
 | D-WE-15 object-bound destructive/publication authority | §§2.2, 2.4, 6; Slice 2 |
 | D-WE-16 revalidate identity/containment/type/observation at use | §§2.2, 2.4, 6; not fully implemented at `14e5cfa` |
-| D-WE-17 final-syscall object/control/lock authority | §§2.2, 2.4; next same-Slice-2 revision |
-| D-WE-18 platform-real incarnation model | §§2.2, 2.4; next same-Slice-2 revision |
-| D-WE-19 closed durable success proof | §§2.2, 2.4; next same-Slice-2 revision |
+| D-WE-17 final-syscall object/control/lock authority | §§2.2, 2.4; post-`5d4be4a` same-Slice-2 candidate |
+| D-WE-18 platform-real incarnation model | §§2.2, 2.4; post-`5d4be4a` same-Slice-2 candidate |
+| D-WE-19 closed durable success proof | §§2.2, 2.4; post-`5d4be4a` same-Slice-2 candidate |
 
 ## 8. Completion boundary
 

@@ -67,16 +67,17 @@ if it does not weaken a gate.
   the bundle committed and pushed with a clean canonical checkout on success.
   If it cannot, it reports the exact durable/dirty/commit/push state and recovery
   action without claiming success.
-- **R-WE-69 (GATE) — Proven deletion ownership.** Recovery may delete only
+- **R-WE-69 (GATE) — Proven retirement ownership.** Recovery may retire only
   regular-file objects whose create-only descriptors and immutable receipts
   prove this transaction created them. Directory identity remains a mutation
-  guard but never grants rename, quarantine, or deletion authority. Removal
-  authority is durably single-use; commit-bearing recovery fails closed.
+  guard but never grants rename, quarantine, or deletion authority. Retirement
+  authority is durably single-use; a manifest-bound interrupted retirement
+  resumes idempotently, and commit-bearing recovery fails closed.
 - **R-WE-70 (GATE) — Race-safe owned removal.** Recovery opens the target once
-  without following links, validates every owned file, atomically quarantines
-  each exact file inside that held directory, revalidates it, and unlinks only
-  its randomized name. Product directories, concurrent replacements, unowned
-  entries, and the shared future-plan parent are always retained.
+  without following links, validates every owned file, atomically retires its
+  public name into retained Git-common quarantine, and revalidates it there.
+  Checked names are never unlinked. Product directories, concurrent replacements,
+  unowned entries, and the shared future-plan parent are always retained.
 - **R-WE-71 (GATE) — Pinned publication.** Future publication pushes the verified
   owned commit OID, not moving `HEAD`, so a concurrent local descendant cannot
   be published by the transaction.
@@ -92,9 +93,9 @@ if it does not weaken a gate.
   entry, but can never authorize deletion of a directory. Rename-and-replace
   invalidates file mutation authority and every directory incarnation survives.
 - **R-WE-74 (GATE) — Mutation-bound control containment.** Refining R-WE-69,
-  every authority-bearing control read/write/delete descends from the real Git
-  common directory through held `dir_fd` handles and `O_NOFOLLOW`; deletion
-  quarantines the exact entry before unlink. Git tree construction uses no
+  every authority-bearing control read/write/retirement descends from the real
+  Git common directory through held `dir_fd` handles and `O_NOFOLLOW`; cleanup
+  retires exact entries into retained quarantine without unlink. Git tree construction uses no
   pathname-based private index. Static or swapped children cause no external
   access and preserve sentinels and product resources.
 - **R-WE-75 (GATE) — Coherent current replay observation.** Refining R-WE-72,
@@ -120,12 +121,16 @@ if it does not weaken a gate.
 - **R-WE-79 (GATE) — Syscall-bound leaf destruction and no-clobber restore.**
   Validation must remain bound to the same leaf object through its destructive
   syscall. A checked quarantine pathname is not authority after its descriptor
-  closes. Final unlink must preserve any replacement, and rollback/restoration
-  must use atomic no-replace semantics; conflicts preserve quarantine evidence.
+  closes. Where the platform cannot bind an unlink to that leaf, cleanup must
+  retain the retired object instead. Rollback/restoration uses atomic no-replace
+  semantics; conflicts preserve both quarantine objects.
 - **R-WE-80 (GATE) — Control and lock incarnation continuity.** Every control
-  directory creation, lock creation, create-only owner publication, use,
-  failure cleanup, and release is bound to the same non-following incarnation.
-  No helper rejection may fall back to raw recursive pathname deletion, and no
+  directory creation, record replacement, lock creation, create-only owner
+  publication, use, failure cleanup, and release is bound to the same
+  non-following incarnation across helper calls. Record replacement preserves
+  the prior object, and post-publication acquisition failure retires an exact
+  owned lock before authority is lost. No helper rejection may fall back to raw
+  recursive pathname deletion, and no
   split operation may adopt, overwrite, or remove a replacement lock.
 - **R-WE-81 (GATE) — Supported-platform stable incarnation identity.** Filesystem
   incarnation evidence must remain stable across the transaction's own required
@@ -137,8 +142,9 @@ if it does not weaken a gate.
   `verified-success` record has a complete versioned schema with exact immutable
   fields, target/path shapes, and every retained/nested/recovery OID validated
   for its historical meaning. Directory, create-only file, and final bundle
-  receipts are required and cross-bound to one internally consistent historical
-  object graph without depending on current checkout inodes.
+  receipts and retained exact-tree construction evidence are required and
+  cross-bound to one internally consistent historical object graph without
+  depending on current checkout inodes.
 - **R-WE-83 (GATE) — Final-state durability proof.** Before reporting success or
   clearing a blocker, the final accepted actual-remote OID must still contain
   the verified success commit. A stable later rollback or inability to prove

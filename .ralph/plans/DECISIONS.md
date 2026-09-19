@@ -204,9 +204,10 @@ an exactly-once contract without constraining planning to an unproven API shape.
 **Decision:** Future recovery derives deletion authority only from immutable
 receipts for regular-file objects created through `O_EXCL` descriptors, never
 from a directory pathname or identity. Directory identity remains a mutation
-guard. Recovery consumes file authority durably, quarantines each exact file
-inside one held target descriptor, revalidates it, and unlinks only that name.
-Every product-directory incarnation is retained.
+guard. Recovery consumes file authority durably, retires each exact file from
+one held target descriptor into retained Git-common quarantine, and revalidates
+it there. Checked names are never unlinked. Every product-directory incarnation
+is retained.
 Publication names the verified owned commit OID directly. Replayed success is
 evidence-validated and separates historical facts from current observations.
 
@@ -228,7 +229,7 @@ authority must remain attached to the created object through its use boundary.
   missing or stale object identity stops rather than inferring authority.
 - Rename-and-replace invalidates file mutation authority even when bytes match;
   directories are never removed under any receipt.
-- Removal authority is consumed durably before unlink. Neither later path reuse
+- Removal authority is consumed durably before public-name retirement. Neither later path reuse
   nor a mutable journal reset can reactivate it.
 - Recovery validates and quarantines exact owned files through a held target FD.
   It preserves every directory, replacement, concurrent entry, and shared parent.
@@ -239,8 +240,8 @@ authority must remain attached to the created object through its use boundary.
 
 **Decision:** Validation that grants authority or supports a current-state claim
 must occur at the boundary where that authority or claim is used. Control-state
-writes and destructive operations use held directory descriptors, `O_NOFOLLOW`,
-and quarantine-before-unlink. Commit construction avoids a pathname-based
+writes and retirement operations use held directory descriptors, `O_NOFOLLOW`,
+and retained quarantine rather than unlink. Commit construction avoids a pathname-based
 private index and proves exact regular-file tree modes, paths, and bytes. Success
 replay validates every recorded OID/relationship before collecting one coherent
 fresh current-state observation.
@@ -264,8 +265,8 @@ at-use failure class across filesystem, Git, and result-reporting boundaries.
 **Consequences:**
 
 - Security-sensitive product and control operations descend from held directory
-  descriptors with non-following opens. Removal quarantines the exact entry,
-  revalidates it, and unlinks only the quarantine name. Static or swapped
+  descriptors with non-following opens. Removal retires the exact entry to
+  retained quarantine and revalidates it without unlink. Static or swapped
   children cause no external mutation or product deletion.
 - Commit construction hashes trusted bytes and rebuilds the base tree directly;
   it does not expose a pathname-raceable private Git index. Constructed and
@@ -291,9 +292,13 @@ preserve the seven failed assertions (0/5 and 0/2).
 never sufficient destructive authority. Product/control deletion remains bound
 to an enforced exclusion or to the same object through the final syscall;
 otherwise the object is preserved. Restoration uses atomic no-replace semantics
-and leaves quarantine evidence on conflict. Control directory and lock creation,
-create-only owner publication, use, cleanup, and release remain bound to one
-incarnation. A constrained helper failure can never fall back to recursive raw
+and leaves quarantine evidence on conflict. Control-record replacement uses an
+atomic descriptor-relative exchange and retains the prior object. Control
+directory and lock creation, create-only owner publication, use, cleanup, and
+release remain bound to one incarnation across helper calls. A durable exact
+retirement manifest makes partial multi-object cleanup resumable. A
+post-publication lock-acquire failure retires the exact lock while authority is
+still held. A constrained helper failure can never fall back to recursive raw
 pathname cleanup.
 
 **Satisfies:** R-WE-22, R-WE-35, R-WE-69, R-WE-70, R-WE-74, R-WE-79,
@@ -333,8 +338,9 @@ Linux test must not be only a macOS attribute-hiding simulation.
 
 **Decision:** Success is a complete versioned proof graph, not a permissive
 status label. Its schema has exact immutable fields and shapes; every retained
-OID is validated according to its meaning; directory, file-creation, and final
-bundle receipts are cross-bound historically. The final accepted remote state
+OID is validated according to its meaning; directory, file-creation, final
+bundle receipts, and retained exact-tree construction evidence are cross-bound
+historically to the commit graph. The final accepted remote state
 must still prove success-commit reachability before blocker cleanup. Preservation
 mode begins before or atomically with durable success publication and governs all
 later failures.
@@ -359,5 +365,7 @@ and use separate diagnostics.
 and owner gate
 `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md`
 are authoritative for ASTRA-10–15. Candidate `14e5cfa` does not fully implement
-D-WE-15 or D-WE-16 and does not yet implement D-WE-17–19. This documentation
-records authority only; it does not authorize fixes or Slice 3.
+D-WE-15 or D-WE-16. The controlled post-`5d4be4a` same-Slice-2 candidate now
+implements D-WE-17–19 with permanent ASTRA-10–15 regressions and native
+macOS/Linux identity evidence. Final exact suites and fresh owner/EXPERT
+acceptance remain required; Slice 3 is not authorized.

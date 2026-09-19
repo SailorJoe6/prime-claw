@@ -171,11 +171,11 @@ reusing the exact disposition input with one of these optional actions:
   prove identity; or
 - `remove-owned-uncommitted` — only before a commit/ref advance and only for
   regular-file objects proven by immutable create-only descriptor receipts;
-  quarantine, revalidate, and unlink those files through one held target FD.
-  Product directories are never removed.
+  retire and revalidate those files as retained Git-common quarantine evidence.
+  Product directories are never removed and checked names are never unlinked.
 
 A failed precondition, matching bytes, or a mutable transaction field never
-establishes deletion ownership. Immediately before the first destructive unlink,
+establishes deletion ownership. Immediately before the first public-name retirement,
 recovery durably consumes that authority with a create-only tombstone. Control
 operations remain non-symlink-contained beneath the Git common directory.
 Directory identity guards later file mutation but grants no deletion authority.
@@ -305,8 +305,78 @@ Authoritative reports:
 - `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md` (SHA-256 `6e1a89865c5008e43ef3c7cb857b0d0b4711f887485bb9cc98b5339df77e0362`)
 - `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md`
 
-Slice 2 remains in progress. Implementation requires a separately authorized
-same-Slice-2 handoff. Slice 3 is not authorized.
+Slice 2 remains in progress. The owner subsequently authorized the controlled
+post-`5d4be4a` same-Slice-2 revision documented below. Slice 3 is not authorized.
+
+## Same-Slice-2 ASTRA-10–15 implementation
+
+The controlled revision after authority commit `5d4be4a` implements the six
+accepted blockers without entering Slice 3:
+
+- **Final-syscall preservation (R-WE-79, D-WE-17).** Product and control leaves
+  are atomically retired from their public name into
+  `<git-common-dir>/prime-claw/quarantine/` and retained. No checked pathname is
+  unlinked. Failed restoration uses descriptor-relative atomic no-replace; an
+  occupied destination and both quarantine objects survive for inspection.
+  Pre-commit multi-object retirement uses an exact durable consumed manifest and
+  deterministic destinations, so an interrupted retirement resumes idempotently.
+- **Control and lock incarnation continuity (R-WE-80, D-WE-17).** Control trees
+  are created one component at a time beneath held non-following descriptors,
+  and their identities are carried into every later helper operation.
+  Control-record replacement uses descriptor-relative atomic exchange and retains
+  the prior object instead of overwriting or unlinking it. One helper call creates
+  a private lock incarnation, writes its owner with `O_EXCL`, publishes it without
+  replacement, and verifies the published object. A post-publication acquisition
+  failure retires the exact lock before descriptor authority is lost. Release
+  validates the recorded directory and owner identities and retires the entire lock without recursive
+  cleanup or deletion. Exact-tree construction evidence stays durable for
+  committed/successful transactions; explicit pre-commit removal retires it with
+  the owned bundle.
+- **Platform-real identity (R-WE-81, D-WE-18).** Version-2 identities use real
+  macOS birth time or Linux `statx` birth time plus mount/device/inode. Mutable
+  ctime is never retained as incarnation evidence. Repository and Git-common
+  filesystems are checked before the first control or product write; a Linux
+  filesystem without `STATX_BTIME` is rejected before mutation.
+- **Closed success proof (R-WE-82, D-WE-19).** A new success is projected into
+  an exact version-2 schema instead of inheriting mutable running/failure fields.
+  It contains exact branch, path, hash, receipt, commit/tree/parent, and
+  publication shapes. Receipt hashes cross-bind the directory receipt, all
+  three create-only file receipts, final bundle identities, and retained
+  exact-tree evidence; its base/tree/modes are validated against the commit graph
+  without consulting current checkout inodes.
+- **Final durability and preservation (R-WE-83–84, D-WE-19).** Replay checks
+  historical evidence, then requires the final coherent actual-remote OID to
+  reach the success commit. Fresh and replayed success release the project lock,
+  repeat the remote proof, and only then retire the blocker as the last fallible
+  mutation. Preservation-only mode begins before the durable success replace;
+  later faults write only separate attempt diagnostics.
+
+Retained quarantine evidence is intentional. Automatic cleanup is not part of
+this slice because portable macOS/Linux APIs cannot condition a final unlink on
+an earlier leaf descriptor. Any later cleanup requires separate owner-approved
+policy and equivalent object-bound authority.
+
+Permanent coverage lives in
+`tests/test_specification_episodes_extension.py`,
+`tests/test_specification_episode_fs_identity.py`, and
+`tests/specification_episodes_astra_regressions.test.mjs`. Native identity proof
+ran on macOS/APFS (Darwin 25.6 arm64, Python 3.14.4) and in a disposable Linux
+arm64 Docker volume (Linux 6.12.76, Python 3.12.3, ext2/ext3-reported volume).
+The Linux test performs create, three file writes, process restart/snapshot,
+manifest-bound retirement, same-byte replacement rejection, and control-record
+exchange with retained prior incarnation; the unsupported-birthtime test proves
+pre-mutation rejection.
+
+Reproduce the native Linux proof from the repository root with a disposable,
+network-isolated container volume (the named local image is the current
+OpenShell-compatible test runtime):
+
+```bash
+docker run --rm --user 0 --network none --read-only -e TMPDIR=/work \
+  --mount type=bind,src="$PWD",dst=/repo,readonly \
+  --mount type=volume,dst=/work -w /repo --entrypoint /usr/bin/python3 \
+  prime-claw-brain:0.1.0 -c "import runpy; d=runpy.run_path('/repo/tests/test_specification_episode_fs_identity.py'); d['test_native_identity_survives_create_restart_and_retirement'](); d['test_native_identity_rejects_same_byte_replacement_after_restart'](); d['test_native_control_replace_exchanges_and_retains_prior_incarnation']()"
+```
 
 ## Verification
 

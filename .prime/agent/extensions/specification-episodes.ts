@@ -4,15 +4,11 @@ import {
   closeSync,
   existsSync,
   lstatSync,
-  mkdirSync,
   openSync,
   readFileSync,
   readSync,
   readdirSync,
   realpathSync,
-  renameSync,
-  rmSync,
-  rmdirSync,
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -175,9 +171,46 @@ function object(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function sameStrings(actual: string[], expected: string[]): boolean {
+  return [...actual].sort().join("\0") === [...expected].sort().join("\0");
+}
+
+function porcelainPaths(output: string): string[] {
+  const records = output.split("\0").filter(Boolean);
+  const paths: string[] = [];
+  for (const record of records) {
+    if (record.length >= 4 && record[2] === " ") paths.push(record.slice(3));
+    else paths.push(record);
+  }
+  return paths;
+}
+
 function exactKeys(value: Record<string, unknown>, allowed: string[], label: string): void {
   const unexpected = Object.keys(value).filter((key) => !allowed.includes(key));
   if (unexpected.length) throw new Error(`${label} contains unsupported field(s): ${unexpected.join(", ")}`);
+}
+
+function exactShape(value: Record<string, unknown>, keys: string[], label: string): void {
+  exactKeys(value, keys, label);
+  const missing = keys.filter((key) => !Object.prototype.hasOwnProperty.call(value, key));
+  if (missing.length) throw new Error(`${label} is missing required field(s): ${missing.join(", ")}`);
+}
+
+function exactHash(value: unknown, label: string): string {
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) throw new Error(`${label} must be a SHA-256 hash`);
+  return value;
+}
+
+function exactOid(value: unknown, label: string): string {
+  if (typeof value !== "string" || !GIT_OID.test(value)) throw new Error(`${label} must be a Git object ID`);
+  return value;
+}
+
+function exactTimestamp(value: unknown, label: string): string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value)) {
+    throw new Error(`${label} must be an RFC3339 UTC timestamp`);
+  }
+  return value;
 }
 
 function requiredString(value: unknown, label: string, maxLength: number): string {
@@ -270,14 +303,19 @@ function canonicalJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function controlLocation(path: string): { root: string; relativePath: string } {
+function controlLocation(path: string): {
+  root: string; relativePath: string; rootIdentity: FilesystemIdentity; parentIdentity: FilesystemIdentity;
+} {
   const marker = `/${CONTROL_DIR}/`;
   const normalized = path.split("\\").join("/");
   const index = normalized.lastIndexOf(marker);
   if (index <= 0) throw new Error(`path is not beneath the Prime Claw control root: ${path}`);
+  const root = normalized.slice(0, index);
   return {
-    root: normalized.slice(0, index),
+    root,
     relativePath: normalized.slice(index + 1),
+    rootIdentity: directoryAuthority(root),
+    parentIdentity: directoryAuthority(dirname(normalized)),
   };
 }
 
@@ -288,6 +326,8 @@ function readDurableJson(path: string): Record<string, unknown> {
       operation: "read-file",
       root: location.root,
       path: location.relativePath,
+      root_identity: location.rootIdentity,
+      parent_identity: location.parentIdentity,
     });
     return object(JSON.parse(result.text), `durable receipt ${path}`);
   } catch (error) {
@@ -296,24 +336,56 @@ function readDurableJson(path: string): Record<string, unknown> {
 }
 
 interface FilesystemIdentity {
+  version: 2;
+  platform: "darwin" | "linux";
   device: string;
   inode: string;
   birthtime_ns: string;
-  ctime_ns: string;
+  mount_id: string | null;
+}
+
+const DIRECTORY_AUTHORITIES = new Map<string, FilesystemIdentity>();
+
+function bindDirectoryAuthority(path: string, value: unknown, label: string): FilesystemIdentity {
+  const observed = identity(value, label);
+  const key = path.split("\\").join("/");
+  const prior = DIRECTORY_AUTHORITIES.get(key);
+  if (prior && canonicalJson(prior) !== canonicalJson(observed)) {
+    throw new Error(`${label} incarnation changed`);
+  }
+  DIRECTORY_AUTHORITIES.set(key, observed);
+  return observed;
+}
+
+function directoryAuthority(path: string): FilesystemIdentity {
+  const key = path.split("\\").join("/");
+  const prior = DIRECTORY_AUTHORITIES.get(key);
+  if (prior) return prior;
+  const observed = secureFs<{ identity: unknown }>({ operation: "directory-identity", path: key });
+  return bindDirectoryAuthority(key, observed.identity, `directory authority ${key}`);
 }
 
 function identity(value: unknown, label: string): FilesystemIdentity {
   const record = object(value, label);
-  for (const key of ["device", "inode", "birthtime_ns", "ctime_ns"] as const) {
-    if (typeof record[key] !== "string" || !/^[0-9]+$/.test(record[key] as string)) {
-      throw new Error(`${label} is invalid`);
-    }
+  exactKeys(record, ["version", "platform", "device", "inode", "birthtime_ns", "mount_id"], label);
+  if (record.version !== 2 || (record.platform !== "darwin" && record.platform !== "linux")) {
+    throw new Error(`${label} has an unsupported identity version or platform`);
   }
+  for (const key of ["device", "inode", "birthtime_ns"] as const) {
+    if (typeof record[key] !== "string" || !/^[0-9]+$/.test(record[key] as string)) throw new Error(`${label} is invalid`);
+  }
+  if (record.mount_id !== null && (typeof record.mount_id !== "string" || !/^[0-9]+$/.test(record.mount_id))) {
+    throw new Error(`${label} mount identity is invalid`);
+  }
+  if (record.platform === "linux" && record.mount_id === null) throw new Error(`${label} lacks Linux mount identity`);
+  if (record.platform === "darwin" && record.mount_id !== null) throw new Error(`${label} has unexpected macOS mount identity`);
   return {
+    version: 2,
+    platform: record.platform,
     device: record.device as string,
     inode: record.inode as string,
     birthtime_ns: record.birthtime_ns as string,
-    ctime_ns: record.ctime_ns as string,
+    mount_id: record.mount_id as string | null,
   };
 }
 
@@ -353,33 +425,31 @@ function createDurableJson(path: string, value: unknown): boolean {
     operation: "create-json",
     root: location.root,
     path: location.relativePath,
+    root_identity: location.rootIdentity,
+    parent_identity: location.parentIdentity,
     text: canonicalJson(value),
   });
   return result.created;
 }
 
-function ensureControlDirectory(commonDir: string, name?: string): string {
-  const root = join(commonDir, CONTROL_DIR);
-  if (existsSync(root) && lstatSync(root).isSymbolicLink()) {
-    throw new Error("Prime Claw Git control root must not be a symlink");
+export function ensureControlDirectory(commonDir: string, name?: string): string {
+  if (name !== undefined && !/^[A-Za-z0-9._-]+$/.test(name)) {
+    throw new Error(`invalid Prime Claw control directory name: ${name}`);
   }
-  mkdirSync(root, { recursive: true, mode: 0o700 });
-  const resolvedRoot = realpathSync(root);
-  if (relative(commonDir, resolvedRoot).startsWith("..")) {
-    throw new Error("Prime Claw Git control root escapes the Git common directory");
-  }
-  if (!name) return resolvedRoot;
-  const child = join(resolvedRoot, name);
-  if (existsSync(child) && lstatSync(child).isSymbolicLink()) {
-    throw new Error(`Prime Claw control directory must not be a symlink: ${name}`);
-  }
-  mkdirSync(child, { recursive: true, mode: 0o700 });
-  if (relative(resolvedRoot, realpathSync(child)).startsWith("..")) {
-    throw new Error(`Prime Claw control directory escapes its root: ${name}`);
-  }
-  return child;
+  const rootIdentity = directoryAuthority(commonDir);
+  const parentPath = name ? ensureControlDirectory(commonDir) : commonDir;
+  const parentIdentity = directoryAuthority(parentPath);
+  const relativePath = name ? `${CONTROL_DIR}/${name}` : CONTROL_DIR;
+  const targetPath = join(commonDir, relativePath);
+  const expected = DIRECTORY_AUTHORITIES.get(targetPath.split("\\").join("/"));
+  const result = secureFs<{ identity: unknown }>({
+    operation: "ensure-directory", repo: commonDir, path: relativePath,
+    root_identity: rootIdentity, parent_identity: parentIdentity,
+    expected_identity: expected ?? null,
+  });
+  bindDirectoryAuthority(targetPath, result.identity, `control directory ${targetPath}`);
+  return targetPath;
 }
-
 function controlFilePath(commonDir: string, child: string, filename: string): string {
   if (!/^[A-Za-z0-9._-]+$/.test(filename)) throw new Error("invalid Prime Claw control filename");
   return join(ensureControlDirectory(commonDir, child), filename);
@@ -387,11 +457,18 @@ function controlFilePath(commonDir: string, child: string, filename: string): st
 
 function replaceDurableJson(path: string, value: unknown): void {
   const location = controlLocation(path);
+  const observed = secureFs<{ exists: boolean; identity?: unknown }>({
+    operation: "read-file", root: location.root, path: location.relativePath, allow_missing: true,
+    root_identity: location.rootIdentity, parent_identity: location.parentIdentity,
+  });
   secureFs<Record<string, unknown>>({
     operation: "replace-json",
     root: location.root,
     path: location.relativePath,
+    root_identity: location.rootIdentity,
+    parent_identity: location.parentIdentity,
     text: canonicalJson(value),
+    expected_identity: observed.exists ? identity(observed.identity, "control state replacement identity") : null,
   });
 }
 
@@ -401,17 +478,26 @@ function readDurableFile(path: string): string {
     operation: "read-file",
     root: location.root,
     path: location.relativePath,
+    root_identity: location.rootIdentity,
+    parent_identity: location.parentIdentity,
   }).text;
 }
 
 function removeDurableFile(path: string): void {
   const location = controlLocation(path);
-  const expectedSha256 = sha256(readDurableFile(path));
+  const observed = secureFs<{ text: string; sha256: string; identity: unknown }>({
+    operation: "read-file", root: location.root, path: location.relativePath,
+    root_identity: location.rootIdentity, parent_identity: location.parentIdentity,
+  });
+  if (observed.sha256 !== sha256(observed.text)) throw new Error("control read returned inconsistent hash evidence");
   secureFs<Record<string, unknown>>({
     operation: "remove-file",
     root: location.root,
     path: location.relativePath,
-    sha256: expectedSha256,
+    root_identity: location.rootIdentity,
+    parent_identity: location.parentIdentity,
+    sha256: observed.sha256,
+    identity: identity(observed.identity, "control state retirement identity"),
   });
 }
 
@@ -430,6 +516,9 @@ interface ProjectLock {
   path: string;
   token: string;
   ownerPath: string;
+  lockIdentity: FilesystemIdentity;
+  ownerIdentity: FilesystemIdentity;
+  ownerSha256: string;
 }
 
 class LockContentionError extends Error {
@@ -443,94 +532,79 @@ class LockContentionError extends Error {
   }
 }
 
-function acquireProjectLock(
+export function acquireProjectLock(
   lockPath: string,
   dispositionId: string,
   ownerSessionId: string,
 ): ProjectLock {
-  mkdirSync(dirname(lockPath), { recursive: true, mode: 0o700 });
+  ensureControlDirectory(controlLocation(lockPath).root, "locks");
   const token = randomUUID();
+  const owner = {
+    version: 2,
+    token,
+    disposition_id: dispositionId,
+    owner_session_id: ownerSessionId,
+    pid: process.pid,
+    acquired_at: new Date().toISOString(),
+  };
+  const ownerText = canonicalJson(owner);
   const location = controlLocation(lockPath);
-  const created = secureFs<{ created: boolean }>({
-    operation: "create-lock",
+  const acquired = secureFs<{
+    created: boolean;
+    lock_identity?: unknown;
+    owner_identity?: unknown;
+    owner_sha256?: string;
+  }>({
+    operation: "acquire-lock",
     root: location.root,
     path: location.relativePath,
-  }).created;
-  if (!created) {
-    let owner: Record<string, unknown> | null = null;
+    root_identity: location.rootIdentity,
+    parent_identity: location.parentIdentity,
+    owner_text: ownerText,
+  });
+  if (!acquired.created) {
+    let existingOwner: Record<string, unknown> | null = null;
     try {
-      owner = readDurableJson(join(lockPath, "owner.json"));
+      existingOwner = readDurableJson(join(lockPath, "owner.json"));
     } catch {
-      // Empty/corrupt lock metadata is still an owned-or-ambiguous lock. Never steal it.
+      // Ambiguous lock metadata is contention and is never stolen.
     }
-    throw new LockContentionError(lockPath, owner);
+    throw new LockContentionError(lockPath, existingOwner);
   }
-  const ownerPath = join(lockPath, "owner.json");
-  try {
-    replaceDurableJson(ownerPath, {
-      version: 1,
-      token,
-      disposition_id: dispositionId,
-      owner_session_id: ownerSessionId,
-      pid: process.pid,
-      acquired_at: new Date().toISOString(),
-    });
-  } catch (error) {
-    rmSync(lockPath, { recursive: true, force: true });
-    throw error;
+  if (typeof acquired.owner_sha256 !== "string" || acquired.owner_sha256 !== sha256(ownerText)) {
+    throw new Error("secure lock acquisition returned invalid owner evidence");
   }
-  return { path: lockPath, token, ownerPath };
+  const lock = {
+    path: lockPath,
+    token,
+    ownerPath: join(lockPath, "owner.json"),
+    lockIdentity: identity(acquired.lock_identity, "project lock identity"),
+    ownerIdentity: identity(acquired.owner_identity, "project lock owner identity"),
+    ownerSha256: acquired.owner_sha256,
+  };
+  secureFs<Record<string, unknown>>({
+    operation: "validate-lock", root: location.root, path: location.relativePath, token,
+    root_identity: location.rootIdentity, parent_identity: location.parentIdentity,
+    lock_identity: lock.lockIdentity, owner_identity: lock.ownerIdentity, owner_sha256: lock.ownerSha256,
+  });
+  return lock;
 }
 
-function releaseProjectLock(lock: ProjectLock): void {
-  const owner = readDurableJson(lock.ownerPath);
-  if (owner.token !== lock.token) {
-    throw new Error(`refusing to release project mutation lock not owned by this invocation: ${lock.path}`);
-  }
+export function releaseProjectLock(lock: ProjectLock): void {
   const location = controlLocation(lock.path);
   secureFs<Record<string, unknown>>({
     operation: "remove-lock",
     root: location.root,
     path: location.relativePath,
+    root_identity: location.rootIdentity,
+    parent_identity: location.parentIdentity,
     token: lock.token,
+    lock_identity: lock.lockIdentity,
+    owner_identity: lock.ownerIdentity,
+    owner_sha256: lock.ownerSha256,
   });
 }
 
-function removeOwnedPrivateIndex(
-  commonDir: string,
-  dispositionId: string,
-  transaction: Record<string, unknown>,
-): void {
-  const indexPath = controlFilePath(commonDir, "indexes", `${dispositionId}.index`);
-  if (transaction.private_index_path !== undefined && transaction.private_index_path !== indexPath) {
-    throw new Error("future transaction private-index path does not match the derived control path");
-  }
-  if (transaction.private_index_path === undefined) return;
-  if (transaction.private_index_path !== indexPath || typeof transaction.private_index_sha256 !== "string"
-    || !/^[0-9a-f]{64}$/.test(transaction.private_index_sha256)) {
-    throw new Error("refusing to remove a private index without exact ownership evidence");
-  }
-  secureFs<Record<string, unknown>>({
-    operation: "remove-index",
-    root: commonDir,
-    path: `${CONTROL_DIR}/indexes/${dispositionId}.index`,
-    sha256: transaction.private_index_sha256,
-  });
-}
-
-function sameStrings(actual: string[], expected: string[]): boolean {
-  return [...actual].sort().join("\0") === [...expected].sort().join("\0");
-}
-
-function porcelainPaths(output: string): string[] {
-  const records = output.split("\0").filter(Boolean);
-  const paths: string[] = [];
-  for (const record of records) {
-    if (record.length >= 4 && record[2] === " ") paths.push(record.slice(3));
-    else paths.push(record);
-  }
-  return paths;
-}
 
 function validateFutureTargetDirectory(futureRoot: string, targetDir: string): void {
   if (!existsSync(targetDir)) return;
@@ -726,6 +800,23 @@ async function remoteRefOid(
   return oid;
 }
 
+async function finalRemoteReachability(
+  pi: ExtensionAPI,
+  cwd: string,
+  state: CanonicalState,
+  commit: string,
+): Promise<string> {
+  const before = await remoteRefOid(pi, cwd, state.remote, state.remoteBranch);
+  const middle = await remoteRefOid(pi, cwd, state.remote, state.remoteBranch);
+  if (before !== middle) throw new Error("actual remote changed during final durability proof");
+  if (middle !== commit && !(await gitIsAncestor(pi, cwd, commit, middle))) {
+    throw new Error(`verified future commit ${commit} is not reachable from final actual remote ${middle}`);
+  }
+  const after = await remoteRefOid(pi, cwd, state.remote, state.remoteBranch);
+  if (middle !== after) throw new Error("actual remote changed after final durability proof");
+  return after;
+}
+
 async function commitPaths(pi: ExtensionAPI, cwd: string, commit: string): Promise<string[]> {
   const output = await git(pi, cwd, ["diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit], undefined);
   return output.split("\0").filter(Boolean);
@@ -844,8 +935,13 @@ function validateFutureOwnershipReceipt(
   },
 ): Record<string, unknown> {
   const receipt = readDurableJson(path);
+  exactShape(receipt, [
+    "version", "kind", "disposition_id", "payload_fingerprint", "owner_session_id",
+    "repository_root", "base_head", "target_directory", "directory_created_exclusively",
+    "directory_identity", "created_at",
+  ], "future directory ownership receipt");
   if (
-    receipt.version !== 2
+    receipt.version !== 3
     || receipt.kind !== "future-directory-ownership"
     || receipt.disposition_id !== expected.dispositionId
     || receipt.payload_fingerprint !== expected.payloadFingerprint
@@ -854,25 +950,13 @@ function validateFutureOwnershipReceipt(
     || receipt.base_head !== expected.baseHead
     || receipt.target_directory !== expected.targetDirectory
     || receipt.directory_created_exclusively !== true
-  ) {
-    throw new Error(`future directory ownership receipt does not match transaction identity: ${path}`);
-  }
+  ) throw new Error(`future directory ownership receipt does not match transaction identity: ${path}`);
+  exactOid(receipt.base_head, "future directory ownership base_head");
   identity(receipt.directory_identity, "future directory ownership identity");
+  exactTimestamp(receipt.created_at, "future directory ownership created_at");
   return receipt;
 }
 
-function validateCurrentDirectoryOwnership(
-  receipt: Record<string, unknown>,
-  targetDir: string,
-): void {
-  assertFilesystemIdentity(
-    targetDir,
-    receipt.directory_identity,
-    "directory",
-    "future directory ownership identity",
-    false,
-  );
-}
 
 function validateFileOwnershipReceipt(
   path: string,
@@ -884,11 +968,17 @@ function validateFileOwnershipReceipt(
     targetDirectory: string;
     name: string;
     content: string;
+    directoryReceiptSha256: string;
   },
 ): Record<string, unknown> {
   const receipt = readDurableJson(path);
+  exactShape(receipt, [
+    "version", "kind", "disposition_id", "payload_fingerprint", "owner_session_id",
+    "repository_root", "target_directory", "name", "sha256", "filesystem_identity",
+    "directory_ownership_receipt_sha256", "created_at",
+  ], `future file ownership receipt ${expected.name}`);
   if (
-    receipt.version !== 1
+    receipt.version !== 2
     || receipt.kind !== "future-file-ownership"
     || receipt.disposition_id !== expected.dispositionId
     || receipt.payload_fingerprint !== expected.payloadFingerprint
@@ -897,8 +987,12 @@ function validateFileOwnershipReceipt(
     || receipt.target_directory !== expected.targetDirectory
     || receipt.name !== expected.name
     || receipt.sha256 !== sha256(expected.content)
+    || receipt.directory_ownership_receipt_sha256 !== expected.directoryReceiptSha256
   ) throw new Error(`future file ownership receipt does not match transaction identity: ${path}`);
+  exactHash(receipt.sha256, `future file ownership hash ${expected.name}`);
+  exactHash(receipt.directory_ownership_receipt_sha256, `future file directory receipt hash ${expected.name}`);
   identity(receipt.filesystem_identity, `future file ownership identity ${expected.name}`);
+  exactTimestamp(receipt.created_at, `future file ownership created_at ${expected.name}`);
   return receipt;
 }
 
@@ -909,30 +1003,46 @@ function validateBundleOwnershipReceipt(
     payloadFingerprint: string;
     ownerSessionId: string;
     repositoryRoot: string;
+    baseHead: string;
     targetDirectory: string;
-    targetDir: string;
     documents: DispositionParams["documents"];
+    directoryReceiptPath: string;
+    directoryReceiptSha256: string;
+    fileReceiptPaths: Record<string, string>;
+    fileReceiptSha256s: Record<string, string>;
   },
-  validateCurrentObjects = true,
 ): Record<string, unknown> {
   const receipt = readDurableJson(path);
+  exactShape(receipt, [
+    "version", "kind", "disposition_id", "payload_fingerprint", "owner_session_id",
+    "repository_root", "target_directory", "directory_identity", "directory_receipt_path",
+    "directory_receipt_sha256", "files", "created_at",
+  ], "future bundle ownership receipt");
   if (
-    receipt.version !== 1
+    receipt.version !== 2
     || receipt.kind !== "future-bundle-ownership"
     || receipt.disposition_id !== expected.dispositionId
     || receipt.payload_fingerprint !== expected.payloadFingerprint
     || receipt.owner_session_id !== expected.ownerSessionId
     || receipt.repository_root !== expected.repositoryRoot
     || receipt.target_directory !== expected.targetDirectory
+    || receipt.directory_receipt_path !== expected.directoryReceiptPath
+    || receipt.directory_receipt_sha256 !== expected.directoryReceiptSha256
   ) throw new Error(`future bundle ownership receipt does not match transaction identity: ${path}`);
-  identity(receipt.directory_identity, "future bundle directory identity");
-  if (validateCurrentObjects) {
-    assertFilesystemIdentity(
-      expected.targetDir,
-      receipt.directory_identity,
-      "directory",
-      "future bundle directory identity",
-    );
+  exactHash(receipt.directory_receipt_sha256, "future bundle directory receipt hash");
+  exactTimestamp(receipt.created_at, "future bundle ownership created_at");
+  const bundleDirectoryIdentity = identity(receipt.directory_identity, "future bundle directory identity");
+  const directoryReceipt = validateFutureOwnershipReceipt(expected.directoryReceiptPath, {
+    dispositionId: expected.dispositionId, payloadFingerprint: expected.payloadFingerprint,
+    ownerSessionId: expected.ownerSessionId, repositoryRoot: expected.repositoryRoot,
+    baseHead: expected.baseHead,
+    targetDirectory: expected.targetDirectory,
+  });
+  if (sha256(readDurableFile(expected.directoryReceiptPath)) !== expected.directoryReceiptSha256) {
+    throw new Error("future directory receipt hash does not match bundle graph");
+  }
+  if (canonicalJson(identity(directoryReceipt.directory_identity, "future directory receipt identity")) !== canonicalJson(bundleDirectoryIdentity)) {
+    throw new Error("future bundle directory identity is not cross-bound to its creation receipt");
   }
   const files = object(receipt.files, "future bundle file identities");
   const documentEntries: Array<[string, string]> = [
@@ -940,20 +1050,29 @@ function validateBundleOwnershipReceipt(
     ["REQUIREMENTS.md", expected.documents.requirements_markdown],
     ["DECISIONS.md", expected.documents.decisions_markdown],
   ];
-  if (!sameStrings(Object.keys(files), documentEntries.map(([name]) => name))) {
-    throw new Error("future bundle ownership receipt does not contain exactly the owned files");
-  }
+  exactShape(files, documentEntries.map(([name]) => name), "future bundle files");
   for (const [name, content] of documentEntries) {
     const entry = object(files[name], `future bundle ownership entry ${name}`);
-    if (entry.sha256 !== sha256(content)) throw new Error(`future bundle ownership hash mismatch: ${name}`);
-    identity(entry.filesystem_identity, `future bundle file identity ${name}`);
-    if (validateCurrentObjects) {
-      assertFilesystemIdentity(
-        join(expected.targetDir, name),
-        entry.filesystem_identity,
-        "file",
-        `future bundle file identity ${name}`,
-      );
+    exactShape(entry, ["sha256", "filesystem_identity", "creation_receipt_path", "creation_receipt_sha256"], `future bundle ownership entry ${name}`);
+    if (
+      entry.sha256 !== sha256(content)
+      || entry.creation_receipt_path !== expected.fileReceiptPaths[name]
+      || entry.creation_receipt_sha256 !== expected.fileReceiptSha256s[name]
+    ) throw new Error(`future bundle ownership graph mismatch: ${name}`);
+    exactHash(entry.sha256, `future bundle hash ${name}`);
+    exactHash(entry.creation_receipt_sha256, `future file receipt hash ${name}`);
+    const fileReceipt = validateFileOwnershipReceipt(expected.fileReceiptPaths[name], {
+      dispositionId: expected.dispositionId, payloadFingerprint: expected.payloadFingerprint,
+      ownerSessionId: expected.ownerSessionId, repositoryRoot: expected.repositoryRoot,
+      targetDirectory: expected.targetDirectory, name, content,
+      directoryReceiptSha256: expected.directoryReceiptSha256,
+    });
+    if (sha256(readDurableFile(expected.fileReceiptPaths[name])) !== expected.fileReceiptSha256s[name]) {
+      throw new Error(`future file receipt hash does not match bundle graph: ${name}`);
+    }
+    const bundleFileIdentity = identity(entry.filesystem_identity, `future bundle file identity ${name}`);
+    if (canonicalJson(bundleFileIdentity) !== canonicalJson(identity(fileReceipt.filesystem_identity, `future file receipt identity ${name}`))) {
+      throw new Error(`future bundle file identity is not cross-bound to its creation receipt: ${name}`);
     }
   }
   return receipt;
@@ -968,97 +1087,144 @@ async function validateVerifiedFutureSuccess(
     dispositionId: string;
     payloadFingerprint: string;
     ownerSessionId: string;
+    ownerSessionFile: string;
     repositoryRoot: string;
     baseHead: string;
     targetDirectory: string;
     ownershipPath: string;
+    fileOwnershipPaths: Record<string, string>;
     bundleOwnershipPath: string;
-    indexPath: string;
-    targetDir: string;
+    treeEvidencePath: string;
     ownedPaths: string[];
     documents: DispositionParams["documents"];
   },
 ): Promise<string> {
-  const commit = transaction.commit_sha;
-  const oidFields = [
-    "base_head",
-    "remote_base_head",
-    "private_tree",
-    "commit_object_sha",
-    "commit_sha",
-    "verified_head",
-    "verified_upstream_head",
-    "verified_remote_head",
-    "remote_oid_before_push",
-  ];
-  for (const field of oidFields) {
-    const value = transaction[field];
-    if (value !== undefined && (typeof value !== "string" || !GIT_OID.test(value))) {
-      throw new Error(`verified-success journal has an invalid ${field} object ID`);
-    }
-  }
+  exactShape(transaction, [
+    "version", "kind", "status", "phase", "disposition_id", "payload_fingerprint",
+    "disposition", "slug", "bundle_sha256", "owner_session_id", "owner_session_file",
+    "repository_root", "git_common_dir", "branch", "base_head", "target_directory",
+    "owned_paths", "document_hashes", "receipts", "commit", "publication",
+    "episode_resources_allocated",
+  ], "verified-success journal");
   if (
-    transaction.status !== "verified-success"
-    || transaction.phase !== "pushed-and-clean"
-    || typeof commit !== "string"
+    transaction.version !== 2 || transaction.kind !== "future-verified-success"
+    || transaction.status !== "verified-success" || transaction.phase !== "pushed-and-clean"
+    || transaction.disposition_id !== expected.dispositionId
+    || transaction.payload_fingerprint !== expected.payloadFingerprint
+    || transaction.disposition !== "future"
+    || transaction.owner_session_id !== expected.ownerSessionId
+    || transaction.owner_session_file !== expected.ownerSessionFile
+    || transaction.repository_root !== expected.repositoryRoot
+    || transaction.git_common_dir !== state.commonDir
     || transaction.base_head !== expected.baseHead
-    || transaction.remote_base_head !== expected.baseHead
-    || transaction.commit_object_sha !== commit
-    || transaction.verified_head !== commit
-    || transaction.verified_upstream_head !== commit
-    || transaction.verified_remote_head !== commit
-    || (transaction.remote_oid_before_push !== undefined
-      && transaction.remote_oid_before_push !== expected.baseHead
-      && transaction.remote_oid_before_push !== commit)
-    || typeof transaction.private_tree !== "string"
-    || transaction.checkout_clean !== true
+    || transaction.target_directory !== expected.targetDirectory
     || transaction.episode_resources_allocated !== false
-    || transaction.ownership_receipt_path !== expected.ownershipPath
-    || transaction.bundle_ownership_receipt_path !== expected.bundleOwnershipPath
-    || transaction.private_index_path !== expected.indexPath
-    || typeof transaction.private_index_sha256 !== "string"
-    || !/^[0-9a-f]{64}$/.test(transaction.private_index_sha256)
-  ) {
-    throw new Error("verified-success journal is missing required success invariants");
+    || transaction.bundle_sha256 !== sha256(canonicalJson(expected.documents))
+  ) throw new Error("verified-success journal is missing required immutable invariants");
+  exactOid(transaction.base_head, "verified-success base_head");
+  if (transaction.slug !== expected.targetDirectory.split("/").at(-1)) throw new Error("verified-success slug mismatch");
+  if (!Array.isArray(transaction.owned_paths) || transaction.owned_paths.length !== expected.ownedPaths.length
+    || transaction.owned_paths.some((path, index) => path !== expected.ownedPaths[index])) {
+    throw new Error("verified-success owned_paths must be the exact ordered bundle paths");
   }
-  validateFutureOwnershipReceipt(expected.ownershipPath, {
-    dispositionId: expected.dispositionId,
-    payloadFingerprint: expected.payloadFingerprint,
-    ownerSessionId: expected.ownerSessionId,
-    repositoryRoot: expected.repositoryRoot,
-    baseHead: expected.baseHead,
-    targetDirectory: expected.targetDirectory,
-  });
-  validateBundleOwnershipReceipt(expected.bundleOwnershipPath, {
-    dispositionId: expected.dispositionId,
-    payloadFingerprint: expected.payloadFingerprint,
-    ownerSessionId: expected.ownerSessionId,
-    repositoryRoot: expected.repositoryRoot,
-    targetDirectory: expected.targetDirectory,
-    targetDir: expected.targetDir,
-    documents: expected.documents,
-  }, false);
-  const commitTree = (await git(pi, cwd, ["rev-parse", `${commit}^{tree}`], undefined)).trim();
-  if (commitTree !== transaction.private_tree) {
-    throw new Error("verified-success private tree does not equal the committed tree");
+  const branch = object(transaction.branch, "verified-success branch");
+  exactShape(branch, ["local", "upstream", "remote", "remote_branch"], "verified-success branch");
+  if (branch.local !== state.currentBranch || branch.upstream !== state.upstream
+    || branch.remote !== state.remote || branch.remote_branch !== state.remoteBranch) {
+    throw new Error("verified-success branch configuration does not match the canonical repository");
   }
-  const hashes = object(transaction.document_hashes, "verified future document hashes");
+  const hashes = object(transaction.document_hashes, "verified-success document hashes");
+  exactShape(hashes, ["SPECIFICATION.md", "REQUIREMENTS.md", "DECISIONS.md"], "verified-success document hashes");
   const expectedHashes: Record<string, string> = {
     "SPECIFICATION.md": sha256(expected.documents.specification_markdown),
     "REQUIREMENTS.md": sha256(expected.documents.requirements_markdown),
     "DECISIONS.md": sha256(expected.documents.decisions_markdown),
   };
-  if (Object.entries(expectedHashes).some(([name, hash]) => hashes[name] !== hash)) {
-    throw new Error("verified-success journal document hashes do not match the disposition bundle");
+  for (const [name, hash] of Object.entries(expectedHashes)) {
+    if (hashes[name] !== hash) throw new Error(`verified-success document hash mismatch: ${name}`);
+    exactHash(hashes[name], `verified-success document hash ${name}`);
   }
-  const parent = (await git(pi, cwd, ["rev-parse", `${commit}^`], undefined)).trim();
-  if (parent !== expected.baseHead) throw new Error("verified future commit parent does not match recorded base");
-  await validateCommitBundle(pi, cwd, commit, expected.ownedPaths, expected.documents);
-  const remoteOid = await remoteRefOid(pi, cwd, state.remote, state.remoteBranch);
-  if (remoteOid !== commit && !(await gitIsAncestor(pi, cwd, commit, remoteOid))) {
-    throw new Error(`verified future commit ${commit} is not durable on actual remote ${remoteOid}`);
+  const receipts = object(transaction.receipts, "verified-success receipts");
+  exactShape(receipts, ["directory", "files", "bundle", "tree_evidence"], "verified-success receipts");
+  const directoryRef = object(receipts.directory, "verified-success directory receipt reference");
+  const bundleRef = object(receipts.bundle, "verified-success bundle receipt reference");
+  const treeEvidenceRef = object(receipts.tree_evidence, "verified-success tree evidence reference");
+  exactShape(directoryRef, ["path", "sha256"], "verified-success directory receipt reference");
+  exactShape(bundleRef, ["path", "sha256"], "verified-success bundle receipt reference");
+  exactShape(treeEvidenceRef, ["path", "sha256"], "verified-success tree evidence reference");
+  if (directoryRef.path !== expected.ownershipPath || bundleRef.path !== expected.bundleOwnershipPath
+    || treeEvidenceRef.path !== expected.treeEvidencePath) {
+    throw new Error("verified-success receipt paths do not match derived control paths");
   }
-  return remoteOid;
+  const directoryReceiptSha256 = exactHash(directoryRef.sha256, "verified-success directory receipt hash");
+  const bundleReceiptSha256 = exactHash(bundleRef.sha256, "verified-success bundle receipt hash");
+  const treeEvidenceSha256 = exactHash(treeEvidenceRef.sha256, "verified-success tree evidence hash");
+  if (sha256(readDurableFile(expected.ownershipPath)) !== directoryReceiptSha256
+    || sha256(readDurableFile(expected.bundleOwnershipPath)) !== bundleReceiptSha256
+    || sha256(readDurableFile(expected.treeEvidencePath)) !== treeEvidenceSha256) {
+    throw new Error("verified-success receipt bytes do not match their hashes");
+  }
+  const fileRefs = object(receipts.files, "verified-success file receipt references");
+  exactShape(fileRefs, ["SPECIFICATION.md", "REQUIREMENTS.md", "DECISIONS.md"], "verified-success file receipt references");
+  const fileReceiptSha256s: Record<string, string> = {};
+  for (const name of ["SPECIFICATION.md", "REQUIREMENTS.md", "DECISIONS.md"]) {
+    const ref = object(fileRefs[name], `verified-success file receipt reference ${name}`);
+    exactShape(ref, ["path", "sha256"], `verified-success file receipt reference ${name}`);
+    if (ref.path !== expected.fileOwnershipPaths[name]) throw new Error(`verified-success file receipt path mismatch: ${name}`);
+    const hash = exactHash(ref.sha256, `verified-success file receipt hash ${name}`);
+    if (sha256(readDurableFile(expected.fileOwnershipPaths[name])) !== hash) throw new Error(`verified-success file receipt bytes mismatch: ${name}`);
+    fileReceiptSha256s[name] = hash;
+  }
+  validateFutureOwnershipReceipt(expected.ownershipPath, {
+    dispositionId: expected.dispositionId, payloadFingerprint: expected.payloadFingerprint,
+    ownerSessionId: expected.ownerSessionId, repositoryRoot: expected.repositoryRoot,
+    baseHead: expected.baseHead, targetDirectory: expected.targetDirectory,
+  });
+  validateBundleOwnershipReceipt(expected.bundleOwnershipPath, {
+    dispositionId: expected.dispositionId, payloadFingerprint: expected.payloadFingerprint,
+    ownerSessionId: expected.ownerSessionId, repositoryRoot: expected.repositoryRoot,
+    baseHead: expected.baseHead, targetDirectory: expected.targetDirectory,
+    documents: expected.documents, directoryReceiptPath: expected.ownershipPath,
+    directoryReceiptSha256, fileReceiptPaths: expected.fileOwnershipPaths, fileReceiptSha256s,
+  });
+  const commit = object(transaction.commit, "verified-success commit");
+  exactShape(commit, ["oid", "tree", "parent", "changed_paths"], "verified-success commit");
+  const commitOid = exactOid(commit.oid, "verified-success commit oid");
+  const commitTree = exactOid(commit.tree, "verified-success commit tree");
+  const treeEvidence = readDurableJson(expected.treeEvidencePath);
+  exactShape(treeEvidence, ["version", "kind", "disposition_id", "base_head", "tree", "bundle_sha256", "modes"], "verified-success tree evidence");
+  const treeModes = object(treeEvidence.modes, "verified-success tree evidence modes");
+  exactShape(treeModes, ["SPECIFICATION.md", "REQUIREMENTS.md", "DECISIONS.md"], "verified-success tree evidence modes");
+  if (treeEvidence.version !== 1 || treeEvidence.kind !== "future-tree-construction-evidence"
+    || treeEvidence.disposition_id !== expected.dispositionId || treeEvidence.base_head !== expected.baseHead
+    || treeEvidence.tree !== commitTree || treeEvidence.bundle_sha256 !== transaction.bundle_sha256
+    || Object.values(treeModes).some((mode) => mode !== "100644 blob")) {
+    throw new Error("verified-success tree evidence does not match the commit graph");
+  }
+  exactOid(treeEvidence.base_head, "verified-success tree evidence base");
+  exactOid(treeEvidence.tree, "verified-success tree evidence tree");
+  if (commit.parent !== expected.baseHead) throw new Error("verified-success commit parent record mismatch");
+  exactOid(commit.parent, "verified-success commit parent");
+  if (!Array.isArray(commit.changed_paths) || commit.changed_paths.length !== expected.ownedPaths.length
+    || commit.changed_paths.some((path, index) => path !== expected.ownedPaths[index])) {
+    throw new Error("verified-success changed_paths mismatch");
+  }
+  const actualTree = (await git(pi, cwd, ["rev-parse", `${commitOid}^{tree}`], undefined)).trim();
+  const actualParent = (await git(pi, cwd, ["rev-parse", `${commitOid}^`], undefined)).trim();
+  if (actualTree !== commitTree || actualParent !== expected.baseHead) throw new Error("verified-success commit relationships are invalid");
+  await validateCommitBundle(pi, cwd, commitOid, expected.ownedPaths, expected.documents);
+  const publication = object(transaction.publication, "verified-success publication");
+  exactShape(publication, ["verified_head", "verified_upstream_head", "verified_remote_head", "checkout_clean", "verified_at"], "verified-success publication");
+  for (const field of ["verified_head", "verified_upstream_head", "verified_remote_head"] as const) {
+    if (exactOid(publication[field], `verified-success publication ${field}`) !== commitOid) throw new Error(`verified-success publication ${field} mismatch`);
+  }
+  if (publication.checkout_clean !== true) throw new Error("verified-success historical checkout was not clean");
+  exactTimestamp(publication.verified_at, "verified-success publication verified_at");
+  const historicalRemote = await remoteRefOid(pi, cwd, state.remote, state.remoteBranch);
+  if (historicalRemote !== commitOid && !(await gitIsAncestor(pi, cwd, commitOid, historicalRemote))) {
+    throw new Error(`verified future commit ${commitOid} is not durable on actual remote ${historicalRemote}`);
+  }
+  return commitOid;
 }
 
 async function reconcileFutureState(
@@ -1128,7 +1294,7 @@ async function reconcileFutureState(
         ? { exists: true, path: privateIndexPath, size: observed.size, sha256: observed.sha256 }
         : { exists: false };
     } catch (error) {
-      observationErrors.push(`private index: ${errorMessage(error)}`);
+      observationErrors.push(`tree evidence: ${errorMessage(error)}`);
     }
   }
 
@@ -1191,7 +1357,7 @@ async function reconcileFutureState(
     observed_target_entries: targetEntries,
     observed_owned_paths: Object.keys(observedFiles),
     observed_owned_files: observedFiles,
-    observed_private_index: privateIndex,
+    observed_tree_evidence: privateIndex,
     observed_commit: commitObservation,
     observation_errors: observationErrors,
   };
@@ -1289,7 +1455,7 @@ async function executeFutureTransaction(
   ];
 
   writeAttempt({ status: "waiting-for-lock", phase: transaction?.phase ?? "validated", observed_at: new Date().toISOString() });
-  let lock: ProjectLock;
+  let lock: ProjectLock | null = null;
   try {
     lock = acquireProjectLock(lockPath, dispositionId, sessionId);
   } catch (error) {
@@ -1376,15 +1542,18 @@ async function executeFutureTransaction(
         }
         const successBase = typeof transaction.base_head === "string" ? transaction.base_head : "";
         if (!GIT_OID.test(successBase)) throw new Error("verified-success journal has an invalid base object ID");
-        await validateVerifiedFutureSuccess(pi, cwd, state, transaction, {
+        const verifiedCommit = await validateVerifiedFutureSuccess(pi, cwd, state, transaction, {
           dispositionId,
           payloadFingerprint,
           ownerSessionId: sessionId,
+          ownerSessionFile: resolvedSessionFile,
           repositoryRoot: cwd,
           baseHead: successBase,
           targetDirectory: relativeDir,
           ownershipPath,
+          fileOwnershipPaths,
           bundleOwnershipPath,
+          treeEvidencePath: indexPath,
           indexPath,
           targetDir,
           ownedPaths,
@@ -1398,6 +1567,11 @@ async function executeFutureTransaction(
           : ["replay did not produce an observation error list"];
         if (observationErrors.length !== 0) {
           throw new Error(`verified-success replay observation failed: ${observationErrors.join("; ")}`);
+        }
+        const finalObservedRemote = observed.observed_remote_head;
+        if (typeof finalObservedRemote !== "string" || !GIT_OID.test(finalObservedRemote)
+          || (finalObservedRemote !== verifiedCommit && !(await gitIsAncestor(pi, cwd, verifiedCommit, finalObservedRemote)))) {
+          throw new Error("final replay observation does not prove success-commit reachability");
         }
       } catch (error) {
         const failure = errorMessage(error);
@@ -1438,37 +1612,29 @@ async function executeFutureTransaction(
           control_state_writes_performed: controlWrites(attemptPath),
         };
       }
+      writeAttempt({ status: "deduplicated-success", phase: "verified-success", observed_at: new Date().toISOString() });
+      const replayLock = lock;
+      lock = null;
+      releaseProjectLock(replayLock);
+      const replayCommit = exactOid(object(transaction.commit, "verified-success commit").oid, "verified-success commit oid");
+      await finalRemoteReachability(pi, cwd, state, replayCommit);
+      await testFault(pi, "before-success-blocker-cleanup");
       if (existsSync(blockerPath) && readDurableJson(blockerPath).disposition_id === dispositionId) {
         removeDurableFile(blockerPath);
       }
-      writeAttempt({ status: "deduplicated-success", phase: "verified-success", observed_at: new Date().toISOString() });
       const currentPaths = (observed.observed_status_paths as string[]) ?? [];
       return {
-        version: transaction.version,
-        disposition_id: transaction.disposition_id,
-        payload_fingerprint: transaction.payload_fingerprint,
-        disposition: transaction.disposition,
-        slug: transaction.slug,
-        bundle_sha256: transaction.bundle_sha256,
-        owner_session_id: transaction.owner_session_id,
-        repository_root: transaction.repository_root,
-        git_common_dir: transaction.git_common_dir,
-        target_directory: transaction.target_directory,
-        owned_paths: transaction.owned_paths,
-        status: transaction.status,
-        phase: transaction.phase,
-        commit_sha: transaction.commit_sha,
-        commit_object_sha: transaction.commit_object_sha,
-        private_tree: transaction.private_tree,
-        document_hashes: transaction.document_hashes,
-        ownership_receipt_path: transaction.ownership_receipt_path,
-        bundle_ownership_receipt_path: transaction.bundle_ownership_receipt_path,
-        verified_head: transaction.verified_head,
-        verified_upstream_head: transaction.verified_upstream_head,
-        verified_remote_head: transaction.verified_remote_head,
-        verified_at: transaction.verified_at,
-        episode_resources_allocated: false,
-        historical_checkout_clean: transaction.checkout_clean,
+        ...transaction,
+        commit_sha: replayCommit,
+        commit_object_sha: replayCommit,
+        private_tree: object(transaction.commit, "verified-success commit").tree,
+        ownership_receipt_path: ownershipPath,
+        bundle_ownership_receipt_path: bundleOwnershipPath,
+        verified_head: object(transaction.publication, "verified-success publication").verified_head,
+        verified_upstream_head: object(transaction.publication, "verified-success publication").verified_upstream_head,
+        verified_remote_head: object(transaction.publication, "verified-success publication").verified_remote_head,
+        verified_at: object(transaction.publication, "verified-success publication").verified_at,
+        historical_checkout_clean: true,
         checkout_clean: currentPaths.length === 0,
         current_checkout_clean: currentPaths.length === 0,
         current_status_paths: currentPaths,
@@ -1571,8 +1737,8 @@ async function executeFutureTransaction(
       || typeof transaction?.commit_sha === "string"
       || typeof transaction?.commit_object_sha === "string"
     );
-    if (transaction?.private_index_path !== undefined && transaction.private_index_path !== indexPath) {
-      throw new Error("future transaction private-index path does not match the derived control path");
+    if (transaction?.tree_evidence_path !== undefined && transaction.tree_evidence_path !== indexPath) {
+      throw new Error("future transaction tree-evidence path does not match the derived control path");
     }
     if (!GIT_OID.test(baseHead)) throw new Error("future transaction has an invalid recorded base object ID");
     if (typeof transaction?.commit_sha === "string" && !GIT_OID.test(transaction.commit_sha)) {
@@ -1595,9 +1761,8 @@ async function executeFutureTransaction(
       if (ownershipConsumedPreflight !== ownershipConsumedPath) {
         throw new Error("derived ownership-consumption path changed");
       }
-      if (existsSync(ownershipConsumedPreflight)) {
-        throw new Error("removal authority for this transaction was already consumed");
-      }
+      // An existing exact consumed manifest resumes an interrupted retirement.
+      // The helper verifies every manifest-bound destination before continuing.
       if (!productMutated || !ownershipProven || !existsSync(ownershipPath)) {
         throw new Error("refusing removal without immutable file ownership proof and a directory mutation guard");
       }
@@ -1618,9 +1783,13 @@ async function executeFutureTransaction(
         ownerSessionId: sessionId,
         repositoryRoot: cwd,
         targetDirectory: relativeDir,
-        targetDir,
         documents: params.documents,
-      }, false);
+        baseHead,
+        directoryReceiptPath: ownershipPath,
+        directoryReceiptSha256: sha256(readDurableFile(ownershipPath)),
+        fileReceiptPaths: fileOwnershipPaths,
+        fileReceiptSha256s: Object.fromEntries(Object.entries(fileOwnershipPaths).map(([name, path]) => [name, sha256(readDurableFile(path))])),
+      });
       if (typeof transaction.commit_sha === "string" || typeof transaction.commit_object_sha === "string") {
         throw new Error("cannot remove a future transaction after a commit object exists; inspect and reconcile the commit");
       }
@@ -1636,9 +1805,9 @@ async function executeFutureTransaction(
       }
       if (staged.length) await git(pi, cwd, ["restore", "--staged", "--", ...ownedPaths], undefined);
 
-      // Re-resolve all destructive control children after the final awaited Git
+      // Re-resolve all retirement control children after the final awaited Git
       // boundary, then revalidate object-bound product ownership. No await occurs
-      // again until the tombstone, product unlinks, and private-index unlink finish.
+      // before one helper retires the product and construction evidence.
       const ownershipConsumedPathAtUse = controlFilePath(
         base.state.commonDir,
         "future-ownership-consumed",
@@ -1648,18 +1817,20 @@ async function executeFutureTransaction(
         throw new Error("derived ownership-consumption path changed");
       }
       controlFilePath(base.state.commonDir, "indexes", `${dispositionId}.index`);
-      if (existsSync(ownershipConsumedPathAtUse)) {
-        throw new Error("removal authority for this transaction was already consumed");
-      }
+      // Existing exact consumed manifests resume in the helper.
       bundleReceipt = validateBundleOwnershipReceipt(bundleOwnershipPath, {
         dispositionId,
         payloadFingerprint,
         ownerSessionId: sessionId,
         repositoryRoot: cwd,
         targetDirectory: relativeDir,
-        targetDir,
         documents: params.documents,
-      }, false);
+        baseHead,
+        directoryReceiptPath: ownershipPath,
+        directoryReceiptSha256: sha256(readDurableFile(ownershipPath)),
+        fileReceiptPaths: fileOwnershipPaths,
+        fileReceiptSha256s: Object.fromEntries(Object.entries(fileOwnershipPaths).map(([name, path]) => [name, sha256(readDurableFile(path))])),
+      });
       const bundleFiles = object(bundleReceipt.files, "future bundle file identities");
       const removalFiles = documentEntries.map(([name, content]) => {
         const fileEntry = object(bundleFiles[name], `future bundle ownership entry ${name}`);
@@ -1667,13 +1838,31 @@ async function executeFutureTransaction(
           name,
           content,
           identity: identity(fileEntry.filesystem_identity, `future bundle file identity ${name}`),
+          retired_name: `product-${dispositionId}-${name}`,
         };
       });
-      if (typeof transaction.private_index_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(transaction.private_index_sha256)) {
-        throw new Error("refusing removal without a valid private-index ownership hash");
+      if (typeof transaction.tree_evidence_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(transaction.tree_evidence_sha256)) {
+        throw new Error("refusing removal without a valid tree-evidence ownership hash");
+      }
+      const existingManifest = existsSync(ownershipConsumedPathAtUse)
+        ? readDurableJson(ownershipConsumedPathAtUse) : null;
+      const treeLocation = controlLocation(indexPath);
+      const treeEvidence = secureFs<{ exists: boolean; sha256?: string; identity?: unknown }>({
+        operation: "read-file", root: treeLocation.root, path: treeLocation.relativePath, allow_missing: true,
+        root_identity: treeLocation.rootIdentity, parent_identity: treeLocation.parentIdentity,
+      });
+      let treeEvidenceIdentity: FilesystemIdentity;
+      if (treeEvidence.exists) {
+        if (treeEvidence.sha256 !== transaction.tree_evidence_sha256) throw new Error("tree evidence hash changed before retirement");
+        treeEvidenceIdentity = identity(treeEvidence.identity, "tree evidence removal identity");
+      } else {
+        if (!existingManifest) throw new Error("refusing removal without the exact tree-evidence object or retirement manifest");
+        const retirements = object(existingManifest.retirements, "consumed retirement manifest");
+        const tree = object(retirements.tree_evidence, "consumed tree evidence retirement");
+        treeEvidenceIdentity = identity(tree.identity, "consumed tree evidence identity");
       }
       const tombstone = {
-        version: 1,
+        version: 2,
         kind: "future-directory-ownership-consumed",
         disposition_id: dispositionId,
         payload_fingerprint: payloadFingerprint,
@@ -1683,22 +1872,39 @@ async function executeFutureTransaction(
         ownership_receipt_sha256: sha256(readDurableFile(ownershipPath)),
         bundle_ownership_receipt_sha256: sha256(readDurableFile(bundleOwnershipPath)),
         consumed_for: "remove-owned-uncommitted",
-        consumed_at: new Date().toISOString(),
+        retirements: {
+          files: Object.fromEntries(removalFiles.map((item) => [item.name, {
+            destination: item.retired_name, identity: item.identity, sha256: sha256(item.content),
+          }])),
+          tree_evidence: {
+            destination: `tree-${dispositionId}.index`, identity: treeEvidenceIdentity,
+            sha256: transaction.tree_evidence_sha256,
+          },
+        },
       };
-      const removal = secureFs<{ consumed_created: boolean }>({
+      if (existingManifest && canonicalJson(existingManifest) !== canonicalJson(tombstone)) {
+        throw new Error("existing consumed retirement manifest does not match immutable ownership evidence");
+      }
+      const removal = secureFs<{ consumed_created: boolean; retirement_complete: boolean }>({
         operation: "remove-bundle",
         repo: cwd,
         common_dir: base.state.commonDir,
+        common_identity: directoryAuthority(base.state.commonDir),
+        consumed_parent_identity: directoryAuthority(dirname(ownershipConsumedPathAtUse)),
+        indexes_identity: directoryAuthority(dirname(indexPath)),
+        quarantine_identity: directoryAuthority(ensureControlDirectory(base.state.commonDir, "quarantine")),
         target_path: relativeDir.split("\\").join("/"),
         directory_identity: identity(bundleReceipt.directory_identity, "future bundle directory identity"),
         files: removalFiles,
         consumed_name: `${dispositionId}.json`,
         tombstone_text: canonicalJson(tombstone),
-        index_name: `${dispositionId}.index`,
-        index_sha256: transaction.private_index_sha256,
+        tree_evidence_name: `${dispositionId}.index`,
+        tree_evidence_retired_name: `tree-${dispositionId}.index`,
+        tree_evidence_sha256: transaction.tree_evidence_sha256,
+        tree_evidence_identity: treeEvidenceIdentity,
       });
+      if (!removal.retirement_complete) throw new Error("owned retirement did not complete");
       ownershipConsumedCreated = removal.consumed_created;
-      if (!ownershipConsumedCreated) throw new Error("removal authority was not consumed safely");
       // Keep the shared future-plan parent. Its earlier absence is an observation,
       // not transaction-specific proof that this transaction exclusively created it.
       const after = await inspectCanonicalRepository(pi, cwd, undefined);
@@ -1852,7 +2058,7 @@ async function executeFutureTransaction(
         ownedDirectoryIdentity = identity(createdDirectory.identity, "created future directory identity");
         productMutated = true;
         ownershipCreated = createDurableJson(ownershipPath, {
-          version: 2,
+          version: 3,
           kind: "future-directory-ownership",
           disposition_id: dispositionId,
           payload_fingerprint: payloadFingerprint,
@@ -1897,7 +2103,7 @@ async function executeFutureTransaction(
           const createdIdentity = identity(createdFile.identity, `created future file identity ${name}`);
           productMutated = true;
           if (!createDurableJson(fileReceiptPath, {
-            version: 1,
+            version: 2,
             kind: "future-file-ownership",
             disposition_id: dispositionId,
             payload_fingerprint: payloadFingerprint,
@@ -1907,6 +2113,7 @@ async function executeFutureTransaction(
             name,
             sha256: sha256(content),
             filesystem_identity: createdIdentity,
+            directory_ownership_receipt_sha256: sha256(readDurableFile(ownershipPath)),
             created_at: new Date().toISOString(),
           })) throw new Error(`future file ownership receipt already exists: ${fileReceiptPath}`);
           fileOwnershipCreated.push(fileReceiptPath);
@@ -1925,6 +2132,7 @@ async function executeFutureTransaction(
           targetDirectory: relativeDir,
           name,
           content,
+          directoryReceiptSha256: sha256(readDurableFile(ownershipPath)),
         });
       }
       const documentHashes = validateOwnedBundle(futureRoot, targetDir, params.documents);
@@ -1939,9 +2147,15 @@ async function executeFutureTransaction(
           targetDirectory: relativeDir,
           name,
           content,
+          directoryReceiptSha256: sha256(readDurableFile(ownershipPath)),
         });
         const fileIdentity = identity(fileReceipt.filesystem_identity, `future file ownership identity ${name}`);
-        fileIdentities[name] = { sha256: sha256(content), filesystem_identity: fileIdentity };
+        fileIdentities[name] = {
+          sha256: sha256(content),
+          filesystem_identity: fileIdentity,
+          creation_receipt_path: fileOwnershipPaths[name],
+          creation_receipt_sha256: sha256(readDurableFile(fileOwnershipPaths[name])),
+        };
         snapshotFiles.push({ name, content, identity: fileIdentity });
       }
       const snapshot = secureFs<{ directory_identity: unknown }>({
@@ -1959,16 +2173,20 @@ async function executeFutureTransaction(
           ownerSessionId: sessionId,
           repositoryRoot: cwd,
           targetDirectory: relativeDir,
-          targetDir,
           documents: params.documents,
-        }, false);
+          baseHead,
+          directoryReceiptPath: ownershipPath,
+          directoryReceiptSha256: sha256(readDurableFile(ownershipPath)),
+          fileReceiptPaths: fileOwnershipPaths,
+          fileReceiptSha256s: Object.fromEntries(Object.entries(fileOwnershipPaths).map(([name, path]) => [name, sha256(readDurableFile(path))])),
+        });
         const recordedDirectory = identity(bundleReceipt.directory_identity, "future bundle directory identity");
         if (canonicalJson(recordedDirectory) !== canonicalJson(finalDirectoryIdentity)) {
           throw new Error("future bundle directory identity changed from immutable evidence");
         }
       } else {
         bundleOwnershipCreated = createDurableJson(bundleOwnershipPath, {
-          version: 1,
+          version: 2,
           kind: "future-bundle-ownership",
           disposition_id: dispositionId,
           payload_fingerprint: payloadFingerprint,
@@ -1976,6 +2194,8 @@ async function executeFutureTransaction(
           repository_root: cwd,
           target_directory: relativeDir,
           directory_identity: finalDirectoryIdentity,
+          directory_receipt_path: ownershipPath,
+          directory_receipt_sha256: sha256(readDurableFile(ownershipPath)),
           files: fileIdentities,
           created_at: new Date().toISOString(),
         });
@@ -2001,17 +2221,17 @@ async function executeFutureTransaction(
       if (current.head !== baseHead) throw new Error("HEAD changed before building the future commit");
 
       ensureControlDirectory(base.state.commonDir, "indexes");
-      removeOwnedPrivateIndex(base.state.commonDir, dispositionId, transaction);
-      transaction = { ...transaction, phase: "building-private-index", document_hashes: documentHashes, private_index_path: indexPath };
+      transaction = { ...transaction, phase: "building-exact-tree", document_hashes: documentHashes, tree_evidence_path: indexPath };
       replaceDurableJson(transactionPath, transaction);
-      await testFault(pi, "before-private-index-build");
-      // The helper opens `indexes` with O_DIRECTORY|O_NOFOLLOW, changes into
-      // that held directory object, and runs every private-index Git operation
-      // with a relative GIT_INDEX_FILE. A pathname swap cannot redirect Git.
+      await testFault(pi, "before-exact-tree-build");
+      // The helper opens `indexes` with O_DIRECTORY|O_NOFOLLOW and constructs
+      // the exact tree directly from trusted blobs. A pathname swap cannot
+      // redirect the retained construction evidence.
       ensureControlDirectory(base.state.commonDir, "indexes");
       const built = secureFs<Record<string, unknown>>({
         operation: "build-tree",
         common_dir: base.state.commonDir,
+        common_identity: directoryAuthority(base.state.commonDir),
         base_head: baseHead,
         target_path: relativeDir.split("\\").join("/"),
         names: documentEntries.map(([name]) => name),
@@ -2030,21 +2250,23 @@ async function executeFutureTransaction(
         bundle_sha256: bundleSha256,
         modes: Object.fromEntries(documentEntries.map(([name]) => [name, "100644 blob"])),
       };
-      if (!createDurableJson(indexPath, indexEvidence)) {
-        throw new Error("private tree-construction evidence already exists");
+      const indexEvidenceText = canonicalJson(indexEvidence);
+      if (!createDurableJson(indexPath, indexEvidence)
+        && sha256(readDurableFile(indexPath)) !== sha256(indexEvidenceText)) {
+        throw new Error("retained tree-construction evidence does not match the rebuilt exact tree");
       }
-      const indexEvidenceSha256 = sha256(canonicalJson(indexEvidence));
+      const indexEvidenceSha256 = sha256(indexEvidenceText);
       validateOwnedBundle(futureRoot, targetDir, params.documents);
       await validateTreeBundle(pi, cwd, tree, ownedPaths, params.documents);
 
       transaction = {
         ...transaction,
-        phase: "private-tree-built",
-        private_tree: tree,
-        private_index_sha256: indexEvidenceSha256,
+        phase: "exact-tree-built",
+        constructed_tree: tree,
+        tree_evidence_sha256: indexEvidenceSha256,
       };
       replaceDurableJson(transactionPath, transaction);
-      await testFault(pi, "private-tree-built");
+      await testFault(pi, "exact-tree-built");
 
       const message = `docs: incubate ${params.decision.slug} specification\n\nPrime-Claw-Disposition: ${dispositionId}`;
       commitObjectSha = (await git(
@@ -2077,8 +2299,8 @@ async function executeFutureTransaction(
       throw new Error(`canonical HEAD ${afterObject.head} is not the owned future commit ${commitObjectSha}`);
     }
 
-    // The private index made the commit without absorbing the shared primary
-    // index. Reconcile only the owned paths after the CAS ref update.
+    // Exact tree construction avoided the shared primary index. Reconcile only
+    // the owned paths after the CAS ref update.
     const reconcileStatus = porcelainPaths(afterObject.status);
     if (reconcileStatus.some((path) => !ownedPaths.includes(path))) {
       throw new Error(`unrelated paths appeared before primary-index reconciliation: ${reconcileStatus.join(", ")}`);
@@ -2092,7 +2314,6 @@ async function executeFutureTransaction(
     commitSha = commitObjectSha;
     transaction = { ...transaction, phase: "committed", commit_sha: commitSha };
     replaceDurableJson(transactionPath, transaction);
-    removeOwnedPrivateIndex(base.state.commonDir, dispositionId, transaction);
 
     const beforePush = await inspectCanonicalRepository(pi, cwd, undefined);
     const remoteBeforePush = await remoteRefOid(pi, cwd, beforePush.remote, beforePush.remoteBranch);
@@ -2148,35 +2369,95 @@ async function executeFutureTransaction(
     if (!sameStrings(await commitPaths(pi, cwd, commitSha), ownedPaths)) {
       throw new Error("verified future commit path set no longer matches the owned bundle");
     }
-    transaction = {
-      ...transaction,
+    const successTree = (await git(pi, cwd, ["rev-parse", `${commitSha}^{tree}`], undefined)).trim();
+    const fileReceiptRefs = Object.fromEntries(Object.entries(fileOwnershipPaths).map(([name, path]) => [name, {
+      path,
+      sha256: sha256(readDurableFile(path)),
+    }]));
+    const successProof: Record<string, unknown> = {
+      version: 2,
+      kind: "future-verified-success",
       status: "verified-success",
       phase: "pushed-and-clean",
-      commit_sha: commitSha,
-      verified_head: verified.head,
-      verified_upstream_head: verified.upstreamHead,
-      verified_remote_head: remoteAfterPush,
-      checkout_clean: true,
-      verified_at: new Date().toISOString(),
-      product_resource_mutation_performed: true,
-      next_safe_action: "future specification is durable; no episode resource was allocated",
+      disposition_id: dispositionId,
+      payload_fingerprint: payloadFingerprint,
+      disposition: "future",
+      slug: params.decision.slug,
+      bundle_sha256: bundleSha256,
+      owner_session_id: sessionId,
+      owner_session_file: resolvedSessionFile,
+      repository_root: cwd,
+      git_common_dir: state.commonDir,
+      branch: {
+        local: verified.currentBranch,
+        upstream: verified.upstream,
+        remote: verified.remote,
+        remote_branch: verified.remoteBranch,
+      },
+      base_head: baseHead,
+      target_directory: relativeDir,
+      owned_paths: ownedPaths,
+      document_hashes: {
+        "SPECIFICATION.md": sha256(params.documents.specification_markdown),
+        "REQUIREMENTS.md": sha256(params.documents.requirements_markdown),
+        "DECISIONS.md": sha256(params.documents.decisions_markdown),
+      },
+      receipts: {
+        directory: { path: ownershipPath, sha256: sha256(readDurableFile(ownershipPath)) },
+        files: fileReceiptRefs,
+        bundle: { path: bundleOwnershipPath, sha256: sha256(readDurableFile(bundleOwnershipPath)) },
+        tree_evidence: { path: indexPath, sha256: sha256(readDurableFile(indexPath)) },
+      },
+      commit: { oid: commitSha, tree: successTree, parent: baseHead, changed_paths: ownedPaths },
+      publication: {
+        verified_head: verified.head,
+        verified_upstream_head: verified.upstreamHead,
+        verified_remote_head: remoteAfterPush,
+        checkout_clean: true,
+        verified_at: new Date().toISOString(),
+      },
       episode_resources_allocated: false,
     };
-    replaceDurableJson(transactionPath, transaction);
+    transaction = successProof;
+    preserveSuccessEvidence = true;
+    replaceDurableJson(transactionPath, successProof);
+    const persistedSuccess = readDurableJson(transactionPath);
+    await validateVerifiedFutureSuccess(pi, cwd, verified, persistedSuccess, {
+      dispositionId, payloadFingerprint, ownerSessionId: sessionId, ownerSessionFile: resolvedSessionFile,
+      repositoryRoot: cwd, baseHead, targetDirectory: relativeDir, ownershipPath,
+      fileOwnershipPaths, bundleOwnershipPath, treeEvidencePath: indexPath, ownedPaths, documents: params.documents,
+    });
     await testFault(pi, "success-journal-written");
+    writeAttempt({ status: "verified-success", phase: "pushed-and-clean", commit_sha: commitSha, observed_at: new Date().toISOString() });
+    const successLock = lock;
+    lock = null;
+    releaseProjectLock(successLock);
+    await finalRemoteReachability(pi, cwd, verified, commitSha);
+    await testFault(pi, "before-success-blocker-cleanup");
     if (existsSync(blockerPath)) {
       const blocker = readDurableJson(blockerPath);
       if (blocker.disposition_id === dispositionId) removeDurableFile(blockerPath);
     }
-    writeAttempt({ status: "verified-success", phase: "pushed-and-clean", commit_sha: commitSha, observed_at: new Date().toISOString() });
     return {
-      ...transaction,
+      ...successProof,
+      commit_sha: commitSha,
+      commit_object_sha: commitSha,
+      private_tree: successTree,
+      ownership_receipt_path: ownershipPath,
+      bundle_ownership_receipt_path: bundleOwnershipPath,
+      verified_head: verified.head,
+      verified_upstream_head: verified.upstreamHead,
+      verified_remote_head: remoteAfterPush,
+      verified_at: object(successProof.publication, "success publication").verified_at,
+      checkout_clean: true,
+      product_resource_mutation_performed: true,
       preflight_receipt_path: base.receiptPath,
       transaction_path: transactionPath,
       attempt_path: attemptPath,
       deduplicated: false,
       control_state_writes_performed: controlWrites(transactionPath, attemptPath),
     };
+
   } catch (error) {
     const failure = errorMessage(error);
     if (preserveSuccessEvidence) {
@@ -2268,14 +2549,14 @@ async function executeFutureTransaction(
     };
   } finally {
     try {
-      releaseProjectLock(lock);
+      if (lock) releaseProjectLock(lock);
     } catch (error) {
       lockReleaseError = errorMessage(error);
       writeAttempt({
         status: "lock-release-failed",
         phase: transaction?.phase ?? "unknown",
         error: lockReleaseError,
-        lock_path: lock.path,
+        lock_path: lock?.path ?? lockPath,
         next_safe_action: "inspect the token-matched lock before any further mutation",
         observed_at: new Date().toISOString(),
       });
@@ -2302,6 +2583,13 @@ async function executeDisposition(
   if (managerCwd !== cwd) throw new Error("session CWD does not match the extension execution root");
   const resolvedSessionFile = validateSessionFile(sessionFile, sessionId, cwd);
   const state = await inspectCanonicalRepository(pi, cwd, signal);
+  const platform = secureFs<{ repo_identity: unknown; common_identity: unknown }>({
+    operation: "platform-preflight",
+    repo: state.repoRoot,
+    common_dir: state.commonDir,
+  });
+  identity(platform.repo_identity, "repository filesystem identity preflight");
+  bindDirectoryAuthority(state.commonDir, platform.common_identity, "Git common filesystem identity preflight");
   if (params.decision.kind === "episode") {
     await git(pi, cwd, ["check-ref-format", "--branch", params.decision.branch_name!], signal);
   }

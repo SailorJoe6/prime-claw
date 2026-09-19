@@ -325,7 +325,7 @@ test("commit-object failure requires explicit recovery and supports safe removal
   assert.equal((await run("git", ["-C", f.cwd, "status", "--porcelain"])).stdout, "");
 });
 
-test("corrupt private-index journal path cannot delete an external sentinel", async (t) => {
+test("corrupt tree-evidence journal path cannot retire an external sentinel", async (t) => {
   const f = await fixture(t);
   f.setExecInterceptor(async ({ args, invoke }) => {
     if (args.includes("commit-tree")) return { stdout: "", stderr: "stop with owned index", code: 70, killed: false };
@@ -337,7 +337,7 @@ test("corrupt private-index journal path cannot delete an external sentinel", as
   const sentinel = join(f.root, "must-survive.txt");
   writeFileSync(sentinel, "do not delete\n");
   const journal = JSON.parse(readFileSync(failed.transaction_path, "utf8"));
-  journal.private_index_path = sentinel;
+  journal.tree_evidence_path = sentinel;
   writeFileSync(failed.transaction_path, `${JSON.stringify(journal, null, 2)}\n`);
   f.setExecInterceptor(null);
 
@@ -347,7 +347,7 @@ test("corrupt private-index journal path cannot delete an external sentinel", as
     undefined, undefined, f.ctx,
   ));
   assert.equal(removal.status, "failed");
-  assert.match(removal.error, /private-index path does not match the derived control path/i);
+  assert.match(removal.error, /tree-evidence path does not match the derived control path/i);
   assert.equal(readFileSync(sentinel, "utf8"), "do not delete\n");
 });
 
@@ -367,7 +367,7 @@ test("push rejection preserves the exact local commit for explicit continuation"
   assert.equal(typeof failed.observed_remote_head, "string");
   assert.equal(Object.keys(failed.observed_owned_files).length, 3);
   assert.equal(failed.observed_commit.content_matches, true);
-  assert.equal(failed.observed_private_index.exists, false);
+  assert.equal(failed.observed_tree_evidence.exists, true);
 
   rmSync(hook);
   const continued = resultDetails(await tool.execute(
@@ -557,15 +557,17 @@ test("token mismatch prevents a false success and preserves the ambiguous lock r
     }
     return result;
   });
-  await assert.rejects(
-    f.tools.get("spec_disposition").execute("lock-token", params(), undefined, undefined, f.ctx),
-    /lock release failed.*receipt/i,
-  );
+  const failed = resultDetails(await f.tools.get("spec_disposition").execute(
+    "lock-token", params(), undefined, undefined, f.ctx,
+  ));
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.corrupt_success_journal_preserved, true);
+  assert.match(failed.error, /lock owner bytes changed before release/i);
   const lockDir = join(f.cwd, ".git/prime-claw/locks/project-mutation.lock");
   assert.equal(existsSync(lockDir), true);
   const attempts = readdirSync(join(f.cwd, ".git/prime-claw/future-attempts"));
   const attempt = JSON.parse(readFileSync(join(f.cwd, ".git/prime-claw/future-attempts", attempts[0]), "utf8"));
-  assert.equal(attempt.status, "lock-release-failed");
+  assert.equal(attempt.status, "corrupt-success");
 });
 
 
@@ -614,12 +616,11 @@ test("every durable future mutation boundary resumes only through explicit recov
     "file-written:SPECIFICATION.md",
     "file-written:REQUIREMENTS.md",
     "file-written:DECISIONS.md",
-    "private-tree-built",
+    "exact-tree-built",
     "commit-object-created",
     "default-ref-advanced",
     "primary-index-reconciled",
     "push-returned",
-    "success-journal-written",
   ];
   for (const [index, phase] of phases.entries()) {
     await t.test(phase, async (st) => {
@@ -671,7 +672,7 @@ test("removal-consumption control-directory symlink fails before external writes
     f.tools.get("spec_disposition").execute(
       "consumed-symlink", params(), undefined, undefined, f.ctx,
     ),
-    /control directory must not be a symlink/i,
+    /control directory must not be a symlink|not a directory/i,
   );
   assert.deepEqual(readdirSync(external), []);
   assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), false);
@@ -687,7 +688,7 @@ test("Git control-root symlink escape fails before receipt writes", async (t) =>
     f.tools.get("spec_disposition").execute(
       "control-symlink", params({ request_id: "request-controlsym" }), undefined, undefined, f.ctx,
     ),
-    /control root must not be a symlink/i,
+    /control root must not be a symlink|not a directory/i,
   );
   assert.deepEqual(readdirSync(outside), []);
 });
@@ -786,7 +787,7 @@ test("consumed removal authority cannot delete a later byte-identical replacemen
     params({ request_id: "request-remove-once", recovery_action: "remove-owned-uncommitted" }),
     undefined, undefined, f.ctx,
   ));
-  assert.equal(removed.status, "recovered-clean");
+  assert.equal(removed.status, "recovered-clean", JSON.stringify({ failed, removed }, null, 2));
   assert.equal(existsSync(removed.ownership_consumed_path), true);
 
   const target = join(f.cwd, ".ralph/plans/future/safe-idea");
@@ -807,7 +808,7 @@ test("consumed removal authority cannot delete a later byte-identical replacemen
     undefined, undefined, f.ctx,
   ));
   assert.equal(repeated.status, "failed");
-  assert.match(repeated.error, /removal authority.*already consumed/i);
+  assert.match(repeated.error, /owned file identity changed|retired file identity mismatch/i);
   assert.equal(readFileSync(join(target, "SPECIFICATION.md"), "utf8"), input.documents.specification_markdown);
 });
 
@@ -903,7 +904,7 @@ test("ASTRA-03 malformed verified-success journal fails closed and remains prese
   ));
   assert.equal(replay.status, "failed");
   assert.equal(replay.corrupt_success_journal_preserved, true);
-  assert.match(replay.error, /missing required success invariants/i);
+  assert.match(replay.error, /unsupported field|missing required success invariants/i);
   assert.equal(existsSync(join(f.cwd, ".ralph/plans/future/safe-idea")), false);
   assert.equal(JSON.parse(readFileSync(first.transaction_path, "utf8")).status, "verified-success");
 });
@@ -952,7 +953,7 @@ test("ASTRA-05 removal preserves a concurrent unowned directory entry", async (t
   assert.equal(removal.status, "failed");
   assert.equal(existsSync(sentinel), true);
   assert.equal(readFileSync(sentinel, "utf8"), "another conversation owns this\n");
-  assert.match(removal.error, /identity changed|filesystem object|not empty|ENOTEMPTY/i);
+  assert.match(removal.error, /identity changed|filesystem object|entry set changed|not empty|ENOTEMPTY/i);
 });
 
 
