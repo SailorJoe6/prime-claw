@@ -201,3 +201,30 @@ confuse liveness inspection, consume runtime resources, and risk acting on the
 wrong invocation. Artifact-first recursive teardown preserves auditability while
 making “fresh, short-lived reviewer” an enforceable lifecycle rather than a
 prompt convention.
+
+
+## D-CO-20 — Separate transport acknowledgement from native-command admission
+
+**Decision:** The conversation dispatches a native episode command only after an
+idle/not-compacting/empty-queue preflight tied to the stable episode, expected
+active session, Git/gate boundary, logical transition identity, and transcript
+cursor. Daemon `prompt` success and RPC IDs are transport acknowledgements only;
+they never authorize waiting, progression, or exactly-once claims. The owner
+immediately checks for a persisted native-command or transition-state admission.
+If none exists, it checks stable evidence and asks the episode once about hidden
+events. Proven absence plus a newly idle target permits one retry of the same
+logical transition. A second non-admission or unresolved ambiguity pauses and
+calls the human. Long-work heartbeats begin only after admission and compute
+elapsed time from actual timestamps, not scheduled interval assumptions.
+
+**Satisfies:** R-CO-9, R-CO-10, R-CO-12, R-CO-31, R-CO-32, R-CO-51,
+R-CO-57, R-CO-58, R-CO-59.
+
+**Rationale:** During the ASTRA-10–15 same-Slice-2 handoff, `/handoff` was sent
+while the episode was finishing another turn. The daemon returned
+`success: true` with RPC ID `daemon_2`, but no command entry, compaction, or
+`execute` transition was persisted. The owner mistakenly treated transport
+success as admission and left both agents idle. The same RPC ID appeared on the
+later successful retry, proving it was neither unique nor durable. Idle
+preflight, prompt admission evidence, and bounded same-identity recovery prevent
+both silent command loss and blind duplicate transitions.

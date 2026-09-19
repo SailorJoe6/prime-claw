@@ -262,8 +262,13 @@ canonical `execute` exactly once after successful compaction.
 Every transition requires:
 
 - confirmation that the intended command is registered in the episode runtime;
-- a unique admission/transition identity;
-- an accepted-command receipt;
+- pre-dispatch proof that the intended stable episode and active session are
+  idle, not compacting, have no queued turn, and remain at the expected durable
+  Git/gate boundary;
+- a unique logical transition identity and pre-dispatch transcript cursor;
+- a transport acknowledgement that is explicitly not treated as admission;
+- durable admission evidence in the stable episode transcript or transition
+  state, such as the expanded native command entry;
 - observation of the expected persisted boundary, such as compaction;
 - inspection of the resulting compaction summary;
 - proof that the summary identifies the correct approved next phase or failed-
@@ -277,6 +282,20 @@ being adjudicated. If auto-compaction races with late findings or produces a
 stale primer, the conversation must not advance on that summary. It shall finish
 persisting the findings and run a controlled guided handoff whose verified
 summary supersedes the stale one.
+
+A daemon `prompt` response with `success: true` proves only transport handling.
+Its RPC ID may repeat and is not a command receipt. The conversation performs a
+short admission check immediately after dispatch; the long episode-work
+heartbeat is not a substitute. If no admission is persisted, it inspects the
+stable transcript/state and asks the episode once whether any command,
+compaction, error, or phase injection occurred. Only after absence is proven and
+the episode is idle may it retry the same logical transition once. Persistent
+ambiguity or a second non-admission pauses and escalates rather than leaving both
+agents idle or blindly resending.
+
+Heartbeat and timeout decisions use actual persisted event and observation
+timestamps. A delayed or coalesced heartbeat delivery never counts as elapsed
+watch time merely because its nominal interval passed.
 
 Messages used for collaboration are not interchangeable with command dispatch.
 Simultaneous TUI observation must remain safe, and operator steering takes
@@ -363,3 +382,7 @@ cancellation, missed reply, bootstrap/admission race, nested reviewer descendant
 and owner restart between artifact preservation and deletion. Every case must
 end with durable evidence or a durable failure record and no orphaned live or
 idle EXPERT resource outside an explicit `cleanup-pending` retry state.
+Native-command tests must also reproduce transport success while a busy episode
+drops admission, repeated/non-unique RPC IDs, proven-absent same-identity retry,
+ambiguous admission escalation, duplicate suppression, delayed heartbeat
+delivery, and exactly one eventual compaction and next-phase injection.
