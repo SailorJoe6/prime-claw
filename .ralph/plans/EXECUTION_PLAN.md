@@ -1,11 +1,12 @@
 # Execution Plan — Worktree-isolated specification episodes
 
 > **Status:** implementation in progress; Slice 1 is validated; candidate
-> `44b92f8` failed its fresh owner/formal EXPERT gate. ASTRA-10/11 remediation
-> is pushed at `e0cf297a5b047bad8811cb199969af89493d9430`. Owner transition
-> `a40489d7-38c1-4170-8b5e-c6f9c660f8b0` authorizes exactly the next bounded
-> ASTRA-17/24 same-Slice-2 task from that clean boundary. Slice 2 remains open;
-> ASTRA-25 and Slices 3–8 remain blocked.
+> `44b92f8` failed its fresh owner/formal EXPERT gate. ASTRA-10/11 and
+> ASTRA-17/24 remediation is pushed through
+> `d190cc4b280516318b66cf31753a1dba98991c21`. Owner transition
+> `dc0f2b07-726b-4fa3-b6c7-7a4170e7bc7c` authorizes exactly the final ASTRA-25
+> same-Slice-2 revision from that clean boundary. Slice 2 remains open; Slices
+> 3–8 remain blocked pending the combined candidate gate.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -23,7 +24,7 @@
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
 | 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed at Slice 1) |
-| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | ASTRA-17/24 bounded revision in progress from clean `e0cf297` | Transition `a40489d7-38c1-4170-8b5e-c6f9c660f8b0` implements ASTRA-17/24 only; ASTRA-25 and final owner/EXPERT acceptance remain pending |
+| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Final ASTRA-25 revision authorized from clean `d190cc4` | Transition `dc0f2b07-726b-4fa3-b6c7-7a4170e7bc7c` closes writer-validator transitions and produces the combined immutable Slice 2 candidate; fresh owner/EXPERT review remains required |
 | 3–8 | `prime-claw-h6w.4`–`.9` | Not started | Dependency-ordered below |
 
 Slice 1 evidence names the exact active-suite command. It does not claim a
@@ -418,6 +419,19 @@ Independent review first returned REVISE at `/Users/jlanders/.prime/agent/sessio
 `4ba275583c7460080c964bde61c536c1c5f1e21ab731d712ecb906c621fc7924`) for order-insensitive crash traces; persistent pre-exit
 traces closed the finding. Final read-only audit PASS is `/Users/jlanders/.prime/agent/session-artifacts/01a0b638-b392-778e-8c04-c5307740fc42/sub-bd380039/astra17-24-trace-audit.md`
 (SHA-256 `2e3d07827dfe8f77f102b2392a8f1b2e9db801eb0299d3450930b774872f3380`).
+
+Final authorized Slice 2 task: transition
+`dc0f2b07-726b-4fa3-b6c7-7a4170e7bc7c` resumes `prime-claw-h6w.3` from clean
+commit `d190cc4b280516318b66cf31753a1dba98991c21` and implements ASTRA-25 only.
+Close every normal/recovery/interruption/removal writer against its exact closed
+validator under R-WE-94/D-WE-23, including reopened R-WE-22/R-WE-90 and
+D-WE-21/D-WE-22. Enumerate permanent transition closure, repeatedly interrupt
+continuation and running-to-removed cleanup, and preserve malformed-success
+handling. Preserve all prior remediations and broad same-UID authority. Run the
+required Node and plan-active Python suites, update all authority/evidence,
+commit and push the combined immutable candidate, prove clean local/upstream/
+actual-remote identity, then stop for fresh owner/formal EXPERT review. Do not
+claim acceptance or start Slice 3; hazardous fixtures remain disposable.
 
 ### 2.5 Promoted episode transaction
 

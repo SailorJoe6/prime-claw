@@ -1,11 +1,12 @@
 # Specification — Worktree-isolated specification episodes
 
 > **Status:** implementation in progress; Slice 1 is validated; candidate
-> `44b92f8` failed its fresh owner/formal EXPERT gate. ASTRA-10/11 remediation
-> is pushed at `e0cf297a5b047bad8811cb199969af89493d9430`. Owner transition
-> `a40489d7-38c1-4170-8b5e-c6f9c660f8b0` authorizes exactly the next bounded
-> ASTRA-17/24 same-Slice-2 task from that clean boundary. Slice 2 remains open;
-> ASTRA-25 and later paths remain blocked.
+> `44b92f8` failed its fresh owner/formal EXPERT gate. ASTRA-10/11 and
+> ASTRA-17/24 remediation is pushed through
+> `d190cc4b280516318b66cf31753a1dba98991c21`. Owner transition
+> `dc0f2b07-726b-4fa3-b6c7-7a4170e7bc7c` authorizes exactly the final ASTRA-25
+> same-Slice-2 revision from that clean boundary. Slice 2 remains open; later
+> paths remain blocked pending the combined candidate gate.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -454,6 +455,20 @@ Post-fix evidence is exact combined Node 93/93, focused helper/identity Python
 platform skip, and inventory 2/2. Final independent trace audit PASS is
 `/Users/jlanders/.prime/agent/session-artifacts/01a0b638-b392-778e-8c04-c5307740fc42/sub-bd380039/astra17-24-trace-audit.md` (SHA-256 `2e3d07827dfe8f77f102b2392a8f1b2e9db801eb0299d3450930b774872f3380`). This remains intermediate ASTRA-17/24
 evidence; ASTRA-25 and owner/formal acceptance remain pending.
+
+Transition `dc0f2b07-726b-4fa3-b6c7-7a4170e7bc7c` authorizes the final bounded
+same-Slice-2 revision from clean commit
+`d190cc4b280516318b66cf31753a1dba98991c21`. Implement exactly ASTRA-25 writer-
+validator transition closure under R-WE-94/D-WE-23, including reopened
+R-WE-22/R-WE-90 and D-WE-21/D-WE-22 authority incorporated at `94ec196`.
+Preserve ASTRA-10/11, ASTRA-17/24, and all prior accepted Slice 2 behavior; do
+not narrow broad same-UID authority. Generate the combined immutable Slice 2
+candidate with permanent transition regressions, accurate docs/inventory/bead
+evidence, required Node and plan-active Python suites, exact commit/push, and
+clean local/upstream/actual-remote identity. Then stop for fresh owner and
+formal EXPERT review without claiming acceptance or starting Slice 3. All
+fault, restart, race, symlink, mount, inode, crash, and destructive fixtures
+remain disposable; live episode and owner resources remain protected.
 
 ## 6. Episode-creation behavior
 
