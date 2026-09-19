@@ -27,6 +27,10 @@ explicit extension and must not weaken a gate.
 - **R-CO-10 (GATE) — Atomic transitions.** Lifecycle mutations and shared records are atomic, idempotent, and scoped to project, conversation, and episode.
 - **R-CO-11 (GATE) — Exact evidence identity.** Every review and approval names an exact pushed commit and applicable artifact, requirement, plan slice, and bead.
 - **R-CO-12 (GATE) — No transcript-only authority.** Transcript prose and in-memory handles are not the sole source of lifecycle truth.
+- **R-CO-50 (GATE) — Owner-installed episode watch.** Immediately after every successful episode activation, the owning conversation installs a durable liveness watch before yielding control; episode reporting is a fast path, never the only completion signal.
+- **R-CO-51 (GATE) — Non-disruptive long observation.** Active-work polling uses a configurable long cadence, normally 15 minutes or more, observes without steering or interrupting the episode, and does not infer failure from one quiet interval.
+- **R-CO-52 (GATE) — Missed-report recovery.** When an episode is idle, completed, failed, or stale without its expected report, the conversation resolves its durable identity, inspects runtime activity plus authoritative oversight, Git, plan, and bead state, and independently recovers the review packet or escalates; runtime status and message delivery alone never approve a gate.
+- **R-CO-53 (GATE) — Restart-safe watch lifecycle.** Watch state, expected gate/report, last observation, and single-poller lease survive owner compaction and restart, follow stable episode identity across active-session changes, and remain active until verified terminal disposition or explicit operator cancellation.
 
 ## Review protocol
 
@@ -81,4 +85,4 @@ explicit extension and must not weaken a gate.
 
 - **R-CO-41 (GATE) — Manual-first evidence.** Autonomous release remains gated on operator acceptance of repeated manual oversight runs and recorded lessons.
 - **R-CO-42 (GATE) — Staged autonomy.** Adoption progresses from passive reporting through suggested decisions and operator-confirmed transitions to disposable autonomous dogfood.
-- **R-CO-43 (GATE) — End-to-end proof.** Tests and concurrent dogfood prove full lifecycle, fresh EXPERT review, triggers, escalation, command recovery, restart recovery, operator interruption, merge, cleanup, and non-interference.
+- **R-CO-43 (GATE) — End-to-end proof.** Tests and concurrent dogfood prove full lifecycle, fresh EXPERT review, triggers, escalation, command recovery, restart recovery, owner-watch recovery of a missing report without false-stale interruption, operator interruption, merge, cleanup, and non-interference.

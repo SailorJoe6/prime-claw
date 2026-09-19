@@ -77,11 +77,44 @@ the conversation. It shall identify at least:
 - EXPERT invocations and reports;
 - revision attempts and stagnation count;
 - native commands admitted and their receipts;
+- the owner-side liveness watch, last observation, expected report or gate, and
+  missed-report recovery state; and
 - blockers, human escalations, merge disposition, and cleanup state.
 
 The record must survive compaction, kernel loss, session restart, daemon restart,
 and owner resumption. State transitions must be atomic and idempotent. Transcript
 prose and in-memory handles are evidence, not the sole authority.
+
+### Owner-side episode watch
+
+Immediately after successfully activating an episode, the owning conversation
+shall install a durable liveness watch before it yields control. The watch is
+owned by the conversation, not the episode: an episode completion message is a
+useful fast path but cannot be the only mechanism that wakes the owner or
+advances review.
+
+The normal active-work observation cadence is deliberately long and
+configurable, with 15 minutes or more as the default class of interval. An
+episode can legitimately spend that long in tests, review, or one tool call.
+The watch therefore observes without interrupting or steering active work and
+does not infer failure from one quiet interval. Explicit episode reports may
+wake the owner sooner.
+
+Each observation resolves the durable episode identity even if its active
+session identifier changed, then compares runtime activity with the authoritative
+oversight record, Git branch/worktree, plans, and bead state. If work is active,
+the owner records progress and reschedules. If the episode is idle, completed,
+failed, or stale without the expected report, the owner recovers the result from
+persisted evidence, requests at most one missing packet when useful, and begins
+independent gate verification or escalation. Runtime labels such as `idle`,
+`completed`, and `child-exited`, and the presence or absence of a message, never
+constitute gate approval by themselves.
+
+The watch and its lease/checkpoint survive owner compaction and restart, prevent
+overlapping duplicate polls, and remain active through every nonterminal gate.
+It is retired only after the owner verifies terminal merge or abandonment and
+records episode retirement, or after an explicit operator cancellation. A
+missing report must delay neither review nor safe recovery.
 
 ## 5. Review protocol
 
@@ -302,4 +335,8 @@ risk-triggered reviews, durable finding incorporation, same-slice revision,
 stagnation escalation, unavailable-EXPERT escalation, controlled compaction
 summary verification, auto-compaction race recovery, exactly-once native
 transitions, restart recovery, operator interruption, safe merge authorization,
-and terminal cleanup without cross-episode interference.
+and terminal cleanup without cross-episode interference. The proof must also
+include a long-running episode that is not falsely declared stale, an episode
+that finishes without reporting, owner restart or compaction while its watch is
+active, active-session replacement, and exactly one recovery poll that discovers
+and verifies the missed result without advancing from a runtime status alone.

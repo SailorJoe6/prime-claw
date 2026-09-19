@@ -152,3 +152,28 @@ subsequently received the findings and revised Slice 2. The outcome was correct
 by message timing, not by a trustworthy primer. Product knowledge from review
 must outlive transcripts, and a verified guided handoff must establish the next
 execution context.
+
+## D-CO-18 — Install an owner-side long-poll watch for every episode
+
+**Decision:** Immediately after an episode is successfully activated, its owning
+conversation creates a durable liveness watch keyed by the episode's stable
+identity. The normal active-work interval is configurable and at least the
+15-minute class. Explicit reports can wake the owner earlier, but neither their
+arrival nor their absence is trusted as the sole lifecycle signal. A poll is
+read-only and non-disruptive while work is active. If an episode becomes idle,
+completed, failed, or stale without the expected packet, the conversation
+recovers status and evidence from the session, oversight record, Git, plans, and
+beads and proceeds to independent review or escalation. The watch survives owner
+compaction/restart, prevents concurrent duplicate polls, and ends only at
+verified terminal disposition or explicit operator cancellation.
+
+**Satisfies:** R-CO-2, R-CO-3, R-CO-9, R-CO-10, R-CO-12, R-CO-13, R-CO-50,
+R-CO-51, R-CO-52, R-CO-53.
+
+**Rationale:** In the Slice 2 POC, the episode finished and pushed `14e5cfa` with
+passing suites but did not send its final completion packet. The conversation
+found the result only by explicitly inspecting the sibling session. Agent
+messages are best-effort collaboration signals, and long-running work can be
+quiet for many minutes. An owner-controlled long poll provides liveness without
+interrupting valid work and preserves the rule that only independently verified,
+durable evidence can advance a gate.
