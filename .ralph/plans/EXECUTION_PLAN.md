@@ -1,8 +1,8 @@
 # Execution Plan — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; the Slice 2
-> (`prime-claw-h6w.3`) safety revision is implemented and locally validated,
-> pending fresh owner/EXPERT acceptance; Slices 3–8 remain unstarted.
+> **Status:** implementation in progress; Slice 1 is validated; revised Slice 2
+> candidate `ae31587` failed owner/EXPERT acceptance on ASTRA-05–09 (including
+> ASTRA-06b and ASTRA-08b) and remains in revision; Slices 3–8 are blocked.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -20,7 +20,7 @@
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
 | 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed at Slice 1) |
-| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Revision implemented; owner/EXPERT re-review pending | Astra 5/5; Node 58/58; `pytest -q tests` 237 passed, 11 warnings; independent read-only audit APPROVE |
+| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | REVISE after owner gate on `ae31587` | Prior suites green, but owner reproduced ASTRA-05/06/07/08/09 at 0/5 and ASTRA-06b/08b at 0/2; another same-Slice-2 execute iteration is required |
 | 3–8 | `prime-claw-h6w.4`–`.9` | Not started | Dependency-ordered below |
 
 Slice 1 evidence names the exact active-suite command. It does not claim a
@@ -201,6 +201,35 @@ owned. Otherwise recovery stops for the operator.
 The five original Astra counterexamples must run against the current extension,
 not only the pinned reviewed blob. The adjacent follow-up regressions above are
 part of the same Slice 2 acceptance boundary and cannot be deferred.
+
+#### Failed `ae31587` gate: next same-Slice-2 acceptance
+
+Reviewed commit `ae31587` is not accepted. The next controlled Slice 2 execute
+iteration must investigate and satisfy this matrix without entering Slice 3:
+
+| Finding | Mechanism to investigate | Permanent regression acceptance |
+|---|---|---|
+| ASTRA-05 | Bind creation authority to actual directory object identity, with portable fail-closed behavior | Rename original and place identical replacement at path; removal preserves replacement and exact status |
+| ASTRA-06 | Re-establish tombstone-child containment at the mutation boundary or use a non-following directory-relative primitive | Late consumption-child swap produces no external entry and no product deletion |
+| ASTRA-06b | Derive/revalidate every destructively accessed control child, especially `indexes`, beneath real Git common state | Static and swapped `indexes` symlinks fail before external read/delete; sentinel survives |
+| ASTRA-07 | Build one fresh post-validation observation and derive all `current_*` output from it | Deterministic concurrent dirt appears in status paths and both current clean flags are false |
+| ASTRA-08 | Validate every present OID and required equality/lineage relationship under a closed success schema | Malformed or inconsistent commit identities preserve evidence/blocker and reject success |
+| ASTRA-08b | Route pre-branch and in-branch malformed-success failures through one preservation-only path | Early invalid ownership path leaves transaction bytes and blocker unchanged; diagnostics are separate |
+| ASTRA-09 | Verify private-index and commit-tree object type/mode at construction, pre-push, and replay | Symlink swap at private-index add fails before push; remote has no `120000` bundle entries |
+
+Evidence is immutable and external to the repository:
+
+- formal EXPERT report: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md`
+- owner gate: adjacent `slice2-ae31587-owner-gate.md`
+- adjacent `slice2-ae31587-new-counterexamples.test.mjs` and owner log (0/5)
+- adjacent `slice2-ae31587-additional-counterexamples.test.mjs` and owner log
+  (0/2)
+
+Passing the prior Node/pytest/original-Astra suites is necessary but insufficient.
+All seven counterexamples must be incorporated as repository regressions and pass
+before owner/EXPERT acceptance. Until the owner verifies this documentation-only
+incorporation and invokes the controlled native `/handoff`, no implementation
+work begins.
 
 ### 2.5 Promoted episode transaction
 
@@ -537,10 +566,14 @@ private transcript text.
 | Canonical checkout dirty | No write/stage/commit; exact paths/status reported |
 | Future write/commit/push interrupted | Journal exact owned files/commit and clean/dirty/ahead state; explicit recover only |
 | Pre-existing byte-identical future bundle | Collision only; no immutable ownership receipt exists, so recovery cannot delete it |
-| Removed target path is later reused | Create-only consumption tombstone makes deletion authority single-use; preserve the replacement even if mutable journal state changes |
+| Owned directory is renamed/replaced before first removal | Object-bound identity fails closed before unlink; preserve replacement and exact status |
+| Removed target path is later reused | Consumed authority stays single-use; preserve replacement even if mutable journal state changes |
 | Concurrent entry appears during owned removal | Unlink only proven files; non-recursive directory removal fails and preserves the new entry |
+| Static or late-swapped control child redirects access | Revalidate every destructive control read/write/delete at use; no external access or product deletion |
 | Local HEAD advances before push | Push the pinned owned commit OID, never moving `HEAD`; unrelated descendant remains unpublished |
-| Success journal malformed or replay checkout dirty | Validate full historical commit/remote/content evidence; preserve malformed state; report current cleanliness separately |
+| Reconciliation observes newer dirt or Git state | Derive all `current_*` fields from one coherent latest observation or fail closed |
+| Success journal has malformed/inconsistent identity | Validate every OID/relationship; preserve exact journal and blocker; separate diagnostics |
+| Private index/commit contains non-regular mode | Reject before push; remote and replayed bundle must contain approved regular-file modes only |
 | Branch or worktree collision | Preserve existing resource; create nothing at that identity |
 | Failure after creating an owned resource | Journal it; remove only when identity and pristine state prove safe, otherwise preserve |
 | Fork mismatch or incomplete branch | Do not activate; preserve fork evidence and recovery state |
@@ -577,6 +610,7 @@ private transcript text.
 | R-WE-34 | 1 and 4 |
 | R-WE-35, R-WE-36 | 2 |
 | R-WE-69, R-WE-70, R-WE-71, R-WE-72 | 2 |
+| R-WE-73, R-WE-74, R-WE-75, R-WE-76, R-WE-77, R-WE-78 | 2 revision gate |
 
 A generated inventory assertion must show every R-WE ID exactly once in the
 requirements source and at least one `proven_by` path after its owning slice.
@@ -601,7 +635,8 @@ concurrency coverage in earlier slices.
 | D-WE-12 validated trusted host mechanics | §§2.1–2.6; all mutating slices |
 | D-WE-13 POC is evidence, not integration proof | audit; Slices 3–4 and 8 |
 | D-WE-14 explicit model-to-host bridge | §§2.1–2.2; Slices 1 and 4 |
-| D-WE-15 immutable destructive/publication authority | §§2.2, 2.4, 6; Slice 2 |
+| D-WE-15 object-bound destructive/publication authority | §§2.2, 2.4, 6; Slice 2 |
+| D-WE-16 revalidate identity/containment/type/observation at use | §§2.2, 2.4, 6; Slice 2 revision gate |
 
 ## 8. Completion boundary
 

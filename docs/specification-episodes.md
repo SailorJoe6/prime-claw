@@ -227,6 +227,42 @@ requires exact document bytes, exact allowed directory entries, unchanged base
 `HEAD`, and no unrelated staged or dirty path. Once a commit exists, removal is
 forbidden; the operator must inspect and reconcile the preserved commit.
 
+## Known failed gate for `ae31587`
+
+The fresh owner and formal Astra EXPERT reviews rejected candidate `ae31587`.
+The original ASTRA-01–04 reproductions are materially improved, but seven new
+assertions fail across five findings:
+
+- **ASTRA-05 (P1):** a path-bound creation receipt deletes a byte-identical
+  replacement directory before first removal. Future recovery must bind to the
+  actual created directory incarnation and preserve rename-and-replace state.
+- **ASTRA-06 / ASTRA-06b (P1, two assertions):** a late swap of
+  `future-ownership-consumed` redirects a tombstone write, while a static
+  `indexes` symlink redirects private-index deletion to an external file. Every
+  destructively accessed control child must be revalidated beneath real Git
+  common state at the exact read/write/delete boundary.
+- **ASTRA-07 (P2/GATE):** replay discards a newer dirty reconciliation and
+  returns older clean fields. All `current_*` fields must come from one coherent
+  latest observation.
+- **ASTRA-08 / ASTRA-08b (P2/GATE, two assertions):** malformed
+  `commit_object_sha` is
+  accepted, and an early invalid ownership path causes the outer catch to
+  overwrite exact corrupt-success evidence. Every recorded identity must be
+  validated, and every malformed-success path must preserve the transaction
+  journal and blocker while writing diagnostics separately.
+- **ASTRA-09 (P2/GATE):** a staging race publishes mode-`120000` symlinks whose
+  blob text matches the Markdown. Index, commit, remote, and replay verification
+  must enforce approved regular-file tree modes.
+
+The durable authority is specification §5.1–5.2, R-WE-69–78, D-WE-15–16, and
+execution-plan §2.4/§6. Formal immutable evidence is:
+
+`/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md`
+
+The adjacent owner gate, two runnable counterexample files, and two owner logs
+record 0/5 and 0/2. Slice 2 remains in revision; no lifecycle transition or
+Slice 3 work is authorized.
+
 ## Verification
 
 Run the focused acceptance suite:
@@ -239,7 +275,7 @@ pytest -q tests/test_specification_episodes_extension.py
 The Node suite uses temporary repositories, isolated session files, and local
 bare remotes. The live dogfood episode branch, worktree, session, and owner
 conversation are inspection-only evidence and are never fault, recovery,
-retirement, abandonment, or cleanup fixtures. The suite proves registration,
+retirement, abandonment, or cleanup fixtures. The prior suite covers registration,
 canonical loading, structured validation,
 both disposition variants, canonical/default-branch source checks, argument-
 array Git, exact future commits, actual remote verification, clean success,
@@ -252,11 +288,13 @@ consumption control-path symlinks, concurrent-entry preservation, pinned-commit
 push, verified-success corruption, historical-versus-current replay state, no
 episode allocation, and corrupt-evidence handling.
 
-Final local revision evidence: the repository Node suite passed 58/58; the five
-preserved Astra counterexamples passed 5/5 against the current extension; and
+Necessary but insufficient evidence for `ae31587`: the repository Node suite
+passed 58/58; the five preserved original Astra counterexamples passed 5/5; and
 the exact active suite `pytest -q tests` passed 237 tests with 11 warnings. Two
 watchdog timing tests each failed once during earlier full-suite attempts and
 passed immediately in isolation; the final exact full-suite rerun was green.
+Those results do not cover the seven failing assertions above and do not satisfy
+the Slice 2 owner gate.
 The pytest bridge loads the real extension through the installed Prime Agent
 RPC loader and checks the two native command surfaces. Prime Agent 0.9.5 RPC has
 no public tool-list or direct tool-invocation command, so schema/execution tests

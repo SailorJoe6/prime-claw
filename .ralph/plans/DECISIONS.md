@@ -201,44 +201,72 @@ an exactly-once contract without constraining planning to an unproven API shape.
 
 ## D-WE-15 — Derive destructive and publication authority from immutable identity
 
-**Decision:** Future recovery derives deletion authority from a create-only
-receipt written only after exclusive directory creation, consumes deletion
-authority durably as a single-use capability before the first unlink, removes
-owned files individually, and removes directories only when empty. Publication
-names the
-verified owned commit OID directly. Replayed success is evidence-validated and
-separates historical success facts from current repository observations.
+**Decision:** Future recovery derives deletion authority from evidence bound to
+both the transaction and the actual directory object exclusively created by it,
+not from pathname or byte equality. It consumes that authority durably as a
+single-use capability before the first unlink, removes owned regular files
+individually, and removes only an empty proven target non-recursively.
+Publication names the verified owned commit OID directly. Replayed success is
+evidence-validated and separates historical facts from current observations.
 
 **Satisfies:** R-WE-22, R-WE-35, R-WE-36, R-WE-69, R-WE-70, R-WE-71,
-R-WE-72.
+R-WE-72, R-WE-73.
 
-**Rationale:** Mutable status labels, matching bytes, moving refs, and
-check-then-recursive-delete windows are observations rather than authority. The
-Astra counterexamples against `6a0d4e4` showed that treating them as authority
-could delete unowned work, publish an unrelated descendant, or claim stale
-success. Immutable transaction identity plus final primitive-level checks makes
-those races fail closed.
+**Rationale:** Mutable labels, matching bytes, path continuity, moving refs, and
+check-then-delete windows are observations rather than authority. The Astra
+counterexamples against `6a0d4e4` and `ae31587` showed that path-bound creation
+receipts can still delete a renamed-and-replaced directory. Destructive
+authority must remain attached to the created object through its use boundary.
 
 **Consequences:**
 
 - Failed preconditions never synthesize ownership. Commit-bearing recovery with
-  missing ownership evidence stops rather than inferring authority from files.
-- Removal authority is consumed durably before unlink. Neither path reuse nor a
-  mutable journal reset can reactivate it, and historical proof cannot authorize
-  automatic recreation.
-- Ownership and consumption records use validated, non-symlink control
-  directories under the Git common directory. A static child symlink fails
-  before an external receipt write or product mutation.
-- Recovery unlinks verified files individually and removes only the empty owned
-  target non-recursively. It preserves concurrent entries and the unproven
-  shared future-plan parent.
-- Push names the verified commit OID directly rather than moving `HEAD`. A
-  concurrent local `HEAD` descendant remains unpublished.
-- `verified-success` replay validates the full historical chain—journal, base,
-  commit, content, ownership, and actual remote—before clearing a blocker.
-  Corrupt evidence remains preserved. Historical cleanliness and fresh current
-  repository observations are separate fields.
+  missing or stale object identity stops rather than inferring authority.
+- Rename-and-replace invalidates removal even when replacement bytes match.
+- Removal authority is consumed durably before unlink. Neither later path reuse
+  nor a mutable journal reset can reactivate it.
+- Recovery unlinks verified regular files individually, removes only an empty
+  proven target, and preserves concurrent entries and the shared future parent.
+- Push names the verified commit OID rather than moving `HEAD`; a concurrent
+  local descendant remains unpublished.
 
-These are durable architectural decisions, not test-specific patches. The
-original five Astra assertions and the adjacent ownership-consumption regressions
-remain required Slice 2 evidence.
+## D-WE-16 — Revalidate identity, containment, type, and observation at use
+
+**Decision:** Validation that grants authority or supports a current-state claim
+must occur at the boundary where that authority or claim is used. Control-state
+writes re-establish non-symlink Git-common-dir containment at mutation. Private
+index and commit validation proves regular-file tree modes as well as path and
+bytes. Success replay validates every recorded OID/relationship and returns one
+coherent fresh post-validation current-state observation.
+
+**Satisfies:** R-WE-35, R-WE-36, R-WE-69, R-WE-72, R-WE-74, R-WE-75,
+R-WE-76, R-WE-77, R-WE-78.
+
+**Rationale:** The fresh owner gate for `ae31587` reproduced ASTRA-06–09. An
+earlier containment check cannot authorize a later write or delete after a
+child-path swap; a journal path/hash cannot authorize access through a static
+`indexes` symlink; an earlier clean snapshot cannot describe state observed
+later; validating one OID cannot authenticate all recorded identities; an outer
+catch cannot normalize corrupt success without destroying evidence; and blob
+equality cannot prove a regular-file tree entry. These are the same authority-
+at-use failure class across filesystem, Git, and result-reporting boundaries.
+
+**Consequences:**
+
+- Every destructively accessed control child, including tombstone and `indexes`
+  directories, is revalidated at use. Static or swapped symlinks cause no
+  external read/write/delete and no product deletion.
+- Index and committed-tree entries must use approved regular-file modes. Symlink
+  mode `120000` is rejected before push and during replay verification.
+- Every present commit/OID field is syntactically and relationally validated.
+  All malformed-success paths are preservation-only: the transaction journal
+  and blocker remain exact while separate attempt evidence records diagnostics.
+- `current_*` fields are derived from one fresh post-validation observation or
+  replay fails closed; older snapshots cannot overwrite newer reconciliation.
+- Permanent regressions ASTRA-05, ASTRA-06, ASTRA-06b, ASTRA-07, ASTRA-08,
+  ASTRA-08b, and ASTRA-09 remain part of Slice 2 acceptance.
+
+**Evidence:** The formal EXPERT report is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md`.
+The adjacent owner gate, two runnable counterexample files, and two owner logs
+preserve the seven failed assertions (0/5 and 0/2).

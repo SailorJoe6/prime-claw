@@ -69,28 +69,51 @@ if it does not weaken a gate.
   action without claiming success.
 - **R-WE-69 (GATE) — Proven deletion ownership.** Recovery may delete a future
   bundle only when immutable transaction-specific evidence proves that this
-  transaction exclusively created its directory. Failed preconditions,
-  byte-identical contents, and mutable journal fields do not grant ownership;
-  historical ownership evidence does not authorize automatic recreation after
-  the directory has been removed, and removal authority is durably single-use so
-  it cannot delete a later replacement at the reused path. Commit-bearing
-  recovery without the receipt fails closed. Both the ownership receipt and its
-  consumed-authority tombstone live beneath validated, non-symlink Git control
-  directories and may not write through an escaping child path.
-- **R-WE-70 (GATE) — Race-safe owned removal.** Recovery unlinks only individually
-  verified owned files and removes the proven target directory non-recursively.
-  A concurrent unowned entry is preserved and makes directory removal fail
-  closed; the shared future-plan parent is retained without exclusive proof.
+  transaction created the actual directory object currently at the path. Failed
+  preconditions, pathname reuse, byte-identical contents, and mutable journal
+  fields do not grant ownership. Removal authority is durably single-use;
+  commit-bearing recovery without valid ownership evidence fails closed.
+- **R-WE-70 (GATE) — Race-safe owned removal.** Recovery revalidates and unlinks
+  only individually verified owned regular files, removes the proven target
+  directory non-recursively only when empty, preserves concurrent unowned
+  entries, and retains the shared future-plan parent without exclusive proof.
 - **R-WE-71 (GATE) — Pinned publication.** Future publication pushes the verified
   owned commit OID, not moving `HEAD`, so a concurrent local descendant cannot
   be published by the transaction.
 - **R-WE-72 (GATE) — Verified replay truth.** A replayed `verified-success`
-  record validates its journal phase and OIDs, commit parent, exact paths and
-  contents, document
-  hashes, immutable ownership evidence, and actual remote reachability before
+  record validates every recorded OID and required relationship, journal phase,
+  commit parent, exact paths, tree types/modes and contents, document hashes,
+  object-bound ownership evidence, and actual remote reachability before
   clearing blockers or reporting historical success. Malformed success state is
-  preserved and fails closed. Historical cleanliness is labeled separately from
-  current checkout cleanliness, status paths, HEAD, upstream, and remote.
+  preserved and fails closed. All current checkout/status/HEAD/upstream/remote
+  fields come from one coherent fresh post-validation observation.
+- **R-WE-73 (GATE) — Directory-object identity.** Refining R-WE-69, ownership
+  evidence binds to the actual exclusively created directory object, not merely
+  its pathname and contents. Rename-and-replace invalidates removal authority
+  and preserves the replacement plus repository status.
+- **R-WE-74 (GATE) — Mutation-bound control containment.** Refining R-WE-69,
+  every control child used for a destructive read, write, or delete—including
+  tombstones and private indexes—is derived and revalidated beneath real Git
+  common state at the use boundary. Static or swapped child symlinks fail before
+  external access and preserve both external sentinels and product resources.
+- **R-WE-75 (GATE) — Coherent current replay observation.** Refining R-WE-72,
+  replay derives every `current_*` field from one fresh observation made after
+  historical evidence validation/reconciliation, or fails closed if coherence
+  cannot be established.
+- **R-WE-76 (GATE) — Complete success identity validation.** Refining R-WE-72,
+  every present recorded commit/OID field is syntactically valid and satisfies
+  its required equality or lineage relationship. Any malformed or inconsistent
+  identity preserves the journal and blocker and rejects success.
+- **R-WE-77 (GATE) — Regular-file index and tree modes.** Refining R-WE-36 and
+  R-WE-72, the private index, constructed commit, pushed commit, and replayed
+  commit contain only approved regular-file modes for the three documents.
+  Path/blob-byte equality cannot make a mode-`120000` symlink entry valid.
+
+- **R-WE-78 (GATE) — Preservation-only corrupt-success handling.** Refining
+  R-WE-72, every malformed `verified-success` condition, including failures
+  detected before normal replay validation, records diagnostics separately and
+  leaves the exact transaction journal and recovery blocker unchanged. No outer
+  catch or generic failure normalization may overwrite evidence under review.
 
 ## Episode creation
 

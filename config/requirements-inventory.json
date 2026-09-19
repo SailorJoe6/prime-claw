@@ -1370,7 +1370,7 @@
    "id": "R-WE-31",
    "priority": "GATE",
    "summary": "Model-derived future names stay within the fixed plans root and Git arguments remain arrays/literal pathspecs.",
-   "status": "partially proven (Slices 1-2 future path; episode destination validation remains)",
+   "status": "partially proven; Slice 2 control-path containment reopened by ASTRA-06/06b at ae31587",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1416,7 +1416,7 @@
    "id": "R-WE-33",
    "priority": "GATE",
    "summary": "Automated evidence covers safe future disposition behavior and failures.",
-   "status": "partially proven (Slices 1-2; episode, coordination, readiness, cleanup, and dogfood remain)",
+   "status": "revision required; ae31587 repository suite omitted seven owner-reproduced Astra assertions",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1439,7 +1439,7 @@
    "id": "R-WE-35",
    "priority": "GATE",
    "summary": "Future mutation uses a project lock and repeats canonical, remote, status, containment, and collision checks under lock.",
-   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
+   "status": "revision required; ae31587 owner/EXPERT gate failed ASTRA-05–09 (seven assertions)",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1462,7 +1462,7 @@
    "id": "R-WE-36",
    "priority": "GATE",
    "summary": "Future mutation commits and pushes only its exact bundle, leaves clean success, and preserves exact recoverable failure state.",
-   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
+   "status": "revision required; ASTRA-07/08/09 invalidate complete clean-success evidence at ae31587",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1485,7 +1485,7 @@
    "id": "R-WE-69",
    "priority": "GATE",
    "summary": "Deletion requires create-only exclusive-directory proof; commit-bearing recovery without it fails closed; authority is consumed once; ownership control paths are non-symlink-contained.",
-   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
+   "status": "revision required; ASTRA-05/06/06b invalidate deletion identity and control containment at ae31587",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1508,7 +1508,7 @@
    "id": "R-WE-70",
    "priority": "GATE",
    "summary": "Recovery unlinks individually verified owned files, removes only an empty target non-recursively, preserves concurrent entries, and retains the shared parent.",
-   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
+   "status": "revision required; ASTRA-05/06 show unowned replacement deletion and redirected recovery mutation",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1554,7 +1554,7 @@
    "id": "R-WE-72",
    "priority": "GATE",
    "summary": "Success replay validates journal/base/commit/content/hashes/ownership/actual remote evidence, preserves corrupt state, and separates historical from current repository facts.",
-   "status": "proven by Slice 2 revision (Astra 5/5, Node 58/58, pytest -q tests 237 passed); fresh owner/EXPERT acceptance pending",
+   "status": "revision required; ASTRA-07/08/08b/09 invalidate replay freshness, identity, preservation, and tree-mode claims",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1570,6 +1570,150 @@
      "tests/test_specification_episodes_extension.py"
     ]
    },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-73",
+   "priority": "GATE",
+   "summary": "Removal authority binds to the actual created directory object; rename-and-replace preserves the replacement and repository status.",
+   "status": "blocked/unproven at ae31587; see formal EXPERT report and owner-reproduced counterexamples",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ]
+   },
+   "blocked_by": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-new-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-additional-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-counterexamples.log",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-additional-counterexamples.log"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-74",
+   "priority": "GATE",
+   "summary": "Every destructively accessed control child is revalidated beneath real Git common state at use; static/swapped symlinks cannot redirect access.",
+   "status": "blocked/unproven at ae31587; see formal EXPERT report and owner-reproduced counterexamples",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ]
+   },
+   "blocked_by": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-new-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-additional-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-counterexamples.log",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-additional-counterexamples.log"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-75",
+   "priority": "GATE",
+   "summary": "Replay current fields come from one coherent fresh post-validation observation or fail closed.",
+   "status": "blocked/unproven at ae31587; see formal EXPERT report and owner-reproduced counterexamples",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ]
+   },
+   "blocked_by": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-new-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-additional-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-counterexamples.log",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-additional-counterexamples.log"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-76",
+   "priority": "GATE",
+   "summary": "Every success OID and identity relationship is validated; malformed/inconsistent commit identity rejects success.",
+   "status": "blocked/unproven at ae31587; see formal EXPERT report and owner-reproduced counterexamples",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ]
+   },
+   "blocked_by": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-new-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-additional-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-counterexamples.log",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-additional-counterexamples.log"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-77",
+   "priority": "GATE",
+   "summary": "Private index and commit/remote/replay trees contain approved regular-file modes, never symlink mode 120000.",
+   "status": "blocked/unproven at ae31587; see formal EXPERT report and owner-reproduced counterexamples",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ]
+   },
+   "blocked_by": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-new-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-additional-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-counterexamples.log",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-additional-counterexamples.log"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-78",
+   "priority": "GATE",
+   "summary": "Every malformed-success path preserves transaction-journal bytes and blockers while recording diagnostics separately.",
+   "status": "blocked/unproven at ae31587; see formal EXPERT report and owner-reproduced counterexamples",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ]
+   },
+   "blocked_by": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-new-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-additional-counterexamples.test.mjs",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-counterexamples.log",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-owner-additional-counterexamples.log"
+   ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
   }

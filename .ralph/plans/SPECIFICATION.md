@@ -1,8 +1,8 @@
 # Specification — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; the Slice 2
-> safety revision is implemented and locally validated under `prime-claw-h6w.3`,
-> pending fresh owner/EXPERT acceptance; later paths remain unstarted.
+> **Status:** implementation in progress; Slice 1 is validated; revised Slice 2
+> candidate `ae31587` failed fresh owner/EXPERT acceptance on ASTRA-05–09 and
+> remains in revision under `prime-claw-h6w.3`; later paths remain unstarted.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -166,42 +166,83 @@ future content must not be overwritten without explicit operator approval.
 
 ### 5.1 Astra-derived future-transaction safety invariants
 
-The owner/EXPERT review of `6a0d4e4` established these non-negotiable
-invariants for the future path:
+The owner/EXPERT reviews of `6a0d4e4` and `ae31587` established these
+non-negotiable invariants for the future path:
 
-1. **Creation proof is deletion authority.** A failed precondition,
-   byte-identical content, expected path, or mutable journal claim does not prove
-   ownership. Removal requires a create-only transaction receipt written only
-   after exclusive target-directory creation. A commit-bearing recovery without
-   that receipt fails closed.
-2. **Deletion authority is single-use.** Immediately before the first unlink,
-   recovery writes a create-only consumed-authority tombstone in a validated,
-   non-symlink Git control directory. A completed removal, later path reuse, or
-   mutable journal reset cannot revive the old receipt. A historical receipt
-   also cannot authorize automatic target recreation.
-3. **Removal uses narrow primitives.** Each expected regular file is checked and
-   unlinked individually. The owned target directory is removed
-   non-recursively only when empty. Concurrent unowned entries survive and make
-   recovery fail closed. The shared `.ralph/plans/future` parent is retained
-   without separate exclusive-creation proof.
+1. **Creation proof is object-bound deletion authority.** A failed precondition,
+   byte-identical content, expected pathname, or mutable journal claim does not
+   prove ownership. Removal requires durable transaction evidence bound to the
+   identity of the actual directory exclusively created by that transaction.
+   Replacing or renaming that directory invalidates authority even when a new
+   directory at the same path has identical bytes. Commit-bearing recovery
+   without valid creation evidence fails closed.
+2. **Destructive authority is single-use and mutation-bound.** Immediately
+   before the first unlink, recovery writes a create-only consumed-authority
+   tombstone. At every control-state read, write, or delete that can grant or use
+   destructive authority, it must re-establish that the derived child (including
+   `future-ownership-consumed` and `indexes`) is non-symlink-contained beneath
+   the real Git common directory. A completed removal, path reuse, static or
+   swapped control-child symlink, or mutable journal reset cannot revive or
+   redirect authority. Historical proof cannot authorize automatic recreation.
+3. **Removal and publication preserve object types.** Each expected target is
+   revalidated and unlinked individually, and the owned directory is removed
+   non-recursively only when empty. Concurrent unowned entries survive. The
+   shared future parent remains without separate creation proof. Private-index
+   and committed-tree verification must prove each document is a regular-file
+   entry with an approved regular-file mode, not only matching path/blob bytes;
+   mode `120000` symlink entries must never be pushed.
 4. **Publication names immutable identity.** Push uses the already verified
    owned commit OID as its source refspec, never moving `HEAD`. If another local
    writer advances `HEAD`, that descendant is not published and the transaction
    reports the resulting divergence.
 5. **Success labels are evidence, not authority.** A replayed
-   `verified-success` record revalidates journal
-   phase and OIDs, commit parent, exact paths and contents, document hashes,
-   immutable ownership evidence, and actual remote reachability before clearing
-   a blocker or reporting historical success. Malformed success state is
-   preserved and fails closed.
-6. **Historical and current state stay distinct.** Historical clean success may
-   remain true while the present checkout is dirty or has advanced. Replay must
-   report current checkout cleanliness, status paths, HEAD, upstream, and remote
-   separately and must never expose stale historical cleanliness as current.
+   `verified-success` record validates every recorded OID field and required
+   identity relationship, journal phase, commit parent, exact paths, tree entry
+   types/modes and contents, document hashes, object-bound ownership evidence,
+   and actual remote reachability before clearing a blocker or reporting
+   historical success. Every malformed-success condition, including invalid
+   paths discovered before ordinary replay validation, enters a preservation-
+   only path: the exact transaction journal remains byte-for-byte unchanged,
+   diagnostics live separately, blockers remain, and replay fails closed.
+6. **Historical and current state stay distinct and coherent.** Historical clean
+   success may remain true while the present checkout is dirty or advanced.
+   Replay returns one coherent fresh post-validation observation for current
+   checkout cleanliness, status paths, HEAD, upstream, and remote; it never
+   mixes an older clean snapshot with newer reconciliation evidence.
 
-These invariants require runnable repository regressions for the original five
-Astra assertions plus stale-receipt path reuse, missing ownership evidence, and
-ownership-control-directory symlink containment.
+### 5.2 Failed gate at `ae31587`
+
+The fresh owner gate for reviewed commit `ae31587` is **REVISE**. The original
+ASTRA-01–04 counterexamples pass, but the following adjacent gaps are accepted
+product knowledge and keep Slice 2 blocked:
+
+| Finding | Durable gap | Mechanisms to investigate | Permanent regression acceptance |
+|---|---|---|---|
+| ASTRA-05 | Creation receipt is path-bound rather than bound to the actual created directory object | Capture and later revalidate stable directory identity without trusting path/bytes alone; fail closed where portable identity cannot be proven | Rename owned directory, create byte-identical replacement at the original path, request first removal; replacement and repository status remain unchanged |
+| ASTRA-06 | A validated consumption-control child can be swapped to a symlink before the tombstone write | Mutation-bound containment revalidation and/or directory-handle-relative exclusive creation that cannot follow a swapped child | Deterministic late child swap creates no external entry and deletes no product path |
+| ASTRA-06b | A static `indexes` control-child symlink can redirect private-index inspection/deletion to an external file | Derive and revalidate every destructively accessed control child beneath real Git common state; do not trust journal path/hash alone | Static and swapped `indexes` symlinks fail before external read/delete and preserve the sentinel |
+| ASTRA-07 | Replay returns old locked-state cleanliness after reconciliation observed newer dirt | Produce one fresh post-validation observation and derive every `current_*` field from it, or fail closed | Inject dirt between locked inspection and reconciliation; result reports it and current cleanliness is false |
+| ASTRA-08 | Replay validates `commit_sha` while accepting malformed `commit_object_sha` | Closed success-record schema plus validation of every OID and equality/lineage relationship | Malform or mismatch each recorded commit identity; preserve journal, retain blocker, and reject success |
+| ASTRA-08b | An invalid ownership-receipt path throws before protected replay validation and the outer catch overwrites exact corrupt evidence | Route all malformed-success failures to observation/attempt records only; transaction journal is read-only during investigation | Corrupt an early-checked success path; reject success while preserving journal bytes and blocker exactly |
+| ASTRA-09 | Blob-byte validation accepts private-index/commit symlink entries | Inspect index/tree mode and object type before commit, before push, and in replay; accept only project-approved regular-file modes | Swap documents to symlinks at private-index add; fail before push and prove remote has no mode-`120000` bundle entry |
+
+Authoritative evidence remains external and unchanged:
+
+- formal EXPERT report: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md`
+- owner gate: the adjacent `slice2-ae31587-owner-gate.md`
+- runnable counterexamples: the adjacent
+  `slice2-ae31587-new-counterexamples.test.mjs`
+- owner reproduction: the adjacent
+  `slice2-ae31587-owner-counterexamples.log` (0/5 passing)
+- additional runnable counterexamples: the adjacent
+  `slice2-ae31587-additional-counterexamples.test.mjs`
+- additional owner reproduction: the adjacent
+  `slice2-ae31587-owner-additional-counterexamples.log` (0/2 passing)
+
+Repository regressions implementing ASTRA-05, ASTRA-06, ASTRA-06b,
+ASTRA-07, ASTRA-08, ASTRA-08b, and ASTRA-09 are required before Slice 2 can
+return to owner/EXPERT acceptance. Passing prior suites cannot compensate for
+these counterexamples.
 
 ## 6. Episode-creation behavior
 
