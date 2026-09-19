@@ -6,7 +6,10 @@
 
 ## D-CO-1 — Conversations, not project contexts, own episodes
 
-**Decision:** `PROJECT_CONTEXT` remains the managed canonical Git boundary. The `UNIVERSAL_AGENT` launches `PROJECT_CONVERSATION` agents inside it, and each conversation creates and drives its own episode.
+**Decision:** `PROJECT_CONTEXT` remains the managed canonical Git boundary. The
+`UNIVERSAL_AGENT` launches durable `PROJECT_CONVERSATION` agents inside it, and
+each conversation creates and drives its own production episodes while retaining
+identity across discussion, incubation, delivery, feedback, and sequential work.
 
 **Satisfies:** R-CO-1, R-CO-2, R-CO-3.
 
@@ -14,7 +17,9 @@
 
 ## D-CO-2 — Automate the complete lifecycle
 
-**Decision:** The overseer covers disposition through merge or abandonment and cleanup rather than automating only the execute loop.
+**Decision:** The durable conversation covers discussion, incubation, promotion,
+episode disposition through merge or abandonment and cleanup, and post-delivery
+feedback rather than automating only the execute loop.
 
 **Satisfies:** R-CO-3, R-CO-4, R-CO-35, R-CO-36, R-CO-37.
 
@@ -28,13 +33,21 @@
 
 **Rationale:** The operator is currently teaching the workflow by driving it. The purpose of the POC is to discover safe evidence and decision contracts before removing per-gate confirmation.
 
-## D-CO-4 — Narrow the first release to one episode per conversation
+## D-CO-4 — Narrow the first release to one active episode per conversation
 
-**Decision:** One conversation drives at most one active episode initially, while many project conversations and their episodes operate concurrently. Multiple episodes per conversation remain a planned extension.
+**Decision:** One durable conversation drives at most one active episode
+initially, may own many sequential episodes over its lifetime, and retains their
+terminal lineage. Multiple project conversations and their active episodes may
+operate concurrently. Multiple active episodes per conversation remain a
+planned extension.
 
-**Satisfies:** R-CO-6, R-CO-7, R-CO-8, R-CO-38.
+**Satisfies:** R-CO-6, R-CO-7, R-CO-8, R-CO-38, R-CO-66.
 
-**Rationale:** Worktrees exist to permit broad project concurrency. Limiting owner cardinality simplifies the first state machine without weakening concurrency across users or conversations.
+**Rationale:** Worktrees exist to permit broad project concurrency. Limiting
+active owner cardinality simplifies the first state machine without weakening
+concurrency across users or conversations, and avoids conflating "one active"
+with "one ever."
+
 
 ## D-CO-5 — Persist an evidence-bound oversight state machine
 
@@ -241,3 +254,102 @@ success as admission and left both agents idle. The same RPC ID appeared on the
 later successful retry, proving it was neither unique nor durable. Idle
 preflight, prompt admission evidence, and bounded same-identity recovery prevent
 both silent command loss and blind duplicate transitions.
+
+
+## D-CO-21 — Bind a versioned conversation role; do not rely on a template alone
+
+**Decision:** `PROJECT_CONVERSATION` is represented by a Git-versioned role
+manifest plus a durable per-session role binding and owner lease. A specialized
+agent profile or template is the operator-facing entry point, but prompt text,
+session name, CWD, transcript, skills, continual-harness entries, and REPL state
+cannot establish identity or mutation authority.
+
+**Satisfies:** R-CO-2, R-CO-9, R-CO-12, R-CO-61, R-CO-62, R-CO-63, R-CO-69,
+R-CO-70, R-CO-72.
+
+**Rationale:** The role must survive repeated compaction, restart, focus changes,
+and sequential episodes. A static template can explain duties but cannot prevent
+fork split-brain, prove ownership, pin a policy version, or recover lifecycle
+truth. A binding and lease make the profile a durable role instead of a persona.
+
+
+## D-CO-22 — Separate role identity, conversational focus, commitments, and authority
+
+**Decision:** The controller models four independent dimensions: durable role
+binding; current conversational focus; active bounded commitments such as an
+episode or review; and authority mode. Focus may move among discussion,
+incubation, promotion, episode oversight, delivery, and feedback without
+changing role identity. An active episode commitment remains explicit when
+attention moves elsewhere.
+
+**Satisfies:** R-CO-3, R-CO-5, R-CO-61, R-CO-64, R-CO-67, R-CO-71.
+
+**Rationale:** A project conversation is not permanently an episode supervisor.
+It naturally moves from casual discussion into implementation and back to user
+feedback. Treating those as different agents loses continuity; treating focus as
+an exclusive lifecycle state drops active duties or lets side discussion mutate
+scope. Orthogonal dimensions preserve both natural conversation and control.
+
+
+## D-CO-23 — Keep conversation history separate from episode authority
+
+**Decision:** A durable conversation thread record stores intent, decisions,
+incubated specifications, focus, feedback, commitments, and episode lineage.
+Every promoted episode receives a separate oversight journal and snapshot.
+Terminal episode evidence remains immutable; later feedback either stays in the
+conversation or creates a new explicitly linked episode and never inherits old
+approvals, watches, commands, or commit authority.
+
+**Satisfies:** R-CO-6, R-CO-9, R-CO-10, R-CO-11, R-CO-65, R-CO-66,
+R-CO-67.
+
+**Rationale:** Product understanding outlives one implementation burst, while
+execution authority must stay exact and bounded. One undifferentiated record
+would either discard valuable continuity or accidentally float approvals and
+scope across releases.
+
+
+## D-CO-24 — Reassert the role and minimum duty pack at every context boundary
+
+**Decision:** Trusted controller logic validates the role binding, lease,
+versions, conversation record, and active oversight record on start, resume,
+daemon restart, fork or clone, every agent turn, and after compaction. It then
+injects the invariant role kernel, the minimum duty packs required by current
+focus and commitments, and a compact authoritative state envelope. The envelope
+is a projection and never overrides the source records.
+
+For the manual prototype, Prime Agent 0.9.5 project-local extension hooks such as
+`session_start`, `before_agent_start`, fork hooks, compaction hooks, persistent
+custom entries, and session-manager identity can prove this design in
+`observe` or `operator-confirmed` mode. Production still requires typed
+bindings, transactional records, capability-gated transitions, and durable
+receipts, whether supplied by Prime Agent core or a reviewed Prime Claw
+controller.
+
+**Satisfies:** R-CO-9, R-CO-12, R-CO-62, R-CO-63, R-CO-68, R-CO-70,
+R-CO-71, R-CO-72.
+
+**Rationale:** Compaction summaries and relevance-ranked harness reminders are
+lossy by design. Loading the complete oversight manual during casual discussion
+wastes context, while failing to reload it during active execution causes role
+drift. Validated focus-specific projection restores exactly the duties needed
+without confusing memory with authority.
+
+
+## D-CO-25 — Fail closed at fork, lease, version, and integrity ambiguity
+
+**Decision:** A fork or clone of a bound conversation starts without mutation
+authority until trusted control atomically transfers the existing lease, creates
+a new conversation identity with no inherited active episode, or marks the new
+session analysis-only. Missing, duplicate, corrupt, stale, incompatible, or
+split-brain binding or state enters explicit recovery, pause, or revocation.
+Migrations are deterministic, versioned, atomic or replay-safe, and audited.
+
+**Satisfies:** R-CO-10, R-CO-38, R-CO-63, R-CO-68, R-CO-69, R-CO-70,
+R-CO-71.
+
+**Rationale:** Prime Agent sessions can resume, fork, clone, compact, and change
+active runtime identity. Ancestry and copied context are useful evidence but do
+not decide which session owns lifecycle authority. Failure-closed lease and
+compatibility checks prevent two plausible conversations from steering one
+episode or silently changing policy mid-gate.

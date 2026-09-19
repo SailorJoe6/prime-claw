@@ -10,20 +10,35 @@ explicit extension and must not weaken a gate.
 ## Hierarchy and scope
 
 - **R-CO-1 (GATE) — Context is not an agent.** `PROJECT_CONTEXT` is the managed canonical Git project boundary and does not require its own resident agent.
-- **R-CO-2 (GATE) — Conversation ownership.** A durable `PROJECT_CONVERSATION` creates, logically owns, reviews, and drives its `EPISODE`.
-- **R-CO-3 (GATE) — Full lifecycle.** Oversight begins with interview/disposition and continues through episode creation, specification, planning, execution slices, PR disposition, retirement, and cleanup.
-- **R-CO-4 (GATE) — Autonomous authority.** After release approval, the conversation may approve gates and advance its episode without per-gate human confirmation.
+- **R-CO-2 (GATE) — Conversation ownership.** A durable `PROJECT_CONVERSATION` creates, logically owns, reviews, and drives its production `EPISODE` resources while retaining conversation identity before, between, and after them.
+- **R-CO-3 (GATE) — Full lifecycle.** A durable conversation begins with discussion and incubation, may promote work through episode creation, specification, planning, execution slices, PR disposition, retirement, and cleanup, then returns to post-delivery feedback or incubation without losing its identity or history.
+- **R-CO-4 (GATE) — Autonomous authority.** After release approval, the conversation may approve gates and advance its currently owned episode without per-gate human confirmation.
 - **R-CO-5 (GATE) — Human control.** The operator can observe, pause, redirect, override, or take over at any time.
 
 ## Concurrency
 
-- **R-CO-6 (GATE) — One initial episode per conversation.** The first release permits at most one active episode owned by a conversation.
+- **R-CO-6 (GATE) — One active episode per conversation initially.** The first release permits at most one active episode owned by a conversation, while allowing that durable conversation to own many sequential episodes over its lifetime.
 - **R-CO-7 (GATE) — Concurrent conversations.** Several conversations in one project can concurrently drive one isolated episode each without interference.
-- **R-CO-8 (LATER) — Multiple episodes per conversation.** The design can later remove the one-active-episode restriction without replacing the ownership model.
+- **R-CO-8 (LATER) — Multiple concurrent episodes per conversation.** The design can later remove the one-active-episode restriction without replacing the ownership model or weakening explicit episode targeting.
+
+## Durable conversation role and focus
+
+- **R-CO-61 (GATE) — Stable role across changing focus.** `PROJECT_CONVERSATION` is a durable role identity, not an episode-supervisor mode. It persists while conversational focus moves among discussion, incubation, promotion, episode oversight, delivery, and post-delivery feedback.
+- **R-CO-62 (GATE) — Versioned role manifest.** The role's invariant responsibilities, trust policy, compatibility requirements, and focus-specific duty packs are stored in a versioned, reviewable project manifest rather than depending on transcript prose, a user reminder, or one prompt template.
+- **R-CO-63 (GATE) — Durable session-role binding.** A bound conversation records stable conversation and project identity, session lineage, role and policy versions, manifest integrity, authority mode, lease or binding epoch, and active episode identity independently of its display name and current prompt.
+- **R-CO-64 (GATE) — Orthogonal focus and commitments.** Current conversational focus, active execution commitments, and authority mode are represented separately. Changing the topic or focus neither drops an owned episode nor grants episode authority, and an active episode does not prevent the conversation from incubating later work.
+- **R-CO-65 (GATE) — Durable conversation thread record.** Product intent, decisions, unresolved questions, incubated specifications, current focus, delivery outcomes, user feedback, and episode lineage survive compaction and restart in a conversation-level record distinct from every episode oversight record.
+- **R-CO-66 (GATE) — Sequential episode lineage.** After delivery or abandonment, the conversation retains the terminal episode record and may promote later feedback into a new episode with a new identity and explicit predecessor link; commits, approvals, findings, watches, and command receipts never carry forward implicitly.
+- **R-CO-67 (GATE) — Side-discussion scope isolation.** Discussion or feedback raised while an episode is active is recorded as incubated follow-up unless the owner performs an explicit, authorized scope-change transition. Casual conversation cannot silently mutate the admitted episode's scope or acceptance conditions.
+- **R-CO-68 (GATE) — Boundary reassertion.** On initial start, resume, daemon restart, fork or clone, every agent turn, and after compaction, trusted controller logic validates the binding and records, then reasserts the invariant role kernel plus the minimum focus-specific duty pack and authoritative state envelope.
+- **R-CO-69 (GATE) — Failure-closed lineage and compatibility.** Missing, duplicate, corrupt, stale, incompatible, or split-brain bindings, manifests, leases, forks, or state versions remove mutation authority and enter explicit recovery, analysis-only, transfer, pause, or revocation state; names, CWD, transcript ancestry, or copied bindings cannot authorize ownership.
+- **R-CO-70 (GATE) — Explicit version migration.** Role, policy, binding, conversation-record, oversight-record, and controller protocol versions migrate through deterministic trusted code with compatibility checks, atomic or replay-safe transitions, and durable audit events; active gates never silently change policy.
+- **R-CO-71 (GATE) — Role and focus observability.** The operator can inspect conversation identity, bound session and lineage, role and policy versions, authority mode, current focus, active commitments, episode and gate identity, state revision, restore/compaction integrity, and allowed next transitions without reconstructing authority from raw transcripts.
+- **R-CO-72 (GATE) — Context is a projection, not authority.** Skills, prompt templates, continual-harness entries, session names, transcript, compaction summaries, REPL state, and recursive-agent registries may aid reasoning but cannot establish role identity, lifecycle truth, ownership, or permission to mutate.
 
 ## Durable control state
 
-- **R-CO-9 (GATE) — Durable state machine.** Episode phase, gate, identities, reviewed commit, findings, approvals, commands, escalations, merge, and cleanup state survive compaction and process/session restart.
+- **R-CO-9 (GATE) — Durable state machines.** Conversation binding, focus, commitments, thread history, and episode phase, gate, identities, reviewed commit, findings, approvals, commands, escalations, merge, and cleanup state survive compaction and process/session restart.
 - **R-CO-10 (GATE) — Atomic transitions.** Lifecycle mutations and shared records are atomic, idempotent, and scoped to project, conversation, and episode.
 - **R-CO-11 (GATE) — Exact evidence identity.** Every review and approval names an exact pushed commit and applicable artifact, requirement, plan slice, and bead.
 - **R-CO-12 (GATE) — No transcript-only authority.** Transcript prose and in-memory handles are not the sole source of lifecycle truth.
@@ -92,4 +107,4 @@ explicit extension and must not weaken a gate.
 
 - **R-CO-41 (GATE) — Manual-first evidence.** Autonomous release remains gated on operator acceptance of repeated manual oversight runs and recorded lessons.
 - **R-CO-42 (GATE) — Staged autonomy.** Adoption progresses from passive reporting through suggested decisions and operator-confirmed transitions to disposable autonomous dogfood.
-- **R-CO-43 (GATE) — End-to-end proof.** Tests and concurrent dogfood prove full lifecycle, fresh EXPERT review, trigger and escalation behavior, report preservation followed by orphan-free recursive EXPERT retirement across failures and restart, busy-target transport-without-admission recovery without duplicate transition, owner-watch recovery of a missing report without false-stale interruption, immediate disarm after inactive-generation reconciliation, zero recurring polls during owner review or human wait, fresh re-arm for the next admitted generation, operator interruption, merge, cleanup, and non-interference.
+- **R-CO-43 (GATE) — End-to-end proof.** Tests and concurrent dogfood prove role restoration across start, resume, fork, repeated compaction, and upgrade; movement among discussion, incubation, promotion, episode oversight, delivery, and feedback; sequential episodes with immutable prior evidence; side-discussion scope isolation; failure-closed split-brain and compatibility handling; full episode lifecycle; fresh EXPERT review; trigger and escalation behavior; report preservation followed by orphan-free recursive EXPERT retirement across failures and restart; busy-target transport-without-admission recovery without duplicate transition; owner-watch recovery of a missing report without false-stale interruption; immediate disarm after inactive-generation reconciliation; zero recurring polls during owner review or human wait; fresh re-arm for the next admitted generation; operator interruption; merge; cleanup; and non-interference.

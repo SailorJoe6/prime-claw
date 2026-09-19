@@ -7,12 +7,16 @@
 
 ## 1. Purpose
 
-Prime Claw needs an evidence-driven control loop in which a durable
-`PROJECT_CONVERSATION` creates and owns an isolated `EPISODE`, reviews its work,
-and drives it through the complete Ralph lifecycle. The episode performs focused
-production work. The conversation acts as the autonomous overseer: it decides
-whether an artifact passes, requests revisions, invokes native phase transitions,
-and advances or pauses the episode.
+Prime Claw needs a durable `PROJECT_CONVERSATION` that can move naturally
+between project discussion, specification incubation, implementation oversight,
+delivery, and post-delivery feedback without losing its identity or duties. When
+work is promoted, the conversation creates and owns an isolated `EPISODE`,
+reviews its work, and drives it through the complete Ralph lifecycle. The episode
+performs focused production work. The conversation remains the autonomous
+owner: it preserves intent, decides whether an artifact passes, requests
+revisions, invokes native phase transitions, advances or pauses the episode, and
+later decides whether user feedback should remain conversational or become a new
+production episode.
 
 This specification records the workflow currently being learned through a
 manual proof. It is intentionally incubated until repeated operator-driven runs
@@ -24,30 +28,54 @@ safe enough to automate.
 ```text
 UNIVERSAL_AGENT
   └── PROJECT_CONTEXT — managed canonical Git project; not necessarily an agent
-        ├── PROJECT_CONVERSATION A — durable conversational owner/overseer
-        │     ├── EPISODE A — isolated branch, worktree, and production session
+        ├── PROJECT_CONVERSATION A — durable product thread and owner/overseer
+        │     ├── conversation record — intent, decisions, focus, feedback, lineage
+        │     ├── EPISODE A1, A2, ... — sequential isolated production episodes
         │     └── EXPERT review instances — fresh, project-scoped reviewers
         └── PROJECT_CONVERSATION B
-              ├── EPISODE B
+              ├── conversation record
+              ├── EPISODE B1, B2, ...
               └── EXPERT review instances
 ```
 
 The `UNIVERSAL_AGENT` creates or clones project contexts and launches
-conversations in the correct canonical checkout. A conversation creates and
-owns its episode, drives the Ralph loop, and remains the authority for lifecycle
-transitions. A project context does not require a resident agent of its own.
+conversations in the correct canonical checkout. A project context does not
+require a resident agent of its own. A `PROJECT_CONVERSATION` is a durable
+project-and-product thread: it discusses and incubates possible work, decides
+when work is ready for promotion, creates and owns production episodes,
+independently reviews them, reconciles delivery and feedback, and preserves
+continuity after each episode is retired.
 
-For the first release, one conversation may drive at most one active episode.
-Many conversations in the same project must be able to drive one episode each
-concurrently. Supporting several active episodes per conversation is an explicit
-later extension, not a permanent architectural restriction.
+Driving an episode is one temporary focus of the conversation, not its identity.
+The stable role remains bound while focus moves among discussion, incubation,
+promotion, episode oversight, delivery, and post-delivery feedback. For the first
+release, one conversation may own at most one active episode, but it may own many
+sequential episodes over its lifetime. Many conversations in the same project
+may each drive one active episode concurrently. Supporting several active
+episodes per conversation is an explicit later extension.
+
+Role binding, conversational focus, active commitments, and authority mode are
+orthogonal. A focus change does not relinquish an active episode or grant new
+lifecycle authority. The conversation may discuss future work while an episode
+runs, but that discussion is captured as incubated follow-up and cannot silently
+change the active episode's admitted scope, requirements, or acceptance
+conditions.
+
+A specialized agent profile is the operator-facing abstraction for this role,
+but profile text is not the role authority. Durable identity requires a
+versioned project role manifest plus a per-session binding and lease. Lifecycle
+truth remains in machine-readable conversation and episode records. A trusted
+controller projects those sources into the model context at each boundary.
+
 
 ## 3. Full lifecycle
 
-The automated workflow covers the episode from beginning to end:
+The conversation persists across repeated cycles of exploration and delivery:
 
 ```text
-conversation interview and disposition
+project discussion
+  → specification incubation
+  → disposition: remain incubated | promote | abandon
   → episode allocation and admission
   → specification production and review
   → planning and plan review
@@ -57,17 +85,78 @@ conversation interview and disposition
   → final readiness and expert review
   → PR merge or explicit abandonment
   → episode retirement and safe worktree cleanup
+  → delivery observation and user feedback
+  → return to discussion/incubation
+  → optional new episode with a new identity and predecessor link
 ```
 
-The conversation has authority to approve gates and advance the episode without
-per-gate human confirmation. The operator may observe, pause, redirect, or take
-over at any time. Automation is not released as the default until manual runs
-have produced sufficient evidence that this authority is safe.
+A terminal episode is immutable history, not the conversation's terminal state.
+Later feedback never reuses its approvals, commands, watches, reviewed commit, or
+worktree identity. If the feedback is promoted, the conversation creates a new
+episode record and explicitly links it to the relevant delivery or predecessor.
 
-## 4. Durable oversight state
+The conversation has authority to approve gates and advance an owned episode
+without per-gate human confirmation only after that authority mode is released.
+The operator may observe, pause, redirect, or take over at any time. Automation
+is not released as the default until manual runs have produced sufficient
+evidence that both focus transitions and episode lifecycle authority are safe.
 
-Each episode shall have a durable, machine-readable oversight record owned by
-the conversation. It shall identify at least:
+
+## 4. Durable role, conversation, and oversight state
+
+The controller separates durable authority into three records and one versioned
+policy source.
+
+### Versioned role manifest
+
+A Git-controlled project manifest defines the invariant `PROJECT_CONVERSATION`
+responsibilities, trust policy, compatible controller and state-schema versions,
+and focus-specific duty packs. A binding pins the manifest and policy versions
+used for an active gate. Policy changes never silently alter authority midway
+through a gate; compatible upgrades use an explicit, audited migration.
+
+A prompt template, skill, continual-harness entry, context file, or agent profile
+may expose or explain this manifest, but none is sufficient authority by itself.
+
+### Durable session-role binding
+
+Each conversation session has a durable binding that identifies at least:
+
+- project and conversation identity;
+- stable bound session and parent/fork lineage;
+- role, policy, controller-protocol, and state-schema versions plus manifest hash;
+- authority mode and operator pause, takeover, or revocation state;
+- binding or lease epoch and current owner session;
+- current conversational focus and active commitments;
+- zero or one active episode identity for the first release; and
+- last verified conversation and oversight revisions.
+
+Display names, CWD, transcript text, ancestry alone, and copied bindings are not
+ownership proofs. A missing, corrupt, incompatible, duplicated, or split-brain
+binding enters `RECOVERY_REQUIRED`, `ANALYSIS_ONLY`, `PAUSED`, or `REVOKED` and
+exposes no mutating lifecycle transition.
+
+### Durable conversation thread record
+
+The conversation-level record preserves information that outlives any episode:
+
+- project/product intent and evolving user goals;
+- decisions, unresolved questions, and incubated specifications;
+- current primary focus and focus-transition history;
+- active commitments and explicitly deferred or follow-up ideas;
+- delivery outcomes and post-delivery user feedback; and
+- the ordered lineage of all episodes created by the conversation.
+
+This record makes a casual discussion, an incubation cycle, episode oversight,
+and later feedback parts of one durable conversation without conflating their
+scopes. When side discussion occurs during active implementation, it is filed as
+incubated follow-up unless an explicit authorized transition changes the active
+episode scope.
+
+### Episode oversight record
+
+Each episode has a separate durable, machine-readable oversight record owned by
+the conversation. It identifies at least:
 
 - project, owner conversation, episode session, branch, worktree, and PR;
 - current lifecycle phase and gate;
@@ -81,9 +170,55 @@ the conversation. It shall identify at least:
   expected report or gate, missed-report recovery state, and disarm reason; and
 - blockers, human escalations, merge disposition, and cleanup state.
 
-The record must survive compaction, kernel loss, session restart, daemon restart,
-and owner resumption. State transitions must be atomic and idempotent. Transcript
-prose and in-memory handles are evidence, not the sole authority.
+Conversation and episode records survive compaction, kernel loss, session
+restart, daemon restart, and owner resumption. Mutations are atomic, idempotent,
+versioned, auditable, and scoped by project, conversation, and episode. An
+append-only transition journal plus deterministic materialized snapshot or an
+equivalent transactional design is required. Model prose and in-memory handles
+never mutate authority directly; trusted typed tools validate expected revision,
+identity, lease, and idempotency key.
+
+### Role restoration and focus projection
+
+On initial start, resume, daemon restart, fork or clone, every model turn, and
+after compaction, trusted controller logic:
+
+1. resolves the stable session and project;
+2. validates the role binding, lease, manifest hash and versions;
+3. validates the conversation record and any active episode snapshot/journal;
+4. enters failure-closed recovery on ambiguity or incompatibility;
+5. reasserts the invariant role kernel;
+6. loads only the duty packs needed by current focus and active commitments; and
+7. injects a compact state envelope naming identity, authority mode, focus,
+   commitments, revisions, authoritative pointers, and allowed transitions.
+
+For example:
+
+```text
+Role: PROJECT_CONVERSATION
+Conversation: pc-...
+Focus: EPISODE_OVERSIGHT
+Authority: operator-confirmed
+Active commitment: episode ep-... / execute / Slice 2 owner review
+Conversation revision: 42
+Episode revision: 184
+Loaded duty pack: episode oversight
+Allowed transitions: approve, revise, escalate, abandon
+```
+
+The envelope is a projection, not authority. A stale compaction summary, harness
+memory, REPL variable, session name, or subagent registry cannot override the
+binding or records. In discussion or incubation focus, unnecessary episode gate
+machinery is omitted unless an active commitment still requires it. If attention
+moves to a side discussion while an episode remains active, both facts appear in
+the envelope.
+
+Fork and clone boundaries fail closed. A copied bound session starts without
+mutation authority until trusted control explicitly transfers the owner lease,
+creates a new conversation identity with no inherited active episode, or marks
+the fork analysis-only. Concurrent claims for one lease are resolved atomically;
+names, lineage, or most-recent-session inference cannot select a winner.
+
 
 ### Owner-side episode watch
 
@@ -347,10 +482,14 @@ state and evidence remain durable after physical cleanup.
 ## 11. Concurrency and safety
 
 Multiple conversations and episodes share Git objects, refs, remotes, daemon
-services, and project stores. Oversight identities, locks, records, command
-receipts, EXPERT reports, and cleanup operations must be scoped by project,
-conversation, and episode. One conversation must never approve, steer, merge, or
-clean another conversation's episode by inference from names or current CWD.
+services, and project stores. Role bindings, owner leases, conversation records,
+oversight identities, locks, command receipts, EXPERT reports, and cleanup
+operations must be scoped by project, conversation, episode, and work generation
+where applicable. One conversation must never approve, steer, merge, or clean
+another conversation's episode by inference from names, lineage, current CWD, or
+"most recent" state. Sequential episodes owned by one conversation retain unique
+identities and explicitly target all transitions; terminal evidence cannot leak
+forward into a successor.
 
 All model-derived paths, commands, finding data, and identifiers are validated.
 Trusted host code owns Git, session, filesystem, and daemon mutations. Argument
@@ -360,22 +499,54 @@ credential files.
 
 ## 12. Manual-first adoption
 
-The current manual POC is product discovery for this controller. Each run should
-record which evidence the conversation inspected, when the operator corrected
-it, which EXPERT reviews would have helped, what made a transition safe, and how
-command/compaction monitoring behaved.
+The current manual POC is product discovery for both the conversation role and
+the episode controller. Each run should record which focus the conversation was
+in, which durable commitments remained active, what context had to be restored,
+which evidence the conversation inspected, when the operator corrected it,
+which EXPERT reviews helped, what made a transition safe, and how command,
+compaction, fork, and monitoring behavior worked.
 
-Automation should proceed in stages: passive observation and reports, suggested
-review decisions, operator-confirmed transitions, then autonomous transitions in
-disposable dogfood runs. Full autonomous authority becomes the default only
-after the operator explicitly accepts the accumulated evidence and specification.
+Prime Agent 0.9.5 has enough verified hooks for a bounded prototype: a
+Git-versioned role manifest; a project-local trusted extension using
+`session_start`, `before_agent_start`, fork and compaction hooks; durable custom
+session entries; and an external atomic conversation/oversight registry. The
+prototype begins in `observe` or `operator-confirmed` authority mode and proves
+role restoration and one typed transition. It does not claim that a system
+prompt, prompt template, skill, continual-harness note, session name, or
+process-local set is a durable role system.
+
+Production acceptance requires typed role bindings, explicit fork/transfer/new-
+conversation/analysis-only semantics, transactional conversation and episode
+state, capability-gated transition tools, durable command admission receipts,
+and unconditional cold-boundary context projection. These may ultimately live
+in Prime Agent core or in a reviewed Prime Claw controller, but the behavior and
+failure-closed guarantees are mandatory.
+
+Automation proceeds in stages: passive observation and reports, suggested focus
+and review decisions, operator-confirmed transitions, then autonomous
+transitions in disposable dogfood runs. Full autonomous authority becomes the
+default only after the operator explicitly accepts accumulated evidence for
+role continuity, focus changes, sequential episode lineage, and the complete
+episode lifecycle.
+
 
 ## 13. Acceptance outcomes
 
 Acceptance requires automated tests and concurrent dogfood runs proving that a
-conversation can create and autonomously drive one episode through the entire
-lifecycle while another conversation does the same in the same project. Tests
-must show independent evidence review, fresh project-scoped EXPERT invocations,
+bound conversation restores its role across initial start, resume, daemon
+restart, fork or clone, kernel loss, upgrade, and repeated compaction; moves
+among discussion, incubation, promotion, oversight, delivery, and feedback;
+retains or changes active commitments correctly as focus changes; and drives
+many sequential episodes without reusing terminal authority. A side discussion
+during active work must remain incubated unless an explicit authorized scope
+transition occurs. Corrupt, stale, incompatible, duplicate, or split-brain
+bindings and owner leases must fail closed, and lease transfer, new-conversation,
+and analysis-only fork dispositions must be proven exactly once.
+
+Tests must also prove that one conversation can create and autonomously drive
+one active episode through the entire lifecycle while another conversation does
+the same in the same project. They must show independent evidence review, fresh
+project-scoped EXPERT invocations,
 risk-triggered reviews, durable finding incorporation, same-slice revision,
 stagnation escalation, unavailable-EXPERT escalation, controlled compaction
 summary verification, auto-compaction race recovery, exactly-once native
@@ -388,6 +559,16 @@ and verifies the missed result without advancing from a runtime status alone.
 After reconciliation the scheduled watch must be absent while the idle episode
 awaits owner review or human input, and the next admitted work generation must
 install exactly one fresh watch before control is yielded.
+
+Role-restoration tests must verify the pinned manifest, binding epoch, authority
+mode, current focus, active commitments, state revisions, and allowed transitions
+in the first turn after every cold boundary. A deliberately stale compaction
+summary or harness memory must not override the durable records. Compatible
+migrations must be atomic and auditable; unknown or incompatible versions must
+remove mutation authority. The operator status surface must explain current
+identity, focus, commitments, versions, restore integrity, and permitted next
+transitions without reading private raw transcript text.
+
 EXPERT lifecycle tests must cover successful review, failure, timeout,
 cancellation, missed reply, bootstrap/admission race, nested reviewer descendants,
 and owner restart between artifact preservation and deletion. Every case must
