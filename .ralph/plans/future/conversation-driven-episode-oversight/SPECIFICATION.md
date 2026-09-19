@@ -77,8 +77,8 @@ the conversation. It shall identify at least:
 - EXPERT invocations, delegated descendants, reports, and cleanup state;
 - revision attempts and stagnation count;
 - native commands admitted and their receipts;
-- the owner-side liveness watch, last observation, expected report or gate, and
-  missed-report recovery state; and
+- the owner-side watch state, admitted work-generation identity, last observation,
+  expected report or gate, missed-report recovery state, and disarm reason; and
 - blockers, human escalations, merge disposition, and cleanup state.
 
 The record must survive compaction, kernel loss, session restart, daemon restart,
@@ -87,34 +87,42 @@ prose and in-memory handles are evidence, not the sole authority.
 
 ### Owner-side episode watch
 
-Immediately after successfully activating an episode, the owning conversation
-shall install a durable liveness watch before it yields control. The watch is
-owned by the conversation, not the episode: an episode completion message is a
-useful fast path but cannot be the only mechanism that wakes the owner or
-advances review.
+The durable episode resource and an active episode work generation are different
+states. Immediately after a task or native command is durably admitted, and
+before the owning conversation yields control, it shall install a liveness watch
+keyed by the episode's stable identity plus a unique work-generation identity
+and expected packet. Creating an episode, keeping it nonterminal, reviewing its
+output, or waiting for operator input does not by itself justify a scheduled
+heartbeat.
 
-The normal active-work observation cadence is deliberately long and
-configurable, with 15 minutes or more as the default class of interval. An
-episode can legitimately spend that long in tests, review, or one tool call.
-The watch therefore observes without interrupting or steering active work and
-does not infer failure from one quiet interval. Explicit episode reports may
-wake the owner sooner.
+The normal active-work cadence is deliberately long and configurable, with 15
+minutes or more as the default class. A generation can legitimately spend that
+long in tests, review, or one tool call. While work is active, the watch observes
+without interrupting or steering and does not infer failure from one quiet
+interval. Explicit episode reports may wake the owner sooner.
 
-Each observation resolves the durable episode identity even if its active
-session identifier changed, then compares runtime activity with the authoritative
-oversight record, Git branch/worktree, plans, and bead state. If work is active,
-the owner records progress and reschedules. If the episode is idle, completed,
-failed, or stale without the expected report, the owner recovers the result from
-persisted evidence, requests at most one missing packet when useful, and begins
-independent gate verification or escalation. Runtime labels such as `idle`,
-`completed`, and `child-exited`, and the presence or absence of a message, never
-constitute gate approval by themselves.
+Each observation resolves durable identity even if the active session changed,
+then compares runtime activity with the authoritative oversight record, Git,
+plans, and bead state. If work remains active, the owner records progress and
+reschedules. If it becomes idle, completed, failed, or stale, the owner performs
+one bounded reconciliation, recovers the expected packet from persisted
+evidence, requests at most one missing packet when useful, or escalates.
+Runtime labels such as `idle`, `completed`, and `child-exited` never approve a
+gate, but they do inform whether an admitted generation is still active.
 
-The watch and its lease/checkpoint survive owner compaction and restart, prevent
-overlapping duplicate polls, and remain active through every nonterminal gate.
-It is retired only after the owner verifies terminal merge or abandonment and
-records episode retirement, or after an explicit operator cancellation. A
-missing report must delay neither review nor safe recovery.
+As soon as the work generation and its packet are reconciled, the owner cancels
+the recurring watch and durably records it as disarmed. This remains true when
+the episode is alive and nonterminal, when independent owner or EXPERT review is
+underway, and when the owning conversation is waiting for human input. Those are
+owner states, not episode activity. Repeated unchanged idle ticks are prohibited.
+The next admitted episode task installs a fresh watch before control is yielded.
+
+While armed, the watch and its lease/checkpoint survive owner compaction and
+restart, prevent overlapping duplicate polls, and follow stable episode identity
+across active-session replacement. Terminal episode retirement remains a
+separate lifecycle operation and does not determine whether a heartbeat should
+exist.
+
 
 ## 5. Review protocol
 
@@ -377,6 +385,9 @@ include a long-running episode that is not falsely declared stale, an episode
 that finishes without reporting, owner restart or compaction while its watch is
 active, active-session replacement, and exactly one recovery poll that discovers
 and verifies the missed result without advancing from a runtime status alone.
+After reconciliation the scheduled watch must be absent while the idle episode
+awaits owner review or human input, and the next admitted work generation must
+install exactly one fresh watch before control is yielded.
 EXPERT lifecycle tests must cover successful review, failure, timeout,
 cancellation, missed reply, bootstrap/admission race, nested reviewer descendants,
 and owner restart between artifact preservation and deletion. Every case must

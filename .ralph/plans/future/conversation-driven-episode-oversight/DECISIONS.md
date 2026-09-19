@@ -153,30 +153,43 @@ by message timing, not by a trustworthy primer. Product knowledge from review
 must outlive transcripts, and a verified guided handoff must establish the next
 execution context.
 
-## D-CO-18 — Install an owner-side long-poll watch for every episode
+## D-CO-18 — Scope the owner watch to one admitted episode work generation
 
-**Decision:** Immediately after an episode is successfully activated, its owning
-conversation creates a durable liveness watch keyed by the episode's stable
-identity. The normal active-work interval is configurable and at least the
-15-minute class. Explicit reports can wake the owner earlier, but neither their
-arrival nor their absence is trusted as the sole lifecycle signal. A poll is
-read-only and non-disruptive while work is active. If an episode becomes idle,
-completed, failed, or stale without the expected packet, the conversation
-recovers status and evidence from the session, oversight record, Git, plans, and
-beads and proceeds to independent review or escalation. The watch survives owner
-compaction/restart, prevents concurrent duplicate polls, and ends only at
-verified terminal disposition or explicit operator cancellation.
+**Decision:** The owning conversation creates a durable liveness watch only after
+an episode task or native command is durably admitted and before control is
+yielded. The watch is keyed by stable episode identity plus a unique work-
+generation identity and expected packet. Its normal active-work interval is
+configurable and at least the 15-minute class. Explicit reports can wake the
+owner earlier, but neither arrival nor absence alone approves a gate.
+
+A poll is read-only and non-disruptive while episode work is active. When the
+watched generation becomes idle, completed, failed, or stale, the owner performs
+one bounded reconciliation using session activity, the oversight record, Git,
+plans, and beads and requests at most one missing packet when useful. Once the
+result is recovered or verified—or owner review, EXPERT review, merge
+adjudication, or human input is the only remaining dependency—the recurring
+watch is cancelled and durably marked disarmed. An episode can remain alive,
+idle, and nonterminal without a heartbeat. A new work generation installs a
+fresh watch before the owner yields control again.
+
+While armed, watch state survives owner compaction/restart, follows stable
+identity across active-session replacement, and prevents duplicate pollers.
+Runtime labels never grant gate authority, but repeated unchanged idle checks
+are prohibited after reconciliation. Owner blockage is recorded as owner state;
+it is never projected onto an idle episode.
 
 **Satisfies:** R-CO-2, R-CO-3, R-CO-9, R-CO-10, R-CO-12, R-CO-13, R-CO-50,
-R-CO-51, R-CO-52, R-CO-53.
+R-CO-51, R-CO-52, R-CO-53, R-CO-60.
 
-**Rationale:** In the Slice 2 POC, the episode finished and pushed `14e5cfa` with
-passing suites but did not send its final completion packet. The conversation
-found the result only by explicitly inspecting the sibling session. Agent
-messages are best-effort collaboration signals, and long-running work can be
-quiet for many minutes. An owner-controlled long poll provides liveness without
-interrupting valid work and preserves the rule that only independently verified,
-durable evidence can advance a gate.
+**Rationale:** In the Slice 2 POC, a watch correctly recovered a missed episode
+completion packet. Later, after the episode completed a documentation-only turn,
+sent its packet, and became idle awaiting owner verification, the watch remained
+scheduled because the episode lifecycle was still nonterminal. The owner then
+misread an optional threat-model choice as mandatory human input, projected that
+owner-level wait onto the sibling, and emitted 13 unchanged heartbeat reports
+over roughly 3 hours 15 minutes. Durable episode lifetime, active episode work,
+and owner decision state are separate. A work-generation-scoped watch preserves
+missed-report recovery without spending context on an inactive sibling.
 
 
 ## D-CO-19 — Preserve each EXPERT result, then retire its invocation tree
