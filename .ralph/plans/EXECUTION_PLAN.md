@@ -1,9 +1,9 @@
 # Execution Plan — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; Slice 2 candidate
-> `3fe649b` passed baseline validation but failed its fresh owner/EXPERT gate on
-> ASTRA-16–24. This revision incorporates authority only. Slice 2 remains open;
-> Slices 3–8 are blocked.
+> **Status:** implementation in progress; Slice 1 is validated; after verified
+> authority commit `1834f6b`, owner transition
+> `eca063c9-561e-4a5b-868c-65a0e13059ec` authorizes one bounded same-Slice-2
+> ASTRA-16–24 revision. Slice 2 remains open; Slices 3–8 are blocked.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -310,9 +310,15 @@ Preserved authoritative evidence:
 - invocation tree: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/invocation-tree.json`
 - cleanup receipt: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-3fe649b/expert-cleanup-receipt.json`
 
-No implementation, handoff, compaction, or Slice 3 work is authorized by this
-incorporation. The PROJECT_CONVERSATION must verify the pushed documentation
-boundary before any further same-Slice-2 execution.
+The PROJECT_CONVERSATION verified authority commit `1834f6b` and authorized
+transition `eca063c9-561e-4a5b-868c-65a0e13059ec`: implement ASTRA-16–24 under
+R-WE-85–93 and D-WE-20–22 in one bounded same-Slice-2 candidate while preserving
+all prior accepted Slice 2 requirements. The live episode worktree/session and
+owning conversation are protected dogfood. Destructive, concurrency, retirement,
+cross-mount, inode-reuse, crash, and fault tests use only disposable fixtures or
+isolated containers. After evidence, Bead update, commit, and push, prove local,
+upstream, and actual-remote identity plus a clean worktree, then stop for fresh
+owner and EXPERT review. Slice 3 remains unauthorized.
 
 ### 2.5 Promoted episode transaction
 

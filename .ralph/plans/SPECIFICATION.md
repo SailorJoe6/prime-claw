@@ -1,8 +1,8 @@
 # Specification — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; Slice 2 candidate
-> `3fe649b` passed baseline suites but failed its fresh owner/EXPERT gate on
-> ASTRA-16–24. This revision incorporates authority only; later paths are blocked.
+> **Status:** implementation in progress; Slice 1 is validated; after verified
+> authority commit `1834f6b`, the owner authorized one bounded same-Slice-2
+> revision for ASTRA-16–24. Slice 2 remains open; later paths are blocked.
 > **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
