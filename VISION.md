@@ -211,9 +211,19 @@ sandbox (via NemoClaw) is the proven blueprint for this security boundary:
 deny-by-default egress, credentials injected at L7 and never touching
 sandbox disk, no host socket/home/network/PID/IPC exposure.
 
-The *contents* of that home (which folders, how the brain links in, daemon
-config) are a secondary design concern, deferred until the builder repo
-exists and the phase skills are proven.
+The contents of that home are a deliberate product surface, not an implicit
+copy of the operator's host home. In particular, a sandboxed claw cannot assume
+that host-global Prime Agent skills exist inside it. The eventual runtime must
+preserve clear conceptual boundaries between capabilities shipped by
+prime-claw, capabilities selected or developed by an operator for their claw,
+and skills carried by an individual project. Making those capabilities
+available and durable across convergence or recreation must remain explicit,
+reproducible, and compatible with the credential-isolation boundary.
+
+The exact packaging, provisioning, conflict, compatibility, and persistence
+model is intentionally unresolved. Manual use of global and project skills
+should supply the evidence for that later design rather than freezing a skill-
+pack mechanism prematurely.
 
 ## The builder repo
 

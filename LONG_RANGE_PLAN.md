@@ -132,7 +132,13 @@ claw-skill-strip deltas are not needed here.)
   path; NO-GO = documented thin-fork fallback. ⚠️ may pivot the gbrain choice.
 - **3b — whole-brain migration + generic memory skills** (port memorize/query/
   ingest/maintain/brain-commit as prime-agent-native skills; wire the IA
-  routing layer; create the operator instance repo `prime-pva`).
+  routing layer; create the operator instance repo `prime-pva`). This slice
+  must also expose the minimum runtime capability boundary needed to distinguish
+  skills shipped by prime-claw, operator-selected global skills, and skills that
+  travel with a project. It should prove that the required capability reaches
+  the sandbox without copying the host home or credential material, while
+  leaving the general packaging and persistence design open until more manual
+  evidence exists.
 - **3c — browse proxy-shim** (port zbrain's local `browse-proxy-shim` +
   `browse-host-bridge` + cookie-jar companion against stock upstream gstack
   browse; credentials never enter the container).
@@ -217,6 +223,10 @@ heartbeat, and can spawn a project conversation on demand.
   docs/information-architecture.md; reports never become knowledge.
 - **Progressive disclosure** — minimal starting context, follow links, no
   bulk-loading.
+- **Capability provenance** — runtime skills and other executable agent
+  capabilities have an explicit source and scope; sandbox construction never
+  assumes access to the operator's host-global state or copies credential
+  material along with capabilities.
 - **Per-slice exit ritual** — each slice ends committed and pushed, with its
   verification gate green.
 
@@ -224,7 +234,9 @@ heartbeat, and can spawn a project conversation on demand.
 
 - No automated loop until manual driving validates the episode workflow
   (Phase 4).
-- No claw-home interior design (folder layout inside the sandbox) until the
-  runtime foundation exists.
+- No premature general skill-pack or claw-home interior design. Preserve the
+  required distribution/operator/project capability boundaries now, but choose
+  concrete packaging, collision, synchronization, and persistence mechanisms
+  only when the relevant phase has enough manual evidence.
 - No Mnemosyne integration until it passes the canonical-niche test in
   docs/information-architecture.md.
