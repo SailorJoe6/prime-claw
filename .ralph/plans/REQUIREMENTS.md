@@ -117,6 +117,38 @@ if it does not weaken a gate.
   leaves the exact transaction journal and recovery blocker unchanged. No outer
   catch or generic failure normalization may overwrite evidence under review.
 
+- **R-WE-79 (GATE) — Syscall-bound leaf destruction and no-clobber restore.**
+  Validation must remain bound to the same leaf object through its destructive
+  syscall. A checked quarantine pathname is not authority after its descriptor
+  closes. Final unlink must preserve any replacement, and rollback/restoration
+  must use atomic no-replace semantics; conflicts preserve quarantine evidence.
+- **R-WE-80 (GATE) — Control and lock incarnation continuity.** Every control
+  directory creation, lock creation, create-only owner publication, use,
+  failure cleanup, and release is bound to the same non-following incarnation.
+  No helper rejection may fall back to raw recursive pathname deletion, and no
+  split operation may adopt, overwrite, or remove a replacement lock.
+- **R-WE-81 (GATE) — Supported-platform stable incarnation identity.** Filesystem
+  incarnation evidence must remain stable across the transaction's own required
+  renames on every supported runtime. Mutable Linux `ctime` must not be relabeled
+  as birth time. Create, continue, removal, replacement, and restart must pass on
+  actual supported Linux/Python/filesystem and macOS combinations; unsupported
+  platforms fail before product mutation and are documented explicitly.
+- **R-WE-82 (GATE) — Closed versioned success schema and receipt graph.** A
+  `verified-success` record has a complete versioned schema with exact immutable
+  fields, target/path shapes, and every retained/nested/recovery OID validated
+  for its historical meaning. Directory, create-only file, and final bundle
+  receipts are required and cross-bound to one internally consistent historical
+  object graph without depending on current checkout inodes.
+- **R-WE-83 (GATE) — Final-state durability proof.** Before reporting success or
+  clearing a blocker, the final accepted actual-remote OID must still contain
+  the verified success commit. A stable later rollback or inability to prove
+  reachability preserves the journal and blocker and fails closed.
+- **R-WE-84 (GATE) — Preservation begins at durable success publication.** The
+  invocation enters preservation-only mode before or atomically with writing a
+  success journal. Every later fault, including final control cleanup, records
+  separate diagnostics and preserves the exact persisted success and blocker
+  evidence; generic failure normalization is forbidden.
+
 ## Episode creation
 
 - **R-WE-14 (GATE) — Durable location.** Worktrees use a configurable durable

@@ -213,6 +213,9 @@ evidence-validated and separates historical facts from current observations.
 **Satisfies:** R-WE-22, R-WE-35, R-WE-36, R-WE-69, R-WE-70, R-WE-71,
 R-WE-72, R-WE-73.
 
+**Implementation status at `14e5cfa`: NOT FULLY IMPLEMENTED.** ASTRA-10,
+ASTRA-12, and ASTRA-13 contradict the destructive/incarnation/evidence claims.
+
 **Rationale:** Mutable labels, matching bytes, path continuity, moving refs, and
 check-then-delete windows are observations rather than authority. The Astra
 counterexamples against `6a0d4e4` and `ae31587` showed that path-bound creation
@@ -245,6 +248,10 @@ fresh current-state observation.
 **Satisfies:** R-WE-35, R-WE-36, R-WE-69, R-WE-72, R-WE-74, R-WE-75,
 R-WE-76, R-WE-77, R-WE-78.
 
+**Implementation status at `14e5cfa`: NOT FULLY IMPLEMENTED.** ASTRA-10–15
+show that validation still ends before dangerous syscalls, misses control/lock
+incarnations and platform semantics, and accepts or overwrites invalid success.
+
 **Rationale:** The fresh owner gate for `ae31587` reproduced ASTRA-06–09. An
 earlier containment check cannot authorize a later write or delete after a
 child-path swap; a journal path/hash cannot authorize access through a static
@@ -276,3 +283,81 @@ at-use failure class across filesystem, Git, and result-reporting boundaries.
 `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md`.
 The adjacent owner gate, two runnable counterexample files, and two owner logs
 preserve the seven failed assertions (0/5 and 0/2).
+
+
+## D-WE-17 — Carry object and lock authority through the final syscall
+
+**Decision:** A pathname, random quarantine name, or pre-syscall validation is
+never sufficient destructive authority. Product/control deletion remains bound
+to an enforced exclusion or to the same object through the final syscall;
+otherwise the object is preserved. Restoration uses atomic no-replace semantics
+and leaves quarantine evidence on conflict. Control directory and lock creation,
+create-only owner publication, use, cleanup, and release remain bound to one
+incarnation. A constrained helper failure can never fall back to recursive raw
+pathname cleanup.
+
+**Satisfies:** R-WE-22, R-WE-35, R-WE-69, R-WE-70, R-WE-74, R-WE-79,
+R-WE-80.
+
+**Rationale:** ASTRA-10 replaced a validated quarantine leaf at the final unlink
+and caused deletion of unowned work; it also proved ordinary restoration can
+clobber a new destination. ASTRA-11 proved raw recursive cleanup, pathname mkdir,
+and split lock-owner publication can escape or adopt another lock incarnation.
+Authority must cover the mutation itself, not only the preceding check.
+
+**Acceptance:** Permanent disposable tests inject replacements at final product
+and control unlink, concurrent restoration destination creation, control mkdir,
+lock-owner publication, helper failure cleanup, and lock release. Every external
+sentinel, prior owner record, and replacement lock survives exactly.
+
+## D-WE-18 — Use a platform-real incarnation model
+
+**Decision:** Filesystem identity fields retain their real platform semantics.
+Mutable `ctime` is never renamed or treated as immutable birth time. The supported
+incarnation model must survive the transaction's own renames while still
+rejecting replacement objects. Supported-platform claims require native tests;
+unsupported platforms are rejected before product mutation and documented.
+
+**Satisfies:** R-WE-11, R-WE-22, R-WE-36, R-WE-69, R-WE-70, R-WE-73,
+R-WE-81.
+
+**Rationale:** ASTRA-12 showed that the Linux no-birthtime branch records ctime as
+birthtime, then rejects the same object after the helper's own rename. A label
+cannot make mutable metadata an incarnation invariant.
+
+**Acceptance:** Native create, continue, removal, replacement, and restart tests
+pass on each supported Linux/Python/filesystem combination and on macOS. The
+Linux test must not be only a macOS attribute-hiding simulation.
+
+## D-WE-19 — Treat success as a closed durable proof object
+
+**Decision:** Success is a complete versioned proof graph, not a permissive
+status label. Its schema has exact immutable fields and shapes; every retained
+OID is validated according to its meaning; directory, file-creation, and final
+bundle receipts are cross-bound historically. The final accepted remote state
+must still prove success-commit reachability before blocker cleanup. Preservation
+mode begins before or atomically with durable success publication and governs all
+later failures.
+
+**Satisfies:** R-WE-72, R-WE-75, R-WE-76, R-WE-78, R-WE-82, R-WE-83,
+R-WE-84.
+
+**Rationale:** ASTRA-13 accepted missing/malformed schema fields, retained
+recovery OIDs, and inconsistent/missing receipt relationships. ASTRA-14 cleared
+a blocker after its newer stable remote observation disproved durability.
+ASTRA-15 overwrote newly persisted corrupt success because preservation began
+only for success read at invocation entry.
+
+**Acceptance:** Permanent table-driven regressions reject every accepted
+ASTRA-13 mutation without changing journal/blocker bytes; a remote rollback
+between historical validation and final observation preserves the blocker; and
+faults after success write or during final cleanup preserve exact success bytes
+and use separate diagnostics.
+
+**Evidence and implementation status:** The formal report
+`/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md`
+and owner gate
+`/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md`
+are authoritative for ASTRA-10–15. Candidate `14e5cfa` does not fully implement
+D-WE-15 or D-WE-16 and does not yet implement D-WE-17–19. This documentation
+records authority only; it does not authorize fixes or Slice 3.

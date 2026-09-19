@@ -38,7 +38,7 @@ prime-claw builds on four prior projects. Read these before designing:
   marker lifecycle, regression tests, evidence, and short-session recovery.
 - [specification-episodes.md](specification-episodes.md) — native `/design` and
   `/spec-it-out`, the trusted structured disposition bridge, durable preflight
-  receipts, and the current product-resource non-mutation boundary.
+  receipts, and Slice 2 owner/EXPERT gate authority through ASTRA-15.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)

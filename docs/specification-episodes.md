@@ -122,16 +122,15 @@ tracked, staged, and untracked checkout. It then exclusively creates only:
 └── DECISIONS.md
 ```
 
-The host builds the commit through a transaction-private Git index initialized
-from the recorded base commit. Only the three literal owned pathspecs enter that
-index. `git write-tree` and `git commit-tree` create the exact commit, and
-`git update-ref <default-ref> <new> <recorded-base>` advances the local branch
-with compare-and-swap semantics. The primary index is then reconciled with only
-the owned paths. This plumbing path intentionally does not run ordinary
-`git commit` hooks; its contract is deterministic exact-path construction plus
-post-commit path/content verification. Any unrelated primary-index or worktree
-change detected before push turns the operation into a recoverable failure, and
-the owned commit is not pushed.
+The host constructs the exact tree without a pathname-based private index. It
+hashes the three trusted document byte strings as `100644 blob` objects and
+rebuilds the recorded base tree with `mktree`; `commit-tree` then creates the
+exact commit. `git update-ref <default-ref> <new> <recorded-base>` advances the
+local branch with compare-and-swap semantics. The primary checkout index is
+reconciled only for the owned paths. This plumbing path intentionally does not
+run ordinary `git commit` hooks. Any unrelated primary-index or worktree change
+detected before push turns the operation into a recoverable failure, and the
+owned commit is not pushed.
 
 Push is non-forcing and targets the configured default upstream explicitly.
 Its source refspec is the already verified owned commit OID, never moving
@@ -221,33 +220,38 @@ requires exact document bytes, exact allowed directory entries, unchanged base
 `HEAD`, and no unrelated staged or dirty path. Once a commit exists, removal is
 forbidden; the operator must inspect and reconcile the preserved commit.
 
-## Failed `ae31587` gate and same-Slice-2 hardening
+## Failed gates and same-Slice-2 hardening
 
-The owner and formal Astra EXPERT reviews rejected candidate `ae31587`. That
-report remains the immutable source evidence. The controlled revision adds:
+The owner and formal Astra EXPERT reviews rejected candidate `ae31587`. Candidate
+`14e5cfa` closes those seven narrow reproductions and passed its repository
+suites, but its fresh owner/EXPERT gate also returned **REVISE**. The following
+mechanisms are meaningful partial progress, not broad proof:
 
 - **Object-bound removal authority (ASTRA-05).** A checked-in Python helper
   opens repository components with `dir_fd` and `O_NOFOLLOW`. Directory identity
   is guard-only and never authorizes deletion. Per-file and final bundle receipts
   bind exact `O_EXCL`-created file objects. Recovery holds the target FD,
-  quarantines and revalidates only those files, and unlinks only randomized
-  names. Every directory and same-name replacement survives.
+  quarantines and revalidates only those files. Pre-quarantine replacements and
+  every directory survive, but final-unlink and restoration races remain open
+  under ASTRA-10.
 - **Mutation-bound control containment (ASTRA-06 / ASTRA-06b).** Durable JSON,
   lock, tombstone, construction-evidence, and cleanup operations descend from
   the real Git common directory through held non-following descriptors. Git no
   longer opens a pathname-based private index: exact trees are constructed from
   trusted document bytes, while the `indexes` child stores only bounded durable
-  evidence. Static and late swaps cannot redirect external reads/writes/deletes.
+  evidence. The tested consumed/index swaps are contained, but control mkdir,
+  fallback cleanup, and lock-incarnation boundaries remain open under ASTRA-11.
 - **Coherent replay observations (ASTRA-07).** Historical validation completes
   first. One final reconciliation brackets local state and queries the actual
   remote both before and after that bracket; any change fails closed. It supplies
   every `current_*` field and timestamps only after the last Git query.
   Historical success does not depend on current working-tree inode identity.
-- **Complete preservation-only success validation (ASTRA-08 / ASTRA-08b).** The
+- **Narrow success-validation fixes (ASTRA-08 / ASTRA-08b).** The
   verified-success branch runs before generic ownership/path checks. It
-  validates every retained OID, required equality/lineage relationship, commit
-  parent, private tree, hashes, immutable receipts, exact bundle, and actual
-  remote state. Any failure preserves exact transaction and blocker bytes;
+  validates the previously reported OIDs and relationships, commit parent,
+  exact tree, hashes, receipts, bundle, and remote state. ASTRA-13 identifies
+  retained recovery OIDs/schema/receipt relations still missing. Covered failures
+  preserve exact transaction and blocker bytes;
   diagnostics go only to the attempt receipt. An outer-catch guard enforces the
   same rule if later diagnostics or blocker handling fail.
 - **Regular Git object modes (ASTRA-09).** The helper hashes trusted document
@@ -265,12 +269,44 @@ regressions inject replacements at the actual file/control quarantine boundary
 and prove fail-closed restoration plus consumed evidence. Every fixture uses a
 temporary repository, disposable Git common state, and a local bare remote.
 
-Formal source evidence:
+Prior formal source evidence:
 
 `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-ae31587/slice2-ae31587-astra-review.md`
 
-Slice 2 remains in progress until fresh owner/EXPERT acceptance. Slice 3 is not
-authorized.
+### Failed `14e5cfa` owner/EXPERT gate
+
+The authoritative range `4460d96..14e5cfa` passed Node 73/73, active pytest
+241 tests, and static/diff checks. Linked runnable evidence nevertheless proves:
+
+- **ASTRA-10:** final unlink can delete a replacement, and restore can clobber a
+  new destination. Acceptance requires syscall-bound deletion or preservation
+  plus atomic no-replace restoration for product and control leaves.
+- **ASTRA-11:** pathname control mkdir/recursive cleanup and split lock-owner
+  publication can escape or adopt a replacement. Acceptance requires one bound
+  lock/control incarnation and no less-constrained fallback cleanup.
+- **ASTRA-12:** Linux's no-birthtime path treats mutable ctime as birthtime and
+  rejects the helper's own renames. Acceptance requires native proof on every
+  supported Linux and macOS combination, or pre-mutation platform rejection.
+- **ASTRA-13:** incomplete schema, retained recovery OIDs, and inconsistent or
+  missing historical receipt relationships still report success. Acceptance
+  requires a closed versioned schema and a cross-bound historical receipt graph.
+- **ASTRA-14:** a newer stable remote rollback can disprove durability while the
+  blocker is cleared. Final accepted remote state must still contain the commit.
+- **ASTRA-15:** newly written success is outside the preservation guard. The
+  guard must begin at durable success publication and cover all later faults.
+
+Stable contracts are R-WE-79–84 and D-WE-17–19. Candidate `14e5cfa` leaves
+R-WE-69/70/72/74/76/78 blocked, R-WE-73 partial, and D-WE-15/16 not fully
+implemented. R-WE-71, the original R-WE-75 coherence defect, and R-WE-77 are
+satisfied for the reviewed paths.
+
+Authoritative reports:
+
+- `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md` (SHA-256 `6e1a89865c5008e43ef3c7cb857b0d0b4711f887485bb9cc98b5339df77e0362`)
+- `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md`
+
+Slice 2 remains in progress. Implementation requires a separately authorized
+same-Slice-2 handoff. Slice 3 is not authorized.
 
 ## Verification
 

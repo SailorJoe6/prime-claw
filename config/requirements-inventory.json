@@ -1324,7 +1324,7 @@
    "id": "R-WE-11",
    "priority": "GATE",
    "summary": "Future incubation creates the exact named SPECIFICATION, REQUIREMENTS, and DECISIONS bundle.",
-   "status": "proven (Slice 2 exact bundle and remote-tree tests)",
+   "status": "reopened by owner gate at 14e5cfa; ASTRA-12 self-invalidates creation/removal on the intended Linux identity branch",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1418,7 +1418,7 @@
    "id": "R-WE-33",
    "priority": "GATE",
    "summary": "Automated evidence covers safe future disposition behavior and failures.",
-   "status": "partially proven (Slices 1-2; all preserved future-incubation Astra regressions are permanent; later slice evidence remains)",
+   "status": "partially proven (prior seven narrow regressions are permanent; ASTRA-10–15 exact boundaries are not yet repository regressions)",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1442,7 +1442,7 @@
    "id": "R-WE-35",
    "priority": "GATE",
    "summary": "Future mutation uses a project lock and repeats canonical, remote, status, containment, and collision checks under lock.",
-   "status": "proven by Slice 2 revision; permanent ASTRA-05–09 regressions and existing concurrency/fault suite pass; owner/EXPERT acceptance pending",
+   "status": "reopened by owner gate at 14e5cfa; ASTRA-11 proves lock incarnation/cleanup can defeat serialization",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1467,7 +1467,7 @@
    "id": "R-WE-36",
    "priority": "GATE",
    "summary": "Future mutation commits and pushes only its exact bundle, leaves clean success, and preserves exact recoverable failure state.",
-   "status": "proven by Slice 2 revision; exact index/tree modes, coherent replay, and corrupt-evidence preservation regressions pass; owner/EXPERT acceptance pending",
+   "status": "reopened by owner gate at 14e5cfa; ASTRA-12 makes the future capability self-invalidating on the intended Linux branch",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1492,7 +1492,7 @@
    "id": "R-WE-69",
    "priority": "GATE",
    "summary": "Recovery deletion authority comes only from immutable receipts for O_EXCL-created regular files; product directories are never deleted.",
-   "status": "proven by Slice 2 revision; descriptor-bound file-only deletion and directory-retention regressions pass",
+   "status": "blocked by ASTRA-10; final unlink can delete an unowned replacement despite earlier receipts",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1517,7 +1517,7 @@
    "id": "R-WE-70",
    "priority": "GATE",
    "summary": "Recovery quarantines, revalidates, and unlinks only exact owned files through one held target FD; all directories and unowned entries remain.",
-   "status": "proven by Slice 2 revision; descriptor-bound file-only deletion and directory-retention regressions pass",
+   "status": "blocked by ASTRA-10; final unlink and restoration are not race-safe",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1542,7 +1542,7 @@
    "id": "R-WE-71",
    "priority": "GATE",
    "summary": "Future publication pushes the pinned verified owned commit OID so a concurrently advanced local HEAD descendant remains unpublished.",
-   "status": "proven by Slice 2 revision; pinned owned-commit push remains covered; owner/EXPERT acceptance pending",
+   "status": "satisfied for the 14e5cfa reviewed path; pinned owned-commit push regression passes",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1566,7 +1566,7 @@
    "id": "R-WE-72",
    "priority": "GATE",
    "summary": "Success replay validates journal/base/commit/content/hashes/ownership/actual remote evidence, preserves corrupt state, and separates historical from current repository facts.",
-   "status": "proven by Slice 2 revision; complete success identity/tree validation, coherent fresh observation, and preservation-only failure pass; owner/EXPERT acceptance pending",
+   "status": "blocked by ASTRA-13 and ASTRA-14; success proof is incomplete and newer remote evidence can contradict durability",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1591,7 +1591,7 @@
    "id": "R-WE-73",
    "priority": "GATE",
    "summary": "Directory identity is a guard for later file mutation, never destructive authority; every directory incarnation survives recovery.",
-   "status": "proven by Slice 2 revision; descriptor-bound file-only deletion and directory-retention regressions pass",
+   "status": "partially satisfied; directories are retained, but ASTRA-12 invalidates the Linux identity guard",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1616,7 +1616,7 @@
    "id": "R-WE-74",
    "priority": "GATE",
    "summary": "Every destructively accessed control child is revalidated beneath real Git common state at use; static/swapped symlinks cannot redirect access.",
-   "status": "proven by Slice 2 revision; static and late-swapped consumed/index control children cannot redirect writes, reads, or deletes",
+   "status": "blocked by ASTRA-11; pathname mkdir, fallback recursive cleanup, and split lock publication escape containment",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1641,7 +1641,7 @@
    "id": "R-WE-75",
    "priority": "GATE",
    "summary": "Replay current fields come from one coherent fresh post-validation observation or fail closed.",
-   "status": "proven by Slice 2 revision; replay current fields derive from one latest successful reconciliation",
+   "status": "satisfied for the original coherent-current-fields defect; does not satisfy ASTRA-14 final durability proof",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1665,7 +1665,7 @@
    "id": "R-WE-76",
    "priority": "GATE",
    "summary": "Every success OID and identity relationship is validated; malformed/inconsistent commit identity rejects success.",
-   "status": "proven by Slice 2 revision; every retained success OID and required equality/lineage relation is validated",
+   "status": "blocked by ASTRA-13; retained recovery OIDs and historical receipt relationships escape validation",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1689,7 +1689,7 @@
    "id": "R-WE-77",
    "priority": "GATE",
    "summary": "Exact-tree construction avoids a pathname-raceable private index and emits only mode-100644 blobs; commit, remote, and replay reject symlink mode 120000.",
-   "status": "proven by Slice 2 revision; index-free exact-tree construction and tree/commit/remote/replay mode regressions pass",
+   "status": "satisfied for the 14e5cfa reviewed Git path; exact index-free 100644 tree construction passes",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1714,7 +1714,7 @@
    "id": "R-WE-78",
    "priority": "GATE",
    "summary": "Every malformed-success path preserves transaction-journal bytes and blockers while recording diagnostics separately.",
-   "status": "proven by Slice 2 revision; malformed-success paths preserve exact journal and blocker bytes and record diagnostics separately",
+   "status": "blocked by ASTRA-13 and ASTRA-15; accepted corrupt evidence clears blockers and newly persisted success can be overwritten",
    "phase": "4",
    "slice": 2,
    "proven_by": {
@@ -1732,6 +1732,202 @@
      "tests/test_specification_episodes_extension.py"
     ]
    },
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-79",
+   "priority": "GATE",
+   "summary": "Leaf deletion remains object/exclusion-bound through the final syscall, and restoration is atomic no-replace with quarantine preservation on conflict.",
+   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-10",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/REQUIREMENTS.md",
+     ".ralph/plans/DECISIONS.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ],
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".prime/agent/helpers/specification-episode-fs.py"
+    ],
+    "tests": []
+   },
+   "blocking_evidence": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-80",
+   "priority": "GATE",
+   "summary": "Control and lock creation, create-only owner publication, use, cleanup, and release stay bound to one non-following incarnation.",
+   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-11",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/REQUIREMENTS.md",
+     ".ralph/plans/DECISIONS.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ],
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".prime/agent/helpers/specification-episode-fs.py"
+    ],
+    "tests": []
+   },
+   "blocking_evidence": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-81",
+   "priority": "GATE",
+   "summary": "Filesystem incarnation semantics survive required mutations on every natively tested supported Linux/macOS runtime; unsupported platforms reject pre-mutation.",
+   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-12",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/REQUIREMENTS.md",
+     ".ralph/plans/DECISIONS.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ],
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".prime/agent/helpers/specification-episode-fs.py"
+    ],
+    "tests": []
+   },
+   "blocking_evidence": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-82",
+   "priority": "GATE",
+   "summary": "Verified success enforces a complete versioned schema, every retained OID, exact immutable shapes, and a cross-bound historical receipt graph.",
+   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-13",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/REQUIREMENTS.md",
+     ".ralph/plans/DECISIONS.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ],
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".prime/agent/helpers/specification-episode-fs.py"
+    ],
+    "tests": []
+   },
+   "blocking_evidence": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-83",
+   "priority": "GATE",
+   "summary": "The final accepted actual-remote OID still contains the verified success commit before success or blocker cleanup.",
+   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-14",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/REQUIREMENTS.md",
+     ".ralph/plans/DECISIONS.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ],
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".prime/agent/helpers/specification-episode-fs.py"
+    ],
+    "tests": []
+   },
+   "blocking_evidence": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-84",
+   "priority": "GATE",
+   "summary": "Preservation-only mode begins before/with durable success publication and preserves exact success/blocker evidence across every later fault.",
+   "status": "blocked/pending another same-Slice-2 revision; authority is ASTRA-15",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/REQUIREMENTS.md",
+     ".ralph/plans/DECISIONS.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ],
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".prime/agent/helpers/specification-episode-fs.py"
+    ],
+    "tests": []
+   },
+   "blocking_evidence": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md"
+   ],
+   "verdict_doc": "docs/specification-episodes.md",
+   "spec": ".ralph/plans/REQUIREMENTS.md"
+  },
+  {
+   "id": "R-WE-22",
+   "priority": "GATE",
+   "summary": "Partial failures report exact resources and recovery never removes or overwrites pre-existing, replacement, or dirty resources.",
+   "status": "blocked for Slice 2 by ASTRA-10 and ASTRA-11; final unlink/restoration and control/lock cleanup can destroy unowned resources",
+   "phase": "4",
+   "slice": 2,
+   "proven_by": {
+    "check": [
+     ".ralph/plans/SPECIFICATION.md",
+     ".ralph/plans/REQUIREMENTS.md",
+     ".ralph/plans/DECISIONS.md",
+     ".ralph/plans/EXECUTION_PLAN.md",
+     "docs/specification-episodes.md"
+    ],
+    "apply": [
+     ".prime/agent/extensions/specification-episodes.ts",
+     ".prime/agent/helpers/specification-episode-fs.py"
+    ],
+    "tests": []
+   },
+   "blocking_evidence": [
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md",
+    "/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md"
+   ],
    "verdict_doc": "docs/specification-episodes.md",
    "spec": ".ralph/plans/REQUIREMENTS.md"
   }

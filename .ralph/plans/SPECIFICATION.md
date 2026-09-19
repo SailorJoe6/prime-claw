@@ -212,11 +212,13 @@ non-negotiable invariants for the future path:
    checkout cleanliness, status paths, HEAD, upstream, and remote; it never
    mixes an older clean snapshot with newer reconciliation evidence.
 
-### 5.2 Failed `ae31587` gate and implemented revision
+### 5.2 Failed `ae31587` gate and narrow `14e5cfa` progress
 
 The fresh owner/EXPERT gate for reviewed commit `ae31587` remains immutable
-**REVISE** evidence. The controlled same-Slice-2 revision implements each gap
-without authorizing Slice 3:
+**REVISE** evidence. Candidate `14e5cfa` closes its seven narrow reproductions,
+but its own fresh owner/EXPERT gate also returned **REVISE**. The mechanisms
+below are meaningful progress, not proof of the broader invariants and not
+authorization for Slice 3:
 
 | Finding | Implemented mechanism | Permanent repository acceptance |
 |---|---|---|
@@ -240,6 +242,38 @@ The seven counterexamples are preserved in
 for same-name file replacement, late `indexes` swap, every retained OID, and
 exact blocker preservation. Passing local validation returns Slice 2 only to
 fresh owner/EXPERT acceptance; it does not start Slice 3.
+
+
+### 5.3 Failed `14e5cfa` gate: ASTRA-10 through ASTRA-15
+
+The authoritative reviewed range is `4460d96..14e5cfa`. Owner checks passed
+(Node 73/73, active `pytest -q tests` 241 passed, static/diff checks), but those
+suites did not exercise six material boundaries. Slice 2 remains in progress.
+
+| Finding | Failed invariant | Exact acceptance condition |
+|---|---|---|
+| ASTRA-10 | A checked quarantine leaf can be replaced before final unlink; ordinary restoration can overwrite a newly appeared destination | Bind deletion through the destructive syscall or preserve; restore atomically with no-replace; permanently inject final product/control unlink, concurrent writes, and restoration collisions |
+| ASTRA-11 | Pathname control mkdir/recursive cleanup can escape, and split lock creation/owner publication can adopt another lock | Bind control/lock create, create-only owner publication, use, cleanup, and release to one incarnation; never fall back to raw recursive deletion; preserve external sentinels and replacement locks in all three reproduced boundaries |
+| ASTRA-12 | Linux no-birthtime fallback relabels mutable ctime and self-invalidates after required renames | Use an incarnation scheme stable across own mutations and replacement-sensitive on actual supported Linux/Python/filesystem plus macOS; otherwise reject before product mutation and document unsupported platforms |
+| ASTRA-13 | Success accepts incomplete/malformed schema, retained recovery OIDs, and missing/inconsistent historical receipts | Enforce a closed versioned schema; validate every retained OID and immutable shape; cross-bind directory, file-creation, and bundle receipts; preserve journal/blocker for every supplied mutation |
+| ASTRA-14 | A newer stable remote rollback disproves durability, but replay still clears the blocker | Require the final accepted remote OID to contain the success commit before success/blocker cleanup; rollback or unprovable reachability preserves evidence |
+| ASTRA-15 | Success written by the current invocation is not preservation-guarded and can be normalized after a later fault | Enter preservation-only mode before/with durable success write; faults after the write or during final cleanup use separate diagnostics and preserve exact journal/blocker bytes |
+
+Stable authority mappings are R-WE-79 through R-WE-84 and D-WE-17 through
+D-WE-19. D-WE-15 and D-WE-16 remain decisions but are not fully implemented by
+`14e5cfa`. The earlier R-WE-69–78 judgments are split: R-WE-71, the original
+R-WE-75 coherence defect, and R-WE-77 are satisfied for reviewed paths;
+R-WE-73 is partial; R-WE-69/70/72/74/76/78 remain blocked.
+
+Authoritative evidence:
+
+- EXPERT report: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md` (SHA-256 `6e1a89865c5008e43ef3c7cb857b0d0b4711f887485bb9cc98b5339df77e0362`)
+- owner gate: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md`
+- linked runnable final-syscall, control/lock, Linux-identity, state-schema,
+  recovery, remote-rollback, and post-success-write evidence beside the reports
+
+This section is documentation authority only. It does not authorize
+implementation, `/handoff`, compaction, or Slice 3.
 
 ## 6. Episode-creation behavior
 

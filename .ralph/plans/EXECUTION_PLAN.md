@@ -1,8 +1,8 @@
 # Execution Plan — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated; the same-Slice-2
-> revision for ASTRA-05–09 (including ASTRA-06b and ASTRA-08b) is implemented
-> and awaits final validation plus fresh owner/EXPERT acceptance; Slices 3–8 are blocked.
+> **Status:** implementation in progress; Slice 1 is validated; Slice 2 candidate
+> `14e5cfa` failed its fresh owner/EXPERT gate on ASTRA-10–15. This turn is
+> documentation-only incorporation. Slice 2 remains open; Slices 3–8 are blocked.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 > **Decisions:** [DECISIONS.md](DECISIONS.md)
@@ -20,7 +20,7 @@
 | Slice | Bead | Status | Evidence |
 |---|---|---|---|
 | 1 — native interviews and trusted preflight | `prime-claw-h6w.2` | Implemented and validated | `.prime/agent/extensions/specification-episodes.ts`; `docs/specification-episodes.md`; focused Node/RPC tests; active project suite `pytest -q tests` (236 passed at Slice 1) |
-| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | Revised implementation and independent audit approved; fresh owner/EXPERT gate pending | All seven preserved counterexamples plus removal-boundary, control-leaf, remote-bracket, historical-inode, and terminal-evidence regressions are permanent; final active-suite evidence is being recorded |
+| 2 — concurrency-safe future incubation | `prime-claw-h6w.3` | **REVISE** at `14e5cfa`; documentation-only ASTRA-10–15 incorporation underway | Prior seven narrow cases and green suites are retained; six new owner-reproduced blockers require another same-Slice-2 revision after explicit handoff |
 | 3–8 | `prime-claw-h6w.4`–`.9` | Not started | Dependency-ordered below |
 
 Slice 1 evidence names the exact active-suite command. It does not claim a
@@ -108,12 +108,13 @@ calls. Keep runtime-only control state beneath:
 This location is shared by the canonical checkout and all of its worktrees,
 survives session/kernel/extension restarts, does not dirty any checkout, and is
 local to the runtime whose sessions/worktrees it describes. Writes use an
-atomic create-or-rename protocol. Future directory deletion authority comes
-only from a separate immutable create-only ownership receipt written after an
-exclusive successful `mkdir`; a failed precondition or mutable journal field
-cannot establish ownership. A project-scoped lock uses atomic directory
-creation, includes diagnostic owner/time metadata, and is never silently
-stolen. Stale-lock recovery is explicit.
+atomic create-or-rename protocol. Product directories are never deletion
+authority and are always retained; only exact transaction-created leaf objects
+may ever be considered for removal. Candidate `14e5cfa` does not yet bind that
+authority through final unlink (ASTRA-10). A project lock must bind atomic
+directory creation, create-only owner publication, use, cleanup, and release to
+one incarnation; `14e5cfa` does not yet meet that contract (ASTRA-11).
+Stale-lock recovery remains explicit.
 
 The host derives a disposition ID from the stable owner session ID,
 disposition, normalized slug, and SHA-256 fingerprint of the exact bundle. A
@@ -227,22 +228,32 @@ Immutable source evidence remains external:
 - adjacent owner gate, two runnable counterexample files, and owner logs
   (original result: 0/5 plus 0/2)
 
-The seven counterexamples now live permanently in
-`tests/specification_episodes_astra_regressions.test.mjs`. Additional cases
-cover same-name replacement, late `indexes` swaps, all retained success OIDs,
-exact blocker preservation, historical/live inode separation, and local/remote
-observation brackets. Direct Python helper regressions inject replacements at
-product-file and control-leaf quarantine boundaries. The independent final
-implementation audit returned APPROVE for ASTRA-05, ASTRA-06/06b, ASTRA-07,
-ASTRA-08/08b, ASTRA-09, R-WE-69–78, and D-WE-15–16.
+The seven prior counterexamples remain permanent. Candidate `14e5cfa` passed
+combined Node suites (73/73), exact active `pytest -q tests` (241 passed, 11
+warnings), and static/diff checks. A preliminary implementation audit approved
+those inspected paths, but the later authoritative owner/formal EXPERT gate
+independently reproduced ASTRA-10–15 and returned **REVISE**. Broad claims that
+R-WE-69–78 or D-WE-15–16 were collectively proven are withdrawn.
 
-Final revision evidence:
+Authority for the next same-Slice-2 revision:
 
-- combined Node suites: 73 passed, 0 failed;
-- exact active suite `pytest -q tests`: 241 passed, 11 importlib deprecation warnings, 0 failed (624.32s).
+| Finding | Requirements / decision | Required permanent acceptance |
+|---|---|---|
+| ASTRA-10 final unlink/restoration clobber | R-WE-69/70/79; D-WE-17 | Final product/control unlink cannot delete a replacement; concurrent restore destination is never overwritten; conflict preserves quarantine evidence |
+| ASTRA-11 control/lock incarnation escape | R-WE-35/74/80; D-WE-17 | Control mkdir, helper failure cleanup, lock owner publication/use/release remain one incarnation; external sentinels, prior owner, and replacement lock survive |
+| ASTRA-12 Linux self-invalidating identity | R-WE-73/81; D-WE-18 | Native supported Linux and macOS create/continue/remove/replacement/restart pass with stable semantics, or unsupported runtime rejects before mutation |
+| ASTRA-13 incomplete success proof | R-WE-72/76/78/82; D-WE-19 | Exact versioned schema, all retained OIDs, and cross-bound historical receipts reject every supplied corruption while preserving evidence |
+| ASTRA-14 contradicted remote durability | R-WE-72/83; D-WE-19 | Final accepted remote OID still contains the success commit before blocker cleanup; stable rollback fails closed |
+| ASTRA-15 newly persisted success overwrite | R-WE-78/84; D-WE-19 | Preservation begins with durable success write; all later injected failures preserve exact journal/blocker and write diagnostics separately |
 
-Fresh owner/formal EXPERT acceptance remains required before Slice 2 can close.
-Slice 3 stays unstarted.
+Authoritative reports:
+
+- `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-astra-review.md` (SHA-256 `6e1a89865c5008e43ef3c7cb857b0d0b4711f887485bb9cc98b5339df77e0362`)
+- `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-14e5cfa/slice2-14e5cfa-owner-gate.md`
+
+No implementation may resume until the PROJECT_CONVERSATION verifies this
+documentation commit and authorizes a controlled same-Slice-2 handoff. Slice 3
+stays unstarted.
 
 ### 2.5 Promoted episode transaction
 
@@ -624,6 +635,7 @@ private transcript text.
 | R-WE-35, R-WE-36 | 2 |
 | R-WE-69, R-WE-70, R-WE-71, R-WE-72 | 2 |
 | R-WE-73, R-WE-74, R-WE-75, R-WE-76, R-WE-77, R-WE-78 | 2 revision gate |
+| R-WE-79, R-WE-80, R-WE-81, R-WE-82, R-WE-83, R-WE-84 | next same-Slice-2 revision gate (ASTRA-10–15) |
 
 A generated inventory assertion must show every R-WE ID exactly once in the
 requirements source and at least one `proven_by` path after its owning slice.
@@ -649,7 +661,10 @@ concurrency coverage in earlier slices.
 | D-WE-13 POC is evidence, not integration proof | audit; Slices 3–4 and 8 |
 | D-WE-14 explicit model-to-host bridge | §§2.1–2.2; Slices 1 and 4 |
 | D-WE-15 object-bound destructive/publication authority | §§2.2, 2.4, 6; Slice 2 |
-| D-WE-16 revalidate identity/containment/type/observation at use | §§2.2, 2.4, 6; Slice 2 revision gate |
+| D-WE-16 revalidate identity/containment/type/observation at use | §§2.2, 2.4, 6; not fully implemented at `14e5cfa` |
+| D-WE-17 final-syscall object/control/lock authority | §§2.2, 2.4; next same-Slice-2 revision |
+| D-WE-18 platform-real incarnation model | §§2.2, 2.4; next same-Slice-2 revision |
+| D-WE-19 closed durable success proof | §§2.2, 2.4; next same-Slice-2 revision |
 
 ## 8. Completion boundary
 
