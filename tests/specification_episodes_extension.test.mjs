@@ -185,7 +185,12 @@ test("future disposition commits and pushes only the three-file bundle without e
   assert.match(details.transaction_path, /\.git\/prime-claw\/future-transactions\/.+\.json$/);
   const receiptText = readFileSync(details.preflight_receipt_path, "utf8");
   const transactionText = readFileSync(details.transaction_path, "utf8");
-  assert.equal(JSON.parse(receiptText).disposition_id, details.disposition_id);
+  const preflightReceipt = JSON.parse(receiptText);
+  assert.equal(preflightReceipt.disposition_id, details.disposition_id);
+  assert.equal(preflightReceipt.retained_preflight_probes.target_directory, null);
+  assert.equal(preflightReceipt.retained_preflight_probes.product_leaf, null);
+  assert.equal(existsSync(preflightReceipt.retained_preflight_probes.anchor), true);
+  assert.equal(existsSync(preflightReceipt.retained_preflight_probes.retired), true);
   assert.doesNotMatch(`${receiptText}${transactionText}`, /Complete behavior|R-1 required|D-1 satisfies/);
   for (const [name, key] of [
     ["SPECIFICATION.md", "specification_markdown"],

@@ -760,6 +760,7 @@ def remove_lock(root: str, rel: str, token: str, lock_identity: dict[str, Any], 
 def ensure_directory(repo: str, rel: str, root_identity: dict[str, Any] | None = None, parent_identity: dict[str, Any] | None = None, expected_identity: dict[str, Any] | None = None) -> dict[str, Any]:
     root_fd = open_root(repo)
     parent_fd = fd = -1
+    retained_directory = None
     try:
         require_identity(root_fd, root_identity, "directory root")
         if parent_identity is None:
@@ -779,13 +780,19 @@ def ensure_directory(repo: str, rel: str, root_identity: dict[str, Any] | None =
                     try:
                         rename_exclusive(parent_fd, temporary, name)
                     except FileExistsError:
-                        # A concurrent compliant creator won publication. Bind
-                        # its real directory, then remove only this call's still-
-                        # open, allocation-unique empty staging directory.
+                        # A concurrent creator won publication. Bind its real
+                        # directory, but retain this call's private staging
+                        # allocation: POSIX has no rmdir-by-fd operation, so a
+                        # checked pathname can never authorize later cleanup.
                         fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
                         if os.listdir(staged_fd): fail("private directory staging allocation is not empty")
-                        os.rmdir(temporary, dir_fd=parent_fd)
-                        os.fsync(parent_fd)
+                        staged_name_fd = os.open(temporary, DIR_FLAGS, dir_fd=parent_fd)
+                        try:
+                            if not matches_fd(staged_name_fd, staged_identity):
+                                fail(f"private directory staging name was replaced; retained {temporary}")
+                        finally:
+                            os.close(staged_name_fd)
+                        retained_directory = "/".join((*components(rel)[:-1], temporary))
                         created = False
                     else:
                         fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
@@ -795,7 +802,9 @@ def ensure_directory(repo: str, rel: str, root_identity: dict[str, Any] | None =
                         created = True
                 finally: os.close(staged_fd)
         require_identity(fd, expected_identity, "directory")
-        return {"created": created, "identity": identity_fd(fd)}
+        result = {"created": created, "identity": identity_fd(fd)}
+        if retained_directory is not None: result["retained_directory"] = retained_directory
+        return result
     finally:
         for item in (fd, parent_fd, root_fd):
             if item >= 0:
@@ -808,17 +817,18 @@ def directory_identity(path: str) -> dict[str, Any]:
     try: return {"identity": identity_fd(fd)}
     finally: os.close(fd)
 
-def open_nearest_directory(path: str) -> int:
+def open_nearest_directory(path: str) -> tuple[int, str]:
     absolute = os.path.abspath(path)
     fd = os.open(os.path.sep, DIR_FLAGS)
+    bound = os.path.sep
     try:
         parts = [part for part in absolute.split(os.path.sep) if part]
         if any(part in (".", "..") or "\x00" in part for part in parts): fail("unsafe absolute preflight path")
         for part in parts:
             try: nxt = os.open(part, DIR_FLAGS, dir_fd=fd)
-            except FileNotFoundError: return fd
-            os.close(fd); fd = nxt
-        return fd
+            except FileNotFoundError: return fd, bound
+            os.close(fd); fd = nxt; bound = os.path.join(bound, part)
+        return fd, bound
     except Exception:
         os.close(fd); raise
 
@@ -826,11 +836,12 @@ def open_nearest_directory(path: str) -> int:
 def platform_preflight(repo: str, common_dir: str, target_rel: str | None = None, require_retirement: bool = False, quarantine_dir: str | None = None, anchor_dir: str | None = None) -> dict[str, Any]:
     repo_fd = open_root(repo)
     common_fd = open_root(common_dir)
-    target_fd = quarantine_fd = anchor_fd = probe_fd = probe_dir_fd = -1
-    probe_name = probe_retired = probe_anchor = probe_dir_name = None
+    target_fd = quarantine_fd = anchor_fd = probe_fd = -1
+    probe_name = probe_retired = probe_anchor = None
+    moved_to_quarantine = linked_to_product = anchor_created = False
     try:
         repo_identity = identity_fd(repo_fd); common_identity = identity_fd(common_fd)
-        target_fd = os.dup(repo_fd)
+        target_fd = os.dup(repo_fd); target_bound = os.path.abspath(repo)
         if target_rel is not None:
             for part in components(target_rel):
                 try: nxt = os.open(part, DIR_FLAGS, dir_fd=target_fd)
@@ -838,12 +849,13 @@ def platform_preflight(repo: str, common_dir: str, target_rel: str | None = None
                 except OSError as error:
                     if error.errno in (errno.ENOTDIR, errno.ELOOP): break
                     raise
-                os.close(target_fd); target_fd = nxt
+                os.close(target_fd); target_fd = nxt; target_bound = os.path.join(target_bound, part)
         target_identity = identity_fd(target_fd)
         quarantine_identity = common_identity; anchor_identity = common_identity
         if require_retirement:
             if not quarantine_dir or not anchor_dir: fail("retirement topology requires actual quarantine and anchor directories")
-            quarantine_fd = open_nearest_directory(quarantine_dir); anchor_fd = open_nearest_directory(anchor_dir)
+            quarantine_fd, quarantine_bound = open_nearest_directory(quarantine_dir)
+            anchor_fd, anchor_bound = open_nearest_directory(anchor_dir)
             quarantine_identity = identity_fd(quarantine_fd); anchor_identity = identity_fd(anchor_fd)
             mount = (target_identity["device"], target_identity.get("mount_id"))
             if any((candidate["device"], candidate.get("mount_id")) != mount for candidate in (quarantine_identity, anchor_identity)):
@@ -851,48 +863,67 @@ def platform_preflight(repo: str, common_dir: str, target_rel: str | None = None
             libc = ctypes.CDLL(None, use_errno=True)
             if not ((sys.platform == "darwin" and hasattr(libc, "renameatx_np")) or hasattr(libc, "renameat2")):
                 fail("unsupported retirement topology: exclusive descriptor-relative rename is unavailable")
-            # Exercise production directions on disposable, allocation-bound
-            # names: anchor -> product namespace, then product -> quarantine.
-            # All probe names are removed before admission is acknowledged.
-            token = secrets.token_hex(16); probe_dir_name = f".prime-claw-preflight-{token}"
+            # Exercise production directions on allocation-bound names:
+            # anchor -> product namespace, then product -> quarantine. The exact
+            # anchor and retired witness are retained because pathname cleanup
+            # cannot be object-bound on supported POSIX platforms.
+            token = secrets.token_hex(16)
             probe_name = f"capability-probe-{token}"; probe_anchor = f"preflight-anchor-{token}"; probe_retired = f"preflight-retired-{token}"
             probe_content = b"prime-claw-retirement-capability-v1\n"
-            moved_to_quarantine = linked_to_product = anchor_created = directory_created = False
             try:
                 probe_fd = os.open(probe_anchor, os.O_RDWR | os.O_CREAT | os.O_EXCL | O_NOFOLLOW, 0o600, dir_fd=anchor_fd); anchor_created = True
                 os.write(probe_fd, probe_content); os.fsync(probe_fd); os.fsync(anchor_fd)
-                os.mkdir(probe_dir_name, 0o700, dir_fd=target_fd); directory_created = True
-                probe_dir_fd = os.open(probe_dir_name, DIR_FLAGS, dir_fd=target_fd); os.fsync(target_fd)
-                os.link(probe_anchor, probe_name, src_dir_fd=anchor_fd, dst_dir_fd=probe_dir_fd, follow_symlinks=False); linked_to_product = True; os.fsync(probe_dir_fd)
-                rename_exclusive_between(probe_dir_fd, probe_name, quarantine_fd, probe_retired); linked_to_product = False; moved_to_quarantine = True
-                os.fsync(probe_dir_fd); os.fsync(quarantine_fd)
+                # Exercise the actual target directory directly. A disposable
+                # subdirectory would itself require an unsafe checked-name rmdir.
+                os.link(probe_anchor, probe_name, src_dir_fd=anchor_fd, dst_dir_fd=target_fd, follow_symlinks=False); linked_to_product = True; os.fsync(target_fd)
+                rename_exclusive_between(target_fd, probe_name, quarantine_fd, probe_retired); linked_to_product = False; moved_to_quarantine = True
+                os.fsync(target_fd); os.fsync(quarantine_fd)
                 retired_fd = os.open(probe_retired, FILE_READ_FLAGS, dir_fd=quarantine_fd)
                 try:
                     if not matches_fd(retired_fd, identity_fd(probe_fd)) or read_fd(retired_fd) != probe_content: fail("retirement capability probe changed allocation or bytes")
                 finally: os.close(retired_fd)
             finally:
-                def remove_owned_probe(container_fd: int, name: str) -> None:
+                def validate_owned_probe(container_fd: int, name: str) -> None:
                     check = os.open(name, FILE_READ_FLAGS, dir_fd=container_fd)
                     try:
-                        if not matches_fd(check, identity_fd(probe_fd)): fail("capability probe name was replaced during cleanup")
-                    finally: os.close(check)
-                    os.unlink(name, dir_fd=container_fd); os.fsync(container_fd)
-                if moved_to_quarantine: remove_owned_probe(quarantine_fd, probe_retired)
-                elif linked_to_product: remove_owned_probe(probe_dir_fd, probe_name)
-                if anchor_created: remove_owned_probe(anchor_fd, probe_anchor)
-                if probe_dir_fd >= 0:
-                    if os.listdir(probe_dir_fd): fail("capability probe directory is not empty after cleanup")
-                    os.close(probe_dir_fd); probe_dir_fd = -1
-                if directory_created: os.rmdir(probe_dir_name, dir_fd=target_fd); os.fsync(target_fd)
+                        if not matches_fd(check, identity_fd(probe_fd)) or read_fd(check) != probe_content:
+                            fail(f"capability probe name was replaced; retained {name}")
+                    finally:
+                        os.close(check)
+                # Probe allocations are intentionally retained. POSIX unlink and
+                # rmdir address names rather than held objects; checking an fd and
+                # then deleting by name would recreate ASTRA-10/11. Random names
+                # bound growth to one retained allocation set per preflight.
+                if moved_to_quarantine: validate_owned_probe(quarantine_fd, probe_retired)
+                elif linked_to_product: validate_owned_probe(target_fd, probe_name)
+                if anchor_created: validate_owned_probe(anchor_fd, probe_anchor)
                 if probe_fd >= 0: os.close(probe_fd); probe_fd = -1
-        return {"repo_identity": repo_identity, "common_identity": common_identity, "target_identity": target_identity, "quarantine_identity": quarantine_identity, "anchor_identity": anchor_identity, "retirement_supported": True}
-    except Exception:
-        # A source-side probe can only remain if capability proof failed before
-        # its exclusive retirement. Keep it fail-closed for operator inspection.
-        raise
+        return {
+            "repo_identity": repo_identity,
+            "common_identity": common_identity,
+            "target_identity": target_identity,
+            "quarantine_identity": quarantine_identity,
+            "anchor_identity": anchor_identity,
+            "retirement_supported": True,
+            "retained_probes": ({
+                "target_directory": None,
+                "anchor": os.path.join(anchor_bound, probe_anchor),
+                "retired": os.path.join(quarantine_bound, probe_retired) if moved_to_quarantine else None,
+                "product_leaf": os.path.join(target_bound, probe_name) if linked_to_product else None,
+            } if anchor_created else None),
+        }
+    except Exception as error:
+        # Every created probe is retained for inspection because cleanup cannot
+        # bind a pathname unlink/rmdir to the allocation held before the syscall.
+        retained = {
+            "target_directory": None,
+            "anchor": os.path.join(locals().get("anchor_bound", os.path.abspath(anchor_dir or common_dir)), probe_anchor) if anchor_created else None,
+            "retired": os.path.join(locals().get("quarantine_bound", os.path.abspath(quarantine_dir or common_dir)), probe_retired) if moved_to_quarantine else None,
+            "product_leaf": os.path.join(locals().get("target_bound", os.path.abspath(repo)), probe_name) if linked_to_product else None,
+        }
+        fail(f"{error}; retained capability probes: {json.dumps(retained, sort_keys=True)}")
     finally:
         if probe_fd >= 0: os.close(probe_fd)
-        if probe_dir_fd >= 0: os.close(probe_dir_fd)
         for fd in (anchor_fd, quarantine_fd, target_fd, common_fd, repo_fd):
             if fd >= 0: os.close(fd)
 

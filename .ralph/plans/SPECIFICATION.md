@@ -415,6 +415,15 @@ After one bounded candidate, update durable evidence and `prime-claw-h6w.3`,
 commit and push, prove clean local/upstream/actual-remote identity, and stop for
 fresh owner and formal EXPERT review. Slice 3 remains unauthorized.
 
+The first bounded execution task removes ASTRA-10/11 checked-name destruction:
+capability probes now link directly into the actual target directory, retain the
+anchor and retired witness at exact receipt paths, and never unlink/rmdir a
+checked probe name. Losing concurrent directory publication retains its private
+allocation and reports that path; TypeScript callers stop instead of silently
+discarding retained state. Final-leaf and late-directory substitution tests
+preserve both incarnations. This is focused implementation evidence only;
+ASTRA-17/24 and ASTRA-25 remain before the combined candidate gate.
+
 ## 6. Episode-creation behavior
 
 For the immediate episode disposition, deterministic automation shall:

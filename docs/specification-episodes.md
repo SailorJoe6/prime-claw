@@ -526,8 +526,28 @@ Preserved evidence:
 - cleanup receipt: `/Users/jlanders/.prime/agent/session-artifacts/01a0b5fe-e74c-7149-80b9-f328a5b1924f/expert-reviews/slice2-44b92f8/expert-cleanup-receipt.json` (SHA-256 `1ffc9bf48db29d0f5d6b195832a029211a77ae6914204f2096f1978049436834`)
 
 The owner verified all 24 report links and all 32 manifest artifacts, recorded
-post-Astra quota, and retired the full invocation tree. Implementation is not
-authorized at this boundary.
+post-Astra quota, and retired the full invocation tree. Transition
+`33137bdb-e96e-4337-92df-1cdd860f9fa6` subsequently authorized one bounded
+same-Slice-2 revision from `94ec196`.
+
+### Current bounded revision: ASTRA-10/11 cleanup safety
+
+The helper no longer performs checked-name unlink or `rmdir` for capability
+probes. It links the probe directly into the actual target directory, exercises
+product-to-quarantine retirement, and retains the exact anchor and retired
+witness paths in the durable disposition receipt. The target checkout receives
+no retained probe directory or leaf. If a retained name is replaced before
+final validation, both allocations survive and preflight fails with exact
+retained paths.
+
+A losing `ensure_directory` publication retains its private staging directory.
+The helper returns its exact relative path; TypeScript control/future callers
+stop and surface that resource instead of reporting clean success. No checked
+staging pathname is removed. Disposable tests substitute foreign content at
+retired, product, and anchor leaf edges and late empty directories at losing
+publication, and prove that all incarnations survive. These focused results do
+not close Slice 2: ASTRA-17/24 and ASTRA-25 remain, followed by the combined
+candidate validation and fresh owner/formal gate.
 
 ## Verification
 

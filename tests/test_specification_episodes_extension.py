@@ -331,6 +331,195 @@ def test_astra_11_control_mkdir_stays_bound_to_held_parent():
         assert not (outside / "indexes").exists()
 
 
+def test_astra_11_losing_directory_publication_retains_private_allocation():
+    module = _load_fs_helper("specification_episode_fs_losing_directory")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-losing-directory-") as raw_root:
+        root = Path(raw_root).resolve(); control = root / "prime-claw"; control.mkdir()
+        parent_identity = _fd_identity(module, control, directory=True)
+        real_rename = module.rename_exclusive
+        def publish_winner_then_lose(parent_fd, source, destination):
+            os.mkdir(destination, dir_fd=parent_fd)
+            raise FileExistsError(destination)
+        module.rename_exclusive = publish_winner_then_lose
+        try:
+            result = module.ensure_directory(str(root), "prime-claw/indexes", parent_identity=parent_identity)
+        finally:
+            module.rename_exclusive = real_rename
+        assert result["created"] is False
+        assert result["retained_directory"].startswith("prime-claw/.prime-claw-dir-create-")
+        assert (root / result["retained_directory"]).is_dir()
+        assert (control / "indexes").is_dir()
+
+
+def test_astra_11_losing_directory_publication_preserves_late_replacement():
+    module = _load_fs_helper("specification_episode_fs_losing_directory_replacement")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-losing-directory-replacement-") as raw_root:
+        root = Path(raw_root).resolve(); control = root / "prime-claw"; control.mkdir()
+        parent_identity = _fd_identity(module, control, directory=True)
+        real_rename = module.rename_exclusive; real_open = module.os.open
+        staged_name = None; staged_opens = 0; saved = control / "saved-owned-staging"
+        def publish_winner_then_lose(parent_fd, source, destination):
+            nonlocal staged_name
+            staged_name = source
+            os.mkdir(destination, dir_fd=parent_fd)
+            raise FileExistsError(destination)
+        def substitute_staging_name(path, flags, *args, **kwargs):
+            nonlocal staged_opens
+            if staged_name is not None and path == staged_name and flags == module.DIR_FLAGS:
+                staged_opens += 1
+                if staged_opens == 1:
+                    os.rename(control / staged_name, saved)
+                    os.mkdir(control / staged_name)
+            return real_open(path, flags, *args, **kwargs)
+        module.rename_exclusive = publish_winner_then_lose; module.os.open = substitute_staging_name
+        try:
+            try:
+                module.ensure_directory(str(root), "prime-claw/indexes", parent_identity=parent_identity)
+            except RuntimeError as error:
+                assert "staging name was replaced" in str(error)
+            else:
+                raise AssertionError("late replacement directory was accepted")
+        finally:
+            module.rename_exclusive = real_rename; module.os.open = real_open
+        assert staged_opens == 1
+        assert saved.is_dir()
+        assert staged_name is not None and (control / staged_name).is_dir()
+        assert (control / "indexes").is_dir()
+
+
+def test_astra_10_preflight_retains_probe_files_instead_of_unlinking_checked_names():
+    module = _load_fs_helper("specification_episode_fs_retained_probes")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-retained-probes-") as raw_root:
+        root = Path(raw_root).resolve(); repo = root / "repo"; common = repo / ".git"
+        target = repo / ".ralph/plans/future"; quarantine = common / "prime-claw/quarantine"; anchors = common / "prime-claw/future-file-anchors"
+        target.mkdir(parents=True); quarantine.mkdir(parents=True); anchors.mkdir(parents=True)
+        real_unlink = module.os.unlink; real_rmdir = module.os.rmdir
+        module.os.unlink = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("checked-name unlink attempted"))
+        module.os.rmdir = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("checked-name rmdir attempted"))
+        try:
+            result = module.platform_preflight(str(repo), str(common), ".ralph/plans/future/x", True, str(quarantine), str(anchors))
+        finally:
+            module.os.unlink = real_unlink; module.os.rmdir = real_rmdir
+        retained = result["retained_probes"]
+        assert Path(retained["retired"]).read_bytes() == b"prime-claw-retirement-capability-v1\n"
+        assert Path(retained["anchor"]).read_bytes() == b"prime-claw-retirement-capability-v1\n"
+        assert retained["target_directory"] is None and retained["product_leaf"] is None
+        assert not any(path.name.startswith((".prime-claw-preflight-", "capability-probe-")) for path in target.iterdir())
+
+
+def test_astra_10_preflight_preserves_foreign_final_leaf_replacement():
+    module = _load_fs_helper("specification_episode_fs_probe_leaf_replacement")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-probe-leaf-replacement-") as raw_root:
+        root = Path(raw_root).resolve(); repo = root / "repo"; common = repo / ".git"
+        target = repo / ".ralph/plans/future"; quarantine = common / "prime-claw/quarantine"; anchors = common / "prime-claw/future-file-anchors"
+        target.mkdir(parents=True); quarantine.mkdir(parents=True); anchors.mkdir(parents=True)
+        real_open = module.os.open; retired_reads = 0; saved = quarantine / "saved-owned-probe"; replaced_name = None
+        def substitute_retired_probe(path, flags, *args, **kwargs):
+            nonlocal retired_reads, replaced_name
+            if isinstance(path, str) and path.startswith("preflight-retired-") and flags == module.FILE_READ_FLAGS:
+                retired_reads += 1
+                if retired_reads == 2:
+                    replaced_name = path
+                    os.rename(quarantine / path, saved)
+                    (quarantine / path).write_bytes(b"foreign\n")
+            return real_open(path, flags, *args, **kwargs)
+        module.os.open = substitute_retired_probe
+        try:
+            try:
+                module.platform_preflight(str(repo), str(common), ".ralph/plans/future/x", True, str(quarantine), str(anchors))
+            except RuntimeError as error:
+                assert "probe name was replaced" in str(error)
+                assert "retained capability probes" in str(error)
+            else:
+                raise AssertionError("foreign probe replacement was accepted")
+        finally:
+            module.os.open = real_open
+        assert retired_reads == 2 and replaced_name is not None
+        assert (quarantine / replaced_name).read_bytes() == b"foreign\n"
+        assert saved.read_bytes() == b"prime-claw-retirement-capability-v1\n"
+
+
+def test_astra_10_preflight_preserves_foreign_anchor_replacement():
+    module = _load_fs_helper("specification_episode_fs_probe_anchor_replacement")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-probe-anchor-replacement-") as raw_root:
+        root = Path(raw_root).resolve(); repo = root / "repo"; common = repo / ".git"
+        target = repo / ".ralph/plans/future"; quarantine = common / "prime-claw/quarantine"; anchors = common / "prime-claw/future-file-anchors"
+        target.mkdir(parents=True); quarantine.mkdir(parents=True); anchors.mkdir(parents=True)
+        real_open = module.os.open; saved = anchors / "saved-owned-anchor"; replaced_name = None
+        def substitute_anchor(path, flags, *args, **kwargs):
+            nonlocal replaced_name
+            if isinstance(path, str) and path.startswith("preflight-anchor-") and flags == module.FILE_READ_FLAGS and replaced_name is None:
+                replaced_name = path
+                os.rename(anchors / path, saved)
+                (anchors / path).write_bytes(b"foreign-anchor\n")
+            return real_open(path, flags, *args, **kwargs)
+        module.os.open = substitute_anchor
+        try:
+            try:
+                module.platform_preflight(str(repo), str(common), ".ralph/plans/future/x", True, str(quarantine), str(anchors))
+            except RuntimeError as error:
+                assert "probe name was replaced" in str(error)
+            else:
+                raise AssertionError("foreign anchor replacement was accepted")
+        finally:
+            module.os.open = real_open
+        assert replaced_name is not None
+        assert (anchors / replaced_name).read_bytes() == b"foreign-anchor\n"
+        assert saved.read_bytes() == b"prime-claw-retirement-capability-v1\n"
+
+
+def test_astra_10_preflight_preserves_foreign_product_leaf_after_failed_retirement():
+    module = _load_fs_helper("specification_episode_fs_probe_product_replacement")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-probe-product-replacement-") as raw_root:
+        root = Path(raw_root).resolve(); repo = root / "repo"; common = repo / ".git"
+        target = repo / ".ralph/plans/future"; quarantine = common / "prime-claw/quarantine"; anchors = common / "prime-claw/future-file-anchors"
+        target.mkdir(parents=True); quarantine.mkdir(parents=True); anchors.mkdir(parents=True)
+        real_open = module.os.open; real_rename = module.rename_exclusive_between
+        saved = target / "saved-owned-product-probe"; replaced_name = None
+        module.rename_exclusive_between = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("injected retirement failure"))
+        def substitute_product(path, flags, *args, **kwargs):
+            nonlocal replaced_name
+            if isinstance(path, str) and path.startswith("capability-probe-") and flags == module.FILE_READ_FLAGS and replaced_name is None:
+                replaced_name = path
+                os.rename(target / path, saved)
+                (target / path).write_bytes(b"foreign-product\n")
+            return real_open(path, flags, *args, **kwargs)
+        module.os.open = substitute_product
+        try:
+            try:
+                module.platform_preflight(str(repo), str(common), ".ralph/plans/future/x", True, str(quarantine), str(anchors))
+            except RuntimeError as error:
+                assert "probe name was replaced" in str(error)
+                assert "retained capability probes" in str(error)
+            else:
+                raise AssertionError("foreign product probe replacement was accepted")
+        finally:
+            module.os.open = real_open; module.rename_exclusive_between = real_rename
+        assert replaced_name is not None
+        assert (target / replaced_name).read_bytes() == b"foreign-product\n"
+        assert saved.read_bytes() == b"prime-claw-retirement-capability-v1\n"
+
+
+def test_astra_11_preflight_creates_no_directory_requiring_checked_name_rmdir():
+    module = _load_fs_helper("specification_episode_fs_no_probe_directory")
+    with tempfile.TemporaryDirectory(prefix="prime-claw-no-probe-directory-") as raw_root:
+        root = Path(raw_root).resolve(); repo = root / "repo"; common = repo / ".git"
+        target = repo / ".ralph/plans/future"; quarantine = common / "prime-claw/quarantine"; anchors = common / "prime-claw/future-file-anchors"
+        target.mkdir(parents=True); quarantine.mkdir(parents=True); anchors.mkdir(parents=True)
+        real_rmdir = module.os.rmdir; calls = []
+        def reject_rmdir(*args, **kwargs):
+            calls.append((args, kwargs))
+            raise AssertionError("checked-name rmdir attempted")
+        module.os.rmdir = reject_rmdir
+        try:
+            result = module.platform_preflight(str(repo), str(common), ".ralph/plans/future/x", True, str(quarantine), str(anchors))
+        finally:
+            module.os.rmdir = real_rmdir
+        assert result["retirement_supported"] is True and calls == []
+        assert result["retained_probes"]["target_directory"] is None
+        assert not any(path.name.startswith((".prime-claw-preflight-", "capability-probe-")) for path in target.iterdir())
+
+
 def test_specification_episodes_node_suite():
     node = shutil.which("node")
     assert node, "Node.js is required because prime-agent itself requires Node >=22.8"

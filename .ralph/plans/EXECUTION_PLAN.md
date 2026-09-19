@@ -374,6 +374,16 @@ is one evidence-backed candidate with current plans/inventory/docs and bead,
 committed and pushed, exact clean local/upstream/actual-remote identity, then a
 stop for fresh owner and formal EXPERT review. Slice 3 remains unauthorized.
 
+Execution progress: the focused ASTRA-10/11 task removes all helper
+checked-name probe unlink/rmdir paths, retains exact witness/staging resources,
+surfaces them through helper and durable preflight receipts, and adds disposable
+substitution coverage for retired/product/anchor leaves plus losing/probe
+directories. Focused Python coverage passes 38 tests with 2 platform skips; the
+clean full extension suite passes 57/57 in 1,199.95 seconds. An earlier loaded
+run's two failures both passed in isolation and in the clean full rerun.
+ASTRA-17/24 and ASTRA-25 remain; no combined candidate or acceptance claim
+exists yet.
+
 ### 2.5 Promoted episode transaction
 
 The episode path derives a unique branch/worktree/session name, creates the

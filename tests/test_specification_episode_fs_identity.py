@@ -189,13 +189,16 @@ def test_platform_preflight_rejects_filesystem_without_exclusive_rename_capabili
         assert not (repo / ".ralph/plans/future/x").exists()
 
 
-def test_platform_preflight_reuses_one_bounded_capability_allocation():
+def test_platform_preflight_retains_one_bounded_capability_allocation_per_call():
     spec = importlib.util.spec_from_file_location("specification_episode_fs_bounded_probe", HELPER); assert spec and spec.loader
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
     with tempfile.TemporaryDirectory() as temp:
-        repo = Path(temp).resolve()/"repo"; common=repo/".git"; q=common/"prime-claw/quarantine"; a=common/"prime-claw/future-file-anchors"
-        (repo/".ralph/plans/future").mkdir(parents=True); q.mkdir(parents=True); a.mkdir(parents=True)
-        for _ in range(3): module.platform_preflight(str(repo),str(common),".ralph/plans/future/x",True,str(q),str(a))
-        assert list(q.iterdir()) == []
-        assert list(a.iterdir()) == []
-        assert not any(p.name.startswith(".prime-claw-preflight-") for p in (repo/".ralph/plans/future").iterdir())
+        repo = Path(temp).resolve()/"repo"; common=repo/".git"; q=common/"prime-claw/quarantine"; a=common/"prime-claw/future-file-anchors"; target=repo/".ralph/plans/future"
+        target.mkdir(parents=True); q.mkdir(parents=True); a.mkdir(parents=True)
+        results = [module.platform_preflight(str(repo),str(common),".ralph/plans/future/x",True,str(q),str(a)) for _ in range(3)]
+        assert len(list(q.iterdir())) == 3
+        assert len(list(a.iterdir())) == 3
+        assert not any(p.name.startswith((".prime-claw-preflight-", "capability-probe-")) for p in target.iterdir())
+        assert len({result["retained_probes"]["retired"] for result in results}) == 3
+        assert len({result["retained_probes"]["anchor"] for result in results}) == 3
+        assert {result["retained_probes"]["target_directory"] for result in results} == {None}

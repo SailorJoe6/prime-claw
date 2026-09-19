@@ -477,11 +477,17 @@ export function ensureControlDirectory(commonDir: string, name?: string): string
   const relativePath = name ? `${CONTROL_DIR}/${name}` : CONTROL_DIR;
   const targetPath = join(commonDir, relativePath);
   const expected = DIRECTORY_AUTHORITIES.get(targetPath.split("\\").join("/"));
-  const result = secureFs<{ identity: unknown }>({
+  const result = secureFs<{ identity: unknown; retained_directory?: unknown }>({
     operation: "ensure-directory", repo: commonDir, path: relativePath,
     root_identity: rootIdentity, parent_identity: parentIdentity,
     expected_identity: expected ?? null,
   });
+  if (result.retained_directory !== undefined) {
+    if (typeof result.retained_directory !== "string") throw new Error("secure directory helper returned an invalid retained path");
+    const retainedPath = join(commonDir, result.retained_directory);
+    secureRelative(commonDir, retainedPath);
+    throw new Error(`control directory publication retained an unremovable private allocation: ${retainedPath}`);
+  }
   bindDirectoryAuthority(targetPath, result.identity, `control directory ${targetPath}`);
   return targetPath;
 }
@@ -836,11 +842,19 @@ function ensureFutureRoot(cwd: string, create = true): string {
   if (existsSync(futureRoot) && lstatSync(futureRoot).isSymbolicLink()) {
     throw new Error("future plans root must not be a symlink");
   }
-  if (create) secureFs<Record<string, unknown>>({
-    operation: "ensure-directory",
-    repo: cwd,
-    path: join(".ralph", "plans", "future").split("\\").join("/"),
-  });
+  if (create) {
+    const ensured = secureFs<{ retained_directory?: unknown }>({
+      operation: "ensure-directory",
+      repo: cwd,
+      path: join(".ralph", "plans", "future").split("\\").join("/"),
+    });
+    if (ensured.retained_directory !== undefined) {
+      if (typeof ensured.retained_directory !== "string") throw new Error("secure directory helper returned an invalid retained path");
+      const retainedPath = join(cwd, ensured.retained_directory);
+      secureRelative(cwd, retainedPath);
+      throw new Error(`future directory publication retained an unremovable private allocation: ${retainedPath}`);
+    }
+  }
   const resolved = existsSync(futureRoot) ? realpathSync(futureRoot) : futureRoot;
   const rel = relative(plansRoot, resolved);
   if (rel.startsWith("..") || rel === "" || rel.startsWith("/")) {
@@ -3089,7 +3103,12 @@ async function executeDisposition(
   const state = await inspectCanonicalRepository(pi, cwd, signal);
   const preflightQuarantine = params.decision.kind === "future" ? join(state.commonDir, CONTROL_DIR, "quarantine") : state.commonDir;
   const preflightAnchors = params.decision.kind === "future" ? join(state.commonDir, CONTROL_DIR, "future-file-anchors") : state.commonDir;
-  const platform = secureFs<{ repo_identity: unknown; common_identity: unknown; retirement_supported: boolean }>({
+  const platform = secureFs<{
+    repo_identity: unknown;
+    common_identity: unknown;
+    retirement_supported: boolean;
+    retained_probes?: unknown;
+  }>({
     operation: "platform-preflight",
     repo: state.repoRoot,
     common_dir: state.commonDir,
@@ -3098,8 +3117,21 @@ async function executeDisposition(
     anchor_dir: preflightAnchors,
     require_retirement: params.decision.kind === "future",
   });
-  if (params.decision.kind === "future" && platform.retirement_supported !== true) {
-    throw new Error("filesystem preflight did not prove the required retirement topology");
+  let retainedPreflightProbes: Record<string, unknown> | null = null;
+  if (params.decision.kind === "future") {
+    if (platform.retirement_supported !== true) {
+      throw new Error("filesystem preflight did not prove the required retirement topology");
+    }
+    retainedPreflightProbes = object(platform.retained_probes, "retained filesystem preflight probes");
+    const targetDirectory = retainedPreflightProbes.target_directory;
+    const anchor = retainedPreflightProbes.anchor;
+    const retired = retainedPreflightProbes.retired;
+    const productLeaf = retainedPreflightProbes.product_leaf;
+    if (targetDirectory !== null || typeof anchor !== "string" || typeof retired !== "string" || productLeaf !== null) {
+      throw new Error("filesystem preflight did not return the exact retained probe set");
+    }
+    secureRelative(state.commonDir, anchor);
+    secureRelative(state.commonDir, retired);
   }
   identity(platform.repo_identity, "repository filesystem identity preflight");
   bindDirectoryAuthority(state.commonDir, platform.common_identity, "Git common filesystem identity preflight");
@@ -3165,6 +3197,7 @@ async function executeDisposition(
     implementation_boundary: params.decision.kind === "future"
       ? "slice-2-future-transaction"
       : "slice-1-preflight-only",
+    retained_preflight_probes: retainedPreflightProbes,
   };
   const receiptCreated = createDurableJson(receiptPath, receipt);
   let durableReceipt: Record<string, unknown> = receipt;
