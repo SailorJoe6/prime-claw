@@ -1,7 +1,7 @@
 # Execution Plan — Reviewed future plans and worktree-isolated implementation episodes
 
 > **Status:** approved and active in the implementation episode.
-> **Current progress:** Slice 1 complete; Slice 2 is next and has not started.
+> **Current progress:** Slices 1–2 complete; Slice 3 is next and has not started.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Original planning location:**
 > `.ralph/plans/future/worktree-isolated-specification-episodes/`
@@ -216,6 +216,18 @@ review.
 - The planning workflow writes to the selected future folder and stops for
   review.
 - Focused Node and Python tests pass.
+
+### Completion evidence
+
+Completed in the second bounded episode iteration. The native extension is at
+`.prime/agent/extensions/reviewed-plan.ts`; project policy remains in
+`.ralph/skills/plan/SKILL.md`; and the duplicate `.agents/skills/plan` surface
+is removed. Deterministic command coverage is in
+`tests/reviewed_plan_extension.test.mjs`. The Python bridge in
+`tests/test_reviewed_plan_extension.py` reruns that suite, checks real offline
+Prime Agent RPC registration, verifies the single command surface, and protects
+the skill review boundary. Operator documentation is in
+`docs/future-specification-bundles.md`.
 
 ### Commit boundary
 
