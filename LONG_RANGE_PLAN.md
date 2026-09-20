@@ -150,45 +150,49 @@ something — routed to the correct store per docs/information-architecture.md.
 
 ## Phase 4 — The episode loop (the Ralph inheritance)
 
-Now the Ralph-style workflow runs on the proven runtime. Manual-first:
-build the phase skills, drive them by hand across real work, let the
-REPL-vs-living-doc lines emerge from felt friction, codify the automated
-loop last.
+Now the Ralph-style workflow runs on the proven runtime. Manual-first: keep the
+phase policy in project-customizable Markdown, drive it across real work, and
+codify only transitions that repeated use proves deterministic.
 
-- **4a — phase skills.** The seven imported prime-agent-native skills
-  (`.ralph/skills/`) are the starting point; refine them by manual driving.
-  Handoff triggers targeted compaction (`compact.run(focus_hint)`). Dogfooding
-  established one stable transition, now implemented and regression-tested as
+- **4a — phase skills and proven transitions.** The canonical skills under
+  `.ralph/skills/` remain editable per operator and project. Native commands
+  load that Markdown rather than duplicating workflow policy. Dogfooding
+  established one stable transition, implemented and regression-tested as
   native `/handoff` → focused compaction → execute; see
-  [docs/handoff-chain.md](docs/handoff-chain.md). This is the first codified
-  seam, not completion of 4a or the episode orchestrator.
-- **4b — episode mechanics.** A spawnable, reapable episode session with a
-  dedicated feature branch and git worktree as its CWD; invocation-tier state
-  in its REPL; a durable identity linking it to its owning project
-  conversation; living-doc updates flow back so the next episode is
-  past-design-aware. The episode stays resumable through implementation, PR
-  review, updates, and rebasing, then its owner reaps the session and worktree
-  after merge or explicit abandonment. (Note: the safe two-message spawn
-  protocol may be unnecessary if we drive manually — decide from evidence,
-  not up front.)
-- **4c — conversation → episode boundary.** `/design` and `/spec-it-out`
-  initiate the boundary with different starting assumptions, but both finish
-  their interview before asking whether to incubate the specification under
-  `.ralph/plans/future/` or promote it into a worktree-isolated episode. Learn
-  what context crosses the promoted boundary: too little = past-design-blind;
-  too much = rot recreated one level up. Manually prove that the owning
-  conversation can retain the returned session identity, coordinate the
-  episode through its PR lifecycle, recognize archived plans as a readiness
-  claim, decide whether to merge, and clean up safely.
+  [docs/handoff-chain.md](docs/handoff-chain.md). Add native
+  `/plan <future-folder>` with the same loader pattern, while keeping artifact
+  interpretation and planning behavior in the customizable plan skill.
+- **4b — episode mechanics.** Implement `/implement-spec <future-folder>` as
+  the explicit promotion boundary: customizable Markdown decides whether the
+  approved folder contains the project-required specification and plan; trusted
+  mechanics create the feature branch, worktree, durable sibling session, active
+  plan placement, and owner/episode identity. The episode starts the
+  customizable execute workflow and stays resumable through implementation, PR
+  review, updates, and rebasing. Its owner reaps the session and worktree only
+  after merge or explicit abandonment.
+- **4c — reviewed conversation → episode workflow.** `/design` and
+  `/spec-it-out` retain different customizable starting assumptions, but both
+  write to a named `.ralph/plans/future/<slug>/` folder and stop for operator
+  review. The operator explicitly invokes `/plan <future-folder>`; the plan is
+  written to that same folder and receives a second operator review. Only
+  `/implement-spec <future-folder>` authorizes implementation and creates the
+  worktree-rooted episode. Manually prove that the owning conversation retains
+  the returned identity, coordinates execute/handoff iterations and any required
+  EXPERT reviews, recognizes archived plans as a readiness claim, decides
+  whether to merge, and cleans up safely.
 - **4d — `upgrade-this-to-prime-agent` command.** Convert a Ralph
-  codex/claude-skills project to prime-agent skills without manual
-  copy-paste; dogfood on the ralph repo.
+  codex/claude-skills project to prime-agent skills without manual copy-paste;
+  dogfood on the ralph repo.
 
-Done when: a project conversation has completed a `/design` or
-`/spec-it-out` interview, made the explicit future-versus-episode disposition,
-and—when promoted—coordinated a worktree-rooted episode that shipped a real
-feature on the sandboxed runtime through merge and safe cleanup, with the
-context-crossing and ownership decisions documented — all manually driven.
+Done when: a project conversation has created a future specification through
+`/design` or `/spec-it-out`, received operator specification approval, created a
+future-folder execution plan through `/plan`, received operator plan approval,
+and promoted it through `/implement-spec` into a worktree-rooted episode that
+shipped a real feature through bounded execute/handoff iterations, merge, and
+safe cleanup. The customizable-policy versus deterministic-mechanics boundary,
+context crossing, ownership, and review gates must be documented and proven by
+manual dogfood before wider orchestration.
+
 
 ## Phase 5 — Communication channels
 

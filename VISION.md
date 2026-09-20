@@ -111,14 +111,17 @@ OPERATOR (a thought worker running many parallel projects)
 - **Conversation.** A long-lived prime-agent session whose CWD is the
   project's canonical checkout. Conversational context clarity comes from CWD
   scoping. A project can have many sibling conversations, each focused on one
-  aspect of the project. Some conversations stay pure brainstorm for weeks;
-  specification-level work is delegated to episodes.
+  aspect of the project. Some conversations stay pure brainstorm for weeks.
+  When work becomes concrete, the conversation develops its specification and
+  execution plan under `.ralph/plans/future/`, with separate operator review of
+  each, before implementation resources are allocated.
 - **Episode.** A temporary prime-agent session, logically owned by the project
   conversation that created it, with its own feature branch and git worktree.
-  It runs a Ralph-style design → plan → execute → handoff cycle for one
-  specification, holds invocation-tier state in its own REPL, updates the
-  project's living docs, stays available through the PR and review lifecycle,
-  and is reaped after merge or explicit abandonment.
+  It begins only after the operator explicitly promotes an approved
+  specification-and-plan bundle. The episode runs Ralph-style execute → handoff
+  iterations, holds invocation-tier state in its own REPL, updates the project's
+  living docs, stays available through the PR and review lifecycle, and is
+  reaped after merge or explicit abandonment.
 
 ### Communication channels map onto the hierarchy
 
@@ -166,32 +169,46 @@ routing.
 
 ## The conversation → episode transition
 
-The transition starts when the operator invokes `/design` or `/spec-it-out`
+The boundary begins when the operator invokes `/design` or `/spec-it-out`
 inside a project conversation. `/design` is for work that still needs
 requirements discovery; `/spec-it-out` is for work whose design is already
-substantially present in the conversation. In either case, the interview runs
-to completion before any episode infrastructure is allocated.
+substantially present in the conversation. Their exact questions and artifacts
+remain project-customizable Markdown under `.ralph/skills/`.
 
-Once all material questions are answered and the work is specification-ready,
-the operator chooses its disposition. Work that is worth preserving but not
-ready for implementation is written under `.ralph/plans/future/` and remains
-part of the project conversation. Work approved to proceed crosses the episode
-boundary: prime-claw creates a feature branch and isolated git worktree, carries
-the relevant conversation into a durable worktree-rooted session, and records
-the originating conversation as its logical owner and coordinator.
+Both workflows write their output into a new named folder under
+`.ralph/plans/future/`, link the resulting artifacts, and ask the operator to
+review them. They do not allocate an episode. The operator may request as many
+specification revisions as needed.
 
-After the specification and planning phases complete, those living docs
-constrain execution. An episode remains available through implementation, PR
-review, updates, and rebasing. Archiving its completed plan is the episode's
-claim that it is ready for owner review; the owning conversation verifies the
-work, decides whether to merge, and reaps the session and worktree only after
-merge or explicit abandonment.
+When the specification is ready for planning, the operator invokes
+`/plan .ralph/plans/future/<slug>`. Native command code validates and passes the
+folder to the project-customizable plan skill. Planning output remains in the
+same future folder, and the project conversation again stops for operator
+review. Specification approval authorizes planning; it does not authorize
+implementation.
+
+Only the explicit
+`/implement-spec .ralph/plans/future/<slug>` command crosses the episode
+boundary. Its customizable skill verifies that the project-required
+specification and planning material is ready. Trusted host mechanics then create
+a feature branch and isolated worktree, promote the approved folder contents to
+the active `.ralph/plans/` location inside that worktree only, carry the active
+conversation into a durable worktree-rooted episode session, and record the
+originating conversation as logical owner. The episode starts the customizable
+execute workflow; specification and planning do not repeat inside it.
+
+The episode remains available through bounded execute/handoff iterations,
+implementation, PR review, updates, and rebasing. Archiving its completed active
+plans is the episode's claim that it is ready for owner review; the owning
+conversation verifies the work, decides whether to merge or abandon, and reaps
+the session and worktree only after that terminal disposition.
 
 The hard problem at this boundary remains *what context crosses*: too little
 and the episode is past-design-blind; too much and the context-rot problem is
 recreated one level up. This is learned by doing, not designed in advance.
 Automated orchestration remains last, after the manually driven boundary is
 validated.
+
 
 ## The handoff → compaction insight
 
