@@ -1,8 +1,9 @@
 # Execution Plan — Reviewed future plans and worktree-isolated implementation episodes
 
-> **Status:** draft awaiting operator review. No implementation is authorized.
+> **Status:** approved and active in the implementation episode.
+> **Current progress:** Slice 1 complete; Slice 2 is next and has not started.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
-> **Planning location:**
+> **Original planning location:**
 > `.ralph/plans/future/worktree-isolated-specification-episodes/`
 
 ## 1. Delivery strategy
@@ -140,6 +141,16 @@ planning or implementation.
 - The completion response must identify and link the actual saved files.
 - The skills stop at operator review.
 - Focused skill-contract tests and `git diff --check` pass.
+
+### Completion evidence
+
+Completed in the first bounded episode iteration. The canonical skills now
+create new future folders, keep their artifacts inside those folders, link the
+saved files, and stop at operator specification review. Focused contract tests
+are in `tests/test_future_plan_skills.py`; operator documentation is in
+`docs/future-specification-bundles.md`. The required `VISION.md` and
+`LONG_RANGE_PLAN.md` workflow alignment was already present at the episode base
+commit and needed no further edit.
 
 ### Commit boundary
 
@@ -388,10 +399,6 @@ This plan does not add:
 
 ## 10. Review gate
 
-This execution plan is a draft in the same future folder as its specification.
-The operator may request revisions in place. No slice starts until the operator
-approves this plan and explicitly invokes:
-
-```text
-/implement-spec .ralph/plans/future/worktree-isolated-specification-episodes
-```
+The operator approved this plan and authorized its one-time manual bootstrap.
+Each bounded execute iteration still completes only one vertical-slice objective
+and returns to the owning project conversation for review before another slice.

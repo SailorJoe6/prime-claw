@@ -1,9 +1,8 @@
 # Specification — Reviewed future plans and worktree-isolated implementation episodes
 
-> **Status:** draft awaiting operator review. No implementation is authorized.
-> This specification lives under `.ralph/plans/future/` until the operator has
-> separately reviewed the specification and its execution plan and explicitly
-> invokes `/implement-spec`.
+> **Status:** approved and active in the implementation episode.
+> The operator separately reviewed this specification and its execution plan,
+> then authorized the documented one-time bootstrap into this episode branch.
 
 ## 1. Purpose
 
@@ -374,17 +373,7 @@ the project conversation and episode:
 
 ## 12. Review gate
 
-This document is not approval to implement. The operator shall review and revise
-this specification in its future-plan folder. Planning begins only when the
-operator invokes:
-
-```text
-/plan .ralph/plans/future/worktree-isolated-specification-episodes
-```
-
-Implementation begins only after the resulting plan is separately reviewed and
-the operator invokes:
-
-```text
-/implement-spec .ralph/plans/future/worktree-isolated-specification-episodes
-```
+The operator completed the specification and plan review gates. Because this
+feature implements `/implement-spec` itself, the approved one-time bootstrap in
+the execution plan created this worktree-rooted episode. Future bundles must use
+the native reviewed transitions once those slices land.

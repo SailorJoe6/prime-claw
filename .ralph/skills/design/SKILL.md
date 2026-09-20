@@ -1,12 +1,46 @@
 ---
 name: design
-description: Use for Ralph's design/specification phase to interview the user and produce .ralph/plans/SPECIFICATION.md.
+description: Use for Ralph's discovery-first specification phase to create a reviewable future-plan bundle.
 ---
 
-First, run through the "prepare" skill. 
+First, run the `prepare` skill.
 
-Then, I want to discuss with you some work we need to do on to this project.  I don't want you to start work on it, I just want to have a conversation with you about it.  Ask me questions about the job to be done, ask your questions one at a time so as not to overwhelm me.  
+Discuss the proposed work with the operator. Do not start implementation. Ask
+requirements questions one at a time so the operator is not overwhelmed. Keep
+the discovery-first behavior: continue until you can describe the work as a
+clear, detailed specification.
 
-When you think you have enough information to describe the work to be done as a detailed spec, create a file `.ralph/plans/SPECIFICATION.md`.  This spec file should act as both a summary and index of the work to be done.  It should index a separate `.ralph/plans/REQUIREMENTS.md` file and `.ralph/plans/DECISIONS.md` which you must also create.  These docs togehter represent The Spec for the work to be done.  the Requirements doc should be a list of the specific requirements you discover during our discussion.  The `DECISIONS.md` file should document the design decisions with tracability showing how each design decision implements one or more requirements.  
+## Create the future specification bundle
 
-Document everything about the work to be done in The Spec in a manner that is both clear and concise.  Be as thorough and detailed as necessary, but avoid fluff and repetition.  Focus on a description of the system as it is now, how it must change and how it will be when the work is done.  This is not a detailed execution plan, that will come later.  This is a specification of the work to be done.  
+When the specification is ready to save:
+
+1. Derive a concise filesystem-safe slug from the work. Use lowercase ASCII
+   letters, digits, and hyphens only.
+2. Use `.ralph/plans/future/<slug>/` as the bundle folder. It must be a new
+   folder. If that path already exists, choose a different specific slug; never
+   overwrite or merge into an existing specification bundle.
+3. Create every specification artifact inside that folder. For this project's
+   default workflow, create `SPECIFICATION.md`, `REQUIREMENTS.md`, and
+   `DECISIONS.md` there. `SPECIFICATION.md` is the summary and index;
+   `REQUIREMENTS.md` records the discovered requirements; and `DECISIONS.md`
+   traces each design decision to one or more requirements.
+4. Do not write newly generated specification artifacts directly under
+   `.ralph/plans/`.
+
+Document the current system, the required change, and the intended end state.
+Be thorough but avoid repetition. This phase specifies the work; it does not
+create an execution plan.
+
+## Stop for operator review
+
+After saving the bundle:
+
+- report the exact project-relative future-folder path;
+- link every artifact you created so the operator can review it now;
+- explicitly ask the operator to review the saved specification; and
+- stop without planning, implementing, creating a branch or worktree, or
+  starting an episode.
+
+Apply requested specification revisions to the same future folder and link the
+updated artifacts again. Do not advance to planning unless the operator later
+invokes the separate planning workflow.
