@@ -1,14 +1,9 @@
 # Specification — Worktree-isolated specification episodes
 
-> **Status:** implementation in progress; Slice 1 is validated. Immutable Slice 2
-> candidate `71a1944eef9330308639312a53865de032bc7c14` received owner **REVISE**;
-> the formal GPT-6 Astra synthesis delivery failed closed while all three
-> specialists independently returned REVISE. Preserve `71a1944` as rejected.
-> Transition `dd08e63a-7f96-4be0-b559-4303c6eeb383` authorizes exactly one
-> bounded six-class Slice 2 correction. Slice 2 stays open; Slice 3 stays blocked.
-> **Beads:** `prime-claw-h6w.1` under Phase 4 epic `prime-claw-h6w`.
-> **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
-> **Decisions:** [DECISIONS.md](DECISIONS.md)
+> **Status:** incubated draft under operator review. The prior implementation
+> and execution plan were discarded. No implementation is active or authorized.
+> This specification is being simplified before new requirements, decisions, or
+> an execution plan are created.
 
 ## 1. Purpose
 
