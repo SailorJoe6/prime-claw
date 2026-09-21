@@ -23,7 +23,25 @@ this repo constructs.
 
 ## Status
 
-Founding skeleton. See [LONG_RANGE_PLAN.md](LONG_RANGE_PLAN.md) Phase 0.
+Active builder repository. Phases 0–2 are complete. Phase 3 has delivered its
+initial tracer-bullet slices and is safely blocked at the recorded model probe
+boundary pending operator clearance. Phase 4 has delivered the owner-accepted
+reviewed specification/planning commands and worktree-isolated episode-promotion
+mechanics; its live human end-to-end dogfood is deliberately deferred to a
+separate future episode. See the [long-range plan](LONG_RANGE_PLAN.md) for the
+full phase status and blockers.
+
+## Phase 4 operator workflows
+
+- [Reviewed future specification bundles](docs/future-specification-bundles.md)
+  — author with `/design` or `/spec-it-out`, pass separate specification and
+  plan review gates, then cross the implementation boundary explicitly with
+  `/implement-spec`.
+- [Native handoff chain](docs/handoff-chain.md) — update durable records and
+  continue an approved episode iteration through focused compaction and the
+  canonical execute workflow.
+- [Documentation index](docs/README.md) — runtime, architecture, evidence, and
+  operator references.
 
 ## Lineage
 

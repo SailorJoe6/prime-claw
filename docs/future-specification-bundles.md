@@ -4,6 +4,40 @@ Prime Claw separates specification authoring from planning and implementation.
 The project conversation owns specification review. No episode resources are
 allocated during authoring.
 
+The reviewed design and implementation provenance is archived with this
+capability:
+
+- [specification](../.ralph/plans/archive/worktree-isolated-specification-episodes/SPECIFICATION.md)
+- [execution plan](../.ralph/plans/archive/worktree-isolated-specification-episodes/EXECUTION_PLAN.md)
+
+## End-to-end operator walkthrough
+
+1. In the project conversation, invoke `/design` while requirements still need
+   discovery, or `/spec-it-out` when the conversation already contains the
+   design. The workflow writes a named `.ralph/plans/future/<slug>/` bundle and
+   stops. Confirm that no branch, worktree, or episode was created.
+2. Review every linked specification artifact in that exact folder. Request
+   revisions in place until satisfied. Explicit specification approval permits
+   **planning only**; it does not authorize implementation.
+3. Invoke `/plan .ralph/plans/future/<slug>`. Review the plan written back into
+   the same folder. Confirm again that planning created no branch, worktree, or
+   episode.
+4. Request plan revisions until satisfied. Explicit plan approval still does
+   not allocate resources. The next command is a separate implementation gate.
+5. Invoke `/implement-spec .ralph/plans/future/<slug>` only after approving the
+   whole bundle. The customizable readiness policy either reports gaps without
+   mutation or calls the trusted episode capability once.
+6. Record the returned stable episode ID, active routing ID, branch, worktree,
+   session name, and execute-admission state. The host identity record binds
+   these resources to the current owner conversation. `delivered` permits that
+   conversation to begin its project-specific oversight.
+   Handle `pending` and `uncertain` as described below; neither authorizes a
+   duplicate execute delivery.
+
+Only a successful episode-capability call in step 5 crosses the implementation
+boundary. Authoring, both human review gates, and planning remain in the
+canonical project conversation.
+
 ## Authoring workflows
 
 Use either project-customizable skill:
@@ -130,14 +164,42 @@ response, unconfirmed worker stop, or partial Git cleanup preserves remaining
 artifacts and reports an actionable uncertain state instead of risking deletion
 under a live worker.
 
+### Operator response to unresolved execute admission
+
+`pending` and `uncertain` are preservation states, not failure confirmations:
+
+- `pending` means the durable identity was written before delivery, but the
+  final `delivered` mark was not durably recorded. A crash may have happened
+  before or after the daemon accepted execute.
+- `uncertain` means the delivery operation reported an ambiguous outcome, such
+  as a lost mutation response. Execute may already be queued or running.
+
+For either state:
+
+1. Do not send execute directly, do not delete or edit the identity record, and
+   do not kill the session or remove its branch/worktree merely because no
+   confirmation arrived.
+2. Preserve the returned identities and inspect the named session, its messages,
+   daemon state, Git branch, and worktree before making an owner decision.
+3. Treat a repeated `/implement-spec` as an identity lookup only. It returns the
+   matching unresolved identity and intentionally does not redeliver execute.
+4. Escalate to the operator with the observed evidence. Continue, revise, or
+   abandon only through the project's explicit owner policy. Before any manual
+   cleanup, independently confirm that the worker is terminated and that the
+   remaining resources are safe to remove.
+
+There is intentionally no automatic recovery or retry protocol in this
+capability. Never manufacture `delivered` state or infer non-admission from an
+idle, missing-response, or transport status alone.
+
 Successful task admission is the boundary where the project conversation begins
 its separately configured oversight workflow. `/implement-spec` does not embed
 oversight policy, run implementation in the owner conversation, or invoke
 `/handoff`.
 
-## Focused verification
+## Automated and integration validation
 
-Run the command loader and end-to-end host-mechanics coverage with:
+Run the command loader and host-mechanics coverage with:
 
 ```sh
 node --experimental-strip-types --test tests/reviewed_plan_extension.test.mjs
@@ -155,3 +217,23 @@ installed offline Prime Agent RPC plus startup probes to prove one native
 `plan`, one native `implement-spec`, the structured tool, a valid inherited
 Prime Agent context, and bounded real daemon create/state/messages/kill behavior
 at the episode worktree CWD.
+
+These checks prove deterministic command loading and bounded episode mechanics.
+They use disposable repositories, offline RPC, and controlled daemon probes.
+They do **not** prove that a human completed both review gates, observed a live
+production episode through execute/handoff, made a terminal merge or abandonment
+decision, and reaped that episode safely.
+
+## Live end-to-end dogfood status
+
+The owner explicitly deferred the live end-to-end dogfood to a separate future
+episode. The closing implementation episode delivered and owner-accepted the
+three mechanical slices, then archived its plans without planning, modifying,
+or promoting the `conversation-driven-episode-oversight` bundle. No nested
+branch, worktree, or episode was created for dogfood.
+
+Until that separate run is complete, report automated and integration evidence
+as such. Do not describe the full authoring → two reviews → planning → promotion
+→ execute/handoff → terminal cleanup workflow as manually proven. The deferred
+disposition and test evidence are recorded in the
+[archived execution plan](../.ralph/plans/archive/worktree-isolated-specification-episodes/EXECUTION_PLAN.md).

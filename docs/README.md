@@ -36,9 +36,10 @@ prime-claw builds on four prior projects. Read these before designing:
 - [handoff-chain.md](handoff-chain.md) — the Phase 4a native `/handoff` →
   focused compaction → next-skill transition, its legacy Ralph-loop lineage,
   marker lifecycle, regression tests, evidence, and short-session recovery.
-- [future-specification-bundles.md](future-specification-bundles.md) — reviewed
-  future-folder authoring, native `/plan`, and explicit `/implement-spec`
-  promotion into a worktree-isolated sibling episode.
+- [future-specification-bundles.md](future-specification-bundles.md) — operator
+  walkthrough for reviewed future-folder authoring, native `/plan`, explicit
+  `/implement-spec` promotion, unresolved admission handling, validation scope,
+  and archived design provenance.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)
