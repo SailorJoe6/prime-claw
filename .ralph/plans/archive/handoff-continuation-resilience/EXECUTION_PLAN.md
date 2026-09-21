@@ -1,8 +1,9 @@
 # Execution Plan — Handoff continuation resilience
 
-> **Status:** implementation complete; acceptance review blocked on unsupported explicit-removal runtime proof.
+> **Status:** implemented, final-Expert reviewed, operator approved, and merged.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
-> **Future bundle:** `.ralph/plans/future/handoff-continuation-resilience/`
+> **Promoted from:** `.ralph/plans/future/handoff-continuation-resilience/`
+> **Implementation commit:** `f89f121f2eba21d06d0bf89c220d38d0c32cc1ae`
 > **Manual oversight record:** `prime-claw-h6w.11`
 
 ## Outcome
@@ -57,32 +58,28 @@ native follow-up, from supported whole-turn TUI/ACP interruption, which removes
 it. The plugin has no reconstruction path and did not retry after either
 whole-turn cancellation or session replacement.
 
-One acceptance boundary remains unsupported in this environment. Prime Agent's
-TUI documents Alt+Up followed by an empty edit as explicit queued-message
-deletion, but named `M-Up` was not observable through the noninteractive tmux
-transport even after a fresh `csi-u` negotiation. ACP and RPC expose no queue
-removal request, and daemon `prime-agent send` delivers an agent message rather
-than invoking native slash-command dispatch. Therefore this episode does not
-claim direct runtime proof for explicit follow-up deletion. That missing public
-surface proof remains an owner review blocker; no private-field test or new
+One public-surface limitation remains disclosed. Prime Agent's TUI documents
+Alt+Up followed by an empty edit as explicit queued-message deletion, but named
+`M-Up` was not observable through the noninteractive tmux transport even after a
+fresh `csi-u` negotiation. ACP and RPC expose no direct queue-removal request,
+and daemon `prime-agent send` delivers an agent message rather than invoking
+native slash-command dispatch. Two fresh exact-commit EXPERT reviews adjudicated
+this as nonblocking: the host gesture is documented, the plugin has no
+reconstruction path, and the real TUI/ACP cancellation evidence independently
+proves that removed continuation is not retried. No private-field test or new
 infrastructure was added.
 
-Validation evidence:
+Final integrated-candidate validation:
 
 - focused Node extension suite: 9 passed;
 - focused Python bridge and installed-loader suite: 4 passed;
-- full repository suite attempt 1: 246 passed, with one unrelated existing
-  candidate-progress watchdog timing test reaching its 15-second timeout;
-- that failed watchdog test passed alone: 1 passed;
-- full repository suite attempt 2: 246 passed, with a different timing-sensitive
-  candidate-progress watchdog case returning its stall code under suite load;
-- the complete watchdog file passed independently: 24 passed;
-- every other repository test passed separately: 223 passed; and
+- active repository suite `pytest -q tests`: 247 passed; and
 - `git diff --check` passed.
 
-The two full-suite failures were isolated to distinct pre-existing process-timing
-tests in `tests/test_embedding_candidate_build.py`; no watchdog code was changed
-or folded into this slice.
+Root `pytest -q` additionally collected retired broken tests under
+`scripts/archive/phase1` (253 passed, 36 failed, 10 errors). The final EXPERT
+adjudicated that result as pre-existing test-discovery debt rather than a
+candidate regression; the supported active suite was fully green.
 
 ## Pre-implementation audit (historical)
 

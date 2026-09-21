@@ -6,6 +6,22 @@ they are archived together. Older sets contain specification, requirements,
 decisions, and execution-plan files; newer project-customized sets may contain a
 different reviewed artifact collection.
 
+## handoff-continuation-resilience/ — Compaction-independent handoff continuation ✅ COMPLETE (2026-09-21)
+
+Changed native `/handoff` to preflight both canonical workflows, admit handoff,
+and queue canonical execute once as a native `followUp`. Compaction remains a
+best-effort context improvement and no longer owns execute admission. Late or
+repeated compaction signals have no path to start another execute pass.
+
+Disposable Prime Agent 0.9.5 evidence covered no-compaction, compaction success,
+compaction cancellation, bounded compaction failure, real TUI interruption, ACP
+cancel, and ACP close/replacement. The integrated implementation commit is
+`f89f121f2eba21d06d0bf89c220d38d0c32cc1ae`. Final validation passed 9 focused
+Node tests, 4 Python bridge/loader tests, all 247 active repository tests, and
+`git diff --check`. Two fresh exact-commit EXPERT reviews returned
+`FINAL EXPERT PASS`, after which the operator explicitly approved merge. Bead
+`prime-claw-h6w.11` holds the manual oversight and evidence record.
+
 ## worktree-isolated-specification-episodes/ — Reviewed future plans and episode promotion ✅ COMPLETE (2026-09-21)
 
 Delivered the accepted deterministic workflow through three owner-reviewed

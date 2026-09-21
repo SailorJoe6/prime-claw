@@ -74,7 +74,7 @@ Compaction is a best-effort context improvement, not the continuation trigger.
 | A compaction event arrives late or repeats | Nothing additional is admitted |
 
 The handoff skill distinguishes **requested** from **confirmed** compaction. A
-`schedule: true` acknowledgement is not completion evidence. Later success,
+`scheduled: true` acknowledgement is not completion evidence. Later success,
 cancellation, or failure is surfaced by Prime Agent itself rather than inferred
 from the presence or absence of `session_compact`.
 

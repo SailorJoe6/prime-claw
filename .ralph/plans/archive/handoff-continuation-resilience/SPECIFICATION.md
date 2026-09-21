@@ -2,7 +2,7 @@
 
 > **Status:** operator approved for implementation through native `/implement-spec`.
 > **Current implementation:** [`docs/handoff-chain.md`](../../../../docs/handoff-chain.md)
-> **Related future work:** [Conversational Ralph command routing](../conversational-ralph-command-routing/SPECIFICATION.md)
+> **Related future work:** [Conversational Ralph command routing](../../future/conversational-ralph-command-routing/SPECIFICATION.md)
 > **Historical advisory evidence:** [`reports/reviews/handoff-resilience-spec-review-a93c27c.md`](../../../../reports/reviews/handoff-resilience-spec-review-a93c27c.md)
 
 ## Purpose
