@@ -1,6 +1,6 @@
 # Execution Plan — Handoff continuation resilience
 
-> **Status:** draft for operator review; planning only.
+> **Status:** operator approved for implementation through native `/implement-spec`.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Future bundle:** `.ralph/plans/future/handoff-continuation-resilience/`
 > **Manual oversight record:** `prime-claw-h6w.11`

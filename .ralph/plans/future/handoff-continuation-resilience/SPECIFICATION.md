@@ -1,6 +1,6 @@
 # Specification — Handoff continuation resilience
 
-> **Status:** operator approved for planning; not approved for implementation.
+> **Status:** operator approved for implementation through native `/implement-spec`.
 > **Current implementation:** [`docs/handoff-chain.md`](../../../../docs/handoff-chain.md)
 > **Related future work:** [Conversational Ralph command routing](../conversational-ralph-command-routing/SPECIFICATION.md)
 > **Historical advisory evidence:** [`reports/reviews/handoff-resilience-spec-review-a93c27c.md`](../../../../reports/reviews/handoff-resilience-spec-review-a93c27c.md)
