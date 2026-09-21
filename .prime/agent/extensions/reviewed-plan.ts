@@ -4,8 +4,11 @@ import {
   createSpecEpisode,
   episodeResultText,
   type EpisodeDependencies,
-} from "./spec-episode.ts";
-import { validateFutureLocation, wrapCanonicalSkill } from "./reviewed-plan-support.ts";
+} from "../extension-support/spec-episode.ts";
+import {
+  validateFutureLocation,
+  wrapCanonicalSkill,
+} from "../extension-support/reviewed-plan-support.ts";
 
 /**
  * Native reviewed planning and implementation-promotion boundaries.

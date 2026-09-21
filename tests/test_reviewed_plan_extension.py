@@ -9,7 +9,7 @@ import tempfile
 
 REPO = Path(__file__).resolve().parents[1]
 EXTENSION = REPO / ".prime" / "agent" / "extensions" / "reviewed-plan.ts"
-EPISODE_EXTENSION = REPO / ".prime" / "agent" / "extensions" / "spec-episode.ts"
+EPISODE_EXTENSION = REPO / ".prime" / "agent" / "extension-support" / "spec-episode.ts"
 NODE_SUITE = REPO / "tests" / "reviewed_plan_extension.test.mjs"
 EPISODE_NODE_SUITE = REPO / "tests" / "spec_episode_extension.test.mjs"
 

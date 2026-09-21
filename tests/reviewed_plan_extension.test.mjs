@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -10,11 +11,31 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import reviewedPlan, { createReviewedPlanExtension } from "../.prime/agent/extensions/reviewed-plan.ts";
 
+const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+
 const LOCATION = ".ralph/plans/future/alpha-plan";
 const USAGE = "Usage: /plan .ralph/plans/future/<slug>";
+
+test("every top-level auto-discovered extension exports a factory", async () => {
+  const extensions = join(REPO_ROOT, ".prime", "agent", "extensions");
+  const files = readdirSync(extensions)
+    .filter((name) => name.endsWith(".ts") || name.endsWith(".js"))
+    .sort();
+
+  assert.ok(files.length > 0, "expected at least one project extension");
+  for (const file of files) {
+    const module = await import(pathToFileURL(join(extensions, file)).href);
+    assert.equal(
+      typeof module.default,
+      "function",
+      `${file} must default-export an extension factory`,
+    );
+  }
+});
 
 function createHarness(cwd, extension = reviewedPlan) {
   const commands = new Map();
