@@ -59,7 +59,9 @@ remain authoritative.
 
 ## Compatibility and safety
 
-- `/handoff` with no guidance retains its current direct behavior.
+- `/handoff` without trailing guidance retains its current default behavior: it
+  starts the canonical handoff workflow without requiring the user to provide or
+  confirm a focus hint.
 - Trailing text remains free-form guidance, not a phase or path selector.
 - Inline mentions of `/handoff` remain ordinary conversation.
 - Canonical handoff and execute procedures remain project-customizable Markdown.
