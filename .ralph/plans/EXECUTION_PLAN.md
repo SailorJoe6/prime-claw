@@ -1,6 +1,6 @@
 # Execution Plan — Handoff continuation resilience
 
-> **Status:** operator approved for implementation through native `/implement-spec`.
+> **Status:** implementation complete; acceptance review blocked on unsupported explicit-removal runtime proof.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Future bundle:** `.ralph/plans/future/handoff-continuation-resilience/`
 > **Manual oversight record:** `prime-claw-h6w.11`
@@ -15,19 +15,89 @@ from a late or repeated compaction signal.
 Deliver this as one bounded implementation slice. Do not add conversational
 routing or a general transition framework.
 
-## Current-state audit
+## Implementation result
 
-The current extension:
+The minimal public-follow-up candidate passed the characterization stop gate and
+was implemented as the bounded slice:
+
+- native `/handoff` preflights both canonical workflow files;
+- handoff is injected first and execute is admitted once with
+  `deliverAs: "followUp"` at the command boundary;
+- `session_compact` no longer admits execute and the pending-session set is gone;
+- the handoff skill reports only the immediate compaction request state and does
+  not invoke execute; and
+- operator documentation now treats queue removal or session termination as the
+  cancellation boundary.
+
+Disposable Prime Agent 0.9.5 RPC sessions loaded the revised real extension and
+proved one completed execute marker with an empty final queue for:
+
+| Path | Session | Evidence |
+|---|---|---|
+| short / no compaction | `01a0c54f-86c0-7452-b793-c5815fc483b7` | `scheduled: false`; one execute follow-up completed |
+| requested success | `01a0c54f-8680-7749-a1c8-3907c252f4d1` | successful `compaction_end`; one execute follow-up completed |
+| requested cancellation | `01a0c54f-8639-735c-9e5f-7fa1df1e2a9f` | `compaction_end` with `aborted: true`; one execute follow-up completed |
+| requested failure | `01a0c54f-8661-7128-8665-3e135f1a5efb` | bounded synthetic failure surfaced; one execute follow-up completed |
+
+Each persisted session recorded exactly one execute-marker user start and one
+exact assistant completion. Supported top-level evidence does not claim
+root/RLM-child isolation, which remains tracked by `prime-claw-f81.3`.
+
+Public interruption and lifecycle evidence:
+
+| Public path | Evidence | Observed result |
+|---|---|---|
+| compaction-only cancellation | session `01a0c54f-8639-735c-9e5f-7fa1df1e2a9f` used `session_before_compact` cancellation | compaction recorded `aborted: true`; execute completed once |
+| TUI whole-turn interrupt | tmux TUI session `01a0c573-211f-745c-ad79-474a273f53d6`; named `C-c` while bash visibly ran | tool aborted; one later submit completed handoff; execute marker count stayed zero and runtime queue was empty |
+| ACP whole-turn cancel | ACP session `9348763c-5a36-449e-852b-4ae87a52a90f` used `session/cancel` during the running tool | handoff returned `cancelled`; a later accepted prompt completed; execute marker count stayed zero |
+| ACP close and replacement | ACP session `8a8bc10e-2142-4f4d-9079-9990442b8d94` was closed during the tool, then replacement `f8e8a912-f9d8-48ac-8bf7-905e60c8acba` completed | execute marker count stayed zero; plugin did not reconstruct or retry in the replacement session |
+
+These results distinguish compaction-only cancellation, which preserves the
+native follow-up, from supported whole-turn TUI/ACP interruption, which removes
+it. The plugin has no reconstruction path and did not retry after either
+whole-turn cancellation or session replacement.
+
+One acceptance boundary remains unsupported in this environment. Prime Agent's
+TUI documents Alt+Up followed by an empty edit as explicit queued-message
+deletion, but named `M-Up` was not observable through the noninteractive tmux
+transport even after a fresh `csi-u` negotiation. ACP and RPC expose no queue
+removal request, and daemon `prime-agent send` delivers an agent message rather
+than invoking native slash-command dispatch. Therefore this episode does not
+claim direct runtime proof for explicit follow-up deletion. That missing public
+surface proof remains an owner review blocker; no private-field test or new
+infrastructure was added.
+
+Validation evidence:
+
+- focused Node extension suite: 9 passed;
+- focused Python bridge and installed-loader suite: 4 passed;
+- full repository suite attempt 1: 246 passed, with one unrelated existing
+  candidate-progress watchdog timing test reaching its 15-second timeout;
+- that failed watchdog test passed alone: 1 passed;
+- full repository suite attempt 2: 246 passed, with a different timing-sensitive
+  candidate-progress watchdog case returning its stall code under suite load;
+- the complete watchdog file passed independently: 24 passed;
+- every other repository test passed separately: 223 passed; and
+- `git diff --check` passed.
+
+The two full-suite failures were isolated to distinct pre-existing process-timing
+tests in `tests/test_embedding_candidate_build.py`; no watchdog code was changed
+or folded into this slice.
+
+## Pre-implementation audit (historical)
+
+Before this slice, the extension:
 
 1. records the session UUID in `pendingExecuteBySession`;
 2. injects canonical handoff Markdown;
 3. waits for `session_compact`; and
 4. only then consumes pending state and injects canonical execute Markdown.
 
-A short session makes `compact.run()` return `scheduled: false`, so no
-`session_compact` event occurs and execute never starts.
+In that design, a short session made `compact.run()` return
+`scheduled: false`, so no `session_compact` event occurred and execute never
+started.
 
-Prime Agent 0.9.5 already provides the smaller seam needed for this fix:
+Prime Agent 0.9.5 already provided the smaller seam needed for this fix:
 
 - `pi.sendUserMessage(..., { deliverAs: "followUp" })` queues a user message
   after the current agent finishes its tools;
@@ -37,10 +107,10 @@ Prime Agent 0.9.5 already provides the smaller seam needed for this fix:
 - native runtime events and errors provide terminal compaction evidence that the
   extension cannot fully classify from `session_compact` alone.
 
-The smallest candidate design is therefore to load both canonical skills during
+The smallest candidate design was therefore to load both canonical skills during
 native command admission, start the handoff turn, and queue canonical execute
-once as a follow-up. Compaction remains inside the handoff workflow but no
-longer owns execute admission. The `session_compact` hook must not inject
+once as a follow-up. Compaction would remain inside the handoff workflow but no
+longer own execute admission. The `session_compact` hook would not inject
 execute.
 
 Invoking native `/handoff` is the approval to queue execute. The extension does
