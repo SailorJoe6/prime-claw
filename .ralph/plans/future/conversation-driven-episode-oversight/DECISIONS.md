@@ -151,9 +151,10 @@ with "one ever."
 conversation first has the episode encode accepted material findings into the
 authoritative requirements, decisions, specification, execution plan, and bead
 as applicable. After verifying that durable state, it invokes native `/handoff`
-with explicit same-gate revision guidance, inspects the resulting compaction
-summary, and only then permits canonical `execute` to begin the revision.
-Auto-compaction cannot substitute for or authorize this transition.
+with explicit same-gate revision guidance. Focused compaction is best-effort;
+canonical `execute` continuation is mandatory unless continuation itself is
+infeasible and does not wait for a summary. Auto-compaction cannot substitute
+for or authorize this transition.
 
 **Satisfies:** R-CO-9, R-CO-12, R-CO-15, R-CO-16, R-CO-44, R-CO-45,
 R-CO-46, R-CO-47, R-CO-48, R-CO-49.
@@ -162,9 +163,9 @@ R-CO-46, R-CO-47, R-CO-48, R-CO-49.
 auto-compaction was in flight. The later compaction summary omitted every
 finding and incorrectly named Slice 3 as next, even though the episode
 subsequently received the findings and revised Slice 2. The outcome was correct
-by message timing, not by a trustworthy primer. Product knowledge from review
-must outlive transcripts, and a verified guided handoff must establish the next
-execution context.
+by message timing, not by trustworthy durable state. Product knowledge from
+review must outlive transcripts. A verified guided handoff establishes the next
+execution context from those artifacts even when no new summary is produced.
 
 ## D-CO-18 — Scope the owner watch to one admitted episode work generation
 

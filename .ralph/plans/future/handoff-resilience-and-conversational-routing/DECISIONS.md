@@ -1,184 +1,223 @@
 # Decisions — Resilient and conversational handoff
 
-> **Status:** incubated future decisions; not approved for implementation.
+> **Status:** incubated future decisions; specification review only.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md)
 
-## D-HR-1 — Solve the enhancement entirely inside prime-claw
+## D-HR-1 — Solve the narrow enhancement inside prime-claw
 
 **Decision:** Use project-local extension and skill mechanisms supported by the
-installed Prime Agent runtime. Do not depend on upstream API changes or
-unsolicited Prime Agent pull requests.
+selected Prime Agent runtime. Do not depend on upstream API changes, and do not
+expand the work into the Ralph loop or episode orchestrator.
 
 **Satisfies:** R-HR-1, R-HR-2.
 
-**Rationale:** Prime Agent does not accept unsolicited contributions, and the
-required behavior can be built as a narrow project plugin protocol.
+**Rationale:** The product need is one handoff seam. A broader orchestration or
+upstream effort would mix separate risks into this proof of concept.
 
-## D-HR-2 — Prefer known continuation over optional compaction
+## D-HR-2 — Make continuation mandatory and compaction best-effort
 
-**Decision:** Treat every normal `compact.run()` result with
-`scheduled is False` as authoritative evidence that no compaction was scheduled.
-Warn with the returned reason, consume the handoff, and inject canonical execute
-without compaction.
+**Decision:** An admitted finalization queues canonical execute exactly once
+unless continuation itself is infeasible. It attempts focused compaction once as
+a context-quality improvement, but no compaction outcome or summary gates
+continuation.
 
-**Satisfies:** R-HR-20, R-HR-21, R-HR-22.
+**Satisfies:** R-HR-17, R-HR-18, R-HR-19, R-HR-20, R-HR-22, R-HR-23.
 
-**Rationale:** Compaction improves context quality but is not the purpose of the
-transition. When Prime Agent explicitly declines it, blocking execution is less
-reliable than continuing with the current context.
+**Rationale:** The transition exists to continue useful work. Prime Agent can
+later auto-compact. Making a best-effort summary a prerequisite recreates the
+short-session dead end and adds human recovery for a non-authoritative artifact.
 
-## D-HR-3 — Distinguish a refusal from an exception
+## D-HR-3 — Treat compaction events as evidence only
 
-**Decision:** A false scheduling result continues automatically. An exception
-produces a detailed operator-visible error and enters recovery-required state;
-it does not automatically inject execute.
+**Decision:** `compact.run()` results and `session_compact` update bounded
+observability only. Finalization, not compaction, owns the consume-once right to
+queue execute. Scheduled acknowledgement is never described as successful
+compaction.
+
+**Satisfies:** R-HR-20, R-HR-21, R-HR-25, R-HR-31, R-HR-33.
+
+**Rationale:** Cancellation, asynchronous failure, and missing terminal events
+make `session_compact` unsuitable as a mandatory workflow trigger. Separating
+evidence from authority removes that coupling.
+
+## D-HR-4 — Reserve human intervention for continuation infeasibility
+
+**Decision:** Do not add a human recovery slash command or
+`RECOVERY_REQUIRED` state for compaction problems. Continue automatically
+without confirmed compaction. Call for human intervention only when canonical
+execute cannot be safely queued or its delivery state cannot be resolved.
 
 **Satisfies:** R-HR-23, R-HR-24, R-HR-25.
 
-**Rationale:** A returned false result is a known outcome. An exception can leave
-the scheduling outcome uncertain, so automatic continuation could race a real
-compaction or duplicate execute.
+**Rationale:** Compaction failure does not prevent useful work. Delivery
+infeasibility is different because claiming continuation without a safe delivery
+path would be false and could make a blind retry duplicate work.
 
-## D-HR-4 — Provide explicit continue-without-compaction recovery
-
-**Decision:** A narrowly scoped operator recovery action can settle the exact
-recovery-required session generation and inject execute without compaction. It
-warns again and consumes state before injection.
-
-**Satisfies:** R-HR-26, R-HR-27, R-HR-31.
-
-**Rationale:** The operator needs a deliberate escape hatch that favors
-execution without converting all unexpected errors into silent success.
-
-## D-HR-5 — Add a Python-backed handoff skill
+## D-HR-5 — Add a Python-backed handoff skill with final-action semantics
 
 **Decision:** Add a project-local Python-backed `handoff` skill with an
 agent-facing `handoff.run(focus=None)` entry point and an internal
-`handoff.finish(focus_hint)` finalizer.
+`handoff.finish(focus_hint)` finalizer. Fresh-session discovery at the exact
+project location is an acceptance requirement. Each call is the agent's final
+action under the workflow contract.
 
 **Satisfies:** R-HR-7, R-HR-9, R-HR-17, R-HR-18.
 
-**Rationale:** This matches Prime Agent’s command-plus-skill interaction model:
-the agent gets a prepared REPL capability while the native command remains
-available to the operator.
+**Rationale:** A prepared callable gives conversational agent work a narrow entry
+point while avoiding copied workflow prose. Final-action behavior is achievable
+as an instruction and testable workflow contract, not as a false technical
+termination guarantee.
 
-## D-HR-6 — Converge all admission in one extension operation
+## D-HR-6 — Converge entry points while preserving their different admission UX
 
-**Decision:** Native `/handoff` and validated REPL requests call one shared
-extension-owned admission function and use one session/generation state machine.
+**Decision:** Direct native `/handoff` and conversational REPL admission converge
+on one extension operation and canonical workflow after admission. Native syntax
+is immediate operator instruction; conversational material inference can require
+confirmation.
 
-**Satisfies:** R-HR-3, R-HR-5, R-HR-8, R-HR-30.
+**Satisfies:** R-HR-3, R-HR-5, R-HR-8, R-HR-16, R-HR-36.
 
-**Rationale:** Multiple entry points are safe only if they do not become multiple
-workflow implementations or multiple routing authorities.
+**Rationale:** One transition owner prevents divergent workflow mechanics. The
+routes need not erase a deliberate UX distinction in order to converge on the
+same canonical handoff.
 
 ## D-HR-7 — Keep workflow prose canonical under `.ralph/skills`
 
-**Decision:** The Python-backed routing skill explains when and how to request a
-handoff but does not copy the durable handoff procedure. The extension continues
-to load canonical `.ralph/skills/handoff` and `.ralph/skills/execute` markdown.
+**Decision:** The routing skill explains when and how to request handoff but does
+not copy the durable handoff procedure. The extension loads canonical handoff
+and execute markdown, and no input can select another continuation.
 
-**Satisfies:** R-HR-4, R-HR-9.
+**Satisfies:** R-HR-3, R-HR-4, R-HR-9.
 
-**Rationale:** Operator/project customization belongs in canonical workflow
-files. Code should own transition mechanics, not duplicate prose.
+**Rationale:** Project customization belongs in canonical workflow files. Code
+owns transition mechanics, not duplicate procedure text.
 
-## D-HR-8 — Use a narrow versioned IPython-result protocol
+## D-HR-8 — Trust the user and confirm only material inference
 
-**Decision:** The Python module reports `begin`, `not-scheduled`, and `exception`
-outcomes through a schema-validated, versioned marker observed through the
-public IPython `tool_result` extension event. The protocol is state-gated and
-cannot name arbitrary commands, phases, or paths.
+**Decision:** Focus is resumption context, not lifecycle authority. Trust clear
+operator intent. Confirm an inference when it adds or changes an objective or
+outcome. After confirmation, update applicable durable artifacts so they preserve
+that decision; do not use stale artifacts to overrule it.
 
-**Satisfies:** R-HR-28, R-HR-29, R-HR-32.
+**Satisfies:** R-HR-10, R-HR-11, R-HR-12, R-HR-13, R-HR-14, R-HR-15, R-HR-16.
 
-**Rationale:** Project extensions cannot register custom kernel host-request
-handlers. A private runtime patch, shell/RPC process, or unowned file marker
-would be broader and less trustworthy than a tiny protocol over a documented
-extension event.
+**Rationale:** The user is authoritative. Confirmation prevents silent scope
+invention, while durable updates ensure the trusted decision survives handoff and
+does not conflict with the next pass.
 
-## D-HR-9 — Make conversational focus action-oriented
+## D-HR-9 — Classify the IPython bridge as model-controlled input
 
-**Decision:** The routing skill converts conversational intent into a focus that
-states what the next execute pass should be prepared to do, including relevant
-evidence and constraints rather than merely repeating a topic label.
+**Decision:** Use a narrow versioned marker on the public IPython `tool_result`
+surface, but make no authentication, provenance, or anti-forgery claim. Validate
+only protocol correctness, bounded fields, supported-session context, legal
+state, and generation.
 
-**Satisfies:** R-HR-10, R-HR-11.
+**Satisfies:** R-HR-26, R-HR-27, R-HR-32.
 
-**Rationale:** Compaction guidance must preserve the future task. “The failed
-probe” names a topic; “prepare to investigate and fix the failed probe” names a
-resumable objective.
+**Rationale:** The acting model can emit the same marker from arbitrary Python.
+Schema and state checks prevent accidental misuse but cannot establish an
+identity hidden from the model.
 
-## D-HR-10 — Confirm every materially inferred focus
+## D-HR-10 — Consume the generation before explicit follow-up delivery
 
-**Decision:** When the agent must infer or expand the objective, it presents the
-proposed action-oriented focus and waits for user confirmation. Explicit,
-actionable guidance proceeds without a redundant question, while insufficient
-evidence produces a clarification question.
+**Decision:** Finalization validates the supported session and generation, then
+consumes or terminally marks its continuation right before queuing canonical
+execute with explicit `deliverAs: "followUp"`. Later bridge input and compaction
+events cannot queue another execute.
 
-**Satisfies:** R-HR-12, R-HR-13, R-HR-14, R-HR-15, R-HR-16.
+**Satisfies:** R-HR-19, R-HR-30, R-HR-31, R-HR-32, R-HR-33, R-HR-40.
 
-**Rationale:** The agent may understand context well enough to propose useful
-guidance, but only the operator can authorize a materially inferred next
-objective. Native syntax remains the operator’s direct instruction.
+**Rationale:** The current tool turn may still be streaming. Follow-up delivery
+expresses the intended ordering, while consume-before-effect protects
+at-most-once behavior across duplicates and interleaving.
 
-## D-HR-11 — Finalize through the prepared handoff module
+## D-HR-11 — Minimize diagnostics with an allowlist and bounded strings
 
-**Decision:** The canonical handoff workflow calls `handoff.finish(focus_hint)`.
-That function calls `compact.run()` once and reports its exact returned outcome
-to the extension; the canonical skill no longer assumes that a compaction event
-will necessarily occur.
+**Decision:** Persist only fixed scalar fields for protocol version, action,
+generation, stage, scheduled status, bounded reason/type/message, and
+continuation status. Never serialize traceback, locals, arbitrary attributes or
+result fields, raw requests, or provider payloads. Instruct the agent/Python
+layer to redact suspected sensitive text, without promising deterministic secret
+removal from arbitrary strings.
 
-**Satisfies:** R-HR-17, R-HR-18, R-HR-19, R-HR-20, R-HR-23.
+**Satisfies:** R-HR-25, R-HR-28, R-HR-29, R-HR-34, R-HR-39.
 
-**Rationale:** Only the Python caller sees an immediate false scheduling result
-in Prime Agent 0.9.5. Making finalization explicit closes the otherwise
-unobservable short-session gap.
+**Rationale:** Deterministic data minimization is enforceable. Perfect redaction
+of arbitrary exception text is not. The contract must distinguish those claims.
 
-## D-HR-12 — Settle by session and generation before injection
+## D-HR-12 — Keep the POC support claim narrower than the shared-runtime risk
 
-**Decision:** All success, refusal, and recovery paths validate stable session
-identity plus a monotonically distinct handoff generation, then consume or
-terminally transition that state before injecting execute.
+**Decision:** Support top-level sibling episode sessions for this POC. Do not
+make root/RLM-child shared-extension-runtime delivery a prerequisite or claim.
+Track that separate delivery proof or supported-API fix in `prime-claw-f81.3`
+before Phase 4b depends on it.
 
-**Satisfies:** R-HR-30, R-HR-31, R-HR-32, R-HR-33.
+**Satisfies:** R-HR-30, R-HR-35.
 
-**Rationale:** Event and callback ordering can vary. One settlement gate prevents
-duplicate and cross-handoff execute injection even when signals arrive late.
+**Rationale:** Session-keyed state and shared-runtime message destination are
+separate properties. This specification can prove the former in its supported
+mode without falsely resolving or being blocked by the latter.
 
-## D-HR-13 — Expose both native and skill slash surfaces intentionally
+## D-HR-13 — Require real-runtime proof of finalization ordering
 
-**Decision:** The project intentionally supports `/handoff` and
-`/skill:handoff`. The former is a direct native command. The latter exposes the
-agent-facing routing skill whose REPL function converges on the same admission
-operation.
+**Decision:** Before implementation acceptance, prove the Specification §5.4
+assumptions in a disposable supported runtime: the finalizer reports every
+outcome, follow-up ordering works while streaming, compaction interleaving cannot
+suppress or duplicate continuation, delivery infeasibility is visible, and the
+skill loads in a fresh session.
 
-**Satisfies:** R-HR-5, R-HR-6, R-HR-7, R-HR-8.
+**Satisfies:** R-HR-7, R-HR-20, R-HR-33, R-HR-38, R-HR-40, R-HR-41.
 
-**Rationale:** This replaces the earlier one-surface rule because the new skill
-adds conversational reasoning and confirmation without creating another
-canonical workflow.
+**Rationale:** Public API documentation narrows the design but cannot prove event
+ordering across Python, extension events, compaction, and streaming follow-up.
+The assumptions must be tested rather than smuggled into planning as facts.
 
-## D-HR-14 — Test behavior at unit and real-runtime boundaries
+## D-HR-14 — Verify behavior at unit, integration, and regression boundaries
 
-**Decision:** Preserve mocked extension coverage and add real Prime Agent proofs
-for both a short-session refusal and successful compaction, including concurrent
-session evidence and the existing regression suite.
+**Decision:** Cover focus routing, every compaction outcome, bounded diagnostic
+serialization, ordering, exactly-once state, missing canonical content, and
+current native behavior. Preserve the full repository regression suite.
 
-**Satisfies:** R-HR-34, R-HR-36, R-HR-37, R-HR-38, R-HR-39, R-HR-40, R-HR-41.
+**Satisfies:** R-HR-36, R-HR-37, R-HR-38, R-HR-39, R-HR-40, R-HR-41, R-HR-42.
 
-**Rationale:** The behavior spans model routing, Python kernel results,
-extension events, compaction, and prompt injection. Unit tests alone cannot
-prove the complete boundary.
+**Rationale:** The behavior crosses model instructions, Python results, extension
+state, event ordering, and delivery. No single test layer is sufficient.
 
-## D-HR-15 — Preserve credential and diagnostic boundaries
+## D-HR-15 — Keep review in the future bundle and retain advisory evidence
 
-**Decision:** Protocol payloads and error reports are bounded and validated;
-diagnostics retain actionable type/message/context while excluding credentials
-and unrelated private content.
+**Decision:** Keep the revised handoff specification under its canonical future
+folder until the operator separately approves specification, plan, and native
+`/implement-spec` promotion. Claim no active-plan slot during review. Retain the
+`a93c27c` EXPERT report as immutable pre-promotion advisory evidence, not a failed
+episode gate.
 
-**Satisfies:** R-HR-24, R-HR-29, R-HR-35.
+**Satisfies:** R-HR-43.
 
-**Rationale:** Better recovery evidence must not weaken the sandbox’s credential
-isolation or turn arbitrary output into trusted control input.
+**Rationale:** The reviewed worktree-isolated episode workflow makes the future
+folder the unit of project-conversation review and native `/implement-spec` the
+sole promotion boundary. Accurate review classification avoids inventing an
+episode gate that never occurred.
+
+## Decision → requirement traceability
+
+| Decision | Requirements |
+|---|---|
+| D-HR-1 | R-HR-1, R-HR-2 |
+| D-HR-2 | R-HR-17, R-HR-18, R-HR-19, R-HR-20, R-HR-22, R-HR-23 |
+| D-HR-3 | R-HR-20, R-HR-21, R-HR-25, R-HR-31, R-HR-33 |
+| D-HR-4 | R-HR-23, R-HR-24, R-HR-25 |
+| D-HR-5 | R-HR-7, R-HR-9, R-HR-17, R-HR-18 |
+| D-HR-6 | R-HR-3, R-HR-5, R-HR-8, R-HR-16, R-HR-36 |
+| D-HR-7 | R-HR-3, R-HR-4, R-HR-9 |
+| D-HR-8 | R-HR-10, R-HR-11, R-HR-12, R-HR-13, R-HR-14, R-HR-15, R-HR-16 |
+| D-HR-9 | R-HR-26, R-HR-27, R-HR-32 |
+| D-HR-10 | R-HR-19, R-HR-30, R-HR-31, R-HR-32, R-HR-33, R-HR-40 |
+| D-HR-11 | R-HR-25, R-HR-28, R-HR-29, R-HR-34, R-HR-39 |
+| D-HR-12 | R-HR-30, R-HR-35 |
+| D-HR-13 | R-HR-7, R-HR-20, R-HR-33, R-HR-38, R-HR-40, R-HR-41 |
+| D-HR-14 | R-HR-36, R-HR-37, R-HR-38, R-HR-39, R-HR-40, R-HR-41, R-HR-42 |
+| D-HR-15 | R-HR-43 |
+
+Every defined GATE requirement is covered by at least one decision. The
+verification below checks this matrix against the requirement IDs before review.

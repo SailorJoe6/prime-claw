@@ -373,8 +373,10 @@ the findings, controlling requirements and decisions, exact reviewed commit,
 acceptance conditions, and intended same-slice revision.
 
 Only after that durable update does the conversation start the revision
-iteration through a controlled compaction boundary. The preferred first-release
-path invokes the native `/handoff` with explicit guidance naming the failed gate,
+iteration through a controlled handoff boundary. Focused compaction is a
+best-effort context improvement, not an authority or continuation gate. The
+preferred first-release path invokes native `/handoff` with explicit guidance
+naming the failed gate,
 finding IDs, acceptance conditions, and same phase or slice. Here `/handoff`
 means “prepare the next execute iteration”; it does not imply approval or
 advancement to the next numbered slice.
@@ -399,8 +401,9 @@ For an approved gate, the conversation invokes native `/handoff` to prepare and
 start the next approved phase or slice. For a failed gate, it invokes native
 `/handoff` only after the findings are durably incorporated, with guidance that
 starts another execute iteration for the same phase or slice. The command owns
-handoff preparation and compaction; the project-local extension then injects
-canonical `execute` exactly once after successful compaction.
+handoff preparation and a best-effort compaction attempt; the project-local
+extension then queues canonical `execute` exactly once unless continuation itself
+is infeasible. Execute delivery does not depend on a `session_compact` event.
 
 Every transition requires:
 
@@ -412,19 +415,21 @@ Every transition requires:
 - a transport acknowledgement that is explicitly not treated as admission;
 - durable admission evidence in the stable episode transcript or transition
   state, such as the expanded native command entry;
-- observation of the expected persisted boundary, such as compaction;
-- inspection of the resulting compaction summary;
-- proof that the summary identifies the correct approved next phase or failed-
-  gate revision, relevant finding IDs, and authoritative durable artifacts;
-- confirmation that the next phase was injected or entered exactly once; and
+- pre-handoff proof that the authoritative durable artifacts identify the correct
+  approved next phase or failed-gate revision, relevant finding IDs, and accepted
+  operator intent;
+- observation of bounded compaction evidence when available, without waiting for
+  or treating a summary as authority;
+- confirmation that the next phase was queued or entered exactly once; and
 - recoverable handling of accepted-but-uncertain or interrupted operations.
 
 Auto-compaction is not an authoritative handoff. The controller must prevent,
 pause, supersede, or otherwise race-proof auto-compaction while a review gate is
 being adjudicated. If auto-compaction races with late findings or produces a
-stale primer, the conversation must not advance on that summary. It shall finish
-persisting the findings and run a controlled guided handoff whose verified
-summary supersedes the stale one.
+stale summary, that summary grants no progression authority. The conversation
+finishes persisting the findings and runs a controlled guided handoff. Canonical
+execute continuation remains mandatory and does not wait for a replacement
+summary; the durable artifacts and confirmed operator intent are authoritative.
 
 A daemon `prompt` response with `success: true` proves only transport handling.
 Its RPC ID may repeat and is not a command receipt. The conversation performs a
