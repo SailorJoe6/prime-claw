@@ -1,6 +1,6 @@
 # Specification — Handoff continuation resilience
 
-> **Status:** incubated future specification; not approved for planning or implementation.
+> **Status:** operator approved for planning; not approved for implementation.
 > **Current implementation:** [`docs/handoff-chain.md`](../../../../docs/handoff-chain.md)
 > **Related future work:** [Conversational Ralph command routing](../conversational-ralph-command-routing/SPECIFICATION.md)
 > **Historical advisory evidence:** [`reports/reviews/handoff-resilience-spec-review-a93c27c.md`](../../../../reports/reviews/handoff-resilience-spec-review-a93c27c.md)
@@ -37,9 +37,13 @@ For an admitted native `/handoff`:
 4. Continue into canonical `execute` whether compaction succeeds, is skipped,
    is refused, is cancelled, or fails. One admitted handoff must not knowingly
    start more than one execute pass.
-5. Stop and ask for human help only when execute continuation itself cannot be
+5. Treat native `/handoff` as authorization for the execute follow-up.
+   Compaction refusal, cancellation, or failure does not revoke that approval.
+   Explicit removal of the queued execute message or termination/replacement of
+   the session cancels the transition.
+6. Stop and ask for human help only when execute continuation itself cannot be
    performed or its delivery state cannot be resolved safely.
-6. Show concise, truthful status that distinguishes compaction outcome from
+7. Show concise, truthful status that distinguishes compaction outcome from
    execute continuation.
 
 A missing or inadequate summary does not authorize, block, or select work. The
@@ -52,7 +56,9 @@ remain authoritative.
 |---|---|
 | Compaction completes | Report confirmed compaction and start the execute pass |
 | Compaction is unnecessary or refused | Report no compaction and start the execute pass |
-| Compaction is cancelled or fails | Report the problem safely and start the execute pass |
+| Compaction alone is cancelled or fails | Report the problem safely and start the execute pass when delivery remains feasible |
+| The queued execute message is explicitly removed | Cancel the transition; do not reconstruct or retry it |
+| The session terminates or is replaced | Cancel the transition with that session |
 | A compaction event arrives late | Do not start an additional execute pass |
 | The same finalization signal repeats | Do not start an additional execute pass |
 | Canonical execute cannot be loaded or safely delivered | Report continuation infeasibility and do not claim success |
@@ -64,6 +70,9 @@ remain authoritative.
   confirm a focus hint.
 - Trailing text remains free-form guidance, not a phase or path selector.
 - Inline mentions of `/handoff` remain ordinary conversation.
+- The extension does not infer cancellation intent from a missing
+  `session_compact` event or an interrupted compaction. Explicit queue removal or
+  session termination/replacement is the cancellation boundary.
 - Canonical handoff and execute procedures remain project-customizable Markdown.
 - Diagnostics remain bounded and do not persist credentials, tracebacks, locals,
   raw provider payloads, or unrelated host data.
@@ -104,7 +113,10 @@ runtime demonstrate:
 
 - execute starts after successful compaction;
 - execute starts when compaction is unnecessary or refused;
-- execute starts after cancellation or failure when delivery remains feasible;
+- execute starts after compaction-only cancellation or failure when delivery
+  remains feasible;
+- explicit queued-message removal and session termination/replacement do not
+  reconstruct or retry execute;
 - late or repeated known signals do not start an additional execute pass;
 - visible failure when continuation itself is infeasible;
 - truthful status for every tested outcome; and
