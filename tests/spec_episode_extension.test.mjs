@@ -177,11 +177,33 @@ test("promotes an opaque bundle, commits it, publishes context, and delivers exe
   const identity = JSON.parse(readFileSync(identityPath, "utf8"));
   assert.deepEqual(Object.keys(identity).sort(), [
     "branch", "episodeActiveSessionId", "episodeId", "episodeSessionFile",
-    "executeDelivered", "ownerSessionId", "sessionName", "slug", "sourceLocation",
+    "executeAdmission", "ownerSessionId", "sessionName", "slug", "sourceLocation",
     "version", "worktree",
   ]);
-  assert.equal(identity.executeDelivered, true);
+  assert.equal(identity.executeAdmission, "delivered");
 });
+
+
+test("no-diff promotion starts clean and creates an allow-empty marker commit", async (t) => {
+  const { repo, worktree } = repositoryFixture(t);
+  git(repo, "rm", "-qr", ".ralph/plans/CURRENT.md", LOCATION);
+  write(join(repo, ".ralph", "plans", "manifest.yaml"), "kind: arbitrary-bundle\n");
+  write(join(repo, ".ralph", "plans", "nested", "notes.txt"), "opaque nested artifact\n");
+  git(repo, "add", "-A");
+  git(repo, "commit", "-qm", "make active plan match future bundle");
+  write(join(repo, LOCATION, "manifest.yaml"), "kind: arbitrary-bundle\n");
+  write(join(repo, LOCATION, "nested", "notes.txt"), "opaque nested artifact\n");
+  const publisher = new FakePublisher();
+
+  const result = await createSpecEpisode(LOCATION, "tool-call-empty", context(repo), dependencies(publisher));
+
+  assert.equal(result.executeAdmission, "delivered");
+  assert.equal(git(worktree, "diff", "--exit-code", "HEAD^", "HEAD"), "");
+  assert.match(git(worktree, "log", "-1", "--pretty=%s"), /promote alpha-plan specification/);
+  assert.equal(existsSync(join(repo, LOCATION, "manifest.yaml")), true);
+  assert.equal(git(worktree, "status", "--porcelain"), "");
+});
+
 
 test("matching repeated request returns identity without another fork or execute delivery", async (t) => {
   const { repo, worktree } = repositoryFixture(t);
@@ -300,6 +322,142 @@ test("session-name collision fails before Git mutation", async (t) => {
 
 
 
+
+
+test("cleanup reports worktree-removal failure after still attempting branch deletion", () => {
+  const calls = [];
+  const adapter = new CliGitAdapter((_cwd, args) => {
+    calls.push(args);
+    if (args[0] === "worktree" && args[1] === "remove") throw new Error("cannot remove worktree");
+    return "";
+  });
+
+  assert.throws(
+    () => adapter.removeCreatedWorktree("/repo", "episode/alpha", "/worktree"),
+    /worktree removal failed: cannot remove worktree/,
+  );
+  assert.deepEqual(calls.map((args) => args.slice(0, 2)), [["worktree", "remove"], ["branch", "-D"]]);
+});
+
+test("cleanup reports branch-deletion failure after confirmed worktree removal", () => {
+  const calls = [];
+  const adapter = new CliGitAdapter((_cwd, args) => {
+    calls.push(args);
+    if (args[0] === "branch" && args[1] === "-D") throw new Error("cannot delete branch");
+    return "";
+  });
+
+  assert.throws(
+    () => adapter.removeCreatedWorktree("/repo", "episode/alpha", "/worktree"),
+    /branch deletion failed: cannot delete branch/,
+  );
+  assert.deepEqual(calls.map((args) => args.slice(0, 2)), [["worktree", "remove"], ["branch", "-D"]]);
+});
+
+test("partial Git cleanup becomes uncertain and preserves identity artifacts", async (t) => {
+  const { repo, worktree } = repositoryFixture(t);
+  class CleanupFailureGit extends CliGitAdapter {
+    removeCreatedWorktree() { throw new Error("worktree removal failed: simulated"); }
+  }
+  const publisher = new FakePublisher({ failDelivery: true });
+
+  await assert.rejects(
+    createSpecEpisode(LOCATION, "tool-call-1", context(repo), {
+      git: new CleanupFailureGit(), filesystem: new NodeFilesystemAdapter(), publisher,
+    }),
+    /Git cleanup was incomplete/,
+  );
+
+  assert.deepEqual(publisher.kills, ["active-episode-1"]);
+  assert.equal(existsSync(worktree), true);
+  assert.equal(existsSync(join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json")), true);
+});
+
+
+test("uncertain execute admission preserves identity and never redelivers on replay", async (t) => {
+  const { repo, worktree } = repositoryFixture(t);
+  const publisher = new FakePublisher();
+  publisher.deliverExecute = async (activeSessionId, prompt) => {
+    publisher.deliveries.push({ activeSessionId, prompt });
+    const pending = JSON.parse(readFileSync(
+      join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
+      "utf8",
+    ));
+    assert.equal(pending.executeAdmission, "pending");
+    throw new EpisodeStateUncertainError("execute admission uncertain");
+  };
+
+  await assert.rejects(
+    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
+    /execute admission uncertain/,
+  );
+
+  assert.deepEqual(publisher.kills, []);
+  assert.equal(existsSync(worktree), true);
+  const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
+  const uncertain = JSON.parse(readFileSync(identityPath, "utf8"));
+  assert.equal(uncertain.executeAdmission, "uncertain");
+
+  const replay = new FakePublisher({ sessions: [{
+    activeSessionId: uncertain.episodeActiveSessionId,
+    sessionId: uncertain.episodeId,
+    sessionFile: uncertain.episodeSessionFile,
+    sessionName: uncertain.sessionName,
+    cwd: uncertain.worktree,
+  }] });
+  const result = await createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay));
+  assert.equal(result.reused, true);
+  assert.equal(result.executeAdmission, "uncertain");
+  assert.deepEqual(replay.deliveries, []);
+  assert.deepEqual(replay.kills, []);
+});
+
+test("crash-window failure after admission preserves pending identity and never redelivers", async (t) => {
+  const { repo, worktree } = repositoryFixture(t);
+  const baseFilesystem = new NodeFilesystemAdapter();
+  let identityWrites = 0;
+  const filesystem = {
+    exists: (path) => baseFilesystem.exists(path),
+    promoteBundle: (...args) => baseFilesystem.promoteBundle(...args),
+    readIdentity: (path) => baseFilesystem.readIdentity(path),
+    removeFile: (path) => baseFilesystem.removeFile(path),
+    writeIdentity(path, identity) {
+      identityWrites += 1;
+      if (identityWrites === 2) throw new Error("crash before delivered mark");
+      baseFilesystem.writeIdentity(path, identity);
+    },
+  };
+  const publisher = new FakePublisher();
+
+  await assert.rejects(
+    createSpecEpisode(LOCATION, "tool-call-1", context(repo), {
+      git: new CliGitAdapter(), filesystem, publisher,
+    }),
+    /delivered identity mark could not be persisted/,
+  );
+
+  assert.equal(publisher.deliveries.length, 1);
+  assert.deepEqual(publisher.kills, []);
+  assert.equal(existsSync(worktree), true);
+  const identity = JSON.parse(readFileSync(
+    join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
+    "utf8",
+  ));
+  assert.equal(identity.executeAdmission, "pending");
+
+  const replay = new FakePublisher({ sessions: [{
+    activeSessionId: identity.episodeActiveSessionId,
+    sessionId: identity.episodeId,
+    sessionFile: identity.episodeSessionFile,
+    sessionName: identity.sessionName,
+    cwd: identity.worktree,
+  }] });
+  const replayResult = await createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay));
+  assert.equal(replayResult.executeAdmission, "pending");
+  assert.deepEqual(replay.deliveries, []);
+});
+
+
 test("uncertain create preserves the promoted branch and worktree", async (t) => {
   const { repo, worktree } = repositoryFixture(t);
   const publisher = new FakePublisher();
@@ -382,6 +540,7 @@ test("public SessionManager forkFrom gets target cwd and a matching successful t
     branch: options.branch,
     worktree: options.worktree,
     sessionName: options.sessionName,
+    executeAdmission: "pending",
     reused: false,
   }));
 });

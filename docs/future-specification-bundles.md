@@ -93,16 +93,19 @@ The capability rejects branch, worktree, or session-name collisions before it
 creates resources. A matching repeated request validates durable session ID,
 session file, branch, worktree, CWD, and name. It returns an active match or
 reactivates an inactive saved session without sending execute again, then
-refreshes the routing ID. A mismatch fails clearly and does not delete the
-pre-existing resource.
+refreshes the routing ID. A stored `pending` or `uncertain` admission is also
+returned without another delivery attempt. A mismatch fails clearly and does
+not delete the pre-existing resource.
 
-On first creation, the capability creates the branch and worktree, overlays the
-validated canonical folder so approved changes need not already be committed,
-replaces only the worktree's active plan files with the complete bundle
-contents, preserves `future/`, `archive/`, and `blocked/`, removes the selected
-source folder only on the episode branch, and commits the promotion. Artifact
-names inside the bundle are opaque to native code. The canonical checkout and
-its future bundle remain unchanged.
+On first creation, the capability creates the branch and worktree, verifies the
+new checkout is clean, overlays the validated canonical folder so approved
+changes need not already be committed, replaces only the worktree's active plan
+files with the complete bundle contents, preserves `future/`, `archive/`, and
+`blocked/`, removes the selected source folder only on the episode branch, and
+creates the promotion marker commit. The marker uses an allowed empty commit
+when the promoted tree already matches `HEAD`. Artifact names inside the bundle
+are opaque to native code. The canonical checkout and its future bundle remain
+unchanged.
 
 Prime Agent's public `SessionManager.forkFrom` API copies the complete owner
 conversation into a new durable session with the episode worktree as its CWD.
@@ -110,14 +113,22 @@ The fork includes the successful `create_spec_episode` tool result so it does
 not begin with a dangling tool call. Prime Agent 0.9.5 has no public extension
 API that publishes a fork as a separate sibling without replacing the owner,
 so the narrowly scoped host adapter uses the daemon supervisor socket injected
-into daemon workers. It publishes the fork as a resident sibling and admits the
-worktree's canonical execute skill exactly once. Local identity state is stored
-under ignored `.prime/agent/state/spec-episodes/` and contains only owner,
-episode, branch, worktree, session, source, and delivery identifiers. A definite
-failure cleans up only resources created by that invocation. A timeout, lost
-mutation response, or unconfirmed worker stop preserves the branch, worktree,
-and session artifacts and reports an actionable uncertain state instead of
-risking deletion under a live worker.
+into daemon workers. Before task delivery it atomically stores the complete
+minimal identity with `executeAdmission: pending`. Confirmed admission changes
+that field to `delivered`; a lost response changes it to `uncertain` when
+possible. `pending` and `uncertain` both prevent replay from sending execute
+again, including the crash window after daemon admission but before the final
+identity update.
+
+Local identity state lives under ignored
+`.prime/agent/state/spec-episodes/` and contains only owner, episode, branch,
+worktree, session, source, and admission identifiers. A definite failure cleans
+up only resources created by that invocation. Cleanup first confirms the worker
+stop and then requires both worktree removal and branch deletion to succeed
+before deleting identity/session artifacts. Any timeout, lost mutation
+response, unconfirmed worker stop, or partial Git cleanup preserves remaining
+artifacts and reports an actionable uncertain state instead of risking deletion
+under a live worker.
 
 Successful task admission is the boundary where the project conversation begins
 its separately configured oversight workflow. `/implement-spec` does not embed
@@ -136,9 +147,10 @@ pytest -q tests/test_reviewed_plan_extension.py
 
 The Node suites cover command validation, opaque temporary-Git promotion,
 lifecycle-directory preservation, promotion commits, inherited context,
-protocol-7 daemon envelopes, uncertain mutation preservation, exactly-once
-execute delivery, active and inactive replay, collision safety, and confirmed
-invocation-owned cleanup. The Python bridge reruns both suites and uses
+protocol-7 daemon envelopes, durable pre-delivery admission, crash-window and
+uncertain-delivery replay suppression, allowed-empty promotion commits, partial
+cleanup observability, active and inactive replay, collision safety, and
+confirmed invocation-owned cleanup. The Python bridge reruns both suites and uses
 installed offline Prime Agent RPC plus startup probes to prove one native
 `plan`, one native `implement-spec`, the structured tool, a valid inherited
 Prime Agent context, and bounded real daemon create/state/messages/kill behavior

@@ -1,7 +1,7 @@
 # Execution Plan — Reviewed future plans and worktree-isolated implementation episodes
 
 > **Status:** approved and active in the implementation episode.
-> **Current progress:** Slices 1–3 complete; Slice 4 is next and has not started.
+> **Current progress:** Slices 1–3 complete after owner-review revision; Slice 4 is next and has not started.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Original planning location:**
 > `.ralph/plans/future/worktree-isolated-specification-episodes/`
@@ -348,6 +348,15 @@ Agent RPC to prove command/tool registration and performs bounded real
 `SessionManager.forkFrom` plus daemon create/state/messages/kill integration.
 Operator behavior and recovery safety are documented in
 `docs/future-specification-bundles.md`.
+
+Owner-review revision made execute admission durable before delivery with
+`pending` / `uncertain` / `delivered` states and replay suppression. It also
+made partial Git cleanup observable and preservation-safe, verified a clean new
+worktree, and made the promotion marker commit succeed with `--allow-empty` when
+the promoted tree already matches `HEAD`. Focused regressions cover uncertain
+delivery despite available kill, the post-admission/pre-mark crash window,
+independent worktree-removal and branch-deletion failures, and both no-diff and
+uncommitted approved bundles.
 
 ### Commit boundary
 

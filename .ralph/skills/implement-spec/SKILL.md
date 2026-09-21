@@ -41,10 +41,13 @@ not supply or invent a branch, worktree, session name, prompt, command, or other
 host parameter. The trusted host capability derives and validates those values.
 
 Report the returned stable episode identity, active routing identity, branch,
-worktree, and session name to the operator. State whether the capability created
-the episode or returned an existing matching identity. The episode receives the
-worktree's canonical execute workflow as its first task; do not send another
-execute prompt and do not begin implementation in the owner conversation.
+worktree, session name, and execute-admission state to the operator. State
+whether the capability created the episode or returned an existing matching
+identity. `delivered` confirms task admission. `pending` or `uncertain` is an
+unresolved exactly-once state: explain it, do not call the tool again in this
+turn, and never send execute directly. A later explicit `/implement-spec`
+replay returns that identity without redelivering. Do not begin implementation
+in the owner conversation.
 
 Once the tool reports success, the owner conversation begins its separately
 configured oversight workflow. Stop without implementing or invoking

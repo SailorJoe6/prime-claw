@@ -54,7 +54,7 @@ export interface EpisodeIdentity {
   branch: string;
   worktree: string;
   sessionName: string;
-  executeDelivered: true;
+  executeAdmission: "pending" | "uncertain" | "delivered";
 }
 
 export interface EpisodeResult extends EpisodeIdentity {
@@ -78,6 +78,7 @@ export interface PublishedSession {
 
 export function episodeResultText(result: Pick<EpisodeResult, "episodeId" | "branch" | "worktree" | "sessionName" | "reused"> & {
   episodeActiveSessionId?: string;
+  executeAdmission?: EpisodeIdentity["executeAdmission"];
 }): string {
   return `Episode ${result.reused ? "reused" : "created"}: ${JSON.stringify({
     episodeId: result.episodeId,
@@ -85,6 +86,7 @@ export function episodeResultText(result: Pick<EpisodeResult, "episodeId" | "bra
     branch: result.branch,
     worktree: result.worktree,
     sessionName: result.sessionName,
+    executeAdmission: result.executeAdmission,
     reused: result.reused,
   })}`;
 }
@@ -94,6 +96,7 @@ export interface GitAdapter {
   hasBranch(repo: string, branch: string): boolean;
   worktrees(repo: string): Array<{ path: string; branch?: string }>;
   createWorktree(repo: string, branch: string, worktree: string): void;
+  assertCleanWorktree(worktree: string): void;
   commitPromotion(worktree: string, slug: string): void;
   removeCreatedWorktree(repo: string, branch: string, worktree: string): void;
 }
@@ -142,13 +145,19 @@ function runGit(cwd: string, args: string[]): string {
 }
 
 export class CliGitAdapter implements GitAdapter {
+  private readonly runner: (cwd: string, args: string[]) => string;
+
+  constructor(runner: (cwd: string, args: string[]) => string = runGit) {
+    this.runner = runner;
+  }
+
   repositoryRoot(cwd: string): string {
-    return realpathSync(runGit(cwd, ["rev-parse", "--show-toplevel"]));
+    return realpathSync(this.runner(cwd, ["rev-parse", "--show-toplevel"]));
   }
 
   hasBranch(repo: string, branch: string): boolean {
     try {
-      runGit(repo, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`]);
+      this.runner(repo, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`]);
       return true;
     } catch {
       return false;
@@ -156,7 +165,7 @@ export class CliGitAdapter implements GitAdapter {
   }
 
   worktrees(repo: string): Array<{ path: string; branch?: string }> {
-    const output = runGit(repo, ["worktree", "list", "--porcelain"]);
+    const output = this.runner(repo, ["worktree", "list", "--porcelain"]);
     if (!output) return [];
     return output.split("\n\n").map((block) => {
       const lines = block.split("\n");
@@ -167,17 +176,32 @@ export class CliGitAdapter implements GitAdapter {
   }
 
   createWorktree(repo: string, branch: string, worktree: string): void {
-    runGit(repo, ["worktree", "add", "-b", branch, worktree, "HEAD"]);
+    this.runner(repo, ["worktree", "add", "-b", branch, worktree, "HEAD"]);
+  }
+
+  assertCleanWorktree(worktree: string): void {
+    const status = this.runner(worktree, ["status", "--porcelain"]);
+    if (status !== "") throw new Error(`New episode worktree is not clean: ${status}`);
   }
 
   commitPromotion(worktree: string, slug: string): void {
-    runGit(worktree, ["add", "-A"]);
-    runGit(worktree, ["commit", "-m", `chore: promote ${slug} specification`]);
+    this.runner(worktree, ["add", "-A"]);
+    this.runner(worktree, ["commit", "--allow-empty", "-m", `chore: promote ${slug} specification`]);
   }
 
   removeCreatedWorktree(repo: string, branch: string, worktree: string): void {
-    try { runGit(repo, ["worktree", "remove", "--force", worktree]); } catch { /* best effort */ }
-    try { runGit(repo, ["branch", "-D", branch]); } catch { /* best effort */ }
+    const failures: string[] = [];
+    try {
+      this.runner(repo, ["worktree", "remove", "--force", worktree]);
+    } catch (error) {
+      failures.push(`worktree removal failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    try {
+      this.runner(repo, ["branch", "-D", branch]);
+    } catch (error) {
+      failures.push(`branch deletion failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (failures.length > 0) throw new Error(`Episode cleanup incomplete: ${failures.join("; ")}`);
   }
 }
 
@@ -246,7 +270,7 @@ function isEpisodeIdentity(value: unknown): value is EpisodeIdentity {
   if (!value || typeof value !== "object") return false;
   const item = value as Record<string, unknown>;
   return item.version === 1
-    && item.executeDelivered === true
+    && ["pending", "uncertain", "delivered"].includes(String(item.executeAdmission))
     && [
       "slug", "sourceLocation", "ownerSessionId", "episodeId",
       "episodeActiveSessionId", "episodeSessionFile", "branch", "worktree", "sessionName",
@@ -458,6 +482,7 @@ export function forkPrimeSession(
     branch: options.branch,
     worktree: options.worktree,
     sessionName: options.sessionName,
+    executeAdmission: "pending",
     reused: false,
   });
   try {
@@ -657,6 +682,8 @@ export async function createSpecEpisode(
   let publisher = dependencies?.publisher;
   let createdWorktree = false;
   let published: PublishedSession | undefined;
+  let identityRecordPath: string | undefined;
+  let identityPersisted = false;
   try {
     const selected = validateFutureLocation(ctx.cwd, rawLocation);
     if (!selected) throw new Error("Invalid future-plan folder");
@@ -675,6 +702,7 @@ export async function createSpecEpisode(
     const sessionName = `${selected.slug}-episode`;
     const ownerSessionId = ctx.sessionManager.getSessionId();
     const recordPath = identityPath(repo, selected.slug);
+    identityRecordPath = recordPath;
     const expected = {
       slug: selected.slug,
       sourceLocation: selected.location,
@@ -702,7 +730,14 @@ export async function createSpecEpisode(
       }
       const refreshed = { ...existing, episodeActiveSessionId: activeSessionId };
       if (refreshed.episodeActiveSessionId !== existing.episodeActiveSessionId) {
-        filesystem.writeIdentity(recordPath, refreshed);
+        try {
+          filesystem.writeIdentity(recordPath, refreshed);
+        } catch (error) {
+          throw new EpisodeStateUncertainError(
+            "Episode reactivated but its refreshed routing identity could not be persisted; resources were preserved.",
+            { cause: error },
+          );
+        }
       }
       return { ...refreshed, reused: true };
     }
@@ -717,6 +752,7 @@ export async function createSpecEpisode(
 
     git.createWorktree(repo, branch, worktree);
     createdWorktree = true;
+    git.assertCleanWorktree(worktree);
     filesystem.promoteBundle(worktree, selected.slug, selected.folder);
     git.commitPromotion(worktree, selected.slug);
 
@@ -731,22 +767,45 @@ export async function createSpecEpisode(
       toolCallId,
       model,
     });
-    await publisher.deliverExecute(published.activeSessionId, executePrompt);
-
-    const identity: EpisodeIdentity = {
+    const pendingIdentity: EpisodeIdentity = {
       version: 1,
       ...expected,
       episodeId: published.sessionId,
       episodeActiveSessionId: published.activeSessionId,
       episodeSessionFile: published.sessionFile,
-      executeDelivered: true,
+      executeAdmission: "pending",
     };
-    filesystem.writeIdentity(recordPath, identity);
-    return { ...identity, reused: false };
+    filesystem.writeIdentity(recordPath, pendingIdentity);
+    identityPersisted = true;
+
+    try {
+      await publisher.deliverExecute(published.activeSessionId, executePrompt);
+    } catch (error) {
+      if (isUncertainMutation(error)) {
+        try {
+          filesystem.writeIdentity(recordPath, { ...pendingIdentity, executeAdmission: "uncertain" });
+        } catch { /* the durable pending record still prevents duplicate admission */ }
+      }
+      throw error;
+    }
+
+    const deliveredIdentity: EpisodeIdentity = { ...pendingIdentity, executeAdmission: "delivered" };
+    try {
+      filesystem.writeIdentity(recordPath, deliveredIdentity);
+    } catch (error) {
+      throw new EpisodeStateUncertainError(
+        "Execute was admitted but the delivered identity mark could not be persisted. Preserved episode resources; replay will not redeliver.",
+        { cause: error },
+      );
+    }
+    return { ...deliveredIdentity, reused: false };
   } catch (error) {
     let failure: unknown = error;
     let cleanupConfirmed = !isUncertainMutation(error);
-    if (published) {
+
+    // Never stop an episode when task admission itself is uncertain. The
+    // pre-delivery identity is the exactly-once guard for a later replay.
+    if (published && cleanupConfirmed) {
       try {
         cleanupConfirmed = await publisher!.kill(published.activeSessionId);
       } catch (killError) {
@@ -756,20 +815,41 @@ export async function createSpecEpisode(
           { cause: killError },
         );
       }
-      if (cleanupConfirmed) filesystem.removeFile(published.sessionFile);
     }
+
     if (createdWorktree && cleanupConfirmed) {
-      const selected = validateFutureLocation(ctx.cwd, rawLocation);
-      if (selected) {
+      try {
+        const selected = validateFutureLocation(ctx.cwd, rawLocation);
+        if (!selected) throw new Error("approved source folder is no longer valid");
         const repo = git.repositoryRoot(selected.projectRoot);
         const branch = `episode/${selected.slug}`;
         const worktree = resolve(dirname(repo), `${basename(repo)}-${selected.slug}-episode`);
         git.removeCreatedWorktree(repo, branch, worktree);
+      } catch (cleanupError) {
+        cleanupConfirmed = false;
+        failure = new EpisodeStateUncertainError(
+          "Episode Git cleanup was incomplete. Preserved remaining identity and session artifacts for operator recovery.",
+          { cause: cleanupError },
+        );
       }
     }
+
+    if (cleanupConfirmed) {
+      try {
+        if (published) filesystem.removeFile(published.sessionFile);
+        if (identityPersisted && identityRecordPath) filesystem.removeFile(identityRecordPath);
+      } catch (cleanupError) {
+        cleanupConfirmed = false;
+        failure = new EpisodeStateUncertainError(
+          "Episode artifact cleanup was incomplete; remaining resources were preserved for operator recovery.",
+          { cause: cleanupError },
+        );
+      }
+    }
+
     if (!cleanupConfirmed && !(failure instanceof EpisodeStateUncertainError)) {
       failure = new EpisodeStateUncertainError(
-        "Episode mutation outcome is uncertain. Preserved branch, worktree, and session artifacts for operator recovery.",
+        "Episode mutation outcome is uncertain. Preserved branch, worktree, identity, and session artifacts for operator recovery.",
         { cause: failure },
       );
     }
