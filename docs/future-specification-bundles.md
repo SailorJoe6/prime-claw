@@ -58,17 +58,88 @@ all planning output and stops for operator plan review. `/plan` never moves the
 bundle, creates an implementation worktree, or authorizes implementation.
 
 There is only one slash-command surface: the native `/plan` command. The former
-`.agents/skills/plan` exposure is intentionally absent. Implementation remains
-unauthorized until the separate `/implement-spec` boundary is invoked.
+`.agents/skills/plan` exposure is intentionally absent.
+
+## Explicit implementation promotion
+
+Implementation remains unauthorized until the operator selects an approved,
+planned bundle with:
+
+```text
+/implement-spec .ralph/plans/future/<slug>
+```
+
+The native handler applies the same relative-path, safe-slug, directory,
+containment, and realpath checks as `/plan`. Invalid input displays concise
+usage and never invokes the model. Valid input loads the current customizable
+readiness policy from `.ralph/skills/implement-spec/SKILL.md` and supplies only
+the validated location. The policy either explains every readiness deficiency
+and stops without calling a tool, or calls `create_spec_episode` exactly once.
+
+`create_spec_episode` accepts only that location. The native command arms that
+exact location for one model turn; an unarmed, different, late, or repeated tool
+call is rejected. The capability also runs only from a persisted, daemon-backed,
+top-level project conversation. Trusted host code derives all other values:
+
+| Identity | Derived value |
+|---|---|
+| Branch | `episode/<slug>` |
+| Worktree | sibling `<repository>-<slug>-episode` directory |
+| Session name | `<slug>-episode` |
+| Stable episode ID | the forked Prime Agent session UUID |
+| Active routing ID | the daemon worker's current active-session ID |
+
+The capability rejects branch, worktree, or session-name collisions before it
+creates resources. A matching repeated request validates durable session ID,
+session file, branch, worktree, CWD, and name. It returns an active match or
+reactivates an inactive saved session without sending execute again, then
+refreshes the routing ID. A mismatch fails clearly and does not delete the
+pre-existing resource.
+
+On first creation, the capability creates the branch and worktree, overlays the
+validated canonical folder so approved changes need not already be committed,
+replaces only the worktree's active plan files with the complete bundle
+contents, preserves `future/`, `archive/`, and `blocked/`, removes the selected
+source folder only on the episode branch, and commits the promotion. Artifact
+names inside the bundle are opaque to native code. The canonical checkout and
+its future bundle remain unchanged.
+
+Prime Agent's public `SessionManager.forkFrom` API copies the complete owner
+conversation into a new durable session with the episode worktree as its CWD.
+The fork includes the successful `create_spec_episode` tool result so it does
+not begin with a dangling tool call. Prime Agent 0.9.5 has no public extension
+API that publishes a fork as a separate sibling without replacing the owner,
+so the narrowly scoped host adapter uses the daemon supervisor socket injected
+into daemon workers. It publishes the fork as a resident sibling and admits the
+worktree's canonical execute skill exactly once. Local identity state is stored
+under ignored `.prime/agent/state/spec-episodes/` and contains only owner,
+episode, branch, worktree, session, source, and delivery identifiers. A definite
+failure cleans up only resources created by that invocation. A timeout, lost
+mutation response, or unconfirmed worker stop preserves the branch, worktree,
+and session artifacts and reports an actionable uncertain state instead of
+risking deletion under a live worker.
+
+Successful task admission is the boundary where the project conversation begins
+its separately configured oversight workflow. `/implement-spec` does not embed
+oversight policy, run implementation in the owner conversation, or invoke
+`/handoff`.
 
 ## Focused verification
 
-Run both layers of command coverage with:
+Run the command loader and end-to-end host-mechanics coverage with:
 
 ```sh
 node --experimental-strip-types --test tests/reviewed_plan_extension.test.mjs
+node --experimental-strip-types --test tests/spec_episode_extension.test.mjs
 pytest -q tests/test_reviewed_plan_extension.py
 ```
 
-The Python bridge reruns the Node suite and asks the installed offline Prime
-Agent RPC loader to confirm exactly one native `plan` registration.
+The Node suites cover command validation, opaque temporary-Git promotion,
+lifecycle-directory preservation, promotion commits, inherited context,
+protocol-7 daemon envelopes, uncertain mutation preservation, exactly-once
+execute delivery, active and inactive replay, collision safety, and confirmed
+invocation-owned cleanup. The Python bridge reruns both suites and uses
+installed offline Prime Agent RPC plus startup probes to prove one native
+`plan`, one native `implement-spec`, the structured tool, a valid inherited
+Prime Agent context, and bounded real daemon create/state/messages/kill behavior
+at the episode worktree CWD.

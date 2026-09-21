@@ -37,8 +37,8 @@ prime-claw builds on four prior projects. Read these before designing:
   focused compaction → next-skill transition, its legacy Ralph-loop lineage,
   marker lifecycle, regression tests, evidence, and short-session recovery.
 - [future-specification-bundles.md](future-specification-bundles.md) — reviewed
-  future-folder authoring plus the native `/plan` gate and its deterministic
-  loader versus customizable planning-policy boundary.
+  future-folder authoring, native `/plan`, and explicit `/implement-spec`
+  promotion into a worktree-isolated sibling episode.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)

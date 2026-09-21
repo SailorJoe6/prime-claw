@@ -1,7 +1,7 @@
 # Execution Plan — Reviewed future plans and worktree-isolated implementation episodes
 
 > **Status:** approved and active in the implementation episode.
-> **Current progress:** Slices 1–2 complete; Slice 3 is next and has not started.
+> **Current progress:** Slices 1–3 complete; Slice 4 is next and has not started.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Original planning location:**
 > `.ralph/plans/future/worktree-isolated-specification-episodes/`
@@ -327,6 +327,27 @@ its branch, starts execute, and returns its identity to the owner conversation.
 - The owner receives stable episode identity for subsequent observation and
   handoff.
 - Focused unit, temporary-Git, and offline RPC integration tests pass.
+
+### Completion evidence
+
+Completed in the third bounded episode iteration. The native command and
+one-turn operator-approval guard are registered by
+`.prime/agent/extensions/reviewed-plan.ts`; shared deterministic loading lives
+in `reviewed-plan-support.ts`; and the trusted host transition is isolated in
+`spec-episode.ts`. Custom readiness policy is in
+`.ralph/skills/implement-spec/SKILL.md`.
+
+`tests/reviewed_plan_extension.test.mjs` covers registration, safe command
+arguments, canonical policy injection, and approval consumption.
+`tests/spec_episode_extension.test.mjs` covers opaque and uncommitted bundle
+promotion in temporary Git repositories, lifecycle preservation, promotion
+commits, context pairing, stable/active identity, active and inactive replay,
+collisions, protocol-7 envelopes, response binding, exactly-once delivery, and
+uncertain-mutation preservation. The Python bridge uses installed offline Prime
+Agent RPC to prove command/tool registration and performs bounded real
+`SessionManager.forkFrom` plus daemon create/state/messages/kill integration.
+Operator behavior and recovery safety are documented in
+`docs/future-specification-bundles.md`.
 
 ### Commit boundary
 
