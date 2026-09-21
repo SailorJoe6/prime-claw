@@ -12,9 +12,10 @@ capability:
 
 ## End-to-end operator walkthrough
 
-1. In the project conversation, invoke `/design` while requirements still need
-   discovery, or `/spec-it-out` when the conversation already contains the
-   design. The workflow writes a named `.ralph/plans/future/<slug>/` bundle and
+1. In the project conversation, invoke `/skill:design` while requirements still
+   need discovery, or `/skill:spec-it-out` when the conversation already
+   contains the design. The workflow writes a named
+   `.ralph/plans/future/<slug>/` bundle and
    stops. Confirm that no branch, worktree, or episode was created.
 2. Review every linked specification artifact in that exact folder. Request
    revisions in place until satisfied. Explicit specification approval permits
@@ -42,8 +43,8 @@ canonical project conversation.
 
 Use either project-customizable skill:
 
-- `design` when requirements discovery is still needed;
-- `spec-it-out` when the conversation already contains most of the design.
+- `/skill:design` when requirements discovery is still needed;
+- `/skill:spec-it-out` when the conversation already contains most of the design.
 
 Both workflows create a new bundle at:
 
@@ -91,7 +92,7 @@ is missing or inadequate, it explains the gap and stops. Otherwise, it links
 all planning output and stops for operator plan review. `/plan` never moves the
 bundle, creates an implementation worktree, or authorizes implementation.
 
-There is only one slash-command surface: the native `/plan` command. The former
+There is only one planning command surface: the native `/plan` command. The former
 `.agents/skills/plan` exposure is intentionally absent.
 
 ## Explicit implementation promotion

@@ -34,7 +34,8 @@ full phase status and blockers.
 ## Phase 4 operator workflows
 
 - [Reviewed future specification bundles](docs/future-specification-bundles.md)
-  — author with `/design` or `/spec-it-out`, pass separate specification and
+  — author with `/skill:design` or `/skill:spec-it-out`, pass separate
+  specification and
   plan review gates, then cross the implementation boundary explicitly with
   `/implement-spec`.
 - [Native handoff chain](docs/handoff-chain.md) — update durable records and
