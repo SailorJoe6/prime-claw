@@ -1,8 +1,10 @@
 # Specification — Reviewed future plans and worktree-isolated implementation episodes
 
-> **Status:** approved and active in the implementation episode.
+> **Status:** accepted implementation complete; archived after Slices 1–3.
 > The operator separately reviewed this specification and its execution plan,
 > then authorized the documented one-time bootstrap into this episode branch.
+> On 2026-09-21 the operator accepted Slices 1–3 and deferred the manual
+> end-to-end dogfood/cleanup proof to a separate future episode.
 
 ## 1. Purpose
 

@@ -1,7 +1,7 @@
 # Execution Plan — Reviewed future plans and worktree-isolated implementation episodes
 
-> **Status:** approved and active in the implementation episode.
-> **Current progress:** Slices 1–3 complete after owner-review revision; Slice 4 is next and has not started.
+> **Status:** implementation complete and ready for archive.
+> **Current progress:** Slices 1–3 are complete after owner-review revision. On 2026-09-21 the owner explicitly deferred Slice 4 end-to-end dogfooding to a separate future episode; this episode did not plan, modify, or promote any dogfood bundle and created no additional branch, worktree, or session.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Original planning location:**
 > `.ralph/plans/future/worktree-isolated-specification-episodes/`
@@ -366,6 +366,13 @@ a deliberately half-created episode as its normal successful outcome.
 
 ## 7. Slice 4 — Manual end-to-end dogfood and documentation closure
 
+> **Owner disposition (2026-09-21): DEFERRED OUTSIDE THIS EPISODE.** The owner
+> decided that end-to-end dogfooding will start as a separate episode when
+> ready. The briefly selected `conversation-driven-episode-oversight` bundle
+> remained untouched: it was not planned, modified, or promoted. No additional
+> branch, worktree, or episode was created. Bead `prime-claw-h6w.15` records
+> this disposition without claiming that the acceptance run occurred.
+
 ### Outcome
 
 A real reviewed future bundle traverses the complete workflow and produces a
@@ -409,6 +416,19 @@ own execute/handoff loop.
 Commit and push only evidence-backed fixes or documentation learned during the
 dogfood run. The dogfood episode itself follows its approved plan and normal
 merge decision.
+
+### Owner disposition and episode closure evidence
+
+The dogfood run did not occur in this episode. The owner deferred it to a
+separate future episode and accepted closure around Slices 1–3. The candidate
+future bundle remained byte-for-byte outside this episode's diff, and no nested
+branch, worktree, or session was allocated.
+
+Final archive validation on 2026-09-21 passed:
+
+- `node --experimental-strip-types --test tests/*extension*.test.mjs` — 43/43;
+- `pytest -q tests` — 245 passed, 11 existing deprecation warnings; and
+- `git diff --check` — clean.
 
 ## 8. Validation matrix
 

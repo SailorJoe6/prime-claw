@@ -1,8 +1,36 @@
 # .ralph/plans/archive — completed plans
 
-Each subfolder holds the plan set (SPECIFICATION, REQUIREMENTS, DECISIONS,
-EXECUTION_PLAN) for one finished phase. Files within a subfolder cross-reference
-each other by relative filename, so they are archived together.
+Each subfolder holds the available plan set for one finished phase or episode.
+Files within a subfolder cross-reference each other by relative filename, so
+they are archived together. Older sets contain specification, requirements,
+decisions, and execution-plan files; newer project-customized sets may contain a
+different reviewed artifact collection.
+
+## worktree-isolated-specification-episodes/ — Reviewed future plans and episode promotion ✅ COMPLETE (2026-09-21)
+
+Delivered the accepted deterministic workflow through three owner-reviewed
+slices: future-folder specification authoring, native reviewed
+`/plan <future-folder>`, and explicit `/implement-spec <future-folder>` promotion
+into a durable worktree-rooted episode. The episode transition includes stable
+identity, inherited conversation context, exactly-once execute admission,
+preservation-safe uncertain outcomes, collision checks, and opaque bundle
+promotion. Operator reference and recovery behavior are documented in
+[`docs/future-specification-bundles.md`](../../../docs/future-specification-bundles.md).
+
+- Slice 1: `c0ac19e4984c1332a09af8df5f8a320551796d31`
+  (`prime-claw-h6w.12`)
+- Slice 2: `0eb00e6360ce607c44ae450e599d977d98703e3a`
+  (`prime-claw-h6w.13`)
+- Slice 3: `67fc17408479581f164c16fe12a455a0856158df`, corrected by
+  `523e9201527a099925c27d995d654adcf391f7c0`
+  (`prime-claw-h6w.14`)
+
+The owner explicitly deferred the planned manual end-to-end dogfood to a
+separate future episode. This episode did not plan, modify, or promote the
+`conversation-driven-episode-oversight` bundle and created no nested episode.
+Bead `prime-claw-h6w.15` records that disposition without claiming the dogfood
+acceptance run occurred. Final closure validation passed all 43 Node extension
+tests and all 245 repository pytest cases.
 
 ## phase1-derisk-gate/ — Phase 1: De-Risk Gate ✅ COMPLETE (2026-09-11)
 
