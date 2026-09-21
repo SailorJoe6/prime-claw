@@ -75,13 +75,21 @@ Once the episode exists, the manual oversight loop is:
 episode performs one bounded slice
   → episode stops and reports an exact pushed commit
   → project conversation independently reviews evidence
-  → operator/conversation disposition: approve | revise | pause | abandon
-  → approved next work uses the real native transition
-  → repeat until merge-ready or abandoned
-  → merge or explicit abandonment
-  → stop episode session and remove worktree safely
+  → project conversation revises the slice, admits the next slice, or calls an EXPERT
+  → repeat without a routine operator wait until the complete spec and plan are implemented
+  → fresh final EXPERT reviews the exact merge candidate
+  → project conversation adjudicates findings and drives any required repair slices
+  → one final operator gate: approve merge | request revision | pause | abandon
+  → after approval, merge; otherwise follow the operator's disposition
+  → stop episode session and remove worktree safely after terminal disposition
   → return the project conversation to discussion and feedback
 ```
+
+The project conversation is the active driver throughout implementation. An
+intermediate slice boundary is an evidence and control point, not a routine HITL
+gate. The operator may intervene at any time, but silence does not require the
+project conversation to wait before continuing work already authorized by the
+reviewed specification and plan.
 
 A completed or abandoned episode becomes history. Later feedback stays in the
 project conversation and, if promoted, creates a new episode rather than
@@ -95,14 +103,25 @@ The project conversation:
 
 - preserves the operator's intent and the reviewed specification and plan;
 - records the returned episode identity, branch, worktree, and session;
-- admits only the work the operator has approved;
-- independently checks the episode's exact commit and evidence;
-- decides, with the operator, whether to approve, revise, pause, or abandon;
+- admits only work within the implementation authority granted by
+  `/implement-spec`;
+- drives the episode through every bounded vertical slice needed to implement
+  the complete reviewed specification and plan;
+- independently checks each exact commit and its evidence, returns concrete
+  findings for same-slice revision, and admits the next planned slice without a
+  routine operator wait;
+- pauses for the operator only at a real authority boundary, unresolved product
+  decision, external blocker, explicit operator intervention, or final merge
+  gate;
+- decides when an intermediate fresh EXPERT review would reduce material risk;
+- obtains and adjudicates a fresh final EXPERT review of the complete exact
+  merge candidate;
 - uses real native commands and supported session interfaces for transitions;
 - prevents side discussions from silently changing the active episode;
 - preserves useful review findings in the specification, plan, bead, or code as
   appropriate;
-- oversees merge or explicit abandonment; and
+- presents one final HITL disposition before merge;
+- oversees approved merge or explicit abandonment; and
 - retires the episode resources after their terminal disposition is verified.
 
 ### Episode
@@ -115,15 +134,24 @@ The episode:
 - runs and reports the agreed verification;
 - commits and pushes its work;
 - reports the exact commit, changed files, tests, limitations, and blockers; and
-- stops for owner review rather than advancing itself through the lifecycle.
+- stops at each slice boundary for project-conversation review rather than
+  advancing itself through the lifecycle; the project conversation normally
+  reviews and promptly admits the next bounded slice.
 
 ### Operator
 
 During the manual proof of concept, the operator retains lifecycle authority.
-The operator may correct scope, pause work, request revision, approve a gate,
-abandon the episode, or take over at any time. The project conversation may make
-recommendations and perform explicitly authorized mechanics, but repeated manual
-evidence must precede any proposal for autonomous authority.
+Invoking `/implement-spec` authorizes the project conversation to drive the
+reviewed specification and plan through all of their bounded implementation and
+revision slices. It does not authorize scope expansion, merge, abandonment, or
+destructive cleanup.
+
+The operator may correct scope, pause work, request revision, abandon the
+episode, or take over at any time. Routine intermediate progress does not wait
+for affirmative operator approval. The required HITL gate occurs once the whole
+specification is implemented, final verification and EXPERT review are complete,
+and the exact merge candidate is ready. Repeated manual evidence must precede
+any proposal to automate authority beyond these boundaries.
 
 ## Review and revision
 
@@ -131,14 +159,20 @@ An episode report is evidence, not approval. The project conversation checks the
 actual branch, commit, diff, tests, documentation, and worktree state. Review is
 always tied to an exact commit.
 
-A review disposition is:
+An intermediate review disposition is:
 
-- **approve** — the reviewed result is acceptable and the operator may authorize
-  the next slice or terminal action;
+- **advance** — the reviewed slice is acceptable and the project conversation
+  admits the next bounded slice already authorized by the plan;
 - **revise** — specific findings and acceptance conditions return to the same
-  slice;
-- **pause** — more information or operator input is required; or
-- **abandon** — preserve evidence and enter safe cleanup.
+  slice without consuming a new lifecycle approval;
+- **consult** — a fresh EXPERT reviews a material question or exact commit before
+  the project conversation continues; or
+- **pause** — a real blocker, authority boundary, or explicit operator request
+  requires operator input.
+
+Abandonment is a terminal operator disposition, not the default answer to an
+ordinary failed slice. The project conversation should first drive bounded
+revision or present a concrete blocker and recommendation.
 
 Material findings must outlive transient reviewer conversation. They are written
 into the most natural durable artifact: the specification for product behavior,
@@ -147,9 +181,10 @@ or a linked immutable review report for evidence. This specification does not
 require separate requirements and decisions catalogs.
 
 Revision stays on the same slice until its findings are resolved or the operator
-changes the plan. Repeated attempts without useful progress should be surfaced
-to the operator rather than hidden behind an automatic retry limit or elaborate
-stagnation state machine.
+changes the plan. Once resolved, the project conversation advances through the
+remaining planned slices without waiting for a new operator prompt. Repeated
+attempts without useful progress should be surfaced to the operator rather than
+hidden behind an automatic retry limit or elaborate stagnation state machine.
 
 ## EXPERT review
 
@@ -158,11 +193,19 @@ The project conversation gives it only the relevant project context and review
 packet, preserves and links its report, adjudicates its findings, and then stops
 the reviewer.
 
-During manual dogfood, EXPERT review is especially useful for specifications,
-plans, final merge readiness, security or credential boundaries, destructive
-cleanup, concurrency, public compatibility, unusually broad changes, or disputed
-test evidence. The operator decides when it is required. Failure to obtain a
-required review pauses the workflow; it does not silently downgrade the review.
+During implementation, the project conversation uses judgment to call a fresh
+EXPERT when independent review would materially reduce risk. It is especially
+useful for security or credential boundaries, destructive cleanup, concurrency,
+public compatibility, unusually broad changes, disputed evidence, or repeated
+revision failures. The operator may also require an EXPERT at any time.
+
+A fresh final EXPERT review is mandatory after the complete specification and
+plan are implemented and before the final HITL merge gate. It reviews the exact
+candidate commit. The project conversation adjudicates every material finding
+and drives bounded repair work when needed. A materially changed candidate gets
+a new final EXPERT review; an earlier report is not approval of later code.
+Failure to obtain a required review pauses the workflow and is reported to the
+operator; it does not silently downgrade the review.
 
 The proof of concept should learn how much reviewer lifecycle management is
 actually necessary. It must not pre-build a general reviewer registry,
@@ -221,9 +264,14 @@ next episode transition.
 
 ## Merge, abandonment, and cleanup
 
-The project conversation may recommend merge only after reviewing the exact
-candidate commit, required tests, documentation, repository state, and any
-required independent review. A changed candidate invalidates the earlier review.
+The project conversation may present the final HITL merge gate only after it has
+reviewed the exact candidate commit, required tests, documentation, repository
+state, and the mandatory final EXPERT report. A changed candidate invalidates
+the earlier final review and requires renewed review before the gate.
+
+Merge requires explicit operator approval at that final gate. The project
+conversation must not infer approval from implementation authorization, operator
+silence, successful tests, or a favorable EXPERT report.
 
 Cleanup begins only after verified merge or explicit abandonment. It stops the
 episode session before removing its worktree, preserves useful evidence, avoids
@@ -243,9 +291,12 @@ Each run should record concise evidence about:
   inherited context, and initial execute admission;
 - what the project conversation needed to remember outside Git, plans, beads,
   and the session transcript;
-- whether one-slice stops and reports were clear;
-- which independent checks found real issues;
-- which operator corrections changed the workflow;
+- whether slice stops and reports gave the project conversation enough evidence
+  to revise or advance promptly;
+- whether the project conversation drove all planned slices without unnecessary
+  operator waits;
+- which intermediate or final EXPERT checks found real issues;
+- which operator interventions changed the workflow;
 - when a watch helped and when it became noise;
 - how native transition admission was verified;
 - how revision findings were preserved;
@@ -259,7 +310,8 @@ The record should distinguish observed facts from proposed automation.
 The first manual proof of concept does not build:
 
 - a universal-agent or project-context controller;
-- autonomous lifecycle authority;
+- unbounded autonomous authority outside an operator-approved specification and
+  plan;
 - a versioned role-manifest, lease, or policy-migration system;
 - a transactional conversation or oversight database;
 - an append-only transition journal;
@@ -279,14 +331,18 @@ conversation can:
 
 1. review a future specification and plan before allocating resources;
 2. create one episode through native `/implement-spec`;
-3. observe one bounded slice without intrusive polling;
-4. independently review its exact pushed commit;
-5. request and verify a same-slice revision or approve the next transition;
-6. use a fresh EXPERT review when chosen and preserve its report;
-7. reach verified merge or explicit abandonment;
-8. stop the episode and clean up its worktree safely; and
-9. return to ordinary project discussion with the episode retained only as
-   history.
+3. observe bounded slices without intrusive polling;
+4. independently review each exact pushed commit and drive same-slice revisions
+   or the next planned slice without routine operator waits;
+5. continue until the complete specification and plan are implemented;
+6. call intermediate EXPERT reviews when judgment says they add value;
+7. obtain, preserve, and adjudicate a mandatory final EXPERT review of the exact
+   merge candidate;
+8. present one final HITL gate and merge only after explicit operator approval,
+   or follow an explicit pause, revision, or abandonment disposition;
+9. stop the episode and clean up its worktree safely; and
+10. return to ordinary project discussion with the episode retained only as
+    history.
 
 The run should end with a short lessons-learned record. Automation is a later
 product decision based on repeated evidence, not an acceptance requirement for
