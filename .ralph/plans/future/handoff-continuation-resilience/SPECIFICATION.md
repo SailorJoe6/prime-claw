@@ -34,8 +34,9 @@ For an admitted native `/handoff`:
 1. Preserve the existing command UX and all trailing guidance.
 2. Prepare durable handoff context using the canonical project workflow.
 3. Attempt focused compaction when appropriate.
-4. Continue into canonical `execute` exactly once whether compaction succeeds,
-   is skipped, is refused, is cancelled, or fails.
+4. Continue into canonical `execute` whether compaction succeeds, is skipped,
+   is refused, is cancelled, or fails. One admitted handoff must not knowingly
+   start more than one execute pass.
 5. Stop and ask for human help only when execute continuation itself cannot be
    performed or its delivery state cannot be resolved safely.
 6. Show concise, truthful status that distinguishes compaction outcome from
@@ -49,11 +50,11 @@ remain authoritative.
 
 | Situation | Required outcome |
 |---|---|
-| Compaction completes | Report confirmed compaction and continue once |
-| Compaction is unnecessary or refused | Report no compaction and continue once |
-| Compaction is cancelled or fails | Report the problem safely and continue once |
-| A compaction event arrives late | Do not continue a second time |
-| The same finalization signal repeats | Do not continue a second time |
+| Compaction completes | Report confirmed compaction and start the execute pass |
+| Compaction is unnecessary or refused | Report no compaction and start the execute pass |
+| Compaction is cancelled or fails | Report the problem safely and start the execute pass |
+| A compaction event arrives late | Do not start an additional execute pass |
+| The same finalization signal repeats | Do not start an additional execute pass |
 | Canonical execute cannot be loaded or safely delivered | Report continuation infeasibility and do not claim success |
 
 ## Compatibility and safety
@@ -86,8 +87,10 @@ It does not add:
 
 This specification does not prescribe a Python finalizer, bridge protocol,
 generation state machine, host authorization mechanism, or other infrastructure.
-Planning must first audit the current extension and supported Prime Agent APIs,
-then choose the smallest design that proves the observable behavior above.
+It also does not promise mathematically strict exactly-once delivery across every
+crash or uncertain transport outcome. Planning must first audit the current
+extension and supported Prime Agent APIs, then choose the smallest design that
+prevents known event paths from admitting duplicate execute passes.
 
 If a proposed approach requires substantial new infrastructure, planning must
 show why a simpler extension-local solution cannot satisfy the behavior.
@@ -97,10 +100,10 @@ show why a simpler extension-local solution cannot satisfy the behavior.
 Implementation is acceptable when focused tests and one disposable supported
 runtime demonstrate:
 
-- one continuation after successful compaction;
-- one continuation when compaction is unnecessary or refused;
-- one continuation after cancellation or failure when delivery remains feasible;
-- no duplicate continuation from late or repeated signals;
+- execute starts after successful compaction;
+- execute starts when compaction is unnecessary or refused;
+- execute starts after cancellation or failure when delivery remains feasible;
+- late or repeated known signals do not start an additional execute pass;
 - visible failure when continuation itself is infeasible;
 - truthful status for every tested outcome; and
 - the existing native handoff and full repository regression suites remain green.
