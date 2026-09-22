@@ -7,7 +7,7 @@ Use the current conversation to specify the proposed work. Do not start
 implementation. Ask only the remaining questions that need operator input, one
 at a time. For small details that are already clear, use your best judgment.
 
-## Create the future specification bundle
+## Create the future specification
 
 When the specification is ready to save:
 
@@ -16,17 +16,13 @@ When the specification is ready to save:
 2. Use `.ralph/plans/future/<slug>/` as the bundle folder. It must be a new
    folder. If that path already exists, choose a different specific slug; never
    overwrite or merge into an existing specification bundle.
-3. Create every specification artifact inside that folder. For this project's
-   default workflow, create `SPECIFICATION.md`, `REQUIREMENTS.md`, and
-   `DECISIONS.md` there. `SPECIFICATION.md` is the summary and index;
-   `REQUIREMENTS.md` records the discovered requirements; and `DECISIONS.md`
-   traces each design decision to one or more requirements.
+3. Create `SPECIFICATION.md` inside that folder detailing the specification.
 4. Do not write newly generated specification artifacts directly under
    `.ralph/plans/`.
 
-Document the current system, the required change, and the intended end state.
-Be thorough but avoid repetition. This phase specifies the work; it does not
-create an execution plan.
+Document the current system, the required change, and the intended end state
+in `SPECIFICATION.md`.  Be thorough but avoid repetition. This phase specifies
+the work; it does not create an execution plan.
 
 ## Stop for operator review
 

@@ -10,7 +10,7 @@ SKILLS = ("design", "spec-it-out")
 
 
 @pytest.mark.parametrize("skill_name", SKILLS)
-def test_authoring_skill_creates_new_future_bundle(skill_name: str) -> None:
+def test_authoring_skill_creates_one_new_future_specification(skill_name: str) -> None:
     text = (ROOT / ".ralph" / "skills" / skill_name / "SKILL.md").read_text()
 
     required_fragments = (
@@ -18,11 +18,15 @@ def test_authoring_skill_creates_new_future_bundle(skill_name: str) -> None:
         "filesystem-safe slug",
         "It must be a new",
         "overwrite or merge into an existing specification bundle",
-        "Create every specification artifact inside that folder",
+        "Create `SPECIFICATION.md` inside that folder",
+        "in `SPECIFICATION.md`",
         "Do not write newly generated specification artifacts directly under",
     )
     for fragment in required_fragments:
         assert fragment in text
+
+    assert "Create every specification artifact inside that folder" not in text
+    assert "create `SPECIFICATION.md`, `REQUIREMENTS.md`, and" not in text
 
 
 @pytest.mark.parametrize("skill_name", SKILLS)

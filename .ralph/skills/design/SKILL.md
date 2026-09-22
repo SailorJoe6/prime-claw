@@ -5,12 +5,13 @@ description: Use for Ralph's discovery-first specification phase to create a rev
 
 First, run the `prepare` skill.
 
-Discuss the proposed work with the operator. Do not start implementation. Ask
+The operator wants to propose new work to do in this project. Discuss the
+proposed work with the operator. Do not start implementation. Ask
 requirements questions one at a time so the operator is not overwhelmed. Keep
 the discovery-first behavior: continue until you can describe the work as a
 clear, detailed specification.
 
-## Create the future specification bundle
+## Create the future specification
 
 When the specification is ready to save:
 
@@ -19,17 +20,13 @@ When the specification is ready to save:
 2. Use `.ralph/plans/future/<slug>/` as the bundle folder. It must be a new
    folder. If that path already exists, choose a different specific slug; never
    overwrite or merge into an existing specification bundle.
-3. Create every specification artifact inside that folder. For this project's
-   default workflow, create `SPECIFICATION.md`, `REQUIREMENTS.md`, and
-   `DECISIONS.md` there. `SPECIFICATION.md` is the summary and index;
-   `REQUIREMENTS.md` records the discovered requirements; and `DECISIONS.md`
-   traces each design decision to one or more requirements.
+3. Create `SPECIFICATION.md` inside that folder detailing the specification.
 4. Do not write newly generated specification artifacts directly under
    `.ralph/plans/`.
 
-Document the current system, the required change, and the intended end state.
-Be thorough but avoid repetition. This phase specifies the work; it does not
-create an execution plan.
+Document the current system, the required change, and the intended end state
+in `SPECIFICATION.md`.  Be thorough but avoid repetition. This phase specifies
+the work; it does not create an execution plan.
 
 ## Stop for operator review
 
