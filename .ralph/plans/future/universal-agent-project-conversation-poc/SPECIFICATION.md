@@ -86,18 +86,23 @@ should not make the conversation bulk-load the builder repository.
 
 ## Capability provisioning
 
-Prime-claw's current Ralph plugin is installed project-locally in the builder
-repository. Prime Agent discovers project-local extensions from the new
-session's own CWD hierarchy, not from a sibling repository. A project
-conversation rooted in another repository therefore cannot use the plugin
-unless it is also available globally or installed into that project.
+Prime-claw's Ralph plugin source belongs in the inert builder path
+`src/prime-agent-plugin/`, not under the auto-discovered project path
+`.prime/agent/extensions/`. The builder repository and every managed project
+must avoid project-local copies while the same plugin is installed globally.
+After a Prime Agent update, the operator observed that discovering the extension
+at both project and user scope prevents Prime Agent from starting rather than
+merely registering ambiguous duplicate commands. The temporary
+`.prime/agent/extensions-bak/` rename recovered startup but is not the durable
+source layout.
 
 For this manual POC, the plugin is installed once into Prime Agent's global
-plugin location on this personal lab machine. The global installation is copied
-from the prime-claw builder project and refreshed there whenever the builder's
-plugin changes. The universal-agent emulator verifies that the global copy is
-present and current before launching project conversations. It does not install
-a separate plugin copy into every managed repository.
+plugin location on this personal lab machine. Explicit builder apply/check
+scripts copy and verify the complete allowlisted plugin from
+`src/prime-agent-plugin/`, and the global installation is refreshed after every
+source change before testing. The universal-agent emulator verifies that the
+global copy is present and current before launching project conversations. It
+does not install a separate plugin copy into every managed repository.
 
 This lab-global installation is POC scaffolding, not a requirement that
 prime-claw modify an operator's ordinary host environment. The final sandbox
@@ -105,14 +110,13 @@ uses the same placement model inside its isolated home: sandbox construction or
 convergence copies the plugin from the builder project into Prime Agent's global
 plugin location so every project conversation can discover one shared version.
 
-If a managed project already contains a project-local copy of the plugin, the
-universal agent surfaces the possible duplicate or stale override and reconciles
-it deliberately. It does not silently maintain competing global and local
-copies. The first read-only startup probe in `openclaw-setup` confirmed why: its
-older project-local handoff extension and the global handoff extension both
-loaded as `handoff:1` and `handoff:2`, leaving no unambiguous canonical
-`/handoff`. After the operator removed the local copy and restarted Prime Agent,
-a fresh probe registered exactly one `/handoff`, `/plan`, and `/implement-spec`,
+If the builder or a managed project contains a project-local copy of the plugin,
+the universal agent treats that as a startup blocker and removes or relocates
+the local copy before launch. It does not silently maintain competing global
+and local copies. An earlier `openclaw-setup` probe exposed ambiguous duplicate
+commands; after the Prime Agent update, the same scope collision became a fatal
+startup error. After the local copy is removed and Prime Agent is restarted, a
+fresh probe must register exactly one `/handoff`, `/plan`, and `/implement-spec`,
 all from the global installation.
 
 The workflow Markdown remains project-local in both stages. The
@@ -152,12 +156,17 @@ observed plugin generations can remain resident past reload, so affected work
 must quiesce and the Prime Agent process or session must restart before fresh
 verification.
 
-The first lab-global installation is complete. The five managed files matched
-the builder sources byte for byte, and a disposable offline Prime Agent RPC
-session outside the builder repository registered `/handoff`, `/plan`, and
-`/implement-spec` from the global paths plus all four expected structured tools.
-The manual refresh and verification procedure is recorded in
-[the lab-global plugin runbook](../../../../docs/lab-global-plugin.md).
+The lab-global installation is current. After migrating the builder source to
+its inert path, the explicit check proved all five managed files match
+byte-for-byte. A fresh builder-rooted offline Prime Agent RPC process started
+successfully and registered exactly one `/handoff`, `/plan`, and
+`/implement-spec`, all from the user-global paths. The apply, refresh, restart,
+and verification procedure is recorded in
+[the lab-global plugin runbook](../../../../docs/lab-global-plugin.md). The
+migration's 17 focused plugin/install tests pass. The full builder suite still
+has five unrelated runtime tests that depend on the current host gbrain checkout
+or OpenShell CLI behavior; this migration does not claim those failures are
+resolved.
 
 ## Manual launch and lifecycle work
 

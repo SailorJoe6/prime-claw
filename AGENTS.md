@@ -21,6 +21,24 @@ behind the design (and the origin session id) is in
 phase skills → episode mechanics → conversation/episode boundary →
 upgrade command → orchestrator LAST.
 
+## Prime Agent plugin source and testing
+
+The prime-claw plugin source is inert under `src/prime-agent-plugin/`. Never put
+plugin source or a copy under this repository's `.prime/agent/extensions/`
+path while the user-global plugin is installed; current Prime Agent versions can
+fail startup when the same extension is discovered at both scopes.
+
+After every plugin-source change, refresh and verify the complete user-global
+copy before testing the new generation:
+
+```bash
+scripts/apply-prime-agent-plugin.sh
+scripts/check-prime-agent-plugin.sh
+```
+
+A loaded process can retain the old generation. Restart Prime Agent and use a
+fresh builder-rooted startup probe before claiming the new generation is active.
+
 ## Non-Interactive Shell Commands
 
 **ALWAYS use non-interactive flags** to avoid hanging on prompts:

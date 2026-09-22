@@ -80,9 +80,10 @@ Select the exact reviewed bundle with:
 /plan .ralph/plans/future/<slug>
 ```
 
-The native project extension at
-`.prime/agent/extensions/reviewed-plan.ts` performs only deterministic loader
-work. It rejects missing input, absolute paths, traversal, symlink escapes,
+The inert plugin entry-point source at
+`src/prime-agent-plugin/extensions/reviewed-plan.ts` defines the deterministic
+loader installed at global scope. It rejects missing input, absolute paths,
+traversal, symlink escapes,
 unsafe slugs, and folders that do not exist. Invalid input displays:
 
 ```text

@@ -27,7 +27,7 @@ import {
   forkPrimeSession,
   NodeFilesystemAdapter,
   PrimeSessionPublisher,
-} from "../.prime/agent/extension-support/spec-episode.ts";
+} from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 
 const LOCATION = ".ralph/plans/future/alpha-plan";
 

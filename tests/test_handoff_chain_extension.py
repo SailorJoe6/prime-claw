@@ -8,7 +8,7 @@ import tempfile
 
 
 REPO = Path(__file__).resolve().parents[1]
-EXTENSION = REPO / ".prime" / "agent" / "extensions" / "handoff-chain.ts"
+EXTENSION = REPO / "src" / "prime-agent-plugin" / "extensions" / "handoff-chain.ts"
 NODE_SUITE = REPO / "tests" / "handoff_chain_extension.test.mjs"
 
 

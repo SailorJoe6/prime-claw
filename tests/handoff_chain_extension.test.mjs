@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import handoffChain from "../.prime/agent/extensions/handoff-chain.ts";
+import handoffChain from "../src/prime-agent-plugin/extensions/handoff-chain.ts";
 
 function createHarness(cwd, throwOnSend = 0) {
   const commands = new Map();

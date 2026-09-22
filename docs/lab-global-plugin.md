@@ -3,10 +3,24 @@
 > Scope: manual POC on Joe's personal DGX Spark only. The final sandbox uses the
 > same environment-global placement inside its isolated home.
 
-## What is installed
+## Source and installed layouts
 
-The source of truth remains the prime-claw builder repository. The lab-global
-copy preserves this relative layout under `~/.prime/agent/`:
+The builder source is deliberately inert. It lives outside Prime Agent's
+project extension discovery path:
+
+```text
+src/prime-agent-plugin/
+  extensions/
+    handoff-chain.ts
+    reviewed-plan.ts
+  extension-support/
+    handoff-prompts.ts
+    reviewed-plan-support.ts
+    spec-episode.ts
+```
+
+The installed copy preserves the inner relative layout under
+`~/.prime/agent/`:
 
 ```text
 extensions/
@@ -18,41 +32,54 @@ extension-support/
   spec-episode.ts
 ```
 
-Prime Agent auto-discovers the two extension entry points. Their relative
-imports resolve through the copied `extension-support/` files.
+Prime Agent auto-discovers the installed extension entry points. Their relative
+imports resolve through the installed `extension-support/` files.
 
-Do not copy the plugin into each managed project. Project-specific Ralph policy
-continues to live under each project's `.ralph/` tree.
+Do not keep plugin source or a second copy under this repository's or a managed
+project's `.prime/agent/extensions/` path. After a Prime Agent update, loading
+the same extension at project and user scope was observed to prevent startup.
+The old duplicate-command behavior is therefore not a safe compatibility mode.
+Renaming the directory to `extensions-bak` is only an emergency recovery step;
+the durable source belongs under `src/prime-agent-plugin/`.
 
-## Install or refresh
+Project-specific Ralph policy continues to live under each project's `.ralph/`
+tree. Do not copy the plugin into each managed project.
 
-From the prime-claw builder repository, first inspect any existing destination
-files. On first installation, stop rather than overwrite an unexplained file
-with one of the same names. Once the files are known to be the managed
-prime-claw copy, refresh all five together:
+## Apply or refresh
+
+From the prime-claw builder repository, run:
 
 ```bash
-mkdir -p "$HOME/.prime/agent/extensions"   "$HOME/.prime/agent/extension-support"
-cp -f .prime/agent/extensions/handoff-chain.ts   "$HOME/.prime/agent/extensions/handoff-chain.ts"
-cp -f .prime/agent/extensions/reviewed-plan.ts   "$HOME/.prime/agent/extensions/reviewed-plan.ts"
-cp -f .prime/agent/extension-support/handoff-prompts.ts   "$HOME/.prime/agent/extension-support/handoff-prompts.ts"
-cp -f .prime/agent/extension-support/reviewed-plan-support.ts   "$HOME/.prime/agent/extension-support/reviewed-plan-support.ts"
-cp -f .prime/agent/extension-support/spec-episode.ts   "$HOME/.prime/agent/extension-support/spec-episode.ts"
+scripts/apply-prime-agent-plugin.sh
+scripts/check-prime-agent-plugin.sh
 ```
 
-Refresh after any builder change to these files. Copying the complete managed
-set avoids mixed-version entry points and support code.
+The apply script copies only the five allowlisted prime-claw files. It does not
+remove or overwrite unrelated global extensions. The check script verifies that
+all five installed files match the inert builder source byte-for-byte and that
+this repository has no project-local plugin tree.
 
-Do not rely on `/reload` to replace an already loaded plugin generation. The
-plugin can remain resident after reload. Let affected work quiesce, then restart
-the Prime Agent process or session before treating the refreshed global copy as
-active.
+For an isolated test destination, set `PRIME_AGENT_PLUGIN_ROOT` to the directory
+that should contain `extensions/` and `extension-support/`:
 
-## Verify
+```bash
+PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test   scripts/apply-prime-agent-plugin.sh
+PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test   scripts/check-prime-agent-plugin.sh
+```
 
-Compare each global file with its builder source using `cmp -s` or a SHA-256
-hash. Then start a fresh Prime Agent process with a CWD outside the builder
-repository and inspect its registered commands and tools.
+Refresh the global installation after every source change and before testing a
+new plugin generation. Copying the complete managed set avoids mixed-version
+entry points and support code.
+
+Do not rely on `/reload` to replace an already loaded plugin generation. Let
+affected work quiesce, restart the Prime Agent process or session, and verify
+with a fresh process before treating the refreshed global copy as active.
+
+## Verify runtime discovery
+
+After `scripts/check-prime-agent-plugin.sh` passes, start a fresh Prime Agent
+process from the builder or another repository and inspect its registered
+commands and tools.
 
 Expected native commands:
 
@@ -67,15 +94,23 @@ Expected structured tools:
 - `create_spec_episode`
 - `handoff_spec_episode`
 
-The command source paths must resolve under `~/.prime/agent/extensions/`, not the
-builder checkout. Plugin verification does not prove a project is ready for
-Ralph: the project's `.ralph/` policy and direct skill exposure are separate
-`PROJECT_CONTEXT` preparation concerns.
+Each command source path must resolve under `~/.prime/agent/extensions/`.
+Starting from the builder repository is an important collision check: the
+builder's source path must remain inert and must not register a second scope.
+Plugin verification does not prove a project is ready for Ralph. The project's
+`.ralph/` policy and direct skill exposure are separate `PROJECT_CONTEXT`
+preparation concerns.
 
-## First installation evidence
+## Evidence history
 
-On 2026-09-22, the five global files matched their builder sources byte for byte.
-A disposable offline RPC session outside the builder repository registered all
-three commands from the global extension paths. A session-start probe also
-confirmed all four structured tools and confirmed that no unsupported
-`ralph_implement_spec` tool was exposed.
+On 2026-09-22, the original five-file global installation matched its builder
+sources byte-for-byte. A disposable offline RPC session registered all three
+commands from the global extension paths and all four structured tools.
+
+After the later Prime Agent update exposed fatal cross-scope collision behavior,
+the builder source was moved out of `.prime/agent/` and the explicit apply/check
+workflow above replaced manual copying. Post-migration, the check script proved
+byte parity and a fresh builder-rooted offline RPC process started successfully
+with exactly one `/handoff`, `/plan`, and `/implement-spec`, all sourced from the
+user-global installation. A session-start probe also confirmed all four expected
+structured tools.

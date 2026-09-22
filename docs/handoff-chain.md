@@ -16,7 +16,7 @@ became predictable during manual driving:
 ```
 
 The mechanism is
-[`.prime/agent/extensions/handoff-chain.ts`](../.prime/agent/extensions/handoff-chain.ts).
+[`src/prime-agent-plugin/extensions/handoff-chain.ts`](../src/prime-agent-plugin/extensions/handoff-chain.ts).
 It automates only this narrow seam. It does not choose work, decide that an
 iteration is complete, or implement the episode orchestrator.
 
@@ -179,8 +179,8 @@ runtime path or a reason to patch private queue state.
 |---|---|---|
 | `.ralph/skills/handoff/SKILL.md` | Project/operator | Canonical tracked workflow |
 | `.ralph/skills/execute/SKILL.md` | Project/operator | Canonical tracked workflow |
-| `.prime/agent/extensions/handoff-chain.ts` | prime-claw | Native and current-session conversational admission |
-| `.prime/agent/extension-support/handoff-prompts.ts` | prime-claw | Shared canonical handoff/execute prompt construction |
+| `src/prime-agent-plugin/extensions/handoff-chain.ts` | prime-claw | Inert source for native and current-session conversational admission |
+| `src/prime-agent-plugin/extension-support/handoff-prompts.ts` | prime-claw | Inert source for shared canonical handoff/execute prompt construction |
 | Durable episode identity | Owning project conversation | Exact remote episode authorization and routing validation |
 | Native `followUp` action | Prime Agent session | From any entry surface's admission until delivery, removal, or session end |
 | `<operator-compaction-guidance>` | Operator | One handoff turn and optional compaction boundary |
