@@ -13,10 +13,9 @@ future folder.
 ## Check planning readiness
 
 Inspect the selected folder using this project's current specification
-conventions. For the default Prime Claw workflow, read `SPECIFICATION.md` and
-its indexed `REQUIREMENTS.md` and `DECISIONS.md` files from that folder. Follow
-links only as needed to understand the reviewed work and audit the repository's
-current state against it.
+conventions. For the default Prime Claw workflow, read `SPECIFICATION.md` from
+that folder. Follow links only as needed to understand the reviewed work and
+audit the repository's current state against it.
 
 If the selected folder lacks required specification material, its documents are
 internally inconsistent, or the work is not adequate to plan safely, explain the

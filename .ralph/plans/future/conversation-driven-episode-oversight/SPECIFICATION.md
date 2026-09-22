@@ -2,7 +2,7 @@
 
 > **Status:** incubated future specification; manual proof-of-concept only.
 > **Depends on:** [Reviewed future plans and worktree-isolated implementation episodes](../../archive/worktree-isolated-specification-episodes/SPECIFICATION.md)
-> **Related work:** [Handoff continuation resilience](../handoff-continuation-resilience/SPECIFICATION.md) and [conversational Ralph command routing](../conversational-ralph-command-routing/SPECIFICATION.md)
+> **Related work:** [Universal-agent and project-conversation manual POC](../universal-agent-project-conversation-poc/SPECIFICATION.md), [handoff continuation resilience](../../archive/handoff-continuation-resilience/SPECIFICATION.md), and [conversational Ralph command routing](../../archive/conversational-ralph-command-routing/SPECIFICATION.md)
 
 ## Purpose
 
@@ -281,6 +281,22 @@ when the terminal disposition calls for it.
 Cleanup does not delete unrelated sessions, worktrees, branches, or another
 conversation's resources. Historical transcripts and reports may remain as
 inactive evidence even after live resources are retired.
+
+## Living specification discipline
+
+This incubating specification is durable working memory for conversations and
+POC runs that may span many context compactions. The project conversation and
+the universal-agent emulator must update it promptly when durable operator
+intent, corrections, oversight findings, or workflow learnings emerge. They
+must not wait for an end-of-run documentation pass or rely on transcripts,
+model memory, or later compaction summaries to recover unrecorded design state.
+
+Keep the specification current rather than append-only. Integrate each learning
+into the relevant behavior or boundary, replace stale claims, and distinguish
+observed facts from ideas that still need testing. When an implementation
+episode already exists, updating this incubating document does not silently
+change that episode's approved scope; scope changes still follow the explicit
+review and authority rules above.
 
 ## Manual proof-of-concept observations
 

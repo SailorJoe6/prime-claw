@@ -17,9 +17,9 @@ capability:
    contains the design. The workflow writes a named
    `.ralph/plans/future/<slug>/` bundle and
    stops. Confirm that no branch, worktree, or episode was created.
-2. Review every linked specification artifact in that exact folder. Request
-   revisions in place until satisfied. Explicit specification approval permits
-   **planning only**; it does not authorize implementation.
+2. Review `SPECIFICATION.md` in that exact folder. Request revisions in place
+   until satisfied. Explicit specification approval permits **planning only**;
+   it does not authorize implementation.
 3. Invoke `/plan .ralph/plans/future/<slug>`. Review the plan written back into
    the same folder. Confirm again that planning created no branch, worktree, or
    episode.
@@ -53,15 +53,20 @@ Both workflows create a new bundle at:
 ```
 
 The skills choose a safe, descriptive slug and refuse to overwrite an existing
-bundle. All specification artifacts belong inside that folder. The default
-Prime Claw skills create `SPECIFICATION.md`, `REQUIREMENTS.md`, and
-`DECISIONS.md`, but those filenames are project policy rather than native
-command requirements.
+bundle. The default Prime Claw skills create one `SPECIFICATION.md` inside that
+folder. Artifact conventions remain project policy rather than native command
+requirements.
 
-After writing the bundle, the agent reports its exact relative path, links every
-artifact, and stops for operator specification review. Requested changes stay
-in the same bundle. Authoring does not create an execution plan, branch,
+After writing the specification, the agent reports its exact relative path,
+links it, and stops for operator specification review. Requested changes stay
+in the same folder. Authoring does not create an execution plan, branch,
 worktree, or episode.
+
+A specification remains a living source of truth for as long as it is
+incubating under `future/`. Durable clarifications and POC learnings are folded
+into it when they emerge, before conversation history or compaction can lose
+them. Update the relevant text and remove stale claims rather than using the
+specification as an append-only activity log.
 
 ## Reviewed planning entry paths
 
