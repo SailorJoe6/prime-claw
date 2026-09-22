@@ -1,6 +1,6 @@
 # Execution Plan — Conversational routing for Ralph native commands
 
-> **Status:** implementation in progress; Slice 3 native-only fallback candidate ready for project-conversation review (`prime-claw-h6w.20`).
+> **Status:** all slices accepted; awaiting final integration review and the explicit HITL merge gate.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Selected future folder:** `.ralph/plans/future/conversational-ralph-command-routing/`
 > **Parent workstream:** `prime-claw-h6w` (Phase 4 episode loop)
@@ -204,8 +204,10 @@ interpretation in TypeScript, or episode creation.
 
 ## Slice 3 — Conversational implementation with host confirmation
 
-**Implementation status:** The required installed Prime Agent 0.9.5 RPC
-characterization proved confirmation → `steer` → matching extension `input`, but
+**Implementation status:** Accepted by the project conversation at
+`272372c9e848c21d48a5968144d2495ea59c4a2e`. The required installed Prime Agent
+0.9.5 RPC characterization proved confirmation → `steer` → matching extension
+`input`, but
 also proved that `agent_end` fires after that input and before the readiness
 agent turn begins. Because the approved design must clear pending and active
 authority on `agent_end`, the bounded `pending → active → consumed` gate cannot
