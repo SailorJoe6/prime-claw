@@ -167,11 +167,12 @@ top-level project conversation. Trusted host code derives all other values:
 
 The capability rejects branch, worktree, or session-name collisions before it
 creates resources. A matching repeated request validates durable session ID,
-session file, branch, worktree, CWD, and name. It returns an active match or
-reactivates an inactive saved session without sending execute again, then
-refreshes the routing ID. A stored `pending` or `uncertain` admission is also
-returned without another delivery attempt. A mismatch fails clearly and does
-not delete the pre-existing resource.
+session file, branch, worktree, CWD, and name and may reactivate the exact saved
+session to refresh its routing ID. A delivered identity is returned without
+another admission. Any nonterminal version-2 bootstrap stage or legacy
+version-1 `pending`/`uncertain` state then fails closed with an actionable
+incomplete-bootstrap error and sends no message. A mismatch fails clearly and
+does not delete the pre-existing resource.
 
 On first creation, the capability creates the branch and worktree, verifies the
 new checkout is clean, overlays the validated canonical folder so approved
@@ -189,50 +190,62 @@ The fork includes the successful `create_spec_episode` tool result so it does
 not begin with a dangling tool call. Prime Agent 0.9.5 has no public extension
 API that publishes a fork as a separate sibling without replacing the owner,
 so the narrowly scoped host adapter uses the daemon supervisor socket injected
-into daemon workers. Before task delivery it atomically stores the complete
-minimal identity with `executeAdmission: pending`. Confirmed admission changes
-that field to `delivered`; a lost response changes it to `uncertain` when
-possible. `pending` and `uncertain` both prevent replay from sending execute
-again, including the crash window after daemon admission but before the final
-identity update.
+into daemon workers. Before task delivery it preflights both canonical workflows and atomically
+stores a version-2 identity with `bootstrapAdmission: handoff-pending`. New
+episodes then use the same narrow two-message transport as later owner-driven
+transitions: canonical handoff is sent as fail-if-busy `steer`, and canonical
+execute is queued exactly once as the sole `followUp`. This focuses the inherited
+planning conversation through the handoff compaction boundary before slice 1.
+
+The bootstrap admission journal records transport stages, not workflow
+completion:
+
+| `bootstrapAdmission` | Meaning |
+|---|---|
+| `handoff-pending` | Durable guard exists; handoff may or may not have crossed a crash boundary |
+| `handoff-uncertain` | The first daemon mutation returned an ambiguous outcome |
+| `execute-pending` | Handoff was acknowledged; execute has not yet been durably confirmed |
+| `execute-rejected` | Handoff was admitted but execute was definitely rejected |
+| `execute-uncertain` | Handoff was admitted and execute may have been admitted |
+| `delivered` | Both daemon admissions were acknowledged |
+
+The host awaits a durable `execute-pending` checkpoint after handoff
+acknowledgement and before issuing execute. A first definite rejection is the
+only delivery failure that permits invocation-owned cleanup. Once handoff may
+have been admitted, every rejection, timeout, disconnect, or checkpoint failure
+preserves the session, worktree, branch, identity, and session file. A repeated
+`/implement-spec` validates and may reopen the exact episode but never replays a
+nonterminal bootstrap stage.
+
+Version-1 identities retain their historical `executeAdmission` field. They are
+truthful legacy records for episodes created through direct execute: `delivered`
+remains eligible for later owner handoff, while `pending` and `uncertain` remain
+inspection boundaries. They are not rewritten to claim an initial handoff that
+never occurred.
 
 Local identity state lives under ignored
 `.prime/agent/state/spec-episodes/` and contains only owner, episode, branch,
-worktree, session, source, and admission identifiers. A definite failure cleans
-up only resources created by that invocation. Cleanup first confirms the worker
-stop and then requires both worktree removal and branch deletion to succeed
-before deleting identity/session artifacts. Any timeout, lost mutation
-response, unconfirmed worker stop, or partial Git cleanup preserves remaining
-artifacts and reports an actionable uncertain state instead of risking deletion
-under a live worker.
+worktree, session, source, and admission identifiers. Cleanup first confirms the
+worker stop and then requires both worktree removal and branch deletion before
+deleting invocation-created artifacts.
 
-### Operator response to unresolved execute admission
+### Operator response to unresolved bootstrap admission
 
-`pending` and `uncertain` are preservation states, not failure confirmations:
+Every nonterminal version-2 stage and legacy version-1 `pending` or `uncertain`
+stage is an at-most-once preservation boundary:
 
-- `pending` means the durable identity was written before delivery, but the
-  final `delivered` mark was not durably recorded. A crash may have happened
-  before or after the daemon accepted execute.
-- `uncertain` means the delivery operation reported an ambiguous outcome, such
-  as a lost mutation response. Execute may already be queued or running.
+1. Do not send handoff or execute directly, edit the identity record, or remove
+   episode resources merely because no confirmation arrived.
+2. Inspect the named session messages, daemon state, Git branch, and worktree to
+   determine which mutation crossed the boundary.
+3. Treat repeated creation as validation/reopen only; it reports incomplete
+   bootstrap and sends no message.
+4. Continue, revise, or abandon only through explicit owner disposition after
+   the evidence is reconciled.
 
-For either state:
-
-1. Do not send execute directly, do not delete or edit the identity record, and
-   do not kill the session or remove its branch/worktree merely because no
-   confirmation arrived.
-2. Preserve the returned identities and inspect the named session, its messages,
-   daemon state, Git branch, and worktree before making an owner decision.
-3. Treat a repeated `/implement-spec` as an identity lookup only. It returns the
-   matching unresolved identity and intentionally does not redeliver execute.
-4. Escalate to the operator with the observed evidence. Continue, revise, or
-   abandon only through the project's explicit owner policy. Before any manual
-   cleanup, independently confirm that the worker is terminated and that the
-   remaining resources are safe to remove.
-
-There is intentionally no automatic recovery or retry protocol in this
-capability. Never manufacture `delivered` state or infer non-admission from an
-idle, missing-response, or transport status alone.
+There is intentionally no automatic recovery or retry protocol. Never
+manufacture `delivered` state or infer non-admission from idle state or a missing
+response.
 
 Successful task admission is the boundary where the project conversation begins
 its separately configured oversight workflow. `/implement-spec` does not embed
@@ -264,10 +277,11 @@ stage is an inspection boundary, not permission to retry. The operation never
 kills the session, removes resources, or adds nonces, leases, durable approvals,
 or generalized remote routing state.
 
-Initial episode creation intentionally remains direct `deliverExecute()`. There
-is no completed slice to hand off at bootstrap, and safely making creation a
-two-mutation transition would require additional durable partial-state and
-cleanup rules beyond this bounded owner-continuation capability.
+Initial episode creation uses this same handoff-first transport. Its version-2
+bootstrap journal supplies the additional durable partial-state and cleanup
+rules required around the two daemon mutations. The first execute slice therefore
+starts only after the canonical handoff turn requests focused compaction of the
+inherited planning context.
 
 ## Automated and integration validation
 
@@ -282,9 +296,8 @@ pytest -q tests/test_reviewed_plan_extension.py
 The Node suites cover native and conversational planning registration,
 validation, canonical Markdown loading, follow-up admission, failure isolation,
 opaque temporary-Git promotion, lifecycle-directory preservation, promotion
-commits, inherited context, protocol-7 daemon envelopes, durable pre-delivery
-admission, crash-window and
-uncertain-delivery replay suppression, allowed-empty promotion commits, partial
+commits, inherited context, protocol-7 daemon envelopes, durable handoff-first bootstrap admission, version-1 compatibility,
+per-mutation crash-window and uncertain-delivery replay suppression, allowed-empty promotion commits, partial
 cleanup observability, active and inactive replay, collision safety, confirmed
 invocation-owned cleanup, exact-owner remote handoff, quiescent-state checks,
 ordered steer/follow-up delivery, and visible partial or uncertain failures. The Python bridge reruns both suites and uses

@@ -40,12 +40,31 @@ export class EpisodeStateUncertainError extends Error {
   }
 }
 
+export class EpisodeBootstrapIncompleteError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "EpisodeBootstrapIncompleteError";
+  }
+}
+
+export class HandoffFollowUpRejectedError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "HandoffFollowUpRejectedError";
+  }
+}
+
 function isUncertainMutation(error: unknown): boolean {
   return error instanceof DaemonMutationUncertainError || error instanceof EpisodeStateUncertainError;
 }
 
-export interface EpisodeIdentity {
-  version: 1;
+function requiresEpisodePreservation(error: unknown): boolean {
+  return isUncertainMutation(error)
+    || error instanceof EpisodeBootstrapIncompleteError
+    || error instanceof HandoffFollowUpRejectedError;
+}
+
+interface EpisodeIdentityBase {
   slug: string;
   sourceLocation: string;
   ownerSessionId: string;
@@ -55,12 +74,26 @@ export interface EpisodeIdentity {
   branch: string;
   worktree: string;
   sessionName: string;
+}
+
+export interface EpisodeIdentityV1 extends EpisodeIdentityBase {
+  version: 1;
   executeAdmission: "pending" | "uncertain" | "delivered";
 }
 
-export interface EpisodeResult extends EpisodeIdentity {
-  reused: boolean;
+export interface EpisodeIdentityV2 extends EpisodeIdentityBase {
+  version: 2;
+  bootstrapAdmission:
+    | "handoff-pending"
+    | "handoff-uncertain"
+    | "execute-pending"
+    | "execute-rejected"
+    | "execute-uncertain"
+    | "delivered";
 }
+
+export type EpisodeIdentity = EpisodeIdentityV1 | EpisodeIdentityV2;
+export type EpisodeResult = EpisodeIdentity & { reused: boolean };
 
 export interface SessionSummary {
   activeSessionId?: string;
@@ -103,9 +136,15 @@ export interface PublishedSession {
   sessionFile: string;
 }
 
-export function episodeResultText(result: Pick<EpisodeResult, "episodeId" | "branch" | "worktree" | "sessionName" | "reused"> & {
+export function episodeResultText(result: {
+  episodeId: string;
+  branch: string;
+  worktree: string;
+  sessionName: string;
+  reused: boolean;
   episodeActiveSessionId?: string;
-  executeAdmission?: EpisodeIdentity["executeAdmission"];
+  executeAdmission?: EpisodeIdentityV1["executeAdmission"];
+  bootstrapAdmission?: EpisodeIdentityV2["bootstrapAdmission"];
 }): string {
   return `Episode ${result.reused ? "reused" : "created"}: ${JSON.stringify({
     episodeId: result.episodeId,
@@ -113,7 +152,8 @@ export function episodeResultText(result: Pick<EpisodeResult, "episodeId" | "bra
     branch: result.branch,
     worktree: result.worktree,
     sessionName: result.sessionName,
-    executeAdmission: result.executeAdmission,
+    ...(result.executeAdmission ? { executeAdmission: result.executeAdmission } : {}),
+    ...(result.bootstrapAdmission ? { bootstrapAdmission: result.bootstrapAdmission } : {}),
     reused: result.reused,
   })}`;
 }
@@ -155,7 +195,12 @@ export interface SessionPublisher {
     model?: { provider: string; id: string };
   }): Promise<PublishedSession>;
   deliverExecute(activeSessionId: string, prompt: string): Promise<void>;
-  deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string): Promise<void>;
+  deliverHandoff(
+    activeSessionId: string,
+    handoffPrompt: string,
+    executePrompt: string,
+    onHandoffAdmitted?: () => void | Promise<void>,
+  ): Promise<void>;
   kill(activeSessionId: string): Promise<boolean>;
   close(): void;
 }
@@ -298,12 +343,30 @@ export class NodeFilesystemAdapter implements FilesystemAdapter {
 function isEpisodeIdentity(value: unknown): value is EpisodeIdentity {
   if (!value || typeof value !== "object") return false;
   const item = value as Record<string, unknown>;
-  return item.version === 1
-    && ["pending", "uncertain", "delivered"].includes(String(item.executeAdmission))
-    && [
-      "slug", "sourceLocation", "ownerSessionId", "episodeId",
-      "episodeActiveSessionId", "episodeSessionFile", "branch", "worktree", "sessionName",
-    ].every((key) => typeof item[key] === "string" && item[key] !== "");
+  const common = [
+    "slug", "sourceLocation", "ownerSessionId", "episodeId",
+    "episodeActiveSessionId", "episodeSessionFile", "branch", "worktree", "sessionName",
+  ].every((key) => typeof item[key] === "string" && item[key] !== "");
+  if (!common) return false;
+  if (item.version === 1) {
+    return ["pending", "uncertain", "delivered"].includes(String(item.executeAdmission));
+  }
+  return item.version === 2 && [
+    "handoff-pending", "handoff-uncertain", "execute-pending",
+    "execute-rejected", "execute-uncertain", "delivered",
+  ].includes(String(item.bootstrapAdmission));
+}
+
+function bootstrapReady(identity: EpisodeIdentity): boolean {
+  return identity.version === 1
+    ? identity.executeAdmission === "delivered"
+    : identity.bootstrapAdmission === "delivered";
+}
+
+function admissionDescription(identity: EpisodeIdentity): string {
+  return identity.version === 1
+    ? `legacy execute admission ${identity.executeAdmission}`
+    : `bootstrap admission ${identity.bootstrapAdmission}`;
 }
 
 interface DaemonResponse {
@@ -511,7 +574,7 @@ export function forkPrimeSession(
     branch: options.branch,
     worktree: options.worktree,
     sessionName: options.sessionName,
-    executeAdmission: "pending",
+    bootstrapAdmission: "handoff-pending",
     reused: false,
   });
   try {
@@ -626,7 +689,12 @@ export class PrimeSessionPublisher implements SessionPublisher {
     }
   }
 
-  async deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string): Promise<void> {
+  async deliverHandoff(
+    activeSessionId: string,
+    handoffPrompt: string,
+    executePrompt: string,
+    onHandoffAdmitted?: () => void | Promise<void>,
+  ): Promise<void> {
     try {
       requireSuccess(await this.client.request({
         type: "prompt",
@@ -647,6 +715,8 @@ export class PrimeSessionPublisher implements SessionPublisher {
       throw error;
     }
 
+    await onHandoffAdmitted?.();
+
     try {
       requireSuccess(await this.client.request({
         type: "prompt",
@@ -664,7 +734,7 @@ export class PrimeSessionPublisher implements SessionPublisher {
           { cause: error },
         );
       }
-      throw new Error(
+      throw new HandoffFollowUpRejectedError(
         `Handoff was admitted, but canonical execute follow-up could not be queued: ${error instanceof Error ? error.message : String(error)}`,
         { cause: error },
       );
@@ -826,8 +896,8 @@ export async function handoffSpecEpisode(
     publisher ??= new PrimeSessionPublisher();
     const sessions = await publisher.list();
     const durableSession = validateExistingIdentity(identity, expected, sessions, git, filesystem, repo);
-    if (identity.executeAdmission !== "delivered") {
-      throw new Error(`Episode initial execute admission is ${identity.executeAdmission}; inspect it before handoff`);
+    if (!bootstrapReady(identity)) {
+      throw new Error(`Episode ${admissionDescription(identity)} is incomplete; inspect it before handoff`);
     }
     if (sessionIsBusy(durableSession)) {
       throw new Error("Owned episode is busy; handoff requires an idle episode with an empty queue");
@@ -946,6 +1016,11 @@ export async function createSpecEpisode(
           );
         }
       }
+      if (!bootstrapReady(refreshed)) {
+        throw new EpisodeBootstrapIncompleteError(
+          `Existing episode has incomplete ${admissionDescription(refreshed)}; inspect it before continuing. No bootstrap message was replayed.`,
+        );
+      }
       return { ...refreshed, reused: true };
     }
 
@@ -963,6 +1038,8 @@ export async function createSpecEpisode(
     filesystem.promoteBundle(worktree, selected.slug, selected.folder);
     git.commitPromotion(worktree, selected.slug);
 
+    const handoffPrompt = canonicalSkillPrompt(worktree, "handoff");
+    if (!handoffPrompt) throw new Error("Episode worktree is missing .ralph/skills/handoff/SKILL.md");
     const executePrompt = wrapCanonicalSkill(worktree, "execute", "operator-episode-source", selected.location);
     if (!executePrompt) throw new Error("Episode worktree is missing .ralph/skills/execute/SKILL.md");
 
@@ -974,44 +1051,73 @@ export async function createSpecEpisode(
       toolCallId,
       model,
     });
-    const pendingIdentity: EpisodeIdentity = {
-      version: 1,
+    const pendingIdentity: EpisodeIdentityV2 = {
+      version: 2,
       ...expected,
       episodeId: published.sessionId,
       episodeActiveSessionId: published.activeSessionId,
       episodeSessionFile: published.sessionFile,
-      executeAdmission: "pending",
+      bootstrapAdmission: "handoff-pending",
     };
     filesystem.writeIdentity(recordPath, pendingIdentity);
     identityPersisted = true;
+    let checkpointedIdentity: EpisodeIdentityV2 | undefined;
 
     try {
-      await publisher.deliverExecute(published.activeSessionId, executePrompt);
+      await publisher.deliverHandoff(
+        published.activeSessionId,
+        handoffPrompt,
+        executePrompt,
+        async () => {
+          const next: EpisodeIdentityV2 = { ...pendingIdentity, bootstrapAdmission: "execute-pending" };
+          try {
+            filesystem.writeIdentity(recordPath, next);
+          } catch (error) {
+            throw new EpisodeBootstrapIncompleteError(
+              "Initial handoff was admitted but its execute checkpoint could not be persisted; execute was not sent and episode resources were preserved.",
+              { cause: error },
+            );
+          }
+          checkpointedIdentity = next;
+        },
+      );
     } catch (error) {
-      if (isUncertainMutation(error)) {
+      const fallback = checkpointedIdentity ?? pendingIdentity;
+      let admission: EpisodeIdentityV2["bootstrapAdmission"] | undefined;
+      if (checkpointedIdentity && error instanceof HandoffFollowUpRejectedError) {
+        admission = "execute-rejected";
+      } else if (checkpointedIdentity && isUncertainMutation(error)) {
+        admission = "execute-uncertain";
+      } else if (!checkpointedIdentity && isUncertainMutation(error)) {
+        admission = "handoff-uncertain";
+      }
+      if (admission) {
         try {
-          filesystem.writeIdentity(recordPath, { ...pendingIdentity, executeAdmission: "uncertain" });
-        } catch { /* the durable pending record still prevents duplicate admission */ }
+          filesystem.writeIdentity(recordPath, { ...fallback, bootstrapAdmission: admission });
+        } catch { /* the earlier durable stage remains the at-most-once replay guard */ }
       }
       throw error;
     }
 
-    const deliveredIdentity: EpisodeIdentity = { ...pendingIdentity, executeAdmission: "delivered" };
+    const deliveredIdentity: EpisodeIdentityV2 = {
+      ...(checkpointedIdentity ?? pendingIdentity),
+      bootstrapAdmission: "delivered",
+    };
     try {
       filesystem.writeIdentity(recordPath, deliveredIdentity);
     } catch (error) {
-      throw new EpisodeStateUncertainError(
-        "Execute was admitted but the delivered identity mark could not be persisted. Preserved episode resources; replay will not redeliver.",
+      throw new EpisodeBootstrapIncompleteError(
+        "Initial handoff and execute follow-up were admitted but the delivered bootstrap mark could not be persisted. Preserved episode resources; replay will not redeliver.",
         { cause: error },
       );
     }
     return { ...deliveredIdentity, reused: false };
   } catch (error) {
     let failure: unknown = error;
-    let cleanupConfirmed = !isUncertainMutation(error);
+    let cleanupConfirmed = !requiresEpisodePreservation(error);
 
-    // Never stop an episode when task admission itself is uncertain. The
-    // pre-delivery identity is the exactly-once guard for a later replay.
+    // Never stop an episode after handoff may have been admitted. Every durable
+    // bootstrap stage is an at-most-once guard; replay requires inspection.
     if (published && cleanupConfirmed) {
       try {
         cleanupConfirmed = await publisher!.kill(published.activeSessionId);
@@ -1054,7 +1160,7 @@ export async function createSpecEpisode(
       }
     }
 
-    if (!cleanupConfirmed && !(failure instanceof EpisodeStateUncertainError)) {
+    if (!cleanupConfirmed && !requiresEpisodePreservation(failure)) {
       failure = new EpisodeStateUncertainError(
         "Episode mutation outcome is uncertain. Preserved branch, worktree, identity, and session artifacts for operator recovery.",
         { cause: failure },

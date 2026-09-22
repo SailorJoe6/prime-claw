@@ -22,6 +22,7 @@ import {
   handoffSpecEpisode,
   DaemonMutationUncertainError,
   EpisodeStateUncertainError,
+  HandoffFollowUpRejectedError,
   episodeResultText,
   forkPrimeSession,
   NodeFilesystemAdapter,
@@ -107,8 +108,10 @@ class FakePublisher {
     this.deliveries.push({ activeSessionId, prompt });
     if (this.failDelivery) throw new Error("delivery rejected");
   }
-  async deliverHandoff(activeSessionId, handoffPrompt, executePrompt) {
+  async deliverHandoff(activeSessionId, handoffPrompt, executePrompt, onHandoffAdmitted) {
     this.handoffs.push({ activeSessionId, handoffPrompt, executePrompt });
+    if (this.failDelivery) throw new Error("delivery rejected");
+    await onHandoffAdmitted?.();
   }
   async kill(activeSessionId) {
     this.kills.push(activeSessionId);
@@ -156,7 +159,7 @@ function idleState(created, activeSessionId = created.episodeActiveSessionId) {
   };
 }
 
-test("promotes an opaque bundle, commits it, publishes context, and delivers execute once", async (t) => {
+test("promotes an opaque bundle, commits it, publishes context, and bootstraps handoff before execute", async (t) => {
   const { repo, worktree } = repositoryFixture(t);
   write(join(repo, LOCATION, "approved-after-head.md"), "uncommitted approved content\n");
   const publisher = new FakePublisher();
@@ -199,20 +202,24 @@ test("promotes an opaque bundle, commits it, publishes context, and delivers exe
     toolCallId: "tool-call-1",
     model: { provider: "test-provider", id: "test-model" },
   });
-  assert.equal(publisher.deliveries.length, 1);
-  assert.deepEqual(publisher.handoffs, []);
-  assert.equal(publisher.deliveries[0].activeSessionId, "active-episode-1");
-  assert.equal(publisher.deliveries[0].prompt.split("canonical execute body").length - 1, 1);
+  assert.deepEqual(publisher.deliveries, []);
+  assert.equal(publisher.handoffs.length, 1);
+  assert.equal(publisher.handoffs[0].activeSessionId, "active-episode-1");
+  assert.equal(publisher.handoffs[0].handoffPrompt.split("canonical handoff body").length - 1, 1);
+  assert.match(publisher.handoffs[0].handoffPrompt, /compact\.run\(focus_hint\)/);
+  assert.equal(publisher.handoffs[0].executePrompt.split("canonical execute body").length - 1, 1);
+  assert.equal(publisher.handoffs[0].executePrompt.split(LOCATION).length - 1, 1);
   assert.equal(publisher.closed, 1);
 
   const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
   const identity = JSON.parse(readFileSync(identityPath, "utf8"));
   assert.deepEqual(Object.keys(identity).sort(), [
-    "branch", "episodeActiveSessionId", "episodeId", "episodeSessionFile",
-    "executeAdmission", "ownerSessionId", "sessionName", "slug", "sourceLocation",
+    "bootstrapAdmission", "branch", "episodeActiveSessionId", "episodeId",
+    "episodeSessionFile", "ownerSessionId", "sessionName", "slug", "sourceLocation",
     "version", "worktree",
   ]);
-  assert.equal(identity.executeAdmission, "delivered");
+  assert.equal(identity.version, 2);
+  assert.equal(identity.bootstrapAdmission, "delivered");
 });
 
 
@@ -229,13 +236,36 @@ test("no-diff promotion starts clean and creates an allow-empty marker commit", 
 
   const result = await createSpecEpisode(LOCATION, "tool-call-empty", context(repo), dependencies(publisher));
 
-  assert.equal(result.executeAdmission, "delivered");
+  assert.equal(result.bootstrapAdmission, "delivered");
   assert.equal(git(worktree, "diff", "--exit-code", "HEAD^", "HEAD"), "");
   assert.match(git(worktree, "log", "-1", "--pretty=%s"), /promote alpha-plan specification/);
   assert.equal(existsSync(join(repo, LOCATION, "manifest.yaml")), true);
   assert.equal(git(worktree, "status", "--porcelain"), "");
 });
 
+
+test("bootstrap journal advances durably between the two admissions", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const baseFilesystem = new NodeFilesystemAdapter();
+  const stages = [];
+  const filesystem = {
+    exists: (path) => baseFilesystem.exists(path),
+    promoteBundle: (...args) => baseFilesystem.promoteBundle(...args),
+    readIdentity: (path) => baseFilesystem.readIdentity(path),
+    removeFile: (path) => baseFilesystem.removeFile(path),
+    writeIdentity(path, identity) {
+      stages.push(identity.bootstrapAdmission ?? `v${identity.version}`);
+      baseFilesystem.writeIdentity(path, identity);
+    },
+  };
+
+  const result = await createSpecEpisode(LOCATION, "tool-call-journal", context(repo), {
+    git: new CliGitAdapter(), filesystem, publisher: new FakePublisher(),
+  });
+
+  assert.equal(result.bootstrapAdmission, "delivered");
+  assert.deepEqual(stages, ["handoff-pending", "execute-pending", "delivered"]);
+});
 
 test("matching repeated request returns identity without another fork or execute delivery", async (t) => {
   const { repo, worktree } = repositoryFixture(t);
@@ -285,6 +315,60 @@ test("matching inactive durable session is reopened without another execute deli
   assert.equal(identity.episodeActiveSessionId, "active-episode-reopened");
 });
 
+
+test("version-1 identities remain truthful legacy direct-execute records", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
+  const legacy = {
+    version: 1,
+    slug: created.slug,
+    sourceLocation: created.sourceLocation,
+    ownerSessionId: created.ownerSessionId,
+    episodeId: created.episodeId,
+    episodeActiveSessionId: created.episodeActiveSessionId,
+    episodeSessionFile: created.episodeSessionFile,
+    branch: created.branch,
+    worktree: created.worktree,
+    sessionName: created.sessionName,
+    executeAdmission: "delivered",
+  };
+  writeFileSync(identityPath, `${JSON.stringify(legacy, null, 2)}\n`);
+  const session = {
+    activeSessionId: legacy.episodeActiveSessionId,
+    sessionId: legacy.episodeId,
+    sessionFile: legacy.episodeSessionFile,
+    sessionName: legacy.sessionName,
+    cwd: legacy.worktree,
+    isSessionActive: true,
+  };
+  const replay = new FakePublisher({ sessions: [session] });
+
+  const reused = await createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay));
+  assert.equal(reused.version, 1);
+  assert.equal(reused.executeAdmission, "delivered");
+  assert.deepEqual(replay.handoffs, []);
+
+  const handoffPublisher = new FakePublisher({
+    sessions: [session],
+    state: idleState(created),
+  });
+  const handoff = await handoffSpecEpisode(LOCATION, "", context(repo), dependencies(handoffPublisher));
+  assert.equal(handoff.admitted, true);
+  assert.equal(handoffPublisher.handoffs.length, 1);
+
+  writeFileSync(identityPath, `${JSON.stringify({ ...legacy, executeAdmission: "uncertain" }, null, 2)}\n`);
+  const unresolved = new FakePublisher({ sessions: [session], state: idleState(created) });
+  await assert.rejects(
+    createSpecEpisode(LOCATION, "tool-call-3", context(repo), dependencies(unresolved)),
+    /legacy execute admission uncertain/,
+  );
+  await assert.rejects(
+    handoffSpecEpisode(LOCATION, "", context(repo), dependencies(unresolved)),
+    /legacy execute admission uncertain is incomplete/,
+  );
+  assert.deepEqual(unresolved.handoffs, []);
+});
 
 test("owner drives an exact idle episode through handoff steer and one execute follow-up", async (t) => {
   const { repo } = repositoryFixture(t);
@@ -414,10 +498,10 @@ test("owner handoff rejects non-root callers and unresolved initial admission", 
 
   const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
   const identity = JSON.parse(readFileSync(identityPath, "utf8"));
-  writeFileSync(identityPath, `${JSON.stringify({ ...identity, executeAdmission: "uncertain" }, null, 2)}\n`);
+  writeFileSync(identityPath, `${JSON.stringify({ ...identity, bootstrapAdmission: "execute-uncertain" }, null, 2)}\n`);
   await assert.rejects(
     handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
-    /initial execute admission is uncertain/,
+    /bootstrap admission execute-uncertain is incomplete/,
   );
   assert.deepEqual(publisher.stateCalls, []);
   assert.deepEqual(publisher.handoffs, []);
@@ -447,6 +531,24 @@ test("owner handoff preflights both canonical workflows before reopening", async
 
   assert.deepEqual(publisher.reopens, []);
   assert.deepEqual(publisher.handoffs, []);
+});
+
+test("initial bootstrap preflights handoff and execute before publication", async (t) => {
+  for (const missing of ["handoff", "execute"]) {
+    const { repo, worktree } = repositoryFixture(t);
+    git(repo, "rm", `.ralph/skills/${missing}/SKILL.md`);
+    git(repo, "commit", "-qm", `remove ${missing}`);
+    const publisher = new FakePublisher();
+
+    await assert.rejects(
+      createSpecEpisode(LOCATION, `tool-call-missing-${missing}`, context(repo), dependencies(publisher)),
+      new RegExp(`missing \.ralph/skills/${missing}/SKILL\.md`),
+    );
+
+    assert.deepEqual(publisher.forks, []);
+    assert.deepEqual(publisher.handoffs, []);
+    assert.equal(existsSync(worktree), false);
+  }
 });
 
 test("non-root session is rejected before collision checks or Git mutation", async (t) => {
@@ -569,29 +671,29 @@ test("partial Git cleanup becomes uncertain and preserves identity artifacts", a
 });
 
 
-test("uncertain execute admission preserves identity and never redelivers on replay", async (t) => {
+test("uncertain initial handoff admission preserves identity and never replays", async (t) => {
   const { repo, worktree } = repositoryFixture(t);
   const publisher = new FakePublisher();
-  publisher.deliverExecute = async (activeSessionId, prompt) => {
-    publisher.deliveries.push({ activeSessionId, prompt });
+  publisher.deliverHandoff = async (activeSessionId, handoffPrompt, executePrompt) => {
+    publisher.handoffs.push({ activeSessionId, handoffPrompt, executePrompt });
     const pending = JSON.parse(readFileSync(
       join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
       "utf8",
     ));
-    assert.equal(pending.executeAdmission, "pending");
-    throw new EpisodeStateUncertainError("execute admission uncertain");
+    assert.equal(pending.bootstrapAdmission, "handoff-pending");
+    throw new EpisodeStateUncertainError("handoff admission uncertain");
   };
 
   await assert.rejects(
     createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
-    /execute admission uncertain/,
+    /handoff admission uncertain/,
   );
 
   assert.deepEqual(publisher.kills, []);
   assert.equal(existsSync(worktree), true);
   const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
   const uncertain = JSON.parse(readFileSync(identityPath, "utf8"));
-  assert.equal(uncertain.executeAdmission, "uncertain");
+  assert.equal(uncertain.bootstrapAdmission, "handoff-uncertain");
 
   const replay = new FakePublisher({ sessions: [{
     activeSessionId: uncertain.episodeActiveSessionId,
@@ -600,14 +702,15 @@ test("uncertain execute admission preserves identity and never redelivers on rep
     sessionName: uncertain.sessionName,
     cwd: uncertain.worktree,
   }] });
-  const result = await createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay));
-  assert.equal(result.reused, true);
-  assert.equal(result.executeAdmission, "uncertain");
-  assert.deepEqual(replay.deliveries, []);
+  await assert.rejects(
+    createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay)),
+    /incomplete bootstrap admission handoff-uncertain/,
+  );
+  assert.deepEqual(replay.handoffs, []);
   assert.deepEqual(replay.kills, []);
 });
 
-test("crash-window failure after admission preserves pending identity and never redelivers", async (t) => {
+test("checkpoint write failure after handoff sends no execute and preserves pending identity", async (t) => {
   const { repo, worktree } = repositoryFixture(t);
   const baseFilesystem = new NodeFilesystemAdapter();
   let identityWrites = 0;
@@ -618,7 +721,7 @@ test("crash-window failure after admission preserves pending identity and never 
     removeFile: (path) => baseFilesystem.removeFile(path),
     writeIdentity(path, identity) {
       identityWrites += 1;
-      if (identityWrites === 2) throw new Error("crash before delivered mark");
+      if (identityWrites === 2) throw new Error("checkpoint disk failure");
       baseFilesystem.writeIdentity(path, identity);
     },
   };
@@ -628,18 +731,94 @@ test("crash-window failure after admission preserves pending identity and never 
     createSpecEpisode(LOCATION, "tool-call-1", context(repo), {
       git: new CliGitAdapter(), filesystem, publisher,
     }),
-    /delivered identity mark could not be persisted/,
+    /execute checkpoint could not be persisted/,
   );
 
-  assert.equal(publisher.deliveries.length, 1);
+  assert.equal(publisher.handoffs.length, 1);
   assert.deepEqual(publisher.kills, []);
   assert.equal(existsSync(worktree), true);
   const identity = JSON.parse(readFileSync(
     join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
     "utf8",
   ));
-  assert.equal(identity.executeAdmission, "pending");
+  assert.equal(identity.bootstrapAdmission, "handoff-pending");
+});
 
+test("definite execute follow-up rejection preserves the admitted handoff", async (t) => {
+  const { repo, worktree } = repositoryFixture(t);
+  const publisher = new FakePublisher();
+  publisher.deliverHandoff = async (activeSessionId, handoffPrompt, executePrompt, onHandoffAdmitted) => {
+    publisher.handoffs.push({ activeSessionId, handoffPrompt, executePrompt });
+    await onHandoffAdmitted();
+    throw new HandoffFollowUpRejectedError("follow-up rejected");
+  };
+
+  await assert.rejects(
+    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
+    /follow-up rejected/,
+  );
+
+  assert.deepEqual(publisher.kills, []);
+  assert.equal(existsSync(worktree), true);
+  const identity = JSON.parse(readFileSync(
+    join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
+    "utf8",
+  ));
+  assert.equal(identity.bootstrapAdmission, "execute-rejected");
+});
+
+test("uncertain execute follow-up preserves the episode and records its stage", async (t) => {
+  const { repo, worktree } = repositoryFixture(t);
+  const publisher = new FakePublisher();
+  publisher.deliverHandoff = async (activeSessionId, handoffPrompt, executePrompt, onHandoffAdmitted) => {
+    publisher.handoffs.push({ activeSessionId, handoffPrompt, executePrompt });
+    await onHandoffAdmitted();
+    throw new EpisodeStateUncertainError("execute follow-up uncertain");
+  };
+
+  await assert.rejects(
+    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
+    /execute follow-up uncertain/,
+  );
+
+  assert.deepEqual(publisher.kills, []);
+  assert.equal(existsSync(worktree), true);
+  const identity = JSON.parse(readFileSync(
+    join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
+    "utf8",
+  ));
+  assert.equal(identity.bootstrapAdmission, "execute-uncertain");
+});
+
+test("delivered-mark failure preserves execute-pending and never replays", async (t) => {
+  const { repo, worktree } = repositoryFixture(t);
+  const baseFilesystem = new NodeFilesystemAdapter();
+  let identityWrites = 0;
+  const filesystem = {
+    exists: (path) => baseFilesystem.exists(path),
+    promoteBundle: (...args) => baseFilesystem.promoteBundle(...args),
+    readIdentity: (path) => baseFilesystem.readIdentity(path),
+    removeFile: (path) => baseFilesystem.removeFile(path),
+    writeIdentity(path, identity) {
+      identityWrites += 1;
+      if (identityWrites === 3) throw new Error("delivered mark disk failure");
+      baseFilesystem.writeIdentity(path, identity);
+    },
+  };
+  const publisher = new FakePublisher();
+
+  await assert.rejects(
+    createSpecEpisode(LOCATION, "tool-call-1", context(repo), {
+      git: new CliGitAdapter(), filesystem, publisher,
+    }),
+    /delivered bootstrap mark could not be persisted/,
+  );
+
+  assert.deepEqual(publisher.kills, []);
+  assert.equal(existsSync(worktree), true);
+  const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
+  const identity = JSON.parse(readFileSync(identityPath, "utf8"));
+  assert.equal(identity.bootstrapAdmission, "execute-pending");
   const replay = new FakePublisher({ sessions: [{
     activeSessionId: identity.episodeActiveSessionId,
     sessionId: identity.episodeId,
@@ -647,11 +826,12 @@ test("crash-window failure after admission preserves pending identity and never 
     sessionName: identity.sessionName,
     cwd: identity.worktree,
   }] });
-  const replayResult = await createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay));
-  assert.equal(replayResult.executeAdmission, "pending");
-  assert.deepEqual(replay.deliveries, []);
+  await assert.rejects(
+    createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay)),
+    /incomplete bootstrap admission execute-pending/,
+  );
+  assert.deepEqual(replay.handoffs, []);
 });
-
 
 test("uncertain create preserves the promoted branch and worktree", async (t) => {
   const { repo, worktree } = repositoryFixture(t);
@@ -735,7 +915,7 @@ test("public SessionManager forkFrom gets target cwd and a matching successful t
     branch: options.branch,
     worktree: options.worktree,
     sessionName: options.sessionName,
-    executeAdmission: "pending",
+    bootstrapAdmission: "handoff-pending",
     reused: false,
   }));
 });
@@ -807,8 +987,19 @@ test("publisher admits remote handoff as steer before the sole execute follow-up
   };
   const publisher = new PrimeSessionPublisher(client);
 
-  await publisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute");
+  let checkpointCalls = 0;
+  await publisher.deliverHandoff(
+    "active-episode-1",
+    "wrapped handoff",
+    "wrapped execute",
+    () => {
+      checkpointCalls += 1;
+      assert.equal(requests.length, 1);
+      assert.equal(requests[0].streamingBehavior, "steer");
+    },
+  );
 
+  assert.equal(checkpointCalls, 1);
   assert.deepEqual(requests, [{
     type: "prompt",
     activeSessionId: "active-episode-1",
