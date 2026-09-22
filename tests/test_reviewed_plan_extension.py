@@ -57,6 +57,7 @@ export default function probe(pi) {
     if (typeof SessionManager.forkFrom === "function"
       && toolNames.includes("ralph_plan")
       && toolNames.includes("create_spec_episode")
+      && toolNames.includes("handoff_spec_episode")
       && !toolNames.includes("ralph_implement_spec")) {
       pi.registerCommand("probe-reviewed-plan-tools", {
         description: "RPC proof that reviewed-plan tools are registered",

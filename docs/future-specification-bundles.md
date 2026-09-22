@@ -239,6 +239,36 @@ its separately configured oversight workflow. `/implement-spec` does not embed
 oversight policy, run implementation in the owner conversation, or invoke
 `/handoff`.
 
+## Owner-driven episode continuation
+
+After one implementation slice reaches an idle boundary, the owning project
+conversation can call `handoff_spec_episode` with the exact future-folder
+location that created the episode and optional operator-supplied compaction
+guidance. This is not another implementation authorization surface. The durable
+episode identity is the authority: host code requires the same top-level owner
+session and revalidates every derived branch, worktree, and durable-session
+field before using the daemon's current active routing ID.
+
+The operation reopens an inactive exact episode when needed, then checks the
+live daemon state and fails closed unless the episode is fully quiescent with an
+empty steering/follow-up queue. It loads the current canonical handoff and
+execute Markdown from the episode worktree before either send. Handoff is sent
+first as fail-if-busy `steer`; execute is then queued exactly once as the sole
+`followUp`. The synchronous result proves only ordered admission. The episode's
+handoff `Status / Evidence / Next Step` output records whether focused compaction
+was requested before the queued execute turn continues.
+
+Definite first-send failure queues no continuation. Definite second-send failure
+reports the irreversible partial transition. An uncertain response at either
+stage is an inspection boundary, not permission to retry. The operation never
+kills the session, removes resources, or adds nonces, leases, durable approvals,
+or generalized remote routing state.
+
+Initial episode creation intentionally remains direct `deliverExecute()`. There
+is no completed slice to hand off at bootstrap, and safely making creation a
+two-mutation transition would require additional durable partial-state and
+cleanup rules beyond this bounded owner-continuation capability.
+
 ## Automated and integration validation
 
 Run the command loader and host-mechanics coverage with:
@@ -255,11 +285,12 @@ opaque temporary-Git promotion, lifecycle-directory preservation, promotion
 commits, inherited context, protocol-7 daemon envelopes, durable pre-delivery
 admission, crash-window and
 uncertain-delivery replay suppression, allowed-empty promotion commits, partial
-cleanup observability, active and inactive replay, collision safety, and
-confirmed invocation-owned cleanup. The Python bridge reruns both suites and uses
+cleanup observability, active and inactive replay, collision safety, confirmed
+invocation-owned cleanup, exact-owner remote handoff, quiescent-state checks,
+ordered steer/follow-up delivery, and visible partial or uncertain failures. The Python bridge reruns both suites and uses
 installed offline Prime Agent RPC plus startup probes to prove one native
-`plan`, one native `implement-spec`, explicit `ralph_plan` and
-`create_spec_episode` tools, no `ralph_implement_spec` tool, the confirmed
+`plan`, one native `implement-spec`, explicit `ralph_plan`, `create_spec_episode`, and `handoff_spec_episode`
+tools, no `ralph_implement_spec` tool, the confirmed
 `steer` lifecycle ordering described above, and a valid inherited
 Prime Agent context, and bounded real daemon create/state/messages/kill behavior
 at the episode worktree CWD.
@@ -272,14 +303,17 @@ decision, and reaped that episode safely.
 
 ## Live end-to-end dogfood status
 
-The owner explicitly deferred the live end-to-end dogfood to a separate future
-episode. The closing implementation episode delivered and owner-accepted the
-three mechanical slices, then archived its plans without planning, modifying,
-or promoting the `conversation-driven-episode-oversight` bundle. No nested
-branch, worktree, or episode was created for dogfood.
+The conversational-routing proof of concept completed the full reviewed
+conversation → isolated episode → bounded execute/handoff slices → owner Expert
+review → explicit merge → safe cleanup lifecycle. Its accepted implementation is
+archived under
+[`.ralph/plans/archive/conversational-ralph-command-routing/`](../.ralph/plans/archive/conversational-ralph-command-routing/).
+That run also established why this owner-driven operation is necessary: every
+between-slice transition still required the operator to type native `/handoff`
+in the episode TUI because ordinary cross-session messages do not invoke the
+slash-command dispatcher.
 
-Until that separate run is complete, report automated and integration evidence
-as such. Do not describe the full authoring → two reviews → planning → promotion
-→ execute/handoff → terminal cleanup workflow as manually proven. The deferred
-disposition and test evidence are recorded in the
-[archived execution plan](../.ralph/plans/archive/worktree-isolated-specification-episodes/EXECUTION_PLAN.md).
+The automated coverage here proves the new exact-owner host mechanics and wire
+ordering. A later episode can dogfood `handoff_spec_episode` itself and record
+its live compaction-request transcript without changing this capability's
+bounded authority or failure contract.

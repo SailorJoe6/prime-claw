@@ -19,6 +19,7 @@ import {
   CliGitAdapter,
   createSpecEpisode,
   DaemonJsonlClient,
+  handoffSpecEpisode,
   DaemonMutationUncertainError,
   EpisodeStateUncertainError,
   episodeResultText,
@@ -52,6 +53,7 @@ function repositoryFixture(t) {
   git(repo, "config", "user.email", "test@example.com");
   git(repo, "config", "user.name", "Spec Episode Test");
   write(join(repo, ".gitignore"), ".prime/agent/state/\n");
+  write(join(repo, ".ralph", "skills", "handoff", "SKILL.md"), "canonical handoff body\n\n```python\ncompaction_result = await compact.run(focus_hint)\n```\n");
   write(join(repo, ".ralph", "skills", "execute", "SKILL.md"), "canonical execute body");
   write(join(repo, ".ralph", "plans", "CURRENT.md"), "old active plan");
   write(join(repo, LOCATION, "manifest.yaml"), "kind: arbitrary-bundle\n");
@@ -65,18 +67,26 @@ function repositoryFixture(t) {
 }
 
 class FakePublisher {
-  constructor({ sessions = [], failDelivery = false, failKill = false } = {}) {
+  constructor({ sessions = [], state = null, failDelivery = false, failKill = false } = {}) {
     this.sessions = sessions;
+    this.state = state;
     this.failDelivery = failDelivery;
     this.failKill = failKill;
     this.listCalls = 0;
+    this.stateCalls = [];
     this.forks = [];
     this.reopens = [];
     this.deliveries = [];
+    this.handoffs = [];
     this.kills = [];
     this.closed = 0;
   }
   async list() { this.listCalls += 1; return this.sessions; }
+  async getState(activeSessionId) {
+    this.stateCalls.push(activeSessionId);
+    if (!this.state) throw new Error("missing fake state");
+    return this.state;
+  }
   async forkAndPublish(options) {
     this.forks.push(options);
     return {
@@ -96,6 +106,9 @@ class FakePublisher {
   async deliverExecute(activeSessionId, prompt) {
     this.deliveries.push({ activeSessionId, prompt });
     if (this.failDelivery) throw new Error("delivery rejected");
+  }
+  async deliverHandoff(activeSessionId, handoffPrompt, executePrompt) {
+    this.handoffs.push({ activeSessionId, handoffPrompt, executePrompt });
   }
   async kill(activeSessionId) {
     this.kills.push(activeSessionId);
@@ -122,6 +135,24 @@ function dependencies(publisher) {
     git: new CliGitAdapter(),
     filesystem: new NodeFilesystemAdapter(),
     publisher,
+  };
+}
+
+function idleState(created, activeSessionId = created.episodeActiveSessionId) {
+  return {
+    activeSessionId,
+    sessionId: created.episodeId,
+    sessionFile: created.episodeSessionFile,
+    sessionName: created.sessionName,
+    cwd: created.worktree,
+    isSessionActive: true,
+    isStreaming: false,
+    isCompacting: false,
+    isBashRunning: false,
+    isRunningTools: false,
+    hasRunningRlmChildren: false,
+    unfinishedActionCount: 0,
+    sessionActions: { queuedCount: 0, steering: [], followUps: [] },
   };
 }
 
@@ -169,6 +200,7 @@ test("promotes an opaque bundle, commits it, publishes context, and delivers exe
     model: { provider: "test-provider", id: "test-model" },
   });
   assert.equal(publisher.deliveries.length, 1);
+  assert.deepEqual(publisher.handoffs, []);
   assert.equal(publisher.deliveries[0].activeSessionId, "active-episode-1");
   assert.equal(publisher.deliveries[0].prompt.split("canonical execute body").length - 1, 1);
   assert.equal(publisher.closed, 1);
@@ -253,6 +285,169 @@ test("matching inactive durable session is reopened without another execute deli
   assert.equal(identity.episodeActiveSessionId, "active-episode-reopened");
 });
 
+
+test("owner drives an exact idle episode through handoff steer and one execute follow-up", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  const publisher = new FakePublisher({
+    sessions: [{
+      ...idleState(created),
+      isSessionActive: true,
+    }],
+    state: idleState(created),
+  });
+
+  const result = await handoffSpecEpisode(
+    LOCATION,
+    "preserve the accepted slice boundary",
+    context(repo),
+    dependencies(publisher),
+  );
+
+  assert.deepEqual(result, {
+    admitted: true,
+    sourceLocation: LOCATION,
+    episodeId: created.episodeId,
+    episodeActiveSessionId: created.episodeActiveSessionId,
+    handoffDelivery: "steer",
+    executeDelivery: "followUp",
+  });
+  assert.deepEqual(publisher.stateCalls, [created.episodeActiveSessionId]);
+  assert.equal(publisher.handoffs.length, 1);
+  assert.equal(publisher.handoffs[0].activeSessionId, created.episodeActiveSessionId);
+  assert.match(publisher.handoffs[0].handoffPrompt, /canonical handoff body/);
+  assert.match(publisher.handoffs[0].handoffPrompt, /compact\.run\(focus_hint\)/);
+  assert.equal(publisher.handoffs[0].handoffPrompt.split("preserve the accepted slice boundary").length - 1, 1);
+  assert.match(publisher.handoffs[0].executePrompt, /canonical execute body/);
+  assert.equal(publisher.closed, 1);
+});
+
+test("owner handoff reopens the exact inactive durable session before delivery", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  const publisher = new FakePublisher({
+    sessions: [{
+      sessionId: created.episodeId,
+      sessionFile: created.episodeSessionFile,
+      sessionName: created.sessionName,
+      cwd: created.worktree,
+      isSessionActive: false,
+      isStreaming: false,
+      isCompacting: false,
+      queuedCount: 0,
+    }],
+    state: idleState(created, "active-episode-reopened"),
+  });
+
+  const result = await handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher));
+
+  assert.equal(result.episodeActiveSessionId, "active-episode-reopened");
+  assert.equal(publisher.reopens.length, 1);
+  assert.equal(publisher.handoffs[0].activeSessionId, "active-episode-reopened");
+  const identity = JSON.parse(readFileSync(
+    join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
+    "utf8",
+  ));
+  assert.equal(identity.episodeActiveSessionId, "active-episode-reopened");
+});
+
+test("owner handoff rejects a different owner before state checks or delivery", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  const publisher = new FakePublisher({
+    sessions: [{ ...idleState(created), isSessionActive: true }],
+    state: idleState(created),
+  });
+  const otherOwner = context(repo);
+  otherOwner.sessionManager.getSessionId = () => "different-owner";
+
+  await assert.rejects(
+    handoffSpecEpisode(LOCATION, "", otherOwner, dependencies(publisher)),
+    /conflicts on ownerSessionId/,
+  );
+
+  assert.deepEqual(publisher.stateCalls, []);
+  assert.deepEqual(publisher.handoffs, []);
+});
+
+test("owner handoff rejects a busy list snapshot and a non-quiescent daemon state", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  const busy = new FakePublisher({
+    sessions: [{ ...idleState(created), isSessionActive: true, isStreaming: true }],
+    state: idleState(created),
+  });
+  await assert.rejects(
+    handoffSpecEpisode(LOCATION, "", context(repo), dependencies(busy)),
+    /episode is busy/i,
+  );
+  assert.deepEqual(busy.stateCalls, []);
+  assert.deepEqual(busy.handoffs, []);
+
+  const queuedState = idleState(created);
+  queuedState.sessionActions = { queuedCount: 1, steering: [], followUps: ["execute"] };
+  const queued = new FakePublisher({
+    sessions: [{ ...idleState(created), isSessionActive: true }],
+    state: queuedState,
+  });
+  await assert.rejects(
+    handoffSpecEpisode(LOCATION, "", context(repo), dependencies(queued)),
+    /not quiescent/,
+  );
+  assert.deepEqual(queued.handoffs, []);
+});
+
+test("owner handoff rejects non-root callers and unresolved initial admission", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  const publisher = new FakePublisher({
+    sessions: [{ ...idleState(created), isSessionActive: true }],
+    state: idleState(created),
+  });
+  const child = context(repo);
+  child.sessionManager.getHeader = () => ({ rlmDepth: 1 });
+  await assert.rejects(
+    handoffSpecEpisode(LOCATION, "", child, dependencies(publisher)),
+    /top-level project conversation/,
+  );
+  assert.equal(publisher.listCalls, 0);
+
+  const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
+  const identity = JSON.parse(readFileSync(identityPath, "utf8"));
+  writeFileSync(identityPath, `${JSON.stringify({ ...identity, executeAdmission: "uncertain" }, null, 2)}\n`);
+  await assert.rejects(
+    handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
+    /initial execute admission is uncertain/,
+  );
+  assert.deepEqual(publisher.stateCalls, []);
+  assert.deepEqual(publisher.handoffs, []);
+});
+
+test("owner handoff preflights both canonical workflows before reopening", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  rmSync(join(created.worktree, ".ralph", "skills", "execute", "SKILL.md"));
+  const publisher = new FakePublisher({
+    sessions: [{
+      sessionId: created.episodeId,
+      sessionFile: created.episodeSessionFile,
+      sessionName: created.sessionName,
+      cwd: created.worktree,
+      isSessionActive: false,
+      isStreaming: false,
+      isCompacting: false,
+      queuedCount: 0,
+    }],
+  });
+
+  await assert.rejects(
+    handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
+    /missing \.ralph\/skills\/execute\/SKILL\.md/,
+  );
+
+  assert.deepEqual(publisher.reopens, []);
+  assert.deepEqual(publisher.handoffs, []);
+});
 
 test("non-root session is rejected before collision checks or Git mutation", async (t) => {
   const { repo, worktree } = repositoryFixture(t);
@@ -603,6 +798,120 @@ test("publisher admits execute as one queued follow-up without template expansio
   }]);
 });
 
+
+test("publisher admits remote handoff as steer before the sole execute follow-up", async () => {
+  const requests = [];
+  const client = {
+    async request(command) { requests.push(command); return { success: true, data: {} }; },
+    close() {},
+  };
+  const publisher = new PrimeSessionPublisher(client);
+
+  await publisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute");
+
+  assert.deepEqual(requests, [{
+    type: "prompt",
+    activeSessionId: "active-episode-1",
+    message: "wrapped handoff",
+    streamingBehavior: "steer",
+    queueIfBusy: false,
+    expandPromptTemplates: false,
+    source: "extension",
+  }, {
+    type: "prompt",
+    activeSessionId: "active-episode-1",
+    message: "wrapped execute",
+    streamingBehavior: "followUp",
+    queueIfBusy: true,
+    expandPromptTemplates: false,
+    source: "extension",
+  }]);
+});
+
+test("publisher exposes first-send failure without queuing execute", async () => {
+  const requests = [];
+  const client = {
+    async request(command) {
+      requests.push(command);
+      return { success: false, error: "episode became busy" };
+    },
+    close() {},
+  };
+  const publisher = new PrimeSessionPublisher(client);
+
+  await assert.rejects(
+    publisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute"),
+    /handoff delivery failed: episode became busy/,
+  );
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].message, "wrapped handoff");
+});
+
+test("publisher exposes second-send failure as a partial transition", async () => {
+  const requests = [];
+  const client = {
+    async request(command) {
+      requests.push(command);
+      return requests.length === 1
+        ? { success: true, data: {} }
+        : { success: false, error: "follow-up rejected" };
+    },
+    close() {},
+  };
+  const publisher = new PrimeSessionPublisher(client);
+
+  await assert.rejects(
+    publisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute"),
+    /Handoff was admitted, but canonical execute follow-up could not be queued: execute follow-up delivery failed: follow-up rejected/,
+  );
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].streamingBehavior, "steer");
+  assert.equal(requests[1].streamingBehavior, "followUp");
+});
+
+test("publisher distinguishes uncertain first and second handoff mutations", async () => {
+  const firstRequests = [];
+  const firstPublisher = new PrimeSessionPublisher({
+    async request(command) {
+      firstRequests.push(command);
+      throw new DaemonMutationUncertainError("prompt", "connection closed");
+    },
+    close() {},
+  });
+  await assert.rejects(
+    firstPublisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute"),
+    (error) => error instanceof EpisodeStateUncertainError && /Handoff task admission is uncertain/.test(error.message),
+  );
+  assert.equal(firstRequests.length, 1);
+
+  const secondRequests = [];
+  const secondPublisher = new PrimeSessionPublisher({
+    async request(command) {
+      secondRequests.push(command);
+      if (secondRequests.length === 1) return { success: true, data: {} };
+      throw new DaemonMutationUncertainError("prompt", "connection closed");
+    },
+    close() {},
+  });
+  await assert.rejects(
+    secondPublisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute"),
+    (error) => error instanceof EpisodeStateUncertainError && /Execute follow-up admission is uncertain after handoff admission/.test(error.message),
+  );
+  assert.equal(secondRequests.length, 2);
+});
+
+test("publisher retrieves the exact active episode state before admission", async () => {
+  const requests = [];
+  const state = { activeSessionId: "active-episode-1", isStreaming: false };
+  const client = {
+    async request(command) { requests.push(command); return { success: true, data: state }; },
+    close() {},
+  };
+  const publisher = new PrimeSessionPublisher(client);
+
+  assert.equal(await publisher.getState("active-episode-1"), state);
+  assert.deepEqual(requests, [{ type: "get_state", activeSessionId: "active-episode-1" }]);
+});
 
 test("daemon client uses protocol-7 command envelope and acknowledges mutation", async (t) => {
   const socketPath = join(tmpdir(), `spec-episode-${process.pid}-${Date.now()}.sock`);

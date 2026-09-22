@@ -2,9 +2,10 @@
 
 > **Status:** Phase 4a dogfood automation. Native `/handoff` and the explicit
 > `ralph_handoff` conversational tool admit canonical `execute` independently
-> from best-effort compaction. The wider episode loop remains manual-first and
-> Phase 4 is not complete.
-> **Beads:** `prime-claw-h6w` → `prime-claw-f81` → `prime-claw-f81.2`; conversational adapter `prime-claw-h6w.18`
+> from best-effort compaction. An owning project conversation can drive the same
+> transition in its exact episode through `handoff_spec_episode`. Phase 4 remains
+> manual-first and is not complete.
+> **Beads:** `prime-claw-h6w` → `prime-claw-f81` → `prime-claw-f81.2`; conversational adapters `prime-claw-h6w.18`, `prime-claw-h6w.21`
 
 prime-claw has two explicit project-local entry surfaces for a transition that
 became predictable during manual driving:
@@ -60,6 +61,46 @@ Inline mentions remain ordinary prose. The extension has no input listener that
 scans for words such as “handoff.” Successful tool output reports only that the
 canonical workflows were admitted; it does not claim that handoff, compaction,
 or the following execute pass completed.
+
+### Owner-driven episode tool
+
+The project-conversation extension also exposes `handoff_spec_episode` for the
+one remote transition proved necessary by manual oversight. Its input is only:
+
+```json
+{"location":".ralph/plans/future/<slug>","guidance":"optional operator focus"}
+```
+
+The exact location selects the ignored durable episode identity. Host code
+requires the caller to be that identity's top-level owner and revalidates the
+branch, worktree, durable session ID and file, CWD, and session name. The model
+cannot supply an active routing ID, worktree, session name, command, phase, or
+arbitrary prompt. An inactive exact session is reopened through the existing
+identity-checked path and its refreshed active ID is persisted.
+
+Before sending either workflow, the host preflights both canonical Markdown
+files and obtains the daemon's exact state. Admission fails closed unless the
+episode has no active turn, tool, bash process, compaction, RLM child, unfinished
+action, steering message, or follow-up. The first daemon prompt is canonical
+handoff with `streamingBehavior: "steer"` and `queueIfBusy: false`; only after
+that acknowledgement does the host queue canonical execute with
+`streamingBehavior: "followUp"` and `queueIfBusy: true`. The second prompt is
+the sole follow-up. The daemon's fail-if-busy check is authoritative if activity
+starts after the state snapshot.
+
+Success reports admission only. The episode's ordered `Status / Evidence / Next
+Step` handoff result is the observable compaction-request evidence; execute can
+run only after that handoff turn reaches its boundary. A first-send failure
+queues no execute. A second-send failure explicitly reports that handoff was
+admitted but continuation was not queued. Ambiguous transport outcomes require
+owner inspection and are never retried automatically. Existing episode
+resources are never deleted to compensate for a remote handoff failure.
+
+Initial `createSpecEpisode()` deliberately keeps direct execute admission. At
+bootstrap there is no completed implementation slice to hand off, and changing
+creation to a two-mutation transition would require new durable partial-state
+and cleanup semantics. That larger state migration is outside this narrow
+counterpart to `deliverExecute()`.
 
 ## Runtime flow
 
@@ -134,8 +175,10 @@ runtime path or a reason to patch private queue state.
 |---|---|---|
 | `.ralph/skills/handoff/SKILL.md` | Project/operator | Canonical tracked workflow |
 | `.ralph/skills/execute/SKILL.md` | Project/operator | Canonical tracked workflow |
-| `.prime/agent/extensions/handoff-chain.ts` | prime-claw | Shared native and conversational admission mechanism |
-| Native `followUp` action | Prime Agent session | From either entry surface's admission until delivery, removal, or session end |
+| `.prime/agent/extensions/handoff-chain.ts` | prime-claw | Native and current-session conversational admission |
+| `.prime/agent/extension-support/handoff-prompts.ts` | prime-claw | Shared canonical handoff/execute prompt construction |
+| Durable episode identity | Owning project conversation | Exact remote episode authorization and routing validation |
+| Native `followUp` action | Prime Agent session | From any entry surface's admission until delivery, removal, or session end |
 | `<operator-compaction-guidance>` | Operator | One handoff turn and optional compaction boundary |
 
 Canonical workflow prose remains customizable Markdown. The extension loads it
@@ -157,8 +200,9 @@ No new project-local transition marker replaces it.
 Prime Agent 0.9.5 may share and rebind the extension runtime captured by
 `pi.sendUserMessage` across a root and RLM child. The public event context has no
 session-bound send method. Supported top-level session behavior does not prove
-root/RLM-child delivery isolation. That separate harness-level proof or fix
-remains tracked by `prime-claw-f81.3`.
+root/RLM-child delivery isolation. `handoff_spec_episode` does not use that
+captured extension runtime: it targets the exact validated daemon active ID.
+The separate current-session limitation remains tracked by `prime-claw-f81.3`.
 
 ## Relationship to the legacy Ralph shell loop
 

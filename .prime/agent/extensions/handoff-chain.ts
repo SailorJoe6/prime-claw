@@ -1,6 +1,8 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { rmSync } from "node:fs";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+import { canonicalSkillPrompt } from "../extension-support/handoff-prompts.ts";
 
 /**
  * Deterministic native /handoff -> canonical execute admission.
@@ -11,7 +13,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
  */
 
 const LEGACY_MARKER = join(".prime", "agent", "state", "chain-next");
-const GUIDANCE_TAG = "operator-compaction-guidance";
 
 type AdmissionResult =
   | { ok: true }
@@ -19,24 +20,6 @@ type AdmissionResult =
 
 function removeLegacyMarker(cwd: string): void {
   rmSync(join(cwd, LEGACY_MARKER), { force: true });
-}
-
-function skillPrompt(cwd: string, name: string, guidance = ""): string | null {
-  const path = join(cwd, ".ralph", "skills", name, "SKILL.md");
-  if (!existsSync(path)) return null;
-  const body = readFileSync(path, "utf8");
-  const wrapped = `<skill name="${name}" location="${path}">
-References are relative to ${dirname(path)}.
-
-${body}
-</skill>`;
-  return guidance
-    ? `${wrapped}
-
-<${GUIDANCE_TAG}>
-${guidance}
-</${GUIDANCE_TAG}>`
-    : wrapped;
 }
 
 function admitHandoff(
@@ -48,7 +31,7 @@ function admitHandoff(
   removeLegacyMarker(cwd);
 
   // Preflight both canonical workflows before beginning a partial transition.
-  const handoff = skillPrompt(cwd, "handoff", guidance.trim());
+  const handoff = canonicalSkillPrompt(cwd, "handoff", guidance.trim());
   if (!handoff) {
     return {
       ok: false,
@@ -56,7 +39,7 @@ function admitHandoff(
       level: "warning",
     };
   }
-  const execute = skillPrompt(cwd, "execute");
+  const execute = canonicalSkillPrompt(cwd, "execute");
   if (!execute) {
     return {
       ok: false,

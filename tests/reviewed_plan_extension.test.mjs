@@ -115,7 +115,7 @@ function count(haystack, needle) {
 test("registers native reviewed commands, planning tool, and native-only implementation", (t) => {
   const f = fixture(t);
   assert.deepEqual([...f.commands.keys()], ["plan", "implement-spec"]);
-  assert.deepEqual([...f.tools.keys()], ["ralph_plan", "create_spec_episode"]);
+  assert.deepEqual([...f.tools.keys()], ["ralph_plan", "create_spec_episode", "handoff_spec_episode"]);
   assert.equal(f.tools.has("ralph_implement_spec"), false);
   assert.deepEqual([...f.events.keys()], ["session_start", "agent_end", "session_shutdown"]);
   assert.match(f.commands.get("plan").description, /explicit .*future/);
@@ -127,6 +127,12 @@ test("registers native reviewed commands, planning tool, and native-only impleme
   assert.ok(planTool.promptGuidelines.every((guideline) => guideline.includes("ralph_plan")));
   assert.deepEqual(f.tools.get("create_spec_episode").parameters.required, ["location"]);
   assert.equal(f.tools.get("create_spec_episode").parameters.additionalProperties, false);
+  const handoffTool = f.tools.get("handoff_spec_episode");
+  assert.equal(handoffTool.executionMode, "sequential");
+  assert.deepEqual(Object.keys(handoffTool.parameters.properties), ["location", "guidance"]);
+  assert.deepEqual(handoffTool.parameters.required, ["location"]);
+  assert.equal(handoffTool.parameters.additionalProperties, false);
+  assert.ok(handoffTool.promptGuidelines.every((guideline) => guideline.includes("handoff_spec_episode") || guideline.startsWith("Pass only")));
 });
 
 test("loads current canonical markdown and injects exact location once", async (t) => {
@@ -364,6 +370,30 @@ test("invalid implement-spec input shows usage without model injection", async (
   }]);
 });
 
+
+test("owner handoff tool requires a durable identity for the exact location", async (t) => {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-handoff-")));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  mkdirSync(join(cwd, LOCATION), { recursive: true });
+  const dependencies = {
+    git: { repositoryRoot() { return cwd; } },
+    filesystem: { readIdentity() { return null; } },
+    publisher: { close() {} },
+  };
+  const f = createHarness(cwd, createReviewedPlanExtension(dependencies));
+
+  const result = await f.tools.get("handoff_spec_episode").execute(
+    "handoff-call-1",
+    { location: LOCATION, guidance: "operator focus" },
+    undefined,
+    undefined,
+    f.ctx,
+  );
+
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /No durable episode identity exists/);
+  assert.deepEqual(f.messages, []);
+});
 
 test("structured tool requires and consumes matching implement-spec approval", async (t) => {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-auth-")));

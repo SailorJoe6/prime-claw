@@ -16,6 +16,7 @@ import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
+import { canonicalSkillPrompt } from "./handoff-prompts.ts";
 import { validateFutureLocation, wrapCanonicalSkill } from "./reviewed-plan-support.ts";
 
 const PROTOCOL_NAME = "prime-agent.daemon";
@@ -68,6 +69,32 @@ export interface SessionSummary {
   sessionFile?: string;
   sessionName?: string;
   cwd?: string;
+  isSessionActive?: boolean;
+  isStreaming?: boolean;
+  isCompacting?: boolean;
+  queuedCount?: number;
+}
+
+export interface EpisodeSessionState extends SessionSummary {
+  isBashRunning?: boolean;
+  isRunningTools?: boolean;
+  hasRunningRlmChildren?: boolean;
+  unfinishedActionCount?: number;
+  sessionActions?: {
+    queuedCount?: number;
+    steering?: unknown[];
+    followUps?: unknown[];
+    active?: unknown;
+  };
+}
+
+export interface EpisodeHandoffResult {
+  admitted: true;
+  sourceLocation: string;
+  episodeId: string;
+  episodeActiveSessionId: string;
+  handoffDelivery: "steer";
+  executeDelivery: "followUp";
 }
 
 export interface PublishedSession {
@@ -111,6 +138,7 @@ export interface FilesystemAdapter {
 
 export interface SessionPublisher {
   list(): Promise<SessionSummary[]>;
+  getState(activeSessionId: string): Promise<EpisodeSessionState>;
   forkAndPublish(options: {
     sourceSessionFile: string;
     worktree: string;
@@ -127,6 +155,7 @@ export interface SessionPublisher {
     model?: { provider: string; id: string };
   }): Promise<PublishedSession>;
   deliverExecute(activeSessionId: string, prompt: string): Promise<void>;
+  deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string): Promise<void>;
   kill(activeSessionId: string): Promise<boolean>;
   close(): void;
 }
@@ -514,6 +543,17 @@ export class PrimeSessionPublisher implements SessionPublisher {
     return Array.isArray(sessions) ? sessions as SessionSummary[] : [];
   }
 
+  async getState(activeSessionId: string): Promise<EpisodeSessionState> {
+    const data = requireSuccess(
+      await this.client.request({ type: "get_state", activeSessionId }),
+      "episode state check",
+    );
+    if (!data || typeof data !== "object") {
+      throw new Error("Episode state check returned no usable state");
+    }
+    return data as EpisodeSessionState;
+  }
+
   async forkAndPublish(options: {
     sourceSessionFile: string;
     worktree: string;
@@ -583,6 +623,51 @@ export class PrimeSessionPublisher implements SessionPublisher {
         );
       }
       throw error;
+    }
+  }
+
+  async deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string): Promise<void> {
+    try {
+      requireSuccess(await this.client.request({
+        type: "prompt",
+        activeSessionId,
+        message: handoffPrompt,
+        streamingBehavior: "steer",
+        queueIfBusy: false,
+        expandPromptTemplates: false,
+        source: "extension",
+      }), "handoff delivery");
+    } catch (error) {
+      if (isUncertainMutation(error)) {
+        throw new EpisodeStateUncertainError(
+          "Handoff task admission is uncertain; inspect the episode before attempting another transition.",
+          { cause: error },
+        );
+      }
+      throw error;
+    }
+
+    try {
+      requireSuccess(await this.client.request({
+        type: "prompt",
+        activeSessionId,
+        message: executePrompt,
+        streamingBehavior: "followUp",
+        queueIfBusy: true,
+        expandPromptTemplates: false,
+        source: "extension",
+      }), "execute follow-up delivery");
+    } catch (error) {
+      if (isUncertainMutation(error)) {
+        throw new EpisodeStateUncertainError(
+          "Execute follow-up admission is uncertain after handoff admission; inspect the episode before attempting another transition.",
+          { cause: error },
+        );
+      }
+      throw new Error(
+        `Handoff was admitted, but canonical execute follow-up could not be queued: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      );
     }
   }
 
@@ -669,6 +754,128 @@ function validateExistingIdentity(
     throw new Error("Existing episode identity references a missing or different durable session");
   }
   return session;
+}
+
+function sessionIsBusy(session: SessionSummary): boolean {
+  return session.isStreaming === true
+    || session.isCompacting === true
+    || (session.queuedCount ?? 0) > 0;
+}
+
+function assertIdleEpisodeState(
+  state: EpisodeSessionState,
+  identity: EpisodeIdentity,
+  activeSessionId: string,
+): void {
+  const matches = state.activeSessionId === activeSessionId
+    && state.sessionId === identity.episodeId
+    && samePath(state.sessionFile, identity.episodeSessionFile)
+    && state.sessionName === identity.sessionName
+    && samePath(state.cwd, identity.worktree);
+  if (!matches) throw new Error("Episode state does not match the durable owned identity");
+
+  const actions = state.sessionActions;
+  const idle = state.isSessionActive === true
+    && state.isStreaming === false
+    && state.isCompacting === false
+    && state.isBashRunning === false
+    && state.isRunningTools === false
+    && state.hasRunningRlmChildren === false
+    && state.unfinishedActionCount === 0
+    && actions?.queuedCount === 0
+    && Array.isArray(actions.steering) && actions.steering.length === 0
+    && Array.isArray(actions.followUps) && actions.followUps.length === 0
+    && actions.active == null;
+  if (!idle) {
+    throw new Error("Owned episode is not quiescent; handoff requires no active turn, tools, compaction, children, or queued actions");
+  }
+}
+
+export async function handoffSpecEpisode(
+  rawLocation: string,
+  guidance: string,
+  ctx: ExtensionContext,
+  dependencies?: EpisodeDependencies,
+): Promise<EpisodeHandoffResult> {
+  const git = dependencies?.git ?? new CliGitAdapter();
+  const filesystem = dependencies?.filesystem ?? new NodeFilesystemAdapter();
+  let publisher = dependencies?.publisher;
+  try {
+    const selected = validateFutureLocation(ctx.cwd, rawLocation);
+    if (!selected) throw new Error("Invalid future-plan folder");
+    const repo = git.repositoryRoot(selected.projectRoot);
+    if (resolve(repo) !== resolve(selected.projectRoot)) {
+      throw new Error("The operation must run from the repository root");
+    }
+    if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
+      throw new Error("Episode handoff is available only from a top-level project conversation");
+    }
+
+    const expected = {
+      slug: selected.slug,
+      sourceLocation: selected.location,
+      ownerSessionId: ctx.sessionManager.getSessionId(),
+      branch: `episode/${selected.slug}`,
+      worktree: resolve(dirname(repo), `${basename(repo)}-${selected.slug}-episode`),
+      sessionName: `${selected.slug}-episode`,
+    };
+    const recordPath = identityPath(repo, selected.slug);
+    const identity = filesystem.readIdentity(recordPath);
+    if (!identity) throw new Error(`No durable episode identity exists for ${selected.location}`);
+
+    publisher ??= new PrimeSessionPublisher();
+    const sessions = await publisher.list();
+    const durableSession = validateExistingIdentity(identity, expected, sessions, git, filesystem, repo);
+    if (identity.executeAdmission !== "delivered") {
+      throw new Error(`Episode initial execute admission is ${identity.executeAdmission}; inspect it before handoff`);
+    }
+    if (sessionIsBusy(durableSession)) {
+      throw new Error("Owned episode is busy; handoff requires an idle episode with an empty queue");
+    }
+
+    // Preflight both workflows before reactivating or messaging the episode.
+    const handoffPrompt = canonicalSkillPrompt(identity.worktree, "handoff", guidance.trim());
+    if (!handoffPrompt) throw new Error("Episode worktree is missing .ralph/skills/handoff/SKILL.md");
+    const executePrompt = canonicalSkillPrompt(identity.worktree, "execute");
+    if (!executePrompt) throw new Error("Episode worktree is missing .ralph/skills/execute/SKILL.md");
+
+    let activeSessionId = durableSession.isSessionActive === false
+      ? undefined
+      : durableSession.activeSessionId;
+    if (!activeSessionId) {
+      const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
+      const reopened = await publisher.reopen({
+        sessionFile: identity.episodeSessionFile,
+        sessionId: identity.episodeId,
+        worktree: identity.worktree,
+        sessionName: identity.sessionName,
+        model,
+      });
+      activeSessionId = reopened.activeSessionId;
+      try {
+        filesystem.writeIdentity(recordPath, { ...identity, episodeActiveSessionId: activeSessionId });
+      } catch (error) {
+        throw new EpisodeStateUncertainError(
+          "Episode reactivated but its refreshed routing identity could not be persisted; no handoff was sent.",
+          { cause: error },
+        );
+      }
+    }
+
+    const state = await publisher.getState(activeSessionId);
+    assertIdleEpisodeState(state, identity, activeSessionId);
+    await publisher.deliverHandoff(activeSessionId, handoffPrompt, executePrompt);
+    return {
+      admitted: true,
+      sourceLocation: selected.location,
+      episodeId: identity.episodeId,
+      episodeActiveSessionId: activeSessionId,
+      handoffDelivery: "steer",
+      executeDelivery: "followUp",
+    };
+  } finally {
+    try { publisher?.close(); } catch { /* a close error must not mask the operation result */ }
+  }
 }
 
 export async function createSpecEpisode(

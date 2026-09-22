@@ -3,6 +3,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import {
   createSpecEpisode,
   episodeResultText,
+  handoffSpecEpisode,
   type EpisodeDependencies,
 } from "../extension-support/spec-episode.ts";
 import {
@@ -233,6 +234,58 @@ export function createReviewedPlanExtension(dependencies?: EpisodeDependencies) 
         } catch (error) {
           return {
             content: [{ type: "text", text: `Episode creation failed: ${error instanceof Error ? error.message : String(error)}` }],
+            details: { error: error instanceof Error ? error.message : String(error) },
+            isError: true,
+          };
+        }
+      },
+    });
+
+    pi.registerTool({
+      name: "handoff_spec_episode",
+      label: "Hand off specification episode",
+      description: "Drive one exact owned idle episode through canonical handoff, then queue canonical execute as its sole follow-up.",
+      promptSnippet: "Hand off an exact owned Ralph episode and queue its next execute pass",
+      promptGuidelines: [
+        "Call handoff_spec_episode only when the operator clearly asks to continue one exact owned episode between implementation slices.",
+        "Pass handoff_spec_episode the exact future-folder location used to create that episode; never search for or infer another episode.",
+        "Pass only operator-supplied optional guidance; ask if the intended compaction focus would be materially inferred.",
+        "Treat handoff_spec_episode as a terminal routing action. Admission does not prove compaction completed; observe the episode before claiming continuation results.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          location: {
+            type: "string",
+            description: "Exact project-relative .ralph/plans/future/<slug> folder used to create the owned episode",
+          },
+          guidance: {
+            type: "string",
+            description: "Optional operator-supplied compaction guidance for the episode handoff workflow",
+          },
+        },
+        required: ["location"],
+        additionalProperties: false,
+      } as any,
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        try {
+          const result = await handoffSpecEpisode(
+            params.location,
+            params.guidance ?? "",
+            ctx,
+            dependencies,
+          );
+          return {
+            content: [{
+              type: "text",
+              text: `Episode handoff admitted for ${result.sourceLocation}: canonical handoff was sent as steer and canonical execute was queued as the sole follow-up. Inspect the episode Status/Evidence output for its compaction-request result before claiming continuation completed.`,
+            }],
+            details: result,
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Episode handoff failed: ${error instanceof Error ? error.message : String(error)}` }],
             details: { error: error instanceof Error ? error.message : String(error) },
             isError: true,
           };
