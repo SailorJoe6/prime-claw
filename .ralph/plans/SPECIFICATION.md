@@ -1,8 +1,8 @@
 # Specification — Conversational routing for Ralph native commands
 
-> **Status:** incubated future specification; not approved for planning or implementation.
+> **Status:** reviewed for planning; execution plan awaiting operator approval.
 > **Delivered command architecture:** [Future specification bundles](../../../../docs/future-specification-bundles.md)
-> **Related future work:** [Handoff continuation resilience](../handoff-continuation-resilience/SPECIFICATION.md)
+> **Related delivered work:** [Handoff continuation resilience](../../archive/handoff-continuation-resilience/SPECIFICATION.md)
 > **Historical advisory evidence:** [`reports/reviews/handoff-resilience-spec-review-a93c27c.md`](../../../../reports/reviews/handoff-resilience-spec-review-a93c27c.md)
 
 ## Purpose
@@ -31,8 +31,8 @@ workflow Markdown. `/implement-spec` is the explicit boundary that may create a
 branch, worktree, and episode.
 
 Native `/handoff` similarly combines extension mechanics with canonical
-project-local workflow Markdown. Its continuation reliability is separate work
-covered by the related handoff-resilience specification.
+project-local workflow Markdown. Its continuation reliability was delivered by
+the archived handoff-resilience work linked above.
 
 Natural-language requests currently reach the model as ordinary conversation.
 There is no supported conversational adapter that can invoke these native
@@ -87,6 +87,9 @@ to claim uniform conversational coverage.
 - Project-customizable phase procedures remain in their canonical Markdown.
 - Missing adapters, rejected input, unavailable approval, and native command
   failures are visible and fail closed.
+- Low-likelihood cases already bounded by one agent run, exact path validation,
+  or existing episode identity/replay checks do not justify nonces, leases,
+  timers, durable approval state, or a generalized authorization machine.
 - Routing does not access or persist credentials or unrelated host data.
 
 ## Scope
@@ -147,9 +150,9 @@ A reasonable order may be conversational `/handoff`, conversational `/plan`, and
 only then a feasibility decision for conversational `/implement-spec`. This is
 guidance, not a mandated implementation architecture.
 
-The bundle remains in `.ralph/plans/future/` until the operator approves this
-specification, separately invokes native `/plan`, approves the resulting plan,
-and invokes native `/implement-spec`.
+This native `/plan` invocation records specification approval for planning
+only. The bundle remains in `.ralph/plans/future/` until the operator separately
+approves the resulting execution plan and invokes native `/implement-spec`.
 
 ## Provenance
 
