@@ -118,6 +118,13 @@ agent installs the missing templates from prime-claw without overwriting
 existing customized files, then prompts the operator to verify and customize
 the templates for that project.
 
+`.ralph/skills/` is the canonical policy location but is not itself a Prime
+Agent skill-discovery directory. The builder currently exposes directly invoked
+phases through `.agents/skills` symlinks while native plugin commands load other
+phase Markdown from `.ralph/skills/`. Project-context preparation must reproduce
+or deliberately replace that exposure and verify that the intended skills and
+native commands are actually available in the new session.
+
 Provisioning is not complete merely because files were copied. Before launching
 or routing work that depends on Ralph, the universal agent verifies the global
 plugin and the target project's required workflow skills are present and
