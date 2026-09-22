@@ -43,6 +43,11 @@ cp -f .prime/agent/extension-support/spec-episode.ts   "$HOME/.prime/agent/exten
 Refresh after any builder change to these files. Copying the complete managed
 set avoids mixed-version entry points and support code.
 
+Do not rely on `/reload` to replace an already loaded plugin generation. The
+plugin can remain resident after reload. Let affected work quiesce, then restart
+the Prime Agent process or session before treating the refreshed global copy as
+active.
+
 ## Verify
 
 Compare each global file with its builder source using `cmp -s` or a SHA-256

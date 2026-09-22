@@ -136,7 +136,10 @@ or routing work that depends on Ralph, the universal agent verifies the global
 plugin and the target project's required workflow skills are present and
 discoverable. The POC should document the exact global install, refresh, and
 verification procedure and record where project-specific customization is
-needed.
+needed. A global refresh is not active merely because `/reload` was invoked:
+observed plugin generations can remain resident past reload, so affected work
+must quiesce and the Prime Agent process or session must restart before fresh
+verification.
 
 The first lab-global installation is complete. The five managed files matched
 the builder sources byte for byte, and a disposable offline Prime Agent RPC
