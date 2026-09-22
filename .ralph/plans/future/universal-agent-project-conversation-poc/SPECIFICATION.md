@@ -130,12 +130,17 @@ phase Markdown from `.ralph/skills/`. Project-context preparation must reproduce
 or deliberately replace that exposure and verify that the intended skills and
 native commands are actually available in the new session. File presence alone
 is insufficient: existing customized skills must also match the native command
-contract and reviewed future-folder lifecycle. The continuing `openclaw-setup` audit demonstrated this distinction: the
-operator aligned its design, specification, planning, and handoff policies with
-the reviewed future-folder workflow, but the project still lacked an
-`implement-spec` skill, its blocked policy still required the parked Prime Ralph
-lifecycle tool, and its direct skill exposure still included legacy `plan` and
-`handoff-old` entries.
+contract and reviewed future-folder lifecycle. The continuing `openclaw-setup` audit demonstrated this distinction. The
+operator first aligned its design, specification, planning, and handoff
+policies, then authorized the universal-agent POC to finish the remaining
+project preparation. The POC added `implement-spec`, replaced the blocked and
+execute policies that depended on parked Prime Ralph, removed direct `plan` and
+`handoff` skill exposure, and exposed `blocked`. A fresh offline Prime Agent
+startup then found exactly one global `/handoff`, `/plan`, and `/implement-spec`
+and only the intended project-local direct skills. The project's full Tier 1
+run still had three stale Prime Ralph/future-package assertions; those are
+tracked separately for removal under `openclaw-fa9n` and do not indicate a
+plugin or skill-discovery collision.
 
 Provisioning is not complete merely because files were copied. Before launching
 or routing work that depends on Ralph, the universal agent verifies the global
