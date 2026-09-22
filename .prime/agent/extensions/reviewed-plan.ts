@@ -14,15 +14,83 @@ import {
  * Native reviewed planning and implementation-promotion boundaries.
  *
  * Commands perform only deterministic path checks and canonical skill loading.
- * Semantic readiness remains in customizable Markdown. The one structured tool
- * exposes no model-controlled branch, worktree, session, prompt, or command.
+ * Semantic readiness remains in customizable Markdown. Explicit structured tools
+ * expose no arbitrary command, prompt, branch, worktree, or session controls.
  */
 
 const PLAN_USAGE = "Usage: /plan .ralph/plans/future/<slug>";
 const IMPLEMENT_USAGE = "Usage: /implement-spec .ralph/plans/future/<slug>";
 
+const PLAN_WORKFLOW = {
+  usage: PLAN_USAGE,
+  skillName: "plan",
+  locationTag: "operator-plan-location",
+};
+const IMPLEMENT_WORKFLOW = {
+  usage: IMPLEMENT_USAGE,
+  skillName: "implement-spec",
+  locationTag: "operator-implementation-location",
+};
+
 function warn(ctx: ExtensionContext, message: string): void {
   ctx.ui.notify(message, "warning");
+}
+
+type SkillWorkflow = {
+  usage: string;
+  skillName: string;
+  locationTag: string;
+};
+
+type SkillAdmissionResult =
+  | { ok: true; location: string }
+  | { ok: false; message: string };
+
+function admitCanonicalSkill(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  rawLocation: string,
+  workflow: SkillWorkflow,
+  delivery: "native" | "followUp",
+  onValidated?: (ctx: ExtensionContext, location: string) => void,
+): SkillAdmissionResult {
+  let selected;
+  try {
+    selected = validateFutureLocation(ctx.cwd, rawLocation);
+  } catch {
+    selected = null;
+  }
+  if (!selected) return { ok: false, message: workflow.usage };
+
+  const prompt = wrapCanonicalSkill(
+    selected.projectRoot,
+    workflow.skillName,
+    workflow.locationTag,
+    selected.location,
+  );
+  if (!prompt) {
+    return {
+      ok: false,
+      message: `reviewed-plan: .ralph/skills/${workflow.skillName}/SKILL.md not found`,
+    };
+  }
+
+  try {
+    if (delivery === "followUp") {
+      pi.sendUserMessage(prompt, { deliverAs: "followUp" });
+    } else {
+      pi.sendUserMessage(prompt);
+    }
+  } catch (error) {
+    if (delivery === "native") throw error;
+    return {
+      ok: false,
+      message: `reviewed-plan: canonical ${workflow.skillName} could not be queued`,
+    };
+  }
+
+  onValidated?.(ctx, selected.location);
+  return { ok: true, location: selected.location };
 }
 
 function registerSkillCommand(
@@ -30,37 +98,22 @@ function registerSkillCommand(
   options: {
     command: string;
     description: string;
-    usage: string;
-    skillName: string;
-    locationTag: string;
+    workflow: SkillWorkflow;
     onValidated?: (ctx: ExtensionContext, location: string) => void;
   },
 ): void {
   pi.registerCommand(options.command, {
     description: options.description,
     handler: async (args, ctx) => {
-      let selected;
-      try {
-        selected = validateFutureLocation(ctx.cwd, args);
-      } catch {
-        selected = null;
-      }
-      if (!selected) {
-        warn(ctx, options.usage);
-        return;
-      }
-      const prompt = wrapCanonicalSkill(
-        selected.projectRoot,
-        options.skillName,
-        options.locationTag,
-        selected.location,
+      const result = admitCanonicalSkill(
+        pi,
+        ctx,
+        args,
+        options.workflow,
+        "native",
+        options.onValidated,
       );
-      if (!prompt) {
-        warn(ctx, `reviewed-plan: .ralph/skills/${options.skillName}/SKILL.md not found`);
-        return;
-      }
-      pi.sendUserMessage(prompt);
-      options.onValidated?.(ctx, selected.location);
+      if (!result.ok) warn(ctx, result.message);
     },
   });
 }
@@ -71,18 +124,62 @@ export function createReviewedPlanExtension(dependencies?: EpisodeDependencies) 
     registerSkillCommand(pi, {
       command: "plan",
       description: "Plan a reviewed specification from an explicit .ralph/plans/future/<slug> folder",
-      usage: PLAN_USAGE,
-      skillName: "plan",
-      locationTag: "operator-plan-location",
+      workflow: PLAN_WORKFLOW,
     });
     registerSkillCommand(pi, {
       command: "implement-spec",
       description: "Review and promote an approved future bundle into an isolated implementation episode",
-      usage: IMPLEMENT_USAGE,
-      skillName: "implement-spec",
-      locationTag: "operator-implementation-location",
+      workflow: IMPLEMENT_WORKFLOW,
       onValidated: (ctx, location) => {
         approvedLocationBySession.set(ctx.sessionManager.getSessionId(), location);
+      },
+    });
+
+    pi.registerTool({
+      name: "ralph_plan",
+      label: "Plan reviewed Ralph specification",
+      description: "Queue the canonical Ralph planning workflow for one exact .ralph/plans/future/<slug> folder. This creates a plan only and never authorizes implementation.",
+      promptSnippet: "Queue canonical Ralph planning for one reviewed future-plan folder",
+      promptGuidelines: [
+        "Call ralph_plan only when the operator clearly asks to plan one exact .ralph/plans/future/<slug> folder.",
+        "Before calling ralph_plan, ask the operator if the folder is missing or materially ambiguous; never search for, select, or invent a folder.",
+        "ralph_plan queues planning only and never records implementation approval or creates episode resources.",
+        "Treat ralph_plan as a terminal routing action: after successful admission, do not continue planning in the current turn.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          location: {
+            type: "string",
+            description: "Exact project-relative .ralph/plans/future/<slug> folder selected by the operator",
+          },
+        },
+        required: ["location"],
+        additionalProperties: false,
+      } as any,
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        const result = admitCanonicalSkill(
+          pi,
+          ctx,
+          params.location,
+          PLAN_WORKFLOW,
+          "followUp",
+        );
+        if (!result.ok) {
+          return {
+            content: [{ type: "text", text: result.message }],
+            details: { admitted: false, error: result.message },
+            isError: true,
+          };
+        }
+        return {
+          content: [{
+            type: "text",
+            text: `Planning admitted for ${result.location}: the canonical workflow was queued as a follow-up. Planning has not completed, and implementation is not authorized.`,
+          }],
+          details: { admitted: true, location: result.location },
+        };
       },
     });
 

@@ -1,6 +1,6 @@
 # Execution Plan — Conversational routing for Ralph native commands
 
-> **Status:** implementation in progress; Slice 1 candidate ready for project-conversation review (`prime-claw-h6w.18`).
+> **Status:** implementation in progress; Slice 2 candidate ready for project-conversation review (`prime-claw-h6w.19`).
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Selected future folder:** `.ralph/plans/future/conversational-ralph-command-routing/`
 > **Parent workstream:** `prime-claw-h6w` (Phase 4 episode loop)
@@ -91,9 +91,9 @@ not permission to patch Prime Agent internals or add a general state machine.
 
 ## Slice 1 — Conversational handoff
 
-**Implementation status:** Candidate complete on `prime-claw-h6w.18`; focused
-and full regression evidence is recorded on that bead. Awaiting
-project-conversation acceptance before Slice 2.
+**Implementation status:** Accepted by the project conversation in commit
+`86b24b5`; focused and full regression evidence is recorded on
+`prime-claw-h6w.18`.
 
 ### Working capability
 
@@ -144,6 +144,10 @@ No planning or implementation adapter, no change to compaction semantics, no
 new continuation state, and no generic natural-language parser.
 
 ## Slice 2 — Conversational reviewed planning
+
+**Implementation status:** Candidate complete on `prime-claw-h6w.19`; focused
+and full regression evidence is recorded on that bead. Awaiting
+project-conversation acceptance before Slice 3.
 
 **Depends on:** Slice 1 accepted by the project conversation.
 

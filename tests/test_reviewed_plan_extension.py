@@ -50,10 +50,12 @@ def test_prime_agent_rpc_loads_native_commands_and_structured_tool() -> None:
     probe_source = """import { SessionManager } from "@earendil-works/pi-coding-agent";
 export default function probe(pi) {
   pi.on("session_start", () => {
+    const toolNames = pi.getAllTools().map((tool) => tool.name);
     if (typeof SessionManager.forkFrom === "function"
-      && pi.getAllTools().some((tool) => tool.name === "create_spec_episode")) {
-      pi.registerCommand("probe-create-spec-episode-tool", {
-        description: "RPC proof that create_spec_episode is registered",
+      && toolNames.includes("ralph_plan")
+      && toolNames.includes("create_spec_episode")) {
+      pi.registerCommand("probe-reviewed-plan-tools", {
+        description: "RPC proof that reviewed-plan tools are registered",
         handler: async () => {},
       });
     }
@@ -93,7 +95,7 @@ export default function probe(pi) {
         assert len(matches) == 1
         assert Path(matches[0]["sourceInfo"]["path"]).resolve() == EXTENSION.resolve()
     assert [command["name"] for command in commands].count(
-        "probe-create-spec-episode-tool"
+        "probe-reviewed-plan-tools"
     ) == 1
 
 

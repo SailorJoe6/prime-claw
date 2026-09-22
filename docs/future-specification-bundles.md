@@ -63,9 +63,13 @@ artifact, and stops for operator specification review. Requested changes stay
 in the same bundle. Authoring does not create an execution plan, branch,
 worktree, or episode.
 
-## Native reviewed planning
+## Reviewed planning entry paths
 
-Planning is a separate reviewed gate. Select the exact reviewed bundle with:
+Planning is a separate reviewed gate with two explicit entry paths.
+
+### Native `/plan`
+
+Select the exact reviewed bundle with:
 
 ```text
 /plan .ralph/plans/future/<slug>
@@ -92,8 +96,30 @@ is missing or inadequate, it explains the gap and stops. Otherwise, it links
 all planning output and stops for operator plan review. `/plan` never moves the
 bundle, creates an implementation worktree, or authorizes implementation.
 
-There is only one planning command surface: the native `/plan` command. The former
-`.agents/skills/plan` exposure is intentionally absent.
+### Conversational `ralph_plan`
+
+A fresh project conversation also exposes the model-callable `ralph_plan` tool.
+It accepts only one required `location` field containing the exact
+`.ralph/plans/future/<slug>` folder selected by the operator. It has no search,
+command, approval, implementation, or routing fields.
+
+When the operator clearly requests planning for an exact folder, the tool calls
+the same deterministic validation and canonical skill-loading helper as native
+`/plan`. Because the tool runs during an agent turn, it queues the wrapped
+planning workflow exactly once with `deliverAs: "followUp"`. Its result reports
+admission only: planning has not completed, and implementation remains
+unauthorized.
+
+If the folder is missing or materially ambiguous, the model asks the operator
+instead of searching, selecting, or inventing a slug. Invalid paths, missing
+folders, symlink escapes, missing canonical Markdown, and queue failures are
+visible and admit no partial workflow. Inline prose is not parsed by extension
+substring matching.
+
+These are two explicit admission surfaces for the same planning operation:
+native `/plan` and conversational `ralph_plan`. The former
+`.agents/skills/plan` exposure remains intentionally absent, so there is still
+no duplicate skill slash command.
 
 ## Explicit implementation promotion
 
@@ -208,14 +234,17 @@ node --experimental-strip-types --test tests/spec_episode_extension.test.mjs
 pytest -q tests/test_reviewed_plan_extension.py
 ```
 
-The Node suites cover command validation, opaque temporary-Git promotion,
-lifecycle-directory preservation, promotion commits, inherited context,
-protocol-7 daemon envelopes, durable pre-delivery admission, crash-window and
+The Node suites cover native and conversational planning registration,
+validation, canonical Markdown loading, follow-up admission, failure isolation,
+opaque temporary-Git promotion, lifecycle-directory preservation, promotion
+commits, inherited context, protocol-7 daemon envelopes, durable pre-delivery
+admission, crash-window and
 uncertain-delivery replay suppression, allowed-empty promotion commits, partial
 cleanup observability, active and inactive replay, collision safety, and
 confirmed invocation-owned cleanup. The Python bridge reruns both suites and uses
 installed offline Prime Agent RPC plus startup probes to prove one native
-`plan`, one native `implement-spec`, the structured tool, a valid inherited
+`plan`, one native `implement-spec`, explicit `ralph_plan` and
+`create_spec_episode` tools, a valid inherited
 Prime Agent context, and bounded real daemon create/state/messages/kill behavior
 at the episode worktree CWD.
 

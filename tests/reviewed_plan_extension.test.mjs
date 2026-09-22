@@ -37,12 +37,14 @@ test("every top-level auto-discovered extension exports a factory", async () => 
   }
 });
 
-function createHarness(cwd, extension = reviewedPlan) {
+function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0) {
   const commands = new Map();
   const tools = new Map();
   const events = new Map();
   const messages = [];
+  const deliveries = [];
   const notices = [];
+  let sendCount = 0;
   const pi = {
     registerCommand(name, definition) {
       commands.set(name, definition);
@@ -53,8 +55,11 @@ function createHarness(cwd, extension = reviewedPlan) {
     on(name, handler) {
       events.set(name, handler);
     },
-    sendUserMessage(message) {
+    sendUserMessage(message, options) {
+      sendCount += 1;
+      if (sendCount === throwOnSend) throw new Error("synthetic send failure");
       messages.push(message);
+      deliveries.push({ message, options });
     },
   };
   const ctx = {
@@ -71,16 +76,16 @@ function createHarness(cwd, extension = reviewedPlan) {
     },
   };
   extension(pi);
-  return { commands, tools, events, ctx, messages, notices };
+  return { commands, tools, events, ctx, messages, deliveries, notices };
 }
 
-function fixture(t, { skill = "canonical plan body", folder = true } = {}) {
+function fixture(t, { skill = "canonical plan body", folder = true, throwOnSend = 0 } = {}) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, ".ralph", "plans", "future"), { recursive: true });
   if (folder) mkdirSync(join(cwd, LOCATION), { recursive: true });
   if (skill !== null) writeSkill(cwd, skill);
-  return { cwd, ...createHarness(cwd) };
+  return { cwd, ...createHarness(cwd, reviewedPlan, throwOnSend) };
 }
 
 function writeSkill(cwd, body, name = "plan") {
@@ -107,12 +112,18 @@ function count(haystack, needle) {
   return haystack.split(needle).length - 1;
 }
 
-test("registers native reviewed commands and one narrowly scoped tool", (t) => {
+test("registers native reviewed commands and two explicit narrow tools", (t) => {
   const f = fixture(t);
   assert.deepEqual([...f.commands.keys()], ["plan", "implement-spec"]);
-  assert.deepEqual([...f.tools.keys()], ["create_spec_episode"]);
+  assert.deepEqual([...f.tools.keys()], ["ralph_plan", "create_spec_episode"]);
   assert.deepEqual([...f.events.keys()], ["session_start", "agent_end", "session_shutdown"]);
   assert.match(f.commands.get("plan").description, /explicit .*future/);
+  const planTool = f.tools.get("ralph_plan");
+  assert.equal(planTool.executionMode, "sequential");
+  assert.deepEqual(Object.keys(planTool.parameters.properties), ["location"]);
+  assert.deepEqual(planTool.parameters.required, ["location"]);
+  assert.equal(planTool.parameters.additionalProperties, false);
+  assert.ok(planTool.promptGuidelines.every((guideline) => guideline.includes("ralph_plan")));
   assert.deepEqual(f.tools.get("create_spec_episode").parameters.required, ["location"]);
   assert.equal(f.tools.get("create_spec_episode").parameters.additionalProperties, false);
 });
@@ -123,12 +134,138 @@ test("loads current canonical markdown and injects exact location once", async (
 
   await f.commands.get("plan").handler(LOCATION, f.ctx);
 
-  assert.deepEqual(f.messages, [
-    expectedPrompt(f.cwd, "current project-customized plan body"),
-  ]);
+  const prompt = expectedPrompt(f.cwd, "current project-customized plan body");
+  assert.deepEqual(f.messages, [prompt]);
+  assert.deepEqual(f.deliveries, [{ message: prompt, options: undefined }]);
   assert.equal(count(f.messages[0], "<operator-plan-location>"), 1);
   assert.equal(count(f.messages[0], LOCATION), 1);
   assert.deepEqual(f.notices, []);
+});
+
+test("conversational planning queues current canonical markdown once as a follow-up", async (t) => {
+  const f = fixture(t, { skill: "old body" });
+  writeSkill(f.cwd, "current project-customized plan body");
+
+  const result = await f.tools.get("ralph_plan").execute(
+    "plan-call-1",
+    { location: `  ${LOCATION}  ` },
+    undefined,
+    undefined,
+    f.ctx,
+  );
+
+  const prompt = expectedPrompt(f.cwd, "current project-customized plan body");
+  assert.deepEqual(f.messages, [prompt]);
+  assert.deepEqual(f.deliveries, [{
+    message: prompt,
+    options: { deliverAs: "followUp" },
+  }]);
+  assert.equal(count(f.messages[0], "<operator-plan-location>"), 1);
+  assert.equal(count(f.messages[0], LOCATION), 1);
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(result.details, { admitted: true, location: LOCATION });
+  assert.match(result.content[0].text, /Planning admitted/);
+  assert.match(result.content[0].text, /has not completed/);
+  assert.match(result.content[0].text, /implementation is not authorized/);
+  assert.deepEqual(f.notices, []);
+
+  const unauthorized = await f.tools.get("create_spec_episode").execute(
+    "episode-after-valid-plan",
+    { location: LOCATION },
+    undefined,
+    undefined,
+    f.ctx,
+  );
+  assert.equal(unauthorized.isError, true);
+  assert.match(unauthorized.content[0].text, /no matching active \/implement-spec approval/);
+});
+
+test("conversational planning rejects invalid exact locations without side effects", async (t) => {
+  const f = fixture(t);
+  const tool = f.tools.get("ralph_plan");
+  const invalidLocations = [
+    "",
+    join(f.cwd, LOCATION),
+    ".ralph/plans/future/../future/alpha-plan",
+    `${LOCATION} another`,
+    ".ralph/plans/future/alpha plan",
+  ];
+
+  for (const [index, location] of invalidLocations.entries()) {
+    const result = await tool.execute(
+      `invalid-${index}`, { location }, undefined, undefined, f.ctx,
+    );
+    assert.equal(result.isError, true);
+    assert.equal(result.content[0].text, USAGE);
+  }
+
+  assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
+  const unauthorized = await f.tools.get("create_spec_episode").execute(
+    "episode-after-invalid-plan",
+    { location: LOCATION },
+    undefined,
+    undefined,
+    f.ctx,
+  );
+  assert.equal(unauthorized.isError, true);
+  assert.match(unauthorized.content[0].text, /no matching active \/implement-spec approval/);
+});
+
+test("conversational planning rejects a missing folder", async (t) => {
+  const f = fixture(t, { folder: false });
+
+  const result = await f.tools.get("ralph_plan").execute(
+    "missing-folder", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+
+  assert.equal(result.isError, true);
+  assert.equal(result.content[0].text, USAGE);
+  assert.deepEqual(f.messages, []);
+});
+
+test("conversational planning rejects a resolved symlink escape", async (t) => {
+  const f = fixture(t, { folder: false });
+  const outside = mkdtempSync(join(tmpdir(), "prime-claw-plan-tool-outside-"));
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  symlinkSync(outside, join(f.cwd, LOCATION), "dir");
+
+  const result = await f.tools.get("ralph_plan").execute(
+    "symlink-escape", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+
+  assert.equal(result.isError, true);
+  assert.equal(result.content[0].text, USAGE);
+  assert.deepEqual(f.messages, []);
+});
+
+test("conversational planning reports missing canonical skill", async (t) => {
+  const f = fixture(t, { skill: null });
+
+  const result = await f.tools.get("ralph_plan").execute(
+    "missing-skill", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /\.ralph\/skills\/plan\/SKILL\.md not found/);
+  assert.deepEqual(f.messages, []);
+});
+
+test("conversational planning reports follow-up queue failure without claiming admission", async (t) => {
+  const f = fixture(t, { throwOnSend: 1 });
+
+  const result = await f.tools.get("ralph_plan").execute(
+    "send-failure", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /canonical plan could not be queued/);
+  assert.deepEqual(result.details, {
+    admitted: false,
+    error: "reviewed-plan: canonical plan could not be queued",
+  });
+  assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
 });
 
 test("missing argument shows usage without model injection", async (t) => {
