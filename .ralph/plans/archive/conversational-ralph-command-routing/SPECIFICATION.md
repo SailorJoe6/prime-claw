@@ -1,8 +1,8 @@
 # Specification — Conversational routing for Ralph native commands
 
-> **Status:** approved for implementation; active episode.
+> **Status:** implemented and archived; awaiting renewed final Expert review and the explicit HITL merge decision.
 > **Delivered command architecture:** [Future specification bundles](../../../../docs/future-specification-bundles.md)
-> **Related delivered work:** [Handoff continuation resilience](../../archive/handoff-continuation-resilience/SPECIFICATION.md)
+> **Related delivered work:** [Handoff continuation resilience](../handoff-continuation-resilience/SPECIFICATION.md)
 > **Historical advisory evidence:** [`reports/reviews/handoff-resilience-spec-review-a93c27c.md`](../../../../reports/reviews/handoff-resilience-spec-review-a93c27c.md)
 
 ## Purpose
@@ -25,7 +25,7 @@ boundary.
 
 Prime Claw now provides native `/plan` and `/implement-spec` commands through the
 architecture delivered by the archived
-[worktree-isolated specification episode](../../archive/worktree-isolated-specification-episodes/SPECIFICATION.md).
+[worktree-isolated specification episode](../worktree-isolated-specification-episodes/SPECIFICATION.md).
 Deterministic extension code validates paths and loads current project-local
 workflow Markdown. `/implement-spec` is the explicit boundary that may create a
 branch, worktree, and episode.

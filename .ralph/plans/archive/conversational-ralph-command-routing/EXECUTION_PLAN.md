@@ -1,6 +1,6 @@
 # Execution Plan — Conversational routing for Ralph native commands
 
-> **Status:** all slices accepted; awaiting final integration review and the explicit HITL merge gate.
+> **Status:** implementation and final validation complete; archived for renewed Expert review and the explicit HITL merge gate.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Selected future folder:** `.ralph/plans/future/conversational-ralph-command-routing/`
 > **Parent workstream:** `prime-claw-h6w` (Phase 4 episode loop)

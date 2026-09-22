@@ -6,6 +6,24 @@ they are archived together. Older sets contain specification, requirements,
 decisions, and execution-plan files; newer project-customized sets may contain a
 different reviewed artifact collection.
 
+## conversational-ralph-command-routing/ — Conversational routing for Ralph native commands ✅ COMPLETE (2026-09-22)
+
+Delivered explicit `ralph_handoff` and `ralph_plan` tools that converge on the
+canonical native workflows while preserving `/handoff`, `/plan`, and
+`/implement-spec`. Handoff uses `steer` followed by the sole `followUp`; planning
+queues canonical planning once and grants no implementation authority. Installed
+Prime Agent 0.9.5 lifecycle evidence selected the approved native-only fallback
+for implementation, so `ralph_implement_spec` is intentionally absent.
+
+Accepted slice commits are `86b24b5dfecac312a46cfbab2190236b73af430b`,
+`d011968d4f505d8df52ebd552e49d654cdf45b74`, and
+`272372c9e848c21d48a5968144d2495ea59c4a2e`; acceptance state is recorded by
+`a25f3b426f8ebe222911d78458f899098e017ff5`. Final validation covered all three
+Node suites, the full Python suite, installed-runtime discovery, archive-link
+resolution, and a clean diff. The unrelated `conversation-driven-episode-oversight`
+bundle remains incubating and unchanged. Merge and resource cleanup remain
+separate explicit operator decisions.
+
 ## handoff-continuation-resilience/ — Compaction-independent handoff continuation ✅ COMPLETE (2026-09-21)
 
 Changed native `/handoff` to preflight both canonical workflows, admit handoff,

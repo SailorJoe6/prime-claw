@@ -1,6 +1,7 @@
 """Regression bridge for the native reviewed-plan command."""
 
 import json
+import re
 from pathlib import Path
 import selectors
 import shutil
@@ -446,3 +447,18 @@ def test_operator_docs_explain_native_only_implementation_fallback() -> None:
         "must not be emulated with durable approvals, leases,",
     ):
         assert fragment in docs
+
+
+def test_archived_conversational_routing_bundle_links_resolve() -> None:
+    """Final archival must preserve every local cross-document link."""
+    bundle = REPO / ".ralph" / "plans" / "archive" / "conversational-ralph-command-routing"
+    for filename in ("SPECIFICATION.md", "EXECUTION_PLAN.md"):
+        document = bundle / filename
+        targets = re.findall(r"\[[^\]]+\]\(([^)]+)\)", document.read_text())
+        relative_targets = [
+            target for target in targets
+            if not target.startswith(("#", "http://", "https://"))
+        ]
+        assert relative_targets, filename
+        for target in relative_targets:
+            assert (document.parent / target).resolve().is_file(), f"{filename}: {target}"
