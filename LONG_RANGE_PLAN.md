@@ -154,13 +154,14 @@ Now the Ralph-style workflow runs on the proven runtime. Manual-first: keep the
 phase policy in project-customizable Markdown, drive it across real work, and
 codify only transitions that repeated use proves deterministic.
 
-Capability placement follows the manual proof boundary. During the host-side
-POC, the universal-agent emulator installs the prime-claw plugin project-locally
-before launching a conversation in a managed project. The final sandbox copies
-the plugin from the builder project into Prime Agent's global plugin location.
-In both stages the universal agent ensures every managed project has a local
-`.ralph/plans/` tree and a complete project-customizable `.ralph/skills/` set,
-installing missing templates and asking the operator to verify them.
+Capability placement follows the manual proof boundary. The personal lab POC
+installs one global prime-claw plugin copy from the builder project and refreshes
+that copy when the builder changes; it does not maintain one plugin copy per
+managed repository. The final sandbox uses the same environment-global
+placement inside its isolated home. In both stages the universal agent ensures
+every managed project has a local `.ralph/plans/` tree and a complete
+project-customizable `.ralph/skills/` set, installing missing templates and
+asking the operator to verify them.
 
 - **4a — phase skills and proven transitions.** The canonical skills under
   `.ralph/skills/` remain editable per operator and project. Native commands

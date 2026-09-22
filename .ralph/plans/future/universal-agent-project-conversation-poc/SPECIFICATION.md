@@ -90,20 +90,25 @@ Prime-claw's current Ralph plugin is installed project-locally in the builder
 repository. Prime Agent discovers project-local extensions from the new
 session's own CWD hierarchy, not from a sibling repository. A project
 conversation rooted in another repository therefore cannot use the plugin
-unless it is provisioned deliberately.
+unless it is also available globally or installed into that project.
 
-During this manual POC, the universal-agent emulator must check each
-`PROJECT_CONTEXT` before launching a project conversation. If the prime-claw
-plugin is absent, it installs the plugin project-locally in that repository and
-verifies that the new session registers the expected commands. This local plugin
-installation is POC-only scaffolding.
+For this manual POC, the plugin is installed once into Prime Agent's global
+plugin location on this personal lab machine. The global installation is copied
+from the prime-claw builder project and refreshed there whenever the builder's
+plugin changes. The universal-agent emulator verifies that the global copy is
+present and current before launching project conversations. It does not install
+a separate plugin copy into every managed repository.
 
-After the POC, the final design installs the prime-claw plugin by copying it from
-the prime-claw builder project into Prime Agent's global plugin location inside
-the sandbox home. Project conversations then discover the shared plugin without
-copying it into every managed repository. Sandbox construction or convergence
-must reproduce that global installation; it must not depend on host-global
-state.
+This lab-global installation is POC scaffolding, not a requirement that
+prime-claw modify an operator's ordinary host environment. The final sandbox
+uses the same placement model inside its isolated home: sandbox construction or
+convergence copies the plugin from the builder project into Prime Agent's global
+plugin location so every project conversation can discover one shared version.
+
+If a managed project already contains a project-local copy of the plugin, the
+universal agent surfaces the possible duplicate or stale override and reconciles
+it deliberately. It does not silently maintain competing global and local
+copies.
 
 The workflow Markdown remains project-local in both stages. The
 `UNIVERSAL_AGENT` must ensure every managed `PROJECT_CONTEXT` contains a local
@@ -114,11 +119,11 @@ existing customized files, then prompts the operator to verify and customize
 the templates for that project.
 
 Provisioning is not complete merely because files were copied. Before launching
-or routing work that depends on Ralph, the universal agent verifies the plugin
-and the target project's required workflow skills are present and discoverable.
-The POC should document the exact install and verification procedure and record
-where project-specific customization is needed.
-
+or routing work that depends on Ralph, the universal agent verifies the global
+plugin and the target project's required workflow skills are present and
+discoverable. The POC should document the exact global install, refresh, and
+verification procedure and record where project-specific customization is
+needed.
 ## Manual launch and lifecycle work
 
 Sibling launching is already a proven Prime Agent capability. This POC should

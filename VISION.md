@@ -240,11 +240,10 @@ reproducible, and compatible with the credential-isolation boundary.
 The general packaging, conflict, compatibility, and persistence model remains
 intentionally unresolved. Manual use should supply evidence rather than freezing
 a general skill-pack mechanism prematurely. The Ralph workflow now has one
-narrow placement decision for that manual proof: during the host-side POC the
-universal-agent emulator installs the prime-claw plugin project-locally before
-launching a project conversation; the final sandbox copies that plugin from the
-builder project into Prime Agent's global plugin location. In both stages, each
-managed project keeps its own `.ralph/plans/` and customizable
+narrow placement decision for that manual proof: the personal lab POC and the
+final sandbox each copy the prime-claw plugin from the builder project into
+Prime Agent's global plugin location for that isolated environment. In both
+stages, each managed project keeps its own `.ralph/plans/` and customizable
 `.ralph/skills/` tree, which the universal agent initializes from templates and
 asks the operator to verify when required files are missing.
 
