@@ -1,6 +1,6 @@
 # Execution Plan — Conversational routing for Ralph native commands
 
-> **Status:** proposed for operator review; not approved for implementation.
+> **Status:** implementation in progress; Slice 1 candidate ready for project-conversation review (`prime-claw-h6w.18`).
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Selected future folder:** `.ralph/plans/future/conversational-ralph-command-routing/`
 > **Parent workstream:** `prime-claw-h6w` (Phase 4 episode loop)
@@ -73,9 +73,9 @@ The public tool names are `ralph_handoff`, `ralph_plan`, and
 
 ## Delivery discipline
 
-Implement the work as three dependency-ordered vertical slices. Before Slice 1,
-create one child implementation bead per slice under `prime-claw-h6w` and record
-the dependency chain. Each slice must:
+Implement the work as three dependency-ordered vertical slices. The implementation
+bead chain is `prime-claw-h6w.18` (Slice 1) → `prime-claw-h6w.19` (Slice 2) →
+`prime-claw-h6w.20` (Slice 3), all under `prime-claw-h6w`. Each slice must:
 
 - remain inside its stated scope;
 - update its own bead with the exact commit and evidence;
@@ -90,6 +90,10 @@ A failed characterization or unavailable public API is a plan-review boundary,
 not permission to patch Prime Agent internals or add a general state machine.
 
 ## Slice 1 — Conversational handoff
+
+**Implementation status:** Candidate complete on `prime-claw-h6w.18`; focused
+and full regression evidence is recorded on that bead. Awaiting
+project-conversation acceptance before Slice 2.
 
 ### Working capability
 

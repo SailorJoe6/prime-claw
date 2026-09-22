@@ -26,12 +26,25 @@ def test_handoff_chain_node_suite():
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_prime_agent_rpc_loads_native_handoff_command():
-    """Smoke the installed Prime Agent loader without invoking a model."""
+def test_prime_agent_rpc_loads_native_handoff_command_and_conversational_tool():
+    """Probe installed offline Prime Agent for both explicit entry surfaces."""
     prime_agent = shutil.which("prime-agent")
     assert prime_agent, "prime-agent is a documented developer prerequisite"
     request = json.dumps({"id": "loader", "type": "get_commands"}) + "\n"
+    probe_source = """export default function probe(pi) {
+  pi.on("session_start", () => {
+    if (pi.getAllTools().some((tool) => tool.name === "ralph_handoff")) {
+      pi.registerCommand("probe-ralph-handoff-tool", {
+        description: "RPC proof that ralph_handoff is registered",
+        handler: async () => {},
+      });
+    }
+  });
+}
+"""
     with tempfile.TemporaryDirectory(prefix="prime-claw-handoff-loader-") as cwd:
+        probe = Path(cwd) / "tool-probe.ts"
+        probe.write_text(probe_source)
         result = subprocess.run(
             [
                 prime_agent,
@@ -44,6 +57,7 @@ def test_prime_agent_rpc_loads_native_handoff_command():
                 "--no-extensions",
                 "--cwd", cwd,
                 "-e", str(EXTENSION),
+                "-e", str(probe),
             ],
             cwd=REPO,
             input=request,
@@ -55,12 +69,13 @@ def test_prime_agent_rpc_loads_native_handoff_command():
     assert result.returncode == 0, result.stdout + result.stderr
     response = json.loads(result.stdout.strip().splitlines()[-1])
     assert response["success"] is True
-    commands = [
-        command for command in response["data"]["commands"]
-        if command["name"] == "handoff"
-    ]
-    assert len(commands) == 1
-    assert Path(commands[0]["sourceInfo"]["path"]).resolve() == EXTENSION.resolve()
+    commands = response["data"]["commands"]
+    handoff = [command for command in commands if command["name"] == "handoff"]
+    assert len(handoff) == 1
+    assert Path(handoff[0]["sourceInfo"]["path"]).resolve() == EXTENSION.resolve()
+    assert [command["name"] for command in commands].count(
+        "probe-ralph-handoff-tool"
+    ) == 1
 
 
 def test_handoff_skill_has_only_one_slash_command_surface():

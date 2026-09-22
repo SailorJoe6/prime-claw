@@ -1,12 +1,13 @@
-# Native handoff chain
+# Ralph handoff chain
 
-> **Status:** Phase 4a dogfood automation. Native `/handoff` admits canonical
-> `execute` independently from best-effort compaction. The wider episode loop
-> remains manual-first and Phase 4 is not complete.
-> **Beads:** `prime-claw-h6w` → `prime-claw-f81` → `prime-claw-f81.2`
+> **Status:** Phase 4a dogfood automation. Native `/handoff` and the explicit
+> `ralph_handoff` conversational tool admit canonical `execute` independently
+> from best-effort compaction. The wider episode loop remains manual-first and
+> Phase 4 is not complete.
+> **Beads:** `prime-claw-h6w` → `prime-claw-f81` → `prime-claw-f81.2`; conversational adapter `prime-claw-h6w.18`
 
-prime-claw has one project-local native command for a transition that became
-predictable during manual driving:
+prime-claw has two explicit project-local entry surfaces for a transition that
+became predictable during manual driving:
 
 ```text
 /execute work → /handoff [optional compaction guidance] → best-effort compaction
@@ -18,7 +19,9 @@ The mechanism is
 It automates only this narrow seam. It does not choose work, decide that an
 iteration is complete, or implement the episode orchestrator.
 
-## Command contract
+## Entry contracts
+
+### Native command
 
 Prime Agent recognizes a native slash command only when it starts the submitted
 message after surrounding whitespace is trimmed. All remaining text is passed to
@@ -39,17 +42,39 @@ the extension as one argument string.
 
 There is no custom target syntax and no `--next` option.
 
+### Conversational tool
+
+A fresh project session also exposes the model-callable `ralph_handoff` tool.
+It is a separate, explicit adapter rather than a prose parser or generic command
+router:
+
+- call it only when the operator clearly asks to hand off the current Ralph
+  implementation pass;
+- pass only optional operator-supplied `guidance`; the tool has no command,
+  phase, approval, target, or arbitrary routing field;
+- ask the operator first when the desired handoff objective would otherwise be
+  materially inferred; and
+- treat successful admission as terminal for the current implementation turn.
+
+Inline mentions remain ordinary prose. The extension has no input listener that
+scans for words such as “handoff.” Successful tool output reports only that the
+canonical workflows were admitted; it does not claim that handoff, compaction,
+or the following execute pass completed.
+
 ## Runtime flow
 
-1. Prime Agent discovers the extension and registers native `/handoff`.
+1. Prime Agent discovers the extension and registers native `/handoff` plus the
+   explicit `ralph_handoff` tool.
 2. The command preflights both canonical files:
    `.ralph/skills/handoff/SKILL.md` and `.ralph/skills/execute/SKILL.md`. A
    missing file fails before the extension begins a partial transition.
-3. The extension injects canonical handoff first. Optional guidance is appended
-   in an `<operator-compaction-guidance>` block. User text never enters routing
-   state or a filesystem path.
-4. At the same command boundary, the extension queues canonical execute exactly
-   once with `pi.sendUserMessage(..., { deliverAs: "followUp" })`.
+3. The shared admission helper injects canonical handoff first. Optional guidance
+   is appended in an `<operator-compaction-guidance>` block. User text never
+   enters routing state or a filesystem path. Native `/handoff` keeps idle
+   command delivery unchanged; `ralph_handoff` explicitly uses `deliverAs:
+   "steer"` because a tool runs while the agent is streaming.
+4. At the same admission boundary, both entry surfaces queue canonical execute
+   exactly once with `pi.sendUserMessage(..., { deliverAs: "followUp" })`.
 5. The handoff turn updates durable context and calls `compact.run(focus_hint)`
    once. Its immediate result reports only whether compaction was requested.
 6. Prime Agent runs requested compaction at the turn boundary when possible,
@@ -109,8 +134,8 @@ runtime path or a reason to patch private queue state.
 |---|---|---|
 | `.ralph/skills/handoff/SKILL.md` | Project/operator | Canonical tracked workflow |
 | `.ralph/skills/execute/SKILL.md` | Project/operator | Canonical tracked workflow |
-| `.prime/agent/extensions/handoff-chain.ts` | prime-claw | Native admission mechanism |
-| Native `followUp` action | Prime Agent session | From `/handoff` admission until delivery, removal, or session end |
+| `.prime/agent/extensions/handoff-chain.ts` | prime-claw | Shared native and conversational admission mechanism |
+| Native `followUp` action | Prime Agent session | From either entry surface's admission until delivery, removal, or session end |
 | `<operator-compaction-guidance>` | Operator | One handoff turn and optional compaction boundary |
 
 Canonical workflow prose remains customizable Markdown. The extension loads it
@@ -181,9 +206,11 @@ Focused regression coverage lives in
 [`tests/handoff_chain_extension.test.mjs`](../tests/handoff_chain_extension.test.mjs)
 and is bridged through
 [`tests/test_handoff_chain_extension.py`](../tests/test_handoff_chain_extension.py).
-It covers preflight, exact guidance, handoff-then-follow-up ordering, one execute
-admission, absence of a compaction admission hook, late-signal safety, visible
-synchronous admission errors, legacy cleanup, and real offline command loading.
+It covers native and conversational registration, shared preflight, exact
+guidance, native delivery compatibility, conversational `steer` followed by the
+sole execute `followUp`, absence of prose or compaction admission hooks,
+late-signal safety, visible first- and second-send errors, legacy cleanup, and
+real offline command-and-tool loading.
 
 Run it with:
 

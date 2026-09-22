@@ -8,6 +8,7 @@ import handoffChain from "../.prime/agent/extensions/handoff-chain.ts";
 
 function createHarness(cwd, throwOnSend = 0) {
   const commands = new Map();
+  const tools = new Map();
   const events = new Map();
   const messages = [];
   const notices = [];
@@ -15,6 +16,9 @@ function createHarness(cwd, throwOnSend = 0) {
   const pi = {
     registerCommand(name, definition) {
       commands.set(name, definition);
+    },
+    registerTool(definition) {
+      tools.set(definition.name, definition);
     },
     on(name, handler) {
       events.set(name, handler);
@@ -35,7 +39,7 @@ function createHarness(cwd, throwOnSend = 0) {
   };
 
   handoffChain(pi);
-  return { cwd, commands, events, messages, notices, ctx };
+  return { cwd, commands, tools, events, messages, notices, ctx };
 }
 
 function fixture(t, throwOnSend = 0) {
@@ -80,13 +84,21 @@ function writeCanonicalSkills(f, handoffBody = "handoff body", executeBody = "ex
   };
 }
 
-test("registers native handoff and only cleanup lifecycle listeners", (t) => {
+test("registers native handoff, one narrow tool, and only cleanup lifecycle listeners", (t) => {
   const f = fixture(t);
   assert.deepEqual([...f.commands.keys()], ["handoff"]);
+  assert.deepEqual([...f.tools.keys()], ["ralph_handoff"]);
   assert.match(f.commands.get("handoff").description, /queued independently/);
+  const tool = f.tools.get("ralph_handoff");
+  assert.equal(tool.executionMode, "sequential");
+  assert.deepEqual(Object.keys(tool.parameters.properties), ["guidance"]);
+  assert.equal(tool.parameters.required, undefined);
+  assert.equal(tool.parameters.additionalProperties, false);
+  assert.ok(tool.promptGuidelines.every((guideline) => guideline.includes("ralph_handoff")));
   assert.equal(typeof f.events.get("session_start"), "function");
   assert.equal(typeof f.events.get("session_shutdown"), "function");
   assert.equal(f.events.has("session_compact"), false);
+  assert.equal(f.events.has("input"), false);
 });
 
 test("preflights then admits handoff followed by one execute follow-up", async (t) => {
@@ -114,6 +126,81 @@ Keep punctuation & spaces.`;
     { message: wrappedSkill("handoff", handoffPath, "handoff body", guidance), options: undefined },
     { message: wrappedSkill("execute", executePath, "execute body"), options: { deliverAs: "followUp" } },
   ]);
+});
+
+test("conversational tool steers handoff then queues the sole execute follow-up", async (t) => {
+  const f = fixture(t);
+  const { handoffPath, executePath } = writeCanonicalSkills(f);
+  const guidance = `focus on the exact reviewed diff;
+preserve punctuation & spacing.`;
+
+  const result = await f.tools.get("ralph_handoff").execute(
+    "tool-call-1",
+    { guidance: `  ${guidance}  ` },
+    undefined,
+    undefined,
+    f.ctx,
+  );
+
+  assert.deepEqual(f.messages, [
+    {
+      message: wrappedSkill("handoff", handoffPath, "handoff body", guidance),
+      options: { deliverAs: "steer" },
+    },
+    {
+      message: wrappedSkill("execute", executePath, "execute body"),
+      options: { deliverAs: "followUp" },
+    },
+  ]);
+  assert.equal(f.messages.filter(({ options }) => options?.deliverAs === "followUp").length, 1);
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(result.details, { admitted: true });
+  assert.match(result.content[0].text, /admitted/);
+  assert.doesNotMatch(result.content[0].text, /completed/);
+  assert.deepEqual(f.notices, []);
+});
+
+test("conversational tool preflights both skills before either send", async (t) => {
+  const f = fixture(t);
+  writeSkill(f.cwd, "handoff", "handoff body");
+
+  const result = await f.tools.get("ralph_handoff").execute(
+    "tool-call-2", {}, undefined, undefined, f.ctx,
+  );
+
+  assert.deepEqual(f.messages, []);
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /execute\/SKILL\.md not found/);
+});
+
+test("conversational tool reports first-send admission failure", async (t) => {
+  const f = fixture(t, 1);
+  writeCanonicalSkills(f);
+
+  const result = await f.tools.get("ralph_handoff").execute(
+    "tool-call-3", {}, undefined, undefined, f.ctx,
+  );
+
+  assert.deepEqual(f.messages, []);
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /handoff could not be admitted/);
+});
+
+test("conversational tool reports second-send failure without claiming continuation", async (t) => {
+  const f = fixture(t, 2);
+  const { handoffPath } = writeCanonicalSkills(f);
+
+  const result = await f.tools.get("ralph_handoff").execute(
+    "tool-call-4", {}, undefined, undefined, f.ctx,
+  );
+
+  assert.deepEqual(f.messages, [{
+    message: wrappedSkill("handoff", handoffPath, "handoff body"),
+    options: { deliverAs: "steer" },
+  }]);
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /follow-up could not be queued/);
+  assert.doesNotMatch(result.content[0].text, /Handoff admitted/);
 });
 
 test("missing handoff fails before a partial transition", async (t) => {

@@ -1,6 +1,6 @@
 # Specification — Conversational routing for Ralph native commands
 
-> **Status:** reviewed for planning; execution plan awaiting operator approval.
+> **Status:** approved for implementation; active episode.
 > **Delivered command architecture:** [Future specification bundles](../../../../docs/future-specification-bundles.md)
 > **Related delivered work:** [Handoff continuation resilience](../../archive/handoff-continuation-resilience/SPECIFICATION.md)
 > **Historical advisory evidence:** [`reports/reviews/handoff-resilience-spec-review-a93c27c.md`](../../../../reports/reviews/handoff-resilience-spec-review-a93c27c.md)
