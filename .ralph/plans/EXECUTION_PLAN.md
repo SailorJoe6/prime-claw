@@ -1,20 +1,21 @@
 # Execution Plan — Conversational routing for Ralph native commands
 
-> **Status:** implementation in progress; Slice 2 candidate ready for project-conversation review (`prime-claw-h6w.19`).
+> **Status:** implementation in progress; Slice 3 native-only fallback candidate ready for project-conversation review (`prime-claw-h6w.20`).
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Selected future folder:** `.ralph/plans/future/conversational-ralph-command-routing/`
 > **Parent workstream:** `prime-claw-h6w` (Phase 4 episode loop)
 
 ## Outcome
 
-Add three explicit, opt-in model-callable adapters so a project conversation can
-act on clear natural-language intent for Ralph handoff, planning, and episode
-creation without asking the operator to retype slash syntax.
+Deliver explicit opt-in conversational adapters for Ralph handoff and reviewed
+planning, and characterize whether implementation promotion can meet the same
+authority boundary. The required runtime proof selected the planned native-only
+fallback for implementation, so no `ralph_implement_spec` adapter is delivered.
 
-Each adapter must converge on the same deterministic admission helper and
-canonical project Markdown as its native command. Native `/handoff`, `/plan`, and
-`/implement-spec` behavior remains unchanged. There is no generic slash-command
-router and no textual slash-command reparsing.
+Delivered adapters converge on the same deterministic admission helper and
+canonical project Markdown as their native commands. Native `/handoff`, `/plan`,
+and `/implement-spec` behavior remains unchanged. There is no generic
+slash-command router and no textual slash-command reparsing.
 
 ## Current-code audit and planning decisions
 
@@ -34,11 +35,13 @@ change is needed.
    canonical handoff as `steer` and canonical execute as the sole `followUp`,
    matching the native two-stage transition. Conversational plan queues its
    canonical workflow once as `followUp`. After trusted confirmation,
-   conversational implementation sends its readiness workflow as `steer` so the
-   existing one-turn authorization can remain simple. Native commands retain
+   a conditional conversational implementation adapter would send its readiness
+   workflow as `steer` only if the lifecycle proof supported the simple one-turn
+   authorization. It did not. Native commands retain
    their current idle-command delivery behavior.
 4. **Arguments and clarification.** The handoff tool accepts only optional
-   operator guidance. The planning and implementation tools accept only one
+   operator guidance. The planning tool and conditional implementation design
+   accept only one
    exact `.ralph/plans/future/<slug>` location. Prompt guidance tells the model
    to ask in ordinary conversation before calling when focus or folder selection
    is materially inferred. Deterministic validation remains the final guard.
@@ -46,15 +49,17 @@ change is needed.
    terminal routing actions. Their results report admission, never completion.
 5. **Implementation authority.** A natural-language request alone cannot
    authorize episode creation because the model interprets that request. Before
-   conversational implementation proceeds, Prime Agent must show the operator a
+   any conversational implementation could proceed, Prime Agent would have to
+   show the operator a
    trusted confirmation naming the exact future folder and explaining that
    approval may create a branch, worktree, and episode session. Only explicit
    confirmation grants temporary authority for the normal readiness workflow.
    Rejection, cancellation, unavailable UI, invalid input, or failure to queue
    that workflow creates nothing. Finer direct-action versus clarification UX is
    deferred to `prime-claw-h6w.17` after dogfood and must not expand this delivery.
-6. **One-use authorization handoff.** Confirmation does not create an episode
-   or bypass the normal readiness workflow. The extension records only one
+6. **Conditional one-use authorization handoff.** Confirmation would not create
+   an episode or bypass the normal readiness workflow. The rejected conditional
+   extension design records only one
    pending exact folder and canonical readiness prompt, then sends that prompt
    as `steer`. When the matching extension-generated input is admitted in the
    same agent run, the pending entry becomes the existing one-use authorization
@@ -68,8 +73,9 @@ change is needed.
    documented `steer` ordering, keep conversational implementation native-only
    instead of adding machinery.
 
-The public tool names are `ralph_handoff`, `ralph_plan`, and
-`ralph_implement_spec`.
+The delivered routing tool names are `ralph_handoff` and `ralph_plan`.
+`create_spec_episode` remains the existing capability gated by native
+`/implement-spec`; `ralph_implement_spec` is intentionally absent.
 
 ## Delivery discipline
 
@@ -145,9 +151,9 @@ new continuation state, and no generic natural-language parser.
 
 ## Slice 2 — Conversational reviewed planning
 
-**Implementation status:** Candidate complete on `prime-claw-h6w.19`; focused
-and full regression evidence is recorded on that bead. Awaiting
-project-conversation acceptance before Slice 3.
+**Implementation status:** Accepted by the project conversation at
+`d011968d4`; focused and full regression evidence is recorded on
+`prime-claw-h6w.19`. Slice 3 may begin.
 
 **Depends on:** Slice 1 accepted by the project conversation.
 
@@ -198,19 +204,29 @@ interpretation in TypeScript, or episode creation.
 
 ## Slice 3 — Conversational implementation with host confirmation
 
+**Implementation status:** The required installed Prime Agent 0.9.5 RPC
+characterization proved confirmation → `steer` → matching extension `input`, but
+also proved that `agent_end` fires after that input and before the readiness
+agent turn begins. Because the approved design must clear pending and active
+authority on `agent_end`, the bounded `pending → active → consumed` gate cannot
+reach the readiness turn. Per the probe-or-omit rule, `ralph_implement_spec`
+remains unregistered and implementation stays native-only. The focused probe is
+retained in `tests/test_reviewed_plan_extension.py` with a credential-free fake
+provider and creates no episode resources. Candidate validation is green: reviewed-plan
+Node 19/19, episode mechanics Node 22/22, focused Python 9/9, and full
+`pytest -q tests` 249 passed with 11 warnings.
+
 **Depends on:** Slice 2 accepted by the project conversation.
 
-### Working capability
+### Conditional capability (not delivered)
 
-In an interactive or RPC project conversation, `ralph_implement_spec` validates
-one exact future folder and presents a host UI confirmation naming that folder
-and the branch/worktree/session consequence. Approval steers the existing
-customizable `/implement-spec` readiness workflow into the same agent run. Only
-that matching extension-generated readiness input receives the existing
-consume-once authorization for `create_spec_episode`. Rejection or any uncertain
-path has no implementation side effect. Non-UI modes remain native-only.
+Had the lifecycle proof passed, an interactive or RPC project conversation would
+have exposed `ralph_implement_spec` with exact-folder validation and trusted host
+confirmation. The observed `agent_end` boundary makes the approved same-run
+consume-once authorization impossible, so this conditional path was omitted.
+All modes remain native-only for implementation promotion.
 
-### Implementation
+### Conditional implementation (not delivered)
 
 - Reuse the same future-location validation and canonical skill wrapper as
   native `/implement-spec`.
@@ -232,7 +248,11 @@ path has no implementation side effect. Non-UI modes remain native-only.
 - Keep all branch, worktree, collision, readiness, replay, identity, and daemon
   behavior inside the existing canonical skill and host capability.
 
-### Acceptance evidence
+### Acceptance evidence and fallback
+
+The UI-path bullets below describe the branch that the failed lifecycle proof
+correctly prevented. The retained evidence instead proves the ordering, the
+native-only surface, and unchanged native authorization.
 
 - Tests cover no UI, explicit rejection, timeout/cancel, invalid location,
   missing readiness skill, confirmation text, send failure, and the successful
@@ -288,7 +308,9 @@ git diff --check
 The project conversation then independently verifies:
 
 - the branch, exact commit range, clean worktree, and pushed remote state;
-- fresh-session discovery of all three tools and all three native commands;
+- fresh-session discovery of the delivered tools (`ralph_handoff`, `ralph_plan`,
+  and existing `create_spec_episode`), absence of `ralph_implement_spec`, and all
+  three native commands;
 - convergence on canonical Markdown and deterministic validators;
 - no episode side effects from clarification, rejection, invalid input, absent
   UI, mismatched pending authorization, or failed admission;

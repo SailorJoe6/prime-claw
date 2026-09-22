@@ -2,9 +2,11 @@
 
 import json
 from pathlib import Path
+import selectors
 import shutil
 import subprocess
 import tempfile
+import time
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -53,7 +55,8 @@ export default function probe(pi) {
     const toolNames = pi.getAllTools().map((tool) => tool.name);
     if (typeof SessionManager.forkFrom === "function"
       && toolNames.includes("ralph_plan")
-      && toolNames.includes("create_spec_episode")) {
+      && toolNames.includes("create_spec_episode")
+      && !toolNames.includes("ralph_implement_spec")) {
       pi.registerCommand("probe-reviewed-plan-tools", {
         description: "RPC proof that reviewed-plan tools are registered",
         handler: async () => {},
@@ -97,6 +100,174 @@ export default function probe(pi) {
     assert [command["name"] for command in commands].count(
         "probe-reviewed-plan-tools"
     ) == 1
+
+
+def test_installed_rpc_characterizes_confirmed_steer_lifecycle_order() -> None:
+    """Prove why conversational implementation remains native-only on 0.9.5."""
+    prime_agent = shutil.which("prime-agent")
+    assert prime_agent, "prime-agent is a documented developer prerequisite"
+    probe_source = r'''import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
+
+const events = [];
+let modelCalls = 0;
+function record(cwd, label) {
+  events.push(label);
+  writeFileSync(join(cwd, "ordering.json"), JSON.stringify(events));
+}
+function message(model, content, reason) {
+  return {
+    role: "assistant", content, api: model.api, provider: model.provider,
+    model: model.id,
+    usage: {
+      input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: reason, timestamp: Date.now(),
+  };
+}
+function streamProbe(model) {
+  const stream = createAssistantMessageEventStream();
+  queueMicrotask(() => {
+    modelCalls += 1;
+    if (modelCalls === 1) {
+      const call = {
+        type: "toolCall", id: "probe-call", name: "probe_implement",
+        arguments: {},
+      };
+      const output = message(model, [call], "toolUse");
+      stream.push({ type: "start", partial: output });
+      stream.push({ type: "toolcall_start", contentIndex: 0, partial: output });
+      stream.push({
+        type: "toolcall_end", contentIndex: 0, toolCall: call, partial: output,
+      });
+      stream.push({ type: "done", reason: "toolUse", message: output });
+    } else {
+      const output = message(
+        model, [{ type: "text", text: "readiness turn" }], "stop",
+      );
+      stream.push({ type: "start", partial: output });
+      stream.push({ type: "text_start", contentIndex: 0, partial: output });
+      stream.push({
+        type: "text_end", contentIndex: 0, content: "readiness turn",
+        partial: output,
+      });
+      stream.push({ type: "done", reason: "stop", message: output });
+    }
+    stream.end();
+  });
+  return stream;
+}
+export default function probe(pi) {
+  pi.registerProvider("probe", {
+    baseUrl: "http://127.0.0.1.invalid", apiKey: "unused", api: "probe-api",
+    streamSimple: streamProbe,
+    models: [{
+      id: "probe-model", name: "Probe", reasoning: false, input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 10000, maxTokens: 1000,
+    }],
+  });
+  let starts = 0;
+  pi.on("before_agent_start", (_event, ctx) => {
+    starts += 1;
+    record(ctx.cwd, `before-agent-start-${starts}`);
+  });
+  pi.on("input", (event, ctx) => {
+    const match = event.text === "READINESS" ? "matching" : "other";
+    record(ctx.cwd, `input-${event.source}-${match}`);
+  });
+  pi.on("agent_end", (_event, ctx) => record(ctx.cwd, "agent-end"));
+  pi.registerTool({
+    name: "probe_implement", label: "Probe",
+    description: "Probe confirmation and steer lifecycle ordering",
+    executionMode: "sequential",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    async execute(_id, _params, _signal, _update, ctx) {
+      record(ctx.cwd, "confirm-requested");
+      const confirmed = await ctx.ui.confirm(
+        "Implement specification?",
+        "Create branch, worktree, and episode for .ralph/plans/future/probe?",
+      );
+      record(ctx.cwd, confirmed ? "confirm-resolved-true" : "confirm-resolved-false");
+      if (!confirmed) {
+        return { content: [{ type: "text", text: "rejected" }], details: {} };
+      }
+      record(ctx.cwd, "send-steer");
+      pi.sendUserMessage("READINESS", { deliverAs: "steer" });
+      return { content: [{ type: "text", text: "admitted" }], details: {} };
+    },
+  });
+}
+'''
+    with tempfile.TemporaryDirectory(prefix="prime-claw-impl-ordering-") as cwd:
+        probe = Path(cwd) / "probe.ts"
+        ordering_path = Path(cwd) / "ordering.json"
+        probe.write_text(probe_source)
+        process = subprocess.Popen(
+            [
+                prime_agent,
+                "--mode", "rpc", "--offline", "--no-session",
+                "--no-skills", "--no-prompt-templates", "--no-context-files",
+                "--no-extensions", "--cwd", cwd, "-e", str(probe),
+                "--provider", "probe", "--model", "probe-model",
+            ],
+            cwd=REPO, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=False, bufsize=0,
+        )
+        assert process.stdin is not None
+        assert process.stdout is not None
+        process.stdin.write((json.dumps({
+            "id": "start", "type": "prompt", "message": "start probe",
+        }) + "\n").encode())
+        process.stdin.flush()
+
+        selector = selectors.DefaultSelector()
+        selector.register(process.stdout, selectors.EVENT_READ)
+        deadline = time.monotonic() + 20
+        agent_ends = 0
+        observed = []
+        try:
+            while time.monotonic() < deadline and agent_ends < 2:
+                ready = selector.select(timeout=max(0, deadline - time.monotonic()))
+                if not ready:
+                    break
+                line = process.stdout.readline()
+                if not line:
+                    break
+                event = json.loads(line.decode())
+                observed.append(event)
+                if (event.get("type") == "extension_ui_request"
+                        and event.get("method") == "confirm"):
+                    process.stdin.write((json.dumps({
+                        "type": "extension_ui_response", "id": event["id"],
+                        "confirmed": True,
+                    }) + "\n").encode())
+                    process.stdin.flush()
+                if event.get("type") == "agent_end":
+                    agent_ends += 1
+        finally:
+            selector.close()
+            process.terminate()
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=3)
+
+        stderr = (process.stderr.read().decode()
+                  if process.stderr is not None else "")
+        assert agent_ends == 2, json.dumps(observed, indent=2) + stderr
+        ordering = json.loads(ordering_path.read_text())
+
+    required = [
+        "input-rpc-other", "before-agent-start-1", "confirm-requested",
+        "confirm-resolved-true", "send-steer", "input-extension-matching",
+        "agent-end", "before-agent-start-2",
+    ]
+    positions = [ordering.index(label) for label in required]
+    assert positions == sorted(positions), ordering
 
 
 def test_installed_prime_agent_forks_valid_context_and_publishes_worktree_session() -> None:
@@ -261,3 +432,17 @@ def test_implement_spec_policy_rejects_inadequate_bundles_without_tool_call() ->
         "Stop without implementing",
     ):
         assert fragment in skill
+
+
+def test_operator_docs_explain_native_only_implementation_fallback() -> None:
+    """The authority limitation and retry boundary must be operator-visible."""
+    docs = (REPO / "docs" / "future-specification-bundles.md").read_text()
+    for fragment in (
+        "Implementation promotion remains native-only",
+        "not register `ralph_implement_spec`",
+        "`agent_end` after that matching input and before the readiness agent turn",
+        "no conversational implementation path",
+        "episode side effect",
+        "must not be emulated with durable approvals, leases,",
+    ):
+        assert fragment in docs

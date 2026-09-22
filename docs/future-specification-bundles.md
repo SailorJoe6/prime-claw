@@ -123,6 +123,21 @@ no duplicate skill slash command.
 
 ## Explicit implementation promotion
 
+Implementation promotion remains native-only. A fresh project conversation does
+not register `ralph_implement_spec`; the operator must use the explicit native
+command below. This is a deliberate fail-closed result, not a missing adapter.
+
+The installed Prime Agent 0.9.5 RPC characterization confirmed host approval,
+`steer`, and matching `input` with `event.source === "extension"`. It also
+showed `agent_end` after that matching input and before the readiness agent turn.
+The approved conversational design clears pending and active authority on
+`agent_end`, so its one-use arm cannot safely reach `create_spec_episode` without
+adding forbidden cross-run lifecycle state. Rejection, cancellation, absent UI,
+and non-UI modes consequently have no conversational implementation path or
+episode side effect. Confirmation UX can be reconsidered only with a simpler
+public runtime ordering; it must not be emulated with durable approvals, leases,
+nonces, timers, or private runtime patches.
+
 Implementation remains unauthorized until the operator selects an approved,
 planned bundle with:
 
@@ -244,7 +259,8 @@ cleanup observability, active and inactive replay, collision safety, and
 confirmed invocation-owned cleanup. The Python bridge reruns both suites and uses
 installed offline Prime Agent RPC plus startup probes to prove one native
 `plan`, one native `implement-spec`, explicit `ralph_plan` and
-`create_spec_episode` tools, a valid inherited
+`create_spec_episode` tools, no `ralph_implement_spec` tool, the confirmed
+`steer` lifecycle ordering described above, and a valid inherited
 Prime Agent context, and bounded real daemon create/state/messages/kill behavior
 at the episode worktree CWD.
 

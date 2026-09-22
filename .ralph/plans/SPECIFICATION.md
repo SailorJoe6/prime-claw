@@ -35,8 +35,12 @@ project-local workflow Markdown. Its continuation reliability was delivered by
 the archived handoff-resilience work linked above.
 
 Natural-language requests currently reach the model as ordinary conversation.
-There is no supported conversational adapter that can invoke these native
-operations directly.
+Conversational adapters now cover handoff and reviewed planning. The required
+installed-runtime characterization found that conversational implementation
+cannot preserve the approved one-run authorization boundary: `agent_end` occurs
+between the matching extension input and the readiness turn. Therefore
+implementation promotion remains native-only; no `ralph_implement_spec` tool is
+registered.
 
 ## Desired experience
 

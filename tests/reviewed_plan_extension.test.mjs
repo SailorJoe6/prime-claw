@@ -112,10 +112,11 @@ function count(haystack, needle) {
   return haystack.split(needle).length - 1;
 }
 
-test("registers native reviewed commands and two explicit narrow tools", (t) => {
+test("registers native reviewed commands, planning tool, and native-only implementation", (t) => {
   const f = fixture(t);
   assert.deepEqual([...f.commands.keys()], ["plan", "implement-spec"]);
   assert.deepEqual([...f.tools.keys()], ["ralph_plan", "create_spec_episode"]);
+  assert.equal(f.tools.has("ralph_implement_spec"), false);
   assert.deepEqual([...f.events.keys()], ["session_start", "agent_end", "session_shutdown"]);
   assert.match(f.commands.get("plan").description, /explicit .*future/);
   const planTool = f.tools.get("ralph_plan");
