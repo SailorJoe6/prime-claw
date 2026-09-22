@@ -16,8 +16,8 @@
 
 This document is the summary and index for the work. It is accompanied by:
 
-- **[REQUIREMENTS.md](../REQUIREMENTS.md)** — the specific requirements discovered during discussion.
-- **[DECISIONS.md](../DECISIONS.md)** — design decisions, each traced to the requirement(s) it satisfies.
+- **[REQUIREMENTS.md](REQUIREMENTS.md)** — the specific requirements discovered during discussion.
+- **[DECISIONS.md](DECISIONS.md)** — design decisions, each traced to the requirement(s) it satisfies.
 
 This is a specification of *what* must change and *why*. It is not an execution plan; that comes later.
 
