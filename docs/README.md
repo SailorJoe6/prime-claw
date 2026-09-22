@@ -40,6 +40,9 @@ prime-claw builds on four prior projects. Read these before designing:
   walkthrough for reviewed future-folder authoring, native `/plan`, explicit
   `/implement-spec` promotion, unresolved admission handling, validation scope,
   and archived design provenance.
+- [lab-global-plugin.md](lab-global-plugin.md) — manual POC installation,
+  refresh, and verification of the shared prime-claw plugin on the personal lab
+  machine.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)

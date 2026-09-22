@@ -131,6 +131,14 @@ plugin and the target project's required workflow skills are present and
 discoverable. The POC should document the exact global install, refresh, and
 verification procedure and record where project-specific customization is
 needed.
+
+The first lab-global installation is complete. The five managed files matched
+the builder sources byte for byte, and a disposable offline Prime Agent RPC
+session outside the builder repository registered `/handoff`, `/plan`, and
+`/implement-spec` from the global paths plus all four expected structured tools.
+The manual refresh and verification procedure is recorded in
+[the lab-global plugin runbook](../../../../docs/lab-global-plugin.md).
+
 ## Manual launch and lifecycle work
 
 Sibling launching is already a proven Prime Agent capability. This POC should
