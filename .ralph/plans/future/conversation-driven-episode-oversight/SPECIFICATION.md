@@ -237,14 +237,12 @@ The project conversation uses the runtime's real registered commands and
 supported interfaces. It does not paste a command's underlying skill text or
 claim that transport acknowledgement proves task admission.
 
-Those commands and skills are currently project-local to the prime-claw builder
-repository and are not automatically visible to a sibling rooted in another
-project. Before this oversight workflow begins, the universal-agent POC must
-supply the required capabilities through a supported mechanism and the project
-conversation must verify that they are actually registered and that the target
-project supplies the workflow Markdown those commands require. Missing tooling
-is a visible preparation gap, not permission to imitate a native transition by
-pasting its Markdown or changing directories.
+Before oversight begins, the project conversation must verify that its required
+native commands and workflow policy are available. Capability provisioning is
+owned by the related
+[universal-agent and project-conversation POC](../universal-agent-project-conversation-poc/SPECIFICATION.md).
+Missing tooling is a visible preparation gap, not permission to imitate a
+native transition.
 
 Before sending a transition, it checks that the intended episode is idle and at
 the expected reviewed Git boundary. After sending, it verifies enough persisted
