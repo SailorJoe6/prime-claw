@@ -108,9 +108,12 @@ plugin location so every project conversation can discover one shared version.
 If a managed project already contains a project-local copy of the plugin, the
 universal agent surfaces the possible duplicate or stale override and reconciles
 it deliberately. It does not silently maintain competing global and local
-copies. A read-only startup probe in `openclaw-setup` confirmed why: its older
-project-local handoff extension and the global handoff extension both loaded as
-`handoff:1` and `handoff:2`, leaving no unambiguous canonical `/handoff`.
+copies. The first read-only startup probe in `openclaw-setup` confirmed why: its
+older project-local handoff extension and the global handoff extension both
+loaded as `handoff:1` and `handoff:2`, leaving no unambiguous canonical
+`/handoff`. After the operator removed the local copy and restarted Prime Agent,
+a fresh probe registered exactly one `/handoff`, `/plan`, and `/implement-spec`,
+all from the global installation.
 
 The workflow Markdown remains project-local in both stages. The
 `UNIVERSAL_AGENT` must ensure every managed `PROJECT_CONTEXT` contains a local
@@ -127,9 +130,12 @@ phase Markdown from `.ralph/skills/`. Project-context preparation must reproduce
 or deliberately replace that exposure and verify that the intended skills and
 native commands are actually available in the new session. File presence alone
 is insufficient: existing customized skills must also match the native command
-contract and reviewed future-folder lifecycle. The first `openclaw-setup` audit,
-for example, found no `implement-spec` skill and found design, planning, blocked,
-and handoff policies still tied to its parked Prime Ralph or active-root model.
+contract and reviewed future-folder lifecycle. The continuing `openclaw-setup` audit demonstrated this distinction: the
+operator aligned its design, specification, planning, and handoff policies with
+the reviewed future-folder workflow, but the project still lacked an
+`implement-spec` skill, its blocked policy still required the parked Prime Ralph
+lifecycle tool, and its direct skill exposure still included legacy `plan` and
+`handoff-old` entries.
 
 Provisioning is not complete merely because files were copied. Before launching
 or routing work that depends on Ralph, the universal agent verifies the global
