@@ -84,29 +84,40 @@ work and retain its identity across pauses and resumes. The universal-agent
 emulator may give it a focused role prompt and exact references when needed; it
 should not make the conversation bulk-load the builder repository.
 
-## Capability availability gap
+## Capability provisioning
 
-Prime-claw's current Ralph commands and skills are installed project-locally in
-the builder repository. Prime Agent discovers project-local extensions and
-skills from the new session's own CWD hierarchy, not from a sibling repository.
-Therefore a project conversation rooted in another repository will not
-automatically have prime-claw's local tooling. No Prime Agent capability package
-is currently installed to provide it globally. Loading only the extension files
-would still be insufficient for the current commands: they deliberately load
-customizable workflow Markdown from `.ralph/skills/` in the target project.
+Prime-claw's current Ralph plugin is installed project-locally in the builder
+repository. Prime Agent discovers project-local extensions from the new
+session's own CWD hierarchy, not from a sibling repository. A project
+conversation rooted in another repository therefore cannot use the plugin
+unless it is provisioned deliberately.
 
-The manual POC must deliberately make the required prime-claw capabilities
-available when it launches a project conversation and verify what the new
-session actually loaded. It may use the smallest supported and reversible
-mechanism, such as explicit extension or skill inputs, while recording how that
-mechanism behaves. It must not claim the commands are available merely because
-the universal-agent emulator can use them.
+During this manual POC, the universal-agent emulator must check each
+`PROJECT_CONTEXT` before launching a project conversation. If the prime-claw
+plugin is absent, it installs the plugin project-locally in that repository and
+verifies that the new session registers the expected commands. This local plugin
+installation is POC-only scaffolding.
 
-This POC should learn which capabilities belong to prime-claw itself, which are
-project-customizable, and how defaults and project overrides should interact.
-It does not need to choose or implement the final packaging system yet. Any
-temporary host-side loading mechanism is POC scaffolding, not proof that the
-same capability reaches the final sandbox after convergence or recreation.
+After the POC, the final design installs the prime-claw plugin by copying it from
+the prime-claw builder project into Prime Agent's global plugin location inside
+the sandbox home. Project conversations then discover the shared plugin without
+copying it into every managed repository. Sandbox construction or convergence
+must reproduce that global installation; it must not depend on host-global
+state.
+
+The workflow Markdown remains project-local in both stages. The
+`UNIVERSAL_AGENT` must ensure every managed `PROJECT_CONTEXT` contains a local
+`.ralph/` tree with the canonical `plans/` and `skills/` structure. If the tree,
+a required subfolder, or any canonical Ralph skill is missing, the universal
+agent installs the missing templates from prime-claw without overwriting
+existing customized files, then prompts the operator to verify and customize
+the templates for that project.
+
+Provisioning is not complete merely because files were copied. Before launching
+or routing work that depends on Ralph, the universal agent verifies the plugin
+and the target project's required workflow skills are present and discoverable.
+The POC should document the exact install and verification procedure and record
+where project-specific customization is needed.
 
 ## Manual launch and lifecycle work
 
@@ -154,16 +165,17 @@ infrastructure.
 
 The POC may teach us about conversation naming and recall, direct versus
 mediated interaction, role prompting, monitoring and steering, restart
-behavior, and how prime-claw capabilities should eventually reach
-project-rooted sessions inside the sandbox.
+behavior, and the practical details of plugin and `.ralph/` provisioning.
 
-Those are questions to explore, not architecture to decide in advance. Use
-lightweight working state and existing interfaces until repeated experience
-shows that automation or durable infrastructure is needed.
+Those are questions to explore within the provisioning model chosen above, not
+reasons to design unrelated infrastructure in advance. Use lightweight working
+state and existing interfaces until repeated experience shows that more
+automation or durable infrastructure is needed.
 
 This specification does not authorize a native project-conversation launcher,
 a universal-agent orchestrator, a conversation registry, fixed monitoring
-policy, capability-packaging system, or automated lifecycle authority.
+policy, a general capability-packaging system beyond the chosen prime-claw
+plugin placement, or automated lifecycle authority.
 
 ## Living specification discipline
 
