@@ -108,7 +108,9 @@ plugin location so every project conversation can discover one shared version.
 If a managed project already contains a project-local copy of the plugin, the
 universal agent surfaces the possible duplicate or stale override and reconciles
 it deliberately. It does not silently maintain competing global and local
-copies.
+copies. A read-only startup probe in `openclaw-setup` confirmed why: its older
+project-local handoff extension and the global handoff extension both loaded as
+`handoff:1` and `handoff:2`, leaving no unambiguous canonical `/handoff`.
 
 The workflow Markdown remains project-local in both stages. The
 `UNIVERSAL_AGENT` must ensure every managed `PROJECT_CONTEXT` contains a local
@@ -123,7 +125,11 @@ Agent skill-discovery directory. The builder currently exposes directly invoked
 phases through `.agents/skills` symlinks while native plugin commands load other
 phase Markdown from `.ralph/skills/`. Project-context preparation must reproduce
 or deliberately replace that exposure and verify that the intended skills and
-native commands are actually available in the new session.
+native commands are actually available in the new session. File presence alone
+is insufficient: existing customized skills must also match the native command
+contract and reviewed future-folder lifecycle. The first `openclaw-setup` audit,
+for example, found no `implement-spec` skill and found design, planning, blocked,
+and handoff policies still tied to its parked Prime Ralph or active-root model.
 
 Provisioning is not complete merely because files were copied. Before launching
 or routing work that depends on Ralph, the universal agent verifies the global
