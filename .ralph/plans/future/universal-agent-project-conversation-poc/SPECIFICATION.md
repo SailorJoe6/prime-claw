@@ -84,12 +84,37 @@ work and retain its identity across pauses and resumes. The universal-agent
 emulator may give it a focused role prompt and exact references when needed; it
 should not make the conversation bulk-load the builder repository.
 
+## Capability availability gap
+
+Prime-claw's current Ralph commands and skills are installed project-locally in
+the builder repository. Prime Agent discovers project-local extensions and
+skills from the new session's own CWD hierarchy, not from a sibling repository.
+Therefore a project conversation rooted in another repository will not
+automatically have prime-claw's local tooling. No Prime Agent capability package
+is currently installed to provide it globally. Loading only the extension files
+would still be insufficient for the current commands: they deliberately load
+customizable workflow Markdown from `.ralph/skills/` in the target project.
+
+The manual POC must deliberately make the required prime-claw capabilities
+available when it launches a project conversation and verify what the new
+session actually loaded. It may use the smallest supported and reversible
+mechanism, such as explicit extension or skill inputs, while recording how that
+mechanism behaves. It must not claim the commands are available merely because
+the universal-agent emulator can use them.
+
+This POC should learn which capabilities belong to prime-claw itself, which are
+project-customizable, and how defaults and project overrides should interact.
+It does not need to choose or implement the final packaging system yet. Any
+temporary host-side loading mechanism is POC scaffolding, not proof that the
+same capability reaches the final sandbox after convergence or recreation.
+
 ## Manual launch and lifecycle work
 
 Sibling launching is already a proven Prime Agent capability. This POC should
 learn and document how the installed runtime exposes it in practice, including
-how this session launches a project-rooted sibling, records its identity,
-communicates with it, and later finds, resumes, or stops it.
+how this session launches a project-rooted sibling, supplies and verifies the
+required prime-claw capabilities, records its identity, communicates with it,
+and later finds, resumes, or stops it.
 
 The POC should use supported Prime Agent interfaces rather than disguise an RLM
 child as a project conversation or build a new abstraction in advance. A launch
