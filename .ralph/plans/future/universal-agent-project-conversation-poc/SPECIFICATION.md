@@ -190,10 +190,21 @@ not a giant copied bootstrap prompt:
    supply project-customizable phase policy;
 4. the one user-global prime-claw plugin supplies only deterministic native
    command and episode mechanics; and
-5. a short initial role prompt tells the conversation to run the project's
-   `prepare` skill, remain a conversation rather than an implementation episode,
-   preserve unrelated dirty state, and wait at the explicit specification,
-   planning, and implementation approval boundaries.
+5. an explicit project-conversation role contract defines the hierarchy terms,
+   the conversation's authority, the separate episode role, and every approval
+   boundary before the bootstrap prompt relies on that vocabulary.
+
+A prompt that merely says "remain a conversation, not an episode" is circular if
+the target project has no durable definition of either role. The first
+`openclaw-setup` preparation audit found no such definition in `AGENTS.md`,
+`.ralph/README.md`, or its exposed skills. Before launch, the POC must provision
+a minimal project-local `project-conversation` policy skill (or an equally
+durable, explicitly loaded role contract) that can be re-read after compaction.
+The short bootstrap prompt may then name that contract, require the agent to run
+it and `prepare`, preserve unrelated dirty state, and wait at the specified
+approval boundaries. Advanced owner/episode oversight remains separate future
+work; the minimum launch contract must not imply that undefined behavior already
+exists.
 
 After substantive admission, the launcher requires a bounded readiness receipt
 from the new conversation. The receipt states its exact CWD, its understanding
