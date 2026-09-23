@@ -239,6 +239,8 @@ a general controller:
 
 - native `/implement-spec` and `create_spec_episode` for promotion and bootstrap;
 - `handoff_spec_episode(location, guidance?)` for exact-owner continuation;
+- narrow two-phase `finalize_spec_episode` for recording operator disposition and
+  closing exact oversight state after ordinary terminal work;
 - existing daemon identity, state, queue, and quiescence validation;
 - `rlm_heartbeat` and session observation for activity-scoped watches;
 - fresh RLM agents with explicit model selection for read-only EXPERT review;
@@ -251,9 +253,11 @@ After accepting an exact slice commit, the owning conversation may invoke
 The capability still fails closed unless location, owner, durable identity,
 canonical prompts, and live daemon state match.
 
-No custom prime-claw CLI, custom `prime-agent-core` agent, native merge command,
-general role registry, reviewer service, or arbitrary remote-command router is
-required in the first release. Those remain later options only if this smaller
+No custom prime-claw CLI, custom `prime-agent-core` agent, native merge or cleanup
+command, general role registry, reviewer service, or arbitrary remote-command
+router is required in the first release. `finalize_spec_episode` records and
+closes lifecycle state only; it never decides whether the specification is done,
+merges, abandons, stops sessions, removes worktrees, or deletes branches. Those remain later options only if this smaller
 proven design fails in real use.
 
 ## Repeatable reviewed lifecycle
@@ -413,16 +417,27 @@ conversation present the exact candidate for one explicit operator decision:
 approve merge | request revision | pause | abandon
 ```
 
-The first release uses the terminal path already proven in dogfooding. After the
-operator's explicit decision, the project conversation uses ordinary Git and
-supported Prime Agent session operations. It verifies the disposition, stops the
-episode session, rechecks Git and worktree state, removes only the owned worktree,
-and applies the project's branch-retention policy.
+The conversation and applicable project review policy decide when implementation
+is complete; the host does not attempt to infer semantic completion. At the one
+explicit operator gate, the conversation invokes the authorize phase of narrow
+`finalize_spec_episode` with the exact location and closed disposition
+(`merged` or `abandoned`). The capability confirms the disposition in the user
+interface and writes an exact owner/episode authorization receipt. It performs no
+Git, session, worktree, or branch mutation.
 
-Dirty, ambiguous, or uncertain state blocks destructive cleanup. Cleanup never
-touches unrelated sessions, worktrees, branches, identities, or another
-conversation's resources. A dedicated terminal host capability is deferred
-unless repeated use shows that the skill-guided path is inadequate.
+The conversation then uses the ordinary terminal path already proven in
+dogfooding. It performs the authorized Git and supported Prime Agent operations,
+verifies the result, stops the episode session, rechecks state, removes only the
+owned worktree, and applies branch-retention policy. Dirty, ambiguous, or
+uncertain state blocks destructive cleanup.
+
+After terminal work, the conversation invokes the completion phase without a
+second user confirmation. Trusted host code requires the matching authorization
+receipt and conservatively validates the exact terminal state before appending
+inactive oversight state and clearing only the matching spec-episode ownership
+expectation. Failure or ambiguity leaves oversight active and preserves the
+receipt and identity for repair. The capability never decides that the spec is
+implemented and never merges, abandons, or cleans resources itself.
 
 Before oversight begins, the project conversation must verify that its required
 native commands and workflow policy are available. Capability provisioning is
@@ -437,10 +452,10 @@ session evidence to know that the transition was admitted before assuming work
 has started. Ambiguity is surfaced rather than answered with blind duplicate
 retries.
 
-Terminal disposition ends the episode, not the conversation. The owner cancels
-episode-specific watches, appends inactive oversight state, clears the matching
-ownership expectation, releases transient episode/review focus, and returns to
-ordinary discussion with its default CONVERSATION identity intact. A
+Successful completion of the authorized terminal receipt ends the episode, not
+the conversation. The owner cancels episode-specific watches, releases transient
+episode/review focus, and returns to ordinary discussion with its default
+CONVERSATION identity intact. A
 later operator-approved future folder may start a new sequential episode through
 the same `/spec-it-out` → `/plan` → `/implement-spec` gates.
 
@@ -523,19 +538,21 @@ The first release adds or changes only:
 
 1. a small universal `APPEND_SYSTEM.md` identity kernel with bounded-role
    precedence;
-2. exact-session oversight activation and terminal deactivation tied to existing
-   spec-episode identity state;
-3. one canonical project-customizable `oversee-episode` skill whose current
+2. exact-session oversight activation tied to existing spec-episode identity
+   state;
+3. narrow two-phase terminal authorization/completion that records disposition
+   and closes oversight without performing cleanup;
+4. one canonical project-customizable `oversee-episode` skill whose current
    contents are supplied freshly during active oversight;
-4. readiness and fail-closed validation for kernel, plugin, package, marker, and
+5. readiness and fail-closed validation for kernel, plugin, package, marker, and
    ownership expectation;
-5. direct owner/episode reporting and one 15-minute non-steering heartbeat per
+6. direct owner/episode reporting and one 15-minute non-steering heartbeat per
    active work generation;
-6. owner-ledger routing of discoveries at stable review boundaries;
-7. existing owner-driven continuation after exact-commit acceptance;
-8. explicit EXPERT reviewer-model, evidence, and required-review failure policy;
+7. owner-ledger routing of discoveries at stable review boundaries;
+8. existing owner-driven continuation after exact-commit acceptance;
+9. explicit EXPERT reviewer-model, evidence, and required-review failure policy;
    and
-9. non-interference and return-to-incubation behavior around ordinary
+10. non-interference and return-to-incubation behavior around ordinary
    conversation, design, specification, and planning.
 
 It reuses native automatic compaction and all existing deterministic host
