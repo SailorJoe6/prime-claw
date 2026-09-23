@@ -65,7 +65,7 @@ Implement the proven first-release design with these narrow resources:
 - install a small managed `APPEND_SYSTEM.md` kernel that defines default
   CONVERSATION capability and explicit EPISODE, EXPERT, and delegated-child
   precedence without embedding detailed procedures;
-- use the current `.ralph/skills/oversee-episode/SKILL.md` as the single canonical
+- add and use `.ralph/skills/oversee-episode/SKILL.md` as the single canonical
   source for active oversight procedure text;
 - replace the rejected flag/profile extension with a small project plugin that
   persists append-only active/inactive markers bound to the exact owner session;
@@ -189,21 +189,25 @@ copied ownership.
    in Git and `prime-claw-h6w.22`.
 2. Add the small managed `APPEND_SYSTEM.md` identity kernel. Define explicit
    precedence for root CONVERSATION, EPISODE, EXPERT, and delegated-child roles.
-3. Rework `project-conversation.ts` into exact-session oversight-mode mechanics:
+3. Add `.ralph/skills/oversee-episode/SKILL.md` with the approved owner-reporting,
+   one-heartbeat-per-active-generation, evidence reconciliation, owner-ledger,
+   authority, review, continuation, terminal, and return-to-conversation policy.
+   Use this one file as both the discoverable skill and active package source.
+4. Rework `project-conversation.ts` into exact-session oversight-mode mechanics:
    - append idempotent active/inactive markers;
    - validate the existing spec-episode identity as ownership expectation;
    - read the current canonical `oversee-episode` package;
    - provide one fresh package through the universal context path;
    - remove stale package representations; and
    - abort visibly on active-state disagreement or corrupt resources.
-4. Integrate `/implement-spec` readiness and activation only after promotion and
+5. Integrate `/implement-spec` readiness and activation only after promotion and
    episode identity are durably established. Integrate terminal deactivation
    with the existing conservative disposition path without inventing automatic
    merge or cleanup.
-5. Extend plugin apply/check manifests for the kernel, plugin, and canonical
+6. Extend plugin apply/check manifests for the kernel, plugin, and canonical
    package. Detect project/CLI prompt shadowing at readiness rather than silently
    weakening identity.
-6. Replace focused Node and native Python coverage with the proven matrix:
+7. Replace focused Node and native Python coverage with the proven matrix:
    - multiple independent root conversations;
    - ordinary fork capability without ownership duplication;
    - actual implement-spec EPISODE transition;
@@ -215,10 +219,10 @@ copied ownership.
    - current package reload exactly once per call; and
    - visible zero-provider blocking for missing/duplicate kernel, corrupt marker,
      expectation mismatch, and missing/corrupt package.
-7. Rewrite current documentation around default CONVERSATION identity,
+8. Rewrite current documentation around default CONVERSATION identity,
    temporary oversight mode, resource precedence, readiness, native compaction,
    and bounded-role transitions. Correct the installed-file inventory.
-8. Synchronize the active specification and plan with the universal direct-report,
+9. Synchronize the active specification and plan with the universal direct-report,
    15-minute per-generation heartbeat, context-pressure checkpoint, and owner-ledger
    policy without copying point-in-time chronology into the specification.
 
@@ -249,8 +253,8 @@ capabilities enforce deterministic transport and identity safety.
 
 1. Add `.prime/agent/profiles/expert-reviewer.md` with the reviewed exact model
    selector, reasoning level, and stable read-only exact-commit review role.
-2. Add `.ralph/skills/oversee-episode/SKILL.md` with progressive-disclosure
-   guidance for:
+2. Extend and validate the Slice 1 `.ralph/skills/oversee-episode/SKILL.md`
+   with EXPERT and owner-driven continuation guidance for:
    - retaining the exact returned identity and current work generation;
    - creating and cancelling one bounded agent-owned heartbeat per admitted
      generation;
