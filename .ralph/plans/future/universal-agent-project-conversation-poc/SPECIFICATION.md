@@ -181,6 +181,31 @@ child as a project conversation or build a new abstraction in advance. A launch
 or message acknowledgement should not be confused with evidence that a
 substantive task was admitted.
 
+A project conversation receives its workflow through layered durable authority,
+not a giant copied bootstrap prompt:
+
+1. its spawn-time CWD makes the selected project root the physical context;
+2. the project `AGENTS.md` supplies repository-wide operating and safety rules;
+3. direct `.agents/skills` exposure and the complete `.ralph/skills/` tree
+   supply project-customizable phase policy;
+4. the one user-global prime-claw plugin supplies only deterministic native
+   command and episode mechanics; and
+5. a short initial role prompt tells the conversation to run the project's
+   `prepare` skill, remain a conversation rather than an implementation episode,
+   preserve unrelated dirty state, and wait at the explicit specification,
+   planning, and implementation approval boundaries.
+
+After substantive admission, the launcher requires a bounded readiness receipt
+from the new conversation. The receipt states its exact CWD, its understanding
+of the conversation-versus-episode boundary, the durable authorities it loaded,
+the dirty or active project state it must preserve, and any real blocker. The
+universal agent separately verifies daemon state, records stable and active
+session identity, and confirms the expected global commands and project skills.
+A publication acknowledgement or plausible prose alone is insufficient. A
+wrong spawn-time CWD, missing policy, or command collision is corrected by
+repairing the project context and creating a fresh session, not by steering the
+misconfigured conversation into pretending it is ready.
+
 If several supported interaction paths exist, they may be tried. Choosing a
 permanent product interface can wait until actual use makes the tradeoffs clear.
 
