@@ -75,41 +75,52 @@ context-focusing transition.
 
 ```text
 PROJECT_CONTEXT — canonical project checkout
-  └── PROJECT_CONVERSATION — explicitly assigned durable owner session
-        ├── future specifications and plans
-        ├── at most one active owned EPISODE in the first release
-        └── fresh advisory EXPERT agents when useful
+  ├── CONVERSATION A — independent user-facing project session
+  │     └── at most one active owned EPISODE in the first release
+  ├── CONVERSATION B — another independent user-facing project session
+  │     └── its own exact-session ownership and episode state
+  └── any number of later independent CONVERSATION sessions
 
 EPISODE — temporary sibling session in an isolated branch and worktree
+EXPERT — fresh bounded reviewer for one focused question or exact commit
+DELEGATED CHILD — bounded subagent that does not inherit owner authority
 ```
 
-### Project conversation
+### Conversation
 
-A `PROJECT_CONVERSATION` is a long-lived Prime Agent session explicitly assigned
-that role when launched, with its working directory set to the project root.
-Project CWD supplies context but does not make every project-rooted session a
-project conversation. Debug sessions, reviewers, and other agents do not gain
-episode authority merely because they share the repository.
+Every independent top-level Prime Agent session the user starts in a project is a
+`CONVERSATION` by default. There is no unique project owner conversation and no
+special launch flag. Any number of conversations may coexist in one project.
+Ordinary discussion, project awareness, and the existing design,
+specification, and planning skills are native behavior rather than new scope.
 
-The project conversation is the operator-facing project thread. Its ordinary
-conversation, project awareness, specification, and planning behavior are
-existing Prime Agent and project-skill capabilities, not new implementation
-scope here. This feature adds explicit startup orientation and makes episode
-oversight one temporary mode of the broader role: it owns only episodes it
-created, reviews their output, and drives already-authorized implementation.
+This feature adds one capability: any conversation may promote a reviewed future
+bundle through native `/implement-spec` and drive the resulting owned episode to
+completion. The conversation enters **oversight mode** only while it owns an
+active episode. Identity, active mode, and detailed procedure are separate:
 
-After terminal disposition and safe cleanup, the project conversation keeps its
-role and returns to discussion and future-work incubation. It may later author,
-plan, and implement another future folder without being relaunched or rebound.
-Episode-specific identity, watch, and review context must not become a permanent
-conversation lock.
+- `CONVERSATION` is the durable default identity;
+- exact-session episode ownership activates oversight mode; and
+- the `oversee-episode` package supplies the detailed procedure.
 
-The first release supports at most one active episode at a time per project
-conversation as a role and workflow rule. It permits any number of sequential
-completed or abandoned episode cycles. It does not add a host-level active-
-episode index or attempt to coordinate concurrent episodes. Dogfooding must
-demonstrate a real need before concurrency enforcement or scheduling is
-designed.
+The conversation's episode-driving identity must be unforgettable. Long ordinary
+discussion, context growth, native compaction, reload, resume, reports,
+heartbeats, and provider/tool continuation must not make it forget how to review,
+continue, pause, or return decisions to the operator. This is a behavioral
+requirement, not a requirement to use a particular injection hook or to customize
+Prime Agent's compaction policy.
+
+An ordinary fork retains CONVERSATION capability but does not duplicate live
+episode ownership: ownership remains bound to the exact source session. The
+`/implement-spec` path uses fork-like mechanics but explicitly transitions the
+new sibling to `EPISODE`. A fresh reviewer receives bounded `EXPERT` instructions,
+and an RLM child follows its bounded delegated task rather than assuming the
+conversation's ownership or authority.
+
+The first release supports at most one active episode at a time per conversation
+as a workflow rule while allowing multiple conversations to own distinct episodes
+and any number of sequential completed or abandoned cycles. It does not add a
+project-wide scheduler or host-level concurrency index.
 
 ### Episode
 
@@ -128,118 +139,122 @@ The operator retains authority over specification and plan approval, scope
 expansion, unresolved product decisions, pause, merge, abandonment, and
 destructive cleanup. The operator may intervene or take over at any time.
 
-Native `/implement-spec` authorizes the assigned project conversation to drive
-all bounded implementation and revision slices already contained in the reviewed
+Native `/implement-spec` authorizes the invoking conversation to drive all
+bounded implementation and revision slices already contained in the reviewed
 specification and plan. It does not authorize any of the retained operator
 choices above.
 
 ## First-release plugin shape
 
-The initial feature has two new policy resources and reuses the host mechanics
-already delivered. The division is intentionally evolvable.
+The first release uses a small universal identity anchor, exact-session oversight
+state, one canonical role package, and the deterministic host mechanics already
+delivered. The evidence-only Prime Agent 0.9.5 POC proved the native mechanics
+below; the production integration must retain that evidence and close the noted
+readiness boundaries.
 
-### 1. Explicit project-conversation agent profile
+### 1. Universal identity kernel
 
-The plugin supplies a small, file-defined `PROJECT_CONVERSATION` agent profile.
-The profile is explicitly selected when a project conversation is created, and
-its role instructions become part of that agent's effective system prompt. An
-ordinary user-message or prompt-template expansion is not sufficient to assign
-the role.
+A short native `APPEND_SYSTEM.md` resource describes identity precedence for all
+standard prime-claw sessions:
 
-The assignment must remain effective when the durable session is resumed or its
-resources are reloaded. It is bound to that exact project-conversation identity:
-a fork, episode, reviewer, or other project-rooted session does not inherit the
-role unless it is separately and explicitly assigned.
+- an independent top-level user-facing project session is CONVERSATION by default;
+- an explicit EPISODE, EXPERT, or delegated-child assignment overrides default
+  ownership and authority;
+- oversight mode exists only when exact-session durable state says that
+  conversation owns an active episode;
+- an active conversation must use its canonical oversight package; and
+- missing identity, package, or restoration readiness is a visible blocker.
 
-The implementation must use a supported Prime Agent system-prompt or
-agent-profile seam and make the resulting role observable in focused tests. The
-exact file layout, launch API, persistence representation, and prompt-injection
-mechanism are planning decisions. The design should prefer a native resident-
-session agent-profile facility if the target runtime provides one and otherwise
-choose the smallest reliable plugin mechanism.
+The kernel is an identity router, not a complete workflow. It must remain small
+and must not duplicate `oversee-episode`, `execute`, reviewer instructions, daemon
+protocol, or project policy. Prime Agent rebuilds this base resource independently
+of conversation history, so normal context compaction does not remove it.
 
-The profile contains only invariants that should shape every turn:
+Project or CLI prompt configuration may shadow the installed append resource.
+Before promotion, readiness validation therefore proves that exactly one expected
+kernel is present and that the restoration plugin and role package are available.
+A deliberate unsupported prompt configuration fails visibly at the promotion
+boundary rather than silently starting an ungoverned episode.
 
-- run the project's `prepare` orientation when the role is first launched,
-  before substantive project work;
-- preserve the ordinary conversation and existing specification and planning
-  workflows without intercepting or replacing them;
-- preserve operator intent and reviewed scope;
-- own only episodes created by this conversation;
-- support at most one active episode at a time in the first release while
-  permitting later sequential episodes;
-- use the canonical oversight workflow only while an episode is active;
-- treat side discussions as separate future work unless the operator explicitly
-  changes active scope;
-- distinguish admission, work completion, review, and approval;
-- never infer merge, abandonment, or destructive-cleanup approval; and
-- stop and surface real blockers rather than manufacturing authority.
+### 2. Exact-session oversight mode and fresh role package
 
-The profile does not carry detailed review procedure, daemon protocol, Git
-recipes, project-specific acceptance policy, or a complete lifecycle model. It
-does not replace, intercept, or narrow the existing `/spec-it-out`, `/plan`, or
-`/implement-spec` workflows. The first release does not add a general role
-registry or ownership-rebinding system.
+Successful `/implement-spec` promotion activates oversight for the exact invoking
+conversation without creating a model turn. The append-only session marker is
+bound to that conversation UUID and the existing durable spec-episode identity
+record is the independent ownership expectation. A marker copied into a fork is
+inert because its UUID no longer matches. Separate conversations may hold
+separate ownership records.
 
-### 2. One project-customizable oversight skill
+While exact-session state is active, a universal `context` hook validates the
+kernel, marker, expectation, and canonical package, removes any older package
+representation, and supplies exactly one fresh package to every real provider
+call. This covers ordinary input, custom triggers, native follow-ups, heartbeats,
+agent messages, reload, resume, and tool continuation without depending on the
+input event or a mutable per-input cache. Activation itself causes no unsolicited
+model response.
+
+Native automatic compaction remains unchanged. Its private summarizer is a
+runtime utility rather than the CONVERSATION agent and need not receive the role
+package. The first real call after compaction must receive one current kernel and
+one current package. No proactive conversation handoff or custom context-sweet-
+spot policy is part of this release.
+
+Terminal episode disposition appends inactive state and removes the ownership
+expectation while leaving default CONVERSATION identity available. Marker and
+expectation disagreement, missing or corrupt packages, and duplicate or missing
+kernels block visibly before an oversight provider call. The existing plugin
+apply/check path plus `/implement-spec` readiness validation owns installation
+integrity; an infinite chain of self-checking sentinel plugins is not required.
+
+### 3. One project-customizable oversight skill
 
 The first release adds one canonical `oversee-episode` skill. It is
-project-customizable in the same way as the existing Ralph skills and is exposed
-to the project conversation through the normal Prime Agent skill mechanism. It
-is used while an owned episode is active; it does not replace the conversation's
-ordinary discussion, specification, specification-revision, planning, or plan-
-revision workflows.
+project-customizable in the same way as the existing Ralph skills. Its canonical
+contents also supply the fresh oversight package while exact-session mode is
+active, avoiding separate drifting copies.
 
 The skill guides the conversation to:
 
 1. retain the exact episode identity and expected work generation;
-2. start and later cancel one bounded watch for admitted work;
-3. reconcile the episode report with session, Git, plan, bead, and test evidence;
+2. establish direct owner/episode reporting and start one non-steering 15-minute
+   heartbeat for each active work generation;
+3. reconcile episode reports with session, Git, plan, bead, and test evidence;
 4. independently review the exact pushed commit;
 5. choose `advance`, `revise`, `consult`, or `pause`;
-6. record durable findings in the artifact that owns them;
-7. invoke the existing exact-owner continuation capability for accepted
-   in-scope work;
-8. obtain and adjudicate fresh EXPERT review under the project's explicit
-   operator-authorized reviewer-model policy when appropriate;
-9. verify and preserve the actual reviewer model and reasoning level with the
-   review evidence;
-10. prepare the exact final candidate and explicit operator gate; and
-11. after the operator's decision, guide the proven merge or abandonment and
-    conservative cleanup procedure.
+6. record durable findings in the owner ledger and route them at stable gates;
+7. invoke existing exact-owner continuation for accepted in-scope work;
+8. obtain and adjudicate fresh EXPERT review under the explicit reviewer policy;
+9. prepare the exact final candidate and operator gate; and
+10. after the operator's decision, guide merge or abandonment and conservative
+    cleanup before returning to ordinary conversation.
 
 The skill owns semantic judgment. It does not implement raw daemon transport,
-forge session identity, bypass path or quiescence checks, or treat prose as a
-host mutation.
+forge identity, bypass path or quiescence checks, or treat prose as a host
+mutation.
 
-Starting with one skill keeps the surface small. Continued use may split it or
-move stable guidance between the agent profile and skills. That split is not a
-permanent compatibility boundary.
-
-### 3. Existing narrow host capabilities
+### 4. Existing narrow host capabilities
 
 The first release reuses the delivered deterministic surfaces instead of adding
 a general controller:
 
 - native `/implement-spec` and `create_spec_episode` for promotion and bootstrap;
 - `handoff_spec_episode(location, guidance?)` for exact-owner continuation;
-- existing daemon identity, state, queue, and quiescence validation inside those
-  capabilities;
+- existing daemon identity, state, queue, and quiescence validation;
 - `rlm_heartbeat` and session observation for activity-scoped watches;
 - fresh RLM agents with explicit model selection for read-only EXPERT review;
+- existing spec-episode identity state as the ownership expectation; and
 - ordinary Git and supported Prime Agent session operations after terminal
   operator disposition.
 
-The tool guidance for `handoff_spec_episode` must match the approved authority
-model. After accepting an exact slice commit, the assigned project conversation
-may invoke it for its exact owned episode without a fresh operator request. The
-capability still fails closed unless location, owner, durable identity, canonical
-prompts, and live daemon quiescence all match.
+After accepting an exact slice commit, the owning conversation may invoke
+`handoff_spec_episode` for its exact episode without a fresh transport request.
+The capability still fails closed unless location, owner, durable identity,
+canonical prompts, and live daemon state match.
 
-No native merge, abandonment, cleanup, episode-status, reviewer, or arbitrary
-remote-command capability is required in the first release. A later capability
-must be justified by observed friction or a safety failure, not by a desire to
-complete an abstract architecture.
+No custom prime-claw CLI, custom `prime-agent-core` agent, native merge command,
+general role registry, reviewer service, or arbitrary remote-command router is
+required in the first release. Those remain later options only if this smaller
+proven design fails in real use.
 
 ## Repeatable reviewed lifecycle
 
@@ -264,14 +279,16 @@ project discussion
 ### Before episode creation
 
 Specification and planning remain ordinary work in the project conversation.
-Beyond initial `prepare` orientation and the non-interference requirements above,
-this release adds no special mechanism for those conversational steps.
+The identity kernel remains present, but this release adds no special controller
+for those conversational steps. Detailed oversight guidance is inactive until a
+successful `/implement-spec` transition.
 
 Specification approval permits planning only. Plan approval does not create an
-episode. Native `/implement-spec` is the explicit implementation boundary.
-Conversational implementation promotion remains intentionally absent because the
-installed runtime could not preserve the required one-run authorization boundary
-without adding unproven durable approval machinery.
+episode. Native `/implement-spec` is the explicit implementation boundary. Before
+promotion it verifies the identity kernel, restoration plugin, canonical
+`oversee-episode` package, and durable state surfaces. After successful episode
+publication it durably binds oversight mode to the invoking conversation and
+verifies the marker and spec-episode expectation before claiming activation.
 
 ### Handoff-first bootstrap
 
@@ -298,15 +315,21 @@ ordered daemon mutation was accepted.
 
 ### Active work watch
 
-After bootstrap or an admitted continuation, the project conversation creates
-one agent-owned, bounded heartbeat for that exact work generation. The watch
-uses existing session observation and persisted Git/session evidence. It does
-not steer active work.
+After episode creation, the episode sends one coordination message identifying
+the exact owner conversation and reports material progress, blockers, and
+completion directly. Reports are evidence, never approval or native-command
+dispatch.
 
-The watch wakes the conversation when the episode reports, becomes idle, blocks,
-or reaches an ambiguous state. It is cancelled as soon as the generation is
-reconciled. A later admitted slice gets a new watch. Repeated unchanged idle
-polling is a bug.
+Whenever the owned episode is actively working, the conversation maintains
+exactly one non-steering 15-minute agent-owned heartbeat for that exact work
+generation. This includes bootstrap, continuation, repairs, review rework, and
+requested evidence. The watch uses existing observation and persisted
+Git/session evidence and never steers active work.
+
+Direct reports are the fast path; the heartbeat is a missed-report safety net. It
+is cancelled as soon as the generation is reconciled as complete, blocked,
+stopped, or waiting only for owner/operator action. A later generation gets a
+fresh watch. Repeated unchanged idle polling or duplicate watches are bugs.
 
 The first release does not add a notification transport, event bus, scheduler
 service, or monitoring database. If this proven observation path fails in later
@@ -414,9 +437,10 @@ session evidence to know that the transition was admitted before assuming work
 has started. Ambiguity is surfaced rather than answered with blind duplicate
 retries.
 
-Terminal disposition ends the episode, not the project conversation. The owner
-cancels episode-specific watches, releases transient episode/review focus, keeps
-its `PROJECT_CONVERSATION` assignment, and returns to ordinary discussion. A
+Terminal disposition ends the episode, not the conversation. The owner cancels
+episode-specific watches, appends inactive oversight state, clears the matching
+ownership expectation, releases transient episode/review focus, and returns to
+ordinary discussion with its default CONVERSATION identity intact. A
 later operator-approved future folder may start a new sequential episode through
 the same `/spec-it-out` → `/plan` → `/implement-spec` gates.
 
@@ -461,6 +485,9 @@ Project-customizable Markdown owns:
 
 Trusted extension code owns:
 
+- identity-kernel and package readiness at the promotion boundary;
+- exact-session oversight markers and agreement with spec-episode ownership;
+- one fresh active role package on every real provider call;
 - exact argument and path validation;
 - owner, session, branch, worktree, and CWD identity;
 - daemon state and quiescence checks;
@@ -469,8 +496,8 @@ Trusted extension code owns:
 - at-most-once replay suppression; and
 - preservation when mutation outcome is uncertain.
 
-The agent profile and skill must not duplicate daemon protocol or bypass these
-mechanics. Extension code must not decide product scope, review quality, or
+The identity kernel, active role package, and skill must not duplicate daemon
+protocol or bypass these mechanics. Extension code must not decide product scope, review quality, or
 operator intent.
 
 ## Side discussions and living intent
@@ -494,20 +521,25 @@ this specification into an append-only journal.
 
 The first release adds or changes only:
 
-1. an explicit lightweight project-conversation agent profile with durable,
-   identity-bound system-prompt behavior and startup `prepare` orientation;
-2. one project-customizable `oversee-episode` skill;
-3. role and skill guidance that starts and cancels existing per-generation
-   heartbeat watches;
-4. `handoff_spec_episode` guidance that permits owner-driven in-scope
-   continuation after exact-commit acceptance;
-5. explicit EXPERT reviewer-model, evidence, and required-review failure policy;
-6. focused tests and documentation for these contracts; and
-7. a non-interference and return-to-incubation contract that leaves the existing
-   conversational workflows available before and after an episode.
+1. a small universal `APPEND_SYSTEM.md` identity kernel with bounded-role
+   precedence;
+2. exact-session oversight activation and terminal deactivation tied to existing
+   spec-episode identity state;
+3. one canonical project-customizable `oversee-episode` skill whose current
+   contents are supplied freshly during active oversight;
+4. readiness and fail-closed validation for kernel, plugin, package, marker, and
+   ownership expectation;
+5. direct owner/episode reporting and one 15-minute non-steering heartbeat per
+   active work generation;
+6. owner-ledger routing of discoveries at stable review boundaries;
+7. existing owner-driven continuation after exact-commit acceptance;
+8. explicit EXPERT reviewer-model, evidence, and required-review failure policy;
+   and
+9. non-interference and return-to-incubation behavior around ordinary
+   conversation, design, specification, and planning.
 
-It reuses all existing deterministic host mechanics and ordinary terminal
-operations.
+It reuses native automatic compaction and all existing deterministic host
+mechanics.
 
 ## Non-goals
 
@@ -518,8 +550,10 @@ The first release does not add:
 - new replacements or wrappers for `/prepare`, `/design`, `/spec-it-out`,
   `/plan`, or `/implement-spec`;
 - an autonomous universal-agent orchestrator;
-- implicit project-conversation role assignment from CWD;
-- a role registry or ownership-rebinding framework;
+- a unique or explicitly launched project-owner conversation;
+- a general role registry or ownership-rebinding framework;
+- custom CONVERSATION compaction or proactive self-handoff;
+- a prime-claw wrapper CLI or custom `prime-agent-core` runtime;
 - host enforcement or scheduling of multiple active episodes;
 - a lifecycle database, generalized state machine, append-only transition
   journal, leases, nonces, or timers;
@@ -535,36 +569,42 @@ The first release does not add:
 
 ## Acceptance and continued dogfooding
 
-The first plugin release is acceptable when a newly launched explicit
-`PROJECT_CONVERSATION`:
+The first plugin release is acceptable when native Prime Agent tests and one live
+run demonstrate that:
 
-1. runs the existing project `prepare` orientation before substantive work;
-2. retains normal project conversation and the existing `/spec-it-out`, `/plan`,
-   and `/implement-spec` entry paths without new wrappers or restrictions;
-3. crosses the implementation boundary only through `/implement-spec` for an
-   already reviewed bundle and retains the returned exact episode identity;
-4. observes one admitted work generation with a bounded heartbeat;
-5. reconciles and independently reviews an exact slice commit;
-6. revises or continues the exact owned episode without another operator
-   transport step and without exceeding approved scope;
-7. obtains and adjudicates a fresh final EXPERT review using the explicit
-   operator-authorized reviewer-model policy, with the actual model and reasoning
-   level recorded against the exact commit;
-8. pauses for the operator rather than silently falling back when that required
-   reviewer is unavailable;
-9. presents the exact merge candidate for explicit operator disposition;
-10. follows the existing safe terminal procedure without new lifecycle
-    infrastructure; and
-11. remains the same assigned, normally conversational project session afterward,
-    with no stale episode lock preventing a later existing workflow or new
-    `/implement-spec` promotion.
+1. multiple independent project sessions each receive exactly one CONVERSATION
+   identity kernel without an explicit role flag;
+2. ordinary conversation and the existing `/design`, `/spec-it-out`, `/plan`, and
+   `/implement-spec` paths remain available;
+3. `/implement-spec` refuses promotion when identity or oversight readiness is
+   incomplete and, when ready, activates exact-session oversight without an
+   unsolicited model turn;
+4. the existing spec-episode identity and active marker agree on the exact owner,
+   while an ordinary fork retains CONVERSATION capability without duplicating
+   ownership;
+5. every real active run receives exactly one current oversight package across
+   ordinary prompts, reports, heartbeats, native follow-ups, tool continuation,
+   reload, resume, and the first real turn after native auto-compaction;
+6. missing, duplicate, or corrupt active identity/package state fails visibly
+   before an ungoverned oversight model call;
+7. an implement-spec target operates as EPISODE, an EXPERT remains a bounded
+   reviewer, and a delegated child does not assume conversation ownership;
+8. the conversation observes each active work generation with direct reporting
+   plus exactly one non-steering 15-minute heartbeat;
+9. it reconciles and independently reviews exact commits, continues or revises
+   only within approved scope, and records discoveries in the owner ledger;
+10. required EXPERT review uses the explicitly authorized model and reasoning
+    level without silent fallback;
+11. only the operator decides merge, abandonment, unresolved scope, and
+    destructive cleanup; and
+12. terminal disposition clears oversight state while leaving the same session
+    available for ordinary conversation and later sequential episodes.
 
-The run must also capture focused evidence for the handoff-first bootstrap and
-owner-driven continuation in a live episode, because those transports have
-strong automated coverage but still benefit from a concise end-to-end transcript
-in the new role-driven workflow.
+The run must also capture focused evidence for handoff-first bootstrap,
+owner-driven continuation, actual `/implement-spec` identity transition, and
+post-compaction recovery. Point-in-time POC and review evidence belongs in linked
+reports and Beads rather than being copied into this living specification.
 
-After that run, update this living specification with observed friction. Add
-another plugin capability only when the run demonstrates a repeated need that
-cannot be handled clearly by the agent profile, skill, or existing supported
-operations.
+After that run, update this specification with observed friction. Add another
+plugin capability only when evidence shows that the identity kernel, fresh role
+package, skill, existing runtime, and readiness checks cannot meet the behavior.
