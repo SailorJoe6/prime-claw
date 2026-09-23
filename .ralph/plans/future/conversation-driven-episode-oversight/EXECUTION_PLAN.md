@@ -102,6 +102,16 @@ the containing transition and session state are verified persisted. Package
 injection must be idempotent across queued work, reports, heartbeats, native
 follow-ups, tool continuation, reload, resume, and cancellation.
 
+Add one narrow two-phase `finalize_spec_episode` capability. Its authorize phase
+accepts the exact location and `merged`/`abandoned` disposition, obtains explicit
+operator UI confirmation, and persists an exact owner/episode receipt without
+performing terminal work. After the skill-guided ordinary Git/session/worktree
+sequence, its completion phase requires that receipt, validates conservative
+terminal facts, appends inactive state, and clears only the matching expectation
+without a second confirmation. Ambiguity leaves all state available for repair.
+The capability records an already-made semantic and operator decision; it never
+decides completion, merges, abandons, or cleans resources.
+
 ### Policy and authority
 
 Add one project-customizable `.ralph/skills/oversee-episode/SKILL.md`. The
@@ -201,9 +211,10 @@ copied ownership.
    - remove stale package representations; and
    - abort visibly on active-state disagreement or corrupt resources.
 5. Integrate `/implement-spec` readiness and activation only after promotion and
-   episode identity are durably established. Integrate terminal deactivation
-   with the existing conservative disposition path without inventing automatic
-   merge or cleanup.
+   episode identity are durably established. Add the approved narrow two-phase
+   `finalize_spec_episode` authorization/completion capability with one UI
+   confirmation, exact durable receipt, conservative terminal validation, and no
+   merge or cleanup authority.
 6. Extend plugin apply/check manifests for the kernel, plugin, and canonical
    package. Detect project/CLI prompt shadowing at readiness rather than silently
    weakening identity.
@@ -215,7 +226,8 @@ copied ownership.
    - normal input, custom trigger, native follow-up, heartbeat, agent message,
      tool continuation, queued/cancelled work, reload, and resume;
    - native automatic compaction with restoration on the first real later call;
-   - idempotent activation/deactivation and no unsolicited provider call;
+   - idempotent activation plus authorized terminal receipt/completion, one user
+     confirmation, and no unsolicited provider call;
    - current package reload exactly once per call; and
    - visible zero-provider blocking for missing/duplicate kernel, corrupt marker,
      expectation mismatch, and missing/corrupt package.
