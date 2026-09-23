@@ -10,6 +10,18 @@ import {
   validateFutureLocation,
   wrapCanonicalSkill,
 } from "../extension-support/reviewed-plan-support.ts";
+import {
+  appendActiveOversight,
+  assertConversationPromotionReady,
+  currentOversightMarker,
+  OVERSIGHT_MARKER_TYPE,
+  type OversightDisposition,
+} from "../extension-support/conversation-oversight.ts";
+import {
+  authorizeEpisodeFinalization,
+  completeEpisodeFinalization,
+  type FinalizationDependencies,
+} from "../extension-support/episode-finalization.ts";
 
 /**
  * Native reviewed planning and implementation-promotion boundaries.
@@ -54,6 +66,7 @@ function admitCanonicalSkill(
   workflow: SkillWorkflow,
   delivery: "native" | "followUp",
   onValidated?: (ctx: ExtensionContext, location: string) => void,
+  preflight?: (ctx: ExtensionContext, location: string) => void,
 ): SkillAdmissionResult {
   let selected;
   try {
@@ -62,6 +75,8 @@ function admitCanonicalSkill(
     selected = null;
   }
   if (!selected) return { ok: false, message: workflow.usage };
+
+  preflight?.(ctx, selected.location);
 
   const prompt = wrapCanonicalSkill(
     selected.projectRoot,
@@ -101,6 +116,7 @@ function registerSkillCommand(
     description: string;
     workflow: SkillWorkflow;
     onValidated?: (ctx: ExtensionContext, location: string) => void;
+    preflight?: (ctx: ExtensionContext, location: string) => void;
   },
 ): void {
   pi.registerCommand(options.command, {
@@ -113,13 +129,19 @@ function registerSkillCommand(
         options.workflow,
         "native",
         options.onValidated,
+        options.preflight,
       );
       if (!result.ok) warn(ctx, result.message);
     },
   });
 }
 
-export function createReviewedPlanExtension(dependencies?: EpisodeDependencies) {
+type ReviewedPlanDependencies = EpisodeDependencies & {
+  finalization?: FinalizationDependencies;
+  createEpisode?: typeof createSpecEpisode;
+};
+
+export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
     const approvedLocationBySession = new Map<string, string>();
     registerSkillCommand(pi, {
@@ -131,6 +153,7 @@ export function createReviewedPlanExtension(dependencies?: EpisodeDependencies) 
       command: "implement-spec",
       description: "Review and promote an approved future bundle into an isolated implementation episode",
       workflow: IMPLEMENT_WORKFLOW,
+      preflight: (ctx) => assertConversationPromotionReady(ctx),
       onValidated: (ctx, location) => {
         approvedLocationBySession.set(ctx.sessionManager.getSessionId(), location);
       },
@@ -226,7 +249,15 @@ export function createReviewedPlanExtension(dependencies?: EpisodeDependencies) 
         }
         approvedLocationBySession.delete(sessionId);
         try {
-          const result = await createSpecEpisode(params.location, toolCallId, ctx, dependencies);
+          assertConversationPromotionReady(ctx);
+          const createEpisode = dependencies?.createEpisode ?? createSpecEpisode;
+          const result = await createEpisode(params.location, toolCallId, ctx, dependencies);
+          appendActiveOversight(pi, ctx, {
+            sourceLocation: result.sourceLocation,
+            slug: result.slug,
+            episodeId: result.episodeId,
+            episodeSessionFile: result.episodeSessionFile,
+          });
           return {
             content: [{ type: "text", text: episodeResultText(result) }],
             details: result,
@@ -237,6 +268,66 @@ export function createReviewedPlanExtension(dependencies?: EpisodeDependencies) 
             details: { error: error instanceof Error ? error.message : String(error) },
             isError: true,
           };
+        }
+      },
+    });
+
+    pi.registerTool({
+      name: "finalize_spec_episode",
+      label: "Finalize specification episode oversight",
+      description: "Record or complete one exact operator-authorized merged/abandoned episode disposition without performing Git or cleanup work.",
+      promptSnippet: "Authorize or complete exact episode finalization after the operator's terminal decision",
+      promptGuidelines: [
+        "Use authorize only after the operator explicitly chooses merged or abandoned for the exact owned episode.",
+        "Authorize records the decision after one UI confirmation and performs no merge, abandonment, stop, worktree, branch, or cleanup mutation.",
+        "Perform ordinary conservative terminal work through the canonical oversight procedure, then use complete for the same exact location and disposition.",
+        "Complete requires the matching receipt and terminal facts; ambiguity preserves active oversight and all evidence.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          phase: { type: "string", enum: ["authorize", "complete"] },
+          location: { type: "string", description: "Exact .ralph/plans/future/<slug> folder owned by this conversation" },
+          disposition: { type: "string", enum: ["merged", "abandoned"] },
+        },
+        required: ["phase", "location", "disposition"],
+        additionalProperties: false,
+      } as any,
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        try {
+          const disposition = params.disposition as OversightDisposition;
+          if (params.phase === "authorize") {
+            const result = await authorizeEpisodeFinalization(
+              params.location,
+              disposition,
+              ctx,
+              (title, message) => ctx.ui.confirm(title, message),
+              dependencies?.finalization,
+            );
+            return {
+              content: [{ type: "text", text: `Episode finalization ${result.reused ? "already authorized" : "authorized"} for ${params.location} as ${disposition}. No terminal work was performed.` }],
+              details: { phase: "authorize", disposition, reused: result.reused, receipt: result.receipt },
+            };
+          }
+          if (params.phase !== "complete") throw new Error("Finalization phase must be authorize or complete");
+          const marker = currentOversightMarker(ctx);
+          if (!marker) throw new Error("No exact active oversight marker exists for this conversation");
+          const receipt = await completeEpisodeFinalization(
+            params.location,
+            disposition,
+            ctx,
+            (status, value) => pi.appendEntry(OVERSIGHT_MARKER_TYPE, { ...value, status }),
+            marker,
+            dependencies?.finalization,
+          );
+          return {
+            content: [{ type: "text", text: `Episode finalization completed for ${params.location} as ${disposition}. Oversight is inactive; CONVERSATION capability remains.` }],
+            details: { phase: "complete", disposition, receipt },
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { content: [{ type: "text", text: `Episode finalization failed: ${message}` }], details: { error: message }, isError: true };
         }
       },
     });

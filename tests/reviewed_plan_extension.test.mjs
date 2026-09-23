@@ -14,6 +14,7 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import reviewedPlan, { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
+import { IDENTITY_KERNEL, markOversightRuntimeReady } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -37,13 +38,14 @@ test("every shipped extension entry point exports a factory", async () => {
   }
 });
 
-function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0) {
+function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPrompt = IDENTITY_KERNEL) {
   const commands = new Map();
   const tools = new Map();
   const events = new Map();
   const messages = [];
   const deliveries = [];
   const notices = [];
+  const entries = [];
   let sendCount = 0;
   const pi = {
     registerCommand(name, definition) {
@@ -55,6 +57,7 @@ function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0) {
     on(name, handler) {
       events.set(name, handler);
     },
+    appendEntry(customType, data) { entries.push({ type: "custom", customType, data }); },
     sendUserMessage(message, options) {
       sendCount += 1;
       if (sendCount === throwOnSend) throw new Error("synthetic send failure");
@@ -68,15 +71,20 @@ function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0) {
       getSessionId() { return "owner-session"; },
       getSessionFile() { return join(cwd, "owner-session.jsonl"); },
       getHeader() { return { rlmDepth: 0 }; },
+      getBranch() { return entries; },
     },
+    getSystemPrompt() { return systemPrompt; },
+    abort() {},
     ui: {
       notify(message, level) {
         notices.push({ message, level });
       },
+      async confirm() { return true; },
     },
   };
   extension(pi);
-  return { commands, tools, events, ctx, messages, deliveries, notices };
+  markOversightRuntimeReady("owner-session");
+  return { commands, tools, events, ctx, messages, deliveries, notices, entries };
 }
 
 function fixture(t, { skill = "canonical plan body", folder = true, throwOnSend = 0 } = {}) {
@@ -85,6 +93,8 @@ function fixture(t, { skill = "canonical plan body", folder = true, throwOnSend 
   mkdirSync(join(cwd, ".ralph", "plans", "future"), { recursive: true });
   if (folder) mkdirSync(join(cwd, LOCATION), { recursive: true });
   if (skill !== null) writeSkill(cwd, skill);
+  writeSkill(cwd, "---\nname: oversee-episode\n---\ncanonical oversight", "oversee-episode");
+  mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
   return { cwd, ...createHarness(cwd, reviewedPlan, throwOnSend) };
 }
 
@@ -115,7 +125,7 @@ function count(haystack, needle) {
 test("registers native reviewed commands, planning tool, and native-only implementation", (t) => {
   const f = fixture(t);
   assert.deepEqual([...f.commands.keys()], ["plan", "implement-spec"]);
-  assert.deepEqual([...f.tools.keys()], ["ralph_plan", "create_spec_episode", "handoff_spec_episode"]);
+  assert.deepEqual([...f.tools.keys()], ["ralph_plan", "create_spec_episode", "finalize_spec_episode", "handoff_spec_episode"]);
   assert.equal(f.tools.has("ralph_implement_spec"), false);
   assert.deepEqual([...f.events.keys()], ["session_start", "agent_end", "session_shutdown"]);
   assert.match(f.commands.get("plan").description, /explicit .*future/);
@@ -127,6 +137,10 @@ test("registers native reviewed commands, planning tool, and native-only impleme
   assert.ok(planTool.promptGuidelines.every((guideline) => guideline.includes("ralph_plan")));
   assert.deepEqual(f.tools.get("create_spec_episode").parameters.required, ["location"]);
   assert.equal(f.tools.get("create_spec_episode").parameters.additionalProperties, false);
+  const finalizeTool = f.tools.get("finalize_spec_episode");
+  assert.deepEqual(Object.keys(finalizeTool.parameters.properties), ["phase", "location", "disposition"]);
+  assert.deepEqual(finalizeTool.parameters.required, ["phase", "location", "disposition"]);
+  assert.equal(finalizeTool.parameters.additionalProperties, false);
   const handoffTool = f.tools.get("handoff_spec_episode");
   assert.equal(handoffTool.executionMode, "sequential");
   assert.deepEqual(Object.keys(handoffTool.parameters.properties), ["location", "guidance"]);
@@ -357,6 +371,17 @@ ${LOCATION}
   assert.deepEqual(f.notices, []);
 });
 
+test("implement-spec refuses a shadowed identity kernel before model injection", async (t) => {
+  const f = fixture(t);
+  writeSkill(f.cwd, "implementation policy", "implement-spec");
+  const shadowed = createHarness(f.cwd, reviewedPlan, 0, "project append shadow");
+  await assert.rejects(
+    shadowed.commands.get("implement-spec").handler(LOCATION, shadowed.ctx),
+    /expected exactly one managed identity kernel/,
+  );
+  assert.deepEqual(shadowed.messages, []);
+});
+
 test("invalid implement-spec input shows usage without model injection", async (t) => {
   const f = fixture(t);
   writeSkill(f.cwd, "implementation policy", "implement-spec");
@@ -370,6 +395,42 @@ test("invalid implement-spec input shows usage without model injection", async (
   }]);
 });
 
+
+test("successful create activates exact owner oversight without unsolicited message", async (t) => {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-activate-")));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  mkdirSync(join(cwd, LOCATION), { recursive: true });
+  writeSkill(cwd, "implementation readiness", "implement-spec");
+  writeSkill(cwd, "---\nname: oversee-episode\n---\ncanonical oversight", "oversee-episode");
+  mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
+  let createCalls = 0;
+  const episode = {
+    version: 2, reused: false, slug: "alpha-plan", sourceLocation: LOCATION,
+    ownerSessionId: "owner-session", episodeId: "episode-id",
+    episodeActiveSessionId: "active-id", episodeSessionFile: join(cwd, "episode.jsonl"),
+    branch: "episode/alpha-plan", worktree: join(cwd, "worktree"),
+    sessionName: "alpha-plan-episode", bootstrapAdmission: "delivered",
+  };
+  const extension = createReviewedPlanExtension({
+    async createEpisode(location) { createCalls += 1; assert.equal(location, LOCATION); return episode; },
+  });
+  const f = createHarness(cwd, extension);
+  await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+  const before = f.messages.length;
+  const result = await f.tools.get("create_spec_episode").execute(
+    "activate-call", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+  assert.equal(result.isError, undefined);
+  assert.equal(createCalls, 1);
+  assert.equal(f.messages.length, before);
+  const markers = f.entries.filter((entry) => entry.customType === "prime-claw-conversation-oversight");
+  assert.equal(markers.length, 1);
+  assert.deepEqual(markers[0].data, {
+    version: 1, status: "active", ownerSessionId: "owner-session",
+    sourceLocation: LOCATION, slug: "alpha-plan", episodeId: "episode-id",
+    episodeSessionFile: join(cwd, "episode.jsonl"),
+  });
+});
 
 test("owner handoff tool requires a durable identity for the exact location", async (t) => {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-handoff-")));
@@ -400,6 +461,8 @@ test("structured tool requires and consumes matching implement-spec approval", a
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, LOCATION), { recursive: true });
   writeSkill(cwd, "implementation readiness", "implement-spec");
+  writeSkill(cwd, "---\nname: oversee-episode\n---\ncanonical oversight", "oversee-episode");
+  mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
   const dependencies = {
     git: { repositoryRoot() { throw new Error("authorized tool reached host capability"); } },
     filesystem: {},

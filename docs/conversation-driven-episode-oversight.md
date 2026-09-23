@@ -1,111 +1,129 @@
 # Conversation-driven episode oversight
 
-Prime Claw provides an explicit `PROJECT_CONVERSATION` role for the long-lived,
-operator-facing project thread. This page documents the delivered role boundary.
-The temporary episode-oversight procedure and configured EXPERT review policy
-are separate later slices; the role does not invent those mechanisms.
+Prime Claw gives every independent top-level project session a small default
+CONVERSATION capability. No launch flag or unique project-owner session is
+required. Ordinary discussion, design, specification, and planning remain native
+Prime Agent behavior.
 
-## Launch an assigned project conversation
+## Managed identity kernel
 
-Launch Prime Agent from the project root with the project extension enabled and
-the explicit flag:
+The inert builder resource `src/prime-agent-plugin/APPEND_SYSTEM.md` contains a
+short managed block identified by `PRIME_CLAW_CONVERSATION_IDENTITY_V1`.
+`scripts/apply-prime-agent-plugin.sh` merges that block into the user-global
+`~/.prime/agent/APPEND_SYSTEM.md` while preserving unrelated user append content.
+The check script verifies exactly one current managed block.
 
-```bash
-prime-agent --cwd /path/to/project --project-conversation
-```
+Prime Agent chooses a project `.prime/agent/APPEND_SYSTEM.md` before the global
+file, and `--append-system-prompt` overrides file discovery. Those supported
+configurations can shadow the kernel. The universal context validator blocks
+visibly when the effective prompt does not contain exactly one expected kernel,
+and `/implement-spec` repeats readiness validation before promotion.
 
-The flag is the assignment boundary only for a pristine top-level launch:
-`rlmDepth` is zero and the session header has no `parentSession`. Merely running
-in the project directory does not grant this role. Runtime children inherit
-extension flags, so the extension explicitly ignores the flag for RLM children,
-forks, implementation episodes, reviewers, and other derived identities.
+The kernel defines precedence rather than detailed procedure:
 
-On initial process startup the extension writes a versioned, session-local marker
-containing only:
+- an independent depth-zero project session has default CONVERSATION capability;
+- an explicit EPISODE, EXPERT, or delegated/depth-positive child remains bounded;
+- copied history never copies exact episode ownership; and
+- oversight mode exists only while exact-session state agrees with a durable
+  spec-episode ownership expectation.
 
-- `role: "PROJECT_CONVERSATION"`;
-- the marker schema version; and
-- the exact assigned Prime Agent session ID.
+Native automatic compaction remains unchanged; native compaction stays the default. Its internal summarizer uses its
+own runtime prompt. The first real conversation call after compaction receives
+the normal identity kernel and, when active, the current oversight package.
+Reload and resume rebuild the kernel from current resources.
 
-A resumed or reloaded session restores the role only when the marker's session
-ID matches the current session ID. A fork can inherit the marker as session
-history, but the different ID keeps the role inactive. A derived runtime cannot
-mint a replacement marker from an inherited flag. Launching a separate pristine
-top-level process with `--project-conversation` is a new explicit assignment.
+## Oversight activation and package
 
-## Startup orientation
+Native `/implement-spec` remains the only promotion authority boundary. Before
+queuing its canonical readiness workflow, the extension verifies:
 
-The role profile requires the first substantive agent turn to inspect and follow
-the existing project `prepare` skill before other project work. Preparation stays
-inside that turn. The extension does not send a `session_start` message, create an
-autonomous preparation turn, or duplicate project preparation policy.
+- exactly one effective identity kernel;
+- the restoration extension is active for this session;
+- `.ralph/skills/oversee-episode/SKILL.md` is readable and valid; and
+- the durable spec-episode state directory is writable.
 
-This matters for RLM admission safety. A separate extension-generated startup
-turn can race with a child's real task; the role therefore adds an invariant to
-the effective system prompt instead of injecting model input.
+After `create_spec_episode` has durably established and delivered the exact
+spec-episode identity, the same tool turn appends one active marker bound to the
+owner session UUID, location, episode UUID, and episode session file. Activation
+sends no separate model message.
 
-## Effective system prompt
+On every real provider context, the restoration extension:
 
-The extension source is inert at
-`src/prime-agent-plugin/extensions/project-conversation.ts`. The normal
-`scripts/apply-prime-agent-plugin.sh` workflow installs it once at user scope;
-do not add a duplicate project-local extension entry point.
+1. validates the identity kernel;
+2. finds the latest marker for the exact current session branch;
+3. requires an exact match with `.prime/agent/state/spec-episodes/<slug>.json`;
+4. removes older `prime-claw-oversee-episode-package` representations;
+5. rereads the canonical `oversee-episode` skill; and
+6. supplies exactly one fresh package.
 
-At the supported `input` admission gate for each assigned agent run, the
-installed extension reads:
+This universal context path covers normal input, extension triggers, queues,
+native follow-ups, heartbeats, agent messages, tool continuation, reload,
+resume, and the first real post-compaction call. Missing or duplicate kernels,
+corrupt markers, ownership disagreement, or missing/malformed packages call
+`ctx.abort()` before provider dispatch and surface an exact error.
 
-```text
-.prime/agent/profiles/project-conversation.md
-```
+An ordinary fork still sees the identity kernel, but a copied owner marker is
+inert because its session UUID differs. The implement-spec fork receives an
+explicit EPISODE identity entry. EXPERT and delegated RLM children follow their
+bounded task and runtime depth rather than assuming owner authority.
 
-It appends the current file contents to the already chained system prompt. This
-preserves overlays from other extensions and lets a supported extension reload
-pick up profile changes without persisting stale prompt text.
+## Canonical oversight procedure
 
-If an assigned session cannot read a non-empty profile, the input hook reports
-the profile path and returns `action: "handled"`. Prime Agent then skips skill and
-prompt-template expansion, `before_agent_start`, and the complete provider/model
-run. This fail-closed path applies to `interactive`, `rpc`, and extension-sourced
-input. A validated profile is cached only for the corresponding run and appended
-once to the previously chained system prompt. Prime Claw does not silently
-continue without the role invariants.
+`.ralph/skills/oversee-episode/SKILL.md` is both the project-customizable skill
+and the sole active package source. It requires:
 
-## Compatibility and authority
+- one direct owner-coordination message;
+- exactly one non-steering 15-minute heartbeat per active bootstrap,
+  continuation, repair, review-rework, or evidence generation;
+- exact session/Git/commit/test/doc/plan/Bead/worktree reconciliation;
+- independent exact-commit review and owner-ledger evidence;
+- `advance`, `revise`, `consult`, or `pause` within approved scope;
+- explicit operator authority for merge, abandonment, unresolved product scope,
+  and destructive cleanup; and
+- return to ordinary CONVERSATION mode after terminal finalization.
 
-The profile preserves ordinary project conversation and existing phase entry
-paths. The extension:
+Reports are evidence, never approval or native-command dispatch. The heartbeat
+is the missed-report safety net and is cancelled when its generation is
+reconciled or waiting only for owner/operator action.
 
-- registers no slash command or model-callable tool;
-- does not change the active tool set;
-- does not intercept `/spec-it-out`, `/plan`, or `/implement-spec`;
-- does not infer role assignment from CWD;
-- does not bind the role to one episode or consume it after terminal work; and
-- grants no merge, abandonment, cleanup, scope-expansion, or product-decision
-  authority.
+## Narrow terminal finalization receipt
 
-The role marker identifies the durable conversation only. After episode creation,
-the assigned conversation sends a one-time owner coordination message and asks
-for direct progress, blocker, and completion reports. While that sibling
-work-generation is active, exactly one non-steering 15-minute heartbeat acts as
-the missed-report safety net. Reports are evidence rather than approval. Material
-context pressure requires a recorded P0, evidence-preserving stop, and context
-refresh before more work; it does not expand scope or duplicate the watch.
-Episode identity, review findings, and terminal state still belong to the
-separate episode workflow and its existing trusted host capabilities.
+`finalize_spec_episode` has two phases and never performs terminal work itself.
 
-## Resource boundaries
+### Authorize
 
-The files have distinct jobs:
+The owning conversation supplies the exact future-folder location and the closed
+disposition `merged` or `abandoned`. The host verifies the exact owner and durable
+episode identity, asks for one explicit UI confirmation, captures the episode
+branch tip, and writes
+`.prime/agent/state/spec-episodes/<slug>.finalization.json`.
+A matching replay returns the existing receipt without another confirmation.
+Authorize does not merge, abandon, stop a session, remove a worktree, delete a
+branch, or decide semantic completion.
 
-- `.prime/agent/profiles/project-conversation.md` contains short invariants that
-  apply to every assigned conversation turn.
-- `src/prime-agent-plugin/extensions/project-conversation.ts` is the inert
-  builder source and owns explicit flag admission,
-  exact-session restoration, profile loading, and system-prompt chaining.
-- Project phase skills continue to own specification, planning, implementation,
-  handoff, and—when delivered—temporary episode-oversight procedure.
-- Existing trusted extensions continue to own validated path, identity,
-  quiescence, and at-most-once transport mechanics.
+### Complete
 
-Do not move the role profile into `.prime/agent/prompts/`. Prompt templates are
-ordinary user input and cannot establish a durable system-prompt role.
+After the canonical skill performs ordinary conservative terminal work, complete
+requires the matching receipt and validates that:
+
+- the exact episode session is no longer active/addressable;
+- the exact owned worktree is absent from disk and Git worktree state; and
+- the authorized episode commit is an ancestor of the current branch for
+  `merged`, or is not an ancestor for `abandoned`.
+
+Only then does it append inactive owner oversight and remove the matching
+spec-episode expectation and receipt. It asks for no second confirmation.
+Failure or ambiguity preserves or restores the receipt, expectation, and active
+marker for repair. Unrelated resources are never removed.
+
+## Installation boundaries
+
+Builder sources remain inert under `src/prime-agent-plugin/`. The apply/check
+workflow manages eight TypeScript files plus one APPEND_SYSTEM block. The
+`oversee-episode` skill remains project-local and is validated before apply; it
+is not copied into the global agent directory.
+
+The extension registers no CONVERSATION launch flag and emits no startup turn.
+It does not replace `/prepare`, `/design`, `/spec-it-out`, `/plan`,
+`/implement-spec`, handoff transport, or ordinary tools. It grants no merge,
+abandonment, cleanup, scope-expansion, or product-decision authority.

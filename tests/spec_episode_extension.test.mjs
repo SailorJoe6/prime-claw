@@ -890,6 +890,7 @@ test("public SessionManager forkFrom gets target cwd and a matching successful t
         getSessionFile: () => "/sessions/fork.jsonl",
         getSessionId: () => "stable-fork-id",
         appendMessage(message) { appended.push(message); return "entry-1"; },
+        appendCustomEntry(customType, data) { appended.push({ type: "custom", customType, data }); return "identity-1"; },
       };
     },
   };
@@ -905,12 +906,17 @@ test("public SessionManager forkFrom gets target cwd and a matching successful t
 
   assert.deepEqual(calls, [{ source: options.sourceSessionFile, cwd: options.worktree }]);
   assert.deepEqual(fork, { sessionFile: "/sessions/fork.jsonl", sessionId: "stable-fork-id" });
-  assert.equal(appended.length, 1);
-  assert.equal(appended[0].role, "toolResult");
-  assert.equal(appended[0].toolCallId, "tool-call-9");
-  assert.equal(appended[0].toolName, "create_spec_episode");
-  assert.equal(appended[0].isError, false);
-  assert.equal(appended[0].content[0].text, episodeResultText({
+  assert.equal(appended.length, 2);
+  assert.deepEqual(appended[0], {
+    type: "custom",
+    customType: "prime-claw-bounded-identity",
+    data: { version: 1, role: "EPISODE", sessionId: "stable-fork-id" },
+  });
+  assert.equal(appended[1].role, "toolResult");
+  assert.equal(appended[1].toolCallId, "tool-call-9");
+  assert.equal(appended[1].toolName, "create_spec_episode");
+  assert.equal(appended[1].isError, false);
+  assert.equal(appended[1].content[0].text, episodeResultText({
     episodeId: "stable-fork-id",
     branch: options.branch,
     worktree: options.worktree,
@@ -921,6 +927,22 @@ test("public SessionManager forkFrom gets target cwd and a matching successful t
 });
 
 
+
+test("episode identity append failure removes the created fork file", () => {
+  const sessionFile = join(tmpdir(), `prime-claw-fork-failure-${process.pid}-${Date.now()}.jsonl`);
+  writeFileSync(sessionFile, "fork");
+  const SessionManager = { forkFrom() { return {
+    getSessionFile: () => sessionFile,
+    getSessionId: () => "failed-fork",
+    appendCustomEntry() { throw new Error("identity append failed"); },
+    appendMessage() { throw new Error("must not append tool result"); },
+  }; } };
+  assert.throws(() => forkPrimeSession(SessionManager, {
+    sourceSessionFile: "/owner.jsonl", worktree: "/worktree", sessionName: "episode",
+    branch: "episode/alpha", toolCallId: "call",
+  }), /identity append failed/);
+  assert.equal(existsSync(sessionFile), false);
+});
 
 test("publisher rejects and kills a daemon identity not bound to the requested fork", async () => {
   const requests = [];

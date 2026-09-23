@@ -10,11 +10,14 @@ project extension discovery path:
 
 ```text
 src/prime-agent-plugin/
+  APPEND_SYSTEM.md
   extensions/
     handoff-chain.ts
     project-conversation.ts
     reviewed-plan.ts
   extension-support/
+    conversation-oversight.ts
+    episode-finalization.ts
     handoff-prompts.ts
     reviewed-plan-support.ts
     spec-episode.ts
@@ -24,11 +27,14 @@ The installed copy preserves the inner relative layout under
 `~/.prime/agent/`:
 
 ```text
+APPEND_SYSTEM.md  # managed block; unrelated content is preserved
 extensions/
   handoff-chain.ts
   project-conversation.ts
   reviewed-plan.ts
 extension-support/
+  conversation-oversight.ts
+  episode-finalization.ts
   handoff-prompts.ts
   reviewed-plan-support.ts
   spec-episode.ts
@@ -56,10 +62,13 @@ scripts/apply-prime-agent-plugin.sh
 scripts/check-prime-agent-plugin.sh
 ```
 
-The apply script copies only the six allowlisted prime-claw files. It does not
+The apply script copies only the eight allowlisted Prime Claw TypeScript files. It does not
 remove or overwrite unrelated global extensions. The check script verifies that
-all six installed files match the inert builder source byte-for-byte and that
-this repository has no project-local plugin tree.
+all eight installed TypeScript files match the inert builder source byte-for-byte and that
+this repository has no project-local plugin tree. The same workflow merges and
+checks one managed CONVERSATION identity block in global `APPEND_SYSTEM.md`
+without overwriting unrelated user append content. The canonical project-local
+`.ralph/skills/oversee-episode/SKILL.md` is preflighted but not globally copied.
 
 For an isolated test destination, set `PRIME_AGENT_PLUGIN_ROOT` to the directory
 that should contain `extensions/` and `extension-support/`:
@@ -89,9 +98,10 @@ Expected native commands:
 - `/plan`
 - `/implement-spec`
 
-Expected explicit role flag:
+Expected default identity resource:
 
-- `--project-conversation`
+- exactly one managed `PRIME_CLAW_CONVERSATION_IDENTITY_V1` block in `APPEND_SYSTEM.md`
+- no explicit CONVERSATION launch flag
 
 Expected structured tools:
 
@@ -99,6 +109,7 @@ Expected structured tools:
 - `ralph_plan`
 - `create_spec_episode`
 - `handoff_spec_episode`
+- `finalize_spec_episode`
 
 Each command source path must resolve under `~/.prime/agent/extensions/`.
 Starting from the builder repository is an important collision check: the

@@ -251,6 +251,24 @@ copied ownership.
 - Update and Dolt-push `prime-claw-h6w.22`, commit one replacement Slice 1
   candidate, push it, and stop for fresh owner and Astra `max` review.
 
+### Replacement Slice 1 implementation evidence
+
+The revised implementation now replaces the rejected flag/profile design with
+the managed identity kernel, exact-session oversight markers, fresh universal
+context package, promotion readiness/activation, explicit EPISODE fork identity,
+and the approved two-phase terminal receipt. The canonical oversight skill is the
+single package source. Apply/check preserves unrelated global append content and
+validates eight TypeScript resources plus the managed kernel and project-local
+package.
+
+Focused verification passed 70 Node contracts, a final 28-test
+reviewed-plan/finalization rerun, 13 focused Python/install/native tests, native
+all-run-path and automatic-compaction fixtures, isolated/global apply/check, and
+fresh global identity/shadowing probes. Final full gates passed 88 Node tests and
+264 Python tests with 11 existing deprecation warnings. The known watchdog test
+passed on its isolated rerun in this generation. `git diff --check` passed.
+Shared handoff scheduling/quiescence code was not changed.
+
 Slice 2 remains blocked until this exact replacement commit is accepted.
 
 ## Slice 2 — Project-customizable oversight and owner-driven continuation

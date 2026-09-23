@@ -17,6 +17,7 @@ import { execFileSync } from "node:child_process";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { canonicalSkillPrompt } from "./handoff-prompts.ts";
+import { appendEpisodeIdentity } from "./conversation-oversight.ts";
 import { validateFutureLocation, wrapCanonicalSkill } from "./reviewed-plan-support.ts";
 
 const PROTOCOL_NAME = "prime-agent.daemon";
@@ -552,6 +553,7 @@ export interface PrimeSessionManagerClass {
     getSessionFile(): string | undefined;
     getSessionId(): string;
     appendMessage(message: Record<string, unknown>): string;
+    appendCustomEntry(customType: string, data: unknown): string;
   };
 }
 
@@ -578,6 +580,7 @@ export function forkPrimeSession(
     reused: false,
   });
   try {
+    appendEpisodeIdentity(fork);
     fork.appendMessage({
       role: "toolResult",
       toolCallId: options.toolCallId,
