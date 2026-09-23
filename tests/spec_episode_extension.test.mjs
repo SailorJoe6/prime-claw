@@ -27,6 +27,7 @@ import {
   forkPrimeSession,
   NodeFilesystemAdapter,
   PrimeSessionPublisher,
+  parseEpisodeIdentity,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 
 const LOCATION = ".ralph/plans/future/alpha-plan";
@@ -158,6 +159,19 @@ function idleState(created, activeSessionId = created.episodeActiveSessionId) {
     sessionActions: { queuedCount: 0, steering: [], followUps: [] },
   };
 }
+
+test("strict episode identity parser rejects malformed binding and admission fields", () => {
+  const valid = { version: 2, slug: "alpha-plan", sourceLocation: LOCATION,
+    ownerSessionId: "owner", episodeId: "episode", episodeActiveSessionId: "active",
+    episodeSessionFile: "/sessions/episode.jsonl", branch: "episode/alpha-plan",
+    worktree: "/worktree", sessionName: "alpha-plan-episode", bootstrapAdmission: "delivered" };
+  assert.deepEqual(parseEpisodeIdentity(valid), valid);
+  for (const changed of [
+    { version: 99 }, { slug: "../escape" }, { sourceLocation: ".ralph/plans/future/other" },
+    { branch: "episode/other" }, { sessionName: "other" }, { bootstrapAdmission: "bad" },
+    { episodeSessionFile: "" },
+  ]) assert.throws(() => parseEpisodeIdentity({ ...valid, ...changed }), /unsupported shape/);
+});
 
 test("promotes an opaque bundle, commits it, publishes context, and bootstraps handoff before execute", async (t) => {
   const { repo, worktree } = repositoryFixture(t);

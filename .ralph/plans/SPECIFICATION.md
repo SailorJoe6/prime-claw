@@ -173,8 +173,9 @@ of conversation history, so normal context compaction does not remove it.
 Project or CLI prompt configuration may shadow the installed append resource.
 Before promotion, readiness validation therefore proves that exactly one expected
 kernel is present and that the restoration plugin and role package are available.
-A deliberate unsupported prompt configuration fails visibly at the promotion
-boundary rather than silently starting an ungoverned episode.
+A deliberate unsupported prompt configuration leaves a truly inactive ordinary
+conversation available, but fails visibly at the promotion boundary and during
+bounded, active, or recovery state rather than starting an ungoverned episode.
 
 ### 2. Exact-session oversight mode and fresh role package
 
@@ -183,7 +184,10 @@ conversation without creating a model turn. The append-only session marker is
 bound to that conversation UUID and the existing durable spec-episode identity
 record is the independent ownership expectation. A marker copied into a fork is
 inert because its UUID no longer matches. Separate conversations may hold
-separate ownership records.
+separate ownership records. On reload or resume, one valid bootstrap-ready
+current-owner expectation with no marker is recovered deterministically to active
+state with visible durable evidence. Inactive, malformed, or disagreeing
+current-owner state blocks; it never silently becomes ordinary conversation.
 
 While exact-session state is active, a universal `context` hook validates the
 kernel, marker, expectation, and canonical package, removes any older package
@@ -199,10 +203,13 @@ package. The first real call after compaction must receive one current kernel an
 one current package. No proactive conversation handoff or custom context-sweet-
 spot policy is part of this release.
 
-Terminal episode disposition appends inactive state and removes the ownership
-expectation while leaving default CONVERSATION identity available. Marker and
-expectation disagreement, missing or corrupt packages, and duplicate or missing
-kernels block visibly before an oversight provider call. The existing plugin
+Terminal episode disposition advances its exact durable receipt monotonically
+through authorized, completing, and completed states, appends inactive state,
+clears the ownership expectation, and retains a completed tombstone while leaving
+default CONVERSATION identity available. Identical replays return the durable
+state/result without another confirmation. Marker, expectation, receipt, or
+package disagreement and invalid active kernels block visibly before an oversight
+provider call. The existing plugin
 apply/check path plus `/implement-spec` readiness validation owns installation
 integrity; an infinite chain of self-checking sentinel plugins is not required.
 
@@ -433,10 +440,12 @@ uncertain state blocks destructive cleanup.
 
 After terminal work, the conversation invokes the completion phase without a
 second user confirmation. Trusted host code requires the matching authorization
-receipt and conservatively validates the exact terminal state before appending
-inactive oversight state and clearing only the matching spec-episode ownership
-expectation. Failure or ambiguity leaves oversight active and preserves the
-receipt and identity for repair. The capability never decides that the spec is
+receipt and conservatively validates exact Git objects, bound target and episode
+tips, daemon rows, and worktree facts. It records `completing`, appends inactive
+oversight, clears only the matching spec-episode ownership expectation, then
+records a durable `completed` tombstone. A crash or identical replay reconciles
+from those monotonic boundaries without another confirmation. Failure or
+ambiguity stays visibly blocked with durable recovery evidence. The capability never decides that the spec is
 implemented and never merges, abandons, or cleans resources itself.
 
 Before oversight begins, the project conversation must verify that its required

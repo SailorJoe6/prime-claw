@@ -1,20 +1,23 @@
 import assert from "node:assert/strict";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import reviewedPlan, { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
-import { IDENTITY_KERNEL, markOversightRuntimeReady } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
+import { EXPECTED_IDENTITY_KERNEL_BLOCK } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -38,13 +41,14 @@ test("every shipped extension entry point exports a factory", async () => {
   }
 });
 
-function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPrompt = IDENTITY_KERNEL) {
+function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPrompt = EXPECTED_IDENTITY_KERNEL_BLOCK) {
   const commands = new Map();
   const tools = new Map();
   const events = new Map();
   const messages = [];
   const deliveries = [];
   const notices = [];
+  const confirmations = [];
   const entries = [];
   let sendCount = 0;
   const pi = {
@@ -55,7 +59,8 @@ function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPro
       tools.set(definition.name, definition);
     },
     on(name, handler) {
-      events.set(name, handler);
+      const earlier = events.get(name);
+      events.set(name, earlier ? async (...args) => { await earlier(...args); return handler(...args); } : handler);
     },
     appendEntry(customType, data) { entries.push({ type: "custom", customType, data }); },
     sendUserMessage(message, options) {
@@ -79,12 +84,11 @@ function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPro
       notify(message, level) {
         notices.push({ message, level });
       },
-      async confirm() { return true; },
+      async confirm(title, message) { confirmations.push({ title, message }); return true; },
     },
   };
   extension(pi);
-  markOversightRuntimeReady("owner-session");
-  return { commands, tools, events, ctx, messages, deliveries, notices, entries };
+  return { commands, tools, events, ctx, messages, deliveries, notices, confirmations, entries };
 }
 
 function fixture(t, { skill = "canonical plan body", folder = true, throwOnSend = 0 } = {}) {
@@ -127,7 +131,7 @@ test("registers native reviewed commands, planning tool, and native-only impleme
   assert.deepEqual([...f.commands.keys()], ["plan", "implement-spec"]);
   assert.deepEqual([...f.tools.keys()], ["ralph_plan", "create_spec_episode", "finalize_spec_episode", "handoff_spec_episode"]);
   assert.equal(f.tools.has("ralph_implement_spec"), false);
-  assert.deepEqual([...f.events.keys()], ["session_start", "agent_end", "session_shutdown"]);
+  assert.deepEqual([...f.events.keys()], ["session_start", "context", "agent_end", "session_shutdown"]);
   assert.match(f.commands.get("plan").description, /explicit .*future/);
   const planTool = f.tools.get("ralph_plan");
   assert.equal(planTool.executionMode, "sequential");
@@ -377,7 +381,7 @@ test("implement-spec refuses a shadowed identity kernel before model injection",
   const shadowed = createHarness(f.cwd, reviewedPlan, 0, "project append shadow");
   await assert.rejects(
     shadowed.commands.get("implement-spec").handler(LOCATION, shadowed.ctx),
-    /expected exactly one managed identity kernel/,
+    /expected exactly one intact managed identity kernel/,
   );
   assert.deepEqual(shadowed.messages, []);
 });
@@ -407,12 +411,17 @@ test("successful create activates exact owner oversight without unsolicited mess
   const episode = {
     version: 2, reused: false, slug: "alpha-plan", sourceLocation: LOCATION,
     ownerSessionId: "owner-session", episodeId: "episode-id",
-    episodeActiveSessionId: "active-id", episodeSessionFile: join(cwd, "episode.jsonl"),
-    branch: "episode/alpha-plan", worktree: join(cwd, "worktree"),
+    episodeActiveSessionId: "active-id",
+    episodeSessionFile: join(resolve(dirname(cwd), `${basename(cwd)}-alpha-plan-episode`), "episode.jsonl"),
+    branch: "episode/alpha-plan", worktree: resolve(dirname(cwd), `${basename(cwd)}-alpha-plan-episode`),
     sessionName: "alpha-plan-episode", bootstrapAdmission: "delivered",
   };
   const extension = createReviewedPlanExtension({
-    async createEpisode(location) { createCalls += 1; assert.equal(location, LOCATION); return episode; },
+    async createEpisode(location) {
+      createCalls += 1; assert.equal(location, LOCATION);
+      writeFileSync(join(cwd, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"), JSON.stringify(episode));
+      return episode;
+    },
   });
   const f = createHarness(cwd, extension);
   await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
@@ -420,16 +429,54 @@ test("successful create activates exact owner oversight without unsolicited mess
   const result = await f.tools.get("create_spec_episode").execute(
     "activate-call", { location: LOCATION }, undefined, undefined, f.ctx,
   );
-  assert.equal(result.isError, undefined);
+  assert.equal(result.isError, undefined, JSON.stringify(result));
   assert.equal(createCalls, 1);
   assert.equal(f.messages.length, before);
   const markers = f.entries.filter((entry) => entry.customType === "prime-claw-conversation-oversight");
   assert.equal(markers.length, 1);
   assert.deepEqual(markers[0].data, {
-    version: 1, status: "active", ownerSessionId: "owner-session",
-    sourceLocation: LOCATION, slug: "alpha-plan", episodeId: "episode-id",
-    episodeSessionFile: join(cwd, "episode.jsonl"),
+    markerVersion: 2, status: "active", ownerSessionId: "owner-session",
+    slug: "alpha-plan", sourceLocation: LOCATION, episodeId: "episode-id",
+    episodeActiveSessionId: "active-id", episodeSessionFile: episode.episodeSessionFile,
+    branch: "episode/alpha-plan", worktree: episode.worktree,
+    sessionName: "alpha-plan-episode", identityVersion: 2, admission: "delivered",
   });
+});
+
+test("registered finalization capability confirms once and replays durable completion", async (t) => {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-finalize-")));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const state = join(cwd, ".prime/agent/state/spec-episodes"); mkdirSync(state, { recursive: true });
+  const worktree = resolve(dirname(cwd), `${basename(cwd)}-alpha-plan-episode`);
+  const identity = { version: 2, slug: "alpha-plan", sourceLocation: LOCATION,
+    ownerSessionId: "owner-session", episodeId: "episode-id", episodeActiveSessionId: "route",
+    episodeSessionFile: join(cwd, "episode.jsonl"), branch: "episode/alpha-plan", worktree,
+    sessionName: "alpha-plan-episode", bootstrapAdmission: "delivered" };
+  const identityPath = join(state, "alpha-plan.json"); writeFileSync(identityPath, JSON.stringify(identity));
+  const finalization = {
+    async listSessions() { return []; }, close() {}, repositoryRoot() { return cwd; },
+    worktrees() { return [{ path: cwd, branch: "main" }]; }, currentBranch() { return "main"; },
+    commit(_repo, ref) { if (ref === "episode/alpha-plan") return "a".repeat(40); if (ref === "refs/heads/main") return "b".repeat(40); if (/^[ab]{40}$/.test(ref)) return ref; throw Error("bad ref"); },
+    isAncestor(_repo, ancestor, descendant) { return ancestor === descendant || (ancestor === "b".repeat(40) && descendant === "b".repeat(40)) || (ancestor === "a".repeat(40) && descendant === "b".repeat(40)); },
+    exists(path) { return path === worktree ? false : existsSync(path); },
+    readJson(path) { return JSON.parse(readFileSync(path, "utf8")); },
+    writeJson(path, value) { mkdirSync(dirname(path), { recursive: true }); const tmp = `${path}.tmp`; writeFileSync(tmp, JSON.stringify(value)); renameSync(tmp, path); },
+    remove(path) { rmSync(path, { force: true }); }, now() { return "2026-01-01T00:00:00.000Z"; },
+  };
+  const f = createHarness(cwd, createReviewedPlanExtension({ finalization }));
+  f.entries.push({ type: "custom", customType: "prime-claw-conversation-oversight", data: {
+    markerVersion: 2, status: "active", ownerSessionId: "owner-session", slug: "alpha-plan",
+    sourceLocation: LOCATION, episodeId: "episode-id", episodeActiveSessionId: "route",
+    episodeSessionFile: join(cwd, "episode.jsonl"), branch: "episode/alpha-plan", worktree,
+    sessionName: "alpha-plan-episode", identityVersion: 2, admission: "delivered",
+  } });
+  const tool = f.tools.get("finalize_spec_episode");
+  const authorized = await tool.execute("auth", { phase: "authorize", location: LOCATION, disposition: "merged" }, undefined, undefined, f.ctx);
+  assert.equal(authorized.isError, undefined); assert.equal(f.confirmations.length, 1);
+  const completed = await tool.execute("complete", { phase: "complete", location: LOCATION, disposition: "merged" }, undefined, undefined, f.ctx);
+  assert.equal(completed.isError, undefined); assert.equal(f.entries.at(-1).data.status, "inactive"); assert.equal(existsSync(identityPath), false);
+  const replay = await tool.execute("replay", { phase: "complete", location: LOCATION, disposition: "merged" }, undefined, undefined, f.ctx);
+  assert.equal(replay.isError, undefined); assert.equal(f.confirmations.length, 1);
 });
 
 test("owner handoff tool requires a durable identity for the exact location", async (t) => {

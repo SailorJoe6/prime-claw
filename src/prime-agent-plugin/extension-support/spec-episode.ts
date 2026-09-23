@@ -323,10 +323,7 @@ export class NodeFilesystemAdapter implements FilesystemAdapter {
     } catch (error) {
       throw new Error(`Episode identity is unreadable: ${path}: ${String(error)}`);
     }
-    if (!isEpisodeIdentity(value)) {
-      throw new Error(`Episode identity has an unsupported shape: ${path}`);
-    }
-    return value;
+    return parseEpisodeIdentity(value, path);
   }
 
   writeIdentity(path: string, identity: EpisodeIdentity): void {
@@ -341,24 +338,33 @@ export class NodeFilesystemAdapter implements FilesystemAdapter {
   }
 }
 
-function isEpisodeIdentity(value: unknown): value is EpisodeIdentity {
-  if (!value || typeof value !== "object") return false;
+export function parseEpisodeIdentity(value: unknown, path = "episode identity"): EpisodeIdentity {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`Episode identity has an unsupported shape: ${path}`);
+  }
   const item = value as Record<string, unknown>;
   const common = [
     "slug", "sourceLocation", "ownerSessionId", "episodeId",
     "episodeActiveSessionId", "episodeSessionFile", "branch", "worktree", "sessionName",
   ].every((key) => typeof item[key] === "string" && item[key] !== "");
-  if (!common) return false;
-  if (item.version === 1) {
-    return ["pending", "uncertain", "delivered"].includes(String(item.executeAdmission));
+  const slug = typeof item.slug === "string" ? item.slug : "";
+  const strict = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+    && item.sourceLocation === `.ralph/plans/future/${slug}`
+    && item.branch === `episode/${slug}`
+    && item.sessionName === `${slug}-episode`;
+  const admission = item.version === 1
+    ? ["pending", "uncertain", "delivered"].includes(String(item.executeAdmission))
+    : item.version === 2 && [
+      "handoff-pending", "handoff-uncertain", "execute-pending",
+      "execute-rejected", "execute-uncertain", "delivered",
+    ].includes(String(item.bootstrapAdmission));
+  if (!common || !strict || !admission) {
+    throw new Error(`Episode identity has an unsupported shape: ${path}`);
   }
-  return item.version === 2 && [
-    "handoff-pending", "handoff-uncertain", "execute-pending",
-    "execute-rejected", "execute-uncertain", "delivered",
-  ].includes(String(item.bootstrapAdmission));
+  return item as unknown as EpisodeIdentity;
 }
 
-function bootstrapReady(identity: EpisodeIdentity): boolean {
+export function episodeBootstrapReady(identity: EpisodeIdentity): boolean {
   return identity.version === 1
     ? identity.executeAdmission === "delivered"
     : identity.bootstrapAdmission === "delivered";
@@ -606,7 +612,8 @@ export class PrimeSessionPublisher implements SessionPublisher {
   async list(): Promise<SessionSummary[]> {
     const data = requireSuccess(await this.client.request({ type: "list", all: true }), "episode collision check");
     const sessions = data && typeof data === "object" ? (data as { sessions?: unknown }).sessions : undefined;
-    return Array.isArray(sessions) ? sessions as SessionSummary[] : [];
+    if (!Array.isArray(sessions)) throw new Error("Episode session list returned a malformed sessions payload");
+    return sessions as SessionSummary[];
   }
 
   async getState(activeSessionId: string): Promise<EpisodeSessionState> {
@@ -797,7 +804,7 @@ export class PrimeSessionPublisher implements SessionPublisher {
   }
 }
 
-function identityPath(projectRoot: string, slug: string): string {
+export function episodeIdentityPath(projectRoot: string, slug: string): string {
   return join(projectRoot, ".prime", "agent", "state", "spec-episodes", `${slug}.json`);
 }
 
@@ -892,14 +899,14 @@ export async function handoffSpecEpisode(
       worktree: resolve(dirname(repo), `${basename(repo)}-${selected.slug}-episode`),
       sessionName: `${selected.slug}-episode`,
     };
-    const recordPath = identityPath(repo, selected.slug);
+    const recordPath = episodeIdentityPath(repo, selected.slug);
     const identity = filesystem.readIdentity(recordPath);
     if (!identity) throw new Error(`No durable episode identity exists for ${selected.location}`);
 
     publisher ??= new PrimeSessionPublisher();
     const sessions = await publisher.list();
     const durableSession = validateExistingIdentity(identity, expected, sessions, git, filesystem, repo);
-    if (!bootstrapReady(identity)) {
+    if (!episodeBootstrapReady(identity)) {
       throw new Error(`Episode ${admissionDescription(identity)} is incomplete; inspect it before handoff`);
     }
     if (sessionIsBusy(durableSession)) {
@@ -981,7 +988,7 @@ export async function createSpecEpisode(
     const worktree = resolve(dirname(repo), `${basename(repo)}-${selected.slug}-episode`);
     const sessionName = `${selected.slug}-episode`;
     const ownerSessionId = ctx.sessionManager.getSessionId();
-    const recordPath = identityPath(repo, selected.slug);
+    const recordPath = episodeIdentityPath(repo, selected.slug);
     identityRecordPath = recordPath;
     const expected = {
       slug: selected.slug,
@@ -1019,7 +1026,7 @@ export async function createSpecEpisode(
           );
         }
       }
-      if (!bootstrapReady(refreshed)) {
+      if (!episodeBootstrapReady(refreshed)) {
         throw new EpisodeBootstrapIncompleteError(
           `Existing episode has incomplete ${admissionDescription(refreshed)}; inspect it before continuing. No bootstrap message was replayed.`,
         );

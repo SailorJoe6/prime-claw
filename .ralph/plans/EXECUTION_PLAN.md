@@ -253,21 +253,34 @@ copied ownership.
 
 ### Replacement Slice 1 implementation evidence
 
-The revised implementation now replaces the rejected flag/profile design with
-the managed identity kernel, exact-session oversight markers, fresh universal
-context package, promotion readiness/activation, explicit EPISODE fork identity,
-and the approved two-phase terminal receipt. The canonical oversight skill is the
-single package source. Apply/check preserves unrelated global append content and
-validates eight TypeScript resources plus the managed kernel and project-local
-package.
+The consolidated repair replaces extension-local readiness with one normally
+discovered reviewed-plan load unit, uses the strict shared EpisodeIdentity parser,
+reconciles current-owner expectation/marker/receipt state on every lifecycle
+boundary, and leaves truly inactive shadowed conversations available. Active and
+promotion paths require one byte-exact managed kernel block and a structurally
+valid nonempty canonical package. The discoverable skill symlink points to the
+same package source.
 
-Focused verification passed 70 Node contracts, a final 28-test
-reviewed-plan/finalization rerun, 13 focused Python/install/native tests, native
-all-run-path and automatic-compaction fixtures, isolated/global apply/check, and
-fresh global identity/shadowing probes. Final full gates passed 88 Node tests and
-264 Python tests with 11 existing deprecation warnings. The known watchdog test
-passed on its isolated rerun in this generation. `git diff --check` passed.
-Shared handoff scheduling/quiescence code was not changed.
+Finalization now binds every identity/marker/Git target field and uses a durable
+`authorized -> completing -> completed` protocol. Unknown Git/daemon/worktree
+facts block. Completed tombstones and completing recovery state make identical
+lost-response replays deterministic without another confirmation. The installer
+serializes APPEND_SYSTEM mutation under a same-directory lock, rejects unsafe or
+malformed paths/markers, preserves unmanaged bytes and mode, fsyncs a unique
+temporary file, atomically replaces, and converges under repeated/concurrent
+apply.
+
+Production native discovery coverage performs real `/implement-spec` creation,
+activation, EPISODE identity, crash-boundary marker recovery with durable visible
+evidence, reload, resume, project/CLI/truncated-resource readiness, and
+extension-absent checks in isolated roots. Focused verification passed 85 Node
+contracts and 20 Python native/install contracts plus five installer subtests.
+Final full gates passed 99 Node tests; the Python run passed 270 tests plus five
+subtests with 11 existing warnings and one baseline timing-sensitive watchdog
+failure, whose isolated rerun passed in 6.34 seconds. Isolated and user-global
+apply/check passed; fresh global inactive, active, and inactive-shadow processes
+observed kernel/package counts `1/0`, `1/1`, and `0/0` respectively. `git diff
+--check` passed. Shared handoff scheduling/quiescence code remains unchanged.
 
 Slice 2 remains blocked until this exact replacement commit is accepted.
 

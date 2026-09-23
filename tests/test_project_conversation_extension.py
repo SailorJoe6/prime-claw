@@ -6,7 +6,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 KERNEL = REPO / "src/prime-agent-plugin/APPEND_SYSTEM.md"
-EXTENSION = REPO / "src/prime-agent-plugin/extensions/project-conversation.ts"
+EXTENSION = REPO / "src/prime-agent-plugin/extensions/reviewed-plan.ts"
 SUPPORT = REPO / "src/prime-agent-plugin/extension-support/conversation-oversight.ts"
 SKILL = REPO / ".ralph/skills/oversee-episode/SKILL.md"
 DOC = REPO / "docs/conversation-driven-episode-oversight.md"
@@ -21,6 +21,13 @@ def test_managed_identity_kernel_is_small_and_routes_bounded_roles():
     assert len(text.splitlines()) < 30
 
 
+def test_oversee_episode_is_exposed_through_normal_project_skill_discovery():
+    link = REPO / ".agents/skills/oversee-episode"
+    assert link.is_symlink()
+    assert link.resolve() == (REPO / ".ralph/skills/oversee-episode").resolve()
+    assert (link / "SKILL.md").read_bytes() == SKILL.read_bytes()
+
+
 def test_canonical_oversight_package_contains_reviewed_policy():
     text = SKILL.read_text()
     for phrase in ["name: oversee-episode", "one owner-coordination message", "15-minute", "exact pushed candidate", "owner ledger", "advance", "revise", "consult", "pause", "finalize_spec_episode", "Only the operator", "ordinary CONVERSATION mode"]:
@@ -29,13 +36,13 @@ def test_canonical_oversight_package_contains_reviewed_policy():
 
 def test_extension_uses_context_and_exact_state_without_rejected_flag_profile():
     extension = EXTENSION.read_text(); support = SUPPORT.read_text()
-    assert 'pi.on("context"' in extension
-    assert 'pi.on("session_start"' in extension
-    assert 'pi.on("session_shutdown"' in extension
-    assert "registerFlag" not in extension
-    assert "before_agent_start" not in extension
+    assert "registerConversationOversight(pi)" in extension
+    assert 'pi.on("context"' in support
+    assert 'pi.on("session_start"' in support
+    assert "registerFlag" not in extension + support
+    assert "before_agent_start" not in support
     assert "project-conversation.md" not in extension + support
-    for phrase in ["IDENTITY_KERNEL", "OVERSIGHT_MARKER_TYPE", "getBranch()", "spec-episodes", "OVERSIGHT_PACKAGE_PATH", "ctx.abort()", "active oversight marker disagrees", "filter"]:
+    for phrase in ["IDENTITY_KERNEL", "OVERSIGHT_MARKER_TYPE", "getBranch()", "spec-episodes", "OVERSIGHT_PACKAGE_PATH", "ctx.abort()", "oversight marker disagrees", "filter"]:
         assert phrase in support
 
 
@@ -60,11 +67,10 @@ def _run_native(tmp_path, with_kernel: bool):
     return completed, records
 
 
-def test_native_missing_kernel_blocks_visibly_before_provider(tmp_path):
+def test_native_inactive_shadowed_kernel_keeps_ordinary_conversation(tmp_path):
     completed, records = _run_native(tmp_path, False)
-    assert completed.returncode != 0
-    assert "expected exactly one managed identity kernel, found 0" in completed.stderr
-    assert not records.exists()
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert json.loads(records.read_text()) == {"kernel": 0, "package": 0}
 
 
 def test_native_inactive_conversation_gets_one_kernel_and_no_package(tmp_path):

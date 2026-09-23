@@ -15,9 +15,10 @@ The check script verifies exactly one current managed block.
 
 Prime Agent chooses a project `.prime/agent/APPEND_SYSTEM.md` before the global
 file, and `--append-system-prompt` overrides file discovery. Those supported
-configurations can shadow the kernel. The universal context validator blocks
-visibly when the effective prompt does not contain exactly one expected kernel,
-and `/implement-spec` repeats readiness validation before promotion.
+configurations can shadow the kernel. A truly inactive ordinary conversation
+remains available under such a shadow. `/implement-spec` readiness and every
+bounded, active, or recovery state require exactly one intact canonical managed
+block and fail visibly before provider dispatch when it is absent or truncated.
 
 The kernel defines precedence rather than detailed procedure:
 
@@ -42,10 +43,14 @@ queuing its canonical readiness workflow, the extension verifies:
 - `.ralph/skills/oversee-episode/SKILL.md` is readable and valid; and
 - the durable spec-episode state directory is writable.
 
-After `create_spec_episode` has durably established and delivered the exact
-spec-episode identity, the same tool turn appends one active marker bound to the
-owner session UUID, location, episode UUID, and episode session file. Activation
-sends no separate model message.
+After `create_spec_episode` has durably established and delivered a strictly
+parsed spec-episode identity, the same tool turn appends and verifies one full
+active marker bound to every owner, location, episode, session, branch, worktree,
+and bootstrap field. Activation sends no separate model message. On restart, a
+valid bootstrap-ready exact-owner expectation with no marker is recovered to an
+active marker with a visible durable recovery message. Inactive, corrupt, or
+disagreeing current-owner state blocks; a copied marker in a different fork UUID
+remains inert.
 
 On every real provider context, the restoration extension:
 
@@ -103,25 +108,36 @@ branch, or decide semantic completion.
 
 ### Complete
 
-After the canonical skill performs ordinary conservative terminal work, complete
-requires the matching receipt and validates that:
+After the canonical skill performs ordinary conservative terminal work (while
+retaining the authorized episode ref until validation), complete requires the
+matching receipt and validates that:
 
 - the exact episode session is no longer active/addressable;
 - the exact owned worktree is absent from disk and Git worktree state; and
-- the authorized episode commit is an ancestor of the current branch for
-  `merged`, or is not an ancestor for `abandoned`.
+- the authorized episode branch still resolves to the exact accepted commit;
+- the exact target branch/ref still descends from its authorization-time commit;
+- all referenced Git objects resolve as commits and ancestry is known; and
+- the episode commit is an ancestor of the bound target for `merged`, or is not
+  an ancestor for `abandoned`.
 
-Only then does it append inactive owner oversight and remove the matching
-spec-episode expectation and receipt. It asks for no second confirmation.
-Failure or ambiguity preserves or restores the receipt, expectation, and active
-marker for repair. Unrelated resources are never removed.
+Only then does it advance the durable receipt monotonically from `authorized`
+to `completing`, append inactive owner oversight, clear the matching expectation,
+and write a durable `completed` tombstone with exact result evidence. It asks for
+no second confirmation. An identical authorize or complete replay returns the
+existing state/result without another confirmation. A crash or ambiguity at any
+boundary remains visibly recoverable from the receipt, marker, and any surviving
+expectation; it never silently becomes ordinary mode. Unrelated resources are
+never removed.
 
 ## Installation boundaries
 
 Builder sources remain inert under `src/prime-agent-plugin/`. The apply/check
-workflow manages eight TypeScript files plus one APPEND_SYSTEM block. The
+workflow manages seven TypeScript files plus one APPEND_SYSTEM block. Oversight
+registration is co-located with the normally discovered `reviewed-plan.ts` entry
+point; there is no redundant production `project-conversation.ts` entry. The
 `oversee-episode` skill remains project-local and is validated before apply; it
-is not copied into the global agent directory.
+is not copied into the global agent directory. `.agents/skills/oversee-episode`
+exposes that same canonical file through normal project skill discovery.
 
 The extension registers no CONVERSATION launch flag and emits no startup turn.
 It does not replace `/prepare`, `/design`, `/spec-it-out`, `/plan`,

@@ -13,7 +13,6 @@ src/prime-agent-plugin/
   APPEND_SYSTEM.md
   extensions/
     handoff-chain.ts
-    project-conversation.ts
     reviewed-plan.ts
   extension-support/
     conversation-oversight.ts
@@ -30,7 +29,6 @@ The installed copy preserves the inner relative layout under
 APPEND_SYSTEM.md  # managed block; unrelated content is preserved
 extensions/
   handoff-chain.ts
-  project-conversation.ts
   reviewed-plan.ts
 extension-support/
   conversation-oversight.ts
@@ -62,12 +60,16 @@ scripts/apply-prime-agent-plugin.sh
 scripts/check-prime-agent-plugin.sh
 ```
 
-The apply script copies only the eight allowlisted Prime Claw TypeScript files. It does not
+The apply script copies only the seven allowlisted Prime Claw TypeScript files. It does not
 remove or overwrite unrelated global extensions. The check script verifies that
-all eight installed TypeScript files match the inert builder source byte-for-byte and that
+all seven installed TypeScript files match the inert builder source byte-for-byte and that
 this repository has no project-local plugin tree. The same workflow merges and
 checks one managed CONVERSATION identity block in global `APPEND_SYSTEM.md`
-without overwriting unrelated user append content. The canonical project-local
+without overwriting unrelated user append content. APPEND updates hold a
+same-directory advisory lock across read/validate/write, reject unsafe symlink or
+malformed-marker destinations, preserve unmanaged bytes and file mode, fsync a
+unique temporary file, and atomically replace the destination. Repeated and
+concurrent applies converge byte-for-byte. The canonical project-local
 `.ralph/skills/oversee-episode/SKILL.md` is preflighted but not globally copied.
 
 For an isolated test destination, set `PRIME_AGENT_PLUGIN_ROOT` to the directory
@@ -102,6 +104,7 @@ Expected default identity resource:
 
 - exactly one managed `PRIME_CLAW_CONVERSATION_IDENTITY_V1` block in `APPEND_SYSTEM.md`
 - no explicit CONVERSATION launch flag
+- oversight hooks registered by the normally discovered `reviewed-plan.ts` entry
 
 Expected structured tools:
 

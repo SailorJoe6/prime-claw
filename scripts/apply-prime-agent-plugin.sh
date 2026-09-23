@@ -6,7 +6,6 @@ source_root="$repo_root/src/prime-agent-plugin"
 destination_root="${PRIME_AGENT_PLUGIN_ROOT:-${HOME:?HOME must be set}/.prime/agent}"
 files=(
   extensions/handoff-chain.ts
-  extensions/project-conversation.ts
   extensions/reviewed-plan.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-finalization.ts
@@ -36,6 +35,7 @@ fi
 python3 "$repo_root/scripts/manage-prime-agent-append-system.py" validate "$kernel_source" "$destination_root/APPEND_SYSTEM.md"
 
 mkdir -p "$destination_root/extensions" "$destination_root/extension-support"
+rm -f "$destination_root/extensions/project-conversation.ts"
 for relative in "${files[@]}"; do
   install -m 0644 "$source_root/$relative" "$destination_root/$relative"
 done

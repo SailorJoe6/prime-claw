@@ -13,8 +13,9 @@ import {
 import {
   appendActiveOversight,
   assertConversationPromotionReady,
-  currentOversightMarker,
+  currentOversightMarkerForFinalization,
   OVERSIGHT_MARKER_TYPE,
+  registerConversationOversight,
   type OversightDisposition,
 } from "../extension-support/conversation-oversight.ts";
 import {
@@ -143,6 +144,7 @@ type ReviewedPlanDependencies = EpisodeDependencies & {
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
+    registerConversationOversight(pi);
     const approvedLocationBySession = new Map<string, string>();
     registerSkillCommand(pi, {
       command: "plan",
@@ -252,12 +254,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           assertConversationPromotionReady(ctx);
           const createEpisode = dependencies?.createEpisode ?? createSpecEpisode;
           const result = await createEpisode(params.location, toolCallId, ctx, dependencies);
-          appendActiveOversight(pi, ctx, {
-            sourceLocation: result.sourceLocation,
-            slug: result.slug,
-            episodeId: result.episodeId,
-            episodeSessionFile: result.episodeSessionFile,
-          });
+          appendActiveOversight(pi, ctx, result);
           return {
             content: [{ type: "text", text: episodeResultText(result) }],
             details: result,
@@ -298,11 +295,14 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         try {
           const disposition = params.disposition as OversightDisposition;
           if (params.phase === "authorize") {
+            const marker = currentOversightMarkerForFinalization(ctx);
+            if (!marker) throw new Error("No exact active oversight marker exists for this conversation");
             const result = await authorizeEpisodeFinalization(
               params.location,
               disposition,
               ctx,
               (title, message) => ctx.ui.confirm(title, message),
+              marker,
               dependencies?.finalization,
             );
             return {
@@ -311,7 +311,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             };
           }
           if (params.phase !== "complete") throw new Error("Finalization phase must be authorize or complete");
-          const marker = currentOversightMarker(ctx);
+          const marker = currentOversightMarkerForFinalization(ctx);
           if (!marker) throw new Error("No exact active oversight marker exists for this conversation");
           const receipt = await completeEpisodeFinalization(
             params.location,

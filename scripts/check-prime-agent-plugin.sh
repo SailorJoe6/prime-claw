@@ -6,7 +6,6 @@ source_root="$repo_root/src/prime-agent-plugin"
 destination_root="${PRIME_AGENT_PLUGIN_ROOT:-${HOME:?HOME must be set}/.prime/agent}"
 files=(
   extensions/handoff-chain.ts
-  extensions/project-conversation.ts
   extensions/reviewed-plan.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-finalization.ts
@@ -16,6 +15,10 @@ files=(
 )
 
 status=0
+if [[ -e "$destination_root/extensions/project-conversation.ts" ]]; then
+  printf 'stale redundant project-conversation entry point: %s\n' "$destination_root/extensions/project-conversation.ts" >&2
+  status=1
+fi
 for forbidden in   "$repo_root/.prime/agent/extensions"   "$repo_root/.prime/agent/extensions-bak"   "$repo_root/.prime/agent/extension-support"; do
   if [[ -e "$forbidden" ]]; then
     printf 'project-local plugin source is not inert: %s

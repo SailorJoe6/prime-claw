@@ -39,8 +39,9 @@ owns an active EPISODE.
 10. For `merged` or `abandoned`, call the authorize phase of
     `finalize_spec_episode`; let its single UI confirmation record the operator
     decision. Then perform the ordinary conservative Git/session/worktree work.
-    Dirty, ambiguous, or uncertain state blocks cleanup. Finally call the
-    completion phase, which validates terminal facts, clears only matching state,
+    Dirty, ambiguous, or uncertain state blocks cleanup. Keep the authorized
+    episode branch/ref available until completion validates its exact tip; apply
+    branch-retention policy only afterward. Finally call the completion phase, which validates terminal facts, clears only matching state,
     and returns this session to ordinary CONVERSATION mode.
 
 Under material context pressure, record the next P0, preserve evidence, stop at a
