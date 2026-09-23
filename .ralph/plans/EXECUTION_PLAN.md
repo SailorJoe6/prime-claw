@@ -1,23 +1,27 @@
 # Execution Plan — Conversation-driven episode oversight
 
-> **Status:** future execution plan awaiting operator review.
+> **Status:** revised design approved after native mechanics POC; active episode
+> must replace rejected Slice 1 before later slices.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
-> **Tracking bead:** `prime-claw-h6w.22`
-> **Implementation authority:** none until the operator separately invokes
-> `/implement-spec .ralph/plans/future/conversation-driven-episode-oversight`.
+> **Tracking bead and owner ledger:** `prime-claw-h6w.22`
+> **Implementation authority:** native `/implement-spec` was already invoked for
+> this exact future folder; authority remains bounded by the revised specification,
+> this plan, and retained operator decisions.
 
 ## Outcome
 
-Deliver the smallest plugin release that orients an explicitly launched
-`PROJECT_CONVERSATION` with the existing `prepare` skill and leaves its normal
-conversation, specification, and planning behavior untouched. Once the operator
-uses the existing `/implement-spec` boundary, the role oversees at most one exact
-owned episode at a time and returns to ordinary project discussion afterward.
+Deliver the smallest plugin release that gives every independent top-level
+project session an unforgettable default CONVERSATION identity while leaving
+ordinary discussion, design, specification, and planning untouched. After native
+`/implement-spec`, the exact invoking conversation enters oversight mode for its
+owned episode, receives one fresh canonical oversight package on every real
+model run, and returns to ordinary conversation after terminal disposition.
 
-The implementation is concentrated on episode oversight. It reuses the delivered
-conversation behavior, phase skills, episode identity, bootstrap, handoff,
-observation, Git, and cleanup mechanics. It adds no conversation engine,
-generalized orchestrator, or lifecycle service.
+The implementation reuses native system-prompt resources, automatic compaction,
+existing episode identity, bootstrap, handoff, observation, Git, and cleanup
+mechanics. It adds no conversation engine, proactive conversation compaction,
+custom CLI, custom `prime-agent-core` runtime, generalized orchestrator, or
+lifecycle service.
 
 ## Readiness and current baseline
 
@@ -39,191 +43,73 @@ baseline is present in the repository:
   the delivered mechanics; and
 - the Node and Python suites cover those contracts.
 
-Do not redesign, wrap, or repeat the existing conversational work. Treat it as a
-compatibility surface: the new role may orient it with `prepare` but must not
-intercept or narrow it. The implementation bead remains open and unclaimed until
-an implementation episode begins.
+Do not redesign, wrap, or repeat existing conversational work. Treat it as a
+compatibility surface. The active episode and Bead already exist.
 
-## P0 checkpoint — repair rejected Slice 1 before any later slice
-
-Owner and fresh EXPERT review rejected exact Slice 1 commit
-`05fabd7c86f6120afe231849f7dac358e5ba9b50`. Repair Slice 1 in place and
-produce a new exact pushed commit for fresh owner and EXPERT review. Do not begin
-Slice 2 until that new commit is accepted.
-
-### Confirmed failures and required repairs
-
-1. **Inherited-flag role leakage (P1).** Prime Agent 0.9.5 copies the parent
-   `sessionConfig.extensionFlagValues` into a native RLM child and starts that
-   runtime with `session_start.reason == "startup"`. The rejected extension
-   therefore minted a new child-bound `PROJECT_CONVERSATION` marker from an
-   inherited flag. A launch flag may create a marker only for a pristine
-   top-level session (`rlmDepth == 0` and no `parentSession`); exact matching
-   markers remain the restoration path. Forks, episodes, reviewers, and RLM
-   children must remain ordinary unless a future separately reviewed mechanism
-   explicitly assigns them.
-2. **False fail-closed profile loading (P1).** Prime Agent 0.9.5 catches and
-   logs `before_agent_start` errors, then continues toward the provider. Throwing
-   from that hook is not enforcement. Validate and admit the current profile at
-   the supported `input` gate. For an assigned session with a missing, empty, or
-   unreadable profile, return `action: "handled"`, emit a visible error, and skip
-   skill/template expansion and the complete agent/provider run. Cache the
-   admitted profile for the corresponding chained `before_agent_start` overlay.
-3. **Installation documentation count (P3).** Change the remaining “all five
-   installed files” statement in `docs/lab-global-plugin.md` to six.
-
-### Native repair evidence
-
-Add focused harness coverage and a native Prime Agent 0.9.5 probe that:
-
-- creates an explicitly assigned top-level parent through the supported runtime;
-- creates a native depth-1 RLM child with inherited session configuration and
-  proves the child has no project-conversation marker;
-- proves fork, episode/reviewer-shaped, new-session, and RLM identities do not
-  gain the role from inherited flags;
-- dispatches missing/empty/unreadable-profile input through each supported source
-  (`interactive`, `rpc`, and `extension`) and proves `handled` prevents any
-  provider/model call;
-- proves valid-profile input reaches the provider with exactly one chained role
-  profile; and
-- proves valid-profile commands and tools remain registered and unchanged.
-
-The review evidence that established the failures is:
-
-- `/var/folders/4_/twy0wz3s1mq650wnqzn1b8rr0000gq/T/prime-claw-slice1-review-ffpiybl4/slice-1-review.md`
-- `/var/folders/4_/twy0wz3s1mq650wnqzn1b8rr0000gq/T/prime-claw-slice1-review-ffpiybl4/evidence/native-probe-result.json`
-
-### Separately tracked baseline handoff defect
-
-Checkpoint investigation found a shared baseline defect in canonical handoff
-admission. That transport code is outside the rejected Slice 1 role-repair scope
-and is tracked in the owner's baseline ledger for separate `main` disposition.
-It does not block this one-off, auto-compacted role-repair continuation. Do not
-repair it, add focused tests for it, or stage, commit, or push changes to its
-shared transport paths from this episode.
-
-### Owner coordination and active-work watch invariant
-
-When an episode becomes active, the episode introduces its exact session identity
-to the owning `PROJECT_CONVERSATION` and reports material progress, blockers, and
-completion directly to that owner. A completion packet names the exact commit,
-tests, docs, active spec/plan changes, Bead state, push state, and worktree state.
-Messages are evidence, not approval, and never dispatch native commands.
-
-Whenever the owned `EPISODE` sibling is actively working for the project
-conversation, exactly one non-steering **15-minute agent-owned heartbeat** must
-monitor that active work generation. This applies to bootstrap work, admitted
-continuation slices, direct follow-up tasks, rejected-slice repairs,
-review-driven rework, and requested evidence or validation work. Direct sibling
-progress reporting is the fast path and never replaces this safety net.
-
-Arm the heartbeat before triggering or admitting sibling work when the transition
-permits it. If work is already active through a delivered report or another
-supported path, arm it immediately when activity becomes known. For a terminal
-handoff transition, pre-arm the next generation before admission when possible;
-otherwise arm it immediately on the admission receipt. Cancel the heartbeat as
-soon as the generation is reconciled as complete, blocked, stopped, or returned
-to owner/operator review. Do not keep a heartbeat while the sibling is idle only
-awaiting owner or operator action. Every later work or repair generation gets a
-fresh heartbeat; never reuse a reconciled generation's watch.
-
-Update the specification, project-conversation profile, current documentation,
-and focused contract tests so this coordination and watch policy is explicit and
-testable without implementing the Slice 2 oversight skill early.
-
-### Context-pressure checkpoint before more steering
-
-The rejected-Slice-1 repair was the concrete first checkpoint for the
-context-pressure policy. The episode recorded the P0 and preserved evidence,
-and auto-compaction supplied the approved one-off context refresh for this same
-repair generation. This continuation does not claim a native handoff transition
-or authorize work outside the bounded Slice 1 repair.
-
-The general context-refresh transition preserves the same rejected-Slice-1
-repair generation. It does
-not accept commit `05fabd7c86f6120afe231849f7dac358e5ba9b50`, authorize new
-scope, resolve either P1, or change operator authority. Keep the existing single
-repair heartbeat across the checkpoint and context-refresh handoff; do not add a
-second watch. Later tests for the oversight policy must assert P0 recording,
-evidence preservation, sibling stop, quiescence confirmation, canonical
-handoff-before-more-steering, sole execute follow-up, unchanged semantic repair
-generation, and no duplicate heartbeat. If work was already reconciled before a
-separate later continuation, cancel the old heartbeat and pre-arm a fresh one
-under the normal later-generation rule.
-
-### Preservation and repair checkpoint
-
-The unrelated dirty `.ralph/skills/execute/SKILL.md` change is not part of this
-feature. Do not overwrite, stage, or include it in the repair commit. Preserve
-its pre-rebase variant in `stash@{0}` until the owner resolves provenance.
-
-The bounded repair is implemented and validated for a replacement Slice 1
-candidate. It admits the role flag only on pristine top-level startup, validates
-assigned profiles at the supported input gate, blocks invalid profiles before
-provider dispatch, and preserves one chained profile overlay for valid runs.
-Native Prime Agent 0.9.5 probes cover all three input sources plus real RLM-child
-and runtime-fork non-inheritance. Focused Node and Python tests pass; the full
-Node suite passes 89 tests; and 259 Python tests pass with one unrelated baseline
-watchdog test deselected after both the full run and an isolated rerun timed out.
-Global apply/check and fresh valid/missing-profile processes pass. Stage only the
-approved repair paths, update `prime-claw-h6w.22`, commit and push one replacement
-Slice 1 candidate, report the completion packet, and stop for fresh owner/EXPERT
-review.
+The original explicit-flag/profile Slice 1 commits `05fabd7c` and `5a5195d` were
+rejected. Native review proved that input-time and `before_agent_start` overlays
+cannot cover all Prime Agent 0.9.5 run paths. The later evidence-only POC, recorded
+in `prime-claw-h6w.22`, proved the revised mechanics: APPEND_SYSTEM is stable in
+the base prompt, exact-session mode markers survive lifecycle changes, `context`
+can supply one fresh procedure package universally without an unsolicited turn,
+and the first real post-compaction call restores identity and mode. Treat the
+rejected commits as negative evidence and replace their design rather than
+incrementally preserving it.
 
 ## Implementation design fixed by this plan
 
-### Explicit role binding
+### Universal identity and exact-session oversight mode
 
-Prime Agent 0.9.5 has system-prompt files and extension hooks but no native
-resident-session profile resource that a durable sibling launcher can select.
-Its example `.prime/agent/agents/*.md` convention belongs to an optional
-subprocess-agent extension and is not automatically applied to daemon siblings.
+Implement the proven first-release design with these narrow resources:
 
-Implement the first release with one inert global-plugin source and one
-project-local profile resource:
+- install a small managed `APPEND_SYSTEM.md` kernel that defines default
+  CONVERSATION capability and explicit EPISODE, EXPERT, and delegated-child
+  precedence without embedding detailed procedures;
+- add and use `.ralph/skills/oversee-episode/SKILL.md` as the single canonical
+  source for active oversight procedure text;
+- replace the rejected flag/profile extension with a small project plugin that
+  persists append-only active/inactive markers bound to the exact owner session;
+- use the existing `.prime/agent/state/spec-episodes/<slug>.json` identity as the
+  independent exact-owner expectation rather than adding another database;
+- on every real model context while oversight is active, validate kernel, marker,
+  expectation, and package, filter any older package representation, and provide
+  exactly one freshly read package;
+- restore mode on reload and resume from durable state; let native compaction run
+  unchanged and require the first real post-compaction call to receive the same
+  kernel and package; and
+- clear exact ownership expectation and append inactive state at terminal
+  disposition while leaving CONVERSATION capability intact.
 
-- `.prime/agent/profiles/project-conversation.md` contains the short role
-  invariants from the specification, including running the existing project
-  `prepare` skill before substantive work;
-- `src/prime-agent-plugin/extensions/project-conversation.ts` registers the explicit
-  boolean launch flag `--project-conversation`;
-- explicit assignment appends one versioned custom session entry containing
-  `role: "PROJECT_CONVERSATION"` and the exact assigned session ID;
-- `session_start` restores the assignment only when the stored session ID
-  equals `ctx.sessionManager.getSessionId()`;
-- `before_agent_start` adds the current profile to the effective system prompt
-  for an assigned session; and
-- a missing or unreadable assigned profile fails closed instead of silently
-  running the session without its role invariants.
+The kernel is global/default capability, not unique ownership. Multiple root
+conversations may coexist. An ordinary fork remains CONVERSATION-capable but its
+copied marker cannot match its new UUID. `/implement-spec` explicitly creates an
+EPISODE identity. A depth-positive RLM child or explicit EXPERT task remains
+bounded and must not receive owner authority even though it can see the universal
+identity kernel.
 
-Preparation remains existing skill policy, not a new autonomous startup turn.
-The profile requires the first substantive agent turn to inspect and follow the
-project's `prepare` skill before continuing. The extension must not queue a
-separate `session_start` user message or duplicate Prime Agent's preparation
-machinery; that would reintroduce the known RLM startup-admission race.
+Before promotion, `/implement-spec` must verify exactly one expected kernel, the
+restoration plugin, canonical oversight package, and writable durable identity
+surfaces. Project or CLI prompt configuration that shadows the installed kernel
+is a visible readiness blocker. During active oversight, missing/duplicate
+kernel, corrupt marker, disagreement with the spec-episode expectation, or
+missing/corrupt package aborts before provider dispatch and reports the exact
+repair. Existing apply/check scripts own installation integrity; do not add a
+self-checking sentinel chain.
 
-The session-ID binding is required because episode and ordinary session forks
-may inherit custom entries. An inherited marker for a different session ID must
-not activate the role. A session without the flag or its own matching marker is
-ordinary even when its CWD is the project root. The role marker records only the
-long-lived conversation role; it must not encode conversational phase state, one
-episode location, or become spent when an episode terminates. Do not add role
-discovery from CWD, a global
-role registry, a rebinding command, or a general preset system.
-
-The extension should read the profile through the project resource path on each
-agent-run boundary, or otherwise reload it through the normal extension reload
-path, so a supported resource reload does not leave stale role text. Apply the
-profile once per agent run, not once per tool or model call. Preserve other
-extensions' chained `event.systemPrompt` content.
+Activation and deactivation are deterministic lifecycle mutations. Activation
+must not start an unsolicited model turn and must not be reported durable until
+the containing transition and session state are verified persisted. Package
+injection must be idempotent across queued work, reports, heartbeats, native
+follow-ups, tool continuation, reload, resume, and cancellation.
 
 ### Policy and authority
 
 Add one project-customizable `.ralph/skills/oversee-episode/SKILL.md`. The
-profile states enduring whole-conversation invariants and points to the skill;
-the skill owns the detailed semantic procedure only while an episode is active.
-It must return the conversation to incubation after terminal disposition rather
-than ending, clearing, or narrowing the `PROJECT_CONVERSATION` role. Neither
+identity kernel states only universal precedence and recovery invariants; the
+skill owns the detailed semantic procedure only while an episode is active and
+is also the canonical active package source. It must return the conversation to
+incubation after terminal disposition rather than ending or narrowing its
+CONVERSATION identity. Neither
 resource duplicates daemon protocol.
 
 Update `handoff_spec_episode` guidance so an exact owning project conversation
@@ -236,7 +122,7 @@ location, identity, quiescence, canonical-prompt, uncertainty, and replay
 checks unchanged.
 
 Native `/implement-spec` remains the only implementation-promotion boundary.
-The role profile, skill, and continuation guidance do not grant merge,
+The identity kernel, active package, skill, and continuation guidance do not grant merge,
 abandonment, destructive-cleanup, scope-expansion, or product-decision
 authority.
 
@@ -286,66 +172,78 @@ repair. Never inspect credential stores while diagnosing availability.
 This is policy executed by the existing skill and RLM APIs. Do not add an EXPERT
 registry, model-ranking service, general model router, or new host capability.
 
-## Slice 1 — Launchable, identity-bound project-conversation role
+## Slice 1 — Unforgettable default CONVERSATION identity and oversight mode
 
-**Working capability:** a user can launch Prime Agent explicitly with
-`--project-conversation`; it begins with the existing project `prepare`
-orientation, and the effective system prompt retains only the small role
-invariants across reload and resume. An unassigned session or inherited fork
-remains ordinary, while existing discussion, `/spec-it-out`, `/plan`, and
-`/implement-spec` entry paths remain unchanged.
+**Working capability:** every standard independent project session receives one
+small default CONVERSATION identity kernel. Successful `/implement-spec`
+activates exact-session oversight without an unsolicited response. Every later
+real active run receives exactly one fresh canonical oversight package across
+all native run paths, reload, resume, and native compaction. Forks, episodes,
+reviewers, and delegated children retain the correct bounded identity and no
+copied ownership.
 
 ### Changes
 
-1. Add `.prime/agent/profiles/project-conversation.md` with only the stable
-   invariants enumerated by the specification.
-2. Add `src/prime-agent-plugin/extensions/project-conversation.ts` implementing
-   the explicit flag, versioned session-local marker, exact-session restoration,
-   fail-closed profile loading, and chained `before_agent_start` prompt overlay.
-   Add it to the existing explicit global-plugin apply/check allowlist; never
-   create a duplicate project-local extension entry point.
-3. Add focused behavioral coverage in
-   `tests/project_conversation_extension.test.mjs` for:
-   - extension factory and flag registration;
-   - no implicit activation from project CWD;
-   - explicit first-launch assignment, profile inclusion exactly once per agent
-     run, and a first-turn requirement to follow the existing `prepare` skill;
-   - no autonomous `session_start` message or duplicate preparation turn;
-   - same-session resume and extension reload;
-   - rejection of a marker inherited by a different fork/session ID;
-   - coexistence with an earlier system-prompt overlay;
-   - no command or active-tool narrowing by the role extension;
-   - role persistence independent of any one episode identity; and
-   - missing-profile failure without silent role loss.
-4. Add a narrow source/resource contract test in
-   `tests/test_project_conversation_extension.py` so packaging or path changes
-   cannot omit the profile or turn it into an ordinary prompt template. Extend
-   `tests/test_prime_agent_plugin_install.py` so apply/check coverage includes
-   the new inert extension source.
-5. Add `docs/conversation-driven-episode-oversight.md` describing explicit
-   launch, startup preparation, identity binding, system-prompt behavior, the
-   existing conversational compatibility surface, and the separation between
-   the profile, temporary episode-policy skill, and trusted mechanics. Link it
-   from `docs/README.md`.
+1. Remove the rejected `--project-conversation` flag/profile assignment design
+   and its stale documentation claims. Preserve its commits and review evidence
+   in Git and `prime-claw-h6w.22`.
+2. Add the small managed `APPEND_SYSTEM.md` identity kernel. Define explicit
+   precedence for root CONVERSATION, EPISODE, EXPERT, and delegated-child roles.
+3. Add `.ralph/skills/oversee-episode/SKILL.md` with the approved owner-reporting,
+   one-heartbeat-per-active-generation, evidence reconciliation, owner-ledger,
+   authority, review, continuation, terminal, and return-to-conversation policy.
+   Use this one file as both the discoverable skill and active package source.
+4. Rework `project-conversation.ts` into exact-session oversight-mode mechanics:
+   - append idempotent active/inactive markers;
+   - validate the existing spec-episode identity as ownership expectation;
+   - read the current canonical `oversee-episode` package;
+   - provide one fresh package through the universal context path;
+   - remove stale package representations; and
+   - abort visibly on active-state disagreement or corrupt resources.
+5. Integrate `/implement-spec` readiness and activation only after promotion and
+   episode identity are durably established. Integrate terminal deactivation
+   with the existing conservative disposition path without inventing automatic
+   merge or cleanup.
+6. Extend plugin apply/check manifests for the kernel, plugin, and canonical
+   package. Detect project/CLI prompt shadowing at readiness rather than silently
+   weakening identity.
+7. Replace focused Node and native Python coverage with the proven matrix:
+   - multiple independent root conversations;
+   - ordinary fork capability without ownership duplication;
+   - actual implement-spec EPISODE transition;
+   - explicit EXPERT and real RLM child precedence;
+   - normal input, custom trigger, native follow-up, heartbeat, agent message,
+     tool continuation, queued/cancelled work, reload, and resume;
+   - native automatic compaction with restoration on the first real later call;
+   - idempotent activation/deactivation and no unsolicited provider call;
+   - current package reload exactly once per call; and
+   - visible zero-provider blocking for missing/duplicate kernel, corrupt marker,
+     expectation mismatch, and missing/corrupt package.
+8. Rewrite current documentation around default CONVERSATION identity,
+   temporary oversight mode, resource precedence, readiness, native compaction,
+   and bounded-role transitions. Correct the installed-file inventory.
+9. Synchronize the active specification and plan with the universal direct-report,
+   15-minute per-generation heartbeat, context-pressure checkpoint, and owner-ledger
+   policy without copying point-in-time chronology into the specification.
 
 ### Verification and checkpoint
 
-- Run the new Node and Python tests plus the existing reviewed-plan and episode
-  extension tests.
-- Apply and check the complete user-global plugin with the repository scripts,
-  then start a fresh disposable process with the flag. Observe the role marker
-  and effective prompt through the extension test harness, then verify a
-  simulated fork does not activate it.
-- Append the exact test results and commit to `prime-claw-h6w.22`.
-- Commit as one reviewable slice and push the episode branch. Suggested commit:
-  `feat: add explicit project conversation role`.
+- Run focused Node and native offline Python tests using isolated config/session
+  roots and fake providers.
+- Run all Node and Python suites; keep the baseline-reproducible candidate
+  watchdog failure visible and separate if it recurs.
+- Run global plugin apply/check and fresh-process readiness probes without
+  modifying unrelated global resources.
+- Prove the exact pushed candidate contains no shared handoff-baseline repair and
+  preserves unrelated execute-skill provenance.
+- Update and Dolt-push `prime-claw-h6w.22`, commit one replacement Slice 1
+  candidate, push it, and stop for fresh owner and Astra `max` review.
 
-Slice 2 depends on this role boundary. Do not combine its oversight procedure
-into the profile merely to reduce file count.
+Slice 2 remains blocked until this exact replacement commit is accepted.
 
 ## Slice 2 — Project-customizable oversight and owner-driven continuation
 
-**Working capability:** the assigned owner has one canonical procedure for
+**Working capability:** the active exact-session owner has one canonical procedure for
 watching, reviewing, revising, continuing, and finally presenting its exact
 episode. Every EXPERT review uses the explicit project profile and exact
 operator-authorized model rather than an inherited default, while existing host
@@ -355,10 +253,8 @@ capabilities enforce deterministic transport and identity safety.
 
 1. Add `.prime/agent/profiles/expert-reviewer.md` with the reviewed exact model
    selector, reasoning level, and stable read-only exact-commit review role.
-2. Add `.ralph/skills/oversee-episode/SKILL.md` with progressive-disclosure
-   guidance for:
-   - verifying required native commands and project policy are available before
-     oversight, and pausing rather than imitating a missing transition;
+2. Extend and validate the Slice 1 `.ralph/skills/oversee-episode/SKILL.md`
+   with EXPERT and owner-driven continuation guidance for:
    - retaining the exact returned identity and current work generation;
    - creating and cancelling one bounded agent-owned heartbeat per admitted
      generation;
@@ -377,17 +273,16 @@ capabilities enforce deterministic transport and identity safety.
    - renewing final EXPERT review after material repairs;
    - presenting merge, revision, pause, or abandonment to the operator before
      terminal Git/session cleanup; and
-   - cancelling episode-specific observation and returning the still-assigned
-     conversation to discussion/specification incubation after terminal work.
+   - cancelling episode-specific observation, clearing exact oversight state,
+     and returning the same conversation to discussion/specification incubation.
 3. Change only the model-facing `handoff_spec_episode` description, parameter
    text, and prompt guidelines in
    `.prime/agent/extensions/reviewed-plan.ts`. Do not weaken or bypass any
    check in `.prime/agent/extension-support/spec-episode.ts`.
 4. Add `tests/test_oversee_episode_skill.py` for the skill's authority,
    observation, evidence, review, continuation, cleanup, return-to-incubation,
-   and sequential-cycle boundaries, including fail-closed handling when required
-   native commands or project policy are absent. It must also prove that the
-   checked-in EXPERT profile names an exact selector and reasoning level; the skill requires
+   and sequential-cycle boundaries. It must also prove that the checked-in
+   EXPERT profile names an exact selector and reasoning level; the skill requires
    exact discovery, explicit spawn arguments, bootstrap-then-message delivery,
    model/reasoning evidence, and fail-closed behavior with no fallback language.
 5. Update `tests/reviewed_plan_extension.test.mjs` and
@@ -405,7 +300,7 @@ capabilities enforce deterministic transport and identity safety.
 
 ### Verification and checkpoint
 
-- Run the focused profile, skill, and reviewed-plan tests.
+- Run the focused identity, package, skill, and reviewed-plan tests.
 - Resolve the checked-in selector to exactly `openai-codex/gpt-6-astra` in the
   target runtime and prove a test spawn accepts `thinking=max`; do not perform a
   substitute spawn if this check fails.
@@ -422,7 +317,7 @@ are green.
 
 ## Slice 3 — Isolated live dogfood and acceptance record
 
-**Working capability:** a fresh explicitly assigned and prepared project
+**Working capability:** a fresh default CONVERSATION project
 conversation takes one already reviewed disposable bundle through admission,
 observation, exact-commit review, owner-driven continuation, final EXPERT review,
 explicit operator disposition, and conservative cleanup, then remains available
@@ -435,9 +330,9 @@ for ordinary project conversation without touching the canonical checkout.
    already reviewed two-generation future bundle into it. Do not copy
    credentials, host-global state, private transcripts, or unrelated repository
    data.
-2. Launch a fresh durable session in the fixture root with
-   `--project-conversation`; verify explicit identity binding and that the first
-   substantive turn follows the existing `prepare` skill without a separate
+2. Launch two fresh durable sessions in the fixture root without a role flag;
+   verify each receives one default identity kernel, retains distinct UUID-bound
+   state, and follows the existing `prepare` skill without a separate
    extension-generated startup turn.
 3. Confirm ordinary project discussion and the existing phase skills remain
    available, without re-dogfooding their already delivered authoring and
@@ -489,8 +384,7 @@ for ordinary project conversation without touching the canonical checkout.
   requirement.
 - Run the full repository gates:
   - `node --test tests/*.test.mjs`
-  - `pytest -q tests` (the active project suite; do not collect historical
-    tests under `scripts/archive/phase1/tests`)
+  - `pytest -q`
   - `git diff --check`
   - relative-link validation used by the existing documentation tests.
 - Append final evidence to `prime-claw-h6w.22`; close it only when all acceptance
