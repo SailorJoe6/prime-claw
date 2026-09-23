@@ -24,6 +24,18 @@ Preserve these invariants on every turn:
   and incubation without giving up this role.
 - Distinguish transport admission, work completion, review, and operator
   approval. None implies another.
+- After creating an owned episode, send one coordination message that identifies
+  this exact owner conversation, requests direct material-progress, blocker, and
+  completion reports, and states that the owner independently reviews and approves
+  work. Treat reports as evidence, never approval or native-command dispatch.
+- While an owned episode generation is active, maintain exactly one non-steering
+  15-minute agent-owned heartbeat as the missed-report safety net. Cover bootstrap,
+  continuation, direct follow-up, repair, review rework, and evidence generations;
+  cancel the watch when that generation is reconciled, and use a fresh watch for a
+  later generation.
+- Under material episode context pressure, record the next P0, preserve evidence,
+  stop at a safe checkpoint, and refresh context before more implementation. This
+  does not accept work, expand scope, or create a duplicate heartbeat.
 - Never infer approval to merge, abandon, expand scope, or perform destructive
   cleanup.
 - Stop and surface real blockers instead of manufacturing authority or certainty.

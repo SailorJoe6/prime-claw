@@ -44,6 +44,132 @@ compatibility surface: the new role may orient it with `prepare` but must not
 intercept or narrow it. The implementation bead remains open and unclaimed until
 an implementation episode begins.
 
+## P0 checkpoint — repair rejected Slice 1 before any later slice
+
+Owner and fresh EXPERT review rejected exact Slice 1 commit
+`05fabd7c86f6120afe231849f7dac358e5ba9b50`. Repair Slice 1 in place and
+produce a new exact pushed commit for fresh owner and EXPERT review. Do not begin
+Slice 2 until that new commit is accepted.
+
+### Confirmed failures and required repairs
+
+1. **Inherited-flag role leakage (P1).** Prime Agent 0.9.5 copies the parent
+   `sessionConfig.extensionFlagValues` into a native RLM child and starts that
+   runtime with `session_start.reason == "startup"`. The rejected extension
+   therefore minted a new child-bound `PROJECT_CONVERSATION` marker from an
+   inherited flag. A launch flag may create a marker only for a pristine
+   top-level session (`rlmDepth == 0` and no `parentSession`); exact matching
+   markers remain the restoration path. Forks, episodes, reviewers, and RLM
+   children must remain ordinary unless a future separately reviewed mechanism
+   explicitly assigns them.
+2. **False fail-closed profile loading (P1).** Prime Agent 0.9.5 catches and
+   logs `before_agent_start` errors, then continues toward the provider. Throwing
+   from that hook is not enforcement. Validate and admit the current profile at
+   the supported `input` gate. For an assigned session with a missing, empty, or
+   unreadable profile, return `action: "handled"`, emit a visible error, and skip
+   skill/template expansion and the complete agent/provider run. Cache the
+   admitted profile for the corresponding chained `before_agent_start` overlay.
+3. **Installation documentation count (P3).** Change the remaining “all five
+   installed files” statement in `docs/lab-global-plugin.md` to six.
+
+### Native repair evidence
+
+Add focused harness coverage and a native Prime Agent 0.9.5 probe that:
+
+- creates an explicitly assigned top-level parent through the supported runtime;
+- creates a native depth-1 RLM child with inherited session configuration and
+  proves the child has no project-conversation marker;
+- proves fork, episode/reviewer-shaped, new-session, and RLM identities do not
+  gain the role from inherited flags;
+- dispatches missing/empty/unreadable-profile input through each supported source
+  (`interactive`, `rpc`, and `extension`) and proves `handled` prevents any
+  provider/model call;
+- proves valid-profile input reaches the provider with exactly one chained role
+  profile; and
+- proves valid-profile commands and tools remain registered and unchanged.
+
+The review evidence that established the failures is:
+
+- `/var/folders/4_/twy0wz3s1mq650wnqzn1b8rr0000gq/T/prime-claw-slice1-review-ffpiybl4/slice-1-review.md`
+- `/var/folders/4_/twy0wz3s1mq650wnqzn1b8rr0000gq/T/prime-claw-slice1-review-ffpiybl4/evidence/native-probe-result.json`
+
+### Separately tracked baseline handoff defect
+
+Checkpoint investigation found a shared baseline defect in canonical handoff
+admission. That transport code is outside the rejected Slice 1 role-repair scope
+and is tracked in the owner's baseline ledger for separate `main` disposition.
+It does not block this one-off, auto-compacted role-repair continuation. Do not
+repair it, add focused tests for it, or stage, commit, or push changes to its
+shared transport paths from this episode.
+
+### Owner coordination and active-work watch invariant
+
+When an episode becomes active, the episode introduces its exact session identity
+to the owning `PROJECT_CONVERSATION` and reports material progress, blockers, and
+completion directly to that owner. A completion packet names the exact commit,
+tests, docs, active spec/plan changes, Bead state, push state, and worktree state.
+Messages are evidence, not approval, and never dispatch native commands.
+
+Whenever the owned `EPISODE` sibling is actively working for the project
+conversation, exactly one non-steering **15-minute agent-owned heartbeat** must
+monitor that active work generation. This applies to bootstrap work, admitted
+continuation slices, direct follow-up tasks, rejected-slice repairs,
+review-driven rework, and requested evidence or validation work. Direct sibling
+progress reporting is the fast path and never replaces this safety net.
+
+Arm the heartbeat before triggering or admitting sibling work when the transition
+permits it. If work is already active through a delivered report or another
+supported path, arm it immediately when activity becomes known. For a terminal
+handoff transition, pre-arm the next generation before admission when possible;
+otherwise arm it immediately on the admission receipt. Cancel the heartbeat as
+soon as the generation is reconciled as complete, blocked, stopped, or returned
+to owner/operator review. Do not keep a heartbeat while the sibling is idle only
+awaiting owner or operator action. Every later work or repair generation gets a
+fresh heartbeat; never reuse a reconciled generation's watch.
+
+Update the specification, project-conversation profile, current documentation,
+and focused contract tests so this coordination and watch policy is explicit and
+testable without implementing the Slice 2 oversight skill early.
+
+### Context-pressure checkpoint before more steering
+
+The rejected-Slice-1 repair was the concrete first checkpoint for the
+context-pressure policy. The episode recorded the P0 and preserved evidence,
+and auto-compaction supplied the approved one-off context refresh for this same
+repair generation. This continuation does not claim a native handoff transition
+or authorize work outside the bounded Slice 1 repair.
+
+The general context-refresh transition preserves the same rejected-Slice-1
+repair generation. It does
+not accept commit `05fabd7c86f6120afe231849f7dac358e5ba9b50`, authorize new
+scope, resolve either P1, or change operator authority. Keep the existing single
+repair heartbeat across the checkpoint and context-refresh handoff; do not add a
+second watch. Later tests for the oversight policy must assert P0 recording,
+evidence preservation, sibling stop, quiescence confirmation, canonical
+handoff-before-more-steering, sole execute follow-up, unchanged semantic repair
+generation, and no duplicate heartbeat. If work was already reconciled before a
+separate later continuation, cancel the old heartbeat and pre-arm a fresh one
+under the normal later-generation rule.
+
+### Preservation and repair checkpoint
+
+The unrelated dirty `.ralph/skills/execute/SKILL.md` change is not part of this
+feature. Do not overwrite, stage, or include it in the repair commit. Preserve
+its pre-rebase variant in `stash@{0}` until the owner resolves provenance.
+
+The bounded repair is implemented and validated for a replacement Slice 1
+candidate. It admits the role flag only on pristine top-level startup, validates
+assigned profiles at the supported input gate, blocks invalid profiles before
+provider dispatch, and preserves one chained profile overlay for valid runs.
+Native Prime Agent 0.9.5 probes cover all three input sources plus real RLM-child
+and runtime-fork non-inheritance. Focused Node and Python tests pass; the full
+Node suite passes 89 tests; and 259 Python tests pass with one unrelated baseline
+watchdog test deselected after both the full run and an isolated rerun timed out.
+Global apply/check and fresh valid/missing-profile processes pass. Stage only the
+approved repair paths, update `prime-claw-h6w.22`, commit and push one replacement
+Slice 1 candidate, report the completion packet, and stop for fresh owner/EXPERT
+review.
+
 ## Implementation design fixed by this plan
 
 ### Explicit role binding

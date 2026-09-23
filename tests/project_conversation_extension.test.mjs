@@ -17,6 +17,7 @@ function createHarness(cwd, {
   entries = [],
   seedCapabilities = false,
   rejectToolChanges = false,
+  header = {},
 } = {}) {
   const flags = new Map();
   const events = new Map();
@@ -24,6 +25,7 @@ function createHarness(cwd, {
   const tools = new Map(seedCapabilities ? [["native-tool", { native: true }]] : []);
   const messages = [];
   const activeToolChanges = [];
+  const notifications = [];
   const storedEntries = structuredClone(entries);
   let currentSessionId = sessionId;
 
@@ -44,14 +46,19 @@ function createHarness(cwd, {
   };
   const ctx = {
     cwd,
+    ui: {
+      notify(message, level) { notifications.push({ message, level }); },
+    },
     sessionManager: {
       getSessionId() { return currentSessionId; },
       getEntries() { return storedEntries; },
+      getHeader() { return header; },
     },
   };
   projectConversation(pi);
   return {
-    pi, ctx, flags, events, commands, tools, messages, activeToolChanges, storedEntries,
+    pi, ctx, flags, events, commands, tools, messages, activeToolChanges,
+    notifications, storedEntries,
     setSessionId(value) { currentSessionId = value; },
   };
 }
@@ -77,8 +84,18 @@ async function start(f, reason = "startup") {
   await f.events.get("session_start")({ reason }, f.ctx);
 }
 
+async function admit(f, source = "interactive") {
+  return f.events.get("input")({ text: "substantive prompt", source }, f.ctx);
+}
+
 async function before(f, systemPrompt = "BASE") {
   return f.events.get("before_agent_start")({ systemPrompt }, f.ctx);
+}
+
+async function run(f, systemPrompt = "BASE", source = "interactive") {
+  const admission = await admit(f, source);
+  assert.notEqual(admission?.action, "handled");
+  return before(f, systemPrompt);
 }
 
 test("registers only the explicit boolean flag and prompt lifecycle hooks", () => {
@@ -91,7 +108,7 @@ test("registers only the explicit boolean flag and prompt lifecycle hooks", () =
       type: "boolean",
       default: false,
     });
-    assert.deepEqual([...f.events.keys()], ["session_start", "before_agent_start"]);
+    assert.deepEqual([...f.events.keys()], ["session_start", "input", "before_agent_start"]);
     assert.deepEqual([...f.commands.keys()], []);
     assert.deepEqual([...f.tools.keys()], []);
     assert.deepEqual(f.activeToolChanges, []);
@@ -103,7 +120,7 @@ test("registers only the explicit boolean flag and prompt lifecycle hooks", () =
 test("does not infer assignment from project cwd", async (t) => {
   const f = fixture(t);
   await start(f);
-  assert.equal(await before(f), undefined);
+  assert.equal(await run(f), undefined);
   assert.deepEqual(f.storedEntries, []);
 });
 
@@ -125,7 +142,7 @@ test("an unassigned session never reads a missing profile", async (t) => {
   const f = fixture(t);
   rmSync(f.profilePath, { force: true });
   await start(f);
-  assert.equal(await before(f), undefined);
+  assert.equal(await run(f), undefined);
 });
 
 test("explicit startup binds the exact session and overlays the current profile", async (t) => {
@@ -133,7 +150,7 @@ test("explicit startup binds the exact session and overlays the current profile"
   await start(f);
 
   assert.deepEqual(f.storedEntries, [marker("owner-session")]);
-  assert.deepEqual(await before(f, "EARLIER OVERLAY"), {
+  assert.deepEqual(await run(f, "EARLIER OVERLAY"), {
     systemPrompt: `EARLIER OVERLAY\n\n${PROFILE}`,
   });
   assert.deepEqual(f.messages, []);
@@ -143,11 +160,12 @@ test("explicit startup binds the exact session and overlays the current profile"
 test("reads the profile once per agent run so reloads do not retain stale text", async (t) => {
   const f = fixture(t, { flag: true });
   await start(f);
-  assert.match((await before(f)).systemPrompt, /profile revision one/);
+  assert.match((await run(f)).systemPrompt, /profile revision one/);
 
   writeFileSync(f.profilePath, "# PROJECT_CONVERSATION\n\nprofile revision two");
-  assert.match((await before(f)).systemPrompt, /profile revision two/);
-  assert.doesNotMatch((await before(f)).systemPrompt, /profile revision one/);
+  const secondRun = await run(f);
+  assert.match(secondRun.systemPrompt, /profile revision two/);
+  assert.doesNotMatch(secondRun.systemPrompt, /profile revision one/);
 });
 
 test("same-session resume and extension reload restore the exact marker without duplication", async (t) => {
@@ -155,7 +173,7 @@ test("same-session resume and extension reload restore the exact marker without 
   for (const reason of ["resume", "reload"]) {
     const f = fixture(t, { sessionId: "owner-session", entries });
     await start(f, reason);
-    assert.match((await before(f)).systemPrompt, /PROJECT_CONVERSATION/);
+    assert.match((await run(f)).systemPrompt, /PROJECT_CONVERSATION/);
     assert.deepEqual(f.storedEntries, entries);
   }
 });
@@ -165,7 +183,7 @@ test("cold process startup restores an existing exact marker without the flag", 
   const entries = [marker("owner-session")];
   const f = fixture(t, { flag: false, sessionId: "owner-session", entries });
   await start(f, "startup");
-  assert.match((await before(f)).systemPrompt, /PROJECT_CONVERSATION/);
+  assert.match((await run(f)).systemPrompt, /PROJECT_CONVERSATION/);
   assert.deepEqual(f.storedEntries, entries);
 });
 
@@ -174,7 +192,7 @@ test("a readable process flag cannot bind non-startup session identities", async
   for (const reason of ["reload", "resume", "new", "fork"]) {
     const f = fixture(t, { flag: true, sessionId: `ordinary-${reason}` });
     await start(f, reason);
-    assert.equal(await before(f), undefined);
+    assert.equal(await run(f), undefined);
     assert.deepEqual(f.storedEntries, []);
   }
 });
@@ -183,16 +201,16 @@ test("a readable process flag cannot bind non-startup session identities", async
 test("one runtime clears assignment across a fork and restores it on owner resume", async (t) => {
   const f = fixture(t, { flag: true, sessionId: "owner-session" });
   await start(f, "startup");
-  assert.match((await before(f)).systemPrompt, /PROJECT_CONVERSATION/);
+  assert.match((await run(f)).systemPrompt, /PROJECT_CONVERSATION/);
 
   f.setSessionId("fork-session");
   await start(f, "fork");
-  assert.equal(await before(f), undefined);
+  assert.equal(await run(f), undefined);
   assert.deepEqual(f.storedEntries, [marker("owner-session")]);
 
   f.setSessionId("owner-session");
   await start(f, "resume");
-  assert.match((await before(f)).systemPrompt, /PROJECT_CONVERSATION/);
+  assert.match((await run(f)).systemPrompt, /PROJECT_CONVERSATION/);
   assert.deepEqual(f.storedEntries, [marker("owner-session")]);
 });
 
@@ -206,7 +224,7 @@ test("a fork with an inherited marker for another session remains ordinary", asy
 
   await start(f, "fork");
 
-  assert.equal(await before(f), undefined);
+  assert.equal(await run(f), undefined);
   assert.deepEqual(f.storedEntries, [inherited]);
   assert.deepEqual(f.messages, []);
 });
@@ -221,7 +239,7 @@ test("a separately explicit process startup can bind a new identity", async (t) 
   await start(f, "startup");
 
   assert.deepEqual(f.storedEntries.at(-1), marker("new-explicit-session"));
-  assert.match((await before(f)).systemPrompt, /PROJECT_CONVERSATION/);
+  assert.match((await run(f)).systemPrompt, /PROJECT_CONVERSATION/);
 });
 
 test("marker validation is versioned, role-specific, and exact-session", async (t) => {
@@ -233,7 +251,7 @@ test("marker validation is versioned, role-specific, and exact-session", async (
   for (const entry of invalid) {
     const f = fixture(t, { sessionId: "owner", entries: [entry] });
     await start(f, "resume");
-    assert.equal(await before(f), undefined);
+    assert.equal(await run(f), undefined);
   }
 });
 
@@ -244,15 +262,55 @@ test("role persistence stores no episode identity or phase state", async (t) => 
   assert.equal(JSON.stringify(f.storedEntries[0]).includes("episode"), false);
 });
 
-test("an assigned session fails closed when the profile is missing or empty", async (t) => {
-  const f = fixture(t, { entries: [marker("owner")], sessionId: "owner" });
-  await start(f, "resume");
+test("an assigned session blocks all supported input sources when the profile is invalid", async (t) => {
+  for (const source of ["interactive", "rpc", "extension"]) {
+    for (const invalid of ["missing", "empty", "unreadable"]) {
+      const f = fixture(t, { entries: [marker("owner")], sessionId: "owner" });
+      await start(f, "resume");
+      if (invalid === "missing") rmSync(f.profilePath, { force: true });
+      if (invalid === "empty") writeFileSync(f.profilePath, "   ");
+      if (invalid === "unreadable") {
+        rmSync(f.profilePath, { force: true });
+        mkdirSync(f.profilePath);
+      }
 
-  rmSync(f.profilePath, { force: true });
-  assert.throws(() => f.events.get("before_agent_start")({ systemPrompt: "BASE" }, f.ctx),
-    /assigned profile unavailable/);
+      assert.deepEqual(await admit(f, source), { action: "handled" });
+      assert.equal(await before(f), undefined);
+      assert.equal(f.notifications.length, 1);
+      assert.equal(f.notifications[0].level, "error");
+      assert.match(f.notifications[0].message, /assigned profile unavailable/);
+      assert.match(f.notifications[0].message, /blocked before model dispatch/);
+    }
+  }
+});
 
-  writeFileSync(f.profilePath, "   ");
-  assert.throws(() => f.events.get("before_agent_start")({ systemPrompt: "BASE" }, f.ctx),
-    /profile is empty/);
+test("valid profiles admit every supported input source with one overlay per run", async (t) => {
+  for (const source of ["interactive", "rpc", "extension"]) {
+    const f = fixture(t, { entries: [marker("owner")], sessionId: "owner" });
+    await start(f, "resume");
+    assert.deepEqual(await admit(f, source), { action: "continue" });
+    const result = await before(f, "CHAINED");
+    assert.equal(result.systemPrompt.split("# PROJECT_CONVERSATION").length - 1, 1);
+    assert.match(result.systemPrompt, /^CHAINED/);
+    assert.equal(await before(f, "SECOND"), undefined);
+  }
+});
+
+test("inherited flags cannot assign child, fork, episode, or reviewer identities", async (t) => {
+  const identities = [
+    { name: "rlm-child", reason: "startup", header: { rlmDepth: 1, parentSession: "/parent.jsonl" } },
+    { name: "episode", reason: "startup", header: { parentSession: "/owner.jsonl" } },
+    { name: "reviewer", reason: "startup", header: { rlmDepth: 1 } },
+    { name: "fork", reason: "fork", header: {} },
+  ];
+  for (const identity of identities) {
+    const f = fixture(t, {
+      flag: true,
+      sessionId: identity.name,
+      header: identity.header,
+    });
+    await start(f, identity.reason);
+    assert.equal(await run(f), undefined);
+    assert.deepEqual(f.storedEntries, []);
+  }
 });

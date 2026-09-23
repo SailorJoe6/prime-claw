@@ -58,7 +58,7 @@ scripts/check-prime-agent-plugin.sh
 
 The apply script copies only the six allowlisted prime-claw files. It does not
 remove or overwrite unrelated global extensions. The check script verifies that
-all five installed files match the inert builder source byte-for-byte and that
+all six installed files match the inert builder source byte-for-byte and that
 this repository has no project-local plugin tree.
 
 For an isolated test destination, set `PRIME_AGENT_PLUGIN_ROOT` to the directory

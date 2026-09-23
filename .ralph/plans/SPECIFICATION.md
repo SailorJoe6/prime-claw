@@ -317,6 +317,29 @@ The first release does not add a notification transport, event bus, scheduler
 service, or monitoring database. If this proven observation path fails in later
 dogfood, that concrete failure will shape the next change.
 
+When the owned episode sibling has materially high context use and new failures,
+follow-up work, or repairs would otherwise be added to that same context, the
+project conversation must not keep steering more implementation into it. It
+first records the new work as the next explicit P0 in the active plan, asks the
+sibling to preserve evidence and stop at a safe checkpoint, confirms quiescence,
+and then invokes the canonical `handoff_spec_episode` transition so compaction
+precedes the sole execute follow-up.
+
+This context-refresh handoff does not accept the prior commit, authorize scope
+expansion, resolve the repair, or change operator authority. It preserves the
+same semantic work or repair generation. Exactly one monitoring heartbeat stays
+active across the brief checkpoint and handoff so there is no monitoring gap; a
+context refresh never creates a duplicate watch. If the prior work was already
+reconciled before a later continuation, its heartbeat is cancelled and the
+normal later-generation rule pre-arms a fresh one. The project conversation must
+make checkpoint-before-more-steering behavior explicit and reviewable in the
+plan and durable evidence.
+
+A shared canonical-handoff transport defect was discovered at this checkpoint.
+It is tracked independently in the owner's baseline ledger and does not block the
+bounded, auto-compacted Slice 1 role repair. This episode must not implement or
+claim resolution of that baseline defect.
+
 ### Slice review and continuation
 
 An episode report is evidence, not approval. The project conversation checks the

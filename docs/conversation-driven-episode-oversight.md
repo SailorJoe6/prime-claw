@@ -14,9 +14,11 @@ the explicit flag:
 prime-agent --cwd /path/to/project --project-conversation
 ```
 
-The flag is the assignment boundary. Merely running in the project directory
-does not grant this role. Ordinary debug sessions, implementation episodes, and
-reviewers remain ordinary agents.
+The flag is the assignment boundary only for a pristine top-level launch:
+`rlmDepth` is zero and the session header has no `parentSession`. Merely running
+in the project directory does not grant this role. Runtime children inherit
+extension flags, so the extension explicitly ignores the flag for RLM children,
+forks, implementation episodes, reviewers, and other derived identities.
 
 On initial process startup the extension writes a versioned, session-local marker
 containing only:
@@ -27,8 +29,9 @@ containing only:
 
 A resumed or reloaded session restores the role only when the marker's session
 ID matches the current session ID. A fork can inherit the marker as session
-history, but the different ID keeps the role inactive. Launching a separate
-process with `--project-conversation` is a new explicit assignment.
+history, but the different ID keeps the role inactive. A derived runtime cannot
+mint a replacement marker from an inherited flag. Launching a separate pristine
+top-level process with `--project-conversation` is a new explicit assignment.
 
 ## Startup orientation
 
@@ -48,7 +51,8 @@ The extension source is inert at
 `scripts/apply-prime-agent-plugin.sh` workflow installs it once at user scope;
 do not add a duplicate project-local extension entry point.
 
-For each agent run in the assigned session, the installed extension reads:
+At the supported `input` admission gate for each assigned agent run, the
+installed extension reads:
 
 ```text
 .prime/agent/profiles/project-conversation.md
@@ -58,9 +62,13 @@ It appends the current file contents to the already chained system prompt. This
 preserves overlays from other extensions and lets a supported extension reload
 pick up profile changes without persisting stale prompt text.
 
-If an assigned session cannot read a non-empty profile, the agent run fails closed
-with the profile path and error. Prime Claw does not silently continue
-without the role invariants.
+If an assigned session cannot read a non-empty profile, the input hook reports
+the profile path and returns `action: "handled"`. Prime Agent then skips skill and
+prompt-template expansion, `before_agent_start`, and the complete provider/model
+run. This fail-closed path applies to `interactive`, `rpc`, and extension-sourced
+input. A validated profile is cached only for the corresponding run and appended
+once to the previously chained system prompt. Prime Claw does not silently
+continue without the role invariants.
 
 ## Compatibility and authority
 
@@ -75,8 +83,14 @@ paths. The extension:
 - grants no merge, abandonment, cleanup, scope-expansion, or product-decision
   authority.
 
-The role marker identifies the durable conversation only. Episode identity,
-work-generation watches, review findings, and terminal state belong to the
+The role marker identifies the durable conversation only. After episode creation,
+the assigned conversation sends a one-time owner coordination message and asks
+for direct progress, blocker, and completion reports. While that sibling
+work-generation is active, exactly one non-steering 15-minute heartbeat acts as
+the missed-report safety net. Reports are evidence rather than approval. Material
+context pressure requires a recorded P0, evidence-preserving stop, and context
+refresh before more work; it does not expand scope or duplicate the watch.
+Episode identity, review findings, and terminal state still belong to the
 separate episode workflow and its existing trusted host capabilities.
 
 ## Resource boundaries
