@@ -5,6 +5,7 @@ import argparse
 import fcntl
 import os
 from pathlib import Path
+import re
 import secrets
 import stat
 import sys
@@ -81,6 +82,29 @@ def read_destination(parent_fd: int, name: str) -> tuple[bytes, int | None]:
         return stream.read(), stat.S_IMODE(info.st_mode)
 
 
+def writer_is_alive(pid: int) -> bool:
+    """Conservatively treat inaccessible process IDs as live writers."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def reconcile_orphan_temps(parent_fd: int, name: str) -> None:
+    """Remove exact-pattern transaction files only after their writer is dead."""
+    pattern = re.compile(rf"\.{re.escape(name)}\.prime-claw-([1-9][0-9]*)-[0-9a-f]{{16}}\.tmp")
+    for entry in os.listdir(parent_fd):
+        match = pattern.fullmatch(entry)
+        if match is None or writer_is_alive(int(match.group(1))):
+            continue
+        info = os.stat(entry, dir_fd=parent_fd, follow_symlinks=False)
+        if stat.S_ISREG(info.st_mode):
+            os.unlink(entry, dir_fd=parent_fd)
+
+
 def atomic_write(parent_fd: int, name: str, content: bytes, mode: int | None) -> None:
     temp_name = f".{name}.prime-claw-{os.getpid()}-{secrets.token_hex(8)}.tmp"
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
@@ -127,6 +151,7 @@ def main() -> int:
             lock_fd = os.open(LOCK_NAME, lock_flags, 0o600, dir_fd=parent_fd)
             try:
                 fcntl.flock(lock_fd, fcntl.LOCK_EX)
+                reconcile_orphan_temps(parent_fd, args.destination.name)
                 existing, mode = read_destination(parent_fd, args.destination.name)
                 selected = managed_range(existing, "installed APPEND_SYSTEM")
                 if args.mode == "validate":

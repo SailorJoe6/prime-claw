@@ -15,8 +15,13 @@ files=(
 )
 
 status=0
-if [[ -e "$destination_root/extensions/project-conversation.ts" ]]; then
-  printf 'stale redundant project-conversation entry point: %s\n' "$destination_root/extensions/project-conversation.ts" >&2
+stale_entry="$destination_root/extensions/project-conversation.ts"
+if [[ -e "$stale_entry" || -L "$stale_entry" ]]; then
+  if [[ ! -f "$stale_entry" || -L "$stale_entry" ]]; then
+    printf 'unsafe managed plugin destination (expected absent or regular file): %s\n' "$stale_entry" >&2
+  else
+    printf 'stale redundant project-conversation entry point: %s\n' "$stale_entry" >&2
+  fi
   status=1
 fi
 for forbidden in   "$repo_root/.prime/agent/extensions"   "$repo_root/.prime/agent/extensions-bak"   "$repo_root/.prime/agent/extension-support"; do
@@ -34,12 +39,18 @@ for relative in "${files[@]}"; do
     printf 'missing plugin source: %s
 ' "$source_file" >&2
     status=1
-  elif [[ ! -f "$installed_file" ]]; then
-    printf 'missing installed plugin file: %s
+  elif [[ -e "$installed_file" || -L "$installed_file" ]]; then
+    if [[ ! -f "$installed_file" || -L "$installed_file" ]]; then
+      printf 'unsafe managed plugin destination (expected absent or regular file): %s
 ' "$installed_file" >&2
-    status=1
-  elif ! cmp -s "$source_file" "$installed_file"; then
-    printf 'stale installed plugin file: %s
+      status=1
+    elif ! cmp -s "$source_file" "$installed_file"; then
+      printf 'stale installed plugin file: %s
+' "$installed_file" >&2
+      status=1
+    fi
+  else
+    printf 'missing installed plugin file: %s
 ' "$installed_file" >&2
     status=1
   fi

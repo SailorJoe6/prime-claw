@@ -16,9 +16,12 @@ The check script verifies exactly one current managed block.
 Prime Agent chooses a project `.prime/agent/APPEND_SYSTEM.md` before the global
 file, and `--append-system-prompt` overrides file discovery. Those supported
 configurations can shadow the kernel. A truly inactive ordinary conversation
-remains available under such a shadow. `/implement-spec` readiness and every
-bounded, active, or recovery state require exactly one intact canonical managed
-block and fail visibly before provider dispatch when it is absent or truncated.
+remains available under such a shadow. `/implement-spec` readiness, explicit
+EPISODE state, active ownership, and recovery require exactly one intact canonical
+managed block. A native depth-positive delegated/RLM child may instead rely on
+Prime Agent's trusted bounded task prompt under an intentional shadow; it receives
+zero CONVERSATION ownership and zero oversight packages. No prose heuristic is
+used.
 
 The kernel defines precedence rather than detailed procedure:
 
@@ -40,15 +43,26 @@ queuing its canonical readiness workflow, the extension verifies:
 
 - exactly one effective identity kernel;
 - the restoration extension is active for this session;
-- `.ralph/skills/oversee-episode/SKILL.md` is readable and valid; and
-- the durable spec-episode state directory is writable.
+- `.ralph/skills/oversee-episode/SKILL.md` has exact supported frontmatter
+  delimiters, one unambiguous top-level quoted or unquoted `name:
+  oversee-episode`, and a nonempty procedure body; and
+- the durable spec-episode state directory is writable; and
+- CWD, state, and expected worktree bindings resolve from one canonical project
+  root, accepting benign filesystem aliases/symlink roots while rejecting
+  noncontained or unavailable roots before publication.
 
 After `create_spec_episode` has durably established and delivered a strictly
 parsed spec-episode identity, the same tool turn appends and verifies one full
 active marker bound to every owner, location, episode, session, branch, worktree,
-and bootstrap field. Activation sends no separate model message. On restart, a
+and stable bootstrap field. The daemon `episodeActiveSessionId` is mutable routing,
+not stable ownership; exact session UUID/file ownership remains stable while a
+verified reopen may refresh the durable route without invalidating oversight.
+Activation sends no separate model message. On restart, a
 valid bootstrap-ready exact-owner expectation with no marker is recovered to an
-active marker with a visible durable recovery message. Inactive, corrupt, or
+active marker with a visible durable recovery message. The known rejected v1
+marker schema is recognized only after exact owner filtering and migrated by
+appending a full v2 evidence marker; foreign copied v1 history is inert, and the
+newer v2 marker supersedes its generation history. Inactive, corrupt, or
 disagreeing current-owner state blocks; a copied marker in a different fork UUID
 remains inert.
 
@@ -98,11 +112,16 @@ reconciled or waiting only for owner/operator action.
 ### Authorize
 
 The owning conversation supplies the exact future-folder location and the closed
-disposition `merged` or `abandoned`. The host verifies the exact owner and durable
-episode identity, asks for one explicit UI confirmation, captures the episode
-branch tip, and writes
+disposition `merged` or `abandoned`. The target is the owner's currently checked
+out project branch, as selected by project policy; it is not implicitly `main`.
+The host verifies the exact owner and durable episode identity, asks for one
+explicit UI confirmation that shows the target branch/ref, authorization-time
+target commit, and exact episode tip, and writes
 `.prime/agent/state/spec-episodes/<slug>.finalization.json`.
 A matching replay returns the existing receipt without another confirmation.
+Receipts and markers are indexed by exact slug/episode generation: completed old
+evidence remains replayable but never acts as the current ownership record, so a
+proven terminal cycle does not prevent a later approved folder.
 Authorize does not merge, abandon, stop a session, remove a worktree, delete a
 branch, or decide semantic completion.
 
@@ -126,8 +145,10 @@ and write a durable `completed` tombstone with exact result evidence. It asks fo
 no second confirmation. An identical authorize or complete replay returns the
 existing state/result without another confirmation. A crash or ambiguity at any
 boundary remains visibly recoverable from the receipt, marker, and any surviving
-expectation; it never silently becomes ordinary mode. Unrelated resources are
-never removed.
+expectation; it never silently becomes ordinary mode. On reload/resume, a strict
+`completing` receipt is reconciled by the narrow native session-start path before
+an ordinary provider call, without invoking the model tool or replaying bootstrap
+admission. Unrelated resources are never removed.
 
 ## Installation boundaries
 

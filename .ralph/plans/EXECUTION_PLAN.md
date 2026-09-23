@@ -203,8 +203,10 @@ copied ownership.
    one-heartbeat-per-active-generation, evidence reconciliation, owner-ledger,
    authority, review, continuation, terminal, and return-to-conversation policy.
    Use this one file as both the discoverable skill and active package source.
-4. Rework `project-conversation.ts` into exact-session oversight-mode mechanics:
-   - append idempotent active/inactive markers;
+4. Co-locate exact-session oversight-mode registration in the normally discovered
+   `reviewed-plan.ts` production entry and remove the redundant entry point:
+   - index active/inactive markers and receipts by exact episode generation;
+   - migrate exact-owner legacy markers append-only while ignoring foreign copied history;
    - validate the existing spec-episode identity as ownership expectation;
    - read the current canonical `oversee-episode` package;
    - provide one fresh package through the universal context path;
@@ -215,9 +217,11 @@ copied ownership.
    `finalize_spec_episode` authorization/completion capability with one UI
    confirmation, exact durable receipt, conservative terminal validation, and no
    merge or cleanup authority.
-6. Extend plugin apply/check manifests for the kernel, plugin, and canonical
+6. Extend plugin apply/check manifests for the kernel, load unit, and canonical
    package. Detect project/CLI prompt shadowing at readiness rather than silently
-   weakening identity.
+   weakening identity. Serialize APPEND updates, reconcile dead-writer temporary
+   files on retry, preflight managed destination types, and require the final
+   mixed-generation check without claiming whole-generation atomicity.
 7. Replace focused Node and native Python coverage with the proven matrix:
    - multiple independent root conversations;
    - ordinary fork capability without ownership duplication;
@@ -253,34 +257,49 @@ copied ownership.
 
 ### Replacement Slice 1 implementation evidence
 
-The consolidated repair replaces extension-local readiness with one normally
-discovered reviewed-plan load unit, uses the strict shared EpisodeIdentity parser,
-reconciles current-owner expectation/marker/receipt state on every lifecycle
-boundary, and leaves truly inactive shadowed conversations available. Active and
-promotion paths require one byte-exact managed kernel block and a structurally
-valid nonempty canonical package. The discoverable skill symlink points to the
-same package source.
+The R1–R10 consolidation indexes marker/receipt truth by exact episode generation,
+keeps completed old tombstones replayable but noncurrent, rejects conflicting live
+state before publication, and permits a later approved cycle. Stable owner markers
+exclude mutable daemon routing, so an exact reopen refresh does not invalidate
+oversight. Exact-owner legacy v1 markers migrate append-only to v2; foreign copied
+legacy history is ignored before parsing and newer v2 evidence supersedes the old
+generation.
 
-Finalization now binds every identity/marker/Git target field and uses a durable
-`authorized -> completing -> completed` protocol. Unknown Git/daemon/worktree
-facts block. Completed tombstones and completing recovery state make identical
-lost-response replays deterministic without another confirmation. The installer
-serializes APPEND_SYSTEM mutation under a same-directory lock, rejects unsafe or
-malformed paths/markers, preserves unmanaged bytes and mode, fsyncs a unique
-temporary file, atomically replaces, and converges under repeated/concurrent
-apply.
+Terminal truth is strict: inactive state requires a matching completed tombstone;
+authorized/completing states never become ordinary; completed state cannot coexist
+with a reappearing expectation. A native session-start recovery reconciles an
+exact `completing` receipt without a provider/model tool. Daemon rows validate all
+supplied UUID aliases, route, and file fields and block every partial/conflicting
+match. Receipts bind and display the project-policy-selected target branch/ref,
+authorization target commit, and exact episode tip.
 
-Production native discovery coverage performs real `/implement-spec` creation,
-activation, EPISODE identity, crash-boundary marker recovery with durable visible
-evidence, reload, resume, project/CLI/truncated-resource readiness, and
-extension-absent checks in isolated roots. Focused verification passed 85 Node
-contracts and 20 Python native/install contracts plus five installer subtests.
-Final full gates passed 99 Node tests; the Python run passed 270 tests plus five
-subtests with 11 existing warnings and one baseline timing-sensitive watchdog
-failure, whose isolated rerun passed in 6.34 seconds. Isolated and user-global
-apply/check passed; fresh global inactive, active, and inactive-shadow processes
-observed kernel/package counts `1/0`, `1/1`, and `0/0` respectively. `git diff
---check` passed. Shared handoff scheduling/quiescence code remains unchanged.
+The installed native test now binds the fake daemon socket inside the test-only
+extension before any provider/tool mutation, asserts the effective transport,
+fake route, and exact create/prompt/ack trace, and cleans only fake resources. It
+also proves two exact generations with retained old receipt replay, route refresh,
+canonical macOS alias plus symlink CWD, quoted valid skill metadata and native
+invalid metadata, marker-gap/v1 migration, reload/resume, extension absence,
+project/CLI shadows, and provider-free finalization recovery. Review-reported live
+sessions `01a0d052-a01e-728f-b13a-527717a56c09` and
+`01a0d032-5fbc-746e-bcff-6fd1cd260cb8` were recorded only and not inspected or
+cleaned.
+
+APPEND_SYSTEM installation retains its lock/atomic/fsync guarantees and now
+reconciles exact-pattern dead-writer temporaries on retry while preserving live
+writer files. Managed TypeScript destinations are preflighted before mutation and
+apply requires the complete final check; documentation explicitly states that the
+multi-file generation is sequential/detected, not atomically swapped. Native
+depth-positive children under an intentional prompt shadow rely on Prime Agent's
+bounded task prompt and receive zero owner state/package, as recorded in the
+living contract.
+
+Final focused gates passed 94 Node contracts and 25 Python native/install
+contracts plus seven installer subtests. Full gates passed 107 Node tests and 276
+Python tests plus seven subtests with 11 existing warnings. Isolated and
+user-global apply/check passed; fresh global inactive, active, and
+inactive-shadow processes observed kernel/package `1/0`, `1/1`, and `0/0`.
+`git diff --check` passed. Shared handoff scheduling/quiescence code remains
+unchanged.
 
 Slice 2 remains blocked until this exact replacement commit is accepted.
 

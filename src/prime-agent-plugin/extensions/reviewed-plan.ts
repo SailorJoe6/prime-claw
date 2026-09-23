@@ -13,6 +13,7 @@ import {
 import {
   appendActiveOversight,
   assertConversationPromotionReady,
+  currentCompletingFinalization,
   currentOversightMarkerForFinalization,
   OVERSIGHT_MARKER_TYPE,
   registerConversationOversight,
@@ -21,6 +22,7 @@ import {
 import {
   authorizeEpisodeFinalization,
   completeEpisodeFinalization,
+  recoverCompletingEpisodeFinalization,
   type FinalizationDependencies,
 } from "../extension-support/episode-finalization.ts";
 
@@ -140,11 +142,27 @@ function registerSkillCommand(
 type ReviewedPlanDependencies = EpisodeDependencies & {
   finalization?: FinalizationDependencies;
   createEpisode?: typeof createSpecEpisode;
+  handoffEpisode?: typeof handoffSpecEpisode;
 };
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
     registerConversationOversight(pi);
+    pi.on("session_start", async (_event, ctx) => {
+      try {
+        const recovery = currentCompletingFinalization(ctx);
+        if (!recovery) return;
+        const recovered = await recoverCompletingEpisodeFinalization(
+          ctx,
+          (status, value) => pi.appendEntry(OVERSIGHT_MARKER_TYPE, { ...value, status }),
+          recovery.marker,
+          dependencies?.finalization,
+        );
+        if (recovered) ctx.ui.notify(`Recovered completed episode finalization for ${recovered.sourceLocation}.`, "warning");
+      } catch (error) {
+        ctx.ui.notify(`prime-claw finalization recovery blocked: ${error instanceof Error ? error.message : String(error)}`, "error");
+      }
+    });
     const approvedLocationBySession = new Map<string, string>();
     registerSkillCommand(pi, {
       command: "plan",
@@ -155,7 +173,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       command: "implement-spec",
       description: "Review and promote an approved future bundle into an isolated implementation episode",
       workflow: IMPLEMENT_WORKFLOW,
-      preflight: (ctx) => assertConversationPromotionReady(ctx),
+      preflight: (ctx, location) => assertConversationPromotionReady(ctx, location),
       onValidated: (ctx, location) => {
         approvedLocationBySession.set(ctx.sessionManager.getSessionId(), location);
       },
@@ -251,7 +269,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         }
         approvedLocationBySession.delete(sessionId);
         try {
-          assertConversationPromotionReady(ctx);
+          assertConversationPromotionReady(ctx, params.location);
           const createEpisode = dependencies?.createEpisode ?? createSpecEpisode;
           const result = await createEpisode(params.location, toolCallId, ctx, dependencies);
           appendActiveOversight(pi, ctx, result);
@@ -295,7 +313,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         try {
           const disposition = params.disposition as OversightDisposition;
           if (params.phase === "authorize") {
-            const marker = currentOversightMarkerForFinalization(ctx);
+            const marker = currentOversightMarkerForFinalization(ctx, params.location);
             if (!marker) throw new Error("No exact active oversight marker exists for this conversation");
             const result = await authorizeEpisodeFinalization(
               params.location,
@@ -311,7 +329,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             };
           }
           if (params.phase !== "complete") throw new Error("Finalization phase must be authorize or complete");
-          const marker = currentOversightMarkerForFinalization(ctx);
+          const marker = currentOversightMarkerForFinalization(ctx, params.location);
           if (!marker) throw new Error("No exact active oversight marker exists for this conversation");
           const receipt = await completeEpisodeFinalization(
             params.location,
@@ -361,7 +379,8 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         try {
-          const result = await handoffSpecEpisode(
+          const handoffEpisode = dependencies?.handoffEpisode ?? handoffSpecEpisode;
+          const result = await handoffEpisode(
             params.location,
             params.guidance ?? "",
             ctx,

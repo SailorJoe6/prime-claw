@@ -175,19 +175,28 @@ Before promotion, readiness validation therefore proves that exactly one expecte
 kernel is present and that the restoration plugin and role package are available.
 A deliberate unsupported prompt configuration leaves a truly inactive ordinary
 conversation available, but fails visibly at the promotion boundary and during
-bounded, active, or recovery state rather than starting an ungoverned episode.
+explicit EPISODE, active, or recovery state rather than starting ungoverned work.
+A native depth-positive delegated/RLM child is already bounded by Prime Agent's
+trusted runtime task prompt; under an intentional project/CLI shadow it may run
+without the CONVERSATION kernel, but receives no owner marker, ownership, or
+oversight package. No prose parsing is used for this exception.
 
 ### 2. Exact-session oversight mode and fresh role package
 
 Successful `/implement-spec` promotion activates oversight for the exact invoking
 conversation without creating a model turn. The append-only session marker is
-bound to that conversation UUID and the existing durable spec-episode identity
-record is the independent ownership expectation. A marker copied into a fork is
-inert because its UUID no longer matches. Separate conversations may hold
-separate ownership records. On reload or resume, one valid bootstrap-ready
+bound to that conversation UUID, exact episode generation, and the existing
+durable spec-episode identity record as the independent ownership expectation.
+The mutable daemon routing ID is not stable ownership; an exact verified reopen
+may refresh it without invalidating the owner marker. A marker copied into a fork
+is inert because its UUID no longer matches. Completed older generations remain
+replayable evidence but never current ownership, so separate conversations and
+later sequential cycles remain independent. On reload or resume, one valid bootstrap-ready
 current-owner expectation with no marker is recovered deterministically to active
 state with visible durable evidence. Inactive, malformed, or disagreeing
-current-owner state blocks; it never silently becomes ordinary conversation.
+current-owner state blocks; it never silently becomes ordinary conversation. The
+known v1 owner marker is migrated append-only to the full current schema after
+exact owner/expectation validation, while foreign copied legacy history is inert.
 
 While exact-session state is active, a universal `context` hook validates the
 kernel, marker, expectation, and canonical package, removes any older package

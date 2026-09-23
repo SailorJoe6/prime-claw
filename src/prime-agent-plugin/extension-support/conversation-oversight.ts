@@ -1,4 +1,4 @@
-import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
@@ -87,25 +87,46 @@ export function assertIdentityKernel(ctx: ExtensionContext): void {
   }
 }
 
+function canonicalProjectRoot(cwd: string): string {
+  try { return realpathSync(cwd); }
+  catch (error) { throw new Error(`project root is unavailable: ${error instanceof Error ? error.message : String(error)}`); }
+}
+function parseSkillFrontmatter(text: string, path: string): { name: string; body: string } {
+  const parsed = /^---\n([\s\S]*?)\n---\n([\s\S]+)$/.exec(text);
+  if (!parsed) throw new Error(`oversight package frontmatter or procedure is incomplete at ${path}`);
+  const values = new Map<string, string>();
+  for (const raw of parsed[1].split("\n")) {
+    if (!raw.trim() || raw.trimStart().startsWith("#")) continue;
+    if (/^[ \t]/.test(raw)) continue; // nested metadata is allowed but never identifies the skill
+    const match = /^([A-Za-z_][A-Za-z0-9_-]*):(?:[ ](.*))?$/.exec(raw);
+    if (!match || values.has(match[1])) throw new Error(`oversight package frontmatter is malformed or ambiguous at ${path}`);
+    values.set(match[1], match[2] ?? "");
+  }
+  const scalar = values.get("name");
+  if (scalar === undefined) throw new Error(`oversight package has no top-level name at ${path}`);
+  let name: string;
+  if (/^[A-Za-z0-9_-]+$/.test(scalar)) name = scalar;
+  else if (/^'[^']*'$/.test(scalar)) name = scalar.slice(1, -1);
+  else if (/^"(?:[^"\\]|\\.)*"$/.test(scalar)) {
+    try { name = JSON.parse(scalar) as string; } catch { throw new Error(`oversight package name is malformed at ${path}`); }
+  } else throw new Error(`oversight package name is malformed at ${path}`);
+  const body = parsed[2].trim();
+  if (name !== "oversee-episode" || !body) throw new Error(`oversight package name or procedure is invalid at ${path}`);
+  return { name, body };
+}
 function packageBody(cwd: string): string {
-  const path = join(cwd, OVERSIGHT_PACKAGE_PATH);
+  const path = join(canonicalProjectRoot(cwd), OVERSIGHT_PACKAGE_PATH);
   let body: string;
   try { body = readFileSync(path, "utf8").trim(); }
-  catch (error) {
-    throw new Error(`oversight package unavailable at ${path}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  const parsed = /^---\n([\s\S]*?)\n---\n([\s\S]+)$/.exec(body);
-  if (!parsed) throw new Error(`oversight package frontmatter or procedure is incomplete at ${path}`);
-  const frontmatter = parsed[1].split("\n");
-  const name = frontmatter.find((line) => line.trim().startsWith("name:"))?.split(":", 2)[1]?.trim();
-  const procedure = parsed[2].trim();
-  if (name !== "oversee-episode" || !procedure) throw new Error(`oversight package name or procedure is invalid at ${path}`);
+  catch (error) { throw new Error(`oversight package unavailable at ${path}: ${error instanceof Error ? error.message : String(error)}`); }
+  parseSkillFrontmatter(body, path);
   return body;
 }
 
-function stateRoot(cwd: string): string { return resolve(cwd, ".prime", "agent", "state", "spec-episodes"); }
+function stateRoot(cwd: string): string { return resolve(canonicalProjectRoot(cwd), ".prime", "agent", "state", "spec-episodes"); }
 function expectedWorktree(cwd: string, slug: string): string {
-  return resolve(dirname(resolve(cwd)), `${basename(resolve(cwd))}-${slug}-episode`);
+  const root = canonicalProjectRoot(cwd);
+  return resolve(dirname(root), `${basename(root)}-${slug}-episode`);
 }
 function validateProjectBinding(identity: EpisodeIdentity, cwd: string): EpisodeIdentity {
   if (resolve(identity.worktree) !== expectedWorktree(cwd, identity.slug)) throw new Error("episode identity worktree binding is invalid");
@@ -139,17 +160,18 @@ function markerFromIdentity(identity: EpisodeIdentity, status: "active" | "inact
     markerVersion: MARKER_VERSION, status,
     ownerSessionId: identity.ownerSessionId, slug: identity.slug,
     sourceLocation: identity.sourceLocation, episodeId: identity.episodeId,
-    episodeActiveSessionId: identity.episodeActiveSessionId,
     episodeSessionFile: identity.episodeSessionFile, branch: identity.branch,
     worktree: identity.worktree, sessionName: identity.sessionName,
     identityVersion: identity.version,
     admission: identity.version === 1 ? identity.executeAdmission : identity.bootstrapAdmission,
   };
 }
+type LegacyMarker = { version: 1; status: "active" | "inactive"; ownerSessionId: string; sourceLocation: string; slug: string; episodeId: string; episodeSessionFile: string };
+type MarkerRecord = { marker?: OversightMarker; legacy?: LegacyMarker };
 function parseMarker(data: unknown): OversightMarker {
   if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("oversight marker is corrupt");
   const item = data as Record<string, unknown>;
-  const fields = ["ownerSessionId","slug","sourceLocation","episodeId","episodeActiveSessionId","episodeSessionFile","branch","worktree","sessionName","admission"];
+  const fields = ["ownerSessionId","slug","sourceLocation","episodeId","episodeSessionFile","branch","worktree","sessionName","admission"];
   const slug = typeof item.slug === "string" ? item.slug : "";
   if (item.markerVersion !== MARKER_VERSION || (item.status !== "active" && item.status !== "inactive")
     || (item.identityVersion !== 1 && item.identityVersion !== 2)
@@ -159,22 +181,50 @@ function parseMarker(data: unknown): OversightMarker {
     || item.branch !== `episode/${slug}` || item.sessionName !== `${slug}-episode`) throw new Error("oversight marker is corrupt");
   return item as unknown as OversightMarker;
 }
-function markers(ctx: ExtensionContext): OversightMarker[] {
-  const result: OversightMarker[] = [];
-  for (const entry of ctx.sessionManager.getBranch() as Array<{type?:string;customType?:string;data?:unknown}>) {
+function parseLegacyMarker(data: unknown): LegacyMarker {
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("legacy oversight marker is corrupt");
+  const item = data as Record<string, unknown>;
+  const fields = ["ownerSessionId","slug","sourceLocation","episodeId","episodeSessionFile"];
+  const slug = typeof item.slug === "string" ? item.slug : "";
+  if (item.version !== 1 || (item.status !== "active" && item.status !== "inactive")
+    || !fields.every((field) => typeof item[field] === "string" && item[field])
+    || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+    || item.sourceLocation !== `.ralph/plans/future/${slug}`) throw new Error("legacy oversight marker is corrupt");
+  return item as unknown as LegacyMarker;
+}
+function markerRecords(ctx: ExtensionContext): MarkerRecord[] {
+  const sessionId = ctx.sessionManager.getSessionId();
+  const entries = ctx.sessionManager.getBranch() as Array<{type?:string;customType?:string;data?:unknown}>;
+  const seen = new Set<string>(); const result: MarkerRecord[] = [];
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
     if (entry.type !== "custom" || entry.customType !== OVERSIGHT_MARKER_TYPE) continue;
-    result.push(parseMarker(entry.data));
+    const raw = entry.data as Record<string, unknown> | undefined;
+    if (raw?.ownerSessionId !== sessionId) continue; // foreign copied history is inert before schema parsing
+    const key = `${String(raw?.slug ?? "")}\0${String(raw?.episodeId ?? "")}`;
+    if (seen.has(key)) continue; seen.add(key);
+    if (raw?.markerVersion === MARKER_VERSION) result.push({ marker: parseMarker(raw) });
+    else result.push({ legacy: parseLegacyMarker(raw) });
   }
   return result;
 }
-function exactMarker(ctx: ExtensionContext, expectation?: EpisodeIdentity): OversightMarker | null {
+function markerForIdentity(ctx: ExtensionContext, identity: EpisodeIdentity): MarkerRecord | null {
   const sessionId = ctx.sessionManager.getSessionId();
-  const all = markers(ctx);
-  if (expectation) {
-    const related = all.filter((marker) => marker.episodeId === expectation.episodeId || marker.slug === expectation.slug);
-    if (related.some((marker) => marker.ownerSessionId !== sessionId)) throw new Error("oversight marker owner disagrees with the exact expectation");
+  const entries = ctx.sessionManager.getBranch() as Array<{type?:string;customType?:string;data?:unknown}>;
+  for (const entry of entries) {
+    if (entry.type !== "custom" || entry.customType !== OVERSIGHT_MARKER_TYPE) continue;
+    const raw = entry.data as Record<string, unknown> | undefined;
+    if ((raw?.slug === identity.slug || raw?.episodeId === identity.episodeId) && raw?.ownerSessionId !== sessionId) {
+      throw new Error("oversight marker owner disagrees with the exact expectation");
+    }
   }
-  return all.filter((marker) => marker.ownerSessionId === sessionId).at(-1) ?? null;
+  return markerRecords(ctx).find((record) => {
+    const value = record.marker ?? record.legacy;
+    return value?.slug === identity.slug && value.episodeId === identity.episodeId;
+  }) ?? null;
+}
+function markerForLocation(ctx: ExtensionContext, sourceLocation: string): MarkerRecord | null {
+  return markerRecords(ctx).find((record) => (record.marker ?? record.legacy)?.sourceLocation === sourceLocation) ?? null;
 }
 function assertAgreement(marker: OversightMarker, identity: EpisodeIdentity): void {
   const expected = markerFromIdentity(identity, marker.status);
@@ -183,11 +233,15 @@ function assertAgreement(marker: OversightMarker, identity: EpisodeIdentity): vo
   }
 }
 
-export function assertConversationPromotionReady(ctx: ExtensionContext): void {
+export function assertConversationPromotionReady(ctx: ExtensionContext, requestedLocation?: string): void {
   assertIdentityKernel(ctx);
   packageBody(ctx.cwd);
   const root = stateRoot(ctx.cwd); mkdirSync(root, { recursive: true }); accessSync(root, constants.R_OK | constants.W_OK);
-  ownerExpectations(ctx);
+  const expectations = ownerExpectations(ctx);
+  if (expectations.length && requestedLocation && expectations[0].sourceLocation !== requestedLocation) {
+    throw new Error(`conversation already owns active expectation ${expectations[0].sourceLocation}`);
+  }
+  assertNoConflictingLifecycleState(ctx, expectations[0] ?? null);
 }
 
 function currentBoundedIdentity(ctx: ExtensionContext): { role: "EPISODE"; sessionId: string } | null {
@@ -209,12 +263,12 @@ export function appendActiveOversight(pi: ExtensionAPI, ctx: ExtensionContext, e
   if (identity.ownerSessionId !== ctx.sessionManager.getSessionId()) throw new Error("created episode owner mismatch");
   const expectation = ownerExpectations(ctx).find((value) => value.slug === identity.slug);
   if (!expectation) throw new Error("created episode expectation was not persisted");
-  const existing = exactMarker(ctx, expectation);
-  if (existing?.status === "active") { assertAgreement(existing, expectation); return existing; }
-  if (existing) throw new Error("inactive oversight marker conflicts with a live expectation");
+  const existingRecord = markerForIdentity(ctx, expectation);
+  if (existingRecord?.marker?.status === "active") { assertAgreement(existingRecord.marker, expectation); return existingRecord.marker; }
+  if (existingRecord?.marker || existingRecord?.legacy) throw new Error("existing marker conflicts with the live episode generation");
   const marker = markerFromIdentity(expectation, "active");
   pi.appendEntry(OVERSIGHT_MARKER_TYPE, marker);
-  const persisted = exactMarker(ctx, expectation);
+  const persisted = markerForIdentity(ctx, expectation)?.marker;
   if (!persisted) throw new Error("active oversight marker did not persist");
   assertAgreement(persisted, expectation);
   return persisted;
@@ -246,14 +300,12 @@ function ownerFinalizationReceipts(ctx: ExtensionContext): FinalizationReceipt[]
     if (`${value.slug}.finalization.json` !== name) throw new Error(`finalization receipt filename/slug mismatch: ${path}`);
     values.push(value);
   }
-  if (values.length > 1) throw new Error("conversation has more than one finalization receipt");
   return values;
 }
 function assertMarkerReceipt(marker: OversightMarker, receipt: FinalizationReceipt): void {
   const pairs: Array<[unknown, unknown]> = [
     [marker.ownerSessionId, receipt.ownerSessionId], [marker.slug, receipt.slug],
     [marker.sourceLocation, receipt.sourceLocation], [marker.episodeId, receipt.episodeId],
-    [marker.episodeActiveSessionId, receipt.episodeActiveSessionId],
     [resolve(marker.episodeSessionFile), resolve(receipt.episodeSessionFile)],
     [marker.branch, receipt.episodeBranch], [resolve(marker.worktree), resolve(receipt.episodeWorktree)],
     [marker.sessionName, receipt.sessionName], [marker.identityVersion, receipt.identityVersion],
@@ -266,61 +318,107 @@ function markerFromReceipt(receipt: FinalizationReceipt, status: "active" | "ina
   return {
     markerVersion: MARKER_VERSION, status, ownerSessionId: receipt.ownerSessionId,
     slug: receipt.slug, sourceLocation: receipt.sourceLocation, episodeId: receipt.episodeId,
-    episodeActiveSessionId: receipt.episodeActiveSessionId,
     episodeSessionFile: receipt.episodeSessionFile, branch: receipt.episodeBranch,
     worktree: receipt.episodeWorktree, sessionName: receipt.sessionName,
     identityVersion: receipt.identityVersion, admission: receipt.admission,
   };
 }
 
-function resolveState(ctx: ExtensionContext): { expectation: EpisodeIdentity | null; marker: OversightMarker | null } {
-  const expectations = ownerExpectations(ctx);
-  const expectation = expectations[0] ?? null;
-  const marker = exactMarker(ctx, expectation ?? undefined);
-  const receipt = ownerFinalizationReceipts(ctx)[0] ?? null;
-  if (receipt) {
-    if (expectation && receipt.slug !== expectation.slug) throw new Error("finalization receipt disagrees with the owner expectation");
-    if (receipt.ownerSessionId !== ctx.sessionManager.getSessionId()) throw new Error("finalization receipt owner mismatch");
-    if (!marker) throw new Error("finalization receipt has no exact-session oversight marker");
+function matchingReceipt(receipts: FinalizationReceipt[], value: { slug: string; episodeId: string }): FinalizationReceipt | null {
+  return receipts.find((receipt) => receipt.slug === value.slug && receipt.episodeId === value.episodeId) ?? null;
+}
+function assertNoConflictingLifecycleState(ctx: ExtensionContext, expectation: EpisodeIdentity | null): void {
+  const receipts = ownerFinalizationReceipts(ctx);
+  const records = markerRecords(ctx);
+  for (const receipt of receipts) {
+    const record = markerForLocation(ctx, receipt.sourceLocation);
+    const marker = record?.marker ?? null;
+    if (receipt.state !== "completed") throw new Error(`terminal ${receipt.state} receipt must be reconciled before promotion`);
+    if (!marker || marker.status !== "inactive") throw new Error("completed receipt lacks its exact inactive marker");
     assertMarkerReceipt(marker, receipt);
-    if (receipt.state === "completed") {
-      if (expectation) throw new Error("completed finalization still has an ownership expectation");
-      if (marker.status !== "inactive") throw new Error("completed finalization requires an inactive marker");
-      return { expectation: null, marker };
-    }
-    if (receipt.state === "completing") throw new Error("episode finalization is completing; replay completion to reconcile it");
   }
+  for (const record of records) {
+    const value = record.marker ?? record.legacy!;
+    const sameExpectation = expectation?.slug === value.slug && expectation.episodeId === value.episodeId;
+    if (record.legacy) {
+      if (!sameExpectation) throw new Error("legacy owner marker requires exact expectation migration before promotion");
+      continue;
+    }
+    if (record.marker!.status === "active" && !sameExpectation) throw new Error("active marker has no matching current expectation");
+    if (record.marker!.status === "inactive" && !matchingReceipt(receipts, record.marker!)) {
+      throw new Error("inactive marker has no matching completed tombstone");
+    }
+  }
+}
+
+function resolveState(ctx: ExtensionContext): { expectation: EpisodeIdentity | null; marker: OversightMarker | null } {
+  const expectation = ownerExpectations(ctx)[0] ?? null;
+  const receipts = ownerFinalizationReceipts(ctx);
   if (expectation) {
     if (!episodeBootstrapReady(expectation)) throw new Error("owner episode expectation is not bootstrap-ready");
+    const record = markerForIdentity(ctx, expectation);
+    if (record?.legacy) throw new Error("legacy owner marker requires session-start migration");
+    const marker = record?.marker ?? null;
     if (!marker) throw new Error("owner episode expectation has no active oversight marker");
     assertAgreement(marker, expectation);
+    const receipt = matchingReceipt(receipts, expectation);
+    if (receipt) {
+      assertMarkerReceipt(marker, receipt);
+      if (receipt.state === "completed") throw new Error("completed finalization cannot coexist with a reappearing expectation");
+      if (receipt.state === "completing") throw new Error("episode finalization is completing; native recovery must reconcile it");
+    }
     if (marker.status !== "active") throw new Error("inactive oversight marker conflicts with a live expectation");
-  } else if (marker?.status === "active") throw new Error("active oversight marker has no durable expectation");
-  return { expectation, marker };
+    return { expectation, marker };
+  }
+  for (const receipt of receipts) {
+    const record = markerForLocation(ctx, receipt.sourceLocation);
+    if (!record?.marker) throw new Error("finalization receipt has no exact v2 marker");
+    assertMarkerReceipt(record.marker, receipt);
+    if (receipt.state !== "completed") throw new Error(`episode finalization is ${receipt.state}; native recovery must reconcile it`);
+    if (record.marker.status !== "inactive") throw new Error("completed finalization requires an inactive marker");
+  }
+  for (const record of markerRecords(ctx)) {
+    const value = record.marker ?? record.legacy!;
+    const receipt = matchingReceipt(receipts, value);
+    if (record.legacy) throw new Error("legacy owner marker has no live expectation for migration");
+    if (record.marker!.status === "active") throw new Error("active oversight marker has no durable expectation");
+    if (!receipt || receipt.state !== "completed") throw new Error("inactive oversight marker lacks a completed matching tombstone");
+  }
+  return { expectation: null, marker: null };
 }
 
 export function reconcileOversightAtSessionStart(pi: ExtensionAPI, ctx: ExtensionContext): void {
-  let expectations: EpisodeIdentity[];
-  try { expectations = ownerExpectations(ctx); } catch (error) { ctx.ui.notify(`prime-claw oversight recovery blocked: ${error instanceof Error ? error.message : String(error)}`, "error"); return; }
   try {
-    const expectation = expectations[0] ?? null;
-    const receipt = ownerFinalizationReceipts(ctx)[0] ?? null;
-    let marker = exactMarker(ctx, expectation ?? undefined);
-    if (receipt && !marker) {
-      const status = receipt.state === "completed" || (receipt.state === "completing" && !expectation) ? "inactive" : "active";
-      marker = markerFromReceipt(receipt, status);
-      pi.appendEntry(OVERSIGHT_MARKER_TYPE, marker);
-      const message = `Recovered ${status} oversight finalization state for ${receipt.sourceLocation} from its durable receipt.`;
-      ctx.ui.notify(message, "warning");
-      void pi.sendMessage({ customType: "prime-claw-oversight-recovery", content: message, display: true });
-    }
-    if (expectation && !marker) {
+    const expectation = ownerExpectations(ctx)[0] ?? null;
+    const receipts = ownerFinalizationReceipts(ctx);
+    if (expectation) {
       if (!episodeBootstrapReady(expectation)) throw new Error("owner episode expectation is not bootstrap-ready");
-      marker = markerFromIdentity(expectation, "active");
-      pi.appendEntry(OVERSIGHT_MARKER_TYPE, marker);
-      const message = `Recovered active oversight for ${expectation.sourceLocation} from the exact durable episode expectation.`;
-      ctx.ui.notify(message, "warning");
-      void pi.sendMessage({ customType: "prime-claw-oversight-recovery", content: message, display: true });
+      const existing = markerForIdentity(ctx, expectation);
+      if (existing?.legacy) {
+        if (existing.legacy.status !== "active") throw new Error("inactive legacy marker conflicts with a live expectation");
+        const migrated = markerFromIdentity(expectation, "active");
+        pi.appendEntry(OVERSIGHT_MARKER_TYPE, migrated);
+        const message = `Migrated legacy oversight for ${expectation.sourceLocation} to the exact v2 marker.`;
+        ctx.ui.notify(message, "warning");
+        void pi.sendMessage({ customType: "prime-claw-oversight-recovery", content: message, display: true });
+      } else if (!existing?.marker) {
+        const recovered = markerFromIdentity(expectation, "active");
+        pi.appendEntry(OVERSIGHT_MARKER_TYPE, recovered);
+        const message = `Recovered active oversight for ${expectation.sourceLocation} from the exact durable episode expectation.`;
+        ctx.ui.notify(message, "warning");
+        void pi.sendMessage({ customType: "prime-claw-oversight-recovery", content: message, display: true });
+      }
+    }
+    for (const receipt of receipts) {
+      let record = markerForLocation(ctx, receipt.sourceLocation);
+      if (!record?.marker) {
+        const status = receipt.state === "authorized" && expectation ? "active" : "inactive";
+        const recovered = markerFromReceipt(receipt, status);
+        pi.appendEntry(OVERSIGHT_MARKER_TYPE, recovered); record = { marker: recovered };
+        const message = `Recovered ${status} oversight finalization state for ${receipt.sourceLocation} from its durable receipt.`;
+        ctx.ui.notify(message, "warning");
+        void pi.sendMessage({ customType: "prime-claw-oversight-recovery", content: message, display: true });
+      }
     }
     resolveState(ctx);
   } catch (error) { ctx.ui.notify(`prime-claw oversight recovery blocked: ${error instanceof Error ? error.message : String(error)}`, "error"); }
@@ -340,8 +438,16 @@ export function applyConversationContext(event: {messages:unknown[]}, ctx: Exten
   } catch (error) { visibleFailure(ctx, error instanceof Error ? error.message : String(error)); }
 }
 export function currentOversightMarker(ctx: ExtensionContext): OversightMarker | null { return resolveState(ctx).marker; }
-export function currentOversightMarkerForFinalization(ctx: ExtensionContext): OversightMarker | null {
-  return exactMarker(ctx, ownerExpectations(ctx)[0]);
+export function currentOversightMarkerForFinalization(ctx: ExtensionContext, sourceLocation: string): OversightMarker | null {
+  return markerForLocation(ctx, sourceLocation)?.marker ?? null;
+}
+export function currentCompletingFinalization(ctx: ExtensionContext): { receipt: FinalizationReceipt; marker: OversightMarker } | null {
+  const receipt = ownerFinalizationReceipts(ctx).find((value) => value.state === "completing");
+  if (!receipt) return null;
+  const marker = markerForLocation(ctx, receipt.sourceLocation)?.marker;
+  if (!marker) throw new Error("completing receipt has no exact v2 marker");
+  assertMarkerReceipt(marker, receipt);
+  return { receipt, marker };
 }
 export function registerConversationOversight(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => reconcileOversightAtSessionStart(pi, ctx));

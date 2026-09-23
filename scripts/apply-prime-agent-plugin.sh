@@ -34,12 +34,28 @@ if [[ ! -s "$oversee_skill" ]]; then
 fi
 python3 "$repo_root/scripts/manage-prime-agent-append-system.py" validate "$kernel_source" "$destination_root/APPEND_SYSTEM.md"
 
+# Reject every unsafe managed TypeScript destination before the first delete or copy.
+managed_destinations=("${files[@]}" extensions/project-conversation.ts)
+for relative in "${managed_destinations[@]}"; do
+  destination="$destination_root/$relative"
+  if [[ -e "$destination" || -L "$destination" ]]; then
+    if [[ ! -f "$destination" || -L "$destination" ]]; then
+      printf 'unsafe managed plugin destination (expected absent or regular file): %s\n' "$destination" >&2
+      exit 1
+    fi
+  fi
+done
+
 mkdir -p "$destination_root/extensions" "$destination_root/extension-support"
 rm -f "$destination_root/extensions/project-conversation.ts"
 for relative in "${files[@]}"; do
   install -m 0644 "$source_root/$relative" "$destination_root/$relative"
 done
 python3 "$repo_root/scripts/manage-prime-agent-append-system.py" apply "$kernel_source" "$destination_root/APPEND_SYSTEM.md"
+
+# Installation is sequential, not an atomic generation swap. The required final
+# check detects any incomplete or mixed generation before apply reports success.
+"$repo_root/scripts/check-prime-agent-plugin.sh"
 
 printf 'prime-claw plugin applied: %s
 ' "$destination_root"

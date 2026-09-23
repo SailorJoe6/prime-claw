@@ -68,8 +68,16 @@ checks one managed CONVERSATION identity block in global `APPEND_SYSTEM.md`
 without overwriting unrelated user append content. APPEND updates hold a
 same-directory advisory lock across read/validate/write, reject unsafe symlink or
 malformed-marker destinations, preserve unmanaged bytes and file mode, fsync a
-unique temporary file, and atomically replace the destination. Repeated and
-concurrent applies converge byte-for-byte. The canonical project-local
+unique temporary file, and atomically replace the destination. Under the same
+lock, a later run removes only exact-pattern orphan temps whose writer PID is no
+longer alive; live-writer temps are preserved. SIGTERM/retry is tested, while an
+uncatchable interruption is reconciled on the next run rather than promised
+away. Repeated and concurrent applies converge byte-for-byte.
+
+TypeScript files are applied sequentially, not as one atomic generation swap.
+All destination types are preflighted before mutation and apply runs the required
+full check before reporting success, so a partial/mixed generation is detected
+and must not be activated. The canonical project-local
 `.ralph/skills/oversee-episode/SKILL.md` is preflighted but not globally copied.
 
 For an isolated test destination, set `PRIME_AGENT_PLUGIN_ROOT` to the directory

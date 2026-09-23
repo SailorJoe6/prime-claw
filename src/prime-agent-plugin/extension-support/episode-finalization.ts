@@ -1,14 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { PrimeSessionPublisher, parseEpisodeIdentity, type EpisodeIdentity, type SessionSummary } from "./spec-episode.ts";
+import { PrimeSessionPublisher, parseEpisodeIdentity, type EpisodeIdentity } from "./spec-episode.ts";
 import type { OversightDisposition, OversightMarker } from "./conversation-oversight.ts";
 
 const SAFE_LOCATION = /^\.ralph\/plans\/future\/([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 const RECEIPT_VERSION = 2;
 const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const SESSION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type FinalizationState = "authorized" | "completing" | "completed";
 
@@ -95,9 +96,28 @@ class NativeFinalizationDependencies implements FinalizationDependencies {
   readJson(path: string) { return JSON.parse(readFileSync(path, "utf8")); }
   writeJson(path: string, value: unknown) {
     mkdirSync(dirname(path), { recursive: true });
-    const temporary = `${path}.tmp-${process.pid}`;
-    writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
-    renameSync(temporary, path);
+    const lock = `${path}.lock`;
+    let lockFd: number | undefined;
+    let temporary: string | undefined;
+    try {
+      lockFd = openSync(lock, "wx", 0o600);
+      temporary = `${path}.tmp-${process.pid}-${Date.now()}`;
+      const valueFd = openSync(temporary, "wx", 0o600);
+      try {
+        writeFileSync(valueFd, `${JSON.stringify(value, null, 2)}\n`);
+        fsyncSync(valueFd);
+      } finally { closeSync(valueFd); }
+      renameSync(temporary, path);
+      temporary = undefined;
+      const directoryFd = openSync(dirname(path), "r");
+      try { fsyncSync(directoryFd); } finally { closeSync(directoryFd); }
+    } finally {
+      if (temporary) rmSync(temporary, { force: true });
+      if (lockFd !== undefined) {
+        closeSync(lockFd);
+        rmSync(lock, { force: true });
+      }
+    }
   }
   remove(path: string) { rmSync(path, { force: true }); }
   now() { return new Date().toISOString(); }
@@ -141,6 +161,7 @@ export function parseFinalizationReceipt(value: unknown): FinalizationReceipt {
       : !["handoff-pending", "handoff-uncertain", "execute-pending", "execute-rejected", "execute-uncertain", "delivered"].includes(String(data.admission)))
     || [...Object.keys(data)].some((key) => !allowed.has(key))
     || [...allowed].some((key) => !(key in data))
+    || !SESSION_UUID.test(String(data.episodeId))
     || !OBJECT_ID.test(String(data.episodeCommit))
     || !OBJECT_ID.test(String(data.targetCommitAtAuthorization))
     || data.targetRef !== `refs/heads/${data.targetBranch}`
@@ -162,7 +183,6 @@ function assertExactMarker(marker: OversightMarker, binding: {
   if (!marker || marker.markerVersion !== 2 || !permitted.includes(marker.status)
     || marker.ownerSessionId !== binding.ownerSessionId || marker.sourceLocation !== binding.sourceLocation
     || marker.slug !== binding.slug || marker.episodeId !== binding.episodeId
-    || marker.episodeActiveSessionId !== binding.episodeActiveSessionId
     || !samePath(marker.episodeSessionFile, binding.episodeSessionFile)
     || marker.branch !== (binding.episodeBranch ?? binding.branch)
     || !samePath(marker.worktree, binding.episodeWorktree ?? binding.worktree ?? "")
@@ -189,6 +209,14 @@ function receiptMatchesIdentity(value: FinalizationReceipt, record: EpisodeIdent
     && value.sessionName === record.sessionName && value.identityVersion === record.version
     && value.admission === (record.version === 1 ? record.executeAdmission : record.bootstrapAdmission);
 }
+function assertLifecycleShape(state: FinalizationState, identityExists: boolean, markerStatus: OversightMarker["status"]): void {
+  const exact = state === "authorized"
+    ? identityExists && markerStatus === "active"
+    : state === "completing"
+      ? (markerStatus === "active" || markerStatus === "inactive")
+      : !identityExists && markerStatus === "inactive";
+  if (!exact) throw new Error(`Finalization ${state} state does not match an exact recoverable crash boundary`);
+}
 function assertRequest(value: FinalizationReceipt, sourceLocation: string, slug: string,
   disposition: OversightDisposition, ownerSessionId: string): void {
   if (value.sourceLocation !== sourceLocation || value.slug !== slug || value.disposition !== disposition
@@ -210,18 +238,15 @@ export async function authorizeEpisodeFinalization(
     if (deps.exists(selected.receipt)) {
       const existing = parseFinalizationReceipt(deps.readJson(selected.receipt));
       assertRequest(existing, selected.sourceLocation, selected.slug, disposition, ctx.sessionManager.getSessionId());
-      if (existing.state === "authorized") {
+      const identityExists = deps.exists(selected.identity);
+      if (identityExists) {
         const existingIdentity = identity(deps.readJson(selected.identity));
         assertExactOwner(existingIdentity, ctx, selected.sourceLocation);
         if (!receiptMatchesIdentity(existing, existingIdentity)) throw new Error("Finalization receipt does not match the exact owned episode");
-        assertExactMarker(marker, existing, ["active"]);
-      } else {
-        if (deps.exists(selected.identity)) {
-          const existingIdentity = identity(deps.readJson(selected.identity));
-          if (!receiptMatchesIdentity(existing, existingIdentity)) throw new Error("Finalization receipt does not match the exact owned episode");
-        }
-        assertExactMarker(marker, existing, existing.state === "completed" ? ["inactive"] : ["active", "inactive"]);
       }
+      assertExactMarker(marker, existing, existing.state === "completed" ? ["inactive"]
+        : existing.state === "authorized" ? ["active"] : ["active", "inactive"]);
+      assertLifecycleShape(existing.state, identityExists, marker.status);
       return { receipt: existing, reused: true };
     }
     const record = identity(deps.readJson(selected.identity));
@@ -234,7 +259,7 @@ export async function authorizeEpisodeFinalization(
     const targetCommitAtAuthorization = deps.commit(selected.repo, `refs/heads/${targetBranch}`);
     const approved = await confirm(
       `Authorize ${disposition} episode finalization?`,
-      `Record the operator decision for ${selected.sourceLocation}. This performs no Git, session, worktree, branch, or cleanup mutation.`,
+      `Record the operator decision for ${selected.sourceLocation}. Target: ${targetBranch} (${`refs/heads/${targetBranch}`}) at ${targetCommitAtAuthorization}. Exact episode tip: ${episodeCommit}. This performs no Git, session, worktree, branch, or cleanup mutation.`,
     );
     if (!approved) throw new Error("Episode finalization authorization was cancelled");
     const value: FinalizationReceipt = {
@@ -255,13 +280,24 @@ function validateSessions(rows: unknown, authorization: FinalizationReceipt): vo
   if (!Array.isArray(rows)) throw new Error("Daemon session list is malformed");
   for (const raw of rows) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Daemon session row is malformed");
-    const row = raw as SessionSummary;
-    const id = nonempty(row.sessionId) ? row.sessionId : nonempty(row.id) ? row.id : undefined;
-    if (!id || !nonempty(row.sessionFile)) throw new Error("Daemon session row is partial or malformed");
-    const idMatch = id === authorization.episodeId;
-    const pathMatch = samePath(row.sessionFile, authorization.episodeSessionFile);
-    if (idMatch && pathMatch) throw new Error("Episode session is still addressable");
-    if (idMatch || pathMatch) throw new Error("Daemon session row partially matches the episode identity");
+    const data = raw as Record<string, unknown>;
+    const supplied = (key: "sessionId" | "id" | "activeSessionId" | "sessionFile") => Object.prototype.hasOwnProperty.call(data, key);
+    for (const key of ["sessionId", "id", "activeSessionId", "sessionFile"] as const) {
+      if (supplied(key) && !nonempty(data[key])) throw new Error(`Daemon session row has an invalid ${key}`);
+    }
+    const ids = [supplied("sessionId") ? data.sessionId as string : undefined, supplied("id") ? data.id as string : undefined]
+      .filter((value): value is string => value !== undefined);
+    if (ids.length === 0 || !supplied("sessionFile")) throw new Error("Daemon session row is partial or malformed");
+    if (ids.some((value) => !SESSION_UUID.test(value))) throw new Error("Daemon session row has an invalid session UUID");
+    if (new Set(ids).size !== 1) throw new Error("Daemon session row has conflicting sessionId/id fields");
+
+    const uuidMatch = ids[0] === authorization.episodeId;
+    const routeMatch = supplied("activeSessionId") && data.activeSessionId === authorization.episodeActiveSessionId;
+    const fileMatch = samePath(data.sessionFile as string, authorization.episodeSessionFile);
+    if (uuidMatch && routeMatch && fileMatch) throw new Error("Episode session is still addressable");
+    if (uuidMatch || routeMatch || fileMatch) {
+      throw new Error("Daemon session row partially or conflictingly matches the exact episode UUID, route, or file");
+    }
   }
 }
 function validateWorktrees(rows: unknown, authorization: FinalizationReceipt): void {
@@ -310,18 +346,17 @@ export async function completeEpisodeFinalization(
     const selected = parseLocation(ctx.cwd, rawLocation, deps);
     let authorization = parseFinalizationReceipt(deps.readJson(selected.receipt));
     assertRequest(authorization, selected.sourceLocation, selected.slug, disposition, ctx.sessionManager.getSessionId());
-    if (authorization.state === "completed") {
-      assertExactMarker(marker, authorization, ["inactive"]);
-      return authorization;
-    }
-    if (deps.exists(selected.identity)) {
+    const identityExists = deps.exists(selected.identity);
+    if (identityExists) {
       const record = identity(deps.readJson(selected.identity));
       assertExactOwner(record, ctx, selected.sourceLocation);
       if (!receiptMatchesIdentity(authorization, record)) throw new Error("Finalization receipt does not match the exact owned episode");
-    } else if (authorization.state === "authorized") {
-      throw new Error("Episode identity is missing before completion began");
     }
-    assertExactMarker(marker, authorization, authorization.state === "authorized" ? ["active"] : ["active", "inactive"]);
+    assertExactMarker(marker, authorization, authorization.state === "completed" ? ["inactive"]
+      : authorization.state === "authorized" ? ["active"] : ["active", "inactive"]);
+    assertLifecycleShape(authorization.state, identityExists, marker.status);
+    if (authorization.state === "completed") return authorization;
+
     await validateTerminalFacts(selected, authorization, disposition, deps);
 
     if (authorization.state === "authorized") {
@@ -336,4 +371,31 @@ export async function completeEpisodeFinalization(
   } catch (error) {
     throw new Error(`Finalization is blocked with durable recovery evidence preserved: ${error instanceof Error ? error.message : String(error)}`);
   } finally { deps.close(); }
+}
+
+export async function recoverCompletingEpisodeFinalization(
+  ctx: ExtensionContext,
+  appendTransition: (status: "inactive", marker: OversightMarker) => void,
+  marker: OversightMarker,
+  supplied?: FinalizationDependencies,
+): Promise<FinalizationReceipt | null> {
+  const deps = supplied ?? new NativeFinalizationDependencies();
+  let delegated = false;
+  try {
+    const selected = parseLocation(ctx.cwd, marker.sourceLocation, deps);
+    if (!deps.exists(selected.receipt)) return null;
+    const receipt = parseFinalizationReceipt(deps.readJson(selected.receipt));
+    if (receipt.state !== "completing") return null;
+    delegated = true;
+    return await completeEpisodeFinalization(
+      marker.sourceLocation,
+      receipt.disposition,
+      ctx,
+      appendTransition,
+      marker,
+      deps,
+    );
+  } finally {
+    if (!delegated) deps.close();
+  }
 }

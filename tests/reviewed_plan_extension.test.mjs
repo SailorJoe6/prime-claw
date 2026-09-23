@@ -437,19 +437,20 @@ test("successful create activates exact owner oversight without unsolicited mess
   assert.deepEqual(markers[0].data, {
     markerVersion: 2, status: "active", ownerSessionId: "owner-session",
     slug: "alpha-plan", sourceLocation: LOCATION, episodeId: "episode-id",
-    episodeActiveSessionId: "active-id", episodeSessionFile: episode.episodeSessionFile,
+    episodeSessionFile: episode.episodeSessionFile,
     branch: "episode/alpha-plan", worktree: episode.worktree,
     sessionName: "alpha-plan-episode", identityVersion: 2, admission: "delivered",
   });
 });
 
-test("registered finalization capability confirms once and replays durable completion", async (t) => {
+test("registered finalization capability confirms once, recovers natively, and replays durable completion", async (t) => {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-finalize-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  writeSkill(cwd, "---\nname: oversee-episode\n---\nprocedure", "oversee-episode");
   const state = join(cwd, ".prime/agent/state/spec-episodes"); mkdirSync(state, { recursive: true });
   const worktree = resolve(dirname(cwd), `${basename(cwd)}-alpha-plan-episode`);
   const identity = { version: 2, slug: "alpha-plan", sourceLocation: LOCATION,
-    ownerSessionId: "owner-session", episodeId: "episode-id", episodeActiveSessionId: "route",
+    ownerSessionId: "owner-session", episodeId: "33333333-3333-4333-8333-333333333333", episodeActiveSessionId: "route",
     episodeSessionFile: join(cwd, "episode.jsonl"), branch: "episode/alpha-plan", worktree,
     sessionName: "alpha-plan-episode", bootstrapAdmission: "delivered" };
   const identityPath = join(state, "alpha-plan.json"); writeFileSync(identityPath, JSON.stringify(identity));
@@ -466,17 +467,53 @@ test("registered finalization capability confirms once and replays durable compl
   const f = createHarness(cwd, createReviewedPlanExtension({ finalization }));
   f.entries.push({ type: "custom", customType: "prime-claw-conversation-oversight", data: {
     markerVersion: 2, status: "active", ownerSessionId: "owner-session", slug: "alpha-plan",
-    sourceLocation: LOCATION, episodeId: "episode-id", episodeActiveSessionId: "route",
+    sourceLocation: LOCATION, episodeId: "33333333-3333-4333-8333-333333333333",
     episodeSessionFile: join(cwd, "episode.jsonl"), branch: "episode/alpha-plan", worktree,
     sessionName: "alpha-plan-episode", identityVersion: 2, admission: "delivered",
   } });
   const tool = f.tools.get("finalize_spec_episode");
   const authorized = await tool.execute("auth", { phase: "authorize", location: LOCATION, disposition: "merged" }, undefined, undefined, f.ctx);
   assert.equal(authorized.isError, undefined); assert.equal(f.confirmations.length, 1);
-  const completed = await tool.execute("complete", { phase: "complete", location: LOCATION, disposition: "merged" }, undefined, undefined, f.ctx);
-  assert.equal(completed.isError, undefined); assert.equal(f.entries.at(-1).data.status, "inactive"); assert.equal(existsSync(identityPath), false);
+  assert.match(f.confirmations[0].message, /Target: main \(refs\/heads\/main\)/);
+  assert.match(f.confirmations[0].message, /Exact episode tip: a{40}/);
+
+  const receiptPath = join(state, "alpha-plan.finalization.json");
+  const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+  writeFileSync(receiptPath, JSON.stringify({ ...receipt, state: "completing", completingAt: "2026-01-01T00:00:01.000Z" }));
+  const messageCount = f.messages.length;
+  await f.events.get("session_start")({}, f.ctx);
+  assert.equal(JSON.parse(readFileSync(receiptPath, "utf8")).state, "completed");
+  assert.equal(f.entries.at(-1).data.status, "inactive");
+  assert.equal(existsSync(identityPath), false);
+  assert.equal(f.messages.length, messageCount, "session-start recovery must not queue a provider call");
+
+  const betaLocation = ".ralph/plans/future/beta";
+  const betaWorktree = resolve(dirname(cwd), `${basename(cwd)}-beta-episode`);
+  const beta = { ...identity, slug: "beta", sourceLocation: betaLocation, episodeId: "episode-beta",
+    episodeActiveSessionId: "route-beta", episodeSessionFile: join(cwd, "beta.jsonl"),
+    branch: "episode/beta", worktree: betaWorktree, sessionName: "beta-episode" };
+  writeFileSync(join(state, "beta.json"), JSON.stringify(beta));
+  f.entries.push({ type: "custom", customType: "prime-claw-conversation-oversight", data: {
+    markerVersion: 2, status: "active", ownerSessionId: "owner-session", slug: "beta",
+    sourceLocation: betaLocation, episodeId: "episode-beta", episodeSessionFile: beta.episodeSessionFile,
+    branch: "episode/beta", worktree: betaWorktree, sessionName: "beta-episode",
+    identityVersion: 2, admission: "delivered",
+  } });
   const replay = await tool.execute("replay", { phase: "complete", location: LOCATION, disposition: "merged" }, undefined, undefined, f.ctx);
   assert.equal(replay.isError, undefined); assert.equal(f.confirmations.length, 1);
+  const laterContext = await f.events.get("context")({ messages: [] }, f.ctx);
+  assert.equal(laterContext.messages.filter((message) => message.customType === "prime-claw-oversee-episode-package").length, 1);
+});
+
+test("registered actual handoff reopen refresh preserves ordinary owner oversight", async (t) => {
+  const cwd=realpathSync(mkdtempSync(join(tmpdir(),"prime-claw-reviewed-plan-route-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
+  mkdirSync(join(cwd,LOCATION),{recursive:true});writeSkill(cwd,"---\nname: oversee-episode\n---\nprocedure","oversee-episode");
+  const slug="alpha-plan",worktree=resolve(dirname(cwd),`${basename(cwd)}-${slug}-episode`);t.after(()=>rmSync(worktree,{recursive:true,force:true}));mkdirSync(worktree,{recursive:true});writeSkill(worktree,"handoff","handoff");writeSkill(worktree,"execute","execute");
+  const state=join(cwd,".prime/agent/state/spec-episodes");mkdirSync(state,{recursive:true});let identity={version:2,slug,sourceLocation:LOCATION,ownerSessionId:"owner-session",episodeId:"33333333-3333-4333-8333-333333333333",episodeActiveSessionId:"old-route",episodeSessionFile:join(cwd,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"};const identityPath=join(state,`${slug}.json`);writeFileSync(identityPath,JSON.stringify(identity));
+  const publisher={async list(){return[{sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:false}]},async reopen(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile}},async getState(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:true,isStreaming:false,isCompacting:false,isBashRunning:false,isRunningTools:false,hasRunningRlmChildren:false,unfinishedActionCount:0,sessionActions:{queuedCount:0,steering:[],followUps:[]}}},async deliverHandoff(){},close(){}};
+  const dependencies={git:{repositoryRoot(){return cwd},hasBranch(){return true},worktrees(){return[{path:worktree,branch:identity.branch}]}},filesystem:{readIdentity(){return identity},writeIdentity(_path,value){identity=value;writeFileSync(identityPath,JSON.stringify(value))},exists(){return true}},publisher};
+  const f=createHarness(cwd,createReviewedPlanExtension(dependencies));f.entries.push({type:"custom",customType:"prime-claw-conversation-oversight",data:{markerVersion:2,status:"active",ownerSessionId:"owner-session",slug,sourceLocation:LOCATION,episodeId:identity.episodeId,episodeSessionFile:identity.episodeSessionFile,branch:identity.branch,worktree,sessionName:identity.sessionName,identityVersion:2,admission:"delivered"}});
+  const result=await f.tools.get("handoff_spec_episode").execute("handoff",{location:LOCATION,guidance:""},undefined,undefined,f.ctx);assert.equal(result.isError,undefined);assert.equal(identity.episodeActiveSessionId,"new-route");const context=await f.events.get("context")({messages:[]},f.ctx);assert.equal(context.messages.filter(m=>m.customType==="prime-claw-oversee-episode-package").length,1);
 });
 
 test("owner handoff tool requires a durable identity for the exact location", async (t) => {
