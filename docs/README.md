@@ -43,6 +43,9 @@ prime-claw builds on four prior projects. Read these before designing:
 - [lab-global-plugin.md](lab-global-plugin.md) — manual POC installation,
   refresh, and verification of the shared prime-claw plugin on the personal lab
   machine.
+- [conversation-driven-episode-oversight.md](conversation-driven-episode-oversight.md)
+  — explicit `PROJECT_CONVERSATION` launch, exact-session role persistence,
+  startup preparation, system-prompt behavior, and authority boundaries.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)

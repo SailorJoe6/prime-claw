@@ -6,6 +6,7 @@ source_root="$repo_root/src/prime-agent-plugin"
 destination_root="${PRIME_AGENT_PLUGIN_ROOT:-${HOME:?HOME must be set}/.prime/agent}"
 files=(
   extensions/handoff-chain.ts
+  extensions/project-conversation.ts
   extensions/reviewed-plan.ts
   extension-support/handoff-prompts.ts
   extension-support/reviewed-plan-support.ts

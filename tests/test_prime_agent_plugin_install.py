@@ -13,6 +13,7 @@ APPLY = REPO / "scripts" / "apply-prime-agent-plugin.sh"
 CHECK = REPO / "scripts" / "check-prime-agent-plugin.sh"
 FILES = (
     "extensions/handoff-chain.ts",
+    "extensions/project-conversation.ts",
     "extensions/reviewed-plan.ts",
     "extension-support/handoff-prompts.ts",
     "extension-support/reviewed-plan-support.ts",

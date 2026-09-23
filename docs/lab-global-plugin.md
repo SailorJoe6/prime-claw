@@ -12,6 +12,7 @@ project extension discovery path:
 src/prime-agent-plugin/
   extensions/
     handoff-chain.ts
+    project-conversation.ts
     reviewed-plan.ts
   extension-support/
     handoff-prompts.ts
@@ -25,6 +26,7 @@ The installed copy preserves the inner relative layout under
 ```text
 extensions/
   handoff-chain.ts
+  project-conversation.ts
   reviewed-plan.ts
 extension-support/
   handoff-prompts.ts
@@ -54,7 +56,7 @@ scripts/apply-prime-agent-plugin.sh
 scripts/check-prime-agent-plugin.sh
 ```
 
-The apply script copies only the five allowlisted prime-claw files. It does not
+The apply script copies only the six allowlisted prime-claw files. It does not
 remove or overwrite unrelated global extensions. The check script verifies that
 all five installed files match the inert builder source byte-for-byte and that
 this repository has no project-local plugin tree.
@@ -86,6 +88,10 @@ Expected native commands:
 - `/handoff`
 - `/plan`
 - `/implement-spec`
+
+Expected explicit role flag:
+
+- `--project-conversation`
 
 Expected structured tools:
 

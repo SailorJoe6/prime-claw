@@ -53,12 +53,13 @@ resident-session profile resource that a durable sibling launcher can select.
 Its example `.prime/agent/agents/*.md` convention belongs to an optional
 subprocess-agent extension and is not automatically applied to daemon siblings.
 
-Implement the first release with these narrow project-plugin resources:
+Implement the first release with one inert global-plugin source and one
+project-local profile resource:
 
 - `.prime/agent/profiles/project-conversation.md` contains the short role
   invariants from the specification, including running the existing project
   `prepare` skill before substantive work;
-- `.prime/agent/extensions/project-conversation.ts` registers the explicit
+- `src/prime-agent-plugin/extensions/project-conversation.ts` registers the explicit
   boolean launch flag `--project-conversation`;
 - explicit assignment appends one versioned custom session entry containing
   `role: "PROJECT_CONVERSATION"` and the exact assigned session ID;
@@ -172,9 +173,11 @@ remains ordinary, while existing discussion, `/spec-it-out`, `/plan`, and
 
 1. Add `.prime/agent/profiles/project-conversation.md` with only the stable
    invariants enumerated by the specification.
-2. Add `.prime/agent/extensions/project-conversation.ts` implementing the
-   explicit flag, versioned session-local marker, exact-session restoration,
+2. Add `src/prime-agent-plugin/extensions/project-conversation.ts` implementing
+   the explicit flag, versioned session-local marker, exact-session restoration,
    fail-closed profile loading, and chained `before_agent_start` prompt overlay.
+   Add it to the existing explicit global-plugin apply/check allowlist; never
+   create a duplicate project-local extension entry point.
 3. Add focused behavioral coverage in
    `tests/project_conversation_extension.test.mjs` for:
    - extension factory and flag registration;
@@ -190,7 +193,9 @@ remains ordinary, while existing discussion, `/spec-it-out`, `/plan`, and
    - missing-profile failure without silent role loss.
 4. Add a narrow source/resource contract test in
    `tests/test_project_conversation_extension.py` so packaging or path changes
-   cannot omit the profile or turn it into an ordinary prompt template.
+   cannot omit the profile or turn it into an ordinary prompt template. Extend
+   `tests/test_prime_agent_plugin_install.py` so apply/check coverage includes
+   the new inert extension source.
 5. Add `docs/conversation-driven-episode-oversight.md` describing explicit
    launch, startup preparation, identity binding, system-prompt behavior, the
    existing conversational compatibility surface, and the separation between
@@ -201,9 +206,10 @@ remains ordinary, while existing discussion, `/spec-it-out`, `/plan`, and
 
 - Run the new Node and Python tests plus the existing reviewed-plan and episode
   extension tests.
-- Start a disposable session with the flag, observe the role marker and
-  effective prompt through the extension test harness, then verify a simulated
-  fork does not activate it.
+- Apply and check the complete user-global plugin with the repository scripts,
+  then start a fresh disposable process with the flag. Observe the role marker
+  and effective prompt through the extension test harness, then verify a
+  simulated fork does not activate it.
 - Append the exact test results and commit to `prime-claw-h6w.22`.
 - Commit as one reviewable slice and push the episode branch. Suggested commit:
   `feat: add explicit project conversation role`.
@@ -357,7 +363,8 @@ for ordinary project conversation without touching the canonical checkout.
   requirement.
 - Run the full repository gates:
   - `node --test tests/*.test.mjs`
-  - `pytest -q`
+  - `pytest -q tests` (the active project suite; do not collect historical
+    tests under `scripts/archive/phase1/tests`)
   - `git diff --check`
   - relative-link validation used by the existing documentation tests.
 - Append final evidence to `prime-claw-h6w.22`; close it only when all acceptance
