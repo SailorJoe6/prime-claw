@@ -345,14 +345,44 @@ with 11 existing warnings. User-global apply/check passed, and a fresh builder-r
 process observed the installed generation with kernel/package `1/0`. `git diff --check`
 passed.
 
-B2–B4 remain deliberately incomplete and outside this commit. Preserve the
-unstaged B2 import-only change in `episode-finalization.ts` and the unstaged,
-unintegrated B4 fake-daemon fixture in `tests/test_reviewed_plan_extension.py`.
-The next P0 is B2 lock reliability, followed by B3 bounded scalar grammar and B4
-native isolation/cleanup. Do not touch shared handoff scheduling, quiescence,
-Slice 2, owner checkout, credentials, or retired leaked sessions.
+### B2 lock reliability evidence
 
-Slice 2 remains blocked until this exact replacement commit is accepted.
+The finalization lock now performs an exact JSON startup handshake for `ready`,
+`contended`, and `fatal` states. It validates the immediate parent and existing
+lock-object type, uses `O_NOFOLLOW` plus `fstat` in the helper, retries only
+confirmed flock contention, and surfaces spawn, Python/`fcntl`, permission, path,
+and protocol failures. Acquisition uses a monotonic 10-second default deadline
+and accepts an `AbortSignal`; the registered finalization tool passes its native
+signal through authorization and completion, while startup recovery remains
+bounded by the default deadline.
+
+A native held-lock handle detects unexpected helper exit, races asynchronous
+terminal validation against holder loss, checks ownership before every later
+durable lifecycle mutation, and uses bounded EOF/SIGTERM/SIGKILL release cleanup.
+Timeout and cancellation terminate their invocation-owned helper before returning.
+Contenders never unlink the persistent lock object or signal a live holder. The
+existing complete transaction reread/revalidation and delayed-winner semantics
+remain intact.
+
+Focused finalization plus registered-tool coverage passed 44 tests. It covers
+directory, symlink, symlink-parent, regular-file parent, inaccessible path,
+missing helper, missing-`fcntl` fatal protocol, stale regular files, live
+contention success, timeout, pre-abort and in-flight cancellation, post-cancel
+reacquisition, native completing recovery after contention, unexpected holder
+loss with zero later writes, cancellation with receipt/identity/marker evidence
+preserved, tool-signal plumbing, and SIGTERM/dead-holder release. Full gates
+passed 123 Node tests and 278 Python tests plus seven subtests with 11 existing
+warnings. User-global apply/check passed. A fresh installed-module process
+acquired/released a stale regular lock and rejected a directory lock immediately;
+a fresh builder-rooted Prime process observed kernel/package `1/0`.
+
+B3 and B4 remain deliberately incomplete and outside this commit. Preserve the
+unstaged, unintegrated B4 fake-daemon fixture in
+`tests/test_reviewed_plan_extension.py`. The next P0 is B3 bounded scalar grammar,
+followed by B4 native isolation/cleanup. Do not touch shared handoff scheduling,
+quiescence, Slice 2, owner checkout, credentials, or retired leaked sessions.
+
+Slice 2 remains blocked until the repaired Slice 1 exact commit is accepted.
 
 ## Slice 2 — Project-customizable oversight and owner-driven continuation
 

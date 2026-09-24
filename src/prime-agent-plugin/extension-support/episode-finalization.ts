@@ -1,4 +1,4 @@
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { accessSync, closeSync, constants as fsConstants, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -50,49 +50,259 @@ export interface FinalizationDependencies {
   writeJson(path: string, value: unknown): void;
   remove(path: string): void;
   now(): string;
-  acquireLock(path: string): Promise<() => Promise<void>>;
+  acquireLock(path: string, options?: FinalizationLockOptions): Promise<FinalizationLockHandle | (() => Promise<void>)>;
 }
 
+export type FinalizationLockHandle = (() => Promise<void>) & {
+  assertHeld(): void;
+  lost: Promise<Error>;
+  release(): Promise<void>;
+};
+
+export type FinalizationLockOptions = {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  pythonExecutable?: string;
+};
+
+type LockAttempt =
+  | { state: "ready"; child: ChildProcessWithoutNullStreams }
+  | { state: "contended"; child: ChildProcessWithoutNullStreams };
+
 const LOCK_RETRY_MS = 20;
+const LOCK_TIMEOUT_MS = 10_000;
+const LOCK_HELPER_SCRIPT = String.raw`import json, os, stat, sys
+try:
+    import fcntl
+    flags = os.O_CREAT | os.O_RDWR
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(sys.argv[1], flags, 0o600)
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        raise OSError("lock object is not a regular file")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        print(json.dumps({"state":"contended"}), flush=True)
+        sys.exit(75)
+except Exception as error:
+    print(json.dumps({"state":"fatal","error":f"{type(error).__name__}: {error}"}), flush=True)
+    sys.exit(70)
+print(json.dumps({"state":"ready"}), flush=True)
+sys.stdin.buffer.read()
+os.close(fd)`;
+
+function assertLockPathReady(path: string): void {
+  const parent = dirname(path);
+  mkdirSync(parent, { recursive: true });
+  const parentStat = lstatSync(parent);
+  if (!parentStat.isDirectory() || parentStat.isSymbolicLink()) {
+    throw new Error(`Finalization lock parent is not a real directory: ${parent}`);
+  }
+  accessSync(parent, fsConstants.R_OK | fsConstants.W_OK | fsConstants.X_OK);
+  if (!existsSync(path)) return;
+  const lockStat = lstatSync(path);
+  if (lockStat.isSymbolicLink() || !lockStat.isFile()) {
+    throw new Error(`Finalization lock object is not a regular file: ${path}`);
+  }
+  accessSync(path, fsConstants.R_OK | fsConstants.W_OK);
+}
+
+function lockWaitError(kind: "cancelled" | "timed out", path: string): Error {
+  return new Error(`Finalization lock acquisition ${kind}: ${path}`);
+}
+
+function waitForChildExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<boolean> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+  return new Promise<boolean>((resolveExit) => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.removeListener("exit", onExit);
+      resolveExit(value);
+    };
+    const onExit = () => finish(true);
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    child.once("exit", onExit);
+    if (child.exitCode !== null || child.signalCode !== null) finish(true);
+  });
+}
+
+async function terminateLockHelper(child: ChildProcessWithoutNullStreams): Promise<void> {
+  child.stdin.destroy();
+  if (await waitForChildExit(child, 100)) return;
+  child.kill("SIGTERM");
+  if (await waitForChildExit(child, 500)) return;
+  child.kill("SIGKILL");
+  if (!await waitForChildExit(child, 500)) throw new Error("Finalization lock helper could not be terminated");
+}
+
+function heldNativeLock(child: ChildProcessWithoutNullStreams, path: string): FinalizationLockHandle {
+  let releasing = false;
+  let releasePromise: Promise<void> | null = null;
+  let loss: Error | null = null;
+  let resolveLost!: (error: Error) => void;
+  const lost = new Promise<Error>((resolveLoss) => { resolveLost = resolveLoss; });
+  const recordLoss = (detail: string) => {
+    if (releasing || loss) return;
+    loss = new Error(`Finalization lock helper was lost while holding ${path}: ${detail}`);
+    resolveLost(loss);
+  };
+  child.once("error", (error) => recordLoss(error.message));
+  child.once("exit", (code, signal) => recordLoss(String(code ?? signal ?? "unknown exit")));
+  if (child.exitCode !== null || child.signalCode !== null) recordLoss(String(child.exitCode ?? child.signalCode));
+  const assertHeld = () => {
+    if (loss) throw loss;
+    if (child.exitCode !== null || child.signalCode !== null) {
+      recordLoss(String(child.exitCode ?? child.signalCode));
+      throw loss ?? new Error(`Finalization lock helper was lost while holding ${path}`);
+    }
+  };
+  const release = async () => {
+    if (releasePromise) return releasePromise;
+    releasePromise = (async () => {
+      let priorLoss = loss;
+      try { assertHeld(); } catch (error) { priorLoss = error instanceof Error ? error : new Error(String(error)); }
+      releasing = true;
+      if (child.exitCode === null && child.signalCode === null) child.stdin.end();
+      if (!await waitForChildExit(child, 500)) await terminateLockHelper(child);
+      child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
+      if (priorLoss) throw priorLoss;
+    })();
+    return releasePromise;
+  };
+  return Object.assign(release, { lost, assertHeld, release });
+}
+
+function normalizeLockHandle(value: FinalizationLockHandle | (() => Promise<void>)): FinalizationLockHandle {
+  if ("assertHeld" in value && "lost" in value && "release" in value) return value as FinalizationLockHandle;
+  const release = value;
+  return Object.assign(release, { assertHeld() {}, lost: new Promise<Error>(() => {}), release });
+}
+
+async function whileLockHeld<T>(lock: FinalizationLockHandle, work: Promise<T>): Promise<T> {
+  const value = await Promise.race([work, lock.lost.then((error) => { throw error; })]);
+  lock.assertHeld();
+  return value;
+}
+
+async function startLockAttempt(
+  path: string,
+  pythonExecutable: string,
+  signal: AbortSignal | undefined,
+  remainingMs: number,
+): Promise<LockAttempt> {
+  const child: ChildProcessWithoutNullStreams = spawn(
+    pythonExecutable,
+    ["-c", LOCK_HELPER_SCRIPT, path],
+    { stdio: ["pipe", "pipe", "pipe"] },
+  );
+  try {
+    return await new Promise<LockAttempt>((resolveAttempt, rejectAttempt) => {
+      let settled = false;
+      let stdout = "";
+      let stderr = "";
+      const timer = setTimeout(() => fail(lockWaitError("timed out", path), true), remainingMs);
+      const onAbort = () => fail(lockWaitError("cancelled", path), true);
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        child.removeListener("error", onError);
+        child.removeListener("close", onClose);
+        child.stdout.removeListener("data", onStdout);
+        child.stderr.removeListener("data", onStderr);
+      };
+      const fail = (error: Error, terminate = false) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (terminate && child.exitCode === null && child.signalCode === null) child.kill("SIGTERM");
+        child.stdin.destroy();
+        child.stdout.destroy();
+        child.stderr.destroy();
+        rejectAttempt(error);
+      };
+      const finish = (value: LockAttempt) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolveAttempt(value);
+      };
+      const parseLine = () => {
+        const newline = stdout.indexOf("\n");
+        if (newline < 0 || settled) return;
+        const line = stdout.slice(0, newline);
+        let message: { state?: unknown; error?: unknown };
+        try { message = JSON.parse(line) as { state?: unknown; error?: unknown }; }
+        catch { return fail(new Error(`Finalization lock helper returned invalid startup output: ${line}`), true); }
+        if (message.state === "ready") return finish({ state: "ready", child });
+        if (message.state === "contended") return finish({ state: "contended", child });
+        if (message.state === "fatal" && typeof message.error === "string") {
+          return fail(new Error(`Finalization lock helper failed: ${message.error}`));
+        }
+        return fail(new Error(`Finalization lock helper returned an unknown startup state: ${line}`), true);
+      };
+      const onStdout = (chunk: Buffer | string) => { stdout += String(chunk); parseLine(); };
+      const onStderr = (chunk: Buffer | string) => { if (stderr.length < 4096) stderr += String(chunk).slice(0, 4096 - stderr.length); };
+      const onError = (error: Error) => fail(new Error(`Finalization lock helper could not start: ${error.message}`));
+      const onClose = (code: number | null, exitSignal: NodeJS.Signals | null) => {
+        if (!settled) fail(new Error(`Finalization lock helper exited before readiness (${code ?? exitSignal ?? "unknown"})${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
+      };
+      child.on("error", onError);
+      child.on("close", onClose);
+      child.stdout.on("data", onStdout);
+      child.stderr.on("data", onStderr);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) onAbort();
+    });
+  } catch (error) {
+    await terminateLockHelper(child);
+    throw error;
+  }
+}
 
 /**
- * Hold a BSD lockf advisory lock in a helper whose stdin is owned by this
- * process. The kernel releases the lock if either process exits, including an
- * ungraceful owner termination. The lock file may remain, but it is not
- * ownership evidence and is never unlinked by contenders.
+ * Hold a crash-released advisory flock in a helper whose stdin is owned by this
+ * process. A stale regular lock file is harmless. Contenders never unlink it or
+ * signal another holder. Only an explicit contention response is retried;
+ * invalid paths, unsupported Python/flock runtimes, helper failures, timeout,
+ * and cancellation fail visibly.
  */
-export async function acquireNativeFinalizationLock(path: string): Promise<() => Promise<void>> {
-  mkdirSync(dirname(path), { recursive: true });
+export async function acquireNativeFinalizationLock(
+  path: string,
+  options: FinalizationLockOptions = {},
+): Promise<FinalizationLockHandle> {
+  const timeoutMs = options.timeoutMs ?? LOCK_TIMEOUT_MS;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("Finalization lock timeout must be a positive finite number");
+  assertLockPathReady(path);
+  const monotonicMs = () => Number(process.hrtime.bigint() / 1_000_000n);
+  const deadline = monotonicMs() + timeoutMs;
   for (;;) {
-    const lockScript = "import fcntl,sys; f=open(sys.argv[1],'a+b'); fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB); print('ready',flush=True); sys.stdin.buffer.read()";
-    const child: ChildProcessWithoutNullStreams = spawn(
-      "python3",
-      ["-c", lockScript, path],
-      { stdio: ["pipe", "pipe", "pipe"] },
-    );
-    const acquired = await new Promise<boolean>((resolveReady, rejectReady) => {
+    if (options.signal?.aborted) throw lockWaitError("cancelled", path);
+    const remaining = deadline - monotonicMs();
+    if (remaining <= 0) throw lockWaitError("timed out", path);
+    const attempt = await startLockAttempt(path, options.pythonExecutable ?? "python3", options.signal, remaining);
+    if (attempt.state === "ready") return heldNativeLock(attempt.child, path);
+    await terminateLockHelper(attempt.child);
+    const retryRemaining = deadline - monotonicMs();
+    if (retryRemaining <= 0) throw lockWaitError("timed out", path);
+    await new Promise<void>((resolveRetry, rejectRetry) => {
       let settled = false;
-      const settle = (value: boolean) => { if (!settled) { settled = true; resolveReady(value); } };
-      child.once("error", (error) => { if (!settled) { settled = true; rejectReady(error); } });
-      child.once("exit", () => settle(false));
-      child.stdout.once("data", (chunk) => settle(String(chunk).includes("ready")));
-    });
-    if (acquired) {
-      let released = false;
-      return async () => {
-        if (released) return;
-        released = true;
-        await new Promise<void>((resolveExit) => {
-          if (child.exitCode !== null || child.signalCode !== null) return resolveExit();
-          child.once("exit", () => resolveExit());
-          child.stdin.end();
-        });
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(wait);
+        options.signal?.removeEventListener("abort", onAbort);
+        if (error) rejectRetry(error); else resolveRetry();
       };
-    }
-    child.stdin.destroy();
-    child.stdout.destroy();
-    child.stderr.destroy();
-    await new Promise((resolveRetry) => setTimeout(resolveRetry, LOCK_RETRY_MS));
+      const onAbort = () => finish(lockWaitError("cancelled", path));
+      const wait = setTimeout(() => finish(), Math.min(LOCK_RETRY_MS, retryRemaining));
+      options.signal?.addEventListener("abort", onAbort, { once: true });
+      if (options.signal?.aborted) onAbort();
+    });
   }
 }
 
@@ -158,7 +368,7 @@ class NativeFinalizationDependencies implements FinalizationDependencies {
   }
   remove(path: string) { rmSync(path, { force: true }); }
   now() { return new Date().toISOString(); }
-  acquireLock(path: string) { return acquireNativeFinalizationLock(path); }
+  acquireLock(path: string, options?: FinalizationLockOptions) { return acquireNativeFinalizationLock(path, options); }
 }
 
 function paths(repo: string, slug: string) {
@@ -268,6 +478,7 @@ export async function authorizeEpisodeFinalization(
   confirm: (title: string, message: string) => Promise<boolean>,
   marker: OversightMarker,
   supplied?: FinalizationDependencies,
+  lockOptions?: FinalizationLockOptions,
 ): Promise<{ receipt: FinalizationReceipt; reused: boolean }> {
   const deps = supplied ?? new NativeFinalizationDependencies();
   try {
@@ -291,7 +502,7 @@ export async function authorizeEpisodeFinalization(
     };
 
     let value: FinalizationReceipt;
-    let release = await deps.acquireLock(lockPath);
+    let lock = normalizeLockHandle(await deps.acquireLock(lockPath, lockOptions));
     try {
       const existing = existingResult(); if (existing) return existing;
       const record = identity(deps.readJson(selected.identity));
@@ -311,7 +522,8 @@ export async function authorizeEpisodeFinalization(
         episodeCommit, targetBranch, targetRef: `refs/heads/${targetBranch}`, targetCommitAtAuthorization,
         authorizedAt: deps.now(),
       };
-    } finally { await release(); }
+      lock.assertHeld();
+    } finally { await lock.release(); }
 
     const approved = await confirm(
       `Authorize ${disposition} episode finalization?`,
@@ -319,7 +531,7 @@ export async function authorizeEpisodeFinalization(
     );
     if (!approved) throw new Error("Episode finalization authorization was cancelled");
 
-    release = await deps.acquireLock(lockPath);
+    lock = normalizeLockHandle(await deps.acquireLock(lockPath, lockOptions));
     try {
       const newer = existingResult(); if (newer) return newer;
       const refreshed = identity(deps.readJson(selected.identity));
@@ -330,9 +542,10 @@ export async function authorizeEpisodeFinalization(
         || deps.commit(selected.repo, value.targetRef) !== value.targetCommitAtAuthorization) {
         throw new Error("Finalization facts changed during operator confirmation");
       }
+      lock.assertHeld();
       deps.writeJson(selected.receipt, value);
       return { receipt: value, reused: false };
-    } finally { await release(); }
+    } finally { await lock.release(); }
   } finally { deps.close(); }
 }
 
@@ -399,12 +612,13 @@ export async function completeEpisodeFinalization(
   appendTransition: (status: "inactive", marker: OversightMarker) => void,
   marker: OversightMarker,
   supplied?: FinalizationDependencies,
+  lockOptions?: FinalizationLockOptions,
 ): Promise<FinalizationReceipt> {
   const deps = supplied ?? new NativeFinalizationDependencies();
   try {
     if (disposition !== "merged" && disposition !== "abandoned") throw new Error("Disposition must be merged or abandoned");
     const selected = parseLocation(ctx.cwd, rawLocation, deps);
-    const release = await deps.acquireLock(`${selected.receipt}.transaction.lock`);
+    const lock = normalizeLockHandle(await deps.acquireLock(`${selected.receipt}.transaction.lock`, lockOptions));
     try {
     let authorization = parseFinalizationReceipt(deps.readJson(selected.receipt));
     assertRequest(authorization, selected.sourceLocation, selected.slug, disposition, ctx.sessionManager.getSessionId());
@@ -419,18 +633,22 @@ export async function completeEpisodeFinalization(
     assertLifecycleShape(authorization.state, identityExists, authorization.state === "completed" ? "inactive" : marker.status);
     if (authorization.state === "completed") return authorization;
 
-    await validateTerminalFacts(selected, authorization, disposition, deps);
+    await whileLockHeld(lock, validateTerminalFacts(selected, authorization, disposition, deps));
 
     if (authorization.state === "authorized") {
       authorization = { ...authorization, state: "completing", completingAt: deps.now() };
+      lock.assertHeld();
       deps.writeJson(selected.receipt, authorization);
     }
+    lock.assertHeld();
     if (marker.status === "active") appendTransition("inactive", { ...marker, status: "inactive" });
+    lock.assertHeld();
     deps.remove(selected.identity);
     const completed: FinalizationReceipt = { ...authorization, state: "completed", completedAt: deps.now() };
+    lock.assertHeld();
     deps.writeJson(selected.receipt, completed);
     return completed;
-    } finally { await release(); }
+    } finally { await lock.release(); }
   } catch (error) {
     throw new Error(`Finalization is blocked with durable recovery evidence preserved: ${error instanceof Error ? error.message : String(error)}`);
   } finally { deps.close(); }
@@ -441,6 +659,7 @@ export async function recoverCompletingEpisodeFinalization(
   appendTransition: (status: "inactive", marker: OversightMarker) => void,
   marker: OversightMarker,
   supplied?: FinalizationDependencies,
+  lockOptions?: FinalizationLockOptions,
 ): Promise<FinalizationReceipt | null> {
   const deps = supplied ?? new NativeFinalizationDependencies();
   let delegated = false;
@@ -457,6 +676,7 @@ export async function recoverCompletingEpisodeFinalization(
       appendTransition,
       marker,
       deps,
+      lockOptions,
     );
   } finally {
     if (!delegated) deps.close();

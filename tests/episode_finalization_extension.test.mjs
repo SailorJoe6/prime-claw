@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -304,5 +304,149 @@ test("native transaction lock is kernel-released after SIGTERM and restart prese
   await new Promise(resolve => child.once("exit", resolve));
   const release = await acquireNativeFinalizationLock(lockPath);
   assert.deepEqual(JSON.parse(String(await import("node:fs").then(fs => fs.readFileSync(receiptPath)))), { state: "completing" });
+  await release();
+});
+
+
+test("native lock rejects permanent path and helper failures without retrying", async t => {
+  const dir = mkdtempSync(join(tmpdir(), "prime-claw-finalization-lock-fatal-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const directoryLock = join(dir, "directory.lock");
+  mkdirSync(directoryLock);
+  await assert.rejects(acquireNativeFinalizationLock(directoryLock, { timeoutMs: 500 }), /not a regular file/);
+
+  const target = join(dir, "target.lock"); writeFileSync(target, "");
+  const symlink = join(dir, "symlink.lock"); symlinkSync(target, symlink);
+  await assert.rejects(acquireNativeFinalizationLock(symlink, { timeoutMs: 500 }), /not a regular file/);
+  const parentTarget = join(dir, "parent-target"); mkdirSync(parentTarget);
+  const symlinkParent = join(dir, "symlink-parent"); symlinkSync(parentTarget, symlinkParent);
+  await assert.rejects(acquireNativeFinalizationLock(join(symlinkParent, "lock"), { timeoutMs: 500 }), /parent is not a real directory/);
+  const fileParent = join(dir, "file-parent"); writeFileSync(fileParent, "not a directory");
+  await assert.rejects(acquireNativeFinalizationLock(join(fileParent, "lock"), { timeoutMs: 500 }), /EEXIST|not a directory/i);
+
+  const unwritable = join(dir, "unwritable"); mkdirSync(unwritable); chmodSync(unwritable, 0o500);
+  try {
+    await assert.rejects(acquireNativeFinalizationLock(join(unwritable, "lock"), { timeoutMs: 500 }), /EACCES|permission denied/i);
+  } finally { chmodSync(unwritable, 0o700); }
+
+  await assert.rejects(
+    acquireNativeFinalizationLock(join(dir, "missing-helper.lock"), { timeoutMs: 500, pythonExecutable: join(dir, "missing-python") }),
+    /helper could not start/,
+  );
+  const brokenPython = join(dir, "python-without-fcntl");
+  const attemptCount = join(dir, "fatal-attempts");
+  writeFileSync(brokenPython, `#!/bin/sh\necho attempt >> ${JSON.stringify(attemptCount)}\necho '{"state":"fatal","error":"ImportError: no module named fcntl"}'\nexit 70\n`);
+  chmodSync(brokenPython, 0o700);
+  await assert.rejects(
+    acquireNativeFinalizationLock(join(dir, "no-fcntl.lock"), { timeoutMs: 2_000, pythonExecutable: brokenPython }),
+    /helper failed: ImportError: no module named fcntl/,
+  );
+  assert.equal(readFileSync(attemptCount, "utf8"), "attempt\n", "fatal helper state must not be retried");
+});
+
+test("native lock retries only contention and supports timeout and cancellation", async t => {
+  const dir = mkdtempSync(join(tmpdir(), "prime-claw-finalization-lock-wait-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const lockPath = join(dir, "transaction.lock");
+  const alreadyAborted = new AbortController(); alreadyAborted.abort();
+  await assert.rejects(acquireNativeFinalizationLock(lockPath, {
+    timeoutMs: 1_000, signal: alreadyAborted.signal, pythonExecutable: join(dir, "must-not-spawn"),
+  }), /acquisition cancelled/);
+  const firstRelease = await acquireNativeFinalizationLock(lockPath, { timeoutMs: 1_000 });
+  const waiter = acquireNativeFinalizationLock(lockPath, { timeoutMs: 2_000 });
+  await new Promise(resolve => setTimeout(resolve, 60));
+  await firstRelease();
+  const secondRelease = await waiter;
+  await secondRelease();
+
+  const timeoutHolder = await acquireNativeFinalizationLock(lockPath, { timeoutMs: 1_000 });
+  const timeoutStarted = Date.now();
+  await assert.rejects(acquireNativeFinalizationLock(lockPath, { timeoutMs: 80 }), /acquisition timed out/);
+  assert.ok(Date.now() - timeoutStarted < 1_000, "contention timeout must stay bounded");
+  await timeoutHolder();
+
+  const cancelHolder = await acquireNativeFinalizationLock(lockPath, { timeoutMs: 1_000 });
+  const controller = new AbortController();
+  const cancelled = acquireNativeFinalizationLock(lockPath, { timeoutMs: 2_000, signal: controller.signal });
+  setTimeout(() => controller.abort(), 60);
+  await assert.rejects(cancelled, /acquisition cancelled/);
+  await cancelHolder();
+
+  const finalRelease = await acquireNativeFinalizationLock(lockPath, { timeoutMs: 1_000 });
+  await finalRelease();
+});
+
+test("native completing recovery waits for a live holder, then revalidates and completes", async t => {
+  const dir = mkdtempSync(join(tmpdir(), "prime-claw-finalization-recovery-lock-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const lockPath = join(dir, "transaction.lock");
+  const holder = await acquireNativeFinalizationLock(lockPath, { timeoutMs: 1_000 });
+  const f = fixture(); await authorize(f);
+  const authorization = f.files.get(f.receiptPath);
+  f.files.set(f.receiptPath, { ...authorization, state: "completing", completingAt: "2026-01-01T00:00:01.000Z" });
+  f.deps.acquireLock = (_path, options) => acquireNativeFinalizationLock(lockPath, options);
+  const transitions = [];
+  const recovery = recoverCompletingEpisodeFinalization(
+    f.ctx,
+    status => transitions.push(status),
+    marker(),
+    f.deps,
+    { timeoutMs: 2_000 },
+  );
+  await new Promise(resolve => setTimeout(resolve, 60));
+  assert.equal(f.files.get(f.receiptPath).state, "completing");
+  await holder();
+  const completed = await recovery;
+  assert.equal(completed.state, "completed");
+  assert.deepEqual(transitions, ["inactive"]);
+});
+
+
+test("unexpected helper loss blocks later lifecycle writes and preserves recovery evidence", async t => {
+  const dir = mkdtempSync(join(tmpdir(), "prime-claw-finalization-lock-loss-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const lossyPython = join(dir, "lossy-python");
+  writeFileSync(lossyPython, '#!/bin/sh\necho \'{"state":"ready"}\'\nsleep 0.05\nexit 42\n');
+  chmodSync(lossyPython, 0o700);
+
+  const f = fixture(); await authorize(f);
+  const writesBefore = f.writes;
+  f.deps.listSessions = async () => { await new Promise(resolve => setTimeout(resolve, 150)); return []; };
+  f.deps.acquireLock = (_path, options) => acquireNativeFinalizationLock(join(dir, "transaction.lock"), {
+    ...options, timeoutMs: 1_000, pythonExecutable: lossyPython,
+  });
+  const transitions = [];
+  await assert.rejects(
+    completeEpisodeFinalization(LOCATION, "merged", f.ctx, status => transitions.push(status), marker(), f.deps),
+    /lock helper was lost/,
+  );
+  assert.equal(f.files.get(f.receiptPath).state, "authorized");
+  assert.equal(f.files.has(f.identityPath), true);
+  assert.equal(f.writes, writesBefore);
+  assert.deepEqual(transitions, []);
+});
+
+
+test("cancelled native completion preserves authorization, identity, and marker transition boundary", async t => {
+  const dir = mkdtempSync(join(tmpdir(), "prime-claw-finalization-cancelled-complete-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const lockPath = join(dir, "transaction.lock");
+  const holder = await acquireNativeFinalizationLock(lockPath, { timeoutMs: 1_000 });
+  const f = fixture(); await authorize(f);
+  f.deps.acquireLock = (_path, options) => acquireNativeFinalizationLock(lockPath, options);
+  const transitions = [];
+  const controller = new AbortController();
+  const completion = completeEpisodeFinalization(
+    LOCATION, "merged", f.ctx, status => transitions.push(status), marker(), f.deps,
+    { timeoutMs: 2_000, signal: controller.signal },
+  );
+  setTimeout(() => controller.abort(), 60);
+  await assert.rejects(completion, /lock acquisition cancelled/);
+  assert.equal(f.files.get(f.receiptPath).state, "authorized");
+  assert.equal(f.files.has(f.identityPath), true);
+  assert.deepEqual(transitions, []);
+  await holder();
+  const release = await acquireNativeFinalizationLock(lockPath, { timeoutMs: 1_000 });
   await release();
 });

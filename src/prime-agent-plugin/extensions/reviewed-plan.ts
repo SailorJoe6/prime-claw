@@ -305,7 +305,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         required: ["phase", "location", "disposition"],
         additionalProperties: false,
       } as any,
-      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      async execute(_toolCallId, params, signal, _onUpdate, ctx) {
         try {
           const disposition = params.disposition as OversightDisposition;
           if (params.phase === "authorize") {
@@ -318,6 +318,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
               (title, message) => ctx.ui.confirm(title, message),
               marker,
               dependencies?.finalization,
+              { signal },
             );
             return {
               content: [{ type: "text", text: `Episode finalization ${result.reused ? "already authorized" : "authorized"} for ${params.location} as ${disposition}. No terminal work was performed.` }],
@@ -334,6 +335,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             (status, value) => pi.appendEntry(OVERSIGHT_MARKER_TYPE, { ...value, status }),
             marker,
             dependencies?.finalization,
+            { signal },
           );
           const current = currentOversightMarker(ctx);
           const laterActive = current?.status === "active" && current.episodeId !== receipt.episodeId ? current : null;

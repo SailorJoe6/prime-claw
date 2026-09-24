@@ -454,6 +454,7 @@ test("registered finalization capability confirms once, recovers natively, and r
     episodeSessionFile: join(cwd, "episode.jsonl"), branch: "episode/alpha-plan", worktree,
     sessionName: "alpha-plan-episode", bootstrapAdmission: "delivered" };
   const identityPath = join(state, "alpha-plan.json"); writeFileSync(identityPath, JSON.stringify(identity));
+  const lockSignals = [];
   const finalization = {
     async listSessions() { return []; }, close() {}, repositoryRoot() { return cwd; },
     worktrees() { return [{ path: cwd, branch: "main" }]; }, currentBranch() { return "main"; },
@@ -463,7 +464,7 @@ test("registered finalization capability confirms once, recovers natively, and r
     readJson(path) { return JSON.parse(readFileSync(path, "utf8")); },
     writeJson(path, value) { mkdirSync(dirname(path), { recursive: true }); const tmp = `${path}.tmp`; writeFileSync(tmp, JSON.stringify(value)); renameSync(tmp, path); },
     remove(path) { rmSync(path, { force: true }); }, now() { return "2026-01-01T00:00:00.000Z"; },
-    async acquireLock() { return async () => {}; },
+    async acquireLock(_path, options) { lockSignals.push(options?.signal); return async () => {}; },
   };
   const f = createHarness(cwd, createReviewedPlanExtension({ finalization }));
   f.entries.push({ type: "custom", customType: "prime-claw-conversation-oversight", data: {
@@ -473,7 +474,8 @@ test("registered finalization capability confirms once, recovers natively, and r
     sessionName: "alpha-plan-episode", identityVersion: 2, admission: "delivered",
   } });
   const tool = f.tools.get("finalize_spec_episode");
-  const authorized = await tool.execute("auth", { phase: "authorize", location: LOCATION, disposition: "merged" }, undefined, undefined, f.ctx);
+  const controller = new AbortController();
+  const authorized = await tool.execute("auth", { phase: "authorize", location: LOCATION, disposition: "merged" }, controller.signal, undefined, f.ctx);
   assert.equal(authorized.isError, undefined); assert.equal(f.confirmations.length, 1);
   assert.match(f.confirmations[0].message, /Target: main \(refs\/heads\/main\)/);
   assert.match(f.confirmations[0].message, /Exact episode tip: a{40}/);
@@ -500,8 +502,9 @@ test("registered finalization capability confirms once, recovers natively, and r
     branch: "episode/beta", worktree: betaWorktree, sessionName: "beta-episode",
     identityVersion: 2, admission: "delivered",
   } });
-  const replay = await tool.execute("replay", { phase: "complete", location: LOCATION, disposition: "merged" }, undefined, undefined, f.ctx);
+  const replay = await tool.execute("replay", { phase: "complete", location: LOCATION, disposition: "merged" }, controller.signal, undefined, f.ctx);
   assert.equal(replay.isError, undefined); assert.equal(f.confirmations.length, 1);
+  assert.deepEqual(lockSignals, [controller.signal, controller.signal, undefined, controller.signal]);
   assert.match(replay.content[0].text, /Current oversight remains active for \.ralph\/plans\/future\/beta/);
   assert.deepEqual(replay.details.currentOversight, { status: "active", sourceLocation: betaLocation, episodeId: "episode-beta" });
   const laterContext = await f.events.get("context")({ messages: [] }, f.ctx);

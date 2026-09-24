@@ -470,8 +470,12 @@ After terminal work, the conversation invokes the completion phase without a
 second user confirmation. Trusted host code requires the matching authorization
 receipt and conservatively validates exact Git objects, bound target and episode
 tips, daemon rows, and worktree facts. The exact receipt lifecycle transaction is
-serialized by a crash-released lock; delayed calls reacquire and revalidate after
-UI confirmation and can never rewind newer compatible evidence. It records `completing`, appends inactive
+serialized by a crash-released lock. Lock acquisition distinguishes readiness,
+actual contention, and fatal path/runtime failure; retries only contention; and
+has bounded timeout and cancellation. Unexpected holder loss blocks later
+mutation. Contenders never delete a lock object or disturb a live holder. Delayed
+calls reacquire and revalidate after UI confirmation and can never rewind newer
+compatible evidence. It records `completing`, appends inactive
 oversight, clears only the matching spec-episode ownership expectation, then
 records a durable `completed` tombstone. A crash or identical replay reconciles
 from those monotonic boundaries without another confirmation. Recovery validates

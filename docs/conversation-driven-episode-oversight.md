@@ -128,7 +128,18 @@ target commit, and exact episode tip, and writes
 `.prime/agent/state/spec-episodes/<slug>.finalization.json`.
 A matching replay returns the existing receipt without another confirmation.
 The exact receipt lifecycle transaction is serialized by a crash-released native
-lock. Authorization releases the lock while the UI waits, then reacquires and
+lock. Lock startup validates the immediate parent and lock-object type, then uses
+a Python/`fcntl.flock` helper handshake that distinguishes `ready`, actual
+contention, and fatal path/runtime errors. Only contention is retried. Waiting is
+bounded to 10 seconds by default, structured tool cancellation is propagated, and
+startup recovery uses the same bound. Timeout, cancellation, helper failure, or
+unexpected holder loss stops before later lifecycle mutation and preserves the
+receipt, marker, and expectation evidence. Contenders never unlink the lock file
+or signal a live holder. This first release requires a local Unix Python runtime
+with `fcntl`; hostile ancestor-path replacement and Windows portability are not
+claimed.
+
+Authorization releases the lock while the UI waits, then reacquires and
 revalidates every binding/state before writing; a delayed compatible call returns
 the newer state/result and a conflict blocks, so completed evidence cannot rewind.
 Receipts and markers are indexed by exact slug/episode generation: completed old
