@@ -85,17 +85,26 @@ def test_native_inactive_conversation_gets_one_kernel_and_no_package(tmp_path):
 def _active_package_setup(path: Path):
     path.write_text(r'''import {basename,dirname,resolve} from "node:path";
 import {mkdirSync,writeFileSync} from "node:fs";
-export default function setup(pi){pi.on("session_start",(_event,ctx)=>{const slug="alpha",ownerSessionId=ctx.sessionManager.getSessionId(),worktree=resolve(dirname(ctx.cwd),`${basename(ctx.cwd)}-${slug}-episode`);const identity={version:2,slug,sourceLocation:`.ralph/plans/future/${slug}`,ownerSessionId,episodeId:"11111111-1111-4111-8111-111111111111",episodeActiveSessionId:"active",episodeSessionFile:resolve(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"};const root=resolve(ctx.cwd,".prime/agent/state/spec-episodes");mkdirSync(root,{recursive:true});writeFileSync(resolve(root,`${slug}.json`),JSON.stringify(identity));pi.appendEntry("prime-claw-conversation-oversight",{markerVersion:2,status:"active",ownerSessionId,slug:identity.slug,sourceLocation:identity.sourceLocation,episodeId:identity.episodeId,episodeSessionFile:identity.episodeSessionFile,branch:identity.branch,worktree:identity.worktree,sessionName:identity.sessionName,identityVersion:2,admission:"delivered"})})}''')
+export default function setup(pi){pi.on("session_start",(_event,ctx)=>{const slug="alpha",ownerSessionId=ctx.sessionManager.getSessionId(),worktree=resolve(dirname(ctx.cwd),`${basename(ctx.cwd)}-${slug}-episode`);const identity={version:2,slug,sourceLocation:`.ralph/plans/future/${slug}`,ownerSessionId,episodeId:"11111111-1111-4111-8111-111111111111",episodeActiveSessionId:"active",episodeSessionFile:resolve(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"};const root=resolve(ctx.cwd,".prime/agent/state/spec-episodes");mkdirSync(root,{recursive:true});const encoded=JSON.stringify(identity);writeFileSync(resolve(root,`${slug}.json`),encoded);writeFileSync(resolve(ctx.cwd,"expected-identity.json"),encoded);pi.appendEntry("prime-claw-conversation-oversight",{markerVersion:2,status:"active",ownerSessionId,slug:identity.slug,sourceLocation:identity.sourceLocation,episodeId:identity.episodeId,episodeSessionFile:identity.episodeSessionFile,branch:identity.branch,worktree:identity.worktree,sessionName:identity.sessionName,identityVersion:2,admission:"delivered"})})}''')
 
 
-def _run_native_active_package(case: Path, description: str):
+def _promotion_package_setup(path: Path):
+    support = json.dumps(str(SUPPORT))
+    path.write_text(f'''import {{basename,dirname,resolve}} from "node:path";
+import {{mkdirSync,writeFileSync}} from "node:fs";
+import {{appendActiveOversight}} from {support};
+export default function setup(pi){{pi.on("session_start",(_event,ctx)=>{{const slug="alpha",ownerSessionId=ctx.sessionManager.getSessionId(),worktree=resolve(dirname(ctx.cwd),`${{basename(ctx.cwd)}}-${{slug}}-episode`);const identity={{version:2,slug,sourceLocation:`.ralph/plans/future/${{slug}}`,ownerSessionId,episodeId:"11111111-1111-4111-8111-111111111111",episodeActiveSessionId:"active",episodeSessionFile:resolve(worktree,"episode.jsonl"),branch:`episode/${{slug}}`,worktree,sessionName:`${{slug}}-episode`,bootstrapAdmission:"delivered"}};const encoded=JSON.stringify(identity),root=resolve(ctx.cwd,".prime/agent/state/spec-episodes");mkdirSync(root,{{recursive:true}});writeFileSync(resolve(root,`${{slug}}.json`),encoded);writeFileSync(resolve(ctx.cwd,"expected-identity.json"),encoded);appendActiveOversight(pi,ctx,{{...identity,reused:false}})}})}}''')
+
+
+def _run_native_active_package(case: Path, description: str = "valid", *, metadata: str | None = None, promote: bool = False):
     prime = shutil.which("prime-agent"); assert prime
     project = case / "project"; (project / ".prime/agent").mkdir(parents=True)
     (project / ".prime/agent/APPEND_SYSTEM.md").write_text(KERNEL.read_text())
     skill = project / ".ralph/skills/oversee-episode/SKILL.md"; skill.parent.mkdir(parents=True)
-    skill.write_bytes(f"---\nname: oversee-episode\ndescription: {description}\n---\nbody".encode())
+    frontmatter = metadata if metadata is not None else f"name: oversee-episode\ndescription: {description}"
+    skill.write_bytes(f"---\n{frontmatter}\n---\nbody".encode())
     records = case / "records.jsonl"; provider = case / "provider.ts"; _provider_extension(provider, records)
-    setup = case / "setup.ts"; _active_package_setup(setup)
+    setup = case / "setup.ts"; (_promotion_package_setup if promote else _active_package_setup)(setup)
     env = {**os.environ, "PRIME_AGENT_CODING_AGENT_DIR": str(case / "agent"), "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1"}
     completed = subprocess.run([prime, "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-extensions", "--cwd", str(project), "-e", str(provider), "-e", str(setup), "-e", str(EXTENSION), "--provider", "poc", "--model", "m", "-p", "probe"], cwd=REPO, env=env, capture_output=True, text=True, timeout=20)
     identity = project / ".prime/agent/state/spec-episodes/alpha.json"
@@ -110,15 +119,26 @@ def test_native_bounded_frontmatter_blocks_before_provider_and_keeps_expectation
         assert completed.returncode != 0
         assert "prime-claw conversation blocked" in completed.stderr
         assert not records.exists(), completed.stdout + completed.stderr
-        value = json.loads(identity.read_text())
-        assert value["bootstrapAdmission"] == "delivered"
-        assert value["ownerSessionId"]
+        assert identity.read_bytes() == (case / "project/expected-identity.json").read_bytes()
+    invalid_metadata = [
+        "name: oversee-episode\ndescription: valid\nmetadata: ignored",
+        "name: oversee-episode\n# comment-only metadata\ndescription: valid",
+        "name: oversee-episode\n\ndescription: valid",
+    ]
+    for mode in ["active", "promotion"]:
+        for index, metadata in enumerate(invalid_metadata):
+            case = tmp_path / f"invalid-metadata-{mode}-{index}"; case.mkdir()
+            completed, records, identity = _run_native_active_package(case, metadata=metadata, promote=mode == "promotion")
+            assert completed.returncode != 0
+            assert "oversight package frontmatter" in completed.stderr
+            assert not records.exists(), completed.stdout + completed.stderr
+            assert identity.read_bytes() == (case / "project/expected-identity.json").read_bytes()
     for index, description in enumerate(["plain scalar", '"quoted # scalar: value"']):
         case = tmp_path / f"valid-{index}"; case.mkdir()
         completed, records, identity = _run_native_active_package(case, description)
         assert completed.returncode == 0, completed.stdout + completed.stderr
         assert json.loads(records.read_text()) == {"kernel": 1, "package": 1}
-        assert json.loads(identity.read_text())["bootstrapAdmission"] == "delivered"
+        assert identity.read_bytes() == (case / "project/expected-identity.json").read_bytes()
 
 
 def test_current_documentation_describes_default_identity_and_temporary_mode():

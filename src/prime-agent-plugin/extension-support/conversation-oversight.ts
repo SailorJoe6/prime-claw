@@ -119,11 +119,12 @@ function parseFrontmatterScalar(value: string, key: string, path: string): strin
 function parseSkillFrontmatter(text: string, path: string): { name: string; body: string } {
   const parsed = /^---\n([\s\S]*?)\n---\n([\s\S]+)$/.exec(text);
   if (!parsed) throw new Error(`oversight package frontmatter or procedure is incomplete at ${path}`);
+  const lines = parsed[1].split("\n");
+  if (lines.length !== 2) throw new Error(`oversight package frontmatter requires exactly name and description lines at ${path}`);
   const values = new Map<string, string>();
-  for (const raw of parsed[1].split("\n")) {
-    if (!raw.trim() || raw.startsWith("#")) continue;
+  for (const raw of lines) {
     if (/^[ \t]/.test(raw) || raw.startsWith("-")) throw new Error(`oversight package frontmatter nesting or sequences are unsupported at ${path}`);
-    const match = /^([A-Za-z_][A-Za-z0-9_-]*):[ ](\S(?:.*\S)?)$/.exec(raw);
+    const match = /^(name|description):[ ](\S(?:.*\S)?)$/.exec(raw);
     if (!match || values.has(match[1])) throw new Error(`oversight package frontmatter is malformed or ambiguous at ${path}`);
     values.set(match[1], parseFrontmatterScalar(match[2], match[1], path));
   }

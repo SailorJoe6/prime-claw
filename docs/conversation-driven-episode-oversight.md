@@ -43,11 +43,13 @@ queuing its canonical readiness workflow, the extension verifies:
 
 - exactly one effective identity kernel;
 - the restoration extension is active for this session;
-- `.ralph/skills/oversee-episode/SKILL.md` follows the deliberately bounded
-  supported frontmatter grammar: exact first/closing `---` lines, unique
-  top-level scalar keys only, exactly one ASCII space after each key colon,
-  exact `name: oversee-episode`, a nonempty `description`, and a nonempty
-  procedure body. Double-quoted values use a nonempty JSON-string subset;
+- `.ralph/skills/oversee-episode/SKILL.md` follows the deliberately bounded,
+  closed frontmatter grammar: exact first/closing `---` lines and exactly one
+  `name` line plus one `description` line between them, with no blank, comment,
+  unknown, duplicate, nested, or sequence metadata lines. Each key has exactly
+  one ASCII space after its colon; `name` must equal `oversee-episode`;
+  `description` and the procedure body must be nonempty. Double-quoted values
+  use a nonempty JSON-string subset;
   single-quoted values have no escapes; and unquoted values reject YAML reserved
   leading indicators, flow delimiters, quotes, mapping/comment forms, tabs, and
   C0/C1 control characters. Decoded quoted controls are rejected too.

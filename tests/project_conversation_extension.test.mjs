@@ -37,6 +37,25 @@ test("bounded frontmatter scalar grammar accepts its documented forms and reject
   }
 });
 
+test("closed package frontmatter rejects unknown, comment, and blank metadata without lifecycle mutation",t=>{
+  const invalidMetadata=[
+    "name: oversee-episode\ndescription: valid\nmetadata: ignored",
+    "name: oversee-episode\n# comment-only metadata\ndescription: valid",
+    "name: oversee-episode\n\ndescription: valid",
+  ];
+  for(const metadata of invalidMetadata){
+    const promotion=fixture(t),episode=identity(promotion),expectation=join(promotion.cwd,".prime/agent/state/spec-episodes/alpha.json"),beforeBranch=structuredClone(promotion.branch),beforeExpectation=readFileSync(expectation);
+    writeFileSync(promotion.packagePath,`---\n${metadata}\n---\nbody`);
+    assert.throws(()=>appendActiveOversight(promotion.pi,promotion.ctx,episode),/frontmatter/);
+    assert.deepEqual(promotion.branch,beforeBranch);assert.deepEqual(readFileSync(expectation),beforeExpectation);assert.equal(promotion.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
+
+    const active=fixture(t),activeEpisode=identity(active),activeExpectation=join(active.cwd,".prime/agent/state/spec-episodes/alpha.json");appendActiveOversight(active.pi,active.ctx,activeEpisode);const activeBranch=structuredClone(active.branch),activeIdentity=readFileSync(activeExpectation);
+    writeFileSync(active.packagePath,`---\n${metadata}\n---\nbody`);
+    assert.throws(()=>context(active),/prime-claw conversation blocked/);
+    assert.equal(active.aborts,1);assert.deepEqual(active.branch,activeBranch);assert.deepEqual(readFileSync(activeExpectation),activeIdentity);assert.equal(active.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
+  }
+});
+
 test("active marker injects exactly one freshly read package",t=>{const f=fixture(t);appendActiveOversight(f.pi,f.ctx,identity(f));const stale={role:"custom",customType:OVERSIGHT_PACKAGE_TYPE,content:"STALE"};let result=context(f,[stale]);assert.equal(result.messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1);assert.match(result.messages.at(-1).content,/REVISION ONE/);writeFileSync(f.packagePath,"---\nname: oversee-episode\ndescription: test package\n---\nREVISION TWO");result=context(f,result.messages);assert.equal(result.messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1);assert.match(result.messages.at(-1).content,/REVISION TWO/)});
 test("session start recovers a delivered current-owner expectation with no marker",async t=>{const f=fixture(t);identity(f);await f.events.get("session_start")({},f.ctx);const markers=f.branch.filter(e=>e.customType===OVERSIGHT_MARKER_TYPE);assert.equal(markers.length,1);assert.equal(markers[0].data.status,"active");assert.match(f.notifications[0].message,/Recovered active oversight/);assert.equal(context(f).messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1)});
 test("mutable episode routing refresh does not invalidate stable ownership",t=>{const f=fixture(t),episode=identity(f);appendActiveOversight(f.pi,f.ctx,episode);const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"),updated=JSON.parse(readFileSync(path,"utf8"));updated.episodeActiveSessionId="reopened-route";writeFileSync(path,JSON.stringify(updated));const result=context(f);assert.equal(result.messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1)});

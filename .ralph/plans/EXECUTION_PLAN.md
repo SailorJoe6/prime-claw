@@ -406,11 +406,56 @@ probes blocked `? bare` with zero provider calls, admitted a quoted package with
 kernel/package `1/1`, and observed an inactive builder-rooted kernel/package
 `1/0`. `git diff --check` passed.
 
-B4 remains deliberately incomplete and outside this commit. Preserve the
-unstaged, unintegrated B4 fake-daemon fixture in
-`tests/test_reviewed_plan_extension.py`. The next P0 is B4 native
-isolation/cleanup. Do not touch shared handoff scheduling, quiescence, Slice 2,
-owner checkout, credentials, or retired leaked sessions.
+### B3-R1 owner revision required
+
+Exact-commit owner review disposition for
+`7ec3702e89a9f5b4a8333bac4ced52d8a88f0713` is **REVISE**. The owner reran 26
+conversation Node tests and nine conversation Python tests successfully, then an
+added negative probe proved the package reader accepts an unknown
+`metadata: ignored` scalar and skips both `# comment-only metadata` and blank
+metadata lines. The bounded package contract is therefore not closed. The root
+cause is that line parsing accepts arbitrary unique scalar keys and explicitly
+skips blank/comment lines, while only later reading `name` and `description`.
+
+Authoritative main design commit `2580c05` is reconciled as merge commit
+`027e7ae8e3a00f8c5eb1555f1795d00cb62b5241`, preserving the promoted
+future-folder deletion and rejected history. The current P0 is the fresh B3-R1
+repair and synchronization of the closed contract into the active specification
+and plan. Make frontmatter contain exactly one `name`
+line and one `description` line between the delimiters. Reject blank, comment,
+unknown, duplicate, nested, sequence, and unsupported-scalar metadata lines in
+the one shared promotion/active reader. Do not adopt general YAML or aliases and
+do not weaken any accepted or rejected scalar boundary from B3. Acceptance must
+prove promotion and active unknown-key, comment-line, and blank-line cases make
+zero provider calls and no lifecycle/package mutation, while canonical, quoted,
+Unicode, URL, internal-punctuation, and all B1/B2/B3 regressions remain green.
+
+#### B3-R1 repair evidence
+
+The shared package reader now requires exactly two frontmatter lines and accepts
+only the `name` and `description` keys, each once. It no longer skips blank or
+comment lines and cannot accept unknown scalar keys. Both values still pass
+through the unchanged bounded B3 scalar parser.
+
+Table-driven Node coverage exercises unknown-key, comment-line, and blank-line
+packages through promotion and active dispatch, proving unchanged marker branch
+and byte-identical expectation evidence with no package append. Native coverage
+runs all three cases through both active and promotion setup, proving nonzero
+visible failure, zero provider records, and byte-identical durable expectation;
+valid accepted punctuation/Unicode/URL forms still dispatch with kernel/package
+`1/1`. Focused gates passed 27 conversation Node tests and nine conversation
+Python tests. Full gates passed 125 Node tests and 279 Python tests plus seven
+subtests with 11 existing warnings. Independent read-only review returned PASS
+for the B3-R1 diff with the B4 path explicitly excluded. User-global apply/check
+passed, and fresh installed active/promotion probes rejected all six invalid
+cases with zero provider records and accepted both valid cases with
+kernel/package `1/1`. The repaired exact commit still requires fresh owner review
+before any B4 handoff or Slice 2 work.
+
+B4 remains deliberately incomplete and must wait for its own later handoff.
+Preserve the unstaged, unintegrated B4 fake-daemon fixture in
+`tests/test_reviewed_plan_extension.py`. Do not touch shared handoff scheduling,
+quiescence, Slice 2, owner checkout, credentials, or retired leaked sessions.
 
 Slice 2 remains blocked until the repaired Slice 1 exact commit is accepted.
 
