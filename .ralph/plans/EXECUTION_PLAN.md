@@ -376,11 +376,38 @@ warnings. User-global apply/check passed. A fresh installed-module process
 acquired/released a stale regular lock and rejected a directory lock immediately;
 a fresh builder-rooted Prime process observed kernel/package `1/0`.
 
-B3 and B4 remain deliberately incomplete and outside this commit. Preserve the
+### B3 bounded frontmatter grammar evidence
+
+The canonical oversight package parser now defines its supported scalar subset
+completely without adopting general YAML. Top-level key lines retain the exact
+one-space form, unique-key check, and no indentation/nesting/sequence rule.
+Nonempty double-quoted values use JSON string syntax; nonempty single-quoted
+values do not decode escapes. Unquoted values reject every YAML reserved leading
+indicator plus flow delimiters, quotes, mapping/comment forms, tabs, and C0/C1
+controls. Raw controls are rejected before quote handling, and decoded JSON
+controls are rejected after parsing. Ordinary internal punctuation, Unicode,
+URLs, and quoted reserved characters remain supported.
+
+The same package reader gates both promotion and every active context dispatch.
+Table-driven unit coverage checks accepted boundaries and all reserved indicator,
+comment, malformed quote/escape, raw control, and decoded control families at
+both gates. Active rejection aborts without changing the expectation/marker
+branch or appending a package. The normally discovered native matrix covers six
+invalid packages, including the three exact audit reproductions and a decoded
+control, with nonzero exit and zero provider calls; valid quoted and unquoted
+packages each produce kernel/package `1/1` and preserve the delivered expectation.
+Focused gates passed 26 conversation Node tests and nine conversation Python
+tests. Full gates passed 124 Node tests and 279 Python tests plus seven subtests
+with 11 existing warnings. User-global apply/check passed. Fresh installed native
+probes blocked `? bare` with zero provider calls, admitted a quoted package with
+kernel/package `1/1`, and observed an inactive builder-rooted kernel/package
+`1/0`. `git diff --check` passed.
+
+B4 remains deliberately incomplete and outside this commit. Preserve the
 unstaged, unintegrated B4 fake-daemon fixture in
-`tests/test_reviewed_plan_extension.py`. The next P0 is B3 bounded scalar grammar,
-followed by B4 native isolation/cleanup. Do not touch shared handoff scheduling,
-quiescence, Slice 2, owner checkout, credentials, or retired leaked sessions.
+`tests/test_reviewed_plan_extension.py`. The next P0 is B4 native
+isolation/cleanup. Do not touch shared handoff scheduling, quiescence, Slice 2,
+owner checkout, credentials, or retired leaked sessions.
 
 Slice 2 remains blocked until the repaired Slice 1 exact commit is accepted.
 

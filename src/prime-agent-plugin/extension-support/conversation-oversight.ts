@@ -90,14 +90,28 @@ function canonicalProjectRoot(cwd: string): string {
   try { return realpathSync(cwd); }
   catch (error) { throw new Error(`project root is unavailable: ${error instanceof Error ? error.message : String(error)}`); }
 }
+const FRONTMATTER_CONTROL_CHARACTER = /[\u0000-\u001f\u007f-\u009f]/;
+function assertFrontmatterText(value: string, key: string, path: string): void {
+  if (FRONTMATTER_CONTROL_CHARACTER.test(value)) {
+    throw new Error(`oversight package ${key} scalar contains a control character at ${path}`);
+  }
+}
 function parseFrontmatterScalar(value: string, key: string, path: string): string {
   if (!value) throw new Error(`oversight package ${key} scalar is empty at ${path}`);
+  assertFrontmatterText(value, key, path);
   if (/^"(?:[^"\\]|\\.)*"$/.test(value)) {
-    try { const parsed = JSON.parse(value); if (typeof parsed === "string" && parsed) return parsed; } catch { /* below */ }
-    throw new Error(`oversight package ${key} scalar is malformed at ${path}`);
+    let parsed: unknown;
+    try { parsed = JSON.parse(value); }
+    catch { throw new Error(`oversight package ${key} scalar is malformed at ${path}`); }
+    if (typeof parsed !== "string" || !parsed) throw new Error(`oversight package ${key} scalar is malformed at ${path}`);
+    assertFrontmatterText(parsed, key, path);
+    return parsed;
   }
-  if (/^'[^']*'$/.test(value)) { const parsed = value.slice(1, -1); if (parsed) return parsed; }
-  if (/^[\[\]{}|>&*!%@`'"-]/.test(value) || /[\[\]{}'"\t]/.test(value) || /:\s|\s#/.test(value)) {
+  if (/^'[^']*'$/.test(value)) {
+    const parsed = value.slice(1, -1);
+    if (parsed) return parsed;
+  }
+  if (/^[-?:,\[\]{}#&*!|>'"%@`]/.test(value) || /[\[\]{}'"\t]/.test(value) || /:\s|\s#/.test(value)) {
     throw new Error(`oversight package ${key} scalar uses unsupported YAML syntax at ${path}`);
   }
   return value;

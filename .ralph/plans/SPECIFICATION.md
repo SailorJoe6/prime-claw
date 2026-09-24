@@ -210,6 +210,15 @@ agent messages, reload, resume, and tool continuation without depending on the
 input event or a mutable per-input cache. Activation itself causes no unsolicited
 model response.
 
+Canonical package frontmatter uses a deliberately bounded scalar grammar rather
+than general YAML: exact delimiters and top-level key lines, unique keys, one
+ASCII space after each key colon, nonempty double-quoted JSON strings, nonempty
+single-quoted strings without escapes, or unquoted text that excludes YAML
+reserved leading indicators, flow delimiters, quote, mapping/comment, tab, and
+C0/C1 control forms. Decoded quoted controls are also invalid. Malformed package
+metadata blocks both promotion and active dispatch before any provider call and
+does not alter the exact expectation or marker evidence.
+
 Native automatic compaction remains unchanged. Its private summarizer is a
 runtime utility rather than the CONVERSATION agent and need not receive the role
 package. The first real call after compaction must receive one current kernel and

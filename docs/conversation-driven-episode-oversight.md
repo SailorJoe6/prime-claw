@@ -45,10 +45,14 @@ queuing its canonical readiness workflow, the extension verifies:
 - the restoration extension is active for this session;
 - `.ralph/skills/oversee-episode/SKILL.md` follows the deliberately bounded
   supported frontmatter grammar: exact first/closing `---` lines, unique
-  top-level scalar keys only, valid quoted or unquoted scalars, exact `name:
-  oversee-episode`, a nonempty `description`, and a nonempty procedure body.
+  top-level scalar keys only, exactly one ASCII space after each key colon,
+  exact `name: oversee-episode`, a nonempty `description`, and a nonempty
+  procedure body. Double-quoted values use a nonempty JSON-string subset;
+  single-quoted values have no escapes; and unquoted values reject YAML reserved
+  leading indicators, flow delimiters, quotes, mapping/comment forms, tabs, and
+  C0/C1 control characters. Decoded quoted controls are rejected too.
   Indentation/nested maps, sequences, block scalars, malformed quotes/brackets,
-  and duplicate keys are unsupported and rejected; this is not a general YAML
+  and duplicate keys are unsupported and rejected. This is not a general YAML
   parser; and
 - the durable spec-episode state directory is writable; and
 - CWD, state, and expected worktree bindings resolve from one canonical project
