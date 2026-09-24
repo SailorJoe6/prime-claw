@@ -809,8 +809,42 @@ suite passed after Python ended. Global apply/check, final installed-copy check,
 TypeScript loading, documentation contracts, and `git diff --check` passed. The
 first independent review found a test-construction error that gave all
 expectation-side artifacts the same spelling; after independent artifact
-construction was added, a fresh read-only re-review returned PASS. The repair
-awaits one exact pushed candidate and renewed complete Slice 1 owner/Astra review.
+construction was added, a fresh read-only re-review returned PASS.
+
+### Complete Slice 1 accepted; README index correction implemented for review
+
+Final owner/Astra review **ACCEPTED** exact
+`b96a9feeb3177c52cdf0ac0d52e6b60f622b74cf`. R1 and R2-R1 are **CLOSED**.
+The authoritative design `56610f4` and reconciliation merge `8d2d9d4` are
+ancestors of the accepted candidate, and the promoted future bundle remains
+absent. The admitted `openai-codex/gpt-6-astra` reviewer at reasoning `max`
+returned PASS with no required findings. The immutable report is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0ba54-da05-76bd-8d22-a0facfdd7f31/sub-083077d9/slice1-r2r1-final-exact-review.md`.
+
+Owner evidence passed Node 144 and Python 28. Final independent evidence passed
+Node 157, the R1 native 10-case matrix, the original R2 native four cases, an
+expanded 54-case native path matrix, and apply/check. The review independently
+proved shared pre/post-reconstruction path equivalence, zero-mutation genuine
+conflicts, receipt-only correction, replay convergence, closed R1, and the
+complete Slice 1 regression surface. This acceptance does not authorize merge or
+terminal cleanup; those remain operator decisions.
+
+The optional P3 docs-only correction at `docs/README.md:47-48` is implemented.
+Only that index summary now says every independent project session defaults to
+CONVERSATION, with temporary exact-session episode oversight and authority
+boundaries. The linked current document is byte-identical to the accepted Slice
+1 candidate. No implementation or test path changed.
+
+Docs-index wording and every local link destination passed. The focused current-
+documentation contract passed 1/1 with nine tests deselected, the installed-copy
+check passed, `git diff --check` passed, and exact diff guards proved the linked
+target document and all `src/` and `tests/` paths unchanged. Commit and push one
+exact docs-only candidate, then stop for owner review. Do not reopen Slice 1
+runtime, merge or clean up the accepted branch, combine this correction with
+Slice 2, or begin Slice 2.
+
+Slice 1 acceptance unblocks Slice 2, but Slice 2 begins only after this docs-only
+candidate is reviewed and a fresh explicit transition admits it.
 
 That coupled repair generation first reconciled authoritative main `5edc73e`
 while preserving the promoted-folder deletion, rejected history, accepted B1
@@ -820,7 +854,7 @@ Its exact candidate received the renewed complete owner/Astra review recorded
 above. Do not change accepted behavior, global discovery, historical archives,
 or begin Slice 2.
 
-Slice 2 remains blocked until the repaired Slice 1 exact commit is accepted.
+Slice 2 is acceptance-unblocked but awaits the docs-only P0 and a fresh explicit transition.
 
 ## Slice 2 — Project-customizable oversight and owner-driven continuation
 
