@@ -1050,10 +1050,12 @@ Validation is green: targeted isolation passed 2/2; maintained Python passed
 passed 157/157; plugin-copy integrity and `git diff --check` passed. Exact path
 and semantic audits confirm no oversight skill, plugin source, host extension,
 current oversight docs, shared-handoff mechanics, or 2B-R1 behavior changed.
-The merge used no rebase, force, or history rewrite. Next amend only this durable
-evidence into the local merge candidate, push that one candidate, and stop for
-owner review. Do not begin Slice 3, terminal merge, cleanup, another increment,
-or unrelated work.
+The merge used no rebase, force, or history rewrite. Exact pushed merge
+`ba79840718e7d9e21494e1d47985922c836418a5` awaits owner review. INT-R1 changes
+only this active-plan chronology; the merge parents, three-path functional
+delta, validation, no-semantic-drift evidence, accepted 2B-R1 semantics, code,
+and tests remain unchanged. Do not rebase or force, repeat integration, begin
+Slice 3, perform terminal merge or cleanup, or do unrelated work.
 
 **Working capability:** the active exact-session owner has one canonical procedure for
 watching, reviewing, revising, continuing, and finally presenting its exact
