@@ -186,23 +186,28 @@ def test_current_docs_bound_owner_continuation_without_changing_host_authority()
     for fragment in (
         "without a new operator transport request",
         "operator focus or a bounded compaction-focus synthesis",
-        "Host ownership, identity, location, quiescence, canonical-prompt, uncertainty, and replay checks remain unchanged",
+        "EPISODE sibling's explicit completion report",
+        "reasonably quiescent observation",
+        "preserves a valid resident route even when `isSessionActive` is false",
+        "ordinary `prompt` with `queueIfBusy: false`",
+        "not an atomic all-busy guard",
+        "streaming race definitely rejects",
+        "immediate-or-queued admission",
+        "never blindly replayed",
         "fresh native `/implement-spec` run",
         "never lifetime-locks that owner",
-        "pre-arms exactly one non-steering intended-generation watch immediately before the terminal call",
-        "definite no-admission failure cancels that watch",
-        "success, partial admission, or ambiguity retains it until reconciliation",
-        "never creates the intended-generation watch after success or arms a duplicate",
     ):
         assert fragment in current
     for fragment in (
-        "accepted findings already recorded inside the approved specification and plan",
-        "No new operator transport request",
-        "never arbitrary prompt routing",
-        "Owner, location, identity, quiescence, canonical-prompt, uncertainty, and replay enforcement are unchanged",
-        "pre-arms exactly one non-steering intended-generation watch immediately before the terminal call",
-        "cancels it only on definite no-admission failure",
-        "retains it across success, partial admission, or ambiguity until reconciliation",
+        "EPISODE sibling's explicit completion report",
+        "heartbeat is only a missed-report safety net",
+        "retains an exact resident route even when `isSessionActive` is false",
+        "ordinary `prompt` with `queueIfBusy: false`",
+        "not an atomic all-busy guard",
+        "streaming race definitely rejects",
+        "immediate-or-queued admission only",
+        "leaves the owner watch available for a later retry",
+        "not permission to retry",
     ):
         assert fragment in future
     for fragment in (
@@ -210,12 +215,14 @@ def test_current_docs_bound_owner_continuation_without_changing_host_authority()
         "broader `ralph_handoff` adapter above remains operator-request-only",
         "existing `<operator-compaction-guidance>` envelope",
         "legacy tag is not a routing authority",
+        "explicit completion report",
+        "reasonably quiescent session observation",
+        "ordinary `prompt`",
+        "not an atomic all-busy guard",
+        "streaming race definitely rejects",
+        "immediate-or-queued admission only",
+        "leaves the owner watch available for a later retry",
         "never retried automatically",
-        "fresh native `/implement-spec`",
-        "pre-arms exactly one non-steering intended-generation watch immediately before the terminal call",
-        "cancelled only on definite no-admission failure",
-        "retained across success, partial admission, or ambiguity until reconciliation",
-        "never created after successful terminal admission and never duplicated",
     ):
         assert fragment in handoff
 

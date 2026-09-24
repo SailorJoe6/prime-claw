@@ -573,10 +573,87 @@ test("registered actual handoff reopen refresh preserves ordinary owner oversigh
   mkdirSync(join(cwd,LOCATION),{recursive:true});writeSkill(cwd,"---\nname: oversee-episode\ndescription: test package\n---\nprocedure","oversee-episode");
   const slug="alpha-plan",worktree=resolve(dirname(cwd),`${basename(cwd)}-${slug}-episode`);t.after(()=>rmSync(worktree,{recursive:true,force:true}));mkdirSync(worktree,{recursive:true});writeSkill(worktree,"handoff","handoff");writeSkill(worktree,"execute","execute");
   const state=join(cwd,".prime/agent/state/spec-episodes");mkdirSync(state,{recursive:true});let identity={version:2,slug,sourceLocation:LOCATION,ownerSessionId:"owner-session",episodeId:"33333333-3333-4333-8333-333333333333",episodeActiveSessionId:"old-route",episodeSessionFile:join(cwd,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"};const identityPath=join(state,`${slug}.json`);writeFileSync(identityPath,JSON.stringify(identity));
-  const publisher={async list(){return[{sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:false}]},async reopen(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile}},async getState(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:true,isStreaming:false,isCompacting:false,isBashRunning:false,isRunningTools:false,hasRunningRlmChildren:false,unfinishedActionCount:0,sessionActions:{queuedCount:0,steering:[],followUps:[]}}},async deliverHandoff(){},close(){}};
+  const publisher={async list(){return[{sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:false}]},async reopen(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile}},async getState(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:false,isStreaming:false,isCompacting:false,isBashRunning:false,isRunningTools:false,hasRunningRlmChildren:false,unfinishedActionCount:0,sessionActions:{queuedCount:0,steering:[],followUps:[]}}},async deliverHandoff(){},close(){}};
   const dependencies={git:{repositoryRoot(){return cwd},hasBranch(){return true},worktrees(){return[{path:worktree,branch:identity.branch}]}},filesystem:{readIdentity(){return identity},writeIdentity(_path,value){identity=value;writeFileSync(identityPath,JSON.stringify(value))},exists(){return true}},publisher};
   const f=createHarness(cwd,createReviewedPlanExtension(dependencies));f.entries.push({type:"custom",customType:"prime-claw-conversation-oversight",data:{markerVersion:2,status:"active",ownerSessionId:"owner-session",slug,sourceLocation:LOCATION,episodeId:identity.episodeId,episodeSessionFile:identity.episodeSessionFile,branch:identity.branch,worktree,sessionName:identity.sessionName,identityVersion:2,admission:"delivered"}});
   const result=await f.tools.get("handoff_spec_episode").execute("handoff",{location:LOCATION,guidance:""},undefined,undefined,f.ctx);assert.equal(result.isError,undefined);assert.equal(identity.episodeActiveSessionId,"new-route");const context=await f.events.get("context")({messages:[]},f.ctx);assert.equal(context.messages.filter(m=>m.customType==="prime-claw-oversee-episode-package").length,1);
+});
+
+test("owner handoff tool success text agrees with prompt delivery details", async (t) => {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-handoff-success-")));
+  const worktree = join(dirname(cwd), `${cwd.split("/").at(-1)}-alpha-plan-episode`);
+  t.after(() => {
+    rmSync(worktree, { recursive: true, force: true });
+    rmSync(cwd, { recursive: true, force: true });
+  });
+  mkdirSync(join(cwd, LOCATION), { recursive: true });
+  mkdirSync(worktree, { recursive: true });
+  writeSkill(worktree, "canonical handoff", "handoff");
+  writeSkill(worktree, "canonical execute", "execute");
+  const identity = {
+    version: 2,
+    slug: "alpha-plan",
+    sourceLocation: LOCATION,
+    ownerSessionId: "owner-session",
+    branch: "episode/alpha-plan",
+    worktree,
+    sessionName: "alpha-plan-episode",
+    episodeId: "episode-id",
+    episodeActiveSessionId: "active-episode-id",
+    episodeSessionFile: join(cwd, "episode.jsonl"),
+    bootstrapAdmission: "delivered",
+  };
+  const idle = {
+    activeSessionId: identity.episodeActiveSessionId,
+    sessionId: identity.episodeId,
+    sessionFile: identity.episodeSessionFile,
+    sessionName: identity.sessionName,
+    cwd: identity.worktree,
+    isSessionActive: false,
+    isStreaming: false,
+    isCompacting: false,
+    isBashRunning: false,
+    isRunningTools: false,
+    hasRunningRlmChildren: false,
+    unfinishedActionCount: 0,
+    queuedCount: 0,
+    sessionActions: { queuedCount: 0, steering: [], followUps: [] },
+  };
+  let delivered = 0;
+  const dependencies = {
+    git: {
+      repositoryRoot() { return cwd; },
+      hasBranch() { return true; },
+      worktrees() { return [{ path: worktree, branch: identity.branch }]; },
+    },
+    filesystem: {
+      readIdentity() { return identity; },
+      exists() { return true; },
+    },
+    publisher: {
+      async list() { return [idle]; },
+      async getState() { return idle; },
+      async deliverHandoff() { delivered += 1; },
+      close() {},
+    },
+  };
+  const f = createHarness(cwd, createReviewedPlanExtension(dependencies));
+
+  const result = await f.tools.get("handoff_spec_episode").execute(
+    "handoff-call-success",
+    { location: LOCATION },
+    undefined,
+    undefined,
+    f.ctx,
+  );
+
+  assert.equal(result.isError, undefined);
+  assert.equal(delivered, 1);
+  assert.equal(result.details.handoffDelivery, "prompt");
+  assert.equal(result.details.executeDelivery, "followUp");
+  assert.match(result.content[0].text, /ordinary prompt/);
+  assert.match(result.content[0].text, /immediate or queued/);
+  assert.doesNotMatch(result.content[0].text, /sent as steer/);
 });
 
 test("owner handoff tool requires a durable identity for the exact location", async (t) => {

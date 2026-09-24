@@ -1,9 +1,9 @@
 # Specification — Conversation-driven episode oversight
 
 > **Status:** living future specification; manual lifecycle proven, lightweight plugin encoding proposed for operator review.
-> **Depends on:** [Reviewed future plans and worktree-isolated implementation episodes](../../archive/worktree-isolated-specification-episodes/SPECIFICATION.md)
-> **Related delivered work:** [handoff continuation resilience](../../archive/handoff-continuation-resilience/SPECIFICATION.md), [conversational Ralph command routing](../../archive/conversational-ralph-command-routing/SPECIFICATION.md), [future specification bundles](../../../../docs/future-specification-bundles.md), and [handoff chain](../../../../docs/handoff-chain.md)
-> **Related future work:** [Universal-agent and project-conversation POC](../universal-agent-project-conversation-poc/SPECIFICATION.md)
+> **Depends on:** [Reviewed future plans and worktree-isolated implementation episodes](archive/worktree-isolated-specification-episodes/SPECIFICATION.md)
+> **Related delivered work:** [handoff continuation resilience](archive/handoff-continuation-resilience/SPECIFICATION.md), [conversational Ralph command routing](archive/conversational-ralph-command-routing/SPECIFICATION.md), [future specification bundles](../../docs/future-specification-bundles.md), and [handoff chain](../../docs/handoff-chain.md)
+> **Related future work:** [Universal-agent and project-conversation POC](future/universal-agent-project-conversation-poc/SPECIFICATION.md)
 
 ## Purpose
 
@@ -55,8 +55,12 @@ conversation-to-episode transitions that this feature builds on:
   focused compaction request before the first execute slice;
 - exact-owner `handoff_spec_episode(location, guidance?)` for later slice
   transitions;
-- canonical handoff as fail-if-busy `steer` followed by canonical execute
-  exactly once as the sole queued `followUp`;
+- handoff-first bootstrap after validated publication, canonical preflight, and
+  durable v2 admission journaling;
+- later owner continuation after a fresh exact observed-state/quiescence check;
+- canonical handoff for both callers as an ordinary `prompt` with `queueIfBusy:
+  false` and no `streamingBehavior`, followed by canonical execute exactly once
+  as the sole queued `followUp`;
 - agent-owned heartbeats and existing session observation for bounded watches;
 - fresh RLM agents for independent EXPERT review, with dogfood explicitly using
   an operator-authorized higher-capability reviewer model rather than silently
@@ -342,9 +346,10 @@ New episodes start with the proven ordered transition:
 ```text
 create branch and worktree
   → promote and commit the reviewed future folder
-  → fork and publish the inherited episode session
+  → complete canonical handoff/execute preflight
+  → fork and validate publication of the inherited episode session
   → persist v2 handoff-pending admission state
-  → send canonical handoff as steer
+  → send canonical handoff as an ordinary prompt
   → request focused compaction of inherited planning context
   → persist execute-pending after handoff acknowledgement
   → queue canonical execute exactly once as the sole follow-up
@@ -354,6 +359,11 @@ create branch and worktree
 Direct execute at bootstrap was tried and was wrong: the first slice inherited a
 large planning conversation without the intended context-focusing handoff. The
 handoff-first sequence is required for new episodes.
+
+Fresh bootstrap does not read episode state, require a previous-slice
+completion report, or claim an observed-idle snapshot. The fresh exact
+observed-state/quiescence check belongs to later `handoff_spec_episode`
+continuation.
 
 Admission state is not work-completion state. Acknowledgement means only that the
 ordered daemon mutation was accepted.
@@ -371,10 +381,19 @@ generation. This includes bootstrap, continuation, repairs, review rework, and
 requested evidence. The watch uses existing observation and persisted
 Git/session evidence and never steers active work.
 
-Direct reports are the fast path; the heartbeat is a missed-report safety net. It
-is cancelled as soon as the generation is reconciled as complete, blocked,
-stopped, or waiting only for owner/operator action. A later generation gets a
-fresh watch. Repeated unchanged idle polling or duplicate watches are bugs.
+The EPISODE sibling and its process are trusted coordination participants. Its
+explicit completion report is the normal coordination signal. The project
+conversation independently reviews and accepts the exact reported slice; it does
+not require a daemon snapshot to prove that the sibling meant "complete." If the
+session then appears reasonably quiescent, the owner issues the handoff.
+
+Direct reports are the fast path; the heartbeat is a missed-report safety net. If
+no completion report arrived but a heartbeat sees apparent quiescence, the owner
+asks the sibling exactly: `You seem done with your work. Are you complete or waiting for some process?` The owner trusts that answer before beginning review
+or handoff. The heartbeat is cancelled as soon as the generation is reconciled
+as complete, blocked, stopped, or waiting only for owner/operator action. A later
+generation gets a fresh watch. Repeated unchanged idle polling or duplicate
+watches are bugs.
 
 The first release does not add a notification transport, event bus, scheduler
 service, or monitoring database. If this proven observation path fails in later
@@ -398,15 +417,26 @@ The review disposition is:
 
 For `advance` or an in-scope `revise`, the project conversation may invoke
 `handoff_spec_episode` without asking the operator to transport another
-`/handoff`. Because successful admission is a terminal routing action, the owner
+`/handoff`. It does so after the trusted completion answer, its independent
+review and acceptance of the exact slice, and a reasonably quiescent session
+observation. Because successful admission is a terminal routing action, the owner
 must cancel the completed generation watch and pre-arm exactly one non-steering
 watch for the intended new generation immediately before the call. The host
 capability then preflights canonical handoff and execute, checks the exact owner
-and idle episode, sends handoff as fail-if-busy `steer`, and queues exactly one
-execute `followUp`. A definite no-admission failure cancels the pre-armed watch;
-success, partial admission, or ambiguity keeps it until the transition is
-reconciled. The owner never attempts to create the watch after a successful
-terminal call.
+and current episode snapshot, retains any valid resident route, and republishes
+only when no route exists. An observed busy snapshot blocks admission.
+
+The host sends handoff as an ordinary `prompt` with `queueIfBusy: false` and no
+`streamingBehavior`, then queues exactly one execute `followUp`. Measured Prime
+Agent 0.9.5 behavior is narrower than an atomic all-busy guard: an intervening
+streaming race definitely rejects the ordinary prompt, while residual non-streaming runtime work can cause it to queue until idle. That queue is
+acceptable after the trusted completion report (or trusted status answer) and
+owner acceptance. Success means only that handoff and its sole execute follow-up
+were admitted, immediate-or-queued; it does not mean either workflow completed.
+A definite first-send rejection sends no execute and leaves the pre-armed
+heartbeat to retry later. Partial admission or ambiguity remains an inspection
+boundary with no replay. The owner never attempts to create the watch after a
+successful terminal call.
 
 Ordinary `agent_message.send()` is model input. It does not dispatch a sibling's
 native slash command. The deterministic host capability exists because the
@@ -529,7 +559,7 @@ decides that the spec is implemented and never merges, abandons, or cleans resou
 Before oversight begins, the project conversation must verify that its required
 native commands and workflow policy are available. Capability provisioning is
 owned by the related
-[universal-agent and project-conversation POC](../universal-agent-project-conversation-poc/SPECIFICATION.md).
+[universal-agent and project-conversation POC](future/universal-agent-project-conversation-poc/SPECIFICATION.md).
 Missing tooling is a visible preparation gap, not permission to imitate a
 native transition.
 

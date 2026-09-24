@@ -167,7 +167,7 @@ def assert_creation_trace(daemon):
     assert [ack_create["commandId"], ack_handoff["commandId"], ack_execute["commandId"]] == [
         create["id"], handoff["id"], execute["id"],
     ]
-    assert handoff["streamingBehavior"] == "steer" and handoff["queueIfBusy"] is False
+    assert "streamingBehavior" not in handoff and handoff["queueIfBusy"] is False
     assert execute["streamingBehavior"] == "followUp" and execute["queueIfBusy"] is True
     for prompt in (handoff, execute):
         assert prompt["source"] == "extension"

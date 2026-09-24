@@ -75,8 +75,16 @@ The exact location selects the ignored durable episode identity. Host code
 requires the caller to be that identity's top-level owner and revalidates the
 branch, worktree, durable session ID and file, CWD, and session name. The model
 cannot supply an active routing ID, worktree, session name, command, phase, or
-arbitrary prompt. An inactive exact session is reopened through the existing
-identity-checked path and its refreshed active ID is persisted.
+arbitrary prompt. A resident route is retained even while the session has no
+pending work (`isSessionActive: false`). The exact durable session is published
+again only when no active routing ID exists, and its refreshed ID is persisted.
+
+The EPISODE sibling and process are trusted coordination participants. Its
+explicit completion report tells the PROJECT_CONVERSATION when to independently
+review the exact slice. After owner acceptance, a reasonably quiescent session
+observation is enough to attempt handoff. The heartbeat is only a missed-report
+safety net. If there is no report but a heartbeat sees apparent quiescence, the
+owner asks `You seem done with your work. Are you complete or waiting for some process?` and trusts the answer before review or handoff.
 
 The exact owner may initiate this transition without a new operator transport
 request after it accepts an exact candidate and selects an approved `advance`, or
@@ -88,36 +96,32 @@ product decisions, or scope expansion, and the tool is not used for `consult`,
 above remains operator-request-only; this owner-specific rule does not change it.
 
 Before sending either workflow, the host preflights both canonical Markdown
-files and obtains the daemon's exact state. Admission fails closed unless the
-episode has no active turn, tool, bash process, compaction, RLM child, unfinished
-action, steering message, or follow-up. The first daemon prompt is canonical
-handoff with `streamingBehavior: "steer"` and `queueIfBusy: false`; only after
-that acknowledgement does the host queue canonical execute with
-`streamingBehavior: "followUp"` and `queueIfBusy: true`. The second prompt is
-the sole follow-up. The daemon's fail-if-busy check is authoritative if activity
-starts after the state snapshot.
+files and obtains the daemon's exact state. An observed busy snapshot fails
+closed. The first daemon request is canonical handoff as an ordinary `prompt`
+with `queueIfBusy: false` and no `streamingBehavior`; only after that
+acknowledgement does the host queue canonical execute with `streamingBehavior:
+"followUp"` and `queueIfBusy: true`. The second prompt is the sole follow-up.
+Measured Prime Agent 0.9.5 behavior is not an atomic all-busy guard: an
+intervening streaming race definitely rejects the ordinary prompt, but residual non-streaming runtime work can make it queue until idle. That queue is acceptable
+after trusted completion and owner acceptance. A `steer` request remains wrong
+for this path because it can queue while streaming even when `queueIfBusy` is
+false.
 
-Success reports admission only. The episode's ordered `Status / Evidence / Next
-Step` handoff result is the observable compaction-request evidence; execute can
-run only after that handoff turn reaches its boundary. A first-send failure
-queues no execute. A second-send failure explicitly reports that handoff was
-admitted but continuation was not queued. Ambiguous transport outcomes require
-owner inspection and are never retried automatically. Existing episode
-resources are never deleted to compensate for a remote handoff failure. At the
-accepted idle boundary, the owner cancels the old generation watch and pre-arms
-exactly one non-steering intended-generation watch immediately before the
-terminal call. That watch is cancelled only on definite no-admission failure and
-retained across success, partial admission, or ambiguity until reconciliation.
-It is never created after successful terminal admission and never duplicated.
-Terminal finalization cancels episode watches and returns the same conversation
-to incubation; a later different reviewed folder starts through a fresh native
-`/implement-spec`, not through this continuation tool.
+Success reports immediate-or-queued admission only, never workflow completion.
+The episode's ordered `Status / Evidence / Next Step` handoff result is the
+observable compaction-request evidence. A definite first-send failure queues no
+execute and leaves the owner watch available for a later retry after trusted
+completion and a new reasonably quiescent observation. A second-send failure
+explicitly reports that handoff was admitted but continuation was not queued.
+Ambiguous transport outcomes require owner inspection and are never retried
+automatically. Existing episode resources are never deleted to compensate for a
+remote handoff failure.
 
 Initial `createSpecEpisode()` also uses the handoff-first transport. The forked
 episode inherits the reviewed planning conversation, so canonical handoff
 requests focused compaction before the first execute slice starts. A version-2
 bootstrap admission journal durably separates the two daemon mutations:
-`handoff-pending` precedes the steer; `execute-pending` is persisted after the
+`handoff-pending` precedes the ordinary prompt; `execute-pending` is persisted after the
 handoff acknowledgement and before the sole follow-up; `delivered` follows the
 second acknowledgement. Rejections and ambiguous crash windows after handoff
 preserve all episode resources and never replay automatically. Version-1

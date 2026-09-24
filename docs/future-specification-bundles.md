@@ -196,12 +196,16 @@ The fork includes the successful `create_spec_episode` tool result so it does
 not begin with a dangling tool call. Prime Agent 0.9.5 has no public extension
 API that publishes a fork as a separate sibling without replacing the owner,
 so the narrowly scoped host adapter uses the daemon supervisor socket injected
-into daemon workers. Before task delivery it preflights both canonical workflows and atomically
-stores a version-2 identity with `bootstrapAdmission: handoff-pending`. New
-episodes then use the same narrow two-message transport as later owner-driven
-transitions: canonical handoff is sent as fail-if-busy `steer`, and canonical
-execute is queued exactly once as the sole `followUp`. This focuses the inherited
+into daemon workers. Fresh creation preflights both canonical workflows,
+validates publication, and atomically stores a version-2 identity with
+`bootstrapAdmission: handoff-pending`. It then sends canonical handoff as an
+ordinary `prompt` with no `streamingBehavior`; after acknowledgement it records
+`execute-pending`, queues canonical execute exactly once as the sole `followUp`,
+and records `delivered` after execute acknowledgement. This focuses the inherited
 planning conversation through the handoff compaction boundary before slice 1.
+Fresh bootstrap does not read episode state, require a previous-slice completion
+report, or obtain an observed-idle snapshot. The later owner-driven continuation
+path retains its fresh exact state re-read and observed-quiescence check.
 
 The bootstrap admission journal records transport stages, not workflow
 completion:
@@ -260,42 +264,38 @@ oversight policy, run implementation in the owner conversation, or invoke
 
 ## Owner-driven episode continuation
 
-After one implementation slice reaches an idle boundary, the owning project
-conversation reconciles evidence and selects `advance`, `revise`, `consult`, or
-`pause`. It may call `handoff_spec_episode` for `advance` after accepting the
-exact candidate, or for `revise` from accepted findings already recorded inside
-the approved specification and plan. No new operator transport request is
-required for those two in-scope dispositions. `consult`, `pause`, scope changes,
-product decisions, merge, abandonment, and cleanup retain their existing
-operator boundaries.
+After an implementation slice, the EPISODE sibling's explicit completion report
+is the coordination signal. The owning project conversation independently
+reviews and accepts the exact slice, then can call `handoff_spec_episode` when
+the session appears reasonably quiescent. The heartbeat is only a missed-report
+safety net: if it observes apparent quiescence without a completion report, the
+owner asks `You seem done with your work. Are you complete or waiting for some process?` and trusts the answer before review or handoff. The call uses the exact
+future-folder location that created the episode and optional accepted in-scope
+compaction guidance. It is not another implementation authorization surface.
+The durable episode identity remains the authority: host code requires the same
+top-level owner session and revalidates every derived branch, worktree, and
+durable-session field before using the daemon's current active routing ID.
 
-The call uses the exact retained future-folder location that created the episode.
-Optional compaction guidance is limited to operator focus or the owner's bounded
-synthesis of accepted recorded in-scope findings. It is never arbitrary prompt
-routing. This is not another implementation authorization surface. The durable
-episode identity is the authority: host code requires the same top-level owner
-session and revalidates every derived branch, worktree, and durable-session field
-before using the daemon's current active routing ID.
+The operation retains an exact resident route even when `isSessionActive` is
+false, and publishes the durable session again only when no route exists. It
+then re-reads live daemon state and fails closed on an observed busy snapshot.
+It loads the current canonical handoff and execute Markdown from the episode
+worktree before either send. Handoff is sent first as an ordinary `prompt` with
+`queueIfBusy: false` and no `streamingBehavior`; execute is then queued exactly
+once as the sole `followUp`. Measured Prime Agent 0.9.5 behavior is not an atomic all-busy guard: a streaming race definitely rejects the ordinary prompt, while
+residual non-streaming runtime work can make it queue until idle. That queue is
+acceptable after trusted completion and owner acceptance. `steer` remains
+unsuitable because it can queue while streaming even with `queueIfBusy: false`.
+The synchronous result proves immediate-or-queued admission only, never
+completion. The episode's handoff `Status / Evidence / Next Step` output records
+whether focused compaction was requested before the queued execute turn
+continues.
 
-At the accepted idle boundary, the owner cancels the old generation watch and
-pre-arms exactly one non-steering intended-generation watch immediately before
-the terminal call. It cancels it only on definite no-admission failure and
-retains it across success, partial admission, or ambiguity until reconciliation.
-The owner never creates that watch after success or arms a duplicate.
-
-The operation reopens an inactive exact episode when needed, then checks the
-live daemon state and fails closed unless the episode is fully quiescent with an
-empty steering/follow-up queue. Owner, location, identity, quiescence,
-canonical-prompt, uncertainty, and replay enforcement are unchanged. It loads the current canonical handoff and
-execute Markdown from the episode worktree before either send. Handoff is sent
-first as fail-if-busy `steer`; execute is then queued exactly once as the sole
-`followUp`. The synchronous result proves only ordered admission. The episode's
-handoff `Status / Evidence / Next Step` output records whether focused compaction
-was requested before the queued execute turn continues.
-
-Definite first-send failure queues no continuation. Definite second-send failure
-reports the irreversible partial transition. An uncertain response at either
-stage is an inspection boundary, not permission to retry. The operation never
+Definite first-send failure queues no continuation and leaves the owner watch
+available for a later retry after trusted completion and a new reasonably
+quiescent observation. Definite second-send failure reports the irreversible
+partial transition. An uncertain response at either stage is an inspection
+boundary, not permission to retry. The operation never
 kills the session, removes resources, or adds nonces, leases, durable approvals,
 or generalized remote routing state.
 
@@ -316,21 +316,28 @@ pytest -q tests/test_reviewed_plan_extension.py
 ```
 
 The Node suites cover native and conversational planning registration,
-validation, canonical Markdown loading, follow-up admission, failure isolation,
-opaque temporary-Git promotion, lifecycle-directory preservation, promotion
-commits, inherited context, protocol-7 daemon envelopes, durable handoff-first bootstrap admission, version-1 compatibility,
-per-mutation crash-window and uncertain-delivery replay suppression, allowed-empty promotion commits, partial
-cleanup observability, active and inactive replay, collision safety, confirmed
-invocation-owned cleanup, exact-owner remote handoff, quiescent-state checks,
-ordered steer/follow-up delivery, and visible partial or uncertain failures. The Python bridge reruns both suites and uses
-installed offline Prime Agent RPC plus startup probes to prove one native
-`plan`, one native `implement-spec`, explicit `ralph_plan`, `create_spec_episode`, and `handoff_spec_episode`
-tools, no `ralph_implement_spec` tool, the confirmed
-`steer` lifecycle ordering described above, and a valid inherited
-Prime Agent context, and bounded real daemon create/state/messages/kill behavior
-at the episode worktree CWD.
+validation, canonical Markdown loading, controlled publisher acknowledgements and
+rejections, failure isolation, opaque temporary-Git promotion,
+lifecycle-directory preservation, promotion commits, inherited context,
+protocol-7 daemon envelopes, durable handoff-first bootstrap admission,
+version-1 compatibility, per-mutation crash-window and uncertain-delivery replay
+suppression, allowed-empty promotion commits, partial cleanup observability,
+active and inactive replay, collision safety, confirmed invocation-owned cleanup,
+exact-owner remote handoff, quiescent-state checks, ordered prompt/follow-up
+delivery, and visible partial or uncertain failures. These maintained plugin tests
+exercise production request and control-flow code. Their controlled client
+responses are not native-runtime admission proof.
 
-These checks prove deterministic command loading and bounded episode mechanics.
+The Python bridge reruns both suites and uses isolated installed Prime Agent RPC
+plus startup probes to check one native `plan`, one native `implement-spec`,
+explicit `ralph_plan`, `create_spec_episode`, and `handoff_spec_episode` tools, no
+`ralph_implement_spec` tool, a valid inherited Prime Agent context, and bounded
+daemon create/state/messages/kill behavior at the episode worktree CWD. Previously
+measured Prime Agent 0.9.5 streaming, residual-work queueing, and steer behavior is
+retained review evidence rather than a claim manufactured by the plugin tests.
+
+Together these checks prove deterministic command loading and bounded episode
+mechanics within their stated test boundaries.
 They use disposable repositories, offline RPC, and controlled daemon probes.
 They do **not** prove that a human completed both review gates, observed a live
 production episode through execute/handoff, made a terminal merge or abandonment

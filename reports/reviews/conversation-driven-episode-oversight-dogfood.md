@@ -4,7 +4,7 @@
 
 ## Scope and current boundary
 
-The isolated dogfood has completed setup, native promotion, and its first implementation generation. Generation two has **not** been admitted. The shared continuation repair is being developed and reviewed separately; this report does not integrate, install, or exercise that work.
+The isolated dogfood has completed setup, native promotion, and its first implementation generation. Generation two has **not** been admitted. The owner-accepted shared continuation repair is now incorporated into the outer episode branch through an ordinary two-parent integration candidate. It has not been installed into the user-global plugin, loaded by the fixture owner, or exercised for a fixture retry.
 
 Open gates remain: a safe canonical continuation, generation two, fresh final EXPERT review of the complete fixture candidate, explicit operator disposition, conservative cleanup, and return to ordinary conversation without a stale episode lock.
 
@@ -64,13 +64,17 @@ The review's supporting checks passed 90 selected Node tests, 5 documentation/po
 
 The operator then corrected the continuation contract. The EPISODE sibling and its completion report are trusted process participants: a direct completion report triggers exact owner review, and after acceptance plus reasonable observed quiescence the owner may issue canonical handoff. The heartbeat is a missed-report or off-track safety net, not a substitute scheduler. If the sibling has not reported but appears idle, the owner asks whether it is complete or waiting and trusts the answer before review or handoff. Residual non-streaming work may cause an ordinary prompt to wait until idle; that is acceptable after report and acceptance. A streaming rejection remains definite and may be retried later. No Prime Agent core change, compare-and-swap primitive, or lease is required by this corrected contract.
 
-A replacement shared repair must preserve the valid state/route fixes, correct the misleading success receipt, remove false atomic claims and tests, and document that immediate-or-queued admission is not completion. That replacement is outside this evidence-only slice.
+The first replacement, exact `dceb5ef1dbb29501a63d951790509c8852c8fc85`, preserved the route/state repair and corrected the receipt but remained blocked because its test language still overstated native proof and its documentation did not clearly distinguish bootstrap from later observed continuation. The bounded docs/tests repair exact `a9381ebb50e100ec85a77048ec35ce76d54d77ba` then removed the fake-native claims, stated the controlled publisher boundary, distinguished bootstrap's lack of a state read from later continuation's fresh snapshot, and corrected intended-retry watch lifecycle. Its final five-file delta contained no runtime-code change.
+
+The owner accepted cumulative shared main exact `a9381ebb50e100ec85a77048ec35ce76d54d77ba` after exact lineage and scope checks, Node 90/90, implementer Python 260/260, a focused pass after one unrelated owner-suite watchdog timeout, link/diff checks, and a fresh exact `openai-codex/gpt-6-astra` reasoning-`max` **PASS**. The retained final review is `trusted-handoff-evidence-repair-review.md` in the owner's session artifacts. The accepted contract is the trusted completion report or status answer, independent owner review and acceptance, reasonable quiescence, an observed continuation snapshot, ordinary prompt admission that may be immediate or queued, definite streaming rejection, truthful receipt, and conservative uncertainty with no replay. Bootstrap performs no state read before publication. No atomic all-busy, Prime Agent core, compare-and-swap, or lease claim remains.
+
+This outer branch now incorporates that accepted cumulative repair through an ordinary merge candidate with first parent `39e946ae32769b9bb767a86176c5ce32d6c3a832` and second parent `a9381ebb50e100ec85a77048ec35ce76d54d77ba`. Conflict resolution preserved the promoted future-folder deletion, the accepted trusted-sibling documentation, the episode finalization and oversight tests, and the accepted main admission tests. This integration is candidate evidence only until exact owner review. It was not installed or exercised against the fixture.
 
 ## Evidence sources and preservation
 
-This record reconciles durable Bead `prime-claw-h6w.22`, the fixture's durable episode state, exact Git objects for promotion and generation one, the rejected exact main candidate, and the retained EXPERT report. It intentionally excludes raw conversation transcripts, credentials, private data, and host-local absolute paths.
+This record reconciles durable Bead `prime-claw-h6w.22`, the fixture's durable episode state, exact Git objects for promotion and generation one, rejected historical repair candidates, owner-accepted shared main, and retained EXPERT reports. It intentionally excludes raw conversation transcripts, credentials, private data, and host-local absolute paths.
 
-The fixture baseline, episode worktree and branch, local bare remote, durable owner state, and accepted generation-one commit remain preserved. No fixture retry, generation-two admission, final EXPERT review, terminal disposition, merge, abandonment, or cleanup is claimed here.
+The fixture baseline, episode worktree and branch, local bare remote, durable owner state, and accepted generation-one commit remain preserved. No plugin installation, fixture retry, generation-two admission, final feature EXPERT review, terminal disposition, merge to main, abandonment, or cleanup is claimed here.
 
 ## Evidence-slice validation
 
@@ -82,3 +86,19 @@ The outer evidence-only candidate passed the maintained repository gates:
 - bounded relative-link validation for changed Markdown — **PASS**, 2/2 local links resolve.
 
 These checks validate the evidence/docs candidate. They do not complete the open live-dogfood gates listed above.
+
+## Accepted-main integration validation
+
+The ordinary two-parent integration candidate passed the final serial gates:
+
+- focused merged handoff/finalization Node coverage — **PASS**, 85/85;
+- maintained Node — **PASS**, 175/175;
+- maintained Python — **PASS**, 298 tests plus 7 subtests (11 deprecation warnings);
+- plugin inventory/install-policy checks — **PASS**, 15 tests plus 7 subtests;
+- changed-Markdown local links — **PASS**, 15/15;
+- plugin-source integrity — **PASS**, all 8 managed source/kernel files are regular and nonempty, with no project-local plugin root; and
+- `git diff --check` and conflict-marker checks — **PASS**.
+
+The first parallel maintained run was not accepted as gate evidence. It exposed one existing finalization-lock timing timeout under concurrent load and seven integration assertions that still referenced the deleted future bundle or historical `steer` transport. The lock case passed focused serially; the integration assertions were corrected to the promoted active paths and accepted ordinary-prompt contract. Both complete maintained suites then passed serially as recorded above.
+
+These checks validate outer branch integration only. They do not prove user-global installation, fixture retry, generation two, final feature EXPERT review, operator disposition, or cleanup.

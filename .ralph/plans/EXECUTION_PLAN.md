@@ -1201,10 +1201,15 @@ for ordinary project conversation without touching the canonical checkout.
    heartbeat. Record that handoff-first admission and work completion remain
    distinct claims.
 2. Reconcile the first exact pushed commit and obtain focused independent review.
-3. Accept or revise it on evidence, update the fixture's durable review record,
-   and invoke `handoff_spec_episode` without another operator transport request.
-4. Cancel the completed generation's watch and create one new bounded watch for
-   the admitted continuation.
+3. Accept or revise it on evidence and update the fixture's durable review record.
+4. Cancel the completed generation's watch, pre-arm exactly one non-steering
+   watch for the intended continuation, and then invoke the terminal
+   `handoff_spec_episode` capability without another operator transport request.
+   Keep that watch available after definite first no-admission while a later owner
+   retry remains intended. Retain it across success, partial admission, or
+   ambiguity until the generation/retry is reconciled complete, blocked, stopped,
+   or waiting only for owner/operator action. The watch must not poll or replay
+   automatically.
 5. Reconcile the complete exact candidate and obtain a fresh final EXPERT review
    using the checked-in exact selector and reasoning level. Record the admitted
    model and reasoning policy against the reviewed commit. Repair and renew
@@ -1268,6 +1273,42 @@ repair was not integrated or applied. Shared-fix replacement, fixture retry,
 generation two, fresh final EXPERT review, operator disposition, conservative
 cleanup, and ordinary-conversation return remain future gates. Preserve all
 fixture resources and accepted generation-one state while those gates remain.
+
+### Accepted shared repair integration checkpoint
+
+The owner accepted cumulative shared main exact
+`a9381ebb50e100ec85a77048ec35ce76d54d77ba` after exact lineage/scope checks,
+maintained and focused gates, and a fresh exact Astra/max `PASS`. Its accepted
+contract trusts the sibling's completion report or status answer. If no report
+arrives but the heartbeat sees apparent quiescence, ask `You seem done with your work. Are you complete or waiting for some process?`
+and trust the answer before review or handoff. A streaming race is a definite
+rejection, while residual non-streaming work may wait until idle. The contract then requires
+independent owner review and acceptance plus reasonable quiescence. Later
+continuation obtains a fresh state snapshot; bootstrap performs no state read
+before publication. Handoff uses an ordinary prompt that may be admitted
+immediately or queued behind residual non-streaming work; streaming is a definite
+rejection. Receipts remain truthful, uncertainty is conservative with no replay,
+and no atomic all-busy, Prime Agent core, compare-and-swap, or lease claim is
+made.
+
+This bounded slice integrates that exact accepted main into accepted outer
+checkpoint `39e946ae32769b9bb767a86176c5ce32d6c3a832` through one ordinary
+no-rewrite merge. Conflict resolution preserves the promoted future-folder
+deletion, accepted shared documentation, episode finalization/oversight tests,
+and accepted main admission tests. One stale integration test now supplies the
+required idle post-publication snapshot instead of the rejected historical
+`isSessionActive: true` interpretation. The maintained plugin tests do not manufacture native-runtime proof; they cover production control flow with controlled client
+acknowledgements and rejections while the measured Prime Agent behavior remains
+review evidence. Final serial validation passed focused merged Node 85/85,
+maintained Node 175/175, maintained Python 298 plus seven subtests, plugin
+inventory/install-policy 15 plus seven subtests, changed-Markdown local links
+15/15, plugin-source integrity, conflict-marker checks, and `git diff --check`.
+The promoted active specification's relative links were corrected for its active
+location. Record the exact two-parent merge commit in Bead evidence after commit.
+
+Do not install or restart the user-global plugin in this slice. Do not reload the
+fixture owner, retry handoff, admit generation two, run the final feature EXPERT,
+seek operator disposition, merge to main, or clean resources.
 
 - Append final evidence to `prime-claw-h6w.22`; close it only when all acceptance
   criteria pass.

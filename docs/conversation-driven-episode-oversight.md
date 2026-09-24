@@ -143,14 +143,29 @@ The call retains the exact future-folder location. Optional guidance is either
 operator focus or a bounded compaction-focus synthesis of those accepted recorded
 findings. Arbitrary chat, unaccepted review findings, product decisions, scope
 expansion, and `consult`, `pause`, or terminal dispositions cannot be routed this
-way. Host ownership, identity, location, quiescence, canonical-prompt,
-uncertainty, and replay checks remain unchanged. At the accepted idle boundary,
-the owner cancels the old generation watch, then pre-arms exactly one non-steering
-intended-generation watch immediately before the terminal call. A definite
-no-admission failure cancels that watch; success, partial admission, or ambiguity
-retains it until reconciliation. The owner never creates the intended-generation
-watch after success or arms a duplicate. Admission proves neither compaction nor
-work completion, and an uncertain result is never retried.
+way. The EPISODE sibling's explicit completion report is the normal coordination
+signal. If a heartbeat instead observes apparent quiescence without a report, the
+owner asks whether the episode is complete or waiting and trusts that status
+answer before review or handoff.
+
+After trusted completion, exact owner review and acceptance, and a reasonably
+quiescent observation, the owner cancels the completed-generation watch and
+pre-arms exactly one watch for the intended continuation immediately before the
+terminal call. Host code preserves a valid resident route even when
+`isSessionActive` is false, republishes only when no route exists, then obtains a
+fresh exact state snapshot and rejects an observed busy state. Bootstrap remains
+distinct: it has no pre-existing state snapshot to read before publication.
+
+Canonical handoff is sent as an ordinary `prompt` with `queueIfBusy: false` and
+no `streamingBehavior`, followed by exactly one execute `followUp`. This is not an
+atomic all-busy guard. A streaming race definitely rejects the prompt; residual
+non-streaming work can make it wait until idle, which is acceptable after trusted
+completion and owner acceptance. A definite first-send rejection admits no
+execute and leaves the intended-generation watch available for a later bounded
+retry. Success proves only immediate-or-queued admission, never workflow
+completion. Partial or uncertain admission is an inspection boundary and is
+never blindly replayed. No Prime Agent core change, compare-and-swap primitive,
+or lease is claimed or required.
 
 After operator-authorized terminal finalization, episode-specific watches end and
 the same session returns to ordinary CONVERSATION incubation. A later reviewed
