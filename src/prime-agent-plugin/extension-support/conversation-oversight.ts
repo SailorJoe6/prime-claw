@@ -249,17 +249,70 @@ function markerForIdentity(ctx: ExtensionContext, identity: EpisodeIdentity): Ma
 function markerForLocation(ctx: ExtensionContext, sourceLocation: string): MarkerRecord | null {
   return markerRecords(ctx).find((record) => (record.marker ?? record.legacy)?.sourceLocation === sourceLocation) ?? null;
 }
-function assertAgreement(marker: OversightMarker, identity: EpisodeIdentity): void {
-  const expected = markerFromIdentity(identity, marker.status);
-  for (const key of Object.keys(expected) as Array<keyof OversightMarker>) {
-    if (marker[key] !== expected[key]) throw new Error(`oversight marker disagrees on ${key}`);
+type StableOversightBindings = {
+  ownerSessionId: string;
+  slug: string;
+  sourceLocation: string;
+  episodeId: string;
+  episodeSessionFile: string;
+  branch: string;
+  worktree: string;
+  sessionName: string;
+  identityVersion: 1 | 2;
+  admission: string;
+};
+const STABLE_BINDING_KEYS = [
+  "ownerSessionId", "slug", "sourceLocation", "episodeId", "episodeSessionFile",
+  "branch", "worktree", "sessionName", "identityVersion", "admission",
+] as const satisfies ReadonlyArray<keyof StableOversightBindings>;
+function stableBindingsFromIdentity(identity: EpisodeIdentity): StableOversightBindings {
+  return {
+    ownerSessionId: identity.ownerSessionId, slug: identity.slug,
+    sourceLocation: identity.sourceLocation, episodeId: identity.episodeId,
+    episodeSessionFile: identity.episodeSessionFile, branch: identity.branch,
+    worktree: identity.worktree, sessionName: identity.sessionName,
+    identityVersion: identity.version,
+    admission: identity.version === 1 ? identity.executeAdmission : identity.bootstrapAdmission,
+  };
+}
+function stableBindingsFromReceipt(receipt: FinalizationReceipt): StableOversightBindings {
+  return {
+    ownerSessionId: receipt.ownerSessionId, slug: receipt.slug,
+    sourceLocation: receipt.sourceLocation, episodeId: receipt.episodeId,
+    episodeSessionFile: receipt.episodeSessionFile, branch: receipt.episodeBranch,
+    worktree: receipt.episodeWorktree, sessionName: receipt.sessionName,
+    identityVersion: receipt.identityVersion, admission: receipt.admission,
+  };
+}
+function stableBindingsFromMarker(marker: OversightMarker): StableOversightBindings {
+  return marker;
+}
+function stableBindingValue(key: keyof StableOversightBindings, value: string | number): string | number {
+  return key === "episodeSessionFile" || key === "worktree" ? resolve(String(value)) : value;
+}
+function assertStableBindingAgreement(
+  left: StableOversightBindings,
+  right: StableOversightBindings,
+  disagreement: (key: keyof StableOversightBindings) => string,
+): void {
+  for (const key of STABLE_BINDING_KEYS) {
+    if (stableBindingValue(key, left[key]) !== stableBindingValue(key, right[key])) {
+      throw new Error(disagreement(key));
+    }
   }
+}
+function assertAgreement(marker: OversightMarker, identity: EpisodeIdentity): void {
+  assertStableBindingAgreement(
+    stableBindingsFromMarker(marker), stableBindingsFromIdentity(identity),
+    (key) => `oversight marker disagrees on ${key}`,
+  );
 }
 function assertLegacyAgreement(marker: LegacyMarker, identity: EpisodeIdentity): void {
   if (marker.status !== "active" || marker.ownerSessionId !== identity.ownerSessionId
     || marker.slug !== identity.slug || marker.sourceLocation !== identity.sourceLocation
     || marker.episodeId !== identity.episodeId
-    || resolve(marker.episodeSessionFile) !== resolve(identity.episodeSessionFile)) {
+    || stableBindingValue("episodeSessionFile", marker.episodeSessionFile)
+      !== stableBindingValue("episodeSessionFile", identity.episodeSessionFile)) {
     throw new Error("legacy oversight marker disagrees with the exact durable expectation");
   }
 }
@@ -344,15 +397,10 @@ function ownerFinalizationReceipts(ctx: ExtensionContext, expectation: EpisodeId
   return values;
 }
 function assertMarkerReceipt(marker: OversightMarker, receipt: FinalizationReceipt): void {
-  const pairs: Array<[unknown, unknown]> = [
-    [marker.ownerSessionId, receipt.ownerSessionId], [marker.slug, receipt.slug],
-    [marker.sourceLocation, receipt.sourceLocation], [marker.episodeId, receipt.episodeId],
-    [resolve(marker.episodeSessionFile), resolve(receipt.episodeSessionFile)],
-    [marker.branch, receipt.episodeBranch], [resolve(marker.worktree), resolve(receipt.episodeWorktree)],
-    [marker.sessionName, receipt.sessionName], [marker.identityVersion, receipt.identityVersion],
-    [marker.admission, receipt.admission],
-  ];
-  if (pairs.some(([left, right]) => left !== right)) throw new Error("oversight marker disagrees with finalization receipt");
+  assertStableBindingAgreement(
+    stableBindingsFromMarker(marker), stableBindingsFromReceipt(receipt),
+    () => "oversight marker disagrees with finalization receipt",
+  );
 }
 
 function markerFromReceipt(receipt: FinalizationReceipt, status: "active" | "inactive"): OversightMarker {
@@ -371,7 +419,7 @@ function matchingReceipt(receipts: FinalizationReceipt[], value: { slug: string;
 type LifecycleRecovery =
   | { kind: "expectation-marker"; identity: EpisodeIdentity }
   | { kind: "legacy-marker"; identity: EpisodeIdentity }
-  | { kind: "receipt-marker"; receipt: FinalizationReceipt; status: "active" | "inactive" }
+  | { kind: "receipt-marker"; receipt: FinalizationReceipt; marker: OversightMarker }
   | { kind: "completing-finalization"; receipt: FinalizationReceipt; marker: OversightMarker };
 
 type LifecycleClassification = {
@@ -465,11 +513,10 @@ function classifyLifecycle(ctx: ExtensionContext): LifecycleClassification {
     if (receipt.state === "completed" && isExpected) {
       throw new Error("completed finalization cannot coexist with a reappearing expectation");
     }
-    candidates.push({
-      kind: "receipt-marker",
-      receipt,
-      status: receipt.state === "authorized" || isExpected ? "active" : "inactive",
-    });
+    const marker = markerFromReceipt(receipt, receipt.state === "authorized" || isExpected ? "active" : "inactive");
+    assertMarkerReceipt(marker, receipt);
+    if (isExpected) assertAgreement(marker, expectation!);
+    candidates.push({ kind: "receipt-marker", receipt, marker });
   }
 
   if (expectation && !recordFor(expectation)) {
@@ -512,8 +559,8 @@ export async function reconcileOversightAtSessionStart(
         pi.appendEntry(OVERSIGHT_MARKER_TYPE, markerFromIdentity(recovery.identity, "active"));
         message = `Migrated legacy oversight for ${recovery.identity.sourceLocation} to the exact v2 marker.`;
       } else if (recovery.kind === "receipt-marker") {
-        pi.appendEntry(OVERSIGHT_MARKER_TYPE, markerFromReceipt(recovery.receipt, recovery.status));
-        message = `Recovered ${recovery.status} oversight finalization state for ${recovery.receipt.sourceLocation} from its durable receipt.`;
+        pi.appendEntry(OVERSIGHT_MARKER_TYPE, recovery.marker);
+        message = `Recovered ${recovery.marker.status} oversight finalization state for ${recovery.receipt.sourceLocation} from its durable receipt.`;
       } else {
         if (!options.recoverCompleting) throw new Error("completing finalization requires the registered recovery coordinator");
         const recovered = await options.recoverCompleting(ctx, recovery.marker);

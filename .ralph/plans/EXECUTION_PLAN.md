@@ -765,6 +765,53 @@ B1-B4, closed R1, and `stash@{0}`. Optional Git default-branch fixture debt is
 excluded. A fresh exact candidate requires renewed complete Slice 1 owner/Astra
 review. Slice 2 remains blocked.
 
+#### R2-R1 repair outcome
+
+The bounded repair generation reconciled authoritative main `56610f4` in merge
+commit `8d2d9d4`, promoted its canonical path-equivalence wording into the active
+plan/specification, and kept the promoted future bundle deleted. R1 remains
+**CLOSED**.
+
+The lifecycle classifier now projects expectations, receipts, and markers into
+one stable-binding shape. One shared comparator keeps owner, generation, source,
+branch, session name, identity version, and admission exact; excludes the mutable
+active route; and applies lexical `path.resolve()` equivalence only to session
+file and worktree without checking existence. Missing-marker recovery constructs
+and validates the exact prospective marker against both its receipt and any
+current expectation before selection, then carries that already-validated object
+to append. Existing-marker readers use the same rule, removing the prior
+append-then-reject seam without rewriting durable records.
+
+The acceptance matrix builds expectation, receipt, and current marker
+independently. It covers normalized-equal session-file and worktree spelling
+variants independently and together, with the variant on either expectation or
+receipt, for `authorized` and `completing` states and missing and existing active
+markers. Both terminal paths are proven nonexistent. A separate existing
+inactive-marker case preserves closed-R1 recovery. Each positive case converges
+once and replay adds no marker, recovery message, or callback. The existing
+stable-conflict table continues to prove readiness/context/repeated-startup
+zero-mutation rejection, correction-only recovery, strict nonpath fields, and
+mutable-route exclusion.
+
+Registered isolated Prime Agent runtime coverage exercises receipt-side
+session-file and worktree variants for both states, reload replay, provider
+counts, marker/message counts, and completed/authorized receipts. It performs no
+recovery-time provider call. The closed R1 real-writer 10-case matrix and all
+lifecycle, lock, terminal-fact, package, route-refresh, legacy, foreign-history,
+cross-generation, and B4 regressions remain green.
+
+Evidence: focused lifecycle Node passed 103/103; focused Python/plugin/native
+passed 28/28; the complete maintained Python suite passed 282 tests plus seven
+subtests with 11 warnings; and the complete Node suite passed 157/157 when run
+serially. A concurrent Node/Python run passed 156/157 with only the already-known
+load-sensitive two-second lock-helper timeout; the exact case and full serial
+suite passed after Python ended. Global apply/check, final installed-copy check,
+TypeScript loading, documentation contracts, and `git diff --check` passed. The
+first independent review found a test-construction error that gave all
+expectation-side artifacts the same spelling; after independent artifact
+construction was added, a fresh read-only re-review returned PASS. The repair
+awaits one exact pushed candidate and renewed complete Slice 1 owner/Astra review.
+
 That coupled repair generation first reconciled authoritative main `5edc73e`
 while preserving the promoted-folder deletion, rejected history, accepted B1
 `e225bb4`, B2 `aff3b819`, B3 `dc439d4`, and B4 `fe8be53`. The sanitized Python

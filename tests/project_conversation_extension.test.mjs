@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -116,6 +116,97 @@ test("ordered startup recovers the writer-produced completing checkpoint with an
   const markerCount=f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length;
   await f.events.get("session_start")({},f.ctx);
   assert.equal(recoveries,1);assert.equal(f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length,markerCount);
+  assert.deepEqual(context(f),{messages:[]});
+  await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);
+});
+
+test("one path-equivalence rule converges expectation receipt and marker spellings",async t=>{
+  const variants=[
+    {name:"session",fields:["episodeSessionFile"]},
+    {name:"worktree",fields:["worktree"]},
+    {name:"both",fields:["episodeSessionFile","worktree"]},
+  ];
+  const dotted=value=>`${dirname(value)}/./${basename(value)}`;
+  for(const side of ["expectation","receipt"]){
+    for(const variant of variants){
+      for(const state of ["authorized","completing"]){
+        for(const existing of [false,true]){
+          await t.test(`${side}-${variant.name}-${state}-${existing?"existing":"missing"}`,async t=>{
+            let recoveries=0,f;
+            f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{
+              recoveries+=1;
+              if(marker.status==="active")f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});
+              rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));
+              const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),value=JSON.parse(readFileSync(path,"utf8"));
+              writeFileSync(path,JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));
+              return true;
+            }}});
+            const canonicalEpisode=identity(f),identityPath=join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"),receiptOverrides={};
+            const expectation={...canonicalEpisode},canonical={episodeSessionFile:canonicalEpisode.episodeSessionFile,worktree:canonicalEpisode.worktree};
+            for(const field of variant.fields){
+              const receiptField=field==="worktree"?"episodeWorktree":field;
+              if(side==="expectation")expectation[field]=dotted(canonicalEpisode[field]);
+              else receiptOverrides[receiptField]=dotted(canonicalEpisode[field]);
+            }
+            if(side==="expectation")writeFileSync(identityPath,JSON.stringify({...expectation,reused:undefined}));
+            if(existing){
+              f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{
+                markerVersion:2,status:"active",ownerSessionId:canonicalEpisode.ownerSessionId,
+                slug:canonicalEpisode.slug,sourceLocation:canonicalEpisode.sourceLocation,episodeId:canonicalEpisode.episodeId,
+                episodeSessionFile:canonicalEpisode.episodeSessionFile,branch:canonicalEpisode.branch,
+                worktree:canonicalEpisode.worktree,sessionName:canonicalEpisode.sessionName,
+                identityVersion:2,admission:canonicalEpisode.bootstrapAdmission,
+              });
+            }
+            const receiptValue=receipt(f,canonicalEpisode,state,receiptOverrides);
+            assert.equal(resolve(expectation.episodeSessionFile),resolve(canonical.episodeSessionFile));
+            assert.equal(resolve(expectation.worktree),resolve(canonical.worktree));
+            assert.equal(resolve(receiptValue.episodeSessionFile),resolve(canonical.episodeSessionFile));
+            assert.equal(resolve(receiptValue.episodeWorktree),resolve(canonical.worktree));
+            assert.equal(existsSync(canonical.episodeSessionFile),false);
+            assert.equal(existsSync(resolve(canonical.worktree)),false);
+            for(const field of variant.fields){
+              const receiptField=field==="worktree"?"episodeWorktree":field;
+              if(side==="expectation"){
+                assert.notEqual(expectation[field],canonical[field]);assert.equal(receiptValue[receiptField],canonical[field]);
+              }else{
+                assert.equal(expectation[field],canonical[field]);assert.notEqual(receiptValue[receiptField],canonical[field]);
+              }
+            }
+            const beforeMarkers=f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length;
+            await f.events.get("session_start")({},f.ctx);
+            const afterMarkers=f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length;
+            const afterMessages=f.branch.filter(entry=>entry.customType==="prime-claw-oversight-recovery").length;
+            assert.equal(recoveries,state==="completing"?1:0);
+            assert.equal(afterMarkers-beforeMarkers,existing?(state==="completing"?1:0):(state==="completing"?2:1));
+            assert.equal(afterMessages,existing?0:1);
+            if(state==="authorized")assert.equal(context(f).messages.filter(message=>message.customType===OVERSIGHT_PACKAGE_TYPE).length,1);
+            else assert.deepEqual(context(f),{messages:[]});
+            await f.events.get("session_start")({},f.ctx);
+            assert.equal(recoveries,state==="completing"?1:0);
+            assert.equal(f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length,afterMarkers);
+            assert.equal(f.branch.filter(entry=>entry.customType==="prime-claw-oversight-recovery").length,afterMessages);
+          });
+        }
+      }
+    }
+  }
+});
+
+test("equivalent completing paths with an existing inactive marker preserve closed R1 recovery",async t=>{
+  let recoveries=0,f;
+  f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{
+    recoveries+=1;assert.equal(marker.status,"inactive");
+    rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));
+    const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),value=JSON.parse(readFileSync(path,"utf8"));
+    writeFileSync(path,JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));return true;
+  }}});
+  const episode=identity(f),marker=appendActiveOversight(f.pi,f.ctx,episode);
+  f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive",episodeSessionFile:`${dirname(marker.episodeSessionFile)}/./${basename(marker.episodeSessionFile)}`,worktree:`${dirname(marker.worktree)}/./${basename(marker.worktree)}`});
+  receipt(f,episode,"completing");
+  const markerCount=f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length;
+  await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);
+  assert.equal(f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length,markerCount);
   assert.deepEqual(context(f),{messages:[]});
   await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);
 });

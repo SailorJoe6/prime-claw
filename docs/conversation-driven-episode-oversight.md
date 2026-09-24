@@ -186,8 +186,14 @@ with state unchanged and zero provider calls. Before selecting missing-marker
 recovery, the read-only classifier also validates the expectation and receipt's
 stable owner, generation, source, session file, branch, worktree, session name,
 identity version, and admission bindings. The mutable active route is excluded.
-A conflict appends no marker or success message and does not invoke recovery or
-the provider, so correcting only the original receipt remains sufficient.
+Session-file and worktree comparison uses the same lexical `path.resolve()`
+equivalence for expectation/receipt preflight, existing markers, and the exact
+prospective recovery marker. It does not require either terminal path to exist.
+The prospective marker is validated before it can be appended or announced, so
+canonically equivalent spellings converge and cannot create evidence that a later
+reader rejects. A genuine conflict appends no marker or success message and does
+not invoke recovery or the provider, so correcting only the original receipt
+remains sufficient.
 
 The exact writer-produced `completing` + matching inactive marker + retained
 expectation checkpoint is recoverable through the same transaction lock and
