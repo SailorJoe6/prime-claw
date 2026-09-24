@@ -218,6 +218,9 @@ copied ownership.
    - migrate exact-owner legacy markers append-only while ignoring foreign copied history;
    - validate the existing spec-episode identity as ownership expectation;
    - read the current canonical `oversee-episode` package;
+   - accept only its closed two-key frontmatter contract (`name` and
+     `description`) and reject blank, comment, unknown, nested, or unsupported
+     scalar metadata before promotion or provider dispatch;
    - provide one fresh package through the universal context path;
    - remove stale package representations; and
    - abort visibly on active-state disagreement or corrupt resources.
