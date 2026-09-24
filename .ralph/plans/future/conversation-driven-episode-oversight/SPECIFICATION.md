@@ -372,6 +372,21 @@ packet for one exact commit. It has no episode or lifecycle mutation authority.
 The project conversation preserves useful findings in the specification, plan,
 bead, code/tests, or a linked immutable report, then stops the reviewer.
 
+Every blocking EXPERT finding must be actionable enough for the EPISODE to have
+a strong chance of repairing it in one pass. In addition to evidence, severity,
+and impact, the report identifies the violated invariant and root cause or
+lifecycle seam; recommends a repair direction and rationale without prescribing
+an exact patch; names constraints and approaches to avoid; specifies concrete
+positive, negative, failure, and replay acceptance evidence as applicable; and
+calls out regression risks, dependencies, or findings that should be repaired
+together. A true product decision includes bounded alternatives and one
+recommendation. Before returning `BLOCK`, the reviewer checks that an implementer
+can act without repeating the review investigation.
+
+This guidance preserves independence. The EXPERT does not edit the subject or
+dictate exact code; it supplies enough architectural and test direction to avoid
+avoidable review/rework cycles.
+
 Every EXPERT invocation is governed by an explicit project/operator reviewer-
 model policy. The selected reviewer must be operator-authorized for its cost and
 access and intentionally suitable for high-capability independent review. It

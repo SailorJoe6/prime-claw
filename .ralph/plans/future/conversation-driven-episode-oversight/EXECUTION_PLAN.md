@@ -149,9 +149,15 @@ thinking: max
 ---
 ```
 
-The Markdown body contains only the stable reviewer role: inspect one exact
-commit read-only, report structured PASS/BLOCK findings with evidence, do not
-edit or steer the subject, and return the result to the owning conversation.
+The Markdown body contains the stable reviewer role: inspect one exact commit
+read-only, report structured PASS/BLOCK findings with evidence, do not edit or
+steer the subject, and return the result to the owning conversation. For every
+BLOCK finding it must also provide the violated invariant, root-cause seam,
+recommended repair direction and rationale, constraints/anti-patterns, concrete
+acceptance tests, regression risks, and repair dependencies. It recommends one
+bounded alternative when a product decision is necessary and self-checks that
+the EPISODE can act without repeating the investigation. It does not prescribe
+an exact patch.
 Changing the configured selector or reasoning level is an operator-reviewed
 project-policy change. The plugin does not infer cost authorization or rank
 models.
@@ -168,10 +174,13 @@ models.
 5. verify the returned spawn handle names the requested model and treat
    successful admission as confirmation that the requested reasoning level was
    accepted;
-6. preserve the reviewer session identity, exact commit, model selector,
+6. require every BLOCK finding to include actionable remediation direction and
+   acceptance evidence under the contract above; reject a report that merely
+   restates the failure or asks the EPISODE to rediscover the repair seam;
+7. preserve the reviewer session identity, exact commit, model selector,
    admitted reasoning level, and final disposition with the review evidence;
    and
-7. stop and delete the fresh reviewer after its findings are preserved.
+8. stop and delete the fresh reviewer after its findings are preserved.
 
 A missing or malformed profile, no exact model match, unsupported reasoning
 level, unavailable credentials, or failed spawn blocks a required review. Do not
@@ -280,6 +289,9 @@ capabilities enforce deterministic transport and identity safety.
      level with the repository's safe RLM admission protocol;
    - recording reviewer identity, exact commit, admitted model/reasoning policy,
      and disposition, with fail-closed operator escalation on unavailability;
+   - requiring each BLOCK finding to give a recommended repair direction,
+     constraints, acceptance tests, regression risks, and repair dependencies
+     without dictating exact code;
    - calling `handoff_spec_episode` only for the exact owned, idle episode and
      accepted in-scope continuation;
    - renewing final EXPERT review after material repairs;
