@@ -100,7 +100,10 @@ Activation and deactivation are deterministic lifecycle mutations. Activation
 must not start an unsolicited model turn and must not be reported durable until
 the containing transition and session state are verified persisted. Package
 injection must be idempotent across queued work, reports, heartbeats, native
-follow-ups, tool continuation, reload, resume, and cancellation.
+follow-ups, tool continuation, reload, resume, and cancellation. Classification
+is read-only: it validates expectation/receipt stable bindings before selecting
+missing-marker recovery, and only then may startup append recovery evidence.
+Conflicting bindings block without append-only session mutation.
 
 Add one narrow two-phase `finalize_spec_episode` capability. Its authorize phase
 accepts the exact location and `merged`/`abandoned` disposition, obtains explicit
@@ -108,7 +111,12 @@ operator UI confirmation, and persists an exact owner/episode receipt without
 performing terminal work. After the skill-guided ordinary Git/session/worktree
 sequence, its completion phase requires that receipt, validates conservative
 terminal facts, appends inactive state, and clears only the matching expectation
-without a second confirmation. Ambiguity leaves all state available for repair.
+without a second confirmation. The shared startup coordinator must recover every
+exact checkpoint emitted by that ordered writer, including `completing` plus an
+inactive marker plus a still-retained matching expectation after identity-removal
+failure. It reuses the lock and terminal-fact validation, does not duplicate the
+inactive marker, and converges without a provider call or second confirmation.
+Ambiguity leaves all state available for repair.
 The capability records an already-made semantic and operator decision; it never
 decides completion, merges, abandons, or cleans resources.
 
@@ -613,6 +621,66 @@ beyond the plan record, or begin Slice 2. Acceptance requires truthful exact
 commands and outcomes, maintained Python 281 plus seven and Node 128 remaining
 green, diff/docs checks passing, a clean pushed candidate, and fresh complete
 Slice 1 owner/Astra review.
+
+### R1/R2 coupled final Slice 1 repair is the next P0
+
+Fresh final Astra review of complete Slice 1 exact
+`dd2103a265e7a081a26ec90fab6bf78cff111315` returned **BLOCK**. Reviewer
+`openai-codex/gpt-6-astra` at reasoning `max`, child `sub-ab6e60f9`, recorded
+the full actionable report at
+`/Users/jlanders/.prime/agent/session-artifacts/01a0ba54-da05-76bd-8d22-a0facfdd7f31/sub-ab6e60f9/slice1-final-exact-review.md`.
+The installed identity/package design, bounded-role precedence, B3 grammar, B4
+fake-only isolation, and ordinary-conversation behavior remain accepted. Repair
+R1 and R2 together before any Slice 2 work.
+
+#### R1 — P1: recover the writer's inactive completing checkpoint
+
+The ordered completion writer can durably leave one exact `completing` receipt,
+a matching inactive marker, and the retained matching expectation when identity
+removal fails after inactive append. Startup currently rejects the expected
+inactive marker before considering the completing receipt, so it makes zero
+recovery/provider calls and strands a checkpoint that the direct finalization
+helper accepts. The shared classifier must recognize every sole exact completing
+checkpoint emitted by the writer and route it through the existing transaction
+lock plus terminal-fact coordinator. Recovery must use no provider call, second
+confirmation, duplicate inactive marker, evidence deletion, or other-generation
+mutation. An inactive marker plus expectation without the exact matching
+`completing` receipt remains invalid.
+
+Acceptance must use the real writer with one-time failures after the completing
+write, inactive append, expectation removal, and completed write, for both
+`merged` and `abandoned`. It must retain blockers for authorized-plus-inactive,
+completed-plus-reappearing-expectation, stable-binding mismatch, orphan/cross-
+generation state, and old completing beside a newer active generation. Lock,
+terminal-fact, readiness, and identity failures must preserve retryable evidence.
+Repeated startup and completion replay must be monotonic and must not reconfirm,
+rewind, duplicate inactive markers, or affect a later active generation.
+
+#### R2 — P2: validate stable expectation/receipt agreement before recovery mutation
+
+With the marker absent, a same-generation expectation and receipt can disagree
+on stable identity while classification selects receipt-marker recovery without
+a direct comparison. Startup then appends the wrong marker and success message;
+later classification blocks, and correcting the original receipt alone cannot
+recover because append-only contradictory evidence remains. Classification must
+stay read-only and compare every stable expectation/receipt field before
+selecting or appending recovery: owner, generation, source, session file, branch,
+worktree, session name, identity version, and admission. Mutable active route
+remains excluded.
+
+Any stable conflict must produce zero append, message, callback, or provider
+calls and byte/branch-identical evidence across replay. Correcting only the
+original receipt must then permit exactly one normal recovery. Preserve foreign
+history, legacy migration, completed-old/current-active behavior, route refresh,
+and all accepted B1-B4 gates. Repair this before broadening R1 recovery so an
+invalid receipt can never become durable marker evidence.
+
+The fresh repair generation must first reconcile authoritative main `5edc73e`
+while preserving the promoted-folder deletion, rejected history, accepted B1
+`e225bb4`, B2 `aff3b819`, B3 `dc439d4`, and B4 `fe8be53`. The sanitized Python
+five-failure ambient baseline is evidence debt only and not repair scope. The
+fresh exact candidate requires complete owner/Astra review. Do not change
+accepted behavior, global discovery, historical archives, or begin Slice 2.
 
 Slice 2 remains blocked until the repaired Slice 1 exact commit is accepted.
 
