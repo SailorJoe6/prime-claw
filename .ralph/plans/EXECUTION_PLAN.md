@@ -1050,12 +1050,48 @@ Validation is green: targeted isolation passed 2/2; maintained Python passed
 passed 157/157; plugin-copy integrity and `git diff --check` passed. Exact path
 and semantic audits confirm no oversight skill, plugin source, host extension,
 current oversight docs, shared-handoff mechanics, or 2B-R1 behavior changed.
-The merge used no rebase, force, or history rewrite. Exact pushed merge
-`ba79840718e7d9e21494e1d47985922c836418a5` awaits owner review. INT-R1 changes
-only this active-plan chronology; the merge parents, three-path functional
-delta, validation, no-semantic-drift evidence, accepted 2B-R1 semantics, code,
-and tests remain unchanged. Do not rebase or force, repeat integration, begin
-Slice 3, perform terminal merge or cleanup, or do unrelated work.
+The merge used no rebase, force, or history rewrite. Owner accepted INT-R1 exact
+`716646ceb0c946a34fcb89654511da00e1b6fc96`; Slice 2B and accepted main-isolation
+integration now stand. The merge parents, three-path functional delta,
+validation, no-semantic-drift evidence, accepted 2B-R1 semantics, code, and
+tests remain unchanged.
+
+**Slice 3 pre-gate setup steps 1–3 complete:** the disposable fixture root
+uses a local bare remote under the same isolated temporary parent. Fixture `main`
+and
+`origin/main` both resolve to baseline exact
+`b5904323dbdc3afc34e954818d97587f582879dd`. All 21 copied candidate plugin,
+profile, orientation, and canonical Ralph-skill blobs match owner-accepted INT-R1
+exact `716646ceb0c946a34fcb89654511da00e1b6fc96`. The reviewed two-generation
+bundle is `.ralph/plans/future/two-generation-oversight-dogfood`; its baseline focused unittest and
+`git diff --check` pass.
+
+At the setup checkpoint, two fresh durable default root conversations were idle
+in that fixture:
+
+- A: session `01a0d41a-5568-705d-8bdb-97130dd1ef16`, route `9ed62e717dbd`;
+- B: session `01a0d41a-5578-70a8-837f-03c627752f37`, route `157a516d2faf`.
+
+Each independently reported exactly one UUID-bound
+`PRIME_CLAW_CONVERSATION_IDENTITY_V1` default `CONVERSATION` kernel, no episode
+ownership, harmless bootstrap as the first user-visible turn with no
+extension-generated startup turn, and successful first-substantive-turn
+`prepare` orientation. Each saw `prepare`, `design`, `spec-it-out`, `execute`,
+`blocked`, and `oversee-episode`, recognized native planning and the native-only
+implementation gate, answered ordinary project discussion, and left exact clean
+status `## main...origin/main`. Their bounded `bd ready` probes found no fixture
+Beads database and made no repair. At that checkpoint no episode state, episode
+branch, worktree, promotion, implementation, or canonical-checkout change
+existed.
+
+**Operator gate — setup step 4 cleared:** the operator issued native
+`/implement-spec .ralph/plans/future/two-generation-oversight-dogfood` in
+conversation A. Durable state binds owner A to promotion commit
+`be1c27c072214ee393a66264008d7726c3e413b3`, episode UUID
+`01a0d43b-e71c-702f-8f94-d5d7e60c2247`, creation route `91480d611757`, the
+expected episode branch/worktree, and delivered bootstrap admission. Conversation
+B remained unowned. No automation called `create_spec_episode` directly or
+simulated the gate.
 
 **Working capability:** the active exact-session owner has one canonical procedure for
 watching, reviewing, revising, continuing, and finally presenting its exact
@@ -1210,6 +1246,29 @@ collection also discovers historical `scripts/archive/phase1/tests`, whose
 archived path assumptions are independently broken; if that broader diagnostic
 is run, record its result separately from the maintained `tests/` acceptance
 suite rather than hiding or conflating it.
+
+### In-progress evidence checkpoint — generation one accepted
+
+The sanitized point-in-time record now lives at
+`reports/reviews/conversation-driven-episode-oversight-dogfood.md`. It reconciles
+the completed isolated setup and native promotion, exact owner/control/episode
+identities, promotion commit `be1c27c072214ee393a66264008d7726c3e413b3`,
+accepted generation-one exact `98ffb066891064abc66e666bec6b9c24b8483a96`,
+direct completion reporting and the single cancelled bootstrap watch, three
+definite no-admission continuation attempts, verified Prime Agent 0.9.5 session
+semantics, rejected repair exact `e41f860ecad9835204386c306b52e4e7a5a99160`
+with its Astra/max `BLOCK`, and the operator-corrected trusted-sibling contract.
+The living documentation links to that record without treating it as policy or
+final acceptance. Evidence-slice validation passed maintained Node 157/157,
+maintained Python 294 plus seven subtests, `git diff --check`, and changed-Markdown
+relative-link validation 2/2.
+
+Generation two remains unadmitted and no fixture watch is active. The rejected
+repair was not integrated or applied. Shared-fix replacement, fixture retry,
+generation two, fresh final EXPERT review, operator disposition, conservative
+cleanup, and ordinary-conversation return remain future gates. Preserve all
+fixture resources and accepted generation-one state while those gates remain.
+
 - Append final evidence to `prime-claw-h6w.22`; close it only when all acceptance
   criteria pass.
 - Commit and push the evidence/docs slice. Suggested commit:

@@ -120,6 +120,15 @@ Reports are evidence, never approval or native-command dispatch. The heartbeat
 is the missed-report safety net and is cancelled when its generation is
 reconciled or waiting only for owner/operator action.
 
+### In-progress dogfood evidence
+
+The sanitized [conversation-driven oversight dogfood record](../reports/reviews/conversation-driven-episode-oversight-dogfood.md)
+tracks the isolated live run through setup, native promotion, accepted generation
+one, observed continuation friction, rejected repair evidence, and the corrected
+trusted-sibling contract. It is explicitly in progress: it does not claim
+generation two, final EXPERT review, operator disposition, cleanup, or final
+acceptance.
+
 ### Owner-driven continuation
 
 At a stable review boundary, the exact owner chooses `advance`, `revise`,
