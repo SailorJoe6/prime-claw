@@ -400,6 +400,23 @@ test("invalid implement-spec input shows usage without model injection", async (
 });
 
 
+test("invalid raw oversight delimiters block promotion before episode creation", async (t) => {
+  const invalid=[
+    " ---\nname: oversee-episode\ndescription: valid package\n---\nbody",
+    "\t---\nname: oversee-episode\ndescription: valid package\n---\nbody",
+    "--- \nname: oversee-episode\ndescription: valid package\n---\nbody",
+    "---\nname: oversee-episode\ndescription: valid package\n ---\nbody",
+    "---\nname: oversee-episode\ndescription: valid package\n\t---\nbody",
+    "---\nname: oversee-episode\ndescription: valid package\n--- \nbody",
+  ];
+  for(const raw of invalid){
+    const cwd=realpathSync(mkdtempSync(join(tmpdir(),"prime-claw-reviewed-plan-raw-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));mkdirSync(join(cwd,LOCATION),{recursive:true});writeSkill(cwd,"implementation readiness","implement-spec");writeSkill(cwd,raw,"oversee-episode");const state=join(cwd,".prime/agent/state/spec-episodes");mkdirSync(state,{recursive:true});let createCalls=0;const extension=createReviewedPlanExtension({async createEpisode(){createCalls+=1;throw new Error("episode creation must not run")}}),f=createHarness(cwd,extension);
+    const beforeEntries=structuredClone(f.entries),beforeMessages=structuredClone(f.messages);
+    await assert.rejects(()=>f.commands.get("implement-spec").handler(LOCATION,f.ctx),/frontmatter/);
+    assert.equal(createCalls,0);assert.deepEqual(f.entries,beforeEntries);assert.deepEqual(f.messages,beforeMessages);assert.deepEqual(readdirSync(state),[]);
+  }
+});
+
 test("successful create activates exact owner oversight without unsolicited message", async (t) => {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-activate-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));

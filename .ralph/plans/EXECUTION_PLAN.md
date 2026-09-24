@@ -486,6 +486,34 @@ canonical package. A canonical two-key package with a normal final newline and
 formatted nonempty body, plus all valid quoted, unquoted, Unicode, URL, and
 punctuation forms, must remain valid. All B1/B2/B3 regressions must pass.
 
+#### B3-R2 repair evidence
+
+Authoritative main design commit `d8a3687` was reconciled as merge commit
+`3905aa1fbed08d3f30c04917a7b45b780a1427c4`, preserving the promoted future
+folder deletion, rejected history, and unrelated dirty B4 fixture. The one shared
+package reader now reads the raw UTF-8 file, validates its exact structure and
+bounded scalar contract, and only then applies the existing injected-text trim.
+No call site gained a separate validator.
+
+Unit coverage exercises space- and tab-indented opening/closing delimiters,
+opening/closing suffix whitespace, and a leading blank line at readiness,
+implement-spec promotion, activation, repeated active dispatch, expectation
+recovery, and completing recovery. It proves zero episode-creation and completion
+calls, no package append, byte- and branch-identical lifecycle evidence, stable
+repeated failure, and canonical restore/resume. The canonical restore includes a
+normal final newline, formatted body indentation, and accepted Unicode, URL, and
+internal punctuation. Native active, promotion, and recovery coverage makes zero
+provider calls for all 18 invalid mode/form combinations and accepts all three
+canonical mode cases with kernel/package `1/1` and byte-identical expectation.
+
+Focused gates passed 55 Node tests and ten Python tests. Full gates passed 128
+Node tests and 280 Python tests plus seven subtests with 11 existing warnings.
+Independent read-only review returned PASS with the B4 fixture explicitly
+excluded. User-global apply/check passed, and fresh installed active, promotion,
+and recovery probes reproduced the 18 fail-closed and three valid outcomes.
+`git diff --check` passed. The repaired exact commit still requires fresh owner
+and Astra review before B4 or Slice 2.
+
 B4 remains deliberately incomplete and must wait for its own later handoff.
 Preserve the unstaged, unintegrated B4 fake-daemon fixture in
 `tests/test_reviewed_plan_extension.py`. Do not touch shared handoff scheduling,

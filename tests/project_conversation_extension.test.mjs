@@ -56,6 +56,40 @@ test("closed package frontmatter rejects unknown, comment, and blank metadata wi
   }
 });
 
+test("raw package delimiters fail closed at every reader gate and recover without drift",async t=>{
+  const canonical="---\nname: oversee-episode\ndescription: valid package\n---\n# Procedure\n\n  formatted step\n";
+  const invalid=[
+    " ---\nname: oversee-episode\ndescription: valid package\n---\nbody",
+    "\t---\nname: oversee-episode\ndescription: valid package\n---\nbody",
+    "--- \nname: oversee-episode\ndescription: valid package\n---\nbody",
+    "\n---\nname: oversee-episode\ndescription: valid package\n---\nbody",
+    "---\nname: oversee-episode\ndescription: valid package\n ---\nbody",
+    "---\nname: oversee-episode\ndescription: valid package\n\t---\nbody",
+    "---\nname: oversee-episode\ndescription: valid package\n--- \nbody",
+  ];
+  for(const raw of invalid){
+    const readiness=fixture(t),readinessBranch=structuredClone(readiness.branch);writeFileSync(readiness.packagePath,raw);
+    assert.throws(()=>assertConversationPromotionReady(readiness.ctx),/frontmatter/);assert.deepEqual(readiness.branch,readinessBranch);
+
+    const activation=fixture(t),activationEpisode=identity(activation),activationPath=join(activation.cwd,".prime/agent/state/spec-episodes/alpha.json"),activationIdentity=readFileSync(activationPath),activationBranch=structuredClone(activation.branch);writeFileSync(activation.packagePath,raw);
+    assert.throws(()=>appendActiveOversight(activation.pi,activation.ctx,activationEpisode),/frontmatter/);assert.deepEqual(activation.branch,activationBranch);assert.deepEqual(readFileSync(activationPath),activationIdentity);assert.equal(activation.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
+
+    const active=fixture(t),activeEpisode=identity(active),activePath=join(active.cwd,".prime/agent/state/spec-episodes/alpha.json");appendActiveOversight(active.pi,active.ctx,activeEpisode);const activeBranch=structuredClone(active.branch),activeIdentity=readFileSync(activePath);writeFileSync(active.packagePath,raw);
+    assert.throws(()=>context(active),/prime-claw conversation blocked/);assert.throws(()=>context(active),/prime-claw conversation blocked/);assert.equal(active.aborts,2);assert.deepEqual(active.branch,activeBranch);assert.deepEqual(readFileSync(activePath),activeIdentity);assert.equal(active.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
+    writeFileSync(active.packagePath,canonical);const resumed=context(active);assert.match(resumed.messages.at(-1).content,/# Procedure\n\n  formatted step/);
+
+    let completionCalls=0;const recovery=fixture(t,{registration:{async recoverCompleting(){completionCalls+=1;return true}}}),recoveryEpisode=identity(recovery),recoveryPath=join(recovery.cwd,".prime/agent/state/spec-episodes/alpha.json"),recoveryIdentity=readFileSync(recoveryPath),recoveryBranch=structuredClone(recovery.branch);writeFileSync(recovery.packagePath,raw);
+    await recovery.events.get("session_start")({},recovery.ctx);await recovery.events.get("session_start")({},recovery.ctx);assert.equal(completionCalls,0);assert.deepEqual(recovery.branch,recoveryBranch);assert.deepEqual(readFileSync(recoveryPath),recoveryIdentity);assert.equal(recovery.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
+    writeFileSync(recovery.packagePath,canonical);await recovery.events.get("session_start")({},recovery.ctx);assert.equal(recovery.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length,1);assert.match(context(recovery).messages.at(-1).content,/# Procedure\n\n  formatted step/);
+  }
+});
+
+test("invalid raw package blocks completing recovery before completion calls",async t=>{
+  let completionCalls=0;const f=fixture(t,{registration:{async recoverCompleting(){completionCalls+=1;return true}}}),episode=identity(f),state=join(f.cwd,".prime/agent/state/spec-episodes"),identityPath=join(state,"alpha.json"),receiptPath=join(state,"alpha.finalization.json");appendActiveOversight(f.pi,f.ctx,episode);receipt(f,episode,"completing");writeFileSync(f.packagePath," ---\nname: oversee-episode\ndescription: valid package\n---\nbody");const beforeBranch=structuredClone(f.branch),beforeIdentity=readFileSync(identityPath),beforeReceipt=readFileSync(receiptPath);
+  await f.events.get("session_start")({},f.ctx);await f.events.get("session_start")({},f.ctx);
+  assert.equal(completionCalls,0);assert.deepEqual(f.branch,beforeBranch);assert.deepEqual(readFileSync(identityPath),beforeIdentity);assert.deepEqual(readFileSync(receiptPath),beforeReceipt);assert.equal(f.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
+});
+
 test("active marker injects exactly one freshly read package",t=>{const f=fixture(t);appendActiveOversight(f.pi,f.ctx,identity(f));const stale={role:"custom",customType:OVERSIGHT_PACKAGE_TYPE,content:"STALE"};let result=context(f,[stale]);assert.equal(result.messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1);assert.match(result.messages.at(-1).content,/REVISION ONE/);writeFileSync(f.packagePath,"---\nname: oversee-episode\ndescription: test package\n---\nREVISION TWO");result=context(f,result.messages);assert.equal(result.messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1);assert.match(result.messages.at(-1).content,/REVISION TWO/)});
 test("session start recovers a delivered current-owner expectation with no marker",async t=>{const f=fixture(t);identity(f);await f.events.get("session_start")({},f.ctx);const markers=f.branch.filter(e=>e.customType===OVERSIGHT_MARKER_TYPE);assert.equal(markers.length,1);assert.equal(markers[0].data.status,"active");assert.match(f.notifications[0].message,/Recovered active oversight/);assert.equal(context(f).messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1)});
 test("mutable episode routing refresh does not invalidate stable ownership",t=>{const f=fixture(t),episode=identity(f);appendActiveOversight(f.pi,f.ctx,episode);const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"),updated=JSON.parse(readFileSync(path,"utf8"));updated.episodeActiveSessionId="reopened-route";writeFileSync(path,JSON.stringify(updated));const result=context(f);assert.equal(result.messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1)});

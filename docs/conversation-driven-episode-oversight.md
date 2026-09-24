@@ -44,9 +44,10 @@ queuing its canonical readiness workflow, the extension verifies:
 - exactly one effective identity kernel;
 - the restoration extension is active for this session;
 - `.ralph/skills/oversee-episode/SKILL.md` follows the deliberately bounded,
-  closed frontmatter grammar: exact first/closing `---` lines and exactly one
-  `name` line plus one `description` line between them, with no blank, comment,
-  unknown, duplicate, nested, or sequence metadata lines. Each key has exactly
+  closed frontmatter grammar: the raw file is validated before whole-file
+  whitespace normalization, with exact unindented first/closing `---` lines and
+  exactly one `name` line plus one `description` line between them, with no blank,
+  comment, unknown, duplicate, nested, or sequence metadata lines. Each key has exactly
   one ASCII space after its colon; `name` must equal `oversee-episode`;
   `description` and the procedure body must be nonempty. Double-quoted values
   use a nonempty JSON-string subset;

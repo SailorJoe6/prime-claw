@@ -136,11 +136,11 @@ function parseSkillFrontmatter(text: string, path: string): { name: string; body
 }
 function packageBody(cwd: string): string {
   const path = join(canonicalProjectRoot(cwd), OVERSIGHT_PACKAGE_PATH);
-  let body: string;
-  try { body = readFileSync(path, "utf8").trim(); }
+  let raw: string;
+  try { raw = readFileSync(path, "utf8"); }
   catch (error) { throw new Error(`oversight package unavailable at ${path}: ${error instanceof Error ? error.message : String(error)}`); }
-  parseSkillFrontmatter(body, path);
-  return body;
+  parseSkillFrontmatter(raw, path);
+  return raw.trim();
 }
 
 function stateRoot(cwd: string): string { return resolve(canonicalProjectRoot(cwd), ".prime", "agent", "state", "spec-episodes"); }
