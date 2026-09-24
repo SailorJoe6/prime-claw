@@ -279,12 +279,36 @@ copied ownership.
   watchdog failure visible and separate if it recurs.
 - Run global plugin apply/check and fresh-process readiness probes without
   modifying unrelated global resources.
-- Prove the exact pushed candidate contains no shared handoff-baseline repair and
-  preserves unrelated execute-skill provenance.
+- Prove the exact pushed candidate preserves unrelated execute-skill provenance.
+  The separately operator-approved P0 shared handoff-baseline repair is allowed
+  and must remain covered by its focused source, native-semantics, and docs tests.
 - Update and Dolt-push `prime-claw-h6w.22`, commit one replacement Slice 1
   candidate, push it, and stop for fresh owner and Astra `max` review.
 
 Slice 2 remains blocked until this exact replacement commit is accepted.
+
+## Operator-approved P0 shared handoff baseline (prerequisite)
+
+Repair the shared host transport before Slice 2 dogfood. Prime Agent 0.9.5 uses
+`isSessionActive` for execution or pending work, not route publication. Therefore
+an idle resident session has `isSessionActive: false` and can still retain a valid
+`activeSessionId`. `handoff_spec_episode` must retain that exact route, publish
+only when the durable session has no route, re-read state after publication, and
+require false plus all detailed busy/action/queue signals clear.
+
+The first canonical handoff admission must be an ordinary `prompt` with
+`queueIfBusy: false`, `expandPromptTemplates: false`, extension source, and no
+`streamingBehavior`. This is the native idle-only race guard. `steer` is not a
+fail-if-busy operation in 0.9.5 and can queue while streaming. Only after definite
+handoff admission may the existing sole execute `followUp` be queued. A busy
+list, state, or native race sends neither message; the owner watch remains armed
+so its heartbeat can retry later. Preserve every existing exact identity, path,
+queue, uncertainty, partial-admission, and no-replay boundary.
+
+Verification covers resident-idle route retention, missing-route publication and
+state re-read, `isSessionActive: true` by itself, every detailed busy cause,
+ordinary-prompt request shape and idle-to-busy rejection, the steer counterexample,
+and unchanged first/second reject and uncertain outcomes.
 
 ## Slice 2 — Project-customizable oversight and owner-driven continuation
 
@@ -325,8 +349,9 @@ capabilities enforce deterministic transport and identity safety.
      and returning the same conversation to discussion/specification incubation.
 3. Change only the model-facing `handoff_spec_episode` description, parameter
    text, and prompt guidelines in
-   `.prime/agent/extensions/reviewed-plan.ts`. Do not weaken or bypass any
-   check in `.prime/agent/extension-support/spec-episode.ts`.
+   `.prime/agent/extensions/reviewed-plan.ts`. Beyond the separately approved P0
+   baseline above, do not weaken or bypass any check in
+   `.prime/agent/extension-support/spec-episode.ts`.
 4. Add `tests/test_oversee_episode_skill.py` for the skill's authority,
    observation, evidence, review, continuation, cleanup, return-to-incubation,
    and sequential-cycle boundaries. It must also prove that the checked-in

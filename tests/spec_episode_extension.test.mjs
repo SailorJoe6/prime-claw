@@ -148,7 +148,7 @@ function idleState(created, activeSessionId = created.episodeActiveSessionId) {
     sessionFile: created.episodeSessionFile,
     sessionName: created.sessionName,
     cwd: created.worktree,
-    isSessionActive: true,
+    isSessionActive: false,
     isStreaming: false,
     isCompacting: false,
     isBashRunning: false,
@@ -340,7 +340,7 @@ test("version-1 identities remain truthful legacy direct-execute records", async
     sessionFile: legacy.episodeSessionFile,
     sessionName: legacy.sessionName,
     cwd: legacy.worktree,
-    isSessionActive: true,
+    isSessionActive: false,
   };
   const replay = new FakePublisher({ sessions: [session] });
 
@@ -370,14 +370,11 @@ test("version-1 identities remain truthful legacy direct-execute records", async
   assert.deepEqual(unresolved.handoffs, []);
 });
 
-test("owner drives an exact idle episode through handoff steer and one execute follow-up", async (t) => {
+test("owner retains an idle resident route and admits handoff prompt before one execute follow-up", async (t) => {
   const { repo } = repositoryFixture(t);
   const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
   const publisher = new FakePublisher({
-    sessions: [{
-      ...idleState(created),
-      isSessionActive: true,
-    }],
+    sessions: [idleState(created)],
     state: idleState(created),
   });
 
@@ -393,9 +390,10 @@ test("owner drives an exact idle episode through handoff steer and one execute f
     sourceLocation: LOCATION,
     episodeId: created.episodeId,
     episodeActiveSessionId: created.episodeActiveSessionId,
-    handoffDelivery: "steer",
+    handoffDelivery: "prompt",
     executeDelivery: "followUp",
   });
+  assert.deepEqual(publisher.reopens, []);
   assert.deepEqual(publisher.stateCalls, [created.episodeActiveSessionId]);
   assert.equal(publisher.handoffs.length, 1);
   assert.equal(publisher.handoffs[0].activeSessionId, created.episodeActiveSessionId);
@@ -406,7 +404,7 @@ test("owner drives an exact idle episode through handoff steer and one execute f
   assert.equal(publisher.closed, 1);
 });
 
-test("owner handoff reopens the exact inactive durable session before delivery", async (t) => {
+test("owner publishes a missing route, re-reads idle state, and then delivers", async (t) => {
   const { repo } = repositoryFixture(t);
   const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
   const publisher = new FakePublisher({
@@ -427,6 +425,7 @@ test("owner handoff reopens the exact inactive durable session before delivery",
 
   assert.equal(result.episodeActiveSessionId, "active-episode-reopened");
   assert.equal(publisher.reopens.length, 1);
+  assert.deepEqual(publisher.stateCalls, ["active-episode-reopened"]);
   assert.equal(publisher.handoffs[0].activeSessionId, "active-episode-reopened");
   const identity = JSON.parse(readFileSync(
     join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
@@ -454,31 +453,64 @@ test("owner handoff rejects a different owner before state checks or delivery", 
   assert.deepEqual(publisher.handoffs, []);
 });
 
-test("owner handoff rejects a busy list snapshot and a non-quiescent daemon state", async (t) => {
+test("owner handoff rejects every busy list signal and sends nothing", async (t) => {
   const { repo } = repositoryFixture(t);
   const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  const busy = new FakePublisher({
-    sessions: [{ ...idleState(created), isSessionActive: true, isStreaming: true }],
-    state: idleState(created),
-  });
-  await assert.rejects(
-    handoffSpecEpisode(LOCATION, "", context(repo), dependencies(busy)),
-    /episode is busy/i,
-  );
-  assert.deepEqual(busy.stateCalls, []);
-  assert.deepEqual(busy.handoffs, []);
+  const busySummaries = [
+    ["isSessionActive alone", { isSessionActive: true }],
+    ["streaming", { isStreaming: true }],
+    ["compacting", { isCompacting: true }],
+    ["queued", { queuedCount: 1 }],
+  ];
 
-  const queuedState = idleState(created);
-  queuedState.sessionActions = { queuedCount: 1, steering: [], followUps: ["execute"] };
-  const queued = new FakePublisher({
-    sessions: [{ ...idleState(created), isSessionActive: true }],
-    state: queuedState,
-  });
-  await assert.rejects(
-    handoffSpecEpisode(LOCATION, "", context(repo), dependencies(queued)),
-    /not quiescent/,
-  );
-  assert.deepEqual(queued.handoffs, []);
+  for (const [label, patch] of busySummaries) {
+    await t.test(label, async () => {
+      const publisher = new FakePublisher({
+        sessions: [{ ...idleState(created), ...patch }],
+        state: idleState(created),
+      });
+      await assert.rejects(
+        handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
+        /episode is busy/i,
+      );
+      assert.deepEqual(publisher.stateCalls, []);
+      assert.deepEqual(publisher.handoffs, []);
+      assert.deepEqual(publisher.reopens, []);
+    });
+  }
+});
+
+test("owner handoff rejects every detailed busy state signal with zero sends", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  const busyStates = [
+    ["isSessionActive alone", { isSessionActive: true }],
+    ["streaming", { isStreaming: true }],
+    ["compacting", { isCompacting: true }],
+    ["bash", { isBashRunning: true }],
+    ["tools", { isRunningTools: true }],
+    ["RLM children", { hasRunningRlmChildren: true }],
+    ["unfinished actions", { unfinishedActionCount: 1 }],
+    ["action queue", { sessionActions: { queuedCount: 1, steering: [], followUps: [] } }],
+    ["steering queue", { sessionActions: { queuedCount: 0, steering: ["handoff"], followUps: [] } }],
+    ["follow-up queue", { sessionActions: { queuedCount: 0, steering: [], followUps: ["execute"] } }],
+    ["active action", { sessionActions: { queuedCount: 0, steering: [], followUps: [], active: {} } }],
+  ];
+
+  for (const [label, patch] of busyStates) {
+    await t.test(label, async () => {
+      const publisher = new FakePublisher({
+        sessions: [idleState(created)],
+        state: { ...idleState(created), ...patch },
+      });
+      await assert.rejects(
+        handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
+        /not quiescent/,
+      );
+      assert.deepEqual(publisher.handoffs, []);
+      assert.deepEqual(publisher.reopens, []);
+    });
+  }
 });
 
 test("owner handoff rejects non-root callers and unresolved initial admission", async (t) => {
@@ -979,7 +1011,7 @@ test("publisher admits execute as one queued follow-up without template expansio
 });
 
 
-test("publisher admits remote handoff as steer before the sole execute follow-up", async () => {
+test("publisher admits remote handoff as an idle-only prompt before the sole execute follow-up", async () => {
   const requests = [];
   const client = {
     async request(command) { requests.push(command); return { success: true, data: {} }; },
@@ -995,7 +1027,7 @@ test("publisher admits remote handoff as steer before the sole execute follow-up
     () => {
       checkpointCalls += 1;
       assert.equal(requests.length, 1);
-      assert.equal(requests[0].streamingBehavior, "steer");
+      assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
     },
   );
 
@@ -1004,7 +1036,6 @@ test("publisher admits remote handoff as steer before the sole execute follow-up
     type: "prompt",
     activeSessionId: "active-episode-1",
     message: "wrapped handoff",
-    streamingBehavior: "steer",
     queueIfBusy: false,
     expandPromptTemplates: false,
     source: "extension",
@@ -1017,6 +1048,51 @@ test("publisher admits remote handoff as steer before the sole execute follow-up
     expandPromptTemplates: false,
     source: "extension",
   }]);
+});
+
+test("idle-to-busy race rejects ordinary prompt and queues neither handoff nor execute", async () => {
+  const requests = [];
+  const client = {
+    async request(command) {
+      requests.push(command);
+      if (command.streamingBehavior === undefined && command.queueIfBusy === false) {
+        return { success: false, error: "Cannot prompt while session is streaming" };
+      }
+      return { success: true, data: {} };
+    },
+    close() {},
+  };
+  const publisher = new PrimeSessionPublisher(client);
+
+  await assert.rejects(
+    publisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute"),
+    /Cannot prompt while session is streaming/,
+  );
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].message, "wrapped handoff");
+  assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
+});
+
+test("Prime Agent steer is a queueing counterexample even when queueIfBusy is false", async () => {
+  const queued = [];
+  const nativeSemantics = {
+    async request(command) {
+      if (command.streamingBehavior === "steer") queued.push(command.message);
+      return { success: true, data: {} };
+    },
+    close() {},
+  };
+
+  const response = await nativeSemantics.request({
+    type: "prompt",
+    activeSessionId: "busy-episode",
+    message: "would queue while streaming",
+    streamingBehavior: "steer",
+    queueIfBusy: false,
+  });
+
+  assert.equal(response.success, true);
+  assert.deepEqual(queued, ["would queue while streaming"]);
 });
 
 test("publisher exposes first-send failure without queuing execute", async () => {
@@ -1056,7 +1132,7 @@ test("publisher exposes second-send failure as a partial transition", async () =
     /Handoff was admitted, but canonical execute follow-up could not be queued: execute follow-up delivery failed: follow-up rejected/,
   );
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].streamingBehavior, "steer");
+  assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
   assert.equal(requests[1].streamingBehavior, "followUp");
 });
 

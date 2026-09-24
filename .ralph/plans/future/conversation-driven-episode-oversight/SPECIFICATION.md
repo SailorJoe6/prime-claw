@@ -55,7 +55,8 @@ conversation-to-episode transitions that this feature builds on:
   focused compaction request before the first execute slice;
 - exact-owner `handoff_spec_episode(location, guidance?)` for later slice
   transitions;
-- canonical handoff as fail-if-busy `steer` followed by canonical execute
+- canonical handoff as an ordinary idle-only `prompt` with
+  `queueIfBusy: false` and no `streamingBehavior`, followed by canonical execute
   exactly once as the sole queued `followUp`;
 - agent-owned heartbeats and existing session observation for bounded watches;
 - fresh RLM agents for independent EXPERT review, with dogfood explicitly using
@@ -321,7 +322,7 @@ create branch and worktree
   → promote and commit the reviewed future folder
   → fork and publish the inherited episode session
   → persist v2 handoff-pending admission state
-  → send canonical handoff as steer
+  → send canonical handoff as an ordinary idle-only prompt
   → request focused compaction of inherited planning context
   → persist execute-pending after handoff acknowledgement
   → queue canonical execute exactly once as the sole follow-up
@@ -379,11 +380,17 @@ For `advance` or an in-scope `revise`, the project conversation may invoke
 must cancel the completed generation watch and pre-arm exactly one non-steering
 watch for the intended new generation immediately before the call. The host
 capability then preflights canonical handoff and execute, checks the exact owner
-and idle episode, sends handoff as fail-if-busy `steer`, and queues exactly one
-execute `followUp`. A definite no-admission failure cancels the pre-armed watch;
-success, partial admission, or ambiguity keeps it until the transition is
-reconciled. The owner never attempts to create the watch after a successful
-terminal call.
+and idle episode, retains any valid resident route, and republishes only when no
+route exists. Its state check requires `isSessionActive: false` plus every
+detailed busy/action/queue signal clear. It sends handoff as an ordinary
+`prompt` with `queueIfBusy: false` and no `streamingBehavior`, then queues exactly
+one execute `followUp`. The ordinary prompt is the daemon-authoritative idle-only
+TOCTOU guard; `steer` would queue during streaming. A definite busy or other
+no-admission failure sends nothing and leaves the pre-armed heartbeat to retry
+later; it is cancelled only when the generation is no longer active or a
+terminal/externally blocked boundary is reached. Success, partial admission, or
+ambiguity keeps the watch until the transition is reconciled. The owner never
+attempts to create the watch after a successful terminal call.
 
 Ordinary `agent_message.send()` is model input. It does not dispatch a sibling's
 native slash command. The deterministic host capability exists because the

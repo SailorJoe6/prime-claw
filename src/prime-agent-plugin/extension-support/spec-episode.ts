@@ -126,7 +126,7 @@ export interface EpisodeHandoffResult {
   sourceLocation: string;
   episodeId: string;
   episodeActiveSessionId: string;
-  handoffDelivery: "steer";
+  handoffDelivery: "prompt";
   executeDelivery: "followUp";
 }
 
@@ -659,7 +659,7 @@ export class PrimeSessionPublisher implements SessionPublisher {
     } catch (error) {
       if (isUncertainMutation(error)) {
         throw new EpisodeStateUncertainError(
-          `Episode reactivation may have succeeded. Preserved durable identity and resources for operator recovery.`,
+          `Episode route publication may have succeeded. Preserved durable identity and resources for operator recovery.`,
           { cause: error },
         );
       }
@@ -700,7 +700,6 @@ export class PrimeSessionPublisher implements SessionPublisher {
         type: "prompt",
         activeSessionId,
         message: handoffPrompt,
-        streamingBehavior: "steer",
         queueIfBusy: false,
         expandPromptTemplates: false,
         source: "extension",
@@ -827,7 +826,8 @@ function validateExistingIdentity(
 }
 
 function sessionIsBusy(session: SessionSummary): boolean {
-  return session.isStreaming === true
+  return session.isSessionActive === true
+    || session.isStreaming === true
     || session.isCompacting === true
     || (session.queuedCount ?? 0) > 0;
 }
@@ -845,7 +845,7 @@ function assertIdleEpisodeState(
   if (!matches) throw new Error("Episode state does not match the durable owned identity");
 
   const actions = state.sessionActions;
-  const idle = state.isSessionActive === true
+  const idle = state.isSessionActive === false
     && state.isStreaming === false
     && state.isCompacting === false
     && state.isBashRunning === false
@@ -903,15 +903,13 @@ export async function handoffSpecEpisode(
       throw new Error("Owned episode is busy; handoff requires an idle episode with an empty queue");
     }
 
-    // Preflight both workflows before reactivating or messaging the episode.
+    // Preflight both workflows before publishing a missing route or messaging the episode.
     const handoffPrompt = canonicalSkillPrompt(identity.worktree, "handoff", guidance.trim());
     if (!handoffPrompt) throw new Error("Episode worktree is missing .ralph/skills/handoff/SKILL.md");
     const executePrompt = canonicalSkillPrompt(identity.worktree, "execute");
     if (!executePrompt) throw new Error("Episode worktree is missing .ralph/skills/execute/SKILL.md");
 
-    let activeSessionId = durableSession.isSessionActive === false
-      ? undefined
-      : durableSession.activeSessionId;
+    let activeSessionId = durableSession.activeSessionId;
     if (!activeSessionId) {
       const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
       const reopened = await publisher.reopen({
@@ -926,7 +924,7 @@ export async function handoffSpecEpisode(
         filesystem.writeIdentity(recordPath, { ...identity, episodeActiveSessionId: activeSessionId });
       } catch (error) {
         throw new EpisodeStateUncertainError(
-          "Episode reactivated but its refreshed routing identity could not be persisted; no handoff was sent.",
+          "Episode route was published but its refreshed routing identity could not be persisted; no handoff was sent.",
           { cause: error },
         );
       }
@@ -940,7 +938,7 @@ export async function handoffSpecEpisode(
       sourceLocation: selected.location,
       episodeId: identity.episodeId,
       episodeActiveSessionId: activeSessionId,
-      handoffDelivery: "steer",
+      handoffDelivery: "prompt",
       executeDelivery: "followUp",
     };
   } finally {
@@ -1011,7 +1009,7 @@ export async function createSpecEpisode(
           filesystem.writeIdentity(recordPath, refreshed);
         } catch (error) {
           throw new EpisodeStateUncertainError(
-            "Episode reactivated but its refreshed routing identity could not be persisted; resources were preserved.",
+            "Episode route was published but its refreshed routing identity could not be persisted; resources were preserved.",
             { cause: error },
           );
         }

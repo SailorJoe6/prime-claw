@@ -75,18 +75,21 @@ The exact location selects the ignored durable episode identity. Host code
 requires the caller to be that identity's top-level owner and revalidates the
 branch, worktree, durable session ID and file, CWD, and session name. The model
 cannot supply an active routing ID, worktree, session name, command, phase, or
-arbitrary prompt. An inactive exact session is reopened through the existing
-identity-checked path and its refreshed active ID is persisted.
+arbitrary prompt. A resident route is retained even while the session has no
+pending work (`isSessionActive: false`). The exact durable session is published
+again only when no active routing ID exists, and its refreshed ID is persisted.
 
 Before sending either workflow, the host preflights both canonical Markdown
-files and obtains the daemon's exact state. Admission fails closed unless the
-episode has no active turn, tool, bash process, compaction, RLM child, unfinished
-action, steering message, or follow-up. The first daemon prompt is canonical
-handoff with `streamingBehavior: "steer"` and `queueIfBusy: false`; only after
-that acknowledgement does the host queue canonical execute with
-`streamingBehavior: "followUp"` and `queueIfBusy: true`. The second prompt is
-the sole follow-up. The daemon's fail-if-busy check is authoritative if activity
-starts after the state snapshot.
+files and obtains the daemon's exact state. Admission fails closed unless
+`isSessionActive` is false and the episode has no streaming turn, tool, bash
+process, compaction, RLM child, unfinished action, steering message, or
+follow-up. The first daemon request is canonical handoff as an ordinary `prompt`
+with `queueIfBusy: false` and no `streamingBehavior`; only after that
+acknowledgement does the host queue canonical execute with `streamingBehavior:
+"followUp"` and `queueIfBusy: true`. The second prompt is the sole follow-up.
+Prime Agent's native ordinary-prompt rejection is authoritative if activity
+starts after the state snapshot. A `steer` request is not fail-if-busy: while
+streaming it queues steering even when `queueIfBusy` is false.
 
 Success reports admission only. The episode's ordered `Status / Evidence / Next
 Step` handoff result is the observable compaction-request evidence; execute can
@@ -100,7 +103,7 @@ Initial `createSpecEpisode()` also uses the handoff-first transport. The forked
 episode inherits the reviewed planning conversation, so canonical handoff
 requests focused compaction before the first execute slice starts. A version-2
 bootstrap admission journal durably separates the two daemon mutations:
-`handoff-pending` precedes the steer; `execute-pending` is persisted after the
+`handoff-pending` precedes the ordinary prompt; `execute-pending` is persisted after the
 handoff acknowledgement and before the sole follow-up; `delivered` follows the
 second acknowledgement. Rejections and ambiguous crash windows after handoff
 preserve all episode resources and never replay automatically. Version-1

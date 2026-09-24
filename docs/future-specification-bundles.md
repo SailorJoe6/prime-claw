@@ -199,8 +199,9 @@ so the narrowly scoped host adapter uses the daemon supervisor socket injected
 into daemon workers. Before task delivery it preflights both canonical workflows and atomically
 stores a version-2 identity with `bootstrapAdmission: handoff-pending`. New
 episodes then use the same narrow two-message transport as later owner-driven
-transitions: canonical handoff is sent as fail-if-busy `steer`, and canonical
-execute is queued exactly once as the sole `followUp`. This focuses the inherited
+transitions: canonical handoff is sent as an ordinary idle-only `prompt` with no
+`streamingBehavior`, and canonical execute is queued exactly once as the sole
+`followUp`. This focuses the inherited
 planning conversation through the handoff compaction boundary before slice 1.
 
 The bootstrap admission journal records transport stages, not workflow
@@ -268,12 +269,16 @@ episode identity is the authority: host code requires the same top-level owner
 session and revalidates every derived branch, worktree, and durable-session
 field before using the daemon's current active routing ID.
 
-The operation reopens an inactive exact episode when needed, then checks the
-live daemon state and fails closed unless the episode is fully quiescent with an
-empty steering/follow-up queue. It loads the current canonical handoff and
-execute Markdown from the episode worktree before either send. Handoff is sent
-first as fail-if-busy `steer`; execute is then queued exactly once as the sole
-`followUp`. The synchronous result proves only ordered admission. The episode's
+The operation retains an exact resident route even when `isSessionActive` is
+false, and publishes the durable session again only when no route exists. It
+then re-reads live daemon state and fails closed unless `isSessionActive` is
+false and every detailed turn, tool, child, action, and queue signal is clear.
+It loads the current canonical handoff and execute Markdown from the episode
+worktree before either send. Handoff is sent first as an ordinary `prompt` with
+`queueIfBusy: false` and no `streamingBehavior`; execute is then queued exactly
+once as the sole `followUp`. This ordinary request gives the daemon an idle-only
+TOCTOU guard. `steer` is not suitable because it can queue while streaming even
+with `queueIfBusy: false`. The synchronous result proves only ordered admission. The episode's
 handoff `Status / Evidence / Next Step` output records whether focused compaction
 was requested before the queued execute turn continues.
 
