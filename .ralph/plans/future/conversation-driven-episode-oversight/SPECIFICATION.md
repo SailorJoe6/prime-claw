@@ -194,11 +194,14 @@ input event or a mutable per-input cache. Activation itself causes no unsolicite
 model response.
 
 The canonical package uses a deliberately closed frontmatter contract rather
-than general YAML. Between the exact delimiters it permits exactly one `name`
-line and one `description` line, with no blank, comment, or unknown metadata
-lines. Values follow the documented bounded quoted or unquoted scalar grammar.
-Anything outside that complete subset blocks both promotion and active dispatch
-before a provider call and without changing lifecycle evidence.
+than general YAML. The reader validates the raw file before any whole-file
+whitespace normalization: the opening and closing `---` delimiters must be exact,
+unindented lines, while ordinary trailing newlines and nonempty formatted body
+text remain valid. Between those delimiters it permits exactly one `name` line
+and one `description` line, with no blank, comment, or unknown metadata lines.
+Values follow the documented bounded quoted or unquoted scalar grammar. Anything
+outside that complete subset blocks both promotion and active dispatch before a
+provider call and without changing lifecycle evidence.
 
 Native automatic compaction remains unchanged. Its private summarizer is a
 runtime utility rather than the CONVERSATION agent and need not receive the role

@@ -216,6 +216,9 @@ copied ownership.
    - append idempotent active/inactive markers;
    - validate the existing spec-episode identity as ownership expectation;
    - read the current canonical `oversee-episode` package;
+   - validate raw package delimiters before any whole-file whitespace
+     normalization; require exact unindented delimiter lines while preserving
+     normal trailing newlines and formatted body text;
    - accept only its closed two-key frontmatter contract (`name` and
      `description`) and reject blank, comment, unknown, nested, or unsupported
      scalar metadata before promotion or provider dispatch;
