@@ -91,27 +91,33 @@ function canonicalProjectRoot(cwd: string): string {
   try { return realpathSync(cwd); }
   catch (error) { throw new Error(`project root is unavailable: ${error instanceof Error ? error.message : String(error)}`); }
 }
+function parseFrontmatterScalar(value: string, key: string, path: string): string {
+  if (!value) throw new Error(`oversight package ${key} scalar is empty at ${path}`);
+  if (/^"(?:[^"\\]|\\.)*"$/.test(value)) {
+    try { const parsed = JSON.parse(value); if (typeof parsed === "string" && parsed) return parsed; } catch { /* below */ }
+    throw new Error(`oversight package ${key} scalar is malformed at ${path}`);
+  }
+  if (/^'[^']*'$/.test(value)) { const parsed = value.slice(1, -1); if (parsed) return parsed; }
+  if (/^[\[\]{}|>&*!%@`'"-]/.test(value) || /[\[\]{}'"\t]/.test(value) || /:\s|\s#/.test(value)) {
+    throw new Error(`oversight package ${key} scalar uses unsupported YAML syntax at ${path}`);
+  }
+  return value;
+}
 function parseSkillFrontmatter(text: string, path: string): { name: string; body: string } {
   const parsed = /^---\n([\s\S]*?)\n---\n([\s\S]+)$/.exec(text);
   if (!parsed) throw new Error(`oversight package frontmatter or procedure is incomplete at ${path}`);
   const values = new Map<string, string>();
   for (const raw of parsed[1].split("\n")) {
-    if (!raw.trim() || raw.trimStart().startsWith("#")) continue;
-    if (/^[ \t]/.test(raw)) continue; // nested metadata is allowed but never identifies the skill
-    const match = /^([A-Za-z_][A-Za-z0-9_-]*):(?:[ ](.*))?$/.exec(raw);
+    if (!raw.trim() || raw.startsWith("#")) continue;
+    if (/^[ \t]/.test(raw) || raw.startsWith("-")) throw new Error(`oversight package frontmatter nesting or sequences are unsupported at ${path}`);
+    const match = /^([A-Za-z_][A-Za-z0-9_-]*):[ ](\S(?:.*\S)?)$/.exec(raw);
     if (!match || values.has(match[1])) throw new Error(`oversight package frontmatter is malformed or ambiguous at ${path}`);
-    values.set(match[1], match[2] ?? "");
+    values.set(match[1], parseFrontmatterScalar(match[2], match[1], path));
   }
-  const scalar = values.get("name");
-  if (scalar === undefined) throw new Error(`oversight package has no top-level name at ${path}`);
-  let name: string;
-  if (/^[A-Za-z0-9_-]+$/.test(scalar)) name = scalar;
-  else if (/^'[^']*'$/.test(scalar)) name = scalar.slice(1, -1);
-  else if (/^"(?:[^"\\]|\\.)*"$/.test(scalar)) {
-    try { name = JSON.parse(scalar) as string; } catch { throw new Error(`oversight package name is malformed at ${path}`); }
-  } else throw new Error(`oversight package name is malformed at ${path}`);
+  const name = values.get("name"); const description = values.get("description");
+  if (name !== "oversee-episode" || !description) throw new Error(`oversight package requires exact name and nonempty description at ${path}`);
   const body = parsed[2].trim();
-  if (name !== "oversee-episode" || !body) throw new Error(`oversight package name or procedure is invalid at ${path}`);
+  if (!body) throw new Error(`oversight package procedure is empty at ${path}`);
   return { name, body };
 }
 function packageBody(cwd: string): string {
@@ -200,7 +206,9 @@ function markerRecords(ctx: ExtensionContext): MarkerRecord[] {
     const entry = entries[index];
     if (entry.type !== "custom" || entry.customType !== OVERSIGHT_MARKER_TYPE) continue;
     const raw = entry.data as Record<string, unknown> | undefined;
-    if (raw?.ownerSessionId !== sessionId) continue; // foreign copied history is inert before schema parsing
+    const owner = raw?.ownerSessionId;
+    if (typeof owner !== "string" || !owner) throw new Error("oversight marker owner is unclassifiable");
+    if (owner !== sessionId) continue; // only a positively identified foreign owner is inert
     const key = `${String(raw?.slug ?? "")}\0${String(raw?.episodeId ?? "")}`;
     if (seen.has(key)) continue; seen.add(key);
     if (raw?.markerVersion === MARKER_VERSION) result.push({ marker: parseMarker(raw) });
@@ -241,7 +249,7 @@ export function assertConversationPromotionReady(ctx: ExtensionContext, requeste
   if (expectations.length && requestedLocation && expectations[0].sourceLocation !== requestedLocation) {
     throw new Error(`conversation already owns active expectation ${expectations[0].sourceLocation}`);
   }
-  assertNoConflictingLifecycleState(ctx, expectations[0] ?? null);
+  assertNoConflictingLifecycleState(ctx, expectations[0] ?? null, false);
 }
 
 function currentBoundedIdentity(ctx: ExtensionContext): { role: "EPISODE"; sessionId: string } | null {
@@ -327,33 +335,48 @@ function markerFromReceipt(receipt: FinalizationReceipt, status: "active" | "ina
 function matchingReceipt(receipts: FinalizationReceipt[], value: { slug: string; episodeId: string }): FinalizationReceipt | null {
   return receipts.find((receipt) => receipt.slug === value.slug && receipt.episodeId === value.episodeId) ?? null;
 }
-function assertNoConflictingLifecycleState(ctx: ExtensionContext, expectation: EpisodeIdentity | null): void {
+function assertNoConflictingLifecycleState(
+  ctx: ExtensionContext,
+  expectation: EpisodeIdentity | null,
+  allowMatchingAuthorized: boolean,
+): void {
   const receipts = ownerFinalizationReceipts(ctx);
   const records = markerRecords(ctx);
   for (const receipt of receipts) {
     const record = markerForLocation(ctx, receipt.sourceLocation);
     const marker = record?.marker ?? null;
-    if (receipt.state !== "completed") throw new Error(`terminal ${receipt.state} receipt must be reconciled before promotion`);
-    if (!marker || marker.status !== "inactive") throw new Error("completed receipt lacks its exact inactive marker");
+    if (!marker) throw new Error("finalization receipt lacks its exact v2 marker");
     assertMarkerReceipt(marker, receipt);
+    const sameExpectation = expectation?.slug === receipt.slug && expectation.episodeId === receipt.episodeId;
+    if (sameExpectation) {
+      if (receipt.state === "authorized" && allowMatchingAuthorized && marker.status === "active") continue;
+      throw new Error(`current expectation conflicts with terminal ${receipt.state} receipt`);
+    }
+    if (receipt.state !== "completed" || marker.status !== "inactive") {
+      throw new Error(`noncurrent terminal ${receipt.state} state must be reconciled before proceeding`);
+    }
   }
   for (const record of records) {
     const value = record.marker ?? record.legacy!;
     const sameExpectation = expectation?.slug === value.slug && expectation.episodeId === value.episodeId;
     if (record.legacy) {
-      if (!sameExpectation) throw new Error("legacy owner marker requires exact expectation migration before promotion");
+      if (!sameExpectation) throw new Error("legacy owner marker requires exact expectation migration before proceeding");
       continue;
     }
-    if (record.marker!.status === "active" && !sameExpectation) throw new Error("active marker has no matching current expectation");
-    if (record.marker!.status === "inactive" && !matchingReceipt(receipts, record.marker!)) {
-      throw new Error("inactive marker has no matching completed tombstone");
+    if (sameExpectation) {
+      if (record.marker!.status !== "active") throw new Error("current expectation has an inactive marker");
+      continue;
     }
+    if (record.marker!.status === "active") throw new Error("orphan active marker conflicts with current lifecycle state");
+    const receipt = matchingReceipt(receipts, record.marker!);
+    if (!receipt || receipt.state !== "completed") throw new Error("inactive marker has no completed matching tombstone");
   }
 }
 
 function resolveState(ctx: ExtensionContext): { expectation: EpisodeIdentity | null; marker: OversightMarker | null } {
   const expectation = ownerExpectations(ctx)[0] ?? null;
   const receipts = ownerFinalizationReceipts(ctx);
+  assertNoConflictingLifecycleState(ctx, expectation, true);
   if (expectation) {
     if (!episodeBootstrapReady(expectation)) throw new Error("owner episode expectation is not bootstrap-ready");
     const record = markerForIdentity(ctx, expectation);
@@ -391,11 +414,23 @@ export function reconcileOversightAtSessionStart(pi: ExtensionAPI, ctx: Extensio
   try {
     const expectation = ownerExpectations(ctx)[0] ?? null;
     const receipts = ownerFinalizationReceipts(ctx);
+    const existingRecords = markerRecords(ctx);
+    if (expectation || receipts.length || existingRecords.length || currentBoundedIdentity(ctx)) {
+      assertIdentityKernel(ctx);
+      packageBody(ctx.cwd);
+    }
     if (expectation) {
       if (!episodeBootstrapReady(expectation)) throw new Error("owner episode expectation is not bootstrap-ready");
       const existing = markerForIdentity(ctx, expectation);
       if (existing?.legacy) {
         if (existing.legacy.status !== "active") throw new Error("inactive legacy marker conflicts with a live expectation");
+        if (existing.legacy.ownerSessionId !== expectation.ownerSessionId
+          || existing.legacy.slug !== expectation.slug
+          || existing.legacy.sourceLocation !== expectation.sourceLocation
+          || existing.legacy.episodeId !== expectation.episodeId
+          || resolve(existing.legacy.episodeSessionFile) !== resolve(expectation.episodeSessionFile)) {
+          throw new Error("legacy oversight marker disagrees with the exact durable expectation");
+        }
         const migrated = markerFromIdentity(expectation, "active");
         pi.appendEntry(OVERSIGHT_MARKER_TYPE, migrated);
         const message = `Migrated legacy oversight for ${expectation.sourceLocation} to the exact v2 marker.`;
@@ -440,6 +475,12 @@ export function applyConversationContext(event: {messages:unknown[]}, ctx: Exten
 export function currentOversightMarker(ctx: ExtensionContext): OversightMarker | null { return resolveState(ctx).marker; }
 export function currentOversightMarkerForFinalization(ctx: ExtensionContext, sourceLocation: string): OversightMarker | null {
   return markerForLocation(ctx, sourceLocation)?.marker ?? null;
+}
+export function assertFinalizationRecoveryReady(ctx: ExtensionContext): void {
+  const completing = ownerFinalizationReceipts(ctx).some((value) => value.state === "completing");
+  if (!completing) return;
+  assertIdentityKernel(ctx);
+  packageBody(ctx.cwd);
 }
 export function currentCompletingFinalization(ctx: ExtensionContext): { receipt: FinalizationReceipt; marker: OversightMarker } | null {
   const receipt = ownerFinalizationReceipts(ctx).find((value) => value.state === "completing");

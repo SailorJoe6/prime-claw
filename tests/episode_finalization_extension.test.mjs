@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { authorizeEpisodeFinalization, completeEpisodeFinalization, parseFinalizationReceipt, recoverCompletingEpisodeFinalization } from "../src/prime-agent-plugin/extension-support/episode-finalization.ts";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { spawn } from "node:child_process";
+import { authorizeEpisodeFinalization, completeEpisodeFinalization, parseFinalizationReceipt, recoverCompletingEpisodeFinalization, acquireNativeFinalizationLock } from "../src/prime-agent-plugin/extension-support/episode-finalization.ts";
 
 const LOCATION = ".ralph/plans/future/alpha";
 const EPISODE = "a".repeat(40);
@@ -27,6 +32,7 @@ function fixture(options = {}) {
   let sessions = options.sessions ?? [];
   let worktrees = options.worktree ? [{ path: "/worktree", branch: "episode/alpha" }] : [{ path: "/repo", branch: "main" }];
   let closed = 0, writes = 0, removes = 0;
+  let lockTail = Promise.resolve();
   const fail = { ...(options.fail ?? {}) };
   const deps = {
     async listSessions() { if (fail.list) throw Error("daemon failed"); return structuredClone(sessions); },
@@ -51,6 +57,13 @@ function fixture(options = {}) {
     writeJson(path, value) { writes++; if (fail.writeAt === writes) throw Error("write failed " + writes); files.set(path, structuredClone(value)); },
     remove(path) { removes++; if (fail.removeAt === removes) throw Error("remove failed"); files.delete(path); },
     now() { return `2026-01-01T00:00:0${writes}.000Z`; },
+    async acquireLock() {
+      const predecessor = lockTail;
+      let unlock;
+      lockTail = new Promise(resolve => { unlock = resolve; });
+      await predecessor;
+      return async () => unlock();
+    },
   };
   const ctx = { cwd: repo, sessionManager: { getSessionId() { return "owner"; } } };
   return { identityPath, receiptPath, record, files, deps, ctx, fail,
@@ -219,4 +232,77 @@ test("native recovery helper completes only a completing receipt without a provi
 
   const quiet = fixture();
   assert.equal(await recoverCompletingEpisodeFinalization(quiet.ctx, () => { throw Error("must not append"); }, marker(), quiet.deps), null);
+});
+
+
+test("delayed overlapping authorization reacquires and returns the completed winner", async () => {
+  const f = fixture();
+  let enteredResolve, approveResolve;
+  const entered = new Promise(resolve => { enteredResolve = resolve; });
+  const approval = new Promise(resolve => { approveResolve = resolve; });
+  let firstConfirms = 0, secondConfirms = 0;
+  const firstPromise = authorizeEpisodeFinalization(LOCATION, "merged", f.ctx, async () => {
+    firstConfirms++; enteredResolve(); return approval;
+  }, marker(), f.deps);
+  await entered;
+  const secondPromise = authorizeEpisodeFinalization(LOCATION, "merged", f.ctx, async () => {
+    secondConfirms++; return true;
+  }, marker(), f.deps);
+  const second = await secondPromise;
+  assert.equal(second.reused, false);
+  assert.equal(secondConfirms, 1);
+  const transitions = [];
+  const completed = await complete(f, "merged", marker("active"), status => transitions.push(status));
+  assert.equal(completed.state, "completed");
+  approveResolve(true);
+  const first = await firstPromise;
+  assert.equal(first.reused, true);
+  assert.deepEqual(completed, first.receipt);
+  assert.equal(firstConfirms, 1);
+  assert.equal(f.writes, 3);
+});
+
+test("delayed overlapping completion returns the durable completed winner to an exact stale replay", async () => {
+  const f = fixture(); await authorize(f);
+  const originalList = f.deps.listSessions;
+  let enteredResolve, continueResolve;
+  const entered = new Promise(resolve => { enteredResolve = resolve; });
+  const continuation = new Promise(resolve => { continueResolve = resolve; });
+  let firstList = true;
+  f.deps.listSessions = async () => {
+    if (firstList) { firstList = false; enteredResolve(); await continuation; }
+    return originalList();
+  };
+  const firstTransitions = [], secondTransitions = [];
+  const firstPromise = complete(f, "merged", marker("active"), status => firstTransitions.push(status));
+  await entered;
+  const secondPromise = complete(f, "merged", marker("active"), status => secondTransitions.push(status));
+  continueResolve();
+  const [first, second] = await Promise.all([firstPromise, secondPromise]);
+  assert.equal(first.state, "completed");
+  assert.deepEqual(second, first);
+  assert.deepEqual(firstTransitions, ["inactive"]);
+  assert.deepEqual(secondTransitions, []);
+  assert.equal(f.files.has(f.identityPath), false);
+});
+
+test("native transaction lock is kernel-released after SIGTERM and restart preserves a completing receipt", async t => {
+  const dir = mkdtempSync(join(tmpdir(), "prime-claw-finalization-lock-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const lockPath = join(dir, "alpha.finalization.json.transaction.lock");
+  const receiptPath = join(dir, "alpha.finalization.json");
+  writeFileSync(receiptPath, JSON.stringify({ state: "completing" }));
+  const moduleUrl = pathToFileURL(join(process.cwd(), "src/prime-agent-plugin/extension-support/episode-finalization.ts")).href;
+  const script = `import { acquireNativeFinalizationLock } from ${JSON.stringify(moduleUrl)}; await acquireNativeFinalizationLock(${JSON.stringify(lockPath)}); process.stdout.write("held\\n"); setInterval(() => {}, 1000);`;
+  const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], { stdio: ["ignore", "pipe", "pipe"] });
+  await new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.stdout.once("data", chunk => String(chunk).includes("held") ? resolve() : reject(Error(`unexpected child output: ${chunk}`)));
+    child.once("exit", (code, signal) => reject(Error(`lock owner exited before interruption: ${code}/${signal}`)));
+  });
+  child.kill("SIGTERM");
+  await new Promise(resolve => child.once("exit", resolve));
+  const release = await acquireNativeFinalizationLock(lockPath);
+  assert.deepEqual(JSON.parse(String(await import("node:fs").then(fs => fs.readFileSync(receiptPath)))), { state: "completing" });
+  await release();
 });

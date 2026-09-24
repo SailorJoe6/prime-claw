@@ -1,6 +1,6 @@
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { PrimeSessionPublisher, parseEpisodeIdentity, type EpisodeIdentity } from "./spec-episode.ts";
@@ -50,6 +50,50 @@ export interface FinalizationDependencies {
   writeJson(path: string, value: unknown): void;
   remove(path: string): void;
   now(): string;
+  acquireLock(path: string): Promise<() => Promise<void>>;
+}
+
+const LOCK_RETRY_MS = 20;
+
+/**
+ * Hold a BSD lockf advisory lock in a helper whose stdin is owned by this
+ * process. The kernel releases the lock if either process exits, including an
+ * ungraceful owner termination. The lock file may remain, but it is not
+ * ownership evidence and is never unlinked by contenders.
+ */
+export async function acquireNativeFinalizationLock(path: string): Promise<() => Promise<void>> {
+  mkdirSync(dirname(path), { recursive: true });
+  for (;;) {
+    const lockScript = "import fcntl,sys; f=open(sys.argv[1],'a+b'); fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB); print('ready',flush=True); sys.stdin.buffer.read()";
+    const child: ChildProcessWithoutNullStreams = spawn(
+      "python3",
+      ["-c", lockScript, path],
+      { stdio: ["pipe", "pipe", "pipe"] },
+    );
+    const acquired = await new Promise<boolean>((resolveReady, rejectReady) => {
+      let settled = false;
+      const settle = (value: boolean) => { if (!settled) { settled = true; resolveReady(value); } };
+      child.once("error", (error) => { if (!settled) { settled = true; rejectReady(error); } });
+      child.once("exit", () => settle(false));
+      child.stdout.once("data", (chunk) => settle(String(chunk).includes("ready")));
+    });
+    if (acquired) {
+      let released = false;
+      return async () => {
+        if (released) return;
+        released = true;
+        await new Promise<void>((resolveExit) => {
+          if (child.exitCode !== null || child.signalCode !== null) return resolveExit();
+          child.once("exit", () => resolveExit());
+          child.stdin.end();
+        });
+      };
+    }
+    child.stdin.destroy();
+    child.stdout.destroy();
+    child.stderr.destroy();
+    await new Promise((resolveRetry) => setTimeout(resolveRetry, LOCK_RETRY_MS));
+  }
 }
 
 class NativeFinalizationDependencies implements FinalizationDependencies {
@@ -96,11 +140,8 @@ class NativeFinalizationDependencies implements FinalizationDependencies {
   readJson(path: string) { return JSON.parse(readFileSync(path, "utf8")); }
   writeJson(path: string, value: unknown) {
     mkdirSync(dirname(path), { recursive: true });
-    const lock = `${path}.lock`;
-    let lockFd: number | undefined;
     let temporary: string | undefined;
     try {
-      lockFd = openSync(lock, "wx", 0o600);
       temporary = `${path}.tmp-${process.pid}-${Date.now()}`;
       const valueFd = openSync(temporary, "wx", 0o600);
       try {
@@ -113,14 +154,11 @@ class NativeFinalizationDependencies implements FinalizationDependencies {
       try { fsyncSync(directoryFd); } finally { closeSync(directoryFd); }
     } finally {
       if (temporary) rmSync(temporary, { force: true });
-      if (lockFd !== undefined) {
-        closeSync(lockFd);
-        rmSync(lock, { force: true });
-      }
     }
   }
   remove(path: string) { rmSync(path, { force: true }); }
   now() { return new Date().toISOString(); }
+  acquireLock(path: string) { return acquireNativeFinalizationLock(path); }
 }
 
 function paths(repo: string, slug: string) {
@@ -235,7 +273,9 @@ export async function authorizeEpisodeFinalization(
   try {
     if (disposition !== "merged" && disposition !== "abandoned") throw new Error("Disposition must be merged or abandoned");
     const selected = parseLocation(ctx.cwd, rawLocation, deps);
-    if (deps.exists(selected.receipt)) {
+    const lockPath = `${selected.receipt}.transaction.lock`;
+    const existingResult = (): { receipt: FinalizationReceipt; reused: true } | null => {
+      if (!deps.exists(selected.receipt)) return null;
       const existing = parseFinalizationReceipt(deps.readJson(selected.receipt));
       assertRequest(existing, selected.sourceLocation, selected.slug, disposition, ctx.sessionManager.getSessionId());
       const identityExists = deps.exists(selected.identity);
@@ -244,35 +284,55 @@ export async function authorizeEpisodeFinalization(
         assertExactOwner(existingIdentity, ctx, selected.sourceLocation);
         if (!receiptMatchesIdentity(existing, existingIdentity)) throw new Error("Finalization receipt does not match the exact owned episode");
       }
-      assertExactMarker(marker, existing, existing.state === "completed" ? ["inactive"]
+      assertExactMarker(marker, existing, existing.state === "completed" ? ["active", "inactive"]
         : existing.state === "authorized" ? ["active"] : ["active", "inactive"]);
-      assertLifecycleShape(existing.state, identityExists, marker.status);
+      assertLifecycleShape(existing.state, identityExists, existing.state === "completed" ? "inactive" : marker.status);
       return { receipt: existing, reused: true };
-    }
-    const record = identity(deps.readJson(selected.identity));
-    assertExactOwner(record, ctx, selected.sourceLocation);
-    if (record.slug !== selected.slug) throw new Error("Episode finalization slug mismatch");
-    assertExactMarker(marker, markerBindingFromIdentity(record), ["active"]);
-    const targetBranch = deps.currentBranch(selected.repo);
-    if (targetBranch === record.branch) throw new Error("Episode branch cannot be the finalization target branch");
-    const episodeCommit = deps.commit(selected.repo, record.branch);
-    const targetCommitAtAuthorization = deps.commit(selected.repo, `refs/heads/${targetBranch}`);
+    };
+
+    let value: FinalizationReceipt;
+    let release = await deps.acquireLock(lockPath);
+    try {
+      const existing = existingResult(); if (existing) return existing;
+      const record = identity(deps.readJson(selected.identity));
+      assertExactOwner(record, ctx, selected.sourceLocation);
+      if (record.slug !== selected.slug) throw new Error("Episode finalization slug mismatch");
+      assertExactMarker(marker, markerBindingFromIdentity(record), ["active"]);
+      const targetBranch = deps.currentBranch(selected.repo);
+      if (targetBranch === record.branch) throw new Error("Episode branch cannot be the finalization target branch");
+      const episodeCommit = deps.commit(selected.repo, record.branch);
+      const targetCommitAtAuthorization = deps.commit(selected.repo, `refs/heads/${targetBranch}`);
+      value = {
+        version: RECEIPT_VERSION, state: "authorized", sourceLocation: selected.sourceLocation, slug: selected.slug,
+        disposition, ownerSessionId: record.ownerSessionId, episodeId: record.episodeId,
+        episodeActiveSessionId: record.episodeActiveSessionId, episodeSessionFile: record.episodeSessionFile,
+        episodeBranch: record.branch, episodeWorktree: record.worktree, sessionName: record.sessionName,
+        identityVersion: record.version, admission: record.version === 1 ? record.executeAdmission : record.bootstrapAdmission,
+        episodeCommit, targetBranch, targetRef: `refs/heads/${targetBranch}`, targetCommitAtAuthorization,
+        authorizedAt: deps.now(),
+      };
+    } finally { await release(); }
+
     const approved = await confirm(
       `Authorize ${disposition} episode finalization?`,
-      `Record the operator decision for ${selected.sourceLocation}. Target: ${targetBranch} (${`refs/heads/${targetBranch}`}) at ${targetCommitAtAuthorization}. Exact episode tip: ${episodeCommit}. This performs no Git, session, worktree, branch, or cleanup mutation.`,
+      `Record the operator decision for ${selected.sourceLocation}. Target: ${value.targetBranch} (${value.targetRef}) at ${value.targetCommitAtAuthorization}. Exact episode tip: ${value.episodeCommit}. This performs no Git, session, worktree, branch, or cleanup mutation.`,
     );
     if (!approved) throw new Error("Episode finalization authorization was cancelled");
-    const value: FinalizationReceipt = {
-      version: RECEIPT_VERSION, state: "authorized", sourceLocation: selected.sourceLocation, slug: selected.slug,
-      disposition, ownerSessionId: record.ownerSessionId, episodeId: record.episodeId,
-      episodeActiveSessionId: record.episodeActiveSessionId, episodeSessionFile: record.episodeSessionFile,
-      episodeBranch: record.branch, episodeWorktree: record.worktree, sessionName: record.sessionName,
-      identityVersion: record.version, admission: record.version === 1 ? record.executeAdmission : record.bootstrapAdmission,
-      episodeCommit, targetBranch, targetRef: `refs/heads/${targetBranch}`, targetCommitAtAuthorization,
-      authorizedAt: deps.now(),
-    };
-    deps.writeJson(selected.receipt, value);
-    return { receipt: value, reused: false };
+
+    release = await deps.acquireLock(lockPath);
+    try {
+      const newer = existingResult(); if (newer) return newer;
+      const refreshed = identity(deps.readJson(selected.identity));
+      assertExactOwner(refreshed, ctx, selected.sourceLocation);
+      if (!receiptMatchesIdentity(value, refreshed)) throw new Error("Episode identity changed during finalization confirmation");
+      if (deps.currentBranch(selected.repo) !== value.targetBranch
+        || deps.commit(selected.repo, refreshed.branch) !== value.episodeCommit
+        || deps.commit(selected.repo, value.targetRef) !== value.targetCommitAtAuthorization) {
+        throw new Error("Finalization facts changed during operator confirmation");
+      }
+      deps.writeJson(selected.receipt, value);
+      return { receipt: value, reused: false };
+    } finally { await release(); }
   } finally { deps.close(); }
 }
 
@@ -344,6 +404,8 @@ export async function completeEpisodeFinalization(
   try {
     if (disposition !== "merged" && disposition !== "abandoned") throw new Error("Disposition must be merged or abandoned");
     const selected = parseLocation(ctx.cwd, rawLocation, deps);
+    const release = await deps.acquireLock(`${selected.receipt}.transaction.lock`);
+    try {
     let authorization = parseFinalizationReceipt(deps.readJson(selected.receipt));
     assertRequest(authorization, selected.sourceLocation, selected.slug, disposition, ctx.sessionManager.getSessionId());
     const identityExists = deps.exists(selected.identity);
@@ -352,9 +414,9 @@ export async function completeEpisodeFinalization(
       assertExactOwner(record, ctx, selected.sourceLocation);
       if (!receiptMatchesIdentity(authorization, record)) throw new Error("Finalization receipt does not match the exact owned episode");
     }
-    assertExactMarker(marker, authorization, authorization.state === "completed" ? ["inactive"]
+    assertExactMarker(marker, authorization, authorization.state === "completed" ? ["active", "inactive"]
       : authorization.state === "authorized" ? ["active"] : ["active", "inactive"]);
-    assertLifecycleShape(authorization.state, identityExists, marker.status);
+    assertLifecycleShape(authorization.state, identityExists, authorization.state === "completed" ? "inactive" : marker.status);
     if (authorization.state === "completed") return authorization;
 
     await validateTerminalFacts(selected, authorization, disposition, deps);
@@ -368,6 +430,7 @@ export async function completeEpisodeFinalization(
     const completed: FinalizationReceipt = { ...authorization, state: "completed", completedAt: deps.now() };
     deps.writeJson(selected.receipt, completed);
     return completed;
+    } finally { await release(); }
   } catch (error) {
     throw new Error(`Finalization is blocked with durable recovery evidence preserved: ${error instanceof Error ? error.message : String(error)}`);
   } finally { deps.close(); }

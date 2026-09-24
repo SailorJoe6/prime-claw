@@ -84,3 +84,16 @@ def test_current_documentation_describes_default_identity_and_temporary_mode():
     for phrase in ["APPEND_SYSTEM.md", "default CONVERSATION", "oversight mode", "oversee-episode", "exact-session", "native compaction", "finalize_spec_episode", "15-minute"]:
         assert phrase in text
     assert "--project-conversation" not in text
+
+
+def test_native_unclassifiable_marker_owners_block_before_provider(tmp_path):
+    prime=shutil.which("prime-agent");assert prime
+    for index, owner in enumerate([None, 7, ""]):
+        case=tmp_path/str(index);case.mkdir();project=case/"project";(project/".prime/agent").mkdir(parents=True);(project/".prime/agent/APPEND_SYSTEM.md").write_text(KERNEL.read_text());skill=project/".ralph/skills/oversee-episode/SKILL.md";skill.parent.mkdir(parents=True);skill.write_text(SKILL.read_text())
+        records=case/"records.jsonl";provider=case/"provider.ts";_provider_extension(provider,records)
+        setup=case/"setup.ts";setup.write_text(f'''export default function s(pi){{pi.on("session_start",()=>pi.appendEntry("prime-claw-conversation-oversight",{{markerVersion:2,status:"active",ownerSessionId:{json.dumps(owner)},slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeSessionFile:"/session",branch:"episode/alpha",worktree:"/worktree",sessionName:"alpha-episode",identityVersion:2,admission:"delivered"}}))}}''')
+        env={**os.environ,"PRIME_AGENT_CODING_AGENT_DIR":str(case/"agent"),"PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND":"1"}
+        completed=subprocess.run([prime,"--mode","text","--offline","--no-session","--no-skills","--no-prompt-templates","--no-context-files","--no-extensions","--cwd",str(project),"-e",str(provider),"-e",str(setup),"-e",str(EXTENSION),"--provider","poc","--model","m","-p","probe"],cwd=REPO,env=env,capture_output=True,text=True,timeout=20)
+        assert completed.returncode!=0
+        assert "owner is unclassifiable" in completed.stderr
+        assert not records.exists()

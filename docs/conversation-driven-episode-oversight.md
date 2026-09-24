@@ -43,9 +43,13 @@ queuing its canonical readiness workflow, the extension verifies:
 
 - exactly one effective identity kernel;
 - the restoration extension is active for this session;
-- `.ralph/skills/oversee-episode/SKILL.md` has exact supported frontmatter
-  delimiters, one unambiguous top-level quoted or unquoted `name:
-  oversee-episode`, and a nonempty procedure body; and
+- `.ralph/skills/oversee-episode/SKILL.md` follows the deliberately bounded
+  supported frontmatter grammar: exact first/closing `---` lines, unique
+  top-level scalar keys only, valid quoted or unquoted scalars, exact `name:
+  oversee-episode`, a nonempty `description`, and a nonempty procedure body.
+  Indentation/nested maps, sequences, block scalars, malformed quotes/brackets,
+  and duplicate keys are unsupported and rejected; this is not a general YAML
+  parser; and
 - the durable spec-episode state directory is writable; and
 - CWD, state, and expected worktree bindings resolve from one canonical project
   root, accepting benign filesystem aliases/symlink roots while rejecting
@@ -62,9 +66,13 @@ valid bootstrap-ready exact-owner expectation with no marker is recovered to an
 active marker with a visible durable recovery message. The known rejected v1
 marker schema is recognized only after exact owner filtering and migrated by
 appending a full v2 evidence marker; foreign copied v1 history is inert, and the
-newer v2 marker supersedes its generation history. Inactive, corrupt, or
-disagreeing current-owner state blocks; a copied marker in a different fork UUID
-remains inert.
+newer v2 marker supersedes its generation history. Only a positively identified,
+nonempty foreign owner is ignored; missing, null, numeric, or empty owner fields
+are unclassifiable corruption. Every exact-owner generation is reconciled before
+selecting the current package or declaring ordinary mode, so orphan active markers
+and old authorized/completing receipts cannot hide behind another active episode.
+Inactive, corrupt, or disagreeing current-owner state blocks; a copied marker in
+a different fork UUID remains inert.
 
 On every real provider context, the restoration extension:
 
@@ -119,9 +127,15 @@ explicit UI confirmation that shows the target branch/ref, authorization-time
 target commit, and exact episode tip, and writes
 `.prime/agent/state/spec-episodes/<slug>.finalization.json`.
 A matching replay returns the existing receipt without another confirmation.
+The exact receipt lifecycle transaction is serialized by a crash-released native
+lock. Authorization releases the lock while the UI waits, then reacquires and
+revalidates every binding/state before writing; a delayed compatible call returns
+the newer state/result and a conflict blocks, so completed evidence cannot rewind.
 Receipts and markers are indexed by exact slug/episode generation: completed old
 evidence remains replayable but never acts as the current ownership record, so a
-proven terminal cycle does not prevent a later approved folder.
+proven terminal cycle does not prevent a later approved folder. Replay output is
+scoped to that exact old episode; if another generation is active, the tool text
+and structured details explicitly say that current oversight remains active.
 Authorize does not merge, abandon, stop a session, remove a worktree, delete a
 branch, or decide semantic completion.
 
@@ -148,7 +162,9 @@ boundary remains visibly recoverable from the receipt, marker, and any surviving
 expectation; it never silently becomes ordinary mode. On reload/resume, a strict
 `completing` receipt is reconciled by the narrow native session-start path before
 an ordinary provider call, without invoking the model tool or replaying bootstrap
-admission. Unrelated resources are never removed.
+admission. Recovery validates the effective managed kernel and canonical package
+before any marker/receipt/expectation mutation; a project or CLI shadow blocks
+with state unchanged and zero provider calls. Unrelated resources are never removed.
 
 ## Installation boundaries
 

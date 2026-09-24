@@ -97,7 +97,7 @@ function fixture(t, { skill = "canonical plan body", folder = true, throwOnSend 
   mkdirSync(join(cwd, ".ralph", "plans", "future"), { recursive: true });
   if (folder) mkdirSync(join(cwd, LOCATION), { recursive: true });
   if (skill !== null) writeSkill(cwd, skill);
-  writeSkill(cwd, "---\nname: oversee-episode\n---\ncanonical oversight", "oversee-episode");
+  writeSkill(cwd, "---\nname: oversee-episode\ndescription: test package\n---\ncanonical oversight", "oversee-episode");
   mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
   return { cwd, ...createHarness(cwd, reviewedPlan, throwOnSend) };
 }
@@ -405,7 +405,7 @@ test("successful create activates exact owner oversight without unsolicited mess
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, LOCATION), { recursive: true });
   writeSkill(cwd, "implementation readiness", "implement-spec");
-  writeSkill(cwd, "---\nname: oversee-episode\n---\ncanonical oversight", "oversee-episode");
+  writeSkill(cwd, "---\nname: oversee-episode\ndescription: test package\n---\ncanonical oversight", "oversee-episode");
   mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
   let createCalls = 0;
   const episode = {
@@ -446,7 +446,7 @@ test("successful create activates exact owner oversight without unsolicited mess
 test("registered finalization capability confirms once, recovers natively, and replays durable completion", async (t) => {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-finalize-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
-  writeSkill(cwd, "---\nname: oversee-episode\n---\nprocedure", "oversee-episode");
+  writeSkill(cwd, "---\nname: oversee-episode\ndescription: test package\n---\nprocedure", "oversee-episode");
   const state = join(cwd, ".prime/agent/state/spec-episodes"); mkdirSync(state, { recursive: true });
   const worktree = resolve(dirname(cwd), `${basename(cwd)}-alpha-plan-episode`);
   const identity = { version: 2, slug: "alpha-plan", sourceLocation: LOCATION,
@@ -463,6 +463,7 @@ test("registered finalization capability confirms once, recovers natively, and r
     readJson(path) { return JSON.parse(readFileSync(path, "utf8")); },
     writeJson(path, value) { mkdirSync(dirname(path), { recursive: true }); const tmp = `${path}.tmp`; writeFileSync(tmp, JSON.stringify(value)); renameSync(tmp, path); },
     remove(path) { rmSync(path, { force: true }); }, now() { return "2026-01-01T00:00:00.000Z"; },
+    async acquireLock() { return async () => {}; },
   };
   const f = createHarness(cwd, createReviewedPlanExtension({ finalization }));
   f.entries.push({ type: "custom", customType: "prime-claw-conversation-oversight", data: {
@@ -501,13 +502,15 @@ test("registered finalization capability confirms once, recovers natively, and r
   } });
   const replay = await tool.execute("replay", { phase: "complete", location: LOCATION, disposition: "merged" }, undefined, undefined, f.ctx);
   assert.equal(replay.isError, undefined); assert.equal(f.confirmations.length, 1);
+  assert.match(replay.content[0].text, /Current oversight remains active for \.ralph\/plans\/future\/beta/);
+  assert.deepEqual(replay.details.currentOversight, { status: "active", sourceLocation: betaLocation, episodeId: "episode-beta" });
   const laterContext = await f.events.get("context")({ messages: [] }, f.ctx);
   assert.equal(laterContext.messages.filter((message) => message.customType === "prime-claw-oversee-episode-package").length, 1);
 });
 
 test("registered actual handoff reopen refresh preserves ordinary owner oversight", async (t) => {
   const cwd=realpathSync(mkdtempSync(join(tmpdir(),"prime-claw-reviewed-plan-route-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
-  mkdirSync(join(cwd,LOCATION),{recursive:true});writeSkill(cwd,"---\nname: oversee-episode\n---\nprocedure","oversee-episode");
+  mkdirSync(join(cwd,LOCATION),{recursive:true});writeSkill(cwd,"---\nname: oversee-episode\ndescription: test package\n---\nprocedure","oversee-episode");
   const slug="alpha-plan",worktree=resolve(dirname(cwd),`${basename(cwd)}-${slug}-episode`);t.after(()=>rmSync(worktree,{recursive:true,force:true}));mkdirSync(worktree,{recursive:true});writeSkill(worktree,"handoff","handoff");writeSkill(worktree,"execute","execute");
   const state=join(cwd,".prime/agent/state/spec-episodes");mkdirSync(state,{recursive:true});let identity={version:2,slug,sourceLocation:LOCATION,ownerSessionId:"owner-session",episodeId:"33333333-3333-4333-8333-333333333333",episodeActiveSessionId:"old-route",episodeSessionFile:join(cwd,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"};const identityPath=join(state,`${slug}.json`);writeFileSync(identityPath,JSON.stringify(identity));
   const publisher={async list(){return[{sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:false}]},async reopen(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile}},async getState(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:true,isStreaming:false,isCompacting:false,isBashRunning:false,isRunningTools:false,hasRunningRlmChildren:false,unfinishedActionCount:0,sessionActions:{queuedCount:0,steering:[],followUps:[]}}},async deliverHandoff(){},close(){}};
@@ -545,7 +548,7 @@ test("structured tool requires and consumes matching implement-spec approval", a
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, LOCATION), { recursive: true });
   writeSkill(cwd, "implementation readiness", "implement-spec");
-  writeSkill(cwd, "---\nname: oversee-episode\n---\ncanonical oversight", "oversee-episode");
+  writeSkill(cwd, "---\nname: oversee-episode\ndescription: test package\n---\ncanonical oversight", "oversee-episode");
   mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
   const dependencies = {
     git: { repositoryRoot() { throw new Error("authorized tool reached host capability"); } },

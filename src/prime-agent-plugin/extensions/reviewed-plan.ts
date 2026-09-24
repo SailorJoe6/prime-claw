@@ -13,7 +13,9 @@ import {
 import {
   appendActiveOversight,
   assertConversationPromotionReady,
+  assertFinalizationRecoveryReady,
   currentCompletingFinalization,
+  currentOversightMarker,
   currentOversightMarkerForFinalization,
   OVERSIGHT_MARKER_TYPE,
   registerConversationOversight,
@@ -150,6 +152,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     registerConversationOversight(pi);
     pi.on("session_start", async (_event, ctx) => {
       try {
+        assertFinalizationRecoveryReady(ctx);
         const recovery = currentCompletingFinalization(ctx);
         if (!recovery) return;
         const recovered = await recoverCompletingEpisodeFinalization(
@@ -339,9 +342,14 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             marker,
             dependencies?.finalization,
           );
+          const current = currentOversightMarker(ctx);
+          const laterActive = current?.status === "active" && current.episodeId !== receipt.episodeId ? current : null;
           return {
-            content: [{ type: "text", text: `Episode finalization completed for ${params.location} as ${disposition}. Oversight is inactive; CONVERSATION capability remains.` }],
-            details: { phase: "complete", disposition, receipt },
+            content: [{ type: "text", text: laterActive
+              ? `Episode finalization is completed for ${params.location} as ${disposition}. Current oversight remains active for ${laterActive.sourceLocation}.`
+              : `Episode finalization is completed for ${params.location} as ${disposition}. Oversight for that exact episode is inactive; CONVERSATION capability remains.` }],
+            details: { phase: "complete", disposition, receipt,
+              currentOversight: laterActive ? { status: "active", sourceLocation: laterActive.sourceLocation, episodeId: laterActive.episodeId } : { status: "inactive", sourceLocation: params.location, episodeId: receipt.episodeId } },
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);

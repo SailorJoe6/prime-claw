@@ -257,49 +257,48 @@ copied ownership.
 
 ### Replacement Slice 1 implementation evidence
 
-The R1–R10 consolidation indexes marker/receipt truth by exact episode generation,
-keeps completed old tombstones replayable but noncurrent, rejects conflicting live
-state before publication, and permits a later approved cycle. Stable owner markers
-exclude mutable daemon routing, so an exact reopen refresh does not invalidate
-oversight. Exact-owner legacy v1 markers migrate append-only to v2; foreign copied
-legacy history is ignored before parsing and newer v2 evidence supersedes the old
-generation.
+The N1–N7 consolidation completes the exact generation truth table. Only a
+positively identified nonempty foreign owner is ignored; unclassifiable markers,
+orphan active generations, and old authorized/completing receipts block even
+when another episode is active. Completed old tombstones remain replayable but
+noncurrent. Stable owner markers exclude mutable routes. Legacy v1 migration
+compares every stable field, including the session file, before append-only v2
+recovery.
 
-Terminal truth is strict: inactive state requires a matching completed tombstone;
-authorized/completing states never become ordinary; completed state cannot coexist
-with a reappearing expectation. A native session-start recovery reconciles an
-exact `completing` receipt without a provider/model tool. Daemon rows validate all
-supplied UUID aliases, route, and file fields and block every partial/conflicting
-match. Receipts bind and display the project-policy-selected target branch/ref,
-authorization target commit, and exact episode tip.
+Receipt authorization/completion now holds a crash-released Python/flock lock for
+each exact transaction. Authorization snapshots under lock, releases it while the
+UI waits, then reacquires and revalidates identity, marker, receipt, target, and
+episode facts. A delayed compatible call returns the newer authorized/completing/
+completed evidence and a conflict blocks, so stale calls cannot rewind state.
+Completing recovery validates the effective kernel and canonical package before
+any session-start mutation and then completes without a provider/model tool.
+Returned replay text/details are scoped to that exact old episode and explicitly
+preserve a later active generation.
 
-The installed native test now binds the fake daemon socket inside the test-only
-extension before any provider/tool mutation, asserts the effective transport,
-fake route, and exact create/prompt/ack trace, and cleans only fake resources. It
-also proves two exact generations with retained old receipt replay, route refresh,
-canonical macOS alias plus symlink CWD, quoted valid skill metadata and native
-invalid metadata, marker-gap/v1 migration, reload/resume, extension absence,
-project/CLI shadows, and provider-free finalization recovery. Review-reported live
-sessions `01a0d052-a01e-728f-b13a-527717a56c09` and
-`01a0d032-5fbc-746e-bcff-6fd1cd260cb8` were recorded only and not inspected or
-cleaned.
+The canonical skill uses a deliberately bounded scalar-only frontmatter grammar:
+exact delimiters, unique top-level keys, supported quoted/unquoted scalars, exact
+name, nonempty description, and nonempty body. Indentation/nesting, sequences,
+block/collection syntax, malformed quotes/brackets, and duplicate keys reject.
+Native negative cases make zero provider calls and quoted/unquoted valid forms
+pass.
 
-APPEND_SYSTEM installation retains its lock/atomic/fsync guarantees and now
-reconciles exact-pattern dead-writer temporaries on retry while preserving live
-writer files. Managed TypeScript destinations are preflighted before mutation and
-apply requires the complete final check; documentation explicitly states that the
-multi-file generation is sequential/detected, not atomically swapped. Native
-depth-positive children under an intentional prompt shadow rely on Prime Agent's
-bounded task prompt and receive zero owner state/package, as recorded in the
-living contract.
+Every publish/recovery-capable installed-native fixture now uses owned-worker mode
+and installs an in-extension `net.Socket` deny guard before lifecycle mutation.
+It asserts the effective fake socket, hard-coded fake route, complete ordered
+create/prompt/ack command IDs and steer/follow-up flags, and registers cleanup
+finalizers. A separate inner-SDK restart fixture proves shadowed completing state
+does not mutate, then provider-free recovery completes once readiness returns.
+No user-daemon session is part of the repaired matrix.
 
-Final focused gates passed 94 Node contracts and 25 Python native/install
-contracts plus seven installer subtests. Full gates passed 107 Node tests and 276
-Python tests plus seven subtests with 11 existing warnings. Isolated and
-user-global apply/check passed; fresh global inactive, active, and
-inactive-shadow processes observed kernel/package `1/0`, `1/1`, and `0/0`.
-`git diff --check` passed. Shared handoff scheduling/quiescence code remains
-unchanged.
+Prior R1–R10, run-path, queue cancellation, auto-compaction, multiple-root,
+canonical alias/symlink, bounded-child shadow, skill discovery, route refresh,
+sequential-cycle, installer, and global probes remain green. Final focused gates
+passed 100 Node contracts and 26 Python native/install contracts plus seven
+installer subtests. Full gates passed 113 Node tests and 277 Python tests plus
+seven subtests with 11 existing warnings. Isolated and user-global apply/check
+passed; fresh global inactive, active, and inactive-shadow processes observed
+kernel/package `1/0`, `1/1`, and `0/0`. `git diff --check` passed. Shared handoff
+scheduling/quiescence code remains unchanged.
 
 Slice 2 remains blocked until this exact replacement commit is accepted.
 

@@ -194,9 +194,13 @@ replayable evidence but never current ownership, so separate conversations and
 later sequential cycles remain independent. On reload or resume, one valid bootstrap-ready
 current-owner expectation with no marker is recovered deterministically to active
 state with visible durable evidence. Inactive, malformed, or disagreeing
-current-owner state blocks; it never silently becomes ordinary conversation. The
-known v1 owner marker is migrated append-only to the full current schema after
-exact owner/expectation validation, while foreign copied legacy history is inert.
+current-owner state blocks; it never silently becomes ordinary conversation. Only
+a positively identified nonempty foreign owner is ignored; unclassifiable owner
+fields block. Every exact-owner generation is reconciled before current ownership
+is selected, so orphan active markers and nonterminal old receipts cannot hide
+behind a different active episode. The known v1 owner marker is migrated
+append-only only after every stable legacy binding matches the exact expectation,
+while foreign copied legacy history is inert.
 
 While exact-session state is active, a universal `context` hook validates the
 kernel, marker, expectation, and canonical package, removes any older package
@@ -450,11 +454,15 @@ uncertain state blocks destructive cleanup.
 After terminal work, the conversation invokes the completion phase without a
 second user confirmation. Trusted host code requires the matching authorization
 receipt and conservatively validates exact Git objects, bound target and episode
-tips, daemon rows, and worktree facts. It records `completing`, appends inactive
+tips, daemon rows, and worktree facts. The exact receipt lifecycle transaction is
+serialized by a crash-released lock; delayed calls reacquire and revalidate after
+UI confirmation and can never rewind newer compatible evidence. It records `completing`, appends inactive
 oversight, clears only the matching spec-episode ownership expectation, then
 records a durable `completed` tombstone. A crash or identical replay reconciles
-from those monotonic boundaries without another confirmation. Failure or
-ambiguity stays visibly blocked with durable recovery evidence. The capability never decides that the spec is
+from those monotonic boundaries without another confirmation. Recovery validates
+the effective kernel and package before any lifecycle mutation and performs no
+provider/model call. Failure or ambiguity stays visibly blocked with durable
+recovery evidence. The capability never decides that the spec is
 implemented and never merges, abandons, or cleans resources itself.
 
 Before oversight begins, the project conversation must verify that its required
