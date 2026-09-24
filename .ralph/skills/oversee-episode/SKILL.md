@@ -29,7 +29,10 @@ owns an active EPISODE.
 7. Independently review each exact pushed candidate. Use a fresh EXPERT when
    required by project policy or material risk. EXPERT is read-only and bounded;
    preserve reviewer identity, exact commit, model/reasoning evidence, findings,
-   and disposition. Never silently weaken or substitute a required review.
+   and disposition. Every BLOCK finding states the violated invariant, root-cause
+   seam, recommended repair direction and rationale, constraints and anti-patterns,
+   concrete acceptance tests, regression risks, and dependencies without prescribing
+   exact patch code. Never silently weaken or substitute a required review.
 8. After exact-commit acceptance, use only the existing exact-owner continuation
    capability. Admission does not prove work completion. Never imitate native
    transport with prose or `agent_message.send`.
