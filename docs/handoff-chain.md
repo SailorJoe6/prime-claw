@@ -68,7 +68,7 @@ The project-conversation extension also exposes `handoff_spec_episode` for the
 one remote transition proved necessary by manual oversight. Its input is only:
 
 ```json
-{"location":".ralph/plans/future/<slug>","guidance":"optional operator focus"}
+{"location":".ralph/plans/future/<slug>","guidance":"optional bounded compaction focus"}
 ```
 
 The exact location selects the ignored durable episode identity. Host code
@@ -77,6 +77,15 @@ branch, worktree, durable session ID and file, CWD, and session name. The model
 cannot supply an active routing ID, worktree, session name, command, phase, or
 arbitrary prompt. An inactive exact session is reopened through the existing
 identity-checked path and its refreshed active ID is persisted.
+
+The exact owner may initiate this transition without a new operator transport
+request after it accepts an exact candidate and selects an approved `advance`, or
+after it accepts and durably records findings for an in-scope `revise`. Optional
+guidance may carry operator focus or a bounded compaction-focus synthesis of
+those accepted records. It cannot carry arbitrary chat, unaccepted findings,
+product decisions, or scope expansion, and the tool is not used for `consult`,
+`pause`, merge, abandonment, or cleanup. The broader `ralph_handoff` adapter
+above remains operator-request-only; this owner-specific rule does not change it.
 
 Before sending either workflow, the host preflights both canonical Markdown
 files and obtains the daemon's exact state. Admission fails closed unless the
@@ -94,7 +103,11 @@ run only after that handoff turn reaches its boundary. A first-send failure
 queues no execute. A second-send failure explicitly reports that handoff was
 admitted but continuation was not queued. Ambiguous transport outcomes require
 owner inspection and are never retried automatically. Existing episode
-resources are never deleted to compensate for a remote handoff failure.
+resources are never deleted to compensate for a remote handoff failure. After
+admission the owner creates exactly one new generation watch before yielding.
+Terminal finalization cancels episode watches and returns the same conversation
+to incubation; a later different reviewed folder starts through a fresh native
+`/implement-spec`, not through this continuation tool.
 
 Initial `createSpecEpisode()` also uses the handoff-first transport. The forked
 episode inherits the reviewed planning conversation, so canonical handoff
@@ -114,8 +127,11 @@ identities remain truthful legacy direct-execute records.
    `.ralph/skills/handoff/SKILL.md` and `.ralph/skills/execute/SKILL.md`. A
    missing file fails before the extension begins a partial transition.
 3. The shared admission helper injects canonical handoff first. Optional guidance
-   is appended in an `<operator-compaction-guidance>` block. User text never
-   enters routing state or a filesystem path. Native `/handoff` keeps idle
+   is appended in the existing `<operator-compaction-guidance>` envelope. For
+   `handoff_spec_episode`, the legacy tag may contain the exact owner's bounded
+   compaction focus derived from accepted durable findings; it does not imply a
+   fresh operator transport request. User text never enters routing state or a
+   filesystem path. Native `/handoff` keeps idle
    command delivery unchanged; `ralph_handoff` explicitly uses `deliverAs:
    "steer"` because a tool runs while the agent is streaming.
 4. At the same admission boundary, both entry surfaces queue canonical execute
@@ -183,7 +199,7 @@ runtime path or a reason to patch private queue state.
 | `src/prime-agent-plugin/extension-support/handoff-prompts.ts` | prime-claw | Inert source for shared canonical handoff/execute prompt construction |
 | Durable episode identity | Owning project conversation | Exact remote episode authorization and routing validation |
 | Native `followUp` action | Prime Agent session | From any entry surface's admission until delivery, removal, or session end |
-| `<operator-compaction-guidance>` | Operator | One handoff turn and optional compaction boundary |
+| `<operator-compaction-guidance>` | Operator, or exact episode owner from accepted durable findings | One handoff turn and optional bounded compaction boundary; the legacy tag is not a routing authority |
 
 Canonical workflow prose remains customizable Markdown. The extension loads it
 rather than duplicating it. The LLM does not choose the next phase or create

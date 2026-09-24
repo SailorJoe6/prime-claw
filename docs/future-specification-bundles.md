@@ -261,16 +261,26 @@ oversight policy, run implementation in the owner conversation, or invoke
 ## Owner-driven episode continuation
 
 After one implementation slice reaches an idle boundary, the owning project
-conversation can call `handoff_spec_episode` with the exact future-folder
-location that created the episode and optional operator-supplied compaction
-guidance. This is not another implementation authorization surface. The durable
+conversation reconciles evidence and selects `advance`, `revise`, `consult`, or
+`pause`. It may call `handoff_spec_episode` for `advance` after accepting the
+exact candidate, or for `revise` from accepted findings already recorded inside
+the approved specification and plan. No new operator transport request is
+required for those two in-scope dispositions. `consult`, `pause`, scope changes,
+product decisions, merge, abandonment, and cleanup retain their existing
+operator boundaries.
+
+The call uses the exact retained future-folder location that created the episode.
+Optional compaction guidance is limited to operator focus or the owner's bounded
+synthesis of accepted recorded in-scope findings. It is never arbitrary prompt
+routing. This is not another implementation authorization surface. The durable
 episode identity is the authority: host code requires the same top-level owner
-session and revalidates every derived branch, worktree, and durable-session
-field before using the daemon's current active routing ID.
+session and revalidates every derived branch, worktree, and durable-session field
+before using the daemon's current active routing ID.
 
 The operation reopens an inactive exact episode when needed, then checks the
 live daemon state and fails closed unless the episode is fully quiescent with an
-empty steering/follow-up queue. It loads the current canonical handoff and
+empty steering/follow-up queue. Owner, location, identity, quiescence,
+canonical-prompt, uncertainty, and replay enforcement are unchanged. It loads the current canonical handoff and
 execute Markdown from the episode worktree before either send. Handoff is sent
 first as fail-if-busy `steer`; execute is then queued exactly once as the sole
 `followUp`. The synchronous result proves only ordered admission. The episode's

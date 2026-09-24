@@ -842,13 +842,14 @@ deselected, local links, and diff checks. No renewed EXPERT review was required
 for this nonmaterial optional documentation correction.
 
 The first bounded increment of the existing approved **Slice 2 — Project-
-customizable oversight and owner-driven continuation** is implemented below and
-awaits one exact commit/push plus owner review. It adds only the project EXPERT
+customizable oversight and owner-driven continuation** is **ACCEPTED** at exact
+`7c4c41fab3bc4034680e29d7b2148c1efd363f8e`. It adds only the project EXPERT
 policy, fail-closed reviewer procedure, focused contracts, and current docs.
-Owner-driven continuation changes remain deferred to a later fresh generation.
-Preserve accepted Slice 1/P3, rejected history, operator-only merge/cleanup/
-product decisions, the shared handoff exclusion, credentials, retired sessions,
-and stash provenance. Do not begin another Slice 2 increment in this generation.
+The remaining approved owner-driven continuation work is Increment 2B and the
+next P0 for a fresh execute generation. Preserve accepted Slice 1/P3/2A,
+rejected history, operator-only merge/cleanup/product decisions, shared handoff
+mechanics, credentials, retired sessions, and stash provenance. Do not begin 2B
+or Slice 3 in this record-only generation.
 
 That coupled repair generation first reconciled authoritative main `5edc73e`
 while preserving the promoted-folder deletion, rejected history, accepted B1
@@ -858,11 +859,11 @@ Its exact candidate received the renewed complete owner/Astra review recorded
 above. Do not change accepted behavior, global discovery, historical archives,
 or begin Slice 2.
 
-Slice 2 is the next P0 and begins only in a fresh post-handoff execute generation.
+Increment 2B is the next P0 and begins only in a fresh execute generation.
 
 ## Slice 2 — Project-customizable oversight and owner-driven continuation
 
-### Increment 2A — explicit EXPERT policy and fail-closed admission
+### Increment 2A — explicit EXPERT policy and fail-closed admission (**ACCEPTED**)
 
 This bounded increment adds the approved project-versioned
 `.prime/agent/profiles/expert-reviewer.md` with exact `name`, `model`, and
@@ -889,9 +890,105 @@ plus seven subtests with 11 existing warnings, plugin installed-copy and current
 doc link checks passed, and `git diff --check` passed. The first two full Node runs each passed 156/157: the unchanged Slice 1
 fatal-lock-helper test timed out instead of surfacing its mocked error; its
 immediate isolated rerun passed 1/1 in 345 ms. A final full Node run passed
-157/157, including that case in 165 ms. Commit and push one exact Increment 2A
-candidate, append exact evidence to `prime-claw-h6w.22`, then stop for owner
-review without starting another increment.
+157/157, including that case in 165 ms. Owner exact-archive verification passed
+Python 15/15, exact local/remote identity, a clean worktree, and the bounded five-
+path diff. Exact Increment 2A `7c4c41fab3bc4034680e29d7b2148c1efd363f8e`
+is accepted. No duplicate intermediate reviewer was required.
+
+### Increment 2B — owner-driven continuation (next P0)
+
+Complete only the remaining existing Slice 2 plan: finish canonical oversight
+guidance for exact identity, watch, evidence, disposition, continuation, and
+terminal return; change only model-facing `handoff_spec_episode` description,
+parameters, and prompt guidelines so the exact owner may `advance` or perform an
+in-scope `revise` from accepted recorded findings without a new operator transport
+request; never weaken host owner, location, identity, quiescence, canonical-
+prompt, uncertainty, or replay checks; add focused skill, reviewed-plan, and
+sequential-cycle contracts; and update current oversight, future-bundle, and
+handoff docs. Preserve the exact EXPERT policy from 2A, accepted Slice 1/P3,
+operator authority, no arbitrary prompt routing, shared handoff mechanics,
+credentials, retired sessions, rejected history, and stash provenance.
+
+This generation selected the smallest coherent end-to-end Increment 2B slice:
+canonical owner disposition/continuation/terminal-return guidance; model-facing
+`handoff_spec_episode` continuation metadata; focused skill, reviewed-plan, and
+same-owner sequential-cycle contracts; and the three current documents. The
+extension diff is limited to `handoff_spec_episode` `description`,
+`promptGuidelines`, and `guidance.description`; `promptSnippet`, schema shape,
+execution body, `spec-episode.ts` host enforcement, and shared handoff mechanics
+remain unchanged.
+
+Focused Python passed 18/18 and focused reviewed-plan Node passed 26/26. The
+sequential contract now completes an old episode, runs fresh native
+`/implement-spec` for another reviewed folder in the same owner, and activates
+that later episode. Maintained Python passed 290 plus seven subtests with 11
+existing warnings; maintained Node passed 157/157. Three-document local-link,
+plugin apply/check, and diff checks passed.
+
+The first fresh exact-profile reviewer `sub-fd961d75` was admitted with returned
+`openai-codex/gpt-6-astra` and successful explicit `thinking=max`; combined
+validated role/task delivery `agentmsg_b8e1ad71-c665-43b8-9928-c1d69c78fb7d`
+was delivered once. It began read-only inspection, then terminated aborted with
+no `PASS` or `BLOCK`. The incomplete evidence is preserved at
+`/Users/jlanders/.prime/agent/session-artifacts/01a0cc01-70b0-75d4-8486-3d21b496380c/sub-fd961d75/slice2b-expert-review-incomplete.md`; the task was not
+resent, and the failed exact reviewer was retired.
+
+Operator correction: a technically failed, terminal EXPERT that produced no
+review disposition may be replaced under PROJECT_CONVERSATION authority without
+new operator approval. A fresh post-handoff generation must first reconcile
+authoritative main `4cbc856` while preserving the promoted future-folder
+deletion and every current dirty Increment 2B path. It must then admit exactly
+one fresh replacement with the identical validated profile, exact review packet,
+`openai-codex/gpt-6-astra`, and `thinking=max` through harmless bootstrap and one
+combined message. Never resend to the failed reviewer or use fallback. If the
+replacement also fails, delivery is ambiguous, or required policy/access is
+unavailable, pause for the operator. On a complete `PASS` or actionable `BLOCK`,
+resume the paused Increment 2B goal and act only on that disposition; then finish
+validation, plan/Bead evidence, one commit/push, and stop for owner review. Do not
+begin another Increment 2B slice, Slice 3, merge, or cleanup.
+
+Fresh continuation reconciled authoritative main in merge commit `6eecd54` while
+preserving all nine dirty Increment 2B files byte-for-byte, the promoted
+future-folder deletion, and `stash@{0}`. Replacement reviewer `sub-89769a48`
+used the same validated profile/packet, returned `openai-codex/gpt-6-astra`,
+and accepted explicit `thinking=max`; its one message was delivered without
+resend or fallback. It returned actionable `BLOCK` B1/B2 against unchanged diff
+SHA-256 `29e2896f7196279ab9b7eb8a216c822936dc3700a84fe01ecb9a714efab2239c`.
+The complete report is preserved at
+`/Users/jlanders/.prime/agent/session-artifacts/01a0cc01-70b0-75d4-8486-3d21b496380c/sub-89769a48/slice2b-increment2b-block-review.md`.
+
+B1 found that the canonical procedure omitted the mandatory fresh final
+exact-candidate EXPERT gate and review renewal after material repairs. B2 found
+that its blanket report-failure escalation omitted the newly approved single
+replacement for a confirmed terminal technical failure with no disposition.
+Both were accepted as coupled in-scope policy-projection gaps. The repaired skill
+and current oversight document now require a fresh exact-candidate final PASS,
+reject intermediate/wrong-commit/incomplete/BLOCK evidence, invalidate prior
+review after material repair, keep pause/abandonment available without a merge-
+readiness claim, and keep PASS non-authoritative. They also durably consume at
+most one same-profile/same-packet/model/reasoning replacement, with no allowance
+reset across context refresh, no resend or BLOCK-shopping, and operator pause on
+ambiguity, unavailable policy/access, or replacement failure.
+
+The two new focused contracts failed before the repair, then passed. Repaired
+focused Python passed 20/20; reviewed-plan Node passed 26/26; maintained Python
+passed 292 plus seven subtests with 11 existing warnings; maintained Node passed
+157/157. Three-document local-link, plugin apply/check, and diff checks passed.
+Because B1/B2 changed the candidate materially, a renewed exact-profile review
+was required. Initial renewed reviewer `sub-ea7630a8` used the exact
+Astra/max policy and received combined packet `agentmsg_f5fe6364-681f-453b-990a-e891ef47ff4e` once, began
+read-only inspection, then terminated with no usable disposition. The incomplete
+attempt is preserved at `/Users/jlanders/.prime/agent/session-artifacts/01a0cc01-70b0-75d4-8486-3d21b496380c/sub-ea7630a8/slice2b-repaired-review-incomplete.md` and the exact reviewer is retired;
+no resend occurred. This consumes the first attempt for the renewed packet.
+The one authorized same-profile/model/reasoning/packet replacement
+`sub-4cc31409` received combined packet
+`agentmsg_af87181e-691f-4973-a7f7-38ac4063f904` once and returned `PASS` against unchanged repaired
+diff SHA-256 `d12b7c2da09ddcacef2b3da4cedc8ab20d9563fb4a69312ab02564bf31b3eba7`.
+It verified both B1/B2 repairs, the full bounded Increment 2B diff, metadata-only
+host boundary, and focused evidence with no material finding. The complete report
+is preserved at `/Users/jlanders/.prime/agent/session-artifacts/01a0cc01-70b0-75d4-8486-3d21b496380c/sub-4cc31409/slice2b-repaired-pass-review.md`. This PASS is review evidence only and grants
+no merge authority. Final diff/installed-copy checks, one candidate commit/push,
+and owner review remain; do not begin Slice 3, merge, or cleanup.
 
 **Working capability:** the active exact-session owner has one canonical procedure for
 watching, reviewing, revising, continuing, and finally presenting its exact
@@ -930,8 +1027,8 @@ capabilities enforce deterministic transport and identity safety.
      and returning the same conversation to discussion/specification incubation.
 3. Change only the model-facing `handoff_spec_episode` description, parameter
    text, and prompt guidelines in
-   `.prime/agent/extensions/reviewed-plan.ts`. Do not weaken or bypass any
-   check in `.prime/agent/extension-support/spec-episode.ts`.
+   `src/prime-agent-plugin/extensions/reviewed-plan.ts`. Do not weaken or bypass any
+   check in `src/prime-agent-plugin/extension-support/spec-episode.ts`.
 4. Add `tests/test_oversee_episode_skill.py` for the skill's authority,
    observation, evidence, review, continuation, cleanup, return-to-incubation,
    and sequential-cycle boundaries. It must also prove that the checked-in

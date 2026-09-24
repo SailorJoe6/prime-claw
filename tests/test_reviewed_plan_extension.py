@@ -610,6 +610,28 @@ def test_implement_spec_policy_rejects_inadequate_bundles_without_tool_call() ->
         assert fragment in skill
 
 
+def test_handoff_metadata_grants_only_recorded_in_scope_owner_continuation() -> None:
+    """Model-facing policy may broaden semantic initiation, never host routing."""
+    source = EXTENSION.read_text()
+    metadata_start = source.index('name: "handoff_spec_episode"')
+    execute_start = source.index("async execute", metadata_start)
+    metadata = " ".join(source[metadata_start:execute_start].split())
+    for fragment in (
+        "owner accepts an in-scope advance or recorded revision",
+        "no new operator transport request is required",
+        "exact retained future-folder location",
+        "accepted recorded in-scope findings",
+        "never route arbitrary chat, unaccepted findings, product decisions, or scope expansion",
+        "consult, pause, merge, abandonment, cleanup, or another episode",
+        "never retry an uncertain result",
+    ):
+        assert fragment in metadata
+    assert "only when the operator clearly asks" not in metadata
+    assert "only operator-supplied" not in metadata
+    assert 'required: ["location"]' in metadata
+    assert "additionalProperties: false" in metadata
+
+
 def test_operator_docs_explain_native_only_implementation_fallback() -> None:
     """The authority limitation and retry boundary must be operator-visible."""
     docs = (REPO / "docs" / "future-specification-bundles.md").read_text()

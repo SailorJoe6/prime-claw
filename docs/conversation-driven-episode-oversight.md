@@ -120,6 +120,30 @@ Reports are evidence, never approval or native-command dispatch. The heartbeat
 is the missed-report safety net and is cancelled when its generation is
 reconciled or waiting only for owner/operator action.
 
+### Owner-driven continuation
+
+At a stable review boundary, the exact owner chooses `advance`, `revise`,
+`consult`, or `pause`. `advance` requires owner acceptance of the exact candidate
+and a next slice already inside the recorded specification and plan. `revise`
+requires accepted findings recorded durably in the specification, plan, Bead,
+code/tests, or linked immutable report and classified inside that approved scope.
+Those two dispositions may call `handoff_spec_episode` without a new operator
+transport request. They do not grant new scope or product authority.
+
+The call retains the exact future-folder location. Optional guidance is either
+operator focus or a bounded compaction-focus synthesis of those accepted recorded
+findings. Arbitrary chat, unaccepted review findings, product decisions, scope
+expansion, and `consult`, `pause`, or terminal dispositions cannot be routed this
+way. Host ownership, identity, location, quiescence, canonical-prompt,
+uncertainty, and replay checks remain unchanged. Admission proves neither
+compaction nor work completion, an uncertain result is never retried, and the
+owner starts one new 15-minute watch before yielding to each admitted generation.
+
+After operator-authorized terminal finalization, episode-specific watches end and
+the same session returns to ordinary CONVERSATION incubation. A later reviewed
+folder requires a fresh native `/implement-spec` run. The first episode never
+lifetime-locks that owner.
+
 ### Explicit EXPERT reviewer policy
 
 The first project policy lives at
@@ -141,12 +165,34 @@ identity, exact reviewed commit, returned model, admitted reasoning, report
 artifact, and disposition. The owner preserves and adjudicates a complete report
 before stopping and deleting that exact reviewer.
 
-Invalid configuration, unavailable or ambiguous resolution, rejected reasoning,
-failed or mismatched spawn, uncertain delivery, or an incomplete report must
-pause for the operator. Uncertain delivery is never resent and a reviewer with
-outstanding delivery/report work is never deleted. The owner never falls back to
-its current/default model or a weaker policy, and favorable EXPERT review never
-authorizes merge.
+One bounded recovery applies when an exact reviewer is confirmed terminal after
+a purely technical failure and produced no usable `PASS` or `BLOCK`. The owner
+preserves the incomplete attempt and records its exact packet identity in the
+owner ledger so context refresh cannot replenish the one-replacement allowance,
+retires that exact reviewer, and may admit exactly one fresh replacement under
+PROJECT_CONVERSATION authority with the same validated profile and exact review
+packet, model, and reasoning. No new operator transport decision is required.
+The exception is unavailable for a still-active reviewer, ambiguous delivery or
+state, unavailable policy or access, or a substantive `BLOCK`. The failed task is
+never resent, a `BLOCK` is never retried to seek a different disposition, and
+replacement failure or uncertainty pauses for the operator with no further
+replacement.
+
+All other invalid configuration, unavailable or ambiguous resolution, rejected
+reasoning, failed or mismatched spawn, uncertain delivery, or incomplete-report
+cases pause for the operator. Uncertain delivery is never resent and a reviewer
+with outstanding delivery/report work is never deleted. The owner never falls
+back to its current/default model or a weaker policy.
+
+Before the owner presents merge readiness, it obtains a fresh final EXPERT
+review of the complete exact candidate, adjudicates every finding, and requires
+`PASS` for that exact commit. An intermediate PASS cannot satisfy this gate; nor
+can another commit's report, an incomplete review, or an unresolved `BLOCK`.
+Any material repair invalidates the prior review and requires a renewed review
+of the repaired exact commit. Pause or abandonment remains available without
+claiming merge readiness. EXPERT PASS is evidence, not merge authority;
+favorable EXPERT review never authorizes merge. Only the operator authorizes
+merge or another terminal disposition.
 
 ## Narrow terminal finalization receipt
 

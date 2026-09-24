@@ -150,7 +150,16 @@ test("registers native reviewed commands, planning tool, and native-only impleme
   assert.deepEqual(Object.keys(handoffTool.parameters.properties), ["location", "guidance"]);
   assert.deepEqual(handoffTool.parameters.required, ["location"]);
   assert.equal(handoffTool.parameters.additionalProperties, false);
-  assert.ok(handoffTool.promptGuidelines.every((guideline) => guideline.includes("handoff_spec_episode") || guideline.startsWith("Pass only")));
+  assert.match(handoffTool.description, /owner accepts an in-scope advance or recorded revision/);
+  assert.deepEqual(handoffTool.promptGuidelines, [
+    "Call handoff_spec_episode only when this exact owner has selected advance after candidate acceptance or revise from accepted findings already recorded inside the approved scope; no new operator transport request is required.",
+    "Pass handoff_spec_episode the exact retained future-folder location used to create that episode; never search for or infer another episode.",
+    "Pass only optional operator focus or a bounded compaction-focus synthesis of the accepted recorded in-scope findings; never route arbitrary chat, unaccepted findings, product decisions, or scope expansion.",
+    "Never call handoff_spec_episode for consult, pause, merge, abandonment, cleanup, or another episode; those boundaries retain their existing operator authority.",
+    "Treat handoff_spec_episode as a terminal routing action. Admission does not prove compaction completed; observe the episode before claiming continuation results, and never retry an uncertain result.",
+  ]);
+  assert.match(handoffTool.parameters.properties.guidance.description, /operator-supplied guidance or the exact owner's bounded synthesis of accepted recorded findings inside the approved scope/);
+  assert.doesNotMatch(handoffTool.description + handoffTool.promptGuidelines.join(" "), /only when the operator clearly asks|only operator-supplied/);
 });
 
 test("loads current canonical markdown and injects exact location once", async (t) => {
@@ -464,7 +473,14 @@ test("registered finalization capability confirms once, recovers natively, and r
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-finalize-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   writeSkill(cwd, "---\nname: oversee-episode\ndescription: test package\n---\nprocedure", "oversee-episode");
+  writeSkill(cwd, "implementation readiness", "implement-spec");
   const state = join(cwd, ".prime/agent/state/spec-episodes"); mkdirSync(state, { recursive: true });
+  const betaLocation = ".ralph/plans/future/beta";
+  mkdirSync(join(cwd, betaLocation), { recursive: true });
+  const betaWorktree = resolve(dirname(cwd), `${basename(cwd)}-beta-episode`);
+  const beta = { version: 2, slug: "beta", sourceLocation: betaLocation, ownerSessionId: "owner-session",
+    episodeId: "episode-beta", episodeActiveSessionId: "route-beta", episodeSessionFile: join(cwd, "beta.jsonl"),
+    branch: "episode/beta", worktree: betaWorktree, sessionName: "beta-episode", bootstrapAdmission: "delivered" };
   const worktree = resolve(dirname(cwd), `${basename(cwd)}-alpha-plan-episode`);
   const identity = { version: 2, slug: "alpha-plan", sourceLocation: LOCATION,
     ownerSessionId: "owner-session", episodeId: "33333333-3333-4333-8333-333333333333", episodeActiveSessionId: "route",
@@ -484,7 +500,16 @@ test("registered finalization capability confirms once, recovers natively, and r
     remove(path) { if (path === identityPath && failIdentityRemovalOnce) { failIdentityRemovalOnce = false; throw Error("one-time identity removal failure"); } rmSync(path, { force: true }); }, now() { return "2026-01-01T00:00:00.000Z"; },
     async acquireLock(_path, options) { lockSignals.push(options?.signal); return async () => {}; },
   };
-  const f = createHarness(cwd, createReviewedPlanExtension({ finalization }));
+  let betaCreates = 0;
+  const f = createHarness(cwd, createReviewedPlanExtension({
+    finalization,
+    async createEpisode(location) {
+      assert.equal(location, betaLocation);
+      betaCreates += 1;
+      writeFileSync(join(state, "beta.json"), JSON.stringify(beta));
+      return beta;
+    },
+  }));
   f.entries.push({ type: "custom", customType: "prime-claw-conversation-oversight", data: {
     markerVersion: 2, status: "active", ownerSessionId: "owner-session", slug: "alpha-plan",
     sourceLocation: LOCATION, episodeId: "33333333-3333-4333-8333-333333333333",
@@ -513,18 +538,14 @@ test("registered finalization capability confirms once, recovers natively, and r
   assert.equal(existsSync(identityPath), false);
   assert.equal(f.messages.length, messageCount, "session-start recovery must not queue a provider call");
 
-  const betaLocation = ".ralph/plans/future/beta";
-  const betaWorktree = resolve(dirname(cwd), `${basename(cwd)}-beta-episode`);
-  const beta = { ...identity, slug: "beta", sourceLocation: betaLocation, episodeId: "episode-beta",
-    episodeActiveSessionId: "route-beta", episodeSessionFile: join(cwd, "beta.jsonl"),
-    branch: "episode/beta", worktree: betaWorktree, sessionName: "beta-episode" };
-  writeFileSync(join(state, "beta.json"), JSON.stringify(beta));
-  f.entries.push({ type: "custom", customType: "prime-claw-conversation-oversight", data: {
-    markerVersion: 2, status: "active", ownerSessionId: "owner-session", slug: "beta",
-    sourceLocation: betaLocation, episodeId: "episode-beta", episodeSessionFile: beta.episodeSessionFile,
-    branch: "episode/beta", worktree: betaWorktree, sessionName: "beta-episode",
-    identityVersion: 2, admission: "delivered",
-  } });
+  await f.commands.get("implement-spec").handler(betaLocation, f.ctx);
+  const laterEpisode = await f.tools.get("create_spec_episode").execute(
+    "create-beta", { location: betaLocation }, controller.signal, undefined, f.ctx,
+  );
+  assert.equal(laterEpisode.isError, undefined);
+  assert.equal(betaCreates, 1);
+  assert.equal(f.entries.at(-1).data.sourceLocation, betaLocation);
+  assert.equal(f.entries.at(-1).data.episodeId, "episode-beta");
   const replay = await tool.execute("replay", { phase: "complete", location: LOCATION, disposition: "merged" }, controller.signal, undefined, f.ctx);
   assert.equal(replay.isError, undefined); assert.equal(f.confirmations.length, 1);
   assert.deepEqual(lockSignals, [controller.signal, controller.signal, controller.signal, undefined, controller.signal]);
@@ -582,7 +603,7 @@ test("owner handoff tool requires a durable identity for the exact location", as
   assert.deepEqual(f.messages, []);
 });
 
-test("structured tool requires and consumes matching implement-spec approval", async (t) => {
+test("fresh native implement-spec runs can sequentially arm different reviewed folders for the same owner", async (t) => {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-auth-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, LOCATION), { recursive: true });
@@ -608,4 +629,13 @@ test("structured tool requires and consumes matching implement-spec approval", a
 
   const consumed = await tool.execute("call-3", { location: LOCATION }, undefined, undefined, f.ctx);
   assert.match(consumed.content[0].text, /no matching active \/implement-spec approval/);
+
+  const betaLocation = ".ralph/plans/future/beta-plan";
+  mkdirSync(join(cwd, betaLocation), { recursive: true });
+  await f.commands.get("implement-spec").handler(betaLocation, f.ctx);
+  const laterAuthorized = await tool.execute("call-4", { location: betaLocation }, undefined, undefined, f.ctx);
+  assert.equal(laterAuthorized.isError, true);
+  assert.match(laterAuthorized.content[0].text, /authorized tool reached host capability/);
+  const laterConsumed = await tool.execute("call-5", { location: betaLocation }, undefined, undefined, f.ctx);
+  assert.match(laterConsumed.content[0].text, /no matching active \/implement-spec approval/);
 });

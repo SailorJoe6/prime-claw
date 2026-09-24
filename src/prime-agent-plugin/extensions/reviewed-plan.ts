@@ -356,13 +356,14 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "handoff_spec_episode",
       label: "Hand off specification episode",
-      description: "Drive one exact owned idle episode through canonical handoff, then queue canonical execute as its sole follow-up.",
+      description: "Continue one exact owned idle episode after its owner accepts an in-scope advance or recorded revision: run canonical handoff, then queue canonical execute as its sole follow-up.",
       promptSnippet: "Hand off an exact owned Ralph episode and queue its next execute pass",
       promptGuidelines: [
-        "Call handoff_spec_episode only when the operator clearly asks to continue one exact owned episode between implementation slices.",
-        "Pass handoff_spec_episode the exact future-folder location used to create that episode; never search for or infer another episode.",
-        "Pass only operator-supplied optional guidance; ask if the intended compaction focus would be materially inferred.",
-        "Treat handoff_spec_episode as a terminal routing action. Admission does not prove compaction completed; observe the episode before claiming continuation results.",
+        "Call handoff_spec_episode only when this exact owner has selected advance after candidate acceptance or revise from accepted findings already recorded inside the approved scope; no new operator transport request is required.",
+        "Pass handoff_spec_episode the exact retained future-folder location used to create that episode; never search for or infer another episode.",
+        "Pass only optional operator focus or a bounded compaction-focus synthesis of the accepted recorded in-scope findings; never route arbitrary chat, unaccepted findings, product decisions, or scope expansion.",
+        "Never call handoff_spec_episode for consult, pause, merge, abandonment, cleanup, or another episode; those boundaries retain their existing operator authority.",
+        "Treat handoff_spec_episode as a terminal routing action. Admission does not prove compaction completed; observe the episode before claiming continuation results, and never retry an uncertain result.",
       ],
       executionMode: "sequential",
       parameters: {
@@ -374,7 +375,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           },
           guidance: {
             type: "string",
-            description: "Optional operator-supplied compaction guidance for the episode handoff workflow",
+            description: "Optional compaction focus: operator-supplied guidance or the exact owner's bounded synthesis of accepted recorded findings inside the approved scope",
           },
         },
         required: ["location"],

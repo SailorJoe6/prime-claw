@@ -5,6 +5,8 @@ REPO = Path(__file__).resolve().parents[1]
 SKILL = REPO / ".ralph/skills/oversee-episode/SKILL.md"
 PROFILE = REPO / ".prime/agent/profiles/expert-reviewer.md"
 DOC = REPO / "docs/conversation-driven-episode-oversight.md"
+FUTURE_DOC = REPO / "docs/future-specification-bundles.md"
+HANDOFF_DOC = REPO / "docs/handoff-chain.md"
 
 
 def _parse_profile(text: str):
@@ -127,6 +129,27 @@ def test_oversee_skill_uses_exact_fail_closed_safe_spawn_protocol():
     assert text.index("Preserve the report") < text.index("stopping and deleting")
 
 
+def test_oversee_skill_bounds_owner_driven_continuation_and_sequential_return():
+    text = " ".join(SKILL.read_text().split())
+    for phrase in [
+        "`advance` only after this owner accepts the exact candidate",
+        "`revise` only from findings this owner has accepted",
+        "An accepted `advance` or in-scope `revise` needs no new operator transport request",
+        "exact retained future-folder location",
+        "operator-supplied focus or a bounded synthesis of the accepted durable findings",
+        "Never route arbitrary chat, unaccepted findings, a new product decision, or scope expansion",
+        "immediately create the one watch for the new active generation before yielding",
+        "never retry an uncertain transport result",
+        "use the tool for `consult`, `pause`, or a terminal disposition",
+        "returns this session to ordinary CONVERSATION mode",
+        "requires a fresh native `/implement-spec` run",
+        "never lifetime-locks the owner conversation",
+    ]:
+        assert phrase in text
+    assert "only when the operator clearly asks" not in text
+    assert text.index("recorded durably") < text.index("call `handoff_spec_episode`")
+
+
 def test_current_documentation_explains_project_expert_policy():
     text = " ".join(DOC.read_text().split())
     for phrase in [
@@ -143,5 +166,73 @@ def test_current_documentation_explains_project_expert_policy():
         "preserves and adjudicates a complete report before stopping and deleting",
         "Uncertain delivery is never resent",
         "never authorizes merge",
+    ]:
+        assert phrase in text
+
+
+def test_current_docs_bound_owner_continuation_without_changing_host_authority():
+    current = " ".join(DOC.read_text().split())
+    future = " ".join(FUTURE_DOC.read_text().split())
+    handoff = " ".join(HANDOFF_DOC.read_text().split())
+    for fragment in (
+        "without a new operator transport request",
+        "operator focus or a bounded compaction-focus synthesis",
+        "Host ownership, identity, location, quiescence, canonical-prompt, uncertainty, and replay checks remain unchanged",
+        "fresh native `/implement-spec` run",
+        "never lifetime-locks that owner",
+    ):
+        assert fragment in current
+    for fragment in (
+        "accepted findings already recorded inside the approved specification and plan",
+        "No new operator transport request",
+        "never arbitrary prompt routing",
+        "Owner, location, identity, quiescence, canonical-prompt, uncertainty, and replay enforcement are unchanged",
+    ):
+        assert fragment in future
+    for fragment in (
+        "without a new operator transport request",
+        "broader `ralph_handoff` adapter above remains operator-request-only",
+        "existing `<operator-compaction-guidance>` envelope",
+        "legacy tag is not a routing authority",
+        "never retried automatically",
+        "fresh native `/implement-spec`",
+    ):
+        assert fragment in handoff
+
+
+def test_oversee_skill_requires_final_review_renewal_and_bounds_one_technical_replacement():
+    text = " ".join(SKILL.read_text().split())
+    for phrase in [
+        "confirmed terminal after a purely technical failure",
+        "no usable `PASS` or `BLOCK` disposition",
+        "exactly one fresh replacement",
+        "same validated profile and exact review packet",
+        "owner ledger so context refresh cannot replenish",
+        "does not apply to a still-active reviewer, ambiguous delivery or state, unavailable policy or access, or a substantive `BLOCK`",
+        "replacement also fails or is uncertain",
+        "fresh final EXPERT review of the complete exact candidate",
+        "intermediate review, another commit's report, incomplete review, or unresolved `BLOCK`",
+        "material repair changes the candidate and invalidates the prior review",
+        "operator pause or abandonment request remains available without a merge-readiness claim",
+        "EXPERT `PASS` is evidence, never merge authority",
+    ]:
+        assert phrase in text
+
+
+def test_current_documentation_explains_final_review_and_one_replacement_limits():
+    text = " ".join(DOC.read_text().split())
+    for phrase in [
+        "confirmed terminal after a purely technical failure",
+        "no usable `PASS` or `BLOCK`",
+        "exactly one fresh replacement",
+        "same validated profile and exact review packet",
+        "context refresh cannot replenish",
+        "still-active reviewer, ambiguous delivery or state, unavailable policy or access, or a substantive `BLOCK`",
+        "replacement failure or uncertainty pauses for the operator",
+        "fresh final EXPERT review of the complete exact candidate",
+        "intermediate PASS cannot satisfy this gate",
+        "material repair invalidates the prior review",
+        "Pause or abandonment remains available without claiming merge readiness",
+        "PASS is evidence, not merge authority",
     ]:
         assert phrase in text
