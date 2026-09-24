@@ -1,12 +1,15 @@
 """Regression bridge for the native reviewed-plan command."""
 
 import json
+import os
 import re
 from pathlib import Path
 import selectors
 import shutil
+import socket
 import subprocess
 import tempfile
+import threading
 import time
 
 
@@ -15,6 +18,127 @@ EXTENSION = REPO / "src" / "prime-agent-plugin" / "extensions" / "reviewed-plan.
 EPISODE_EXTENSION = REPO / "src" / "prime-agent-plugin" / "extension-support" / "spec-episode.ts"
 NODE_SUITE = REPO / "tests" / "reviewed_plan_extension.test.mjs"
 EPISODE_NODE_SUITE = REPO / "tests" / "spec_episode_extension.test.mjs"
+FAKE_PUBLICATION_ROUTE = "fake-publication-route"
+
+
+class PublicationFakeDaemon:
+    """Strict local daemon fixture for native publication transport tests."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.envelopes: list[dict] = []
+        self.responses: dict[str, dict] = {}
+        self._stop = False
+        self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self._socket.bind(str(path))
+        self._socket.listen()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self) -> None:
+        while not self._stop:
+            try:
+                self._socket.settimeout(0.2)
+                connection, _ = self._socket.accept()
+            except (TimeoutError, socket.timeout, OSError):
+                continue
+            with connection:
+                connection.sendall((json.dumps({
+                    "type": "daemon_hello",
+                    "protocol": {"name": "prime-agent.daemon", "version": 7},
+                    "schema": {"revision": 28},
+                }) + "\n").encode())
+                buffer = b""
+                while not self._stop:
+                    try:
+                        data = connection.recv(65536)
+                    except OSError:
+                        break
+                    if not data:
+                        break
+                    buffer += data
+                    while b"\n" in buffer:
+                        line, buffer = buffer.split(b"\n", 1)
+                        if not line:
+                            continue
+                        envelope = json.loads(line)
+                        self.envelopes.append(envelope)
+                        command = envelope.get("command", {})
+                        command_type = command.get("type")
+                        if command_type == "ack_result":
+                            continue
+                        if command_type == "create":
+                            header = json.loads(
+                                Path(command["sessionPath"]).read_text().splitlines()[0]
+                            )
+                            data = {
+                                "activeSessionId": FAKE_PUBLICATION_ROUTE,
+                                "sessionId": header["id"],
+                                "sessionFile": command["sessionPath"],
+                                "sessionName": command["name"],
+                                "cwd": command["config"]["cwd"],
+                                "isSessionActive": True,
+                            }
+                        elif command_type == "get_state":
+                            data = {
+                                "activeSessionId": FAKE_PUBLICATION_ROUTE,
+                                "sessionId": self._session_id,
+                                "sessionFile": self._session_file,
+                                "sessionName": self._session_name,
+                                "cwd": self._cwd,
+                            }
+                        elif command_type == "get_messages":
+                            data = {"messages": [{
+                                "role": "toolResult", "toolCallId": "call-real",
+                            }]}
+                        elif command_type == "kill":
+                            data = {"ok": True}
+                        else:
+                            data = {}
+                        if command_type == "create":
+                            self._session_id = data["sessionId"]
+                            self._session_file = data["sessionFile"]
+                            self._session_name = data["sessionName"]
+                            self._cwd = data["cwd"]
+                        self.responses[envelope["id"]] = data
+                        connection.sendall((json.dumps({
+                            "type": "response", "id": envelope["id"],
+                            "success": True, "data": data,
+                        }) + "\n").encode())
+
+    def close(self) -> None:
+        self._stop = True
+        try:
+            self._socket.close()
+        except OSError:
+            pass
+        self._thread.join(2)
+        self.path.unlink(missing_ok=True)
+
+
+
+
+def assert_legacy_publication_trace(daemon: PublicationFakeDaemon) -> None:
+    """Every mutation must use the exact fake route and protocol-7 ack chain."""
+    commands = [envelope["command"] for envelope in daemon.envelopes]
+    assert [command["type"] for command in commands] == [
+        "create", "ack_result", "get_state", "get_messages", "kill", "ack_result",
+    ], commands
+    create, create_ack, get_state, get_messages, kill, kill_ack = commands
+    assert daemon.responses[create["id"]]["activeSessionId"] == FAKE_PUBLICATION_ROUTE
+    for command in (get_state, get_messages, kill):
+        assert command["activeSessionId"] == FAKE_PUBLICATION_ROUTE
+    assert create_ack["commandId"] == create["id"]
+    assert kill_ack["commandId"] == kill["id"]
+    assert len({create["id"], create_ack["id"], get_state["id"],
+                get_messages["id"], kill["id"], kill_ack["id"]}) == 6
+    assert all(command["id"].startswith("spec_episode_") for command in (create, get_state, get_messages, kill))
+    assert all(command["id"].startswith("spec_episode_ack_") for command in (create_ack, kill_ack))
+    assert len({envelope["clientId"] for envelope in daemon.envelopes}) == 1
+    for envelope in daemon.envelopes:
+        assert envelope["type"] == "command"
+        assert envelope["protocol"] == {"name": "prime-agent.daemon", "version": 7}
+        assert envelope["command"]["id"] == envelope["id"]
 
 
 def test_reviewed_plan_node_suite() -> None:
@@ -251,7 +375,6 @@ export default function probe(pi) {
                     agent_ends += 1
         finally:
             selector.close()
-            process.terminate()
             try:
                 process.wait(timeout=3)
             except subprocess.TimeoutExpired:
@@ -273,15 +396,40 @@ export default function probe(pi) {
 
 
 def test_installed_prime_agent_forks_valid_context_and_publishes_worktree_session() -> None:
-    """Exercise public SessionManager plus bounded daemon create/state/messages/kill."""
+    """Exercise public SessionManager against a runtime-verified fake daemon only."""
     prime_agent = shutil.which("prime-agent")
     assert prime_agent, "prime-agent is a documented developer prerequisite"
     request = json.dumps({"id": "loader", "type": "get_commands"}) + "\n"
     episode_import = json.dumps(str(EPISODE_EXTENSION))
-    probe_source = f"""import {{ mkdirSync, realpathSync, rmSync, writeFileSync }} from "node:fs";
+    with tempfile.TemporaryDirectory(prefix="prime-claw-fake-episode-") as cwd:
+        root = Path(cwd)
+        socket_path = root / "publication.sock"
+        transport_path = root / "transport.jsonl"
+        daemon = PublicationFakeDaemon(socket_path)
+        try:
+            probe_source = f"""import net from "node:net";
+import {{ appendFileSync, lstatSync, mkdirSync, realpathSync, rmSync, writeFileSync }} from "node:fs";
 import {{ join, resolve }} from "node:path";
 import {{ SessionManager }} from "@earendil-works/pi-coding-agent";
 import {{ DaemonJsonlClient, forkPrimeSession }} from {episode_import};
+
+const expectedSocket = {json.dumps(str(socket_path))};
+const transportRecords = {json.dumps(str(transport_path))};
+if (!lstatSync(expectedSocket).isSocket()) throw new Error("fake socket missing");
+process.env.PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET = expectedSocket;
+const originalConnect = net.Socket.prototype.connect;
+function guardedConnect(...args) {{
+  let arg = args[0];
+  if (Array.isArray(arg)) arg = arg[0];
+  const path = typeof arg === "string" ? arg : arg?.path;
+  if (path !== expectedSocket) throw new Error(`non-fixture transport denied: ${{path}}`);
+  appendFileSync(transportRecords, JSON.stringify({{ kind: "connect", path, isFake: true }}) + "\\n");
+  return originalConnect.apply(this, args);
+}}
+net.Socket.prototype.connect = guardedConnect;
+appendFileSync(transportRecords, JSON.stringify({{
+  kind: "runtime-guard", socket: expectedSocket, transportIsFake: true,
+}}) + "\\n");
 
 const usage = {{
   input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
@@ -290,57 +438,59 @@ const usage = {{
 
 export default function probe(pi) {{
   pi.on("session_start", async (_event, ctx) => {{
-    try {{
-    const projectPath = join(ctx.cwd, "published-worktree");
-    mkdirSync(projectPath, {{ recursive: true }});
-    const project = realpathSync(projectPath);
-    const sessions = join(ctx.cwd, "probe-sessions");
-    mkdirSync(sessions, {{ recursive: true }});
-    const source = SessionManager.create(ctx.cwd, sessions);
-    const firstEntry = source.appendMessage({{ role: "user", content: [{{ type: "text", text: "approved" }}], timestamp: Date.now() }});
-    source.appendModelChange("test-provider", "test-model");
-    source.appendThinkingLevelChange("high");
-    source.appendCompaction("preserved compact context", firstEntry, 100);
-    source.appendMessage({{
-      role: "assistant",
-      content: [{{ type: "toolCall", id: "call-real", name: "create_spec_episode", arguments: {{ location: ".ralph/plans/future/probe" }} }}],
-      api: "test", provider: "test", model: "test", usage, stopReason: "toolUse", timestamp: Date.now(),
-    }});
-    const fork = forkPrimeSession(SessionManager, {{
-      sourceSessionFile: source.getSessionFile(),
-      worktree: project,
-      sessionName: `probe-${{process.pid}}`,
-      branch: "episode/probe",
-      toolCallId: "call-real",
-    }});
-    const opened = SessionManager.open(fork.sessionFile, sessions);
-    const inherited = opened.buildSessionContext().messages;
-    const inheritedTypes = new Set(opened.getEntries().map((entry) => entry.type));
-    const paired = inherited.at(-1)?.role === "toolResult"
-      && inherited.at(-1)?.toolCallId === "call-real"
-      && inheritedTypes.has("model_change")
-      && inheritedTypes.has("thinking_level_change")
-      && inheritedTypes.has("compaction");
-    const socketPath = process.env.PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET;
-    if (!socketPath) throw new Error("missing injected supervisor socket");
-    const client = new DaemonJsonlClient(socketPath);
+    let project;
+    let sessions;
+    let fork;
+    let client;
     let activeSessionId;
     try {{
-      const name = `probe-${{process.pid}}-${{Date.now()}}`;
+      if (process.env.PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET !== expectedSocket
+          || net.Socket.prototype.connect !== guardedConnect) {{
+        throw new Error("fake transport not effective before lifecycle mutation");
+      }}
+      const projectPath = join(ctx.cwd, "published-worktree");
+      mkdirSync(projectPath, {{ recursive: true }});
+      project = realpathSync(projectPath);
+      sessions = join(ctx.cwd, "probe-sessions");
+      mkdirSync(sessions, {{ recursive: true }});
+      const source = SessionManager.create(ctx.cwd, sessions);
+      const firstEntry = source.appendMessage({{ role: "user", content: [{{ type: "text", text: "approved" }}], timestamp: Date.now() }});
+      source.appendModelChange("test-provider", "test-model");
+      source.appendThinkingLevelChange("high");
+      source.appendCompaction("preserved compact context", firstEntry, 100);
+      source.appendMessage({{
+        role: "assistant",
+        content: [{{ type: "toolCall", id: "call-real", name: "create_spec_episode", arguments: {{ location: ".ralph/plans/future/probe" }} }}],
+        api: "test", provider: "test", model: "test", usage, stopReason: "toolUse", timestamp: Date.now(),
+      }});
+      fork = forkPrimeSession(SessionManager, {{
+        sourceSessionFile: source.getSessionFile(), worktree: project,
+        sessionName: `probe-${{process.pid}}`, branch: "episode/probe", toolCallId: "call-real",
+      }});
+      const opened = SessionManager.open(fork.sessionFile, sessions);
+      const inherited = opened.buildSessionContext().messages;
+      const inheritedTypes = new Set(opened.getEntries().map((entry) => entry.type));
+      const paired = inherited.at(-1)?.role === "toolResult"
+        && inherited.at(-1)?.toolCallId === "call-real"
+        && inheritedTypes.has("model_change")
+        && inheritedTypes.has("thinking_level_change")
+        && inheritedTypes.has("compaction");
+      client = new DaemonJsonlClient(expectedSocket);
+      const name = `probe-${{process.pid}}`;
       const created = await client.request({{
         type: "create", sessionPath: fork.sessionFile, lifecycle: "resident",
         name, config: {{ cwd: project }},
-      }}, 120000);
+      }}, 30_000);
       if (created.success !== true) throw new Error(created.error ?? "create failed");
       activeSessionId = created.data.activeSessionId ?? created.data.id;
+      if (activeSessionId !== "{FAKE_PUBLICATION_ROUTE}") throw new Error("unexpected fake route");
       const state = await client.request({{ type: "get_state", activeSessionId }});
       const messages = await client.request({{ type: "get_messages", activeSessionId }});
       const pairedPublished = messages.data.messages.some(
         (message) => message.role === "toolResult" && message.toolCallId === "call-real",
       );
-      const valid = paired
-        && pairedPublished
-        && state.success === true
+      const valid = paired && pairedPublished && state.success === true
+        && state.data.activeSessionId === "{FAKE_PUBLICATION_ROUTE}"
         && state.data.sessionId === fork.sessionId
         && resolve(state.data.sessionFile) === resolve(fork.sessionFile)
         && resolve(state.data.cwd) === resolve(project)
@@ -348,51 +498,75 @@ export default function probe(pi) {{
       const killed = await client.request({{ type: "kill", activeSessionId }});
       activeSessionId = undefined;
       if (!valid || killed.success !== true) throw new Error(`fork/publication proof failed: ${{JSON.stringify({{ paired, pairedPublished, fork, state: state.data, killed }})}}`);
-      pi.registerCommand("probe-real-spec-episode-publication", {{ description: "probe", handler: async () => {{}} }});
-    }} finally {{
-      if (activeSessionId) await client.request({{ type: "kill", activeSessionId }}).catch(() => undefined);
-      rmSync(fork.sessionFile, {{ force: true }});
-      client.close();
-      rmSync(project, {{ recursive: true, force: true }});
-      rmSync(sessions, {{ recursive: true, force: true }});
-    }}
+      writeFileSync(join(ctx.cwd, "probe-success.json"), JSON.stringify({{ ok: true }}));
+      pi.registerCommand("probe-fake-spec-episode-publication", {{ description: "probe", handler: async () => {{}} }});
     }} catch (error) {{
       writeFileSync(join(ctx.cwd, "probe-error.txt"), error?.stack ?? String(error));
+    }} finally {{
+      if (activeSessionId && client) await client.request({{ type: "kill", activeSessionId }}).catch(() => undefined);
+      if (fork?.sessionFile) rmSync(fork.sessionFile, {{ force: true }});
+      client?.close();
+      if (project) rmSync(project, {{ recursive: true, force: true }});
+      if (sessions) rmSync(sessions, {{ recursive: true, force: true }});
     }}
   }});
 }}
 """
-    with tempfile.TemporaryDirectory(prefix="prime-claw-real-episode-") as cwd:
-        probe = Path(cwd) / "real-episode-probe.ts"
-        probe.write_text(probe_source)
-        result = subprocess.run(
-            [
-                prime_agent,
-                "--mode", "rpc",
-                "--offline",
-                "--no-session",
-                "--no-skills",
-                "--no-prompt-templates",
-                "--no-context-files",
-                "--no-extensions",
-                "--cwd", cwd,
-                "-e", str(probe),
-            ],
-            cwd=REPO,
-            input=request,
-            text=True,
-            capture_output=True,
-            timeout=60,
-            check=False,
-        )
-        error_path = Path(cwd) / "probe-error.txt"
-        probe_error = error_path.read_text() if error_path.exists() else ""
-    assert result.returncode == 0, result.stdout + result.stderr + probe_error
-    response = json.loads(result.stdout.strip().splitlines()[-1])
-    assert response["success"] is True
-    assert [command["name"] for command in response["data"]["commands"]].count(
-        "probe-real-spec-episode-publication"
-    ) == 1, result.stdout + result.stderr + probe_error
+            probe = root / "fake-episode-probe.ts"
+            probe.write_text(probe_source)
+            process = subprocess.Popen(
+                [
+                    prime_agent, "--mode", "rpc", "--offline", "--no-session",
+                    "--no-skills", "--no-prompt-templates", "--no-context-files",
+                    "--no-extensions", "--cwd", cwd, "-e", str(EXTENSION),
+                    "-e", str(probe),
+                ],
+                cwd=REPO,
+                env={
+                    **{
+                        key: value for key, value in os.environ.items()
+                        if not key.startswith("PRIME_AGENT_INTERNAL_")
+                        and not key.startswith("RLM_")
+                        and key != "PRIME_AGENT_KERNEL_OWNER_PID"
+                    },
+                    "PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET": str(socket_path),
+                    "PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_REGISTRY_DIR": str(root / "supervisor"),
+                    "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1",
+                },
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True,
+            )
+            assert process.stdin is not None and process.stdout is not None
+            process.stdin.write(request)
+            process.stdin.flush()
+            process.stdin.close()
+            response = json.loads(process.stdout.readline())
+            success_path = root / "probe-success.json"
+            error_path = root / "probe-error.txt"
+            deadline = time.monotonic() + 20
+            while (not success_path.exists() and not error_path.exists()
+                   and time.monotonic() < deadline):
+                time.sleep(0.02)
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=3)
+            stderr = process.stderr.read() if process.stderr is not None else ""
+            probe_error = error_path.read_text() if error_path.exists() else ""
+            assert success_path.exists(), stderr + probe_error
+            assert json.loads(success_path.read_text()) == {"ok": True}
+            assert response["success"] is True
+            assert_legacy_publication_trace(daemon)
+            transport = [json.loads(line) for line in transport_path.read_text().splitlines()]
+            assert transport[0] == {
+                "kind": "runtime-guard", "socket": str(socket_path), "transportIsFake": True,
+            }
+            assert transport[1:] == [{"kind": "connect", "path": str(socket_path), "isFake": True}]
+            assert not (root / "published-worktree").exists()
+            assert not (root / "probe-sessions").exists()
+        finally:
+            daemon.close()
 
 
 def test_reviewed_skills_have_only_native_slash_command_surfaces() -> None:

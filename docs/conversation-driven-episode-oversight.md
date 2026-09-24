@@ -184,6 +184,21 @@ admission. Recovery validates the effective managed kernel and canonical package
 before any marker/receipt/expectation mutation; a project or CLI shadow blocks
 with state unchanged and zero provider calls. Unrelated resources are never removed.
 
+## Native validation isolation
+
+Checked-in native publication and session-start recovery tests never use the
+operator's daemon route. Each runtime installs a Unix-socket fake transport at
+module load, verifies the exact socket and guarded `net.Socket.connect` binding
+before lifecycle events can mutate state, and rejects every other destination.
+The subprocess harness removes inherited daemon-worker, recursive-agent, session
+lease, and kernel-owner routing state before adding only the named fake route.
+Publication evidence asserts the protocol-7 command envelope, unique ordered
+command IDs, exact fake route, mutation acknowledgments, and the `steer` then
+`followUp` delivery flags. Cleanup for the exact worktree, branch, socket/daemon,
+session files, and lifecycle fixture state is registered before publication or
+recovery. A deliberate post-creation assertion failure proves that cleanup still
+removes every registered resource.
+
 ## Installation boundaries
 
 Builder sources remain inert under `src/prime-agent-plugin/`. The apply/check

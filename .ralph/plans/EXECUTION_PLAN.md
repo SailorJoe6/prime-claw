@@ -514,10 +514,69 @@ and recovery probes reproduced the 18 fail-closed and three valid outcomes.
 `git diff --check` passed. The repaired exact commit still requires fresh owner
 and Astra review before B4 or Slice 2.
 
-B4 remains deliberately incomplete and must wait for its own later handoff.
-Preserve the unstaged, unintegrated B4 fake-daemon fixture in
-`tests/test_reviewed_plan_extension.py`. Do not touch shared handoff scheduling,
-quiescence, Slice 2, owner checkout, credentials, or retired leaked sessions.
+### B3-R2 accepted; B4 is the next P0
+
+Owner/expert disposition for exact
+`dc439d479497afa3103bf325820c26089f3d5bfc` is **ACCEPTED**. Owner review
+verified exact local/remote identity, the six-path repair scope, 55 focused Node
+tests, and ten focused Python tests. Fresh Astra/max exact-commit review returned
+PASS with no findings; its report is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0ba54-da05-76bd-8d22-a0facfdd7f31/sub-95061e2e/b3r2-exact-review.md`.
+Accepted bounded checkpoints are B1 `e225bb4`, B2 `aff3b819`, and the complete
+repaired B3 `dc439d4`. Slice 1 remains blocked only on B4 and fresh final
+owner/Astra review of the complete candidate.
+
+The next P0 is the already approved B4 native isolation and cleanup repair from
+the `dff6dc7` review and owner ledger. Integrate the preserved dirty fake-daemon
+fixture. Every checked-in publication/session-start recovery test, including the
+separate legacy publication test in `tests/test_reviewed_plan_extension.py`, must
+install and verify fake-only transport inside the runtime before any lifecycle
+mutation. Alternatively, move a truly live operator-gated path outside the
+automated suite with explicit labeling. No unrestricted automated publication
+may remain.
+
+For every create, prompt, and acknowledgment command, assert the exact hard-coded
+fake destination route, ordered command IDs, and steer/follow-up flags rather
+than only the returned identity. Register cleanup for the exact created worktree,
+branch, socket/daemon, and fixture state before the first assertion that can fail.
+Add intentional post-creation assertion-failure evidence proving cleanup. The
+suite must not require a reviewer-supplied guard or contact a user daemon. Retain
+all B1/B2/B3 behavior. Shared handoff, Slice 2, owner checkout, credentials,
+retired sessions, and stash provenance remain excluded.
+
+#### B4 implementation evidence
+
+The preserved legacy publication fixture is now integrated. Its generated runtime
+installs a protocol-7 Unix-socket fake, verifies the exact socket and patched
+`net.Socket.connect` before its session-start handler mutates lifecycle state,
+and rejects any other transport destination. The main native discovery,
+completed-generation, lifecycle-classifier, and completing-recovery probes use
+the same pre-event fake-only boundary. No checked-in automated publication or
+recovery path relies on an inherited user-daemon route. The subprocess harness
+also strips inherited internal worker, recursive-agent, lease, and kernel-owner
+routing state before adding only explicit test socket/registry bindings, so the
+same gate is portable to a nested reviewer runtime.
+
+Native traces now assert the exact fake active route, ordered create/prompt/ack
+sequence, unique command and acknowledgment IDs, protocol/client envelope,
+acknowledgment binding, and handoff `steer`/`queueIfBusy: false` followed by
+execute `followUp`/`queueIfBusy: true`. Worktree, branch, daemon/socket, session,
+and lifecycle-state cleanup is registered before publication or recovery and is
+idempotent. A dedicated test creates all resources, intentionally fails an
+assertion after creation, and proves exact worktree, branch, socket, and fixture
+state removal.
+
+Focused native/legacy coverage passed six tests; the complete reviewed-plan and
+native Python files passed 15 tests. Full gates passed 128 Node tests and 281
+Python tests plus seven subtests with 11 existing warnings. User-global
+apply/check and `git diff --check` passed. Documentation records the fake-only
+native validation boundary. An independent child-runtime review first blocked on
+ambient routing and incomplete session-cleanup proof; both remediations landed,
+the exact child-runtime six-test gate passed, and the reviewer returned PASS with
+no remaining B4 blocker. B1, B2, and repaired B3 behavior remains green, and
+shared handoff, Slice 2, owner checkout, credentials, retired sessions, and stash
+provenance remain untouched. B4 awaits one exact review commit and fresh final
+complete-candidate owner/Astra disposition before Slice 1 can advance.
 
 Slice 2 remains blocked until the repaired Slice 1 exact commit is accepted.
 
