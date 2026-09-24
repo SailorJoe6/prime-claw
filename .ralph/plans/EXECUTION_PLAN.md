@@ -567,16 +567,52 @@ assertion after creation, and proves exact worktree, branch, socket, and fixture
 state removal.
 
 Focused native/legacy coverage passed six tests; the complete reviewed-plan and
-native Python files passed 15 tests. Full gates passed 128 Node tests and 281
-Python tests plus seven subtests with 11 existing warnings. User-global
+native Python files passed 15 tests. The maintained gates passed 128 Node tests
+and `pytest -q tests` passed 281 tests plus seven subtests with 11 existing
+warnings. User-global
 apply/check and `git diff --check` passed. Documentation records the fake-only
 native validation boundary. An independent child-runtime review first blocked on
 ambient routing and incomplete session-cleanup proof; both remediations landed,
 the exact child-runtime six-test gate passed, and the reviewer returned PASS with
 no remaining B4 blocker. B1, B2, and repaired B3 behavior remains green, and
 shared handoff, Slice 2, owner checkout, credentials, retired sessions, and stash
-provenance remain untouched. B4 awaits one exact review commit and fresh final
-complete-candidate owner/Astra disposition before Slice 1 can advance.
+provenance remain untouched. Exact B4 commit `fe8be5332c721a4c4891a23491c00a50e0f58c7f` received a
+final owner **REVISE for evidence/plan accuracy only** disposition; its accepted
+implementation and tests remain unchanged.
+
+### B4-R1 evidence/plan accuracy repair
+
+Final owner review of exact
+`fe8be5332c721a4c4891a23491c00a50e0f58c7f` returned **REVISE for
+evidence/plan accuracy only**. The accepted B4 implementation and tests must not
+change. Owner reruns passed the exact B4 gate 15/15 and full Node 128/128. The
+maintained Python acceptance command is `pytest -q tests`; it passed 281 tests
+plus seven subtests with 11 warnings.
+
+The active plan had still described root `pytest -q` as the Python acceptance
+gate. An exact-archive root run instead produced 287 passes plus seven subtests,
+36 failures, and ten setup errors. Every failure/error was under historical
+`scripts/archive/phase1/tests` and expected nonexistent duplicated
+`scripts/archive/phase1/scripts/...` paths. This diagnostic must remain visible;
+it is not evidence that the maintained 281-result fulfilled the literal root
+command.
+
+B4-R1 reconciled authoritative main `d1c491e` in the candidate merge while
+preserving the promoted future-folder deletion, accepted B1-B4 history, and
+`stash@{0}`. This repair changes only evidence/plan accuracy: `pytest -q tests`
+is the maintained acceptance suite, while root `pytest -q` is the separate known
+historical archive diagnostic with the exact outcome above. Fresh post-merge
+validation passed `pytest -q tests` with 281 tests plus seven subtests and 11
+warnings. The first Node run overlapped that Python run and hit the known
+lock-helper timing timeout at 127/128; the exact case then passed 1/1 in
+isolation and a serial full rerun passed 128/128. `git diff --check` and the
+documentation contracts in the maintained Python suite passed, and the complete
+candidate differs from accepted B4 only in this active plan. Do not change
+global pytest discovery, repair historical Phase 1 archives, edit B4 implementation/tests/docs
+beyond the plan record, or begin Slice 2. Acceptance requires truthful exact
+commands and outcomes, maintained Python 281 plus seven and Node 128 remaining
+green, diff/docs checks passing, a clean pushed candidate, and fresh complete
+Slice 1 owner/Astra review.
 
 Slice 2 remains blocked until the repaired Slice 1 exact commit is accepted.
 
@@ -724,11 +760,17 @@ for ordinary project conversation without touching the canonical checkout.
 - Link the evidence from `docs/conversation-driven-episode-oversight.md` and
   update the living specification only if the run changes a durable product
   requirement.
-- Run the full repository gates:
+- Run the maintained repository gates:
   - `node --test tests/*.test.mjs`
-  - `pytest -q`
+  - `pytest -q tests`
   - `git diff --check`
   - relative-link validation used by the existing documentation tests.
+
+Do not call a root-level `pytest -q` result a passing maintained gate. Root
+collection also discovers historical `scripts/archive/phase1/tests`, whose
+archived path assumptions are independently broken; if that broader diagnostic
+is run, record its result separately from the maintained `tests/` acceptance
+suite rather than hiding or conflating it.
 - Append final evidence to `prime-claw-h6w.22`; close it only when all acceptance
   criteria pass.
 - Commit and push the evidence/docs slice. Suggested commit:
