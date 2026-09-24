@@ -213,8 +213,12 @@ Terminal episode disposition appends inactive state and removes the ownership
 expectation while leaving default CONVERSATION identity available. Before any
 startup recovery appends marker evidence, the one shared classifier validates
 all stable expectation/receipt bindings directly, including when the marker is
-missing; disagreement blocks with expectation, receipt, and append-only session
-evidence unchanged. Marker and expectation disagreement, missing or corrupt
+missing. Session-file and worktree bindings use one canonical path-equivalence
+rule before and after reconstruction; a prospectively reconstructed marker must
+satisfy the same rule before it is appended. Canonically equivalent spellings
+must not become contradictory raw marker evidence, while genuinely different
+paths still block. Any disagreement blocks with expectation, receipt, and
+append-only session evidence unchanged. Marker and expectation disagreement, missing or corrupt
 packages, and duplicate or missing kernels block visibly before an oversight
 provider call. The existing plugin
 apply/check path plus `/implement-spec` readiness validation owns installation

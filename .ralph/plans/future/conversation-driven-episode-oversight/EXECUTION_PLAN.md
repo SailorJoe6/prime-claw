@@ -103,7 +103,11 @@ injection must be idempotent across queued work, reports, heartbeats, native
 follow-ups, tool continuation, reload, resume, and cancellation. Classification
 is read-only: it validates expectation/receipt stable bindings before selecting
 missing-marker recovery, and only then may startup append recovery evidence.
-Conflicting bindings block without append-only session mutation.
+Session-file and worktree agreement uses one canonical path-equivalence rule for
+expectations, receipts, current markers, and the exact marker proposed for
+reconstruction. Canonically equivalent spellings must converge without an
+append-then-reject cycle; genuinely different bindings block with no append-only
+session mutation.
 
 Add one narrow two-phase `finalize_spec_episode` capability. Its authorize phase
 accepts the exact location and `merged`/`abandoned` disposition, obtains explicit
