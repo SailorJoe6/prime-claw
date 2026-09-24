@@ -1011,7 +1011,7 @@ test("publisher admits execute as one queued follow-up without template expansio
 });
 
 
-test("publisher admits remote handoff as an idle-only prompt before the sole execute follow-up", async () => {
+test("publisher admits remote handoff as an ordinary prompt before the sole execute follow-up", async () => {
   const requests = [];
   const client = {
     async request(command) { requests.push(command); return { success: true, data: {} }; },
@@ -1050,7 +1050,7 @@ test("publisher admits remote handoff as an idle-only prompt before the sole exe
   }]);
 });
 
-test("idle-to-busy race rejects ordinary prompt and queues neither handoff nor execute", async () => {
+test("streaming race rejects ordinary prompt and queues neither handoff nor execute", async () => {
   const requests = [];
   const client = {
     async request(command) {
@@ -1071,6 +1071,29 @@ test("idle-to-busy race rejects ordinary prompt and queues neither handoff nor e
   assert.equal(requests.length, 1);
   assert.equal(requests[0].message, "wrapped handoff");
   assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
+});
+
+test("ordinary prompt may queue behind residual non-streaming work", async () => {
+  const admitted = [];
+  const nativeSemantics = {
+    async request(command) {
+      // Characterize the measured native boundary: queueIfBusy:false rejects a
+      // streaming race, but is not an atomic fail-if-any-busy primitive.
+      admitted.push(command.message);
+      return { success: true, data: {} };
+    },
+    close() {},
+  };
+
+  const response = await nativeSemantics.request({
+    type: "prompt",
+    activeSessionId: "non-stream-busy-episode",
+    message: "admitted now or queued until idle",
+    queueIfBusy: false,
+  });
+
+  assert.equal(response.success, true);
+  assert.deepEqual(admitted, ["admitted now or queued until idle"]);
 });
 
 test("Prime Agent steer is a queueing counterexample even when queueIfBusy is false", async () => {

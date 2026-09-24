@@ -294,21 +294,34 @@ Repair the shared host transport before Slice 2 dogfood. Prime Agent 0.9.5 uses
 an idle resident session has `isSessionActive: false` and can still retain a valid
 `activeSessionId`. `handoff_spec_episode` must retain that exact route, publish
 only when the durable session has no route, re-read state after publication, and
-require false plus all detailed busy/action/queue signals clear.
+fail closed when its observed snapshot reports activity.
+
+The EPISODE sibling and process are trusted. Its explicit completion report is
+the coordination signal; the PROJECT_CONVERSATION independently reviews and
+accepts the exact slice, then issues handoff when the session appears reasonably
+quiescent. The heartbeat is only a missed-report safety net. If no completion
+report arrived but the heartbeat observes apparent quiescence, ask the sibling
+`You seem done with your work. Are you complete or waiting for some process?`
+and trust the answer before review or handoff.
 
 The first canonical handoff admission must be an ordinary `prompt` with
 `queueIfBusy: false`, `expandPromptTemplates: false`, extension source, and no
-`streamingBehavior`. This is the native idle-only race guard. `steer` is not a
-fail-if-busy operation in 0.9.5 and can queue while streaming. Only after definite
-handoff admission may the existing sole execute `followUp` be queued. A busy
-list, state, or native race sends neither message; the owner watch remains armed
-so its heartbeat can retry later. Preserve every existing exact identity, path,
-queue, uncertainty, partial-admission, and no-replay boundary.
+`streamingBehavior`. This is not an atomic fail-if-any-busy primitive. Measured
+0.9.5 behavior definitely rejects a streaming race, but residual non-streaming
+runtime work may cause the ordinary prompt to queue until idle. That is acceptable
+after trusted completion and owner acceptance. Only after definite handoff
+admission may the existing sole execute `followUp` be queued. Success means
+immediate-or-queued admission, not completion. An observed-busy or definite
+first-send rejection leaves the heartbeat armed for a later owner retry after
+trusted completion and a new reasonably quiescent observation. Preserve every
+existing exact identity, path, observed-busy rejection, queue, uncertainty,
+partial-admission, and no-replay boundary.
 
 Verification covers resident-idle route retention, missing-route publication and
-state re-read, `isSessionActive: true` by itself, every detailed busy cause,
-ordinary-prompt request shape and idle-to-busy rejection, the steer counterexample,
-and unchanged first/second reject and uncertain outcomes.
+state re-read, `isSessionActive: true` by itself, every detailed observed busy
+cause, ordinary-prompt request shape, streaming-race rejection, the residual non-streaming queue and steer counterexamples, and unchanged first/second reject
+and uncertain outcomes. It also enforces the completion-report/status-question/
+trusted-answer coordination contract and transport-neutral success text.
 
 ## Slice 2 — Project-customizable oversight and owner-driven continuation
 
@@ -340,8 +353,10 @@ capabilities enforce deterministic transport and identity safety.
    - requiring each BLOCK finding to give a recommended repair direction,
      constraints, acceptance tests, regression risks, and repair dependencies
      without dictating exact code;
-   - calling `handoff_spec_episode` only for the exact owned, idle episode and
-     accepted in-scope continuation;
+   - treating the sibling's completion report (or trusted answer to the exact
+     heartbeat status question) as coordination, independently accepting the
+     exact slice, and calling `handoff_spec_episode` only when the owned episode
+     appears reasonably quiescent;
    - renewing final EXPERT review after material repairs;
    - presenting merge, revision, pause, or abandonment to the operator before
      terminal Git/session cleanup; and

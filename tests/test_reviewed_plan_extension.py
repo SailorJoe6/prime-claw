@@ -395,6 +395,29 @@ export default function probe(pi) {{
     ) == 1, result.stdout + result.stderr + probe_error
 
 
+def test_handoff_policy_documents_trusted_completion_and_honest_transport() -> None:
+    """Living and current docs must not promise an atomic all-busy primitive."""
+    paths = (
+        REPO / ".ralph/plans/future/conversation-driven-episode-oversight/SPECIFICATION.md",
+        REPO / ".ralph/plans/future/conversation-driven-episode-oversight/EXECUTION_PLAN.md",
+        REPO / "docs/handoff-chain.md",
+        REPO / "docs/future-specification-bundles.md",
+    )
+    question = "You seem done with your work. Are you complete or waiting for some process?"
+    for path in paths:
+        text = path.read_text()
+        assert question in text, path
+        assert "completion report" in text, path
+        assert "streaming race" in text, path
+        assert "residual non-streaming" in text, path
+        assert "atomic all-busy" in text or "atomic fail-if-any-busy" in text, path
+
+    extension = EXTENSION.read_text()
+    assert "sent as steer" not in extension
+    assert "ordinary prompt" in extension
+    assert "immediate or queued" in extension
+
+
 def test_reviewed_skills_have_only_native_slash_command_surfaces() -> None:
     """Native commands must not compete with duplicate skill commands."""
     assert not (REPO / ".agents" / "skills" / "plan").exists()

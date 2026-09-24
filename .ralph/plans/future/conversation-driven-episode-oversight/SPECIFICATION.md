@@ -55,7 +55,7 @@ conversation-to-episode transitions that this feature builds on:
   focused compaction request before the first execute slice;
 - exact-owner `handoff_spec_episode(location, guidance?)` for later slice
   transitions;
-- canonical handoff as an ordinary idle-only `prompt` with
+- canonical handoff as an ordinary `prompt` after an observed-idle snapshot, with
   `queueIfBusy: false` and no `streamingBehavior`, followed by canonical execute
   exactly once as the sole queued `followUp`;
 - agent-owned heartbeats and existing session observation for bounded watches;
@@ -322,7 +322,7 @@ create branch and worktree
   → promote and commit the reviewed future folder
   → fork and publish the inherited episode session
   → persist v2 handoff-pending admission state
-  → send canonical handoff as an ordinary idle-only prompt
+  → after the observed-idle snapshot, send canonical handoff as an ordinary prompt
   → request focused compaction of inherited planning context
   → persist execute-pending after handoff acknowledgement
   → queue canonical execute exactly once as the sole follow-up
@@ -349,10 +349,19 @@ generation. This includes bootstrap, continuation, repairs, review rework, and
 requested evidence. The watch uses existing observation and persisted
 Git/session evidence and never steers active work.
 
-Direct reports are the fast path; the heartbeat is a missed-report safety net. It
-is cancelled as soon as the generation is reconciled as complete, blocked,
-stopped, or waiting only for owner/operator action. A later generation gets a
-fresh watch. Repeated unchanged idle polling or duplicate watches are bugs.
+The EPISODE sibling and its process are trusted coordination participants. Its
+explicit completion report is the normal coordination signal. The project
+conversation independently reviews and accepts the exact reported slice; it does
+not require a daemon snapshot to prove that the sibling meant "complete." If the
+session then appears reasonably quiescent, the owner issues the handoff.
+
+Direct reports are the fast path; the heartbeat is a missed-report safety net. If
+no completion report arrived but a heartbeat sees apparent quiescence, the owner
+asks the sibling exactly: `You seem done with your work. Are you complete or waiting for some process?` The owner trusts that answer before beginning review
+or handoff. The heartbeat is cancelled as soon as the generation is reconciled
+as complete, blocked, stopped, or waiting only for owner/operator action. A later
+generation gets a fresh watch. Repeated unchanged idle polling or duplicate
+watches are bugs.
 
 The first release does not add a notification transport, event bus, scheduler
 service, or monitoring database. If this proven observation path fails in later
@@ -376,21 +385,26 @@ The review disposition is:
 
 For `advance` or an in-scope `revise`, the project conversation may invoke
 `handoff_spec_episode` without asking the operator to transport another
-`/handoff`. Because successful admission is a terminal routing action, the owner
+`/handoff`. It does so after the trusted completion answer, its independent
+review and acceptance of the exact slice, and a reasonably quiescent session
+observation. Because successful admission is a terminal routing action, the owner
 must cancel the completed generation watch and pre-arm exactly one non-steering
 watch for the intended new generation immediately before the call. The host
 capability then preflights canonical handoff and execute, checks the exact owner
-and idle episode, retains any valid resident route, and republishes only when no
-route exists. Its state check requires `isSessionActive: false` plus every
-detailed busy/action/queue signal clear. It sends handoff as an ordinary
-`prompt` with `queueIfBusy: false` and no `streamingBehavior`, then queues exactly
-one execute `followUp`. The ordinary prompt is the daemon-authoritative idle-only
-TOCTOU guard; `steer` would queue during streaming. A definite busy or other
-no-admission failure sends nothing and leaves the pre-armed heartbeat to retry
-later; it is cancelled only when the generation is no longer active or a
-terminal/externally blocked boundary is reached. Success, partial admission, or
-ambiguity keeps the watch until the transition is reconciled. The owner never
-attempts to create the watch after a successful terminal call.
+and current episode snapshot, retains any valid resident route, and republishes
+only when no route exists. An observed busy snapshot blocks admission.
+
+The host sends handoff as an ordinary `prompt` with `queueIfBusy: false` and no
+`streamingBehavior`, then queues exactly one execute `followUp`. Measured Prime
+Agent 0.9.5 behavior is narrower than an atomic all-busy guard: an intervening
+streaming race definitely rejects the ordinary prompt, while residual non-streaming runtime work can cause it to queue until idle. That queue is
+acceptable after the trusted completion report (or trusted status answer) and
+owner acceptance. Success means only that handoff and its sole execute follow-up
+were admitted, immediate-or-queued; it does not mean either workflow completed.
+A definite first-send rejection sends no execute and leaves the pre-armed
+heartbeat to retry later. Partial admission or ambiguity remains an inspection
+boundary with no replay. The owner never attempts to create the watch after a
+successful terminal call.
 
 Ordinary `agent_message.send()` is model input. It does not dispatch a sibling's
 native slash command. The deterministic host capability exists because the

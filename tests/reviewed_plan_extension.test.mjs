@@ -371,6 +371,83 @@ test("invalid implement-spec input shows usage without model injection", async (
 });
 
 
+test("owner handoff tool success text agrees with prompt delivery details", async (t) => {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-handoff-success-")));
+  const worktree = join(dirname(cwd), `${cwd.split("/").at(-1)}-alpha-plan-episode`);
+  t.after(() => {
+    rmSync(worktree, { recursive: true, force: true });
+    rmSync(cwd, { recursive: true, force: true });
+  });
+  mkdirSync(join(cwd, LOCATION), { recursive: true });
+  mkdirSync(worktree, { recursive: true });
+  writeSkill(worktree, "canonical handoff", "handoff");
+  writeSkill(worktree, "canonical execute", "execute");
+  const identity = {
+    version: 2,
+    slug: "alpha-plan",
+    sourceLocation: LOCATION,
+    ownerSessionId: "owner-session",
+    branch: "episode/alpha-plan",
+    worktree,
+    sessionName: "alpha-plan-episode",
+    episodeId: "episode-id",
+    episodeActiveSessionId: "active-episode-id",
+    episodeSessionFile: join(cwd, "episode.jsonl"),
+    bootstrapAdmission: "delivered",
+  };
+  const idle = {
+    activeSessionId: identity.episodeActiveSessionId,
+    sessionId: identity.episodeId,
+    sessionFile: identity.episodeSessionFile,
+    sessionName: identity.sessionName,
+    cwd: identity.worktree,
+    isSessionActive: false,
+    isStreaming: false,
+    isCompacting: false,
+    isBashRunning: false,
+    isRunningTools: false,
+    hasRunningRlmChildren: false,
+    unfinishedActionCount: 0,
+    queuedCount: 0,
+    sessionActions: { queuedCount: 0, steering: [], followUps: [] },
+  };
+  let delivered = 0;
+  const dependencies = {
+    git: {
+      repositoryRoot() { return cwd; },
+      hasBranch() { return true; },
+      worktrees() { return [{ path: worktree, branch: identity.branch }]; },
+    },
+    filesystem: {
+      readIdentity() { return identity; },
+      exists() { return true; },
+    },
+    publisher: {
+      async list() { return [idle]; },
+      async getState() { return idle; },
+      async deliverHandoff() { delivered += 1; },
+      close() {},
+    },
+  };
+  const f = createHarness(cwd, createReviewedPlanExtension(dependencies));
+
+  const result = await f.tools.get("handoff_spec_episode").execute(
+    "handoff-call-success",
+    { location: LOCATION },
+    undefined,
+    undefined,
+    f.ctx,
+  );
+
+  assert.equal(result.isError, undefined);
+  assert.equal(delivered, 1);
+  assert.equal(result.details.handoffDelivery, "prompt");
+  assert.equal(result.details.executeDelivery, "followUp");
+  assert.match(result.content[0].text, /ordinary prompt/);
+  assert.match(result.content[0].text, /immediate or queued/);
+  assert.doesNotMatch(result.content[0].text, /sent as steer/);
+});
+
 test("owner handoff tool requires a durable identity for the exact location", async (t) => {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-handoff-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));

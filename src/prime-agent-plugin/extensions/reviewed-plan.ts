@@ -279,7 +279,7 @@ export function createReviewedPlanExtension(dependencies?: EpisodeDependencies) 
           return {
             content: [{
               type: "text",
-              text: `Episode handoff admitted for ${result.sourceLocation}: canonical handoff was sent as steer and canonical execute was queued as the sole follow-up. Inspect the episode Status/Evidence output for its compaction-request result before claiming continuation completed.`,
+              text: `Episode handoff admitted for ${result.sourceLocation}: canonical handoff was admitted as an ordinary prompt and canonical execute was queued as the sole follow-up. Admission may be immediate or queued; inspect the episode Status/Evidence output before claiming either workflow completed.`,
             }],
             details: result,
           };

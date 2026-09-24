@@ -199,8 +199,8 @@ so the narrowly scoped host adapter uses the daemon supervisor socket injected
 into daemon workers. Before task delivery it preflights both canonical workflows and atomically
 stores a version-2 identity with `bootstrapAdmission: handoff-pending`. New
 episodes then use the same narrow two-message transport as later owner-driven
-transitions: canonical handoff is sent as an ordinary idle-only `prompt` with no
-`streamingBehavior`, and canonical execute is queued exactly once as the sole
+transitions: after an observed-idle snapshot, canonical handoff is sent as an
+ordinary `prompt` with no `streamingBehavior`, and canonical execute is queued exactly once as the sole
 `followUp`. This focuses the inherited
 planning conversation through the handoff compaction boundary before slice 1.
 
@@ -261,30 +261,38 @@ oversight policy, run implementation in the owner conversation, or invoke
 
 ## Owner-driven episode continuation
 
-After one implementation slice reaches an idle boundary, the owning project
-conversation can call `handoff_spec_episode` with the exact future-folder
-location that created the episode and optional operator-supplied compaction
-guidance. This is not another implementation authorization surface. The durable
-episode identity is the authority: host code requires the same top-level owner
-session and revalidates every derived branch, worktree, and durable-session
-field before using the daemon's current active routing ID.
+After an implementation slice, the EPISODE sibling's explicit completion report
+is the coordination signal. The owning project conversation independently
+reviews and accepts the exact slice, then can call `handoff_spec_episode` when
+the session appears reasonably quiescent. The heartbeat is only a missed-report
+safety net: if it observes apparent quiescence without a completion report, the
+owner asks `You seem done with your work. Are you complete or waiting for some process?` and trusts the answer before review or handoff. The call uses the exact
+future-folder location that created the episode and optional accepted in-scope
+compaction guidance. It is not another implementation authorization surface.
+The durable episode identity remains the authority: host code requires the same
+top-level owner session and revalidates every derived branch, worktree, and
+durable-session field before using the daemon's current active routing ID.
 
 The operation retains an exact resident route even when `isSessionActive` is
 false, and publishes the durable session again only when no route exists. It
-then re-reads live daemon state and fails closed unless `isSessionActive` is
-false and every detailed turn, tool, child, action, and queue signal is clear.
+then re-reads live daemon state and fails closed on an observed busy snapshot.
 It loads the current canonical handoff and execute Markdown from the episode
 worktree before either send. Handoff is sent first as an ordinary `prompt` with
 `queueIfBusy: false` and no `streamingBehavior`; execute is then queued exactly
-once as the sole `followUp`. This ordinary request gives the daemon an idle-only
-TOCTOU guard. `steer` is not suitable because it can queue while streaming even
-with `queueIfBusy: false`. The synchronous result proves only ordered admission. The episode's
-handoff `Status / Evidence / Next Step` output records whether focused compaction
-was requested before the queued execute turn continues.
+once as the sole `followUp`. Measured Prime Agent 0.9.5 behavior is not an atomic all-busy guard: a streaming race definitely rejects the ordinary prompt, while
+residual non-streaming runtime work can make it queue until idle. That queue is
+acceptable after trusted completion and owner acceptance. `steer` remains
+unsuitable because it can queue while streaming even with `queueIfBusy: false`.
+The synchronous result proves immediate-or-queued admission only, never
+completion. The episode's handoff `Status / Evidence / Next Step` output records
+whether focused compaction was requested before the queued execute turn
+continues.
 
-Definite first-send failure queues no continuation. Definite second-send failure
-reports the irreversible partial transition. An uncertain response at either
-stage is an inspection boundary, not permission to retry. The operation never
+Definite first-send failure queues no continuation and leaves the owner watch
+available for a later retry after trusted completion and a new reasonably
+quiescent observation. Definite second-send failure reports the irreversible
+partial transition. An uncertain response at either stage is an inspection
+boundary, not permission to retry. The operation never
 kills the session, removes resources, or adds nonces, leases, durable approvals,
 or generalized remote routing state.
 
@@ -311,7 +319,7 @@ commits, inherited context, protocol-7 daemon envelopes, durable handoff-first b
 per-mutation crash-window and uncertain-delivery replay suppression, allowed-empty promotion commits, partial
 cleanup observability, active and inactive replay, collision safety, confirmed
 invocation-owned cleanup, exact-owner remote handoff, quiescent-state checks,
-ordered steer/follow-up delivery, and visible partial or uncertain failures. The Python bridge reruns both suites and uses
+ordered prompt/follow-up delivery, and visible partial or uncertain failures. The Python bridge reruns both suites and uses
 installed offline Prime Agent RPC plus startup probes to prove one native
 `plan`, one native `implement-spec`, explicit `ralph_plan`, `create_spec_episode`, and `handoff_spec_episode`
 tools, no `ralph_implement_spec` tool, the confirmed
