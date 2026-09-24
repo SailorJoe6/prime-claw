@@ -236,10 +236,14 @@ clears the ownership expectation, and retains a completed tombstone while leavin
 default CONVERSATION identity available. Identical replays return the durable
 state/result without another confirmation. Before any startup recovery appends
 marker evidence, the one shared classifier validates all stable
-expectation/receipt bindings directly, including when the marker is missing;
-disagreement blocks with expectation, receipt, and append-only session evidence
-unchanged. Marker, expectation, receipt, or package disagreement and invalid
-active kernels block visibly before an oversight provider call. The existing plugin
+expectation/receipt bindings directly, including when the marker is missing.
+Session-file and worktree bindings use one canonical path-equivalence rule before
+and after reconstruction; a prospectively reconstructed marker must satisfy the
+same rule before it is appended. Canonically equivalent spellings must not become
+contradictory raw marker evidence, while genuinely different paths still block.
+Any disagreement blocks with expectation, receipt, and append-only session
+evidence unchanged. Marker, expectation, receipt, or package disagreement and
+invalid active kernels block visibly before an oversight provider call. The existing plugin
 apply/check path plus `/implement-spec` readiness validation owns installation
 integrity; an infinite chain of self-checking sentinel plugins is not required.
 

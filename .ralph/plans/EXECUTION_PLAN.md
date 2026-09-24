@@ -103,7 +103,11 @@ injection must be idempotent across queued work, reports, heartbeats, native
 follow-ups, tool continuation, reload, resume, and cancellation. Classification
 is read-only: it validates expectation/receipt stable bindings before selecting
 missing-marker recovery, and only then may startup append recovery evidence.
-Conflicting bindings block without append-only session mutation.
+Session-file and worktree agreement uses one canonical path-equivalence rule for
+expectations, receipts, current markers, and the exact marker proposed for
+reconstruction. Canonically equivalent spellings must converge without an
+append-then-reject cycle; genuinely different bindings block with no append-only
+session mutation.
 
 Add one narrow two-phase `finalize_spec_episode` capability. Its authorize phase
 accepts the exact location and `merged`/`abandoned` disposition, obtains explicit
@@ -711,12 +715,63 @@ sanitized five-failure ambient baseline remain evidence debt, not repair scope.
 The implementation awaits one exact pushed candidate and renewed complete Slice 1
 owner/Astra review.
 
-The fresh repair generation must first reconcile authoritative main `5edc73e`
+### R2-R1 residual path-equivalence repair is the next P0
+
+Renewed final Astra review of exact
+`886b71877ed163a7a02ba04bb92b76c36aaeb76b` returned **BLOCK** on one
+residual R2 P2 finding, R2-R1. R1 is **CLOSED** and must remain a regression
+gate rather than being reopened. Reviewer `openai-codex/gpt-6-astra` at
+reasoning `max` recorded the full actionable report at
+`/Users/jlanders/.prime/agent/session-artifacts/01a0ba54-da05-76bd-8d22-a0facfdd7f31/sub-4bcc582e/slice1-r12-final-exact-review.md`.
+
+The residual seam is inconsistent path equivalence during marker recovery.
+Expectation/receipt preflight accepts canonically equal session-file and
+worktree spellings with `resolve()`, such as a redundant `/./` segment, but
+`markerFromReceipt()` persists the receipt's raw spelling. The next
+marker/expectation check uses raw equality, blocks after the marker and recovery
+success message were appended, and leaves correction of only the receipt unable
+to recover. Native and Node evidence reproduced the defect independently for
+both path fields. Provider dispatch remains zero, but the required no-mutation
+contract is violated.
+
+Use one stable-binding path-equivalence rule across expectation/receipt
+validation, current-marker validation, and the exact prospective reconstructed
+marker. Validate the representation that will be persisted before any append or
+success message, or reconstruct one coherent representation accepted by every
+reader. Do not require paths to exist or use `realpath`; terminal paths may
+legitimately be absent. Do not append then roll back, rewrite the expectation or
+receipt, weaken nonpath bindings, include the mutable route, or change the exact
+terminal receipt checks. Preserve foreign history, legacy migration, completed-
+old/current-active behavior, package/kernel gates, closed R1, accepted B1-B4,
+shared handoff behavior, global discovery, and the Slice 2 boundary.
+
+Acceptance covers canonically equal session-file and worktree spellings
+independently and together, with variants on either expectation or receipt, for
+`authorized` and `completing`, missing and existing markers, and nonexistent
+terminal paths. Every supported case must converge once. Any representation
+rejected by policy must leave expectation/receipt bytes, branch, success-message
+count, recovery callback count, and provider count unchanged across readiness,
+context, and repeated registered startup. Genuinely different paths and all
+nonpath stable mismatches remain zero-mutation blockers; correcting only the
+original receipt permits exactly one recovery. Replay must not duplicate a
+marker/message/confirmation, rewind, or affect another generation. Run registered
+native equivalents, the closed R1 10-case real-writer matrix, and all lifecycle,
+lock, package, route-refresh, legacy, foreign-history, cross-generation, and B4
+regressions.
+
+The fresh repair generation must first reconcile authoritative main `56610f4`
+while preserving the promoted future-folder deletion, rejected history, accepted
+B1-B4, closed R1, and `stash@{0}`. Optional Git default-branch fixture debt is
+excluded. A fresh exact candidate requires renewed complete Slice 1 owner/Astra
+review. Slice 2 remains blocked.
+
+That coupled repair generation first reconciled authoritative main `5edc73e`
 while preserving the promoted-folder deletion, rejected history, accepted B1
 `e225bb4`, B2 `aff3b819`, B3 `dc439d4`, and B4 `fe8be53`. The sanitized Python
-five-failure ambient baseline is evidence debt only and not repair scope. The
-fresh exact candidate requires complete owner/Astra review. Do not change
-accepted behavior, global discovery, historical archives, or begin Slice 2.
+five-failure ambient baseline remains evidence debt only and not repair scope.
+Its exact candidate received the renewed complete owner/Astra review recorded
+above. Do not change accepted behavior, global discovery, historical archives,
+or begin Slice 2.
 
 Slice 2 remains blocked until the repaired Slice 1 exact commit is accepted.
 
