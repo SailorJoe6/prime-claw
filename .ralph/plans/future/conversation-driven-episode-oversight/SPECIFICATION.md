@@ -210,9 +210,13 @@ one current package. No proactive conversation handoff or custom context-sweet-
 spot policy is part of this release.
 
 Terminal episode disposition appends inactive state and removes the ownership
-expectation while leaving default CONVERSATION identity available. Marker and
-expectation disagreement, missing or corrupt packages, and duplicate or missing
-kernels block visibly before an oversight provider call. The existing plugin
+expectation while leaving default CONVERSATION identity available. Before any
+startup recovery appends marker evidence, the one shared classifier validates
+all stable expectation/receipt bindings directly, including when the marker is
+missing; disagreement blocks with expectation, receipt, and append-only session
+evidence unchanged. Marker and expectation disagreement, missing or corrupt
+packages, and duplicate or missing kernels block visibly before an oversight
+provider call. The existing plugin
 apply/check path plus `/implement-spec` readiness validation owns installation
 integrity; an infinite chain of self-checking sentinel plugins is not required.
 
@@ -460,8 +464,15 @@ After terminal work, the conversation invokes the completion phase without a
 second user confirmation. Trusted host code requires the matching authorization
 receipt and conservatively validates the exact terminal state before appending
 inactive oversight state and clearing only the matching spec-episode ownership
-expectation. Failure or ambiguity leaves oversight active and preserves the
-receipt and identity for repair. The capability never decides that the spec is
+expectation. Its shared startup classifier recognizes every exact checkpoint the
+completion writer can durably leave, including a `completing` receipt with an
+inactive matching marker while the matching expectation is still retained after
+identity-removal failure. Recovery re-enters the existing locked finalization
+coordinator, revalidates terminal facts, and completes without a provider call,
+second confirmation, duplicate inactive marker, or effect on another generation.
+An inactive marker plus expectation without the exact matching `completing`
+receipt remains invalid. Failure or ambiguity preserves the receipt, expectation,
+and marker evidence for another exact replay. The capability never decides that the spec is
 implemented and never merges, abandons, or cleans resources itself.
 
 Before oversight begins, the project conversation must verify that its required

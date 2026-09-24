@@ -100,7 +100,10 @@ Activation and deactivation are deterministic lifecycle mutations. Activation
 must not start an unsolicited model turn and must not be reported durable until
 the containing transition and session state are verified persisted. Package
 injection must be idempotent across queued work, reports, heartbeats, native
-follow-ups, tool continuation, reload, resume, and cancellation.
+follow-ups, tool continuation, reload, resume, and cancellation. Classification
+is read-only: it validates expectation/receipt stable bindings before selecting
+missing-marker recovery, and only then may startup append recovery evidence.
+Conflicting bindings block without append-only session mutation.
 
 Add one narrow two-phase `finalize_spec_episode` capability. Its authorize phase
 accepts the exact location and `merged`/`abandoned` disposition, obtains explicit
@@ -108,7 +111,12 @@ operator UI confirmation, and persists an exact owner/episode receipt without
 performing terminal work. After the skill-guided ordinary Git/session/worktree
 sequence, its completion phase requires that receipt, validates conservative
 terminal facts, appends inactive state, and clears only the matching expectation
-without a second confirmation. Ambiguity leaves all state available for repair.
+without a second confirmation. The shared startup coordinator must recover every
+exact checkpoint emitted by that ordered writer, including `completing` plus an
+inactive marker plus a still-retained matching expectation after identity-removal
+failure. It reuses the lock and terminal-fact validation, does not duplicate the
+inactive marker, and converges without a provider call or second confirmation.
+Ambiguity leaves all state available for repair.
 The capability records an already-made semantic and operator decision; it never
 decides completion, merges, abandons, or cleans resources.
 
