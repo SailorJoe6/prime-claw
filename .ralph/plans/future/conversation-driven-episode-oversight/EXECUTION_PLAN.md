@@ -412,11 +412,17 @@ for ordinary project conversation without touching the canonical checkout.
 - Link the evidence from `docs/conversation-driven-episode-oversight.md` and
   update the living specification only if the run changes a durable product
   requirement.
-- Run the full repository gates:
+- Run the maintained repository gates:
   - `node --test tests/*.test.mjs`
-  - `pytest -q`
+  - `pytest -q tests`
   - `git diff --check`
   - relative-link validation used by the existing documentation tests.
+
+Do not call a root-level `pytest -q` result a passing maintained gate. Root
+collection also discovers historical `scripts/archive/phase1/tests`, whose
+archived path assumptions are independently broken; if that broader diagnostic
+is run, record its result separately from the maintained `tests/` acceptance
+suite rather than hiding or conflating it.
 - Append final evidence to `prime-claw-h6w.22`; close it only when all acceptance
   criteria pass.
 - Commit and push the evidence/docs slice. Suggested commit:
