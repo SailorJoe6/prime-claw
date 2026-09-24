@@ -811,7 +811,7 @@ first independent review found a test-construction error that gave all
 expectation-side artifacts the same spelling; after independent artifact
 construction was added, a fresh read-only re-review returned PASS.
 
-### Complete Slice 1 accepted; README index correction implemented for review
+### Complete Slice 1 and README P3 accepted; Slice 2 is the next P0
 
 Final owner/Astra review **ACCEPTED** exact
 `b96a9feeb3177c52cdf0ac0d52e6b60f622b74cf`. R1 and R2-R1 are **CLOSED**.
@@ -829,22 +829,26 @@ conflicts, receipt-only correction, replay convergence, closed R1, and the
 complete Slice 1 regression surface. This acceptance does not authorize merge or
 terminal cleanup; those remain operator decisions.
 
-The optional P3 docs-only correction at `docs/README.md:47-48` is implemented.
-Only that index summary now says every independent project session defaults to
-CONVERSATION, with temporary exact-session episode oversight and authority
-boundaries. The linked current document is byte-identical to the accepted Slice
-1 candidate. No implementation or test path changed.
+The optional P3 docs-only correction at `docs/README.md:47-48` is **ACCEPTED**
+at exact `e5b92cc7b75c39f58414a6f4439730b2e5e8272c`. Only the active plan and
+that index changed from accepted Slice 1; `src/`, `tests/`, and the linked
+current oversight document remained unchanged. The corrected summary says every
+independent project session defaults to CONVERSATION, with temporary exact-
+session episode oversight and authority boundaries.
 
-Docs-index wording and every local link destination passed. The focused current-
-documentation contract passed 1/1 with nine tests deselected, the installed-copy
-check passed, `git diff --check` passed, and exact diff guards proved the linked
-target document and all `src/` and `tests/` paths unchanged. Commit and push one
-exact docs-only candidate, then stop for owner review. Do not reopen Slice 1
-runtime, merge or clean up the accepted branch, combine this correction with
-Slice 2, or begin Slice 2.
+Owner acceptance independently verified exact local/remote identity and a clean
+worktree, correct wording, the current-documentation contract 1/1 with nine tests
+deselected, local links, and diff checks. No renewed EXPERT review was required
+for this nonmaterial optional documentation correction.
 
-Slice 1 acceptance unblocks Slice 2, but Slice 2 begins only after this docs-only
-candidate is reviewed and a fresh explicit transition admits it.
+The first bounded increment of the existing approved **Slice 2 — Project-
+customizable oversight and owner-driven continuation** is implemented below and
+awaits one exact commit/push plus owner review. It adds only the project EXPERT
+policy, fail-closed reviewer procedure, focused contracts, and current docs.
+Owner-driven continuation changes remain deferred to a later fresh generation.
+Preserve accepted Slice 1/P3, rejected history, operator-only merge/cleanup/
+product decisions, the shared handoff exclusion, credentials, retired sessions,
+and stash provenance. Do not begin another Slice 2 increment in this generation.
 
 That coupled repair generation first reconciled authoritative main `5edc73e`
 while preserving the promoted-folder deletion, rejected history, accepted B1
@@ -854,9 +858,40 @@ Its exact candidate received the renewed complete owner/Astra review recorded
 above. Do not change accepted behavior, global discovery, historical archives,
 or begin Slice 2.
 
-Slice 2 is acceptance-unblocked but awaits the docs-only P0 and a fresh explicit transition.
+Slice 2 is the next P0 and begins only in a fresh post-handoff execute generation.
 
 ## Slice 2 — Project-customizable oversight and owner-driven continuation
+
+### Increment 2A — explicit EXPERT policy and fail-closed admission
+
+This bounded increment adds the approved project-versioned
+`.prime/agent/profiles/expert-reviewer.md` with exact `name`, `model`, and
+`thinking` policy; extends the canonical oversight skill with raw profile
+validation, exact discovery, harmless-bootstrap admission, returned-model
+verification, one combined role/packet delivery, actionable report validation,
+evidence preservation, and exact reviewer retirement; adds focused positive and
+negative profile/procedure contracts; and documents the current behavior. It
+does not change host extensions, handoff transport, lifecycle state, shared
+handoff semantics, or terminal authority. The remaining owner-driven
+continuation guidance and extension/tests/docs work in this Slice stay pending.
+
+Target-runtime `rlm.find_models` resolved exactly
+`openai-codex/gpt-6-astra`. A real safe-protocol test spawn returned that model
+for reviewer `sub-693f7326`; explicit `thinking=max` admission succeeded. The
+reviewer initially BLOCKed three contract gaps; after coupled repair, its fresh
+read-only re-review returned PASS with no material findings. The preserved
+report is `/Users/jlanders/.prime/agent/session-artifacts/01a0cc01-70b0-75d4-8486-3d21b496380c/sub-693f7326/slice2-expert-policy-review.md`, and the exact
+reviewer was deleted only after preservation.
+
+Focused EXPERT contracts passed 5/5, focused Python identity/docs contracts
+passed 15/15, focused Node oversight passed 58/58, maintained Python passed 287
+plus seven subtests with 11 existing warnings, plugin installed-copy and current-
+doc link checks passed, and `git diff --check` passed. The first two full Node runs each passed 156/157: the unchanged Slice 1
+fatal-lock-helper test timed out instead of surfacing its mocked error; its
+immediate isolated rerun passed 1/1 in 345 ms. A final full Node run passed
+157/157, including that case in 165 ms. Commit and push one exact Increment 2A
+candidate, append exact evidence to `prime-claw-h6w.22`, then stop for owner
+review without starting another increment.
 
 **Working capability:** the active exact-session owner has one canonical procedure for
 watching, reviewing, revising, continuing, and finally presenting its exact

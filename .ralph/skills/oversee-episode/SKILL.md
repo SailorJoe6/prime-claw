@@ -33,6 +33,30 @@ owns an active EPISODE.
    seam, recommended repair direction and rationale, constraints and anti-patterns,
    concrete acceptance tests, regression risks, and dependencies without prescribing
    exact patch code. Never silently weaken or substitute a required review.
+
+   For every required EXPERT review, load
+   `.prime/agent/profiles/expert-reviewer.md` from the project. Validate raw
+   frontmatter before constructing a mapping: line-exact delimiters; exactly one
+   nonempty bounded scalar each for `name`, `model`, and `thinking`; no duplicate,
+   nested, collection, block, or additional keys; `name: expert-reviewer`; and a
+   nonempty Markdown body. Resolve `model` with `rlm.find_models` and require one
+   exact selector match. Then use the repository safe-spawn protocol: call
+   `rlm.spawn` with only a harmless bootstrap plus the exact resolved `model` and
+   configured `thinking`. Before delivery, verify the returned handle names that
+   exact model; successful spawn admission is the evidence that the explicit
+   reasoning request was accepted. Send one combined task containing the validated
+   profile body and focused read-only exact-commit packet exactly once through
+   `agent_message.send`.
+
+   Require a complete `PASS` or actionable `BLOCK` report; an incomplete report
+   does not satisfy the gate. Preserve the report before stopping and deleting
+   that exact fresh reviewer. Record its session identity, exact commit, returned
+   model, admitted reasoning level, report artifact, and disposition. If profile
+   validation, exact discovery, spawn, returned-model verification, reasoning
+   admission, delivery, or report completion fails or is uncertain, pause and ask
+   the operator. Never resend an uncertain delivered task, delete a reviewer with
+   outstanding delivery/report work, use the current/default model, lower
+   reasoning, retry another selector, or claim that the EXPERT gate ran.
 8. After exact-commit acceptance, use only the existing exact-owner continuation
    capability. Admission does not prove work completion. Never imitate native
    transport with prose or `agent_message.send`.

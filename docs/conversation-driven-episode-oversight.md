@@ -120,6 +120,34 @@ Reports are evidence, never approval or native-command dispatch. The heartbeat
 is the missed-report safety net and is cancelled when its generation is
 reconciled or waiting only for owner/operator action.
 
+### Explicit EXPERT reviewer policy
+
+The first project policy lives at
+`.prime/agent/profiles/expert-reviewer.md`. Its closed frontmatter names
+`expert-reviewer` and selects `openai-codex/gpt-6-astra` with reasoning level
+`max`; the Markdown body defines the independent, read-only exact-commit role,
+prohibits editing or steering the subject, requires returning findings to the
+owner, and defines the actionable `BLOCK` contract. This is project/operator
+configuration, not a portable claim that one model is always best.
+
+For required review, the owner validates the raw closed profile before mapping
+it, resolves one exact selector match, and uses the repository safe-spawn
+sequence: admit a fresh RLM with only a harmless bootstrap and the explicit
+selector/reasoning arguments, verify that the returned handle names the requested
+model, then send the profile body plus real read-only packet together exactly
+once. Successful spawn admission proves acceptance of the explicit reasoning
+request; the handle is not claimed to echo it. Evidence records the reviewer
+identity, exact reviewed commit, returned model, admitted reasoning, report
+artifact, and disposition. The owner preserves and adjudicates a complete report
+before stopping and deleting that exact reviewer.
+
+Invalid configuration, unavailable or ambiguous resolution, rejected reasoning,
+failed or mismatched spawn, uncertain delivery, or an incomplete report must
+pause for the operator. Uncertain delivery is never resent and a reviewer with
+outstanding delivery/report work is never deleted. The owner never falls back to
+its current/default model or a weaker policy, and favorable EXPERT review never
+authorizes merge.
+
 ## Narrow terminal finalization receipt
 
 `finalize_spec_episode` has two phases and never performs terminal work itself.
