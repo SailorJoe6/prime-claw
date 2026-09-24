@@ -195,10 +195,16 @@ models.
 8. stop and delete the fresh reviewer after its findings are preserved.
 
 A missing or malformed profile, no exact model match, unsupported reasoning
-level, unavailable credentials, or failed spawn blocks a required review. Do not
-retry with a different model, inherit the conversation default, or weaken the
-gate. Report the exact failure and pause for operator authorization or external
-repair. Never inspect credential stores while diagnosing availability.
+level, or unavailable credentials/access blocks a required review and pauses for
+operator or external repair. A definitive technical failure of one exact
+reviewer is different: after verifying the reviewer is terminal and has no usable
+PASS/BLOCK report, preserve the attempt evidence, retire that reviewer, and admit
+one fresh replacement with the identical validated profile, exact packet, model,
+and reasoning without asking the operator. Never resend a delivered task to the
+failed reviewer. If delivery/report status remains ambiguous or the one fresh
+replacement also fails, pause for the operator. Never retry with a different
+model, inherit the conversation default, weaken the gate, or inspect credential
+stores while diagnosing availability.
 
 This is policy executed by the existing skill and RLM APIs. Do not add an EXPERT
 registry, model-ranking service, general model router, or new host capability.

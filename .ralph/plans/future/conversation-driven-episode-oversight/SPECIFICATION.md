@@ -420,10 +420,18 @@ not claim that it can automatically rank all available models or infer the
 operator's cost authorization.
 
 The review evidence records the actual reviewer model selector and reasoning
-level alongside the exact reviewed commit. If a required EXPERT cannot run under
-the authorized policy, the workflow pauses and asks the operator. It must not
-silently substitute the routine/default model, weaken the review requirement, or
-report a passing EXPERT gate without the required reviewer.
+level alongside the exact reviewed commit. If a required EXPERT cannot run because the configured model, reasoning level,
+access, or credentials are unavailable, the workflow pauses and asks the
+operator. A purely technical reviewer failure does not itself require operator
+authority to retry: after confirming the exact reviewer is terminal and produced
+no usable PASS/BLOCK report, the owning CONVERSATION preserves the incomplete
+attempt, retires that exact reviewer, and may admit one fresh replacement with
+the same validated profile and exact review packet. It never resends a delivered
+task to the failed reviewer, changes model/reasoning, or counts the incomplete
+attempt as review evidence. If the replacement also fails, the outcome remains
+ambiguous, or policy/access is unavailable, pause for the operator. The workflow
+must not silently substitute the routine/default model, weaken the review
+requirement, or report a passing EXPERT gate without the required reviewer.
 
 Intermediate EXPERT use is judgment-based. It is especially useful for security,
 credential boundaries, destructive operations, concurrency, compatibility,
