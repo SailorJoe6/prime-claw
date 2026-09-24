@@ -141,8 +141,10 @@ def test_oversee_skill_bounds_owner_driven_continuation_and_sequential_return():
         "cancel the completed generation's old watch",
         "pre-arm exactly one non-steering watch for the intended generation",
         "immediately before calling the terminal `handoff_spec_episode`",
-        "Cancel the pre-armed watch only when the result proves definite no-admission",
-        "Retain it across success, partial admission, or ambiguity until the transition is reconciled",
+        "keep the pre-armed intended-generation watch available for a later fresh observed-idle retry",
+        "The watch never retries automatically",
+        "Before any owner retry, obtain a fresh exact state snapshot",
+        "Retain the watch across success, partial admission, ambiguity, or definite first-send no-admission",
         "Never create the intended-generation watch after success or arm a duplicate",
         "never retry an uncertain transport result",
         "use the tool for `consult`, `pause`, or a terminal disposition",
@@ -157,6 +159,28 @@ def test_oversee_skill_bounds_owner_driven_continuation_and_sequential_return():
     continuation = text.split("For an accepted `advance` or in-scope `revise`", 1)[1].split("Before presenting merge readiness", 1)[0]
     assert continuation.index("cancel the completed generation's old watch") < continuation.index("pre-arm exactly one non-steering watch")
     assert continuation.index("pre-arm exactly one non-steering watch") < continuation.index("calling the terminal `handoff_spec_episode`")
+
+
+def test_oversee_skill_trusts_idle_status_and_retains_the_intended_retry_watch():
+    raw = SKILL.read_text()
+    text = " ".join(raw.split())
+    question = "You seem done with your work. Are you complete or waiting for some process?"
+
+    assert question in raw
+    for phrase in [
+        "If no completion report arrives but the heartbeat sees apparent quiescence",
+        "Trust that answer before beginning review or handoff",
+        "definite first-send no-admission",
+        "keep the pre-armed intended-generation watch available for a later fresh observed-idle retry",
+        "The watch never retries automatically",
+        "require the exact owned episode to be idle again",
+    ]:
+        assert phrase in text
+    assert "Cancel the pre-armed watch only when the result proves definite no-admission" not in text
+    assert text.index("If no completion report arrives") < text.index(question)
+    assert text.index(question) < text.index("Trust that answer before beginning review or handoff")
+    retry = text.split("If the result proves definite first-send no-admission", 1)[1]
+    assert retry.index("keep the pre-armed intended-generation watch") < retry.index("Before any owner retry")
 
 
 def test_current_documentation_explains_project_expert_policy():
@@ -187,6 +211,9 @@ def test_current_docs_bound_owner_continuation_without_changing_host_authority()
         "without a new operator transport request",
         "operator focus or a bounded compaction-focus synthesis",
         "EPISODE sibling's explicit completion report",
+        "You seem done with your work. Are you complete or waiting for some process?",
+        "later fresh observed-idle retry",
+        "watch never retries automatically",
         "reasonably quiescent observation",
         "preserves a valid resident route even when `isSessionActive` is false",
         "ordinary `prompt` with `queueIfBusy: false`",

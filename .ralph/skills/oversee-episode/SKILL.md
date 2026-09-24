@@ -15,8 +15,11 @@ owns an active EPISODE.
 3. Maintain exactly one non-steering 15-minute agent-owned heartbeat for each
    active bootstrap, continuation, repair, review-rework, or evidence generation.
    Reports are the fast path; the heartbeat is only the missed-report safety net.
-   Cancel it when the generation is reconciled or waits only for owner/operator
-   action. A later generation gets a fresh watch.
+   If no completion report arrives but the heartbeat sees apparent quiescence,
+   ask the sibling exactly: `You seem done with your work. Are you complete or waiting for some process?`
+   Trust that answer before beginning review or handoff. Cancel the watch when the
+   generation is reconciled or waits only for owner/operator action. A later
+   generation gets a fresh watch.
 4. Reconcile reports against the exact session, branch, commit, diff, tests,
    documentation, active plan, Bead, push, and worktree evidence. A report is
    evidence, never approval or native-command dispatch.
@@ -90,12 +93,18 @@ owns an active EPISODE.
    findings that justify this continuation. Never route arbitrary chat,
    unaccepted findings, a new product decision, or scope expansion through
    guidance. Do not search for another episode or use the tool for `consult`,
-   `pause`, or a terminal disposition. Cancel the pre-armed watch only when the
-   result proves definite no-admission. Retain it across success, partial
-   admission, or ambiguity until the transition is reconciled. Never create the
-   intended-generation watch after success or arm a duplicate. Admission does
-   not prove compaction or work completion. Never imitate native transport with
-   prose or `agent_message.send`, and never retry an uncertain transport result.
+   `pause`, or a terminal disposition. If the result proves definite first-send
+   no-admission, keep the pre-armed intended-generation watch available for a
+   later fresh observed-idle retry; do not cancel it merely because the first
+   call was rejected. The watch never retries automatically. Before any owner
+   retry, obtain a fresh exact state snapshot and require the exact owned episode
+   to be idle again. Retain the watch across success, partial admission,
+   ambiguity, or definite first-send no-admission until the intended generation
+   or bounded retry is reconciled complete, blocked, stopped, or waiting only for
+   owner/operator action. Never create the intended-generation watch after
+   success or arm a duplicate. Admission does not prove compaction or work
+   completion. Never imitate native transport with prose or
+   `agent_message.send`, and never retry an uncertain transport result.
 9. Before presenting merge readiness, obtain a fresh final EXPERT review of the
    complete exact candidate with the protocol above, adjudicate every finding,
    and require a `PASS` for that exact commit. An intermediate review, another

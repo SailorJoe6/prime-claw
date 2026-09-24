@@ -1310,6 +1310,28 @@ Do not install or restart the user-global plugin in this slice. Do not reload th
 fixture owner, retry handoff, admit generation two, run the final feature EXPERT,
 seek operator disposition, merge to main, or clean resources.
 
+### Canonical oversight package coherence repair — owner review pending
+
+Post-install review of owner-accepted integration exact
+`a16f57fc29febdf6278b3d0afe71fb42060d9ea4` found one bounded policy mismatch in
+`.ralph/skills/oversee-episode/SKILL.md`. The bounded repair now asks an
+apparently idle sibling without a completion report exactly
+`You seem done with your work. Are you complete or waiting for some process?`
+before review or continuation. When a pre-armed intended-generation heartbeat
+meets a definite first-send no-admission result, the same bounded watch remains
+available for a later fresh observed-idle retry rather than being cancelled;
+uncertainty and no-replay boundaries remain unchanged, and the watch never
+retries automatically.
+
+Focused regressions cover both canonical-package requirements and the living
+overview now states the same contract. The active specification already carried
+the accepted semantics and needed no revision. Validation passed focused Python
+35/35, focused Node 85/85, maintained Node 175/175, and maintained Python 299
+plus seven subtests. Final diff, link, and source-integrity results are recorded
+in Bead evidence. No fixture-owner reload, fixture handoff retry, generation-two
+admission, final EXPERT decision, terminal disposition, or cleanup occurred.
+Commit and push one candidate, then stop for exact owner review.
+
 - Append final evidence to `prime-claw-h6w.22`; close it only when all acceptance
   criteria pass.
 - Commit and push the evidence/docs slice. Suggested commit:

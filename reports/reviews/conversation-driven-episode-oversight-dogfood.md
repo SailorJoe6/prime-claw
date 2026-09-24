@@ -102,3 +102,31 @@ The ordinary two-parent integration candidate passed the final serial gates:
 The first parallel maintained run was not accepted as gate evidence. It exposed one existing finalization-lock timing timeout under concurrent load and seven integration assertions that still referenced the deleted future bundle or historical `steer` transport. The lock case passed focused serially; the integration assertions were corrected to the promoted active paths and accepted ordinary-prompt contract. Both complete maintained suites then passed serially as recorded above.
 
 These checks validate outer branch integration only. They do not prove user-global installation, fixture retry, generation two, final feature EXPERT review, operator disposition, or cleanup.
+
+## Post-install canonical-package coherence repair
+
+After owner acceptance of integration exact
+`a16f57fc29febdf6278b3d0afe71fb42060d9ea4`, the user-global apply/check and
+fresh-process native probes remained valid. Inspection of the freshly injected
+canonical `oversee-episode` package found two documentation-policy mismatches:
+it paraphrased the trusted idle-without-report status question, and it cancelled
+the intended-generation watch after definite first-send no-admission even though
+the accepted specification retains that watch for a later retry.
+
+This bounded source repair now:
+
+- asks exactly `You seem done with your work. Are you complete or waiting for some process?`
+  when apparent quiescence has no completion report, then trusts the answer before
+  review or handoff;
+- retains the already pre-armed intended-generation watch after definite first-send
+  no-admission for a later fresh observed-idle owner retry;
+- states that the watch never retries automatically and preserves the existing
+  uncertainty/no-replay boundary; and
+- adds focused regression assertions for both requirements.
+
+The active specification already carried the accepted contract and did not need
+semantic revision. Focused policy/injection validation passed 35/35 Python and
+85/85 Node; maintained validation passed 175/175 Node and 299 Python tests plus
+7 subtests. No fixture-owner reload, fixture handoff retry, generation-two
+admission, final EXPERT decision, terminal disposition, or cleanup occurred in
+this repair.

@@ -144,9 +144,9 @@ operator focus or a bounded compaction-focus synthesis of those accepted recorde
 findings. Arbitrary chat, unaccepted review findings, product decisions, scope
 expansion, and `consult`, `pause`, or terminal dispositions cannot be routed this
 way. The EPISODE sibling's explicit completion report is the normal coordination
-signal. If a heartbeat instead observes apparent quiescence without a report, the
-owner asks whether the episode is complete or waiting and trusts that status
-answer before review or handoff.
+signal. If a heartbeat instead observes apparent quiescence without a report,
+the owner asks exactly: `You seem done with your work. Are you complete or waiting for some process?`
+and trusts that status answer before review or handoff.
 
 After trusted completion, exact owner review and acceptance, and a reasonably
 quiescent observation, the owner cancels the completed-generation watch and
@@ -161,8 +161,10 @@ no `streamingBehavior`, followed by exactly one execute `followUp`. This is not 
 atomic all-busy guard. A streaming race definitely rejects the prompt; residual
 non-streaming work can make it wait until idle, which is acceptable after trusted
 completion and owner acceptance. A definite first-send rejection admits no
-execute and leaves the intended-generation watch available for a later bounded
-retry. Success proves only immediate-or-queued admission, never workflow
+execute and leaves the intended-generation watch available for a later fresh
+observed-idle retry; the watch never retries automatically. Before that bounded
+owner retry, a fresh exact state snapshot must show the exact owned episode idle
+again. Success proves only immediate-or-queued admission, never workflow
 completion. Partial or uncertain admission is an inspection boundary and is
 never blindly replayed. No Prime Agent core change, compare-and-swap primitive,
 or lease is claimed or required.
