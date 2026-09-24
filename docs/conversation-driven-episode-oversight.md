@@ -182,7 +182,19 @@ expectation; it never silently becomes ordinary mode. On reload/resume, a strict
 an ordinary provider call, without invoking the model tool or replaying bootstrap
 admission. Recovery validates the effective managed kernel and canonical package
 before any marker/receipt/expectation mutation; a project or CLI shadow blocks
-with state unchanged and zero provider calls. Unrelated resources are never removed.
+with state unchanged and zero provider calls. Before selecting missing-marker
+recovery, the read-only classifier also validates the expectation and receipt's
+stable owner, generation, source, session file, branch, worktree, session name,
+identity version, and admission bindings. The mutable active route is excluded.
+A conflict appends no marker or success message and does not invoke recovery or
+the provider, so correcting only the original receipt remains sufficient.
+
+The exact writer-produced `completing` + matching inactive marker + retained
+expectation checkpoint is recoverable through the same transaction lock and
+terminal-fact coordinator. Because the marker is already inactive, recovery does
+not append it again. An inactive marker plus expectation without that exact
+`completing` receipt remains invalid. Unrelated resources and generations are
+never removed or changed.
 
 ## Native validation isolation
 

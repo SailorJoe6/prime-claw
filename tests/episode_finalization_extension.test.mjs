@@ -54,8 +54,8 @@ function fixture(options = {}) {
     },
     exists(path) { return path === "/worktree" ? Boolean(options.worktree) : files.has(path); },
     readJson(path) { if (!files.has(path)) throw Error("missing " + path); return structuredClone(files.get(path)); },
-    writeJson(path, value) { writes++; if (fail.writeAt === writes) throw Error("write failed " + writes); files.set(path, structuredClone(value)); },
-    remove(path) { removes++; if (fail.removeAt === removes) throw Error("remove failed"); files.delete(path); },
+    writeJson(path, value) { writes++; if (fail.writeAt === writes) throw Error("write failed " + writes); files.set(path, structuredClone(value)); if (fail.writeAfterAt === writes) throw Error("write failed after durable write " + writes); },
+    remove(path) { removes++; if (fail.removeAt === removes) throw Error("remove failed"); files.delete(path); if (fail.removeAfterAt === removes) throw Error("remove failed after durable removal"); },
     now() { return `2026-01-01T00:00:0${writes}.000Z`; },
     async acquireLock() {
       const predecessor = lockTail;
@@ -169,21 +169,30 @@ test("successful completion leaves a durable tombstone and identical complete/au
   assert.equal(authorizeReplay.reused, true); assert.equal(authorizeReplay.receipt.state, "completed"); assert.equal(confirms, 0);
 });
 
-test("failure at every durable completion boundary preserves a visible monotonic recovery record", async () => {
-  // first write is authorization. Completion writes completing (2), then removes identity, then writes completed (3).
-  for (const fail of [{ writeAt: 2 }, { removeAt: 1 }, { writeAt: 3 }]) {
-    const f = fixture({ fail }); await authorize(f); const transitions = [];
-    await assert.rejects(complete(f, "merged", marker(), status => transitions.push(status)), /durable recovery evidence preserved/);
-    const saved = parseFinalizationReceipt(f.files.get(f.receiptPath));
-    assert.ok(saved.state === "authorized" || saved.state === "completing");
-    assert.notEqual(saved.state, "completed");
-    const recovered = await complete(f, "merged", marker(transitions.length ? "inactive" : "active"));
-    assert.equal(recovered.state, "completed");
+test("one-time failure after every durable completion boundary recovers monotonically for merged and abandoned", async () => {
+  for (const disposition of ["merged", "abandoned"]) {
+    const options = disposition === "merged" ? {} : { merged: false };
+    for (const boundary of ["completing-write", "inactive-append", "expectation-removal", "completed-write"]) {
+      const fail = boundary === "completing-write" ? { writeAfterAt: 2 }
+        : boundary === "expectation-removal" ? { removeAfterAt: 1 }
+          : boundary === "completed-write" ? { writeAfterAt: 3 } : {};
+      const f = fixture({ ...options, fail }); await authorize(f, disposition); const transitions = [];
+      let failAppend = boundary === "inactive-append";
+      await assert.rejects(complete(f, disposition, marker(), status => {
+        transitions.push(status);
+        if (failAppend) { failAppend = false; throw Error("append failed after durable inactive marker"); }
+      }), /durable recovery evidence preserved/);
+      const saved = parseFinalizationReceipt(f.files.get(f.receiptPath));
+      assert.ok(saved.state === "completing" || saved.state === "completed");
+      const replayMarker = marker(transitions.length ? "inactive" : "active");
+      const recovered = await complete(f, disposition, replayMarker, status => transitions.push(status));
+      assert.equal(recovered.state, "completed");
+      assert.equal(f.files.has(f.identityPath), false);
+      assert.deepEqual(transitions, ["inactive"]);
+      const replay = await complete(f, disposition, marker("inactive"), () => { throw Error("must not append"); });
+      assert.deepEqual(replay, recovered);
+    }
   }
-  const f = fixture(); await authorize(f);
-  await assert.rejects(complete(f, "merged", marker(), () => { throw Error("append failed"); }), /durable recovery evidence preserved/);
-  assert.equal(f.files.get(f.receiptPath).state, "completing"); assert.equal(f.files.has(f.identityPath), true);
-  assert.equal((await complete(f, "merged", marker())).state, "completed");
 });
 
 test("replay reconciles completing records whether identity and inactive append crossed the crash boundary", async () => {

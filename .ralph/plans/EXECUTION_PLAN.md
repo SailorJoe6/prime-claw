@@ -675,6 +675,42 @@ history, legacy migration, completed-old/current-active behavior, route refresh,
 and all accepted B1-B4 gates. Repair this before broadening R1 recovery so an
 invalid receipt can never become durable marker evidence.
 
+#### Coupled R1/R2 repair outcome
+
+The repair generation reconciled authoritative main `5edc73e` in merge commit
+`37f66b8` and carried its R1/R2 additions into the promoted active specification
+and plan while keeping the future bundle deleted. The shared lifecycle classifier
+now validates same-generation expectation/receipt stable bindings before recovery
+selection, including a foreign-owner receipt that collides with the exact current
+generation; unrelated foreign history remains inert. It compares owner,
+generation, source, canonical session file, branch, canonical worktree, session
+name, identity version, and admission while excluding the mutable active route.
+The expected-generation truth table now selects locked completing recovery for an
+exact inactive marker only when the matching receipt is `completing`; all adjacent
+inactive, authorized, completed, orphan, mismatch, and cross-generation blockers
+remain fail-closed.
+
+Coverage adds byte/branch-identical conflict replay for every stable field,
+correction of only the original receipt followed by exactly one recovery, and an
+explicit mutable-route positive case. A registered extension test drives the real
+completion writer through a one-time identity-removal failure, observes the exact
+`completing` plus inactive plus retained-expectation checkpoint, and proves
+provider-free recovery without another inactive append or confirmation. The
+direct writer matrix injects one-time failure after each durable boundary for
+both `merged` and `abandoned`, then proves monotonic completion and replay.
+
+Evidence: the focused lifecycle Node set passed 77/77; the installed/plugin Python
+set passed 38 tests plus seven subtests; user-global apply/check passed; the full
+Node suite passed 131/131; and maintained `pytest -q tests` passed 281 tests plus
+seven subtests with 11 warnings. Type loading, documentation contracts, and
+`git diff --check` passed. An independent read-only implementation review checked
+the complete source/test/doc diff against the Astra report, reran the 77-test
+focused lifecycle set, and returned PASS with no blocking findings. The
+separately recorded historical root diagnostic and
+sanitized five-failure ambient baseline remain evidence debt, not repair scope.
+The implementation awaits one exact pushed candidate and renewed complete Slice 1
+owner/Astra review.
+
 The fresh repair generation must first reconcile authoritative main `5edc73e`
 while preserving the promoted-folder deletion, rejected history, accepted B1
 `e225bb4`, B2 `aff3b819`, B3 `dc439d4`, and B4 `fe8be53`. The sanitized Python

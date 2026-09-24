@@ -100,6 +100,79 @@ test("unclassifiable expectation and receipt owners block every lifecycle surfac
 
 test("promotion uses full current and legacy stable-binding agreement",async t=>{const current=fixture(t),episode=identity(current),marker=appendActiveOversight(current.pi,current.ctx,episode);current.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data={...marker,episodeSessionFile:"/wrong/current.jsonl"};assert.throws(()=>assertConversationPromotionReady(current.ctx,episode.sourceLocation),/disagrees/);const legacy=fixture(t),legacyEpisode=identity(legacy);legacy.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{version:1,status:"active",ownerSessionId:legacyEpisode.ownerSessionId,sourceLocation:legacyEpisode.sourceLocation,slug:legacyEpisode.slug,episodeId:legacyEpisode.episodeId,episodeSessionFile:"/wrong/legacy.jsonl"});assert.throws(()=>assertConversationPromotionReady(legacy.ctx,legacyEpisode.sourceLocation),/legacy oversight marker disagrees/);await legacy.events.get("session_start")({},legacy.ctx);assert.equal(legacy.branch.filter(e=>e.customType===OVERSIGHT_MARKER_TYPE&&e.data.markerVersion===2).length,0)});
 test("current active generation cannot hide old nonterminal or orphan owner state",t=>{for(const kind of ["authorized","completing","orphan-active"]){const f=fixture(t),beta=identity(f,{slug:"beta",episodeId:"22222222-2222-4222-8222-222222222222"});appendActiveOversight(f.pi,f.ctx,beta);if(kind==="orphan-active"){f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...f.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",branch:"episode/alpha",worktree:resolve(dirname(f.cwd),`${basename(f.cwd)}-alpha-episode`),sessionName:"alpha-episode"})}else{const marker={...f.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data,status:"inactive",slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeSessionFile:"/old.jsonl",branch:"episode/alpha",worktree:"/old",sessionName:"alpha-episode"};f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,marker);writeFileSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),JSON.stringify({version:2,state:kind,sourceLocation:marker.sourceLocation,slug:"alpha",disposition:"merged",ownerSessionId:marker.ownerSessionId,episodeId:marker.episodeId,episodeActiveSessionId:"old-route",episodeSessionFile:marker.episodeSessionFile,episodeBranch:marker.branch,episodeWorktree:marker.worktree,sessionName:marker.sessionName,identityVersion:2,admission:"delivered",episodeCommit:"a".repeat(40),targetBranch:"main",targetRef:"refs/heads/main",targetCommitAtAuthorization:"b".repeat(40),authorizedAt:"2026-01-01",...(kind==="completing"?{completingAt:"2026-01-02"}:{})}))}assert.throws(()=>context(f),/prime-claw conversation blocked/);assert.throws(()=>assertConversationPromotionReady(f.ctx,".ralph/plans/future/beta"))}});
+test("ordered startup recovers the writer-produced completing checkpoint with an inactive marker",async t=>{
+  let recoveries=0,f;
+  f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{
+    recoveries+=1;assert.equal(marker.status,"inactive");
+    rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));
+    const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json");
+    const value=JSON.parse(readFileSync(path,"utf8"));
+    writeFileSync(path,JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));
+    return true;
+  }}});
+  const episode=identity(f),marker=appendActiveOversight(f.pi,f.ctx,episode);
+  f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});
+  receipt(f,episode,"completing");
+  const markerCount=f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length;
+  await f.events.get("session_start")({},f.ctx);
+  assert.equal(recoveries,1);assert.equal(f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length,markerCount);
+  assert.deepEqual(context(f),{messages:[]});
+  await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);
+});
+
+test("marker-absent stable expectation and receipt conflicts are read-only and correction alone recovers once",async t=>{
+  const mismatches=[
+    {ownerSessionId:"other-owner"},
+    {episodeId:"22222222-2222-4222-8222-222222222222"},
+    {sourceLocation:".ralph/plans/future/other"},
+    {episodeSessionFile:"/other/session.jsonl"},
+    {episodeBranch:"episode/other"},
+    {episodeWorktree:"/other/worktree"},
+    {sessionName:"other-episode"},
+    {identityVersion:1},
+    {admission:"other-admission"},
+  ];
+  for(const mismatch of mismatches){
+    let recoveries=0,f;
+    f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{
+      recoveries+=1;
+      if(marker.status==="active")f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});
+      rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));
+      const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),value=JSON.parse(readFileSync(path,"utf8"));
+      writeFileSync(path,JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));return true;
+    }}});
+    const episode=identity(f),identityPath=join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"),receiptPath=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json");
+    receipt(f,episode,"completing",mismatch);
+    const beforeBranch=structuredClone(f.branch),beforeIdentity=readFileSync(identityPath),beforeReceipt=readFileSync(receiptPath);
+    assert.throws(()=>context(f),/prime-claw conversation blocked/);
+    assert.throws(()=>assertConversationPromotionReady(f.ctx,episode.sourceLocation));
+    assert.deepEqual(f.branch,beforeBranch);assert.deepEqual(readFileSync(identityPath),beforeIdentity);assert.deepEqual(readFileSync(receiptPath),beforeReceipt);
+    for(let replay=0;replay<2;replay+=1){
+      await f.events.get("session_start")({},f.ctx);
+      assert.equal(recoveries,0);assert.deepEqual(f.branch,beforeBranch);
+      assert.deepEqual(readFileSync(identityPath),beforeIdentity);assert.deepEqual(readFileSync(receiptPath),beforeReceipt);
+      assert.match(f.notifications.at(-1).message,/recovery blocked/);
+    }
+    receipt(f,episode,"completing");
+    await f.events.get("session_start")({},f.ctx);
+    assert.equal(recoveries,1);assert.equal(JSON.parse(readFileSync(receiptPath,"utf8")).state,"completed");
+    assert.deepEqual(context(f),{messages:[]});
+    await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);
+  }
+});
+
+test("marker-absent recovery excludes mutable route from stable expectation receipt agreement",async t=>{
+  let recoveries=0,f;
+  f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{
+    recoveries+=1;if(marker.status==="active")f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});
+    rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));
+    const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),value=JSON.parse(readFileSync(path,"utf8"));
+    writeFileSync(path,JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));return true;
+  }}});
+  const episode=identity(f);receipt(f,episode,"completing",{episodeActiveSessionId:"stale-route"});
+  await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);assert.deepEqual(context(f),{messages:[]});
+});
+
 test("ordered startup never recovers an old completing or orphan generation beside active beta",async t=>{for(const kind of ["old-completing","orphan-active"]){let recoveries=0;const f=fixture(t,{registration:{recoverCompleting:async()=>{recoveries++;return true}}}),beta=identity(f,{slug:"beta",episodeId:"22222222-2222-4222-8222-222222222222"}),betaMarker=appendActiveOversight(f.pi,f.ctx,beta);if(kind==="old-completing"){const alpha={...beta,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeActiveSessionId:"alpha-route",episodeSessionFile:"/old.jsonl",branch:"episode/alpha",worktree:"/old",sessionName:"alpha-episode"};f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...betaMarker,status:"inactive",slug:alpha.slug,sourceLocation:alpha.sourceLocation,episodeId:alpha.episodeId,episodeSessionFile:alpha.episodeSessionFile,branch:alpha.branch,worktree:alpha.worktree,sessionName:alpha.sessionName});receipt(f,alpha,"completing")}else{f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...betaMarker,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeSessionFile:"/orphan.jsonl",branch:"episode/alpha",worktree:"/orphan",sessionName:"alpha-episode"})}const before=structuredClone(f.branch);await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,0);assert.deepEqual(f.branch,before);assert.match(f.notifications.at(-1).message,/recovery blocked/)}});
 
 test("ordered startup recovers the sole completing generation once and converges to ordinary",async t=>{let recoveries=0,f;f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{recoveries++;f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));const value=JSON.parse(readFileSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),"utf8"));writeFileSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));return true}}});const episode=identity(f),marker=appendActiveOversight(f.pi,f.ctx,episode);receipt(f,episode,"completing");await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);assert.deepEqual(context(f),{messages:[]});await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);assert.equal(f.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data.status,"inactive");assert.equal(marker.status,"active")});

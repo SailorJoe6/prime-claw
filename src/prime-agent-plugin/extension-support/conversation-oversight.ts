@@ -319,7 +319,7 @@ export function appendEpisodeIdentity(session: {appendCustomEntry(customType:str
   session.appendCustomEntry(BOUNDED_IDENTITY_TYPE, {version:1,role:"EPISODE",sessionId:session.getSessionId()});
 }
 
-function ownerFinalizationReceipts(ctx: ExtensionContext): FinalizationReceipt[] {
+function ownerFinalizationReceipts(ctx: ExtensionContext, expectation: EpisodeIdentity | null): FinalizationReceipt[] {
   const root = stateRoot(ctx.cwd);
   if (!existsSync(root)) return [];
   const values: FinalizationReceipt[] = [];
@@ -330,10 +330,11 @@ function ownerFinalizationReceipts(ctx: ExtensionContext): FinalizationReceipt[]
     let raw: unknown;
     try { raw = JSON.parse(readFileSync(path, "utf8")); }
     catch (error) { throw new Error(`finalization receipt is unreadable: ${error instanceof Error ? error.message : String(error)}`); }
-    if (raw && typeof raw === "object" && !Array.isArray(raw)
-      && typeof (raw as { ownerSessionId?: unknown }).ownerSessionId === "string"
-      && (raw as { ownerSessionId: string }).ownerSessionId.length > 0
-      && (raw as { ownerSessionId: string }).ownerSessionId !== ctx.sessionManager.getSessionId()) continue;
+    const item = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+    const foreignOwner = typeof item?.ownerSessionId === "string" && item.ownerSessionId.length > 0
+      && item.ownerSessionId !== ctx.sessionManager.getSessionId();
+    const sameExpectedGeneration = Boolean(expectation && item?.slug === expectation.slug && item?.episodeId === expectation.episodeId);
+    if (foreignOwner && !sameExpectedGeneration) continue;
     let value: FinalizationReceipt;
     try { value = parseFinalizationReceipt(raw); }
     catch (error) { throw new Error(`finalization receipt is invalid: ${error instanceof Error ? error.message : String(error)}`); }
@@ -387,7 +388,7 @@ function sameGeneration(left: { slug: string; episodeId: string }, right: { slug
 
 function classifyLifecycle(ctx: ExtensionContext): LifecycleClassification {
   const expectation = ownerExpectations(ctx)[0] ?? null;
-  const receipts = ownerFinalizationReceipts(ctx);
+  const receipts = ownerFinalizationReceipts(ctx, expectation);
   const records = markerRecords(ctx);
   const recordFor = (value: { slug: string; episodeId: string }) => records.find((record) => {
     const marker = record.marker ?? record.legacy!;
@@ -396,6 +397,8 @@ function classifyLifecycle(ctx: ExtensionContext): LifecycleClassification {
   const receiptFor = (value: { slug: string; episodeId: string }) => receipts.find((receipt) => sameGeneration(receipt, value)) ?? null;
 
   if (expectation && !episodeBootstrapReady(expectation)) throw new Error("owner episode expectation is not bootstrap-ready");
+  const expectationReceipt = expectation ? receiptFor(expectation) : null;
+  if (expectation && expectationReceipt) assertMarkerReceipt(markerFromIdentity(expectation, "active"), expectationReceipt);
 
   for (const record of records) {
     const value = record.marker ?? record.legacy!;
@@ -426,7 +429,14 @@ function classifyLifecycle(ctx: ExtensionContext): LifecycleClassification {
     }
     const marker = record.marker!;
     if (isExpected) {
-      if (marker.status !== "active") throw new Error("current expectation has an inactive marker");
+      if (marker.status === "inactive") {
+        if (receipt?.state === "completing") {
+          candidates.push({ kind: "completing-finalization", receipt, marker });
+          continue;
+        }
+        if (receipt?.state === "completed") throw new Error("completed finalization cannot coexist with a reappearing expectation");
+        throw new Error("current expectation has an inactive marker");
+      }
       if (!receipt || receipt.state === "authorized") {
         activeMarker = marker;
         activeReceipt = receipt;
