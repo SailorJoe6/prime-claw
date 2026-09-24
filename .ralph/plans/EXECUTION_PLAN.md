@@ -1032,9 +1032,28 @@ returned `PASS` on unchanged six-file snapshot SHA-256 `f2f3f01f672a7f9006acb3ad
 no material finding. The complete report is `/Users/jlanders/.prime/agent/session-artifacts/01a0cc01-70b0-75d4-8486-3d21b496380c/sub-abed98b9/slice2b-r1-pass-review.md`. PASS is evidence
 only, not merge authority or live activation proof.
 
-Next run final diff/installed-copy checks, commit and push one bounded 2B-R1
-candidate, and stop for owner review. Do not begin another 2B increment, Slice
-3, terminal merge, or cleanup.
+Owner accepted exact pushed 2B-R1
+`8b9f5b6fd048e582efbcaefd2693830e3008eac0`. The repaired watch ordering and
+all previously accepted Increment 2B semantics now stand; this acceptance does
+not authorize Slice 3, terminal merge, cleanup, or another 2B increment.
+
+**Shared probe-isolation integration:** accepted origin/main exact
+`624f85612d3172ad559b369502ddbc5fae4d7be4` was integrated by a normal
+non-rewriting merge whose parents preserve accepted 2B-R1 exact
+`8b9f5b6fd048e582efbcaefd2693830e3008eac0` and the upstream fix. The upstream
+delta is exactly `AGENTS.md`, `scripts/run-prime-agent-probe.sh`, and
+`tests/test_prime_agent_probe_isolation.py`; it prevents config-mutating native
+probes from reaching user-global settings.
+
+Validation is green: targeted isolation passed 2/2; maintained Python passed
+294 plus seven subtests with 11 existing deprecation warnings; maintained Node
+passed 157/157; plugin-copy integrity and `git diff --check` passed. Exact path
+and semantic audits confirm no oversight skill, plugin source, host extension,
+current oversight docs, shared-handoff mechanics, or 2B-R1 behavior changed.
+The merge used no rebase, force, or history rewrite. Next amend only this durable
+evidence into the local merge candidate, push that one candidate, and stop for
+owner review. Do not begin Slice 3, terminal merge, cleanup, another increment,
+or unrelated work.
 
 **Working capability:** the active exact-session owner has one canonical procedure for
 watching, reviewing, revising, continuing, and finally presenting its exact

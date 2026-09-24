@@ -70,6 +70,15 @@ See the global `rlm-automatic-preparation-startup-race` prompt note and
 openclaw-setup `docs/prime-agent-rlm-preparation-race.md` for the full
 diagnosis.
 
+## Native Prime Agent probe isolation
+
+Native Prime Agent probes and tests that can mutate configuration must run through
+`scripts/run-prime-agent-probe.sh`. `--session-dir` isolates session artifacts only;
+it does not isolate `settings.json`. The wrapper gives each probe temporary
+`PRIME_AGENT_CODING_AGENT_DIR` and `PRIME_AGENT_SESSION_DIR` roots and removes them
+on exit. Do not send configuration-mutating RPC requests such as
+`set_auto_compaction` from an unguarded Prime Agent process.
+
 ## Sandbox lifecycle safety
 
 Sandbox rebuild/recovery/policy work follows an apply/check/validate
