@@ -13,18 +13,11 @@ import {
 import {
   appendActiveOversight,
   assertConversationPromotionReady,
-  currentOversightMarker,
-  currentOversightMarkerForFinalization,
+  currentOversightMarkerForClose,
   OVERSIGHT_MARKER_TYPE,
   registerConversationOversight,
-  type OversightDisposition,
 } from "../extension-support/conversation-oversight.ts";
-import {
-  authorizeEpisodeFinalization,
-  completeEpisodeFinalization,
-  recoverCompletingEpisodeFinalization,
-  type FinalizationDependencies,
-} from "../extension-support/episode-finalization.ts";
+import { closeEpisodeOversight } from "../extension-support/episode-close.ts";
 
 /**
  * Native reviewed planning and implementation-promotion boundaries.
@@ -140,25 +133,13 @@ function registerSkillCommand(
 }
 
 type ReviewedPlanDependencies = EpisodeDependencies & {
-  finalization?: FinalizationDependencies;
   createEpisode?: typeof createSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
 };
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
-    registerConversationOversight(pi, {
-      recoverCompleting: async (ctx, marker) => {
-        const recovered = await recoverCompletingEpisodeFinalization(
-          ctx,
-          (status, value) => pi.appendEntry(OVERSIGHT_MARKER_TYPE, { ...value, status }),
-          marker,
-          dependencies?.finalization,
-        );
-        if (recovered) ctx.ui.notify(`Recovered completed episode finalization for ${recovered.sourceLocation}.`, "warning");
-        return Boolean(recovered);
-      },
-    });
+    registerConversationOversight(pi);
     const approvedLocationBySession = new Map<string, string>();
     registerSkillCommand(pi, {
       command: "plan",
@@ -285,70 +266,49 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
 
     pi.registerTool({
       name: "finalize_spec_episode",
-      label: "Finalize specification episode oversight",
-      description: "Record or complete one exact operator-authorized merged/abandoned episode disposition without performing Git or cleanup work.",
-      promptSnippet: "Authorize or complete exact episode finalization after the operator's terminal decision",
+      label: "Close specification episode bookkeeping",
+      description: "Idempotently clear exact owned episode identity and oversight state after the owning conversation verifies terminal work.",
+      promptSnippet: "Close exact episode bookkeeping after verified terminal work",
       promptGuidelines: [
-        "Use authorize only after the operator explicitly chooses merged or abandoned for the exact owned episode.",
-        "Authorize records the decision after one UI confirmation and performs no merge, abandonment, stop, worktree, branch, or cleanup mutation.",
-        "Perform ordinary conservative terminal work through the canonical oversight procedure, then use complete for the same exact location and disposition.",
-        "Complete requires the matching receipt and terminal facts; ambiguity preserves active oversight and all evidence.",
+        "Call finalize_spec_episode only after the operator's conversational terminal decision has been carried out and verified for this exact owned episode.",
+        "Pass only the exact retained future-folder location used to create the owned episode.",
+        "This is a no-UI bookkeeping close. It performs no Git, merge, abandonment, session, worktree, branch, or cleanup action.",
+        "An identical replay is idempotent; any owner, location, identity, or state mismatch remains a blocker.",
       ],
       executionMode: "sequential",
       parameters: {
         type: "object",
         properties: {
-          phase: { type: "string", enum: ["authorize", "complete"] },
           location: { type: "string", description: "Exact .ralph/plans/future/<slug> folder owned by this conversation" },
-          disposition: { type: "string", enum: ["merged", "abandoned"] },
         },
-        required: ["phase", "location", "disposition"],
+        required: ["location"],
         additionalProperties: false,
       } as any,
-      async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         try {
-          const disposition = params.disposition as OversightDisposition;
-          if (params.phase === "authorize") {
-            const marker = currentOversightMarkerForFinalization(ctx, params.location);
-            if (!marker) throw new Error("No exact active oversight marker exists for this conversation");
-            const result = await authorizeEpisodeFinalization(
-              params.location,
-              disposition,
-              ctx,
-              (title, message) => ctx.ui.confirm(title, message),
-              marker,
-              dependencies?.finalization,
-              { signal },
-            );
-            return {
-              content: [{ type: "text", text: `Episode finalization ${result.reused ? "already authorized" : "authorized"} for ${params.location} as ${disposition}. No terminal work was performed.` }],
-              details: { phase: "authorize", disposition, reused: result.reused, receipt: result.receipt },
-            };
-          }
-          if (params.phase !== "complete") throw new Error("Finalization phase must be authorize or complete");
-          const marker = currentOversightMarkerForFinalization(ctx, params.location);
-          if (!marker) throw new Error("No exact active oversight marker exists for this conversation");
-          const receipt = await completeEpisodeFinalization(
+          const marker = currentOversightMarkerForClose(ctx, params.location);
+          if (!marker) throw new Error("No exact oversight marker exists for this conversation");
+          const result = closeEpisodeOversight(
             params.location,
-            disposition,
             ctx,
-            (status, value) => pi.appendEntry(OVERSIGHT_MARKER_TYPE, { ...value, status }),
             marker,
-            dependencies?.finalization,
-            { signal },
+            (value) => {
+              pi.appendEntry(OVERSIGHT_MARKER_TYPE, { ...value, status: "inactive" });
+              const persisted = currentOversightMarkerForClose(ctx, params.location);
+              if (!persisted || persisted.status !== "inactive" || persisted.episodeId !== value.episodeId) {
+                throw new Error("Inactive episode bookkeeping evidence did not persist");
+              }
+            },
           );
-          const current = currentOversightMarker(ctx);
-          const laterActive = current?.status === "active" && current.episodeId !== receipt.episodeId ? current : null;
           return {
-            content: [{ type: "text", text: laterActive
-              ? `Episode finalization is completed for ${params.location} as ${disposition}. Current oversight remains active for ${laterActive.sourceLocation}.`
-              : `Episode finalization is completed for ${params.location} as ${disposition}. Oversight for that exact episode is inactive; CONVERSATION capability remains.` }],
-            details: { phase: "complete", disposition, receipt,
-              currentOversight: laterActive ? { status: "active", sourceLocation: laterActive.sourceLocation, episodeId: laterActive.episodeId } : { status: "inactive", sourceLocation: params.location, episodeId: receipt.episodeId } },
+            content: [{ type: "text", text: result.reused
+              ? `Episode bookkeeping was already closed for ${params.location}. CONVERSATION capability remains.`
+              : `Episode bookkeeping closed for ${params.location}. Oversight is inactive; CONVERSATION capability remains.` }],
+            details: { location: params.location, reused: result.reused, episodeId: result.marker.episodeId, status: "inactive" },
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          return { content: [{ type: "text", text: `Episode finalization failed: ${message}` }], details: { error: message }, isError: true };
+          return { content: [{ type: "text", text: `Episode bookkeeping close failed: ${message}` }], details: { error: message }, isError: true };
         }
       },
     });

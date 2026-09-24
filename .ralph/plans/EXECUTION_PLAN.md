@@ -96,33 +96,24 @@ missing/corrupt package aborts before provider dispatch and reports the exact
 repair. Existing apply/check scripts own installation integrity; do not add a
 self-checking sentinel chain.
 
-Activation and deactivation are deterministic lifecycle mutations. Activation
-must not start an unsolicited model turn and must not be reported durable until
-the containing transition and session state are verified persisted. Package
-injection must be idempotent across queued work, reports, heartbeats, native
-follow-ups, tool continuation, reload, resume, and cancellation. Classification
-is read-only: it validates expectation/receipt stable bindings before selecting
-missing-marker recovery, and only then may startup append recovery evidence.
-Session-file and worktree agreement uses one canonical path-equivalence rule for
-expectations, receipts, current markers, and the exact marker proposed for
-reconstruction. Canonically equivalent spellings must converge without an
-append-then-reject cycle; genuinely different bindings block with no append-only
-session mutation.
+Activation and bookkeeping close are deterministic lifecycle mutations.
+Activation must not start an unsolicited model turn and must not be reported
+durable until the containing transition and session state are verified persisted.
+Package injection must be idempotent across queued work, reports, heartbeats,
+native follow-ups, tool continuation, reload, resume, and cancellation.
+Classification is read-only and validates exact expectation/marker bindings
+before selecting missing-marker recovery. Session-file and worktree agreement
+uses one canonical path-equivalence rule for expectations, current markers, and
+the exact marker proposed for reconstruction. Genuinely different bindings block
+with no append-only session mutation.
 
-Add one narrow two-phase `finalize_spec_episode` capability. Its authorize phase
-accepts the exact location and `merged`/`abandoned` disposition, obtains explicit
-operator UI confirmation, and persists an exact owner/episode receipt without
-performing terminal work. After the skill-guided ordinary Git/session/worktree
-sequence, its completion phase requires that receipt, validates conservative
-terminal facts, appends inactive state, and clears only the matching expectation
-without a second confirmation. The shared startup coordinator must recover every
-exact checkpoint emitted by that ordered writer, including `completing` plus an
-inactive marker plus a still-retained matching expectation after identity-removal
-failure. It reuses the lock and terminal-fact validation, does not duplicate the
-inactive marker, and converges without a provider call or second confirmation.
-Ambiguity leaves all state available for repair.
-The capability records an already-made semantic and operator decision; it never
-decides completion, merges, abandons, or cleans resources.
+Keep `finalize_spec_episode` only as a location-only bookkeeping close after the
+owning CONVERSATION has performed and verified terminal work. It shows no UI,
+records no disposition or authorization receipt, appends matching inactive
+evidence only when needed, and removes only the exact matching expectation.
+Identical replay is idempotent, including removal-only retry after inactive
+evidence was appended. It has no Git, daemon-inventory, merge, abandonment,
+session, worktree, branch, cleanup, lock, or recovery-coordinator capability.
 
 ### Policy and authority
 
@@ -240,10 +231,9 @@ copied ownership.
    - remove stale package representations; and
    - abort visibly on active-state disagreement or corrupt resources.
 5. Integrate `/implement-spec` readiness and activation only after promotion and
-   episode identity are durably established. Add the approved narrow two-phase
-   `finalize_spec_episode` authorization/completion capability with one UI
-   confirmation, exact durable receipt, conservative terminal validation, and no
-   merge or cleanup authority.
+   episode identity are durably established. Add the narrow location-only,
+   no-UI, idempotent bookkeeping close with exact owner/identity checks and no
+   terminal-action authority.
 6. Extend plugin apply/check manifests for the kernel, load unit, and canonical
    package. Detect project/CLI prompt shadowing at readiness rather than silently
    weakening identity. Serialize APPEND updates, reconcile dead-writer temporary
@@ -257,8 +247,8 @@ copied ownership.
    - normal input, custom trigger, native follow-up, heartbeat, agent message,
      tool continuation, queued/cancelled work, reload, and resume;
    - native automatic compaction with restoration on the first real later call;
-   - idempotent activation plus authorized terminal receipt/completion, one user
-     confirmation, and no unsolicited provider call;
+   - idempotent activation plus exact bookkeeping close, no duplicate UI, and no
+     unsolicited provider call;
    - current package reload exactly once per call; and
    - visible zero-provider blocking for missing/duplicate kernel, corrupt marker,
      expectation mismatch, and missing/corrupt package.
@@ -363,7 +353,7 @@ with 11 existing warnings. User-global apply/check passed, and a fresh builder-r
 process observed the installed generation with kernel/package `1/0`. `git diff --check`
 passed.
 
-### B2 lock reliability evidence
+### Historical B2 lock reliability evidence (superseded at the terminal seam)
 
 The finalization lock now performs an exact JSON startup handshake for `ready`,
 `contended`, and `fatal` states. It validates the immediate parent and existing
@@ -1331,6 +1321,50 @@ plus seven subtests. Final diff, link, and source-integrity results are recorded
 in Bead evidence. No fixture-owner reload, fixture handoff retry, generation-two
 admission, final EXPERT decision, terminal disposition, or cleanup occurred.
 Commit and push one candidate, then stop for exact owner review.
+
+### Simplified conversational terminal workflow — next P0
+
+The operator approved a dogfood-driven replacement of current Step 10 and the
+over-engineered `finalize_spec_episode` lifecycle. Preserve owner-accepted exact
+`0b2e887719e2e967f8c5cb93b01c9897bbf08d8d` and all earlier behavior outside
+this terminal seam.
+
+Replace finalization with this flow: after exact owner acceptance and a fresh
+final EXPERT `PASS`, present readiness conversationally; treat the operator's
+ordinary merge, revise, pause, or abandon response as the sole terminal decision;
+then let the owning CONVERSATION perform and verify context-sensitive Git,
+session, worktree, branch, and cleanup work. Remove the duplicate confirmation
+UI, authorize phase and receipt, two-phase finalize state machine, lock/recovery
+machinery, generic terminal Git validator, and global daemon inventory/UUID
+validation.
+
+Retain only the smallest trusted exact-owner/location bookkeeping close after
+AI-verified terminal work. It clears matching plugin-owned episode
+identity/oversight state, appends inactive evidence only if required, is
+idempotent, shows no UI, and performs no Git, session, worktree, branch, merge,
+or cleanup action. Update the active specification, canonical oversight package,
+plugin source/registration/inventory, focused Node/Python tests, living docs, and
+dogfood evidence coherently. Do not apply/reload the plugin or mutate, retry, or
+clean the disposable fixture in this generation. Its merged/stopped state and
+stale bookkeeping/retained refs are preserved evidence. Commit and push one
+bounded candidate, update the Bead, and stop for exact owner review.
+
+Implementation status for this bounded candidate:
+
+- `finalize_spec_episode` is now a location-only, no-UI bookkeeping close;
+  obsolete receipt/authorization/lock/recovery/Git/daemon machinery and its
+  support file are removed, while exact identity/marker checks, one-generation-
+  per-location isolation, and interruption-safe idempotent replay remain;
+- the canonical Step 10, active specification, living docs, installer inventory,
+  dogfood evidence, and focused Node/Python coverage describe the same flow;
+- maintained Node passes 119/119. The exact final Python run passes 297 tests
+  plus seven subtests and reproduces only the known unrelated candidate-watchdog
+  timeout; that exact test passes alone in 2.22 seconds. Isolated native
+  oversight/discovery probes pass 6/6, plugin install/inventory coverage passes
+  36 tests plus seven subtests, changed-doc links pass 9/9, and `git diff
+  --check` is clean; and
+- the plugin was not applied or reloaded, and the frozen disposable fixture was
+  not mutated, retried, or cleaned.
 
 - Append final evidence to `prime-claw-h6w.22`; close it only when all acceptance
   criteria pass.

@@ -117,17 +117,28 @@ owns an active EPISODE.
    revision, pause, or abandonment decision only after this owner-verification
    gate. Only the operator grants terminal authority. Never infer merge,
    abandonment, scope, or destructive cleanup.
-10. For `merged` or `abandoned`, call the authorize phase of
-    `finalize_spec_episode`; let its single UI confirmation record the operator
-    decision. Then perform the ordinary conservative Git/session/worktree work.
-    Dirty, ambiguous, or uncertain state blocks cleanup. Keep the authorized
-    episode branch/ref available until completion validates its exact tip; apply
-    branch-retention policy only afterward. Finally call the completion phase,
-    which validates terminal facts, clears only matching state, and returns this
-    session to ordinary CONVERSATION mode. Cancel episode-specific watches and
-    record the terminal disposition. A later reviewed folder requires a fresh
-    native `/implement-spec` run; one completed episode never lifetime-locks the
-    owner conversation.
+10. Treat the operator's ordinary conversational `merge`, `revise`, `pause`, or
+    `abandon` response as the sole terminal decision. Do not ask for a duplicate
+    confirmation or route the decision through a plugin authorization phase.
+    For `revise` or `pause`, retain the episode and follow the applicable owner
+    path above. For `merge` or `abandon`, inspect current evidence and perform the
+    context-sensitive Git, session, worktree, branch-retention, and cleanup work
+    directly with ordinary conservative tools. Verify the exact result after
+    each applicable action. Dirty, ambiguous, or uncertain state blocks
+    destructive cleanup; never substitute a generic scripted terminal policy for
+    live owner judgment.
+
+    Only after terminal work is verified, call `finalize_spec_episode` once with
+    the exact retained future-folder `location`. This no-UI, idempotent call is
+    bookkeeping only: it clears the matching plugin-owned episode identity and
+    oversight state and may append matching inactive evidence. It performs no
+    Git, merge, abandonment, session, worktree, branch, or cleanup action. If its
+    outcome is uncertain, do not replay terminal work; recheck exact state and
+    retry only the bookkeeping close when safe. Cancel episode-specific watches,
+    record the terminal disposition and evidence, and return to ordinary
+    CONVERSATION work. A later reviewed folder at a fresh location requires a
+    native `/implement-spec` run; one closed episode never lifetime-locks the owner
+    conversation.
 
 Under material context pressure, record the next P0, preserve evidence, stop at a
 safe checkpoint, and use native context refresh before more implementation. This

@@ -29,15 +29,17 @@ def test_oversee_episode_is_exposed_through_normal_project_skill_discovery():
 
 
 def test_canonical_oversight_package_contains_reviewed_policy():
-    text = SKILL.read_text()
-    for phrase in ["name: oversee-episode", "one owner-coordination message", "15-minute", "exact pushed candidate", "owner ledger", "advance", "revise", "consult", "pause", "finalize_spec_episode", "Only the operator", "ordinary CONVERSATION mode"]:
+    text = " ".join(SKILL.read_text().split())
+    for phrase in ["name: oversee-episode", "one owner-coordination message", "15-minute", "exact pushed candidate", "owner ledger", "advance", "revise", "consult", "pause", "finalize_spec_episode", "Only the operator", "ordinary CONVERSATION work", "sole terminal decision", "no-UI, idempotent"]:
         assert phrase in text
 
 
 def test_extension_uses_context_and_exact_state_without_rejected_flag_profile():
     extension = EXTENSION.read_text(); support = SUPPORT.read_text()
-    assert "registerConversationOversight(pi, {" in extension
-    assert "recoverCompleting:" in extension
+    assert "registerConversationOversight(pi);" in extension
+    assert "recoverCompleting:" not in extension
+    assert "episode-finalization" not in extension + support
+    assert "authorization receipt" not in extension + support
     assert "currentCompletingFinalization" not in extension + support
     assert "assertFinalizationRecoveryReady" not in extension + support
     assert 'pi.on("context"' in support

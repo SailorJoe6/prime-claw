@@ -148,8 +148,11 @@ def test_oversee_skill_bounds_owner_driven_continuation_and_sequential_return():
         "Never create the intended-generation watch after success or arm a duplicate",
         "never retry an uncertain transport result",
         "use the tool for `consult`, `pause`, or a terminal disposition",
-        "returns this session to ordinary CONVERSATION mode",
-        "requires a fresh native `/implement-spec` run",
+        "Treat the operator's ordinary conversational `merge`, `revise`, `pause`, or `abandon` response as the sole terminal decision",
+        "Only after terminal work is verified, call `finalize_spec_episode` once with the exact retained future-folder `location`",
+        "This no-UI, idempotent call is bookkeeping only",
+        "return to ordinary CONVERSATION work",
+        "A later reviewed folder at a fresh location requires a native `/implement-spec` run",
         "never lifetime-locks the owner conversation",
     ]:
         assert phrase in text
@@ -159,6 +162,8 @@ def test_oversee_skill_bounds_owner_driven_continuation_and_sequential_return():
     continuation = text.split("For an accepted `advance` or in-scope `revise`", 1)[1].split("Before presenting merge readiness", 1)[0]
     assert continuation.index("cancel the completed generation's old watch") < continuation.index("pre-arm exactly one non-steering watch")
     assert continuation.index("pre-arm exactly one non-steering watch") < continuation.index("calling the terminal `handoff_spec_episode`")
+    for forbidden in ["authorize phase", "authorization receipt", "completion phase", "single UI confirmation", "terminal facts"]:
+        assert forbidden not in text
 
 
 def test_oversee_skill_trusts_idle_status_and_retains_the_intended_retry_watch():

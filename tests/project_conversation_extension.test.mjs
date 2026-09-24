@@ -1,287 +1,43 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import test from "node:test";
 import {
-  appendActiveOversight, applyConversationContext, assertConversationPromotionReady, EXPECTED_IDENTITY_KERNEL_BLOCK,
-  OVERSIGHT_MARKER_TYPE, OVERSIGHT_PACKAGE_TYPE, registerConversationOversight,
-  currentOversightMarkerForFinalization,
+  appendActiveOversight, applyConversationContext, assertConversationPromotionReady,
+  EXPECTED_IDENTITY_KERNEL_BLOCK, OVERSIGHT_MARKER_TYPE, OVERSIGHT_PACKAGE_TYPE,
+  registerConversationOversight, currentOversightMarkerForClose,
 } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
 
-function fixture(t,{sessionId="owner",prompt=EXPECTED_IDENTITY_KERNEL_BLOCK,entries=[],registration={}}={}){const cwd=realpathSync(mkdtempSync(join(tmpdir(),"pc-oversight-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));const packagePath=join(cwd,".ralph/skills/oversee-episode/SKILL.md");mkdirSync(dirname(packagePath),{recursive:true});writeFileSync(packagePath,"---\nname: oversee-episode\ndescription: test package\n---\nREVISION ONE");const branch=structuredClone(entries),events=new Map(),notifications=[];let aborts=0,currentPrompt=prompt;const ctx={cwd,ui:{notify(message,level){notifications.push({message,level})}},abort(){aborts++},getSystemPrompt(){return currentPrompt},sessionManager:{getSessionId(){return sessionId},getBranch(){return branch}}};const pi={on(name,handler){events.set(name,handler)},appendEntry(customType,data){branch.push({type:"custom",customType,data})},sendMessage(message){branch.push({type:"custom_message",...message})}};registerConversationOversight(pi,registration);return{cwd,packagePath,branch,events,notifications,get aborts(){return aborts},setPrompt(value){currentPrompt=value},ctx,pi}}
-function identity(f,{episodeId="11111111-1111-4111-8111-111111111111",slug="alpha",owner=f.ctx.sessionManager.getSessionId(),admission="delivered"}={}){const worktree=resolve(dirname(f.cwd),`${basename(f.cwd)}-${slug}-episode`),value={version:2,slug,sourceLocation:`.ralph/plans/future/${slug}`,ownerSessionId:owner,episodeId,episodeActiveSessionId:"active",episodeSessionFile:join(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:admission};const path=join(f.cwd,".prime/agent/state/spec-episodes",`${slug}.json`);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,JSON.stringify(value));return{...value,reused:false}}
-function context(f,messages=[]){return f.events.get("context")({messages},f.ctx)}
-function receipt(f,episode,state="completing",overrides={}){const value={version:2,state,sourceLocation:episode.sourceLocation,slug:episode.slug,disposition:"merged",ownerSessionId:episode.ownerSessionId,episodeId:episode.episodeId,episodeActiveSessionId:episode.episodeActiveSessionId,episodeSessionFile:episode.episodeSessionFile,episodeBranch:episode.branch,episodeWorktree:episode.worktree,sessionName:episode.sessionName,identityVersion:2,admission:"delivered",episodeCommit:"a".repeat(40),targetBranch:"main",targetRef:"refs/heads/main",targetCommitAtAuthorization:"b".repeat(40),authorizedAt:"2026-01-01",...(state!=="authorized"?{completingAt:"2026-01-02"}:{}),...(state==="completed"?{completedAt:"2026-01-03"}:{}),...overrides};writeFileSync(join(f.cwd,".prime/agent/state/spec-episodes",`${episode.slug}.finalization.json`),JSON.stringify(value));return value}
+function fixture(t,{sessionId="owner",prompt=EXPECTED_IDENTITY_KERNEL_BLOCK,entries=[]}={}){
+  const cwd=realpathSync(mkdtempSync(join(tmpdir(),"pc-oversight-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
+  const packagePath=join(cwd,".ralph/skills/oversee-episode/SKILL.md");mkdirSync(dirname(packagePath),{recursive:true});
+  writeFileSync(packagePath,"---\nname: oversee-episode\ndescription: test package\n---\nREVISION ONE");
+  const branch=structuredClone(entries),events=new Map(),notifications=[];let aborts=0,currentPrompt=prompt;
+  const ctx={cwd,ui:{notify(message,level){notifications.push({message,level})}},abort(){aborts++},getSystemPrompt(){return currentPrompt},sessionManager:{getSessionId(){return sessionId},getBranch(){return branch}}};
+  const pi={on(name,handler){events.set(name,handler)},appendEntry(customType,data){branch.push({type:"custom",customType,data})},sendMessage(message){branch.push({type:"custom_message",...message})}};
+  registerConversationOversight(pi);return{cwd,packagePath,branch,events,notifications,get aborts(){return aborts},setPrompt(value){currentPrompt=value},ctx,pi};
+}
+function identity(f,{episodeId="11111111-1111-4111-8111-111111111111",slug="alpha",owner=f.ctx.sessionManager.getSessionId(),admission="delivered"}={}){
+  const worktree=resolve(dirname(f.cwd),`${basename(f.cwd)}-${slug}-episode`),value={version:2,slug,sourceLocation:`.ralph/plans/future/${slug}`,ownerSessionId:owner,episodeId,episodeActiveSessionId:"active",episodeSessionFile:join(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:admission};
+  const path=join(f.cwd,".prime/agent/state/spec-episodes",`${slug}.json`);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,JSON.stringify(value));return{...value,reused:false};
+}
+function marker(value,status="active"){return{markerVersion:2,status,ownerSessionId:value.ownerSessionId,slug:value.slug,sourceLocation:value.sourceLocation,episodeId:value.episodeId,episodeSessionFile:value.episodeSessionFile,branch:value.branch,worktree:value.worktree,sessionName:value.sessionName,identityVersion:value.version,admission:value.bootstrapAdmission};}
+function context(f,messages=[]){return f.events.get("context")({messages},f.ctx);}
 
 test("managed kernel source equals the canonical expected block",()=>{assert.equal(readFileSync(new URL("../src/prime-agent-plugin/APPEND_SYSTEM.md",import.meta.url),"utf8").trim(),EXPECTED_IDENTITY_KERNEL_BLOCK)});
 test("registers only session recovery and context hooks",()=>{const events=new Map();registerConversationOversight({on(n,h){events.set(n,h)},appendEntry(){}});assert.deepEqual([...events.keys()],["session_start","context"])});
 test("truly inactive conversation tolerates project or CLI kernel shadowing",t=>{for(const prompt of ["BASE","CLI SHADOW"]){const f=fixture(t,{prompt});assert.deepEqual(context(f,[{role:"user",content:"hello"}]),{messages:[{role:"user",content:"hello"}]});assert.equal(f.aborts,0)}});
-test("promotion readiness requires one intact canonical kernel and procedure body",t=>{const f=fixture(t);assert.doesNotThrow(()=>appendActiveOversight(f.pi,f.ctx,identity(f)));for(const prompt of ["PRIME_CLAW_CONVERSATION_IDENTITY_V1",`${EXPECTED_IDENTITY_KERNEL_BLOCK}\n${EXPECTED_IDENTITY_KERNEL_BLOCK}`]){const bad=fixture(t,{prompt});const episode=identity(bad);assert.throws(()=>appendActiveOversight(bad.pi,bad.ctx,episode),/intact managed identity kernel|persisted/)}const quoted=fixture(t);writeFileSync(quoted.packagePath,"---\nname: \"oversee-episode\"\ndescription: \"valid package\"\n---\nvalid body");assert.doesNotThrow(()=>appendActiveOversight(quoted.pi,quoted.ctx,identity(quoted)));for(const body of ["---\nname: oversee-episode\n---\n","---\nname: oversee-episode\nname: other\n---\nbody","---\nmetadata:\n  name: oversee-episode\n---\nbody","---\nname: \"unterminated\ndescription: ok\n---\nbody","---\nname: oversee-episode\ndescription: [unterminated\n---\nbody","---\nname: oversee-episode\ndescription: \"unterminated\n---\nbody","---\nname: oversee-episode\ndescription: ok\nmetadata:\n  nested: value\n---\nbody","---\nname: oversee-episode\ndescription: ok\n- sequence\n---\nbody"]){const bad=fixture(t);writeFileSync(bad.packagePath,body);assert.throws(()=>appendActiveOversight(bad.pi,bad.ctx,identity(bad)),/frontmatter|top-level name|scalar|nesting|name is malformed|requires exact|procedure/)}});
-test("bounded frontmatter scalar grammar accepts its documented forms and rejects reserved or control forms",t=>{
-  const accepted=[
-    "plain scalar",'"quoted # scalar: value"',"'? quoted indicator'",'"escaped \\"quote\\" and \\\\ slash"',
-    "Unicode café λ","https://host/path","key:value","a,b","why?","C#","ok#tag",
-  ];
-  for(const description of accepted){
-    const f=fixture(t);writeFileSync(f.packagePath,`---\nname: oversee-episode\ndescription: ${description}\n---\nbody`);const episode=identity(f);assert.doesNotThrow(()=>appendActiveOversight(f.pi,f.ctx,episode));assert.equal(context(f).messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1);
-  }
-  const rejected=[
-    "- item","? key",": value",",value","[value","]value","{value","}value","# comment only","&anchor","*alias","!tag","| block","> folded","'malformed",'"malformed',"%directive","@reserved","`reserved",
-    "nested: value","ok # comment",'""',"''",'"bad\\q"','"escaped\\nline"','"escaped\\tvalue"','"escaped\\u0000nul"','"escaped\\u007fdelete"','"escaped\\u0085next-line"',
-    "raw\tvalue","raw\u0000nul","raw\u001fseparator","raw\u007fdelete","raw\u0085next-line",
-  ];
-  for(const description of rejected){
-    const promotion=fixture(t);writeFileSync(promotion.packagePath,`---\nname: oversee-episode\ndescription: ${description}\n---\nbody`);assert.throws(()=>appendActiveOversight(promotion.pi,promotion.ctx,identity(promotion)),/unsupported YAML syntax|control character|scalar is malformed|frontmatter/);
-    const active=fixture(t),episode=identity(active);appendActiveOversight(active.pi,active.ctx,episode);const before=structuredClone(active.branch);writeFileSync(active.packagePath,`---\nname: oversee-episode\ndescription: ${description}\n---\nbody`);assert.throws(()=>context(active),/prime-claw conversation blocked/);assert.equal(active.aborts,1);assert.deepEqual(active.branch,before);assert.equal(active.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
-  }
-});
+test("promotion requires the canonical kernel and package",t=>{const f=fixture(t);assert.doesNotThrow(()=>appendActiveOversight(f.pi,f.ctx,identity(f)));for(const prompt of ["PRIME_CLAW_CONVERSATION_IDENTITY_V1",`${EXPECTED_IDENTITY_KERNEL_BLOCK}\n${EXPECTED_IDENTITY_KERNEL_BLOCK}`]){const bad=fixture(t,{prompt});assert.throws(()=>appendActiveOversight(bad.pi,bad.ctx,identity(bad)),/intact managed identity kernel/)}const bad=fixture(t);writeFileSync(bad.packagePath,"---\nname: wrong\ndescription: x\n---\nbody");assert.throws(()=>appendActiveOversight(bad.pi,bad.ctx,identity(bad)),/requires exact name/)});
+test("active exact expectation injects one freshly read canonical package",t=>{const f=fixture(t),episode=identity(f);appendActiveOversight(f.pi,f.ctx,episode);let result=context(f,[{role:"user",content:"x"}]);assert.equal(result.messages.filter(x=>x.customType===OVERSIGHT_PACKAGE_TYPE).length,1);writeFileSync(f.packagePath,"---\nname: oversee-episode\ndescription: changed\n---\nREVISION TWO");result=context(f,result.messages);const packages=result.messages.filter(x=>x.customType===OVERSIGHT_PACKAGE_TYPE);assert.equal(packages.length,1);assert.match(packages[0].content,/REVISION TWO/);assert.equal(currentOversightMarkerForClose(f.ctx,episode.sourceLocation).episodeId,episode.episodeId)});
+test("session start reconstructs a missing active marker from exact expectation",async t=>{const f=fixture(t),episode=identity(f);await f.events.get("session_start")({},f.ctx);assert.equal(f.branch.findLast(x=>x.customType===OVERSIGHT_MARKER_TYPE).data.status,"active");assert.equal(f.branch.findLast(x=>x.customType===OVERSIGHT_MARKER_TYPE).data.episodeId,episode.episodeId);assert.match(f.notifications.at(-1).message,/Recovered active oversight/)});
+test("inactive closed evidence is ordinary and allows a later episode",t=>{const f=fixture(t);const old={version:2,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",ownerSessionId:"owner",episodeId:"old",episodeActiveSessionId:"route",episodeSessionFile:"/old/session.jsonl",branch:"episode/alpha",worktree:"/old/worktree",sessionName:"alpha-episode",bootstrapAdmission:"delivered"};f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(old,"inactive")});assert.deepEqual(context(f),{messages:[]});assert.doesNotThrow(()=>assertConversationPromotionReady(f.ctx,".ralph/plans/future/beta"));const beta=identity(f,{slug:"beta",episodeId:"new"});appendActiveOversight(f.pi,f.ctx,beta);assert.equal(currentOversightMarkerForClose(f.ctx,beta.sourceLocation).episodeId,"new")});
+test("orphan active exact-owner evidence blocks instead of becoming ordinary",t=>{const f=fixture(t);const old={version:2,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",ownerSessionId:"owner",episodeId:"old",episodeActiveSessionId:"route",episodeSessionFile:"/old/session.jsonl",branch:"episode/alpha",worktree:"/old/worktree",sessionName:"alpha-episode",bootstrapAdmission:"delivered"};f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(old)});assert.throws(()=>context(f),/orphan active/);assert.equal(f.aborts,1)});
+test("foreign owner evidence is inert",t=>{const foreign={version:2,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",ownerSessionId:"other",episodeId:"foreign",episodeActiveSessionId:"route",episodeSessionFile:"/old/session.jsonl",branch:"episode/alpha",worktree:"/old/worktree",sessionName:"alpha-episode",bootstrapAdmission:"delivered"};const f=fixture(t,{entries:[{type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(foreign)}]});assert.deepEqual(context(f),{messages:[]})});
+test("unclassifiable owner and stable-binding mismatch fail closed",t=>{const f=fixture(t),episode=identity(f);f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:{...marker(episode),ownerSessionId:""}});assert.throws(()=>context(f),/owner is unclassifiable/);const g=fixture(t),other=identity(g);g.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:{...marker(other),branch:"episode/wrong"}});assert.throws(()=>context(g),/corrupt|disagrees/)});
+test("bounded EPISODE identity overrides conversation ownership",t=>{const f=fixture(t);f.branch.push({type:"custom",customType:"prime-claw-bounded-identity",data:{version:1,role:"EPISODE",sessionId:"owner"}});const result=context(f);assert.equal(result.messages.at(-1).customType,"prime-claw-bounded-identity-package");assert.match(result.messages.at(-1).content,/role=EPISODE/)});
 
-test("closed package frontmatter rejects unknown, comment, and blank metadata without lifecycle mutation",t=>{
-  const invalidMetadata=[
-    "name: oversee-episode\ndescription: valid\nmetadata: ignored",
-    "name: oversee-episode\n# comment-only metadata\ndescription: valid",
-    "name: oversee-episode\n\ndescription: valid",
-  ];
-  for(const metadata of invalidMetadata){
-    const promotion=fixture(t),episode=identity(promotion),expectation=join(promotion.cwd,".prime/agent/state/spec-episodes/alpha.json"),beforeBranch=structuredClone(promotion.branch),beforeExpectation=readFileSync(expectation);
-    writeFileSync(promotion.packagePath,`---\n${metadata}\n---\nbody`);
-    assert.throws(()=>appendActiveOversight(promotion.pi,promotion.ctx,episode),/frontmatter/);
-    assert.deepEqual(promotion.branch,beforeBranch);assert.deepEqual(readFileSync(expectation),beforeExpectation);assert.equal(promotion.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
+test("inactive marker with exact identity remains provider-visible for explicit close replay",t=>{const f=fixture(t),episode=identity(f);f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(episode,"inactive")});const result=context(f);assert.equal(result.messages.filter(x=>x.customType===OVERSIGHT_PACKAGE_TYPE).length,1);assert.equal(currentOversightMarkerForClose(f.ctx,episode.sourceLocation).status,"inactive")});
 
-    const active=fixture(t),activeEpisode=identity(active),activeExpectation=join(active.cwd,".prime/agent/state/spec-episodes/alpha.json");appendActiveOversight(active.pi,active.ctx,activeEpisode);const activeBranch=structuredClone(active.branch),activeIdentity=readFileSync(activeExpectation);
-    writeFileSync(active.packagePath,`---\n${metadata}\n---\nbody`);
-    assert.throws(()=>context(active),/prime-claw conversation blocked/);
-    assert.equal(active.aborts,1);assert.deepEqual(active.branch,activeBranch);assert.deepEqual(readFileSync(activeExpectation),activeIdentity);assert.equal(active.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
-  }
-});
-
-test("raw package delimiters fail closed at every reader gate and recover without drift",async t=>{
-  const canonical="---\nname: oversee-episode\ndescription: valid package\n---\n# Procedure\n\n  formatted step\n";
-  const invalid=[
-    " ---\nname: oversee-episode\ndescription: valid package\n---\nbody",
-    "\t---\nname: oversee-episode\ndescription: valid package\n---\nbody",
-    "--- \nname: oversee-episode\ndescription: valid package\n---\nbody",
-    "\n---\nname: oversee-episode\ndescription: valid package\n---\nbody",
-    "---\nname: oversee-episode\ndescription: valid package\n ---\nbody",
-    "---\nname: oversee-episode\ndescription: valid package\n\t---\nbody",
-    "---\nname: oversee-episode\ndescription: valid package\n--- \nbody",
-  ];
-  for(const raw of invalid){
-    const readiness=fixture(t),readinessBranch=structuredClone(readiness.branch);writeFileSync(readiness.packagePath,raw);
-    assert.throws(()=>assertConversationPromotionReady(readiness.ctx),/frontmatter/);assert.deepEqual(readiness.branch,readinessBranch);
-
-    const activation=fixture(t),activationEpisode=identity(activation),activationPath=join(activation.cwd,".prime/agent/state/spec-episodes/alpha.json"),activationIdentity=readFileSync(activationPath),activationBranch=structuredClone(activation.branch);writeFileSync(activation.packagePath,raw);
-    assert.throws(()=>appendActiveOversight(activation.pi,activation.ctx,activationEpisode),/frontmatter/);assert.deepEqual(activation.branch,activationBranch);assert.deepEqual(readFileSync(activationPath),activationIdentity);assert.equal(activation.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
-
-    const active=fixture(t),activeEpisode=identity(active),activePath=join(active.cwd,".prime/agent/state/spec-episodes/alpha.json");appendActiveOversight(active.pi,active.ctx,activeEpisode);const activeBranch=structuredClone(active.branch),activeIdentity=readFileSync(activePath);writeFileSync(active.packagePath,raw);
-    assert.throws(()=>context(active),/prime-claw conversation blocked/);assert.throws(()=>context(active),/prime-claw conversation blocked/);assert.equal(active.aborts,2);assert.deepEqual(active.branch,activeBranch);assert.deepEqual(readFileSync(activePath),activeIdentity);assert.equal(active.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
-    writeFileSync(active.packagePath,canonical);const resumed=context(active);assert.match(resumed.messages.at(-1).content,/# Procedure\n\n  formatted step/);
-
-    let completionCalls=0;const recovery=fixture(t,{registration:{async recoverCompleting(){completionCalls+=1;return true}}}),recoveryEpisode=identity(recovery),recoveryPath=join(recovery.cwd,".prime/agent/state/spec-episodes/alpha.json"),recoveryIdentity=readFileSync(recoveryPath),recoveryBranch=structuredClone(recovery.branch);writeFileSync(recovery.packagePath,raw);
-    await recovery.events.get("session_start")({},recovery.ctx);await recovery.events.get("session_start")({},recovery.ctx);assert.equal(completionCalls,0);assert.deepEqual(recovery.branch,recoveryBranch);assert.deepEqual(readFileSync(recoveryPath),recoveryIdentity);assert.equal(recovery.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
-    writeFileSync(recovery.packagePath,canonical);await recovery.events.get("session_start")({},recovery.ctx);assert.equal(recovery.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length,1);assert.match(context(recovery).messages.at(-1).content,/# Procedure\n\n  formatted step/);
-  }
-});
-
-test("invalid raw package blocks completing recovery before completion calls",async t=>{
-  let completionCalls=0;const f=fixture(t,{registration:{async recoverCompleting(){completionCalls+=1;return true}}}),episode=identity(f),state=join(f.cwd,".prime/agent/state/spec-episodes"),identityPath=join(state,"alpha.json"),receiptPath=join(state,"alpha.finalization.json");appendActiveOversight(f.pi,f.ctx,episode);receipt(f,episode,"completing");writeFileSync(f.packagePath," ---\nname: oversee-episode\ndescription: valid package\n---\nbody");const beforeBranch=structuredClone(f.branch),beforeIdentity=readFileSync(identityPath),beforeReceipt=readFileSync(receiptPath);
-  await f.events.get("session_start")({},f.ctx);await f.events.get("session_start")({},f.ctx);
-  assert.equal(completionCalls,0);assert.deepEqual(f.branch,beforeBranch);assert.deepEqual(readFileSync(identityPath),beforeIdentity);assert.deepEqual(readFileSync(receiptPath),beforeReceipt);assert.equal(f.branch.filter(entry=>entry.customType===OVERSIGHT_PACKAGE_TYPE).length,0);
-});
-
-test("active marker injects exactly one freshly read package",t=>{const f=fixture(t);appendActiveOversight(f.pi,f.ctx,identity(f));const stale={role:"custom",customType:OVERSIGHT_PACKAGE_TYPE,content:"STALE"};let result=context(f,[stale]);assert.equal(result.messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1);assert.match(result.messages.at(-1).content,/REVISION ONE/);writeFileSync(f.packagePath,"---\nname: oversee-episode\ndescription: test package\n---\nREVISION TWO");result=context(f,result.messages);assert.equal(result.messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1);assert.match(result.messages.at(-1).content,/REVISION TWO/)});
-test("session start recovers a delivered current-owner expectation with no marker",async t=>{const f=fixture(t);identity(f);await f.events.get("session_start")({},f.ctx);const markers=f.branch.filter(e=>e.customType===OVERSIGHT_MARKER_TYPE);assert.equal(markers.length,1);assert.equal(markers[0].data.status,"active");assert.match(f.notifications[0].message,/Recovered active oversight/);assert.equal(context(f).messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1)});
-test("mutable episode routing refresh does not invalidate stable ownership",t=>{const f=fixture(t),episode=identity(f);appendActiveOversight(f.pi,f.ctx,episode);const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"),updated=JSON.parse(readFileSync(path,"utf8"));updated.episodeActiveSessionId="reopened-route";writeFileSync(path,JSON.stringify(updated));const result=context(f);assert.equal(result.messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1)});
-
-test("inactive or wrong-owner marker never hides current expectation",t=>{for(const kind of ["inactive","wrong-owner"]){const f=fixture(t),episode=identity(f);const marker=appendActiveOversight(f.pi,f.ctx,episode);if(kind==="inactive")f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});else{f.branch.length=0;f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,ownerSessionId:"corrupt"})}assert.throws(()=>context(f),/prime-claw conversation blocked/);assert.equal(f.aborts,1)}});
-test("unclassifiable marker owners never silently become ordinary",t=>{for(const owner of [undefined,null,7,""]){const entry={type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:{markerVersion:2,status:"active",ownerSessionId:owner,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"ep",episodeSessionFile:"/session",branch:"episode/alpha",worktree:"/worktree",sessionName:"alpha-episode",identityVersion:2,admission:"delivered"}},f=fixture(t,{entries:[entry]});assert.throws(()=>context(f),/owner is unclassifiable/);assert.equal(f.aborts,1)}});
-test("unclassifiable expectation and receipt owners block every lifecycle surface without recovery mutation",async t=>{for(const recordType of ["expectation","receipt"]){for(const owner of [undefined,null,7,""]){let recoveries=0;const f=fixture(t,{registration:{recoverCompleting:async()=>{recoveries++;return true}}}),episode=identity(f);if(recordType==="expectation"){const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"),value=JSON.parse(readFileSync(path,"utf8"));if(owner===undefined)delete value.ownerSessionId;else value.ownerSessionId=owner;writeFileSync(path,JSON.stringify(value))}else{rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));const value=receipt(f,episode,"completing",{ownerSessionId:owner});if(owner===undefined){delete value.ownerSessionId;writeFileSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),JSON.stringify(value))}}assert.throws(()=>context(f),/prime-claw conversation blocked/);assert.throws(()=>assertConversationPromotionReady(f.ctx,episode.sourceLocation));const markerCount=f.branch.filter(e=>e.customType===OVERSIGHT_MARKER_TYPE).length;await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,0);assert.equal(f.branch.filter(e=>e.customType===OVERSIGHT_MARKER_TYPE).length,markerCount);assert.match(f.notifications.at(-1).message,/recovery blocked/)}}});
-
-test("promotion uses full current and legacy stable-binding agreement",async t=>{const current=fixture(t),episode=identity(current),marker=appendActiveOversight(current.pi,current.ctx,episode);current.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data={...marker,episodeSessionFile:"/wrong/current.jsonl"};assert.throws(()=>assertConversationPromotionReady(current.ctx,episode.sourceLocation),/disagrees/);const legacy=fixture(t),legacyEpisode=identity(legacy);legacy.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{version:1,status:"active",ownerSessionId:legacyEpisode.ownerSessionId,sourceLocation:legacyEpisode.sourceLocation,slug:legacyEpisode.slug,episodeId:legacyEpisode.episodeId,episodeSessionFile:"/wrong/legacy.jsonl"});assert.throws(()=>assertConversationPromotionReady(legacy.ctx,legacyEpisode.sourceLocation),/legacy oversight marker disagrees/);await legacy.events.get("session_start")({},legacy.ctx);assert.equal(legacy.branch.filter(e=>e.customType===OVERSIGHT_MARKER_TYPE&&e.data.markerVersion===2).length,0)});
-test("current active generation cannot hide old nonterminal or orphan owner state",t=>{for(const kind of ["authorized","completing","orphan-active"]){const f=fixture(t),beta=identity(f,{slug:"beta",episodeId:"22222222-2222-4222-8222-222222222222"});appendActiveOversight(f.pi,f.ctx,beta);if(kind==="orphan-active"){f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...f.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",branch:"episode/alpha",worktree:resolve(dirname(f.cwd),`${basename(f.cwd)}-alpha-episode`),sessionName:"alpha-episode"})}else{const marker={...f.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data,status:"inactive",slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeSessionFile:"/old.jsonl",branch:"episode/alpha",worktree:"/old",sessionName:"alpha-episode"};f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,marker);writeFileSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),JSON.stringify({version:2,state:kind,sourceLocation:marker.sourceLocation,slug:"alpha",disposition:"merged",ownerSessionId:marker.ownerSessionId,episodeId:marker.episodeId,episodeActiveSessionId:"old-route",episodeSessionFile:marker.episodeSessionFile,episodeBranch:marker.branch,episodeWorktree:marker.worktree,sessionName:marker.sessionName,identityVersion:2,admission:"delivered",episodeCommit:"a".repeat(40),targetBranch:"main",targetRef:"refs/heads/main",targetCommitAtAuthorization:"b".repeat(40),authorizedAt:"2026-01-01",...(kind==="completing"?{completingAt:"2026-01-02"}:{})}))}assert.throws(()=>context(f),/prime-claw conversation blocked/);assert.throws(()=>assertConversationPromotionReady(f.ctx,".ralph/plans/future/beta"))}});
-test("ordered startup recovers the writer-produced completing checkpoint with an inactive marker",async t=>{
-  let recoveries=0,f;
-  f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{
-    recoveries+=1;assert.equal(marker.status,"inactive");
-    rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));
-    const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json");
-    const value=JSON.parse(readFileSync(path,"utf8"));
-    writeFileSync(path,JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));
-    return true;
-  }}});
-  const episode=identity(f),marker=appendActiveOversight(f.pi,f.ctx,episode);
-  f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});
-  receipt(f,episode,"completing");
-  const markerCount=f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length;
-  await f.events.get("session_start")({},f.ctx);
-  assert.equal(recoveries,1);assert.equal(f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length,markerCount);
-  assert.deepEqual(context(f),{messages:[]});
-  await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);
-});
-
-test("one path-equivalence rule converges expectation receipt and marker spellings",async t=>{
-  const variants=[
-    {name:"session",fields:["episodeSessionFile"]},
-    {name:"worktree",fields:["worktree"]},
-    {name:"both",fields:["episodeSessionFile","worktree"]},
-  ];
-  const dotted=value=>`${dirname(value)}/./${basename(value)}`;
-  for(const side of ["expectation","receipt"]){
-    for(const variant of variants){
-      for(const state of ["authorized","completing"]){
-        for(const existing of [false,true]){
-          await t.test(`${side}-${variant.name}-${state}-${existing?"existing":"missing"}`,async t=>{
-            let recoveries=0,f;
-            f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{
-              recoveries+=1;
-              if(marker.status==="active")f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});
-              rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));
-              const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),value=JSON.parse(readFileSync(path,"utf8"));
-              writeFileSync(path,JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));
-              return true;
-            }}});
-            const canonicalEpisode=identity(f),identityPath=join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"),receiptOverrides={};
-            const expectation={...canonicalEpisode},canonical={episodeSessionFile:canonicalEpisode.episodeSessionFile,worktree:canonicalEpisode.worktree};
-            for(const field of variant.fields){
-              const receiptField=field==="worktree"?"episodeWorktree":field;
-              if(side==="expectation")expectation[field]=dotted(canonicalEpisode[field]);
-              else receiptOverrides[receiptField]=dotted(canonicalEpisode[field]);
-            }
-            if(side==="expectation")writeFileSync(identityPath,JSON.stringify({...expectation,reused:undefined}));
-            if(existing){
-              f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{
-                markerVersion:2,status:"active",ownerSessionId:canonicalEpisode.ownerSessionId,
-                slug:canonicalEpisode.slug,sourceLocation:canonicalEpisode.sourceLocation,episodeId:canonicalEpisode.episodeId,
-                episodeSessionFile:canonicalEpisode.episodeSessionFile,branch:canonicalEpisode.branch,
-                worktree:canonicalEpisode.worktree,sessionName:canonicalEpisode.sessionName,
-                identityVersion:2,admission:canonicalEpisode.bootstrapAdmission,
-              });
-            }
-            const receiptValue=receipt(f,canonicalEpisode,state,receiptOverrides);
-            assert.equal(resolve(expectation.episodeSessionFile),resolve(canonical.episodeSessionFile));
-            assert.equal(resolve(expectation.worktree),resolve(canonical.worktree));
-            assert.equal(resolve(receiptValue.episodeSessionFile),resolve(canonical.episodeSessionFile));
-            assert.equal(resolve(receiptValue.episodeWorktree),resolve(canonical.worktree));
-            assert.equal(existsSync(canonical.episodeSessionFile),false);
-            assert.equal(existsSync(resolve(canonical.worktree)),false);
-            for(const field of variant.fields){
-              const receiptField=field==="worktree"?"episodeWorktree":field;
-              if(side==="expectation"){
-                assert.notEqual(expectation[field],canonical[field]);assert.equal(receiptValue[receiptField],canonical[field]);
-              }else{
-                assert.equal(expectation[field],canonical[field]);assert.notEqual(receiptValue[receiptField],canonical[field]);
-              }
-            }
-            const beforeMarkers=f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length;
-            await f.events.get("session_start")({},f.ctx);
-            const afterMarkers=f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length;
-            const afterMessages=f.branch.filter(entry=>entry.customType==="prime-claw-oversight-recovery").length;
-            assert.equal(recoveries,state==="completing"?1:0);
-            assert.equal(afterMarkers-beforeMarkers,existing?(state==="completing"?1:0):(state==="completing"?2:1));
-            assert.equal(afterMessages,existing?0:1);
-            if(state==="authorized")assert.equal(context(f).messages.filter(message=>message.customType===OVERSIGHT_PACKAGE_TYPE).length,1);
-            else assert.deepEqual(context(f),{messages:[]});
-            await f.events.get("session_start")({},f.ctx);
-            assert.equal(recoveries,state==="completing"?1:0);
-            assert.equal(f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length,afterMarkers);
-            assert.equal(f.branch.filter(entry=>entry.customType==="prime-claw-oversight-recovery").length,afterMessages);
-          });
-        }
-      }
-    }
-  }
-});
-
-test("equivalent completing paths with an existing inactive marker preserve closed R1 recovery",async t=>{
-  let recoveries=0,f;
-  f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{
-    recoveries+=1;assert.equal(marker.status,"inactive");
-    rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));
-    const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),value=JSON.parse(readFileSync(path,"utf8"));
-    writeFileSync(path,JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));return true;
-  }}});
-  const episode=identity(f),marker=appendActiveOversight(f.pi,f.ctx,episode);
-  f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive",episodeSessionFile:`${dirname(marker.episodeSessionFile)}/./${basename(marker.episodeSessionFile)}`,worktree:`${dirname(marker.worktree)}/./${basename(marker.worktree)}`});
-  receipt(f,episode,"completing");
-  const markerCount=f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length;
-  await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);
-  assert.equal(f.branch.filter(entry=>entry.customType===OVERSIGHT_MARKER_TYPE).length,markerCount);
-  assert.deepEqual(context(f),{messages:[]});
-  await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);
-});
-
-test("marker-absent stable expectation and receipt conflicts are read-only and correction alone recovers once",async t=>{
-  const mismatches=[
-    {ownerSessionId:"other-owner"},
-    {episodeId:"22222222-2222-4222-8222-222222222222"},
-    {sourceLocation:".ralph/plans/future/other"},
-    {episodeSessionFile:"/other/session.jsonl"},
-    {episodeBranch:"episode/other"},
-    {episodeWorktree:"/other/worktree"},
-    {sessionName:"other-episode"},
-    {identityVersion:1},
-    {admission:"other-admission"},
-  ];
-  for(const mismatch of mismatches){
-    let recoveries=0,f;
-    f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{
-      recoveries+=1;
-      if(marker.status==="active")f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});
-      rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));
-      const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),value=JSON.parse(readFileSync(path,"utf8"));
-      writeFileSync(path,JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));return true;
-    }}});
-    const episode=identity(f),identityPath=join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"),receiptPath=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json");
-    receipt(f,episode,"completing",mismatch);
-    const beforeBranch=structuredClone(f.branch),beforeIdentity=readFileSync(identityPath),beforeReceipt=readFileSync(receiptPath);
-    assert.throws(()=>context(f),/prime-claw conversation blocked/);
-    assert.throws(()=>assertConversationPromotionReady(f.ctx,episode.sourceLocation));
-    assert.deepEqual(f.branch,beforeBranch);assert.deepEqual(readFileSync(identityPath),beforeIdentity);assert.deepEqual(readFileSync(receiptPath),beforeReceipt);
-    for(let replay=0;replay<2;replay+=1){
-      await f.events.get("session_start")({},f.ctx);
-      assert.equal(recoveries,0);assert.deepEqual(f.branch,beforeBranch);
-      assert.deepEqual(readFileSync(identityPath),beforeIdentity);assert.deepEqual(readFileSync(receiptPath),beforeReceipt);
-      assert.match(f.notifications.at(-1).message,/recovery blocked/);
-    }
-    receipt(f,episode,"completing");
-    await f.events.get("session_start")({},f.ctx);
-    assert.equal(recoveries,1);assert.equal(JSON.parse(readFileSync(receiptPath,"utf8")).state,"completed");
-    assert.deepEqual(context(f),{messages:[]});
-    await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);
-  }
-});
-
-test("marker-absent recovery excludes mutable route from stable expectation receipt agreement",async t=>{
-  let recoveries=0,f;
-  f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{
-    recoveries+=1;if(marker.status==="active")f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});
-    rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));
-    const path=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),value=JSON.parse(readFileSync(path,"utf8"));
-    writeFileSync(path,JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));return true;
-  }}});
-  const episode=identity(f);receipt(f,episode,"completing",{episodeActiveSessionId:"stale-route"});
-  await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);assert.deepEqual(context(f),{messages:[]});
-});
-
-test("ordered startup never recovers an old completing or orphan generation beside active beta",async t=>{for(const kind of ["old-completing","orphan-active"]){let recoveries=0;const f=fixture(t,{registration:{recoverCompleting:async()=>{recoveries++;return true}}}),beta=identity(f,{slug:"beta",episodeId:"22222222-2222-4222-8222-222222222222"}),betaMarker=appendActiveOversight(f.pi,f.ctx,beta);if(kind==="old-completing"){const alpha={...beta,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeActiveSessionId:"alpha-route",episodeSessionFile:"/old.jsonl",branch:"episode/alpha",worktree:"/old",sessionName:"alpha-episode"};f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...betaMarker,status:"inactive",slug:alpha.slug,sourceLocation:alpha.sourceLocation,episodeId:alpha.episodeId,episodeSessionFile:alpha.episodeSessionFile,branch:alpha.branch,worktree:alpha.worktree,sessionName:alpha.sessionName});receipt(f,alpha,"completing")}else{f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...betaMarker,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeSessionFile:"/orphan.jsonl",branch:"episode/alpha",worktree:"/orphan",sessionName:"alpha-episode"})}const before=structuredClone(f.branch);await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,0);assert.deepEqual(f.branch,before);assert.match(f.notifications.at(-1).message,/recovery blocked/)}});
-
-test("ordered startup recovers the sole completing generation once and converges to ordinary",async t=>{let recoveries=0,f;f=fixture(t,{registration:{recoverCompleting:async(_ctx,marker)=>{recoveries++;f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));const value=JSON.parse(readFileSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),"utf8"));writeFileSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),JSON.stringify({...value,state:"completed",completedAt:"2026-01-03"}));return true}}});const episode=identity(f),marker=appendActiveOversight(f.pi,f.ctx,episode);receipt(f,episode,"completing");await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);assert.deepEqual(context(f),{messages:[]});await f.events.get("session_start")({},f.ctx);assert.equal(recoveries,1);assert.equal(f.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data.status,"inactive");assert.equal(marker.status,"active")});
-
-test("exact-owner legacy v1 marker migrates once and newer v2 supersedes its history",async t=>{const f=fixture(t),episode=identity(f);f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{version:1,status:"active",ownerSessionId:episode.ownerSessionId,sourceLocation:episode.sourceLocation,slug:episode.slug,episodeId:episode.episodeId,episodeSessionFile:episode.episodeSessionFile});await f.events.get("session_start")({},f.ctx);const current=f.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE);assert.equal(current.data.markerVersion,2);assert.match(f.branch.find(e=>e.customType==="prime-claw-oversight-recovery").content,/Migrated legacy oversight/);assert.equal(context(f).messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1)});
-test("legacy exact-owner migration blocks stable session-file disagreement",async t=>{const f=fixture(t),episode=identity(f);f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{version:1,status:"active",ownerSessionId:episode.ownerSessionId,sourceLocation:episode.sourceLocation,slug:episode.slug,episodeId:episode.episodeId,episodeSessionFile:"/wrong/session.jsonl"});await f.events.get("session_start")({},f.ctx);assert.match(f.notifications.at(-1).message,/legacy oversight marker disagrees/);assert.equal(f.branch.filter(e=>e.customType===OVERSIGHT_MARKER_TYPE&&e.data.markerVersion===2).length,0);assert.throws(()=>context(f),/legacy oversight marker disagrees/)});
-
-test("foreign copied legacy marker remains inert in ordinary fork",t=>{const legacy={type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:{version:1,status:"active",ownerSessionId:"parent",sourceLocation:".ralph/plans/future/alpha",slug:"alpha",episodeId:"ep",episodeSessionFile:"/session"}},f=fixture(t,{sessionId:"fork",entries:[legacy]});assert.deepEqual(context(f),{messages:[]});assert.equal(f.aborts,0)});
-
-test("copied owner marker is inert in ordinary fork without its expectation",t=>{const parent=fixture(t),episode=identity(parent);appendActiveOversight(parent.pi,parent.ctx,episode);const fork=fixture(t,{sessionId:"fork",entries:parent.branch});assert.deepEqual(context(fork),{messages:[]});assert.equal(fork.aborts,0)});
-test("explicit exact-session EPISODE identity requires kernel and overrides ownership",t=>{const entry={type:"custom",customType:"prime-claw-bounded-identity",data:{version:1,role:"EPISODE",sessionId:"episode"}},f=fixture(t,{sessionId:"episode",entries:[entry]});const result=context(f);assert.match(result.messages.at(-1).content,/role=EPISODE/);const shadow=fixture(t,{sessionId:"episode",entries:[entry],prompt:"SHADOW"});assert.throws(()=>context(shadow),/prime-claw conversation blocked/)});
-test("strict expectation and package corruption block before provider",t=>{for(const kind of ["missing-kernel","duplicate-kernel","missing-package","header-package","expectation-version","expectation-slug","expectation-admission","expectation-branch","bad-marker"]){const f=fixture(t),episode=identity(f);appendActiveOversight(f.pi,f.ctx,episode);if(kind==="missing-kernel")f.setPrompt("BASE");if(kind==="duplicate-kernel")f.setPrompt(`${EXPECTED_IDENTITY_KERNEL_BLOCK}\n${EXPECTED_IDENTITY_KERNEL_BLOCK}`);if(kind==="missing-package")rmSync(f.packagePath);if(kind==="header-package")writeFileSync(f.packagePath,"---\nname: oversee-episode\n---\n");if(kind.startsWith("expectation-")){const p=join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"),d=JSON.parse(readFileSync(p,"utf8"));if(kind==="expectation-version")d.version=99;if(kind==="expectation-slug")d.slug="other";if(kind==="expectation-admission")d.bootstrapAdmission="bad";if(kind==="expectation-branch")d.branch="episode/other";writeFileSync(p,JSON.stringify(d))}if(kind==="bad-marker")f.branch.at(-1).data.markerVersion=99;assert.throws(()=>context(f),/prime-claw conversation blocked/);assert.equal(f.aborts,1)}});
-test("completed old generation permits a later cycle and remains replay-addressable",async t=>{const f=fixture(t),alpha=identity(f),active=appendActiveOversight(f.pi,f.ctx,alpha),state=join(f.cwd,".prime/agent/state/spec-episodes");rmSync(join(state,"alpha.json"));f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...active,status:"inactive"});writeFileSync(join(state,"alpha.finalization.json"),JSON.stringify({version:2,state:"completed",sourceLocation:alpha.sourceLocation,slug:alpha.slug,disposition:"merged",ownerSessionId:alpha.ownerSessionId,episodeId:alpha.episodeId,episodeActiveSessionId:alpha.episodeActiveSessionId,episodeSessionFile:alpha.episodeSessionFile,episodeBranch:alpha.branch,episodeWorktree:alpha.worktree,sessionName:alpha.sessionName,identityVersion:2,admission:"delivered",episodeCommit:"a".repeat(40),targetBranch:"main",targetRef:"refs/heads/main",targetCommitAtAuthorization:"b".repeat(40),authorizedAt:"2026-01-01",completingAt:"2026-01-02",completedAt:"2026-01-03"}));assert.deepEqual(context(f),{messages:[]});assert.doesNotThrow(()=>assertConversationPromotionReady(f.ctx,".ralph/plans/future/beta"));const beta=identity(f,{slug:"beta",episodeId:"episode-2"});appendActiveOversight(f.pi,f.ctx,beta);const before=structuredClone(f.branch);await f.events.get("session_start")({},f.ctx);assert.deepEqual(f.branch,before);assert.equal(context(f).messages.filter(m=>m.customType===OVERSIGHT_PACKAGE_TYPE).length,1);assert.equal(currentOversightMarkerForFinalization(f.ctx,alpha.sourceLocation).episodeId,alpha.episodeId)});
-
-test("conflicting live generation is rejected before later promotion",t=>{const f=fixture(t),alpha=identity(f);appendActiveOversight(f.pi,f.ctx,alpha);assert.throws(()=>assertConversationPromotionReady(f.ctx,".ralph/plans/future/beta"),/already owns active expectation/)});
-
-test("finalization completing blocks context and completed tombstone reconciles inactive mode",t=>{const f=fixture(t),episode=identity(f),marker=appendActiveOversight(f.pi,f.ctx,episode),receiptPath=join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json");const base={version:2,state:"completing",sourceLocation:marker.sourceLocation,slug:marker.slug,disposition:"merged",ownerSessionId:marker.ownerSessionId,episodeId:marker.episodeId,episodeActiveSessionId:episode.episodeActiveSessionId,episodeSessionFile:marker.episodeSessionFile,episodeBranch:marker.branch,episodeWorktree:marker.worktree,sessionName:marker.sessionName,identityVersion:marker.identityVersion,admission:marker.admission,episodeCommit:"a".repeat(40),targetBranch:"main",targetRef:"refs/heads/main",targetCommitAtAuthorization:"b".repeat(40),authorizedAt:"2026-01-01",completingAt:"2026-01-02"};writeFileSync(receiptPath,JSON.stringify(base));assert.throws(()=>context(f),/completing/);f.pi.appendEntry(OVERSIGHT_MARKER_TYPE,{...marker,status:"inactive"});rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));writeFileSync(receiptPath,JSON.stringify({...base,state:"completed",completedAt:"2026-01-03"}));assert.deepEqual(context(f),{messages:[]});assert.equal(currentOversightMarkerForFinalization(f.ctx, episode.sourceLocation).status,"inactive")});
-
-test("session start reconstructs missing marker at every finalization crash boundary",async t=>{for(const scenario of [{state:"completing",identity:true,status:"active"},{state:"completing",identity:false,status:"inactive"},{state:"completed",identity:false,status:"inactive"}]){const f=fixture(t),episode=identity(f),base={version:2,state:scenario.state,sourceLocation:episode.sourceLocation,slug:episode.slug,disposition:"merged",ownerSessionId:episode.ownerSessionId,episodeId:episode.episodeId,episodeActiveSessionId:episode.episodeActiveSessionId,episodeSessionFile:episode.episodeSessionFile,episodeBranch:episode.branch,episodeWorktree:episode.worktree,sessionName:episode.sessionName,identityVersion:2,admission:"delivered",episodeCommit:"a".repeat(40),targetBranch:"main",targetRef:"refs/heads/main",targetCommitAtAuthorization:"b".repeat(40),authorizedAt:"2026-01-01",completingAt:"2026-01-02",...(scenario.state==="completed"?{completedAt:"2026-01-03"}:{})};if(!scenario.identity)rmSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.json"));writeFileSync(join(f.cwd,".prime/agent/state/spec-episodes/alpha.finalization.json"),JSON.stringify(base));await f.events.get("session_start")({},f.ctx);const marker=f.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data;assert.equal(marker.status,scenario.status);if(scenario.state==="completed")assert.deepEqual(context(f),{messages:[]});else assert.throws(()=>context(f),/completing/)}});
-
-test("multiple conversations recover only their own exact expectation",async t=>{const a=fixture(t,{sessionId:"a"}),b=fixture(t,{sessionId:"b"});identity(a,{episodeId:"ep-a"});identity(b,{episodeId:"ep-b"});await a.events.get("session_start")({},a.ctx);await b.events.get("session_start")({},b.ctx);assert.equal(a.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data.episodeId,"ep-a");assert.equal(b.branch.findLast(e=>e.customType===OVERSIGHT_MARKER_TYPE).data.episodeId,"ep-b")});
+test("closed future-folder locations cannot be reused for a later generation",t=>{const f=fixture(t);const old={version:2,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",ownerSessionId:"owner",episodeId:"old",episodeActiveSessionId:"route",episodeSessionFile:"/old/session.jsonl",branch:"episode/alpha",worktree:"/old/worktree",sessionName:"alpha-episode",bootstrapAdmission:"delivered"};f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(old,"inactive")});assert.throws(()=>assertConversationPromotionReady(f.ctx,old.sourceLocation),/cannot be reused/);assert.doesNotThrow(()=>assertConversationPromotionReady(f.ctx,".ralph/plans/future/beta"))});
+test("duplicate generations at one location block close lookup",t=>{const f=fixture(t),current=identity(f);f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(current)});f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker({...current,episodeId:"older"},"inactive")});assert.throws(()=>currentOversightMarkerForClose(f.ctx,current.sourceLocation),/multiple oversight generations/)});

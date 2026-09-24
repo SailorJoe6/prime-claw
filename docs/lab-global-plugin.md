@@ -16,7 +16,7 @@ src/prime-agent-plugin/
     reviewed-plan.ts
   extension-support/
     conversation-oversight.ts
-    episode-finalization.ts
+    episode-close.ts
     handoff-prompts.ts
     reviewed-plan-support.ts
     spec-episode.ts
@@ -32,7 +32,7 @@ extensions/
   reviewed-plan.ts
 extension-support/
   conversation-oversight.ts
-  episode-finalization.ts
+  episode-close.ts
   handoff-prompts.ts
   reviewed-plan-support.ts
   spec-episode.ts
@@ -60,8 +60,10 @@ scripts/apply-prime-agent-plugin.sh
 scripts/check-prime-agent-plugin.sh
 ```
 
-The apply script copies only the seven allowlisted Prime Claw TypeScript files. It does not
-remove or overwrite unrelated global extensions. The check script verifies that
+The apply script copies only the seven allowlisted Prime Claw TypeScript files. It
+removes the one formerly managed obsolete `episode-finalization.ts` support file
+with the same destination-type safety checks, and does not remove or overwrite
+unrelated global extensions. The check script verifies that
 all seven installed TypeScript files match the inert builder source byte-for-byte and that
 this repository has no project-local plugin tree. The same workflow merges and
 checks one managed CONVERSATION identity block in global `APPEND_SYSTEM.md`
@@ -120,7 +122,7 @@ Expected structured tools:
 - `ralph_plan`
 - `create_spec_episode`
 - `handoff_spec_episode`
-- `finalize_spec_episode`
+- `finalize_spec_episode` — location-only, no-UI episode bookkeeping close after verified terminal work
 
 Each command source path must resolve under `~/.prime/agent/extensions/`.
 Starting from the builder repository is an important collision check: the
@@ -133,12 +135,12 @@ preparation concerns.
 
 On 2026-09-22, the original five-file global installation matched its builder
 sources byte-for-byte. A disposable offline RPC session registered all three
-commands from the global extension paths and all four structured tools.
+commands from the global extension paths and all four structured tools available in that earlier generation.
 
 After the later Prime Agent update exposed fatal cross-scope collision behavior,
 the builder source was moved out of `.prime/agent/` and the explicit apply/check
 workflow above replaced manual copying. Post-migration, the check script proved
 byte parity and a fresh builder-rooted offline RPC process started successfully
 with exactly one `/handoff`, `/plan`, and `/implement-spec`, all sourced from the
-user-global installation. A session-start probe also confirmed all four expected
+user-global installation. A session-start probe also confirmed all five expected
 structured tools.

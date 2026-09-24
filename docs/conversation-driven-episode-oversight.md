@@ -76,10 +76,11 @@ appending a full v2 evidence marker; foreign copied v1 history is inert, and the
 newer v2 marker supersedes its generation history. Only a positively identified,
 nonempty foreign owner is ignored; missing, null, numeric, or empty owner fields
 are unclassifiable corruption. Every exact-owner generation is reconciled before
-selecting the current package or declaring ordinary mode, so orphan active markers
-and old authorized/completing receipts cannot hide behind another active episode.
-Inactive, corrupt, or disagreeing current-owner state blocks; a copied marker in
-a different fork UUID remains inert.
+selecting the current package or declaring ordinary mode, so an orphan active marker cannot hide behind another
+active episode. Historical inactive markers are inert when no matching identity
+exists. An inactive marker with its exact identity still present is a visible,
+retryable bookkeeping-close boundary. Corrupt or disagreeing current-owner state
+blocks; a copied marker in a different fork UUID remains inert.
 
 On every real provider context, the restoration extension:
 
@@ -114,7 +115,7 @@ and the sole active package source. It requires:
 - `advance`, `revise`, `consult`, or `pause` within approved scope;
 - explicit operator authority for merge, abandonment, unresolved product scope,
   and destructive cleanup; and
-- return to ordinary CONVERSATION mode after terminal finalization.
+- return to ordinary CONVERSATION mode after exact bookkeeping close.
 
 Reports are evidence, never approval or native-command dispatch. The heartbeat
 is the missed-report safety net and is cancelled when its generation is
@@ -124,10 +125,11 @@ reconciled or waiting only for owner/operator action.
 
 The sanitized [conversation-driven oversight dogfood record](../reports/reviews/conversation-driven-episode-oversight-dogfood.md)
 tracks the isolated live run through setup, native promotion, accepted generation
-one, observed continuation friction, rejected repair evidence, and the corrected
-trusted-sibling contract. It is explicitly in progress: it does not claim
-generation two, final EXPERT review, operator disposition, cleanup, or final
-acceptance.
+one, observed continuation friction, rejected repair evidence, and the corrected trusted-sibling contract. It now includes accepted generation two, the fresh final EXPERT `PASS`, the
+operator's conversational merge decision, completed fixture terminal work, the
+duplicate-confirmation friction, and the approved simplified terminal correction.
+The fixture remains frozen with stale bookkeeping and retained refs as evidence;
+the corrected plugin generation is not applied or reloaded in this revision.
 
 ### Owner-driven continuation
 
@@ -169,8 +171,9 @@ completion. Partial or uncertain admission is an inspection boundary and is
 never blindly replayed. No Prime Agent core change, compare-and-swap primitive,
 or lease is claimed or required.
 
-After operator-authorized terminal finalization, episode-specific watches end and
-the same session returns to ordinary CONVERSATION incubation. A later reviewed
+After the operator's conversational terminal decision, verified terminal work,
+and exact bookkeeping close, episode-specific watches end and the same session
+returns to ordinary CONVERSATION incubation. A later reviewed
 folder requires a fresh native `/implement-spec` run. The first episode never
 lifetime-locks that owner.
 
@@ -224,92 +227,37 @@ claiming merge readiness. EXPERT PASS is evidence, not merge authority;
 favorable EXPERT review never authorizes merge. Only the operator authorizes
 merge or another terminal disposition.
 
-## Narrow terminal finalization receipt
+## Exact bookkeeping close
 
-`finalize_spec_episode` has two phases and never performs terminal work itself.
+After a fresh final EXPERT `PASS`, the owning CONVERSATION presents readiness in
+ordinary conversation. The operator's merge, revise, pause, or abandon response
+is the sole terminal decision. Revision and pause retain the episode. For merge
+or abandonment, the owner inspects live state, performs the applicable Git,
+session, worktree, branch-retention, and cleanup actions with ordinary tools, and
+verifies their outcome. Ambiguity blocks destructive cleanup.
 
-### Authorize
+Only after terminal work is verified does the owner call
+`finalize_spec_episode(location)`. Despite its compatibility name, this is a
+location-only, no-UI bookkeeping close. It validates the exact owner, retained
+future-folder location, episode identity, and oversight marker; appends inactive
+evidence once; and removes only the matching identity file. It performs no Git,
+merge, abandonment, session, worktree, branch, daemon-inventory, or cleanup work.
 
-The owning conversation supplies the exact future-folder location and the closed
-disposition `merged` or `abandoned`. The target is the owner's currently checked
-out project branch, as selected by project policy; it is not implicitly `main`.
-The host verifies the exact owner and durable episode identity, asks for one
-explicit UI confirmation that shows the target branch/ref, authorization-time
-target commit, and exact episode tip, and writes
-`.prime/agent/state/spec-episodes/<slug>.finalization.json`.
-A matching replay returns the existing receipt without another confirmation.
-The exact receipt lifecycle transaction is serialized by a crash-released native
-lock. Lock startup validates the immediate parent and lock-object type, then uses
-a Python/`fcntl.flock` helper handshake that distinguishes `ready`, actual
-contention, and fatal path/runtime errors. Only contention is retried. Waiting is
-bounded to 10 seconds by default, structured tool cancellation is propagated, and
-startup recovery uses the same bound. Timeout, cancellation, helper failure, or
-unexpected holder loss stops before later lifecycle mutation and preserves the
-receipt, marker, and expectation evidence. Contenders never unlink the lock file
-or signal a live holder. This first release requires a local Unix Python runtime
-with `fcntl`; hostile ancestor-path replacement and Windows portability are not
-claimed.
-
-Authorization releases the lock while the UI waits, then reacquires and
-revalidates every binding/state before writing; a delayed compatible call returns
-the newer state/result and a conflict blocks, so completed evidence cannot rewind.
-Receipts and markers are indexed by exact slug/episode generation: completed old
-evidence remains replayable but never acts as the current ownership record, so a
-proven terminal cycle does not prevent a later approved folder. Replay output is
-scoped to that exact old episode; if another generation is active, the tool text
-and structured details explicitly say that current oversight remains active.
-Authorize does not merge, abandon, stop a session, remove a worktree, delete a
-branch, or decide semantic completion.
-
-### Complete
-
-After the canonical skill performs ordinary conservative terminal work (while
-retaining the authorized episode ref until validation), complete requires the
-matching receipt and validates that:
-
-- the exact episode session is no longer active/addressable;
-- the exact owned worktree is absent from disk and Git worktree state; and
-- the authorized episode branch still resolves to the exact accepted commit;
-- the exact target branch/ref still descends from its authorization-time commit;
-- all referenced Git objects resolve as commits and ancestry is known; and
-- the episode commit is an ancestor of the bound target for `merged`, or is not
-  an ancestor for `abandoned`.
-
-Only then does it advance the durable receipt monotonically from `authorized`
-to `completing`, append inactive owner oversight, clear the matching expectation,
-and write a durable `completed` tombstone with exact result evidence. It asks for
-no second confirmation. An identical authorize or complete replay returns the
-existing state/result without another confirmation. A crash or ambiguity at any
-boundary remains visibly recoverable from the receipt, marker, and any surviving
-expectation; it never silently becomes ordinary mode. On reload/resume, a strict
-`completing` receipt is reconciled by the narrow native session-start path before
-an ordinary provider call, without invoking the model tool or replaying bootstrap
-admission. Recovery validates the effective managed kernel and canonical package
-before any marker/receipt/expectation mutation; a project or CLI shadow blocks
-with state unchanged and zero provider calls. Before selecting missing-marker
-recovery, the read-only classifier also validates the expectation and receipt's
-stable owner, generation, source, session file, branch, worktree, session name,
-identity version, and admission bindings. The mutable active route is excluded.
-Session-file and worktree comparison uses the same lexical `path.resolve()`
-equivalence for expectation/receipt preflight, existing markers, and the exact
-prospective recovery marker. It does not require either terminal path to exist.
-The prospective marker is validated before it can be appended or announced, so
-canonically equivalent spellings converge and cannot create evidence that a later
-reader rejects. A genuine conflict appends no marker or success message and does
-not invoke recovery or the provider, so correcting only the original receipt
-remains sufficient.
-
-The exact writer-produced `completing` + matching inactive marker + retained
-expectation checkpoint is recoverable through the same transaction lock and
-terminal-fact coordinator. Because the marker is already inactive, recovery does
-not append it again. An inactive marker plus expectation without that exact
-`completing` receipt remains invalid. Unrelated resources and generations are
-never removed or changed.
+The close has no authorize phase, disposition parameter, confirmation dialog,
+authorization receipt, terminal-fact validator, lock, two-phase state machine, or
+startup completion coordinator. If inactive evidence was appended but identity
+removal failed, exact replay validates the same bindings, removes the identity,
+and does not duplicate the marker. If identity removal completed and the result
+was lost, inactive evidence plus an absent identity returns idempotent success.
+A closed future-folder location is one-generation-only. Promotion rejects its
+reuse, and duplicate generations at one location block close lookup, so a delayed
+old call cannot clear newer work. Legacy `.finalization.json` files are inert
+preserved artifacts; the classifier neither uses nor deletes them.
 
 ## Native validation isolation
 
-Checked-in native publication and session-start recovery tests never use the
-operator's daemon route. Each runtime installs a Unix-socket fake transport at
+Checked-in native publication and oversight tests never use the operator's
+daemon route. Each runtime installs a Unix-socket fake transport at
 module load, verifies the exact socket and guarded `net.Socket.connect` binding
 before lifecycle events can mutate state, and rejects every other destination.
 The subprocess harness removes inherited daemon-worker, recursive-agent, session
@@ -317,8 +265,7 @@ lease, and kernel-owner routing state before adding only the named fake route.
 Publication evidence asserts the protocol-7 command envelope, unique ordered
 command IDs, exact fake route, mutation acknowledgments, and the `steer` then
 `followUp` delivery flags. Cleanup for the exact worktree, branch, socket/daemon,
-session files, and lifecycle fixture state is registered before publication or
-recovery. A deliberate post-creation assertion failure proves that cleanup still
+session files, and lifecycle fixture state is registered before publication. A deliberate post-creation assertion failure proves that cleanup still
 removes every registered resource.
 
 ## Installation boundaries

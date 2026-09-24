@@ -8,13 +8,19 @@ files=(
   extensions/handoff-chain.ts
   extensions/reviewed-plan.ts
   extension-support/conversation-oversight.ts
-  extension-support/episode-finalization.ts
+  extension-support/episode-close.ts
   extension-support/handoff-prompts.ts
   extension-support/reviewed-plan-support.ts
   extension-support/spec-episode.ts
 )
 
 status=0
+obsolete_file="$destination_root/extension-support/episode-finalization.ts"
+if [[ -e "$obsolete_file" || -L "$obsolete_file" ]]; then
+  printf 'stale obsolete episode finalization support file: %s
+' "$obsolete_file" >&2
+  status=1
+fi
 stale_entry="$destination_root/extensions/project-conversation.ts"
 if [[ -e "$stale_entry" || -L "$stale_entry" ]]; then
   if [[ ! -f "$stale_entry" || -L "$stale_entry" ]]; then

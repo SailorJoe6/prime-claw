@@ -20,7 +20,7 @@ FILES = (
     "extensions/handoff-chain.ts",
     "extensions/reviewed-plan.ts",
     "extension-support/conversation-oversight.ts",
-    "extension-support/episode-finalization.ts",
+    "extension-support/episode-close.ts",
     "extension-support/handoff-prompts.ts",
     "extension-support/reviewed-plan-support.ts",
     "extension-support/spec-episode.ts",
@@ -65,6 +65,19 @@ class PrimeAgentPluginInstallTests(unittest.TestCase):
             self.assertEqual(append.count("PRIME_CLAW_CONVERSATION_IDENTITY_V1"), 1)
             checked = self.run_script(CHECK, destination)
             self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+
+    def test_apply_removes_and_check_rejects_obsolete_finalization_support(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-obsolete-") as tmp:
+            destination = Path(tmp) / "agent"
+            obsolete = destination / "extension-support" / "episode-finalization.ts"
+            obsolete.parent.mkdir(parents=True)
+            obsolete.write_text("legacy machinery\n")
+            checked = self.run_script(CHECK, destination)
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("stale obsolete episode finalization support file", checked.stderr)
+            applied = self.run_script(APPLY, destination)
+            self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
+            self.assertFalse(obsolete.exists())
 
     def test_check_rejects_a_stale_global_file(self) -> None:
         with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-stale-") as tmp:

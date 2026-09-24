@@ -4,9 +4,20 @@
 
 ## Scope and current boundary
 
-The isolated dogfood has completed setup, native promotion, and its first implementation generation. Generation two has **not** been admitted. The owner-accepted shared continuation repair is now incorporated into the outer episode branch through an ordinary two-parent integration candidate. It has not been installed into the user-global plugin, loaded by the fixture owner, or exercised for a fixture retry.
+The isolated dogfood completed two implementation generations. Generation two
+exact `b8ddda43da88c897c2a844cca99d31a95f38c7fb` passed fresh final EXPERT review,
+and the operator chose merge in ordinary conversation. The owning conversation
+performed and verified the fixture's context-sensitive terminal work: fixture
+main includes the candidate, the EPISODE is stopped, and its worktree is removed.
+Stale plugin bookkeeping and retained refs remain frozen as evidence.
 
-Open gates remain: a safe canonical continuation, generation two, fresh final EXPERT review of the complete fixture candidate, explicit operator disposition, conservative cleanup, and return to ordinary conversation without a stale episode lock.
+The original `finalize_spec_episode` authorization attempt cancelled because its
+confirmation UI was not attached to the supervising conversation. No terminal
+work was inferred from that cancellation. Dogfood showed that duplicate UI and
+two-phase generic terminal validation were unnecessary and misplaced. The
+operator approved the simplified terminal workflow now implemented in this
+bounded outer candidate. It has not been applied or reloaded, and the disposable
+fixture will not be mutated, retried, or cleaned in this generation.
 
 ## Isolated setup and native promotion
 
@@ -130,3 +141,53 @@ semantic revision. Focused policy/injection validation passed 35/35 Python and
 7 subtests. No fixture-owner reload, fixture handoff retry, generation-two
 admission, final EXPERT decision, terminal disposition, or cleanup occurred in
 this repair.
+## Generation two, final review, and terminal-work evidence
+
+A fresh-route continuation admitted generation two and produced exact pushed
+candidate `b8ddda43da88c897c2a844cca99d31a95f38c7fb`, directly after accepted
+generation one `98ffb066891064abc66e666bec6b9c24b8483a96`. Its three-file delta was the
+fixture active plan, `dogfood/state.json`, and `tests/test_dogfood_state.py`.
+Focused fixture validation passed 1/1 and the worktree was clean at review.
+
+Fresh final reviewer session `01a0d584-83d4-7335-bc8b-995b36e675f8` used exact
+`openai-codex/gpt-6-astra` with admitted `max` reasoning and returned
+`PASS — no material findings` for that exact commit. The retained sanitized
+report has SHA-256
+`a1ad1f509efef53c9a1123a89b03b83309ea079fbcd70a75857897f1da7e1d16`.
+
+The operator then selected merge conversationally. The first native authorization
+call returned `Episode finalization authorization was cancelled`; no UI receipt
+or terminal mutation resulted. The supervising conversation subsequently carried
+out and verified the already-authorized fixture terminal work using live context.
+Fixture main now includes `b8ddda43…`, the EPISODE is stopped, and its worktree is
+removed. The stale plugin identity/oversight bookkeeping and retained refs remain
+untouched as frozen evidence.
+
+This friction led to the approved outer correction: readiness and the sole
+operator decision stay conversational; the owning CONVERSATION performs and
+verifies context-sensitive terminal work; and the plugin retains only an exact,
+location-only, no-UI, idempotent bookkeeping close. Authorization receipts,
+locks, completion recovery, generic Git validation, and global daemon inventory
+are removed. This evidence does not claim the corrected generation was installed
+or exercised against the frozen fixture.
+
+## Simplified terminal-workflow candidate validation
+
+The bounded outer correction removed 684 lines of obsolete finalization support
+and replaced them with a small exact bookkeeping close plus focused interruption
+and generation-isolation tests. Final maintained validation passed:
+
+- Node: **119/119**;
+- Python: **297 tests plus 7 subtests**, with only the known unrelated
+  candidate-watchdog full-run timeout; its exact isolated rerun passed in 2.22
+  seconds (11 existing deprecation warnings);
+- isolated native oversight/discovery probes: **6/6**;
+- plugin install/inventory and focused policy coverage: **36 tests plus 7 subtests**;
+- changed-Markdown relative links: **9/9**; and
+- `git diff --check`: **PASS**.
+
+A pre-review full Python run passed all 298 tests plus seven subtests. On the
+exact final diff, all 297 other tests and seven subtests passed, while the known
+candidate-progress watchdog again hit its 15-second full-run timeout; its exact
+isolated rerun passed in 2.22 seconds. No global plugin apply/reload or
+disposable-fixture mutation occurred.

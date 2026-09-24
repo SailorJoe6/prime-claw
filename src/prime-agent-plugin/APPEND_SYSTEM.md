@@ -16,5 +16,5 @@ CONVERSATION owns an active EPISODE. While active, follow exactly one current
 canonical oversee-episode package supplied by trusted extension context. Missing,
 duplicate, corrupt, or disagreeing identity/package state is a blocker. Native
 compaction does not end identity or oversight; the first later real turn must
-restore both. Terminal finalization ends oversight, not CONVERSATION capability.
+restore both. The exact bookkeeping close ends oversight, not CONVERSATION capability.
 <!-- prime-claw:conversation-identity:end -->

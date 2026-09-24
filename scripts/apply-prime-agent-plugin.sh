@@ -8,7 +8,7 @@ files=(
   extensions/handoff-chain.ts
   extensions/reviewed-plan.ts
   extension-support/conversation-oversight.ts
-  extension-support/episode-finalization.ts
+  extension-support/episode-close.ts
   extension-support/handoff-prompts.ts
   extension-support/reviewed-plan-support.ts
   extension-support/spec-episode.ts
@@ -35,7 +35,8 @@ fi
 python3 "$repo_root/scripts/manage-prime-agent-append-system.py" validate "$kernel_source" "$destination_root/APPEND_SYSTEM.md"
 
 # Reject every unsafe managed TypeScript destination before the first delete or copy.
-managed_destinations=("${files[@]}" extensions/project-conversation.ts)
+obsolete_file="extension-support/episode-finalization.ts"
+managed_destinations=("${files[@]}" extensions/project-conversation.ts "$obsolete_file")
 for relative in "${managed_destinations[@]}"; do
   destination="$destination_root/$relative"
   if [[ -e "$destination" || -L "$destination" ]]; then
@@ -47,7 +48,7 @@ for relative in "${managed_destinations[@]}"; do
 done
 
 mkdir -p "$destination_root/extensions" "$destination_root/extension-support"
-rm -f "$destination_root/extensions/project-conversation.ts"
+rm -f "$destination_root/extensions/project-conversation.ts" "$destination_root/$obsolete_file"
 for relative in "${files[@]}"; do
   install -m 0644 "$source_root/$relative" "$destination_root/$relative"
 done
