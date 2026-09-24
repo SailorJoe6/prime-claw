@@ -396,10 +396,12 @@ for ordinary project conversation without touching the canonical checkout.
    heartbeat. Record that handoff-first admission and work completion remain
    distinct claims.
 2. Reconcile the first exact pushed commit and obtain focused independent review.
-3. Accept or revise it on evidence, update the fixture's durable review record,
-   and invoke `handoff_spec_episode` without another operator transport request.
-4. Cancel the completed generation's watch and create one new bounded watch for
-   the admitted continuation.
+3. Accept or revise it on evidence and update the fixture's durable review record.
+4. Cancel the completed generation's watch, pre-arm exactly one non-steering
+   watch for the intended continuation, and then invoke the terminal
+   `handoff_spec_episode` capability without another operator transport request.
+   Cancel that watch only on definite no-admission failure; retain it across
+   success, partial admission, or ambiguity until reconciliation.
 5. Reconcile the complete exact candidate and obtain a fresh final EXPERT review
    using the checked-in exact selector and reasoning level. Record the admitted
    model and reasoning policy against the reviewed commit. Repair and renew

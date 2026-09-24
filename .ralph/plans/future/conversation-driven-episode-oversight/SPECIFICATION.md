@@ -375,9 +375,15 @@ The review disposition is:
 
 For `advance` or an in-scope `revise`, the project conversation may invoke
 `handoff_spec_episode` without asking the operator to transport another
-`/handoff`. The host capability preflights canonical handoff and execute, checks
-the exact owner and idle episode, sends handoff as fail-if-busy `steer`, and
-queues exactly one execute `followUp`.
+`/handoff`. Because successful admission is a terminal routing action, the owner
+must cancel the completed generation watch and pre-arm exactly one non-steering
+watch for the intended new generation immediately before the call. The host
+capability then preflights canonical handoff and execute, checks the exact owner
+and idle episode, sends handoff as fail-if-busy `steer`, and queues exactly one
+execute `followUp`. A definite no-admission failure cancels the pre-armed watch;
+success, partial admission, or ambiguity keeps it until the transition is
+reconciled. The owner never attempts to create the watch after a successful
+terminal call.
 
 Ordinary `agent_message.send()` is model input. It does not dispatch a sibling's
 native slash command. The deterministic host capability exists because the
