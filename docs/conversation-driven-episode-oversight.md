@@ -135,9 +135,13 @@ operator focus or a bounded compaction-focus synthesis of those accepted recorde
 findings. Arbitrary chat, unaccepted review findings, product decisions, scope
 expansion, and `consult`, `pause`, or terminal dispositions cannot be routed this
 way. Host ownership, identity, location, quiescence, canonical-prompt,
-uncertainty, and replay checks remain unchanged. Admission proves neither
-compaction nor work completion, an uncertain result is never retried, and the
-owner starts one new 15-minute watch before yielding to each admitted generation.
+uncertainty, and replay checks remain unchanged. At the accepted idle boundary,
+the owner cancels the old generation watch, then pre-arms exactly one non-steering
+intended-generation watch immediately before the terminal call. A definite
+no-admission failure cancels that watch; success, partial admission, or ambiguity
+retains it until reconciliation. The owner never creates the intended-generation
+watch after success or arms a duplicate. Admission proves neither compaction nor
+work completion, and an uncertain result is never retried.
 
 After operator-authorized terminal finalization, episode-specific watches end and
 the same session returns to ordinary CONVERSATION incubation. A later reviewed

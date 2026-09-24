@@ -277,6 +277,12 @@ episode identity is the authority: host code requires the same top-level owner
 session and revalidates every derived branch, worktree, and durable-session field
 before using the daemon's current active routing ID.
 
+At the accepted idle boundary, the owner cancels the old generation watch and
+pre-arms exactly one non-steering intended-generation watch immediately before
+the terminal call. It cancels it only on definite no-admission failure and
+retains it across success, partial admission, or ambiguity until reconciliation.
+The owner never creates that watch after success or arms a duplicate.
+
 The operation reopens an inactive exact episode when needed, then checks the
 live daemon state and fails closed unless the episode is fully quiescent with an
 empty steering/follow-up queue. Owner, location, identity, quiescence,

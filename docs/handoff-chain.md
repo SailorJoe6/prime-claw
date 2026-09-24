@@ -103,8 +103,12 @@ run only after that handoff turn reaches its boundary. A first-send failure
 queues no execute. A second-send failure explicitly reports that handoff was
 admitted but continuation was not queued. Ambiguous transport outcomes require
 owner inspection and are never retried automatically. Existing episode
-resources are never deleted to compensate for a remote handoff failure. After
-admission the owner creates exactly one new generation watch before yielding.
+resources are never deleted to compensate for a remote handoff failure. At the
+accepted idle boundary, the owner cancels the old generation watch and pre-arms
+exactly one non-steering intended-generation watch immediately before the
+terminal call. That watch is cancelled only on definite no-admission failure and
+retained across success, partial admission, or ambiguity until reconciliation.
+It is never created after successful terminal admission and never duplicated.
 Terminal finalization cancels episode watches and returns the same conversation
 to incubation; a later different reviewed folder starts through a fresh native
 `/implement-spec`, not through this continuation tool.

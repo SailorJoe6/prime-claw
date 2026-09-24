@@ -990,6 +990,52 @@ is preserved at `/Users/jlanders/.prime/agent/session-artifacts/01a0cc01-70b0-75
 no merge authority. Final diff/installed-copy checks, one candidate commit/push,
 and owner review remain; do not begin Slice 3, merge, or cleanup.
 
+Owner review of exact pushed candidate
+`b1db65a1084c907d537e14a0c5e4dee8bc249b82` returned `REVISE` on one bounded
+2B-R1 protocol-ordering defect; all other accepted 2B semantics and evidence
+stand. `handoff_spec_episode` is terminal routing, so the current instruction to
+create the intended-generation watch after successful admission can leave the
+continuation unmonitored because the owner cannot continue after that terminal
+action.
+
+**2B-R1 implementation status:** authoritative main `e646f0a` is reconciled by
+merge `8d1ed8695770440f4516bf207f6d546b6d7d5d24`, preserving this owner
+disposition, accepted history, exact reviewer artifacts, promoted future-folder
+deletion, and `stash@{0}`. The authoritative specification wording was promoted
+to the active specification while the future bundle remains deleted.
+
+The canonical skill now cancels the old generation watch at the accepted idle
+boundary, pre-arms exactly one non-steering intended-generation watch
+immediately before terminal `handoff_spec_episode`, cancels it only on definite
+no-admission failure, and retains it across success, partial admission, or
+ambiguity until reconciliation. It explicitly rejects after-success creation,
+duplicate watches, and uncertainty retry. The three current docs state the same
+ordering without changing host checks or shared handoff mechanics. Focused
+contracts cover every ordering branch and failed 2/2 before repair, then passed
+2/2 after repair. Accepted profile/replacement/final-review/continuation
+semantics remain unchanged.
+
+Validation is green: the new focused ordering/doc contracts failed 2/2 before
+repair and passed 2/2 after; the complete focused Python set passed 20/20;
+reviewed-plan Node passed 26/26; maintained Python passed 292 plus seven subtests
+with 11 existing deprecation warnings; maintained Node passed 157/157; plugin
+apply/check and `git diff --check` passed.
+
+Initial renewed reviewer `sub-c318f244` received packet
+`agentmsg_d11f2099-0bd2-44e3-b6f3-0adc276ac51c` once, asked whether read-only Git inspection was
+allowed, and terminated without `PASS`/`BLOCK`; no resend or steer occurred. Its
+incomplete evidence is `/Users/jlanders/.prime/agent/session-artifacts/01a0cc01-70b0-75d4-8486-3d21b496380c/sub-c318f244/slice2b-r1-review-incomplete.md`. The one authorized same-profile,
+same-model/reasoning, same-packet replacement `sub-abed98b9`
+received packet `agentmsg_debd82e0-947b-4fde-9c81-1027f8cd4ef6` once. After one narrow clarification
+that read-only inspection was permitted but mutation remained forbidden, it
+returned `PASS` on unchanged six-file snapshot SHA-256 `f2f3f01f672a7f9006acb3adc0363c5e4dcd600e0064b031cd8c756c997a42f6` with
+no material finding. The complete report is `/Users/jlanders/.prime/agent/session-artifacts/01a0cc01-70b0-75d4-8486-3d21b496380c/sub-abed98b9/slice2b-r1-pass-review.md`. PASS is evidence
+only, not merge authority or live activation proof.
+
+Next run final diff/installed-copy checks, commit and push one bounded 2B-R1
+candidate, and stop for owner review. Do not begin another 2B increment, Slice
+3, terminal merge, or cleanup.
+
 **Working capability:** the active exact-session owner has one canonical procedure for
 watching, reviewing, revising, continuing, and finally presenting its exact
 episode. Every EXPERT review uses the explicit project profile and exact

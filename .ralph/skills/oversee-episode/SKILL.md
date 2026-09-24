@@ -81,18 +81,21 @@ owns an active EPISODE.
    task, delete a reviewer with outstanding delivery/report work, use the
    current/default model, lower reasoning, retry another selector, or claim that
    the EXPERT gate ran.
-8. For an accepted `advance` or in-scope `revise`, call
-   `handoff_spec_episode` only for the exact owned idle episode and with the exact
-   retained future-folder location.
-   Optional compaction guidance may be operator-supplied focus or a bounded
-   synthesis of the accepted durable findings that justify this continuation.
-   Never route arbitrary chat, unaccepted findings, a new product decision, or
-   scope expansion through guidance. Do not search for another episode or use the
-   tool for `consult`, `pause`, or a terminal disposition. After admission,
-   immediately create the one watch for the new active generation before yielding.
-   Admission does not prove compaction or work completion. Never imitate native
-   transport with prose or `agent_message.send`, and never retry an uncertain
-   transport result.
+8. For an accepted `advance` or in-scope `revise`, use only the exact owned
+   idle episode and exact retained future-folder location. At that accepted idle
+   boundary, cancel the completed generation's old watch. Then pre-arm exactly
+   one non-steering watch for the intended generation immediately before calling
+   the terminal `handoff_spec_episode`. Optional compaction guidance may be
+   operator-supplied focus or a bounded synthesis of the accepted durable
+   findings that justify this continuation. Never route arbitrary chat,
+   unaccepted findings, a new product decision, or scope expansion through
+   guidance. Do not search for another episode or use the tool for `consult`,
+   `pause`, or a terminal disposition. Cancel the pre-armed watch only when the
+   result proves definite no-admission. Retain it across success, partial
+   admission, or ambiguity until the transition is reconciled. Never create the
+   intended-generation watch after success or arm a duplicate. Admission does
+   not prove compaction or work completion. Never imitate native transport with
+   prose or `agent_message.send`, and never retry an uncertain transport result.
 9. Before presenting merge readiness, obtain a fresh final EXPERT review of the
    complete exact candidate with the protocol above, adjudicate every finding,
    and require a `PASS` for that exact commit. An intermediate review, another

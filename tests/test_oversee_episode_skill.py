@@ -138,7 +138,12 @@ def test_oversee_skill_bounds_owner_driven_continuation_and_sequential_return():
         "exact retained future-folder location",
         "operator-supplied focus or a bounded synthesis of the accepted durable findings",
         "Never route arbitrary chat, unaccepted findings, a new product decision, or scope expansion",
-        "immediately create the one watch for the new active generation before yielding",
+        "cancel the completed generation's old watch",
+        "pre-arm exactly one non-steering watch for the intended generation",
+        "immediately before calling the terminal `handoff_spec_episode`",
+        "Cancel the pre-armed watch only when the result proves definite no-admission",
+        "Retain it across success, partial admission, or ambiguity until the transition is reconciled",
+        "Never create the intended-generation watch after success or arm a duplicate",
         "never retry an uncertain transport result",
         "use the tool for `consult`, `pause`, or a terminal disposition",
         "returns this session to ordinary CONVERSATION mode",
@@ -147,7 +152,11 @@ def test_oversee_skill_bounds_owner_driven_continuation_and_sequential_return():
     ]:
         assert phrase in text
     assert "only when the operator clearly asks" not in text
-    assert text.index("recorded durably") < text.index("call `handoff_spec_episode`")
+    assert "After admission, immediately create the one watch" not in text
+    assert text.index("recorded durably") < text.index("calling the terminal `handoff_spec_episode`")
+    continuation = text.split("For an accepted `advance` or in-scope `revise`", 1)[1].split("Before presenting merge readiness", 1)[0]
+    assert continuation.index("cancel the completed generation's old watch") < continuation.index("pre-arm exactly one non-steering watch")
+    assert continuation.index("pre-arm exactly one non-steering watch") < continuation.index("calling the terminal `handoff_spec_episode`")
 
 
 def test_current_documentation_explains_project_expert_policy():
@@ -180,6 +189,10 @@ def test_current_docs_bound_owner_continuation_without_changing_host_authority()
         "Host ownership, identity, location, quiescence, canonical-prompt, uncertainty, and replay checks remain unchanged",
         "fresh native `/implement-spec` run",
         "never lifetime-locks that owner",
+        "pre-arms exactly one non-steering intended-generation watch immediately before the terminal call",
+        "definite no-admission failure cancels that watch",
+        "success, partial admission, or ambiguity retains it until reconciliation",
+        "never creates the intended-generation watch after success or arms a duplicate",
     ):
         assert fragment in current
     for fragment in (
@@ -187,6 +200,9 @@ def test_current_docs_bound_owner_continuation_without_changing_host_authority()
         "No new operator transport request",
         "never arbitrary prompt routing",
         "Owner, location, identity, quiescence, canonical-prompt, uncertainty, and replay enforcement are unchanged",
+        "pre-arms exactly one non-steering intended-generation watch immediately before the terminal call",
+        "cancels it only on definite no-admission failure",
+        "retains it across success, partial admission, or ambiguity until reconciliation",
     ):
         assert fragment in future
     for fragment in (
@@ -196,6 +212,10 @@ def test_current_docs_bound_owner_continuation_without_changing_host_authority()
         "legacy tag is not a routing authority",
         "never retried automatically",
         "fresh native `/implement-spec`",
+        "pre-arms exactly one non-steering intended-generation watch immediately before the terminal call",
+        "cancelled only on definite no-admission failure",
+        "retained across success, partial admission, or ambiguity until reconciliation",
+        "never created after successful terminal admission and never duplicated",
     ):
         assert fragment in handoff
 
