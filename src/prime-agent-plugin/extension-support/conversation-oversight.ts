@@ -48,7 +48,6 @@ export type OversightMarker = {
   slug: string;
   sourceLocation: string;
   episodeId: string;
-  episodeActiveSessionId: string;
   episodeSessionFile: string;
   branch: string;
   worktree: string;
@@ -152,6 +151,7 @@ function ownerExpectations(ctx: ExtensionContext): EpisodeIdentity[] {
     catch (error) { throw new Error(`episode identity is unreadable: ${path}: ${String(error)}`); }
     if (raw && typeof raw === "object" && !Array.isArray(raw)
       && typeof (raw as { ownerSessionId?: unknown }).ownerSessionId === "string"
+      && (raw as { ownerSessionId: string }).ownerSessionId.length > 0
       && (raw as { ownerSessionId: string }).ownerSessionId !== ctx.sessionManager.getSessionId()) continue;
     const identity = validateProjectBinding(parseEpisodeIdentity(raw, path), ctx.cwd);
     if (`${identity.slug}.json` !== name) throw new Error(`episode identity filename/slug mismatch: ${path}`);
@@ -240,16 +240,26 @@ function assertAgreement(marker: OversightMarker, identity: EpisodeIdentity): vo
     if (marker[key] !== expected[key]) throw new Error(`oversight marker disagrees on ${key}`);
   }
 }
+function assertLegacyAgreement(marker: LegacyMarker, identity: EpisodeIdentity): void {
+  if (marker.status !== "active" || marker.ownerSessionId !== identity.ownerSessionId
+    || marker.slug !== identity.slug || marker.sourceLocation !== identity.sourceLocation
+    || marker.episodeId !== identity.episodeId
+    || resolve(marker.episodeSessionFile) !== resolve(identity.episodeSessionFile)) {
+    throw new Error("legacy oversight marker disagrees with the exact durable expectation");
+  }
+}
 
 export function assertConversationPromotionReady(ctx: ExtensionContext, requestedLocation?: string): void {
   assertIdentityKernel(ctx);
   packageBody(ctx.cwd);
   const root = stateRoot(ctx.cwd); mkdirSync(root, { recursive: true }); accessSync(root, constants.R_OK | constants.W_OK);
-  const expectations = ownerExpectations(ctx);
-  if (expectations.length && requestedLocation && expectations[0].sourceLocation !== requestedLocation) {
-    throw new Error(`conversation already owns active expectation ${expectations[0].sourceLocation}`);
-  }
-  assertNoConflictingLifecycleState(ctx, expectations[0] ?? null, false);
+  const state = classifyLifecycle(ctx);
+  if (state.mode === "ordinary") return;
+  if (state.mode === "active" && !state.receipt && requestedLocation
+    && state.expectation?.sourceLocation === requestedLocation) return;
+  if (state.mode === "active" && state.receipt) throw new Error(`current expectation conflicts with terminal ${state.receipt.state} receipt`);
+  if (state.mode === "active") throw new Error(`conversation already owns active expectation ${state.expectation?.sourceLocation}`);
+  throw new Error(`oversight lifecycle requires ${state.mode} reconciliation before promotion`);
 }
 
 function currentBoundedIdentity(ctx: ExtensionContext): { role: "EPISODE"; sessionId: string } | null {
@@ -265,21 +275,27 @@ function currentBoundedIdentity(ctx: ExtensionContext): { role: "EPISODE"; sessi
 }
 
 export function appendActiveOversight(pi: ExtensionAPI, ctx: ExtensionContext, episode: EpisodeResult): OversightMarker {
-  assertConversationPromotionReady(ctx);
+  assertIdentityKernel(ctx);
+  packageBody(ctx.cwd);
+  const root = stateRoot(ctx.cwd); mkdirSync(root, { recursive: true }); accessSync(root, constants.R_OK | constants.W_OK);
   const identity = validateProjectBinding(parseEpisodeIdentity(episode, "created episode result"), ctx.cwd);
   if (!episodeBootstrapReady(identity)) throw new Error("created episode expectation is not bootstrap-ready");
   if (identity.ownerSessionId !== ctx.sessionManager.getSessionId()) throw new Error("created episode owner mismatch");
-  const expectation = ownerExpectations(ctx).find((value) => value.slug === identity.slug);
+  const expectation = ownerExpectations(ctx).find((value) => sameGeneration(value, identity));
   if (!expectation) throw new Error("created episode expectation was not persisted");
-  const existingRecord = markerForIdentity(ctx, expectation);
-  if (existingRecord?.marker?.status === "active") { assertAgreement(existingRecord.marker, expectation); return existingRecord.marker; }
-  if (existingRecord?.marker || existingRecord?.legacy) throw new Error("existing marker conflicts with the live episode generation");
+  const state = classifyLifecycle(ctx);
+  if (state.mode === "active" && state.marker && sameGeneration(state.marker, expectation)) return state.marker;
+  if (state.mode !== "recovery" || state.recovery?.kind !== "expectation-marker"
+    || !sameGeneration(state.recovery.identity, expectation)) {
+    throw new Error("created episode expectation is not the sole recoverable lifecycle generation");
+  }
   const marker = markerFromIdentity(expectation, "active");
   pi.appendEntry(OVERSIGHT_MARKER_TYPE, marker);
-  const persisted = markerForIdentity(ctx, expectation)?.marker;
-  if (!persisted) throw new Error("active oversight marker did not persist");
-  assertAgreement(persisted, expectation);
-  return persisted;
+  const persisted = classifyLifecycle(ctx);
+  if (persisted.mode !== "active" || !persisted.marker || !sameGeneration(persisted.marker, expectation)) {
+    throw new Error("active oversight marker did not persist");
+  }
+  return persisted.marker;
 }
 export function appendInactiveOversight(pi: ExtensionAPI, marker: OversightMarker): void {
   pi.appendEntry(OVERSIGHT_MARKER_TYPE, { ...marker, status: "inactive" } satisfies OversightMarker);
@@ -301,6 +317,7 @@ function ownerFinalizationReceipts(ctx: ExtensionContext): FinalizationReceipt[]
     catch (error) { throw new Error(`finalization receipt is unreadable: ${error instanceof Error ? error.message : String(error)}`); }
     if (raw && typeof raw === "object" && !Array.isArray(raw)
       && typeof (raw as { ownerSessionId?: unknown }).ownerSessionId === "string"
+      && (raw as { ownerSessionId: string }).ownerSessionId.length > 0
       && (raw as { ownerSessionId: string }).ownerSessionId !== ctx.sessionManager.getSessionId()) continue;
     let value: FinalizationReceipt;
     try { value = parseFinalizationReceipt(raw); }
@@ -335,128 +352,158 @@ function markerFromReceipt(receipt: FinalizationReceipt, status: "active" | "ina
 function matchingReceipt(receipts: FinalizationReceipt[], value: { slug: string; episodeId: string }): FinalizationReceipt | null {
   return receipts.find((receipt) => receipt.slug === value.slug && receipt.episodeId === value.episodeId) ?? null;
 }
-function assertNoConflictingLifecycleState(
-  ctx: ExtensionContext,
-  expectation: EpisodeIdentity | null,
-  allowMatchingAuthorized: boolean,
-): void {
-  const receipts = ownerFinalizationReceipts(ctx);
-  const records = markerRecords(ctx);
-  for (const receipt of receipts) {
-    const record = markerForLocation(ctx, receipt.sourceLocation);
-    const marker = record?.marker ?? null;
-    if (!marker) throw new Error("finalization receipt lacks its exact v2 marker");
-    assertMarkerReceipt(marker, receipt);
-    const sameExpectation = expectation?.slug === receipt.slug && expectation.episodeId === receipt.episodeId;
-    if (sameExpectation) {
-      if (receipt.state === "authorized" && allowMatchingAuthorized && marker.status === "active") continue;
-      throw new Error(`current expectation conflicts with terminal ${receipt.state} receipt`);
-    }
-    if (receipt.state !== "completed" || marker.status !== "inactive") {
-      throw new Error(`noncurrent terminal ${receipt.state} state must be reconciled before proceeding`);
-    }
-  }
-  for (const record of records) {
-    const value = record.marker ?? record.legacy!;
-    const sameExpectation = expectation?.slug === value.slug && expectation.episodeId === value.episodeId;
-    if (record.legacy) {
-      if (!sameExpectation) throw new Error("legacy owner marker requires exact expectation migration before proceeding");
-      continue;
-    }
-    if (sameExpectation) {
-      if (record.marker!.status !== "active") throw new Error("current expectation has an inactive marker");
-      continue;
-    }
-    if (record.marker!.status === "active") throw new Error("orphan active marker conflicts with current lifecycle state");
-    const receipt = matchingReceipt(receipts, record.marker!);
-    if (!receipt || receipt.state !== "completed") throw new Error("inactive marker has no completed matching tombstone");
-  }
+type LifecycleRecovery =
+  | { kind: "expectation-marker"; identity: EpisodeIdentity }
+  | { kind: "legacy-marker"; identity: EpisodeIdentity }
+  | { kind: "receipt-marker"; receipt: FinalizationReceipt; status: "active" | "inactive" }
+  | { kind: "completing-finalization"; receipt: FinalizationReceipt; marker: OversightMarker };
+
+type LifecycleClassification = {
+  mode: "ordinary" | "active" | "recovery";
+  expectation: EpisodeIdentity | null;
+  marker: OversightMarker | null;
+  receipt: FinalizationReceipt | null;
+  recovery: LifecycleRecovery | null;
+};
+
+function sameGeneration(left: { slug: string; episodeId: string }, right: { slug: string; episodeId: string }): boolean {
+  return left.slug === right.slug && left.episodeId === right.episodeId;
 }
 
-function resolveState(ctx: ExtensionContext): { expectation: EpisodeIdentity | null; marker: OversightMarker | null } {
+function classifyLifecycle(ctx: ExtensionContext): LifecycleClassification {
   const expectation = ownerExpectations(ctx)[0] ?? null;
   const receipts = ownerFinalizationReceipts(ctx);
-  assertNoConflictingLifecycleState(ctx, expectation, true);
-  if (expectation) {
-    if (!episodeBootstrapReady(expectation)) throw new Error("owner episode expectation is not bootstrap-ready");
-    const record = markerForIdentity(ctx, expectation);
-    if (record?.legacy) throw new Error("legacy owner marker requires session-start migration");
-    const marker = record?.marker ?? null;
-    if (!marker) throw new Error("owner episode expectation has no active oversight marker");
-    assertAgreement(marker, expectation);
-    const receipt = matchingReceipt(receipts, expectation);
-    if (receipt) {
-      assertMarkerReceipt(marker, receipt);
-      if (receipt.state === "completed") throw new Error("completed finalization cannot coexist with a reappearing expectation");
-      if (receipt.state === "completing") throw new Error("episode finalization is completing; native recovery must reconcile it");
-    }
-    if (marker.status !== "active") throw new Error("inactive oversight marker conflicts with a live expectation");
-    return { expectation, marker };
-  }
-  for (const receipt of receipts) {
-    const record = markerForLocation(ctx, receipt.sourceLocation);
-    if (!record?.marker) throw new Error("finalization receipt has no exact v2 marker");
-    assertMarkerReceipt(record.marker, receipt);
-    if (receipt.state !== "completed") throw new Error(`episode finalization is ${receipt.state}; native recovery must reconcile it`);
-    if (record.marker.status !== "inactive") throw new Error("completed finalization requires an inactive marker");
-  }
-  for (const record of markerRecords(ctx)) {
+  const records = markerRecords(ctx);
+  const recordFor = (value: { slug: string; episodeId: string }) => records.find((record) => {
+    const marker = record.marker ?? record.legacy!;
+    return sameGeneration(marker, value);
+  }) ?? null;
+  const receiptFor = (value: { slug: string; episodeId: string }) => receipts.find((receipt) => sameGeneration(receipt, value)) ?? null;
+
+  if (expectation && !episodeBootstrapReady(expectation)) throw new Error("owner episode expectation is not bootstrap-ready");
+
+  for (const record of records) {
     const value = record.marker ?? record.legacy!;
-    const receipt = matchingReceipt(receipts, value);
-    if (record.legacy) throw new Error("legacy owner marker has no live expectation for migration");
-    if (record.marker!.status === "active") throw new Error("active oversight marker has no durable expectation");
-    if (!receipt || receipt.state !== "completed") throw new Error("inactive oversight marker lacks a completed matching tombstone");
+    if (expectation && sameGeneration(value, expectation)) {
+      if (record.marker) assertAgreement(record.marker, expectation);
+      else assertLegacyAgreement(record.legacy!, expectation);
+    }
+    const receipt = receiptFor(value);
+    if (receipt) {
+      if (!record.marker) throw new Error("finalization receipt cannot bind to a legacy marker");
+      assertMarkerReceipt(record.marker, receipt);
+    }
   }
-  return { expectation: null, marker: null };
+
+  const candidates: LifecycleRecovery[] = [];
+  let activeMarker: OversightMarker | null = null;
+  let activeReceipt: FinalizationReceipt | null = null;
+
+  for (const record of records) {
+    const value = record.marker ?? record.legacy!;
+    const isExpected = Boolean(expectation && sameGeneration(value, expectation));
+    const receipt = receiptFor(value);
+    if (record.legacy) {
+      if (!isExpected) throw new Error("legacy owner marker requires exact expectation migration before proceeding");
+      if (receipt) throw new Error("legacy owner marker cannot coexist with terminal evidence");
+      candidates.push({ kind: "legacy-marker", identity: expectation! });
+      continue;
+    }
+    const marker = record.marker!;
+    if (isExpected) {
+      if (marker.status !== "active") throw new Error("current expectation has an inactive marker");
+      if (!receipt || receipt.state === "authorized") {
+        activeMarker = marker;
+        activeReceipt = receipt;
+        continue;
+      }
+      if (receipt.state === "completed") throw new Error("completed finalization cannot coexist with a reappearing expectation");
+      candidates.push({ kind: "completing-finalization", receipt, marker });
+      continue;
+    }
+    if (receipt?.state === "completed" && marker.status === "inactive") continue;
+    if (receipt?.state === "completing" && !expectation && marker.status === "inactive") {
+      candidates.push({ kind: "completing-finalization", receipt, marker });
+      continue;
+    }
+    if (marker.status === "active") throw new Error("orphan active marker conflicts with current lifecycle state");
+    if (!receipt) throw new Error("inactive marker has no completed matching tombstone");
+    throw new Error(`noncurrent terminal ${receipt.state} state must be reconciled before proceeding`);
+  }
+
+  for (const receipt of receipts) {
+    if (recordFor(receipt)) continue;
+    const isExpected = Boolean(expectation && sameGeneration(receipt, expectation));
+    if (receipt.state === "authorized" && !isExpected) {
+      throw new Error("authorized finalization receipt has no live exact expectation");
+    }
+    if (receipt.state === "completed" && isExpected) {
+      throw new Error("completed finalization cannot coexist with a reappearing expectation");
+    }
+    candidates.push({
+      kind: "receipt-marker",
+      receipt,
+      status: receipt.state === "authorized" || isExpected ? "active" : "inactive",
+    });
+  }
+
+  if (expectation && !recordFor(expectation)) {
+    const receipt = receiptFor(expectation);
+    if (!receipt) candidates.push({ kind: "expectation-marker", identity: expectation });
+  }
+
+  if (activeMarker && candidates.length) throw new Error("active generation conflicts with lifecycle recovery state");
+  if (candidates.length > 1) throw new Error("multiple lifecycle generations require recovery; refusing ambiguous reconciliation");
+  if (candidates.length === 1) {
+    return { mode: "recovery", expectation, marker: null, receipt: null, recovery: candidates[0] };
+  }
+  if (activeMarker) return { mode: "active", expectation, marker: activeMarker, receipt: activeReceipt, recovery: null };
+  if (expectation) throw new Error("owner episode expectation has no classifiable lifecycle state");
+  return { mode: "ordinary", expectation: null, marker: null, receipt: null, recovery: null };
 }
 
-export function reconcileOversightAtSessionStart(pi: ExtensionAPI, ctx: ExtensionContext): void {
+export type ConversationOversightRegistration = {
+  recoverCompleting?: (ctx: ExtensionContext, marker: OversightMarker) => Promise<boolean>;
+};
+
+export async function reconcileOversightAtSessionStart(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  options: ConversationOversightRegistration = {},
+): Promise<void> {
   try {
-    const expectation = ownerExpectations(ctx)[0] ?? null;
-    const receipts = ownerFinalizationReceipts(ctx);
-    const existingRecords = markerRecords(ctx);
-    if (expectation || receipts.length || existingRecords.length || currentBoundedIdentity(ctx)) {
+    let state = classifyLifecycle(ctx);
+    if (state.mode !== "ordinary" || currentBoundedIdentity(ctx)) {
       assertIdentityKernel(ctx);
       packageBody(ctx.cwd);
     }
-    if (expectation) {
-      if (!episodeBootstrapReady(expectation)) throw new Error("owner episode expectation is not bootstrap-ready");
-      const existing = markerForIdentity(ctx, expectation);
-      if (existing?.legacy) {
-        if (existing.legacy.status !== "active") throw new Error("inactive legacy marker conflicts with a live expectation");
-        if (existing.legacy.ownerSessionId !== expectation.ownerSessionId
-          || existing.legacy.slug !== expectation.slug
-          || existing.legacy.sourceLocation !== expectation.sourceLocation
-          || existing.legacy.episodeId !== expectation.episodeId
-          || resolve(existing.legacy.episodeSessionFile) !== resolve(expectation.episodeSessionFile)) {
-          throw new Error("legacy oversight marker disagrees with the exact durable expectation");
-        }
-        const migrated = markerFromIdentity(expectation, "active");
-        pi.appendEntry(OVERSIGHT_MARKER_TYPE, migrated);
-        const message = `Migrated legacy oversight for ${expectation.sourceLocation} to the exact v2 marker.`;
-        ctx.ui.notify(message, "warning");
-        void pi.sendMessage({ customType: "prime-claw-oversight-recovery", content: message, display: true });
-      } else if (!existing?.marker) {
-        const recovered = markerFromIdentity(expectation, "active");
-        pi.appendEntry(OVERSIGHT_MARKER_TYPE, recovered);
-        const message = `Recovered active oversight for ${expectation.sourceLocation} from the exact durable episode expectation.`;
+    for (let step = 0; state.mode === "recovery" && step < 3; step += 1) {
+      const recovery = state.recovery!;
+      let message: string | null = null;
+      if (recovery.kind === "expectation-marker") {
+        pi.appendEntry(OVERSIGHT_MARKER_TYPE, markerFromIdentity(recovery.identity, "active"));
+        message = `Recovered active oversight for ${recovery.identity.sourceLocation} from the exact durable episode expectation.`;
+      } else if (recovery.kind === "legacy-marker") {
+        pi.appendEntry(OVERSIGHT_MARKER_TYPE, markerFromIdentity(recovery.identity, "active"));
+        message = `Migrated legacy oversight for ${recovery.identity.sourceLocation} to the exact v2 marker.`;
+      } else if (recovery.kind === "receipt-marker") {
+        pi.appendEntry(OVERSIGHT_MARKER_TYPE, markerFromReceipt(recovery.receipt, recovery.status));
+        message = `Recovered ${recovery.status} oversight finalization state for ${recovery.receipt.sourceLocation} from its durable receipt.`;
+      } else {
+        if (!options.recoverCompleting) throw new Error("completing finalization requires the registered recovery coordinator");
+        const recovered = await options.recoverCompleting(ctx, recovery.marker);
+        if (!recovered) throw new Error("completing finalization did not reach a durable completed state");
+      }
+      if (message) {
         ctx.ui.notify(message, "warning");
         void pi.sendMessage({ customType: "prime-claw-oversight-recovery", content: message, display: true });
       }
+      state = classifyLifecycle(ctx);
     }
-    for (const receipt of receipts) {
-      let record = markerForLocation(ctx, receipt.sourceLocation);
-      if (!record?.marker) {
-        const status = receipt.state === "authorized" && expectation ? "active" : "inactive";
-        const recovered = markerFromReceipt(receipt, status);
-        pi.appendEntry(OVERSIGHT_MARKER_TYPE, recovered); record = { marker: recovered };
-        const message = `Recovered ${status} oversight finalization state for ${receipt.sourceLocation} from its durable receipt.`;
-        ctx.ui.notify(message, "warning");
-        void pi.sendMessage({ customType: "prime-claw-oversight-recovery", content: message, display: true });
-      }
-    }
-    resolveState(ctx);
-  } catch (error) { ctx.ui.notify(`prime-claw oversight recovery blocked: ${error instanceof Error ? error.message : String(error)}`, "error"); }
+    if (state.mode === "recovery") throw new Error("oversight recovery did not converge within the bounded coordinator");
+  } catch (error) {
+    ctx.ui.notify(`prime-claw oversight recovery blocked: ${error instanceof Error ? error.message : String(error)}`, "error");
+  }
 }
 
 export function applyConversationContext(event: {messages:unknown[]}, ctx: ExtensionContext) {
@@ -464,33 +511,25 @@ export function applyConversationContext(event: {messages:unknown[]}, ctx: Exten
     && (message.customType === OVERSIGHT_PACKAGE_TYPE || message.customType === BOUNDED_PACKAGE_TYPE)));
   try {
     const bounded = currentBoundedIdentity(ctx);
-    if (bounded) { assertIdentityKernel(ctx); return { messages:[...messages,{role:"custom",customType:BOUNDED_PACKAGE_TYPE,content:`PRIME_CLAW_BOUNDED_IDENTITY_V1\nrole=${bounded.role}\nsessionId=${bounded.sessionId}`,display:false,timestamp:Date.now()}] }; }
-    const state = resolveState(ctx);
-    if (!state.expectation && (!state.marker || state.marker.status === "inactive")) return { messages };
+    if (bounded) { assertIdentityKernel(ctx); return { messages:[...messages,{role:"custom",customType:BOUNDED_PACKAGE_TYPE,content:`PRIME_CLAW_BOUNDED_IDENTITY_V1
+role=${bounded.role}
+sessionId=${bounded.sessionId}`,display:false,timestamp:Date.now()}] }; }
+    const state = classifyLifecycle(ctx);
+    if (state.mode === "ordinary") return { messages };
+    if (state.mode === "recovery") throw new Error(`oversight lifecycle requires ${state.recovery!.kind} recovery before provider dispatch`);
     assertIdentityKernel(ctx);
     const body = packageBody(ctx.cwd);
     return {messages:[...messages,{role:"custom",customType:OVERSIGHT_PACKAGE_TYPE,content:body,display:false,timestamp:Date.now()}]};
   } catch (error) { visibleFailure(ctx, error instanceof Error ? error.message : String(error)); }
 }
-export function currentOversightMarker(ctx: ExtensionContext): OversightMarker | null { return resolveState(ctx).marker; }
+export function currentOversightMarker(ctx: ExtensionContext): OversightMarker | null {
+  const state = classifyLifecycle(ctx);
+  return state.mode === "active" ? state.marker : null;
+}
 export function currentOversightMarkerForFinalization(ctx: ExtensionContext, sourceLocation: string): OversightMarker | null {
   return markerForLocation(ctx, sourceLocation)?.marker ?? null;
 }
-export function assertFinalizationRecoveryReady(ctx: ExtensionContext): void {
-  const completing = ownerFinalizationReceipts(ctx).some((value) => value.state === "completing");
-  if (!completing) return;
-  assertIdentityKernel(ctx);
-  packageBody(ctx.cwd);
-}
-export function currentCompletingFinalization(ctx: ExtensionContext): { receipt: FinalizationReceipt; marker: OversightMarker } | null {
-  const receipt = ownerFinalizationReceipts(ctx).find((value) => value.state === "completing");
-  if (!receipt) return null;
-  const marker = markerForLocation(ctx, receipt.sourceLocation)?.marker;
-  if (!marker) throw new Error("completing receipt has no exact v2 marker");
-  assertMarkerReceipt(marker, receipt);
-  return { receipt, marker };
-}
-export function registerConversationOversight(pi: ExtensionAPI): void {
-  pi.on("session_start", (_event, ctx) => reconcileOversightAtSessionStart(pi, ctx));
+export function registerConversationOversight(pi: ExtensionAPI, options: ConversationOversightRegistration = {}): void {
+  pi.on("session_start", (_event, ctx) => reconcileOversightAtSessionStart(pi, ctx, options));
   pi.on("context", (event, ctx) => applyConversationContext(event, ctx));
 }

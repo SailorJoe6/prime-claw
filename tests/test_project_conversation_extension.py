@@ -36,7 +36,10 @@ def test_canonical_oversight_package_contains_reviewed_policy():
 
 def test_extension_uses_context_and_exact_state_without_rejected_flag_profile():
     extension = EXTENSION.read_text(); support = SUPPORT.read_text()
-    assert "registerConversationOversight(pi)" in extension
+    assert "registerConversationOversight(pi, {" in extension
+    assert "recoverCompleting:" in extension
+    assert "currentCompletingFinalization" not in extension + support
+    assert "assertFinalizationRecoveryReady" not in extension + support
     assert 'pi.on("context"' in support
     assert 'pi.on("session_start"' in support
     assert "registerFlag" not in extension + support

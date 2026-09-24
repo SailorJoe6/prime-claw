@@ -309,6 +309,49 @@ passed; fresh global inactive, active, and inactive-shadow processes observed
 kernel/package `1/0`, `1/1`, and `0/0`. `git diff --check` passed. Shared handoff
 scheduling/quiescence code remains unchanged.
 
+### B1 lifecycle classifier/coordinator repair evidence
+
+The operator-stopped checkpoint resumed as one bounded B1 slice after the approved
+design merge `6293e6d7aeacb6c7bfba6ae9873a26c7c5988f11`. Preserve the rejected
+candidate `dff6dc7d5120c24e5e4a621ad37d6aebdf705a91` and its Astra report at
+`/Users/jlanders/.prime/agent/session-artifacts/01a0ba54-da05-76bd-8d22-a0facfdd7f31/sub-c635cfce/slice1-n1-n7-review.md`.
+
+B1 now has one pure lifecycle classifier shared by provider context, promotion
+preflight, post-publication activation, current-marker selection, and ordered
+session-start reconciliation. It validates every current-owner expectation,
+marker, and receipt before selecting ordinary, active, or one exact recovery.
+Only a valid nonempty foreign owner is inert. Missing, null, numeric, or empty
+owners fail closed. Exact current and legacy stable bindings are checked before
+promotion or migration. Completed old generations remain inert; orphan active,
+old authorized/completing, inactive-without-completed, and reappearing-expectation
+states block even beside another active generation.
+
+The normally discovered extension now registers one lifecycle-mutating startup
+coordinator. It validates kernel/package readiness before mutation, reconstructs
+or migrates at most one selected marker, reclassifies, and invokes completing
+recovery only when that generation remains the sole recoverable state. The former
+independent finalization startup handler and its separate catch were removed, so
+a blocker cannot be swallowed by a later mutator. The stable `OversightMarker`
+type no longer declares the mutable route field.
+
+Focused contracts passed 25 conversation lifecycle tests and 25 reviewed-plan
+tests. Four installed-runtime discovery tests passed. The new native matrix made
+zero provider calls, zero fake-daemon calls, and zero lifecycle mutations for
+empty owners across all three record types, old completing plus active beta,
+orphan active plus active beta, current-marker stable mismatch, and legacy stable
+mismatch; completed-old plus active-current and sole completing recovery remain
+valid. Full gates passed 118 Node tests and 278 Python tests plus seven subtests
+with 11 existing warnings. User-global apply/check passed, and a fresh builder-rooted
+process observed the installed generation with kernel/package `1/0`. `git diff --check`
+passed.
+
+B2–B4 remain deliberately incomplete and outside this commit. Preserve the
+unstaged B2 import-only change in `episode-finalization.ts` and the unstaged,
+unintegrated B4 fake-daemon fixture in `tests/test_reviewed_plan_extension.py`.
+The next P0 is B2 lock reliability, followed by B3 bounded scalar grammar and B4
+native isolation/cleanup. Do not touch shared handoff scheduling, quiescence,
+Slice 2, owner checkout, credentials, or retired leaked sessions.
+
 Slice 2 remains blocked until this exact replacement commit is accepted.
 
 ## Slice 2 — Project-customizable oversight and owner-driven continuation

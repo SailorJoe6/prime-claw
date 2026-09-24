@@ -508,6 +508,19 @@ test("registered finalization capability confirms once, recovers natively, and r
   assert.equal(laterContext.messages.filter((message) => message.customType === "prime-claw-oversee-episode-package").length, 1);
 });
 
+test("registered startup coordinator never bypasses a cross-generation lifecycle blocker", async (t) => {
+  const cwd=realpathSync(mkdtempSync(join(tmpdir(),"prime-claw-reviewed-plan-conflict-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
+  writeSkill(cwd,"---\nname: oversee-episode\ndescription: test package\n---\nprocedure","oversee-episode");
+  const state=join(cwd,".prime/agent/state/spec-episodes");mkdirSync(state,{recursive:true});
+  const betaWorktree=resolve(dirname(cwd),`${basename(cwd)}-beta-episode`),beta={version:2,slug:"beta",sourceLocation:".ralph/plans/future/beta",ownerSessionId:"owner-session",episodeId:"22222222-2222-4222-8222-222222222222",episodeActiveSessionId:"beta-route",episodeSessionFile:join(betaWorktree,"episode.jsonl"),branch:"episode/beta",worktree:betaWorktree,sessionName:"beta-episode",bootstrapAdmission:"delivered"};
+  writeFileSync(join(state,"beta.json"),JSON.stringify(beta));
+  const alpha={markerVersion:2,status:"inactive",ownerSessionId:"owner-session",slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeSessionFile:"/old/alpha.jsonl",branch:"episode/alpha",worktree:"/old/alpha",sessionName:"alpha-episode",identityVersion:2,admission:"delivered"};
+  const receiptPath=join(state,"alpha.finalization.json");writeFileSync(receiptPath,JSON.stringify({version:2,state:"completing",sourceLocation:alpha.sourceLocation,slug:alpha.slug,disposition:"merged",ownerSessionId:alpha.ownerSessionId,episodeId:alpha.episodeId,episodeActiveSessionId:"alpha-route",episodeSessionFile:alpha.episodeSessionFile,episodeBranch:alpha.branch,episodeWorktree:alpha.worktree,sessionName:alpha.sessionName,identityVersion:2,admission:"delivered",episodeCommit:"a".repeat(40),targetBranch:"main",targetRef:"refs/heads/main",targetCommitAtAuthorization:"b".repeat(40),authorizedAt:"2026-01-01",completingAt:"2026-01-02"}));
+  let recoveryCalls=0;const f=createHarness(cwd,createReviewedPlanExtension({finalization:{async acquireLock(){recoveryCalls++;throw new Error("must not run")}}}));
+  f.entries.push({type:"custom",customType:"prime-claw-conversation-oversight",data:{markerVersion:2,status:"active",ownerSessionId:"owner-session",slug:beta.slug,sourceLocation:beta.sourceLocation,episodeId:beta.episodeId,episodeSessionFile:beta.episodeSessionFile,branch:beta.branch,worktree:beta.worktree,sessionName:beta.sessionName,identityVersion:2,admission:"delivered"}},{type:"custom",customType:"prime-claw-conversation-oversight",data:alpha});
+  const before=structuredClone(f.entries);await f.events.get("session_start")({},f.ctx);assert.equal(recoveryCalls,0);assert.deepEqual(f.entries,before);assert.equal(JSON.parse(readFileSync(receiptPath,"utf8")).state,"completing");assert.match(f.notices.find(n=>/recovery blocked/.test(n.message)).message,/active generation conflicts|noncurrent terminal/);
+});
+
 test("registered actual handoff reopen refresh preserves ordinary owner oversight", async (t) => {
   const cwd=realpathSync(mkdtempSync(join(tmpdir(),"prime-claw-reviewed-plan-route-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
   mkdirSync(join(cwd,LOCATION),{recursive:true});writeSkill(cwd,"---\nname: oversee-episode\ndescription: test package\n---\nprocedure","oversee-episode");

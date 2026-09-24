@@ -13,8 +13,6 @@ import {
 import {
   appendActiveOversight,
   assertConversationPromotionReady,
-  assertFinalizationRecoveryReady,
-  currentCompletingFinalization,
   currentOversightMarker,
   currentOversightMarkerForFinalization,
   OVERSIGHT_MARKER_TYPE,
@@ -149,22 +147,17 @@ type ReviewedPlanDependencies = EpisodeDependencies & {
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
-    registerConversationOversight(pi);
-    pi.on("session_start", async (_event, ctx) => {
-      try {
-        assertFinalizationRecoveryReady(ctx);
-        const recovery = currentCompletingFinalization(ctx);
-        if (!recovery) return;
+    registerConversationOversight(pi, {
+      recoverCompleting: async (ctx, marker) => {
         const recovered = await recoverCompletingEpisodeFinalization(
           ctx,
           (status, value) => pi.appendEntry(OVERSIGHT_MARKER_TYPE, { ...value, status }),
-          recovery.marker,
+          marker,
           dependencies?.finalization,
         );
         if (recovered) ctx.ui.notify(`Recovered completed episode finalization for ${recovered.sourceLocation}.`, "warning");
-      } catch (error) {
-        ctx.ui.notify(`prime-claw finalization recovery blocked: ${error instanceof Error ? error.message : String(error)}`, "error");
-      }
+        return Boolean(recovered);
+      },
     });
     const approvedLocationBySession = new Map<string, string>();
     registerSkillCommand(pi, {
