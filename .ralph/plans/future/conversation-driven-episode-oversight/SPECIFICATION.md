@@ -193,6 +193,13 @@ agent messages, reload, resume, and tool continuation without depending on the
 input event or a mutable per-input cache. Activation itself causes no unsolicited
 model response.
 
+The canonical package uses a deliberately closed frontmatter contract rather
+than general YAML. Between the exact delimiters it permits exactly one `name`
+line and one `description` line, with no blank, comment, or unknown metadata
+lines. Values follow the documented bounded quoted or unquoted scalar grammar.
+Anything outside that complete subset blocks both promotion and active dispatch
+before a provider call and without changing lifecycle evidence.
+
 Native automatic compaction remains unchanged. Its private summarizer is a
 runtime utility rather than the CONVERSATION agent and need not receive the role
 package. The first real call after compaction must receive one current kernel and
