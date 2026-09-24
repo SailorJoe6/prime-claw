@@ -416,6 +416,68 @@ def test_handoff_policy_documents_trusted_completion_and_honest_transport() -> N
     assert "sent as steer" not in extension
     assert "ordinary prompt" in extension
     assert "immediate or queued" in extension
+    episode_support = (
+        REPO / "src/prime-agent-plugin/extension-support/spec-episode.ts"
+    ).read_text()
+    assert 'handoffDelivery: "prompt"' in episode_support
+    assert 'executeDelivery: "followUp"' in episode_support
+
+
+def test_bootstrap_and_continuation_document_distinct_state_boundaries() -> None:
+    """Fresh creation must not inherit the later continuation snapshot gate."""
+    specification = (
+        REPO / ".ralph/plans/future/conversation-driven-episode-oversight/SPECIFICATION.md"
+    ).read_text()
+    docs = (REPO / "docs/future-specification-bundles.md").read_text()
+
+    for text in (specification, docs):
+        assert "Fresh bootstrap does not read episode state" in text
+        assert "observed-idle snapshot" in text
+        assert "later" in text and "continuation" in text
+        assert "completion report" in text
+
+    bootstrap = specification.split("### Handoff-first bootstrap", 1)[1].split(
+        "### First-turn identity", 1
+    )[0]
+    assert "fork and validate publication" in bootstrap
+    assert "complete canonical handoff/execute preflight" in bootstrap
+    assert "persist v2 handoff-pending" in bootstrap
+    assert "persist execute-pending" in bootstrap
+    assert "persist delivered" in bootstrap
+    assert "after the observed-idle snapshot" not in bootstrap
+
+    continuation = docs.split("## Owner-driven episode continuation", 1)[1].split(
+        "## Automated and integration validation", 1
+    )[0]
+    assert "re-reads live daemon state" in continuation
+    assert "fails closed on an observed busy snapshot" in continuation
+
+
+def test_publisher_tests_do_not_claim_fake_native_admission_proof() -> None:
+    """Maintained tests exercise production code without inventing native semantics."""
+    tests = (REPO / "tests/spec_episode_extension.test.mjs").read_text()
+    plan = (
+        REPO / ".ralph/plans/future/conversation-driven-episode-oversight/EXECUTION_PLAN.md"
+    ).read_text()
+
+    assert "nativeSemantics" not in tests
+    assert 'from "../src/prime-agent-plugin/extension-support/spec-episode.ts"' in tests
+    assert "mocked already-admitted handoff" in tests
+    assert "controlled first ordinary-prompt rejection" in tests
+    assert "maintained plugin tests do not" in plan
+    assert "native-runtime proof" in plan
+
+
+def test_dogfood_watch_policy_retains_intended_retry_without_replay() -> None:
+    """A definite first rejection preserves only the bounded intended-retry watch."""
+    plan = (
+        REPO / ".ralph/plans/future/conversation-driven-episode-oversight/EXECUTION_PLAN.md"
+    ).read_text()
+    assert "after definite first no-admission while a later owner" in plan
+    assert "retry remains intended" in plan
+    assert "waiting only for owner/operator action" in plan
+    assert "must not poll or replay" in plan
+    assert "automatically" in plan
 
 
 def test_reviewed_skills_have_only_native_slash_command_surfaces() -> None:

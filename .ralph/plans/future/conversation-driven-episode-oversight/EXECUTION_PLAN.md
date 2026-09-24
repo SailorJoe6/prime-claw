@@ -273,15 +273,18 @@ copied ownership.
 
 ### Verification and checkpoint
 
-- Run focused Node and native offline Python tests using isolated config/session
-  roots and fake providers.
+- Run focused Node publisher/policy tests and offline Python integration tests
+  using isolated config/session roots and controlled providers. Treat maintained
+  plugin tests as production control-flow coverage, not native-runtime proof.
 - Run all Node and Python suites; keep the baseline-reproducible candidate
   watchdog failure visible and separate if it recurs.
 - Run global plugin apply/check and fresh-process readiness probes without
   modifying unrelated global resources.
 - Prove the exact pushed candidate preserves unrelated execute-skill provenance.
   The separately operator-approved P0 shared handoff-baseline repair is allowed
-  and must remain covered by its focused source, native-semantics, and docs tests.
+  and must remain covered by focused production-publisher, policy, and docs tests.
+  Previously measured Prime Agent 0.9.5 behavior remains retained review evidence;
+  maintained plugin tests do not manufacture native-runtime proof.
 - Update and Dolt-push `prime-claw-h6w.22`, commit one replacement Slice 1
   candidate, push it, and stop for fresh owner and Astra `max` review.
 
@@ -319,9 +322,13 @@ partial-admission, and no-replay boundary.
 
 Verification covers resident-idle route retention, missing-route publication and
 state re-read, `isSessionActive: true` by itself, every detailed observed busy
-cause, ordinary-prompt request shape, streaming-race rejection, the residual non-streaming queue and steer counterexamples, and unchanged first/second reject
-and uncertain outcomes. It also enforces the completion-report/status-question/
-trusted-answer coordination contract and transport-neutral success text.
+cause, ordinary-prompt request shape, controlled publisher acknowledgements and
+rejections, and unchanged first/second reject and uncertain outcomes. Retained
+review evidence records the previously measured 0.9.5 streaming-race,
+residual-non-streaming queue, and steer behavior; maintained plugin tests do not
+claim to reproduce native admission semantics. Policy tests also enforce the
+completion-report/status-question/trusted-answer coordination contract and
+transport-neutral success text.
 
 ## Slice 2 — Project-customizable oversight and owner-driven continuation
 
@@ -440,8 +447,11 @@ for ordinary project conversation without touching the canonical checkout.
 4. Cancel the completed generation's watch, pre-arm exactly one non-steering
    watch for the intended continuation, and then invoke the terminal
    `handoff_spec_episode` capability without another operator transport request.
-   Cancel that watch only on definite no-admission failure; retain it across
-   success, partial admission, or ambiguity until reconciliation.
+   Keep that watch available after definite first no-admission while a later owner
+   retry remains intended. Retain it across success, partial admission, or
+   ambiguity until the generation/retry is reconciled complete, blocked, stopped,
+   or waiting only for owner/operator action. The watch must not poll or replay
+   automatically.
 5. Reconcile the complete exact candidate and obtain a fresh final EXPERT review
    using the checked-in exact selector and reasoning level. Record the admitted
    model and reasoning policy against the reviewed commit. Repair and renew

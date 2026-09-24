@@ -55,9 +55,12 @@ conversation-to-episode transitions that this feature builds on:
   focused compaction request before the first execute slice;
 - exact-owner `handoff_spec_episode(location, guidance?)` for later slice
   transitions;
-- canonical handoff as an ordinary `prompt` after an observed-idle snapshot, with
-  `queueIfBusy: false` and no `streamingBehavior`, followed by canonical execute
-  exactly once as the sole queued `followUp`;
+- handoff-first bootstrap after validated publication, canonical preflight, and
+  durable v2 admission journaling;
+- later owner continuation after a fresh exact observed-state/quiescence check;
+- canonical handoff for both callers as an ordinary `prompt` with `queueIfBusy:
+  false` and no `streamingBehavior`, followed by canonical execute exactly once
+  as the sole queued `followUp`;
 - agent-owned heartbeats and existing session observation for bounded watches;
 - fresh RLM agents for independent EXPERT review, with dogfood explicitly using
   an operator-authorized higher-capability reviewer model rather than silently
@@ -320,9 +323,10 @@ New episodes start with the proven ordered transition:
 ```text
 create branch and worktree
   → promote and commit the reviewed future folder
-  → fork and publish the inherited episode session
+  → complete canonical handoff/execute preflight
+  → fork and validate publication of the inherited episode session
   → persist v2 handoff-pending admission state
-  → after the observed-idle snapshot, send canonical handoff as an ordinary prompt
+  → send canonical handoff as an ordinary prompt
   → request focused compaction of inherited planning context
   → persist execute-pending after handoff acknowledgement
   → queue canonical execute exactly once as the sole follow-up
@@ -332,6 +336,11 @@ create branch and worktree
 Direct execute at bootstrap was tried and was wrong: the first slice inherited a
 large planning conversation without the intended context-focusing handoff. The
 handoff-first sequence is required for new episodes.
+
+Fresh bootstrap does not read episode state, require a previous-slice
+completion report, or claim an observed-idle snapshot. The fresh exact
+observed-state/quiescence check belongs to later `handoff_spec_episode`
+continuation.
 
 Admission state is not work-completion state. Acknowledgement means only that the
 ordered daemon mutation was accepted.

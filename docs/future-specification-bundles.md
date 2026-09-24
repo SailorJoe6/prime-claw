@@ -196,13 +196,16 @@ The fork includes the successful `create_spec_episode` tool result so it does
 not begin with a dangling tool call. Prime Agent 0.9.5 has no public extension
 API that publishes a fork as a separate sibling without replacing the owner,
 so the narrowly scoped host adapter uses the daemon supervisor socket injected
-into daemon workers. Before task delivery it preflights both canonical workflows and atomically
-stores a version-2 identity with `bootstrapAdmission: handoff-pending`. New
-episodes then use the same narrow two-message transport as later owner-driven
-transitions: after an observed-idle snapshot, canonical handoff is sent as an
-ordinary `prompt` with no `streamingBehavior`, and canonical execute is queued exactly once as the sole
-`followUp`. This focuses the inherited
+into daemon workers. Fresh creation preflights both canonical workflows,
+validates publication, and atomically stores a version-2 identity with
+`bootstrapAdmission: handoff-pending`. It then sends canonical handoff as an
+ordinary `prompt` with no `streamingBehavior`; after acknowledgement it records
+`execute-pending`, queues canonical execute exactly once as the sole `followUp`,
+and records `delivered` after execute acknowledgement. This focuses the inherited
 planning conversation through the handoff compaction boundary before slice 1.
+Fresh bootstrap does not read episode state, require a previous-slice completion
+report, or obtain an observed-idle snapshot. The later owner-driven continuation
+path retains its fresh exact state re-read and observed-quiescence check.
 
 The bootstrap admission journal records transport stages, not workflow
 completion:
@@ -313,21 +316,28 @@ pytest -q tests/test_reviewed_plan_extension.py
 ```
 
 The Node suites cover native and conversational planning registration,
-validation, canonical Markdown loading, follow-up admission, failure isolation,
-opaque temporary-Git promotion, lifecycle-directory preservation, promotion
-commits, inherited context, protocol-7 daemon envelopes, durable handoff-first bootstrap admission, version-1 compatibility,
-per-mutation crash-window and uncertain-delivery replay suppression, allowed-empty promotion commits, partial
-cleanup observability, active and inactive replay, collision safety, confirmed
-invocation-owned cleanup, exact-owner remote handoff, quiescent-state checks,
-ordered prompt/follow-up delivery, and visible partial or uncertain failures. The Python bridge reruns both suites and uses
-installed offline Prime Agent RPC plus startup probes to prove one native
-`plan`, one native `implement-spec`, explicit `ralph_plan`, `create_spec_episode`, and `handoff_spec_episode`
-tools, no `ralph_implement_spec` tool, the confirmed
-`steer` lifecycle ordering described above, and a valid inherited
-Prime Agent context, and bounded real daemon create/state/messages/kill behavior
-at the episode worktree CWD.
+validation, canonical Markdown loading, controlled publisher acknowledgements and
+rejections, failure isolation, opaque temporary-Git promotion,
+lifecycle-directory preservation, promotion commits, inherited context,
+protocol-7 daemon envelopes, durable handoff-first bootstrap admission,
+version-1 compatibility, per-mutation crash-window and uncertain-delivery replay
+suppression, allowed-empty promotion commits, partial cleanup observability,
+active and inactive replay, collision safety, confirmed invocation-owned cleanup,
+exact-owner remote handoff, quiescent-state checks, ordered prompt/follow-up
+delivery, and visible partial or uncertain failures. These maintained plugin tests
+exercise production request and control-flow code. Their controlled client
+responses are not native-runtime admission proof.
 
-These checks prove deterministic command loading and bounded episode mechanics.
+The Python bridge reruns both suites and uses isolated installed Prime Agent RPC
+plus startup probes to check one native `plan`, one native `implement-spec`,
+explicit `ralph_plan`, `create_spec_episode`, and `handoff_spec_episode` tools, no
+`ralph_implement_spec` tool, a valid inherited Prime Agent context, and bounded
+daemon create/state/messages/kill behavior at the episode worktree CWD. Previously
+measured Prime Agent 0.9.5 streaming, residual-work queueing, and steer behavior is
+retained review evidence rather than a claim manufactured by the plugin tests.
+
+Together these checks prove deterministic command loading and bounded episode
+mechanics within their stated test boundaries.
 They use disposable repositories, offline RPC, and controlled daemon probes.
 They do **not** prove that a human completed both review gates, observed a live
 production episode through execute/handoff, made a terminal merge or abandonment

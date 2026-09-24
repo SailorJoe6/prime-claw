@@ -1011,10 +1011,17 @@ test("publisher admits execute as one queued follow-up without template expansio
 });
 
 
-test("publisher admits remote handoff as an ordinary prompt before the sole execute follow-up", async () => {
+test("publisher handles a mocked already-admitted handoff before the sole execute follow-up", async () => {
   const requests = [];
+  const events = [];
   const client = {
-    async request(command) { requests.push(command); return { success: true, data: {} }; },
+    async request(command) {
+      requests.push(command);
+      events.push(command.message);
+      // This controlled acknowledgement represents an ordinary prompt that the
+      // runtime has already admitted, either immediately or queued until idle.
+      return { success: true, data: {} };
+    },
     close() {},
   };
   const publisher = new PrimeSessionPublisher(client);
@@ -1026,12 +1033,14 @@ test("publisher admits remote handoff as an ordinary prompt before the sole exec
     "wrapped execute",
     () => {
       checkpointCalls += 1;
+      events.push("checkpoint");
       assert.equal(requests.length, 1);
       assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
     },
   );
 
   assert.equal(checkpointCalls, 1);
+  assert.deepEqual(events, ["wrapped handoff", "checkpoint", "wrapped execute"]);
   assert.deepEqual(requests, [{
     type: "prompt",
     activeSessionId: "active-episode-1",
@@ -1050,72 +1059,36 @@ test("publisher admits remote handoff as an ordinary prompt before the sole exec
   }]);
 });
 
-test("streaming race rejects ordinary prompt and queues neither handoff nor execute", async () => {
+test("publisher stops after a controlled first ordinary-prompt rejection", async () => {
   const requests = [];
   const client = {
     async request(command) {
       requests.push(command);
-      if (command.streamingBehavior === undefined && command.queueIfBusy === false) {
-        return { success: false, error: "Cannot prompt while session is streaming" };
-      }
-      return { success: true, data: {} };
+      return { success: false, error: "injected first prompt rejection" };
     },
     close() {},
   };
   const publisher = new PrimeSessionPublisher(client);
+  let checkpointCalls = 0;
 
   await assert.rejects(
-    publisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute"),
-    /Cannot prompt while session is streaming/,
+    publisher.deliverHandoff(
+      "active-episode-1",
+      "wrapped handoff",
+      "wrapped execute",
+      () => { checkpointCalls += 1; },
+    ),
+    /injected first prompt rejection/,
   );
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].message, "wrapped handoff");
-  assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
-});
-
-test("ordinary prompt may queue behind residual non-streaming work", async () => {
-  const admitted = [];
-  const nativeSemantics = {
-    async request(command) {
-      // Characterize the measured native boundary: queueIfBusy:false rejects a
-      // streaming race, but is not an atomic fail-if-any-busy primitive.
-      admitted.push(command.message);
-      return { success: true, data: {} };
-    },
-    close() {},
-  };
-
-  const response = await nativeSemantics.request({
+  assert.equal(checkpointCalls, 0);
+  assert.deepEqual(requests, [{
     type: "prompt",
-    activeSessionId: "non-stream-busy-episode",
-    message: "admitted now or queued until idle",
+    activeSessionId: "active-episode-1",
+    message: "wrapped handoff",
     queueIfBusy: false,
-  });
-
-  assert.equal(response.success, true);
-  assert.deepEqual(admitted, ["admitted now or queued until idle"]);
-});
-
-test("Prime Agent steer is a queueing counterexample even when queueIfBusy is false", async () => {
-  const queued = [];
-  const nativeSemantics = {
-    async request(command) {
-      if (command.streamingBehavior === "steer") queued.push(command.message);
-      return { success: true, data: {} };
-    },
-    close() {},
-  };
-
-  const response = await nativeSemantics.request({
-    type: "prompt",
-    activeSessionId: "busy-episode",
-    message: "would queue while streaming",
-    streamingBehavior: "steer",
-    queueIfBusy: false,
-  });
-
-  assert.equal(response.success, true);
-  assert.deepEqual(queued, ["would queue while streaming"]);
+    expandPromptTemplates: false,
+    source: "extension",
+  }]);
 });
 
 test("publisher exposes first-send failure without queuing execute", async () => {
