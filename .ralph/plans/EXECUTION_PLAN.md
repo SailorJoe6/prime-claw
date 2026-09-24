@@ -218,6 +218,9 @@ copied ownership.
    - migrate exact-owner legacy markers append-only while ignoring foreign copied history;
    - validate the existing spec-episode identity as ownership expectation;
    - read the current canonical `oversee-episode` package;
+   - validate raw package delimiters before any whole-file whitespace
+     normalization; require exact unindented delimiter lines while preserving
+     normal trailing newlines and formatted body text;
    - accept only its closed two-key frontmatter contract (`name` and
      `description`) and reject blank, comment, unknown, nested, or unsupported
      scalar metadata before promotion or provider dispatch;
@@ -451,6 +454,37 @@ passed, and fresh installed active/promotion probes rejected all six invalid
 cases with zero provider records and accepted both valid cases with
 kernel/package `1/1`. The repaired exact commit still requires fresh owner review
 before any B4 handoff or Slice 2 work.
+
+### B3-R2 owner/expert revision required
+
+Exact-commit owner/Astra disposition for
+`26cef4f78a399da4580b53b08a3bbb499c1e326e` is **REVISE**. The fresh Astra/max
+report is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0ba54-da05-76bd-8d22-a0facfdd7f31/sub-39e2a007/b3r1-exact-review.md`.
+Its actionable P2 proves `packageBody()` trims the whole raw package before
+parser validation, so space/tab-indented opening `---` lines normalize to exact.
+Independent native active and promotion cases exited zero and reached the fake
+provider with kernel/package `1/1`; promotion, activation, or recovery mutation
+can therefore occur even though the exact-delimiter contract requires fail-closed
+behavior. The closed two-key allowlist itself is correct.
+
+The next P0 after handoff is one fresh B3-R2 repair. First reconcile authoritative
+main design commit `d8a3687` while preserving the promoted future-folder
+deletion, rejected history, and dirty B4 fixture. Validate the raw opening and
+closing delimiter/frontmatter structure before any whole-file whitespace
+normalization, retaining one shared reader for every gate; keep post-validation
+injected-text formatting separate. Do not generalize YAML, add aliases, comments,
+or unknown keys, duplicate validators, fix only one call site, reject normal
+trailing newlines or formatted nonempty body indentation, or touch B4.
+
+Acceptance must prove space/tab-indented opening delimiters and other nonexact
+opening/closing forms reject at the complete reader, promotion, activation,
+active dispatch, and startup recovery with zero provider, episode-creation, and
+completion calls; no package append; byte- and branch-identical lifecycle
+evidence; no drift on repeated failure; and successful resume after restoring a
+canonical package. A canonical two-key package with a normal final newline and
+formatted nonempty body, plus all valid quoted, unquoted, Unicode, URL, and
+punctuation forms, must remain valid. All B1/B2/B3 regressions must pass.
 
 B4 remains deliberately incomplete and must wait for its own later handoff.
 Preserve the unstaged, unintegrated B4 fake-daemon fixture in
