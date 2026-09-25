@@ -295,3 +295,29 @@ def test_current_documentation_explains_final_review_and_one_replacement_limits(
         "PASS is evidence, not merge authority",
     ]:
         assert phrase in text
+
+
+def test_completed_plan_readiness_is_owner_policy_before_final_review():
+    """Contract test only: semantic owner behavior needs separate live evidence."""
+    skill = " ".join(SKILL.read_text().split())
+    docs = " ".join(DOC.read_text().split())
+    gate = skill.index("When the EPISODE claims completion")
+    review = skill.index("obtain a fresh final EXPERT review")
+    close = skill.index("Only after terminal work is verified, call `finalize_spec_episode`")
+    assert gate < review < close
+    for requirement in (
+        "not during ordinary in-progress `advance`",
+        "project-customizable execute skill and approved plan",
+        "*all* required active artifacts",
+        "never assume universal filenames",
+        "those exact artifacts into its corresponding archive bundle",
+        "update the archive index coherently, and repair relative links",
+        "Trace the promoted paths to archived counterparts using the episode's Git diff/history",
+        "at the exact pushed candidate commit",
+        "stale active copies, missing index/link evidence, or uncertain provenance block completion",
+        "documented project terminal policy that explicitly uses another finished state",
+    ):
+        assert requirement in skill
+    assert "not an ordinary in-progress `advance` gate" in docs
+    assert "not an executable owner-behavior test" in docs
+    assert "cannot prove an agent follows it" in docs

@@ -243,20 +243,31 @@ approved bundle; the example filenames in `/execute` are not a universal
 schema. It traces the promoted paths to their archived counterparts with the
 candidate's Git diff/history, then checks the files, archive index entry, and
 relative links at the exact pushed candidate. An unrelated archive directory
-is not proof. The optional `scripts/verify-completed-plan.py --index <index> --bundle-root
-<archive-bundle> --artifact <active> <archived> [...]` checks explicitly
-supplied active/archive path pairs (including nested paths), the exact
-`## <bundle>/` heading in this project's archive README, and bounded inline
-Markdown links and images in the selected section and archived Markdown files.
-Reference-style links, ambiguous raw parenthesized destinations, and HTML or
-other unsupported syntax return non-success for manual link inspection;
-fenced and inline code examples are ignored. A non-success/manual-inspection
-result is not a helper PASS and requires separately recorded exact-candidate
-manual link evidence before merge readiness. The helper neither discovers
-required files nor establishes provenance or approves merge. A documented project policy may instead define another
+is not proof. A documented project policy may instead define another
 terminal state with equally reviewable artifact/link evidence. Missing or
 uncertain evidence blocks a completion/merge-readiness claim and calls for
 in-scope repair or pause before final review.
+
+Historical state comparison (manual evidence, **not an executable owner-behavior
+test**): at reviewed merge commit `248f944f70acdbe19d3a93c6781ebcdb2eea22d2`,
+`git ls-tree -r --name-only` shows both promoted
+`.ralph/plans/SPECIFICATION.md` and `.ralph/plans/EXECUTION_PLAN.md` still
+active, no `archive/conversation-driven-episode-oversight/` counterparts, and
+no matching entry in the archive README. Under the readiness rule above, that
+completed episode must not be presented as merge-ready. At the separate
+one-time cleanup commit `26cefa16b83016a53737cceeda92822fe0098ebf`, both
+active paths are absent, their exact counterparts are in
+`.ralph/plans/archive/conversation-driven-episode-oversight/`, and the archive
+README has its `## conversation-driven-episode-oversight/` entry. Representative
+relative links from the archived specification to
+`../worktree-isolated-specification-episodes/SPECIFICATION.md` and
+`../../../../docs/future-specification-bundles.md` resolve in that commit
+(`git cat-file -e <commit>:<target>`). This later tree is suitable artifact
+evidence for owner review; it does not retroactively validate the earlier
+merge, prove all links, or authorize any merge. Policy-contract tests guard
+that the rule stays in the owner skill, but cannot prove an agent follows it
+in a live episode. Bead `prime-claw-mu1` retains the behavioral-coverage
+acceptance decision for the owner.
 
 After this reconciliation, the owner obtains a fresh final EXPERT review of
 the complete exact candidate, adjudicates every finding, and requires
