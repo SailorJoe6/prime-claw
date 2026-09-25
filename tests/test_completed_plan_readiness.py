@@ -153,6 +153,23 @@ def test_link_syntax_fails_closed_or_ignores_literal_examples(tmp_path):
     assert check(active, archive, index).returncode == 0
 
 
+def test_info_suffixed_fence_is_not_a_close_or_real_index_heading(tmp_path):
+    active, archive, index = fixture(tmp_path)
+    for before, after in zip(active, archive):
+        before.rename(after)
+    index.write_text("# Index\n```markdown\n```md\n## episode-one/ — COMPLETE\n")
+    result = check(active, archive, index)
+    assert result.returncode == 1
+    assert "requires one exact" in result.stdout
+    # A legal close without an info suffix permits the real heading.
+    index.write_text("# Index\n```markdown\n```md\n## example-only/\n```\n"
+                     "## episode-one/ — COMPLETE\n[Steps](episode-one/STEPS_CUSTOM.md)\n")
+    assert check(active, archive, index).returncode == 0
+    # The same fence grammar applies to artifact links, not just headings.
+    archive[0].write_text("```markdown\n```md\n[example](missing.md)\n```\n")
+    assert check(active, archive, index).returncode == 0
+
+
 def test_index_reference_links_require_manual_evidence(tmp_path):
     active, archive, index = fixture(tmp_path)
     for before, after in zip(active, archive):

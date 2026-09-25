@@ -12,6 +12,18 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+FENCE_CLOSE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
+
+
+def fence_transition(line: str, state: tuple[str, int] | None) -> tuple[str, int] | None:
+    """Update a fenced-code state; info text is legal only on an opener."""
+    if state is not None:
+        close = FENCE_CLOSE.match(line.rstrip('\r\n'))
+        if close and close.group(1)[0] == state[0] and len(close.group(1)) >= state[1]:
+            return None
+        return state
+    opener = FENCE.match(line)
+    return (opener.group(1)[0], len(opener.group(1))) if opener else None
 INLINE_CODE = re.compile(r"(`+)(.*?)\1", re.DOTALL)
 # Bounded inline links/images: plain path, optional double-quoted title, or
 # angle-wrapped path (which may contain spaces/parentheses).
@@ -23,19 +35,14 @@ HTML = re.compile(r"</?[A-Za-z][^>]*>|<[^<>\s]+(?:\.\w+|/[^<>]*)>")
 def checked_links(document: Path, text: str) -> list[str]:
     errors = []
     visible = []
-    fence_char = None
-    fence_size = 0
+    fence = None
     for line in text.splitlines():
-        marker = FENCE.match(line)
-        if fence_char:
-            if marker and marker.group(1)[0] == fence_char and len(marker.group(1)) >= fence_size:
-                fence_char = None
-            continue
-        if marker:
-            fence_char, fence_size = marker.group(1)[0], len(marker.group(1))
+        was_fenced = fence is not None
+        fence = fence_transition(line, fence)
+        if was_fenced or fence is not None:
             continue
         visible.append(line)
-    if fence_char:
+    if fence is not None:
         errors.append(f"{document}: manual link inspection required: unclosed fenced code")
     # Markdown code spans can cross a line break; mask them after collecting
     # non-fenced lines so their link-like examples remain inert.
@@ -63,17 +70,12 @@ def checked_links(document: Path, text: str) -> list[str]:
 def real_index_headings(text: str) -> list[tuple[int, int, int, str]]:
     """Return heading positions outside fenced examples, including child headings."""
     headings = []
-    fence_char = None
-    fence_size = 0
+    fence = None
     offset = 0
     for line in text.splitlines(keepends=True):
-        marker = FENCE.match(line)
-        if fence_char:
-            if marker and marker.group(1)[0] == fence_char and len(marker.group(1)) >= fence_size:
-                fence_char = None
-        elif marker:
-            fence_char, fence_size = marker.group(1)[0], len(marker.group(1))
-        else:
+        was_fenced = fence is not None
+        fence = fence_transition(line, fence)
+        if not was_fenced and fence is None:
             heading = re.match(r"^(#{1,6}) (.*)$", line.rstrip('\r\n'))
             if heading:
                 headings.append((offset, offset + len(line), len(heading.group(1)), heading.group(2)))
