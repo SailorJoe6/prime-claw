@@ -266,8 +266,8 @@ relative links from the archived specification to
 evidence for owner review; it does not retroactively validate the earlier
 merge, prove all links, or authorize any merge. Policy-contract tests guard
 that the rule stays in the owner skill, but cannot prove an agent follows it
-in a live episode. Bead `prime-claw-mu1` retains the behavioral-coverage
-acceptance decision for the owner.
+in a live episode. The before-and-after trees provide bounded manual
+artifact-state coverage, not a live EPISODE behavior test.
 
 After this reconciliation, the owner obtains a fresh final EXPERT review of
 the complete exact candidate, adjudicates every finding, and requires
