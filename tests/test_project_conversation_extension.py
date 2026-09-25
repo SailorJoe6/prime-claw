@@ -10,6 +10,7 @@ EXTENSION = REPO / "src/prime-agent-plugin/extensions/reviewed-plan.ts"
 SUPPORT = REPO / "src/prime-agent-plugin/extension-support/conversation-oversight.ts"
 SKILL = REPO / ".ralph/skills/oversee-episode/SKILL.md"
 DOC = REPO / "docs/conversation-driven-episode-oversight.md"
+DOGFOOD = REPO / "reports/reviews/conversation-driven-episode-oversight-dogfood.md"
 
 
 def test_managed_identity_kernel_is_small_and_routes_bounded_roles():
@@ -185,6 +186,31 @@ def test_current_documentation_describes_default_identity_and_temporary_mode():
     for phrase in ["APPEND_SYSTEM.md", "default CONVERSATION", "oversight mode", "oversee-episode", "exact-session", "native compaction", "finalize_spec_episode", "15-minute"]:
         assert phrase in text
     assert "--project-conversation" not in text
+
+
+def test_dogfood_report_preserves_frozen_old_finalizer_chronology():
+    text = DOGFOOD.read_text()
+    cancelled = text.index("first old-design native\nauthorization call returned `Episode finalization authorization was cancelled`")
+    authorized = text.index("second old-design authorization succeeded for disposition `merged`")
+    completed = text.index("exactly one old-design `complete` call")
+    assert cancelled < authorized < completed
+    for phrase in [
+        "b8ddda43da88c897c2a844cca99d31a95f38c7fb",
+        "fast-forwarded and pushed disposable `main`",
+        "01a0d43b-e71c-702f-8f94-d5d7e60c2247",
+        "removed its clean worktree",
+        "only the main\nworktree remained",
+        "matching local and remote episode refs were retained",
+        "Finalization is blocked with durable recovery evidence preserved: Daemon session row has an invalid session UUID",
+        "The call was not retried",
+        "receipt remains `authorized`",
+        "matching retained identity/oversight evidence and refs remain frozen",
+    ]:
+        assert phrase in text
+    summary = DOC.read_text()
+    assert "both old-design authorization attempts" in summary
+    assert "still-`authorized` receipt" in summary
+    assert "Daemon session row has an invalid session UUID" in summary
 
 
 def test_native_unclassifiable_marker_owners_block_before_provider(tmp_path):

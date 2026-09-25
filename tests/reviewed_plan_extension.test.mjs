@@ -482,10 +482,38 @@ test("registered bookkeeping close is no-UI, exact, and idempotent", async (t) =
   assert.equal(closed.isError,undefined);assert.equal(closed.details.reused,false);assert.equal(existsSync(identityPath),false);assert.equal(f.confirmations.length,0);assert.equal(f.entries.at(-1).data.status,"inactive");
   const before=structuredClone(f.entries),replay=await tool.execute("replay",{location:LOCATION},undefined,undefined,f.ctx);
   assert.equal(replay.isError,undefined);assert.equal(replay.details.reused,true);assert.deepEqual(f.entries,before);assert.match(replay.content[0].text,/already closed/);
-  const wrong=await tool.execute("wrong",{location:".ralph/plans/future/beta"},undefined,undefined,f.ctx);assert.equal(wrong.isError,true);assert.match(wrong.content[0].text,/No exact oversight marker/);
+  const betaLocation=".ralph/plans/future/beta-plan",betaSlug="beta-plan",betaWorktree=resolve(dirname(cwd),`${basename(cwd)}-${betaSlug}-episode`),beta={...identity,slug:betaSlug,sourceLocation:betaLocation,episodeId:"55555555-5555-4555-8555-555555555555",episodeActiveSessionId:"beta-route",episodeSessionFile:join(betaWorktree,"episode.jsonl"),branch:`episode/${betaSlug}`,worktree:betaWorktree,sessionName:`${betaSlug}-episode`},betaPath=join(state,`${betaSlug}.json`);
+  mkdirSync(join(cwd,betaLocation),{recursive:true});writeFileSync(betaPath,JSON.stringify(beta));f.entries.push({type:"custom",customType:"prime-claw-conversation-oversight",data:{markerVersion:2,status:"active",ownerSessionId:beta.ownerSessionId,slug:beta.slug,sourceLocation:beta.sourceLocation,episodeId:beta.episodeId,episodeSessionFile:beta.episodeSessionFile,branch:beta.branch,worktree:beta.worktree,sessionName:beta.sessionName,identityVersion:2,admission:"delivered"}});
+  const betaBytes=readFileSync(betaPath,"utf8"),betaMarkers=structuredClone(f.entries),historical=await tool.execute("replay-during-beta",{location:LOCATION},undefined,undefined,f.ctx);
+  assert.equal(historical.isError,undefined);assert.equal(historical.details.reused,true);assert.equal(historical.details.episodeId,identity.episodeId);assert.equal(historical.details.location,LOCATION);assert.match(historical.content[0].text,/already closed.*alpha-plan/);assert.doesNotMatch(historical.content[0].text,/beta-plan/);assert.equal(readFileSync(betaPath,"utf8"),betaBytes);assert.deepEqual(f.entries,betaMarkers);assert.equal(f.confirmations.length,0);assert.deepEqual(f.messages,[]);
+  const betaContext=await f.events.get("context")({messages:[]},f.ctx);assert.equal(betaContext.messages.filter(message=>message.customType==="prime-claw-oversee-episode-package").length,1);
+  const wrong=await tool.execute("wrong",{location:".ralph/plans/future/unknown-plan"},undefined,undefined,f.ctx);assert.equal(wrong.isError,true);assert.match(wrong.content[0].text,/No exact oversight marker/);assert.equal(readFileSync(betaPath,"utf8"),betaBytes);assert.deepEqual(f.entries,betaMarkers);
+  rmSync(betaPath);f.entries.push({type:"custom",customType:"prime-claw-conversation-oversight",data:{...betaMarkers.at(-1).data,status:"inactive"}});
   const newer={...identity,episodeId:"44444444-4444-4444-8444-444444444444",episodeActiveSessionId:"new-route"};writeFileSync(identityPath,JSON.stringify(newer));
-  f.entries.push({type:"custom",customType:"prime-claw-conversation-oversight",data:{...f.entries.findLast(entry=>entry.customType==="prime-claw-conversation-oversight").data,status:"active",episodeId:newer.episodeId}});
+  f.entries.push({type:"custom",customType:"prime-claw-conversation-oversight",data:{...before.at(-1).data,status:"active",episodeId:newer.episodeId}});
   const stale=await tool.execute("stale-old-close",{location:LOCATION},undefined,undefined,f.ctx);assert.equal(stale.isError,true);assert.match(stale.content[0].text,/multiple oversight generations/);assert.equal(JSON.parse(readFileSync(identityPath,"utf8")).episodeId,newer.episodeId);assert.equal(f.entries.at(-1).data.status,"active");
+});
+
+test("historical bookkeeping replay stays alpha-scoped while beta remains active across restart", async (t) => {
+  const cwd=realpathSync(mkdtempSync(join(tmpdir(),"prime-claw-reviewed-plan-historical-close-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
+  const alphaLocation=LOCATION,betaLocation=".ralph/plans/future/beta-plan";
+  mkdirSync(join(cwd,alphaLocation),{recursive:true});mkdirSync(join(cwd,betaLocation),{recursive:true});
+  writeSkill(cwd,"---\nname: oversee-episode\ndescription: test package\n---\nprocedure","oversee-episode");
+  const state=join(cwd,".prime/agent/state/spec-episodes");mkdirSync(state,{recursive:true});
+  const make=(slug,sourceLocation,episodeId)=>{const worktree=resolve(dirname(cwd),`${basename(cwd)}-${slug}-episode`);return{version:2,slug,sourceLocation,ownerSessionId:"owner-session",episodeId,episodeActiveSessionId:`${slug}-route`,episodeSessionFile:join(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"}};
+  const alpha=make("alpha-plan",alphaLocation,"33333333-3333-4333-8333-333333333333"),beta=make("beta-plan",betaLocation,"44444444-4444-4444-8444-444444444444");
+  const mark=(identity,status)=>({markerVersion:2,status,ownerSessionId:identity.ownerSessionId,slug:identity.slug,sourceLocation:identity.sourceLocation,episodeId:identity.episodeId,episodeSessionFile:identity.episodeSessionFile,branch:identity.branch,worktree:identity.worktree,sessionName:identity.sessionName,identityVersion:2,admission:"delivered"});
+  const betaPath=join(state,"beta-plan.json");writeFileSync(betaPath,JSON.stringify(beta));
+  const entries=[mark(alpha,"inactive"),mark(beta,"active")].map(data=>({type:"custom",customType:"prime-claw-conversation-oversight",data}));
+  const assertReplay=async(f,label)=>{
+    const identityBefore=readFileSync(betaPath,"utf8"),markersBefore=structuredClone(f.entries);
+    const result=await f.tools.get("finalize_spec_episode").execute(label,{location:alphaLocation},undefined,undefined,f.ctx);
+    assert.equal(result.isError,undefined);assert.equal(result.details.reused,true);assert.equal(result.details.episodeId,alpha.episodeId);assert.equal(result.details.location,alphaLocation);assert.match(result.content[0].text,/already closed.*alpha-plan/);assert.doesNotMatch(result.content[0].text,/beta-plan/);
+    assert.equal(readFileSync(betaPath,"utf8"),identityBefore);assert.deepEqual(f.entries,markersBefore);assert.equal(f.confirmations.length,0);assert.deepEqual(f.messages,[]);
+    const context=await f.events.get("context")({messages:[]},f.ctx);assert.equal(context.messages.filter(message=>message.customType==="prime-claw-oversee-episode-package").length,1);
+  };
+  const first=createHarness(cwd);first.entries.push(...structuredClone(entries));await assertReplay(first,"historical-close");
+  const restarted=createHarness(cwd);restarted.entries.push(...structuredClone(entries));await restarted.events.get("session_start")({},restarted.ctx);assert.deepEqual(restarted.entries,entries);await assertReplay(restarted,"historical-close-after-restart");
 });
 
 test("registered actual handoff reopen refresh preserves ordinary owner oversight", async (t) => {

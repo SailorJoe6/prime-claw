@@ -239,10 +239,16 @@ a single exact-owner/location close removes only the matching episode expectatio
 and appends inactive oversight evidence when needed. The close is no-UI and
 idempotent. Exact replay with inactive evidence and no identity is a no-op;
 inactive evidence with the exact identity still present permits removal-only
-retry without a duplicate marker. A closed future-folder location is
-one-generation-only: promotion rejects reuse, and duplicate generations at one
-location block close lookup so a delayed call cannot clear newer work. Marker,
-expectation, or package disagreement and invalid active kernels block visibly before an oversight provider call. Old
+retry without a duplicate marker. Historical close replay is resolved separately
+from current active ownership: an exact old inactive marker with no identity
+returns old-episode-scoped `reused: true` even while a different-location later
+episode is active, without changing that later identity, marker history, or
+package. A closed future-folder location is one-generation-only: promotion rejects
+reuse, and duplicate generations at one location block close lookup so a delayed
+call cannot clear newer work. Unknown or foreign locations, orphan active markers,
+malformed owner/state, and identity/marker binding disagreement remain blockers.
+Marker, expectation, or package disagreement and invalid active kernels block
+visibly before an oversight provider call. Old
 receipt files are inert legacy artifacts and are neither consulted nor deleted.
 The existing plugin apply/check path plus `/implement-spec` readiness validation
 owns installation integrity; an infinite chain of self-checking sentinel plugins

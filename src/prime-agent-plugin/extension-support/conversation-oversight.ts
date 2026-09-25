@@ -474,7 +474,10 @@ export function currentOversightMarker(ctx: ExtensionContext): OversightMarker |
 export function currentOversightMarkerForClose(ctx: ExtensionContext, sourceLocation: string): OversightMarker | null {
   const locationMarker = markerForLocation(ctx, sourceLocation)?.marker ?? null;
   const state = classifyLifecycle(ctx);
-  if (state.mode === "active" && state.expectation?.sourceLocation === sourceLocation) return locationMarker;
+  if (state.mode === "active") {
+    if (state.expectation?.sourceLocation === sourceLocation) return locationMarker;
+    return locationMarker?.status === "inactive" ? locationMarker : null;
+  }
   if (state.mode !== "ordinary") return null;
   return locationMarker;
 }

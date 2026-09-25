@@ -1366,6 +1366,69 @@ Implementation status for this bounded candidate:
 - the plugin was not applied or reloaded, and the frozen disposable fixture was
   not mutated, retried, or cleaned.
 
+### Accepted B1/B2 repair — next P0
+
+Exact candidate `d50380dcc16ddf3b802fa065ae359521fca7a319` is BLOCKED by
+the accepted exact-commit EXPERT report
+`/Users/jlanders/.prime/agent/session-artifacts/01a0ba54-da05-76bd-8d22-a0facfdd7f31/sub-6a1d5cf7/simplified-terminal-review.md`
+(SHA-256 `a70865f877caca65563e2ad2b9a3675bfaaca77ea008fccf1b1c11f2228a9e5e`).
+Repair only accepted B1 and B2 in one bounded candidate.
+
+**B1 — historical close replay beside later ownership.** Separate lookup of a
+proven closed generation from current active ownership. After alpha is closed,
+an exact `finalize_spec_episode(location)` alpha replay must return alpha-scoped
+`reused: true` even while fresh-location beta is active. It must not append or
+delete beta evidence, alter beta identity bytes, change beta marker/package state,
+or fall back to beta. Prove this through registered-tool and native sequential,
+restart, and replay assertions. Preserve blockers for unknown/foreign locations,
+same-location duplicate generations, orphan active markers, malformed owner/state,
+and identity/marker binding mismatch. Preserve append-failure, removal-only retry,
+and lost-result replay coverage. Add no receipt, lock, UI, terminal Git/daemon
+validator, cleanup automation, or expanded lifecycle machinery.
+
+**B2 — truthful frozen dogfood chronology.** Preserve both old-design
+authorization attempts in order: the first cancelled UI attempt, then the later
+successful `merged` authorization for exact fixture tip
+`b8ddda43da88c897c2a844cca99d31a95f38c7fb`. Record that the exact test
+CONVERSATION fast-forwarded and pushed disposable main, stopped the EPISODE,
+removed its clean worktree, verified only main remained, and retained matching
+local/remote episode refs. Record exactly one subsequent completion call and its
+exact result: `Finalization is blocked with durable recovery evidence preserved:
+Daemon session row has an invalid session UUID`. It was not retried; the receipt
+remains `authorized`, with matching retained identity/oversight evidence and refs.
+Update the sanitized dogfood report and concise current summaries without turning
+chronology into normative policy.
+
+Do not inspect, mutate, retry, reload, finalize, or clean the disposable fixture.
+Do not apply/reload the plugin. Keep the owner-observed full-Python watchdog
+timeout truthful and separate; do not repair it. Run focused and full gates,
+commit/push one repaired candidate, update the Bead, and stop for fresh exact
+owner/EXPERT review.
+
+Repair implementation status:
+
+- B1 now exposes a different-location historical marker only when it is exact v2
+  inactive evidence; the full lifecycle classifier still validates current beta
+  before lookup succeeds, and the close helper still requires alpha's identity to
+  be absent before returning alpha-scoped `reused: true`;
+- registered and native sequential/restart/replay coverage inspects the exact
+  successful alpha tool result and proves byte-identical beta identity, unchanged
+  complete marker history, no new daemon command, and one beta oversight package;
+- B2 now preserves both old-design authorization attempts, successful `merged`
+  authorization, completed terminal work, the exact one-time invalid-session-UUID
+  completion blocker, no retry, the still-`authorized` receipt, and matching
+  retained evidence/refs without touching the fixture;
+- focused Node passes 41/41, the exact native replay probe passes 1/1, and focused
+  Python passes 34 tests plus seven subtests;
+- maintained Node passes 120/120; maintained `python3 -m pytest -q tests` passes
+  299 tests plus seven subtests in 90.75 seconds with 11 existing warnings; and
+- changed-Markdown links pass 9/9, source/inventory/shell/diff checks pass, no
+  plugin apply/reload occurred, and the disposable fixture remained untouched.
+
+The prior `d50380d` full-Python watchdog timeout and isolated rerun remain truthful
+historical evidence above. This repair's later all-green run does not rewrite that
+observed candidate history or expand scope to the watchdog.
+
 - Append final evidence to `prime-claw-h6w.22`; close it only when all acceptance
   criteria pass.
 - Commit and push the evidence/docs slice. Suggested commit:

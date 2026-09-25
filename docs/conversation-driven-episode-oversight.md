@@ -126,10 +126,13 @@ reconciled or waiting only for owner/operator action.
 The sanitized [conversation-driven oversight dogfood record](../reports/reviews/conversation-driven-episode-oversight-dogfood.md)
 tracks the isolated live run through setup, native promotion, accepted generation
 one, observed continuation friction, rejected repair evidence, and the corrected trusted-sibling contract. It now includes accepted generation two, the fresh final EXPERT `PASS`, the
-operator's conversational merge decision, completed fixture terminal work, the
-duplicate-confirmation friction, and the approved simplified terminal correction.
-The fixture remains frozen with stale bookkeeping and retained refs as evidence;
-the corrected plugin generation is not applied or reloaded in this revision.
+operator's conversational merge decision, both old-design authorization attempts,
+the later successful `merged` authorization, and completed fixture terminal work.
+It also records the single unretried completion failure — `Finalization is blocked
+with durable recovery evidence preserved: Daemon session row has an invalid session UUID`
+— plus the still-`authorized` receipt and matching retained identity, oversight,
+and refs. The fixture remains frozen; the corrected plugin generation is not
+applied or reloaded in this revision.
 
 ### Owner-driven continuation
 

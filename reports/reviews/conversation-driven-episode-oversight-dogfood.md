@@ -11,9 +11,16 @@ performed and verified the fixture's context-sensitive terminal work: fixture
 main includes the candidate, the EPISODE is stopped, and its worktree is removed.
 Stale plugin bookkeeping and retained refs remain frozen as evidence.
 
-The original `finalize_spec_episode` authorization attempt cancelled because its
-confirmation UI was not attached to the supervising conversation. No terminal
-work was inferred from that cancellation. Dogfood showed that duplicate UI and
+The old design produced two distinct authorization attempts. The first
+`finalize_spec_episode` authorization cancelled because its confirmation UI was
+not attached to the supervising conversation; no terminal work was inferred from
+that cancellation. The later owner interaction successfully authorized `merged`
+for exact fixture tip `b8ddda43da88c897c2a844cca99d31a95f38c7fb`. After the
+test CONVERSATION completed and verified the disposable terminal work, exactly
+one completion call failed with
+`Finalization is blocked with durable recovery evidence preserved: Daemon session row has an invalid session UUID`.
+It was not retried. The receipt remains `authorized`, and matching identity,
+oversight, and retained refs remain frozen. Dogfood showed that duplicate UI and
 two-phase generic terminal validation were unnecessary and misplaced. The
 operator approved the simplified terminal workflow now implemented in this
 bounded outer candidate. It has not been applied or reloaded, and the disposable
@@ -83,9 +90,20 @@ This outer branch now incorporates that accepted cumulative repair through an or
 
 ## Evidence sources and preservation
 
-This record reconciles durable Bead `prime-claw-h6w.22`, the fixture's durable episode state, exact Git objects for promotion and generation one, rejected historical repair candidates, owner-accepted shared main, and retained EXPERT reports. It intentionally excludes raw conversation transcripts, credentials, private data, and host-local absolute paths.
+This record reconciles durable Bead `prime-claw-h6w.22`, the fixture's retained
+durable owner evidence, exact Git objects, rejected historical repair candidates,
+owner-accepted shared main, and retained EXPERT reports. It intentionally excludes
+raw conversation transcripts, credentials, private data, and host-local absolute
+paths.
 
-The fixture baseline, episode worktree and branch, local bare remote, durable owner state, and accepted generation-one commit remain preserved. No plugin installation, fixture retry, generation-two admission, final feature EXPERT review, terminal disposition, merge to main, abandonment, or cleanup is claimed here.
+### Historical pre-generation-two checkpoint
+
+The following paragraph records an earlier checkpoint and does not describe the
+fixture's latest resource state. At that checkpoint, the fixture baseline,
+episode worktree and branch, local bare remote, durable owner state, and accepted
+generation-one commit remained preserved. No plugin installation, fixture retry,
+generation-two admission, final feature EXPERT review, terminal disposition,
+merge to main, abandonment, or cleanup was claimed at that checkpoint.
 
 ## Evidence-slice validation
 
@@ -155,13 +173,27 @@ Fresh final reviewer session `01a0d584-83d4-7335-bc8b-995b36e675f8` used exact
 report has SHA-256
 `a1ad1f509efef53c9a1123a89b03b83309ea079fbcd70a75857897f1da7e1d16`.
 
-The operator then selected merge conversationally. The first native authorization
-call returned `Episode finalization authorization was cancelled`; no UI receipt
-or terminal mutation resulted. The supervising conversation subsequently carried
-out and verified the already-authorized fixture terminal work using live context.
-Fixture main now includes `b8ddda43…`, the EPISODE is stopped, and its worktree is
-removed. The stale plugin identity/oversight bookkeeping and retained refs remain
-untouched as frozen evidence.
+The operator then selected merge conversationally. In exact test CONVERSATION
+`01a0d41a-5568-705d-8bdb-97130dd1ef16`, the first old-design native
+authorization call returned `Episode finalization authorization was cancelled`;
+no UI receipt or terminal mutation resulted. During a later owner interaction, a
+second old-design authorization succeeded for disposition `merged` and exact
+fixture tip `b8ddda43da88c897c2a844cca99d31a95f38c7fb`.
+
+That test CONVERSATION then fast-forwarded and pushed disposable `main`, stopped
+EPISODE `01a0d43b-e71c-702f-8f94-d5d7e60c2247` through supported
+`prime-agent stop`, removed its clean worktree, and verified that only the main
+worktree remained. The matching local and remote episode refs were retained. It
+then made exactly one old-design `complete` call, which returned:
+
+```text
+Finalization is blocked with durable recovery evidence preserved: Daemon session row has an invalid session UUID
+```
+
+The call was not retried. The finalization receipt remains `authorized`, and the
+matching retained identity/oversight evidence and refs remain frozen. This is the
+actual old-finalizer blocker; it is distinct from the earlier cancelled
+confirmation and does not claim that bookkeeping completion succeeded.
 
 This friction led to the approved outer correction: readiness and the sole
 operator decision stay conversational; the owning CONVERSATION performs and
@@ -191,3 +223,27 @@ exact final diff, all 297 other tests and seven subtests passed, while the known
 candidate-progress watchdog again hit its 15-second full-run timeout; its exact
 isolated rerun passed in 2.22 seconds. No global plugin apply/reload or
 disposable-fixture mutation occurred.
+
+## B1/B2 repair candidate validation
+
+The bounded repair separates exact historical replay from current ownership and
+corrects the frozen chronology above. It does not alter the simplified terminal
+policy, reintroduce removed finalization machinery, or claim installation against
+the disposable fixture.
+
+Repair validation passed:
+
+- focused lifecycle and registered-tool Node coverage: **41/41**;
+- exact native sequential/restart replay probe: **1/1**;
+- focused Python policy/install coverage: **34 tests plus 7 subtests**;
+- maintained Node: **120/120**;
+- maintained `python3 -m pytest -q tests`: **299 tests plus 7 subtests** in
+  90.75 seconds, with 11 existing deprecation warnings;
+- changed-Markdown relative links: **9/9**; and
+- source inventory, shell syntax, `git diff --check`, and worktree-scope checks:
+  **PASS**.
+
+The earlier `d50380d` watchdog timeout and isolated rerun remain recorded in the
+preceding section as historical evidence. No global plugin apply/reload and no
+disposable-fixture inspection, mutation, retry, finalization, or cleanup occurred
+in this repair.
