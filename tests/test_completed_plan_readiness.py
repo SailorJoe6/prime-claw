@@ -36,6 +36,16 @@ def test_unarchived_completed_bundle_is_not_ready(tmp_path):
     assert "archived artifact missing" in result.stdout
 
 
+def test_dangling_active_symlink_still_blocks_completion(tmp_path):
+    active, archive, index = fixture(tmp_path)
+    for before, after in zip(active, archive):
+        before.rename(after)
+    active[0].symlink_to(active[0].parent / "missing-target.md")
+    result = check(active, archive, index)
+    assert result.returncode == 1
+    assert "active artifact still present" in result.stdout
+
+
 def test_archived_custom_named_bundle_is_ready(tmp_path):
     active, archive, index = fixture(tmp_path)
     for before, after in zip(active, archive):
@@ -151,6 +161,38 @@ def test_link_syntax_fails_closed_or_ignores_literal_examples(tmp_path):
     (archive[0].parent / "Appendix (final).md").write_text("appendix")
     archive[0].write_text("[Appendix](<Appendix (final).md>)\n")
     assert check(active, archive, index).returncode == 0
+
+
+def test_html_comment_cannot_supply_index_entry(tmp_path):
+    active, archive, index = fixture(tmp_path)
+    for before, after in zip(active, archive):
+        before.rename(after)
+    index.write_text("# Index\n<!--\n## episode-one/ — COMPLETE\n-->\n")
+    result = check(active, archive, index)
+    assert result.returncode == 1
+    assert "requires one exact" in result.stdout
+    # Comment-contained fake fences/headings/links cannot hide the real entry.
+    index.write_text("# Index\n<!--\n```markdown\n## episode-one/ — fake\n"
+                     "[fake](missing.md)\n-->\n## episode-one/ — COMPLETE\n"
+                     "[Steps](episode-one/STEPS_CUSTOM.md)\n")
+    assert check(active, archive, index).returncode == 0
+    archive[0].write_text("<!-- [fake](missing.md) -->\n[Steps](STEPS_CUSTOM.md)\n")
+    assert check(active, archive, index).returncode == 0
+
+
+def test_unclosed_comment_and_raw_html_block_fail_closed(tmp_path):
+    active, archive, index = fixture(tmp_path)
+    for before, after in zip(active, archive):
+        before.rename(after)
+    for text in ("# Index\n<!--\n## episode-one/ — fake\n",
+                 "# Index\n<div>\n## episode-one/ — fake\n</div>\n"):
+        index.write_text(text)
+        result = check(active, archive, index)
+        assert result.returncode == 1
+        assert "manual link inspection required" in result.stdout
+    # HTML in an unrelated section cannot silently change index visibility.
+    index.write_text("## older/\n<div>opaque</div>\n## episode-one/ — COMPLETE\n")
+    assert "manual link inspection required" in check(active, archive, index).stdout
 
 
 def test_info_suffixed_fence_is_not_a_close_or_real_index_heading(tmp_path):

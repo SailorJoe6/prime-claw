@@ -32,23 +32,70 @@ REFERENCE = re.compile(r"!?\[[^]\n]+\]\[[^]\n]*\]|^ {0,3}\[[^]\n]+\]:", re.MULTI
 HTML = re.compile(r"</?[A-Za-z][^>]*>|<[^<>\s]+(?:\.\w+|/[^<>]*)>")
 
 
-def checked_links(document: Path, text: str) -> list[str]:
+def blank(text: str) -> str:
+    """Hide literal syntax while keeping offsets and line boundaries stable."""
+    return ''.join('\n' if char == '\n' else ' ' for char in text)
+
+
+def mask_visible(document: Path, text: str) -> tuple[str, list[str]]:
+    """One conservative visibility pass for both index headings and links."""
     errors = []
     visible = []
     fence = None
-    for line in text.splitlines():
-        was_fenced = fence is not None
-        fence = fence_transition(line, fence)
-        if was_fenced or fence is not None:
+    comment = False
+    for line in text.splitlines(keepends=True):
+        if fence is not None:
+            fence = fence_transition(line, fence)
+            visible.append(blank(line))
             continue
-        visible.append(line)
+        pieces = []
+        remaining = line
+        while remaining:
+            if comment:
+                end = remaining.find('-->')
+                if end < 0:
+                    pieces.append(blank(remaining))
+                    remaining = ''
+                else:
+                    pieces.append(blank(remaining[:end + 3]))
+                    remaining = remaining[end + 3:]
+                    comment = False
+            else:
+                start = remaining.find('<!--')
+                if start < 0:
+                    pieces.append(remaining)
+                    remaining = ''
+                else:
+                    pieces.append(remaining[:start])
+                    remaining = remaining[start:]
+                    comment = True
+        masked = ''.join(pieces)
+        if not comment and FENCE.match(masked):
+            fence = fence_transition(masked, None)
+            visible.append(blank(line))
+        else:
+            visible.append(masked)
+    if comment:
+        errors.append(f"{document}: manual link inspection required: unclosed HTML comment")
     if fence is not None:
         errors.append(f"{document}: manual link inspection required: unclosed fenced code")
-    # Markdown code spans can cross a line break; mask them after collecting
-    # non-fenced lines so their link-like examples remain inert.
-    content = INLINE_CODE.sub("", "\n".join(visible))
+    content = INLINE_CODE.sub(lambda match: blank(match.group()), ''.join(visible))
     if '`' in content:
         errors.append(f"{document}: manual link inspection required: ambiguous inline code")
+    return content, errors
+
+
+def raw_html_error(document: Path, content: str) -> list[str]:
+    # A supported angle-wrapped inline destination is not raw HTML.
+    without_links = LINK.sub(lambda match: blank(match.group()), content)
+    if re.search(r'<[A-Za-z!/]', without_links):
+        return [f"{document}: manual link inspection required: raw HTML/angle syntax"]
+    return []
+
+
+def checked_links(document: Path, text: str) -> list[str]:
+    content, errors = mask_visible(document, text)
+    errors.extend(raw_html_error(document, content))
     for match in reversed(list(LINK.finditer(content))):
         raw = match.group(1).strip('<>')
         target = urlsplit(raw)
@@ -56,31 +103,25 @@ def checked_links(document: Path, text: str) -> list[str]:
             local = unquote(target.path)
             if local and not (document.parent / local).exists():
                 errors.append(f"{document}: broken link {raw}")
-        content = content[:match.start()] + content[match.end():]
+        content = content[:match.start()] + blank(content[match.start():match.end()]) + content[match.end():]
     if REFERENCE.search(content) or HTML.search(content):
         errors.append(f"{document}: manual link inspection required: reference or HTML/angle syntax")
-    # Any remaining inline-link opener may be a parenthesized/unsupported URL.
     if re.search(r"!?\[[^]\n]*\]\(", content):
         errors.append(f"{document}: manual link inspection required: unsupported inline destination")
     return errors
 
 
-
-
-def real_index_headings(text: str) -> list[tuple[int, int, int, str]]:
-    """Return heading positions outside fenced examples, including child headings."""
+def real_index_headings(visible: str) -> list[tuple[int, int, int, str]]:
+    """Return headings from already-masked Markdown, including descendants."""
     headings = []
-    fence = None
     offset = 0
-    for line in text.splitlines(keepends=True):
-        was_fenced = fence is not None
-        fence = fence_transition(line, fence)
-        if not was_fenced and fence is None:
-            heading = re.match(r"^(#{1,6}) (.*)$", line.rstrip('\r\n'))
-            if heading:
-                headings.append((offset, offset + len(line), len(heading.group(1)), heading.group(2)))
+    for line in visible.splitlines(keepends=True):
+        heading = re.match(r"^(#{1,6}) (.*)$", line.rstrip('\r\n'))
+        if heading:
+            headings.append((offset, offset + len(line), len(heading.group(1)), heading.group(2)))
         offset += len(line)
     return headings
+
 
 def verify(index: Path, bundle_root: Path, artifacts: list[tuple[Path, Path]]) -> list[str]:
     errors = []
@@ -92,7 +133,7 @@ def verify(index: Path, bundle_root: Path, artifacts: list[tuple[Path, Path]]) -
     if index.parent.resolve() != root.parent:
         errors.append(f"index does not belong to archive root: {index}")
     for active, archive in artifacts:
-        if active.exists():
+        if active.exists() or active.is_symlink():
             errors.append(f"active artifact still present: {active}")
         # Resolve symlinks too: a nominal child that points outside is not inside.
         if archive.resolve() == root or root not in archive.resolve().parents:
@@ -105,17 +146,20 @@ def verify(index: Path, bundle_root: Path, artifacts: list[tuple[Path, Path]]) -
         errors.append(f"archive index missing: {index}")
     else:
         text = index.read_text()
+        visible, visibility_errors = mask_visible(index, text)
+        errors.extend(visibility_errors)
+        errors.extend(raw_html_error(index, visible))
         # Only real H2 headings count. H3-H6 descendants remain in the entry;
         # fenced examples and unrelated H2/H1 sections do not count.
-        headings = real_index_headings(text)
+        headings = real_index_headings(visible)
         entries = [(start, end) for start, end, level, label in headings
                    if level == 2 and re.match(re.escape(bundle_root.name) + r"/(?=\s|$)", label)]
         if len(entries) != 1:
             errors.append(f"archive index requires one exact ## {bundle_root.name}/ entry (found {len(entries)}): {index}")
         else:
             start, _ = entries[0]
-            end = next((at for at, _, level, _ in headings if at > start and level <= 2), len(text))
-            errors.extend(checked_links(index, text[start:end]))
+            end = next((at for at, _, level, _ in headings if at > start and level <= 2), len(visible))
+            errors.extend(checked_links(index, visible[start:end]))
     return errors
 
 
