@@ -233,8 +233,26 @@ cases pause for the operator. Uncertain delivery is never resent and a reviewer
 with outstanding delivery/report work is never deleted. The owner never falls
 back to its current/default model or a weaker policy.
 
-Before the owner presents merge readiness, it obtains a fresh final EXPERT
-review of the complete exact candidate, adjudicates every finding, and requires
+When an EPISODE claims completion, the owner first reconciles the exact
+promoted plan-artifact bundle with the project-customizable terminal policy.
+This is a final-readiness gate, not an ordinary in-progress `advance` gate.
+For the default `/execute` policy, the episode must archive its required active
+specification and plan, update the archive index, and preserve resolvable links.
+The owner identifies required paths from that project's execute skill and
+approved bundle; the example filenames in `/execute` are not a universal
+schema. It traces the promoted paths to their archived counterparts with the
+candidate's Git diff/history, then checks the files, archive index entry, and
+relative links at the exact pushed candidate. An unrelated archive directory
+is not proof. The optional `scripts/verify-completed-plan.py` checks explicitly
+supplied active/archive path pairs, index presence/entry, and local Markdown
+links; it neither discovers required files nor establishes provenance or
+approves merge. A documented project policy may instead define another
+terminal state with equally reviewable artifact/link evidence. Missing or
+uncertain evidence blocks a completion/merge-readiness claim and calls for
+in-scope repair or pause before final review.
+
+After this reconciliation, the owner obtains a fresh final EXPERT review of
+the complete exact candidate, adjudicates every finding, and requires
 `PASS` for that exact commit. An intermediate PASS cannot satisfy this gate; nor
 can another commit's report, an incomplete review, or an unresolved `BLOCK`.
 Any material repair invalidates the prior review and requires a renewed review
