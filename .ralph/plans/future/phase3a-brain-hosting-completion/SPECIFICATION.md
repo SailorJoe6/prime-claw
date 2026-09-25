@@ -30,7 +30,7 @@ The operator's 4096-dimensional Qwen candidate is partial, not accepted. The las
 - Real inference and Git credentials stay in host-side OpenShell providers; the sandbox carries only placeholders. Never copy host `auth.json`, inspect credential stores, or write secrets into the brain clone. Use the OpenShell gateway, not NemoClaw.
 - The private Qwen endpoint exists only in ignored local configuration and must not appear in tracked code, evidence, logs, or this specification. Candidate egress policy permits only that configured host/port and restores canonical policy afterward. The candidate and canonical databases remain isolated; no in-place vector migration or premature cutover is acceptable. Keep the single established OpenShell gateway (17670).
 - Do not use `--skip-failed` or silently drop source files to reach a bookmark. Preserve both databases when provider, source, transport, or validation checks fail. Do not issue a second build while one is running.
-- Implementation must respect the operator's approval boundaries: this draft permits neither new episode resources nor a change to product scope, cutover criteria, or rollback contract.
+- Implementation must respect the operator's approval boundaries: this specification permits neither new episode resources nor a change to product scope, cutover criteria, or rollback contract.
 
 ## Outside this specification
 
