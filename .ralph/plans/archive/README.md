@@ -6,6 +6,18 @@ they are archived together. Older sets contain specification, requirements,
 decisions, and execution-plan files; newer project-customized sets may contain a
 different reviewed artifact collection.
 
+## conversation-driven-episode-oversight/ — Conversation-owned implementation episodes ✅ COMPLETE (2026-09-25)
+
+Delivered default CONVERSATION identity, exact-owner EPISODE oversight, owner-driven
+handoff and independent review, and one conversational terminal decision with a
+no-UI bookkeeping close. The operator approved the reviewed feature at
+`248f944f70acdbe19d3a93c6781ebcdb2eea22d2`; it was fast-forwarded to
+`main`, the episode was stopped and cleaned up, and Bead `prime-claw-h6w.22`
+was closed. The completed specification and plan were archived after that merge
+because the final candidate had left them active at `.ralph/plans/`.
+Bead `prime-claw-mu1` tracks the open prevention requirement; this archive
+corrects the delivered artifact state, not the missing merge-readiness check.
+
 ## conversational-ralph-command-routing/ — Conversational routing for Ralph native commands ✅ COMPLETE (2026-09-22)
 
 Delivered explicit `ralph_handoff` and `ralph_plan` tools that converge on the

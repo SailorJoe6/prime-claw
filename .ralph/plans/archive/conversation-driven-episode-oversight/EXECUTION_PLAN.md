@@ -1,7 +1,7 @@
 # Execution Plan — Conversation-driven episode oversight
 
-> **Status:** revised design approved after native mechanics POC; active episode
-> must replace rejected Slice 1 before later slices.
+> **Status:** completed and archived after operator-approved merge. The
+> implementation checkpoints below retain their historical status.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Tracking bead and owner ledger:** `prime-claw-h6w.22`
 > **Implementation authority:** native `/implement-spec` was already invoked for

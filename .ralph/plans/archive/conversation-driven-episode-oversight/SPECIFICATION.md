@@ -1,9 +1,9 @@
 # Specification — Conversation-driven episode oversight
 
-> **Status:** living future specification; manual lifecycle proven, lightweight plugin encoding proposed for operator review.
-> **Depends on:** [Reviewed future plans and worktree-isolated implementation episodes](archive/worktree-isolated-specification-episodes/SPECIFICATION.md)
-> **Related delivered work:** [handoff continuation resilience](archive/handoff-continuation-resilience/SPECIFICATION.md), [conversational Ralph command routing](archive/conversational-ralph-command-routing/SPECIFICATION.md), [future specification bundles](../../docs/future-specification-bundles.md), and [handoff chain](../../docs/handoff-chain.md)
-> **Related future work:** [Universal-agent and project-conversation POC](future/universal-agent-project-conversation-poc/SPECIFICATION.md)
+> **Status:** completed and archived after operator-approved merge. Historical design and implementation checkpoints below remain as evidence.
+> **Depends on:** [Reviewed future plans and worktree-isolated implementation episodes](../worktree-isolated-specification-episodes/SPECIFICATION.md)
+> **Related delivered work:** [handoff continuation resilience](../handoff-continuation-resilience/SPECIFICATION.md), [conversational Ralph command routing](../conversational-ralph-command-routing/SPECIFICATION.md), [future specification bundles](../../../../docs/future-specification-bundles.md), and [handoff chain](../../../../docs/handoff-chain.md)
+> **Related future work:** [Universal-agent and project-conversation POC](../../future/universal-agent-project-conversation-poc/SPECIFICATION.md)
 
 ## Purpose
 
@@ -542,7 +542,7 @@ than interpreted or cleaned automatically.
 Before oversight begins, the project conversation must verify that its required
 native commands and workflow policy are available. Capability provisioning is
 owned by the related
-[universal-agent and project-conversation POC](future/universal-agent-project-conversation-poc/SPECIFICATION.md).
+[universal-agent and project-conversation POC](../../future/universal-agent-project-conversation-poc/SPECIFICATION.md).
 Missing tooling is a visible preparation gap, not permission to imitate a
 native transition.
 

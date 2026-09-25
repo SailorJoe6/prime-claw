@@ -570,10 +570,10 @@ export default function probe(pi) {{
 
 
 def test_handoff_policy_documents_trusted_completion_and_honest_transport() -> None:
-    """Living and current docs must not promise an atomic all-busy primitive."""
+    """Archived feature and current docs must not promise an atomic all-busy primitive."""
     paths = (
-        REPO / ".ralph/plans/SPECIFICATION.md",
-        REPO / ".ralph/plans/EXECUTION_PLAN.md",
+        REPO / ".ralph/plans/archive/conversation-driven-episode-oversight/SPECIFICATION.md",
+        REPO / ".ralph/plans/archive/conversation-driven-episode-oversight/EXECUTION_PLAN.md",
         REPO / "docs/handoff-chain.md",
         REPO / "docs/future-specification-bundles.md",
     )
@@ -600,7 +600,7 @@ def test_handoff_policy_documents_trusted_completion_and_honest_transport() -> N
 def test_bootstrap_and_continuation_document_distinct_state_boundaries() -> None:
     """Fresh creation must not inherit the later continuation snapshot gate."""
     specification = (
-        REPO / ".ralph/plans/SPECIFICATION.md"
+        REPO / ".ralph/plans/archive/conversation-driven-episode-oversight/SPECIFICATION.md"
     ).read_text()
     docs = (REPO / "docs/future-specification-bundles.md").read_text()
 
@@ -631,7 +631,7 @@ def test_publisher_tests_do_not_claim_fake_native_admission_proof() -> None:
     """Maintained tests exercise production code without inventing native semantics."""
     tests = (REPO / "tests/spec_episode_extension.test.mjs").read_text()
     plan = (
-        REPO / ".ralph/plans/EXECUTION_PLAN.md"
+        REPO / ".ralph/plans/archive/conversation-driven-episode-oversight/EXECUTION_PLAN.md"
     ).read_text()
 
     assert "nativeSemantics" not in tests
@@ -645,7 +645,7 @@ def test_publisher_tests_do_not_claim_fake_native_admission_proof() -> None:
 def test_dogfood_watch_policy_retains_intended_retry_without_replay() -> None:
     """A definite first rejection preserves only the bounded intended-retry watch."""
     plan = (
-        REPO / ".ralph/plans/EXECUTION_PLAN.md"
+        REPO / ".ralph/plans/archive/conversation-driven-episode-oversight/EXECUTION_PLAN.md"
     ).read_text()
     assert "after definite first no-admission while a later owner" in plan
     assert "retry remains intended" in plan
