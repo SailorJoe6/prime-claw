@@ -40,9 +40,30 @@ def test_archived_custom_named_bundle_is_ready(tmp_path):
     active, archive, index = fixture(tmp_path)
     for before, after in zip(active, archive):
         before.rename(after)
-    archive[0].write_text("[Steps](STEPS_CUSTOM.md)\n")
+    (archive[0].parent / "diagram.png").write_bytes(b"png")
+    archive[0].write_text("[Steps](STEPS_CUSTOM.md)\n![diagram](diagram.png)\n")
     result = check(active, archive, index)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_archived_image_with_missing_local_target_blocks(tmp_path):
+    active, archive, index = fixture(tmp_path)
+    for before, after in zip(active, archive):
+        before.rename(after)
+    archive[0].write_text("![diagram](missing.png)\n")
+    result = check(active, archive, index)
+    assert result.returncode == 1
+    assert "broken link missing.png" in result.stdout
+
+
+def test_archive_name_in_unrelated_prose_is_not_index_entry(tmp_path):
+    active, archive, index = fixture(tmp_path)
+    for before, after in zip(active, archive):
+        before.rename(after)
+    index.write_text("# Index\nOnly an unrelated prose mention of episode-one/ exists.\n")
+    result = check(active, archive, index)
+    assert result.returncode == 1
+    assert "archive index has no entry" in result.stdout
 
 
 def test_partial_archival_wrong_index_and_broken_link_block(tmp_path):
@@ -62,7 +83,7 @@ def test_broken_archive_index_link_blocks(tmp_path):
     active, archive, index = fixture(tmp_path)
     for before, after in zip(active, archive):
         before.rename(after)
-    index.write_text("## [episode-one/](episode-one/missing.md) — COMPLETE\n")
+    index.write_text("## episode-one/ — COMPLETE\n[missing](episode-one/missing.md)\n")
     result = check(active, archive, index)
     assert result.returncode == 1
     assert "broken index link" in result.stdout

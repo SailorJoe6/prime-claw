@@ -10,7 +10,8 @@ import re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-LINK = re.compile(r"(?<!!)\[[^]\n]*\]\(([^)]+)\)")
+# Both text links and images carry local paths that must survive archival.
+LINK = re.compile(r"!?\[[^]\n]*\]\(([^)]+)\)")
 
 
 def broken_links(document: Path) -> list[str]:
@@ -46,14 +47,15 @@ def verify(index: Path, artifacts: list[tuple[Path, Path]]) -> list[str]:
         if index.parent != directory.parent:
             errors.append(f"index does not belong to archive root: {index}")
         index_text = index.read_text()
-        entry = re.search(r"(?<![\w/-])" + re.escape(directory.name) + r"/", index_text)
+        # This project's archive index represents a bundle with a level-two
+        # heading. A casual mention of its name in prose is not an index entry.
+        entry = re.search(r"^## " + re.escape(directory.name) + r"/(?=\s|$).*\n?", index_text, re.MULTILINE)
         if not entry:
             errors.append(f"archive index has no entry for {directory.name}/: {index}")
         else:
             # Only inspect the relevant entry, not unrelated historical sections.
             next_heading = re.search(r"^#{1,6} ", index_text[entry.end():], re.MULTILINE)
-            line_start = index_text.rfind('\n', 0, entry.start()) + 1
-            section = index_text[line_start:entry.end() + next_heading.start() if next_heading else None]
+            section = index_text[entry.start():entry.end() + next_heading.start() if next_heading else None]
             for raw in LINK.findall(section):
                 target = raw.strip().split(' "', 1)[0].strip('<>')
                 if target and not target.startswith('#') and not urlsplit(target).scheme and not target.startswith('//'):
