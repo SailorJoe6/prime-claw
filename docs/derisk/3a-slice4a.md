@@ -195,3 +195,14 @@ and actual remote HEAD, reconcile the local source commit without force,
 revalidate both repaired files, and verify the remote receipt before any
 candidate build. Do not infer Git or embedding health
 from this older snapshot.
+
+A later owner-approved read-only P0 investigation narrowed allowed-canary failure
+to `NET:OPEN ALLOWED` then `NET:FAIL` in about 198 ms, with no recorded
+`HTTP:GET`; gateway logs lack a per-request reset reason. An overlapping
+socket sample saw one brief outbound TCP/443 connection, but cannot attribute
+the reset. Noninteractive host packet capture is unavailable and the sandbox
+has no packet/trace tooling. Do not guess at a proxy or VPN fix: obtain an
+approved metadata-only packet capture or per-request proxy trace first, with
+explicit preservation of the unpublished local brain Git repair if any
+instrumentation is destructive. See
+[`phase3a-slice1-proxy-diagnostic-20260925.json`](../evidence/phase3a-slice1-proxy-diagnostic-20260925.json).

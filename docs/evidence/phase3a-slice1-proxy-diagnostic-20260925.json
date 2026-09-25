@@ -1,0 +1,43 @@
+{
+  "baseline": {
+    "docker_container_status": "running",
+    "gateway_status": "healthy",
+    "openshell_version": "0.0.116",
+    "sandbox_policy_status": "effective"
+  },
+  "bounded_reproduction": {
+    "command": "openshell sandbox exec -n prime-claw --timeout 12 --no-tty -- curl -sS -o /dev/null -w HTTP=%{http_code} --max-time 5 https://example.com/",
+    "exit": 56,
+    "http": 0,
+    "stderr_class": "connection_reset"
+  },
+  "diagnostic_access": {
+    "container_trace_tools": "tcpdump, strace, bpftrace absent; no tool installed",
+    "host_packet_capture": "sudo -n -v exit 1; no noninteractive privilege; no capture attempted",
+    "supervisor_proxy_trace": "not present at current INFO logging level"
+  },
+  "log_observations": {
+    "conclusion": "authorization succeeds; reset source and root cause undetermined",
+    "gateway": "session/relay events, no per-request upstream reset reason",
+    "github": "earlier ALLOWED then NET:FAIL signature",
+    "sandbox_allowed_canary": "NET:OPEN ALLOWED example.com:443, followed ~198ms later by NET:FAIL; no recorded HTTP:GET",
+    "source": "OpenShell sandbox and gateway logs, 2026-09-25"
+  },
+  "next_decision": "Owner/operator provides or authorizes a safe per-request supervisor proxy trace or metadata-only packet capture method preserving OpenShell boundary and local brain Git repair commit; correlate upstream SYN/TLS/FIN/RST with one allowed canary, then test only a proven fix.",
+  "observed_at": "2026-09-25",
+  "prior_signatures_not_assumed": [
+    "U1 encoded-%2F",
+    "VPN/RBAC 403"
+  ],
+  "safety": "No restart, policy/provider change, credential access, database mutation, Qwen work, or private brain Git push. Local repair 5dde0012eadf1df7c3e9c83d228e2d0d31f36695 remains unpublished.",
+  "scope": "read-only Slice 1 P0 OpenShell egress diagnosis; no source publication",
+  "socket_sample": {
+    "limitation": "Temporal overlap suggests an outbound port-443 TCP connection but does not identify the destination or which endpoint reset the proxied client; concurrent background traffic cannot be fully excluded.",
+    "method": "read-only /proc/net/tcp and tcp6 sampler in existing sandbox Docker network namespace for 4 seconds overlapping one allowed canary; only remote TCP port 443, TCP state, local ephemeral port counted; no IP or payload captured",
+    "one_ephemeral_443_connection": {
+      "ESTABLISHED_samples": 10,
+      "TIME_WAIT_samples": 216
+    },
+    "samples": 232
+  }
+}

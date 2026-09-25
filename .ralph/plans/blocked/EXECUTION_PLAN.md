@@ -1,6 +1,6 @@
 # Execution Plan — Finish the Phase 3a brain-hosting tracer bullet
 
-> **Status:** Operator-approved active EPISODE; owner accepted an in-scope Slice 1 root-cause investigation (2026-09-25). Source publication is still unproven; no later slice has begun.
+> **Status:** Operator-approved EPISODE; Slice 1 P0 investigation made bounded progress but is blocked on an authorized per-request proxy/packet trace (2026-09-25). Source publication is still unproven; no later slice has begun.
 > **Approved specification:** [SPECIFICATION.md](SPECIFICATION.md) in this active episode bundle.
 > **Tracking:** `prime-claw-zwg`; source/Qwen prerequisite `prime-claw-zwg.5`; routed write `prime-claw-zwg.4`.
 
@@ -37,6 +37,12 @@ An offline code/test increment makes the clone stage fail closed on fetch failur
 Use `/skill:investigate` to establish why **allowed** sandbox HTTPS and Git reset; do not infer the cause from the old VPN state or retry old fixes. The latest recorded probe reached OpenShell proxy `CONNECT 200`, completed TLS with the OpenShell Sandbox CA, sent `GET /`, then reset before origin HTTP. OCSF reported `ALLOWED` followed by `NET:FAIL`. Host and an unrelated Docker canary returned 200. The earlier U1 encoded-`%2F` reset and VPN/RBAC 403 have different signatures. Proxy-upstream failure is a hypothesis, not a finding: the existing logs do not identify the reset reason. Obtain discriminating evidence, test a specific cause, fix only the proven cause, then prove both the allowed canary and sandbox Git remote access before reconciling the brain source. Bead `prime-claw-zwg.5` and the owner ledger record acceptance of this bounded P0.
 
 Joe explicitly rejects database backups as a gate: `gbrain` and `gbrain_qwen4096` are disposable derived indexes, while brain Git is authoritative. Do **not** discard the unpublished local repair commit `5dde0012eadf1df7c3e9c83d228e2d0d31f36695` if a proven repair requires a destructive operation. No speculative restart, provider/policy bypass, Qwen probe/build, or Slice 2 before the exact Slice 1 remote source push receipt. Preserve the credential isolation boundary.
+
+### Slice 1 P0 investigation checkpoint — trace capability required
+
+Read-only OpenShell 0.0.116 supervisor and gateway logs confirm that an allowed canary transitions `NET:OPEN ALLOWED` to `NET:FAIL` in about 198 ms, without a recorded `HTTP:GET`; gateway logs contain relay activity but no origin/proxy reset reason. A bounded canary again exited 56 / HTTP 000. A 4-second `/proc/net/tcp{,6}` sample overlapped one failed canary and observed one short-lived outbound TCP/443 socket (10 samples ESTABLISHED, 216 TIME_WAIT out of 232 samples), but does not identify its destination or prove who reset the proxied client; background traffic remains possible. `sudo -n -v` found no noninteractive host packet-capture permission, and the sandbox lacks `tcpdump`, `strace`, and `bpftrace`. No restart, policy/provider bypass, credential access, database mutation, private Git push, or Qwen call occurred. Reproduction and limitations: `docs/evidence/phase3a-slice1-proxy-diagnostic-20260925.json`.
+
+**Exact blocker:** present INFO logs and available read-only tools cannot distinguish proxy-local rejection, upstream TLS failure, or a network RST. The owner/operator must supply or explicitly authorize a safe per-request OpenShell supervisor proxy trace or metadata-only packet capture method that preserves the credential boundary and unpublished local brain repair commit. If the method needs a service/sandbox restart or a sidecar joining its network namespace, obtain explicit approval and a Git-source preservation plan first; do not try a speculative restart. Correlate the next single allowed canary with upstream SYN/TLS/FIN/RST, prove a specific cause, make only its minimal authorized repair, then prove sandbox canary and Git remote access before resuming source reconciliation. Keep Slice 2 blocked.
 
 ## Slice 2 — Complete an isolated 4096d source-current candidate
 
