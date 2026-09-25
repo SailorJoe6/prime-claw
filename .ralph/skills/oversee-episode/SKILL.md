@@ -116,10 +116,15 @@ owns an active EPISODE.
    index coherently, and repair relative links. Trace the promoted paths to
    archived counterparts using the episode's Git diff/history and inspect the
    resulting files, index entry, and resolvable bundle links at the exact pushed
-   candidate commit. `scripts/verify-completed-plan.py --index <index> --artifact
-   <active> <archived> [--artifact <active> <archived> ...]` can check the
-   explicit project-supplied paths mechanically; it does not discover the
-   required set, establish provenance, or grant approval. A documented project
+   candidate commit. `scripts/verify-completed-plan.py --index <index> --bundle-root
+   <archive-bundle> --artifact <active> <archived> [--artifact <active>
+   <archived> ...]` can check the explicit project-supplied paths mechanically
+   (including nested files). It supports this project's `## <bundle>/` archive
+   index and bounded inline Markdown links/images; unsupported or ambiguous
+   syntax returns non-success for manual inspection. A non-success/manual-
+   inspection result is not a helper PASS: record separate exact-candidate
+   link evidence before any merge-readiness claim. The helper does not discover
+   the required set, establish provenance, or grant approval. A documented project
    terminal policy that explicitly uses another finished state may replace
    archival, but must supply equally reviewable artifact/link evidence.
    Missing artifacts, stale active copies, missing index/link evidence, or
