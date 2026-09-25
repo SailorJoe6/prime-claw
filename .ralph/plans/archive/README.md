@@ -1,10 +1,23 @@
-# .ralph/plans/archive — completed plans
+# .ralph/plans/archive — completed and superseded plans
 
-Each subfolder holds the available plan set for one finished phase or episode.
-Files within a subfolder cross-reference each other by relative filename, so
-they are archived together. Older sets contain specification, requirements,
-decisions, and execution-plan files; newer project-customized sets may contain a
-different reviewed artifact collection.
+Each subfolder preserves an available plan set for a finished phase or episode,
+or a clearly marked incomplete, superseded artifact. Files within a subfolder
+cross-reference each other by relative filename, so they are archived together.
+Older sets contain specification, requirements, decisions, and execution-plan
+files; newer project-customized sets may contain a different reviewed artifact
+collection.
+
+## phase3a-bufd-superseded-incomplete/ — Phase 3a brain-hosting BUFD bundle ⚠️ INCOMPLETE / SUPERSEDED (2026-09-25)
+
+These four files were moved together from `.ralph/plans/blocked/` to preserve
+the earlier BUFD design and execution history. They are **not** a completed or
+accepted Phase 3a implementation, and this archive does not resolve the blocked
+Qwen migration or authorize Slice 4B. The private brain-source repair remains
+unpublished due to sandbox Git transport failure; the candidate remains partial
+and there has been no cutover. Bead `prime-claw-zwg.5` tracks the live blocker.
+The replacement, outcome-first specification is a draft for operator review at
+`.ralph/plans/future/phase3a-brain-hosting-completion/SPECIFICATION.md`.
+It has no execution plan or implementation approval yet.
 
 ## conversation-driven-episode-oversight/ — Conversation-owned implementation episodes ✅ COMPLETE (2026-09-25)
 

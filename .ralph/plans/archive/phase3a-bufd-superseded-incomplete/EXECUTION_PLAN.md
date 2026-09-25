@@ -234,8 +234,8 @@ Embedding config/vector-width mismatches stop before migration or sync.
 
 **Exit evidence.** Hermetic create dry-run selected Kimi + gateway OpenAI/1536 and only gateway
 + GitHub providers. `tests/test_portable_provider_defaults.py` passed 27 tests; the canonical
-suite passed 177. Verdict: [3a-slice4p.md](../../../docs/derisk/3a-slice4p.md); machine evidence:
-[portable-defaults-20260917T184315Z.json](../../../docs/evidence/portable-defaults-20260917T184315Z.json).
+suite passed 177. Verdict: [3a-slice4p.md](../../../../docs/derisk/3a-slice4p.md); machine evidence:
+[portable-defaults-20260917T184315Z.json](../../../../docs/evidence/portable-defaults-20260917T184315Z.json).
 
 ---
 
@@ -266,7 +266,7 @@ or to a public starter/example brain.
 supplies their own repository. Ignored-local and environment selections reach the existing clone
 path; malformed settings fail before external boundaries. Proven by 50 focused tests, 228 canonical
 tests, and an operator-local create dry-run. Verdict:
-[3a-slice4r.md](../../../docs/derisk/3a-slice4r.md). Inventory R3a-16 is proven; Slice 4A is the operator-priority gate before 4B.
+[3a-slice4r.md](../../../../docs/derisk/3a-slice4r.md). Inventory R3a-16 is proven; Slice 4A is the operator-priority gate before 4B.
 
 ---
 
