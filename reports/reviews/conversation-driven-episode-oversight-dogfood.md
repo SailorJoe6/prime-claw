@@ -1,15 +1,15 @@
 # Conversation-driven episode oversight dogfood
 
-> **Status:** In progress as of 2026-09-24. This is a sanitized point-in-time evidence record, not canonical policy, final acceptance, merge approval, or a native-command instruction.
+> **Status:** Completed disposable dogfood; evidence-only closure pending exact outer owner review. This is a sanitized evidence record, not canonical policy, outer merge approval, or a native-command instruction.
 
 ## Scope and current boundary
 
 The isolated dogfood completed two implementation generations. Generation two
 exact `b8ddda43da88c897c2a844cca99d31a95f38c7fb` passed fresh final EXPERT review,
 and the operator chose merge in ordinary conversation. The owning conversation
-performed and verified the fixture's context-sensitive terminal work: fixture
-main includes the candidate, the EPISODE is stopped, and its worktree is removed.
-Stale plugin bookkeeping and retained refs remain frozen as evidence.
+performed and verified the fixture's context-sensitive terminal work. The old
+bookkeeping failure below is historical checkpoint evidence; accepted-generation
+recovery and final clean fixture state are recorded at the end of this report.
 
 The old design produced two distinct authorization attempts. The first
 `finalize_spec_episode` authorization cancelled because its confirmation UI was
@@ -19,12 +19,13 @@ for exact fixture tip `b8ddda43da88c897c2a844cca99d31a95f38c7fb`. After the
 test CONVERSATION completed and verified the disposable terminal work, exactly
 one completion call failed with
 `Finalization is blocked with durable recovery evidence preserved: Daemon session row has an invalid session UUID`.
-It was not retried. The receipt remains `authorized`, and matching identity,
-oversight, and retained refs remain frozen. Dogfood showed that duplicate UI and
-two-phase generic terminal validation were unnecessary and misplaced. The
-operator approved the simplified terminal workflow now implemented in this
-bounded outer candidate. It has not been applied or reloaded, and the disposable
-fixture will not be mutated, retried, or cleaned in this generation.
+It was not retried. At that historical checkpoint, the receipt remained
+`authorized`, and matching identity, oversight, and retained refs were frozen.
+Dogfood showed that duplicate UI and two-phase generic terminal validation were
+unnecessary and misplaced. The approved simplified terminal generation was later
+applied globally and used in the controlled recovery documented below. The old
+receipt remains inert; the matching identity and merged episode refs are now
+removed. No further fixture action is authorized in this evidence-only generation.
 
 ## Isolated setup and native promotion
 
@@ -247,3 +248,100 @@ The earlier `d50380d` watchdog timeout and isolated rerun remain recorded in the
 preceding section as historical evidence. No global plugin apply/reload and no
 disposable-fixture inspection, mutation, retry, finalization, or cleanup occurred
 in this repair.
+
+## Accepted generation installation and fresh-process proof
+
+The owner accepted exact simplified-terminal repair
+`e17891c771206808bec7400a8ea67a09bdfb6f32` after a fresh exact
+`openai-codex/gpt-6-astra` reasoning-`max` **PASS** with no material findings.
+The report SHA-256 is
+`0d5109244aa6e74955a8addefd0b28d8c1008b46a0ac36612362e051a45f8891`.
+This acceptance authorized controlled installation and dogfood recovery, not an
+outer merge.
+
+The canonical global apply/check workflow then passed and reported the
+user-global copy current. A fresh isolated Prime Agent process rooted in the
+accepted feature worktree passed **2/2** native probes in 13.68 seconds: real
+implement-spec activation/resume/absence, and historical inactive-generation
+close replay beside a later cycle. The probe did not use the persistent user
+configuration or session stores and did not touch the disposable fixture.
+
+The project-local skill copies remained deliberately distinct:
+
+- accepted feature package:
+  `b4d49566f02d4eb5584df4b2222382f08e0b3744c5948e11b4dc36e2db79b20e`;
+- then-current dirty main checkout's old package:
+  `ee82bde79b1e371a03b2aa28863372821a6d73e92bed61ea5554106fd6a5ef6a`;
+- disposable fixture's old package:
+  `6f25411efab75fecb9cf45dc5d2772b2620e79b614426ef4553e1b5ecedbf071`.
+
+Project skill discovery is not a hot-reload mechanism. This currently loaded
+outer owner therefore truthfully retained its old package even after global
+apply/check; only fresh processes proved the accepted generation.
+
+## Simplified close recovery and final fixture state
+
+For the controlled recovery, the accepted skill bytes were temporarily overlaid
+only in the disposable project. An initial `prime-agent send` reopened the
+archived test CONVERSATION from the wrong CWD. The owner detected the mistake
+before any mutation, stopped that route, cancelled its watch, and verified that
+identity, receipt, markers, refs, and worktree were unchanged.
+
+The successful foreground resume used the explicit fixture CWD and exact test
+CONVERSATION session file. It verified the new conversational terminal step and
+location-only no-UI tool, then called `finalize_spec_episode` exactly once with
+the sole argument
+`.ralph/plans/future/two-generation-oversight-dogfood`. The bookkeeping close
+succeeded without performing Git, session, worktree, ref, or skill mutation:
+
+- the exact episode identity file was removed;
+- two matching oversight markers remained, with the latest marker `inactive`;
+- the test session returned to ordinary CONVERSATION capability; and
+- the old `.finalization.json` remained inert with `state=authorized`,
+  `disposition=merged`, and exact `episodeCommit=b8ddda43da88c897c2a844cca99d31a95f38c7fb`,
+  alongside its preserved zero-byte transaction lock.
+
+The owner restored the disposable project's original skill bytes exactly to
+`6f25411efab75fecb9cf45dc5d2772b2620e79b614426ef4553e1b5ecedbf071`,
+returning its worktree to clean state. A second correctly rooted ordinary
+CONVERSATION turn verified terminal facts and removed only the merged local and
+remote `episode/two-generation-oversight-dogfood` refs.
+
+Final retained state is:
+
+- clean matching local and remote `main` at
+  `b8ddda43da88c897c2a844cca99d31a95f38c7fb`;
+- both merged episode refs absent and no unrelated ref deletion;
+- only the main worktree;
+- inactive EPISODE;
+- inactive/resumable ordinary test CONVERSATION;
+- exact restored project-local skill bytes;
+- inert old receipt and lock preserved; and
+- all watches cancelled.
+
+This is the completed dogfood evidence boundary. The disposable fixture must not
+be inspected, mutated, retried, finalized, cleaned, or deleted further.
+## Evidence-only closure validation
+
+This final outer diff changes only the active plan, this report, and the living
+oversight documentation. No runtime, skill, plugin, test, or specification
+semantics were changed; no installation, reload, or fixture action was repeated.
+
+- `node --test --experimental-strip-types tests/*.test.mjs` — **PASS**, 120/120.
+- `python3 -m pytest -q tests` — **NOT GREEN**: 298 tests and 7 subtests passed,
+  but `test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero`
+  timed out after 15 seconds following its expected stall message (11 existing
+  deprecation warnings). This known unrelated watchdog test also timed out after
+  15 seconds in its exact isolated rerun, so this run does not claim an isolated
+  pass.
+- `python3 -m pytest -q tests -k 'not test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero'`
+  — **PASS**, 298 tests and 7 subtests, 1 deselected (11 existing warnings).
+- Focused dogfood chronology and canonical oversight skill policy tests —
+  **PASS**, 1/1 and 10/10 respectively.
+- Changed-Markdown relative links — **PASS**, 2/2.
+- `git diff --check` — **PASS**.
+
+The watchdog failure is kept visible for exact owner review and is not repaired or
+interpreted as a dogfood result. Earlier accepted-repair serial Python 299 + 7
+subtests remained valid for its own commit; it does not turn this later
+non-green full run into a pass.

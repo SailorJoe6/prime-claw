@@ -121,18 +121,31 @@ Reports are evidence, never approval or native-command dispatch. The heartbeat
 is the missed-report safety net and is cancelled when its generation is
 reconciled or waiting only for owner/operator action.
 
-### In-progress dogfood evidence
+### Completed dogfood evidence
 
 The sanitized [conversation-driven oversight dogfood record](../reports/reviews/conversation-driven-episode-oversight-dogfood.md)
-tracks the isolated live run through setup, native promotion, accepted generation
-one, observed continuation friction, rejected repair evidence, and the corrected trusted-sibling contract. It now includes accepted generation two, the fresh final EXPERT `PASS`, the
-operator's conversational merge decision, both old-design authorization attempts,
-the later successful `merged` authorization, and completed fixture terminal work.
-It also records the single unretried completion failure — `Finalization is blocked
-with durable recovery evidence preserved: Daemon session row has an invalid session UUID`
-— plus the still-`authorized` receipt and matching retained identity, oversight,
-and refs. The fixture remains frozen; the corrected plugin generation is not
-applied or reloaded in this revision.
+tracks the isolated live run through setup, two accepted generations, final EXPERT
+review, the operator's conversational merge decision, completed terminal work,
+and recovery from the old finalizer. It preserves both old-design authorization attempts,
+including the later successful `merged` authorization, followed by the
+single unretried failure `Finalization is blocked with durable recovery evidence
+preserved: Daemon session row has an invalid session UUID` and the old
+still-`authorized` receipt.
+
+After the simplified generation was accepted, global apply/check and two isolated
+fresh-process native probes passed. The loaded outer owner was not hot-reloaded and
+truthfully retained its old package. A temporary accepted-skill overlay was limited
+to the disposable project and restored byte-for-byte after one location-only,
+no-UI bookkeeping close. A wrong-CWD resume was detected and stopped before
+mutation; the successful foreground resume used the explicit fixture CWD and exact
+test CONVERSATION session.
+
+The final retained evidence has no episode identity, two matching markers with the
+latest inactive, an ordinary inactive/resumable test CONVERSATION, an inert old
+receipt and zero-byte lock, clean matching local/remote `main` at
+`b8ddda43da88c897c2a844cca99d31a95f38c7fb`, no episode refs, only the main
+worktree, an inactive EPISODE, and no remaining watches. The fixture is frozen at
+that completed evidence state.
 
 ### Owner-driven continuation
 

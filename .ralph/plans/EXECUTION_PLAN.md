@@ -1429,6 +1429,61 @@ The prior `d50380d` full-Python watchdog timeout and isolated rerun remain truth
 historical evidence above. This repair's later all-green run does not rewrite that
 observed candidate history or expand scope to the watchdog.
 
+### Final evidence-only dogfood closure — complete
+
+Owner accepted exact repair `e17891c771206808bec7400a8ea67a09bdfb6f32`
+after fresh exact Astra/max PASS. Global apply/check and isolated fresh-process
+2/2 proof then passed. The controlled disposable dogfood recovery and cleanup are
+complete under that accepted generation. This final generation reconciles that
+evidence only.
+
+This update is limited to the active execution plan, sanitized dogfood report,
+`docs/conversation-driven-episode-oversight.md`, and Bead evidence, and records:
+
+- successful global apply/check and isolated fresh-process 2/2 proof;
+- the accepted feature, current dirty-main old package, and frozen fixture old
+  package as distinct project-local skill hashes;
+- the first wrong-CWD `prime-agent send` attempt, detected and stopped before any
+  fixture mutation, with its watch cancelled and exact evidence unchanged;
+- the correct foreground resume with explicit fixture CWD and exact test
+  CONVERSATION session file;
+- exactly one one-argument, no-UI `finalize_spec_episode` bookkeeping close for
+  `.ralph/plans/future/two-generation-oversight-dogfood`;
+- exact identity removal, two matching markers with latest `inactive`, and the
+  test session restored to ordinary CONVERSATION capability;
+- preservation of the inert old `authorized` merged receipt and zero-byte lock;
+- exact restoration of the temporary accepted-skill overlay to the fixture's old
+  skill bytes before final Git/ref cleanup;
+- final clean local/remote main at
+  `b8ddda43da88c897c2a844cca99d31a95f38c7fb`, safe deletion of only the merged
+  local/remote episode refs, only the main worktree, inactive EPISODE, and all
+  watches cancelled; and
+- truthful provenance that this currently loaded outer owner retains its old
+  package and was not hot-reloaded.
+
+Closure evidence is now reconciled in the sanitized report and living
+documentation. It records the accepted generation and fresh-process proof, the
+stopped wrong-CWD attempt, the successful exact-CWD one-argument close, preserved
+legacy artifacts, restored project skill, final Git/worktree/session state, and
+cancelled watches. No additional fixture action was needed or performed in this
+generation.
+
+Validation for this evidence-only diff: maintained Node passes 120/120; the full
+Python run is **not green** because the known unrelated candidate-progress
+watchdog test timed out after its expected stall message (298 tests plus seven
+subtests passed). Its exact isolated rerun also timed out; this is not reported
+as a pass. Excluding only that test, Python passes 298 tests plus seven subtests
+with one deselection and 11 existing warnings. Focused dogfood chronology and
+canonical oversight policy checks pass 1/1 and 10/10, changed-Markdown links pass
+2/2, and `git diff --check` passes. The non-green gate and isolated failure stay
+visible for exact owner review; no watchdog change is in scope.
+
+Do not change runtime code, canonical skills, plugin source, tests, or specification
+semantics. Do not apply/reload anything. Do not inspect, mutate, retry, finalize,
+clean, or delete the disposable fixture further. Run documentation/link/diff and
+appropriate maintained gates, commit and push one evidence-only candidate, update
+the Bead, and stop for exact owner review.
+
 - Append final evidence to `prime-claw-h6w.22`; close it only when all acceptance
   criteria pass.
 - Commit and push the evidence/docs slice. Suggested commit:
