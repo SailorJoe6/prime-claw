@@ -105,7 +105,25 @@ owns an active EPISODE.
    success or arm a duplicate. Admission does not prove compaction or work
    completion. Never imitate native transport with prose or
    `agent_message.send`, and never retry an uncertain transport result.
-9. Before presenting merge readiness, obtain a fresh final EXPERT review of the
+9. When the EPISODE claims completion (not during ordinary in-progress
+   `advance`), reconcile the exact promoted artifact bundle recorded for this
+   episode with the project's terminal plan policy before final EXPERT review
+   or any merge-readiness presentation. Load the project-customizable execute
+   skill and approved plan to identify *all* required active artifacts; never
+   assume universal filenames or accept an unrelated archived directory as
+   proof. If that policy requires archival, require the episode to move those
+   exact artifacts into its corresponding archive bundle, update the archive
+   index coherently, and repair relative links. Trace the promoted paths to
+   archived counterparts using the episode's Git diff/history and inspect the
+   resulting files, index entry, and resolvable bundle links at the exact pushed
+   candidate commit. A documented project terminal policy that explicitly uses
+   another finished state may replace archival, but must supply equally
+   reviewable artifact/link evidence.
+   Missing artifacts, stale active copies, missing index/link evidence, or
+   uncertain provenance block completion and merge readiness: record the gap
+   and seek in-scope repair or pause. Do not turn this into an in-progress
+   continuation gate or ask the operator to merge an incomplete candidate.
+   Once this state is reconciled, obtain a fresh final EXPERT review of the
    complete exact candidate with the protocol above, adjudicate every finding,
    and require a `PASS` for that exact commit. An intermediate review, another
    commit's report, incomplete review, or unresolved `BLOCK` cannot satisfy this
