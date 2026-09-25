@@ -167,3 +167,31 @@ probe returned HTTP 502 with zero values. Prime-claw did not retry, did not appl
 did not run the sandbox probe, and did not start another build. Both databases remain preserved
 and no cutover occurred. Evidence:
 [`embedding-resume-preflight-http502-20260918T152548Z.json`](../evidence/embedding-resume-preflight-http502-20260918T152548Z.json).
+
+## 2026-09-25 Slice 1 source-transport checkpoint — still blocked
+
+The later, validated two-file frontmatter repair is local sandbox brain commit
+`5dde0012eadf1df7c3e9c83d228e2d0d31f36695`; the local `origin/main`
+tracking ref is older and **not a remote receipt**. A fresh bounded sandbox
+`git ls-remote` failed with a connection reset. In-sandbox GitHub and the
+normally allowed `example.com` canary all returned curl exit 56 / HTTP 000,
+while host GitHub HTTPS returned 200 and `zetup vpn status` reported
+`not-connected`. This strongly suggests an authorized egress/VPN fault but
+does not by itself prove the sole cause. No push, Qwen probe or build, database
+mutation, credential access, or credential-boundary change occurred. See
+[`phase3a-slice1-transport-20260925.json`](../evidence/phase3a-slice1-transport-20260925.json).
+
+The clone stage has a fail-closed offline repair under test: a failed fetch
+must no longer be hidden by `tail`, and local divergence must stop without an
+`ff skipped` success or unsafe retry. This is **not** Slice 1 completion. The
+operator restored the authorized VPN connection, but a fresh sandbox Git
+probe still reset and the allowed canary still returned curl 56 / HTTP 000.
+Gateway control plane reports healthy, policy effective, and the OpenShell
+service running. Do not assume reconnection alone repaired the sandbox data
+path. The owner/operator must arrange safe host/OpenShell egress repair that
+preserves both databases and the credential boundary; no sandbox restart,
+provider update, or policy change was attempted. Then recheck sandbox egress
+and actual remote HEAD, reconcile the local source commit without force,
+revalidate both repaired files, and verify the remote receipt before any
+candidate build. Do not infer Git or embedding health
+from this older snapshot.

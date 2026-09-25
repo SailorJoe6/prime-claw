@@ -394,6 +394,91 @@ def test_brain_clone_idempotent_fetch_branch(tmp_path, monkeypatch):
     assert "remote set-url origin" in s
 
 
+def _offline_brain_clone_exec(tmp_path, monkeypatch, *, fetch_failures=0, merge_fails=False):
+    """Run only the generated Bash against a fake git; never contact a remote."""
+    brain = tmp_path / "brain"
+    (brain / ".git").mkdir(parents=True)
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    log = tmp_path / "fake-git.log"
+    fetch_count = tmp_path / "fetch-count"
+    fake_git = fake_bin / "git"
+    fake_git.write_text(
+        f"#!{sys.executable}\n"
+        "import pathlib, sys\n"
+        f"log = pathlib.Path({str(log)!r})\n"
+        f"count_file = pathlib.Path({str(fetch_count)!r})\n"
+        "argv = sys.argv[1:]\n"
+        "if argv[:1] == ['-C']: argv = argv[2:]\n"
+        "command = argv[0]\n"
+        "with log.open('a') as out: out.write(command + '\\n')\n"
+        "if command == 'fetch':\n"
+        "    count = int(count_file.read_text()) + 1 if count_file.exists() else 1\n"
+        "    count_file.write_text(str(count))\n"
+        f"    if count <= {fetch_failures}:\n"
+        "        print('fake fetch failed', file=sys.stderr)\n"
+        "        sys.exit(128)\n"
+        f"if command == 'merge' and {merge_fails!r}:\n"
+        "    print('fake non-fast-forward', file=sys.stderr)\n"
+        "    sys.exit(1)\n"
+        "if command == 'rev-parse': print('abc123')\n"
+    )
+    fake_git.chmod(0o755)
+    calls = []
+
+    def offline_exec(_cfg, script, timeout=30):
+        env = os.environ.copy()
+        env.update(PATH=str(fake_bin) + os.pathsep + env.get('PATH', ''), api_token='offline-placeholder')
+        result = subprocess.run(['bash', '-c', script], env=env, text=True,
+                                capture_output=True, timeout=timeout, check=False)
+        calls.append(result)
+        return result.returncode, result.stdout + result.stderr
+    monkeypatch.setattr(pc, 'sandbox_exec', offline_exec)
+    sleeps = []
+    monkeypatch.setattr(pc, '_sleep', sleeps.append)
+    return cfg(tmp_path, sb_brain_dir=str(brain), brain_clone_retry_delay=0), log, calls, sleeps
+
+
+def _fake_git_commands(log):
+    return log.read_text().splitlines() if log.exists() else []
+
+
+def test_brain_clone_existing_fetch_pipeline_failure_fails_closed(tmp_path, monkeypatch):
+    c, log, calls, sleeps = _offline_brain_clone_exec(
+        tmp_path, monkeypatch, fetch_failures=20)
+    c['brain_clone_attempts'] = 2
+    assert pc.stage_brain_clone(c, Args()) != 0
+    assert len(calls) == 2 and len(sleeps) == 1
+    commands = _fake_git_commands(log)
+    assert commands.count('fetch') == 2
+    assert 'merge' not in commands
+    assert 'config' not in commands
+    assert 'rev-parse' not in commands
+
+
+def test_brain_clone_existing_divergence_fails_without_retry(tmp_path, monkeypatch):
+    c, log, calls, sleeps = _offline_brain_clone_exec(
+        tmp_path, monkeypatch, merge_fails=True)
+    assert pc.stage_brain_clone(c, Args()) != 0
+    assert len(calls) == 1 and sleeps == []
+    commands = _fake_git_commands(log)
+    assert commands.count('fetch') == commands.count('merge') == 1
+    assert 'config' not in commands
+    assert 'rev-parse' not in commands
+
+
+def test_brain_clone_existing_transient_fetch_retries_to_success(tmp_path, monkeypatch):
+    c, log, calls, sleeps = _offline_brain_clone_exec(
+        tmp_path, monkeypatch, fetch_failures=1)
+    assert pc.stage_brain_clone(c, Args()) == 0
+    assert len(calls) == 2 and len(sleeps) == 1
+    commands = _fake_git_commands(log)
+    assert commands.count('fetch') == 2
+    assert commands.count('merge') == 1
+    assert commands.count('config') == 2
+    assert commands.count('rev-parse') == 1
+
+
 def test_brain_clone_config_override(tmp_path, monkeypatch):
     seen = {}
     monkeypatch.setattr(pc, "sandbox_exec", lambda c, s, timeout=30: (seen.setdefault("s", s), 0, "")[1:])

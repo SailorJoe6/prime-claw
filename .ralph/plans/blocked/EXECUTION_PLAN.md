@@ -1,7 +1,7 @@
 # Execution Plan — Finish the Phase 3a brain-hosting tracer bullet
 
-> **Status:** Draft for operator plan review; no implementation authority.
-> **Approved specification:** [SPECIFICATION.md](SPECIFICATION.md) in this exact future folder.
+> **Status:** Operator-approved active EPISODE; Slice 1 paused at an external authorized-egress blocker (2026-09-25). No later slice has begun.
+> **Approved specification:** [SPECIFICATION.md](SPECIFICATION.md) in this active episode bundle.
 > **Tracking:** `prime-claw-zwg`; source/Qwen prerequisite `prime-claw-zwg.5`; routed write `prime-claw-zwg.4`.
 
 ## Result and starting point
@@ -25,6 +25,12 @@ A failing external prerequisite stops its slice safely, preserves both databases
 - Diagnose the failing authorized sandbox Git transport and repair only its proper host/OpenShell/VPN/egress seam if within approved authority. Do not use DGX to push source, copy credentials into the sandbox, or work around the provider boundary. Recheck the private remote branch before publishing; reconcile remote advancement without force and rerun both source frontmatter validations. Treat the absent third path through supported full-sync reconciliation, not manual failure-ledger edits. Replace `ff skipped` success with truthful divergence handling in the clone path: local commits must not be silently stranded or discarded; no force or implicit merge of unreviewed remote changes.
 - Verify remote contains the repaired commit (or a safely reconciled descendant), that the sandbox clone is clean and push-capable, and that no gbrain sync/build is active. Recheck canonical/candidate identity without mutating either DB. If transport remains externally blocked, stop here; do not start Slice 2.
 - Add focused offline tests only if repository-controlled transport behavior changes. Record a sanitized transport/source receipt and update `docs/derisk/3a-slice4a.md` plus `prime-claw-zwg.5`. Commit/push the prime-claw checkpoint for exact owner review. Do not claim this slice complete merely because the repair is still local.
+
+### Slice 1 checkpoint (2026-09-25) — partial safety fix; remote publication blocked
+
+A read-only sandbox probe found local brain commit `5dde0012eadf1df7c3e9c83d228e2d0d31f36695` on clean `main`, with old local tracking ref `5a477eaa5b311b9b45324591dd308e83ddcd1ded`; this is not a verified remote HEAD. A bounded in-sandbox `git ls-remote` failed with `connection_reset`; both GitHub HTTPS and allowed `example.com` canary failed HTTP 000 / curl 56. Host GitHub HTTPS returned 200, but `zetup vpn status` returned `not-connected`. No credentials or databases were inspected/changed, and no Qwen call, source push, or build occurred. Evidence: `docs/evidence/phase3a-slice1-transport-20260925.json` (path relative to repository root).
+
+An offline code/test increment makes the clone stage fail closed on fetch failure (`pipefail`) and local non-fast-forward divergence (one attempt, no `ff skipped` success); this is not a complete Slice 1. **Unblock condition:** Joe restored authorized VPN, but the bounded post-reconnect sandbox Git probe still reset and even allowed `example.com` stayed at HTTP 000 / curl 56. OpenShell reports gateway healthy, policy effective, and service running. The owner/operator must coordinate safe host/OpenShell sandbox-egress repair that preserves both databases and the credential boundary; no sandbox restart, provider update, or policy change was attempted. Then take one fresh sandbox egress/Git check, read actual remote HEAD, reconcile without force, revalidate both repaired frontmatter files, push, and verify exact remote receipt. Do not mistake VPN reconnection or a local tracking ref for a push receipt. Slice 2 and Qwen work remain forbidden until Slice 1 is accepted.
 
 ## Slice 2 — Complete an isolated 4096d source-current candidate
 

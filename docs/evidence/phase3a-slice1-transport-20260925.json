@@ -1,0 +1,57 @@
+{
+  "interpretation": "Initial VPN disconnect matched the outage, but operator-confirmed reconnect did not restore sandbox Git or allowed HTTPS canary. Gateway control plane is healthy and policy effective; data-path cause is unresolved. No provider/policy/sandbox restart attempted.",
+  "offline_verification": {
+    "diff": "git diff --check: pass",
+    "focused": "python3 -m pytest -q tests/test_runtime_image.py tests/test_brain_repo_config.py: 85 passed, 2 warnings",
+    "maintained": "python3 -m pytest -q tests: 302 passed, 11 warnings, 7 subtests passed",
+    "syntax": "python3 -m py_compile bin/prime-claw: pass"
+  },
+  "post_vpn_reconnect": {
+    "openshell_gateway_status": "healthy",
+    "openshell_service_running": true,
+    "operator_confirmed_vpn_reconnected": true,
+    "remote_receipt": "not_verified",
+    "sandbox_git_ls_remote_error_class": "connection_reset",
+    "sandbox_https_allowed_canary": {
+      "curl_exit": 56,
+      "http": 0
+    },
+    "sandbox_policy_status": "effective"
+  },
+  "recorded_utc": "2026-09-25T19:22:52.095990+00:00",
+  "safety": {
+    "credential_boundary_changed": false,
+    "databases_mutated": false,
+    "push_attempted": false,
+    "qwen_probes_or_builds": false,
+    "sandbox_credentials_inspected": false
+  },
+  "scope": "Slice 1 bounded transport/source checkpoint; no Qwen probe or build",
+  "source": {
+    "clone_status": "clean_at_read_only_probe",
+    "last_local_tracking_head": "5a477eaa5b311b9b45324591dd308e83ddcd1ded",
+    "local_head": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695",
+    "remote_head": null,
+    "remote_receipt": "not_verified",
+    "sandbox_clone": "/sandbox/brain"
+  },
+  "transport": {
+    "host_https_github_http": 200,
+    "host_vpn_status": "not-connected",
+    "sandbox_git_ls_remote_error_class": "connection_reset",
+    "sandbox_git_ls_remote_exit": 128,
+    "sandbox_https_allowed_canary": {
+      "curl_exit": 56,
+      "http": 0
+    },
+    "sandbox_https_api_github": {
+      "curl_exit": 56,
+      "http": 0
+    },
+    "sandbox_https_github": {
+      "curl_exit": 56,
+      "http": 0
+    }
+  },
+  "unblock": "Owner/operator authorizes safe host/OpenShell sandbox-egress repair that preserves both databases and credential boundary. Then a fresh bounded sandbox canary/Git check, actual remote-head read, safe source reconciliation and exact remote push receipt are required."
+}

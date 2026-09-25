@@ -1991,12 +1991,15 @@ def stage_brain_clone(cfg, args) -> int:
               f"brief retry rides out genuine L7 injection delay); idempotent fetch --ff-only if already cloned")
         return 0
     script = f"""
-set -e
+set -eo pipefail
 if [ -d {q_sb_git} ]; then
   echo "brain: already cloned at {sb_brain}; fetching + fast-forwarding"
   git -C {q_sb_brain} remote set-url origin "{url}"
   git -C {q_sb_brain} fetch origin {q_branch} 2>&1 | tail -2
-  git -C {q_sb_brain} merge --ff-only {q_remote_ref} 2>&1 | tail -2 || echo "brain: ff skipped (local state)"
+  if ! git -C {q_sb_brain} merge --ff-only {q_remote_ref} 2>&1 | tail -2; then
+    echo "brain: local checkout cannot fast-forward; resolve local history before retry"
+    exit 42
+  fi
 else
   echo "brain: cloning {repo}@{branch} -> {sb_brain}"
   rm -rf -- {q_sb_brain}
@@ -2013,6 +2016,12 @@ echo "brain: HEAD=$(git -C {q_sb_brain} rev-parse --short HEAD 2>/dev/null) remo
         code, out = sandbox_exec(cfg, script, timeout=180)
         if code == 0:
             break
+        # A successful fetch followed by a failed ff-only merge is not transient.
+        # Preserve the local commit; do not retry or proceed to indexing stale source.
+        if code == 42 and "brain: local checkout cannot fast-forward" in out:
+            print("error: brain clone stage: local checkout cannot fast-forward; "
+                  "inspect and reconcile local commits before retry", file=sys.stderr)
+            return code
         if attempt < attempts:
             print(f"brain: clone attempt {attempt}/{attempts} failed; "
                   f"retrying in {delay}s ...")
