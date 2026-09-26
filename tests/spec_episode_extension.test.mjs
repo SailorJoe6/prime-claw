@@ -418,6 +418,53 @@ test("owner retains an idle resident route and admits handoff prompt before one 
   assert.equal(publisher.closed, 1);
 });
 
+test("owner handoff accepts a renamed durable agent with the same GUID and session file", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  const renamed = { ...idleState(created), sessionName: "operator-renamed-agent" };
+  const publisher = new FakePublisher({ sessions: [renamed], state: renamed });
+
+  const result = await handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher));
+
+  assert.equal(result.admitted, true);
+  assert.equal(result.episodeId, created.episodeId);
+  assert.equal(publisher.handoffs.length, 1);
+});
+
+test("owner handoff accepts differing list and state recorded cwd for the same GUID and file", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  const publisher = new FakePublisher({
+    sessions: [{ ...idleState(created), cwd: join(repo, "list-recorded-cwd") }],
+    state: { ...idleState(created), cwd: join(repo, "state-recorded-cwd") },
+  });
+
+  const result = await handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher));
+
+  assert.equal(result.admitted, true);
+  assert.equal(result.episodeId, created.episodeId);
+  assert.equal(publisher.handoffs.length, 1);
+});
+
+test("owner handoff rejects a different GUID from list or get_state with zero delivery", async (t) => {
+  const { repo } = repositoryFixture(t);
+  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
+  for (const source of ["list", "get_state"]) {
+    await t.test(source, async () => {
+      const publisher = new FakePublisher({
+        sessions: [source === "list" ? { ...idleState(created), sessionId: "different-guid" } : idleState(created)],
+        state: source === "get_state" ? { ...idleState(created), sessionId: "different-guid" } : idleState(created),
+      });
+      await assert.rejects(
+        handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
+        source === "list" ? /missing or different durable session/ : /does not match the durable owned identity/,
+      );
+      assert.deepEqual(publisher.handoffs, []);
+      assert.deepEqual(publisher.reopens, []);
+    });
+  }
+});
+
 test("owner publishes a missing route, re-reads idle state, and then delivers", async (t) => {
   const { repo } = repositoryFixture(t);
   const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
