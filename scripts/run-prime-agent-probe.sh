@@ -12,14 +12,28 @@ if [ "$#" -eq 0 ]; then
   exit 64
 fi
 
-probe_root="$(mktemp -d "${TMPDIR:-/tmp}/prime-claw-prime-agent-probe.XXXXXX")"
-probe_root="$(cd "$probe_root" && pwd -P)"
+if [ "$retain_root" = true ]; then
+  # Keep the native worker socket below macOS's 104-byte AF_UNIX path field.
+  # The private root is still canonicalized before it becomes TMPDIR.
+  probe_root="$(mktemp -d /tmp/pcp.XXXXXX)"
+else
+  probe_root="$(mktemp -d "${TMPDIR:-/tmp}/prime-claw-prime-agent-probe.XXXXXX")"
+fi
 cleanup() {
   if [ "$retain_root" = false ]; then
     rm -rf -- "$probe_root"
   fi
 }
 trap cleanup EXIT HUP INT TERM
+
+if ! physical_root="$(cd "$probe_root" && pwd -P)"; then
+  echo "Could not canonicalize isolated probe root: $probe_root" >&2
+  exit 65
+fi
+probe_root="$physical_root"
+if [ "$retain_root" = true ]; then
+  printf 'Retained isolated Prime Agent probe root: %s\n' "$probe_root" >&2
+fi
 
 mkdir -p "$probe_root/config" "$probe_root/sessions"
 chmod 700 "$probe_root" "$probe_root/config" "$probe_root/sessions"
@@ -31,7 +45,18 @@ chmod 700 "$probe_root" "$probe_root/config" "$probe_root/sessions"
 if [ "$retain_root" = true ]; then
   mkdir -p "$probe_root/home" "$probe_root/tmp"
   chmod 700 "$probe_root/home" "$probe_root/tmp"
-  printf 'Retained isolated Prime Agent probe root: %s\n' "$probe_root" >&2
+  # v0.9.6 uses this TMPDIR for both daemon.sock and the longer worker socket.
+  # Count encoded bytes after canonicalization and reserve one NUL in sun_path[104].
+  # A later fixture must separately check any custom --daemon-socket it chooses.
+  socket_dir="$probe_root/tmp/prime-agent-$(id -u)"
+  supervisor_socket="$socket_dir/daemon.sock"
+  worker_socket="$socket_dir/worker-xxxxxxxxxxxx-xxxxxxxxxxxx.sock"
+  supervisor_bytes="$(LC_ALL=C printf '%s' "$supervisor_socket" | LC_ALL=C wc -c | tr -d '[:space:]')"
+  worker_bytes="$(LC_ALL=C printf '%s' "$worker_socket" | LC_ALL=C wc -c | tr -d '[:space:]')"
+  if [ "$supervisor_bytes" -gt 103 ] || [ "$worker_bytes" -gt 103 ]; then
+    echo "Retained probe root exceeds the 103-byte Unix socket pathname budget" >&2
+    exit 65
+  fi
   # A daemon probe must not inherit the caller's worker role, supervisor socket,
   # provider credentials, or other Prime Agent internal routing variables.
   env -i \

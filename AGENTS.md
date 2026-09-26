@@ -76,10 +76,14 @@ Native Prime Agent probes and tests that can mutate configuration must run throu
 `scripts/run-prime-agent-probe.sh`. `--session-dir` isolates session artifacts only;
 it does not isolate `settings.json`. The wrapper gives each probe temporary
 `PRIME_AGENT_CODING_AGENT_DIR` and `PRIME_AGENT_SESSION_DIR` roots; ordinary probes
-remove them on exit. For detached scratch daemon tests, `--retain-root` also
-isolates `HOME` and `TMPDIR`, strips inherited routing and credential variables,
-and **never** removes the scratch root on exit. Prove scoped shutdown and the
-absence of scratch processes and listeners before separately cleaning that root.
+remove them on exit. For detached scratch daemon tests, `--retain-root` selects a
+short private canonical root and validates the default supervisor and worker
+Unix socket path **byte** budget. It isolates `HOME` and `TMPDIR`, strips
+inherited routing and credential variables, and **never** removes the scratch
+root on exit. A fixture
+using a custom `--daemon-socket` must validate that path separately. Prove
+scoped shutdown and the absence of scratch processes and listeners before
+separately cleaning that root.
 The flag does not authorize a live episode action. Do not send
 configuration-mutating RPC requests such as `set_auto_compaction` from an
 unguarded Prime Agent process.
