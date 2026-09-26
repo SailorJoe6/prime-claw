@@ -175,3 +175,7 @@ Final candidate checks (guarded, Python-only):
 **53 passed**; `python3 -B -m unittest discover -s tests -p test_prime_agent_probe_isolation.py -v`
 **7 passed**; syntax compilation of driver/test and `git diff --check` passed.
 No installed CLI command was attempted. Fresh exact-commit review remains mandatory.
+
+## Exact-commit EXPERT review — BLOCK
+
+The independent review of exact pushed commit `b3fa1320bda38190022b9e3491e8de47cadd25f4` is [COMPLETE BLOCK: D1–D3](scratch-smoke-expert-block-b3fa132-20260926.md). **PRE-RUN BLOCK:** no installed-CLI preflight or smoke is authorized. At review, Joe timeboxed this effort: do not do further driver repair or use the installed CLI without asking him first, regardless of the verdict.
