@@ -73,3 +73,5 @@ passes **7** Python-owned tests.
 pass. The earlier 17-test candidate claims above refer to the blocked commit,
 not this revision. The modified code/test/doc remain unreviewed until the exact
 pushed SHA is supplied to the independent EXPERT.
+
+Exact pushed `168343436b05f9c584eb701f9dfc57a573302c05` received [EXPERT BLOCK R1–R4](scratch-smoke-expert-block-1683434-20260926.md). **PRE-RUN BLOCK continues**; no installed-CLI preflight or `--run-smoke` is authorized on this candidate.
