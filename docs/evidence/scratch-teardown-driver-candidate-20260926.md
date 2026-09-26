@@ -19,3 +19,5 @@ This is the implementation candidate for the [bounded driver contract](scratch-t
 ## Review gate and limits
 
 A fresh read-only EXPERT must review the **exact pushed candidate commit** and return a complete actionable PASS/BLOCK before any native use, including read-only driver preflight. A PASS would permit consideration of only one bounded isolated no-prompt default-socket smoke, with the root retained and unresolved outcomes quarantined. It would not approve the separate faux-provider tool-root experiment, a live EPISODE action, handoff, Prime Agent core changes, merge, or Qwen work. If the driver cannot establish a unique empty baseline or safe teardown, stop and consult rather than weaken guards.
+
+The [fresh exact-commit EXPERT review](scratch-smoke-expert-block-85fed9e-20260926.md) returned **BLOCK** on `85fed9e` with five actionable in-scope safety findings. The native preflight and `--run-smoke` remain blocked; this candidate report preserves the pre-review claim, not a later approval.
