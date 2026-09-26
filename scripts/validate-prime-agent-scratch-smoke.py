@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import selectors
 import stat
 import subprocess
 import sys
@@ -18,6 +19,11 @@ from typing import Protocol
 
 SOCKET_BUDGET = 103  # macOS sun_path[104], reserving one NUL byte.
 MAX_OUTPUT = 1_000_000
+MAX_SCAN_ENTRIES = 2048
+MAX_FIELD_BYTES = 4096
+MAX_RECORD_BYTES = 65536
+MAX_REPORT_BYTES = 256_000
+MAX_COMMAND_BYTES = 1_000_000
 START_RE = re.compile(r"^Daemon started on (.+) \(pid ([1-9][0-9]*)\)$")
 # The probe wrapper invokes this driver with env -i. Any additional setting
 # could reroute shutdown/discovery to live HOME, sockets, or provider state.
@@ -36,12 +42,16 @@ class CommandResult:
     stdout: str = ""
     stderr: str = ""
     timed_out: bool = False
+    output_truncated: bool = False
 
     def record(self) -> dict:
+        if len(self.stdout.encode()) > MAX_COMMAND_BYTES or len(self.stderr.encode()) > MAX_COMMAND_BYTES:
+            raise UnsafeScratch("command result exceeds capture bound")
         # Keep failure diagnostics without printing raw CLI output or descriptor secrets.
         return {
             "returncode": self.returncode,
             "timed_out": self.timed_out,
+            "output_truncated": self.output_truncated,
             "stdout_bytes": len(self.stdout.encode()),
             "stdout_sha256": hashlib.sha256(self.stdout.encode()).hexdigest(),
             "stderr_bytes": len(self.stderr.encode()),
@@ -59,8 +69,14 @@ class Observation:
     socket_files: list[str] = field(default_factory=list)
     descriptors: list[dict] = field(default_factory=list)
     registry_files: list[str] = field(default_factory=list)
+    registry_owners: list[dict] = field(default_factory=list)
     other_files: list[str] = field(default_factory=list)
     pid_starts: dict[int, str | None] = field(default_factory=dict)
+    # Injected observations are complete by default. Native observations begin
+    # incomplete and become complete only after an independent /bin/ps health
+    # check plus every discovered and captured PID/start check succeeds.
+    ps_complete: bool = True
+    required_pids: list[int] = field(default_factory=list)
 
     def record(self) -> dict:
         return asdict(self)
@@ -68,8 +84,7 @@ class Observation:
 
 class Runner(Protocol):
     def command(self, argv: list[str], timeout: int) -> CommandResult: ...
-    def observe(self, root: Path, cli: Path) -> Observation: ...
-    def pid_start(self, pid: int) -> str | None: ...
+    def observe(self, root: Path, cli: Path, required_pids: set[int] | None = None) -> Observation: ...
     def quiet_interval(self) -> None: ...
 
 
@@ -85,6 +100,33 @@ def required_private_dir(path: Path, expected: Path) -> None:
     st = path.stat()
     if st.st_uid != os.getuid() or stat.S_IMODE(st.st_mode) != 0o700:
         raise UnsafeScratch(f"private directory owner/mode mismatch: {expected.name}")
+
+
+def cli_identity(cli: Path) -> tuple[int, int, str]:
+    """Physical pathname and opened inode/hash must agree at each command boundary.
+
+    Python 3.9 on macOS cannot atomically bind pathname verification to exec.
+    """
+    if not cli.is_absolute() or cli != Path(os.path.realpath(cli)):
+        raise UnsafeScratch("CLI physical pathname changed")
+    fd = os.open(cli, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or not (st.st_mode & 0o111):
+            raise UnsafeScratch("CLI is not an executable regular file")
+        digest = hashlib.sha256()
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            while True:
+                chunk = stream.read(65536)
+                if not chunk:
+                    break
+                digest.update(chunk)
+        current = os.stat(cli, follow_symlinks=False)
+        if (current.st_dev, current.st_ino) != (st.st_dev, st.st_ino):
+            raise UnsafeScratch("CLI pathname replaced while hashing")
+        return st.st_dev, st.st_ino, digest.hexdigest()
+    finally:
+        os.close(fd)
 
 
 def validate_root(env: dict[str, str], cli: Path, expected_sha256: str) -> tuple[Path, Path]:
@@ -104,11 +146,11 @@ def validate_root(env: dict[str, str], cli: Path, expected_sha256: str) -> tuple
     for socket in (socket_dir / "daemon.sock", socket_dir / ("worker-" + "x" * 12 + "-" + "y" * 12 + ".sock")):
         if len(os.fsencode(str(socket))) > SOCKET_BUDGET:
             raise UnsafeScratch("Unix socket pathname exceeds 103-byte budget")
-    if not cli.is_absolute() or cli.is_symlink() or not cli.is_file() or not os.access(cli, os.X_OK):
-        raise UnsafeScratch("CLI must be an absolute, executable, non-symlink file")
+    if not cli.is_absolute() or cli != Path(os.path.realpath(cli)) or not cli.is_file() or not os.access(cli, os.X_OK):
+        raise UnsafeScratch("CLI must be an absolute, physical, executable file")
     if not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
         raise UnsafeScratch("expected CLI SHA-256 is required")
-    actual_sha256 = hashlib.sha256(cli.read_bytes()).hexdigest()
+    actual_sha256 = cli_identity(cli)[2]
     if actual_sha256 != expected_sha256:
         raise UnsafeScratch("installed CLI SHA-256 does not match reviewed identity")
     project = root / "project"
@@ -118,36 +160,61 @@ def validate_root(env: dict[str, str], cli: Path, expected_sha256: str) -> tuple
 
 
 def parse_lsof(stdout: str, root: Path) -> list[dict]:
+    # -F pn may include a file-descriptor separator on some lsof builds.
+    # Unknown, empty, oversized or malformed records are NOT an empty scan.
+    if len(stdout.encode(errors="replace")) > MAX_OUTPUT:
+        raise UnsafeScratch("lsof output exceeds scan bound")
     refs: set[tuple[int, str]] = set()
     pid: int | None = None
-    for line in stdout.splitlines():
-        if not line:
-            continue
-        if line.startswith("p"):
-            if not line[1:].isdigit() or int(line[1:]) <= 1:
+    lines = stdout.splitlines()
+    if len(lines) > MAX_SCAN_ENTRIES:
+        raise UnsafeScratch("lsof record count exceeds scan bound")
+    file_record = False
+    for line in lines:
+        if not line or len(line.encode(errors="replace")) > MAX_FIELD_BYTES or "\x00" in line or "\r" in line:
+            raise UnsafeScratch("malformed lsof record")
+        field, value = line[0], line[1:]
+        if field == "p":
+            if pid is not None and not file_record:
+                raise UnsafeScratch("lsof PID has no file records")
+            file_record = False
+            if not value.isdecimal() or len(value) > 12 or int(value) <= 1:
                 raise UnsafeScratch("malformed lsof PID")
-            pid = int(line[1:])
-        elif line.startswith("n"):
-            name = line[1:]
+            pid = int(value)
+        elif field == "f":
+            if pid is None or not value:
+                raise UnsafeScratch("malformed lsof file descriptor")
+            file_record = True
+        elif field == "n":
             if pid is None:
                 raise UnsafeScratch("lsof pathname before PID")
-            if str(root) in name and (not name.startswith("/") or not inside(name, root)):
+            if not value:
+                raise UnsafeScratch("empty lsof pathname")
+            file_record = True
+            if str(root) in value and (not value.startswith("/") or not inside(value, root)):
                 raise UnsafeScratch("lsof root reference has an unrecognized or escaping path")
-            if name.startswith("/") and inside(name, root):
-                refs.add((pid, name))
+            if value.startswith("/") and inside(value, root):
+                refs.add((pid, value))
+                if len(refs) > MAX_SCAN_ENTRIES:
+                    raise UnsafeScratch("lsof root references exceed scan bound")
+        else:
+            raise UnsafeScratch("unknown lsof field in independent scan")
+    if pid is not None and not file_record:
+        raise UnsafeScratch("truncated lsof PID record")
     return [{"pid": pid, "path": path} for pid, path in sorted(refs)]
 
 
-def parse_daemon_ps(result: CommandResult, root: Path) -> list[dict]:
-    if result.timed_out or result.returncode != 0 or len(result.stdout.encode()) > MAX_OUTPUT:
+def parse_daemon_ps(result: CommandResult, root: Path, collected: list[dict] | None = None) -> list[dict]:
+    if (result.timed_out or result.returncode != 0 or result.stderr.strip()
+            or len(result.stdout.encode()) > MAX_OUTPUT):
         raise UnsafeScratch("daemon ps failed or exceeded output bound")
     try:
         daemons = json.loads(result.stdout)
     except ValueError as error:
         raise UnsafeScratch("daemon ps returned invalid JSON") from error
-    if not isinstance(daemons, list):
-        raise UnsafeScratch("daemon ps returned non-array JSON")
-    safe = []
+    if not isinstance(daemons, list) or len(daemons) > MAX_SCAN_ENTRIES:
+        raise UnsafeScratch("daemon ps returned invalid or oversized array")
+    safe = [] if collected is None else collected
     for entry in daemons:
         if not isinstance(entry, dict) or not isinstance(entry.get("socketPath"), str):
             raise UnsafeScratch("daemon ps returned invalid entry")
@@ -160,7 +227,17 @@ def parse_daemon_ps(result: CommandResult, root: Path) -> list[dict]:
         status = entry.get("status")
         if status not in ("current", "stale", "unreachable", "orphan-file"):
             raise UnsafeScratch("daemon ps returned unknown status")
-        safe.append({"socketPath": str(socket), "pid": pid, "status": status})
+        if type(entry.get("isDefault")) is not bool:
+            raise UnsafeScratch("daemon ps default-socket identity is missing")
+        session_count = entry.get("sessionCount")
+        if session_count is not None and (type(session_count) is not int or session_count < 0):
+            raise UnsafeScratch("daemon ps returned invalid session count")
+        tracked = entry.get("hasTrackedWorkers", False)
+        if type(tracked) is not bool:
+            raise UnsafeScratch("daemon ps returned invalid worker flag")
+        safe.append({"socketPath": str(socket), "pid": pid, "status": status,
+                     "isDefault": entry["isDefault"], "sessionCount": session_count,
+                     "hasTrackedWorkers": tracked})
     return safe
 
 
@@ -188,8 +265,133 @@ def parse_shutdown(result: CommandResult, root: Path) -> list[dict]:
     return stopped
 
 
+def scan_root_entries(root: Path):
+    """Explicit, bounded walk; unlike Path.rglob, traversal errors propagate."""
+    pending = [root]
+    count = 0
+    while pending:
+        directory = pending.pop()
+        children = []
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                count += 1
+                if count > MAX_SCAN_ENTRIES or len(os.fsencode(entry.path)) > MAX_FIELD_BYTES:
+                    raise UnsafeScratch("private root enumeration exceeds scan bound")
+                path = Path(entry.path)
+                st = entry.stat(follow_symlinks=False)
+                if stat.S_ISLNK(st.st_mode) or not inside(path, root):
+                    raise UnsafeScratch("symlink or redirect inside private scratch root")
+                yield path, st
+                if stat.S_ISDIR(st.st_mode):
+                    children.append(path)
+        pending.extend(reversed(children))
+
+
+def read_scanned_json(path: Path, st: os.stat_result, label: str):
+    if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_RECORD_BYTES:
+        raise UnsafeScratch("invalid or oversized " + label)
+    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    fd = os.open(path, flags)
+    try:
+        opened = os.fstat(fd)
+        if (not stat.S_ISREG(opened.st_mode) or opened.st_dev != st.st_dev
+                or opened.st_ino != st.st_ino or opened.st_size > MAX_RECORD_BYTES):
+            raise UnsafeScratch("changed or oversized " + label)
+        with os.fdopen(fd, "rb", closefd=False) as reader:
+            data = reader.read(MAX_RECORD_BYTES + 1)
+        if len(data) > MAX_RECORD_BYTES or len(data) != opened.st_size:
+            raise UnsafeScratch("changed or oversized " + label)
+        try:
+            return json.loads(data.decode("utf-8"))
+        except (UnicodeError, ValueError) as error:
+            raise UnsafeScratch("malformed " + label) from error
+    finally:
+        os.close(fd)
+
+
+def default_descriptor_dir(root: Path, socket: Path) -> Path:
+    # v0.9.6 daemon-supervisor.ts:692-697 hashes normalized socket path.
+    key = hashlib.sha256(str(socket).encode()).hexdigest()[:12]
+    return root / "config" / "daemon-workers" / key
+
+
+def parse_owner_record(value, path: Path, root: Path) -> dict:
+    registry = root / "home" / ".prime" / "supervisor-owners"
+    if (not isinstance(value, dict) or path.name != "owner.json"
+            or path.parent.parent != registry or not path.parent.name.endswith(".owner")):
+        raise UnsafeScratch("invalid supervisor owner record layout")
+    generation = path.parent.name[:-6]
+    if (not re.fullmatch(r"[A-Za-z0-9._-]{1,128}", generation)
+            or type(value.get("version")) is not int or value["version"] != 1
+            or value.get("role") != "supervisor"
+            or value.get("generation") != generation
+            or value.get("phase") not in ("starting", "owner", "stopping")
+            or type(value.get("pid")) is not int or value["pid"] <= 1):
+        raise UnsafeScratch("invalid supervisor owner identity")
+    for key in ("token", "appVersion", "createdAt", "updatedAt"):
+        if not isinstance(value.get(key), str) or not value[key] or len(value[key]) > 256:
+            raise UnsafeScratch("invalid supervisor owner metadata")
+    start = value.get("processStartId")
+    if start is not None and (not isinstance(start, str) or not start or len(start) > 256):
+        raise UnsafeScratch("invalid supervisor owner process start")
+    for key in ("socketPath", "descriptorDir", "agentDir"):
+        path_value = value.get(key)
+        if (not isinstance(path_value, str) or len(path_value) > MAX_FIELD_BYTES
+                or not Path(path_value).is_absolute() or not inside(path_value, root)):
+            raise UnsafeScratch("supervisor owner scope escapes scratch root")
+    return {"path": str(path), "generation": generation, "pid": value["pid"],
+            "start_id": start, "socketPath": value["socketPath"],
+            "descriptorDir": value["descriptorDir"], "agentDir": value["agentDir"],
+            "phase": value["phase"]}
+
+
+def validate_owner_scope(value, owner: dict, path: Path) -> None:
+    if (not isinstance(value, dict) or path.name != "scope.json"
+            or any(value.get(key) != owner.get(key) for key in
+                   ("version", "role", "token", "generation", "socketPath", "descriptorDir"))):
+        raise UnsafeScratch("supervisor owner scope disagrees with owner record")
+
+
+def parse_worker_descriptor(value, path: Path, root: Path) -> dict:
+    if not isinstance(value, dict) or type(value.get("version")) is not int or value["version"] not in (1, 2):
+        raise UnsafeScratch("unknown worker descriptor format")
+    pid = value.get("pid")
+    start = value.get("processStartId")
+    if (type(pid) is not int or pid <= 1 or not isinstance(start, str)
+            or not start or len(start) > 256):
+        raise UnsafeScratch("worker descriptor lacks a stable process identity")
+    for key in ("workerId", "authenticationToken", "rootActiveSessionId",
+                "createdAt", "updatedAt", "lifecycle"):
+        if not isinstance(value.get(key), str) or not value[key] or len(value[key]) > 256:
+            raise UnsafeScratch("worker descriptor lacks required native metadata")
+    if (not isinstance(value.get("createCommand"), dict)
+            or type(value.get("consecutiveFailures")) is not int
+            or value["consecutiveFailures"] < 0):
+        raise UnsafeScratch("worker descriptor lacks required native lifecycle")
+    for key in ("socketPath", "supervisorSocketPath", "recoveryJournalPath"):
+        reported = value.get(key)
+        if (not isinstance(reported, str) or len(reported) > MAX_FIELD_BYTES
+                or not Path(reported).is_absolute() or not inside(reported, root)):
+            raise UnsafeScratch("worker descriptor path escapes scratch root")
+    worker_id = value["workerId"]
+    if (not re.fullmatch(r"[A-Za-z0-9._-]{1,128}", worker_id)
+            or path.name != worker_id + ".json"
+            or path.parent != default_descriptor_dir(root, Path(value["supervisorSocketPath"]))):
+        raise UnsafeScratch("worker descriptor filename or socket scope disagrees")
+    for key in ("orphanProcessJournalPath", "sessionDir", "sessionFile"):
+        reported = value.get(key)
+        if reported is not None and (not isinstance(reported, str)
+                                    or not Path(reported).is_absolute() or not inside(reported, root)):
+            raise UnsafeScratch("optional worker descriptor path escapes scratch root")
+    return {"path": str(path), "pid": pid, "start_id": start,
+            "socketPath": value["socketPath"],
+            "supervisorSocketPath": value["supervisorSocketPath"],
+            "recoveryJournalPath": value["recoveryJournalPath"]}
+
+
 def snapshot_quiet(obs: Observation) -> bool:
-    if not obs.valid or obs.reason or obs.root_refs or obs.unix_refs or obs.registry_files:
+    if (not obs.valid or obs.reason or not obs.ps_complete or obs.root_refs
+            or obs.unix_refs or obs.registry_files or obs.registry_owners):
         return False
     if any(d.get("pid") is not None and obs.pid_starts.get(d["pid"]) is not None for d in obs.daemons):
         return False
@@ -201,9 +403,52 @@ def snapshot_quiet(obs: Observation) -> bool:
 
 
 def baseline_empty(obs: Observation) -> bool:
-    return (obs.valid and not obs.reason and not obs.daemons and not obs.root_refs
-            and not obs.unix_refs and not obs.socket_files and not obs.descriptors
-            and not obs.registry_files and not obs.other_files and not obs.pid_starts)
+    return (obs.valid and not obs.reason and obs.ps_complete and not obs.daemons
+            and not obs.root_refs and not obs.unix_refs and not obs.socket_files
+            and not obs.descriptors and not obs.registry_files and not obs.registry_owners
+            and not obs.other_files and not obs.pid_starts)
+
+
+def active_shutdown_admission(active: Observation, root: Path, socket: Path,
+                              expected_pid: int | None, start_ok: bool) -> tuple[bool, bool, str]:
+    """Fail closed on any competing or unreconciled owner before destructive shutdown."""
+    if not active.valid or active.reason or not active.ps_complete:
+        return False, False, "active ownership observation was incomplete; no shutdown admitted"
+    if active.descriptors:
+        return False, False, "active observation found worker metadata; no shutdown admitted"
+    if any(path != str(socket) for path in active.socket_files):
+        return False, False, "active observation found an unexpected socket; no shutdown admitted"
+    if any(d["socketPath"] != str(socket) or not d["isDefault"]
+           or d["hasTrackedWorkers"] or d["sessionCount"] != 0
+           or (expected_pid is not None and d["pid"] != expected_pid)
+           for d in active.daemons):
+        return False, False, "active daemon had a different owner, sessions, or workers; no shutdown admitted"
+    if any(ref["pid"] != expected_pid for ref in active.root_refs + active.unix_refs):
+        return False, False, "active root reference had a different owner; no shutdown admitted"
+    if any(pid != expected_pid and start is not None for pid, start in active.pid_starts.items()):
+        return False, False, "active process identity had a different owner; no shutdown admitted"
+    if not start_ok:
+        # One uncertain owned start may still have detached a daemon. Only a
+        # complete, still-empty private namespace admits one isolated stop.
+        if (active.daemons or active.root_refs or active.unix_refs or active.socket_files
+                or active.descriptors or active.registry_files or active.registry_owners
+                or any(start is not None for start in active.pid_starts.values())):
+            return False, False, "uncertain start has a possible owner; no shutdown admitted"
+        return True, False, "start result uncertain; one isolated shutdown may be attempted"
+    if expected_pid is None or len(active.daemons) != 1 or active.daemons[0]["status"] != "current":
+        return False, False, "active supervisor was not uniquely current; no shutdown admitted"
+    if active.pid_starts.get(expected_pid) is None or len(active.registry_owners) != 1:
+        return False, False, "active supervisor and registry owner were not both proven; no shutdown admitted"
+    owner = active.registry_owners[0]
+    owner_dir = root / "home" / ".prime" / "supervisor-owners" / (owner["generation"] + ".owner")
+    expected_records = {str(owner_dir / "owner.json"), str(owner_dir / "scope.json")}
+    if (set(active.registry_files) != expected_records or owner["pid"] != expected_pid
+            or owner["start_id"] != "ps:" + active.pid_starts[expected_pid]
+            or owner["socketPath"] != str(socket)
+            or owner["descriptorDir"] != str(default_descriptor_dir(root, socket))
+            or owner["agentDir"] != str(root / "config") or owner["phase"] != "owner"):
+        return False, False, "active registry identity or scope disagreed; no shutdown admitted"
+    return True, True, ""
 
 
 class NativeRunner:
@@ -212,6 +457,7 @@ class NativeRunner:
     def __init__(self, env: dict[str, str], cli: Path, cwd: Path):
         self.env = {**env, "LC_ALL": "C", "TZ": "UTC"}
         self.cli = cli
+        self.identity = cli_identity(cli)
         self.cwd = cwd
         if sys.platform != "darwin":
             raise UnsafeScratch("native scratch smoke is reviewed only for macOS")
@@ -228,17 +474,59 @@ class NativeRunner:
     def command(self, argv: list[str], timeout: int) -> CommandResult:
         if not argv or Path(argv[0]) not in (self.cli, self.lsof, self.ps):
             raise UnsafeScratch("unexpected executable in scratch driver")
+        if Path(argv[0]) == self.cli and cli_identity(self.cli) != self.identity:
+            raise UnsafeScratch("CLI identity changed before invocation")
+        # Pipe pumping caps bytes in memory while draining both streams. A
+        # timeout only kills the exact child handle created by this call.
         try:
-            done = subprocess.run(argv, cwd=self.cwd, env=self.env, timeout=timeout,
-                                  capture_output=True, text=True, errors="replace", check=False)
-            return CommandResult(done.returncode, done.stdout, done.stderr)
-        except subprocess.TimeoutExpired as error:
-            out = error.stdout or b""
-            err = error.stderr or b""
-            return CommandResult(None, out.decode(errors="replace") if isinstance(out, bytes) else out,
-                                 err.decode(errors="replace") if isinstance(err, bytes) else err, True)
+            proc = subprocess.Popen(argv, cwd=self.cwd, env=self.env,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except OSError:
             return CommandResult(None)
+        output = {"stdout": bytearray(), "stderr": bytearray()}
+        selector = selectors.DefaultSelector()
+        expired = False
+        oversized = False
+        deadline = time.monotonic() + timeout
+        try:
+            for name, pipe in (("stdout", proc.stdout), ("stderr", proc.stderr)):
+                selector.register(pipe, selectors.EVENT_READ, name)
+            while selector.get_map():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    expired = True
+                    break
+                for key, _ in selector.select(remaining):
+                    chunk = os.read(key.fileobj.fileno(), 65536)
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                    elif len(output[key.data]) + len(chunk) > MAX_COMMAND_BYTES:
+                        oversized = True
+                        break
+                    else:
+                        output[key.data].extend(chunk)
+                if oversized:
+                    break
+            remaining = deadline - time.monotonic()
+            if not oversized and not expired:
+                try:
+                    proc.wait(timeout=max(remaining, 0.001))
+                except subprocess.TimeoutExpired:
+                    expired = True
+            if oversized or expired:
+                if proc.poll() is None:
+                    proc.kill()  # This exact direct child only, never a daemon PID.
+                proc.wait()
+            return CommandResult(None if expired or oversized else proc.returncode,
+                                 output["stdout"].decode(errors="replace"),
+                                 output["stderr"].decode(errors="replace"), expired or oversized, oversized)
+        finally:
+            if proc.poll() is None:
+                proc.kill()  # Exact direct child on unexpected pump failure.
+                proc.wait()
+            selector.close()
+            proc.stdout.close()
+            proc.stderr.close()
 
     def _lsof(self, args: list[str], root: Path) -> list[dict]:
         result = self.command([str(self.lsof), "-nP", "-F", "pn", *args], 12)
@@ -257,192 +545,231 @@ class NativeRunner:
         if result.timed_out or result.returncode != 0 or result.stderr.strip():
             raise UnsafeScratch("independent process identity scan failed")
         start = result.stdout.strip()
-        if not start or "\n" in start or len(start) > 100:
+        if not re.fullmatch(r"[A-Z][a-z]{2} [A-Z][a-z]{2} [ 0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9] [0-9]{4}", start):
             raise UnsafeScratch("process start identity missing or malformed")
         return start
 
-    def observe(self, root: Path, cli: Path) -> Observation:
+    def observe(self, root: Path, cli: Path, required_pids: set[int] | None = None) -> Observation:
+        # Retain already observed ownership facts if a later independent scan
+        # fails. Unknown or incomplete active observations forbid shutdown.
+        obs = Observation(ps_complete=False, required_pids=sorted(required_pids or set()))
         try:
-            return self._observe(root, cli)
-        except (UnsafeScratch, OSError, ValueError) as error:
-            # Errors here are bounded driver constants, never raw daemon output.
-            return Observation(valid=False, reason=str(error)[:200])
+            self._observe_into(obs, root, cli, required_pids or set())
+        except Exception as error:
+            obs.valid = False
+            obs.reason = str(error)[:200] if isinstance(error, UnsafeScratch) else "independent observation failed"
+        return obs
 
-    def _observe(self, root: Path, cli: Path) -> Observation:
-        obs = Observation()
-        obs.daemons = parse_daemon_ps(self.command([str(cli), "daemon", "ps", "--json"], 12), root)
+    def _observe_into(self, obs: Observation, root: Path, cli: Path, required_pids: set[int]) -> None:
+        parse_daemon_ps(self.command([str(cli), "daemon", "ps", "--json"], 12), root, obs.daemons)
         obs.root_refs = self._lsof(["+D", str(root)], root)
         obs.unix_refs = self._lsof(["-U"], root)
         descriptor_dir = root / "config" / "daemon-workers"
         registry_dir = root / "home" / ".prime" / "supervisor-owners"
-        for path in root.rglob("*"):
-            if path.is_symlink():
-                raise UnsafeScratch("symlink inside private scratch root")
-            mode = path.lstat().st_mode
-            if stat.S_ISSOCK(mode):
+        owner_records: dict[Path, dict] = {}
+        owner_scopes: dict[Path, dict] = {}
+        for path, st in scan_root_entries(root):
+            if stat.S_ISSOCK(st.st_mode):
                 obs.socket_files.append(str(path))
-            elif stat.S_ISREG(mode):
-                if inside(path, descriptor_dir) and path.suffix == ".json":
-                    if path.stat().st_size > MAX_OUTPUT:
-                        raise UnsafeScratch("oversized worker descriptor")
-                    try:
-                        descriptor = json.loads(path.read_text())
-                    except (ValueError, UnicodeError) as error:
-                        raise UnsafeScratch("malformed worker descriptor") from error
-                    if not isinstance(descriptor, dict):
-                        raise UnsafeScratch("worker descriptor is not an object")
-                    pid = descriptor.get("pid")
-                    start_id = descriptor.get("processStartId")
-                    if (descriptor.get("version") not in (1, 2) or type(pid) is not int or pid <= 1
-                            or not isinstance(start_id, str) or not start_id):
-                        raise UnsafeScratch("worker descriptor lacks a stable process identity")
-                    for key in ("socketPath", "supervisorSocketPath"):
-                        if not isinstance(descriptor.get(key), str) or not inside(descriptor[key], root):
-                            raise UnsafeScratch("worker descriptor socket escapes scratch root")
-                    obs.descriptors.append({"path": str(path), "pid": pid, "start_id": start_id,
-                                            "socketPath": descriptor["socketPath"],
-                                            "supervisorSocketPath": descriptor["supervisorSocketPath"]})
+            elif stat.S_ISREG(st.st_mode):
+                if inside(path, descriptor_dir):
+                    # Native descriptors live under daemon-workers/<socket hash>/.
+                    # Recovery/orphan journals are opaque retained metadata.
+                    if (path.parent.parent != descriptor_dir
+                            or not re.fullmatch(r"[0-9a-f]{12}", path.parent.name)):
+                        raise UnsafeScratch("unknown worker descriptor layout")
+                    if path.name.endswith((".recovery.jsonl", ".orphans.jsonl")):
+                        obs.other_files.append(str(path))
+                    elif path.suffix == ".json":
+                        desc = read_scanned_json(path, st, "worker descriptor")
+                        obs.descriptors.append(parse_worker_descriptor(desc, path, root))
+                    else:
+                        raise UnsafeScratch("unknown worker descriptor artifact")
                 elif inside(path, registry_dir):
                     obs.registry_files.append(str(path))
+                    if path.parent.parent == registry_dir and path.parent.name.endswith(".owner"):
+                        if path.name == "owner.json":
+                            owner = read_scanned_json(path, st, "supervisor owner record")
+                            obs.registry_owners.append(parse_owner_record(owner, path, root))
+                            owner_records[path.parent] = owner
+                        elif path.name == "scope.json":
+                            owner_scopes[path.parent] = read_scanned_json(path, st, "supervisor owner scope")
                 else:
                     obs.other_files.append(str(path))
-            elif not stat.S_ISDIR(mode):
+            elif not stat.S_ISDIR(st.st_mode):
                 raise UnsafeScratch("unknown filesystem entry in scratch root")
+        for owner_dir in owner_records.keys() | owner_scopes.keys():
+            if owner_dir not in owner_records or owner_dir not in owner_scopes:
+                raise UnsafeScratch("incomplete supervisor registry owner record")
+            validate_owner_scope(owner_scopes[owner_dir], owner_records[owner_dir], owner_dir / "scope.json")
         pids = {d["pid"] for d in obs.daemons if d["pid"] is not None}
         pids.update(r["pid"] for r in obs.root_refs + obs.unix_refs)
         pids.update(d["pid"] for d in obs.descriptors)
+        pids.update(owner["pid"] for owner in obs.registry_owners)
+        pids.update(required_pids)
+        if len(pids) > MAX_SCAN_ENTRIES or any(type(pid) is not int or pid <= 1 for pid in pids):
+            raise UnsafeScratch("invalid or oversized process identity set")
+        # Even an apparently empty discovery must prove /bin/ps works.
+        if self.pid_start(os.getpid()) is None:
+            raise UnsafeScratch("independent process scan health check failed")
         for pid in sorted(pids):
             obs.pid_starts[pid] = self.pid_start(pid)
         for ref in obs.root_refs + obs.unix_refs:
             if obs.pid_starts[ref["pid"]] is None:
                 raise UnsafeScratch("root reference disappeared during process identity scan")
-        return obs
+        obs.ps_complete = True
 
 
 def record_report(root: Path, report: dict) -> None:
+    """Create one bounded, owner-only, durable record; never replace on replay."""
     path = root / "scratch-smoke-report.json"
-    if path.exists() or path.is_symlink():
-        raise UnsafeScratch("scratch report path already exists; root retained")
-    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
-    path.chmod(0o600)
+    try:
+        encoded = (json.dumps(report, sort_keys=True, ensure_ascii=True) + "\n").encode()
+        if len(encoded) > MAX_REPORT_BYTES:
+            raise UnsafeScratch("report serialization exceeds bound")
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(fd, "wb", closefd=False) as stream:
+                stream.write(encoded)
+                stream.flush()
+                os.fsync(fd)
+        finally:
+            os.close(fd)
+        directory = os.open(root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    except Exception as error:
+        raise UnsafeScratch(f"evidence write failed for retained root {root}; quarantine and inspect report path manually") from error
 
 
 def smoke(env: dict[str, str], cli: Path, expected_sha256: str, runner: Runner, *, run_native: bool) -> dict:
-    """One guarded start and one scoped shutdown; every root is retained."""
+    """One owned start, at most one isolated shutdown; preserve every root."""
     root, project = validate_root(env, cli, expected_sha256)
-    report: dict = {"root": str(root), "cli_sha256": expected_sha256,
+    identity = cli_identity(cli)
+    report: dict = {"root": str(root), "cli_path": str(cli), "cli_sha256": expected_sha256,
+                    "cli_device": identity[0], "cli_inode": identity[1],
+                    "helper_cwd": str(getattr(runner, "cwd", Path.cwd())),
                     "mode": "smoke" if run_native else "preflight", "status": "blocked_preflight",
                     "events": [], "reasons": []}
 
-    def observe() -> Observation:
-        try:
-            return runner.observe(root, cli)
-        except Exception:
-            return Observation(valid=False, reason="independent observation raised an exception")
+    def reason(message: str) -> None:
+        report["reasons"].append(message[:200])
 
-    def command(argv: list[str], timeout: int) -> CommandResult:
+    def observation(stage: str, required: set[int] | None = None) -> Observation:
         try:
-            return runner.command(argv, timeout)
+            if cli_identity(cli) != identity:
+                raise UnsafeScratch("CLI identity changed before observation")
+            value = runner.observe(root, cli, required_pids=required)
+            if not isinstance(value, Observation):
+                raise UnsafeScratch("observation did not return a supported result")
         except Exception:
-            return CommandResult(None)  # Unknown outcome, never replay a mutation.
+            value = Observation(valid=False, ps_complete=False, reason="independent observation failed")
+        try:
+            record = value.record()
+            if len(json.dumps(record)) > MAX_REPORT_BYTES // 2:
+                raise UnsafeScratch("observation record exceeds bound")
+            report[stage] = record if stage != "postflight" else report.setdefault(stage, []) + [record]
+        except Exception:
+            value.valid = False
+            value.reason = "observation evidence recording failed"
+            minimal = {"valid": False, "reason": value.reason, "ps_complete": False}
+            report[stage] = minimal if stage != "postflight" else report.setdefault(stage, []) + [minimal]
+        return value
 
-    baseline = observe()
-    report["baseline"] = baseline.record()
+    def command(operation: str, argv: list[str], timeout: int) -> CommandResult:
+        # Exact safe argv/cwd are recorded BEFORE the attempt. No secrets or env.
+        event = {"operation": operation, "argv": argv[:20],
+                 "cwd": str(getattr(runner, "cwd", Path.cwd())), "cli_path": str(cli),
+                 "cli_sha256": expected_sha256}
+        report["events"].append(event)
+        try:
+            if cli_identity(cli) != identity:
+                raise UnsafeScratch("CLI identity changed before invocation")
+            outcome = runner.command(argv, timeout)
+            event.update(outcome.record())
+            return outcome
+        except Exception:
+            event["error"] = "invocation or result recording failed; outcome unknown"
+            return CommandResult(None, timed_out=True)
+
+    baseline = observation("baseline")
     if not baseline_empty(baseline):
-        report["reasons"].append(baseline.reason or "scratch baseline is not empty and uniquely owned")
+        reason(baseline.reason or "scratch baseline is not empty and uniquely owned")
         record_report(root, report)
-        return report  # Never shutdown an unowned preflight root.
+        return report
     if not run_native:
         report["status"] = "preflight_ready"
         record_report(root, report)
         return report
 
-    project.mkdir(mode=0o700)
+    try:
+        project.mkdir(mode=0o700)
+    except Exception:
+        reason("scratch project creation failed before start admission")
+        record_report(root, report)
+        return report
     socket = root / "tmp" / f"prime-agent-{os.getuid()}" / "daemon.sock"
     start_args = [str(cli), "daemon", "start", "--offline", "--no-extensions", "--no-skills",
                   "--no-prompt-templates", "--no-context-files", "--no-tools", "--cwd", str(project)]
-    # From this point an owned start was attempted; even a timeout could have
-    # detached a daemon. No second start is ever allowed in this root.
-    ownership_revoked = False
+    start = command("daemon_start_once", start_args, 18)
     start_ok = False
     active_ok = False
+    admission = False
+    ownership_revoked = False
     captured: dict[int, str | None] = {}
     try:
-        start = command(start_args, 18)
-        report["events"].append({"operation": "daemon_start_once", **start.record()})
         if start.stdout.strip().startswith("Daemon already running on "):
             ownership_revoked = True
-            report["reasons"].append("start found a competing daemon after the empty baseline; no shutdown admitted")
+            reason("start reported a competing daemon; no shutdown admitted")
         else:
             match = START_RE.fullmatch(start.stdout.strip()) if start.returncode == 0 and not start.timed_out else None
             start_ok = bool(match and match.group(1) == str(socket))
-            if not start_ok:
-                report["reasons"].append("start result is uncertain; never retry")
-            active = observe()
-            report["active"] = active.record()
             expected_pid = int(match.group(2)) if start_ok else None
-            unexpected_owner = (active.valid and
-                (any(d["socketPath"] != str(socket) or d["pid"] not in (expected_pid, None)
-                     for d in active.daemons)
-                 or any(ref["pid"] != expected_pid for ref in active.root_refs + active.unix_refs)
-                 or bool(active.descriptors)
-                 or any(pid != expected_pid and start_id is not None
-                        for pid, start_id in active.pid_starts.items())))
-            if (not active.valid and "out-of-root" in active.reason) or unexpected_owner:
+            if not start_ok:
+                reason("start result uncertain; never retry")
+            active = observation("active", {expected_pid} if expected_pid else set())
+            admission, active_ok, decision = active_shutdown_admission(active, root, socket, expected_pid, start_ok)
+            if not admission:
                 ownership_revoked = True
-                report["reasons"].append("active observation found foreign or unexpected ownership; no shutdown admitted")
+                reason(decision)
             else:
-                active_ok = (active.valid and start_ok and len(active.daemons) == 1
-                             and active.daemons[0]["socketPath"] == str(socket)
-                             and active.daemons[0]["pid"] == expected_pid
-                             and active.daemons[0]["status"] == "current"
-                             and active.pid_starts.get(expected_pid) is not None)
-                if not active_ok:
-                    report["reasons"].append("active supervisor identity was not uniquely reconciled")
-                if active.valid:
-                    captured = dict(active.pid_starts)
+                if decision:
+                    reason(decision)
+                captured = dict(active.pid_starts)
     except Exception:
-        report["reasons"].append("unexpected driver error after owned start attempt")
-    finally:
-        if ownership_revoked:
-            report["status"] = "unresolved_ownership"
-        else:
-            # Top-level shutdown selects the isolated HOME+TMPDIR state root.
-            # The per-socket `daemon shutdown` cannot reap unknown/hidden workers.
-            stop = command([str(cli), "shutdown", "--force", "--json"], 35)
-            report["events"].append({"operation": "top_level_shutdown_once", **stop.record()})
-            try:
-                report["stopped"] = parse_shutdown(stop, root)
-                shutdown_ok = True
-            except UnsafeScratch as error:
-                shutdown_ok = False
-                report["reasons"].append(str(error))
-            first = observe()
-            try:
-                runner.quiet_interval()
-                interval_ok = True
-            except Exception:
-                interval_ok = False
-                report["reasons"].append("post-shutdown quiet interval failed")
-            second = observe()
-            report["postflight"] = [first.record(), second.record()]
-            quiet = interval_ok and snapshot_quiet(first) and snapshot_quiet(second)
-            if not quiet:
-                report["reasons"].append("independent post-shutdown scans are not both empty and valid")
-            identities_gone = True
-            for pid, start_id in captured.items():
-                try:
-                    current = runner.pid_start(pid)
-                except Exception:
-                    identities_gone = False
-                    break
-                if not start_id or current is not None:
-                    identities_gone = False  # Same PID still alive or PID reuse: unresolved.
-                    break
-            if not identities_gone:
-                report["reasons"].append("captured process identity persists, was reused, or could not be checked")
-            report["status"] = "stopped" if start_ok and active_ok and shutdown_ok and quiet and identities_gone else "unresolved"
-        record_report(root, report)
+        ownership_revoked = True
+        reason("active ownership reconciliation failed; no shutdown admitted")
+
+    shutdown_ok = False
+    if ownership_revoked:
+        report["status"] = "unresolved_ownership"
+    else:
+        # No other mutation after this call, even if parsing/evidence fails.
+        stop = command("top_level_shutdown_once", [str(cli), "shutdown", "--force", "--json"], 35)
+        try:
+            report["stopped"] = parse_shutdown(stop, root)
+            shutdown_ok = True
+        except Exception:
+            reason("shutdown result failed, invalid, or uncertain")
+        first = observation("postflight", set(captured))
+        try:
+            runner.quiet_interval()
+            interval_ok = True
+        except Exception:
+            interval_ok = False
+            reason("post-shutdown quiet interval failed")
+        second = observation("postflight", set(captured))
+        quiet = interval_ok and snapshot_quiet(first) and snapshot_quiet(second)
+        if not quiet:
+            reason("independent post-shutdown scans are not both empty and valid")
+        if any(first.pid_starts.get(pid) is not None or second.pid_starts.get(pid) is not None
+               or pid not in first.pid_starts or pid not in second.pid_starts for pid in captured):
+            quiet = False
+            reason("captured process identity persisted, was reused, or was not checked twice")
+        report["status"] = "stopped" if start_ok and active_ok and shutdown_ok and quiet else "unresolved"
+    record_report(root, report)
     return report
 
 

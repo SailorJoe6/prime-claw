@@ -21,3 +21,55 @@ This is the implementation candidate for the [bounded driver contract](scratch-t
 A fresh read-only EXPERT must review the **exact pushed candidate commit** and return a complete actionable PASS/BLOCK before any native use, including read-only driver preflight. A PASS would permit consideration of only one bounded isolated no-prompt default-socket smoke, with the root retained and unresolved outcomes quarantined. It would not approve the separate faux-provider tool-root experiment, a live EPISODE action, handoff, Prime Agent core changes, merge, or Qwen work. If the driver cannot establish a unique empty baseline or safe teardown, stop and consult rather than weaken guards.
 
 The [fresh exact-commit EXPERT review](scratch-smoke-expert-block-85fed9e-20260926.md) returned **BLOCK** on `85fed9e` with five actionable in-scope safety findings. The native preflight and `--run-smoke` remain blocked; this candidate report preserves the pre-review claim, not a later approval.
+
+## In-scope B1–B5 revision (unreviewed; PRE-RUN BLOCK remains)
+
+The `85fed9e` EXPERT BLOCK is retained verbatim in the linked report. The
+separate `fix/episode-id-authority` revision addresses those five findings; it
+is **not** EPISODE work and does not authorize installed-CLI preflight or smoke.
+
+- B1: retain partial daemon/owner facts when a later scan fails. Parse paired
+  native `owner.json`/`scope.json`, require the expected PID, `ps:` process
+  start, socket and agent scope (including the native 12-hex socket-hash
+  descriptor directory), zero `sessionCount`, and no tracked workers
+  before allowing one destructive shutdown. Incomplete scans revoke authority.
+- B2: bounded explicit filesystem enumeration propagates traversal/stat/read
+  errors; owner/worker JSON has bounded, redacted native-shape validation;
+  lsof accepts named and legitimate unnamed file descriptors but rejects
+  unknown/malformed records. Invalid scans cannot prove an empty namespace.
+- B3: every observation runs an independent `/bin/ps` health check even when
+  candidate discovery is empty; both postflight scans include every captured
+  PID and its process-start identity, and a persistent/reused PID blocks stopped.
+- B4: the executable must be a canonical physical path. Opened device/inode
+  and SHA-256 are checked against the admitted CLI before each call; retained
+  events record safe exact argv, helper cwd, executable path/hash, while
+  `--cwd` explicitly names the scratch project. There is a **non-atomic
+  check-to-exec gap** on macOS Python 3.9; this does not claim atomic binding.
+- B5: command stdout/stderr are pumped with a live per-stream byte cap and
+  bounded timeout; only the direct spawned CLI child handle is killed on
+  timeout/overflow, never an arbitrary daemon PID. Invocation/result parsing,
+  both postflight scans, and report evidence have independent fail-closed
+  boundaries. The report is capped, exclusive, mode 0600, and fsynced; an
+  evidence-write failure explicitly requires retained-root manual quarantine.
+
+Fake-only acceptance runs mock all Popen/run/check_output calls by default;
+only an explicit in-test Popen fake is permitted. During development an obsolete
+`subprocess.run` mock missed the new Popen path once: the only process executed
+was the test-owned `/tmp/prime-claw-fake-cli-*/prime-agent` script containing
+`#!/bin/sh` and `exit 99`; the first test invocation exited 99 and stopped
+before system lsof/ps cases. No installed Prime Agent CLI, daemon, provider,
+network, credential store, or active EPISODE was invoked. The suite now includes
+`test_unmocked_subprocess_guard_regression` and injection-only OS scans.
+
+These are source/fake-test claims only. A fresh exact-pushed-commit independent
+EXPERT gate is still required; the prior wrapper-only PASS is not driver PASS.
+
+Revision fake acceptance evidence (before the next exact-commit review):
+`python3 -B -m unittest discover -s tests -p test_prime_agent_scratch_smoke.py -v`
+passes **37** tests; the wrapper suite command
+`python3 -B -m unittest discover -s tests -p test_prime_agent_probe_isolation.py -v`
+passes **7** Python-owned tests.
+`python3 -m py_compile` of driver and driver test plus `git diff --check`
+pass. The earlier 17-test candidate claims above refer to the blocked commit,
+not this revision. The modified code/test/doc remain unreviewed until the exact
+pushed SHA is supplied to the independent EXPERT.
