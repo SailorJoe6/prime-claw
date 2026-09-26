@@ -829,7 +829,7 @@ function validateExistingIdentity(
   }
   const session = sessions.find((entry) => entry.sessionId === identity.episodeId
     && samePath(entry.sessionFile, identity.episodeSessionFile));
-  if (!session || session.sessionName !== identity.sessionName || !samePath(session.cwd, identity.worktree)) {
+  if (!session) {
     throw new Error("Existing episode identity references a missing or different durable session");
   }
   return session;
@@ -849,9 +849,7 @@ function assertIdleEpisodeState(
 ): void {
   const matches = state.activeSessionId === activeSessionId
     && state.sessionId === identity.episodeId
-    && samePath(state.sessionFile, identity.episodeSessionFile)
-    && state.sessionName === identity.sessionName
-    && samePath(state.cwd, identity.worktree);
+    && samePath(state.sessionFile, identity.episodeSessionFile);
   if (!matches) throw new Error("Episode state does not match the durable owned identity");
 
   const actions = state.sessionActions;
