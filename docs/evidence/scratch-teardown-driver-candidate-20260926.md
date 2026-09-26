@@ -121,3 +121,5 @@ commit safety before any installed-binary command.
 Revision checks: `python3 -B -m unittest discover -s tests -p test_prime_agent_scratch_smoke.py -q` **45 passed**;
 `python3 -B -m unittest discover -s tests -p test_prime_agent_probe_isolation.py -q` **7 passed**;
 `python3 -B -m py_compile` on driver/tests and `git diff --check` passed.
+
+Exact pushed `bafd0e3707eee55b9c129302c57166d9dea24d73` received [EXPERT BLOCK C1–C3](scratch-smoke-expert-block-bafd0e3-20260926.md). **PRE-RUN BLOCK continues**; no installed-CLI preflight or `--run-smoke` is authorized on this candidate.
