@@ -43,6 +43,8 @@ class CommandResult:
     stderr: str = ""
     timed_out: bool = False
     output_truncated: bool = False
+    child_unresolved: bool = False
+    capture_failed: bool = False
 
     def record(self) -> dict:
         if len(self.stdout.encode()) > MAX_COMMAND_BYTES or len(self.stderr.encode()) > MAX_COMMAND_BYTES:
@@ -52,6 +54,8 @@ class CommandResult:
             "returncode": self.returncode,
             "timed_out": self.timed_out,
             "output_truncated": self.output_truncated,
+            "child_unresolved": self.child_unresolved,
+            "capture_failed": self.capture_failed,
             "stdout_bytes": len(self.stdout.encode()),
             "stdout_sha256": hashlib.sha256(self.stdout.encode()).hexdigest(),
             "stderr_bytes": len(self.stderr.encode()),
@@ -68,6 +72,9 @@ class Observation:
     unix_refs: list[dict] = field(default_factory=list)
     socket_files: list[str] = field(default_factory=list)
     descriptors: list[dict] = field(default_factory=list)
+    supervisor_configs: list[dict] = field(default_factory=list)
+    command_journals: list[dict] = field(default_factory=list)
+    snapshot_generations: list[str] = field(default_factory=list)
     registry_files: list[str] = field(default_factory=list)
     registry_owners: list[dict] = field(default_factory=list)
     other_files: list[str] = field(default_factory=list)
@@ -352,6 +359,34 @@ def validate_owner_scope(value, owner: dict, path: Path) -> None:
         raise UnsafeScratch("supervisor owner scope disagrees with owner record")
 
 
+def scoped_path(value, root: Path, label: str) -> str:
+    if (not isinstance(value, str) or not value or len(value.encode()) > MAX_FIELD_BYTES
+            or not Path(value).is_absolute() or not inside(value, root)):
+        raise UnsafeScratch("invalid or out-of-root " + label)
+    return value
+
+
+def parse_supervisor_config(value, path: Path, root: Path, socket: Path) -> dict:
+    if (path != default_descriptor_dir(root, socket) / "supervisor-config"
+            or not isinstance(value, dict) or type(value.get("version")) is not int
+            or value["version"] != 1 or value.get("socketPath") != str(socket)):
+        raise UnsafeScratch("invalid supervisor config identity")
+    if set(value) != {"version", "socketPath", "defaultSessionConfig"}:
+        raise UnsafeScratch("unknown supervisor config field")
+    config = value.get("defaultSessionConfig")
+    if not isinstance(config, dict) or config.get("agentDir") != str(root / "config"):
+        raise UnsafeScratch("invalid supervisor config agent scope")
+    for key, expected in (("cwd", root / "project"), ("sessionDir", root / "sessions")):
+        if key in config and config[key] != str(expected):
+            raise UnsafeScratch("invalid supervisor config " + key)
+    if "telemetryDisabled" in config and config["telemetryDisabled"] is not True:
+        raise UnsafeScratch("invalid supervisor config telemetry")
+    if set(config) - {"cwd", "agentDir", "sessionDir", "telemetryDisabled"}:
+        raise UnsafeScratch("unknown supervisor config field")
+    return {"path": str(path), "version": 1, "socketPath": str(socket),
+            "agentDir": config["agentDir"]}
+
+
 def parse_worker_descriptor(value, path: Path, root: Path) -> dict:
     if not isinstance(value, dict) or type(value.get("version")) is not int or value["version"] not in (1, 2):
         raise UnsafeScratch("unknown worker descriptor format")
@@ -361,32 +396,134 @@ def parse_worker_descriptor(value, path: Path, root: Path) -> dict:
             or not start or len(start) > 256):
         raise UnsafeScratch("worker descriptor lacks a stable process identity")
     for key in ("workerId", "authenticationToken", "rootActiveSessionId",
-                "createdAt", "updatedAt", "lifecycle"):
+                "createdAt", "updatedAt"):
         if not isinstance(value.get(key), str) or not value[key] or len(value[key]) > 256:
             raise UnsafeScratch("worker descriptor lacks required native metadata")
-    if (not isinstance(value.get("createCommand"), dict)
+    if (value.get("lifecycle") not in ("starting", "ready", "recovering", "stopping", "failed")
             or type(value.get("consecutiveFailures")) is not int
             or value["consecutiveFailures"] < 0):
         raise UnsafeScratch("worker descriptor lacks required native lifecycle")
+    create = value.get("createCommand")
+    if not isinstance(create, dict) or create.get("type") != "create":
+        raise UnsafeScratch("invalid worker create command")
+    if set(create) - {"type", "sessionPath", "noSession", "config" if value["version"] == 1 else "type"}:
+        raise UnsafeScratch("unknown worker create command fields")
+    if "noSession" in create and type(create["noSession"]) is not bool:
+        raise UnsafeScratch("invalid worker create noSession")
+    if "sessionPath" in create:
+        scoped_path(create["sessionPath"], root / "sessions", "worker sessionPath")
+    if "config" in create:
+        config = create["config"]
+        if not isinstance(config, dict):
+            raise UnsafeScratch("invalid legacy worker create config")
+        for key, expected in (("cwd", root / "project"), ("agentDir", root / "config"),
+                              ("sessionDir", root / "sessions")):
+            if key in config and config[key] != str(expected):
+                raise UnsafeScratch("invalid legacy worker config " + key)
     for key in ("socketPath", "supervisorSocketPath", "recoveryJournalPath"):
-        reported = value.get(key)
-        if (not isinstance(reported, str) or len(reported) > MAX_FIELD_BYTES
-                or not Path(reported).is_absolute() or not inside(reported, root)):
-            raise UnsafeScratch("worker descriptor path escapes scratch root")
+        scoped_path(value.get(key), root, "worker " + key)
     worker_id = value["workerId"]
+    directory = default_descriptor_dir(root, Path(value["supervisorSocketPath"]))
+    worker_socket = (root / "tmp" / f"prime-agent-{os.getuid()}" /
+                     f"worker-{directory.name}-{worker_id[:12]}.sock")
     if (not re.fullmatch(r"[A-Za-z0-9._-]{1,128}", worker_id)
-            or path.name != worker_id + ".json"
-            or path.parent != default_descriptor_dir(root, Path(value["supervisorSocketPath"]))):
+            or path != directory / (worker_id + ".json")
+            or value["supervisorSocketPath"] != str(root / "tmp" / f"prime-agent-{os.getuid()}" / "daemon.sock")
+            or value["socketPath"] != str(worker_socket)
+            or value["recoveryJournalPath"] != str(directory / (worker_id + ".recovery.jsonl"))):
         raise UnsafeScratch("worker descriptor filename or socket scope disagrees")
-    for key in ("orphanProcessJournalPath", "sessionDir", "sessionFile"):
-        reported = value.get(key)
-        if reported is not None and (not isinstance(reported, str)
-                                    or not Path(reported).is_absolute() or not inside(reported, root)):
-            raise UnsafeScratch("optional worker descriptor path escapes scratch root")
+    if ("orphanProcessJournalPath" in value and value["orphanProcessJournalPath"] !=
+            str(directory / (worker_id + ".orphans.jsonl"))):
+        raise UnsafeScratch("invalid worker orphan journal scope")
+    if "sessionDir" in value and value["sessionDir"] != str(root / "sessions"):
+        raise UnsafeScratch("invalid worker session directory")
+    if "sessionFile" in value:
+        scoped_path(value["sessionFile"], root / "sessions", "worker session file")
+    for key in ("ownerClientId", "rootSessionId", "workerInstanceId", "stopRequestedAt", "lastFailureAt", "lastError"):
+        if key in value and (not isinstance(value[key], str) or not value[key] or len(value[key]) > 256):
+            raise UnsafeScratch("invalid optional worker metadata")
+    if "archiveOnStop" in value and type(value["archiveOnStop"]) is not bool:
+        raise UnsafeScratch("invalid worker archive metadata")
+    if "telemetryDisabled" in value and value["telemetryDisabled"] is not True:
+        raise UnsafeScratch("invalid worker telemetry metadata")
+    if value["version"] == 2 and "config" in create:
+        raise UnsafeScratch("legacy config in v2 worker descriptor")
     return {"path": str(path), "pid": pid, "start_id": start,
             "socketPath": value["socketPath"],
             "supervisorSocketPath": value["supervisorSocketPath"],
             "recoveryJournalPath": value["recoveryJournalPath"]}
+
+
+def read_scanned_bytes(path: Path, st: os.stat_result, label: str) -> bytes:
+    if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_RECORD_BYTES:
+        raise UnsafeScratch("invalid or oversized " + label)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+    try:
+        opened = os.fstat(fd)
+        if (not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != (st.st_dev, st.st_ino)
+                or opened.st_size > MAX_RECORD_BYTES):
+            raise UnsafeScratch("changed or oversized " + label)
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            data = stream.read(MAX_RECORD_BYTES + 1)
+        if len(data) != opened.st_size or len(data) > MAX_RECORD_BYTES:
+            raise UnsafeScratch("changed or oversized " + label)
+        return data
+    finally:
+        os.close(fd)
+
+
+def validate_command_journal(path: Path, st: os.stat_result) -> dict:
+    data = read_scanned_bytes(path, st, "command journal")
+    try:
+        lines = data.decode("utf-8").splitlines()
+        if len(lines) > MAX_SCAN_ENTRIES:
+            raise UnsafeScratch("command journal entry bound exceeded")
+        for line in lines:
+            entry = json.loads(line)
+            if (not isinstance(entry, dict) or type(entry.get("version")) is not int
+                    or entry["version"] != 1 or entry.get("type") not in
+                    ("received", "result", "acknowledged")
+                    or not isinstance(entry.get("key"), str) or not entry["key"]
+                    or not isinstance(entry.get("recordedAt"), str) or not entry["recordedAt"]):
+                raise UnsafeScratch("invalid command journal record")
+            kind = entry["type"]
+            if kind == "received" and any(not isinstance(entry.get(key), str) or not entry[key]
+                                          for key in ("clientId", "commandId", "commandType")):
+                raise UnsafeScratch("invalid received command journal record")
+            if kind == "result" and (not isinstance(entry.get("response"), dict)
+                                     or entry["response"].get("type") != "response"):
+                raise UnsafeScratch("invalid result command journal record")
+    except (UnicodeError, ValueError) as error:
+        raise UnsafeScratch("malformed command journal") from error
+    return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def validate_worker_journal(path: Path, st: os.stat_result, worker_pid: int) -> None:
+    data = read_scanned_bytes(path, st, "worker journal")
+    try:
+        lines = data.decode("utf-8").splitlines()
+        if len(lines) > MAX_SCAN_ENTRIES:
+            raise UnsafeScratch("worker journal entry bound exceeded")
+        for line in lines:
+            value = json.loads(line)
+            if (not isinstance(value, dict) or type(value.get("version")) is not int
+                    or value["version"] != 1 or not isinstance(value.get("recordedAt"), str)
+                    or not value["recordedAt"]):
+                raise UnsafeScratch("invalid worker journal record")
+            if path.name.endswith(".recovery.jsonl"):
+                if (any(not isinstance(value.get(key), str) or not value[key]
+                        for key in ("activeSessionId", "sessionId", "operation"))
+                        or type(value.get("busy")) is not bool):
+                    raise UnsafeScratch("invalid worker recovery record")
+                if "sessionFile" in value:
+                    scoped_path(value["sessionFile"], path.parents[3] / "sessions", "worker recovery session file")
+            elif (type(value.get("pid")) is not int or value["pid"] <= 1
+                  or value.get("ownerPid") != worker_pid
+                  or type(value.get("active")) is not bool
+                  or ("processStartId" in value and not isinstance(value["processStartId"], str))):
+                raise UnsafeScratch("invalid worker orphan record")
+    except (UnicodeError, ValueError) as error:
+        raise UnsafeScratch("malformed worker journal") from error
 
 
 def snapshot_quiet(obs: Observation) -> bool:
@@ -405,7 +542,8 @@ def snapshot_quiet(obs: Observation) -> bool:
 def baseline_empty(obs: Observation) -> bool:
     return (obs.valid and not obs.reason and obs.ps_complete and not obs.daemons
             and not obs.root_refs and not obs.unix_refs and not obs.socket_files
-            and not obs.descriptors and not obs.registry_files and not obs.registry_owners
+            and not obs.descriptors and not obs.supervisor_configs and not obs.command_journals
+            and not obs.snapshot_generations and not obs.registry_files and not obs.registry_owners
             and not obs.other_files and not obs.pid_starts)
 
 
@@ -431,15 +569,21 @@ def active_shutdown_admission(active: Observation, root: Path, socket: Path,
         # One uncertain owned start may still have detached a daemon. Only a
         # complete, still-empty private namespace admits one isolated stop.
         if (active.daemons or active.root_refs or active.unix_refs or active.socket_files
-                or active.descriptors or active.registry_files or active.registry_owners
+                or active.descriptors or active.supervisor_configs or active.command_journals
+                or active.registry_files or active.registry_owners
                 or any(start is not None for start in active.pid_starts.values())):
             return False, False, "uncertain start has a possible owner; no shutdown admitted"
         return True, False, "start result uncertain; one isolated shutdown may be attempted"
+    if (len(active.supervisor_configs) != 1 or active.supervisor_configs[0]["socketPath"] != str(socket)
+            or len(active.command_journals) > 1):
+        return False, False, "active supervisor metadata missing or inconsistent; no shutdown admitted"
     if expected_pid is None or len(active.daemons) != 1 or active.daemons[0]["status"] != "current":
         return False, False, "active supervisor was not uniquely current; no shutdown admitted"
     if active.pid_starts.get(expected_pid) is None or len(active.registry_owners) != 1:
         return False, False, "active supervisor and registry owner were not both proven; no shutdown admitted"
     owner = active.registry_owners[0]
+    if active.snapshot_generations != [owner["generation"]]:
+        return False, False, "active snapshot generation disagreed; no shutdown admitted"
     owner_dir = root / "home" / ".prime" / "supervisor-owners" / (owner["generation"] + ".owner")
     expected_records = {str(owner_dir / "owner.json"), str(owner_dir / "scope.json")}
     if (set(active.registry_files) != expected_records or owner["pid"] != expected_pid
@@ -478,17 +622,22 @@ class NativeRunner:
             raise UnsafeScratch("CLI identity changed before invocation")
         # Pipe pumping caps bytes in memory while draining both streams. A
         # timeout only kills the exact child handle created by this call.
+        output = {"stdout": bytearray(), "stderr": bytearray()}
+        selector = None
+        expired = False
+        oversized = False
+        failed = False
+        unresolved = False
         try:
             proc = subprocess.Popen(argv, cwd=self.cwd, env=self.env,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except OSError:
             return CommandResult(None)
-        output = {"stdout": bytearray(), "stderr": bytearray()}
-        selector = selectors.DefaultSelector()
-        expired = False
-        oversized = False
-        deadline = time.monotonic() + timeout
+        # From the instant Popen returns, all selector setup and draining is
+        # covered by exact-child containment. Cleanup has its own finite budget.
         try:
+            deadline = time.monotonic() + timeout
+            selector = selectors.DefaultSelector()
             for name, pipe in (("stdout", proc.stdout), ("stderr", proc.stderr)):
                 selector.register(pipe, selectors.EVENT_READ, name)
             while selector.get_map():
@@ -507,26 +656,47 @@ class NativeRunner:
                         output[key.data].extend(chunk)
                 if oversized:
                     break
-            remaining = deadline - time.monotonic()
             if not oversized and not expired:
                 try:
-                    proc.wait(timeout=max(remaining, 0.001))
+                    proc.wait(timeout=max(min(deadline - time.monotonic(), timeout), 0.001))
                 except subprocess.TimeoutExpired:
                     expired = True
-            if oversized or expired:
-                if proc.poll() is None:
-                    proc.kill()  # This exact direct child only, never a daemon PID.
-                proc.wait()
-            return CommandResult(None if expired or oversized else proc.returncode,
-                                 output["stdout"].decode(errors="replace"),
-                                 output["stderr"].decode(errors="replace"), expired or oversized, oversized)
+        except Exception:
+            failed = True
         finally:
-            if proc.poll() is None:
-                proc.kill()  # Exact direct child on unexpected pump failure.
-                proc.wait()
-            selector.close()
-            proc.stdout.close()
-            proc.stderr.close()
+            if expired or oversized or failed:
+                # Never signal a daemon or process group: only this Popen handle.
+                # poll/kill/wait may themselves fail; no unbounded wait follows.
+                try:
+                    if proc.poll() is None:
+                        proc.kill()
+                except Exception:
+                    unresolved = True
+                try:
+                    proc.wait(timeout=2)
+                except Exception:
+                    unresolved = True
+            try:
+                if proc.poll() is None:
+                    unresolved = True
+            except Exception:
+                unresolved = True
+            if selector is not None:
+                try:
+                    selector.close()
+                except Exception:
+                    failed = True
+            for pipe in (proc.stdout, proc.stderr):
+                if pipe is not None:
+                    try:
+                        pipe.close()
+                    except Exception:
+                        failed = True
+        return CommandResult(None if expired or oversized or failed or unresolved else proc.returncode,
+                             output["stdout"].decode(errors="replace"),
+                             output["stderr"].decode(errors="replace"),
+                             expired or oversized or failed or unresolved, oversized,
+                             child_unresolved=unresolved, capture_failed=failed)
 
     def _lsof(self, args: list[str], root: Path) -> list[dict]:
         result = self.command([str(self.lsof), "-nP", "-F", "pn", *args], 12)
@@ -568,24 +738,42 @@ class NativeRunner:
         registry_dir = root / "home" / ".prime" / "supervisor-owners"
         owner_records: dict[Path, dict] = {}
         owner_scopes: dict[Path, dict] = {}
+        worker_journals: list[tuple[Path, os.stat_result]] = []
+        expected_dir = default_descriptor_dir(root, root / "tmp" / f"prime-agent-{os.getuid()}" / "daemon.sock")
         for path, st in scan_root_entries(root):
-            if stat.S_ISSOCK(st.st_mode):
+            if inside(path, descriptor_dir) and path != descriptor_dir:
+                if stat.S_ISDIR(st.st_mode):
+                    # A native no-session supervisor creates an empty snapshot
+                    # cache generation. Any other directory is unmodelled.
+                    if path not in (expected_dir, expected_dir / "snapshot-cache") and not (
+                            path.parent == expected_dir / "snapshot-cache"
+                            and re.fullmatch(r"[A-Za-z0-9._-]{1,128}", path.name)):
+                        raise UnsafeScratch("unknown supervisor descriptor directory")
+                    if path.parent == expected_dir / "snapshot-cache":
+                        obs.snapshot_generations.append(path.name)
+                    continue
+                if path.parent != expected_dir:
+                    raise UnsafeScratch("unknown nested supervisor artifact")
+                if not stat.S_ISREG(st.st_mode):
+                    raise UnsafeScratch("unknown supervisor descriptor artifact type")
+                if path.name == "supervisor-config":
+                    config = read_scanned_json(path, st, "supervisor config")
+                    obs.supervisor_configs.append(parse_supervisor_config(config, path, root,
+                                            root / "tmp" / f"prime-agent-{os.getuid()}" / "daemon.sock"))
+                elif path.name == "command-journal.jsonl":
+                    obs.command_journals.append(validate_command_journal(path, st))
+                elif re.fullmatch(r"[A-Za-z0-9._-]{1,128}\.(recovery|orphans)\.jsonl", path.name):
+                    worker_journals.append((path, st))
+                    obs.other_files.append(str(path))
+                elif path.suffix == ".json":
+                    desc = read_scanned_json(path, st, "worker descriptor")
+                    obs.descriptors.append(parse_worker_descriptor(desc, path, root))
+                else:
+                    raise UnsafeScratch("unknown supervisor descriptor artifact")
+            elif stat.S_ISSOCK(st.st_mode):
                 obs.socket_files.append(str(path))
             elif stat.S_ISREG(st.st_mode):
-                if inside(path, descriptor_dir):
-                    # Native descriptors live under daemon-workers/<socket hash>/.
-                    # Recovery/orphan journals are opaque retained metadata.
-                    if (path.parent.parent != descriptor_dir
-                            or not re.fullmatch(r"[0-9a-f]{12}", path.parent.name)):
-                        raise UnsafeScratch("unknown worker descriptor layout")
-                    if path.name.endswith((".recovery.jsonl", ".orphans.jsonl")):
-                        obs.other_files.append(str(path))
-                    elif path.suffix == ".json":
-                        desc = read_scanned_json(path, st, "worker descriptor")
-                        obs.descriptors.append(parse_worker_descriptor(desc, path, root))
-                    else:
-                        raise UnsafeScratch("unknown worker descriptor artifact")
-                elif inside(path, registry_dir):
+                if inside(path, registry_dir):
                     obs.registry_files.append(str(path))
                     if path.parent.parent == registry_dir and path.parent.name.endswith(".owner"):
                         if path.name == "owner.json":
@@ -598,6 +786,13 @@ class NativeRunner:
                     obs.other_files.append(str(path))
             elif not stat.S_ISDIR(st.st_mode):
                 raise UnsafeScratch("unknown filesystem entry in scratch root")
+        for journal, journal_stat in worker_journals:
+            worker_id = journal.name.split(".", 1)[0]
+            matches = [descriptor for descriptor in obs.descriptors
+                       if Path(descriptor["path"]).stem == worker_id]
+            if len(matches) != 1:
+                raise UnsafeScratch("orphan worker journal lacks descriptor")
+            validate_worker_journal(journal, journal_stat, matches[0]["pid"])
         for owner_dir in owner_records.keys() | owner_scopes.keys():
             if owner_dir not in owner_records or owner_dir not in owner_scopes:
                 raise UnsafeScratch("incomplete supervisor registry owner record")
@@ -731,6 +926,10 @@ def smoke(env: dict[str, str], cli: Path, expected_sha256: str, runner: Runner, 
                 reason("start result uncertain; never retry")
             active = observation("active", {expected_pid} if expected_pid else set())
             admission, active_ok, decision = active_shutdown_admission(active, root, socket, expected_pid, start_ok)
+            if start.child_unresolved:
+                admission = False
+                active_ok = False
+                decision = "direct start CLI child may still run; no shutdown admitted"
             if not admission:
                 ownership_revoked = True
                 reason(decision)
@@ -761,13 +960,24 @@ def smoke(env: dict[str, str], cli: Path, expected_sha256: str, runner: Runner, 
             interval_ok = False
             reason("post-shutdown quiet interval failed")
         second = observation("postflight", set(captured))
-        quiet = interval_ok and snapshot_quiet(first) and snapshot_quiet(second)
-        if not quiet:
-            reason("independent post-shutdown scans are not both empty and valid")
-        if any(first.pid_starts.get(pid) is not None or second.pid_starts.get(pid) is not None
-               or pid not in first.pid_starts or pid not in second.pid_starts for pid in captured):
+        quiet = False
+        try:
+            # Both snapshots have already been retained; classification cannot
+            # erase either observation or turn malformed fields into absence.
+            quiet = bool(interval_ok and snapshot_quiet(first) and snapshot_quiet(second))
+            if not quiet:
+                reason("independent post-shutdown scans are not both empty and valid")
+        except Exception:
+            reason("post-shutdown quiet classification failed; outcome unresolved")
+        try:
+            persisted = any(first.pid_starts.get(pid) is not None or second.pid_starts.get(pid) is not None
+                            or pid not in first.pid_starts or pid not in second.pid_starts for pid in captured)
+            if persisted:
+                quiet = False
+                reason("captured process identity persisted, was reused, or was not checked twice")
+        except Exception:
             quiet = False
-            reason("captured process identity persisted, was reused, or was not checked twice")
+            reason("captured process identity classification failed; outcome unresolved")
         report["status"] = "stopped" if start_ok and active_ok and shutdown_ok and quiet else "unresolved"
     record_report(root, report)
     return report

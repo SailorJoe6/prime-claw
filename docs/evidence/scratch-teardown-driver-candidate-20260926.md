@@ -75,3 +75,49 @@ not this revision. The modified code/test/doc remain unreviewed until the exact
 pushed SHA is supplied to the independent EXPERT.
 
 Exact pushed `168343436b05f9c584eb701f9dfc57a573302c05` received [EXPERT BLOCK R1–R4](scratch-smoke-expert-block-1683434-20260926.md). **PRE-RUN BLOCK continues**; no installed-CLI preflight or `--run-smoke` is authorized on this candidate.
+
+## R1–R4 repair candidate after exact-commit BLOCK (unreviewed; PRE-RUN BLOCK)
+
+The immutable [EXPERT BLOCK on `1683434`](scratch-smoke-expert-block-1683434-20260926.md)
+remains authoritative. This is a separate delegated `fix/episode-id-authority`
+scratch-driver revision. It is not live Phase 3a EPISODE work. Neither the earlier
+wrapper PASS nor this source/fake evidence authorizes even read-only installed-CLI
+preflight. A fresh exact-pushed-commit EXPERT review is still required.
+
+- **R1/R3:** explicit pinned-v0.9.6 socket-hash inventory recognizes and bounds
+  `supervisor-config`, `command-journal.jsonl`, and the empty native
+  `snapshot-cache/<generation>` tree separately from worker descriptors and
+  worker journals. Supervisor config version, socket, agent/cwd/session scope,
+  journal record shapes, generation/owner identity and unknown paths fail closed.
+  Native worker v1/v2 descriptors now require lifecycle enum, durable
+  `createCommand.type="create"`, version-specific nested fields, exact native
+  worker socket/recovery/orphan paths, scoped optional paths, and stable PID/start.
+  Malformed worker journals and orphan journal scope remain adverse. Worker
+  metadata still vetoes active shutdown; valid stale records only support quiet
+  postflight after absent process identities.
+- **R2/R4:** both postflight observations are collected before fallible quiet
+  and captured-PID reconciliation. Classification exceptions retain a bounded
+  unresolved report rather than escaping. Direct CLI child containment starts
+  immediately after `Popen`; selector setup/register/select/read and timeout/
+  overflow errors only signal that exact child handle. All reap waits carry a
+  finite timeout, with `child_unresolved` and `capture_failed` in redacted
+  command evidence. An unreaped direct start CLI child revokes shutdown
+  authority even if later discovery looks empty. Failed report serialization/fsync explicitly raises a
+  retained-root quarantine error; a partially written, uncommitted report on
+  fsync failure is **not** a returned `stopped` verdict.
+
+Fake-only tests retain the fail-fast `Popen`/`run`/`check_output` guards before
+any runner call. A Python-only native-shaped filesystem/start/stop fake proves
+one shutdown and two quiet snapshots with retained supervisor state. Negative
+injections cover wrong-scope/malformed metadata, unknown files, unsupported
+worker versions/lifecycle/create fields, traversal/read failures after partial
+owner facts, quiet/PID classification errors, selector lifecycle failures,
+kill/refusal-to-reap, redaction and same-root replay. No installed Prime Agent
+CLI, daemon, socket, provider, credential, network, native experiment, or live
+EPISODE action was used. Remaining uncertainty: this remains a model of the
+read-only pinned source, not a verified native run; review must establish exact
+commit safety before any installed-binary command.
+
+Revision checks: `python3 -B -m unittest discover -s tests -p test_prime_agent_scratch_smoke.py -q` **45 passed**;
+`python3 -B -m unittest discover -s tests -p test_prime_agent_probe_isolation.py -q` **7 passed**;
+`python3 -B -m py_compile` on driver/tests and `git diff --check` passed.
