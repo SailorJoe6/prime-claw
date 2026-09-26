@@ -1,0 +1,20 @@
+# Episode cwd divergence — fork versus recovery (2026-09-26)
+
+**Verdict: fork causation UNKNOWN; execution-root harm NOT demonstrated.** This read-only review corrects an earlier time-zone error and records an isolated test plan. It does not authorize a live switch, handoff, or a change to episode creation.
+
+## Exact observed sequence
+
+- Initial creation code calls `SessionManager.forkFrom(sourceSessionFile, worktree)` (`spec-episode.ts:575–577`), then daemon `create(lifecycle:resident, config.cwd=worktree)` and checks the returned cwd (`:766–802`). The owned JSONL header created 2026-09-25 19:17 UTC records the worktree cwd.
+- An in-episode `ipython` call returned `os.getcwd()` as the worktree at 2026-09-26 01:27 UTC. No further root-session tool call appears after that result in the owned JSONL.
+- Read-only supervisor logs show old workers receiving SIGTERM at 01:33 UTC, restart/adoption activity, and a replacement worker listening at 01:35:07 UTC. The owned session appended `session_state=active` at 01:35:07.503 UTC. The current public `list(all:true)` and `get_state` match the exact durable ID/file and report the builder cwd. `list` maps the current route to a worker whose OS cwd, and whose child `python -m rlm.repl` process's **idle** OS cwd, are also the builder cwd.
+- `ps lstart` prints local PDT, while JSONL and logs use UTC. The current worker/kernel started **after** the 01:27 worktree result. They cannot be assumed to have produced that earlier result. The current public route differs from the route retained in the original identity record; route refresh is expected to be mutable, not a new durable identity.
+
+The sequence places the observed mismatch after a daemon restart/rebind, not at initial fork creation. The logs do not prove why the recovered session's public cwd is the builder cwd, whether fork ancestry mattered to recovery, or where the next built-in or Python tool would execute. Idle process cwd is not execution-time tool cwd. Do not claim that removing a plugin check is safe **or** harmful solely from these metadata snapshots.
+
+## Operator hypothesis and controlled next test
+
+Joe noted that a full conversation fork is compacted soon afterward and the episode relies on plan/spec/Beads/`/prepare`; a fresh session could avoid inherited context and possibly cwd lineage. `VISION.md:190–208` explicitly treats how much context crosses as an empirical tradeoff, while the archived worktree-isolated-episodes spec `:266–285` required a full fork and the later oversight spec `:346–365` compacts inherited planning context. Personal-life brain keyword and hybrid queries had no relevant compiled fork-decision page; those repo documents are the source for this rationale.
+
+A bounded **scratch-only A/B** should create one source in builder, then A with `SessionManager.forkFrom(source, worktree)` and B with a fresh session rooted in worktree. Publish both via isolated daemon `create(config.cwd=worktree)`, record exact ID/file/route, header, `list`/`get_state`, perform a controlled restart of only scratch-owned processes, and compare recovered metadata. If a safe isolated tool path is available, measure execution-time `ipython os.getcwd()` and bash/relative resolution before and after restart for each. Such a probe writes scratch transcript/kernel/session state and was **not** run in this read-only review. A-only failure would support fork-specific recovery; both failing would support generic recovery; metadata drift with worktree execution would not establish tool-root harm. Preserve strict scratch ownership, cleanup, and no live process contact.
+
+No plugin source, user-global copy, live episode route, session file, or terminal state was changed. The active Slice 1 remains blocked; the operator rules out Prime Agent core updates or unsolicited PRs. This report supplements the prior synthetic-switch evidence at commit `5a8fdd5cfbbdb67be35229dbdf860760d85b7bd2` and was reviewed by an ordinary read-only investigator (`sub-d1ebdb1e`, `openai-codex/gpt-6-sol`), not a required final EXPERT.
