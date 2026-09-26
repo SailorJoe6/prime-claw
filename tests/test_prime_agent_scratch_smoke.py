@@ -835,7 +835,7 @@ class ScratchSmokeTests(unittest.TestCase):
         descriptor_dir = smoke.default_descriptor_dir(self.root, self.socket)
         config_path = descriptor_dir / "supervisor-config"
         journal_path = descriptor_dir / "command-journal.jsonl"
-        journal_path.write_text(json.dumps({"version": 1, "type": "received", "key": "k",
+        journal_path.write_text(json.dumps({"version": 1, "type": "received", "key": "[\"c\",\"id\"]",
                                             "clientId": "c", "commandId": "id", "commandType": "shutdown",
                                             "recordedAt": "time"}) + "\n")
         results = self.os_results(ps=smoke.CommandResult(0, json.dumps([{
@@ -898,7 +898,7 @@ class ScratchSmokeTests(unittest.TestCase):
                     (directory / "owner.json").unlink()
                     (directory / "scope.json").unlink()
                     journal = smoke.default_descriptor_dir(test.root, test.socket) / "command-journal.jsonl"
-                    journal.write_text(json.dumps({"version": 1, "type": "acknowledged", "key": "k", "recordedAt": "time"}) + "\n")
+                    journal.write_text("\n")
                     return smoke.CommandResult(0, '{"stopped": [], "failed": []}')
                 if tuple(argv[1:]) == ("daemon", "ps", "--json"):
                     rows = ([{"socketPath": str(test.socket), "pid": 123, "status": "current",
@@ -1086,6 +1086,301 @@ class ScratchSmokeTests(unittest.TestCase):
                 self.assertTrue(child.waits and all(v is not None and v <= 5 for v in child.waits))
                 self.assertEqual(result.child_unresolved, failure in ("refuse", "kill_failure"))
                 self.assertNotIn("secret-", json.dumps(result.record()))
+
+    def test_c1_record_failures_preserve_revocation_and_one_stop_semantics(self):
+        class BadRecord(smoke.CommandResult):
+            def record(self):
+                raise ValueError("secret-record")
+        for start in (BadRecord(0, f"Daemon already running on {self.socket}"),
+                      BadRecord(None, child_unresolved=True),
+                      BadRecord(0, f"Daemon already running on {self.socket}", child_unresolved=True),
+                      smoke.CommandResult(0, f"Daemon already running on {self.socket}",
+                                          stderr="x" * (smoke.MAX_COMMAND_BYTES + 1))):
+            with self.subTest(start=start.__class__.__name__):
+                (self.root / "scratch-smoke-report.json").unlink(missing_ok=True)
+                (self.root / "project").rmdir() if (self.root / "project").exists() else None
+                report, runner = self.run_fake([smoke.Observation(), smoke.Observation()], start=start)
+                self.assertEqual(report["status"], "unresolved_ownership")
+                self.assertEqual(len(runner.commands), 1)
+                self.assertNotIn("secret-record", json.dumps(report))
+                self.assert_replay_nonmutating(runner)
+        (self.root / "scratch-smoke-report.json").unlink()
+        (self.root / "project").rmdir()
+        report, runner = self.run_fake([smoke.Observation(), smoke.Observation(),
+                                        smoke.Observation(), smoke.Observation()],
+                                       start=BadRecord(None, timed_out=True))
+        self.assertEqual(report["status"], "unresolved")
+        self.assertEqual(len(runner.commands), 2)
+        self.assert_replay_nonmutating(runner)
+
+    def test_c1_native_invalid_utf8_expansion_unreaped_start(self):
+        if sys.platform != "darwin":
+            self.skipTest("macOS-only native driver")
+        native = smoke.NativeRunner(self.env, self.cli, self.root)
+        class Child:
+            returncode = None
+            def __init__(self):
+                self.stdout, self.stdout_writer = os.pipe()
+                self.stderr, self.stderr_writer = os.pipe()
+                os.close(self.stdout_writer)
+                os.close(self.stderr_writer)
+                self.stdout = os.fdopen(self.stdout, "rb")
+                self.stderr = os.fdopen(self.stderr, "rb")
+                self.kills = 0
+                self.waits = []
+            def poll(self): return None
+            def kill(self): self.kills += 1
+            def wait(self, timeout=None):
+                self.waits.append(timeout)
+                raise smoke.subprocess.TimeoutExpired("fake", timeout)
+        child = Child()
+        real_read = os.read
+        emitted = False
+        def read(fd, size):
+            nonlocal emitted
+            if fd == child.stderr.fileno() and not emitted:
+                emitted = True
+                return b"\xff" * 400_000
+            return real_read(fd, size)
+        with mock.patch.object(smoke.subprocess, "Popen", return_value=child), \
+             mock.patch.object(smoke.os, "read", side_effect=read):
+            start = native.command([str(self.cli), "daemon", "start"], 5)
+        self.assertTrue(start.child_unresolved)
+        self.assertTrue(start.output_truncated, (len(start.stderr.encode()), start.capture_failed, emitted))
+        self.assertLessEqual(len(start.stderr.encode()), smoke.MAX_COMMAND_BYTES)
+        self.assertEqual(child.kills, 1)
+        self.assertTrue(child.waits and all(v is not None and v <= 5 for v in child.waits))
+        report, runner = self.run_fake([smoke.Observation(), smoke.Observation()], start=start)
+        self.assertEqual(report["status"], "unresolved_ownership")
+        self.assertEqual(len(runner.commands), 1)
+        self.assert_replay_nonmutating(runner)
+
+    def test_c2_generations_orphans_and_changed_state_revoke_stopped(self):
+        for first, second, expected in (
+            (smoke.Observation(snapshot_generations=["g1"]),
+             smoke.Observation(snapshot_generations=["g1"]), "stopped"),
+            (smoke.Observation(snapshot_generations=["g2"]), smoke.Observation(), "unresolved"),
+            (smoke.Observation(), smoke.Observation(snapshot_generations=["g2"]), "unresolved"),
+            (smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": "ps:T1"}],
+                               pid_starts={345: None}),
+             smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": "ps:T1"}],
+                               pid_starts={345: None}), "stopped"),
+            (smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": "ps:T1"}],
+                               pid_starts={345: "T1"}),
+             smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": "ps:T1"}],
+                               pid_starts={345: None}), "unresolved"),
+            (smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": "ps:T1"}],
+                               pid_starts={345: None}),
+             smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": "ps:T1"}],
+                               pid_starts={345: "T2"}), "unresolved"),
+            (smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": "ps:T1"}],
+                               pid_starts={345: None}),
+             smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": "ps:T1"}],
+                               pid_starts={345: "T1"}), "unresolved"),
+            (smoke.Observation(), smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": "ps:T1"}],
+                                                   pid_starts={345: None}), "unresolved"),
+            (smoke.Observation(), smoke.Observation(descriptors=[{"path": "new", "pid": 234}],
+                                                   pid_starts={234: None}), "unresolved"),
+            (smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": None}],
+                               pid_starts={345: None}),
+             smoke.Observation(orphan_candidates=[{"pid": 345, "start_id": None}],
+                               pid_starts={345: None}), "unresolved"),
+        ):
+            with self.subTest(expected=expected, first=first.record()):
+                (self.root / "scratch-smoke-report.json").unlink(missing_ok=True)
+                (self.root / "project").rmdir() if (self.root / "project").exists() else None
+                report, runner = self.run_fake([smoke.Observation(), self.active(), first, second],
+                                               start=self.good_start(), pid_values={123: None})
+                self.assertEqual(report["status"], expected)
+                self.assertEqual(len(runner.commands), 2)
+                self.assert_replay_nonmutating(runner)
+
+    def test_c2_uncertain_start_generation_does_not_admit_shutdown(self):
+        report, runner = self.run_fake([smoke.Observation(), smoke.Observation(snapshot_generations=["g1"])],
+                                       start=smoke.CommandResult(None, timed_out=True))
+        self.assertEqual(report["status"], "unresolved_ownership")
+        self.assertEqual(len(runner.commands), 1)
+        self.assert_replay_nonmutating(runner)
+
+    def test_c2_real_journal_latest_record_pid_scan_and_partial_failure(self):
+        directory = smoke.default_descriptor_dir(self.root, self.socket)
+        directory.mkdir(parents=True)
+        descriptor = {"version": 2, "workerId": "w1", "pid": 234, "processStartId": "ps:old",
+                      "socketPath": str(self.root / "tmp" / f"prime-agent-{os.getuid()}" /
+                                        f"worker-{directory.name}-w1.sock"),
+                      "recoveryJournalPath": str(directory / "w1.recovery.jsonl"),
+                      "orphanProcessJournalPath": str(directory / "w1.orphans.jsonl"),
+                      "supervisorSocketPath": str(self.socket), "authenticationToken": "secret-worker",
+                      "rootActiveSessionId": "r1", "createdAt": "time", "updatedAt": "time",
+                      "lifecycle": "ready", "createCommand": {"type": "create"},
+                      "consecutiveFailures": 0}
+        (directory / "w1.json").write_text(json.dumps(descriptor))
+        journal = directory / "w1.orphans.jsonl"
+        def row(pid, active, start="ps:Fri Jan  1 00:00:00 2027"):
+            return json.dumps({"version": 1, "pid": pid, "ownerPid": 234,
+                               "active": active, "processStartId": start, "recordedAt": "time"}) + "\n"
+        journal.write_text(row(345, True) + row(345, False) + row(346, True))
+        class OSRunner(FakeOSNativeRunner):
+            def command(self, argv, timeout):
+                self.commands.append(tuple(argv))
+                if argv[1:] == ["daemon", "ps", "--json"]: return smoke.CommandResult(0, "[]")
+                if argv[0] == "/usr/sbin/lsof": return smoke.CommandResult(1)
+                if argv[0] == "/bin/ps":
+                    return smoke.CommandResult(0, "Fri Jan  1 00:00:00 2027\n") if argv[2] == str(os.getpid()) else smoke.CommandResult(1)
+                raise AssertionError("unexpected native call")
+        runner = OSRunner(self.cli, [])
+        observed = runner.observe(self.root, self.cli)
+        self.assertTrue(observed.valid, observed.reason)
+        self.assertEqual(observed.orphan_candidates, [{"pid": 346, "start_id": "ps:Fri Jan  1 00:00:00 2027"}])
+        self.assertEqual({int(v[2]) for v in runner.commands if v[0] == "/bin/ps"}, {os.getpid(), 234, 346})
+        self.assertTrue(smoke.snapshot_quiet(observed))
+        self.assertNotIn("secret-worker", json.dumps(observed.record()))
+        journal.write_text(row(346, True) + "{truncated")
+        partial = OSRunner(self.cli, []).observe(self.root, self.cli)
+        self.assertFalse(partial.valid)
+        self.assertEqual(partial.orphan_candidates, [{"pid": 346, "start_id": "ps:Fri Jan  1 00:00:00 2027"}])
+        self.assertFalse(smoke.snapshot_quiet(partial))
+
+    def test_c2_full_filesystem_postflight_checks_new_orphan_twice(self):
+        test = self
+        class Runner(FakeOSNativeRunner):
+            def __init__(self):
+                super().__init__(test.cli, [])
+                self.live = False
+                self.post = 0
+                self.orphan_checks = []
+            def command(self, argv, timeout):
+                self.commands.append(tuple(argv))
+                if tuple(argv[1:3]) == ("daemon", "start"):
+                    test.owner_fixture()
+                    self.live = True
+                    return test.good_start()
+                if tuple(argv[1:3]) == ("shutdown", "--force"):
+                    self.live = False
+                    owner = test.root / "home" / ".prime" / "supervisor-owners" / "g1.owner"
+                    (owner / "owner.json").unlink()
+                    (owner / "scope.json").unlink()
+                    directory = smoke.default_descriptor_dir(test.root, test.socket)
+                    descriptor = {"version": 2, "workerId": "w1", "pid": 234,
+                                  "processStartId": "ps:old", "socketPath": str(test.root / "tmp" /
+                                      f"prime-agent-{os.getuid()}" / f"worker-{directory.name}-w1.sock"),
+                                  "recoveryJournalPath": str(directory / "w1.recovery.jsonl"),
+                                  "orphanProcessJournalPath": str(directory / "w1.orphans.jsonl"),
+                                  "supervisorSocketPath": str(test.socket), "authenticationToken": "secret",
+                                  "rootActiveSessionId": "r1", "createdAt": "time", "updatedAt": "time",
+                                  "lifecycle": "ready", "createCommand": {"type": "create"},
+                                  "consecutiveFailures": 0}
+                    (directory / "w1.json").write_text(json.dumps(descriptor))
+                    (directory / "w1.orphans.jsonl").write_text(json.dumps({
+                        "version": 1, "pid": 345, "ownerPid": 234, "processStartId": "ps:Fri Jan  1 00:00:00 2027",
+                        "active": True, "recordedAt": "time"}) + "\n")
+                    return smoke.CommandResult(0, '{"stopped":[],"failed":[]}')
+                if tuple(argv[1:]) == ("daemon", "ps", "--json"):
+                    self.post += not self.live and (test.root / "project").exists()
+                    rows = ([{"socketPath": str(test.socket), "pid": 123, "status": "current",
+                              "isDefault": True, "sessionCount": 0, "hasTrackedWorkers": False}]
+                            if self.live else [])
+                    return smoke.CommandResult(0, json.dumps(rows))
+                if argv[0] == "/usr/sbin/lsof":
+                    return smoke.CommandResult(0, f"p123\nn{test.socket}\n") if self.live else smoke.CommandResult(1)
+                if argv[0] == "/bin/ps":
+                    pid = int(argv[2])
+                    if pid == 345:
+                        self.orphan_checks.append(self.post)
+                    return (smoke.CommandResult(0, "Fri Jan  1 00:00:00 2027\n")
+                            if pid == os.getpid() or pid == 123 and self.live else smoke.CommandResult(1))
+                raise AssertionError("unexpected fake command")
+            def quiet_interval(self): pass
+        runner = Runner()
+        report = smoke.smoke(self.env, self.cli, self.sha, runner, run_native=True)
+        self.assertEqual(report["status"], "stopped")
+        self.assertEqual(runner.orphan_checks, [1, 2])
+        self.assertTrue(all(snap["orphan_candidates"] == [{"pid": 345, "start_id": "ps:Fri Jan  1 00:00:00 2027"}]
+                            for snap in report["postflight"]))
+        self.assertNotIn("secret", json.dumps(report))
+        self.assert_replay_nonmutating(runner)
+
+    def test_c3_legacy_and_command_journal_source_shapes(self):
+        directory = smoke.default_descriptor_dir(self.root, self.socket)
+        directory.mkdir(parents=True)
+        path = directory / "command-journal.jsonl"
+        key = json.dumps(["c", "id"], separators=(",", ":"))
+        received = {"version": 1, "type": "received", "key": key, "clientId": "c",
+                    "commandId": "id", "commandType": "shutdown", "recordedAt": "time"}
+        response = {"type": "response", "command": "shutdown", "success": True, "data": {"token": "secret-data"}}
+        result = {"version": 1, "type": "result", "key": key, "response": response, "recordedAt": "time"}
+        ack = {"version": 1, "type": "acknowledged", "key": key, "recordedAt": "time"}
+        for contents in ("\n", "".join(json.dumps(v) + "\n" for v in (received, result, ack)),
+                         json.dumps({**result, "response": {"type": "response", "command": "shutdown",
+                                                               "success": False, "error": "hidden"}}) + "\n"):
+            path.write_text(contents)
+            observed = FakeOSNativeRunner(self.cli, self.os_results()).observe(self.root, self.cli)
+            self.assertTrue(observed.valid, observed.reason)
+            self.assertTrue(smoke.snapshot_quiet(observed))
+            self.assertNotIn("secret-data", json.dumps(observed.record()))
+        for contents in ("", "\n\n", "{bad", json.dumps({**result, "response": {"type": "response"}}) + "\n",
+                         json.dumps({**result, "response": {**response, "success": "yes"}}) + "\n",
+                         json.dumps({**result, "response": {**response, "error": "bad"}}) + "\n",
+                         json.dumps({**result, "response": {"type": "response", "command": "shutdown",
+                                                                "success": False, "error": "hidden",
+                                                                "errorInfo": {"code": "unknown"}}}) + "\n"):
+            path.write_text(contents)
+            observed = FakeOSNativeRunner(self.cli, self.os_results()).observe(self.root, self.cli)
+            self.assertFalse(observed.valid)
+            self.assertFalse(smoke.snapshot_quiet(observed))
+        path.unlink()
+        worker = {"version": 1, "workerId": "w1", "pid": 234, "processStartId": "ps:old",
+                  "socketPath": str(self.root / "tmp" / f"prime-agent-{os.getuid()}" /
+                                    f"worker-{directory.name}-w1.sock"),
+                  "recoveryJournalPath": str(directory / "w1.recovery.jsonl"),
+                  "supervisorSocketPath": str(self.socket), "authenticationToken": "secret-token",
+                  "rootActiveSessionId": "r1", "createdAt": "time", "updatedAt": "time",
+                  "lifecycle": "ready", "createCommand": {"type": "create", "config": {
+                      "cwd": str(self.root / "project"), "agentDir": str(self.root / "config"),
+                      "sessionDir": str(self.root / "sessions"), "telemetryDisabled": True,
+                      "noTools": True, "models": ["x"], "autonomous": {"enabled": False}}},
+                  "consecutiveFailures": 0}
+        worker_path = directory / "w1.json"
+        worker_path.write_text(json.dumps(worker))
+        results = self.os_results(pid=smoke.CommandResult(1))
+        results[-1] = (("/bin/ps", "-p", "234", "-o", "lstart="), smoke.CommandResult(1))
+        valid = FakeOSNativeRunner(self.cli, results).observe(self.root, self.cli)
+        self.assertTrue(valid.valid, valid.reason)
+        for bad in ({"routing": {"socketPath": "/outside"}},
+                    {"createCommand": {"type": "create", "config": {"noTools": "invalid"}}},
+                    {"createCommand": {"type": "create", "config": {"telemetryDisabled": 7}}},
+                    {"createCommand": {"type": "create", "config": {"unknown": 1}}}):
+            worker_path.write_text(json.dumps({**worker, **bad}))
+            observed = FakeOSNativeRunner(self.cli, self.os_results()).observe(self.root, self.cli)
+            self.assertFalse(observed.valid)
+            self.assertNotIn("secret-token", json.dumps(observed.record()))
+
+    def test_c3_rejected_postflight_journal_blocks_full_smoke_and_replay(self):
+        test = self
+        class Runner(FakeRunner):
+            def __init__(self):
+                super().__init__(test.cli, [smoke.Observation(), test.active()], start=test.good_start())
+                self.post = 0
+            def observe(self, root, cli, required_pids=None):
+                if self.observations:
+                    return super().observe(root, cli, required_pids)
+                self.post += 1
+                if self.post == 1:
+                    directory = smoke.default_descriptor_dir(root, test.socket)
+                    directory.mkdir(parents=True)
+                    (directory / "command-journal.jsonl").write_text(json.dumps({
+                        "version": 1, "type": "result", "key": '["c","id"]',
+                        "response": {"type": "response", "data": "secret-response"},
+                        "recordedAt": "time"}) + "\n")
+                return FakeOSNativeRunner(test.cli, test.os_results(pid=smoke.CommandResult(1))).observe(root, cli, required_pids)
+        runner = Runner()
+        report = smoke.smoke(self.env, self.cli, self.sha, runner, run_native=True)
+        self.assertEqual(report["status"], "unresolved")
+        self.assertEqual(len(runner.commands), 2)
+        self.assertFalse(report["postflight"][0]["valid"])
+        self.assertFalse(report["postflight"][1]["valid"])
+        self.assertNotIn("secret-response", json.dumps(report))
+        self.assert_replay_nonmutating(runner)
 
     def test_unmocked_subprocess_guard_regression(self):
         with self.assertRaisesRegex(AssertionError, "unmocked subprocess"):

@@ -7,6 +7,7 @@ import argparse
 from dataclasses import asdict, dataclass, field
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -75,6 +76,8 @@ class Observation:
     supervisor_configs: list[dict] = field(default_factory=list)
     command_journals: list[dict] = field(default_factory=list)
     snapshot_generations: list[str] = field(default_factory=list)
+    orphan_candidates: list[dict] = field(default_factory=list)
+    worker_journal_digests: list[dict] = field(default_factory=list)
     registry_files: list[str] = field(default_factory=list)
     registry_owners: list[dict] = field(default_factory=list)
     other_files: list[str] = field(default_factory=list)
@@ -387,9 +390,92 @@ def parse_supervisor_config(value, path: Path, root: Path, socket: Path) -> dict
             "agentDir": config["agentDir"]}
 
 
+# Pinned v0.9.6 AgentSessionRuntimeConfig. Legacy v1 alone can carry
+# this runtime config; v2 keeps only durable create fields. Never retain it.
+LEGACY_STRINGS = {"provider", "model", "apiKey", "systemPrompt", "thinking", "executionMode"}
+LEGACY_ARRAYS = {"appendSystemPrompt", "models", "tools", "extensions", "skills",
+                 "promptTemplates", "themes"}
+LEGACY_BOOLS = {"noTools", "noBuiltinTools", "noExtensions", "noSkills",
+                "noPromptTemplates", "noThemes", "noContextFiles", "serializedRefine"}
+
+
+def finite_number(value) -> bool:
+    return type(value) in (int, float) and math.isfinite(value)
+
+
+def validate_legacy_config(config: dict, root: Path) -> None:
+    allowed = (LEGACY_STRINGS | LEGACY_ARRAYS | LEGACY_BOOLS |
+               {"cwd", "agentDir", "sessionDir", "telemetryDisabled", "autonomous",
+                "extensionFlagValues", "initialGoal"})
+    if set(config) - allowed:
+        raise UnsafeScratch("unknown legacy worker config field")
+    for key, expected in (("cwd", root / "project"), ("agentDir", root / "config"),
+                          ("sessionDir", root / "sessions")):
+        if key in config and config[key] != str(expected):
+            raise UnsafeScratch("invalid legacy worker config scope")
+    if "telemetryDisabled" in config and config["telemetryDisabled"] is not True:
+        raise UnsafeScratch("invalid legacy worker telemetry")
+    for key in LEGACY_STRINGS & config.keys():
+        if not isinstance(config[key], str):
+            raise UnsafeScratch("invalid legacy worker string")
+    if "executionMode" in config and config["executionMode"] not in ("interactive", "print", "json", "rpc", "acp"):
+        raise UnsafeScratch("invalid legacy worker execution mode")
+    if "thinking" in config and config["thinking"] not in ("off", "minimal", "low", "medium", "high", "xhigh", "max"):
+        raise UnsafeScratch("invalid legacy worker thinking")
+    for key in LEGACY_ARRAYS & config.keys():
+        if not isinstance(config[key], list) or any(not isinstance(v, str) for v in config[key]):
+            raise UnsafeScratch("invalid legacy worker string list")
+    for key in LEGACY_BOOLS & config.keys():
+        if type(config[key]) is not bool:
+            raise UnsafeScratch("invalid legacy worker boolean")
+    if "extensionFlagValues" in config:
+        flags = config["extensionFlagValues"]
+        if not isinstance(flags, dict) or any(not isinstance(k, str) or type(v) not in (bool, str)
+                                               for k, v in flags.items()):
+            raise UnsafeScratch("invalid legacy extension flags")
+    if "initialGoal" in config:
+        goal = config["initialGoal"]
+        if (not isinstance(goal, dict) or set(goal) - {"objective", "tokenBudget"}
+                or not isinstance(goal.get("objective"), str) or not goal["objective"]
+                or ("tokenBudget" in goal and not finite_number(goal["tokenBudget"]))):
+            raise UnsafeScratch("invalid legacy initial goal")
+    if "autonomous" in config:
+        auto = config["autonomous"]
+        if not isinstance(auto, dict) or set(auto) - {"enabled", "maxContinuations", "maxTurns", "maxTokens",
+                                                 "timeoutMs", "continuationPrompt", "gates", "subagentKeepAliveMs"}:
+            raise UnsafeScratch("invalid legacy autonomous config")
+        for key in ("enabled",):
+            if key in auto and type(auto[key]) is not bool:
+                raise UnsafeScratch("invalid legacy autonomous boolean")
+        for key in ("maxContinuations", "maxTurns", "maxTokens", "timeoutMs", "subagentKeepAliveMs"):
+            if key in auto and not finite_number(auto[key]):
+                raise UnsafeScratch("invalid legacy autonomous number")
+        if "continuationPrompt" in auto and not isinstance(auto["continuationPrompt"], str):
+            raise UnsafeScratch("invalid legacy autonomous prompt")
+        if "gates" in auto:
+            gates = auto["gates"]
+            if not isinstance(gates, dict) or set(gates) - {"commands", "maxRetries", "timeoutMs"}:
+                raise UnsafeScratch("invalid legacy autonomous gates")
+            if "commands" in gates and (not isinstance(gates["commands"], list)
+                                       or any(not isinstance(v, str) for v in gates["commands"])):
+                raise UnsafeScratch("invalid legacy gate commands")
+            for key in ("maxRetries", "timeoutMs"):
+                if key in gates and not finite_number(gates[key]):
+                    raise UnsafeScratch("invalid legacy gate number")
+
+
 def parse_worker_descriptor(value, path: Path, root: Path) -> dict:
     if not isinstance(value, dict) or type(value.get("version")) is not int or value["version"] not in (1, 2):
         raise UnsafeScratch("unknown worker descriptor format")
+    allowed = {"version", "workerId", "pid", "processStartId", "socketPath",
+               "recoveryJournalPath", "orphanProcessJournalPath", "supervisorSocketPath",
+               "authenticationToken", "workerInstanceId", "rootActiveSessionId",
+               "ownerClientId", "rootSessionId", "sessionFile", "sessionDir",
+               "telemetryDisabled", "createdAt", "updatedAt", "lifecycle",
+               "createCommand", "consecutiveFailures", "stopRequestedAt",
+               "archiveOnStop", "lastFailureAt", "lastError"}
+    if set(value) - allowed:
+        raise UnsafeScratch("unknown worker descriptor routing field")
     pid = value.get("pid")
     start = value.get("processStartId")
     if (type(pid) is not int or pid <= 1 or not isinstance(start, str)
@@ -416,10 +502,9 @@ def parse_worker_descriptor(value, path: Path, root: Path) -> dict:
         config = create["config"]
         if not isinstance(config, dict):
             raise UnsafeScratch("invalid legacy worker create config")
-        for key, expected in (("cwd", root / "project"), ("agentDir", root / "config"),
-                              ("sessionDir", root / "sessions")):
-            if key in config and config[key] != str(expected):
-                raise UnsafeScratch("invalid legacy worker config " + key)
+        if value["version"] != 1:
+            raise UnsafeScratch("legacy config in v2 worker descriptor")
+        validate_legacy_config(config, root)
     for key in ("socketPath", "supervisorSocketPath", "recoveryJournalPath"):
         scoped_path(value.get(key), root, "worker " + key)
     worker_id = value["workerId"]
@@ -446,8 +531,8 @@ def parse_worker_descriptor(value, path: Path, root: Path) -> dict:
         raise UnsafeScratch("invalid worker archive metadata")
     if "telemetryDisabled" in value and value["telemetryDisabled"] is not True:
         raise UnsafeScratch("invalid worker telemetry metadata")
-    if value["version"] == 2 and "config" in create:
-        raise UnsafeScratch("legacy config in v2 worker descriptor")
+    if "orphanProcessJournalPath" in value:
+        scoped_path(value["orphanProcessJournalPath"], root, "worker orphan journal")
     return {"path": str(path), "pid": pid, "start_id": start,
             "socketPath": value["socketPath"],
             "supervisorSocketPath": value["supervisorSocketPath"],
@@ -475,10 +560,16 @@ def read_scanned_bytes(path: Path, st: os.stat_result, label: str) -> bytes:
 def validate_command_journal(path: Path, st: os.stat_result) -> dict:
     data = read_scanned_bytes(path, st, "command journal")
     try:
-        lines = data.decode("utf-8").splitlines()
+        text = data.decode("utf-8")
+        # compact() writes precisely one newline for an empty map.
+        lines = [] if text == "\n" else text.splitlines()
+        if not lines and text != "\n":
+            raise UnsafeScratch("invalid empty command journal")
         if len(lines) > MAX_SCAN_ENTRIES:
             raise UnsafeScratch("command journal entry bound exceeded")
         for line in lines:
+            if not line:
+                raise UnsafeScratch("invalid blank command journal record")
             entry = json.loads(line)
             if (not isinstance(entry, dict) or type(entry.get("version")) is not int
                     or entry["version"] != 1 or entry.get("type") not in
@@ -487,43 +578,113 @@ def validate_command_journal(path: Path, st: os.stat_result) -> dict:
                     or not isinstance(entry.get("recordedAt"), str) or not entry["recordedAt"]):
                 raise UnsafeScratch("invalid command journal record")
             kind = entry["type"]
-            if kind == "received" and any(not isinstance(entry.get(key), str) or not entry[key]
-                                          for key in ("clientId", "commandId", "commandType")):
-                raise UnsafeScratch("invalid received command journal record")
-            if kind == "result" and (not isinstance(entry.get("response"), dict)
-                                     or entry["response"].get("type") != "response"):
-                raise UnsafeScratch("invalid result command journal record")
+            fields = {"version", "type", "key", "recordedAt"}
+            if kind == "received":
+                fields.update(("clientId", "commandId", "commandType"))
+                if any(not isinstance(entry.get(key), str) or not entry[key]
+                       for key in ("clientId", "commandId", "commandType")):
+                    raise UnsafeScratch("invalid received command journal record")
+                if entry["key"] != json.dumps([entry["clientId"], entry["commandId"]],
+                                               separators=(",", ":"), ensure_ascii=False):
+                    # JSON.stringify uses compact spacing and UTF-8 string contents.
+                    raise UnsafeScratch("invalid command journal key")
+            elif kind == "result":
+                fields.add("response")
+                response = entry.get("response")
+                if (not isinstance(response, dict) or response.get("type") != "response"
+                        or not isinstance(response.get("command"), str) or not response["command"]
+                        or type(response.get("success")) is not bool):
+                    raise UnsafeScratch("invalid result command journal response")
+                response_fields = {"type", "command", "success", "id"}
+                if "id" in response and not isinstance(response["id"], str):
+                    raise UnsafeScratch("invalid result response id")
+                if response["success"]:
+                    response_fields.add("data")
+                else:
+                    response_fields.update(("error", "errorInfo"))
+                    if not isinstance(response.get("error"), str):
+                        raise UnsafeScratch("invalid result response error")
+                    if "errorInfo" in response:
+                        info = response["errorInfo"]
+                        fields_by_code = {
+                            "missing_session_cwd": {"issue"},
+                            "session_import_file_not_found": {"filePath"},
+                            "session_already_active": {"sessionPath"},
+                            "session_recovering": {"activeSessionId"},
+                            "update_restarting": set(),
+                            "command_result_uncertain": {"clientId", "commandId"},
+                        }
+                        if not isinstance(info, dict) or info.get("code") not in fields_by_code:
+                            raise UnsafeScratch("invalid result response error info")
+                        code = info["code"]
+                        required = fields_by_code[code]
+                        allowed = {"code"} | required | ({"activeSessionId"} if code == "session_already_active" else set())
+                        if set(info) - allowed or not required <= set(info):
+                            raise UnsafeScratch("invalid result response error info")
+                        if any(not isinstance(info[key], str) or not info[key]
+                               for key in required - {"issue"}):
+                            raise UnsafeScratch("invalid result response error identity")
+                        if "activeSessionId" in info and not isinstance(info["activeSessionId"], str):
+                            raise UnsafeScratch("invalid result response active session")
+                        if code == "missing_session_cwd" and not isinstance(info["issue"], dict):
+                            raise UnsafeScratch("invalid result response cwd issue")
+                if set(response) - response_fields:
+                    raise UnsafeScratch("invalid result response discriminant")
+            if set(entry) != fields:
+                raise UnsafeScratch("unknown or missing command journal field")
     except (UnicodeError, ValueError) as error:
         raise UnsafeScratch("malformed command journal") from error
     return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 
-def validate_worker_journal(path: Path, st: os.stat_result, worker_pid: int) -> None:
+def validate_worker_journal(path: Path, st: os.stat_result, worker_pid: int,
+                            partial: list[dict] | None = None,
+                            digests: list[dict] | None = None) -> list[dict]:
     data = read_scanned_bytes(path, st, "worker journal")
+    if digests is not None:
+        digests.append({"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+    latest: dict[int, dict] = {}
     try:
         lines = data.decode("utf-8").splitlines()
         if len(lines) > MAX_SCAN_ENTRIES:
             raise UnsafeScratch("worker journal entry bound exceeded")
         for line in lines:
+            if not line:
+                raise UnsafeScratch("invalid blank worker journal record")
             value = json.loads(line)
             if (not isinstance(value, dict) or type(value.get("version")) is not int
                     or value["version"] != 1 or not isinstance(value.get("recordedAt"), str)
                     or not value["recordedAt"]):
                 raise UnsafeScratch("invalid worker journal record")
             if path.name.endswith(".recovery.jsonl"):
-                if (any(not isinstance(value.get(key), str) or not value[key]
-                        for key in ("activeSessionId", "sessionId", "operation"))
+                if (set(value) - {"version", "recordedAt", "activeSessionId", "sessionId",
+                                  "operation", "busy", "sessionFile"}
+                        or any(not isinstance(value.get(key), str) or not value[key]
+                               for key in ("activeSessionId", "sessionId", "operation"))
                         or type(value.get("busy")) is not bool):
                     raise UnsafeScratch("invalid worker recovery record")
                 if "sessionFile" in value:
                     scoped_path(value["sessionFile"], path.parents[3] / "sessions", "worker recovery session file")
-            elif (type(value.get("pid")) is not int or value["pid"] <= 1
-                  or value.get("ownerPid") != worker_pid
-                  or type(value.get("active")) is not bool
-                  or ("processStartId" in value and not isinstance(value["processStartId"], str))):
-                raise UnsafeScratch("invalid worker orphan record")
+            else:
+                if (set(value) - {"version", "recordedAt", "pid", "ownerPid", "kernelPid",
+                                  "processStartId", "active"}
+                        or type(value.get("pid")) is not int or value["pid"] <= 1
+                        or value.get("ownerPid") != worker_pid
+                        or type(value.get("active")) is not bool
+                        or ("kernelPid" in value and (type(value["kernelPid"]) is not int or value["kernelPid"] <= 1))
+                        or ("processStartId" in value and (not isinstance(value["processStartId"], str)
+                                                              or not re.fullmatch(
+                                                                  r"ps:[A-Z][a-z]{2} [A-Z][a-z]{2} [ 0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9] [0-9]{4}",
+                                                                  value["processStartId"])))):
+                    raise UnsafeScratch("invalid worker orphan record")
+                latest[value["pid"]] = value
+                if partial is not None:
+                    partial[:] = [{"pid": item["pid"], "start_id": item.get("processStartId")}
+                                  for item in latest.values() if item["active"]]
     except (UnicodeError, ValueError) as error:
         raise UnsafeScratch("malformed worker journal") from error
+    return [{"pid": item["pid"], "start_id": item.get("processStartId")}
+            for item in latest.values() if item["active"]]
 
 
 def snapshot_quiet(obs: Observation) -> bool:
@@ -535,6 +696,10 @@ def snapshot_quiet(obs: Observation) -> bool:
     if any(d.get("status") != "orphan-file" for d in obs.daemons):
         return False
     if any(d.get("pid") is not None and obs.pid_starts.get(d["pid"]) is not None for d in obs.descriptors):
+        return False
+    # A PID-only orphan has no identity proof even if ps currently says absent.
+    if any(not item.get("start_id") or obs.pid_starts.get(item["pid"]) is not None
+           or item["pid"] not in obs.pid_starts for item in obs.orphan_candidates):
         return False
     return all(start is None for start in obs.pid_starts.values())
 
@@ -570,6 +735,7 @@ def active_shutdown_admission(active: Observation, root: Path, socket: Path,
         # complete, still-empty private namespace admits one isolated stop.
         if (active.daemons or active.root_refs or active.unix_refs or active.socket_files
                 or active.descriptors or active.supervisor_configs or active.command_journals
+                or active.snapshot_generations or active.orphan_candidates
                 or active.registry_files or active.registry_owners
                 or any(start is not None for start in active.pid_starts.values())):
             return False, False, "uncertain start has a possible owner; no shutdown admitted"
@@ -692,9 +858,15 @@ class NativeRunner:
                         pipe.close()
                     except Exception:
                         failed = True
+        # Replacement decoding may triple raw bytes. Keep encoded evidence
+        # bounded too, without discarding child lifecycle flags.
+        decoded = {name: bytes(data).decode(errors="replace") for name, data in output.items()}
+        if any(len(text.encode()) > MAX_COMMAND_BYTES for text in decoded.values()):
+            oversized = True
+            decoded = {name: text.encode()[:MAX_COMMAND_BYTES].decode("utf-8", errors="ignore")
+                       for name, text in decoded.items()}
         return CommandResult(None if expired or oversized or failed or unresolved else proc.returncode,
-                             output["stdout"].decode(errors="replace"),
-                             output["stderr"].decode(errors="replace"),
+                             decoded["stdout"], decoded["stderr"],
                              expired or oversized or failed or unresolved, oversized,
                              child_unresolved=unresolved, capture_failed=failed)
 
@@ -792,7 +964,13 @@ class NativeRunner:
                        if Path(descriptor["path"]).stem == worker_id]
             if len(matches) != 1:
                 raise UnsafeScratch("orphan worker journal lacks descriptor")
-            validate_worker_journal(journal, journal_stat, matches[0]["pid"])
+            candidates: list[dict] = []
+            # Retain validated latest-record identities even if a later line fails.
+            try:
+                validate_worker_journal(journal, journal_stat, matches[0]["pid"], candidates,
+                                        obs.worker_journal_digests)
+            finally:
+                obs.orphan_candidates.extend(candidates)
         for owner_dir in owner_records.keys() | owner_scopes.keys():
             if owner_dir not in owner_records or owner_dir not in owner_scopes:
                 raise UnsafeScratch("incomplete supervisor registry owner record")
@@ -801,6 +979,7 @@ class NativeRunner:
         pids.update(r["pid"] for r in obs.root_refs + obs.unix_refs)
         pids.update(d["pid"] for d in obs.descriptors)
         pids.update(owner["pid"] for owner in obs.registry_owners)
+        pids.update(item["pid"] for item in obs.orphan_candidates)
         pids.update(required_pids)
         if len(pids) > MAX_SCAN_ENTRIES or any(type(pid) is not int or pid <= 1 for pid in pids):
             raise UnsafeScratch("invalid or oversized process identity set")
@@ -883,11 +1062,17 @@ def smoke(env: dict[str, str], cli: Path, expected_sha256: str, runner: Runner, 
             if cli_identity(cli) != identity:
                 raise UnsafeScratch("CLI identity changed before invocation")
             outcome = runner.command(argv, timeout)
-            event.update(outcome.record())
-            return outcome
         except Exception:
-            event["error"] = "invocation or result recording failed; outcome unknown"
+            event["error"] = "invocation failed; outcome unknown"
             return CommandResult(None, timed_out=True)
+        # Recording is a fallible evidence plane, not the command result. Its
+        # failure cannot erase competing-owner text or an unreaped child.
+        try:
+            event.update(outcome.record())
+        except Exception:
+            event["error"] = "result evidence recording failed; outcome uncertain"
+            outcome.capture_failed = True
+        return outcome
 
     baseline = observation("baseline")
     if not baseline_empty(baseline):
@@ -914,12 +1099,15 @@ def smoke(env: dict[str, str], cli: Path, expected_sha256: str, runner: Runner, 
     admission = False
     ownership_revoked = False
     captured: dict[int, str | None] = {}
+    captured_generations: set[str] = set()
+    captured_orphans: set[tuple[int, str | None]] = set()
     try:
         if start.stdout.strip().startswith("Daemon already running on "):
             ownership_revoked = True
             reason("start reported a competing daemon; no shutdown admitted")
         else:
-            match = START_RE.fullmatch(start.stdout.strip()) if start.returncode == 0 and not start.timed_out else None
+            match = START_RE.fullmatch(start.stdout.strip()) if (start.returncode == 0 and not start.timed_out
+                                                                and not start.capture_failed) else None
             start_ok = bool(match and match.group(1) == str(socket))
             expected_pid = int(match.group(2)) if start_ok else None
             if not start_ok:
@@ -937,6 +1125,8 @@ def smoke(env: dict[str, str], cli: Path, expected_sha256: str, runner: Runner, 
                 if decision:
                     reason(decision)
                 captured = dict(active.pid_starts)
+                captured_generations = set(active.snapshot_generations)
+                captured_orphans = {(item["pid"], item.get("start_id")) for item in active.orphan_candidates}
     except Exception:
         ownership_revoked = True
         reason("active ownership reconciliation failed; no shutdown admitted")
@@ -959,7 +1149,10 @@ def smoke(env: dict[str, str], cli: Path, expected_sha256: str, runner: Runner, 
         except Exception:
             interval_ok = False
             reason("post-shutdown quiet interval failed")
-        second = observation("postflight", set(captured))
+        # Candidates first found in postflight one must be checked again in
+        # postflight two; second-only candidates have no first check and veto.
+        discovered_first = {item["pid"] for item in first.orphan_candidates}
+        second = observation("postflight", set(captured) | discovered_first)
         quiet = False
         try:
             # Both snapshots have already been retained; classification cannot
@@ -978,6 +1171,24 @@ def smoke(env: dict[str, str], cli: Path, expected_sha256: str, runner: Runner, 
         except Exception:
             quiet = False
             reason("captured process identity classification failed; outcome unresolved")
+        try:
+            generations_first, generations_second = set(first.snapshot_generations), set(second.snapshot_generations)
+            first_orphans = {(item["pid"], item.get("start_id")) for item in first.orphan_candidates}
+            second_orphans = {(item["pid"], item.get("start_id")) for item in second.orphan_candidates}
+            if (not generations_first <= captured_generations or not generations_second <= captured_generations
+                    or generations_first != generations_second or first_orphans != second_orphans
+                    or any(sorted(getattr(first, name), key=str) != sorted(getattr(second, name), key=str)
+                           for name in ("descriptors", "supervisor_configs", "command_journals",
+                                        "worker_journal_digests", "other_files", "socket_files"))
+                    or any(item[1] is None for item in first_orphans | second_orphans)
+                    or any(pid not in first.pid_starts or pid not in second.pid_starts
+                           or first.pid_starts[pid] is not None or second.pid_starts[pid] is not None
+                           for pid, _ in first_orphans | second_orphans | captured_orphans)):
+                quiet = False
+                reason("postflight generation or orphan identity changed, persisted, or lacked two checks")
+        except Exception:
+            quiet = False
+            reason("postflight identity reconciliation failed; outcome unresolved")
         report["status"] = "stopped" if start_ok and active_ok and shutdown_ok and quiet else "unresolved"
     record_report(root, report)
     return report

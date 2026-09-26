@@ -123,3 +123,55 @@ Revision checks: `python3 -B -m unittest discover -s tests -p test_prime_agent_s
 `python3 -B -m py_compile` on driver/tests and `git diff --check` passed.
 
 Exact pushed `bafd0e3707eee55b9c129302c57166d9dea24d73` received [EXPERT BLOCK C1–C3](scratch-smoke-expert-block-bafd0e3-20260926.md). **PRE-RUN BLOCK continues**; no installed-CLI preflight or `--run-smoke` is authorized on this candidate.
+
+## C1–C3 repair candidate after exact-commit BLOCK (unreviewed; PRE-RUN BLOCK)
+
+The immutable [EXPERT BLOCK on `bafd0e3`](scratch-smoke-expert-block-bafd0e3-20260926.md)
+remains authoritative evidence about that earlier commit. This bounded driver-only
+revision is separate from the active Phase 3a EPISODE. It changes only this
+candidate note, the scratch driver, and its Python-only tests. It does not
+permit installed-CLI preflight, `--run-smoke`, a native experiment, or cleanup.
+
+- **C1:** command lifecycle and event recording are distinct. A failed
+  `record()` preserves the start result's already-running response and
+  `child_unresolved` flag. Already-known competing-owner or unreaped-child
+  facts block shutdown even with an empty later observation. A reaped ordinary
+  uncertain start still permits one isolated stop. NativeRunner caps decoded
+  UTF-8-replacement evidence as well as raw pumped bytes, and retains timeout,
+  truncation, and exact-child-reap flags. The injected fake Popen receives
+  400,000 invalid bytes (1,200,000 decoded bytes before bounding), refuses
+  reaping, and produces exactly one start mutation plus a retained redacted
+  unresolved-ownership report and nonmutating replay.
+- **C2:** v0.9.6 orphan journal records are parsed with latest-record per-PID
+  semantics. Inactive latest records are historical; active records retain
+  PID/start identity, including partial facts before a later malformed line.
+  Native observations independently query each active candidate even when
+  daemon ps/lsof finds nothing. Both postflights check captured and first-scan
+  candidates; second-only candidates, alive/reused/missing-identity PIDs,
+  incomplete scans, foreign/new generation, or changed artifact inventories
+  (including bounded worker-journal digests) veto `stopped`. Captured-generation retained residue and dead, validly
+  identified stale orphans remain permitted. The driver never signals a
+  journal PID. Source-shaped filesystem/start/stop fake assertions include
+  per-postflight OS PID calls, redacted reports, and same-root replay.
+- **C3:** v1 legacy runtime config fields and v2 durable create fields are
+  version-aware, type-checked and scoped. Unsupported top-level routing or
+  nested config is rejected. Command journal validates response success/error
+  discriminants and source-record fields, accepts the native compacted single
+  newline empty journal, and rejects malformed nonempty lines. Worker orphan
+  identities are tied to native macOS `ps:` start shape. Diagnostic records
+  contain no authentication token, config, response data, or raw command output.
+
+These are guarded Python-only source/fake claims, not a native run. The test
+setup intercepts `Popen`, `run`, and `check_output` by default; the exceptional
+Popen fake uses Python-owned pipes only. The pinned public source clone was
+inspected read-only at `e260085dd8f742e0def3d871860c9a888b114851`.
+A **fresh exact-pushed-commit independent EXPERT approval** is required before
+any installed Prime Agent command, including preflight. The macOS Python 3.9
+check-to-exec gap remains the previously declared residual, not an atomic
+binding claim.
+
+Final candidate checks (guarded, Python-only):
+`python3 -B -m unittest discover -s tests -p test_prime_agent_scratch_smoke.py -v`
+**53 passed**; `python3 -B -m unittest discover -s tests -p test_prime_agent_probe_isolation.py -v`
+**7 passed**; syntax compilation of driver/test and `git diff --check` passed.
+No installed CLI command was attempted. Fresh exact-commit review remains mandatory.
