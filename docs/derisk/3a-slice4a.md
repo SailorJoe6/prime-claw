@@ -206,3 +206,12 @@ approved metadata-only packet capture or per-request proxy trace first, with
 explicit preservation of the unpublished local brain Git repair if any
 instrumentation is destructive. See
 [`phase3a-slice1-proxy-diagnostic-20260925.json`](../evidence/phase3a-slice1-proxy-diagnostic-20260925.json).
+
+A 2026-09-27 documentation-first check reconstructed the first proven private
+brain Git path (`docs/derisk/3a-slice1.md`) and compared it with the effective
+OpenShell Git/canary rules. Those rules are present, but a fresh credential-free
+sandbox canary still reset after `NET:OPEN ALLOWED` while the host returned 200.
+Git-only placeholder or URL setup cannot explain that shared failure; the
+upstream reset source remains unknown. See
+[`phase3a-slice1-context-investigation-20260927.json`](../evidence/phase3a-slice1-context-investigation-20260927.json).
+No brain-source remote receipt exists; do not begin Qwen work.

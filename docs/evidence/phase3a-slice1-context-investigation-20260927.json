@@ -1,0 +1,38 @@
+{
+  "history": {
+    "distinct_prior_signatures": [
+      "literal ${api_token} single-quoted URL -> HTTP 401; corrected double quote in 2bfcc03",
+      "U1 npm encoded-%2F path -> ECONNRESET; not a GitHub root/canary request",
+      "VPN-down ai-gateway -> istio-envoy RBAC 403; proxy-root-cause theory retracted in docs/derisk/U1.md:165-173"
+    ],
+    "expected_path": "host GitHub provider prime-claw-github custom github-push; opaque api_token placeholder in /sandbox/brain Git HTTPS remote, L7 bearer substitution on github.com; /usr/bin/git permitted by github_brain REST policy; GET/HEAD/OPTIONS and git-upload-pack/git-receive-pack POST",
+    "first_proven": "docs/derisk/3a-slice1.md:8-26,33-61; first manual sandbox Git clone/push commit 11a683b, corrected fresh-create acceptance 2bfcc03"
+  },
+  "hypothesis_test": {
+    "finding": "Insufficient: expected credentialed Git path was historically proven; live effective github_brain and egress_canary rule shapes are present; credential-free example.com fails too. A Git-only placeholder/quoting/permission issue cannot alone explain the shared reset. Other undocumented OpenShell/host data-path context remains possible, not diagnosed.",
+    "hypothesis": "Missing documented Git placeholder/profile/URL/policy setup alone causes current reset.",
+    "remaining_unknown": "Which endpoint resets the allowed connection and its upstream connect/TLS failure reason; INFO OCSF and socket sampling do not identify it."
+  },
+  "next_owner_action": "Consult a fresh high-reasoning EXPERT on this bounded evidence. Request a documented safe diagnostic discriminator (supported live per-request supervisor proxy telemetry or operator-supplied metadata-only redacted trace) before any invasive action; preserve unpublished brain Git commit and security boundary. No Slice 2 until exact source receipt.",
+  "read_only_live_checks": {
+    "brain_source": "read-only /sandbox/brain HEAD 5dde0012eadf1df7c3e9c83d228e2d0d31f36695, git status --porcelain empty",
+    "effective_policy": "github_brain github.com/api.github.com:443 protocol rest read-write with /usr/bin/git,/usr/local/bin/uv,/usr/bin/curl; egress_canary example.com:443 exists; matches documented relevant rule shape, no policy mutation",
+    "episode_local_config": "bin/prime-claw status in isolated EPISODE checkout exits 1 before runtime probes because no local brain_repo selection; existing sandbox is Ready with prior configured brain clone. This limits use of checkout wrapper and is not proof of the network reset.",
+    "gateway": "healthy, version 0.0.116 (openshell gateway info)",
+    "host_canary": {
+      "command": "curl -sS -o /dev/null -w host_HTTP=%{http_code} --max-time 7 https://example.com/",
+      "exit": 0,
+      "http": 200
+    },
+    "ocsf_canary": "epoch 1790547353.046 NET:OPEN ALLOWED /usr/bin/curl -> example.com:443 (egress_canary engine:opa); epoch 1790547353.141 NET:FAIL (~95ms); no specific reset reason in current INFO log",
+    "sandbox": "Ready, effective policy source sandbox (openshell sandbox get prime-claw -o json)",
+    "sandbox_canary": {
+      "command": "openshell sandbox exec -n prime-claw --timeout 12 --no-tty -- curl -sS -o /dev/null -w sandbox_HTTP=%{http_code} --max-time 7 https://example.com/",
+      "error_class": "connection_reset",
+      "exit": 56,
+      "http": 0
+    }
+  },
+  "safety_and_limits": "No token/env values, provider secrets, TLS payload, packet capture, sidecar, restart, provider/policy change, DB access, Qwen, or Git remote push. A fresh remote HEAD/source receipt is still unavailable. Previous speculative sidecar was withdrawn.",
+  "scope": "Phase 3a Slice 1 owner-approved documentation-first /skill:investigate; read-only, one canary, no transport fix or brain push"
+}
