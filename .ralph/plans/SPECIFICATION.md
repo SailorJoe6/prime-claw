@@ -1,6 +1,6 @@
 # Specification — Finish the Phase 3a brain-hosting tracer bullet
 
-> **Status:** Operator-approved specification. Exact episode Slice 1 is blocked awaiting an approved per-request proxy/packet diagnostic method; brain-source remote receipt is still pending (2026-09-25).
+> **Status:** Operator-approved specification. Exact EPISODE is active for the owner-accepted documentation-first Slice 1 investigation (2026-09-26); brain-source remote receipt remains pending.
 > **Tracking:** `prime-claw-zwg`; operator-local embedding prerequisite `prime-claw-zwg.5`; routed write `prime-claw-zwg.4`.
 > **History:** `.ralph/plans/archive/phase3a-bufd-superseded-incomplete/` preserves the incomplete, superseded four-document BUFD bundle. It records prior reasoning, not a second active implementation plan.
 
