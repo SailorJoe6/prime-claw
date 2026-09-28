@@ -1,0 +1,38 @@
+{
+  "cause": "UNKNOWN; remote moved after bounded preflight, without a source-current local checkout. No fetch or merge attempted.",
+  "checkout_clean": true,
+  "code_readiness": {
+    "candidate_full_source_count_bookmark_failure_and_freshness_gates": "implemented offline, not run against candidate",
+    "compile_and_diff_check": true,
+    "focused_tests_passed": 157,
+    "native_prime_agent_tests_not_rerun": "Not run safely while the user Prime Agent daemon is active; initial unsafely initiated full suite was terminated after a test stalled. No claim of complete maintained suite pass.",
+    "ordinary_index_no_skip_fail_closed": "implemented offline in this project checkout, not invoked on live canonical",
+    "safe_non_native_suite_passed": 252
+  },
+  "decision": "BLOCKED_SAFE",
+  "expected_owner_accepted_brain_remote_main": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+  "live_remote_main_at_final_gate": "b695658b8271f4541e47b87f62c5b14c19075528",
+  "local_sandbox_brain_head": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+  "prerequisite_probes": {
+    "canonical_policy_restored_exactly": true,
+    "host_dimensions": 4096,
+    "host_http_status": 200,
+    "sandbox_dimensions": 4096,
+    "sandbox_http_status": 200,
+    "source_dry_run_eligible_files": 1117
+  },
+  "safety": {
+    "active_gbrain_sync_processes": 0,
+    "candidate_build_started": false,
+    "candidate_database_unchanged": true,
+    "candidate_policy_restored": true,
+    "canonical_database_unchanged": true,
+    "credentials_accessed": false,
+    "no_cutover_or_routed_write": true,
+    "sandbox_probe_completed_only_after_host_pass": true,
+    "source_remote_reconciliation_attempted": false
+  },
+  "scope": "Phase 3a Slice 2 source-current candidate stop before build",
+  "timestamp_utc": "2026-09-28T23:37:05.396966+00:00",
+  "unblock_condition": "Owner coordinates or approves an in-scope source-current reconciliation from exact moved remote HEAD, with lossless preservation and fresh read-only verification; then recheck host/sandbox endpoint, canonical policy, source and database gates before one candidate build. Do not infer authorization to fetch/merge or reset from this record."
+}

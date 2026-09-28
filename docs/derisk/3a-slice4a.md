@@ -253,3 +253,27 @@ material findings; its complete report is
 No Qwen/4096d index, database cutover, routed write, historical reset cause,
 or terminal EPISODE completion is accepted. Slice 2 remains conditional on
 its approved private-service clearance and bounded preflight gates.
+
+## 2026-09-28 Slice 2 exact-model preflight — stopped on source movement
+
+After Joe confirmed the private service ready, one host and then one isolated
+sandbox `Qwen3-Embedding-8B` request each returned HTTP 200 with 4096 values.
+The temporary candidate policy was restored to the exact canonical gateway
+policy, and neither index changed. A read-only full-source dry run counted
+1,117 eligible files. The ordinary index path's old second-pass
+`--skip-failed`/masked-exit behavior was removed in the project candidate and
+exercised by offline failure-gate tests; the candidate script now gates
+source/page/path coverage and zero unresolved failures before success.
+
+Before live build, remote brain `main` moved from the accepted Slice 1 receipt
+`5c47c067e93eb633da8a8dcb28221e23eea7685b` to
+`b695658b8271f4541e47b87f62c5b14c19075528` while the sandbox clone
+remained clean on the older SHA. This is an exact source-current stop, not a
+Qwen failure or a reason to infer the historical Git/L7 reset cause. No
+fetch/merge or candidate build was attempted, no canonical/candidate database
+was changed, and no cutover or routed write occurred. See
+[`phase3a-slice2-preflight-20260928.json`](../evidence/phase3a-slice2-preflight-20260928.json)
+and
+[`phase3a-slice2-source-movement-20260928.json`](../evidence/phase3a-slice2-source-movement-20260928.json).
+Owner-coordinated lossless source reconciliation and fresh gates are required
+before one preserved isolated build.

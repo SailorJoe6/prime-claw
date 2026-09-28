@@ -284,6 +284,12 @@ def test_candidate_script_isolated_config_database_model_and_timeouts(tmp_path):
     assert "p.embedding_signature IS DISTINCT FROM 'openai:Qwen3-Embedding-8B:4096'" in script
     assert "idx_chunks_embedding" in script
     assert "LAST_COMMIT" in script and '[ "$LAST_COMMIT" = "$BRAIN_HEAD" ]' in script
+    assert "--full --no-pull --no-extract --workers 1 --dry-run --yes" in script
+    assert "EXPECTED_FILES=" in script and '[ "$P" = "$EXPECTED_FILES" ]' in script
+    assert "count(DISTINCT source_path)" in script and '[ "$PATHS" = "$P" ]' in script
+    assert 'BRAIN_HEAD_AFTER=' in script and '[ "$BRAIN_HEAD_AFTER" = "$BRAIN_HEAD" ]' in script
+    assert 'status --json' in script and 'unacknowledged_failures' in script
+    assert '[ "$UNACK" = 0 ]' in script and 'status --porcelain' in script
     assert "DROP DATABASE" not in script.upper()
     assert "ALTER DATABASE" not in script.upper()
 
@@ -298,6 +304,36 @@ def test_candidate_script_isolated_config_database_model_and_timeouts(tmp_path):
         "provider_base_urls": {"openai": FAKE_BASE_URL},
         "openai_api_key": "dummy",
     }
+
+
+def test_candidate_full_source_gates_reject_missing_or_stale_rows(tmp_path):
+    """Exercise the generated source-count/vector/bookmark gates without a DB."""
+    script = pc._candidate_build_script(cfg(tmp_path), pc._embedding_settings(cfg(tmp_path)))
+    line = next(line for line in script.splitlines() if line.startswith('EXPECTED_FILES='))
+    for text, expected_ok in (
+            ("Full-sync dry run (strategy=markdown): 1117 file(s) would be imported from <source> @ abc.", True),
+            ("Full-sync dry run: 1117 file(s) would be imported", False)):
+        result = subprocess.run(["bash", "-euo", "pipefail", "-c",
+                                 "DRY_OUTPUT=$1; " + line + '; [ "${EXPECTED_FILES:-0}" -gt 0 ]',
+                                 "_", text], capture_output=True, text=True, timeout=5)
+        assert (result.returncode == 0) is expected_ok
+    gates = "\n".join(line for line in script.splitlines()
+                      if line.startswith('[ "${P:-0}"') or line == '[ "$LAST_COMMIT" = "$BRAIN_HEAD" ]'
+                      or line == '[ "$UNACK" = 0 ]'
+                      or line == '[ "$BRAIN_HEAD_AFTER" = "$BRAIN_HEAD" ]')
+    good = dict(os.environ, P="1117", EXPECTED_FILES="1117", PATHS="1117", C="3000",
+                BAD="0", COLTYPE="vector(4096)", HNSW="0", UNACK="0",
+                BRAIN_HEAD="abc", BRAIN_HEAD_AFTER="abc", LAST_COMMIT="abc")
+    for changes, expected_ok in (({}, True), ({"P": "1116"}, False),
+                                 ({"PATHS": "1116"}, False), ({"C": "0"}, False),
+                                 ({"BAD": "1"}, False), ({"COLTYPE": "vector(1536)"}, False),
+                                 ({"HNSW": "1"}, False), ({"UNACK": "1"}, False),
+                                 ({"BRAIN_HEAD_AFTER": "moved"}, False),
+                                 ({"LAST_COMMIT": "stale"}, False)):
+        result = subprocess.run(["bash", "-euo", "pipefail", "-c", gates],
+                                env={**good, **changes}, capture_output=True,
+                                text=True, timeout=5)
+        assert (result.returncode == 0) is expected_ok, changes
 
 
 def test_candidate_dry_run_has_no_external_calls_or_private_output(tmp_path, monkeypatch, capsys):

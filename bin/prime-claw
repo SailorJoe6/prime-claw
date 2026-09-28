@@ -1336,8 +1336,20 @@ def _candidate_build_script(cfg: dict, settings: dict) -> str:
         progress_poll_seconds,
     )
     sync = (
+        "SOURCE_STATUS=$(git -C " + q(sb_brain) + " status --porcelain)\n"
+        "[ -z \"$SOURCE_STATUS\" ]\n"
         "BRAIN_HEAD=$(git -C " + q(sb_brain) + " rev-parse HEAD)\n"
+        "DRY_OUTPUT=$(gbrain sync --source brain --full --no-pull --no-extract --workers 1 --dry-run --yes 2>&1)\n"
+        "EXPECTED_FILES=$(printf '%s\\n' \"$DRY_OUTPUT\" | sed -n 's/^Full-sync dry run (strategy=markdown): \\([0-9][0-9]*\\) file(s) would be imported.*/\\1/p')\n"
+        "[ \"${EXPECTED_FILES:-0}\" -gt 0 ]\n"
         + watchdog_script +
+        "SOURCE_STATUS_AFTER=$(git -C " + q(sb_brain) + " status --porcelain)\n"
+        "[ -z \"$SOURCE_STATUS_AFTER\" ]\n"
+        "BRAIN_HEAD_AFTER=$(git -C " + q(sb_brain) + " rev-parse HEAD)\n"
+        "[ \"$BRAIN_HEAD_AFTER\" = \"$BRAIN_HEAD\" ]\n"
+        "UNACK=$(gbrain status --json | python3 -c " + q(
+            "import json,sys; print(json.load(sys.stdin)['sync']['unacknowledged_failures'])") + ")\n"
+        "[ \"$UNACK\" = 0 ]\n"
         "P=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
         " -Atc \"SELECT count(*) FROM pages WHERE source_id='brain';\")\n"
         "C=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
@@ -1349,8 +1361,10 @@ def _candidate_build_script(cfg: dict, settings: dict) -> str:
         " -Atc \"SELECT count(*) FROM pg_indexes WHERE tablename='content_chunks' AND indexname='idx_chunks_embedding';\")\n"
         "LAST_COMMIT=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
         " -Atc \"SELECT COALESCE(last_commit,'') FROM sources WHERE id='brain';\")\n"
-        'echo "candidate-build head=$BRAIN_HEAD bookmark=$LAST_COMMIT pages=$P chunks=$C bad=$BAD column=$COLTYPE hnsw=$HNSW"\n'
-        '[ "${P:-0}" -gt 0 ] && [ "${C:-0}" -gt 0 ] && [ "$BAD" = 0 ] && [ "$COLTYPE" = "vector(' + str(settings["dimensions"]) + ')" ] && [ "$HNSW" = 0 ]\n'
+        "PATHS=$(psql -h localhost -p " + q(pgport) + " -U " + q(pgu) + " -d " + q(database) +
+        " -Atc \"SELECT count(DISTINCT source_path) FROM pages WHERE source_id='brain' AND source_path IS NOT NULL;\")\n"
+        'echo "candidate-build head=$BRAIN_HEAD bookmark=$LAST_COMMIT files=$EXPECTED_FILES pages=$P paths=$PATHS chunks=$C bad=$BAD failures=$UNACK column=$COLTYPE hnsw=$HNSW"\n'
+        '[ "${P:-0}" -gt 0 ] && [ "$P" = "$EXPECTED_FILES" ] && [ "$PATHS" = "$P" ] && [ "${C:-0}" -gt 0 ] && [ "$BAD" = 0 ] && [ "$COLTYPE" = "vector(' + str(settings["dimensions"]) + ')" ] && [ "$HNSW" = 0 ] || exit 1\n'
         '[ "$LAST_COMMIT" = "$BRAIN_HEAD" ]\n'
     )
     return env + setup + sync
@@ -2109,13 +2123,13 @@ def stage_brain_index(cfg, args) -> int:
     `gbrain sync --source brain` to import + EMBED (embeddings ride the ai-gateway L7 using
     the placeholder key in /sandbox/.gbrain/config.json — Slice 0 proved this path).
 
-    Idempotent: init --migrate-only and sources add are safe to re-run; sync is incremental
-    (bookmark by git commit). Files with malformed frontmatter in the brain repo would block
-    the sync bookmark, so after a sync attempt the stage runs `gbrain sync --skip-failed`
-    (a no-op when nothing failed) to acknowledge unparseable files and advance past them;
-    repair belongs to the brain's own triage workflows, not this runtime. Extract (link/
-    timeline edges) is left to sync's default post-import step; on large first imports it is
-    deferred (sync prints "run 'gbrain extract --stale'") — not required for R3a-2 serving.
+    Idempotent: init --migrate-only and sources add are safe to re-run; the
+    no-pull full-source sync checks the pinned checked-out git commit. Malformed
+    source files must fail closed; never acknowledge
+    failures with --skip-failed or mask a failed sync behind a populated legacy index.
+    Extract (link/timeline edges) is left to sync's default post-import step; on large
+    first imports it is deferred (sync prints "run 'gbrain extract --stale'") — not
+    required for R3a-2 serving.
     """
     name = cfg["sandbox_name"]
     pgu = _cfg_get(cfg, "postgres_user", "POSTGRES_USER", "gbrain")
@@ -2130,7 +2144,7 @@ def stage_brain_index(cfg, args) -> int:
     dburl = "postgresql://" + pgu + ":" + pgu + "@localhost:" + pgport + "/" + pgd
     if args.dry_run:
         print(f"dry_run: gbrain init --migrate-only + sources add brain --path {sb_brain} + "
-              f"sync --source brain (import+embed via gateway; model {emodel}, dims {edims})")
+              f"sync --source brain --full --no-pull --yes (fail-closed import+embed via gateway; model {emodel}, dims {edims})")
         return 0
     # Repeat the read-only exact-profile guard so direct stage use is also safe.
     try:
@@ -2165,12 +2179,19 @@ def stage_brain_index(cfg, args) -> int:
     print("brain-index: source 'brain' registered -> " + sb_brain)
     # Import + embed. Generous timeout: a full first sync of ~1k pages embeds ~2.7k chunks
     # through the gateway (~10-20 min observed; batch-size 40). Incremental re-runs are fast.
-    # The stage gates on pages>0 in PG afterward, so a silently-failed sync can't pass.
-    sync_cmd = ("gbrain sync --source brain 2>&1 | tail -6\n"
-                "gbrain sync --source brain --skip-failed 2>&1 | tail -2\n"
+    # A failed full-source import must stop before any page/bookmark gate, even
+    # when an older index is populated. Pin to this checked-out source commit.
+    bookmark_sql = "SELECT COALESCE(last_commit,'') FROM sources WHERE id='brain';"
+    sync_cmd = ("set -e\n"
+                "gbrain sync --source brain --full --no-pull --yes 2>&1 | tail -6\n"
+                "SOURCE_HEAD=$(git -C " + shlex.quote(sb_brain) + " rev-parse HEAD)\n"
+                "BOOKMARK=$(psql -h localhost -p " + pgport + " -U " + pgu + " -d " + pgd +
+                " -v ON_ERROR_STOP=1 -Atc " + shlex.quote(bookmark_sql) + ")\n"
+                "[ \"$BOOKMARK\" = \"$SOURCE_HEAD\" ]\n"
                 "N=$(psql -h localhost -p " + pgport + " -U " + pgu + " -d " + pgd +
-                " -tc 'SELECT count(*) FROM pages;' | tr -d ' \\n')\n"
-                "echo \"brain-index pages=$N\"\n"
+                " -v ON_ERROR_STOP=1 -tc " + shlex.quote("SELECT count(*) FROM pages WHERE source_id='brain';") +
+                " | tr -d ' \\n')\n"
+                "echo \"brain-index pages=$N bookmark=$BOOKMARK\"\n"
                 "[ \"${N:-0}\" -gt 0 ]\n")
     code, out = sandbox_exec(cfg, env + sync_cmd, timeout=2400)
     if code != 0:

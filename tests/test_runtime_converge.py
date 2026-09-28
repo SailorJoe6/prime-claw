@@ -366,8 +366,8 @@ def test_brain_config_lives_at_sandbox_home_not_repo(tmp_path, monkeypatch):
 
 
 def test_brain_index_stage_sequence(tmp_path, monkeypatch):
-    """stage_brain_index: migrate schema -> sources add (idempotent) -> sync (import+embed)
-    -> skip-failed -> pages>0 gate. pipefail so gbrain failures aren't masked by tail."""
+    """stage_brain_index: migrate -> source -> one pinned full sync -> exact
+    bookmark and source-scoped page gate, with no failure acknowledgement."""
     calls, fx = _exec_recorder(monkeypatch)
     monkeypatch.setattr(pc, "sandbox_exec", fx)
     rc = pc.stage_brain_index(cfg(tmp_path), Args())
@@ -378,10 +378,13 @@ def test_brain_index_stage_sequence(tmp_path, monkeypatch):
     assert "--embedding-model openai:text-embedding-3-large" in joined
     assert "--embedding-dimensions 1536" in joined
     assert "sources add brain --path /sandbox/brain --force" in joined
-    assert "gbrain sync --source brain" in joined
-    assert "--skip-failed" in joined
-    assert "set -o pipefail" in joined
-    assert "SELECT count(*) FROM pages" in joined  # pages>0 gate
+    assert joined.count("gbrain sync --source brain") == 1
+    assert "gbrain sync --source brain --full --no-pull --yes" in joined
+    assert "--skip-failed" not in joined
+    assert "set -o pipefail" in joined and "set -e\n" in joined
+    assert "SOURCE_HEAD=$(git -C /sandbox/brain rev-parse HEAD)" in joined
+    assert "last_commit" in joined and '"$BOOKMARK" = "$SOURCE_HEAD"' in joined
+    assert "SELECT count(*) FROM pages WHERE source_id=" in joined
 
 
 def test_brain_index_stage_dry_run(tmp_path, capsys):
@@ -401,6 +404,43 @@ def test_brain_index_sync_failure_propagates(tmp_path, monkeypatch, capsys):
     rc = pc.stage_brain_index(cfg(tmp_path), Args())
     assert rc == 1
     assert "brain-index stage (sync)" in capsys.readouterr().err
+
+
+def test_brain_index_shell_stops_on_failed_sync_or_stale_bookmark(tmp_path, monkeypatch):
+    """Execute the generated shell offline: a populated old index cannot mask failure."""
+    calls, fx = _exec_recorder(monkeypatch)
+    monkeypatch.setattr(pc, "sandbox_exec", fx)
+    assert pc.stage_brain_index(cfg(tmp_path), Args()) == 0
+    script = next(command for command in calls if "gbrain sync --source brain" in command)
+    shim = tmp_path / "shim"
+    shim.mkdir()
+    commands = {
+        "gbrain": '#!/bin/sh\nprintf "%s\n" sync >> "$GBRAIN_MARKER"\nexit "$SYNC_RC"\n',
+        "git": '#!/bin/sh\nprintf "%s\n" "$TEST_HEAD"\n',
+        "psql": ('#!/bin/sh\nprintf "%s\n" query >> "$PSQL_MARKER"\n'
+                 'case "$*" in *last_commit*) printf "%s\n" "$TEST_BOOKMARK";;'
+                 ' *) printf "9\n";; esac\n'),
+    }
+    for name, body in commands.items():
+        path = shim / name
+        path.write_text(body)
+        path.chmod(0o755)
+    for sync_rc, bookmark, expected_ok, expected_queries in (
+            (17, "current", False, 0),
+            (0, "stale", False, 1),
+            (0, "current", True, 2)):
+        gmarker, pmarker = tmp_path / "gbrain.calls", tmp_path / "psql.calls"
+        gmarker.write_text("")
+        pmarker.write_text("")
+        env = dict(os.environ, PATH=str(shim) + os.pathsep + os.environ["PATH"],
+                   SYNC_RC=str(sync_rc), TEST_HEAD="current", TEST_BOOKMARK=bookmark,
+                   GBRAIN_MARKER=str(gmarker), PSQL_MARKER=str(pmarker))
+        result = subprocess.run(["bash", "-c", script], env=env, capture_output=True,
+                                text=True, timeout=10)
+        assert (result.returncode == 0) is expected_ok
+        assert gmarker.read_text().count("sync") == 1
+        assert pmarker.read_text().count("query") == expected_queries
+        assert ("brain-index pages=" in result.stdout) is expected_ok
 
 
 def test_brain_index_sources_add_idempotent(tmp_path, monkeypatch):

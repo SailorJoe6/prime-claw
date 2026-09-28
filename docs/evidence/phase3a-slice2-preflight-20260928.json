@@ -1,0 +1,63 @@
+{
+  "host_exact_model_probe": {
+    "dimensions": 4096,
+    "dimensions_field": "omitted",
+    "ok": true,
+    "requested_model": "Qwen3-Embedding-8B",
+    "status": 200
+  },
+  "owner_gate": "Joe confirmed the private Qwen service ready; this is operator clearance only, measured health appears below.",
+  "policy": {
+    "candidate_applied_and_verified": true,
+    "canonical_after_exactly_matches_before": true,
+    "canonical_before_sha256": "df716b2cd9d91d02417cc6a96f535be481e7768fe6a8b7df80b316f93489a321",
+    "canonical_home_route_absent": true
+  },
+  "preflight_database": {
+    "candidate": {
+      "bookmark_present": false,
+      "chunks": 3029,
+      "max_dimensions": 4096,
+      "min_dimensions": 4096,
+      "null_vectors": 0,
+      "pages": 1057,
+      "unacknowledged_preexisting_failures": 3
+    },
+    "canonical": {
+      "bookmark": "5a477eaa5b311b9b45324591dd308e83ddcd1ded",
+      "chunks": 3031,
+      "max_dimensions": 1536,
+      "min_dimensions": 1536,
+      "null_vectors": 0,
+      "pages": 1059
+    }
+  },
+  "safety": {
+    "active_gbrain_sync_processes_after": 0,
+    "active_gbrain_sync_processes_before": 0,
+    "candidate_build_started": false,
+    "credential_material_accessed": false,
+    "database_snapshots_unchanged_after_probes": true,
+    "endpoint_recorded": false
+  },
+  "sandbox_exact_model_probe": {
+    "dimensions": 4096,
+    "dimensions_field": "omitted",
+    "ok": true,
+    "requested_model": "Qwen3-Embedding-8B",
+    "status": 200
+  },
+  "scope": "Phase 3a Slice 2 bounded host-then-sandbox exact-model preflight; no candidate build or cutover claimed by this artifact",
+  "source": {
+    "checkout_clean": true,
+    "expected_accepted_receipt": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "live_remote_main": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "sandbox_head": "5c47c067e93eb633da8a8dcb28221e23eea7685b"
+  },
+  "source_dry_run": {
+    "command": "gbrain sync --source brain --full --no-pull --no-extract --dry-run --yes (candidate GBRAIN_HOME; read-only)",
+    "eligible_markdown_files": 1117,
+    "exit": 0
+  },
+  "timestamp_utc": "2026-09-28T22:31:01.728797+00:00"
+}
