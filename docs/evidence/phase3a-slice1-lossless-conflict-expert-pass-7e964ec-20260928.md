@@ -1,0 +1,24 @@
+PASS — no material finding remains against the bounded owner resolution proposal for the inspected source objects.
+
+Subject: pushed EPISODE commit `7e964ec41e6ead3fec3abb1d83b2506195360da0`, parent `3e1fb5f4aa997e0e40bab20081e603375ebf2a22`. Candidate HEAD and its origin tracking ref both match; worktree is clean. The supplied [sanitized report](docs/evidence/phase3a-slice1-brain-git-conflict-20260927.json) matches SHA256 `3bda41ee139db94fd20d0b80182438e715d5e7b831fa84a7a3b818b91b216c85`. The candidate changes only the blocked plan/spec, current documentation, and evidence. Its conflict stop respects the approved narrow exception.
+
+Independent source proof (read-only, existing authorized sandbox):
+- Before and after review, clean source HEAD/main = `5dde0012eadf1df7c3e9c83d228e2d0d31f36695`; fetched origin/main = `0d19316b3ab5e20f0338f6f3114a20b36c8088d8`. Parent chains independently establish common base `5a477eaa5b311b9b45324591dd308e83ddcd1ded`, one local-only commit, and 16 remote-only commits. Remote changes total 303 paths: 82 added, 25 deleted, 196 modified. Exactly one of the two locally repaired paths overlaps.
+- Page A: local removes only the second occurrence of two byte-identical `doc_id` lines. Remote removes that same occurrence; the first occurrence and canonical value are identical in local and remote. Thus it is an identical duplicate, not a competing ID choice. Both local and remote frontmatter pass independent strict YAML checks. Remote changes only `last_fetched` and `last_checked_comments` values in the remaining metadata; both are chronologically newer. Remote preserves every original body line and adds 41 lines. Keeping Page A byte-for-byte from remote therefore preserves the entire local repair AND all remote additions.
+- Page B: base and remote are byte-identical, with no Page B changes in any of the 16 remote-only commits. Both have invalid YAML. The local repair only moves the empty sequence onto the `relations.projects` key line by removing a newline and one space. Local YAML parses correctly as an empty sequence, and the body is byte-identical. File modes remain unchanged.
+- All six inspected page blobs were verified against their Git object IDs. No private page paths, values, or content are reproduced here.
+
+Expected reconciliation fingerprint:
+- Page A must remain remote blob `ed79e35d74cf00c19073d6f2cf92e9cc72de24ab`.
+- Page B must become repaired blob `7e7144950e480d30bf7b700605eec502c763d267` (base/remote blob `e4584ca2e670d25d8ceb846db1c208e358ff4212`).
+- The resulting tree must differ from the rechecked remote tree ONLY at Page B, without mode changes. This preserves all 303 remote path changes, including deletions.
+
+Resolution recommendation: keep remote Page A unchanged and replay only Page B's proven repair onto a descendant of the rechecked remote main. Retain a durable reference to the original local repair commit; do not discard it through reset or destructive rewrite. No new content/product choice is needed on this evidence. The owning conversation must still record this exact resolution and authorize resumption under the existing conflict-stop gate. This review does not itself grant that authority.
+
+Required execution gates/tests (not performed or waived by this review):
+- Positive: remote identity still matches the reviewed SHA; resulting ancestry contains that remote tip; exactly the expected Page B-only tree delta; Page A blob unchanged; both pages pass the intended source/frontmatter validator; clone is clean after the repair commit.
+- Negative: changed remote, different canonical `doc_id`, any Page A body/metadata loss, an extra changed path/mode, or failed YAML validation must stop publication. Do not use a whole-tree “ours/theirs” resolution or replay the complete old commit blindly.
+- Failure: renewed auth/transport/reset or non-fast-forward rejection must stop, preserve both histories and the repair, and produce no success receipt. No automatic retries, force, network/policy/credential workarounds, DB or Qwen work.
+- Replay: recognize the repaired Page B blob as already applied; do not duplicate the repair or resolve an uncertain prior push by pushing again. Read remote state first. Completion still needs the independent exact remote SHA receipt and later owner review.
+
+Limitations: I verified the fetched remote snapshot, not the live remote server; no fetch, remote probe, merge preview, reconciliation, push, native gbrain operation, DB/provider/policy/VPN action, or lifecycle mutation was performed. YAML checks were independent in-memory checks, not a claim of live gbrain/index acceptance. Historical reset cause remains UNKNOWN. This PASS approves neither source push, Slice 1 acceptance, scope change, nor merge.
