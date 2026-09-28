@@ -215,3 +215,11 @@ Git-only placeholder or URL setup cannot explain that shared failure; the
 upstream reset source remains unknown. See
 [`phase3a-slice1-context-investigation-20260927.json`](../evidence/phase3a-slice1-context-investigation-20260927.json).
 No brain-source remote receipt exists; do not begin Qwen work.
+
+On 2026-09-27, a VPN-off sandbox remote read and fetch succeeded, but the
+local two-file repair and 16 newer remote commits have one overlapping page.
+A nonmutating merge preview reported a content conflict. The repair remains
+local; no source push or receipt occurred. See the sanitized
+[`phase3a-slice1-brain-git-conflict-20260927.json`](../evidence/phase3a-slice1-brain-git-conflict-20260927.json)
+and blocked execution plan for the owner-review stop condition. This does not
+explain the historical allowed Git/L7 reset.

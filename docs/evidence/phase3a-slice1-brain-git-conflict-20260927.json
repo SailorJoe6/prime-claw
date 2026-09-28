@@ -1,0 +1,45 @@
+{
+  "authority": "active .ralph/plans/EXECUTION_PLAN.md Joe-approved narrow exception; historical allowed Git/L7 reset cause UNKNOWN",
+  "commands": [
+    "openshell sandbox exec -n prime-claw -- git -C /sandbox/brain status --porcelain",
+    "openshell sandbox exec -n prime-claw -- git -C /sandbox/brain rev-parse HEAD",
+    "openshell sandbox exec -n prime-claw -- git -C /sandbox/brain ls-remote origin refs/heads/main",
+    "openshell sandbox exec -n prime-claw -- git -C /sandbox/brain fetch --no-tags origin refs/heads/main:refs/remotes/origin/main",
+    "openshell sandbox exec -n prime-claw -- git -C /sandbox/brain merge-base HEAD refs/remotes/origin/main",
+    "openshell sandbox exec -n prime-claw -- git -C /sandbox/brain rev-list --left-right --count HEAD...refs/remotes/origin/main",
+    "openshell sandbox exec -n prime-claw -- git -C /sandbox/brain diff --name-status <merge-base> refs/remotes/origin/main",
+    "openshell sandbox exec -n prime-claw -- git -C /sandbox/brain diff --name-status <merge-base> HEAD",
+    "openshell sandbox exec -n prime-claw -- git -C /sandbox/brain merge-tree --write-tree --no-messages HEAD refs/remotes/origin/main"
+  ],
+  "comparison": {
+    "analysis": "Local deletes the obsolete doc_id frontmatter line. Remote also removes that line but updates nearby frontmatter fields and adds substantive body material. The merge algorithm reports a content conflict; remote cannot be substituted for the local repair without owner review. The other repaired page has no remote path overlap. No private page path or contents are recorded.",
+    "conflict_type": "content: same repaired page changed on both sides",
+    "decision_boundary": "Nontrivial content conflict plus 16 newer remote commits meets the plan stop condition; do not resolve, force, reset, or push by guess.",
+    "merge_base": "5a477eaa5b311b9b45324591dd308e83ddcd1ded",
+    "merge_tree_exit": 1,
+    "overlapping_changed_paths": 1,
+    "overlapping_path_sha256_prefix": "18e18723344a322a",
+    "unmerged_stages": 3
+  },
+  "local": {
+    "checkout_clean_before_and_after": true,
+    "head": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695",
+    "local_only_commits": 1,
+    "repaired_paths_changed": 2
+  },
+  "observed_at_utc": "2026-09-28T15:59:57.877526+00:00",
+  "remote": {
+    "changed_paths": 303,
+    "fetched_tracking_ref": "0d19316b3ab5e20f0338f6f3114a20b36c8088d8",
+    "file_status_counts": {
+      "added": 82,
+      "deleted": 25,
+      "modified": 196
+    },
+    "read_head": "0d19316b3ab5e20f0338f6f3114a20b36c8088d8",
+    "remote_only_commits": 16
+  },
+  "scope": "Phase 3a Slice 1 Joe-approved safe personal brain Git source-publication attempt; stopped before reconciliation or source push",
+  "source_mutation": "No local HEAD, worktree, provider, policy, credential or database mutation. Read-only Git fetch updated origin/main tracking ref and merge-tree wrote unreferenced preview objects only. No source merge/rebase/cherry-pick or push.",
+  "unblock": "Owner reviews the exact collided page and newer remote work in the authorized sandbox, decides a lossless resolution preserving both remote additions and the validated frontmatter repair; separately authorizes resumption of this bounded source publication. Recheck remote movement, reconcile without force, validate both repaired files, push and independently verify exact SHA receipt. Stop on new reset/auth/transport or ambiguity. No Qwen/Slice2."
+}
