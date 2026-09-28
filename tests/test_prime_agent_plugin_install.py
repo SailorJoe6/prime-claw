@@ -17,6 +17,7 @@ APPLY = REPO / "scripts" / "apply-prime-agent-plugin.sh"
 CHECK = REPO / "scripts" / "check-prime-agent-plugin.sh"
 MANAGER = REPO / "scripts" / "manage-prime-agent-append-system.py"
 FILES = (
+    "extensions/goal-blocker-control.ts",
     "extensions/handoff-chain.ts",
     "extensions/reviewed-plan.ts",
     "extension-support/conversation-oversight.ts",

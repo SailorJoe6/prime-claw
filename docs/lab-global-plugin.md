@@ -12,6 +12,7 @@ project extension discovery path:
 src/prime-agent-plugin/
   APPEND_SYSTEM.md
   extensions/
+    goal-blocker-control.ts
     handoff-chain.ts
     reviewed-plan.ts
   extension-support/
@@ -28,6 +29,7 @@ The installed copy preserves the inner relative layout under
 ```text
 APPEND_SYSTEM.md  # managed block; unrelated content is preserved
 extensions/
+  goal-blocker-control.ts
   handoff-chain.ts
   reviewed-plan.ts
 extension-support/
@@ -60,11 +62,11 @@ scripts/apply-prime-agent-plugin.sh
 scripts/check-prime-agent-plugin.sh
 ```
 
-The apply script copies only the seven allowlisted Prime Claw TypeScript files. It
+The apply script copies only the eight allowlisted Prime Claw TypeScript files. It
 removes the one formerly managed obsolete `episode-finalization.ts` support file
 with the same destination-type safety checks, and does not remove or overwrite
 unrelated global extensions. The check script verifies that
-all seven installed TypeScript files match the inert builder source byte-for-byte and that
+all eight installed TypeScript files match the inert builder source byte-for-byte and that
 this repository has no project-local plugin tree. The same workflow merges and
 checks one managed CONVERSATION identity block in global `APPEND_SYSTEM.md`
 without overwriting unrelated user append content. APPEND updates hold a
@@ -110,14 +112,17 @@ Expected native commands:
 - `/plan`
 - `/implement-spec`
 
-Expected default identity resource:
+Expected default identity and work-control resources:
 
 - exactly one managed `PRIME_CLAW_CONVERSATION_IDENTITY_V1` block in `APPEND_SYSTEM.md`
+- bounded goal/heartbeat prompt guidelines from `goal-blocker-control.ts`
 - no explicit CONVERSATION launch flag
 - oversight hooks registered by the normally discovered `reviewed-plan.ts` entry
 
 Expected structured tools:
 
+- `pause_thread_goal`
+- `resume_thread_goal`
 - `ralph_handoff`
 - `ralph_plan`
 - `create_spec_episode`

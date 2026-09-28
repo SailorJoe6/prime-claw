@@ -323,9 +323,13 @@ removes every registered resource.
 ## Installation boundaries
 
 Builder sources remain inert under `src/prime-agent-plugin/`. The apply/check
-workflow manages seven TypeScript files plus one APPEND_SYSTEM block. Oversight
-registration is co-located with the normally discovered `reviewed-plan.ts` entry
-point; there is no redundant production `project-conversation.ts` entry. The
+workflow manages eight TypeScript files plus one APPEND_SYSTEM block. The managed
+`goal-blocker-control.ts` entry registers `pause_thread_goal` and
+`resume_thread_goal`; its prompt guidelines supply bounded goal and heartbeat
+control to every session that loads the plugin, independent of Ralph's execute
+skill. Oversight registration remains co-located with the normally discovered
+`reviewed-plan.ts` entry point; there is no redundant production
+`project-conversation.ts` entry. The
 `oversee-episode` skill remains project-local and is validated before apply; it
 is not copied into the global agent directory. `.agents/skills/oversee-episode`
 exposes that same canonical file through normal project skill discovery.

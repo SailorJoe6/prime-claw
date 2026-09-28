@@ -21,6 +21,13 @@ def test_execute_skill_enforces_one_small_complete_slice() -> None:
         assert fragment in text
 
 
+def test_execute_skill_defers_goal_and_heartbeat_control_to_plugin_context() -> None:
+    text = EXECUTE_SKILL.read_text()
+
+    for fragment in ("pause_thread_goal", "resume_thread_goal", "Set up a goal", "heartbeat"):
+        assert fragment not in text
+
+
 def test_agent_execute_skill_uses_canonical_definition() -> None:
     assert AGENT_SKILL.is_symlink()
     assert AGENT_SKILL.resolve() == EXECUTE_SKILL.parent.resolve()
