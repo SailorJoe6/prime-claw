@@ -221,5 +221,20 @@ local two-file repair and 16 newer remote commits have one overlapping page.
 A nonmutating merge preview reported a content conflict. The repair remains
 local; no source push or receipt occurred. See the sanitized
 [`phase3a-slice1-brain-git-conflict-20260927.json`](../evidence/phase3a-slice1-brain-git-conflict-20260927.json)
-and blocked execution plan for the owner-review stop condition. This does not
+and the execution plan's historical owner-review stop checkpoint. This does not
 explain the historical allowed Git/L7 reset.
+
+## 2026-09-28 Slice 1 personal brain source-publication candidate
+
+Joe accepted the reviewed, lossless Page A remote / Page B local resolution.
+The original sandbox repair remains available under its durable Git ref.
+The published descendant `5c47c067e93eb633da8a8dcb28221e23eea7685b`
+changes only Page B from the reviewed remote tip; Page A and all other remote
+paths stay intact. Both page frontmatters passed the source validator, the
+clone was clean, one non-force push succeeded, and an independent remote
+read returned this exact SHA. See
+[`phase3a-slice1-source-publication-20260928.json`](../evidence/phase3a-slice1-source-publication-20260928.json).
+This later receipt supersedes the earlier *pending publication* status above,
+not its transport/conflict evidence. The historical Git/L7 reset cause remains
+unknown. Slice 1 still requires independent owner acceptance before Qwen or
+Slice 2; no database, embedding, or routed-write acceptance is claimed.

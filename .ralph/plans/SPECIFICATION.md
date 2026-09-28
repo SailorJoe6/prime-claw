@@ -1,6 +1,6 @@
 # Specification — Finish the Phase 3a brain-hosting tracer bullet
 
-> **Status:** Operator-approved specification. Exact EPISODE Slice 1 is active under Joe's reviewed, bounded lossless personal brain Git resolution (2026-09-28). Historical reset cause remains UNKNOWN; source remote receipt and separate owner acceptance remain pending.
+> **Status:** Operator-approved specification. Exact EPISODE Slice 1 source-publication candidate has an independent remote SHA receipt (2026-09-28), but separate owner review/acceptance remains pending. Historical reset cause remains UNKNOWN; no Qwen/Slice 2 has begun.
 > **Tracking:** `prime-claw-zwg`; operator-local embedding prerequisite `prime-claw-zwg.5`; routed write `prime-claw-zwg.4`.
 > **History:** `.ralph/plans/archive/phase3a-bufd-superseded-incomplete/` preserves the incomplete, superseded four-document BUFD bundle. It records prior reasoning, not a second active implementation plan.
 

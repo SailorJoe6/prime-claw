@@ -1,0 +1,78 @@
+{
+  "approval": "Joe-approved narrow source-publication exception and owner-accepted fresh EXPERT PASS at docs/evidence/phase3a-slice1-lossless-conflict-expert-pass-7e964ec-20260928.md",
+  "limits": "No Qwen, database/index sync or cutover, routed write, network repair, VPN/Hermes, credential/provider/policy/restart change. Historical allowed Git/L7 reset cause remains UNKNOWN; current successful Git transaction does not identify it. Owner must separately review/accept Slice 1 before Slice 2.",
+  "observed_at_utc": "2026-09-28T18:29:38.186998+00:00",
+  "original_local_repair": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695",
+  "original_repair_durable_ref": "refs/heads/phase3a-slice1-original-repair",
+  "original_repair_ref_verified": true,
+  "previous_remote_main": "0d19316b3ab5e20f0338f6f3114a20b36c8088d8",
+  "publication": {
+    "candidate_commit": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "exact_remote_sha_receipt": true,
+    "independent_post_push_ls_remote_exit": 0,
+    "independent_post_push_remote_main": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "pre_push_live_remote_main": "0d19316b3ab5e20f0338f6f3114a20b36c8088d8",
+    "push": "one non-force git push origin HEAD:refs/heads/main",
+    "push_exit": 0
+  },
+  "reconciliation": {
+    "method": "New branch from reviewed remote tip; stage only the validated Page B blob from preserved local repair; one descendant commit. No merge, force, reset, whole-tree replay, or extra path/mode change.",
+    "page_a_and_b_mode": "100644",
+    "page_a_path_sha256_prefix": "18e18723344a322a",
+    "page_a_remote_and_result_blob": "ed79e35d74cf00c19073d6f2cf92e9cc72de24ab",
+    "page_b_path_sha256_prefix": "58a2d21f378e48ca",
+    "page_b_previous_remote_blob": "e4584ca2e670d25d8ceb846db1c208e358ff4212",
+    "page_b_result_blob": "7e7144950e480d30bf7b700605eec502c763d267",
+    "result_ancestry_contains_reviewed_remote": true,
+    "result_parent_is_reviewed_remote": true,
+    "result_tree_delta_vs_remote": {
+      "changed_paths": 1,
+      "mode_changes": 0,
+      "only_page_b": true
+    }
+  },
+  "reproduce": {
+    "note": "Write commands are provenance only. Do not repeat the publication to validate its receipt.",
+    "read": [
+      "git -C /sandbox/brain ls-remote origin refs/heads/main",
+      "git -C /sandbox/brain rev-parse HEAD",
+      "git -C /sandbox/brain rev-parse refs/heads/phase3a-slice1-original-repair",
+      "git -C /sandbox/brain rev-parse HEAD^",
+      "git -C /sandbox/brain merge-base --is-ancestor <reviewed-remote> HEAD",
+      "git -C /sandbox/brain diff --raw <reviewed-remote> HEAD",
+      "git -C /sandbox/brain ls-tree HEAD -- <Page A or B>",
+      "gbrain frontmatter validate /sandbox/brain/<Page A or B> --json",
+      "git -C /sandbox/brain status --porcelain"
+    ],
+    "scope": "Run only in existing authorized sandbox with no credential material on disk; substitute private Page A/B paths locally, do not publish them.",
+    "write_already_completed": [
+      "git -C /sandbox/brain update-ref refs/heads/phase3a-slice1-original-repair <original-repair> <zero-ref>",
+      "git -C /sandbox/brain switch --no-track -c phase3a-slice1-source-publication refs/remotes/origin/main",
+      "git -C /sandbox/brain checkout <original-repair> -- <Page B>",
+      "git -C /sandbox/brain commit -m \"fix: preserve validated brain frontmatter on current source\"",
+      "git -C /sandbox/brain push origin HEAD:refs/heads/main"
+    ]
+  },
+  "scope": "Approved Phase 3a Slice 1 lossless personal brain source publication only; candidate pending separate owner acceptance",
+  "shared_base": "5a477eaa5b311b9b45324591dd308e83ddcd1ded",
+  "validation": {
+    "active_gbrain_sync_or_build_processes_observed": 0,
+    "gbrain_frontmatter_validate_read_only_json": {
+      "page_a": {
+        "exit": 0,
+        "files_with_errors": 0,
+        "ok": true
+      },
+      "page_b": {
+        "exit": 0,
+        "files_with_errors": 0,
+        "ok": true
+      }
+    },
+    "gbrain_status_read_only_exit": 0,
+    "original_local_repair_ref_intact": true,
+    "sandbox_checkout_clean_before_and_after": true,
+    "source_update_did_not_change_databases": true,
+    "strict_yaml": "Previously independently validated by fresh EXPERT against these exact blob IDs; native gbrain source validation rerun on resulting checkout before publication."
+  }
+}
