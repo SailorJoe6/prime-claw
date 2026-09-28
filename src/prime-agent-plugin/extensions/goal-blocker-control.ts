@@ -68,7 +68,7 @@ export default function goalBlockerControl(pi: ExtensionAPI) {
       additionalProperties: false,
     } as any,
     async execute() {
-      pi.sendUserMessage("/goal resume", { deliverAs: "followUp" });
+      pi.sendUserMessage("/goal resume", { deliverAs: "steer" });
       return {
         content: [
           { type: "text", text: "Queued native /goal resume at the next safe session boundary." },

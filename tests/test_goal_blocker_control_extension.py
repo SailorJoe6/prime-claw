@@ -23,10 +23,12 @@ def test_goal_blocker_control_supports_background_waits_and_human_blockers() -> 
         "background work finishes",
         "externally blocked",
         'pi.sendUserMessage("/goal pause", { deliverAs: "steer" })',
-        'pi.sendUserMessage("/goal resume", { deliverAs: "followUp" })',
+        'pi.sendUserMessage("/goal resume", { deliverAs: "steer" })',
     ):
         assert fragment in text
 
+    assert text.count('deliverAs: "steer"') == 2
+    assert 'deliverAs: "followUp"' not in text
     assert "thread_goal_state" in text
     assert "private AgentSession methods" in text
     assert 'from "typebox"' not in text
