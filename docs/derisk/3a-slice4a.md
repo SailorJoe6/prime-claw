@@ -236,5 +236,20 @@ read returned this exact SHA. See
 [`phase3a-slice1-source-publication-20260928.json`](../evidence/phase3a-slice1-source-publication-20260928.json).
 This later receipt supersedes the earlier *pending publication* status above,
 not its transport/conflict evidence. The historical Git/L7 reset cause remains
-unknown. Slice 1 still requires independent owner acceptance before Qwen or
-Slice 2; no database, embedding, or routed-write acceptance is claimed.
+unknown. At this candidate checkpoint, Slice 1 still required independent
+owner acceptance before Qwen or Slice 2; no database, embedding, or
+routed-write acceptance was claimed.
+
+## 2026-09-28 owner acceptance of Slice 1 source publication
+
+This owner independently verified live brain remote `5c47c067e93eb633da8a8dcb28221e23eea7685b`
+and clean pushed project candidate `7265229207706a954e4c2d4c1489129ff0d9b3ec`, including
+the approved one-page-only descendant, preserved original repair, and both
+native frontmatter checks. A fresh exact-commit EXPERT returned PASS with no
+material findings; its complete report is
+[`phase3a-slice1-source-publication-expert-pass-7265229-20260928.md`](../evidence/phase3a-slice1-source-publication-expert-pass-7265229-20260928.md)
+(pushed report-only checkpoint `ca5c1ca7f6f56edb0eb50317668bba83ec705c5b`).
+**Slice 1 safe brain-source publication is accepted on those exact identities.**
+No Qwen/4096d index, database cutover, routed write, historical reset cause,
+or terminal EPISODE completion is accepted. Slice 2 remains conditional on
+its approved private-service clearance and bounded preflight gates.
