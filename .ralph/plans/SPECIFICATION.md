@@ -1,6 +1,6 @@
 # Specification — Finish the Phase 3a brain-hosting tracer bullet
 
-> **Status:** Operator-approved specification. Exact EPISODE Slice 1 remains blocked after the documentation-first investigation (2026-09-27); brain-source remote receipt remains pending.
+> **Status:** Operator-approved specification. Exact EPISODE Slice 1 is active under Joe's narrow personal brain-source publication exception (2026-09-27); historical reset cause remains UNKNOWN, and brain-source remote receipt remains pending.
 > **Tracking:** `prime-claw-zwg`; operator-local embedding prerequisite `prime-claw-zwg.5`; routed write `prime-claw-zwg.4`.
 > **History:** `.ralph/plans/archive/phase3a-bufd-superseded-incomplete/` preserves the incomplete, superseded four-document BUFD bundle. It records prior reasoning, not a second active implementation plan.
 
@@ -30,7 +30,7 @@ The operator's 4096-dimensional Qwen candidate is partial, not accepted. The las
 - Real inference and Git credentials stay in host-side OpenShell providers; the sandbox carries only placeholders. Never copy host `auth.json`, inspect credential stores, or write secrets into the brain clone. Use the OpenShell gateway, not NemoClaw.
 - The private Qwen endpoint exists only in ignored local configuration and must not appear in tracked code, evidence, logs, or this specification. Candidate egress policy permits only that configured host/port and restores canonical policy afterward. The candidate and canonical databases remain isolated; no in-place vector migration or premature cutover is acceptable. Keep the single established OpenShell gateway (17670).
 - Do not use `--skip-failed` or silently drop source files to reach a bookmark. Preserve both databases when provider, source, transport, or validation checks fail. Do not issue a second build while one is running.
-- Implementation must respect the operator's approval boundaries: this specification permits neither new episode resources nor a change to product scope, cutover criteria, or rollback contract.
+- Implementation must respect the operator's approval boundaries: this specification permits neither new episode resources nor a change to product scope, cutover criteria, or rollback contract. Joe's narrow Slice 1 exception allows safe non-force reconciliation and source publication while the historical reset cause remains UNKNOWN, after a current sandbox remote read succeeded. It does not authorize force, destructive rewrite, speculative network repair, credential/policy/VPN/Hermes changes, Qwen/Slice 2, or claiming completion without an independent exact remote receipt and owner review. Stop on conflict, remote movement, renewed transport/auth failure, or uncertain evidence; preserve the unpublished repair and newer remote work.
 
 ## Outside this specification
 
