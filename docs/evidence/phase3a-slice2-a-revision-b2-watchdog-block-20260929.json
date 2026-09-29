@@ -1,0 +1,32 @@
+{
+  "no_write_b2_diagnostic": {
+    "captured_output": "watchdog printed no durable DB progress; subprocess still timed out under pytest",
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q -p no:cacheprovider tests/test_embedding_candidate_build.py::test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero",
+    "exit_code": 1,
+    "independent_cause": "UNKNOWN. The group/process snapshot and timeout show the original group was created, but do not distinguish signal delivery/teardown failure from a descendant retaining captured pipe handles. No code or test harness change was attempted.",
+    "prior_expert_result": "same test timed out under pytest in full focused selection (62 passed, 1 failed, 3 warnings), and isolated pytest timed out; a direct function invocation passed",
+    "private_raw_log_sha256": "90d98a9bdd683245022eafeac687a93201022a31f39f0907e87c328d07e0657f",
+    "process_tree_snapshot": "Pytest Python launched a bash process, then an isolated setsid Bash process group (group leader PGID equals leader PID) with a Bash descendant and sleep descendants while the test was running. After pytest failure and test-owned finally cleanup, the sampled original group/descendants were absent; this does not prove watchdog cleanup succeeded before the timeout.",
+    "raw_log_published": false,
+    "rerun_until_green": false,
+    "result": "1 failed, 1 warning in 15.15s; test subprocess.TimeoutExpired after its unchanged 15-second watchdog bound",
+    "test_selection_or_assertion_relaxed": false,
+    "timeout_inflated": false
+  },
+  "observed_at_utc": "2026-09-29T22:46:44.961864+00:00",
+  "schema": "phase3a-slice2-a-revision-b2-fail-closed-v1",
+  "scope": "Owner-accepted A revision at clean pushed project 67f0f9cf08a2c5f56c458e85400585003365ba8f; old independent EXPERT BLOCK remains substantive.",
+  "source_guards": {
+    "accepted_active_checkout": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "brain_source_push": false,
+    "exact_remote_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "index_build_cutover_routed_write_qwen_retry": false,
+    "new_brain_source_ref_or_commit": false,
+    "old_candidate_parent": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "old_local_review_commit": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "old_local_review_ref": "refs/heads/phase3a-slice2-b695-frontmatter-20-candidate",
+    "remote_ref_clean_checkout_no_sync_policy_both_database_snapshots_before_and_after": true
+  },
+  "status": "BLOCKED_SAFE_NO_NEW_CANDIDATE",
+  "stop_condition": "A required focused watchdog test reproduced a failure. Do not prepare a new candidate or claim a reproducibly green required suite. Keep exact A metadata decision recorded, old local candidate unchanged and Slice 2 blocked. Ask owner for a separate bounded code/test-harness repair authorization or a validated in-scope diagnostic that resolves the cause; do not waive the test. Once repaired, repeat fresh gates and the approved A revision proof."
+}

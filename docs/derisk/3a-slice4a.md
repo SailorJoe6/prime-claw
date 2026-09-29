@@ -445,3 +445,16 @@ timeout is still a blocker; no code repair, skip, timeout inflation, source
 publication, index/build, cutover or routed write is authorized by A.
 New validation, reproducible focused tests, fresh EXPERT PASS, and owner
 acceptance must precede any separate non-force publication decision.
+
+## 2026-09-29 A revision blocked by independent B2 reproduction
+
+The [sanitized no-write watchdog receipt](../evidence/phase3a-slice2-a-revision-b2-watchdog-block-20260929.json)
+records one isolated pytest run that timed out after the test's unchanged
+15-second subprocess bound. A process-tree snapshot confirmed an isolated
+worker group and descendants while the test ran. It did not establish
+whether the worker signal or captured-pipe cleanup failed. The prior EXPERT
+reported the same timeout in its focused selection and isolated run. This
+pass stopped without a new source candidate, code/test edits, brain push,
+index/build, or cutover. Joe's A metadata decision remains approved for a
+later separately gated candidate pass. Do not treat an earlier 63-pass run
+as a reproducibly green B2 gate.
