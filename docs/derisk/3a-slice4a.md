@@ -478,3 +478,26 @@ original unaccepted local candidate unchanged. No code/test timeout or
 assertion change, source publication, database/policy mutation, index/build,
 cutover or routed write occurred. The required B2 gate remains red and
 Joe's approved A metadata rule remains pending a *new* source candidate.
+
+## 2026-09-29 Joe authorized narrow B2 safety-gate repair
+
+Joe approved moving Phase 3a forward after the owner explained the required
+offline watchdog stall test and asked to broaden the former frontmatter-only
+scope for a **bounded root-cause diagnosis and minimal code/test-harness
+repair**. The approval does not waive the test, raise its timeout, weaken
+assertions, permit retries until green, or authorize a brain source push,
+index/build, cutover or routed write. The exact cause remains UNKNOWN:
+prior synthetic probes found the outer shell and isolated worker group live
+at the unchanged 15-second limit, while a separate primitive-only Bash
+negative-PGID TERM signal succeeded. Those results narrow hypotheses but
+are not a required-test pass.
+
+Next, prove the watchdog teardown fault through one bounded offline
+instrumented diagnostic; repair only the evidenced lifecycle seam, retain
+full stalled-worker and descendant-cleanup assertions, then rerun the
+required focused no-write selection without skips. A fresh independent
+EXPERT and owner review are needed on the project repair. Only after B2 is
+reproducibly green may the exact-20 Joe-A brain frontmatter candidate be
+prepared locally and separately reviewed. The old `1c97c409f005366aca132f5ff68c1a8c23483cc3`
+source candidate remains unaccepted and unpushed; remote main remains
+`b695658b8271f4541e47b87f62c5b14c19075528`.
