@@ -1,0 +1,78 @@
+.......F.......................................................          [100%]
+=================================== FAILURES ===================================
+____ test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero _____
+
+tmp_path = PosixPath('/Users/jlanders/.prime/agent/session-artifacts/01a08d45-2530-7042-9b25-132a01919d01/sub-69f4e860/expert-review-d875c81/pytest-tmp/test_candidate_progress_watchd0')
+
+    def test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero(tmp_path):
+        leader_pid_file = tmp_path / "sync.pid"
+        descendant_pid_file = tmp_path / "descendant.pid"
+        progress_file = tmp_path / "progress"
+        progress_file.write_text("steady")
+        descendant = (
+            "trap '' HUP INT TERM; "
+            f"echo $$ > {shlex.quote(str(descendant_pid_file))}; "
+            "while :; do sleep 1; done"
+        )
+        worker = (
+            "bash -c " + shlex.quote(descendant) + " & "
+            f"echo $$ > {shlex.quote(str(leader_pid_file))}; "
+            "trap 'exit 0' TERM; while :; do sleep 1; done"
+        )
+        fragment = pc._candidate_progress_watchdog_script(
+            "bash -c " + shlex.quote(worker),
+            "cat " + shlex.quote(str(progress_file)),
+            stall_seconds=1,
+            poll_seconds=1,
+            term_grace_seconds=1,
+        )
+
+        try:
+>           result = subprocess.run(
+                ["bash", "-c", "set -euo pipefail\n" + fragment],
+                text=True,
+                capture_output=True,
+                timeout=15,
+                env=_watchdog_test_env(tmp_path),
+            )
+
+tests/test_embedding_candidate_build.py:170:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:557: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:1221: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:2154: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Popen: returncode: -9 args: ['bash', '-c', 'set -euo pipefail\ncommand -v s...>
+endtime = 1232533.09997775, orig_timeout = 15, stdout_seq = []
+stderr_seq = [b'[prime-claw candidate-progress-watchdog] no durable candidate DB progress for 1s; terminating isolated sync\n']
+skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() > endtime:
+>           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['bash', '-c', 'set -euo pipefail\ncommand -v setsid >/dev/null\nprogress_snapshot() { cat /Users/jlanders/.prime/agent/session-artifacts/01a08d45-2530-7042-9b25-132a01919d01/sub-69f4e860/expert-review-d875c81/pytest-tmp/test_candidate_progress_watchd0/progress; }\nSYNC_STALL_SECONDS=1\nSYNC_POLL_SECONDS=1\nSYNC_TERM_GRACE_SECONDS=1\nLAST_PROGRESS=$(progress_snapshot)\nLAST_PROGRESS_AT=$(date +%s)\nWATCHDOG_STATE=$(mktemp /tmp/prime-claw-candidate-watchdog.XXXXXX)\nsetsid bash -c \'bash -c \'"\'"\'trap \'"\'"\'"\'"\'"\'"\'"\'"\'\'"\'"\'"\'"\'"\'"\'"\'"\' HUP INT TERM; echo $$ > /Users/jlanders/.prime/agent/session-artifacts/01a08d45-2530-7042-9b25-132a01919d01/sub-69f4e860/expert-review-d875c81/pytest-tmp/test_candidate_progress_watchd0/descendant.pid; while :; do sleep 1; done\'"\'"\' & echo $$ > /Users/jlanders/.prime/agent/session-artifacts/01a08d45-2530-7042-9b25-132a01919d01/sub-69f4e860/expert-review-d875c81/pytest-tmp/test_candidate_progress_watchd0/sync.pid; trap \'"\'"\'exit 0\'"\'"\' TERM; while :; do sleep 1; done\' &\nSYNC_PID=$!\nsignal_candidate_sync() { kill -"$1" -- "-$SYNC_PID" 2>/dev/null || true; }\ncandidate_sync_group_alive() { kill -0 -- "-$SYNC_PID" 2>/dev/null; }\nterminate_candidate_sync() {\n  signal_candidate_sync TERM\n  for _ in $(seq 1 "$SYNC_TERM_GRACE_SECONDS"); do candidate_sync_group_alive || break; sleep 1; done\n  if candidate_sync_group_alive; then signal_candidate_sync KILL; fi\n  return 0\n}\n(\n  while kill -0 "$SYNC_PID" 2>/dev/null; do\n    sleep "$SYNC_POLL_SECONDS"\n    CURRENT_PROGRESS=$(progress_snapshot 2>/dev/null || true)\n    NOW=$(date +%s)\n    if [ -n "$CURRENT_PROGRESS" ] && [ "$CURRENT_PROGRESS" != "$LAST_PROGRESS" ]; then\n      LAST_PROGRESS="$CURRENT_PROGRESS"\n      LAST_PROGRESS_AT=$NOW\n    elif [ $((NOW - LAST_PROGRESS_AT)) -ge "$SYNC_STALL_SECONDS" ]; then\n      printf stalled > "$WATCHDOG_STATE"\n      echo "[prime-claw candidate-progress-watchdog] no durable candidate DB progress for ${SYNC_STALL_SECONDS}s; terminating isolated sync" >&2\n      terminate_candidate_sync\n      exit 0\n    fi\n  done\n) &\nWATCHDOG_PID=$!\ncleanup_candidate_watchdog() { kill "$WATCHDOG_PID" 2>/dev/null || true; wait "$WATCHDOG_PID" 2>/dev/null || true; rm -f "$WATCHDOG_STATE"; }\nhandle_candidate_signal() { terminate_candidate_sync; cleanup_candidate_watchdog; wait "$SYNC_PID" 2>/dev/null || true; exit 143; }\ntrap cleanup_candidate_watchdog EXIT\ntrap handle_candidate_signal HUP INT TERM\nset +e\nwait "$SYNC_PID"\nSYNC_RC=$?\nset -e\nWATCHDOG_RESULT=$(cat "$WATCHDOG_STATE" 2>/dev/null || true)\nterminate_candidate_sync\ncleanup_candidate_watchdog\ntrap - EXIT HUP INT TERM\n[ "$WATCHDOG_RESULT" != stalled ] || exit 124\n[ "$SYNC_RC" -eq 0 ] || exit "$SYNC_RC"\n']' timed out after 15 seconds
+
+/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:1268: TimeoutExpired
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:533
+<frozen importlib._bootstrap>:533
+<frozen importlib._bootstrap>:533
+  <frozen importlib._bootstrap>:533: DeprecationWarning: the load_module() method is deprecated and slated for removal in Python 3.15; use exec_module() instead
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_embedding_candidate_build.py::test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero
+1 failed, 62 passed, 3 warnings in 22.46s

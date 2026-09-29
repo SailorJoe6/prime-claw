@@ -389,3 +389,40 @@ matched brain title differs from its malformed source text. The candidate
 is neither published nor accepted. Fresh independent EXPERT and owner review
 are required before a separate gated brain publication, index/build, or
 cutover. No full maintained-suite pass is claimed.
+
+## 2026-09-29 independent EXPERT BLOCK on exact candidate
+
+The fresh [EXPERT BLOCK report](../evidence/phase3a-slice2-frontmatter-expert-block-d875c81-20260929.md)
+(SHA-256 `1d8c70dd29c05274870bbf24d8585effdaa9c1355e3cde9218afd660e1dd4e41`),
+[structured evidence](../evidence/phase3a-slice2-frontmatter-expert-block-d875c81-20260929.json)
+(SHA-256 `fde0f12c6d978de82a5466c21a474bf29bacb60e2cf603861a9b965f05498768`),
+and [focused test log display copy](../evidence/phase3a-slice2-frontmatter-expert-block-focused-tests-d875c81-20260929.txt)
+(SHA-256 `05b7849bb765db0c6390151dd3d432795a83f379ee130c63c905ebb85a53bc0a`)
+are tracked. The report and structured evidence are byte-exact copies; the
+reviewer-owned raw log SHA-256 remains `6b894a3bda2ffdc20335b1c15ccecfdd12b0df06c4d21cdd0b8fa7638f5539a7`.
+The display copy only trims four trailing-whitespace lines for repository
+`git diff --check`. The reviewer independently confirmed exact-20-only
+byte-preserved headers, native zero-error full-source validation, and unpushed
+source. These syntax/content checks are not candidate acceptance.
+
+**B1:** The YAML_PARSE page's original malformed header has explicit simple
+title **and type** values. Both differ materially from the new header, whose
+values resemble parser defaults. A content-matched gbrain page does not prove
+metadata intent; the identical copy in another source group adds provenance
+ambiguity. Joe must choose the exact two-field precedence: preserve the Git
+values in the new header (EXPERT recommendation) or knowingly prefer the
+work-gbrain values and accept changed title/type semantics. The old Markdown
+bytes remain unchanged under either option. No decision is inferred.
+
+**B2:** The reviewer reran the required focused no-write selection and got
+62 passed, one watchdog-stall pytest timeout, and three warnings, despite the
+episode's prior 63-pass run. An isolated pytest run timed out; direct function
+invocation passed. Root cause is unproven. Bounded read-only diagnosis may
+separate platform/harness behavior from code; a code fix or waiver is not
+within this frontmatter-only repair grant. Never skip the test, increase its
+timeout to hide failure, or rerun until green.
+
+The candidate remains local/unpushed and unaccepted; source-current Slice 2
+remains blocked. No brain publication, Qwen retry, index, build, cutover or
+routed write. Fresh EXPERT and owner review are required after any material
+repair, plus the independent test gate before publication.
