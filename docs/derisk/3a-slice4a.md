@@ -426,3 +426,22 @@ The candidate remains local/unpushed and unaccepted; source-current Slice 2
 remains blocked. No brain publication, Qwen retry, index, build, cutover or
 routed write. Fresh EXPERT and owner review are required after any material
 repair, plus the independent test gate before publication.
+
+## 2026-09-29 Joe chose A for the YAML_PARSE header pair
+
+Joe answered **“a”** to the explicit two-option EXPERT B1 question. The
+owner accepts **A**: a new valid prefix for the single YAML_PARSE file must
+use the explicit Git **title and type** already in that file's malformed
+header, not the conflicting work-gbrain fallback-looking values. The prior
+Markdown, including its old malformed header, remains byte-exact as the
+suffix. The other 19 frontmatter headers retain the previously reviewed
+matched gbrain metadata. This resolves the product-metadata choice only.
+
+The former `1c97c409f005366aca132f5ff68c1a8c23483cc3` candidate remains
+unpushed and unaccepted. The owner permits only an isolated local exact-20
+revision and bounded read-only B2 watchdog diagnosis within the approved
+frontmatter/test-gate scope. The independently observed focused pytest
+timeout is still a blocker; no code repair, skip, timeout inflation, source
+publication, index/build, cutover or routed write is authorized by A.
+New validation, reproducible focused tests, fresh EXPERT PASS, and owner
+acceptance must precede any separate non-force publication decision.
