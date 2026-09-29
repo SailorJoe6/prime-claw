@@ -1,0 +1,93 @@
+{
+  "authorization": "Owner-accepted exact ambiguity finding; in-scope private sandbox proof-first review under bounded repair grant. No source-edit permission is exercised unless all exact 20 pages are deterministic and body/identity safe.",
+  "before_after_safety": {
+    "active_checkout_clean_unchanged": true,
+    "both_db_snapshots_unchanged": true,
+    "brain_remote_push": false,
+    "brain_source_edits_or_candidate_ref": false,
+    "canonical_policy_unchanged": true,
+    "exact_remote_main_unchanged": true,
+    "inspection_tracking_main_repair_refs_unchanged": true,
+    "no_sync_process": true,
+    "qwen_retry_index_build_cutover_routed_write": false
+  },
+  "decision": {
+    "candidate_created": false,
+    "focused_candidate_tests": false,
+    "native_full_source_zero_error_validation": false,
+    "partial_source_edits": false,
+    "why_not_deterministic": "No explicit title/ID value is present in the leading content of any of 18 MISSING_OPEN pages. A first-H1 guess is not compelled by source conventions; 2 pages have multiple H1s. MISSING_CLOSE begins with a delimiter but has no metadata key before a line-3 H1; selecting header/body boundary and nonempty metadata is not provable. YAML_PARSE has a title key but three consecutive non-key/non-list lines in its header without a preceding block-scalar marker: whether to retain them as metadata or body is not provable. An automated rewrite would risk adding unapproved values or changing body/identity, violating all-20 proof."
+  },
+  "next_gate": "Owner chooses/supplies intent-preserving private-safe semantics; fresh exact remote/ref/checkout/policy/both DB/no-sync gates before any renewed isolated candidate attempt; independent EXPERT and owner review required before any later brain publication.",
+  "procedure": {
+    "boundary": "All raw page bytes/paths and native errors stayed inside the authorized OpenShell sandbox; only aggregate structural facts were returned. No in-repo or project copy of private raw content.",
+    "native_scratch_probes": "Prior immutable ambiguity receipt: empty-header native validation fails EMPTY_FRONTMATTER; first-H1-derived title passes syntax for one copy only; no proof of intended value or stable ID.",
+    "reproducible_safe_inputs": "Native no-fix report for exact b695 under sandbox scratch source; compare exact-20 code/path pairs, inspect first 60 lines, leading HTML comment and H1 positions, YAML delimiter/key/list/heading structure; compare simple normalized title/H1/stem equality in all native-valid pages; never use this heuristic as metadata intent proof."
+  },
+  "sanitized_findings": {
+    "missing_close": {
+      "first_h1_line": 3,
+      "id_key_before_h1": false,
+      "keys_before_h1": 0,
+      "nonkey_nonlist_before_h1": 0,
+      "title_key_before_h1": false,
+      "total_lines": 13,
+      "type": "MISSING_CLOSE"
+    },
+    "missing_open": {
+      "count": 18,
+      "first_h1_matches_file_stem_under_simple_normalization": 0,
+      "first_h1_prefix_matches_file_stem_under_simple_normalization": 0,
+      "h1_count_at_least_one": 18,
+      "h1_count_at_least_two": 2,
+      "heading_first": 2,
+      "leading_comment_has_explicit_title_or_id_key": 0,
+      "leading_html_comments_closed": 16,
+      "pre_h1_explicit_metadata_keys": 0
+    },
+    "valid_file_conventions_heuristic": {
+      "limitation": "Structural comparison does not prove intended metadata or page identity; simple string extraction is not a YAML/identity parser.",
+      "native_valid_files": 1169,
+      "simple_title_key_present": 1166,
+      "title_equals_filename_stem_simple_normalization": 877,
+      "title_equals_first_h1_simple_normalization": 601,
+      "with_frontmatter": 1169,
+      "with_h1": 676
+    },
+    "yaml_parse": {
+      "h1_after_header": false,
+      "has_id_key_in_header": false,
+      "has_title_key_in_header": true,
+      "header_content_lines": 19,
+      "nonkey_nonlist_consecutive": true,
+      "nonkey_nonlist_line_count": 3,
+      "previous_line_has_block_scalar_indicator": false,
+      "type": "YAML_PARSE"
+    }
+  },
+  "sanitized_semantic_alternatives_for_owner": [
+    "Approve or supply exact intended title/ID policy for each of the 18 headerless pages (including which heading is title on the two multiple-H1 pages) and identify an unchanged body boundary from existing content. A one-file syntax pass is insufficient.",
+    "Privately review the 13-line missing-close page inside the sandbox: identify whether the opening delimiter is intended metadata or body and which original bytes form the body; supply any nonempty metadata required without inventing values.",
+    "Privately review the YAML_PARSE header inside the sandbox: decide whether its three non-key/non-list lines belong to an existing YAML value or are body prose, and specify an exact byte-preserving syntax fix if possible.",
+    "If original body and page identity cannot be preserved for any file, pause this approved pass; request an explicit change to the migration/repair contract or source-author correction, then fresh review and validation. No skip-failed indexing is an alternative."
+  ],
+  "schema": "phase3a-slice2-private-proof-review-v1",
+  "source": {
+    "active_checkout_head": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "ambiguity_receipt": "docs/evidence/phase3a-slice2-repair-candidate-ambiguity-b695658b-20260929.json",
+    "ambiguity_receipt_sha256": "66268f4d404fd387e3d4c7a4d95a9bdaa82d4361751344d0716cf6153d29af32",
+    "exact_b695_archive_digest_confirmed": true,
+    "failure_codes": {
+      "MISSING_CLOSE": 1,
+      "MISSING_OPEN": 18,
+      "YAML_PARSE": 1
+    },
+    "local_main_and_original_repair_ref": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695",
+    "native_failure_receipt": "docs/evidence/phase3a-slice2-native-source-validation-b695658b-20260928.json",
+    "preexisting_failed_files": 20,
+    "sandbox_raw_report_sha256": "66fbfc2eeb772920f643af52abcab5c46c2b68c01519576f9b2c6b8e93793f69",
+    "target_remote_main": "b695658b8271f4541e47b87f62c5b14c19075528"
+  },
+  "status": "BLOCKED_SAFE_NO_CANDIDATE",
+  "timestamp_utc": "2026-09-29T19:10:22.123147+00:00"
+}

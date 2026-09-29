@@ -336,3 +336,17 @@ unchanged. No candidate, brain edit, index or build occurred. Joe must decide
 a private-safe metadata/syntax rule or authorize in-sandbox review before
 any new candidate attempt; independent EXPERT and owner acceptance still gate
 later source publication.
+
+## 2026-09-29 private proof-first review: no safe candidate
+
+The [sanitized private review receipt](../evidence/phase3a-slice2-private-proof-review-b695658b-20260929.json)
+shows that none of the 18 pages missing an opening header has an explicit
+leading title/ID value. The first H1 is not a universal title convention, and
+two pages have multiple H1s. The missing-close page has no metadata before
+its heading; the YAML parse failure has three lines whose status as metadata
+or body cannot be determined safely. The sandbox returned only aggregate
+results. All remote/ref/checkout/no-sync/policy/database gates passed before
+and after. No brain file was edited and no candidate was created. Joe must
+privately settle the exact value and body-boundary choices or authorize a
+separate scope change. Full-source native validation and candidate tests did
+not run because a safe candidate does not exist.
