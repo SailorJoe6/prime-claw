@@ -1,0 +1,46 @@
+{
+  "authorization": "Read-only ancestry/tree/mode assessment after one isolated fetch; do not rewrite checked-out HEAD, local main or origin-tracking branch; no reconciliation/build.",
+  "decision": "BLOCKED_SAFE_UNEXPECTED_TRACKING_REF_UPDATE",
+  "fetch": {
+    "attempts": 1,
+    "command": "git -C /sandbox/brain fetch --no-tags --no-write-fetch-head --no-recurse-submodules origin refs/heads/main:refs/inspection/phase3a-slice2-b695658b",
+    "configured_fetch_refspec": "+refs/heads/*:refs/remotes/origin/*",
+    "exit_code": 0,
+    "inspection_ref": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "unexpected_origin_tracking_advance": true
+  },
+  "limitation": "Immediate cause of this fetch boundary: configured remote.origin.fetch maps all heads to origin tracking, and Git updated origin/main during an explicit inspection-ref fetch. Historical Git/L7 reset cause remains UNKNOWN.",
+  "not_performed": [
+    "No history ancestry/tree/path/mode or source validation assessment",
+    "No checkout, reset, tracking-ref restoration, merge, rebase or brain push",
+    "No Qwen probe, index/build/cutover, DB/provider/policy/network/credential change or routed write"
+  ],
+  "owner_decision_needed": "Review unexpected origin/main ref advance; decide separately whether to permit further read-only assessment of already fetched b695 object and any ref-state restoration/reconciliation. Do not infer approval from safe-looking refs.",
+  "post_fetch": {
+    "canonical_and_candidate_db_snapshots_unchanged": true,
+    "checked_out_head": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "checkout_clean": true,
+    "inspection_ref": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "local_main": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695",
+    "origin_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "original_repair_ref": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695",
+    "policy_unchanged": true,
+    "remote_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "zero_gbrain_sync": true
+  },
+  "pre_fetch": {
+    "canonical_and_candidate_db_snapshots_unchanged": true,
+    "checked_out_head": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "checkout_clean": true,
+    "inspection_ref_absent": true,
+    "local_main": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695",
+    "moved_commit_absent_locally": true,
+    "origin_main": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "original_repair_ref": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695",
+    "policy_unchanged": true,
+    "remote_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "zero_gbrain_sync": true
+  },
+  "scope": "One owner-authorized bounded source-history inspection; halted at fetch ref boundary",
+  "timestamp_utc": "2026-09-29T00:13:28.583526+00:00"
+}

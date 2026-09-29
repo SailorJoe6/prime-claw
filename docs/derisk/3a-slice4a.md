@@ -277,3 +277,19 @@ and
 [`phase3a-slice2-source-movement-20260928.json`](../evidence/phase3a-slice2-source-movement-20260928.json).
 Owner-coordinated lossless source reconciliation and fresh gates are required
 before one preserved isolated build.
+
+## 2026-09-28 inspection fetch — unexpected origin tracking advance
+
+One owner-authorized source-history inspection passed fresh exact live remote,
+clean checkout, preserved original repair ref, no-sync and unchanged policy/DB
+gates. A single Git fetch obtained the exact moved commit in an isolated
+`refs/inspection/` ref, but Git also advanced `origin/main` to that commit
+under the existing wildcard remote fetch mapping. That violated the
+no-tracking-update limit. The checked-out HEAD remained clean at the accepted
+Slice 1 commit and local `main`/original repair ref remained intact. The
+inspection stopped before ancestry, tree/mode/path and source validation. No
+ref restoration, source merge/push, candidate build, cutover or routed write
+followed. See the sanitized
+[`phase3a-slice2-inspection-fetch-boundary-20260928.json`](../evidence/phase3a-slice2-inspection-fetch-boundary-20260928.json).
+Further read-only assessment or ref-state repair requires a separate owner
+decision; the historical Git/L7 reset cause is still unknown.
