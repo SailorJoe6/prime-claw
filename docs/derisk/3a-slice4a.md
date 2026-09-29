@@ -350,3 +350,28 @@ and after. No brain file was edited and no candidate was created. Joe must
 privately settle the exact value and body-boundary choices or authorize a
 separate scope change. Full-source native validation and candidate tests did
 not run because a safe candidate does not exist.
+
+## 2026-09-29 work-gbrain match and Joe's frontmatter-only correction
+
+The [sanitized read-only local work-gbrain get-page receipt](../evidence/phase3a-slice2-local-work-gbrain-get-page-20260929.json)
+records exact non-fuzzy `get` success for all 20 pages. On 19 pages every sampled
+source seven-word window appears in the returned page; the short missing-close
+page has 109/114 overlapping windows and a matching H1. All 20 returned pages
+have `type` and `title` frontmatter, no explicit `id`. Nineteen saved titles
+match the first H1; the remaining YAML_PARSE page's saved title differs from
+an explicit malformed-source title line. The local database demonstrates page
+presence and supplies candidate header values, not Git-source validity.
+
+Joe clarified that the repair is simply to add gbrain-compliant frontmatter
+to the exact 20 Markdown files. The next isolated candidate may prefix the
+matched work-gbrain `type`/`title`, preserving every original Markdown byte as
+the new file's suffix; paths remain unchanged and no ID is invented. For the
+YAML title conflict, the owner-selected candidate tactic uses the matched
+gbrain title in the new header and leaves the old source line untouched below
+it; a material page-identity change still stops publication. This **changes the prior intent-proof
+contract for candidate preparation**, not the requirements for exact-20-only
+diff, native full-source zero-error validation, no-write checks, independent
+EXPERT/owner acceptance, or later non-force remote publication. No candidate,
+brain source edit, index, build, cutover, or routed write exists yet. Stop if
+the prefix-only rule fails validation or identity/preservation proof; do not
+silently expand into content editing or skipping errors.
