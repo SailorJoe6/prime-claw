@@ -1,0 +1,55 @@
+{
+  "content_evidence": {
+    "by_frontmatter_error": {
+      "MISSING_CLOSE": {
+        "all_source_7grams_present": 0,
+        "exact_get_success": 1,
+        "shared_7grams": 109,
+        "source_7grams": 114,
+        "source_pages": 1
+      },
+      "MISSING_OPEN": {
+        "all_source_7grams_present": 18,
+        "exact_get_success": 18,
+        "source_pages": 18
+      },
+      "YAML_PARSE": {
+        "all_source_7grams_present": 1,
+        "exact_get_success": 1,
+        "source_pages": 1
+      }
+    },
+    "comparison": "For each source file and returned get-page text, lowercase and tokenize ASCII alphanumerics; compute SHA-256 truncated to 20 hex digits of each seven-token window; discard the first 20 source tokens; compare sets. This is content evidence, NOT byte identity, exact metadata intent, or a valid Git source repair.",
+    "missing_close_source_7grams_shared": 109,
+    "missing_close_source_7grams_total": 114,
+    "source_pages_with_all_sampled_7grams_in_get_page": 19
+  },
+  "limits_and_disposition": [
+    "Local work gbrain has content for all 20, but this rebuildable database is not authoritative Git source. The 20 malformed tracked Git pages remain invalid for the source-current gate.",
+    "All 19 get-page titles on pages with first H1 equal that H1; this could be derived metadata and does not independently prove author intent. The YAML_PARSE get-page title differs from the explicit Git-source title under basic normalization.",
+    "The get-page Source repo/File path fields can describe a cited source rather than the brain page’s Git origin; a first tested field disagreed with the brain Git remote/path despite complete content fingerprint overlap. They are not proof of source provenance.",
+    "No byte-preserved body boundary, intended ID/title for all 20, or safe repair candidate is established. No brain Git edit/ref/push, database/policy change, index/build/cutover, or routed write was performed. Joe’s prior generic repair grant does not authorize silently choosing conflicting metadata."
+  ],
+  "local_work_brain": {
+    "client": "gbrain CLI 0.49.0.0",
+    "exact_nonfuzzy_get_success": 20,
+    "get_page_explicit_id_key_count": 0,
+    "get_page_header_keyset_for_all_20": [
+      "type",
+      "title"
+    ],
+    "get_page_nonempty_title_count": 20,
+    "get_title_equals_first_source_H1": {
+      "eligible_pages": 19,
+      "matches": 19
+    },
+    "method": "For 19 pages, search the first source H1; for the YAML_PARSE page, search its explicit existing title. Select the unique namespaced result whose slug ends in the source filename stem, then run non-fuzzy exact gbrain get on that result. A bare source filename stem did not resolve by exact get in the first six tested; keyword hits and get-page provenance fields were not treated as identity proof.",
+    "yaml_parse_get_title_equals_explicit_source_title_even_after_basic_normalization": false
+  },
+  "next_decision": "CONSULT Joe on an explicit source-preservation/title-selection contract or authoritative source-author corrections before any isolated candidate, independent EXPERT review, owner acceptance, or non-force brain source publication.",
+  "project_parent_checkpoint": "9774b6834bcc5531de3111fcd8509d457333a831",
+  "schema_version": 1,
+  "scope": "The exact 20 pre-existing Markdown frontmatter errors; no private source paths, slugs, titles, bodies, or page IDs are recorded here.",
+  "source_commit_validated": "b695658b8271f4541e47b87f62c5b14c19075528",
+  "status": "READ_ONLY_LOCAL_WORK_GBRAIN_GET_PAGE_MATCH_20_OF_20"
+}
