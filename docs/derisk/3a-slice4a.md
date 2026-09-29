@@ -375,3 +375,17 @@ EXPERT/owner acceptance, or later non-force remote publication. No candidate,
 brain source edit, index, build, cutover, or routed write exists yet. Stop if
 the prefix-only rule fails validation or identity/preservation proof; do not
 silently expand into content editing or skipping errors.
+
+## 2026-09-29 exact-b695 prefix candidate for independent review
+
+The [sanitized candidate receipt](../evidence/phase3a-slice2-b695-frontmatter-prefix-candidate-20260929.json)
+identifies a local, unpushed brain Git review ref and exact commit. Only 20
+originally invalid Markdown pages changed, each by a metadata-only prefix.
+Original bytes remain exact suffixes, path/mode and accepted Slice 1 repair
+blobs are preserved. Native validation scanned all 1,189 Markdown pages with
+zero frontmatter errors; focused offline no-write tests passed (63 tests).
+This does not prove historical title intent for the YAML-parse page, whose
+matched brain title differs from its malformed source text. The candidate
+is neither published nor accepted. Fresh independent EXPERT and owner review
+are required before a separate gated brain publication, index/build, or
+cutover. No full maintained-suite pass is claimed.

@@ -1,0 +1,264 @@
+{
+  "authorization": "Owner-accepted in-scope exact-20 prefix-only candidate preparation recorded at project 9b8af9546d0308ace74bd2f791985f4570be69f9. No brain source publication or Slice 2 build authorized in this pass.",
+  "before_after_gates": {
+    "active_checkout_clean_accepted5c47": true,
+    "both_database_snapshots_unchanged": true,
+    "brain_remote_push": false,
+    "candidate_worktree_clean": true,
+    "inspection_and_origin_main_b695": true,
+    "live_brain_remote_main_exact_b695": true,
+    "local_main_and_original_repair_ref5dde": true,
+    "no_sync_process": true,
+    "only_new_local_candidate_ref": true,
+    "policy_unchanged": true,
+    "qwen_retry_index_build_cutover_routed_write": false
+  },
+  "observed_at_utc": "2026-09-29T21:19:56.522806+00:00",
+  "private_mapping": {
+    "full_source_7gram_coverage": 19,
+    "matched_pages": 20,
+    "material_identity_change_detection": "Candidate path, source-group match, and native SLUG_MISMATCH validation are stable; historical author-intended title is not proved. EXPERT and owner must review the YAML title conflict before publication.",
+    "method": "Inside authorized sandbox, inspect exact 20 native error paths and private source bytes; transfer all-source read-only local work-gbrain listing plus exact non-fuzzy get --source-id __all__ --include-content metadata/content into sandbox-private scratch; choose 19 unique title-and-suffix matches, then choose YAML_PARSE among two identical-content/metadata copies by the same source group as the 19. Compare SHA256 truncated seven-token windows after first 20 source tokens; never use get-page Source repo/File citations or fuzzy suggestions as provenance. No raw source path/title/page body recorded here.",
+    "missing_close_shared_7grams": 109,
+    "missing_close_source_7grams": 114,
+    "same_source_group": 20,
+    "yaml_chosen_same_source_group_as_other_19": true,
+    "yaml_matched_title_differs_from_malformed_source_explicit_title": true,
+    "yaml_two_identical_content_and_metadata_candidates_in_distinct_source_groups": true
+  },
+  "repair_and_validation": {
+    "accepted_slice1_repair_blobs_unchanged": 2,
+    "candidate_git_tree_parent": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "changed_markdown_paths": 20,
+    "full_maintained_suite_pass_claimed": false,
+    "git_diff_check_exit": 0,
+    "header_values": "Only matched gbrain type/title in minimal YAML frontmatter; no id invented; no original Markdown byte removed, rewritten or reordered.",
+    "mode_changes": 0,
+    "native_command": "gbrain frontmatter validate <isolated-exact-b695-candidate-worktree> --json (gbrain 0.50.0.0; no --fix)",
+    "native_files_with_errors": 0,
+    "native_markdown_files_scanned": 1189,
+    "native_raw_private_report_sha256": "494bd2465b5c3d78be9ea4f6ef25f67e2508ac9db481d04dab9fa9e5df9d613c",
+    "native_total_errors": 0,
+    "new_or_deleted_paths": 0,
+    "newer_remote_content_preserved_by_exact_parent_plus_exact20_diff": true,
+    "offline_no_write_test_command": "python3 -m pytest -q tests/test_embedding_candidate_build.py tests/test_runtime_validate.py tests/test_runtime_converge.py",
+    "offline_no_write_test_result": "63 passed, 3 warnings in 10.67s",
+    "old_file_bytes_exact_suffix": 20,
+    "path_records": [
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "70159c2d1d7271b4fc910a6ea19a5366466837c9cceccc2536ca26d95b5a1811",
+        "error_code": "MISSING_CLOSE",
+        "matched_title_sha256": "a323cef57d3732cdc6e37a74b1b7f3a469f1220bc631d42db751972b3a737371",
+        "matched_type_sha256": "38a81e87e79631e602bf5fbd307ce2fcd382b1670c585ea09032aac778a80531",
+        "old_bytes_sha256": "a3cbfb3310a1925a2cf768f639a2374fa9a48822832320198dc26bd54b1f3c09",
+        "path_sha256": "02f34178a76d36a48bdfa5f1e2007c32d8472f94cdd56865d88ccef11d99ae8f",
+        "prefix_bytes": 44
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "499074f2462f62cc486de3d52315170495e9ae41373ea92c0bdbb04eee330d74",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "2a798e84c23a7b875485c5615c3618e626b00a265f167460add59c3f7e5bfccf",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "16926a8189a8164a562e7fee11a498b8c31bf9d543c9263e1dc495e8a1bd1ea8",
+        "path_sha256": "078754ff7cc2c2dde5ebb8d34585ac1b86a3684c281c38003a2ca063620fe553",
+        "prefix_bytes": 88
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "5dd601f913f6759b71eb7b73316608ee59cb9473557c117aa7f1538b56d4c076",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "49dee2af39b410bfc23e554f5b868f3ab37aa39c36f2a3dfd6431819f3fc48a2",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "a05ee966179bc1bacd3ba88080f8519f28a886458c90684cdff8b13c614d6e35",
+        "path_sha256": "2690850624dec9df165b1ab47fa0fa60d7a73b0074d57cef6af1f542bc2ae6a9",
+        "prefix_bytes": 60
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "197e13ce73b5a18d84c058202cdf7c9f42e2119ab1ec7ff49da3f16e893c01a6",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "e2d32dfe40958d8e0e01238f85736b961d6e14020e9eda3d77b040035c091564",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "3ea048d2daaf4ef06ae2c4bb980e7380cf3f914c8250ca8dfd4853bce040fbe8",
+        "path_sha256": "383c06b99f1211edc8e61384ed71d9ae499b6ba32c143399aabc209ca94fbe1a",
+        "prefix_bytes": 83
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "c8b32207fd5979236111b6e654c7b03e5b2baebd6e183494641fab9313486bdb",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "e05611e88a4c4b4f3d2a0df19c1362874f4bbfd3c2e758e401976cc27cf1318f",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "38b1b5235f517debade65562e8f927ff4941edde0b472c30652b81e732933d7f",
+        "path_sha256": "4241e4a2ef6887fa55c61d076fb74bd9e5bb64dac172d9c83b964303b9002262",
+        "prefix_bytes": 102
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "bab6088791bcc95720b79a363eae04694d7e3e7b03b75244e146dc658137d4c2",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "3e37df395eb9d930ea93d25b78aef42ba76bc5dccee9cbd0d778e49684d2c909",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "34f8a4bf91e29dc351e89ed2b6b3f386c5424be2231a5539b45321b8b82084c3",
+        "path_sha256": "44f64f43ef2d4d6b5cfff89e5959cb3e141b670cd3b4ca56b1a1bd05c2bdfd58",
+        "prefix_bytes": 106
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "724cacad946df588337b0f7890c67ba27bf6a20b311b76a065c417cb98ef86cb",
+        "error_code": "YAML_PARSE",
+        "matched_title_sha256": "697bc27119e086ae2b6da7861bb693fc4af4e10ad0a150b9f11dc3857e2a7b61",
+        "matched_type_sha256": "da5e11efa36720a4211ac89acf1479952e99b35636f006a70bcede07495289d6",
+        "old_bytes_sha256": "9a5d2936507cc9769246ad55044d872b6b84f7bf5d09bceb5813b94e49dd64c0",
+        "path_sha256": "4581a76586e2b3bdfd97ac2657e871c67eda6a8ca11945faeec09acfba0ed803",
+        "prefix_bytes": 84
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "f4a99979043ebe33e672b0218d32d0b2ac79cb5564707abe90e197d784726567",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "9dced0e8107563adf846703707bfe739b71351af44bb7e52238194e0c87d7b5f",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "d268b119c4ae9c82afe7401ce8eac109cddf9790cb1b3c3334a5a0b7093abebc",
+        "path_sha256": "517e0a23e9a337cb202bbfe9444731c7dba848482e88a373feb471a30159eb20",
+        "prefix_bytes": 117
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "6a841fb9c35e017dfcd39dc396a81f5f28e046b1952634e670565bec4fd69b6c",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "05e5f6757c9c80bf8b4f5a70e96d83b2a1439d8798248f1a4931a8daf3b66668",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "834816349f9603f5297788c513aecdcf58f196dfc9416f1a72bcd41369725502",
+        "path_sha256": "563842b3f1193b090468e8b22700c0e72af7e8ac5ec9332a1c5dad49940bb18d",
+        "prefix_bytes": 111
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "448198844965a42cad301173489b3ebbb29d4de7548c666940e21b6459a5394c",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "0c501dd45d4aaa39b87e413f7203d10132e65098669c1704326bbe932c9a061b",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "7c38b481d37399c559a74b4db70cbddc3b573a0c3767c506bcf5ec58efdf8e8c",
+        "path_sha256": "5a2a9b0587a12b6ada3281bcb74953b3e6de81b5200756a42be8fdcab3d654c0",
+        "prefix_bytes": 100
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "05d0ff4ee67c5ac39da9aae3bf6db3b48e7b0c4e853b329078b62f0609ef3f55",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "9d5410d037012e9565536d87e2b254ef8cde1605e841a92babdc994c42c2e144",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "e2d0c3733ec0c49d8f4b903c89a2c6eecde399c46bfe0e9f6808cb5cbc08a0e3",
+        "path_sha256": "62aaa16c4e975e28413a50ae29af509d13eeda6f7bc8a44e226820c9f8b10457",
+        "prefix_bytes": 91
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "0d5f313309c2ea087bd33b96d5e8e96c130b3d8d882ea4ae193e77660e109ae8",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "7fb84252fa3ede478455d073009e0fda46fbc9cacb8edcea99359d3c68699e2c",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "e4a72a039448f4de9682512a6b3f13e5fe37e687d1774fdcfd67d9d14c1c8ca6",
+        "path_sha256": "6f0b9354a12edb14ac4b1729285275ac0975856b6f3b190dbd7e2bb5e88fff06",
+        "prefix_bytes": 91
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "27cf9fcb1d369e950fdbe59400a96e38fe7708d930ff6ef6577a50f97604eab9",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "47ee8af2078a85226ab407f8aa4343a1ef5e84f57a5afcc1e9cd3ee9c15df1d1",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "2853ad5a17d646f8f48d4f01ffdd2c4d8cd88c17e6717ca1cceced6606a9bc66",
+        "path_sha256": "6fe9204ee7468aa1e8aec4379ea0e9a039ea7dee26039bb9cfe6df7d42b06cb3",
+        "prefix_bytes": 97
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "86e19499d52b612dc933e8bc0b09926d0459aaf95a527db2aed32cf856780faa",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "d16abe71847d61f3ecb21860740e4d4377901fb99ad33ba2cd77c122491ab35a",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "26d00502b5730d8c6e686920d6f183187535c3423c0d0c947b0440a0d1d8c729",
+        "path_sha256": "731a5234c47ed1908c1ccf0de3a1e89559c05189f90416da1525ce153f727e2f",
+        "prefix_bytes": 56
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "483b03ee5d15ba96285d809e07fbcb9fb7149848ad11f4c1c60328408fb94c32",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "66d46dab341e031074717b3a9e3c26e6a872741c6a571d77a42ab8ba9a63b4a4",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "280280f357cb16d64ee7c50bfeea8c60c7c56720fba7fa3c3d715132d67ce9db",
+        "path_sha256": "a00a1c9d6a77559157cb0002c9ca9e77e53c152ddf2b52a2fce31583710b0a16",
+        "prefix_bytes": 119
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "1d02e2b60eca91906a616c2f6d539c99fb35ef9b8a75c9c6b47257be1404772f",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "4893c3c6fefef086ecbb9cb7e5e2c6dcf1813e585380b2bd74bdc4393698552b",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "55c5a98cff501d15aa1860a0f2ea0c92d853f8f03dc018265844dfc7f748f42c",
+        "path_sha256": "b2d92b588aeed810fbde3d427f5d79e5119bece0a3c62091404450a27c18c2e5",
+        "prefix_bytes": 46
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "1d8a975d977158c0ff6c597947d7dc3de082dc7489fdbd2bc362c9a1efbeb6d4",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "d5da82d16e5d922855b57b58de8240f7835d393fa1786964983e8100cc848f02",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "65213b7683883c31843c857a77428aec2ba12341dc563376cc4d668f3d401abc",
+        "path_sha256": "bc5f8a19534edd9d717fa7db5d6521e61cf9557e9fc8ec61540ea9248b0991c2",
+        "prefix_bytes": 87
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "f9e53c7373c934de3e77d8c0a9ca060792c9a8fbc10026051d2bdcbd46c403e5",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "937631242697f250040311ba81c1ae6e1acf2f38ca9dbe88a3d1e0f0a5604be2",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "019fe29d24a9f151d1abf65a41370e6960c2ab89ddc68f40d146e2b367d952a4",
+        "path_sha256": "d7b76ef54121e49e6cbd911e6230a151bce6c610f83194e377fdbde81632f1b7",
+        "prefix_bytes": 94
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "0186746ceecd590fed7e759db6cae014de947b50cdb2ade4b4ca2121c4cdc5a2",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "a783164c4e6ad82b219a4dd8fabd5a3cae9877303aa685e784d9fb51af014df0",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "a8e0a4acafdc96d40e53a847a3129d918b579ec67bfccb72f4fb058e82019d59",
+        "path_sha256": "de6a4232041f2b014942fe3571d04b4b28ad44935512354af867fcd5e9002a34",
+        "prefix_bytes": 66
+      },
+      {
+        "body_byte_exact_suffix": true,
+        "candidate_bytes_sha256": "8025b1dad85ea55ff240992a02281667f9c31a44ac5a59dd676006eeea90c805",
+        "error_code": "MISSING_OPEN",
+        "matched_title_sha256": "cadeb14bbd98b1a1e3407ffb1cfbbf7348924daa76d677417be918196a964492",
+        "matched_type_sha256": "edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8",
+        "old_bytes_sha256": "b8a67d6c2d70cfdba69bb8cfddafac6c867460874b1e0a3c85c8747eac73681d",
+        "path_sha256": "e0c87a6a0d43ac0ff99f3a4f85c923229d526db34ad8a966836f7f8e9004a52a",
+        "prefix_bytes": 114
+      }
+    ]
+  },
+  "review_boundary": "This local brain Git candidate ref/commit is not pushed or accepted. A fresh independent EXPERT and owner decision are required. A separate fresh-gated non-force brain publication, then fresh full-source no-skip index/build validation, may follow only if approved. Stop this pass without cutover.",
+  "schema": "phase3a-slice2-exact-b695-frontmatter-prefix-candidate-v1",
+  "source": {
+    "accepted_active_checkout": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "candidate_commit": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "candidate_parent": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "candidate_ref": "refs/heads/phase3a-slice2-b695-frontmatter-20-candidate",
+    "exact_remote_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "local_work_gbrain_content_match_receipt": "docs/evidence/phase3a-slice2-local-work-gbrain-get-page-20260929.json",
+    "local_work_gbrain_content_match_receipt_sha256": "d67499c5a7e348e02d0546b69df2a2b15a519bd9f2a9be85a21b0e6ec9b8d7e9",
+    "native_baseline_receipt": "docs/evidence/phase3a-slice2-native-source-validation-b695658b-20260928.json",
+    "original_repair_ref": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695"
+  },
+  "status": "ISOLATED_CANDIDATE_FOR_EXPERT_AND_OWNER_REVIEW_NOT_ACCEPTED"
+}
