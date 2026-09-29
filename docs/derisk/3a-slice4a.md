@@ -308,3 +308,16 @@ records aggregate results and file hashes, not private paths/content. No lint,
 repair, source reconciliation, candidate build, cutover or routed write followed.
 The active checkout/refs, remote, policy and both databases stayed unchanged.
 Further repair/reconciliation needs a separate owner decision.
+
+## 2026-09-29 private-safe frontmatter triage — no build authority
+
+The [sanitized triage receipt](../evidence/phase3a-slice2-frontmatter-triage-b695658b-20260929.json)
+records independent native no-fix scans of isolated accepted 5c47 and b695
+archives. All 20 b695 errors match accepted by private relative path and error
+code and lie on unchanged files. Accepted scan covered 1,117 Markdown files;
+b695 covered 1,189. This does not mean the source is valid: both scans exit 1.
+The prior no-write dry run only tested the registered accepted checkout, not the
+isolated b695 source; full-source index eligibility is unknown and no dry run
+was attempted. No raw private paths or content were published. Remote, refs,
+clean checkout, policy, both DB snapshots and no-sync gates remained unchanged.
+Joe must separately decide any repair/reconciliation before candidate work.

@@ -1,0 +1,76 @@
+{
+  "index_eligibility": {
+    "assessed": false,
+    "reason": "Only prior gbrain sync --dry-run proof targeted the registered accepted checkout, not the isolated b695 scratch source. Pointing a source at scratch would require an unproven reconfiguration; no strictly no-write proof for this exact source is available. Dry-run was not attempted."
+  },
+  "limitations": [
+    "Same 20 private relative-path/error-code pairs occurred on accepted baseline; this does not establish native pass or full-source index eligibility.",
+    "Messages/line numbers and full-source lint were not compared.",
+    "Full maintained test suite and historical Git/L7 reset cause remain unproven."
+  ],
+  "native_validation": {
+    "accepted": {
+      "errors": 20,
+      "exit_code": 1,
+      "files_with_errors": 20,
+      "markdown_files": 1117,
+      "report_sha256": "5f800c7c318f17ba6a3a907f34dcd2dcd3985d64130e97671cc260bc7fb03708"
+    },
+    "accepted_only_errors": 0,
+    "candidate": {
+      "errors": 20,
+      "exit_code": 1,
+      "files_with_errors": 20,
+      "markdown_files": 1189,
+      "report_sha256": "66fbfc2eeb772920f643af52abcab5c46c2b68c01519576f9b2c6b8e93793f69"
+    },
+    "candidate_error_provenance": [
+      {
+        "code": "MISSING_CLOSE",
+        "files": 1,
+        "provenance": "unchanged"
+      },
+      {
+        "code": "MISSING_OPEN",
+        "files": 18,
+        "provenance": "unchanged"
+      },
+      {
+        "code": "YAML_PARSE",
+        "files": 1,
+        "provenance": "unchanged"
+      }
+    ],
+    "candidate_only_errors": 0,
+    "comparison": "private relative path + error code multiset (not messages/line numbers)",
+    "matched_error_instances": 20,
+    "raw_reports_retained_only_in_sandbox": true,
+    "tool": "gbrain 0.50.0.0 frontmatter validate <isolated-scratch-source> --json (without --fix)"
+  },
+  "owner_decision": "Owner separately decides whether/how to repair preexisting frontmatter failures and reconcile source; no candidate build is authorized.",
+  "safety": {
+    "fresh_before_and_after_remote_refs_clean_checkout_no_sync_policy_both_db_gates_passed": true,
+    "no_db_provider_policy_network_credential_change": true,
+    "no_fetch_or_active_ref_checkout_change": true,
+    "no_frontmatter_edit_fix": true,
+    "no_qwen_retry_index_build_cutover_or_routed_write": true
+  },
+  "scope": "Private-safe classification only of native frontmatter failure on already-fetched exact b695; no repair or candidate acceptance.",
+  "source": {
+    "accepted_commit": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "accepted_scratch_archive_sha256": "15b389d57ee4541a9e39033710ffb0aae1257c0c16dab9687f5ca8def57ce322",
+    "accepted_tree_regular_files": 1139,
+    "candidate_commit": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "candidate_scratch_archive_sha256": "0cfdfeb95baf0ae296b9c321ae2737fb5643e9789e5bb108ac35d778cb1b38c7",
+    "candidate_tree_regular_files": 1211,
+    "deleted_paths": 0,
+    "diff_manifest_sha256": "add35bd3a6d6d68b968a9caa76218e3a4c74028b033353aab89c6934300d3d61",
+    "live_remote_main_before_and_after": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "modified_paths": 32,
+    "new_paths": 72,
+    "scratch_content_mismatches": 0,
+    "scratch_symlinks": 0
+  },
+  "status": "BLOCKED_SAFE_READ_ONLY_TRIAGE",
+  "timestamp_utc": "2026-09-29T17:54:12.852910+00:00"
+}
