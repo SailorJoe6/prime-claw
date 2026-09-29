@@ -1,0 +1,76 @@
+{
+  "basis": {
+    "accepted_commit": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "all_20_unchanged_from_accepted": true,
+    "codes": {
+      "MISSING_CLOSE": 1,
+      "MISSING_OPEN": 18,
+      "YAML_PARSE": 1
+    },
+    "error_files_total": 20,
+    "target_commit": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "triage_receipt": "docs/evidence/phase3a-slice2-frontmatter-triage-b695658b-20260929.json",
+    "triage_receipt_sha256": "90fcd9713edb0fd05c0186234cad3f49c5f610a1d1efd0bc8c0a440136d73d9e"
+  },
+  "bounded_safe_probe": {
+    "derived_title_header": {
+      "limitation": "One passing syntax probe does not establish intended metadata, page identity, or a safe rule for all 18 pages.",
+      "native_gbrain_0_50_0_0_validate_exit": 0,
+      "private_report_sha256": "5d5e7f4491616d453bdf75a645bb48dcb0184fb22bc22582aa3bd28e1df27161",
+      "transformation": "derive title field from first existing H1 in one scratch copy; retain original body bytes"
+    },
+    "empty_header": {
+      "native_gbrain_0_50_0_0_validate_exit": 1,
+      "private_report_sha256": "fadfcc04eb07abf99e44bb6c11b9985583e75d3b4f7721efce4d588f9aacfbec",
+      "result_error_code": "EMPTY_FRONTMATTER",
+      "transformation": "prepend YAML opening and closing delimiters; retain original body bytes"
+    },
+    "source": "One copy of one MISSING_OPEN page in a sandbox scratch directory, never the brain repo."
+  },
+  "limitations": [
+    "No full-source native zero-error validation, lint, or focused no-write tests: no candidate was produced.",
+    "Full-source index eligibility, full maintained suite, and historical Git/L7 reset cause remain unproven."
+  ],
+  "safety": {
+    "active_checkout_clean": true,
+    "active_head_unchanged": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "before_and_after_live_remote_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "both_db_snapshots_unchanged": true,
+    "brain_push": false,
+    "brain_source_files_edited": false,
+    "candidate_commit_or_ref_created": false,
+    "canonical_policy_unchanged": true,
+    "local_main_and_original_repair_ref_unchanged": true,
+    "no_index_build_cutover_routed_write": true,
+    "no_sync_process": true,
+    "private_raw_paths_or_contents_published": false,
+    "tracking_inspection_refs_unchanged": true
+  },
+  "sanitized_structure": {
+    "missing_close": {
+      "closing_delimiters": 0,
+      "files": 1,
+      "heading_in_unterminated_region": true,
+      "opening_delimiters": 1,
+      "total_lines": 13
+    },
+    "missing_open": {
+      "existing_explicit_id_fields_in_first_60_lines": 0,
+      "has_at_least_one_h1": 18,
+      "has_at_least_two_h1": 2,
+      "heading_first": 2,
+      "html_comment_first": 16
+    },
+    "yaml_parse": {
+      "files": 1,
+      "header_content_lines": 19,
+      "nonblank_nonkey_nonlist_lines": 3
+    }
+  },
+  "scope": "Approved exact-20 frontmatter repair candidate preparation only; stopped before any brain source edit due to unproven metadata/body/ID preservation.",
+  "starting_project_commit": "4e5b2aad87e5b1b258a994ab7948308b2f2f60f1",
+  "status": "BLOCKED_SAFE_NO_CANDIDATE",
+  "stop_reason": "A nonempty metadata value is needed for the 18 MISSING_OPEN files, but no approved intent-preserving value/ID rule is established across all pages. The MISSING_CLOSE page includes a heading in an unterminated header and the YAML_PARSE header contains three non-key/non-list lines. Inserting or rewriting delimiters/metadata could alter body and identity. Stop rather than invent fields or silently skip.",
+  "timestamp_utc": "2026-09-29T18:42:26.869482+00:00",
+  "unblock_condition": "Owner-approved deterministic rule for minimal frontmatter values, delimiter placement, and YAML structure for these exact 20 files with demonstrable byte-preserved bodies and IDs, or an owner-approved private in-sandbox review that resolves the ambiguity without exposing raw paths/content. Then recheck all gates and prepare/validate the exact-20 isolated candidate for fresh EXPERT and owner review."
+}

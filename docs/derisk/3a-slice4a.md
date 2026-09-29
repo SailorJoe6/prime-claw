@@ -321,3 +321,18 @@ isolated b695 source; full-source index eligibility is unknown and no dry run
 was attempted. No raw private paths or content were published. Remote, refs,
 clean checkout, policy, both DB snapshots and no-sync gates remained unchanged.
 Joe must separately decide any repair/reconciliation before candidate work.
+
+## 2026-09-29 exact-20 repair candidate stopped before edits
+
+The [sanitized ambiguity receipt](../evidence/phase3a-slice2-repair-candidate-ambiguity-b695658b-20260929.json)
+records a native no-fix scratch-copy probe: an empty YAML header fails with
+`EMPTY_FRONTMATTER`; a first-H1-derived title passes syntax on one copy but
+does not prove intended metadata for 18 missing-header pages. One unterminated
+header includes a heading, and another invalid YAML header has unclassified
+content lines. Changing delimiters or metadata without a deterministic
+body/ID-preserving rule risks changing meaning. The exact remote, refs,
+clean active checkout, no-sync state, policy and both DB snapshots remained
+unchanged. No candidate, brain edit, index or build occurred. Joe must decide
+a private-safe metadata/syntax rule or authorize in-sandbox review before
+any new candidate attempt; independent EXPERT and owner acceptance still gate
+later source publication.
