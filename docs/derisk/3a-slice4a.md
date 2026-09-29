@@ -293,3 +293,18 @@ followed. See the sanitized
 [`phase3a-slice2-inspection-fetch-boundary-20260928.json`](../evidence/phase3a-slice2-inspection-fetch-boundary-20260928.json).
 Further read-only assessment or ref-state repair requires a separate owner
 decision; the historical Git/L7 reset cause is still unknown.
+
+## 2026-09-28 native source validation — blocked safely
+
+The owner approved validation only of the already-fetched b695 source. Fresh
+remote, ref, clean-checkout, no-sync, policy and both DB gates passed. A
+separate scratch view extracted the exact Git archive without symlinks. All
+1,211 extracted file contents matched the archive. Native `gbrain 0.50.0.0
+frontmatter validate --json` scanned 1,189 Markdown files and failed with
+20 errors on 20 files (18 `MISSING_OPEN`, one `MISSING_CLOSE`, one `YAML_PARSE`).
+The raw report is retained only in sandbox scratch; the
+[sanitized receipt](../evidence/phase3a-slice2-native-source-validation-b695658b-20260928.json)
+records aggregate results and file hashes, not private paths/content. No lint,
+repair, source reconciliation, candidate build, cutover or routed write followed.
+The active checkout/refs, remote, policy and both databases stayed unchanged.
+Further repair/reconciliation needs a separate owner decision.

@@ -1,0 +1,52 @@
+{
+  "decision_needed": "Owner reviews 20 frontmatter failures and authorizes any repair/reconciliation separately. Stop without a build or source ref change.",
+  "native_frontmatter": {
+    "command": "gbrain frontmatter validate <isolated-scratch-source> --json (no --fix, no --dry-run)",
+    "error_codes": {
+      "MISSING_CLOSE": 1,
+      "MISSING_OPEN": 18,
+      "YAML_PARSE": 1
+    },
+    "exit_code": 1,
+    "files_with_errors": 20,
+    "gbrain_version": "0.50.0.0",
+    "raw_report_retained_in_isolated_sandbox_scratch": true,
+    "report_sha256": "66fbfc2eeb772920f643af52abcab5c46c2b68c01519576f9b2c6b8e93793f69",
+    "stderr_bytes": 0,
+    "total_errors": 20,
+    "total_markdown_files": 1189
+  },
+  "not_proven": [
+    "Native frontmatter pass or full-source acceptance",
+    "Native lint pass (not run after frontmatter failure)",
+    "Candidate build/index/cutover or source reconciliation",
+    "Full maintained test suite",
+    "Historical Git/L7 reset cause"
+  ],
+  "safety": {
+    "canonical_and_candidate_db_snapshots_unchanged": true,
+    "checked_out_brain_clean": true,
+    "no_active_checkout_or_ref_change": true,
+    "no_gbrain_sync": true,
+    "no_new_fetch": true,
+    "no_qwen_probe_or_build_or_index_or_cutover": true,
+    "policy_unchanged": true
+  },
+  "scope": "Native read-only validation of already-fetched exact brain source in sandbox scratch view only; no source reconciliation or candidate build.",
+  "source": {
+    "accepted_checkout_head": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "archive_embedded_commit": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "archive_sha256": "0cfdfeb95baf0ae296b9c321ae2737fb5643e9789e5bb108ac35d778cb1b38c7",
+    "commit": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "inspection_ref": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "live_remote_before_and_after": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "original_repair_and_local_main": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695",
+    "recursive_tree_entries": 1211,
+    "scratch_content_mismatches_against_archive": 0,
+    "scratch_other": 0,
+    "scratch_regular_files": 1211,
+    "scratch_symlinks": 0
+  },
+  "status": "BLOCKED_SAFE_NATIVE_FRONTMATTER_FAILURE",
+  "timestamp_utc": "2026-09-29T00:40:14.448131+00:00"
+}
