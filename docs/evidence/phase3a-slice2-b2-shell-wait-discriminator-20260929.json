@@ -1,0 +1,57 @@
+{
+  "conclusion": {
+    "candidate_acceptance": false,
+    "isolated_worker_group_still_alive_at_15s": true,
+    "outer_shell_still_alive_at_15s": true,
+    "pipe_only_retention_after_shell_exit_excluded_for_this_run": true,
+    "required_focused_test_gate": "FAILED_IN_PRIOR_EXPERT_AND_EP_RUNS",
+    "signal_or_worker_teardown_root_cause": "UNKNOWN"
+  },
+  "method": {
+    "diagnostic_pytest_exit_code": 0,
+    "diagnostic_pytest_summary": "one diagnostic passed with one importlib deprecation warning; not the required focused gate",
+    "generated_watchdog_fragment_from_current_project": true,
+    "one_off_result_sha256": "ea520cdae4220401d31ce26414dc7b4f75efe493527529ae8cdb2a9836673899",
+    "one_off_script_sha256": "97c873dae2dca88d1b4eec398047a967e00a0c6966437854fffc13ac9ec457e2",
+    "popen_stdout_stderr_pipes": true,
+    "post_exit_pipe_probe_seconds": 2,
+    "required_test_rerun": false,
+    "run_inside_project_python_pytest_with_plugin_autoload_disabled": true,
+    "shell_wait_timeout_seconds": 15,
+    "synthetic_worker_same_semantics_as_required_test": true,
+    "test_source_or_timeout_edited": false
+  },
+  "observed": {
+    "captured_pipes_eof_within_2s_after_shell_exit": null,
+    "elapsed_to_shell_wait_seconds": 15.003,
+    "isolated_group_alive_at_discriminator": true,
+    "isolated_group_leader_file_present": true,
+    "kind": "diagnostic_only_not_required_gate",
+    "pipe_probe_timeout_seconds": 2,
+    "required_test_unchanged": true,
+    "root_cause": "UNKNOWN",
+    "shell_alive_at_discriminator": true,
+    "shell_returncode": null,
+    "shell_wait_timeout": true,
+    "source_and_policy_untouched": true,
+    "wait_timeout_seconds": 15
+  },
+  "postrun_safety": {
+    "brain_checkout_clean": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "brain_push_or_index_build_cutover": false,
+    "brain_remote_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "new_brain_ref_or_commit": false,
+    "old_candidate_ref_unchanged": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "project_clean_head_upstream_remote": "0185491e46ae0ef3d53d93a4591e8c7d44596f70",
+    "project_source_database_policy_code_test_mutation": false,
+    "watch_cancelled": true
+  },
+  "schema": "phase3a-slice2-b2-no-write-shell-wait-discriminator-v1",
+  "status": "EVIDENCE_ONLY_REQUIRED_GATE_STILL_FAILED",
+  "subject": {
+    "brain_remote_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "old_unaccepted_candidate": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "prior_ep_block_receipt_sha256": "fa95acff84b66cf02c96114ed03f6f1b272899e0887eaaed12bb09a327ec97bb",
+    "project_base": "0185491e46ae0ef3d53d93a4591e8c7d44596f70"
+  }
+}

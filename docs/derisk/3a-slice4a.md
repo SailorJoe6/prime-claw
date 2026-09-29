@@ -458,3 +458,23 @@ pass stopped without a new source candidate, code/test edits, brain push,
 index/build, or cutover. Joe's A metadata decision remains approved for a
 later separately gated candidate pass. Do not treat an earlier 63-pass run
 as a reproducibly green B2 gate.
+
+## 2026-09-29 owner one-off no-write B2 discriminator
+
+The [sanitized diagnostic receipt](../evidence/phase3a-slice2-b2-shell-wait-discriminator-20260929.json)
+SHA-256 `327eed27b7511acae39f41f6c08c7c523be1c34ce4874a716af6ed36309ebd7f` records a synthetic, temporary
+pytest probe of the current generated watchdog fragment with the same isolated
+worker semantics. It did **not** rerun or pass the required focused test.
+`Popen.wait(timeout=15)` timed out while both the outer shell and its distinct
+isolated worker group remained alive. A post-exit captured-pipe check could
+not run because the shell was still live. This rules out a pipe-only hang
+after shell exit for that run, but does **not** prove why the watchdog's
+signal/worker teardown failed. Root cause remains UNKNOWN.
+
+Post-run project HEAD/upstream/remote stayed clean at
+`0185491e46ae0ef3d53d93a4591e8c7d44596f70`; brain remote/main stayed
+`b695658b8271f4541e47b87f62c5b14c19075528`, accepted checkout and
+original unaccepted local candidate unchanged. No code/test timeout or
+assertion change, source publication, database/policy mutation, index/build,
+cutover or routed write occurred. The required B2 gate remains red and
+Joe's approved A metadata rule remains pending a *new* source candidate.
