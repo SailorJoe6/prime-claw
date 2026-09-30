@@ -19,12 +19,41 @@ restart and Joe-run manual UAT.
 - Use the public `before_agent_start` hook. Gate on selected `ipython` and
   model-visible Python skills `goal` / `goal` and `rlm-heartbeat` /
   `rlm_heartbeat`.
-- Missing capabilities are a silent no-op. Pre-existing, duplicate, or malformed
-  policy markers fail closed.
+- Missing capabilities return a silent no-op before marker validation, including
+  when the incompatible base prompt contains a work-control marker or sentinel.
+  Pre-existing, duplicate, or malformed markers fail closed only for otherwise
+  compatible runs.
 - Keep policy contribution transient, deterministic, non-accumulating, and no
   more than 4,000 UTF-8 bytes excluding markers/sentinel.
 - Use only proportionate non-native automation plus manual UAT. Never launch a
   second Prime Agent process while the daemon is active.
+
+## Required replacement for rejected `60a2d4b`
+
+Owner review rejected exact commit
+`60a2d4bb5f3a0e51620c62ae7bf0f640c0fc5ddb`. Preserve it in history and revise
+only the five accepted findings recorded on `prime-claw-h6w.22` and
+`prime-claw-h6w.24.1`:
+
+1. Move the compatibility return before collision validation. Add every
+   incompatible-plus-marker/sentinel shape as a direct silent-no-op test while
+   retaining compatible collision abort tests.
+2. Limit manual UAT to visible old-tool, goal/heartbeat wait-transfer, fresh-goal,
+   and human-blocker outcomes. Keep hidden gating and non-accumulation in direct
+   tests only.
+3. Remove the duplicate intermediate EXPERT review. The replacement Checkpoint 1
+   candidate receives owner review; the one mandatory final exact-candidate
+   EXPERT remains after UAT and final artifact reconciliation.
+4. Correct the stale `prime-claw-h6w.24.1` description/evidence without erasing
+   its historical comments.
+5. Correct `docs/lab-global-plugin.md` to name both obsolete managed files:
+   `extensions/goal-blocker-control.ts` and
+   `extension-support/episode-finalization.ts`.
+
+Keep the accepted removal-first implementation and proportionate safe test
+boundary unchanged. Do not apply/check or launch Prime Agent in this replacement
+pass. Produce one clean pushed replacement candidate with exact evidence for
+owner review, then stop.
 
 ## Checkpoint 1 — safety-first implementation candidate
 
@@ -55,8 +84,10 @@ Bead: `prime-claw-h6w.24.1`.
 
 ### Proportionate tests
 
-- [x] Add direct Node tests for compatible/incompatible capability shapes,
-  default selected tools, marker collisions, deterministic bounded content,
+- [x] Revise direct Node tests so every incompatible capability plus every
+  marker/sentinel shape is an unchanged silent no-op with zero notify/abort;
+  retain compatible collision abort coverage, default selected tools,
+  deterministic bounded content,
   project append coexistence, and no mutation or message/tool registration.
 - [x] Add Python static tests for absence of obsolete tools/source/transport and
   unique sentinel ownership.
@@ -79,13 +110,15 @@ native suite, or any concurrent Prime Agent process.
 - [x] Update the lab-global plugin and oversight docs for the new extension and
   absence of pause/resume tools.
 - [x] Record exact check results in this plan and `prime-claw-h6w.24.1`.
-- [ ] Commit and push one clean candidate.
-- [ ] Obtain fresh owner and EXPERT review of the exact candidate; amend and
-  re-run checks if required.
-- [ ] Run managed `scripts/apply-prime-agent-plugin.sh` and
-  `scripts/check-prime-agent-plugin.sh` against the user-global copy.
-- [ ] Verify the installed files match the candidate and the old installed entry
-  is absent.
+- [x] Commit and push candidate `60a2d4b`; owner review rejected it with five
+  accepted revision findings.
+- [x] Commit and push one clean replacement candidate with exact safe evidence.
+- [ ] Obtain fresh owner review of the replacement and stop. Do not run the
+  duplicate intermediate EXPERT review and do not apply/check in this pass.
+- [ ] After later owner acceptance, run managed apply/check against the
+  user-global copy and verify parity/obsolete-file absence.
+- [ ] Preserve exactly one mandatory final exact-candidate EXPERT gate after
+  manual UAT and final artifact reconciliation.
 - [ ] Stop before restart. Report that PID 22654 (or whichever sole process is
   still loaded) has not loaded the new generation.
 
@@ -97,17 +130,16 @@ This checkpoint is operator-controlled. After Checkpoint 1 apply/check:
 
 1. Quiesce work and restart the sole Prime Agent process once using the
    operator's normal service action. Do not start a concurrent instance.
-2. In a fresh session, Joe confirms `pause_thread_goal` and
+2. In a fresh session, Joe visibly confirms `pause_thread_goal` and
    `resume_thread_goal` are absent.
-3. Joe observes a compatible normal session transfer active work from a bounded
-   goal to an exact monitored wait, then create a fresh goal only if substantive
-   work remains.
-4. Joe observes a human-only blocker produce one actionable checkpoint and no
-   heartbeat that merely polls the person.
-5. Joe confirms an incompatible capability configuration receives no policy.
-6. Joe confirms no visible policy accumulation across ordinary turns and saved
-   session resume.
-7. Record only Joe's observed pass/fail. On pass, finish docs/Beads and archive
+3. Joe observes a compatible normal session visibly transfer active work from a
+   bounded goal to an exact monitored wait, then create a fresh goal only if
+   substantive work remains.
+4. Joe observes a human-only blocker produce one visible actionable checkpoint
+   and no heartbeat that merely polls the person.
+5. Hidden capability gating and non-accumulation remain direct-test contracts;
+   they are not manual-UAT steps.
+6. Record only Joe's observed pass/fail. On pass, finish docs/Beads and archive
    the active plan/spec. On failure, retain the exact observation and repair as
    a newly approved bounded candidate.
 
@@ -115,24 +147,27 @@ This checkpoint is operator-controlled. After Checkpoint 1 apply/check:
 
 ### Checkpoint 1 focused tests
 
-Final pre-commit evidence:
+Rejected candidate `60a2d4b` evidence remains in its commit and Bead history.
+Replacement-candidate pre-commit evidence:
 
-- Focused tests:
-  `pytest -q tests/test_goal_heartbeat_work_control_extension.py tests/test_prime_agent_plugin_install.py tests/test_execute_skill.py`
-  initially passed `19` tests and `9` subtests. The later full safe suite includes
-  the added unsafe-obsolete-path cases and the final collision-abort behavior.
+- Focused direct Node suite passed `8/8`, including the 25-case cross product of
+  five incompatible capability shapes and five marker/sentinel shapes. Every
+  incompatible case returned unchanged with zero notify/abort; compatible
+  collisions retained abort/error coverage.
+- Focused Python/plugin/install/execute command passed `20` tests plus `11`
+  subtests in `6.02s`.
 - Source-audited safe Python command explicitly included 18 non-native files and
   excluded the five whole files that launch Prime Agent. Result:
-  `268 passed, 11 subtests passed` in `18.32s`; 11 existing Python deprecation
+  `268 passed, 11 subtests passed` in `18.13s`; 11 existing Python deprecation
   warnings.
-- All six mock-based Node extension suites passed `134` tests in `27.1s`.
+- All six mock-based Node extension suites passed `135` tests in `27.6s`.
 - `bash -n scripts/apply-prime-agent-plugin.sh scripts/check-prime-agent-plugin.sh`
   and `git diff --check` passed.
-- Policy body is 2,503 UTF-8 bytes before template interpolation, below the
-  4,000-byte bound; managed plugin source contains one V1 sentinel owner.
+- Policy body remains below the 4,000-byte bound; managed plugin source retains
+  one V1 sentinel owner.
 
-No native Prime Agent probe or full native suite ran. The sole daemon remained
-untouched.
+No native Prime Agent probe, full native suite, managed apply/check, or new
+Prime Agent process ran. The sole daemon remained untouched.
 
 ### Safe-suite boundary
 
@@ -145,6 +180,9 @@ is active.
 
 ## Current stop boundary
 
-Checkpoint 1 ends after one clean pushed candidate, fresh review, and managed
-apply/check. Installation does not imply activation. The episode must stop and
-hand the exact restart action plus concise manual checklist to the operator.
+This replacement pass ends after one clean pushed candidate is sent for fresh
+owner review. Do not run the duplicate intermediate EXPERT gate or managed
+apply/check in this pass. After later owner acceptance, Checkpoint 1 may apply
+and check the installed copy, then stop before restart. Installation will not
+imply activation. Exactly one mandatory final exact-candidate EXPERT review
+remains after manual UAT and final artifact reconciliation.

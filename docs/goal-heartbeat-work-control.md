@@ -120,9 +120,11 @@ native goal controls or a fresh clean session.
 
 Proportionate automated coverage is intentionally non-native:
 
-- direct Node tests cover capability gating, default tool selection,
-  deterministic bounded content, marker collisions, transient behavior, no
-  message/state mutation, and project-append coexistence;
+- direct Node tests cover capability gating before collision validation,
+  incompatible-plus-marker unchanged no-op with zero notification/abort,
+  default tool selection, deterministic bounded content, compatible marker
+  collisions, transient behavior, no message/state mutation, and project-append
+  coexistence;
 - Python static tests prove the obsolete tools, source entry, and autonomous
   slash-command transport are absent;
 - isolated installer tests prove safe obsolete-file migration, unsafe-path
@@ -139,17 +141,14 @@ Prime Agent process, broad version matrix, or repeated native suite is required.
 After one operator-controlled restart, Joe performs manual UAT in a fresh
 installed generation:
 
-1. Confirm `pause_thread_goal` and `resume_thread_goal` are absent.
-2. In a compatible normal session, observe active-work goal → monitored
+1. Visibly confirm `pause_thread_goal` and `resume_thread_goal` are absent.
+2. In a compatible normal session, visibly observe active-work goal → monitored
    observable wait → fresh goal only when substantive work remains.
-3. Observe one actionable human-blocker checkpoint and no person-polling
-   heartbeat.
-4. Confirm a session missing any required capability receives no work-control
-   policy.
-5. Confirm the policy does not visibly accumulate across ordinary turns or a
-   saved-session resume.
+3. Observe one visible actionable human-blocker checkpoint and no
+   person-polling heartbeat.
 
-Record only Joe's observed pass/fail. Do not claim the loaded generation or
+Hidden capability gating and non-accumulation remain direct-test contracts, not
+manual-UAT steps. Record only Joe's observed pass/fail. Do not claim the loaded generation or
 behavior changed before that restart and manual observation.
 
 ## Incident lineage

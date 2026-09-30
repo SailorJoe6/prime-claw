@@ -63,9 +63,11 @@ scripts/check-prime-agent-plugin.sh
 ```
 
 The apply script copies only the eight allowlisted Prime Claw TypeScript files. It
-removes the one formerly managed obsolete `episode-finalization.ts` support file
-with the same destination-type safety checks, and does not remove or overwrite
-unrelated global extensions. The check script verifies that
+removes two formerly managed obsolete files with the same destination-type
+safety checks:
+`extension-support/episode-finalization.ts` and
+`extensions/goal-blocker-control.ts`. It does not remove or overwrite unrelated
+global extensions. The check script verifies that
 all eight installed TypeScript files match the inert builder source byte-for-byte and that
 this repository has no project-local plugin tree. The same workflow merges and
 checks one managed CONVERSATION identity block in global `APPEND_SYSTEM.md`

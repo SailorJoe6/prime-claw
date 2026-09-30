@@ -59,6 +59,34 @@ function compatibleEvent(overrides = {}) {
   };
 }
 
+function incompatibleOptions() {
+  return [
+    { selectedTools: ["read"], skills: compatibleEvent().systemPromptOptions.skills },
+    { selectedTools: ["ipython"], skills: [pythonSkill("rlm-heartbeat", "rlm_heartbeat")] },
+    { selectedTools: ["ipython"], skills: [pythonSkill("goal", "goal")] },
+    { selectedTools: ["ipython"], skills: [
+      pythonSkill("goal", "goal", { disableModelInvocation: true }),
+      pythonSkill("rlm-heartbeat", "rlm_heartbeat"),
+    ] },
+    { selectedTools: ["ipython"], skills: [
+      pythonSkill("goal", "wrong"),
+      pythonSkill("rlm-heartbeat", "rlm_heartbeat"),
+    ] },
+  ];
+}
+
+function collisionShapes() {
+  return [
+    WORK_CONTROL_START,
+    WORK_CONTROL_END,
+    WORK_CONTROL_SENTINEL,
+    `${WORK_CONTROL_START}
+${WORK_CONTROL_END}`,
+    `${WORK_CONTROL_POLICY}
+${WORK_CONTROL_POLICY}`,
+  ];
+}
+
 function count(text, needle) {
   return text.split(needle).length - 1;
 }
@@ -100,23 +128,31 @@ test("the runtime default tool set is compatible when selectedTools is omitted",
 });
 
 test("each missing or unusable capability is a silent no-op", () => {
-  const variants = [
-    { selectedTools: ["read"], skills: compatibleEvent().systemPromptOptions.skills },
-    { selectedTools: ["ipython"], skills: [pythonSkill("rlm-heartbeat", "rlm_heartbeat")] },
-    { selectedTools: ["ipython"], skills: [pythonSkill("goal", "goal")] },
-    { selectedTools: ["ipython"], skills: [
-      pythonSkill("goal", "goal", { disableModelInvocation: true }),
-      pythonSkill("rlm-heartbeat", "rlm_heartbeat"),
-    ] },
-    { selectedTools: ["ipython"], skills: [
-      pythonSkill("goal", "wrong"),
-      pythonSkill("rlm-heartbeat", "rlm_heartbeat"),
-    ] },
-  ];
-  for (const systemPromptOptions of variants) {
+  for (const systemPromptOptions of incompatibleOptions()) {
     const f = harness();
     assert.equal(f.handler(compatibleEvent({ systemPromptOptions })), undefined);
     assert.deepEqual(f.calls, { tools: 0, messages: 0, commands: 0 });
+    assert.deepEqual(f.notices, []);
+    assert.equal(f.aborts, 0);
+  }
+});
+
+test("incompatible runs ignore every marker and sentinel collision shape", () => {
+  for (const systemPromptOptions of incompatibleOptions()) {
+    for (const collision of collisionShapes()) {
+      const f = harness();
+      const event = compatibleEvent({
+        systemPrompt: `BASE
+${collision}`,
+        systemPromptOptions,
+      });
+      const before = structuredClone(event);
+      assert.equal(f.handler(event), undefined);
+      assert.deepEqual(event, before);
+      assert.deepEqual(f.calls, { tools: 0, messages: 0, commands: 0 });
+      assert.deepEqual(f.notices, []);
+      assert.equal(f.aborts, 0);
+    }
   }
 });
 
@@ -141,17 +177,8 @@ ${projectAppend}` }));
   assert.ok(result.systemPrompt.indexOf(projectAppend) < result.systemPrompt.indexOf(WORK_CONTROL_SENTINEL));
 });
 
-test("any pre-existing marker or sentinel collision fails closed", () => {
-  const collisions = [
-    WORK_CONTROL_START,
-    WORK_CONTROL_END,
-    WORK_CONTROL_SENTINEL,
-    `${WORK_CONTROL_START}
-${WORK_CONTROL_END}`,
-    `${WORK_CONTROL_POLICY}
-${WORK_CONTROL_POLICY}`,
-  ];
-  for (const collision of collisions) {
+test("any pre-existing marker or sentinel collision fails closed for compatible runs", () => {
+  for (const collision of collisionShapes()) {
     const f = harness();
     assert.throws(
       () => f.handler(compatibleEvent({ systemPrompt: `BASE

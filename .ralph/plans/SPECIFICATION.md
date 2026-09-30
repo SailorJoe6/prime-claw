@@ -44,16 +44,19 @@ A compatible run has all three supported structured signals:
 3. a model-visible Python skill named `rlm-heartbeat` with import name
    `rlm_heartbeat`.
 
-Missing, disabled, or mismatched capabilities produce a silent no-op. Capability
-is evaluated per run from structured event data, never rendered prompt prose or
-filesystem discovery.
+Missing, disabled, or mismatched capabilities produce a silent no-op before
+any marker or collision validation. An incompatible run leaves the event
+unchanged and emits no notification, abort, error, tool, message, or state
+mutation even when its base prompt contains a work-control marker or sentinel.
+Capability is evaluated per run from structured event data, never rendered
+prompt prose or filesystem discovery.
 
-The deterministic policy has sentinel
+For a compatible run only, the deterministic policy has sentinel
 `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1`, explicit start/end markers, and no
-more than 4,000 UTF-8 bytes excluding markers and sentinel. It appears once in a
-compatible run. Any pre-existing marker or sentinel, including partial,
-duplicate, or malformed shapes, is a collision and fails closed. A project
-`APPEND_SYSTEM.md` cannot suppress the later contribution.
+more than 4,000 UTF-8 bytes excluding markers and sentinel. It appears once.
+Any pre-existing marker or sentinel, including partial, duplicate, or malformed
+shapes, is a collision and fails closed. A project `APPEND_SYSTEM.md` cannot
+suppress the later contribution.
 
 ## Ownership model
 
@@ -138,9 +141,10 @@ The candidate is accepted for restart review when all are true:
 2. Removal happens before the new transient extension is installed by the
    managed apply sequence.
 3. Direct non-native tests cover each compatibility signal, disabled/mismatched
-   skills, default selected tools, deterministic single-copy policy, size bound,
-   marker/collision failure, project append coexistence, no event mutation, and
-   no message/tool/command registration.
+   skills, default selected tools, incompatible-plus-marker silent no-op,
+   deterministic single-copy policy, size bound, compatible collision failure,
+   project append coexistence, no event mutation, and no
+   message/tool/command/notification/abort activity on incompatible runs.
 4. Isolated installer tests cover obsolete regular-file removal, unsafe
    directory/symlink rejection before mutation, unrelated-file preservation,
    new allowlist parity, and stale-file check failure.
@@ -151,10 +155,12 @@ The candidate is accepted for restart review when all are true:
    launched.
 7. Canonical docs, active plan/spec, and Beads describe exactly these two
    checkpoints and preserve rejected `3f2072e` as history.
-8. One clean candidate is committed and pushed, then receives fresh owner and
-   EXPERT review.
-9. Managed global apply/check succeeds, but the loaded process is explicitly
-   reported as old until restart.
+8. One clean replacement candidate is committed and pushed for fresh owner
+   review. The duplicate intermediate EXPERT gate is removed; exactly one
+   mandatory final exact-candidate EXPERT review remains after manual UAT and
+   final artifact reconciliation.
+9. Only after owner acceptance, managed global apply/check succeeds, but the
+   loaded process is explicitly reported as old until restart.
 
 ### Checkpoint 2 — operator restart and Joe-observed UAT
 
@@ -162,16 +168,16 @@ After the candidate and apply/check, stop with the exact restart action and a
 short checklist. In one fresh post-restart session Joe observes and records
 pass/fail for:
 
-1. old pause/resume tools absent;
-2. compatible normal session: active goal → monitored observable wait → fresh
-   goal only when substantive agent work remains;
-3. human-only blocker: one actionable checkpoint and no person-polling
-   heartbeat;
-4. incompatible capability configuration: no work-control policy; and
-5. no visible policy accumulation across ordinary turns or saved-session
-   resume.
+1. old pause/resume tools are visibly absent;
+2. a compatible normal session visibly moves from active-work goal to monitored
+   observable wait and creates a fresh goal only when substantive agent work
+   remains; and
+3. a human-only blocker produces one visible actionable checkpoint and no
+   heartbeat that merely polls the person.
 
-Manual observation is the behavioral acceptance evidence. Do not claim more
+Hidden capability gating and non-accumulation remain direct-test contracts, not
+manual-UAT steps. Manual observation is the behavioral acceptance evidence. Do
+not claim more
 than Joe reports. Full completion and archival occur only after Checkpoint 2.
 
 ## Scope boundaries

@@ -50,8 +50,8 @@ function rejectCollision(systemPrompt: string, ctx: ExtensionContext): void {
 
 export default function goalHeartbeatWorkControl(pi: ExtensionAPI) {
   pi.on("before_agent_start", (event: any, ctx: ExtensionContext) => {
-    rejectCollision(event.systemPrompt, ctx);
     if (!compatible(event)) return;
+    rejectCollision(event.systemPrompt, ctx);
     return { systemPrompt: `${event.systemPrompt}
 
 ${WORK_CONTROL_POLICY}` };
