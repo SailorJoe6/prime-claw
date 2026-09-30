@@ -721,3 +721,41 @@ cutover, routed write, or plugin overwrite occurred.
 ## 2026-09-30 — fresh exact-candidate EXPERT BLOCK F1 (proof-only revision)
 
 A fresh independent `openai-codex/gpt-6-astra`/`max` EXPERT reviewed local-only exact brain commit `83eee06e4322b3264bb812959a2a5482bce13151` against pushed project evidence `aa124b8dc429800ff9f5e2b87fd0eaa0725a0ca7` and returned **BLOCK F1 only**: the binding second, non-Git scratch full-source validation was not performed. The isolated Git native result independently reproduced 1,202/zero and the unchanged offline tests passed 85/three warnings; all other candidate, newer-source, accepted-blob, ref, policy, both DB and Beads checks passed. The exact EPISODE confirmed the scratch result is absent. Complete private EXPERT report SHA-256 `3560beec3b46403fa0dcfcaeb00378f35a68dc880da453c87ec38812c6d6a154`; [sanitized owner disposition](../evidence/phase3a-slice2-joe-a-expert-block-83eee-20260930.md) SHA-256 `2e57ef0eab35cdf99d297a1d1b1a44271ac06d4a39e923a92aae861073e0c937`. The owner accepted **F1 as in-scope proof-only REVISE**, not the candidate. Safely validate a distinct exact-commit scratch view with byte/path/mode identity and fresh state gates, then require fresh EXPERT PASS and separate owner decision. Source/parent/routed-write remain BLOCKED; no brain publication, Qwen/index/build, cutover or routed write.
+
+## 2026-09-30 F1: distinct non-Git scratch proof for exact local-only candidate
+
+The owner accepted the independent F1 **BLOCK** only as a proof-only revision.
+No change was made to candidate `83eee06e4322b3264bb812959a2a5482bce13151`
+or its local ref. Fresh before-and-after checks passed: live brain `main` remains
+its parent `eb157c713b24bb0ec9315ae27617b16da5cbf71b`; accepted checkout
+is clean and no-sync; preserved refs, exact base policy and **both** database
+aggregates match their prior snapshots; no active sync/build was observed.
+
+From the immutable exact candidate tree, `git archive --format=tar` produced
+an explicitly extracted **non-Git scratch source view**, separate from the
+previous isolated Git worktree. Before native validation, all 1,224 tracked
+paths were checked for complete path, Git mode, and blob byte identity (Git
+blob SHA-1); special/unsafe paths and `.git` metadata were excluded. Each of
+the 20 original Markdown files remains an exact suffix; both accepted Slice 1
+blobs are byte-equal; all 82 disjoint newer remote paths have the expected
+bytes or absence. A post-validation independent walk rechecked all 1,224
+files, modes, blob IDs and the same SHA-256 identity manifest
+`a6b30f27d09f60475c733082e6f33afc099e0bceb4737f05d4a868943a2c8556`.
+The full Git tree has 1,206 Markdown files; the native frontmatter validator
+scanned its applicable 1,202 Markdown files.
+
+Native no-fix `gbrain frontmatter validate <non-Git scratch view> --json`
+exited **0 with 1,202 Markdown files, zero files with errors and zero errors**.
+Private report SHA-256 `d107df5ec1f064754538ff6b126a295cef457e18edec1ea1d70c8774458f703b`.
+The [sanitized F1 proof receipt](../evidence/phase3a-slice2-joe-a-f1-nongit-scratch-83eee-20260930.json)
+SHA-256 `2e7748a25e166ab37b83847895f0d74dca61f8f5b2de11f2bd578078c93f2404`
+records the exact private artifact paths and provenance without private page
+content. No additional test run was needed for proof-only F1; the unchanged
+focused selection remains 85 passing tests/three warnings (log SHA-256
+`b62c8cf47706f4c0827b17a43eb10962162d6341829b0189ef9a7aaac221eba3`).
+
+This evidence is **not acceptance** of the candidate or B1/source-current.
+Fresh independent exact-commit EXPERT review and a separate owner decision
+remain required. Source, parent, and ordered Qwen Beads stay BLOCKED. No
+brain push/publication, Qwen retry/index/build/cutover, routed write or
+plugin overwrite occurred.
