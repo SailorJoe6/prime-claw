@@ -19,9 +19,9 @@ PRIME_AGENT_SOURCE; TIER1_ENV_FILE override), same fail-fast ladder (docker
 readiness -> source staging -> image build -> container run), same install
 commands, same in-container apply/check against the container's own
 ~/.prime/agent. Host-side fork staging in source mode duplicates the
-driver's B1 contract (fresh build every run after removing the four
-pack-consumed dist dirs); if the driver's staging contract changes, change
-it there first and mirror it here.
+driver's B1 contract (fresh build every run after FAIL-CLOSED removal of
+the four pack-consumed dist dirs); if the driver's staging contract
+changes, change it there first and mirror it here.
 
 Container/ host file exchange uses a session share directory bind-mounted
 at the SAME absolute path on both sides, so paths embedded in probe sources
@@ -130,18 +130,41 @@ def _load_install_selection() -> tuple[str, str]:
     return "pinned", pinned
 
 
+def _remove_dist_tree(path: Path) -> None:
+    """Fail-closed `rm -rf` equivalent for one pack-consumed dist tree.
+
+    Mirrors the driver's `rm -rf` under `set -e` (scripts/test-tier1.sh):
+    absence is fine; a symlink or plain file is unlinked; a directory is
+    removed recursively; any permission/IO/type error raises, so the run
+    stops BEFORE build/pack/image-build/container creation — a possibly
+    stale tree never reaches the packer.
+    """
+    try:
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        elif path.is_dir():
+            shutil.rmtree(path)
+        # else: absent — nothing to remove
+    except OSError as exc:
+        raise RuntimeError(
+            f"tier-1 fixture: cannot remove stale build output {path} "
+            f"({exc}) — refusing to build/pack from a possibly-stale tree"
+        ) from exc
+
+
 def _stage_fork_release(source: str) -> tuple[str, Path]:
     """Mirror of the driver's B1 source staging: FRESH build on every run.
 
     The fork build (tsgo + asset copies) does NOT clean dist, so the four
-    pack-consumed dist dirs are removed first; freshness is never inferred
-    from version equality or directory existence. release:pack wipes its
+    pack-consumed dist dirs are removed first — fail-closed, exactly like
+    the driver's rm -rf under set -e; freshness is never inferred from
+    version equality or directory existence. release:pack wipes its
     out-dir before writing, so a failed run leaves no fallback artifacts.
     """
     src = Path(source)
     print(f"tier-1 fixture: fresh fork build (rm dist dirs; npm run build in {source})")
     for pkg in DIST_DIRS:
-        shutil.rmtree(src / pkg / "dist", ignore_errors=True)
+        _remove_dist_tree(src / pkg / "dist")
     subprocess.run(["npm", "run", "build"], cwd=src, check=True, timeout=1800)
     out_dir = src / FORK_STAGE_SUBDIR
     print(f"tier-1 fixture: release:pack -> {out_dir}")
@@ -372,6 +395,103 @@ def _is_relative_to(path: Path, root: Path) -> bool:
         return False
 
 
+def _container_absent(container_id: str, timeout: float = 15) -> bool:
+    """True only when docker POSITIVELY reports the container absent.
+
+    A nonzero `docker inspect` means absent; a timeout or local error
+    means absence is NOT established (conservative — B2).
+    """
+    try:
+        out = subprocess.run(["docker", "inspect", container_id],
+                             capture_output=True, text=True, timeout=timeout)
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return out.returncode != 0
+
+
+def _remove_session_container(container_id: str, *,
+                              rm_timeout: float = 60) -> None:
+    """Remove the ONE captured session container and verify absence (B2).
+
+    Bounded: exactly one forced removal plus one inspect verification,
+    both scoped to the captured container ID — no docker-wide pruning,
+    no name-based guesses, no retries. Idempotent: a nonzero removal exit
+    (e.g. "No such container") with positively verified absence succeeds —
+    the container is already gone. A timeout or launch failure always
+    fails closed, even when a later inspect reports absence: a hung docker
+    CLI is itself a teardown anomaly worth surfacing. Otherwise raises
+    RuntimeError with the exact container identity and diagnostics, so
+    the gate can never go green with a leaked container.
+    """
+    diagnostics = []
+    fatal = None    # timeout / launch failure: always fails closed
+    rm_error = None  # nonzero exit: OK only when absence is verified
+    try:
+        rm = subprocess.run(["docker", "rm", "-f", container_id],
+                            capture_output=True, text=True, timeout=rm_timeout)
+        diagnostics.append(
+            f"docker rm -f rc={rm.returncode} "
+            f"stdout={rm.stdout.strip()!r} stderr={rm.stderr.strip()!r}")
+        if rm.returncode != 0:
+            rm_error = f"docker rm -f exited {rm.returncode}"
+    except subprocess.TimeoutExpired:
+        fatal = f"docker rm -f timed out after {rm_timeout}s"
+        diagnostics.append(fatal)
+    except OSError as exc:
+        fatal = f"docker rm -f could not run: {exc}"
+        diagnostics.append(fatal)
+    absent = _container_absent(container_id)
+    diagnostics.append(f"docker inspect: absent={absent}")
+    if fatal is None and absent:
+        if rm_error:
+            print(f"tier-1 fixture: {rm_error}, but container absence is "
+                  "verified — treating teardown as idempotent success")
+        return
+    reasons = [r for r in (fatal, rm_error) if r]
+    if not absent:
+        reasons.append("the container is still present afterwards")
+    raise RuntimeError(
+        "tier-1 fixture: TEARDOWN FAILED — could not establish clean "
+        f"removal of the session container. container_id={container_id}. "
+        f"Reasons: {'; '.join(reasons)}. Final absence check: "
+        f"absent={absent}. Diagnostics: {'; '.join(diagnostics) or 'none'}. "
+        f"Remove it manually: docker rm -f {container_id}"
+    )
+
+
+def _finalize_session(container_id, share: Path, in_flight=None) -> None:
+    """Session teardown: verified container removal, then share policy.
+
+    The session share is evidence: it is removed only when no container
+    can still own it (nothing was published, or teardown verified
+    absence). When teardown fails while a setup/test failure is already
+    in flight, the teardown failure is attached to it as a note so BOTH
+    surface; otherwise the teardown failure raises on its own.
+    """
+    teardown_error = None
+    if container_id is not None:
+        try:
+            _remove_session_container(container_id)
+        except RuntimeError as exc:
+            teardown_error = exc
+            print(f"tier-1 fixture: {exc}")
+    container_gone = container_id is None or teardown_error is None
+    if not os.environ.get("TIER1_KEEP_SHARE"):
+        if container_gone:
+            shutil.rmtree(share, ignore_errors=True)
+        else:
+            print(f"tier-1 fixture: session container may still own the "
+                  f"share — preserving evidence at {share}")
+    else:
+        print(f"tier-1 fixture: TIER1_KEEP_SHARE set — preserving {share}")
+    if teardown_error is not None:
+        if in_flight is not None:
+            in_flight.add_note(
+                f"tier-1 fixture teardown also failed: {teardown_error}")
+        else:
+            raise teardown_error
+
+
 @pytest.fixture(scope="session")
 def tier1_container(request):
     """One tier-1 container per pytest session that includes container tests.
@@ -379,7 +499,9 @@ def tier1_container(request):
     Driver-equivalent setup runs ONCE here: build the image (cached),
     stage/install prime-agent per .env, then apply + check the plugin
     against the container's own ~/.prime/agent. The container is destroyed
-    at session end.
+    — and its absence verified — at session end; a teardown failure fails
+    the run with the exact container identity (B2), and the session share
+    evidence is preserved while a container may still own it.
     """
     if shutil.which("docker") is None:
         pytest.skip("tier 1 requires Docker: no docker executable on PATH")
@@ -396,6 +518,7 @@ def tier1_container(request):
     log_lines = [f"mode={mode} value={value}", f"share={share}"]
 
     container_id = None
+    setup_error = None
     try:
         mounts = ["-v", f"{REPO}:{WORKSPACE}:ro",
                   "-v", f"{share}:{share}"]
@@ -419,7 +542,9 @@ def tier1_container(request):
             check=True, capture_output=True, text=True, timeout=1200,
         )
 
-        name = f"prime-claw-tier1-session-{os.getpid()}"
+        # Unique per run (pid + epoch): a later run never collides with —
+        # and therefore never inherits — a failed run's leftover container.
+        name = f"prime-claw-tier1-session-{os.getpid()}-{int(time.time())}"
         started = subprocess.run(
             ["docker", "run", "-d", "--name", name, *mounts,
              IMAGE, "sleep", "infinity"],
@@ -455,14 +580,11 @@ def tier1_container(request):
         setup_log.write_text("\n".join(log_lines))
 
         yield container
+    except BaseException as exc:  # setup failure or throw-in at the yield
+        setup_error = exc
+        raise
     finally:
-        if container_id is not None:
-            subprocess.run(["docker", "rm", "-f", container_id],
-                           capture_output=True, timeout=60)
-        if not os.environ.get("TIER1_KEEP_SHARE"):
-            shutil.rmtree(share, ignore_errors=True)
-        else:
-            print(f"tier-1 fixture: TIER1_KEEP_SHARE set — preserving {share}")
+        _finalize_session(container_id, share, setup_error)
 
 
 @pytest.fixture

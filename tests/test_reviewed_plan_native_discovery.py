@@ -416,5 +416,3 @@ export default function x(pi){pi.registerProvider("poc",{baseUrl:"x",apiKey:"x",
     replay_env={**env2,"PROBE_MODE":"replay"};replay=run(tier1_container,[PRIME,"--mode","text","--offline","--session-dir",str(sessions),"--no-skills","--no-prompt-templates","--no-context-files","--cwd",project,"--provider","poc","--model","m","--resume",str(owner_files[0]),"-p","replay old alpha after restart"],replay_env)
     assert replay.returncode==0,replay.stdout+replay.stderr;assert tier1_container.read_text(beta_path)==beta_raw;assert oversight_markers()==markers_before;assert len(daemon.commands)==commands_before
     replay_rows=[json.loads(x) for x in records.read_text().splitlines()][rows_before:];restart_result=replay_rows[-1]["alphaResult"];assert len(replay_rows)>=2 and replay_rows[0]["package"]==1 and replay_rows[-1]["package"]==1 and restart_result["toolCallId"]=="replay-restart" and restart_result["isError"] is False and restart_result["text"]=="Episode bookkeeping was already closed for .ralph/plans/future/alpha. CONVERSATION capability remains." and restart_result["details"]["reused"] is True,replay_rows
-
-

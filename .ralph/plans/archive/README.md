@@ -17,10 +17,13 @@ fork pack), in-container apply/check, a validated probe, and a hard deadline; an
 (3) pytest markers (`container` = tier 1, `sandbox` = tier 2, unmarked = tier 0),
 the session-scoped `tier1_container` fixture (one container per run,
 driver-mirrored setup, exec helpers), migration of all tier-1 suites to
-in-container exec, and the `scripts/test-all.sh` sequencer. Acceptance: the
-tier-0 default `python3 -m pytest tests/ -q` passes with no Docker (223 passed,
-144 skipped); the full tier-1 suite passes in one container for both install
-modes (37 passed). Accepted commits: slice 1 `2666843`, slice 2 `bc00cba`,
+in-container exec, and the `scripts/test-all.sh` sequencer. Acceptance
+(verified split, mirroring the slice-3 evidence note): the tier-0 default
+`python3 -m pytest tests/ -q` passes with no Docker (223 passed, 144 skipped,
+post-reconciliation). Tier-1 in ONE session container: source mode
+**34 passed/139s BEFORE the merge reconciliation**; pinned mode
+**37 passed/118s AFTER reconciliation**; the post-reconciliation source-mode
+gate is NOT claimed. Accepted commits: slice 1 `2666843`, slice 2 `bc00cba`,
 slice 3 `d040c02` plus merge-reconciliation `7118a44` (rebased onto main
 `9b3edd2`, the goal-heartbeat plugin generation).
 

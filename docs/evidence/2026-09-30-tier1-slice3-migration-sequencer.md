@@ -241,3 +241,137 @@ DEVELOPERS.md's "Testing" section the canonical operator-facing reference,
 and its spec pointer was repointed to
 `.ralph/plans/archive/plugin-test-container/SPECIFICATION.md` in the
 archival commit.
+
+## Final-expert-block repair (c53972f review → this commit)
+
+The FINAL EXPERT gate on `c53972f` returned **BLOCK** with three findings
+(full report preserved in the main repository at
+`docs/evidence/2026-09-30-tier1-final-expert-review-c53972f.md`, to be
+folded into the archive bundle's `reviews/` at merge time). All three are
+repaired in this commit; scope was limited to `tests/conftest.py`, the new
+behavioral tests, the archive index, the inventory, and this note.
+
+### B1 — fixture source staging is now fail-closed (was P2, 10/10)
+
+`tests/conftest.py:_stage_fork_release` no longer removes the four
+pack-consumed dist trees with `shutil.rmtree(ignore_errors=True)`. The new
+`_remove_dist_tree` mirrors the driver's `rm -rf` under `set -e`
+(`scripts/test-tier1.sh:258-265`): absence is fine; symlinks/plain files
+are unlinked (never recursed); directories are removed recursively; any
+permission/IO/type error raises, stopping the run BEFORE
+build/pack/image-build/container creation. Behavioral coverage in
+`tests/test_tier1_fixture.py` exercises the ACTUAL fixture path with
+recording npm/node substitutes (never real Docker, never a real build):
+
+- `TestStageForkRelease`: stale outputs removed + current source packed;
+  replay after a source change WITHOUT a version change packs the changed
+  implementation; cleanup denial (0555 `retired-module/` with an obsolete
+  compiled file) stops before build/pack with the stale tree untouched;
+  build failure fails closed before pack; pack failure fails closed
+  without fallback artifacts; missing dist trees stay a valid positive
+  case.
+- `TestRemoveDistTree`: absent / plain-file / symlink / permission-denied
+  semantics of the removal primitive itself.
+- `TestDryRunEquivalent`: a default `pytest tests/ -q` invocation skips
+  every fixture user at collection (behavioral, via the real
+  `pytest_collection_modifyitems` hook), and the fixture's docker skip
+  guards structurally precede the single `_stage_fork_release` call site —
+  the fixture-level dry-run-equivalent performs no build/pack/docker call.
+
+### B2 — container teardown is verified and part of the gate (was P2, 10/10)
+
+The session fixture finalizer no longer fire-and-forgets `docker rm -f`.
+Teardown now goes through `_remove_session_container`: exactly one forced
+removal plus one `docker inspect` absence verification, both scoped to the
+one captured container ID — no docker-wide pruning, no name-based guesses,
+no retries, bounded timeouts. Semantics:
+
+- removal OK + absence verified → success (and only then is the session
+  share removed — share evidence is never deleted while a container may
+  still own it);
+- removal nonzero + absence verified → idempotent success (already absent);
+- removal nonzero/timeout/launch failure without verified absence, a
+  still-present container after "successful" removal, or ANY timeout →
+  `RuntimeError` with the exact container identity and full diagnostics,
+  so the gate can never go green with a leaked container;
+- when a setup/test failure is already in flight, the teardown failure is
+  attached to it via `add_note` so BOTH surface;
+- the session container name is now unique per run
+  (`prime-claw-tier1-session-<pid>-<epoch>`), so a later run never
+  collides with — or inherits — a failed run's leftover.
+
+`tests/test_tier1_fixture.py::TestSessionTeardown` covers the acceptance
+matrix with a recording docker substitute: positive
+setup/body/teardown proves absence (`rm -f` then `inspect`, in order);
+removal-nonzero and timeout fail the gate and retain identity +
+diagnostics + share evidence; unpublished container means zero docker
+calls; setup-failure + teardown-failure preserves both errors;
+already-absent is idempotent; unrelated containers are never targeted;
+`TIER1_KEEP_SHARE=1` still preserves the share. Static guards pin the
+unique-name construction and the absence of docker-wide operations.
+
+Fresh no-leftover-containers check (this repair pass ran NO container
+workloads — tier-0 gate plus fake-docker behavioral tests only):
+
+```
+$ docker ps -a --filter name=prime-claw-tier1-session
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+```
+
+(empty — no tier-1 session containers remain.)
+
+### B3 — archive index states the verified acceptance split (was P2, 10/10)
+
+`.ralph/plans/archive/README.md` no longer claims the full tier-1 suite
+passes "for both install modes (37 passed)". The entry now records the
+verified split exactly as this note does: source mode **34 passed/139s
+BEFORE the merge reconciliation**, pinned mode **37 passed/118s AFTER
+reconciliation**, and the post-reconciliation source-mode gate NOT
+claimed. The valid pre-reconciliation 34-test source result is preserved,
+not erased.
+
+### Hygiene (from the same review, non-blocking)
+
+- (a) The five R-T1-* `plan` references in
+  `config/requirements-inventory.json` now point to the archived spec
+  (`.ralph/plans/archive/plugin-test-container/SPECIFICATION.md`); the new
+  `tests/test_tier1_fixture.py` is listed under R-T1-3 (default-skip
+  policy) and R-T1-4 (session fixture) `proven_by`.
+- (b) The new blank line at EOF in
+  `tests/test_reviewed_plan_native_discovery.py` is removed
+  (`git diff --check` clean).
+- (c) The historical slice-3 host checksum captures referenced above
+  (`/tmp/tier1-host-{before,after}-slice3.sha256`) name the obsolete
+  `goal-blocker-control.ts` generation (8 managed files) and omit the
+  current `goal-heartbeat-work-control.ts`; they remain as HISTORICAL
+  RECORD of their run windows and are not rewritten. The current-generation
+  hash check is the fresh evidence for the final review window — captured
+  read-only in this repair pass (repair ran no container workloads, so
+  host state is trivially untouched):
+
+```
+8faa7537a1f177327177c796287d6d36ab50df624f8c5552906f50ca6437d595  extensions/goal-heartbeat-work-control.ts
+debd42d40ba1c9a9ba23607c0e2f25e8505e6ef640cedfb62d8bffbe8d61ceb6  extensions/handoff-chain.ts
+1c7c5a9870c3a23c7f1bec8facdab8471e5290ee4a41991e8d5dab7bc5488b22  extensions/reviewed-plan.ts
+07d376b1bfad0b0cd4af8d8cd298b2a6e94a35e5f46bea1c69a17031b208a714  extension-support/conversation-oversight.ts
+a40953bb802242c4dbeb698627ea1a0886e1ded8a73f3ffe66bec56a952a2732  extension-support/episode-close.ts
+a85fde2479c5b3cf5d2f28cfb33eefad413abeed6a16397236df9de322b4cb08  extension-support/handoff-prompts.ts
+a4230f9aded32585f778a82ddd3b659deea513507a14d0c742cc656eb58bf107  extension-support/reviewed-plan-support.ts
+071fad769058b82e92e2615d6092bf73e052e74025141ad48e149057577296d4  extension-support/spec-episode.ts
+fea6c335b95dc688ed9c16b4830db4da63b15af3dd19a5420a75de54601d9b1b  APPEND_SYSTEM.md
+```
+
+  Both obsolete files confirmed absent on the host:
+  `extensions/goal-blocker-control.ts`,
+  `extension-support/episode-finalization.ts`.
+
+### Post-repair tier-0 gate
+
+`python3 -m pytest tests/ -q` → **249 passed, 144 skipped** in ~39s
+(249 = the 222-test post-reconciliation gate + 27 new fixture behavioral
+tests; skips unchanged). The single failure was again the documented
+pre-existing timing flake
+`test_embedding_candidate_build.py::test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero`,
+green on immediate standalone re-run (1 passed in ~2s) — unchanged
+test/subject code, host-only watchdog timing, unrelated to this repair
+(the repair touches no sandbox/watchdog code).
