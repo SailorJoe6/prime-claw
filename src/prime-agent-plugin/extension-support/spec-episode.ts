@@ -563,6 +563,16 @@ export interface PrimeSessionManagerClass {
   };
 }
 
+export function runtimeSessionManagerClass(sessionManager: object): PrimeSessionManagerClass {
+  const candidate = Object.getPrototypeOf(sessionManager)?.constructor as
+    | Partial<PrimeSessionManagerClass>
+    | undefined;
+  if (!candidate || typeof candidate.forkFrom !== "function") {
+    throw new Error("Prime Agent did not expose a runtime SessionManager with forkFrom");
+  }
+  return candidate as PrimeSessionManagerClass;
+}
+
 export function forkPrimeSession(
   SessionManager: PrimeSessionManagerClass,
   options: {
@@ -604,9 +614,14 @@ export function forkPrimeSession(
 
 export class PrimeSessionPublisher implements SessionPublisher {
   private readonly client: DaemonJsonlClient;
+  private readonly SessionManager?: PrimeSessionManagerClass;
 
-  constructor(client = new DaemonJsonlClient(daemonSocketPath())) {
+  constructor(
+    client = new DaemonJsonlClient(daemonSocketPath()),
+    SessionManager?: PrimeSessionManagerClass,
+  ) {
     this.client = client;
+    this.SessionManager = SessionManager;
   }
 
   async list(): Promise<SessionSummary[]> {
@@ -635,8 +650,8 @@ export class PrimeSessionPublisher implements SessionPublisher {
     toolCallId: string;
     model?: { provider: string; id: string };
   }): Promise<PublishedSession> {
-    const module = await import("@earendil-works/pi-coding-agent");
-    const { sessionFile, sessionId } = forkPrimeSession(module.SessionManager, options);
+    if (!this.SessionManager) throw new Error("Episode publication is missing the runtime SessionManager");
+    const { sessionFile, sessionId } = forkPrimeSession(this.SessionManager, options);
     try {
       return await this.openResident({
         sessionFile,
@@ -995,7 +1010,10 @@ export async function createSpecEpisode(
       sessionName,
     };
     const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
-    publisher ??= new PrimeSessionPublisher();
+    publisher ??= new PrimeSessionPublisher(
+      undefined,
+      runtimeSessionManagerClass(ctx.sessionManager),
+    );
     const sessions = await publisher.list();
     const existing = filesystem.readIdentity(recordPath);
     if (existing) {

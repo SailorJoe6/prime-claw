@@ -192,7 +192,12 @@ unchanged.
 
 Prime Agent's public `SessionManager.forkFrom` API copies the complete owner
 conversation into a new durable session with the episode worktree as its CWD.
-The fork includes the successful `create_spec_episode` tool result so it does
+The plugin takes the `SessionManager` class from the actual read-only
+`ctx.sessionManager` instance that Prime Agent already supplied and verifies that
+`forkFrom` is callable. It does not re-import the complete coding-agent package
+from inside the extension loader, so source and bundled runtimes use the same
+already-loaded class identity. The fork includes the successful
+`create_spec_episode` tool result so it does
 not begin with a dangling tool call. Prime Agent 0.9.5 has no public extension
 API that publishes a fork as a separate sibling without replacing the owner,
 so the narrowly scoped host adapter uses the daemon supervisor socket injected

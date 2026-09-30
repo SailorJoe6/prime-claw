@@ -169,6 +169,15 @@ def test_spec_episode_node_suite() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_episode_creation_reuses_host_session_manager_without_runtime_package_import() -> None:
+    """Source-mode Jiti loading must not re-import the complete coding-agent package."""
+    source = EPISODE_EXTENSION.read_text()
+    assert 'import("@earendil-works/pi-coding-agent")' not in source
+    assert "runtimeSessionManagerClass(ctx.sessionManager)" in source
+    assert "Object.getPrototypeOf(sessionManager)?.constructor" in source
+    assert "typeof candidate.forkFrom" in source
+
+
 def test_prime_agent_rpc_loads_native_commands_and_structured_tool() -> None:
     """Probe real offline RPC after startup to prove command and tool registration."""
     prime_agent = shutil.which("prime-agent")

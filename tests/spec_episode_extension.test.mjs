@@ -28,6 +28,7 @@ import {
   NodeFilesystemAdapter,
   PrimeSessionPublisher,
   parseEpisodeIdentity,
+  runtimeSessionManagerClass,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 
 const LOCATION = ".ralph/plans/future/alpha-plan";
@@ -1020,6 +1021,64 @@ test("public SessionManager forkFrom gets target cwd and a matching successful t
 });
 
 
+
+test("runtime SessionManager resolution reuses the class already supplied by the extension context", () => {
+  class RuntimeSessionManager {
+    static forkFrom() { throw new Error("not called by resolver"); }
+  }
+
+  assert.equal(runtimeSessionManagerClass(new RuntimeSessionManager()), RuntimeSessionManager);
+  assert.throws(
+    () => runtimeSessionManagerClass({}),
+    /did not expose a runtime SessionManager with forkFrom/,
+  );
+});
+
+test("publisher forks with the supplied runtime SessionManager without importing the coding-agent package", async () => {
+  const calls = [];
+  class RuntimeSessionManager {
+    static forkFrom(source, cwd) {
+      calls.push({ source, cwd });
+      return {
+        getSessionFile: () => "/sessions/runtime-fork.jsonl",
+        getSessionId: () => "runtime-fork-id",
+        appendCustomEntry() { return "identity"; },
+        appendMessage() { return "tool-result"; },
+      };
+    }
+  }
+  const requests = [];
+  const client = {
+    async request(command) {
+      requests.push(command);
+      return { success: true, data: {
+        activeSessionId: "active-runtime-fork",
+        sessionId: "runtime-fork-id",
+        sessionFile: "/sessions/runtime-fork.jsonl",
+        sessionName: "alpha-episode",
+        cwd: "/repo-alpha-episode",
+      } };
+    },
+    close() {},
+  };
+  const publisher = new PrimeSessionPublisher(client, RuntimeSessionManager);
+
+  const result = await publisher.forkAndPublish({
+    sourceSessionFile: "/sessions/owner.jsonl",
+    worktree: "/repo-alpha-episode",
+    sessionName: "alpha-episode",
+    branch: "episode/alpha",
+    toolCallId: "tool-call-runtime",
+  });
+
+  assert.deepEqual(calls, [{ source: "/sessions/owner.jsonl", cwd: "/repo-alpha-episode" }]);
+  assert.deepEqual(result, {
+    activeSessionId: "active-runtime-fork",
+    sessionId: "runtime-fork-id",
+    sessionFile: "/sessions/runtime-fork.jsonl",
+  });
+  assert.deepEqual(requests.map((request) => request.type), ["create"]);
+});
 
 test("episode identity append failure removes the created fork file", () => {
   const sessionFile = join(tmpdir(), `prime-claw-fork-failure-${process.pid}-${Date.now()}.jsonl`);
