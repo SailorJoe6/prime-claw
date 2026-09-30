@@ -1,0 +1,71 @@
+{
+  "boundary": {
+    "historical_unaccepted_candidate": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "last_observed_accepted_clean_checkout": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "last_observed_brain_remote_main": "eb157c713b24bb0ec9315ae27617b16da5cbf71b",
+    "no_new_brain_candidate_ref_push_or_source_edit": true,
+    "no_qwen_retry_index_build_cutover_routed_write": true,
+    "project_base_commit": "27671cce2363c80fb34844e521166d8b6187d3cf",
+    "slice2_not_accepted": true
+  },
+  "code_hashes": {
+    "bin/prime-claw_sha256": "610c2d8db2b067937d86356c945e7e4b6634bec63376775b96d415223921bb13",
+    "tests/test_embedding_candidate_build.py_sha256": "1fe201e0d72f915b97db532da7333025bdf9154d249edf98c0001d7e250b41d2"
+  },
+  "decision": "LOCAL REPAIR CHECKS PASS, NOT INDEPENDENT EXPERT PASS; stop after a clean project checkpoint for fresh exact-commit EXPERT and owner review before any new Joe-A brain candidate.",
+  "repair": {
+    "bounded_owned_teardown": "On early leader exit, owned negative-PID group TERM and KILL happen before wait/reap to clear descendant-only groups; when shim is still live, direct PID TERM and KILL precede final group KILL. Never signal the caller PGID or a process name. State and watcher cleanup remain bounded.",
+    "preserved": "Original 15-second test body, assertions, shell fragment and three-module selection are unchanged; production sync command remains literal setsid gbrain sync ... 2>&1 &; no DB, brain source, sandbox or provider action.",
+    "runtime_surface": "bin/prime-claw::_candidate_progress_watchdog_script",
+    "same_pid_group_attestation": "Background setsid shell function execs resolved setsid binary. Inside isolated group, Bash writes ready:<its PID> into private watchdog state before exec of original sync command. Parent requires matching PID and group before starting no-progress clock; short completed work can still be classified after cleanup.",
+    "status_contract": "Completed ready worker returns real 0 or nonzero status after group cleanup. Never-ready setsid or launch failure returns125; signal returns143; genuine durable-progress stall retains124."
+  },
+  "review_provenance": {
+    "findings": [
+      "P1/B2-R1 failed group probe to dead-leader gap can strand an isolated TERM-ignoring descendant and pipe writers",
+      "P2/B2-R2 fast isolated worker exits 0/7 misreported as launch 125"
+    ],
+    "prior_expert_verdict": "BLOCK",
+    "private_report_sha256": "acf6cb1b0ad473005ac9b191d0f5a7b286d3698dad1501c4661b5e088399774b",
+    "reviewed_commit": "e4cfe1b79f293a34ccb3f15e46d1643813e54c9b",
+    "sanitized_report": "docs/evidence/phase3a-slice2-b2-setsid-repair-expert-block-e4cfe1-20260930.md"
+  },
+  "schema": "prime-claw.phase3a.slice2.b2_watchdog_revision.v1",
+  "scope": "owner-approved linked P1/B2-R1 and P2/B2-R2 watchdog runtime/test-harness repair only; local offline no-write",
+  "tests": {
+    "environment": "PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q -p no:cacheprovider --basetemp=<unique-private-scratch>",
+    "final_full_run": {
+      "private_log_sha256": "e9022fb94edc40b82799b816b65fff4951f09a673599e8855c7cfba7349f2669",
+      "result": "PASS",
+      "scratch": "distinct private basetemp; disabled bytecode/cache",
+      "summary": "72 passed, 3 warnings in 24.67s"
+    },
+    "new_cases": [
+      "fast isolated /usr/bin/true returns0 and exit7 returns7",
+      "actual failed negative group probe then isolated group + TERM-ignoring child + leader exit0/7; captured-output EOF, no leader/group/descendant, state removed",
+      "never-ready shim and pre-group launch failure return125 and leave no shim/state",
+      "signal before group readiness and at successful-probe/handler handoff returns143 and clears worker, descendant, group and state"
+    ],
+    "prior_full_runs_before_final_group_assertions": [
+      {
+        "private_log_sha256": "d33ab657a1ad68fd6ec439581df13d325112758ffb2ddbfc0a6167ef1a09ccad",
+        "summary": "72 passed, 3 warnings in 23.30s"
+      },
+      {
+        "private_log_sha256": "42ab6b8f34bcf5dbe190d8e8d5150159ec9ba76aaf1dbd89cfec1a5182129ca6",
+        "summary": "72 passed, 3 warnings in 22.63s"
+      }
+    ],
+    "required_unchanged_full_selection": "tests/test_embedding_candidate_build.py tests/test_runtime_validate.py tests/test_runtime_converge.py",
+    "retained_cases": [
+      "original 15-second stalled worker plus TERM-ignoring descendant",
+      "three-second delayed setsid shim",
+      "ordinary progress-reset success and signal cleanup"
+    ],
+    "targeted_before_final_group_assertions": {
+      "private_log_sha256": "e0f792c969f9c2c327d76672b0817aba774c9a8fb555bdb82a1eba20f408b0da",
+      "selection": "tests/test_embedding_candidate_build.py -k candidate_progress_watchdog",
+      "summary": "11 passed, 23 deselected, 1 warning in 19.89s"
+    }
+  }
+}

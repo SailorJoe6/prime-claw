@@ -166,13 +166,16 @@ errors.
 5. Keep `GBRAIN_AI_EMBED_TIMEOUT_MS` and `GBRAIN_QUERY_EMBED_TIMEOUT_MS` at `1000000`, and keep
    the outer timeout above the sync deadline.
 
-The candidate watchdog waits for the `setsid` worker's process group to become ready
-before it starts the no-progress clock. A launch that never forms the group fails
-closed (125) with bounded cleanup; a real no-progress stall still exits 124.
-Do not extend the 15-second offline watchdog safety test or bypass its worker and
-descendant cleanup assertions. A green local test gate does not authorize a brain
-source push or a candidate build; complete the separate review and source-current
-checks first.
+The candidate watchdog requires a marker written **after** the `setsid` worker
+enters its own process group before it starts the no-progress clock. A fast
+completed worker returns its original 0/nonzero status after group cleanup.
+A launch that never forms the owned group fails closed (125) with bounded
+cleanup; a real no-progress stall still exits 124. Cleanup covers a surviving
+descendant even if its group leader has exited; it never targets the caller's
+group. Do not extend the 15-second offline watchdog safety test or bypass its
+worker and descendant cleanup assertions. A green local test gate does not
+authorize a brain source push or a candidate build; complete the independent
+repair review and source-current checks first.
 
 The 2026-09-18 resume exposed a fail-fast gap: upstream gbrain's `--full` `import.files` path did
 not honor `GBRAIN_SYNC_STALL_ABORT_SECONDS=1200`; only the 12,000-second hard deadline stopped the

@@ -230,6 +230,267 @@ def test_candidate_progress_watchdog_terminates_before_setsid_group_exists(tmp_p
                 pass
 
 
+@pytest.mark.parametrize("command, expected", [('/usr/bin/true', 0), ("bash -c 'exit 7'", 7)])
+def test_candidate_progress_watchdog_preserves_fast_worker_status(tmp_path, command, expected):
+    state_ref = tmp_path / "state-ref"
+    env = _watchdog_test_env(tmp_path)
+    env["WATCHDOG_STATE_REF"] = str(state_ref)
+    fragment = pc._candidate_progress_watchdog_script(
+        command, "printf steady", stall_seconds=2, poll_seconds=1, term_grace_seconds=1,
+    )
+    mktemp_probe = (
+        'mktemp() { local path; path=$(command mktemp "$@") || return; '
+        'printf %s "$path" > "$WATCHDOG_STATE_REF"; printf %s "$path"; }\n'
+    )
+    result = subprocess.run(
+        ["bash", "-c", "set -euo pipefail\n" + mktemp_probe + fragment],
+        text=True, capture_output=True, timeout=8, env=env,
+    )
+    assert result.returncode == expected, result.stderr
+    assert not os.path.exists(state_ref.read_text())
+
+
+@pytest.mark.parametrize("worker_status", [0, 7])
+def test_candidate_progress_watchdog_reaps_group_after_missed_probe(tmp_path, worker_status):
+    """A real failed group probe cannot discard a later leader exit or child."""
+    gate = tmp_path / "failed-probe"
+    descendant_pid_file = tmp_path / "descendant.pid"
+    leader_pid_file = tmp_path / "leader.pid"
+    state_ref = tmp_path / "state-ref"
+    env = _watchdog_test_env(tmp_path)
+    env.update(WATCHDOG_PROBE_GATE=str(gate), WATCHDOG_DESC_FILE=str(descendant_pid_file),
+               WATCHDOG_STATE_REF=str(state_ref))
+    setsid = tmp_path / "bin" / "setsid"
+    setsid.write_text(
+        f"#!{sys.executable}\n"
+        "import os, sys, time\n"
+        f"while not os.path.exists({str(gate)!r}): time.sleep(0.005)\n"
+        "os.setsid()\n"
+        "os.execvp(sys.argv[1], sys.argv[1:])\n"
+    )
+    descendant = (
+        "trap '' HUP INT TERM; "
+        f"echo $$ > {shlex.quote(str(descendant_pid_file))}; "
+        "while :; do sleep 1; done"
+    )
+    worker = (
+        "bash -c " + shlex.quote(descendant) + " & "
+        f"echo $$ > {shlex.quote(str(leader_pid_file))}; "
+        f"while [ ! -s {shlex.quote(str(descendant_pid_file))} ]; do sleep 0.01; done; "
+        f"exit {worker_status}"
+    )
+    fragment = pc._candidate_progress_watchdog_script(
+        "bash -c " + shlex.quote(worker), "printf steady",
+        stall_seconds=3, poll_seconds=1, term_grace_seconds=1,
+    )
+    probe = (
+        'mktemp() { local path; path=$(command mktemp "$@") || return; '
+        'printf %s "$path" > "$WATCHDOG_STATE_REF"; printf %s "$path"; }\n'
+        'kill() { local rc=0; builtin kill "$@" || rc=$?; '
+        'if [ "${1:-}" = -0 ] && [ "${2:-}" = -- ] '
+        '&& [ "${3:-}" = "-$SYNC_PID" ] && [ "$rc" -ne 0 ] '
+        '&& [ ! -e "$WATCHDOG_PROBE_GATE" ]; then '
+        ': > "$WATCHDOG_PROBE_GATE"; '
+        'for _ in $(seq 1 200); do [ -s "$WATCHDOG_DESC_FILE" ] && break; sleep 0.01; done; '
+        '[ -s "$WATCHDOG_DESC_FILE" ] || return 99; sleep 0.2; '
+        'fi; return "$rc"; }\n'
+    )
+    proc = subprocess.Popen(
+        ["bash", "-c", "set -euo pipefail\n" + probe + fragment],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+    )
+    try:
+        _stdout, stderr = proc.communicate(timeout=9)  # Also proves pipe EOF.
+        assert gate.exists() and leader_pid_file.exists() and descendant_pid_file.exists()
+        assert proc.returncode == worker_status, stderr
+        leader_pid = int(leader_pid_file.read_text())
+        assert leader_pid != os.getpgrp()
+        assert _wait_pid_gone(leader_pid)
+        assert _wait_pid_gone(int(descendant_pid_file.read_text()))
+        try:
+            os.killpg(leader_pid, 0)
+        except ProcessLookupError:
+            pass
+        else:
+            pytest.fail("isolated sync process group survived watchdog cleanup")
+        assert not os.path.exists(state_ref.read_text())
+    finally:
+        if leader_pid_file.exists():
+            leader_pid = int(leader_pid_file.read_text())
+            if leader_pid != os.getpgrp():
+                try:
+                    os.killpg(leader_pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        if proc.poll() is None:
+            proc.kill()
+            proc.communicate(timeout=2)
+
+
+@pytest.mark.parametrize("launch_failure", [False, True])
+def test_candidate_progress_watchdog_unready_launch_returns_125(tmp_path, launch_failure):
+    """Neither a failed setsid launch nor a never-ready shim is success."""
+    shim_pid_file = tmp_path / "shim.pid"
+    state_ref = tmp_path / "state-ref"
+    env = _watchdog_test_env(tmp_path)
+    env["WATCHDOG_STATE_REF"] = str(state_ref)
+    setsid = tmp_path / "bin" / "setsid"
+    if launch_failure:
+        setsid.write_text("#!/bin/sh\nexit 22\n")
+    else:
+        setsid.write_text(
+            f"#!{sys.executable}\n"
+            "import os, signal, time\n"
+            f"with open({str(shim_pid_file)!r}, 'w') as out: out.write(str(os.getpid()))\n"
+            "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+            "time.sleep(30)\n"
+        )
+    fragment = pc._candidate_progress_watchdog_script(
+        "/usr/bin/true", "printf steady", stall_seconds=2, poll_seconds=1,
+        term_grace_seconds=1,
+    )
+    probe = (
+        'mktemp() { local path; path=$(command mktemp "$@") || return; '
+        'printf %s "$path" > "$WATCHDOG_STATE_REF"; printf %s "$path"; }\n'
+    )
+    try:
+        result = subprocess.run(
+            ["bash", "-c", "set -euo pipefail\n" + probe + fragment],
+            text=True, capture_output=True, timeout=9, env=env,
+        )
+        assert result.returncode == 125, result.stderr
+        if not launch_failure:
+            assert _wait_pid_gone(int(shim_pid_file.read_text()))
+        assert not os.path.exists(state_ref.read_text())
+    finally:
+        if shim_pid_file.exists():
+            try:
+                os.kill(int(shim_pid_file.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+def test_candidate_progress_watchdog_signal_before_group_ready(tmp_path):
+    shim_pid_file = tmp_path / "shim.pid"
+    state_ref = tmp_path / "state-ref"
+    env = _watchdog_test_env(tmp_path)
+    env["WATCHDOG_STATE_REF"] = str(state_ref)
+    setsid = tmp_path / "bin" / "setsid"
+    setsid.write_text(
+        f"#!{sys.executable}\n"
+        "import os, signal, time\n"
+        f"with open({str(shim_pid_file)!r}, 'w') as out: out.write(str(os.getpid()))\n"
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+        "time.sleep(30)\n"
+    )
+    fragment = pc._candidate_progress_watchdog_script(
+        "/usr/bin/true", "printf steady", stall_seconds=30, poll_seconds=1,
+        term_grace_seconds=1,
+    )
+    probe = (
+        'mktemp() { local path; path=$(command mktemp "$@") || return; '
+        'printf %s "$path" > "$WATCHDOG_STATE_REF"; printf %s "$path"; }\n'
+    )
+    proc = subprocess.Popen(
+        ["bash", "-c", "set -euo pipefail\n" + probe + fragment],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+    )
+    try:
+        deadline = time.time() + 3
+        while not shim_pid_file.exists() and time.time() < deadline:
+            time.sleep(0.01)
+        assert shim_pid_file.exists()
+        proc.terminate()
+        _stdout, stderr = proc.communicate(timeout=7)
+        assert proc.returncode == 143, stderr
+        assert _wait_pid_gone(int(shim_pid_file.read_text()))
+        assert not os.path.exists(state_ref.read_text())
+    finally:
+        if shim_pid_file.exists():
+            try:
+                os.kill(int(shim_pid_file.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        if proc.poll() is None:
+            proc.kill()
+            proc.communicate(timeout=2)
+
+
+def test_candidate_progress_watchdog_signal_at_handler_handoff(tmp_path):
+    """Signal while a successful readiness probe is returning, before final traps."""
+    state_ref = tmp_path / "state-ref"
+    leader_pid_file = tmp_path / "leader.pid"
+    descendant_pid_file = tmp_path / "descendant.pid"
+    handoff_gate = tmp_path / "at-handoff"
+    handoff_release = tmp_path / "release-handoff"
+    env = _watchdog_test_env(tmp_path)
+    env.update(WATCHDOG_STATE_REF=str(state_ref), WATCHDOG_DESC_FILE=str(descendant_pid_file),
+               WATCHDOG_HANDOFF_GATE=str(handoff_gate), WATCHDOG_HANDOFF_RELEASE=str(handoff_release))
+    descendant = (
+        "trap '' HUP INT TERM; "
+        f"echo $$ > {shlex.quote(str(descendant_pid_file))}; "
+        "while :; do sleep 1; done"
+    )
+    worker = (
+        "bash -c " + shlex.quote(descendant) + " & "
+        f"echo $$ > {shlex.quote(str(leader_pid_file))}; "
+        "trap 'exit 143' TERM; while :; do sleep 1; done"
+    )
+    fragment = pc._candidate_progress_watchdog_script(
+        "bash -c " + shlex.quote(worker), "printf steady",
+        stall_seconds=30, poll_seconds=1, term_grace_seconds=1,
+    )
+    probe = (
+        'mktemp() { local path; path=$(command mktemp "$@") || return; '
+        'printf %s "$path" > "$WATCHDOG_STATE_REF"; printf %s "$path"; }\n'
+        'kill() { local rc=0; builtin kill "$@" || rc=$?; '
+        'if [ "${1:-}" = -0 ] && [ "${2:-}" = -- ] '
+        '&& [ "${3:-}" = "-$SYNC_PID" ] && [ "$rc" -eq 0 ] '
+        '&& [ "$SYNC_READY" = "ready:$SYNC_PID" ] '
+        '&& [ ! -e "$WATCHDOG_HANDOFF_GATE" ]; then '
+        ': > "$WATCHDOG_HANDOFF_GATE"; '
+        'for _ in $(seq 1 200); do [ -s "$WATCHDOG_DESC_FILE" ] && break; sleep 0.01; done; '
+        'for _ in $(seq 1 300); do [ -e "$WATCHDOG_HANDOFF_RELEASE" ] && break; sleep 0.01; done; '
+        'fi; return "$rc"; }\n'
+    )
+    proc = subprocess.Popen(
+        ["bash", "-c", "set -euo pipefail\n" + probe + fragment],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+    )
+    try:
+        deadline = time.time() + 3
+        while not handoff_gate.exists() and time.time() < deadline:
+            time.sleep(0.01)
+        assert handoff_gate.exists() and descendant_pid_file.exists()
+        proc.terminate()
+        handoff_release.write_text("release")
+        _stdout, stderr = proc.communicate(timeout=7)
+        assert proc.returncode == 143, stderr
+        leader_pid = int(leader_pid_file.read_text())
+        assert leader_pid != os.getpgrp()
+        assert _wait_pid_gone(leader_pid)
+        assert _wait_pid_gone(int(descendant_pid_file.read_text()))
+        try:
+            os.killpg(leader_pid, 0)
+        except ProcessLookupError:
+            pass
+        else:
+            pytest.fail("isolated sync process group survived watchdog cleanup")
+        assert not os.path.exists(state_ref.read_text())
+    finally:
+        handoff_release.write_text("release")
+        if leader_pid_file.exists():
+            leader_pid = int(leader_pid_file.read_text())
+            if leader_pid != os.getpgrp():
+                try:
+                    os.killpg(leader_pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        if proc.poll() is None:
+            proc.kill()
+            proc.communicate(timeout=2)
+
+
 def test_candidate_progress_watchdog_resets_and_signal_cleanup_reaps_group(tmp_path):
     pid_file = tmp_path / "sync.pid"
     progress_file = tmp_path / "progress"

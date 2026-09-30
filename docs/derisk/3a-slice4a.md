@@ -588,3 +588,35 @@ candidate, source push, Qwen retry, indexing, build, cutover or routed write.
 ## 2026-09-30 fresh independent B2 watchdog repair review
 
 The fresh read-only EXPERT reviewed pushed commit `e4cfe1b79f293a34ccb3f15e46d1643813e54c9b`, verified the original failure/observer and post-fix green log hashes, and independently passed the unchanged required no-write three-module selection (64/64, three warnings). Its exact report SHA-256 `acf6cb1b0ad473005ac9b191d0f5a7b286d3698dad1501c4661b5e088399774b` returned substantive `BLOCK`: B2-R1 can leave an isolated TERM-ignoring descendant and open captured pipe writers after a failed readiness group sample and worker exit; B2-R2 replaces a fast worker’s true 0/nonzero status with 125. The owner accepted these in-scope repair findings, **not** the repaired code. Report: `docs/evidence/phase3a-slice2-b2-setsid-repair-expert-block-e4cfe1-20260930.md` (sanitized project copy; raw probe artifacts private). B1 and B2 remain blocked. No new brain candidate/source push, Qwen retry/index/build/cutover/routed write, or Slice 2 acceptance.
+
+## 2026-09-30 B2-R1/R2 linked watchdog revision (local-only)
+
+The independent EXPERT [BLOCK on exact commit `e4cfe1b`](../evidence/phase3a-slice2-b2-setsid-repair-expert-block-e4cfe1-20260930.md)
+identified two linked seams: a missed group probe followed by leader exit could
+leave a TERM-ignoring child and pipe writers alive, and fast isolated workers
+could incorrectly return 125 instead of their actual 0/nonzero status. The
+owner accepted both findings as part of the already approved minimal watchdog
+repair, not as a new candidate or product decision.
+
+The revised watchdog marks isolation from the worker's own group after `setsid`
+and before `exec`, then waits for a matching marker and group. The original
+`setsid gbrain sync ... 2>&1 &` launch line remains in the generated build
+script. A completed fast worker is reaped **after** bounded group cleanup and
+returns its original status. A never-ready shim or failed group launch returns
+125; a signal returns 143; a real stall remains 124. The early-exit cleanup
+reaches a descendant-only group even if the leader has already exited. It does
+not signal the caller's group or a broad process name.
+
+The [sanitized revision receipt](../evidence/phase3a-slice2-b2-r1-r2-revision-20260930.json)
+(SHA-256 `888f0017e317b532c0e5f9c520cffc2dd28abb6f29c140bcfdfdff3f57af9f9c`)
+records deterministic fast 0/7, missed-probe exit 0/7 with a TERM-ignoring
+child, readiness failure, early signal and handler-handoff checks. Captured
+output reached EOF; no group, leader, child or watchdog state remained. The
+original 15-second test body and the no-write selection were not weakened.
+The final unchanged three-module selection passed 72 tests/three warnings
+in 24.67 seconds with bytecode/cache disabled and a unique private basetemp.
+Two earlier same-selection runs passed 72 tests each before the final group
+assertions were added. This is local repair evidence, **not** an independent
+EXPERT or owner acceptance; B1/source acceptance is still blocked. No new
+brain candidate, source push, Qwen retry, indexing, build, cutover or routed
+write took place in this revision generation.
