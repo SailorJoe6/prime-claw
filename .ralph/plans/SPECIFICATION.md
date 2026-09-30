@@ -192,8 +192,16 @@ started operation becomes an observable wait even though the broader requested
 outcome remains unfinished. The bounded repair changes only canonical policy and
 docs, active specification/plan, direct semantic-content tests, and Bead
 evidence. It adds the explicit event-driven wait and human-blocker transitions.
-Produce one clean pushed repair candidate for owner review. Do not restore native
-probes or broad testing, and do not apply/check or restart in the repair pass.
+Owner accepted exact pushed repair
+`486f4af62b7c1088a0ad10eb9ca05a2e0f735401`. Its bounded managed
+apply/check gate passed on 2026-09-30 PDT;
+all eight installed managed TypeScript files are regular, byte-identical to
+source, and the obsolete paths are absent without dangling symlinks. Loaded
+daemon PID `14672` predates installation, so the
+repair is installed but is not claimed active. Stop before the separate
+operator-controlled restart and renewed UAT. Do not restore native probes or
+broad testing, launch Prime Agent, begin final artifact archival/EXPERT review,
+or broaden scope.
 
 ## Scope boundaries
 

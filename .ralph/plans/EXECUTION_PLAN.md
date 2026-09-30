@@ -84,6 +84,12 @@ For one bounded repair pass:
   boundary; do not restore native probes or broaden testing.
 - [x] Commit and push one clean repair candidate for owner review, then stop.
   Do not apply/check, restart, or begin another UAT in this repair pass.
+- [x] Owner accepted exact pushed repair
+  `486f4af62b7c1088a0ad10eb9ca05a2e0f735401` for the bounded managed
+  apply/check gate. Independent review found no material issue.
+- [x] Run managed apply/check for that exact accepted generation, independently
+  verify installed regular-file byte parity and obsolete-file absence, record
+  the loaded runtime identity, and stop before restart or renewed UAT.
 
 Joe's native `/goal clear` in this exact episode reported no goal. This
 supersedes the false/stale paused-goal blocker previously reported by the local
@@ -231,6 +237,59 @@ Prime Agent probe, managed apply/check, restart, or manual UAT:
   scripts/check-prime-agent-plugin.sh`, `git diff --check`, the 4,000-byte policy
   bound (`2,828` bytes), and unique sentinel ownership all passed.
 
+### Event-driven repair managed installation evidence
+
+On 2026-09-30 PDT, with exact owner-accepted repair
+`486f4af62b7c1088a0ad10eb9ca05a2e0f735401` at HEAD and no
+source/script difference from that commit:
+
+- `scripts/apply-prime-agent-plugin.sh` exited `0` in `0.64s`. It reported
+  the inert source/global copy current, applied to
+  `/Users/jlanders/.prime/agent`, and explicitly required a restart before
+  treating the generation as active. Its mandatory final check passed.
+- `scripts/check-prime-agent-plugin.sh` independently exited `0` in `0.23s`
+  and reported the inert source/global copy current.
+- `python3 scripts/manage-prime-agent-append-system.py check` with the canonical
+  source and installed `/Users/jlanders/.prime/agent/APPEND_SYSTEM.md`
+  independently exited `0` in `0.19s`.
+- A separate Python `Path.lstat()` / `read_bytes()` / `hashlib.sha256()` audit
+  passed. Each of the eight installed paths is a mode-`0644` regular file, not
+  a symlink, and is byte-identical to inert source:
+
+  | Absolute managed installed path | Bytes | SHA-256 |
+  | --- | ---: | --- |
+  | `/Users/jlanders/.prime/agent/extensions/goal-heartbeat-work-control.ts` | 4878 | `8faa7537a1f177327177c796287d6d36ab50df624f8c5552906f50ca6437d595` |
+  | `/Users/jlanders/.prime/agent/extensions/handoff-chain.ts` | 4449 | `debd42d40ba1c9a9ba23607c0e2f25e8505e6ef640cedfb62d8bffbe8d61ceb6` |
+  | `/Users/jlanders/.prime/agent/extensions/reviewed-plan.ts` | 15324 | `1c7c5a9870c3a23c7f1bec8facdab8471e5290ee4a41991e8d5dab7bc5488b22` |
+  | `/Users/jlanders/.prime/agent/extension-support/conversation-oversight.ts` | 25901 | `07d376b1bfad0b0cd4af8d8cd298b2a6e94a35e5f46bea1c69a17031b208a714` |
+  | `/Users/jlanders/.prime/agent/extension-support/episode-close.ts` | 2864 | `a40953bb802242c4dbeb698627ea1a0886e1ded8a73f3ffe66bec56a952a2732` |
+  | `/Users/jlanders/.prime/agent/extension-support/handoff-prompts.ts` | 645 | `a85fde2479c5b3cf5d2f28cfb33eefad413abeed6a16397236df9de322b4cb08` |
+  | `/Users/jlanders/.prime/agent/extension-support/reviewed-plan-support.ts` | 1995 | `a4230f9aded32585f778a82ddd3b659deea513507a14d0c742cc656eb58bf107` |
+  | `/Users/jlanders/.prime/agent/extension-support/spec-episode.ts` | 44367 | `5342c12e6b7d0ab87d3955491cc8864175444551791d1f1deabe1597cfc63558` |
+
+- `/Users/jlanders/.prime/agent/extensions/goal-blocker-control.ts`,
+  `/Users/jlanders/.prime/agent/extension-support/episode-finalization.ts`, and
+  `/Users/jlanders/.prime/agent/extensions/project-conversation.ts` are absent;
+  none exists as a dangling symlink.
+- `/Users/jlanders/.prime/agent/APPEND_SYSTEM.md` is a regular file, not a
+  symlink. Its sole managed block is byte-identical to
+  `src/prime-agent-plugin/APPEND_SYSTEM.md`: 1,114 bytes, SHA-256
+  `1edfae19b113187332c031ee7e0ac92943a1e9e08cd84fe34af1e980b3300a7a`. The
+  complete installed
+  file is 1,118 bytes with SHA-256
+  `fea6c335b95dc688ed9c16b4830db4da63b15af3dd19a5420a75de54601d9b1b`;
+  the two unmanaged prefix bytes and two
+  unmanaged suffix bytes were preserved. Marker counts are exactly one start
+  and one end.
+- No Prime Agent process or native probe was launched. Loaded daemon PID
+  `14672` (started 2026-09-30 09:15:41 PDT),
+  daemon-node PID `14714` (09:15:42 PDT), and
+  conversation PID `38255` still use build
+  `cwd-fix-v0.9.7-r1`, package version `0.9.7`,
+  checkout commit `c094b9eea32173d7c4dd0c0a444a332ebac8f5d8`. The daemon predates the
+  installed goal-policy write at 10:12:30 PDT, so this pass does **not** claim
+  that the loaded runtime activated repair `486f4af62b7c1088a0ad10eb9ca05a2e0f735401`.
+
 ### Checkpoint 1 managed installation evidence
 
 On 2026-09-29 PDT, with accepted commit
@@ -279,10 +338,13 @@ is active.
 
 ## Current stop boundary
 
-The post-restart UAT repair candidate is pushed for owner review. Stop before
-managed apply/check, restart, or renewed UAT. The user-global installation still
-contains the previously accepted generation that produced the failed UAT; this
-repair pass makes no activation claim. After owner acceptance, run a separately
-authorized managed apply/check and restart gate before repeating only the visible
-Checkpoint 2 checks. Exactly one mandatory final exact-candidate EXPERT review
-remains after passing UAT and final artifact reconciliation.
+Exact accepted repair
+`486f4af62b7c1088a0ad10eb9ca05a2e0f735401` is installed and checked, but
+the loaded
+daemon predates installation and is not claimed active. Stop before restart or
+renewed UAT. The operator's next action is exact: quiesce active Prime Agent work,
+restart the sole daemon (currently PID `14672`) once using the normal service
+action without launching a concurrent daemon, then open
+a fresh builder-rooted session and run only the three visible Checkpoint 2
+manual-UAT checks. Do not begin archival or the mandatory final exact-candidate
+EXPERT review until UAT passes and artifacts are reconciled.
