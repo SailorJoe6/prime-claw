@@ -7,6 +7,45 @@ Older sets contain specification, requirements, decisions, and execution-plan
 files; newer project-customized sets may contain a different reviewed artifact
 collection.
 
+## plugin-test-container/ — Test tier architecture + tier-1 plugin test container ✅ COMPLETE (2026-09-30)
+
+Delivered the three-tier test architecture and the tier-1 plugin test container
+across three owner-reviewed slices: (1) the tier-1 image and driver
+(`docker/test.Dockerfile`, `scripts/test-tier1.sh`, `tests/test_tier1_image.py`);
+(2) install selection (pinned release via vendor installer, or source via fresh
+fork pack), in-container apply/check, a validated probe, and a hard deadline; and
+(3) pytest markers (`container` = tier 1, `sandbox` = tier 2, unmarked = tier 0),
+the session-scoped `tier1_container` fixture (one container per run,
+driver-mirrored setup, exec helpers), migration of all tier-1 suites to
+in-container exec, and the `scripts/test-all.sh` sequencer. Acceptance: the
+tier-0 default `python3 -m pytest tests/ -q` passes with no Docker (223 passed,
+144 skipped); the full tier-1 suite passes in one container for both install
+modes (37 passed). Accepted commits: slice 1 `2666843`, slice 2 `bc00cba`,
+slice 3 `d040c02` plus merge-reconciliation `7118a44` (rebased onto main
+`9b3edd2`, the goal-heartbeat plugin generation).
+
+- [Archived specification](plugin-test-container/SPECIFICATION.md)
+- [Archived execution plan](plugin-test-container/EXECUTION_PLAN.md)
+- [EXPERT review reports (BLOCK/PASS trail)](plugin-test-container/reviews/)
+- Acceptance evidence:
+  [slice 1 image + driver](../../../docs/evidence/2026-09-29-tier1-slice1-image-driver.md),
+  [slice 2 install selection](../../../docs/evidence/2026-09-30-tier1-slice2-install-selection.md),
+  [slice 3 migration + sequencer](../../../docs/evidence/2026-09-30-tier1-slice3-migration-sequencer.md)
+- Operator-facing doc home (named by the approved plan):
+  [DEVELOPERS.md](../../../DEVELOPERS.md) "Testing" section
+
+EXPERT review trail: slice 1 BLOCK `47d2830` → BLOCK `d8dbc5d` → PASS
+`2666843`; slice 2 BLOCK `470be98` → PASS `bc00cba`. Slice 3 had NOT received
+its final EXPERT gate at archival time; the owner runs a fresh FINAL EXPERT
+review on the complete exact candidate (`d040c02..<archival>`), so this archive
+does not record a slice-3 PASS. Beads `prime-claw-blw.1`/`.2`/`.3` are closed;
+`prime-claw-blw.4` (shared-base extraction) is deferred P2.
+
+Note: the archived EXECUTION_PLAN.md contains a historical promotion quote
+reading `/implement-spec .ralph/plans/future/plugin-test-container`; that
+bundle's reviewed artifact set now lives beside it in this subfolder, with the
+five review reports preserved under `reviews/`.
+
 ## goal-heartbeat-work-control/ — Plugin-global goal and heartbeat work control ✅ COMPLETE (2026-09-30)
 
 Delivered transient, capability-gated, event-driven goal/heartbeat ownership for

@@ -7,7 +7,7 @@ Branch: episode/plugin-test-container
 **Status: this note describes the REWORKED slice-2 driver.** The original
 commit `470be98` was reviewed by EXPERT and BLOCKed (three findings:
 stale-source replay, weak probe acceptance, soft probe deadline — report at
-`.ralph/plans/future/plugin-test-container/reviews/2026-09-30-slice2-470be98-expert-block.md`
+`.ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice2-470be98-expert-block.md`
 in the main repo). The rework repairs exactly those three findings against
 the slice-2 artifacts only (`scripts/test-tier1.sh`,
 `tests/test_tier1_driver.py`, this note) plus the sanctioned
@@ -199,4 +199,4 @@ byte-identical.
   EXPERT and remains valid; its behavioral claims about source freshness,
   probe acceptance, and the probe deadline were BLOCKed and are repaired
   here. Full BLOCK report:
-  `.ralph/plans/future/plugin-test-container/reviews/2026-09-30-slice2-470be98-expert-block.md`.
+  `.ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice2-470be98-expert-block.md`.

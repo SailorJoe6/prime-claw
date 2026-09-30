@@ -4,10 +4,10 @@ Date: 2026-09-29 (initial), refreshed 2026-09-30 after two EXPERT review rounds
 Bead: prime-claw-blw.1
 Branch: episode/plugin-test-container
 Reviews (reports in the main repo): the gate on `47d2830`
-(`.ralph/plans/future/plugin-test-container/reviews/2026-09-30-slice1-47d2830-expert-block.md`)
+(`.ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-47d2830-expert-block.md`)
 returned BLOCK with three findings (B1/B2/B3, repaired in `d8dbc5d`); the
 gate on `d8dbc5d`
-(`.ralph/plans/future/plugin-test-container/reviews/2026-09-30-slice1-d8dbc5d-expert-block.md`)
+(`.ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-d8dbc5d-expert-block.md`)
 verified B1/B2 resolved and returned BLOCK with one remaining finding (B3-R,
 repaired here). Both reviewed commits are invalidated; this note describes
 the repaired state.
@@ -217,7 +217,7 @@ one finding remained.
 
 Main advanced past the branch point (`d0a9883`) by three review-report
 commits only (EXPERT BLOCK on `47d2830`, EXPERT BLOCK on `d8dbc5d`, EXPERT
-PASS on `2666843` — all docs under `.ralph/plans/future/plugin-test-container/reviews/`).
+PASS on `2666843` — all docs under `.ralph/plans/archive/plugin-test-container/reviews/`).
 No goal/heartbeat plugin work (h6w.24 area) landed on main during Slice 1.
 
 The episode branch was rebased onto `origin/main` (`1a0836d`) before Slice 2

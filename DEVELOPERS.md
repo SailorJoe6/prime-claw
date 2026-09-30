@@ -37,7 +37,7 @@ openclaw-setup:
 
 ## Testing
 
-Tests are organized into three tiers (see `.ralph/plans/SPECIFICATION.md`
+Tests are organized into three tiers (see `.ralph/plans/archive/plugin-test-container/SPECIFICATION.md`
 "Test tiers"). Tier assignment is by **pytest marker** (`pytest.ini`):
 unmarked tests are tier 0, `container` tests are tier 1, `sandbox` tests
 are tier 2. `tests/conftest.py` auto-marks any test that requests the

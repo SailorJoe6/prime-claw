@@ -223,3 +223,21 @@ Post-rebase acceptance (all on the reconciled branch):
   plugin to the goal-heartbeat generation mid-session, so the managed
   file set itself changed on the host — the before/after captures across
   each slice-3 run window were identical).
+
+## Docs-conversion step (terminal policy) — satisfied by DEVELOPERS.md
+
+The execute skill's completion policy asks whether the spec has been
+converted into `docs/` documentation describing the new project state
+before the bundle is archived. For this bundle the approved plan named
+**DEVELOPERS.md as the doc home** for the tier model, and slice 3 already
+delivered that conversion: DEVELOPERS.md's "Testing" section was rewritten
+to document the three tiers, marker-based tier assignment, the auto-mark /
+default-skip policy (plain `pytest tests/ -q` is always the Docker-free
+tier-0 default), the session container fixture, and `scripts/test-all.sh`.
+The evidence trail itself lives in `docs/evidence/` (this note plus the
+slice-1 and slice-2 notes), which is the established evidence convention.
+No separate `docs/` page is needed; archiving the bundle makes
+DEVELOPERS.md's "Testing" section the canonical operator-facing reference,
+and its spec pointer was repointed to
+`.ralph/plans/archive/plugin-test-container/SPECIFICATION.md` in the
+archival commit.
