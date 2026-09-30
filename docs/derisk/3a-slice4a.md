@@ -537,3 +537,15 @@ source-current acceptance, index/build, cutover, or routed write. The next
 bounded diagnostic must observe an *actually failing* test's process group
 and captured pipe endpoints before any watchdog edit. A later local A
 candidate must preserve the newer source after fresh exact gates and review.
+
+## 2026-09-30 bounded B2 process/pipe observation
+
+The [sanitized observation](../evidence/phase3a-slice2-b2-required-pytest-pipe-observation-20260930.json)
+records one unchanged watchdog pytest monitored externally by `ps` and `lsof`.
+It passed in 2.17 seconds. A TERM-ignoring descendant briefly remained in
+the isolated group after its worker leader exited, holding inherited stdout
+and stderr pipe writers, but group cleanup completed before pytest returned.
+That passing timeline does not diagnose the earlier required-test and EXPERT
+15-second timeouts. No watchdog or test code changed, and no new source
+candidate was created. Further repair needs a causal capture from a failing
+run; the required three-module no-write gate remains blocked.

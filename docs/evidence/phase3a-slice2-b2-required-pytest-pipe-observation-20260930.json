@@ -1,0 +1,55 @@
+{
+  "conclusion": "This one bounded observation did not reproduce a failing pytest. It proves only normal passing group/PID/pipe lifecycle with the observer present, not why prior unmodified required pytest and independent EXPERT attempts exceeded 15 seconds. No source edit/test edit, no new brain source candidate/ref/push, Qwen retry, indexing/build, cutover or routed write. Do not infer reproducibly green focused gate or B2 remediation.",
+  "monitor": {
+    "method": "ps -axo pid,ppid,pgid,sess,stat,comm; lsof -nP -p <selected-test-descendant-PIDs> -Fpcftn; restrict to test parent/child tree, worker/descendant files and worker group, store raw private JSONL only",
+    "normalized_timeline": [
+      {
+        "pipe_relation": "worker leader, descendant, direct Bash and watchdog share inherited stdout/stderr writer endpoint identifiers; pytest has PIPE FDs (reader-to-writer peer mapping not proved)",
+        "process_relation": "direct Bash child of pytest; isolated worker leader with its own PGID, watchdog background shell under direct Bash, TERM-ignoring worker descendant in isolated group",
+        "t_seconds": 0.959
+      },
+      {
+        "pipe_relation": "orphan descendant and direct Bash still hold the inherited stdout/stderr writer endpoint identifiers",
+        "process_relation": "worker group leader already absent; TERM-ignoring descendant temporarily orphaned (parent 1) but retains original isolated PGID, while direct Bash and watchdog remain",
+        "t_seconds": 1.701
+      },
+      {
+        "pipe_relation": "no causal failed-run pipe state was observed",
+        "process_relation": "worker group no longer observed; pytest/direct Bash still observed during test cleanup",
+        "t_seconds": 2.45
+      },
+      {
+        "pipe_relation": "no inherited writer leak during this passing run",
+        "process_relation": "pytest exited after pass; monitored process tree absent",
+        "t_seconds": 2.842
+      }
+    ],
+    "pipe_snapshot_count": 3,
+    "private_samples_sha256": "dcaf81615746df253a74e6e6e8f23b7e790f313c63690d62c8fa02ac7d44c2a3",
+    "sample_count": 9
+  },
+  "schema": "phase3a-slice2-b2-required-pytest-pipe-observation-v1",
+  "scope": "One unchanged required watchdog pytest, out-of-process read-only macOS ps/lsof PID/PGID and PIPE-FD monitor. No pytest plugin, no shell fragment/test edit; unique pytest --basetemp private location. Monitor started before pytest and ended after it exited.",
+  "state_guard": {
+    "accepted_checkout_clean": true,
+    "accepted_checkout_head": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "brain_remote_main": "eb157c713b24bb0ec9315ae27617b16da5cbf71b",
+    "historical_local_candidate_oid": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "historical_local_candidate_parent": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "historical_local_candidate_ref": "refs/heads/phase3a-slice2-b695-frontmatter-20-candidate",
+    "no_sync_index_build_observed": true,
+    "policy_and_both_db_aggregate_snapshots_unchanged": true,
+    "remote_source_reconciliation": "previous structural only, not source-current acceptance",
+    "tracking_origin_main": "b695658b8271f4541e47b87f62c5b14c19075528"
+  },
+  "status": "BLOCKED_NO_FAILING_TRACE_NO_REPAIR_NO_CANDIDATE",
+  "test_command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q -p no:cacheprovider --basetemp=<unique-private-temp> tests/test_embedding_candidate_build.py::test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero",
+  "test_observation": {
+    "previous_unmodified_and_expert_timeout_still_blocks": true,
+    "private_pytest_log_sha256": "4d62c0decff7c275e1c2c801bf673bf7680954231c0f8870a172737fb3cc1d91",
+    "required_three_module_focused_gate_ran": false,
+    "result": "PASS; 1 passed, 1 warning, 2.17s",
+    "unchanged_bound_seconds": 15
+  },
+  "unblock": "Capture direct Bash, worker and descendant process groups and inherited stdout/stderr pipe endpoints during an actual failing required pytest; determine specific cause before a minimal authorized repair and reproducible unchanged 3-module no-write gate. If the failure cannot be observed causally, remain blocked and seek owner direction rather than patching from theory."
+}
