@@ -767,3 +767,32 @@ Fresh independent `openai-codex/gpt-6-astra`/`max` EXPERT **PASS** on exact push
 ## 2026-09-30 — conditional non-force Joe-A source publication decision
 
 The exact accepted local-only brain candidate `83eee06e4322b3264bb812959a2a5482bce13151` remains a direct child of live remote `main` `eb157c713b24bb0ec9315ae27617b16da5cbf71b`. After the separate owner acceptance, a fresh read-only project/brain ref and clean-checkout check passed. The owner separately [authorized](../evidence/phase3a-slice2-joe-a-nonforce-publication-owner-authorization-20260930.md) SHA-256 `c52aa86c570d5ced5b2e0ad330cd101bc66ed5b5c7d92f29b599fc127753cff8` at most one ordinary **non-force** fast-forward of that exact commit, strictly contingent on fresh pre/post remote, exact diff, refs, no-sync/no-build, effective policy and both DB gates. **No brain source push has happened at this decision checkpoint.** Any remote movement, gate mismatch or ambiguous transport stops without force/rebase/blind retry. Source, parent and routed-write remain BLOCKED; no Qwen/index/build, cutover or routed write is authorized.
+
+## 2026-09-30 Joe-A candidate: one conditional ordinary non-force publication
+
+After separate independent EXPERT PASS, local-candidate acceptance and owner
+publication approval, the EPISODE freshly reverified brain `main` at the exact
+direct parent `eb157c713b24bb0ec9315ae27617b16da5cbf71b` and candidate
+`83eee06e4322b3264bb812959a2a5482bce13151` at its preserved local ref.
+The fresh tree check found exactly 20 frontmatter-only Markdown changes. Every
+original Markdown byte remained an exact suffix; both accepted Slice 1 blobs
+and all 82 disjoint newer paths stayed equal. All 1,224 candidate archive
+files matched Git blob IDs. The accepted checkout remained clean and no-sync,
+the preserved refs/policy and **both** database aggregates matched, and no
+active sync/embed/index/build was observed.
+
+Exactly **one ordinary non-force** push of the accepted candidate ref to brain
+`main` exited 0. An independent remote lookup then returned the exact accepted
+candidate. A postflight repeated the checkout, refs, unchanged candidate tree,
+policy, both database aggregates, and no-active-build checks. Git advanced
+only the local `origin/main` tracking ref as an ordinary consequence of that
+push; the accepted checkout and preserved source refs did not move. The
+[sanitized publication receipt](../evidence/phase3a-slice2-joe-a-nonforce-publication-83eee-20260930.json)
+SHA-256 `13d67211d22a12a6aacc7afcd6f7ddac32a5ecb48159438ab0ba5114a62768f0` identifies the private
+fresh-tree report by hash without including private page content.
+
+**Source publication is not source-current acceptance.** This publication
+did not invoke Qwen retry/index/build/cutover, routed write, merge, plugin
+overwrite or cleanup. Source `.5`, parent, and ordered routed-write `.4`
+Beads remain BLOCKED. The owner must review exact post-publication evidence
+separately before any next Slice 2 decision.
