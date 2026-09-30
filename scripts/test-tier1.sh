@@ -38,8 +38,9 @@ for arg in "$@"; do
     esac
 done
 
-command -v docker >/dev/null 2>&1 || die "docker not found on PATH"
-docker info >/dev/null 2>&1 || die "docker daemon is not reachable"
+# Filesystem check only — safe on informational paths (--help/--dry-run).
+# Docker CLI and daemon checks live on the real-execution path below so that
+# --help and --dry-run never contact Docker at all.
 [ -f "$REPO_ROOT/$DOCKERFILE" ] || die "missing $DOCKERFILE"
 
 BUILD_ARGS=()
@@ -58,6 +59,11 @@ if [ "$DRY_RUN" -eq 1 ]; then
     echo "dry-run: docker run --rm $IMAGE bash -lc '$SMOKE_CMD'"
     exit 0
 fi
+
+# Readiness checks — real execution path only. Informational paths
+# (--help/--dry-run) have already exited above and never reach Docker.
+command -v docker >/dev/null 2>&1 || die "docker not found on PATH"
+docker info >/dev/null 2>&1 || die "docker daemon is not reachable"
 
 # ${BUILD_ARGS[@]+...} guard: bash 3.2 (macOS default) treats expanding an
 # empty array under set -u as an unbound-variable error.
