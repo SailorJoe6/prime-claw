@@ -620,3 +620,7 @@ assertions were added. This is local repair evidence, **not** an independent
 EXPERT or owner acceptance; B1/source acceptance is still blocked. No new
 brain candidate, source push, Qwen retry, indexing, build, cutover or routed
 write took place in this revision generation.
+
+## 2026-09-30 independent B2-R3 fast-success review
+
+A fresh read-only EXPERT reviewed pushed project `82dd37b2ee6513dc27aa2977a8c0c410b09ae22b` and independently passed the unchanged no-write three-module selection (72 tests/three warnings). Its report SHA-256 `34cf742145abac25abefb671ec7863b004e126725c8bccc66ff6e650144afce0` returned substantive `BLOCK` B2-R3: the attested fast-success watchdog branch exits the **entire generated build shell** before the mandatory post-sync source/failure-ledger/parity/vector/schema/bookmark gates. Controlled synthetic generated-sync probes falsely returned 0 with failing gates never reached; ordinary observed-ready success reached and rejected them. The owner accepted this inside the existing watchdog repair scope, **not** the repaired code. Sanitized report: `docs/evidence/phase3a-slice2-b2-r3-fast-success-expert-block-82dd37-20260930.md`; private synthetic artifacts remain private. B1/B2/source-current gates remain blocked. No new brain candidate/source push, Qwen retry/index/build/cutover/routed write or Slice 2 acceptance.
