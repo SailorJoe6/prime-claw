@@ -515,3 +515,25 @@ excluded from the B2 inference. No runtime or test-harness code was changed.
 A further bounded diagnostic must capture an actual failing worker and
 inherited pipe state before any repair. The approved A metadata decision
 remains pending behind this gate; no new brain candidate was created.
+
+## 2026-09-30 read-only newer brain source inspection after B2 stop
+
+After the inconclusive B2 episode stopped, the live brain remote moved from
+`b695658b8271f4541e47b87f62c5b14c19075528` to direct child
+`eb157c713b24bb0ec9315ae27617b16da5cbf71b`. An explicit object-only
+fetch used an empty refmap, no `FETCH_HEAD` write, and no tags; checkout,
+tracking ref, original unaccepted candidate, project refs, and sandbox clone
+remained unchanged/clean. The new remote commit adds 13 paths and modifies 69;
+none of the exact 20 error targets or accepted Slice 1 blobs changed. It has
+one unrelated new blank EOF line (`git diff --check` exit 2), which the
+exact-20 repair must not silently rewrite. Isolated native full-source
+validation of exact `eb157` scanned 1,202 Markdown files and still found the
+same 20 frontmatter errors (18 MISSING_OPEN, one MISSING_CLOSE, one YAML_PARSE).
+The [sanitized owner inspection](../evidence/phase3a-slice2-source-advance-eb157-owner-inspection-20260930.json)
+SHA-256 `c893f98cb121857c5c51580e864203bcc8307fa0c67ace9abf090bdc34dbb52a`
+reconciles source movement structurally **only**. B2 cause/unchanged focused
+test gate remain blocked; there is no new candidate, source publication,
+source-current acceptance, index/build, cutover, or routed write. The next
+bounded diagnostic must observe an *actually failing* test's process group
+and captured pipe endpoints before any watchdog edit. A later local A
+candidate must preserve the newer source after fresh exact gates and review.

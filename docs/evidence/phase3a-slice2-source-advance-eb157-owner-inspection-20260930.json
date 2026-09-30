@@ -1,0 +1,94 @@
+{
+  "b2_gate": {
+    "cause_proven": false,
+    "code_or_test_edit": false,
+    "inconclusive_episode_receipt": "docs/evidence/phase3a-slice2-b2-watchdog-diagnostic-inconclusive-20260930.json",
+    "new_frontmatter_candidate": false,
+    "receipt_sha256": "82c91a59dcc9912548975afcc49e96dc5b53b778a2be504341cdf9960e183cee",
+    "required_three_module_reproducibly_green": false
+  },
+  "brain_source": {
+    "before_after_active_checkout": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "before_after_local_main": "5dde0012eadf1df7c3e9c83d228e2d0d31f36695",
+    "before_after_old_unaccepted_candidate": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "before_after_tracking_origin_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "checkout_clean": true,
+    "commit_distance": 1,
+    "inspection_fetch_flags": [
+      "--no-tags",
+      "--no-write-fetch-head",
+      "--refmap=",
+      "origin",
+      "refs/heads/main"
+    ],
+    "inspection_fetch_no_ref_destination": true,
+    "live_remote": "eb157c713b24bb0ec9315ae27617b16da5cbf71b",
+    "new_commit_exact_parent": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "previous_remote": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "remote_stable_after_inspection": true
+  },
+  "decision": {
+    "accepted": "Read-only structural reconciliation of new remote tip; future candidate base must be freshly rechecked against the live remote and preserve this newer commit. The single upstream blank EOF whitespace finding is outside the exact-20 repair; do not alter unrelated source.",
+    "next_in_scope": "Record owner B2 diagnostic finding and run one bounded failing-run PID/PGID plus stdout/stderr pipe-endpoint observation. Make no watchdog code/test edit before root-cause proof; no frontmatter candidate until the unchanged required focused three-module gate is reproducibly green. Recheck exact live remote/ref/policy/DB gates before any later candidate.",
+    "not_accepted": [
+      "Original candidate1c97",
+      "Any B2 code/test fix",
+      "Required focused green gate",
+      "New Joe-A frontmatter candidate",
+      "Brain source publication",
+      "Slice2 source-current acceptance",
+      "Index/build/cutover/routed write"
+    ]
+  },
+  "native_full_source_isolated": {
+    "error_code_counts": {
+      "MISSING_CLOSE": 1,
+      "MISSING_OPEN": 18,
+      "YAML_PARSE": 1
+    },
+    "exact_remote_commit": "eb157c713b24bb0ec9315ae27617b16da5cbf71b",
+    "files_with_errors": 20,
+    "gbrain_frontmatter_validate_exit": 1,
+    "logic_for_same_exact20": "All 20 prior error-path hashes are absent from the old-to-new Git diff, and native full-source error count and code distribution remain 20 (18 MISSING_OPEN, 1 MISSING_CLOSE, 1 YAML_PARSE); no new errors can replace unchanged prior errors under the same validator.",
+    "nonregular_entries_skipped": 0,
+    "raw_private_report_ephemeral_sha256": "ad6ef64324a3f1de66b621a07691ef33b8eae2955827a22a6535d469bd160ada",
+    "raw_private_report_retained": false,
+    "regular_files_extracted": 1224,
+    "total_errors": 20,
+    "total_markdown_files": 1202
+  },
+  "observed_at_utc": "2026-09-30T02:08:49.297487+00:00",
+  "owner_episode": {
+    "completed_generation_watch_cancelled": true,
+    "native_exact_session_idle": true,
+    "project_checkout_clean": true,
+    "project_checkpoint": "b1d860cf6a8b44573d5b4990a0135fa85ff6ad29",
+    "project_head_upstream_and_live_remote_equal": true,
+    "session_id": "01a0da00-3403-77ae-930a-919658d7d1f8"
+  },
+  "private_tree_sanitized": {
+    "accepted_slice1_repair_old_blobs_changed": [],
+    "candidate_hash_method_matches_all_20": true,
+    "changed_paths": 82,
+    "existing_file_mode_changes": 0,
+    "extension_counts": {
+      "json": 2,
+      "md": 80
+    },
+    "overlap_with_existing_exact20_targets": 0,
+    "status_counts": {
+      "A": 13,
+      "M": 69
+    },
+    "upstream_commit_diff_check_exit": 2,
+    "upstream_commit_whitespace_findings": [
+      {
+        "category": "new blank line at EOF.",
+        "line": 215,
+        "path_sha256": "c214d0571fa9c02b1fe5c153a17eb038858a24556741ac6cd2fd6b1d64925b05"
+      }
+    ]
+  },
+  "schema": "phase3a-slice2-source-advance-owner-inspection-v1",
+  "status": "SOURCE_ADVANCE_STRUCTURALLY_RECONCILED_SLICE2_STILL_BLOCKED"
+}
