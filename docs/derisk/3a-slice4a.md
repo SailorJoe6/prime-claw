@@ -549,3 +549,15 @@ That passing timeline does not diagnose the earlier required-test and EXPERT
 15-second timeouts. No watchdog or test code changed, and no new source
 candidate was created. Further repair needs a causal capture from a failing
 run; the required three-module no-write gate remains blocked.
+
+## 2026-09-30 required three-module external observation
+
+The [sanitized one-run receipt](../evidence/phase3a-slice2-b2-full-focused-external-observation-20260930.json)
+records one unchanged no-write focused selection under an external `ps`/`lsof`
+observer. It passed once: 63 passed, three warnings in 9.86 seconds. The
+watchdog worker's brief orphaned descendant and inherited pipe writers
+cleared in this passing run. The earlier independent EXPERT test timeout
+remains unexplained; one pass is not a reproducibly green required gate. An
+accidental unscoped final observer sample was discarded locally and not
+published. No code, test, brain source or database was changed. Stop pending
+owner direction for any further failure-time diagnosis.

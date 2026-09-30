@@ -1,0 +1,52 @@
+{
+  "conclusion": "The observed run passed, not a reproduced failure or a reproducibly green required gate; no specific causal root-cause seam can be reported. Stop per owner one-run rule. No code/test change, brain source candidate/ref/push, Qwen retry, index/build, cutover, routed write or Slice2 acceptance. Original B1+B2 EXPERT BLOCK remains.",
+  "external_observer": {
+    "method": "separate process samples ps -axo pid,ppid,pgid,sess,stat,comm and lsof -nP -p <selected PID set> -Fpcftn; identify leader and descendant by test-created PID files in unique scratch basetemp",
+    "observer_limit": "At final sample after pytest exited, observer accidentally called lsof with an empty selected PID list. Its unscoped host pipe output was discarded locally, excluded from sanitized private samples and all published evidence, and the one-run test was not repeated. Intermediate target worker snapshots were selected by PID/PGID. No causal failing PID/pipe timeline exists.",
+    "sample_count": 30,
+    "sanitized_private_samples_sha256": "16ad44a67fe3b5ae09771b930f9ede1bd71b4630b5a120e0bd26f46030aecb51",
+    "target_worker_observation": [
+      {
+        "pipe_state": "direct Bash, leader and descendant inherited stdout/stderr writer endpoints; pytest had PIPE FDs",
+        "relation": "pytest direct Bash child held the isolated worker leader in its own process group; worker descendant and sleep in that group; watchdog background Bash remained in pytest process group",
+        "t_seconds": 0.961
+      },
+      {
+        "pipe_state": "orphan descendant still held inherited stdout/stderr writer endpoints shared with direct Bash",
+        "relation": "worker leader gone; TERM-ignoring descendant briefly orphaned (parent 1) while retaining worker PGID; direct Bash and watchdog remained",
+        "t_seconds": 1.694
+      },
+      {
+        "pipe_state": "no live inherited writer persisted through passing test completion",
+        "relation": "orphan descendant observed transiently as exiting/zombie in original worker PGID; direct Bash observed exiting",
+        "t_seconds": 2.399
+      },
+      {
+        "pipe_state": "not a failing-run trace",
+        "relation": "first worker group no longer observed; subsequent independent pytest test created a different Bash worker",
+        "t_seconds": 2.773
+      }
+    ]
+  },
+  "schema": "phase3a-slice2-b2-full-focused-external-observation-v1",
+  "scope": "Exactly one unchanged no-write focused three-module pytest selection under separate ps/lsof observer; original watchdog timeout remains 15 seconds; no in-band instrumentation, source edit, test edit or skipped/relaxed assertion.",
+  "state_after": {
+    "accepted_checkout_clean": true,
+    "accepted_checkout_head": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "both_db_aggregate_snapshots_unchanged": true,
+    "brain_remote_main": "eb157c713b24bb0ec9315ae27617b16da5cbf71b",
+    "historical_unaccepted_local_candidate": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "policy_unchanged": true,
+    "tracking_origin_main": "b695658b8271f4541e47b87f62c5b14c19075528"
+  },
+  "status": "BLOCKED_ONE_FOCUSED_PASS_NOT_REPRODUCIBLY_GREEN_NO_CAUSAL_FAILING_TRACE",
+  "test_command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q -p no:cacheprovider --basetemp=<unique-private-scratch> tests/test_embedding_candidate_build.py tests/test_runtime_validate.py tests/test_runtime_converge.py",
+  "test_result": {
+    "exit_code": 0,
+    "interpretation": "one passing selection; independent EXPERT same required selection previously failed with 62 passes and one watchdog test TimeoutExpired at 15s; no reproducibly green gate",
+    "original_watchdog_bound_seconds": 15,
+    "private_pytest_log_sha256": "853d9c25680e08f6c1dc9642e704195215c6d33dc091ad030dcdfe52ebd344dc",
+    "summary": "63 passed, 3 warnings in 9.86s"
+  },
+  "unblock": "Owner decision required for another bounded failure-time diagnostic; a minimal repair requires causal evidence from an actual failing run, and only later reproducibly green unchanged three-module no-write selection permits a fresh source-current isolated A candidate."
+}
