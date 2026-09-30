@@ -584,3 +584,7 @@ The original 15-second bound, assertions and selection remain intact. These are
 local repair checks, not independent EXPERT or owner acceptance. Brain remote,
 accepted checkout, policy and both DB snapshots stayed unchanged. No new brain
 candidate, source push, Qwen retry, indexing, build, cutover or routed write.
+
+## 2026-09-30 fresh independent B2 watchdog repair review
+
+The fresh read-only EXPERT reviewed pushed commit `e4cfe1b79f293a34ccb3f15e46d1643813e54c9b`, verified the original failure/observer and post-fix green log hashes, and independently passed the unchanged required no-write three-module selection (64/64, three warnings). Its exact report SHA-256 `acf6cb1b0ad473005ac9b191d0f5a7b286d3698dad1501c4661b5e088399774b` returned substantive `BLOCK`: B2-R1 can leave an isolated TERM-ignoring descendant and open captured pipe writers after a failed readiness group sample and worker exit; B2-R2 replaces a fast worker’s true 0/nonzero status with 125. The owner accepted these in-scope repair findings, **not** the repaired code. Report: `docs/evidence/phase3a-slice2-b2-setsid-repair-expert-block-e4cfe1-20260930.md` (sanitized project copy; raw probe artifacts private). B1 and B2 remain blocked. No new brain candidate/source push, Qwen retry/index/build/cutover/routed write, or Slice 2 acceptance.
