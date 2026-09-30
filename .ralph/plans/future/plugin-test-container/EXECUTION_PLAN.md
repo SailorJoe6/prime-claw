@@ -22,7 +22,9 @@
   rejected: it needs network at container-start and is slow. Instead the
   source path packs a tarball **on the host** and the container installs that
   tarball — mechanically identical to the pinned-registry path.
-- Test inventory audit (tier assignments):
+- Test inventory audit (tier assignments; point-in-time as of
+  planning — the assignment rule below is the durable contract, re-audited
+  at merge time):
   - **Tier 1 (move into container):** `tests/test_handoff_chain_extension.py`,
     `tests/test_reviewed_plan_extension.py` (node bridges + RPC probes),
     `tests/test_project_conversation_extension.py`,
@@ -149,6 +151,9 @@ Acceptance evidence:
 - `tests/test_inventory_integrity.py` still passes; new requirements
   (R-T1-* entries) added to `config/requirements-inventory.json` per the
   apply/check/validate/test discipline.
+- Final pre-merge step: rebase on current `main`, re-run the tier-1
+  inventory audit, and migrate any plugin-touching tests that landed during
+  implementation (see "Merge reconciliation" risk).
 - Bead `.3` and epic `prime-claw-blw` updated; committed + pushed.
 
 ## Explicit non-goals (this plan)
@@ -170,3 +175,11 @@ Acceptance evidence:
   redesign.
 - **macOS Docker bind-mount performance** for the read-only plugin mount is
   expected to be a non-issue at this size; revisit only if measured slow.
+- **Merge reconciliation against a moving main.** This repo has active
+  parallel development. New plugin-touching tests (node suites, install
+  tests, live RPC probes) may land on `main` while this plan is in flight.
+  At merge time the episode must re-audit the test inventory (the tier-1
+  candidate pattern: any test invoking `node`, a `prime-agent` binary, or a
+  plugin install), migrate any new tier-1 tests into the container, and
+  record the re-audit in the final evidence note. The tier assignment rule,
+  not a frozen file list, is the durable contract.
