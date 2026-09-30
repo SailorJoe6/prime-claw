@@ -681,3 +681,39 @@ other processes update that repo; no file was overwritten and a native handoff
 is held until the intended loaded generation is reconciled. No brain source
 publication, Qwen retry/index/build, cutover, routed write or Slice 2 source-
 current acceptance follows from the B2 decision.
+
+## 2026-09-30 new local-only Joe-A exact-20 source-current candidate (review pending)
+
+The owner accepted **only** the independently reviewed B2-R3 watchdog repair
+at project `5c1d10bf39e61abc84eb4fca0c11ee11b4c1a5ff` and authorized a
+separate source-current **local-only** candidate pass. Before writing, live
+brain `main` was rechecked as `eb157c713b24bb0ec9315ae27617b16da5cbf71b`;
+the accepted no-sync checkout was clean, the old candidate and original repair
+refs were intact, policy exactly matched the baseline, no sync/build was
+running, and **both** database aggregate snapshots were unchanged. The 20
+previous target paths were byte-identical in the new remote tree; its 82
+newer disjoint changes and the two accepted Slice 1 repair blobs were retained.
+
+One **new local ref** `refs/heads/phase3a-slice2-eb157-joe-a-frontmatter-20-candidate`
+now points to `83eee06e4322b3264bb812959a2a5482bce13151`, whose exact parent
+is live `eb157`. Its diff has exactly 20 modified Markdown paths, no path/mode
+changes, no invented ID, and each original file is an exact suffix of the
+candidate bytes. The 19 content-matched work-gbrain type/title pairs are
+preserved from the historical prefix mapping and rechecked against its
+metadata hashes. For the sole YAML_PARSE page, a new valid prefix uses the
+**original Git title and type** as Joe selected; its older fallback pair was
+not used. Native `gbrain frontmatter validate` found **zero errors across
+1,202 Markdown files**. The unchanged offline three-module selection passed
+**85 tests, three warnings in 50.79 seconds** with unique scratch and disabled
+bytecode/cache. Live ref, accepted checkout, preserved refs, policy, no-sync
+state, and both DB aggregate gates were rechecked unchanged after committing.
+
+[Sanitized receipt](../evidence/phase3a-slice2-joe-a-eb157-local-candidate-20260930.json)
+SHA-256 `88f5192f348c8c3f8c2bbea9bfb1f2fe33507859cf77644a20f59cf35fbde8d4`;
+private native report SHA-256 `7ada1dd65ccf6033ebd25832429b1959d52d974e951ebaef13e9f004cb9fc9ab`;
+focused test log SHA-256 `b62c8cf47706f4c0827b17a43eb10962162d6341829b0189ef9a7aaac221eba3`.
+The old candidate `1c97c409f005366aca132f5ff68c1a8c23483cc3` remains
+preserved and unaccepted. This **new local candidate is not accepted**;
+independent exact-commit EXPERT review and separate owner decision are next.
+Source/parent Beads remain BLOCKED. No brain publication, Qwen retry/index/build,
+cutover, routed write, or plugin overwrite occurred.
