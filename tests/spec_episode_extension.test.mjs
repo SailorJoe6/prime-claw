@@ -110,8 +110,8 @@ class FakePublisher {
     this.deliveries.push({ activeSessionId, prompt });
     if (this.failDelivery) throw new Error("delivery rejected");
   }
-  async deliverHandoff(activeSessionId, handoffPrompt, executePrompt, onHandoffAdmitted) {
-    this.handoffs.push({ activeSessionId, handoffPrompt, executePrompt });
+  async deliverHandoff(activeSessionId, handoffPrompt, executePrompt, onHandoffAdmitted, queueHandoffIfBusy = false) {
+    this.handoffs.push({ activeSessionId, handoffPrompt, executePrompt, queueHandoffIfBusy });
     if (this.failDelivery) throw new Error("delivery rejected");
     await onHandoffAdmitted?.();
   }
@@ -220,6 +220,7 @@ test("promotes an opaque bundle, commits it, publishes context, and bootstraps h
   assert.deepEqual(publisher.deliveries, []);
   assert.equal(publisher.handoffs.length, 1);
   assert.equal(publisher.handoffs[0].activeSessionId, "active-episode-1");
+  assert.equal(publisher.handoffs[0].queueHandoffIfBusy, true);
   assert.equal(publisher.handoffs[0].handoffPrompt.split("canonical handoff body").length - 1, 1);
   assert.match(publisher.handoffs[0].handoffPrompt, /compact\.run\(focus_hint\)/);
   assert.equal(publisher.handoffs[0].executePrompt.split("canonical execute body").length - 1, 1);
@@ -1188,6 +1189,47 @@ test("publisher handles a mocked already-admitted handoff before the sole execut
     activeSessionId: "active-episode-1",
     message: "wrapped handoff",
     queueIfBusy: false,
+    expandPromptTemplates: false,
+    source: "extension",
+  }, {
+    type: "prompt",
+    activeSessionId: "active-episode-1",
+    message: "wrapped execute",
+    streamingBehavior: "followUp",
+    queueIfBusy: true,
+    expandPromptTemplates: false,
+    source: "extension",
+  }]);
+});
+
+test("publisher queues initial handoff behind automatic preparation before execute", async () => {
+  const requests = [];
+  const events = [];
+  const client = {
+    async request(command) {
+      requests.push(command);
+      events.push(command.message);
+      return { success: true, data: {} };
+    },
+    close() {},
+  };
+  const publisher = new PrimeSessionPublisher(client);
+
+  await publisher.deliverHandoff(
+    "active-episode-1",
+    "wrapped handoff",
+    "wrapped execute",
+    () => { events.push("checkpoint"); },
+    true,
+  );
+
+  assert.deepEqual(events, ["wrapped handoff", "checkpoint", "wrapped execute"]);
+  assert.deepEqual(requests, [{
+    type: "prompt",
+    activeSessionId: "active-episode-1",
+    message: "wrapped handoff",
+    streamingBehavior: "followUp",
+    queueIfBusy: true,
     expandPromptTemplates: false,
     source: "extension",
   }, {

@@ -304,11 +304,16 @@ boundary, not permission to retry. The operation never
 kills the session, removes resources, or adds nonces, leases, durable approvals,
 or generalized remote routing state.
 
-Initial episode creation uses this same handoff-first transport. Its version-2
-bootstrap journal supplies the additional durable partial-state and cleanup
-rules required around the two daemon mutations. The first execute slice therefore
-starts only after the canonical handoff turn requests focused compaction of the
-inherited planning context.
+Initial episode creation keeps the same handoff-first ordering but uses a
+bootstrap-only queued transport. A newly published resident session may already
+be running automatic preparation, so canonical handoff is admitted as
+`streamingBehavior: "followUp"` with `queueIfBusy: true`; canonical execute is
+then queued as the sole next `followUp`. Later owner-driven handoffs retain the
+ordinary fail-closed prompt above. The version-2 bootstrap journal supplies the
+durable partial-state and cleanup rules around both daemon mutations. The first
+execute slice therefore starts only after automatic preparation and canonical
+handoff have completed in order, with handoff requesting focused compaction of
+the inherited planning context.
 
 ## Automated and integration validation
 

@@ -201,6 +201,7 @@ export interface SessionPublisher {
     handoffPrompt: string,
     executePrompt: string,
     onHandoffAdmitted?: () => void | Promise<void>,
+    queueHandoffIfBusy?: boolean,
   ): Promise<void>;
   kill(activeSessionId: string): Promise<boolean>;
   close(): void;
@@ -719,13 +720,19 @@ export class PrimeSessionPublisher implements SessionPublisher {
     handoffPrompt: string,
     executePrompt: string,
     onHandoffAdmitted?: () => void | Promise<void>,
+    queueHandoffIfBusy = false,
   ): Promise<void> {
     try {
       requireSuccess(await this.client.request({
         type: "prompt",
         activeSessionId,
         message: handoffPrompt,
-        queueIfBusy: false,
+        // Initial publication may already be running automatic preparation, so
+        // bootstrap queues behind it. Owner continuations keep the fail-closed
+        // ordinary prompt after their exact idle-state preflight.
+        ...(queueHandoffIfBusy
+          ? { streamingBehavior: "followUp", queueIfBusy: true }
+          : { queueIfBusy: false }),
         expandPromptTemplates: false,
         source: "extension",
       }), "handoff delivery");
@@ -1104,6 +1111,7 @@ export async function createSpecEpisode(
           }
           checkpointedIdentity = next;
         },
+        true,
       );
     } catch (error) {
       const fallback = checkpointedIdentity ?? pendingIdentity;

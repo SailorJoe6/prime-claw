@@ -172,9 +172,12 @@ pre-arms exactly one watch for the intended continuation immediately before the
 terminal call. Host code preserves a valid resident route even when
 `isSessionActive` is false, republishes only when no route exists, then obtains a
 fresh exact state snapshot and rejects an observed busy state. Bootstrap remains
-distinct: it has no pre-existing state snapshot to read before publication.
+distinct: it has no pre-existing state snapshot to read before publication and a
+newly published episode may already be running automatic preparation. Initial
+bootstrap therefore queues canonical handoff as a `followUp` before queuing the
+sole execute `followUp`; it does not weaken the later handoff busy-state gate.
 
-Canonical handoff is sent as an ordinary `prompt` with `queueIfBusy: false` and
+Canonical handoff for owner-driven continuation is sent as an ordinary `prompt` with `queueIfBusy: false` and
 no `streamingBehavior`, followed by exactly one execute `followUp`. This is not an
 atomic all-busy guard. A streaming race definitely rejects the prompt; residual
 non-streaming work can make it wait until idle, which is acceptable after trusted

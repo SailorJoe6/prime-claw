@@ -117,13 +117,16 @@ Ambiguous transport outcomes require owner inspection and are never retried
 automatically. Existing episode resources are never deleted to compensate for a
 remote handoff failure.
 
-Initial `createSpecEpisode()` also uses the handoff-first transport. The forked
-episode inherits the reviewed planning conversation, so canonical handoff
-requests focused compaction before the first execute slice starts. A version-2
-bootstrap admission journal durably separates the two daemon mutations:
-`handoff-pending` precedes the ordinary prompt; `execute-pending` is persisted after the
-handoff acknowledgement and before the sole follow-up; `delivered` follows the
-second acknowledgement. Rejections and ambiguous crash windows after handoff
+Initial `createSpecEpisode()` also uses handoff-first ordering, but publication
+can immediately start automatic preparation. Its bootstrap-only first send is
+therefore a queued `followUp` with `queueIfBusy: true`, followed by the sole
+execute `followUp`; later owner-driven handoffs keep the ordinary fail-closed
+prompt above. The forked episode inherits the reviewed planning conversation, so
+canonical handoff requests focused compaction before the first execute slice
+starts. A version-2 bootstrap admission journal durably separates the two daemon
+mutations: `handoff-pending` precedes the queued handoff; `execute-pending` is
+persisted after the handoff acknowledgement and before the sole execute
+follow-up; `delivered` follows the second acknowledgement. Rejections and ambiguous crash windows after handoff
 preserve all episode resources and never replay automatically. Version-1
 identities remain truthful legacy direct-execute records.
 
