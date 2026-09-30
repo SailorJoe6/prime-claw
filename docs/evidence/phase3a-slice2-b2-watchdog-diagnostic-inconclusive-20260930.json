@@ -1,0 +1,53 @@
+{
+  "approved_scope": "Owner-approved contextual B2 minimal code/test-harness repair only after cause proven; project starting HEAD/upstream 46b39e69dd6a93f9145286b34ffc37f0cccd2152. Original independent EXPERT B1+B2 BLOCK remains substantive.",
+  "baseline_failure": {
+    "result": "Unmodified isolated required pytest exceeded unchanged 15-second subprocess timeout. Prior independent reviewer also reproduced full focused and isolated timeout. Outer Bash and isolated group observed alive during failing run; exact failure cause unproved.",
+    "sanitized_receipt": "docs/evidence/phase3a-slice2-a-revision-b2-watchdog-block-20260929.json",
+    "sha256": "fa95acff84b66cf02c96114ed03f6f1b272899e0887eaaed12bb09a327ec97bb"
+  },
+  "bounded_diagnostics": [
+    {
+      "kind": "read-only independent script/test review",
+      "result": "Hypothesis: orphan worker holds captured pipe descriptors after Bash exits, but alternatives include Bash wait or group-alive teardown. Hypothesis not demonstrated."
+    },
+    {
+      "kind": "pytest plugin out-of-band trace; no repo/source edit",
+      "private_log_sha256": "554b7eb01813cb2559692df7730cfbec20cdb284d8ed6382a325de7f4e6ef73b",
+      "result": "First trace-only probe passed in 2.24s, but Bash 3.2 did not support the chosen BASH_XTRACEFD capture: empty trace, no causal conclusion."
+    },
+    {
+      "kind": "probe setup error, excluded from B2 inference",
+      "private_log_sha256": "9fbced227e5b19a0aa0e592dc73cae5b214abd652dd09cb8e35b0dd32952323e",
+      "result": "Instrumentation used Bash $BASHPID under set -u, unavailable in Bash 3.2; resulting failure cannot diagnose original timeout. Probe fixed before later runs."
+    },
+    {
+      "kind": "corrected out-of-band trace of unchanged safety test, two bounded observations",
+      "last_private_trace_sha256": "6d7638c58c76397dae843b203cc06046b85d29cf4cb231d0f53c586f92adc745",
+      "private_logs_sha256": [
+        "4d62c0decff7c275e1c2c801bf673bf7680954231c0f8870a172737fb3cc1d91",
+        "de6a34496fb221e28faef6be22b9a127bc09617c919c93d95cac17e9a5847c0a"
+      ],
+      "result": "Each test passed within 2.3 seconds; trace showed isolated group signal TERM return 0, group-alive return 0, signal KILL return 0, group-alive return 1. Instrumentation logs to a private fd and preserves the test 15-second bound/assertions, but timing is changed and no failing trace was obtained. These successful traces do not establish why a prior unmodified run timed out."
+    },
+    {
+      "kind": "one further unmodified isolated no-write test for timing comparison, not an acceptance gate",
+      "private_log_sha256": "5782332236681bf7386c9756d697c8df6ea6e3e77f72f7100b535947c11e0f6f",
+      "result": "Passed in 2.16s. A prior unmodified test failed after 15s; one passing diagnostic cannot prove reproducibility or excuse root-cause proof."
+    }
+  ],
+  "guard_result": {
+    "active_accepted_checkout": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "brain_remote_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "checkout_clean": true,
+    "no_gbrain_sync_index_build_process": true,
+    "old_candidate_oid": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "old_candidate_parent": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "old_candidate_ref": "refs/heads/phase3a-slice2-b695-frontmatter-20-candidate",
+    "policy_and_both_db_aggregate_snapshots_unchanged": true,
+    "source_refs_and_remote_unchanged": true
+  },
+  "limits": "No source code/test harness repair was made because no causal failing-process trace exists. No unchanged required three-module green gate was claimed or run. No new brain candidate/source ref, source push, Qwen retry, index/build/cutover or routed write. Private logs and test temporary paths are not published.",
+  "next": "Stop. Further diagnostic work needs a bounded approach that captures process and pipe state during an actual failing pytest run, then an evidenced minimal repair and reproducible full focused no-write selection. Only after that gate passes may the owner-approved A exact-20 candidate be prepared and freshly reviewed.",
+  "schema": "phase3a-slice2-b2-watchdog-diagnostic-v1",
+  "status": "BLOCKED_ROOT_CAUSE_UNKNOWN_NO_REPAIR_NO_NEW_CANDIDATE"
+}

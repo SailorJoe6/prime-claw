@@ -501,3 +501,17 @@ reproducibly green may the exact-20 Joe-A brain frontmatter candidate be
 prepared locally and separately reviewed. The old `1c97c409f005366aca132f5ff68c1a8c23483cc3`
 source candidate remains unaccepted and unpushed; remote main remains
 `b695658b8271f4541e47b87f62c5b14c19075528`.
+
+## 2026-09-30 B2 diagnostic: root cause still unknown
+
+The [sanitized bounded diagnostic receipt](../evidence/phase3a-slice2-b2-watchdog-diagnostic-inconclusive-20260930.json)
+records one independent read-only hypothesis and the test observations.
+Corrected private traces of two passing isolated pytest runs show TERM/KILL
+signals reaching the isolated worker group and a subsequent absence check.
+They do not explain the previously reproduced 15-second timeout; a later
+unmodified single pass does not make the required three-module suite
+reproducibly green. A probe-only Bash 3.2 instrumentation mistake was
+excluded from the B2 inference. No runtime or test-harness code was changed.
+A further bounded diagnostic must capture an actual failing worker and
+inherited pipe state before any repair. The approved A metadata decision
+remains pending behind this gate; no new brain candidate was created.
