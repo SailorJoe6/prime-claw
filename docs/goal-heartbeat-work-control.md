@@ -43,7 +43,7 @@ Ownership follows the next useful action:
 |---|---|---|
 | Active agent work | Agent | One compatible bounded goal |
 | Observable external wait | Exact process, job, deployment, or worker | One bounded heartbeat per independent wait |
-| Human-only blocker | Operator or external authority | No person-polling heartbeat; compatible epoch goal is completed at the actionable handoff |
+| Human-only blocker | Operator or external authority | Current epoch goal completes at the actionable handoff; no person-polling heartbeat |
 | Finished | Nobody | No outcome-owned goal or heartbeat remains |
 
 A goal may overlap a heartbeat only during the short safe transfer that creates
@@ -53,22 +53,26 @@ owns independent work.
 ### Active work
 
 For substantive multi-step work, inspect current goal state and create one
-bounded goal unless a compatible active goal already owns the same authorized
-outcome. Do not create goals for quick answers. Never complete, replace, or
-reinterpret an incompatible pending goal merely to make room.
+bounded goal for the current active-work epoch unless a compatible active goal
+already owns the same authorized work. The epoch advances the broader requested
+outcome, but completing it does not claim that outcome is complete. Goal creation
+does not require predicting the next gate or ownership boundary. Do not create
+goals for quick answers. Never complete, replace, or reinterpret an incompatible
+pending goal merely to make room.
 
 ### Observable waits
 
-Before yielding to a long-running operation:
+When the agent actually starts a long-running or background operation such as a
+subagent, build or test, download, deployment, or container startup:
 
-1. Retain an inspectable operation identity and output or status location.
+1. Retain an inspectable handle and output or status location.
 2. Create one `rlm_heartbeat` monitor with exact running, success, failure,
    staleness, cleanup, and resumable-checkpoint conditions.
 3. Verify the heartbeat ID and recheck the operation.
 4. If it is already terminal, delete and verify the monitor and handle the
    result now.
-5. Otherwise complete the compatible epoch goal, report the handoff, and end
-   the turn.
+5. If it is still running, complete the current epoch goal even when requested
+   work remains, report the handoff, and end the turn.
 
 A non-terminal check reports only meaningful change, creates no goal, and never
 restarts work. Routine monitors use follow-up delivery. The first terminal
@@ -78,12 +82,13 @@ substantive agent work remains. A completed epoch is never resumed.
 
 ### Human blockers
 
-For a credential, permission, physical action, product decision, or other
-human-only dependency, stop only monitors that cannot produce useful evidence.
-Complete a compatible epoch goal at the actionable handoff. Report the exact
-blocker, external action, process state, and resumable checkpoint once, then
-stop. Never schedule a heartbeat merely to poll a person. After the operator
-clears the blocker, substantive work starts under a fresh compatible goal.
+When blocked or waiting for user input, credentials, permission, physical
+action, a product decision, or another human-only dependency, stop only monitors
+that cannot produce useful evidence. Complete the current epoch goal even when
+the requested outcome remains unfinished. Report the exact blocker, external
+action, process state, and one resumable checkpoint, then stop without creating
+a heartbeat merely to poll the person. After the blocker clears, create a fresh
+goal before substantive work resumes.
 
 Prime Claw never injects, simulates, or calls native `/goal pause` or
 `/goal resume` for autonomous work control. Human use of Prime Agent's native

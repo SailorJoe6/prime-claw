@@ -134,9 +134,14 @@ The work-control entry registers no tool and sends no message. On each compatibl
 `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block. Compatibility requires the
 selected `ipython` tool plus model-visible Python skills `goal` / `goal` and
 `rlm-heartbeat` / `rlm_heartbeat`. Missing capabilities are a silent no-op;
-pre-existing or malformed work-control markers fail closed. The obsolete
-installed `extensions/goal-blocker-control.ts` is removed by apply and rejected
-by check. Apply preserves unrelated extension files.
+pre-existing or malformed work-control markers fail closed. Its event-driven
+policy gives the current active-work epoch a goal without predicting the next
+gate. After an operation actually starts, a verified heartbeat owns any ongoing
+wait and the epoch goal completes even if the broader requested outcome remains;
+a human-only blocker instead ends the epoch with one resumable checkpoint and no
+person-polling heartbeat. The obsolete installed
+`extensions/goal-blocker-control.ts` is removed by apply and rejected by check.
+Apply preserves unrelated extension files.
 
 Each command source path must resolve under `~/.prime/agent/extensions/`.
 Starting from the builder repository is an important collision check: the

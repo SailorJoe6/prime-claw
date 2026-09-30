@@ -76,21 +76,25 @@ work.
 ### Active work
 
 For substantive multi-step work, inspect goal state and create one bounded goal
-unless a compatible active goal already owns the same authorized outcome. Do
-not create goals for trivial answers. Never replace, complete, or reinterpret an
+for the current active-work epoch toward the broader requested outcome unless a
+compatible active goal already owns that work. Writing the goal does not require
+predicting the next wait or human gate. Completing an active-work epoch at an
+ownership transfer does not claim that the broader requested outcome is complete. Do not
+create goals for trivial answers. Never replace, complete, or reinterpret an
 incompatible pending goal merely to make room. Completed epochs are not resumed.
 
 ### Observable waits
 
-Before yielding to an observable long-running operation:
+When the agent actually starts a long-running or background operation such as a
+subagent, build or test, download, deployment, or container startup:
 
 1. retain an inspectable operation identity and output/status location;
 2. create one `rlm_heartbeat` monitor with exact running, success, failure,
    staleness, cleanup, and resumable-checkpoint conditions;
 3. verify its ID and recheck the operation;
 4. if already terminal, delete and verify the monitor and handle the result now;
-5. otherwise complete the compatible epoch goal, report the handoff, and end
-   the turn.
+5. otherwise complete the current epoch goal even when requested work remains,
+   report the handoff, and end the turn.
 
 A non-terminal heartbeat reports only meaningful change, creates no goal, and
 never restarts work. Routine monitors use follow-up delivery. The first terminal
@@ -101,12 +105,13 @@ goal before continuing. An unrelated pending goal remains untouched.
 
 ### Human blockers
 
-For a credential, permission, physical action, product decision, or other
-human-only dependency, stop only monitors that cannot produce useful evidence.
-Complete a compatible current epoch at the actionable handoff. Report once the
-exact blocker, external action, process state, and resumable checkpoint, then
-stop. Never schedule a heartbeat merely to poll a person. After operator
-confirmation, substantive work starts under a fresh compatible goal.
+For user input, credentials, permission, physical action, product decision, or
+another human-only dependency, stop only monitors that cannot produce useful
+evidence. Complete the current epoch at the actionable handoff even when the
+requested outcome remains unfinished. Report once the exact blocker, external
+action, process state, and resumable checkpoint, then stop. Never schedule a
+heartbeat merely to poll a person. After the blocker clears, create a fresh goal
+before substantive work resumes.
 
 The model must never inject, simulate, or call native `/goal pause` or
 `/goal resume` for autonomous control. Human native goal commands remain
@@ -177,8 +182,18 @@ pass/fail for:
 
 Hidden capability gating and non-accumulation remain direct-test contracts, not
 manual-UAT steps. Manual observation is the behavioral acceptance evidence. Do
-not claim more
-than Joe reports. Full completion and archival occur only after Checkpoint 2.
+not claim more than Joe reports. Full completion and archival occur only after
+Checkpoint 2.
+
+The first post-restart UAT passed old-tool absence but failed the ownership
+transfer behavior. With goal `7f71dda7-9707-447a-963c-a7029eee8523`, the reloaded
+policy did not make clear that an event-driven active-work epoch ends when a
+started operation becomes an observable wait even though the broader requested
+outcome remains unfinished. The bounded repair changes only canonical policy and
+docs, active specification/plan, direct semantic-content tests, and Bead
+evidence. It adds the explicit event-driven wait and human-blocker transitions.
+Produce one clean pushed repair candidate for owner review. Do not restore native
+probes or broad testing, and do not apply/check or restart in the repair pass.
 
 ## Scope boundaries
 

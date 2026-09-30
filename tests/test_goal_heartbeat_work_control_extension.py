@@ -25,6 +25,24 @@ def test_goal_heartbeat_work_control_node_suite() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_event_driven_epoch_semantics_are_explicit_and_non_predictive() -> None:
+    source = EXTENSION.read_text()
+    required = (
+        "current active-work epoch toward the broader requested outcome",
+        "Completing an epoch does not claim the requested outcome is complete",
+        "does not require predicting the next gate or ownership boundary",
+        "actually starts a long-running or background operation",
+        "if it is still running, complete the current goal even when requested work remains",
+        "blocked or waiting for user input, credentials, permission, physical action",
+        "complete the current goal even when the requested outcome remains unfinished",
+        "After the blocker clears, create a fresh goal before substantive work resumes",
+    )
+    for phrase in required:
+        assert phrase in source
+    assert "identify the next known" not in source
+    assert "objective must be true when ownership transfers" not in source
+
+
 def test_obsolete_tools_and_autonomous_pause_resume_transport_are_absent() -> None:
     assert EXTENSION.is_file()
     assert not OBSOLETE.exists()

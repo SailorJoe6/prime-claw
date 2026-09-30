@@ -114,10 +114,24 @@ test("compatible runs receive exactly one deterministic bounded policy", () => {
     .replace(WORK_CONTROL_SENTINEL, "");
   assert.ok(Buffer.byteLength(policyBody, "utf8") <= 4000);
   assert.match(policyBody, /create one bounded active-work goal/);
+  assert.match(policyBody, /current active-work epoch toward the broader requested outcome/);
+  assert.match(policyBody, /Completing an epoch does not claim the requested outcome is complete/);
+  assert.match(policyBody, /does not require predicting the next gate or ownership boundary/);
+  assert.match(policyBody, /actually starts a long-running or background operation/);
+  assert.match(policyBody, /subagent, build or test, download, deployment, or container startup/);
+  assert.match(policyBody, /retain an inspectable handle and output\/status location/);
   assert.match(policyBody, /create one bounded rlm_heartbeat/);
+  assert.match(policyBody, /verify its ID; recheck the operation/);
+  assert.match(policyBody, /if it is still running, complete the current goal even when requested work remains and end the turn/);
   assert.match(policyBody, /create a fresh bounded goal/);
-  assert.match(policyBody, /Do not create a heartbeat merely to poll a person/);
+  assert.match(policyBody, /blocked or waiting for user input, credentials, permission, physical action, or a product decision/);
+  assert.match(policyBody, /complete the current goal even when the requested outcome remains unfinished/);
+  assert.match(policyBody, /one resumable checkpoint/);
+  assert.match(policyBody, /without creating a heartbeat to poll the person/);
+  assert.match(policyBody, /After the blocker clears, create a fresh goal before substantive work resumes/);
   assert.match(policyBody, /Never inject, simulate, or call native \/goal pause or \/goal resume/);
+  assert.doesNotMatch(policyBody, /identify the next known/);
+  assert.doesNotMatch(policyBody, /objective must (?:be|become) true when ownership transfers/);
 });
 
 test("the runtime default tool set is compatible when selectedTools is omitted", () => {

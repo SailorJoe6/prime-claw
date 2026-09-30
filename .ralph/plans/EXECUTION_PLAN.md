@@ -55,6 +55,40 @@ boundary unchanged. Do not apply/check or launch Prime Agent in this replacement
 pass. Produce one clean pushed replacement candidate with exact evidence for
 owner review, then stop.
 
+## Required repair after failed post-restart UAT
+
+The first reloaded UAT passed visible old-tool absence but failed the ownership
+transfer case. With goal `7f71dda7-9707-447a-963c-a7029eee8523`, the policy did
+not make clear that an active-work epoch ends at an actual ownership-transfer
+event even when the broader requested outcome remains unfinished. The failure
+and operator-corrected semantics are recorded on `prime-claw-h6w.22` and
+`prime-claw-h6w.24.2`.
+
+For one bounded repair pass:
+
+- [x] Replace predictive-boundary wording with event-driven semantics. A goal
+  owns the current active-work epoch toward the broader requested outcome; epoch
+  completion does not claim requested-outcome completion and does not require
+  predicting the next gate.
+- [x] When the agent actually starts a long-running/background operation, retain
+  an inspectable handle/status, create and verify one heartbeat, recheck terminal
+  state, and, if still running, complete the current goal and end the turn. The
+  terminal heartbeat deletes itself and creates a fresh goal only if agent work
+  remains.
+- [x] For a human-only blocker, complete the current goal, report one exact
+  resumable checkpoint, and create no heartbeat. After unblocking, create a
+  fresh goal before substantive work.
+- [x] Update canonical docs, active specification/plan, direct semantic-content
+  tests, and Bead evidence only.
+- [x] Run focused direct tests and the existing proportionate safe non-native
+  boundary; do not restore native probes or broaden testing.
+- [x] Commit and push one clean repair candidate for owner review, then stop.
+  Do not apply/check, restart, or begin another UAT in this repair pass.
+
+Joe's native `/goal clear` in this exact episode reported no goal. This
+supersedes the false/stale paused-goal blocker previously reported by the local
+skill result; do not block the repair pass on that stale state.
+
 ## Checkpoint 1 — safety-first implementation candidate
 
 Bead: `prime-claw-h6w.24.1`.
@@ -144,6 +178,12 @@ This checkpoint is operator-controlled. After Checkpoint 1 apply/check:
    the active plan/spec. On failure, retain the exact observation and repair as
    a newly approved bounded candidate.
 
+First post-restart result: old-tool absence passed. Goal/wait transfer failed
+because the policy did not clearly end the active-work epoch at the actual wait
+handoff while keeping the broader requested outcome unfinished. Manual UAT
+remains failed pending the bounded repair above; the human-blocker case was not
+accepted as a pass.
+
 ## Validation record
 
 ### Checkpoint 1 focused tests
@@ -170,6 +210,26 @@ Replacement-candidate pre-commit evidence:
 No native Prime Agent probe, full native suite, managed apply/check, or new
 Prime Agent process ran during candidate construction. The sole daemon remained
 untouched through candidate acceptance.
+
+### Post-restart UAT repair candidate evidence
+
+The event-driven semantic repair changed only the approved policy, direct tests,
+canonical docs, active plan/spec, and Bead evidence. Validation used no native
+Prime Agent probe, managed apply/check, restart, or manual UAT:
+
+- Focused Node policy suite: `8/8` passed.
+- Focused Python command: `21 passed, 11 subtests passed` in `6.35s`.
+- Explicit safe non-native Python command: `269 passed, 11 subtests passed` in
+  `19.20s`, with 11 existing deprecation warnings. PID 19132 was transferred to
+  heartbeat `bf646472-9987-4ddc-ae80-d5b7729a4afb`; the terminal observer
+  captured exit 0 and deleted and verified absence of that exact monitor.
+- All six mock-based Node extension suites: `135/135` passed in `28.77s`. PID
+  21675 was transferred to heartbeat
+  `3b1c28da-e41b-4987-8f55-46eb47f4472c`; the terminal observer captured exit 0
+  and deleted and verified absence of that exact monitor.
+- `bash -n scripts/apply-prime-agent-plugin.sh
+  scripts/check-prime-agent-plugin.sh`, `git diff --check`, the 4,000-byte policy
+  bound (`2,828` bytes), and unique sentinel ownership all passed.
 
 ### Checkpoint 1 managed installation evidence
 
@@ -219,9 +279,10 @@ is active.
 
 ## Current stop boundary
 
-Checkpoint 1 is installed and checked, but not activated. Daemon PID 22654 still
-owns the pre-install loaded generation. Stop before restart. The operator's next
-action is to quiesce work and restart that sole daemon once using the normal
-service action, then perform only the three visible manual-UAT checks in
-Checkpoint 2. Exactly one mandatory final exact-candidate EXPERT review remains
-after manual UAT and final artifact reconciliation.
+The post-restart UAT repair candidate is pushed for owner review. Stop before
+managed apply/check, restart, or renewed UAT. The user-global installation still
+contains the previously accepted generation that produced the failed UAT; this
+repair pass makes no activation claim. After owner acceptance, run a separately
+authorized managed apply/check and restart gate before repeating only the visible
+Checkpoint 2 checks. Exactly one mandatory final exact-candidate EXPERT review
+remains after passing UAT and final artifact reconciliation.
