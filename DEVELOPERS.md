@@ -70,14 +70,33 @@ Tests are being organized into explicit tiers (see
   no Docker, no plugin install. Use the bounded command above until slice 3
   adds markers.
 - **Tier 1 — slim container** (slice 1 delivered the image + driver; slice 2
-  adds the in-container prime-agent install; slice 3 migrates the coupled
-  tests in). Anything needing Node, a prime-agent install, or the plugin runs
-  inside a plain-Docker container so the prime-agent under test can never
-  touch the host's `~/.prime/agent/`. `scripts/test-tier1.sh` builds the slim
-  image (`docker/test.Dockerfile`) and smoke-runs it (`--dry-run` prints the
-  plan, `--rebuild` skips cache). The smoke run verifies only the container
-  toolchain (Node/Python/pytest versions) — it does NOT install or validate
-  the plugin.
+  added the in-container prime-agent install + plugin apply/check; slice 3
+  migrates the coupled tests in). Anything needing Node, a prime-agent
+  install, or the plugin runs inside a plain-Docker container so the
+  prime-agent under test can never touch the host's `~/.prime/agent/`.
+  `scripts/test-tier1.sh` builds the slim image (`docker/test.Dockerfile`),
+  then runs ONE ephemeral container that installs prime-agent, applies the
+  plugin (`scripts/apply-prime-agent-plugin.sh`), and verifies it
+  (`scripts/check-prime-agent-plugin.sh`) against the container's own
+  `~/.prime/agent/` — with the repo bind-mounted read-only at `/workspace`.
+
+  Install selection lives in a gitignored `.env` at the repo root (copy
+  `.env.example`; set EXACTLY ONE selector — the driver fails fast on
+  neither/both):
+
+  - `PRIME_AGENT_PINNED=<version>` — install a released version via the
+    vendor installer (`install.sh`; the same mechanism `bin/prime-claw`
+    uses — prime-agent is not on the public npm registry).
+  - `PRIME_AGENT_SOURCE=/absolute/path/to/prime-agent` — build from a local
+    fork checkout: the host runs the fork's `release:pack`, the tarballs are
+    staged into the container over a `file:` URL base, and the container
+    installs from them.
+
+  Flags: `--dry-run` prints the plan (never contacts Docker), `--rebuild`
+  skips the build cache, `--smoke` runs only the toolchain smoke report (no
+  `.env` needed), `--probe` appends a container-side RPC probe
+  (`get_commands`) against the installed plugin. Network is used only at
+  image build and the in-container prime-agent install step.
 - **Tier 2 — host, OpenShell.** `tests/test_runtime_*.py` orchestrate
   sandboxes from the host and stay outside any container.
 

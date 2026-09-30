@@ -1,10 +1,12 @@
 """Tier-0 regression coverage for the tier-1 slim test image and its driver.
 
-Static checks only (no Docker required): the Dockerfile must exist and stay
+Static checks (no Docker required): the Dockerfile must exist and stay
 slim (no Postgres/pgvector/gbrain/OpenShell policy machinery), and the driver
-script must be executable with a --help/--dry-run surface. Live build/smoke
-evidence is produced by scripts/test-tier1.sh itself and recorded under
-docs/evidence/ per the execution plan.
+script must be executable with a --help/--dry-run surface. Behavioral tests
+exercise the driver's --smoke mode (slice-1 contract: build + toolchain
+smoke, no .env needed); slice-2 install-selection coverage lives in
+tests/test_tier1_driver.py. Live build/smoke evidence is produced by
+scripts/test-tier1.sh itself and recorded under docs/evidence/.
 """
 
 from __future__ import annotations
@@ -67,7 +69,8 @@ class TestTier1Driver(unittest.TestCase):
 
     def test_driver_dry_run_prints_plan_without_running(self):
         out = subprocess.run(
-            [str(DRIVER), "--dry-run"], capture_output=True, text=True, timeout=30
+            [str(DRIVER), "--dry-run", "--smoke"],
+            capture_output=True, text=True, timeout=30,
         )
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertIn("dry-run: docker build", out.stdout)
@@ -143,7 +146,7 @@ class TestTier1DriverNegativeEnvironments(unittest.TestCase):
         with __import__("tempfile").TemporaryDirectory() as td:
             tmp = Path(td)
             record = self._make_fake_docker(tmp, info_rc=1, build_rc=1, run_rc=1)
-            out = self._run_driver("--dry-run", env=self._env(tmp))
+            out = self._run_driver("--dry-run", "--smoke", env=self._env(tmp))
             self.assertEqual(out.returncode, 0, out.stderr)
             self.assertIn("dry-run: docker build", out.stdout)
             self.assertFalse(
@@ -158,7 +161,7 @@ class TestTier1DriverNegativeEnvironments(unittest.TestCase):
             import shutil
             if shutil.which("docker", path=env["PATH"]):
                 self.skipTest("docker unexpectedly present in minimal PATH")
-            for args in (("--help",), ("--dry-run",)):
+            for args in (("--help",), ("--dry-run", "--smoke")):
                 out = self._run_driver(*args, env=env)
                 self.assertEqual(
                     out.returncode, 0,
@@ -171,7 +174,7 @@ class TestTier1DriverNegativeEnvironments(unittest.TestCase):
             import shutil
             if shutil.which("docker", path=env["PATH"]):
                 self.skipTest("docker unexpectedly present in minimal PATH")
-            out = self._run_driver(env=env)
+            out = self._run_driver("--smoke", env=env)
             self.assertNotEqual(out.returncode, 0)
             self.assertIn("docker not found", out.stderr)
             self.assertNotIn("OK", out.stdout)
@@ -180,7 +183,7 @@ class TestTier1DriverNegativeEnvironments(unittest.TestCase):
         with __import__("tempfile").TemporaryDirectory() as td:
             tmp = Path(td)
             record = self._make_fake_docker(tmp, info_rc=1)
-            out = self._run_driver(env=self._env(tmp))
+            out = self._run_driver("--smoke", env=self._env(tmp))
             self.assertNotEqual(out.returncode, 0)
             self.assertIn("daemon", out.stderr)
             self.assertNotIn("OK", out.stdout)
@@ -193,7 +196,7 @@ class TestTier1DriverNegativeEnvironments(unittest.TestCase):
         with __import__("tempfile").TemporaryDirectory() as td:
             tmp = Path(td)
             record = self._make_fake_docker(tmp, build_rc=1)
-            out = self._run_driver(env=self._env(tmp))
+            out = self._run_driver("--smoke", env=self._env(tmp))
             self.assertNotEqual(out.returncode, 0)
             self.assertNotIn("OK", out.stdout)
             self.assertEqual(record.read_text().split(), ["info", "build"])
@@ -202,7 +205,7 @@ class TestTier1DriverNegativeEnvironments(unittest.TestCase):
         with __import__("tempfile").TemporaryDirectory() as td:
             tmp = Path(td)
             record = self._make_fake_docker(tmp, run_rc=1)
-            out = self._run_driver(env=self._env(tmp))
+            out = self._run_driver("--smoke", env=self._env(tmp))
             self.assertNotEqual(out.returncode, 0)
             self.assertNotIn("OK", out.stdout)
             self.assertEqual(record.read_text().split(), ["info", "build", "run"])
@@ -214,7 +217,7 @@ class TestTier1DriverNegativeEnvironments(unittest.TestCase):
         with __import__("tempfile").TemporaryDirectory() as td:
             tmp = Path(td)
             record = self._make_fake_docker(tmp)
-            out = self._run_driver(env=self._env(tmp))
+            out = self._run_driver("--smoke", env=self._env(tmp))
             self.assertEqual(out.returncode, 0, out.stderr)
             self.assertIn("OK", out.stdout)
             self.assertEqual(record.read_text().split(), ["info", "build", "run"])
