@@ -1,0 +1,105 @@
+{
+  "causal_seam": "_candidate_progress_watchdog_script starts a setsid shim in background and immediately assumes its PID is a process-group ID. The watchdog terminates early while its target PID still belongs to the parent group: group-directed signal/probe misses the live shim, watcher exits, shim forms its group later, direct Bash stays blocked waiting, and original Python subprocess.run reaches its 15-second bound. Signal and group-aliveness paths must include the still-live direct worker PID before PGID readiness.",
+  "external_observation": {
+    "lsof_with_empty_selection": false,
+    "method": "private out-of-process ps PID/PPID/PGID/comm sampling at roughly 0.25-0.35 seconds; narrowly selected lsof PIPE endpoints only after slow watchdog case and with nonempty selected PID list",
+    "normalized_timeline": [
+      {
+        "direct_bash": "waiting on child worker",
+        "t_seconds": 0.301,
+        "watchdog": "background Bash watchdog exists in pytest PGID",
+        "worker": "setsid Python shim PID exists but PGID is still pytest PGID"
+      },
+      {
+        "t_seconds": 1.245,
+        "watchdog": "background watcher still alive with sleep ending",
+        "worker": "still Python shim in pytest PGID, no isolated group"
+      },
+      {
+        "t_seconds": 1.587,
+        "watchdog": "watcher gone; group target was never present while watcher existed",
+        "worker": "still Python shim in pytest PGID, no isolated group"
+      },
+      {
+        "t_seconds": 3.522,
+        "watchdog": "absent",
+        "worker": "still Python shim in pytest PGID"
+      },
+      {
+        "t_seconds": 3.847,
+        "watchdog": "already absent",
+        "worker": "now Bash in its own isolated PGID, with descendant"
+      },
+      {
+        "pipe_state": "direct Bash, worker and descendant still hold the same inherited stdout/stderr writer pipes",
+        "t_seconds": 7.171,
+        "worker": "leader and descendant remain in isolated group, alongside direct Bash waiting"
+      },
+      {
+        "pipe_state": "same inherited writer pipes still open",
+        "t_seconds": 14.629,
+        "worker": "leader and descendant still running"
+      },
+      {
+        "direct_bash": "still waiting",
+        "t_seconds": 15.021,
+        "worker": "still running in isolated PGID, after watcher disappeared"
+      }
+    ],
+    "private_raw_sample_sha256": "caeea91c32b9c41a2723db0db52682b73b286fc866a75d329cbe0ab3250077c2",
+    "samples": 69,
+    "scoped_lsof_samples": 12
+  },
+  "limits": "The observation proves the ordering and inherited writer retention; it does not attribute the long Python shim initialization delay to a specific host subsystem. Raw PIDs and pipe identifiers remain private. No other run in the six-run campaign was started after the first original failure.",
+  "preserved_boundary": {
+    "accepted_checkout_clean": true,
+    "accepted_checkout_head": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "both_db_aggregate_snapshots_unchanged": true,
+    "historical_unaccepted_local_candidate": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "no_new_brain_candidate_ref_or_push": true,
+    "no_qwen_retry_index_build_cutover_routed_write": true,
+    "policy_unchanged": true,
+    "remote_main": "eb157c713b24bb0ec9315ae27617b16da5cbf71b",
+    "tracking_origin_main": "b695658b8271f4541e47b87f62c5b14c19075528"
+  },
+  "repair": {
+    "behavior": "Wait up to five seconds for background setsid shim PID to become its isolated process-group ID. The no-progress clock restarts only after group readiness. Startup termination trap cleans worker process/group, inherited pipes and watchdog state before the regular signal handler takes over. A never-ready group exits 125 with bounded cleanup. Ordinary TERM/grace/KILL logic remains unchanged.",
+    "code_surface": "bin/prime-claw::_candidate_progress_watchdog_script only; original 15-second test body, assertion, shell fragment and selection unchanged",
+    "final_source_sha256": "cc69eecff60771f1859b56c2ef34da1aeb971c5057a38baaa3024c5635838963",
+    "final_test_sha256": "7c6a51a3ac4ec8e64c99a330d45c011906554d97466fdbf77b7fdbd4f3a6f162",
+    "initial_rejected_attempt": "Fallback to signaling the direct PID before PGID readiness made original assertions miss worker PID files and failed the focused gate (3 failed); discarded before the final repair.",
+    "new_regression": "test_candidate_progress_watchdog_terminates_before_setsid_group_exists delays the test-only setsid shim by three seconds and asserts watchdog returns 124 and reaps the shim; original tests unchanged."
+  },
+  "repair_status": "CAUSAL_B2_STARTUP_READINESS_RUNTIME_FIX_LOCAL_ONLY_PENDING_INDEPENDENT_EXPERT_AND_OWNER_REVIEW",
+  "reproduction": {
+    "attempts_consumed": 1,
+    "campaign_maximum": 6,
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q -p no:cacheprovider --basetemp=<unique-private-scratch> tests/test_embedding_candidate_build.py tests/test_runtime_validate.py tests/test_runtime_converge.py",
+    "exit_code": 1,
+    "failed_test": "test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero",
+    "private_test_log_sha256": "6a981f04a8546415ec5150109f2ca60b68f02ce1e54e2c2dbc43315b76d35996",
+    "source_state": "12520500af24c746f1caa4f2d64eee6ff1ab1ada, before repair",
+    "stop_reason": "first genuine original watchdog test TimeoutExpired at 15 seconds",
+    "summary": "1 failed, 62 passed, 3 warnings in 22.14s"
+  },
+  "schema": "phase3a-slice2-b2-setsid-startup-race-v1",
+  "status": "ORIGINAL_WATCHDOG_TIMEOUT_REPRODUCED_FIRST_OF_SIX_STOPPED_CAUSAL_STARTUP_RACE",
+  "validation": {
+    "focused_gate_1": {
+      "private_log_sha256": "1118b293dade6dcc08baccd79635835ed4ebe157c8f0233aacd56201ae3c590e",
+      "scratch": "unique private basetemp, bytecode and cache disabled",
+      "summary": "64 passed, 3 warnings in 13.30s"
+    },
+    "focused_gate_2": {
+      "private_log_sha256": "6d1cb7a50c0f82e3549bf481d6b57503641d83deb090d93ce6345b00fe44da70",
+      "scratch": "second unique private basetemp, bytecode and cache disabled",
+      "summary": "64 passed, 3 warnings in 13.67s"
+    },
+    "independent_expert_status": "NOT_YET_REVIEWED",
+    "owner_status": "NOT_YET_ACCEPTED",
+    "targeted_original_plus_new_plus_signal": {
+      "private_log_sha256": "b2a5123cf69f719bc031a4d96a950dc5452421f22a63a30884606407f6c11685",
+      "summary": "3 passed, 1 warning in 11.83s"
+    }
+  }
+}

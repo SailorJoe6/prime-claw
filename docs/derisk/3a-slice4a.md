@@ -561,3 +561,26 @@ remains unexplained; one pass is not a reproducibly green required gate. An
 accidental unscoped final observer sample was discarded locally and not
 published. No code, test, brain source or database was changed. Stop pending
 owner direction for any further failure-time diagnosis.
+
+## 2026-09-30 B2 failure capture and bounded readiness repair
+
+The first of Joe's approved six unchanged diagnostic selections reproduced the
+original 15-second watchdog `TimeoutExpired`; the campaign stopped without a
+second diagnostic run. An [external PID/PGID and pipe receipt](../evidence/phase3a-slice2-b2-setsid-startup-race-20260930.json)
+shows the `setsid` Python shim was still in the parent's group when the stall
+watcher exited, and formed its own group only afterward. Its direct Bash
+parent stayed blocked, with worker and descendant retaining captured pipe
+writers, until the original test timeout. The receipt reports the cause without
+publishing private raw process samples.
+
+A first direct-PID fallback failed the unchanged safety tests and was discarded.
+The bounded runtime repair waits for the isolated group to exist before starting
+the no-progress clock; an early signal or launch-readiness failure cleans the
+worker and fails closed. A new delayed-`setsid` regression passed along with the
+unchanged original watchdog and signal tests (3/3). Two separate original
+three-module no-write focused selections passed after the repair (64 tests,
+three warnings each, 13.30 and 13.67 seconds), using separate scratch basetemps.
+The original 15-second bound, assertions and selection remain intact. These are
+local repair checks, not independent EXPERT or owner acceptance. Brain remote,
+accepted checkout, policy and both DB snapshots stayed unchanged. No new brain
+candidate, source push, Qwen retry, indexing, build, cutover or routed write.

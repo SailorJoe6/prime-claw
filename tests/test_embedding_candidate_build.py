@@ -189,6 +189,47 @@ def test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero(tmp_pa
                 pass
 
 
+def test_candidate_progress_watchdog_terminates_before_setsid_group_exists(tmp_path):
+    """A slow setsid shim must not make an early stall signal miss the worker."""
+    progress_file = tmp_path / "progress"
+    progress_file.write_text("steady")
+    shim_pid_file = tmp_path / "shim.pid"
+    env = _watchdog_test_env(tmp_path)
+    setsid = tmp_path / "bin" / "setsid"
+    setsid.write_text(
+        f"#!{sys.executable}\n"
+        "import os, sys, time\n"
+        f"with open({str(shim_pid_file)!r}, 'w') as pidfile: pidfile.write(str(os.getpid()))\n"
+        "time.sleep(3)\n"
+        "os.setsid()\n"
+        "os.execvp(sys.argv[1], sys.argv[1:])\n"
+    )
+    fragment = pc._candidate_progress_watchdog_script(
+        "bash -c 'while :; do sleep 1; done'",
+        "cat " + shlex.quote(str(progress_file)),
+        stall_seconds=1,
+        poll_seconds=1,
+        term_grace_seconds=1,
+    )
+    try:
+        result = subprocess.run(
+            ["bash", "-c", "set -euo pipefail\n" + fragment],
+            text=True,
+            capture_output=True,
+            timeout=12,
+            env=env,
+        )
+        assert result.returncode == 124
+        assert "candidate-progress-watchdog" in result.stderr
+        assert _wait_pid_gone(int(shim_pid_file.read_text()))
+    finally:
+        if shim_pid_file.exists():
+            try:
+                os.kill(int(shim_pid_file.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
 def test_candidate_progress_watchdog_resets_and_signal_cleanup_reaps_group(tmp_path):
     pid_file = tmp_path / "sync.pid"
     progress_file = tmp_path / "progress"
