@@ -176,3 +176,50 @@ stale trace assertion, NOT version coupling.
 - The scratch-space patched plugin copy used to extract the EACCES stack
   lived only under `.test-results/` (never the repo, never the host
   plugin) and was deleted with it.
+
+## Merge reconciliation (goal-heartbeat-work-control merge, 9b3edd2)
+
+Mid-slice, `main` advanced through the goal-heartbeat-work-control merge
+(`a6a55bc` → `9b3edd2`): the plugin generation changed
+(`extensions/goal-blocker-control.ts` deleted,
+`extensions/goal-heartbeat-work-control.ts` added; apply/check scripts
+updated), `tests/test_goal_blocker_control_extension.py` was deleted and
+`tests/test_goal_heartbeat_work_control_extension.py` +
+`tests/goal_heartbeat_work_control_extension.test.mjs` were added, and
+`tests/test_prime_agent_plugin_install.py` gained the new-generation
+FILES list plus generalized obsolete-file cases.
+
+Per the plan's merge-reconciliation watch item, the branch was rebased
+onto `9b3edd2` and the inventory re-audited against the assignment RULE
+(needs node / prime-agent binary / plugin install → tier 1):
+
+- `test_goal_blocker_control_extension.py`: accepted main's deletion
+  (its target extension no longer exists; its assertions about
+  `pause_thread_goal`/`resume_thread_goal` are obsolete by design).
+- `test_goal_heartbeat_work_control_extension.py` (new, from main): the
+  node-suite bridge invoked host node → migrated to the container fixture
+  (tier 1); the two source-contract tests stay tier 0.
+- `test_prime_agent_plugin_install.py`: the rebase conflict was resolved
+  by keeping the container migration and porting main's three semantic
+  changes into it (new FILES generation; two-case obsolete-files test;
+  new unsafe-obsolete-goal-extension test), preserving the pytest style
+  and parametrize conversion.
+- The R-T1-4 inventory entry's test list was updated to the new
+  generation's file (integrity test caught the stale reference — the
+  discipline working as designed).
+- The new `.test.mjs` suite is bridged (container exec); the
+  every-node-suite-has-a-bridge static guard covers it.
+
+Post-rebase acceptance (all on the reconciled branch):
+
+- `python3 -m pytest tests/ -q` (tier-0 default): **223 passed,
+  144 skipped in ~21s**, no Docker dependency.
+- `python3 -m pytest tests/ -q -m container` (pinned 0.9.3): **37 passed
+  in 118s** in ONE session container — now including the
+  goal-heartbeat node suite and the new-generation install tests.
+- `scripts/test-all.sh`: tier0 PASS (19s), tier1 PASS (115s), OK.
+- Host `~/.prime/agent` untouched across every run (sha256 over the
+  managed files + APPEND_SYSTEM.md; note the operator updated the host
+  plugin to the goal-heartbeat generation mid-session, so the managed
+  file set itself changed on the host — the before/after captures across
+  each slice-3 run window were identical).

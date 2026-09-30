@@ -1218,7 +1218,7 @@
      "tests/test_handoff_chain_extension.py",
      "tests/test_reviewed_plan_extension.py",
      "tests/test_project_conversation_extension.py",
-     "tests/test_goal_blocker_control_extension.py",
+     "tests/test_goal_heartbeat_work_control_extension.py",
      "tests/test_conversation_oversight_native.py",
      "tests/test_reviewed_plan_native_discovery.py",
      "tests/test_prime_agent_plugin_install.py",

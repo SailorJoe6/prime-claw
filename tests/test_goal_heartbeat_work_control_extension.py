@@ -1,26 +1,27 @@
-"""Direct non-native coverage for plugin-global goal/heartbeat work control."""
+"""Direct non-native coverage for plugin-global goal/heartbeat work control.
+
+Tier policy (slice 3): the node suite bridge is tier 1 and runs INSIDE the
+session's tier-1 container via the `tier1_container` fixture (auto-marked
+`container`; see tests/conftest.py); the source-contract checks below stay
+tier 0.
+"""
 
 from pathlib import Path
-import shutil
-import subprocess
 
 
 REPO = Path(__file__).resolve().parents[1]
 EXTENSION = REPO / "src/prime-agent-plugin/extensions/goal-heartbeat-work-control.ts"
 OBSOLETE = REPO / "src/prime-agent-plugin/extensions/goal-blocker-control.ts"
-NODE_SUITE = REPO / "tests/goal_heartbeat_work_control_extension.test.mjs"
+# Container path (repo bind-mounted read-only at /workspace).
+WS_NODE_SUITE = "/workspace/tests/goal_heartbeat_work_control_extension.test.mjs"
 MANAGED_SOURCE = REPO / "src/prime-agent-plugin"
 
 
-def test_goal_heartbeat_work_control_node_suite() -> None:
-    node = shutil.which("node")
-    assert node, "Node.js is required because Prime Agent requires Node >=22.8"
-    result = subprocess.run(
-        [node, "--experimental-strip-types", "--test", str(NODE_SUITE)],
-        cwd=REPO,
-        text=True,
-        capture_output=True,
-        check=False,
+def test_goal_heartbeat_work_control_node_suite(tier1_container) -> None:
+    """Run the TypeScript suite against a mocked ExtensionAPI, in-container."""
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", WS_NODE_SUITE,
+        timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
