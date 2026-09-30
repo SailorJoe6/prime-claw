@@ -143,18 +143,23 @@ machine's single-instance rule and is not acceptance evidence. Its standalone
 RPC framework and machine-readable evidence matrix were removed. No concurrent
 Prime Agent process, broad version matrix, or repeated native suite is required.
 
-After one operator-controlled restart, Joe performs manual UAT in a fresh
-installed generation:
+The operator-controlled restart and visible manual UAT completed on 2026-09-30
+against the installed generation from accepted repair
+`486f4af62b7c1088a0ad10eb9ca05a2e0f735401`:
 
-1. Visibly confirm `pause_thread_goal` and `resume_thread_goal` are absent.
-2. In a compatible normal session, visibly observe active-work goal → monitored
-   observable wait → fresh goal only when substantive work remains.
-3. Observe one visible actionable human-blocker checkpoint and no
-   person-polling heartbeat.
+1. Joe confirmed `pause_thread_goal` and `resume_thread_goal` were absent.
+2. Goal `1cac0599-adbd-4ed1-9e84-24d854a277e5` transferred an observable PID
+   `46498` wait to heartbeat `6c244df4-97ab-4c95-8e8d-0521215322e6`. The goal
+   completed while the broader UAT remained unfinished; a nonterminal check did
+   not create a goal or restart work; terminal handling observed exit 0, deleted
+   and verified absence of the heartbeat, and removed the marker.
+3. Human-blocker goal `4c5fcf18-3f69-4f8c-99de-d68bbef7f721` completed with an
+   empty heartbeat inventory and one resumable checkpoint. Joe supplied the
+   requested `human-blocker-uat-cleared` token before fresh substantive work.
 
-Hidden capability gating and non-accumulation remain direct-test contracts, not
-manual-UAT steps. Record only Joe's observed pass/fail. Do not claim the loaded generation or
-behavior changed before that restart and manual observation.
+The exact visible receipts are durable on `prime-claw-h6w.24.2`. Hidden
+capability gating and non-accumulation remain direct-test contracts, not claims
+from manual observation.
 
 ## Incident lineage
 

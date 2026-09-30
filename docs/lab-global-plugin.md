@@ -163,3 +163,13 @@ byte parity and a fresh builder-rooted offline RPC process started successfully
 with exactly one `/handoff`, `/plan`, and `/implement-spec`, all sourced from the
 user-global installation. A session-start probe also confirmed all five expected
 structured tools.
+
+On 2026-09-30, managed apply/check installed exact accepted goal/heartbeat repair
+`486f4af62b7c1088a0ad10eb9ca05a2e0f735401`. Independent evidence recorded all
+eight managed TypeScript files as regular, non-symlink, and byte-identical to
+builder source; the obsolete goal-blocker entry was absent and the preserving
+`APPEND_SYSTEM.md` check passed. After the sole-daemon restart, visible UAT
+confirmed obsolete-tool absence, event-driven goal-to-monitored-wait transfer
+with terminal cleanup, and a human-only blocker with no person-polling
+heartbeat. Exact receipts are on `prime-claw-h6w.24.2`; canonical behavior is in
+[goal-heartbeat-work-control.md](goal-heartbeat-work-control.md).

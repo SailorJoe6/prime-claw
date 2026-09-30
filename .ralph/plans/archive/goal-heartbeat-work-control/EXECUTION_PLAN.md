@@ -158,8 +158,9 @@ native suite, or any concurrent Prime Agent process.
   managed installation gate. No duplicate intermediate EXPERT review ran.
 - [x] Run managed apply/check against the
   user-global copy and verify parity/obsolete-file absence.
-- [ ] Preserve exactly one mandatory final exact-candidate EXPERT gate after
-  manual UAT and final artifact reconciliation.
+- [x] Preserve exactly one mandatory final exact-candidate EXPERT gate after
+  manual UAT and final artifact reconciliation. It remains the owning
+  conversation's next gate and was not run by this episode.
 - [x] Stop before restart. Report that daemon PID 22654 remains the pre-install
   loaded process; installation is not activation and no restart occurred.
 
@@ -186,9 +187,34 @@ This checkpoint is operator-controlled. After Checkpoint 1 apply/check:
 
 First post-restart result: old-tool absence passed. Goal/wait transfer failed
 because the policy did not clearly end the active-work epoch at the actual wait
-handoff while keeping the broader requested outcome unfinished. Manual UAT
-remains failed pending the bounded repair above; the human-blocker case was not
-accepted as a pass.
+handoff while keeping the broader requested outcome unfinished; the
+human-blocker case was not accepted as a pass in that run.
+
+After installation of exact repaired generation
+`486f4af62b7c1088a0ad10eb9ca05a2e0f735401` and the operator-controlled restart,
+the renewed visible Checkpoint 2 UAT passed all three cases. Joe observed the
+obsolete pause/resume tools absent; an exact goal transfer to a monitored
+heartbeat wait, followed by terminal cleanup; and an exact human-only blocker
+that completed its goal, created no heartbeat, and resumed only after Joe
+supplied the requested unblock token. Exact UAT identities and receipts are
+durably recorded on `prime-claw-h6w.22` and `prime-claw-h6w.24.2`.
+
+## Terminal candidate after passing UAT
+
+Complete one bounded terminal reconciliation pass only:
+
+- [x] Reconcile canonical docs, direct tests, active artifacts, and directly
+  relevant Beads with the accepted behavior and recorded passing UAT.
+- [x] Run the proportionate final non-native checks without launching Prime
+  Agent, a native probe, or a broad/native suite.
+- [x] Archive the exact active specification/plan bundle under
+  `.ralph/plans/archive/goal-heartbeat-work-control/`, update the archive index,
+  and verify its relative links.
+- [x] Prepare and push one complete terminal candidate with exact
+  Git/path/link evidence, then stop for owner reconciliation. The exact pushed
+  commit is recorded on the directly relevant Beads after push.
+- [x] Do not run the mandatory fresh final exact-candidate EXPERT review, merge,
+  abandon, remove the worktree/session/branch, or finalize episode bookkeeping.
 
 ## Validation record
 
@@ -235,7 +261,8 @@ Prime Agent probe, managed apply/check, restart, or manual UAT:
   and deleted and verified absence of that exact monitor.
 - `bash -n scripts/apply-prime-agent-plugin.sh
   scripts/check-prime-agent-plugin.sh`, `git diff --check`, the 4,000-byte policy
-  bound (`2,828` bytes), and unique sentinel ownership all passed.
+  bound (`2,828` characters / `2,975` UTF-8 bytes), and unique sentinel
+  ownership all passed.
 
 ### Event-driven repair managed installation evidence
 
@@ -336,15 +363,32 @@ The safe command enumerated every non-native Python file explicitly. It excluded
 least one real Prime Agent launch. Do not use `pytest tests` while the sole daemon
 is active.
 
+### Terminal reconciliation evidence
+
+- Canonical acceptance evidence now records the exact passing visible UAT
+  receipts from `prime-claw-h6w.24.2`; no approved runtime behavior changed.
+- `node --experimental-strip-types --test
+  tests/goal_heartbeat_work_control_extension.test.mjs` passed `8/8`.
+- `pytest -q tests/test_goal_heartbeat_work_control_extension.py
+  tests/test_prime_agent_plugin_install.py tests/test_execute_skill.py` passed
+  `21` tests plus `11` subtests in `6.38s`; the final post-archive combined
+  focused command exited 0 in `7.08s`.
+- `bash -n scripts/apply-prime-agent-plugin.sh
+  scripts/check-prime-agent-plugin.sh`, final managed plugin check, and
+  `git diff --check` passed. The policy is `2,828` characters / `2,975` UTF-8
+  bytes and owns one sentinel.
+- The exact active bundle moved to
+  `.ralph/plans/archive/goal-heartbeat-work-control/`. The archive index links
+  both artifacts and the canonical operating contract; all three relative
+  targets resolve to regular files. `src/`, `scripts/`, and `tests/` have no
+  diff from accepted repair `486f4af62b7c1088a0ad10eb9ca05a2e0f735401`.
+- No Prime Agent/native probe, broad/native suite, fresh final EXPERT review,
+  merge, abandonment, cleanup, or episode-bookkeeping close ran.
+
 ## Current stop boundary
 
-Exact accepted repair
-`486f4af62b7c1088a0ad10eb9ca05a2e0f735401` is installed and checked, but
-the loaded
-daemon predates installation and is not claimed active. Stop before restart or
-renewed UAT. The operator's next action is exact: quiesce active Prime Agent work,
-restart the sole daemon (currently PID `14672`) once using the normal service
-action without launching a concurrent daemon, then open
-a fresh builder-rooted session and run only the three visible Checkpoint 2
-manual-UAT checks. Do not begin archival or the mandatory final exact-candidate
-EXPERT review until UAT passes and artifacts are reconciled.
+This archived bundle and its pushed Git commit are the episode's terminal
+readiness claim. Stop for owner reconciliation. The owning conversation must
+obtain the mandatory fresh final exact-candidate EXPERT PASS before it can ask
+the operator for a merge decision. Archival and passing UAT do not authorize
+merge, abandonment, resource cleanup, or episode bookkeeping finalization.

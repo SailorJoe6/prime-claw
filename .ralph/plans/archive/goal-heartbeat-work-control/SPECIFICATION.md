@@ -194,14 +194,23 @@ docs, active specification/plan, direct semantic-content tests, and Bead
 evidence. It adds the explicit event-driven wait and human-blocker transitions.
 Owner accepted exact pushed repair
 `486f4af62b7c1088a0ad10eb9ca05a2e0f735401`. Its bounded managed
-apply/check gate passed on 2026-09-30 PDT;
-all eight installed managed TypeScript files are regular, byte-identical to
-source, and the obsolete paths are absent without dangling symlinks. Loaded
-daemon PID `14672` predates installation, so the
-repair is installed but is not claimed active. Stop before the separate
-operator-controlled restart and renewed UAT. Do not restore native probes or
-broad testing, launch Prime Agent, begin final artifact archival/EXPERT review,
-or broaden scope.
+apply/check gate passed on 2026-09-30 PDT; all eight installed managed TypeScript
+files were regular and byte-identical to source, and the obsolete paths were
+absent without dangling symlinks. After the operator-controlled restart, renewed
+visible Checkpoint 2 UAT passed: obsolete pause/resume tools were absent; an exact
+goal transferred to a monitored wait and cleaned up; and an exact human blocker
+completed its goal with no heartbeat before Joe supplied the requested unblock
+token. Exact receipts are recorded on `prime-claw-h6w.22` and
+`prime-claw-h6w.24.2`.
+
+The terminal reconciliation archived this specification and its execution plan
+under `.ralph/plans/archive/goal-heartbeat-work-control/`, linked both artifacts
+from the archive index, aligned canonical acceptance evidence with Joe's exact
+passing UAT, and reran the proportionate non-native gates. This archive is a
+readiness claim for owner reconciliation, not merge authority. The mandatory
+fresh final exact-candidate EXPERT review remains the owner's next gate. No Prime
+Agent/native probe, merge, abandonment, episode-resource cleanup, bookkeeping
+finalization, behavior change, or scope expansion occurred.
 
 ## Scope boundaries
 
