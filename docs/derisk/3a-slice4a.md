@@ -759,3 +759,7 @@ Fresh independent exact-commit EXPERT review and a separate owner decision
 remain required. Source, parent, and ordered Qwen Beads stay BLOCKED. No
 brain push/publication, Qwen retry/index/build/cutover, routed write or
 plugin overwrite occurred.
+
+## 2026-09-30 — Joe-A exact local candidate accepted, not published
+
+Fresh independent `openai-codex/gpt-6-astra`/`max` EXPERT **PASS** on exact pushed project proof `703f1827ddeb91763542209a0d4c3d94491adeb8` and unchanged local-only brain candidate `83eee06e4322b3264bb812959a2a5482bce13151` independently reproduced the distinct scratch and isolated Git native 1,202/zero no-fix scans, both before/after manifests, complete source preservation, unchanged 85 passing focused tests and live ref/policy/both DB/Beads gates. Complete private EXPERT report SHA-256 `837a3895d222dd60790aee93fa9835a5ad94867e59ab19a4b498fd9988fef065`. After separate owner reconciliation, the owner accepts **only the exact local candidate**; [sanitized decision](../evidence/phase3a-slice2-joe-a-local-candidate-owner-accepted-83eee-20260930.md) SHA-256 `9c841e1bf304eb8a38a56b2b4a33d7db6eaa14bb680c2908d1315bf117b8f917`. The brain ref is not pushed. Source/parent/routed-write stay BLOCKED; a separately gated non-force publication decision is next, not automatic source-current/index/build/cutover/routed-write acceptance.
