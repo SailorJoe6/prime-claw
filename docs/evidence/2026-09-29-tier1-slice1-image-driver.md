@@ -1,12 +1,16 @@
 # Evidence — Slice 1: tier-1 slim test image + dumb driver
 
-Date: 2026-09-29 (initial), refreshed 2026-09-30 after EXPERT review rework
+Date: 2026-09-29 (initial), refreshed 2026-09-30 after two EXPERT review rounds
 Bead: prime-claw-blw.1
 Branch: episode/plugin-test-container
-Review: `.ralph/plans/future/plugin-test-container/reviews/2026-09-30-slice1-47d2830-expert-block.md`
-(in the main repo) returned BLOCK with three findings (B1/B2/B3); the rework
-section at the bottom records the repairs. The reviewed commit `47d2830` is
-invalidated; this note now describes the repaired state.
+Reviews (reports in the main repo): the gate on `47d2830`
+(`.ralph/plans/future/plugin-test-container/reviews/2026-09-30-slice1-47d2830-expert-block.md`)
+returned BLOCK with three findings (B1/B2/B3, repaired in `d8dbc5d`); the
+gate on `d8dbc5d`
+(`.ralph/plans/future/plugin-test-container/reviews/2026-09-30-slice1-d8dbc5d-expert-block.md`)
+verified B1/B2 resolved and returned BLOCK with one remaining finding (B3-R,
+repaired here). Both reviewed commits are invalidated; this note describes
+the repaired state.
 
 ## What was delivered
 
@@ -114,8 +118,12 @@ Post-rework runs (2026-09-30, after the B1/B2/B3 repairs):
 
 ### Demonstrated (verified in code or by direct re-observation)
 
-- The Slice-1 diff cannot be the cause of the 6 failures: it touched no code
-  those tests load (demonstrated by the additive-only `git status` above).
+- Neither slice-1 commit (`47d2830`, `d8dbc5d`) changes any existing plugin
+  or probe code: both diffs are additive-only (the `git status` observation
+  above, plus rework files limited to the new driver, new tests, and docs).
+  This bounds what the slice touched; additive scope alone does NOT establish
+  non-causation. The six per-test failure causes remain **UNRESOLVED** — no
+  retained failure traces were re-analyzed to establish them.
 - At least one failed test does NOT load the host-installed plugin at all:
   `test_prime_agent_rpc_loads_native_commands_and_structured_tool` invokes
   `prime-agent --no-extensions -e <repo extension source> -e <temp probe>`
@@ -141,10 +149,14 @@ Post-rework runs (2026-09-30, after the B1/B2/B3 repairs):
   grandchild holding the pipe open). No stack sample was taken during the
   incident, so the identification of WHICH read blocked is inference from the
   code, not direct observation.
-- Both the failures and the hang belong to the host-coupling incident class
-  (SPECIFICATION.md "Why this is a problem") that tier 1 eliminates by
-  construction — this is the design motivation, not a proven per-test
-  attribution.
+- Hypothesis: the failures and the hang belong to the host-coupling incident
+  class (SPECIFICATION.md "Why this is a problem") that tier 1's
+  filesystem/process isolation is designed to prevent — isolation stops the
+  prime-agent under test from contaminating the host's real environment.
+  This is a design motivation, not a demonstrated per-test attribution.
+  Isolation also does NOT itself repair the unbounded pipe reads documented
+  above; those are test-code defects that persist in any environment until
+  every pipe read is given a deadline (Slice 3 scope, below).
 
 Fix direction (Slice 3 scope): when these probes move into the tier-1
 container, give every pipe read a deadline (e.g. read via selector into a
@@ -186,6 +198,20 @@ The EXPERT gate on `47d2830` returned BLOCK with three findings; repairs:
   Observations / Demonstrated / Hypotheses; the host-generation mismatch is
   recorded as observed-but-not-demonstrated cause; and the image-size
   comparison is corrected to 606MB vs `prime-claw-brain:0.1.0` 5.17GB.
+
+Round 2 (2026-09-30, EXPERT gate on `d8dbc5d`): B1 and B2 verified resolved;
+one finding remained.
+
+- **B3-R — residual epistemic overreach in this note.** The Demonstrated
+  section still concluded the slice "cannot be the cause" of the six
+  failures from additive scope alone, and the Hypotheses section stated
+  tier 1 "eliminates by construction" the incident class too strongly.
+  Repair: the Demonstrated claim is now bounded to the verified fact
+  (neither slice-1 commit changes existing plugin/probe code) with the six
+  per-test causes left explicitly UNRESOLVED; the "eliminates by
+  construction" claim is demoted to an explicit hypothesis that also states
+  isolation does not itself repair the unbounded reads. All observations
+  from the original run are preserved unchanged.
 
 ## Shared-base extraction: DEFERRED (escape hatch)
 
