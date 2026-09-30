@@ -12,7 +12,7 @@ project extension discovery path:
 src/prime-agent-plugin/
   APPEND_SYSTEM.md
   extensions/
-    goal-blocker-control.ts
+    goal-heartbeat-work-control.ts
     handoff-chain.ts
     reviewed-plan.ts
   extension-support/
@@ -29,7 +29,7 @@ The installed copy preserves the inner relative layout under
 ```text
 APPEND_SYSTEM.md  # managed block; unrelated content is preserved
 extensions/
-  goal-blocker-control.ts
+  goal-heartbeat-work-control.ts
   handoff-chain.ts
   reviewed-plan.ts
 extension-support/
@@ -115,19 +115,26 @@ Expected native commands:
 Expected default identity and work-control resources:
 
 - exactly one managed `PRIME_CLAW_CONVERSATION_IDENTITY_V1` block in `APPEND_SYSTEM.md`
-- bounded goal/heartbeat prompt guidelines from `goal-blocker-control.ts`
+- one transient, capability-gated goal/heartbeat policy from `goal-heartbeat-work-control.ts`
 - no explicit CONVERSATION launch flag
 - oversight hooks registered by the normally discovered `reviewed-plan.ts` entry
 
 Expected structured tools:
 
-- `pause_thread_goal`
-- `resume_thread_goal`
 - `ralph_handoff`
 - `ralph_plan`
 - `create_spec_episode`
 - `handoff_spec_episode`
 - `finalize_spec_episode` — location-only, no-UI episode bookkeeping close after verified terminal work
+
+The work-control entry registers no tool and sends no message. On each compatible
+`before_agent_start` run it adds exactly one
+`PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block. Compatibility requires the
+selected `ipython` tool plus model-visible Python skills `goal` / `goal` and
+`rlm-heartbeat` / `rlm_heartbeat`. Missing capabilities are a silent no-op;
+pre-existing or malformed work-control markers fail closed. The obsolete
+installed `extensions/goal-blocker-control.ts` is removed by apply and rejected
+by check. Apply preserves unrelated extension files.
 
 Each command source path must resolve under `~/.prime/agent/extensions/`.
 Starting from the builder repository is an important collision check: the

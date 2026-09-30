@@ -1,139 +1,162 @@
 # Goal and heartbeat work control
 
-This document is the operational source of truth for Prime Claw's plugin-global
-goal and heartbeat lifecycle policy. The implementation is being delivered in
-six reviewed slices. This initial revision records only the Slice 1 carrier
-characterization. It does not claim that the production policy, migration, or
-lifecycle behavior is installed.
+Prime Claw supplies one plugin-global policy for deciding whether useful work is
+owned by a persistent goal or an agent-owned heartbeat. The policy is generic;
+Ralph `/execute` owns only plan execution and does not duplicate it.
 
-## Intended boundary
+## Supported runtime boundary
 
-The policy belongs to the user-global Prime Claw plugin. It must contribute one
-transient system-prompt block to each compatible agent run. It must not depend
-on Ralph's `execute` skill, a project `APPEND_SYSTEM.md`, custom conversation
-messages, Prime Agent core patches, or private runtime fields.
+The implementation targets the installed Prime Agent `0.9.7` downstream build
+`cwd-fix-v0.9.7-r1` at
+`c094b9eea32173d7c4dd0c0a444a332ebac8f5d8`. Prime Agent `0.9.6` appears only
+in the incident history below. Prime Claw does not patch or roll back Prime
+Agent.
 
-A compatible run has all three structured resources:
+`src/prime-agent-plugin/extensions/goal-heartbeat-work-control.ts` uses the
+public `before_agent_start` hook. It returns a replacement system prompt for the
+current run only. It does not register a tool, send a message, or write session
+state. A project `APPEND_SYSTEM.md` is already part of the base prompt and
+cannot suppress the later contribution.
 
-- `ipython` in `event.systemPromptOptions.selectedTools ?? ["ipython"]`;
-- a model-visible Python skill named `goal` with import name `goal`; and
-- a model-visible Python skill named `rlm-heartbeat` with import name
+A run is compatible only when structured runtime data shows all three:
+
+- `ipython` is selected (or Prime Agent supplies its documented default tool
+  set);
+- the model-visible Python skill `goal` has import name `goal`; and
+- the model-visible Python skill `rlm-heartbeat` has import name
   `rlm_heartbeat`.
 
-The production policy and fail-closed marker rules are Slice 2 work. Slice 1
-uses a temporary sentinel and temporary extensions only.
+Missing or disabled capabilities are a silent no-op. The extension does not
+infer capability by parsing rendered prose or checking files. Compatibility is
+re-evaluated for every run, including after resource reload.
 
-## Characterized public seam
+The deterministic block is bounded to 4,000 UTF-8 bytes excluding markers. It
+contains exactly one `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` sentinel. Any
+pre-existing start marker, end marker, or sentinel is a collision and fails
+closed rather than accumulating or accepting malformed policy state.
 
-Prime Agent's public `before_agent_start` extension hook is the selected
-carrier. The event exposes the fully assembled `systemPrompt` and the
-`systemPromptOptions` that produced it. A handler can return a replacement
-`systemPrompt` for that agent run.
+## Ownership model
 
-The characterization established these properties:
+Ownership follows the next useful action:
 
-1. Each new run presents the hook with a base prompt containing zero copies of
-   the temporary sentinel.
-2. A returned prompt remains active for the provider's tool continuation in
-   the same agent run.
-3. The next run starts from the base prompt, so the contribution does not
-   accumulate.
-4. `selectedTools` and loaded skill objects provide the required structured
-   compatibility signals, including Python skill kind and import name.
-5. Resource reload rebuilds those signals. Removing the heartbeat fixture's
-   Python package metadata changed it to a Markdown skill and omitted the
-   contribution; restoring the metadata and reloading restored the
-   contribution.
-6. A newly opened process resuming the saved session receives one fresh
-   contribution.
-7. A project-local `.prime/agent/APPEND_SYSTEM.md` is present in the assembled
-   base prompt but does not suppress the later hook contribution.
-8. The sentinel is absent from the complete saved session JSONL, including
-   user, assistant, tool-result, and custom records.
+| State | Owner | Persistent control |
+|---|---|---|
+| Active agent work | Agent | One compatible bounded goal |
+| Observable external wait | Exact process, job, deployment, or worker | One bounded heartbeat per independent wait |
+| Human-only blocker | Operator or external authority | No person-polling heartbeat; compatible epoch goal is completed at the actionable handoff |
+| Finished | Nobody | No outcome-owned goal or heartbeat remains |
 
-These are carrier properties, not model-behavior or lifecycle dogfood.
+A goal may overlap a heartbeat only during the short safe transfer that creates
+and verifies monitoring before completing the active-work goal, or when each
+owns independent work.
 
-## Reproducible native probe
+### Active work
 
-The probe is `tests/test_goal_work_control_native.py`. It creates all provider,
-extension, skill, project, and session fixtures under pytest's temporary root.
-It invokes every Prime Agent process through
-`scripts/run-prime-agent-probe.sh`, uses offline RPC mode and a deterministic
-local provider, and does not use credentials or network access.
+For substantive multi-step work, inspect current goal state and create one
+bounded goal unless a compatible active goal already owns the same authorized
+outcome. Do not create goals for quick answers. Never complete, replace, or
+reinterpret an incompatible pending goal merely to make room.
 
-The fixture inputs are:
+### Observable waits
 
-- temporary Python skills `goal` / `goal` and `rlm-heartbeat` /
-  `rlm_heartbeat`;
-- active tool selection containing `ipython`;
-- project append marker `PROJECT_APPEND_SHADOW_FOR_GOAL_CARRIER_PROBE`;
-- transient hook sentinel `PRIME_CLAW_GOAL_HEARTBEAT_CARRIER_PROBE_V1`; and
-- prompts `FIRST_RUN`, `SECOND_RUN`,
-  `MISSING_HEARTBEAT_AFTER_RELOAD`, `RESTORED_AFTER_RELOAD`, and
-  `SAVED_SESSION_RESUME`.
+Before yielding to a long-running operation:
 
-The provider capture records the exact system prompt, latest prompt label,
-provider-call kind, message-role sequence, append-marker count, and sentinel
-count for every request. The hook capture records its exact input prompt, raw
-and normalized selected tools, structured skill signals, and compatibility
-decision. The test reads the exact session JSONL before pytest removes the
-fixture.
+1. Retain an inspectable operation identity and output or status location.
+2. Create one `rlm_heartbeat` monitor with exact running, success, failure,
+   staleness, cleanup, and resumable-checkpoint conditions.
+3. Verify the heartbeat ID and recheck the operation.
+4. If it is already terminal, delete and verify the monitor and handle the
+   result now.
+5. Otherwise complete the compatible epoch goal, report the handoff, and end
+   the turn.
 
-Expected provider classifications are:
+A non-terminal check reports only meaningful change, creates no goal, and never
+restarts work. Routine monitors use follow-up delivery. The first terminal
+observer captures evidence, deletes and verifies the exact monitor, performs
+bounded cleanup, and acts idempotently. It creates a fresh goal only when
+substantive agent work remains. A completed epoch is never resumed.
 
-| Prompt | Provider call | Sentinel copies |
-|---|---|---:|
-| `FIRST_RUN` | primary | 1 |
-| `FIRST_RUN` | tool continuation | 1 |
-| `SECOND_RUN` | primary | 1 |
-| `MISSING_HEARTBEAT_AFTER_RELOAD` | primary | 0 |
-| `RESTORED_AFTER_RELOAD` | primary | 1 |
-| `SAVED_SESSION_RESUME` | primary | 1 |
+### Human blockers
 
-The primary and tool-continuation prompts for `FIRST_RUN` must be byte-for-byte
-equal. Every hook input must contain zero sentinel copies. The complete saved
-session file must contain zero sentinel copies.
+For a credential, permission, physical action, product decision, or other
+human-only dependency, stop only monitors that cannot produce useful evidence.
+Complete a compatible epoch goal at the actionable handoff. Report the exact
+blocker, external action, process state, and resumable checkpoint once, then
+stop. Never schedule a heartbeat merely to poll a person. After the operator
+clears the blocker, substantive work starts under a fresh compatible goal.
 
-Run the focused check only in an operator-controlled maintenance window with no
-active Prime Agent process:
+Prime Claw never injects, simulates, or calls native `/goal pause` or
+`/goal resume` for autonomous work control. Human use of Prime Agent's native
+goal commands remains authoritative.
+
+## Migration and activation
+
+The obsolete model-facing `pause_thread_goal` and `resume_thread_goal` tools and
+`src/prime-agent-plugin/extensions/goal-blocker-control.ts` are removed. Apply
+removes the formerly managed installed file
+`extensions/goal-blocker-control.ts` only when destination preflight confirms
+all managed paths are safe regular files or absent. Check rejects a stale old
+file. Unrelated global extensions and unmanaged `APPEND_SYSTEM.md` bytes are
+preserved.
+
+Apply/check are safe to test under an isolated `PRIME_AGENT_PLUGIN_ROOT`. For
+the managed user-global installation run:
 
 ```sh
-pytest -q tests/test_goal_work_control_native.py
+scripts/apply-prime-agent-plugin.sh
+scripts/check-prime-agent-plugin.sh
 ```
 
-The test checks `prime-agent status --json` first and skips rather than starting
-a concurrent standalone instance. This machine-level guard is separate from
-the probe wrapper's configuration and session isolation.
+Installation is not activation. The already loaded Prime Agent process may
+retain its old extension generation. Do not use `/reload` as an activation
+claim. The operator must restart Prime Agent once work is quiescent and perform
+the manual checks below in a fresh session.
 
-## Evidence status
+Apply does not mutate stored goal state or purge already queued old-generation
+messages. A legacy paused or budget-limited goal requires human recovery with
+native goal controls or a fresh clean session.
 
-The recorded characterization run on 2026-09-30 used:
+## Acceptance evidence
 
-- `prime-agent --version`: `0.9.7`;
-- downstream build: `cwd-fix-v0.9.7-r1`;
-- source commit: `c094b9eea32173d7c4dd0c0a444a332ebac8f5d8`;
-- focused command: `pytest -q tests/test_goal_work_control_native.py -vv`;
-- result: `1 passed in 10.83s`; and
-- Bead: `prime-claw-h6w.24.1`.
+Proportionate automated coverage is intentionally non-native:
 
-The approved specification's operator incidents occurred on the 0.9.6
-downstream generation. The current characterization is equivalent evidence for
-the installed 0.9.7 successor; it does not retroactively claim that this exact
-fixture ran on 0.9.6.
+- direct Node tests cover capability gating, default tool selection,
+  deterministic bounded content, marker collisions, transient behavior, no
+  message/state mutation, and project-append coexistence;
+- Python static tests prove the obsolete tools, source entry, and autonomous
+  slash-command transport are absent;
+- isolated installer tests prove safe obsolete-file migration, unsafe-path
+  rejection, unrelated-file preservation, convergence, and check behavior;
+- the safe non-native Python suite and `git diff --check` provide regression
+  coverage.
 
-## Characterization limits
+The prior native provider-capture run on rejected commit
+`3f2072e3f6031f688a1dcb437da79f278df2f254` was informative but violated the
+machine's single-instance rule and is not acceptance evidence. Its standalone
+RPC framework and machine-readable evidence matrix were removed. No concurrent
+Prime Agent process, broad version matrix, or repeated native suite is required.
 
-Slice 1 intentionally does not:
+After one operator-controlled restart, Joe performs manual UAT in a fresh
+installed generation:
 
-- change a production extension or installed plugin generation;
-- remove the pause/resume tools or their migration artifacts;
-- inject the canonical production marker or policy text;
-- prove compaction, queued-follow-up, RLM-heartbeat, agent-message, or
-  goal-continuation paths;
-- call `goal` or `rlm-heartbeat` at runtime;
-- prove lifecycle decisions, failure recovery, or model compliance; or
-- apply the plugin or start another daemon.
+1. Confirm `pause_thread_goal` and `resume_thread_goal` are absent.
+2. In a compatible normal session, observe active-work goal → monitored
+   observable wait → fresh goal only when substantive work remains.
+3. Observe one actionable human-blocker checkpoint and no person-polling
+   heartbeat.
+4. Confirm a session missing any required capability receives no work-control
+   policy.
+5. Confirm the policy does not visibly accumulate across ordinary turns or a
+   saved-session resume.
 
-The full installed prompt matrix belongs to Slice 3. Lifecycle success, race,
-and failure behavior belongs to Slices 4 and 5. Manual model dogfood belongs to
-Slice 6.
+Record only Joe's observed pass/fail. Do not claim the loaded generation or
+behavior changed before that restart and manual observation.
+
+## Incident lineage
+
+On Prime Agent `0.9.6`, operator-observed queued pause/resume transport produced
+two unsafe outcomes: a pause steer interrupted the very work that needed to
+create monitoring, and a queued resume outlived its premise and arrived after
+later work had already completed. Those incidents motivated the no-steering,
+fresh-goal design. They do not establish behavior on `0.9.7` and are retained
+only as design provenance.

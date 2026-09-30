@@ -5,7 +5,7 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source_root="$repo_root/src/prime-agent-plugin"
 destination_root="${PRIME_AGENT_PLUGIN_ROOT:-${HOME:?HOME must be set}/.prime/agent}"
 files=(
-  extensions/goal-blocker-control.ts
+  extensions/goal-heartbeat-work-control.ts
   extensions/handoff-chain.ts
   extensions/reviewed-plan.ts
   extension-support/conversation-oversight.ts
@@ -16,12 +16,20 @@ files=(
 )
 
 status=0
-obsolete_file="$destination_root/extension-support/episode-finalization.ts"
-if [[ -e "$obsolete_file" || -L "$obsolete_file" ]]; then
-  printf 'stale obsolete episode finalization support file: %s
-' "$obsolete_file" >&2
-  status=1
-fi
+obsolete_files=(
+  "extensions/goal-blocker-control.ts:stale obsolete goal blocker control extension"
+  "extension-support/episode-finalization.ts:stale obsolete episode finalization support file"
+)
+for entry in "${obsolete_files[@]}"; do
+  relative="${entry%%:*}"
+  diagnostic="${entry#*:}"
+  obsolete_file="$destination_root/$relative"
+  if [[ -e "$obsolete_file" || -L "$obsolete_file" ]]; then
+    printf '%s: %s
+' "$diagnostic" "$obsolete_file" >&2
+    status=1
+  fi
+done
 stale_entry="$destination_root/extensions/project-conversation.ts"
 if [[ -e "$stale_entry" || -L "$stale_entry" ]]; then
   if [[ ! -f "$stale_entry" || -L "$stale_entry" ]]; then
