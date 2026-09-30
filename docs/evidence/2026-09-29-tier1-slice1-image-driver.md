@@ -213,6 +213,19 @@ one finding remained.
   isolation does not itself repair the unbounded reads. All observations
   from the original run are preserved unchanged.
 
+## Rebase onto main (2026-09-30, start of Slice 2)
+
+Main advanced past the branch point (`d0a9883`) by three review-report
+commits only (EXPERT BLOCK on `47d2830`, EXPERT BLOCK on `d8dbc5d`, EXPERT
+PASS on `2666843` — all docs under `.ralph/plans/future/plugin-test-container/reviews/`).
+No goal/heartbeat plugin work (h6w.24 area) landed on main during Slice 1.
+
+The episode branch was rebased onto `origin/main` (`1a0836d`) before Slice 2
+so it carries those review records. The rebased commits are
+content-identical to the reviewed ones; only hashes changed (reviewed
+`2666843` → rebased `b2f6b86`). Post-rebase tier-0 gate (bounded command in
+DEVELOPERS.md): **161 passed in 10.08s** — green.
+
 ## Shared-base extraction: DEFERRED (escape hatch)
 
 The runtime image (`docker/runtime.Dockerfile`) derives FROM the OpenShell
