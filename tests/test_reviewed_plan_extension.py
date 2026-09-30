@@ -1,15 +1,20 @@
-"""Regression bridge for the native reviewed-plan command."""
+"""Regression bridge for the native reviewed-plan command.
+
+Tier policy: the node-suite bridges and the live RPC/publication probes are
+tier 1 — they run INSIDE the session's tier-1 container via the
+`tier1_container` fixture (auto-marked `container`; see tests/conftest.py),
+with scratch on the same-path session share (ctmp) and the fake publication
+daemon in-container (tests/container/fake_daemon.py; a host-bound Unix
+socket is unreachable from the container through the macOS virtiofs mount).
+The policy/documentation tests below stay tier 0.
+"""
 
 import json
 import os
 import re
 from pathlib import Path
 import selectors
-import shutil
-import socket
 import subprocess
-import tempfile
-import threading
 import time
 
 
@@ -19,152 +24,71 @@ EPISODE_EXTENSION = REPO / "src" / "prime-agent-plugin" / "extension-support" / 
 NODE_SUITE = REPO / "tests" / "reviewed_plan_extension.test.mjs"
 EPISODE_NODE_SUITE = REPO / "tests" / "spec_episode_extension.test.mjs"
 FAKE_PUBLICATION_ROUTE = "fake-publication-route"
+# Container paths (repo bind-mounted read-only at /workspace).
+WS_EXTENSION = "/workspace/src/prime-agent-plugin/extensions/reviewed-plan.ts"
+WS_EPISODE_EXTENSION = "/workspace/src/prime-agent-plugin/extension-support/spec-episode.ts"
+WS_REVIEWED_PLAN_NODE_SUITE = "/workspace/tests/reviewed_plan_extension.test.mjs"
+WS_SPEC_EPISODE_NODE_SUITE = "/workspace/tests/spec_episode_extension.test.mjs"
+WS_EPISODE_CLOSE_NODE_SUITE = "/workspace/tests/episode_close_extension.test.mjs"
 
 
-class PublicationFakeDaemon:
-    """Strict local daemon fixture for native publication transport tests."""
+def assert_legacy_publication_trace(envelopes: list, responses: dict) -> None:
+    """Every mutation must use the exact fake route and protocol-7 ack chain.
 
-    def __init__(self, path: Path) -> None:
-        self.path = path
-        self.envelopes: list[dict] = []
-        self.responses: dict[str, dict] = {}
-        self._stop = False
-        self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self._socket.bind(str(path))
-        self._socket.listen()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-
-    def _run(self) -> None:
-        while not self._stop:
-            try:
-                self._socket.settimeout(0.2)
-                connection, _ = self._socket.accept()
-            except (TimeoutError, socket.timeout, OSError):
-                continue
-            with connection:
-                connection.sendall((json.dumps({
-                    "type": "daemon_hello",
-                    "protocol": {"name": "prime-agent.daemon", "version": 7},
-                    "schema": {"revision": 28},
-                }) + "\n").encode())
-                buffer = b""
-                while not self._stop:
-                    try:
-                        data = connection.recv(65536)
-                    except OSError:
-                        break
-                    if not data:
-                        break
-                    buffer += data
-                    while b"\n" in buffer:
-                        line, buffer = buffer.split(b"\n", 1)
-                        if not line:
-                            continue
-                        envelope = json.loads(line)
-                        self.envelopes.append(envelope)
-                        command = envelope.get("command", {})
-                        command_type = command.get("type")
-                        if command_type == "ack_result":
-                            continue
-                        if command_type == "create":
-                            header = json.loads(
-                                Path(command["sessionPath"]).read_text().splitlines()[0]
-                            )
-                            data = {
-                                "activeSessionId": FAKE_PUBLICATION_ROUTE,
-                                "sessionId": header["id"],
-                                "sessionFile": command["sessionPath"],
-                                "sessionName": command["name"],
-                                "cwd": command["config"]["cwd"],
-                                "isSessionActive": True,
-                            }
-                        elif command_type == "get_state":
-                            data = {
-                                "activeSessionId": FAKE_PUBLICATION_ROUTE,
-                                "sessionId": self._session_id,
-                                "sessionFile": self._session_file,
-                                "sessionName": self._session_name,
-                                "cwd": self._cwd,
-                            }
-                        elif command_type == "get_messages":
-                            data = {"messages": [{
-                                "role": "toolResult", "toolCallId": "call-real",
-                            }]}
-                        elif command_type == "kill":
-                            data = {"ok": True}
-                        else:
-                            data = {}
-                        if command_type == "create":
-                            self._session_id = data["sessionId"]
-                            self._session_file = data["sessionFile"]
-                            self._session_name = data["sessionName"]
-                            self._cwd = data["cwd"]
-                        self.responses[envelope["id"]] = data
-                        connection.sendall((json.dumps({
-                            "type": "response", "id": envelope["id"],
-                            "success": True, "data": data,
-                        }) + "\n").encode())
-
-    def close(self) -> None:
-        self._stop = True
-        try:
-            self._socket.close()
-        except OSError:
-            pass
-        self._thread.join(2)
-        self.path.unlink(missing_ok=True)
-
-
-
-
-def assert_legacy_publication_trace(daemon: PublicationFakeDaemon) -> None:
-    """Every mutation must use the exact fake route and protocol-7 ack chain."""
-    commands = [envelope["command"] for envelope in daemon.envelopes]
+    envelopes/responses are reconstructed host-side from the in-container
+    fake daemon's JSONL logs (tests/container/fake_daemon.py), written to
+    the same-path session share.
+    """
+    commands = [envelope["command"] for envelope in envelopes]
     assert [command["type"] for command in commands] == [
         "create", "ack_result", "get_state", "get_messages", "kill", "ack_result",
     ], commands
     create, create_ack, get_state, get_messages, kill, kill_ack = commands
-    assert daemon.responses[create["id"]]["activeSessionId"] == FAKE_PUBLICATION_ROUTE
+    assert responses[create["id"]]["activeSessionId"] == FAKE_PUBLICATION_ROUTE
     for command in (get_state, get_messages, kill):
         assert command["activeSessionId"] == FAKE_PUBLICATION_ROUTE
     assert create_ack["commandId"] == create["id"]
     assert kill_ack["commandId"] == kill["id"]
     assert len({create["id"], create_ack["id"], get_state["id"],
                 get_messages["id"], kill["id"], kill_ack["id"]}) == 6
-    assert all(command["id"].startswith("spec_episode_") for command in (create, get_state, get_messages, kill))
-    assert all(command["id"].startswith("spec_episode_ack_") for command in (create_ack, kill_ack))
-    assert len({envelope["clientId"] for envelope in daemon.envelopes}) == 1
-    for envelope in daemon.envelopes:
+    assert all(command["id"].startswith("spec_episode_")
+               for command in (create, get_state, get_messages, kill))
+    assert all(command["id"].startswith("spec_episode_ack_")
+               for command in (create_ack, kill_ack))
+    assert len({envelope["clientId"] for envelope in envelopes}) == 1
+    for envelope in envelopes:
         assert envelope["type"] == "command"
         assert envelope["protocol"] == {"name": "prime-agent.daemon", "version": 7}
         assert envelope["command"]["id"] == envelope["id"]
 
 
-def test_reviewed_plan_node_suite() -> None:
+def test_reviewed_plan_node_suite(tier1_container) -> None:
     """Run the TypeScript extension against a mocked ExtensionAPI."""
-    node = shutil.which("node")
-    assert node, "Node.js is required because prime-agent itself requires Node >=22.8"
-    result = subprocess.run(
-        [node, "--experimental-strip-types", "--test", str(NODE_SUITE)],
-        cwd=REPO,
-        text=True,
-        capture_output=True,
-        check=False,
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test",
+        WS_REVIEWED_PLAN_NODE_SUITE, timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_spec_episode_node_suite() -> None:
+def test_spec_episode_node_suite(tier1_container) -> None:
     """Run temporary-Git, context-fork, idempotency, and daemon-envelope tests."""
-    node = shutil.which("node")
-    assert node, "Node.js is required because prime-agent itself requires Node >=22.8"
-    result = subprocess.run(
-        [node, "--experimental-strip-types", "--test", str(EPISODE_NODE_SUITE)],
-        cwd=REPO,
-        text=True,
-        capture_output=True,
-        check=False,
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test",
+        WS_SPEC_EPISODE_NODE_SUITE, timeout=180,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_episode_close_node_suite(tier1_container) -> None:
+    """Run the episode-close TypeScript suite inside the tier-1 container.
+
+    This suite previously had no pytest bridge; slice 3 adds it so every
+    committed node suite runs under the tier-1 container.
+    """
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test",
+        WS_EPISODE_CLOSE_NODE_SUITE, timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -178,10 +102,10 @@ def test_episode_creation_reuses_host_session_manager_without_runtime_package_im
     assert "typeof candidate.forkFrom" in source
 
 
-def test_prime_agent_rpc_loads_native_commands_and_structured_tool() -> None:
+def test_prime_agent_rpc_loads_native_commands_and_structured_tool(
+    tier1_container, ctmp,
+) -> None:
     """Probe real offline RPC after startup to prove command and tool registration."""
-    prime_agent = shutil.which("prime-agent")
-    assert prime_agent, "prime-agent is a documented developer prerequisite"
     request = json.dumps({"id": "loader", "type": "get_commands"}) + "\n"
     probe_source = """import { SessionManager } from "@earendil-works/pi-coding-agent";
 export default function probe(pi) {
@@ -200,30 +124,24 @@ export default function probe(pi) {
   });
 }
 """
-    with tempfile.TemporaryDirectory(prefix="prime-claw-plan-loader-") as cwd:
-        probe = Path(cwd) / "tool-probe.ts"
-        probe.write_text(probe_source)
-        result = subprocess.run(
-            [
-                prime_agent,
-                "--mode", "rpc",
-                "--offline",
-                "--no-session",
-                "--no-skills",
-                "--no-prompt-templates",
-                "--no-context-files",
-                "--no-extensions",
-                "--cwd", cwd,
-                "-e", str(EXTENSION),
-                "-e", str(probe),
-            ],
-            cwd=REPO,
-            input=request,
-            text=True,
-            capture_output=True,
-            timeout=30,
-            check=False,
-        )
+    probe = ctmp / "tool-probe.ts"
+    probe.write_text(probe_source)
+    result = tier1_container.run(
+        "prime-agent",
+        "--mode", "rpc",
+        "--offline",
+        "--no-session",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-context-files",
+        "--no-extensions",
+        "--cwd", str(ctmp),
+        "-e", WS_EXTENSION,
+        "-e", str(probe),
+        input_text=request,
+        timeout=40,
+        workdir=None,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     response = json.loads(result.stdout.strip().splitlines()[-1])
     assert response["success"] is True
@@ -231,16 +149,16 @@ export default function probe(pi) {
     for name in ("plan", "implement-spec"):
         matches = [command for command in commands if command["name"] == name]
         assert len(matches) == 1
-        assert Path(matches[0]["sourceInfo"]["path"]).resolve() == EXTENSION.resolve()
+        assert matches[0]["sourceInfo"]["path"] == WS_EXTENSION
     assert [command["name"] for command in commands].count(
         "probe-reviewed-plan-tools"
     ) == 1
 
 
-def test_installed_rpc_characterizes_confirmed_steer_lifecycle_order() -> None:
+def test_installed_rpc_characterizes_confirmed_steer_lifecycle_order(
+    tier1_container, ctmp,
+) -> None:
     """Prove why conversational implementation remains native-only on 0.9.5."""
-    prime_agent = shutil.which("prime-agent")
-    assert prime_agent, "prime-agent is a documented developer prerequisite"
     probe_source = r'''import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
@@ -336,64 +254,58 @@ export default function probe(pi) {
   });
 }
 '''
-    with tempfile.TemporaryDirectory(prefix="prime-claw-impl-ordering-") as cwd:
-        probe = Path(cwd) / "probe.ts"
-        ordering_path = Path(cwd) / "ordering.json"
-        probe.write_text(probe_source)
-        process = subprocess.Popen(
-            [
-                prime_agent,
-                "--mode", "rpc", "--offline", "--no-session",
-                "--no-skills", "--no-prompt-templates", "--no-context-files",
-                "--no-extensions", "--cwd", cwd, "-e", str(probe),
-                "--provider", "probe", "--model", "probe-model",
-            ],
-            cwd=REPO, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=False, bufsize=0,
-        )
-        assert process.stdin is not None
-        assert process.stdout is not None
-        process.stdin.write((json.dumps({
-            "id": "start", "type": "prompt", "message": "start probe",
-        }) + "\n").encode())
-        process.stdin.flush()
+    ordering_path = ctmp / "ordering.json"
+    probe = ctmp / "probe.ts"
+    probe.write_text(probe_source)
+    process = tier1_container.popen(
+        "prime-agent",
+        "--mode", "rpc", "--offline", "--no-session",
+        "--no-skills", "--no-prompt-templates", "--no-context-files",
+        "--no-extensions", "--cwd", str(ctmp), "-e", str(probe),
+        "--provider", "probe", "--model", "probe-model",
+        timeout=90,
+    )
+    process.stdin.write((json.dumps({
+        "id": "start", "type": "prompt", "message": "start probe",
+    }) + "\n").encode())
+    process.stdin.flush()
 
-        selector = selectors.DefaultSelector()
-        selector.register(process.stdout, selectors.EVENT_READ)
-        deadline = time.monotonic() + 20
-        agent_ends = 0
-        observed = []
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ)
+    deadline = time.monotonic() + 20
+    agent_ends = 0
+    observed = []
+    try:
+        while time.monotonic() < deadline and agent_ends < 2:
+            ready = selector.select(timeout=max(0, deadline - time.monotonic()))
+            if not ready:
+                break
+            line = process.stdout.readline()
+            if not line:
+                break
+            event = json.loads(line.decode())
+            observed.append(event)
+            if (event.get("type") == "extension_ui_request"
+                    and event.get("method") == "confirm"):
+                process.stdin.write((json.dumps({
+                    "type": "extension_ui_response", "id": event["id"],
+                    "confirmed": True,
+                }) + "\n").encode())
+                process.stdin.flush()
+            if event.get("type") == "agent_end":
+                agent_ends += 1
+    finally:
+        selector.close()
         try:
-            while time.monotonic() < deadline and agent_ends < 2:
-                ready = selector.select(timeout=max(0, deadline - time.monotonic()))
-                if not ready:
-                    break
-                line = process.stdout.readline()
-                if not line:
-                    break
-                event = json.loads(line.decode())
-                observed.append(event)
-                if (event.get("type") == "extension_ui_request"
-                        and event.get("method") == "confirm"):
-                    process.stdin.write((json.dumps({
-                        "type": "extension_ui_response", "id": event["id"],
-                        "confirmed": True,
-                    }) + "\n").encode())
-                    process.stdin.flush()
-                if event.get("type") == "agent_end":
-                    agent_ends += 1
-        finally:
-            selector.close()
-            try:
-                process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=3)
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=3)
 
-        stderr = (process.stderr.read().decode()
-                  if process.stderr is not None else "")
-        assert agent_ends == 2, json.dumps(observed, indent=2) + stderr
-        ordering = json.loads(ordering_path.read_text())
+    stderr = (process.stderr.read().decode(errors="replace")
+              if process.stderr is not None else "")
+    assert agent_ends == 2, json.dumps(observed, indent=2) + stderr
+    ordering = json.loads(ordering_path.read_text())
 
     required = [
         "input-rpc-other", "before-agent-start-1", "confirm-requested",
@@ -404,19 +316,20 @@ export default function probe(pi) {
     assert positions == sorted(positions), ordering
 
 
-def test_installed_prime_agent_forks_valid_context_and_publishes_worktree_session() -> None:
+def test_installed_prime_agent_forks_valid_context_and_publishes_worktree_session(
+    tier1_container, ctmp,
+) -> None:
     """Exercise public SessionManager against a runtime-verified fake daemon only."""
-    prime_agent = shutil.which("prime-agent")
-    assert prime_agent, "prime-agent is a documented developer prerequisite"
     request = json.dumps({"id": "loader", "type": "get_commands"}) + "\n"
-    episode_import = json.dumps(str(EPISODE_EXTENSION))
-    with tempfile.TemporaryDirectory(prefix="prime-claw-fake-episode-") as cwd:
-        root = Path(cwd)
-        socket_path = root / "publication.sock"
-        transport_path = root / "transport.jsonl"
-        daemon = PublicationFakeDaemon(socket_path)
-        try:
-            probe_source = f"""import net from "node:net";
+    episode_import = json.dumps(WS_EPISODE_EXTENSION)
+    root = ctmp
+    socket_path = f"/tmp/pc-pub-{os.getpid()}-{time.time_ns()}.sock"
+    transport_path = root / "transport.jsonl"
+    daemon = tier1_container.start_daemon(
+        socket_path, FAKE_PUBLICATION_ROUTE, root / "daemon-log",
+    )
+    try:
+        probe_source = f"""import net from "node:net";
 import {{ appendFileSync, lstatSync, mkdirSync, realpathSync, rmSync, writeFileSync }} from "node:fs";
 import {{ join, resolve }} from "node:path";
 import {{ SessionManager }} from "@earendil-works/pi-coding-agent";
@@ -521,61 +434,55 @@ export default function probe(pi) {{
   }});
 }}
 """
-            probe = root / "fake-episode-probe.ts"
-            probe.write_text(probe_source)
-            process = subprocess.Popen(
-                [
-                    prime_agent, "--mode", "rpc", "--offline", "--no-session",
-                    "--no-skills", "--no-prompt-templates", "--no-context-files",
-                    "--no-extensions", "--cwd", cwd, "-e", str(EXTENSION),
-                    "-e", str(probe),
-                ],
-                cwd=REPO,
-                env={
-                    **{
-                        key: value for key, value in os.environ.items()
-                        if not key.startswith("PRIME_AGENT_INTERNAL_")
-                        and not key.startswith("RLM_")
-                        and key != "PRIME_AGENT_KERNEL_OWNER_PID"
-                    },
-                    "PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET": str(socket_path),
-                    "PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_REGISTRY_DIR": str(root / "supervisor"),
-                    "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1",
-                },
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                text=True,
-            )
-            assert process.stdin is not None and process.stdout is not None
-            process.stdin.write(request)
-            process.stdin.flush()
-            process.stdin.close()
-            response = json.loads(process.stdout.readline())
-            success_path = root / "probe-success.json"
-            error_path = root / "probe-error.txt"
-            deadline = time.monotonic() + 20
-            while (not success_path.exists() and not error_path.exists()
-                   and time.monotonic() < deadline):
-                time.sleep(0.02)
-            try:
-                process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=3)
-            stderr = process.stderr.read() if process.stderr is not None else ""
-            probe_error = error_path.read_text() if error_path.exists() else ""
-            assert success_path.exists(), stderr + probe_error
-            assert json.loads(success_path.read_text()) == {"ok": True}
-            assert response["success"] is True
-            assert_legacy_publication_trace(daemon)
-            transport = [json.loads(line) for line in transport_path.read_text().splitlines()]
-            assert transport[0] == {
-                "kind": "runtime-guard", "socket": str(socket_path), "transportIsFake": True,
-            }
-            assert transport[1:] == [{"kind": "connect", "path": str(socket_path), "isFake": True}]
-            assert not (root / "published-worktree").exists()
-            assert not (root / "probe-sessions").exists()
-        finally:
-            daemon.close()
+        probe = root / "fake-episode-probe.ts"
+        probe.write_text(probe_source)
+        process = tier1_container.popen(
+            "prime-agent", "--mode", "rpc", "--offline", "--no-session",
+            "--no-skills", "--no-prompt-templates", "--no-context-files",
+            "--no-extensions", "--cwd", str(root), "-e", WS_EXTENSION,
+            "-e", str(probe),
+            env={
+                "PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET": socket_path,
+                "PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_REGISTRY_DIR": str(root / "supervisor"),
+                "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1",
+            },
+            timeout=90,
+        )
+        process.stdin.write(request.encode())
+        process.stdin.flush()
+        process.stdin.close()
+        response = json.loads(process.stdout.readline())
+        success_path = root / "probe-success.json"
+        error_path = root / "probe-error.txt"
+        deadline = time.monotonic() + 20
+        while (not success_path.exists() and not error_path.exists()
+               and time.monotonic() < deadline):
+            time.sleep(0.02)
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=3)
+        stderr = process.stderr.read() if process.stderr is not None else b""
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(errors="replace")
+        probe_error = error_path.read_text() if error_path.exists() else ""
+        assert success_path.exists(), stderr + probe_error
+        assert json.loads(success_path.read_text()) == {"ok": True}
+        assert response["success"] is True
+        assert_legacy_publication_trace(daemon.envelopes, daemon.responses)
+        transport = [json.loads(line)
+                     for line in transport_path.read_text().splitlines()]
+        assert transport[0] == {
+            "kind": "runtime-guard", "socket": socket_path, "transportIsFake": True,
+        }
+        assert transport[1:] == [
+            {"kind": "connect", "path": socket_path, "isFake": True},
+        ]
+        assert not (root / "published-worktree").exists()
+        assert not (root / "probe-sessions").exists()
+    finally:
+        daemon.close()
 
 
 def test_handoff_policy_documents_trusted_completion_and_honest_transport() -> None:

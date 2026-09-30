@@ -1130,6 +1130,122 @@
    },
    "evidence": "docs/derisk/3a-slice4r.md",
    "verdict_doc": "docs/derisk/3a-slice4r.md"
+  },
+  {
+   "id": "R-T1-1",
+   "priority": "P1",
+   "summary": "Tier-1 slim test container image + standalone driver: docker/test.Dockerfile (Ubuntu 24.04 + Node 22 + python3/pytest), scripts/test-tier1.sh builds the image and runs one ephemeral container; --smoke, --dry-run (never contacts Docker), --rebuild; informational paths are Docker-free.",
+   "status": "met (slice 1, EXPERT PASS on 2666843 \u2261 b2f6b86)",
+   "plan": ".ralph/plans/SPECIFICATION.md (test tiers)",
+   "proven_by": {
+    "apply": [
+     "scripts/test-tier1.sh"
+    ],
+    "check": [
+     "scripts/test-tier1.sh"
+    ],
+    "validate": [
+     "docker/test.Dockerfile"
+    ],
+    "tests": [
+     "tests/test_tier1_image.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-09-29-tier1-slice1-image-driver.md"
+  },
+  {
+   "id": "R-T1-2",
+   "priority": "P1",
+   "summary": "Tier-1 install selection + in-container plugin apply/check: .env (exactly one of PRIME_AGENT_PINNED via vendor installer / PRIME_AGENT_SOURCE via fresh fork release:pack staged over file: URLs; fail fast on neither/both), plugin apply+check against the container's own ~/.prime/agent, --probe validates the get_commands reply semantically under a hard timeout --kill-after deadline.",
+   "status": "met (slice 2 + rework, EXPERT PASS on bc00cba)",
+   "plan": ".ralph/plans/SPECIFICATION.md (test tiers)",
+   "proven_by": {
+    "apply": [
+     "scripts/test-tier1.sh"
+    ],
+    "check": [
+     "scripts/test-tier1.sh"
+    ],
+    "validate": [
+     "scripts/test-tier1.sh"
+    ],
+    "tests": [
+     "tests/test_tier1_driver.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-09-30-tier1-slice2-install-selection.md"
+  },
+  {
+   "id": "R-T1-3",
+   "priority": "P1",
+   "summary": "Tier markers and default-skip policy: pytest.ini registers container (tier 1) and sandbox (tier 2); unmarked = tier 0; tests/conftest.py auto-marks tier1_container/ctmp users and skips tier 1/2 without an explicit -m, so plain pytest is always the Docker-free tier-0 default; tests/test_runtime_*.py are marked sandbox.",
+   "status": "met (slice 3)",
+   "plan": ".ralph/plans/SPECIFICATION.md (test tiers)",
+   "proven_by": {
+    "apply": [],
+    "check": [
+     "pytest.ini",
+     "tests/conftest.py"
+    ],
+    "validate": [
+     "tests/conftest.py"
+    ],
+    "tests": [
+     "tests/test_container_helpers_static.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-09-30-tier1-slice3-migration-sequencer.md"
+  },
+  {
+   "id": "R-T1-4",
+   "priority": "P1",
+   "summary": "Session-scoped tier-1 container fixture + migrated plugin suites: one container per pytest run with driver-equivalent setup (install prime-agent per .env, apply+check plugin once), exec/popen helpers with in-container hard timeouts, same-path session share for scratch, in-container fake daemon + self-verifying choreography runners (tests/container/); every node suite has a pytest bridge (episode_close and project_conversation bridges added); no tier-1 test code resolves host binaries.",
+   "status": "met (slice 3)",
+   "plan": ".ralph/plans/SPECIFICATION.md (test tiers)",
+   "proven_by": {
+    "apply": [
+     "tests/conftest.py"
+    ],
+    "check": [
+     "tests/conftest.py"
+    ],
+    "validate": [
+     "tests/container/fake_daemon.py",
+     "tests/container/sigterm_orphan_probe.py",
+     "tests/container/concurrent_apply_probe.py"
+    ],
+    "tests": [
+     "tests/test_handoff_chain_extension.py",
+     "tests/test_reviewed_plan_extension.py",
+     "tests/test_project_conversation_extension.py",
+     "tests/test_goal_blocker_control_extension.py",
+     "tests/test_conversation_oversight_native.py",
+     "tests/test_reviewed_plan_native_discovery.py",
+     "tests/test_prime_agent_plugin_install.py",
+     "tests/test_container_helpers_static.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-09-30-tier1-slice3-migration-sequencer.md"
+  },
+  {
+   "id": "R-T1-5",
+   "priority": "P1",
+   "summary": "Dumb whole-suite sequencer: scripts/test-all.sh runs tier 0 -> tier 1 (tier 2 only on explicit --with-sandbox), fail-fast, prints a tier summary, logs into the gitignored .test-results/ directory. No retries, no parallelism, no CI wiring.",
+   "status": "met (slice 3)",
+   "plan": ".ralph/plans/SPECIFICATION.md (test tiers)",
+   "proven_by": {
+    "apply": [],
+    "check": [
+     "scripts/test-all.sh"
+    ],
+    "validate": [
+     "scripts/test-all.sh"
+    ],
+    "tests": [
+     "tests/test_container_helpers_static.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-09-30-tier1-slice3-migration-sequencer.md"
   }
  ],
  "phase2": {}

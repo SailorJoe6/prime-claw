@@ -6,6 +6,8 @@ confirmed teardown, idempotency (absent resources are no-ops), and --image.
 """
 import os, json
 import pytest
+
+pytestmark = pytest.mark.sandbox
 from importlib.machinery import SourceFileLoader
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

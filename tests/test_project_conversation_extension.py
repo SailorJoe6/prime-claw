@@ -1,7 +1,13 @@
+"""Native project-conversation oversight tests.
+
+Tier policy: the static contract/documentation tests are tier 0. The native
+prime-agent probes are tier 1 and run INSIDE the session's tier-1 container
+via the `tier1_container` fixture (auto-marked `container`; see
+tests/conftest.py). Tier-1 test code never references host paths or host
+binaries; scratch lives on the same-path session share (ctmp).
+"""
+
 import json
-import os
-import shutil
-import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -11,6 +17,13 @@ SUPPORT = REPO / "src/prime-agent-plugin/extension-support/conversation-oversigh
 SKILL = REPO / ".ralph/skills/oversee-episode/SKILL.md"
 DOC = REPO / "docs/conversation-driven-episode-oversight.md"
 DOGFOOD = REPO / "reports/reviews/conversation-driven-episode-oversight-dogfood.md"
+
+# Container paths (repo bind-mounted read-only at /workspace).
+WS_EXTENSION = "/workspace/src/prime-agent-plugin/extensions/reviewed-plan.ts"
+WS_SUPPORT = "/workspace/src/prime-agent-plugin/extension-support/conversation-oversight.ts"
+WS_KERNEL = "src/prime-agent-plugin/APPEND_SYSTEM.md"
+WS_SKILL = ".ralph/skills/oversee-episode/SKILL.md"
+WS_NODE_SUITE = "/workspace/tests/project_conversation_extension.test.mjs"
 
 
 def test_managed_identity_kernel_is_small_and_routes_bounded_roles():
@@ -52,6 +65,19 @@ def test_extension_uses_context_and_exact_state_without_rejected_flag_profile():
         assert phrase in support
 
 
+def test_project_conversation_node_suite(tier1_container):
+    """Run the project-conversation TypeScript suite inside the container.
+
+    This suite previously had no pytest bridge; slice 3 adds it so every
+    committed node suite runs under the tier-1 container.
+    """
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", WS_NODE_SUITE,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def _provider_extension(path: Path, records: Path):
     source = r'''import {appendFileSync} from "node:fs";
 import {createAssistantMessageEventStream} from "@earendil-works/pi-ai";
@@ -61,26 +87,25 @@ streamSimple(model,context){appendFileSync(records,JSON.stringify({kernel:contex
     path.write_text(source.replace("RECORDS", json.dumps(str(records))))
 
 
-def _run_native(tmp_path, with_kernel: bool):
-    prime = shutil.which("prime-agent"); assert prime
-    project = tmp_path / "project"; project.mkdir()
+def _run_native(tier1_container, ctmp, with_kernel: bool):
+    project = ctmp / "project"; project.mkdir()
     if with_kernel:
         (project / ".prime/agent").mkdir(parents=True)
-        (project / ".prime/agent/APPEND_SYSTEM.md").write_text(KERNEL.read_text())
-    records = tmp_path / "records.jsonl"; provider = tmp_path / "provider.ts"; _provider_extension(provider, records)
-    env = {**os.environ, "PRIME_AGENT_CODING_AGENT_DIR": str(tmp_path / "agent")}
-    completed = subprocess.run([prime, "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-extensions", "--cwd", str(project), "-e", str(provider), "-e", str(EXTENSION), "--provider", "poc", "--model", "m", "-p", "probe"], cwd=REPO, env=env, capture_output=True, text=True, timeout=20)
+        (project / ".prime/agent/APPEND_SYSTEM.md").write_text(tier1_container.read_repo(WS_KERNEL))
+    records = ctmp / "records.jsonl"; provider = ctmp / "provider.ts"; _provider_extension(provider, records)
+    env = {"PRIME_AGENT_CODING_AGENT_DIR": str(ctmp / "agent")}
+    completed = tier1_container.run("prime-agent", "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-extensions", "--cwd", str(project), "-e", str(provider), "-e", WS_EXTENSION, "--provider", "poc", "--model", "m", "-p", "probe", env=env, timeout=40)
     return completed, records
 
 
-def test_native_inactive_shadowed_kernel_keeps_ordinary_conversation(tmp_path):
-    completed, records = _run_native(tmp_path, False)
+def test_native_inactive_shadowed_kernel_keeps_ordinary_conversation(tier1_container, ctmp):
+    completed, records = _run_native(tier1_container, ctmp, False)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert json.loads(records.read_text()) == {"kernel": 0, "package": 0}
 
 
-def test_native_inactive_conversation_gets_one_kernel_and_no_package(tmp_path):
-    completed, records = _run_native(tmp_path, True)
+def test_native_inactive_conversation_gets_one_kernel_and_no_package(tier1_container, ctmp):
+    completed, records = _run_native(tier1_container, ctmp, True)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert json.loads(records.read_text()) == {"kernel": 1, "package": 0}
 
@@ -98,34 +123,33 @@ export default function setup(pi){pi.on("session_start",(_event,ctx)=>{const slu
 
 
 def _promotion_package_setup(path: Path):
-    support = json.dumps(str(SUPPORT))
+    support = json.dumps(WS_SUPPORT)
     path.write_text(f'''import {{basename,dirname,resolve}} from "node:path";
 import {{mkdirSync,writeFileSync}} from "node:fs";
 import {{appendActiveOversight}} from {support};
 export default function setup(pi){{pi.on("session_start",(_event,ctx)=>{{const slug="alpha",ownerSessionId=ctx.sessionManager.getSessionId(),worktree=resolve(dirname(ctx.cwd),`${{basename(ctx.cwd)}}-${{slug}}-episode`);const identity={{version:2,slug,sourceLocation:`.ralph/plans/future/${{slug}}`,ownerSessionId,episodeId:"11111111-1111-4111-8111-111111111111",episodeActiveSessionId:"active",episodeSessionFile:resolve(worktree,"episode.jsonl"),branch:`episode/${{slug}}`,worktree,sessionName:`${{slug}}-episode`,bootstrapAdmission:"delivered"}};const encoded=JSON.stringify(identity),root=resolve(ctx.cwd,".prime/agent/state/spec-episodes");mkdirSync(root,{{recursive:true}});writeFileSync(resolve(root,`${{slug}}.json`),encoded);writeFileSync(resolve(ctx.cwd,"expected-identity.json"),encoded);appendActiveOversight(pi,ctx,{{...identity,reused:false}})}})}}''')
 
 
-def _run_native_active_package(case: Path, description: str = "valid", *, metadata: str | None = None, raw_package: str | None = None, promote: bool = False, recover: bool = False):
-    prime = shutil.which("prime-agent"); assert prime
+def _run_native_active_package(tier1_container, case: Path, description: str = "valid", *, metadata: str | None = None, raw_package: str | None = None, promote: bool = False, recover: bool = False):
     project = case / "project"; (project / ".prime/agent").mkdir(parents=True)
-    (project / ".prime/agent/APPEND_SYSTEM.md").write_text(KERNEL.read_text())
+    (project / ".prime/agent/APPEND_SYSTEM.md").write_text(tier1_container.read_repo(WS_KERNEL))
     skill = project / ".ralph/skills/oversee-episode/SKILL.md"; skill.parent.mkdir(parents=True)
     frontmatter = metadata if metadata is not None else f"name: oversee-episode\ndescription: {description}"
     skill.write_bytes((raw_package if raw_package is not None else f"---\n{frontmatter}\n---\nbody").encode())
     records = case / "records.jsonl"; provider = case / "provider.ts"; _provider_extension(provider, records)
     setup = case / "setup.ts"
     (_recovery_package_setup if recover else _promotion_package_setup if promote else _active_package_setup)(setup)
-    env = {**os.environ, "PRIME_AGENT_CODING_AGENT_DIR": str(case / "agent"), "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1"}
-    completed = subprocess.run([prime, "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-extensions", "--cwd", str(project), "-e", str(provider), "-e", str(setup), "-e", str(EXTENSION), "--provider", "poc", "--model", "m", "-p", "probe"], cwd=REPO, env=env, capture_output=True, text=True, timeout=20)
+    env = {"PRIME_AGENT_CODING_AGENT_DIR": str(case / "agent"), "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1"}
+    completed = tier1_container.run("prime-agent", "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-extensions", "--cwd", str(project), "-e", str(provider), "-e", str(setup), "-e", WS_EXTENSION, "--provider", "poc", "--model", "m", "-p", "probe", env=env, timeout=40)
     identity = project / ".prime/agent/state/spec-episodes/alpha.json"
     return completed, records, identity
 
 
-def test_native_bounded_frontmatter_blocks_before_provider_and_keeps_expectation(tmp_path):
+def test_native_bounded_frontmatter_blocks_before_provider_and_keeps_expectation(tier1_container, ctmp):
     invalid = ["? bare", ": bare", ",bare", "# comment only", "raw\x00nul", '"escaped\\u0000nul"']
     for index, description in enumerate(invalid):
-        case = tmp_path / f"invalid-{index}"; case.mkdir()
-        completed, records, identity = _run_native_active_package(case, description)
+        case = ctmp / f"invalid-{index}"; case.mkdir()
+        completed, records, identity = _run_native_active_package(tier1_container, case, description)
         assert completed.returncode != 0
         assert "prime-claw conversation blocked" in completed.stderr
         assert not records.exists(), completed.stdout + completed.stderr
@@ -137,21 +161,21 @@ def test_native_bounded_frontmatter_blocks_before_provider_and_keeps_expectation
     ]
     for mode in ["active", "promotion"]:
         for index, metadata in enumerate(invalid_metadata):
-            case = tmp_path / f"invalid-metadata-{mode}-{index}"; case.mkdir()
-            completed, records, identity = _run_native_active_package(case, metadata=metadata, promote=mode == "promotion")
+            case = ctmp / f"invalid-metadata-{mode}-{index}"; case.mkdir()
+            completed, records, identity = _run_native_active_package(tier1_container, case, metadata=metadata, promote=mode == "promotion")
             assert completed.returncode != 0
             assert "oversight package frontmatter" in completed.stderr
             assert not records.exists(), completed.stdout + completed.stderr
             assert identity.read_bytes() == (case / "project/expected-identity.json").read_bytes()
     for index, description in enumerate(["plain scalar", '"quoted # scalar: value"']):
-        case = tmp_path / f"valid-{index}"; case.mkdir()
-        completed, records, identity = _run_native_active_package(case, description)
+        case = ctmp / f"valid-{index}"; case.mkdir()
+        completed, records, identity = _run_native_active_package(tier1_container, case, description)
         assert completed.returncode == 0, completed.stdout + completed.stderr
         assert json.loads(records.read_text()) == {"kernel": 1, "package": 1}
         assert identity.read_bytes() == (case / "project/expected-identity.json").read_bytes()
 
 
-def test_native_raw_package_delimiters_block_active_promotion_and_recovery(tmp_path):
+def test_native_raw_package_delimiters_block_active_promotion_and_recovery(tier1_container, ctmp):
     invalid = [
         " ---\nname: oversee-episode\ndescription: valid\n---\nbody",
         "\t---\nname: oversee-episode\ndescription: valid\n---\nbody",
@@ -162,9 +186,9 @@ def test_native_raw_package_delimiters_block_active_promotion_and_recovery(tmp_p
     ]
     for mode in ["active", "promotion", "recovery"]:
         for index, raw in enumerate(invalid):
-            case = tmp_path / f"raw-{mode}-{index}"; case.mkdir()
+            case = ctmp / f"raw-{mode}-{index}"; case.mkdir()
             completed, records, identity = _run_native_active_package(
-                case, raw_package=raw, promote=mode == "promotion", recover=mode == "recovery",
+                tier1_container, case, raw_package=raw, promote=mode == "promotion", recover=mode == "recovery",
             )
             assert completed.returncode != 0
             assert ("expectation-marker recovery" if mode == "recovery" else "frontmatter") in completed.stderr
@@ -172,9 +196,9 @@ def test_native_raw_package_delimiters_block_active_promotion_and_recovery(tmp_p
             assert identity.read_bytes() == (case / "project/expected-identity.json").read_bytes()
     canonical = "---\nname: oversee-episode\ndescription: Unicode café https://host/path key:value a,b why? C#\n---\n# Procedure\n\n  formatted step\n"
     for mode in ["active", "promotion", "recovery"]:
-        case = tmp_path / f"valid-raw-{mode}"; case.mkdir()
+        case = ctmp / f"valid-raw-{mode}"; case.mkdir()
         completed, records, identity = _run_native_active_package(
-            case, raw_package=canonical, promote=mode == "promotion", recover=mode == "recovery",
+            tier1_container, case, raw_package=canonical, promote=mode == "promotion", recover=mode == "recovery",
         )
         assert completed.returncode == 0, completed.stdout + completed.stderr
         assert json.loads(records.read_text()) == {"kernel": 1, "package": 1}
@@ -213,14 +237,13 @@ def test_dogfood_report_preserves_frozen_old_finalizer_chronology():
     assert "Daemon session row has an invalid session UUID" in summary
 
 
-def test_native_unclassifiable_marker_owners_block_before_provider(tmp_path):
-    prime=shutil.which("prime-agent");assert prime
+def test_native_unclassifiable_marker_owners_block_before_provider(tier1_container, ctmp):
     for index, owner in enumerate([None, 7, ""]):
-        case=tmp_path/str(index);case.mkdir();project=case/"project";(project/".prime/agent").mkdir(parents=True);(project/".prime/agent/APPEND_SYSTEM.md").write_text(KERNEL.read_text());skill=project/".ralph/skills/oversee-episode/SKILL.md";skill.parent.mkdir(parents=True);skill.write_text(SKILL.read_text())
+        case=ctmp/str(index);case.mkdir();project=case/"project";(project/".prime/agent").mkdir(parents=True);(project/".prime/agent/APPEND_SYSTEM.md").write_text(tier1_container.read_repo(WS_KERNEL));skill=project/".ralph/skills/oversee-episode/SKILL.md";skill.parent.mkdir(parents=True);skill.write_text(tier1_container.read_repo(WS_SKILL))
         records=case/"records.jsonl";provider=case/"provider.ts";_provider_extension(provider,records)
         setup=case/"setup.ts";setup.write_text(f'''export default function s(pi){{pi.on("session_start",()=>pi.appendEntry("prime-claw-conversation-oversight",{{markerVersion:2,status:"active",ownerSessionId:{json.dumps(owner)},slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeSessionFile:"/session",branch:"episode/alpha",worktree:"/worktree",sessionName:"alpha-episode",identityVersion:2,admission:"delivered"}}))}}''')
-        env={**os.environ,"PRIME_AGENT_CODING_AGENT_DIR":str(case/"agent"),"PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND":"1"}
-        completed=subprocess.run([prime,"--mode","text","--offline","--no-session","--no-skills","--no-prompt-templates","--no-context-files","--no-extensions","--cwd",str(project),"-e",str(provider),"-e",str(setup),"-e",str(EXTENSION),"--provider","poc","--model","m","-p","probe"],cwd=REPO,env=env,capture_output=True,text=True,timeout=20)
+        env={"PRIME_AGENT_CODING_AGENT_DIR":str(case/"agent"),"PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND":"1"}
+        completed=tier1_container.run("prime-agent","--mode","text","--offline","--no-session","--no-skills","--no-prompt-templates","--no-context-files","--no-extensions","--cwd",str(project),"-e",str(provider),"-e",str(setup),"-e",WS_EXTENSION,"--provider","poc","--model","m","-p","probe",env=env,timeout=40)
         assert completed.returncode!=0
         assert "owner is unclassifiable" in completed.stderr
         assert not records.exists()
