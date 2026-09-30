@@ -17,7 +17,7 @@ APPLY = REPO / "scripts" / "apply-prime-agent-plugin.sh"
 CHECK = REPO / "scripts" / "check-prime-agent-plugin.sh"
 MANAGER = REPO / "scripts" / "manage-prime-agent-append-system.py"
 FILES = (
-    "extensions/goal-blocker-control.ts",
+    "extensions/goal-heartbeat-work-control.ts",
     "extensions/handoff-chain.ts",
     "extensions/reviewed-plan.ts",
     "extension-support/conversation-oversight.ts",
@@ -67,18 +67,55 @@ class PrimeAgentPluginInstallTests(unittest.TestCase):
             checked = self.run_script(CHECK, destination)
             self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
 
-    def test_apply_removes_and_check_rejects_obsolete_finalization_support(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-obsolete-") as tmp:
-            destination = Path(tmp) / "agent"
-            obsolete = destination / "extension-support" / "episode-finalization.ts"
-            obsolete.parent.mkdir(parents=True)
-            obsolete.write_text("legacy machinery\n")
-            checked = self.run_script(CHECK, destination)
-            self.assertNotEqual(checked.returncode, 0)
-            self.assertIn("stale obsolete episode finalization support file", checked.stderr)
-            applied = self.run_script(APPLY, destination)
-            self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
-            self.assertFalse(obsolete.exists())
+    def test_apply_removes_and_check_rejects_obsolete_managed_files(self) -> None:
+        obsolete_cases = (
+            ("extensions/goal-blocker-control.ts", "stale obsolete goal blocker control extension"),
+            ("extension-support/episode-finalization.ts", "stale obsolete episode finalization support file"),
+        )
+        for relative, diagnostic in obsolete_cases:
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory(
+                prefix="prime-claw-plugin-obsolete-"
+            ) as tmp:
+                destination = Path(tmp) / "agent"
+                obsolete = destination / relative
+                obsolete.parent.mkdir(parents=True)
+                obsolete.write_text("legacy machinery\n")
+                unrelated = destination / "extensions/unrelated.ts"
+                unrelated.parent.mkdir(parents=True, exist_ok=True)
+                unrelated.write_text("preserve me\n")
+                checked = self.run_script(CHECK, destination)
+                self.assertNotEqual(checked.returncode, 0)
+                self.assertIn(diagnostic, checked.stderr)
+                applied = self.run_script(APPLY, destination)
+                self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
+                self.assertFalse(obsolete.exists())
+                self.assertEqual(unrelated.read_text(), "preserve me\n")
+
+    def test_apply_rejects_unsafe_obsolete_goal_extension_before_mutation(self) -> None:
+        for unsafe_kind in ("directory", "symlink"):
+            with self.subTest(unsafe_kind=unsafe_kind), tempfile.TemporaryDirectory(
+                prefix="prime-claw-plugin-obsolete-unsafe-"
+            ) as tmp:
+                destination = Path(tmp) / "agent"
+                obsolete = destination / "extensions/goal-blocker-control.ts"
+                obsolete.parent.mkdir(parents=True)
+                unrelated = destination / "extensions/unrelated.ts"
+                unrelated.write_text("preserve me\n")
+                if unsafe_kind == "directory":
+                    obsolete.mkdir()
+                else:
+                    target = Path(tmp) / "outside.ts"
+                    target.write_text("outside remains untouched\n")
+                    obsolete.symlink_to(target)
+
+                applied = self.run_script(APPLY, destination)
+
+                self.assertNotEqual(applied.returncode, 0)
+                self.assertIn("unsafe managed plugin destination", applied.stderr)
+                self.assertEqual(unrelated.read_text(), "preserve me\n")
+                if unsafe_kind == "symlink":
+                    self.assertTrue(obsolete.is_symlink())
+                    self.assertEqual(target.read_text(), "outside remains untouched\n")
 
     def test_check_rejects_a_stale_global_file(self) -> None:
         with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-stale-") as tmp:

@@ -7,6 +7,26 @@ Older sets contain specification, requirements, decisions, and execution-plan
 files; newer project-customized sets may contain a different reviewed artifact
 collection.
 
+## goal-heartbeat-work-control/ — Plugin-global goal and heartbeat work control ✅ COMPLETE (2026-09-30)
+
+Delivered transient, capability-gated, event-driven goal/heartbeat ownership for
+compatible Prime Agent sessions while removing the unsafe model-facing
+pause/resume transport. The accepted repair is
+`486f4af62b7c1088a0ad10eb9ca05a2e0f735401`; managed installation evidence is
+`3a526ec68a13783d11acb609b3d485a577b26a91`. Joe's renewed visible UAT passed
+obsolete-tool absence, exact goal-to-monitored-wait transfer and cleanup, and an
+exact human-only blocker with no polling heartbeat. Exact receipts are on
+`prime-claw-h6w.24.2`.
+
+- [Archived specification](goal-heartbeat-work-control/SPECIFICATION.md)
+- [Archived execution plan](goal-heartbeat-work-control/EXECUTION_PLAN.md)
+- [Canonical operating contract](../../../docs/goal-heartbeat-work-control.md)
+
+This archive is the episode's terminal readiness claim for owner reconciliation.
+The mandatory fresh exact-candidate EXPERT review has not run; this archive does
+not authorize merge, abandonment, resource cleanup, or episode bookkeeping
+finalization.
+
 ## phase3a-bufd-superseded-incomplete/ — Phase 3a brain-hosting BUFD bundle ⚠️ INCOMPLETE / SUPERSEDED (2026-09-25)
 
 These four files were moved together from `.ralph/plans/blocked/` to preserve

@@ -5,7 +5,7 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source_root="$repo_root/src/prime-agent-plugin"
 destination_root="${PRIME_AGENT_PLUGIN_ROOT:-${HOME:?HOME must be set}/.prime/agent}"
 files=(
-  extensions/goal-blocker-control.ts
+  extensions/goal-heartbeat-work-control.ts
   extensions/handoff-chain.ts
   extensions/reviewed-plan.ts
   extension-support/conversation-oversight.ts
@@ -36,8 +36,11 @@ fi
 python3 "$repo_root/scripts/manage-prime-agent-append-system.py" validate "$kernel_source" "$destination_root/APPEND_SYSTEM.md"
 
 # Reject every unsafe managed TypeScript destination before the first delete or copy.
-obsolete_file="extension-support/episode-finalization.ts"
-managed_destinations=("${files[@]}" extensions/project-conversation.ts "$obsolete_file")
+obsolete_files=(
+  extensions/goal-blocker-control.ts
+  extension-support/episode-finalization.ts
+)
+managed_destinations=("${files[@]}" extensions/project-conversation.ts "${obsolete_files[@]}")
 for relative in "${managed_destinations[@]}"; do
   destination="$destination_root/$relative"
   if [[ -e "$destination" || -L "$destination" ]]; then
@@ -49,7 +52,10 @@ for relative in "${managed_destinations[@]}"; do
 done
 
 mkdir -p "$destination_root/extensions" "$destination_root/extension-support"
-rm -f "$destination_root/extensions/project-conversation.ts" "$destination_root/$obsolete_file"
+rm -f "$destination_root/extensions/project-conversation.ts"
+for relative in "${obsolete_files[@]}"; do
+  rm -f "$destination_root/$relative"
+done
 for relative in "${files[@]}"; do
   install -m 0644 "$source_root/$relative" "$destination_root/$relative"
 done

@@ -12,7 +12,7 @@ project extension discovery path:
 src/prime-agent-plugin/
   APPEND_SYSTEM.md
   extensions/
-    goal-blocker-control.ts
+    goal-heartbeat-work-control.ts
     handoff-chain.ts
     reviewed-plan.ts
   extension-support/
@@ -29,7 +29,7 @@ The installed copy preserves the inner relative layout under
 ```text
 APPEND_SYSTEM.md  # managed block; unrelated content is preserved
 extensions/
-  goal-blocker-control.ts
+  goal-heartbeat-work-control.ts
   handoff-chain.ts
   reviewed-plan.ts
 extension-support/
@@ -63,9 +63,11 @@ scripts/check-prime-agent-plugin.sh
 ```
 
 The apply script copies only the eight allowlisted Prime Claw TypeScript files. It
-removes the one formerly managed obsolete `episode-finalization.ts` support file
-with the same destination-type safety checks, and does not remove or overwrite
-unrelated global extensions. The check script verifies that
+removes two formerly managed obsolete files with the same destination-type
+safety checks:
+`extension-support/episode-finalization.ts` and
+`extensions/goal-blocker-control.ts`. It does not remove or overwrite unrelated
+global extensions. The check script verifies that
 all eight installed TypeScript files match the inert builder source byte-for-byte and that
 this repository has no project-local plugin tree. The same workflow merges and
 checks one managed CONVERSATION identity block in global `APPEND_SYSTEM.md`
@@ -115,19 +117,31 @@ Expected native commands:
 Expected default identity and work-control resources:
 
 - exactly one managed `PRIME_CLAW_CONVERSATION_IDENTITY_V1` block in `APPEND_SYSTEM.md`
-- bounded goal/heartbeat prompt guidelines from `goal-blocker-control.ts`
+- one transient, capability-gated goal/heartbeat policy from `goal-heartbeat-work-control.ts`
 - no explicit CONVERSATION launch flag
 - oversight hooks registered by the normally discovered `reviewed-plan.ts` entry
 
 Expected structured tools:
 
-- `pause_thread_goal`
-- `resume_thread_goal`
 - `ralph_handoff`
 - `ralph_plan`
 - `create_spec_episode`
 - `handoff_spec_episode`
 - `finalize_spec_episode` — location-only, no-UI episode bookkeeping close after verified terminal work
+
+The work-control entry registers no tool and sends no message. On each compatible
+`before_agent_start` run it adds exactly one
+`PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block. Compatibility requires the
+selected `ipython` tool plus model-visible Python skills `goal` / `goal` and
+`rlm-heartbeat` / `rlm_heartbeat`. Missing capabilities are a silent no-op;
+pre-existing or malformed work-control markers fail closed. Its event-driven
+policy gives the current active-work epoch a goal without predicting the next
+gate. After an operation actually starts, a verified heartbeat owns any ongoing
+wait and the epoch goal completes even if the broader requested outcome remains;
+a human-only blocker instead ends the epoch with one resumable checkpoint and no
+person-polling heartbeat. The obsolete installed
+`extensions/goal-blocker-control.ts` is removed by apply and rejected by check.
+Apply preserves unrelated extension files.
 
 Each command source path must resolve under `~/.prime/agent/extensions/`.
 Starting from the builder repository is an important collision check: the
@@ -149,3 +163,13 @@ byte parity and a fresh builder-rooted offline RPC process started successfully
 with exactly one `/handoff`, `/plan`, and `/implement-spec`, all sourced from the
 user-global installation. A session-start probe also confirmed all five expected
 structured tools.
+
+On 2026-09-30, managed apply/check installed exact accepted goal/heartbeat repair
+`486f4af62b7c1088a0ad10eb9ca05a2e0f735401`. Independent evidence recorded all
+eight managed TypeScript files as regular, non-symlink, and byte-identical to
+builder source; the obsolete goal-blocker entry was absent and the preserving
+`APPEND_SYSTEM.md` check passed. After the sole-daemon restart, visible UAT
+confirmed obsolete-tool absence, event-driven goal-to-monitored-wait transfer
+with terminal cleanup, and a human-only blocker with no person-polling
+heartbeat. Exact receipts are on `prime-claw-h6w.24.2`; canonical behavior is in
+[goal-heartbeat-work-control.md](goal-heartbeat-work-control.md).

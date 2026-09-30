@@ -327,9 +327,11 @@ removes every registered resource.
 
 Builder sources remain inert under `src/prime-agent-plugin/`. The apply/check
 workflow manages eight TypeScript files plus one APPEND_SYSTEM block. The managed
-`goal-blocker-control.ts` entry registers `pause_thread_goal` and
-`resume_thread_goal`; its prompt guidelines supply bounded goal and heartbeat
-control to every session that loads the plugin, independent of Ralph's execute
+`goal-heartbeat-work-control.ts` registers one transient, capability-gated
+`before_agent_start` policy and no model-facing pause/resume tools. Its generic,
+event-driven lifecycle treats an actual monitored wait or human-only blocker as
+an ownership transfer; completing that active-work epoch is not a claim that the
+broader requested outcome finished. This remains independent of Ralph's execute
 skill. Oversight registration remains co-located with the normally discovered
 `reviewed-plan.ts` entry point; there is no redundant production
 `project-conversation.ts` entry. The

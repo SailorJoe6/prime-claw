@@ -1,0 +1,60 @@
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+
+export const WORK_CONTROL_SENTINEL = "PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1";
+export const WORK_CONTROL_START = "<!-- prime-claw:goal-heartbeat-work-control:start -->";
+export const WORK_CONTROL_END = "<!-- prime-claw:goal-heartbeat-work-control:end -->";
+
+export const WORK_CONTROL_POLICY = `${WORK_CONTROL_START}
+${WORK_CONTROL_SENTINEL}
+Goal and heartbeat work control:
+- For substantive multi-step work, inspect the persistent goal and create one bounded active-work goal unless a compatible active goal already owns the same authorized work. Do not create goals for trivial answers or quick lookups. Do not replace, complete, or reinterpret an incompatible pending goal merely to make room.
+- A goal owns the current active-work epoch toward the broader requested outcome. Completing an epoch does not claim the requested outcome is complete, and goal creation does not require predicting the next gate or ownership boundary.
+- A heartbeat owns one exact observable wait. Keep it with a goal only during the short handoff that creates and verifies monitoring before completing the compatible active-work goal, or when they own independent work.
+- When the agent actually starts a long-running or background operation such as a subagent, build or test, download, deployment, or container startup: retain an inspectable handle and output/status location; create one bounded rlm_heartbeat with exact running, success, failure, staleness, cleanup, and resumable-checkpoint conditions; verify its ID; recheck the operation; then, if it is still running, complete the current goal even when requested work remains and end the turn. If it is already terminal, delete and verify removal of the heartbeat and handle the result now.
+- A non-terminal heartbeat check reports only meaningful change and creates no goal. It never restarts work. Routine monitors use follow-up delivery. Delete the exact heartbeat and verify absence at terminal state.
+- The first observer of terminal state captures evidence, deletes the exact monitor, performs bounded cleanup, and acts idempotently. If the requested outcome is complete, report it without another goal. If substantive agent work remains, create a fresh bounded goal before continuing. Never resume a completed epoch or disturb an unrelated pending goal.
+- When blocked or waiting for user input, credentials, permission, physical action, or a product decision: stop only monitors that cannot produce useful evidence; complete the current goal even when the requested outcome remains unfinished; report the exact blocker, external action, process state, and one resumable checkpoint; then stop without creating a heartbeat to poll the person. After the blocker clears, create a fresh goal before substantive work resumes.
+- Never inject, simulate, or call native /goal pause or /goal resume for autonomous work control. Human use of native goal commands remains authoritative.
+- Preserve narrower episode, expert, delegated-task, security, and credential boundaries. Report any goal or heartbeat control-plane failure with the external identity and checkpoint intact; never claim a transfer or completion that did not occur.
+${WORK_CONTROL_END}`;
+
+function occurrences(text: string, needle: string): number {
+  return text.split(needle).length - 1;
+}
+
+function compatible(event: any): boolean {
+  const selectedTools = event.systemPromptOptions?.selectedTools ?? ["ipython"];
+  const skills = event.systemPromptOptions?.skills ?? [];
+  const hasPythonSkill = (name: string, importName: string) => skills.some((skill: any) =>
+    skill?.name === name
+    && skill?.kind === "python"
+    && skill?.python?.importName === importName
+    && skill?.disableModelInvocation !== true
+  );
+  return selectedTools.includes("ipython")
+    && hasPythonSkill("goal", "goal")
+    && hasPythonSkill("rlm-heartbeat", "rlm_heartbeat");
+}
+
+function rejectCollision(systemPrompt: string, ctx: ExtensionContext): void {
+  const startCount = occurrences(systemPrompt, WORK_CONTROL_START);
+  const endCount = occurrences(systemPrompt, WORK_CONTROL_END);
+  const sentinelCount = occurrences(systemPrompt, WORK_CONTROL_SENTINEL);
+  if (startCount !== 0 || endCount !== 0 || sentinelCount !== 0) {
+    const message = "goal-heartbeat-work-control: existing policy marker or sentinel collision; "
+      + `start=${startCount} end=${endCount} sentinel=${sentinelCount}`;
+    ctx.ui.notify(message, "error");
+    ctx.abort();
+    throw new Error(message);
+  }
+}
+
+export default function goalHeartbeatWorkControl(pi: ExtensionAPI) {
+  pi.on("before_agent_start", (event: any, ctx: ExtensionContext) => {
+    if (!compatible(event)) return;
+    rejectCollision(event.systemPrompt, ctx);
+    return { systemPrompt: `${event.systemPrompt}
+
+${WORK_CONTROL_POLICY}` };
+  });
+}

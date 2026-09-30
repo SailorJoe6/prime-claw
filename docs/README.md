@@ -46,6 +46,9 @@ prime-claw builds on four prior projects. Read these before designing:
 - [conversation-driven-episode-oversight.md](conversation-driven-episode-oversight.md)
   — every independent project session defaults to CONVERSATION, with temporary
   exact-session episode oversight and authority boundaries.
+- [goal-heartbeat-work-control.md](goal-heartbeat-work-control.md) — the
+  plugin-global event-driven goal/heartbeat ownership policy, capability gating,
+  safe migration, activation boundary, and manual acceptance checklist.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)
