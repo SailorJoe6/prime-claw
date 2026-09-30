@@ -113,14 +113,15 @@ native suite, or any concurrent Prime Agent process.
 - [x] Commit and push candidate `60a2d4b`; owner review rejected it with five
   accepted revision findings.
 - [x] Commit and push one clean replacement candidate with exact safe evidence.
-- [ ] Obtain fresh owner review of the replacement and stop. Do not run the
-  duplicate intermediate EXPERT review and do not apply/check in this pass.
-- [ ] After later owner acceptance, run managed apply/check against the
+- [x] Obtain fresh owner review of exact replacement
+  `4a6e07a5cf0752b20976c65b2108ae8acd338792`; owner accepted it for the bounded
+  managed installation gate. No duplicate intermediate EXPERT review ran.
+- [x] Run managed apply/check against the
   user-global copy and verify parity/obsolete-file absence.
 - [ ] Preserve exactly one mandatory final exact-candidate EXPERT gate after
   manual UAT and final artifact reconciliation.
-- [ ] Stop before restart. Report that PID 22654 (or whichever sole process is
-  still loaded) has not loaded the new generation.
+- [x] Stop before restart. Report that daemon PID 22654 remains the pre-install
+  loaded process; installation is not activation and no restart occurred.
 
 ## Checkpoint 2 — restart and manual UAT
 
@@ -167,7 +168,45 @@ Replacement-candidate pre-commit evidence:
   one V1 sentinel owner.
 
 No native Prime Agent probe, full native suite, managed apply/check, or new
-Prime Agent process ran. The sole daemon remained untouched.
+Prime Agent process ran during candidate construction. The sole daemon remained
+untouched through candidate acceptance.
+
+### Checkpoint 1 managed installation evidence
+
+On 2026-09-29 PDT, with accepted commit
+`4a6e07a5cf0752b20976c65b2108ae8acd338792` at HEAD:
+
+- `scripts/apply-prime-agent-plugin.sh` exited 0, installed to
+  `/Users/jlanders/.prime/agent`, ran its final check, and explicitly required a
+  restart before treating the generation as active.
+- `scripts/check-prime-agent-plugin.sh` exited 0 independently and reported the
+  inert source/global copy current.
+- Independent byte comparison found all eight installed regular files exactly
+  equal to inert source:
+
+  | Managed installed path | Bytes | SHA-256 |
+  | --- | ---: | --- |
+  | `extensions/goal-heartbeat-work-control.ts` | 4487 | `bdea90e1ecd5610c3ea90b77ac682e2b1b91149ba6b2a12f880577a87f10a7db` |
+  | `extensions/handoff-chain.ts` | 4449 | `debd42d40ba1c9a9ba23607c0e2f25e8505e6ef640cedfb62d8bffbe8d61ceb6` |
+  | `extensions/reviewed-plan.ts` | 15324 | `1c7c5a9870c3a23c7f1bec8facdab8471e5290ee4a41991e8d5dab7bc5488b22` |
+  | `extension-support/conversation-oversight.ts` | 25901 | `07d376b1bfad0b0cd4af8d8cd298b2a6e94a35e5f46bea1c69a17031b208a714` |
+  | `extension-support/episode-close.ts` | 2864 | `a40953bb802242c4dbeb698627ea1a0886e1ded8a73f3ffe66bec56a952a2732` |
+  | `extension-support/handoff-prompts.ts` | 645 | `a85fde2479c5b3cf5d2f28cfb33eefad413abeed6a16397236df9de322b4cb08` |
+  | `extension-support/reviewed-plan-support.ts` | 1995 | `a4230f9aded32585f778a82ddd3b659deea513507a14d0c742cc656eb58bf107` |
+  | `extension-support/spec-episode.ts` | 44367 | `5342c12e6b7d0ab87d3955491cc8864175444551791d1f1deabe1597cfc63558` |
+
+- `extensions/goal-blocker-control.ts`,
+  `extension-support/episode-finalization.ts`, and legacy
+  `extensions/project-conversation.ts` are absent with no dangling symlink.
+- Managed `APPEND_SYSTEM.md` validation passed; its canonical source block is
+  1,115 bytes with SHA-256
+  `0b65110b71b6de6b14244f4006cd6ac3f98a3308fab9e0b131389778a83b57c3`.
+- No Prime Agent process or native probe was launched. Daemon PID 22654 (started
+  2026-09-29 20:00:28 PDT) and daemon-node PID 22731 still point at build
+  `cwd-fix-v0.9.7-r1`, package version `0.9.7`, checkout commit
+  `c094b9eea32173d7c4dd0c0a444a332ebac8f5d8`; conversation PID 12874 remains a
+  child of PID 22654. Because the daemon predates the 23:51:05 PDT installed-file
+  write, this pass does not claim it loaded the installed generation.
 
 ### Safe-suite boundary
 
@@ -180,9 +219,9 @@ is active.
 
 ## Current stop boundary
 
-This replacement pass ends after one clean pushed candidate is sent for fresh
-owner review. Do not run the duplicate intermediate EXPERT gate or managed
-apply/check in this pass. After later owner acceptance, Checkpoint 1 may apply
-and check the installed copy, then stop before restart. Installation will not
-imply activation. Exactly one mandatory final exact-candidate EXPERT review
-remains after manual UAT and final artifact reconciliation.
+Checkpoint 1 is installed and checked, but not activated. Daemon PID 22654 still
+owns the pre-install loaded generation. Stop before restart. The operator's next
+action is to quiesce work and restart that sole daemon once using the normal
+service action, then perform only the three visible manual-UAT checks in
+Checkpoint 2. Exactly one mandatory final exact-candidate EXPERT review remains
+after manual UAT and final artifact reconciliation.
