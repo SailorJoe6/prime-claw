@@ -95,6 +95,16 @@ Each slice must:
 
 If a slice changes managed plugin source, run `scripts/apply-prime-agent-plugin.sh` and `scripts/check-prime-agent-plugin.sh` before testing that generation. Do not claim a newly installed generation is active in an already loaded process. Any required daemon restart is an explicit operator handoff, not an agent-created second instance.
 
+### Episode tracking
+
+- Implementation parent: `prime-claw-h6w.24`.
+- Slice 1: `prime-claw-h6w.24.1` — in progress in episode `01a0f0a2-a3d5-706e-92e6-0448235e8127`.
+- Slice 2: `prime-claw-h6w.24.2` — blocked by Slice 1 acceptance.
+- Slice 3: `prime-claw-h6w.24.3` — blocked by Slice 2 acceptance.
+- Slice 4: `prime-claw-h6w.24.4` — blocked by Slice 3 acceptance.
+- Slice 5: `prime-claw-h6w.24.5` — blocked by Slice 4 acceptance.
+- Slice 6: `prime-claw-h6w.24.6` — blocked by Slice 5 acceptance.
+
 ## Slice 1 — Characterize the per-run policy carrier
 
 **Working capability:** a reproducible, credential-free native probe proves or disproves the public Prime Agent seam needed to deliver one transient, capability-gated policy without durable conversation messages.
@@ -127,6 +137,24 @@ git diff --check
 ```
 
 The slice covers the carrier prerequisites for specification AC1–8; it does not complete that matrix.
+
+### Current evidence (2026-09-30)
+
+- `tests/test_goal_work_control_native.py` provides the temporary RPC provider,
+  hook, Python-skill, reload, project-append, saved-session, and session-record
+  fixtures without changing production plugin source.
+- One isolated run on Prime Agent 0.9.7 build `cwd-fix-v0.9.7-r1` at
+  `c094b9eea32173d7c4dd0c0a444a332ebac8f5d8` passed: `1 passed in 10.83s`.
+- The final test refuses to start its standalone probe while any Prime Agent
+  process is active. In the active episode it reports `1 skipped` rather than
+  violating the machine-level single-instance rule.
+- The safe Python suite passes `263` tests and `7` subtests; the Node suite
+  passes `127` tests; `python3 -m py_compile` and `git diff --check` pass.
+- `docs/goal-heartbeat-work-control.md` records the public seam, fixture inputs,
+  exact evidence, current 0.9.7 baseline, and characterization limits.
+- Review remains open on whether the successful isolated run plus the guarded
+  safe suite is sufficient, or whether an operator-controlled maintenance
+  window must repeat the probe and complete an all-Python run before acceptance.
 
 ### Explicit non-goals
 
