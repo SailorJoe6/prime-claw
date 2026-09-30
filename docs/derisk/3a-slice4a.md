@@ -657,3 +657,27 @@ This is a local repair checkpoint, **not** a fresh EXPERT/owner acceptance of
 B2, B1 or any brain candidate. No brain source/ref publication, Qwen retry,
 index/build, cutover or routed write occurred. Keep the current blocked
 source/candidate gate until the exact pushed repair is independently reviewed.
+
+## 2026-09-30 B2-R3 independent PASS and bounded owner decision
+
+A fresh read-only EXPERT independently reviewed exact pushed project commit
+`5c1d10bf39e61abc84eb4fca0c11ee11b4c1a5ff` with `openai-codex/gpt-6-astra` / `max` and returned
+**PASS** with no material B2-R3 findings. Its private report SHA-256 is
+`7e965c8467422f54a8d11ee3b00727e5253115c460d438f33874535d475de9a2`. The unchanged no-write selection passed
+85 tests/three warnings in 50.62 seconds; exact-prior-generator controls
+returned 12 expected failures/three passes, detecting caller continuation and
+all eleven generated-suffix cases. The owner verified the report, exact seven-
+path commit, clean pushed branch, preserved receipt and idle EPISODE, then
+**accepted only this B2-R3 watchdog runtime/test-harness repair**.
+[Sanitized decision](../evidence/phase3a-slice2-b2-r3-owner-accepted-5c1d10-20260930.md)
+SHA-256 `6eec1341f85eff261df3843ee901a15670f0947262ebff38c36178da5389c4a7` records the limits.
+
+B1 remains blocked: no new local-only Joe-A exact-20 candidate has been made;
+the old `1c97c409f005366aca132f5ff68c1a8c23483cc3` is unaccepted. The brain
+checkout is clean but a fresh live remote read failed with exit 128, so the
+remote ref, policy and both DB gates must be freshly verified before work.
+The installed plugin support file also differs from current `main` while
+other processes update that repo; no file was overwritten and a native handoff
+is held until the intended loaded generation is reconciled. No brain source
+publication, Qwen retry/index/build, cutover, routed write or Slice 2 source-
+current acceptance follows from the B2 decision.
