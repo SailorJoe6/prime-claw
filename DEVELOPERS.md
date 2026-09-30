@@ -44,6 +44,23 @@ pytest tests/ -q
 Prove a new test can fail before trusting it: add the assertion, run it
 against the pre-fix state, confirm it goes red, then fix.
 
+### Test tiers
+
+Tests are organized into explicit tiers (see
+`.ralph/plans/SPECIFICATION.md` while the tier rollout is in flight):
+
+- **Tier 0 — host, no environment.** Static checks; plain
+  `pytest tests/ -q`. No Node, no prime-agent, no Docker.
+- **Tier 1 — slim container** (being rolled out). Anything needing Node, a
+  prime-agent install, or the plugin runs inside a plain-Docker container so
+  the prime-agent under test can never touch the host's `~/.prime/agent/`.
+  `scripts/test-tier1.sh` builds the slim image (`docker/test.Dockerfile`)
+  and smoke-runs it (`--dry-run` prints the plan, `--rebuild` skips cache).
+- **Tier 2 — host, OpenShell.** `tests/test_runtime_*.py` orchestrate
+  sandboxes from the host and stay outside any container.
+
+Requires Docker for tier 1 only.
+
 ## Local-state rules
 
 - Never commit credential material.
