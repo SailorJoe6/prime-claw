@@ -624,3 +624,36 @@ write took place in this revision generation.
 ## 2026-09-30 independent B2-R3 fast-success review
 
 A fresh read-only EXPERT reviewed pushed project `82dd37b2ee6513dc27aa2977a8c0c410b09ae22b` and independently passed the unchanged no-write three-module selection (72 tests/three warnings). Its report SHA-256 `34cf742145abac25abefb671ec7863b004e126725c8bccc66ff6e650144afce0` returned substantive `BLOCK` B2-R3: the attested fast-success watchdog branch exits the **entire generated build shell** before the mandatory post-sync source/failure-ledger/parity/vector/schema/bookmark gates. Controlled synthetic generated-sync probes falsely returned 0 with failing gates never reached; ordinary observed-ready success reached and rejected them. The owner accepted this inside the existing watchdog repair scope, **not** the repaired code. Sanitized report: `docs/evidence/phase3a-slice2-b2-r3-fast-success-expert-block-82dd37-20260930.md`; private synthetic artifacts remain private. B1/B2/source-current gates remain blocked. No new brain candidate/source push, Qwen retry/index/build/cutover/routed write or Slice 2 acceptance.
+
+## 2026-09-30 local B2-R3 caller-continuation repair (fresh review pending)
+
+The prior pushed watchdog source at `82dd37b` and doc-only project HEAD
+`05f70db` have the same `bin/prime-claw` SHA-256
+`610c2d8db2b067937d86356c945e7e4b6634bec63376775b96d415223921bb13`.
+With that source, an attested missed-group-probe worker exit 0 returned from
+the enclosing shell before its distinct caller sentinel 37; the exact
+generated production sync suffix returned 0 without visiting a synthetic
+post-sync bookmark gate. These new tests failed before the repair.
+
+The bounded revision reaps the successful worker and owned group/descendants,
+clears its startup signal traps, skips a second wait/watcher and **continues**
+the enclosing generated build through every original post-sync gate. A fast
+nonzero worker still aborts after cleanup. The new no-write generated-sync
+matrix checks a positive fast0 route through both source checks, the failure
+ledger, page/path/chunk parity, vector/schema/index and bookmark gates. Ten
+independent faults (dirty source, changed HEAD, unacknowledged failures,
+missing pages/paths/chunks, bad vectors, wrong schema, unexpected index and
+stale bookmark) each reach the relevant gate and return nonzero. The original
+15-second watchdog test body, bound, assertions, shell fragment and required
+three-module selection remain unchanged. Targeted tests passed 15/15; the
+three-module offline gate passed 85 tests/three warnings in 46.12 seconds
+with unique scratch, disabled bytecode/cache and synthetic-only command
+boundaries. R1 group/descendant/pipe cleanup and R2 truthful fast status,
+never-ready 125, signal 143 and stall 124 remain covered.
+
+[Sanitized receipt](../evidence/phase3a-slice2-b2-r3-caller-continuation-revision-20260930.json)
+SHA-256 `2bbd6922b59dbaaeca153bd2fbaeeb3ff0ffd25cc264a7d264d00801053ed8ee`.
+This is a local repair checkpoint, **not** a fresh EXPERT/owner acceptance of
+B2, B1 or any brain candidate. No brain source/ref publication, Qwen retry,
+index/build, cutover or routed write occurred. Keep the current blocked
+source/candidate gate until the exact pushed repair is independently reviewed.

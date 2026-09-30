@@ -1,0 +1,63 @@
+{
+  "boundary": {
+    "historical_unaccepted_candidate": "1c97c409f005366aca132f5ff68c1a8c23483cc3",
+    "last_observed_accepted_clean_checkout": "5c47c067e93eb633da8a8dcb28221e23eea7685b",
+    "last_observed_brain_remote_main": "eb157c713b24bb0ec9315ae27617b16da5cbf71b",
+    "last_observed_tracking_main": "b695658b8271f4541e47b87f62c5b14c19075528",
+    "no_new_brain_candidate_ref_push_or_source_edit": true,
+    "no_qwen_retry_index_build_cutover_routed_write": true,
+    "slice2_not_accepted": true
+  },
+  "code_hashes": {
+    "bin/prime-claw_sha256": "abd3e64f22b1ca230c29a3ff9444d1631bb25dd1032834c71756c16cd5d8d722",
+    "tests/test_embedding_candidate_build.py_sha256": "63ec4403c830d38421e40d3e60e166d69eb4c42fd70de7c084ccf390c77c3a3c"
+  },
+  "decision": "LOCAL B2-R3 REPAIR GATE PASS, NOT INDEPENDENT EXPERT PASS. Keep B2/B1 blocked; stop at clean pushed project checkpoint for new exact-commit EXPERT/owner review.",
+  "provenance": {
+    "baseline_and_reviewed_source_same_sha256": "610c2d8db2b067937d86356c945e7e4b6634bec63376775b96d415223921bb13",
+    "baseline_doc_only_head": "05f70dbd0dcbf17541da1bec99a7e99a7d1a296e",
+    "independent_expert_verdict": "BLOCK",
+    "original_private_report_sha256": "34cf742145abac25abefb671ec7863b004e126725c8bccc66ff6e650144afce0",
+    "reviewed_commit": "82dd37b2ee6513dc27aa2977a8c0c410b09ae22b",
+    "sanitized_report": "docs/evidence/phase3a-slice2-b2-r3-fast-success-expert-block-82dd37-20260930.md"
+  },
+  "repair": {
+    "fast_success": "After attested early worker exit0, existing bounded owned group/descendant/state cleanup captures result, resets startup signal handlers and falls through to the enclosing generated build post-sync gates. It does not start watcher or wait a second time.",
+    "not_a_completion_shortcut": "The worker marker attests only group/worker lifecycle, not source, DB, vector or bookmark completeness.",
+    "preserved": [
+      "fast nonzero worker exit7 aborts after cleanup",
+      "never-ready/failed launch returns125",
+      "signal returns143",
+      "real stall returns124",
+      "R1 owned descendant/group/pipe EOF cleanup and R2 truthful worker status",
+      "original 15-second test body/bound/selection/assertions/shell fragment and production sync launch line unchanged"
+    ],
+    "surface": "bin/prime-claw::_candidate_progress_watchdog_script"
+  },
+  "schema": "prime-claw.phase3a.slice2.b2_r3_revision.v1",
+  "scope": "Owner-accepted in-scope B2-R3 watchdog caller-continuation repair only; local no-write test-harness integration. No B1 or candidate authorization.",
+  "tests": {
+    "green_after_repair": {
+      "environment": "PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q -p no:cacheprovider --basetemp=<unique-private-scratch>",
+      "full_log_sha256": "aec59b329b658f495fddf489aa59d5c737c7e49652b04fd1da0c015db54620ce",
+      "full_result": "85 passed, 3 warnings in 46.12s",
+      "no_write_boundary": "Only synthetic executables and event files in unique pytest tmp_path; generated suffix excludes configuration/database setup, no real Git brain/source, DB, provider, sandbox, network or credentials used.",
+      "required_full_selection": "tests/test_embedding_candidate_build.py tests/test_runtime_validate.py tests/test_runtime_converge.py",
+      "targeted": "15 passed, 32 deselected, 1 warning in 23.98s",
+      "targeted_log_sha256": "e680f7337e529eaf23a48d175b91c181fbc9613c0f6ea3592753d4d17c4fb006",
+      "test_conditions": [
+        "Attested real failed group probe, isolated worker with TERM-ignoring descendant exits0: enclosing caller sentinel reached with distinct37; leader, descendant, group and state removed; captured output reaches EOF. Exit7 does not continue.",
+        "Exact generated production sync suffix runs with temp-only synthetic git/gbrain/psql and setsid shim. Positive fast0 reaches both post-source Git checks, failure ledger, page/path/chunk/vector/schema/index/bookmark queries and returns0.",
+        "Individual synthetic faults: dirty post-source, changed HEAD, unacknowledged failures, missing pages, missing distinct paths, no chunks, bad/stale vectors, incompatible vector schema, unexpected index and stale bookmark; each reaches its relevant gate and rejects with nonzero.",
+        "Retained original delayed shim, progress reset, stalled TERM-ignoring descendant, signals, fast0/7, EOF/state/group and original 15s cases."
+      ]
+    },
+    "red_on_exact_reviewed_source": {
+      "attested_missed_probe_continuation": "One case failed: actual 0, expected enclosing caller sentinel exit37; sibling fast7/no-continuation and R1 cases passed.",
+      "generated_production_sync": "Positive synthetic generated suffix returned0 before post-sync gate events; failed at expected bookmark gate-reach assertion.",
+      "integration_log_sha256": "2e3a6e91902695b99a6aa0a292ba60a1be763871cc64d5f3dede31874143793b",
+      "log_sha256": "1d37f42f5a4a52426a6d81c0db17ba0b72b31b35565f73a1e341f674e635a4eb",
+      "method": "New tests first on doc-only HEAD with bin/prime-claw byte-identical to reviewed 82dd37; no prior source file edit."
+    }
+  }
+}

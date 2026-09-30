@@ -1214,6 +1214,7 @@ def _candidate_progress_watchdog_script(
         "setsid " + sync_command + " &\n"
         "SYNC_PID=$!\n"
         "WATCHDOG_PID=\n"
+        "SYNC_EARLY_SUCCESS=0\n"
         "abort_candidate_startup() {\n"
         "  kill -TERM -- \"-$SYNC_PID\" 2>/dev/null || true\n"
         "  if [ \"${1:-}\" != capture ]; then kill -TERM \"$SYNC_PID\" 2>/dev/null || true; fi\n"
@@ -1237,7 +1238,11 @@ def _candidate_progress_watchdog_script(
         "  if ! kill -0 \"$SYNC_PID\" 2>/dev/null; then\n"
         "    SYNC_READY=$(cat \"$WATCHDOG_STATE\" 2>/dev/null || true)\n"
         "    abort_candidate_startup capture\n"
-        "    if [ \"$SYNC_READY\" = \"ready:$SYNC_PID\" ]; then exit \"$SYNC_RC\"; fi\n"
+        "    if [ \"$SYNC_READY\" = \"ready:$SYNC_PID\" ]; then\n"
+        "      [ \"$SYNC_RC\" -eq 0 ] || exit \"$SYNC_RC\"\n"
+        "      SYNC_EARLY_SUCCESS=1\n"
+        "      break\n"
+        "    fi\n"
         "    echo '[prime-claw candidate-progress-watchdog] isolated sync exited before process group was ready' >&2\n"
         "    exit 125\n"
         "  fi\n"
@@ -1248,6 +1253,9 @@ def _candidate_progress_watchdog_script(
         "  fi\n"
         "  sleep 0.1\n"
         "done\n"
+        "if [ \"$SYNC_EARLY_SUCCESS\" -eq 1 ]; then\n"
+        "  trap - HUP INT TERM\n"
+        "else\n"
         "LAST_PROGRESS_AT=$(date +%s)\n"
         "signal_candidate_sync() { kill -\"$1\" -- \"-$SYNC_PID\" 2>/dev/null || true; }\n"
         "candidate_sync_group_alive() { kill -0 -- \"-$SYNC_PID\" 2>/dev/null; }\n"
@@ -1288,6 +1296,7 @@ def _candidate_progress_watchdog_script(
         "trap - EXIT HUP INT TERM\n"
         "[ \"$WATCHDOG_RESULT\" != stalled ] || exit 124\n"
         "[ \"$SYNC_RC\" -eq 0 ] || exit \"$SYNC_RC\"\n"
+        "fi\n"
     )
 
 

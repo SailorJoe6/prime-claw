@@ -168,14 +168,21 @@ errors.
 
 The candidate watchdog requires a marker written **after** the `setsid` worker
 enters its own process group before it starts the no-progress clock. A fast
-completed worker returns its original 0/nonzero status after group cleanup.
-A launch that never forms the owned group fails closed (125) with bounded
-cleanup; a real no-progress stall still exits 124. Cleanup covers a surviving
-descendant even if its group leader has exited; it never targets the caller's
-group. Do not extend the 15-second offline watchdog safety test or bypass its
-worker and descendant cleanup assertions. A green local test gate does not
-authorize a brain source push or a candidate build; complete the independent
-repair review and source-current checks first.
+completed worker returns its true failure status after group cleanup; on an
+attested fast **success**, it must continue the enclosing generated build
+through the original unchanged-source, unresolved-failure, page/path/chunk,
+vector/schema/index and bookmark gates. The marker proves worker isolation,
+not candidate completeness; never treat a successful worker exit as build
+acceptance. A launch that never forms the owned group fails closed (125) with
+bounded cleanup; a real no-progress stall still exits 124. Cleanup covers a
+surviving descendant even if its group leader has exited; it never targets
+the caller's group. Do not extend the 15-second offline watchdog safety test
+or bypass its worker and descendant cleanup assertions. The local B2-R3
+continuation repair passed its synthetic gate-reachability matrix and 85-test
+three-module no-write selection, but is pending fresh exact-commit independent
+review. A green local test gate does not authorize a brain source push or a
+candidate build; complete the independent repair review and source-current
+checks first.
 
 The 2026-09-18 resume exposed a fail-fast gap: upstream gbrain's `--full` `import.files` path did
 not honor `GBRAIN_SYNC_STALL_ABORT_SECONDS=1200`; only the 12,000-second hard deadline stopped the

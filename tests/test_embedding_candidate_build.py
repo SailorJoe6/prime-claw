@@ -251,12 +251,15 @@ def test_candidate_progress_watchdog_preserves_fast_worker_status(tmp_path, comm
 
 
 @pytest.mark.parametrize("worker_status", [0, 7])
-def test_candidate_progress_watchdog_reaps_group_after_missed_probe(tmp_path, worker_status):
+@pytest.mark.parametrize("continue_caller", [False, True])
+def test_candidate_progress_watchdog_reaps_group_after_missed_probe(tmp_path, worker_status,
+                                                                   continue_caller):
     """A real failed group probe cannot discard a later leader exit or child."""
     gate = tmp_path / "failed-probe"
     descendant_pid_file = tmp_path / "descendant.pid"
     leader_pid_file = tmp_path / "leader.pid"
     state_ref = tmp_path / "state-ref"
+    continuation = tmp_path / "caller-continued"
     env = _watchdog_test_env(tmp_path)
     env.update(WATCHDOG_PROBE_GATE=str(gate), WATCHDOG_DESC_FILE=str(descendant_pid_file),
                WATCHDOG_STATE_REF=str(state_ref))
@@ -283,6 +286,8 @@ def test_candidate_progress_watchdog_reaps_group_after_missed_probe(tmp_path, wo
         "bash -c " + shlex.quote(worker), "printf steady",
         stall_seconds=3, poll_seconds=1, term_grace_seconds=1,
     )
+    if continue_caller:
+        fragment += ("printf continued > " + shlex.quote(str(continuation)) + "\nexit 37\n")
     probe = (
         'mktemp() { local path; path=$(command mktemp "$@") || return; '
         'printf %s "$path" > "$WATCHDOG_STATE_REF"; printf %s "$path"; }\n'
@@ -302,7 +307,9 @@ def test_candidate_progress_watchdog_reaps_group_after_missed_probe(tmp_path, wo
     try:
         _stdout, stderr = proc.communicate(timeout=9)  # Also proves pipe EOF.
         assert gate.exists() and leader_pid_file.exists() and descendant_pid_file.exists()
-        assert proc.returncode == worker_status, stderr
+        assert proc.returncode == (37 if continue_caller and worker_status == 0
+                                   else worker_status), stderr
+        assert continuation.exists() == (continue_caller and worker_status == 0)
         leader_pid = int(leader_pid_file.read_text())
         assert leader_pid != os.getpgrp()
         assert _wait_pid_gone(leader_pid)
@@ -606,6 +613,140 @@ def test_candidate_script_isolated_config_database_model_and_timeouts(tmp_path):
         "provider_base_urls": {"openai": FAKE_BASE_URL},
         "openai_api_key": "dummy",
     }
+
+
+@pytest.mark.parametrize("fault, reached", [
+    ("none", "psql-bookmark"),
+    ("dirty", "git-status-post"),
+    ("changed_head", "git-head-post"),
+    ("unack", "gbrain-status"),
+    ("pages", "psql-pages"),
+    ("paths", "psql-paths"),
+    ("chunks", "psql-chunks"),
+    ("bad_vector", "psql-bad-vector"),
+    ("schema", "psql-schema"),
+    ("index", "psql-index"),
+    ("bookmark", "psql-bookmark"),
+])
+def test_candidate_generated_sync_fast_success_reaches_post_sync_gates(tmp_path, fault, reached):
+    """Run the exact generated sync suffix with only synthetic command boundaries."""
+    build = pc._candidate_build_script(cfg(tmp_path), pc._embedding_settings(cfg(tmp_path)))
+    source_anchor = "SOURCE_STATUS=$(git -C "
+    assert build.count(source_anchor) == 1
+    sync_suffix = build[build.index(source_anchor):]
+    assert "setsid gbrain sync --source brain --full --no-pull --no-extract --workers 1 --yes 2>&1 &" in sync_suffix
+    events = tmp_path / "events"
+    done = tmp_path / "worker-done"
+    gate = tmp_path / "failed-group-probe"
+    state_ref = tmp_path / "state-ref"
+    env = _watchdog_test_env(tmp_path)
+    env.update(FAKE_EVENTS=str(events), FAKE_WORKER_DONE=str(done),
+               FAKE_GROUP_GATE=str(gate), FAKE_STATE_REF=str(state_ref),
+               FAKE_FAULT=fault, FAKE_DIR=str(tmp_path))
+    fake_bin = tmp_path / "bin"
+    setsid = fake_bin / "setsid"
+    setsid.write_text(
+        f"#!{sys.executable}\n"
+        "import os, sys, time\n"
+        f"while not os.path.exists({str(gate)!r}): time.sleep(0.005)\n"
+        "os.setsid()\n"
+        "os.execvp(sys.argv[1], sys.argv[1:])\n"
+    )
+    for name, body in {
+        "git": r"""
+import os, sys
+from pathlib import Path
+p = Path(os.environ['FAKE_DIR'])
+args = sys.argv[1:]
+assert args[0] == '-C' and args[2] in ('status', 'rev-parse'), args
+kind = 'status' if args[2] == 'status' else 'head'
+marker = p / ('git-' + kind + '-seen')
+phase = 'post' if marker.exists() else 'pre'
+marker.touch()
+with open(os.environ['FAKE_EVENTS'], 'a') as log: log.write('git-' + kind + '-' + phase + '\n')
+if kind == 'status':
+    if phase == 'post' and os.environ['FAKE_FAULT'] == 'dirty': print(' M synthetic.md')
+else:
+    print('changed' if phase == 'post' and os.environ['FAKE_FAULT'] == 'changed_head' else 'abc')
+""",
+        "gbrain": r"""
+import os, sys
+from pathlib import Path
+args = sys.argv[1:]
+if args[0] == 'sync':
+    if '--dry-run' in args:
+        with open(os.environ['FAKE_EVENTS'], 'a') as log: log.write('gbrain-dry-run\n')
+        print('Full-sync dry run (strategy=markdown): 2 file(s) would be imported from <synthetic> @ abc.')
+    else:
+        assert args == ['sync', '--source', 'brain', '--full', '--no-pull', '--no-extract', '--workers', '1', '--yes'], args
+        with open(os.environ['FAKE_EVENTS'], 'a') as log: log.write('gbrain-sync-worker\n')
+        Path(os.environ['FAKE_WORKER_DONE']).touch()
+elif args == ['status', '--json']:
+    with open(os.environ['FAKE_EVENTS'], 'a') as log: log.write('gbrain-status\n')
+    print('{"sync":{"unacknowledged_failures":' + ('1' if os.environ['FAKE_FAULT'] == 'unack' else '0') + '}}')
+else:
+    raise SystemExit('unexpected synthetic gbrain command')
+""",
+        "psql": r"""
+import os, sys
+q = sys.argv[-1]
+if 'concat_ws(' in q: key, value = 'progress', '2|3|3|time'
+elif 'vector_dims(' in q: key, value = 'bad-vector', '0'
+elif 'format_type(' in q: key, value = 'schema', 'vector(4096)'
+elif 'FROM pg_indexes' in q: key, value = 'index', '0'
+elif 'COALESCE(last_commit' in q: key, value = 'bookmark', 'abc'
+elif 'count(DISTINCT source_path)' in q: key, value = 'paths', '2'
+elif 'FROM content_chunks c JOIN pages' in q: key, value = 'chunks', '3'
+elif 'FROM pages WHERE' in q: key, value = 'pages', '2'
+else: raise SystemExit('unexpected synthetic SQL')
+with open(os.environ['FAKE_EVENTS'], 'a') as log: log.write('psql-' + key + '\n')
+fault = os.environ['FAKE_FAULT']
+if (fault, key) in {('pages', 'pages'), ('paths', 'paths'), ('chunks', 'chunks')}:
+    value = '0'
+elif fault == 'bad_vector' and key == 'bad-vector': value = '1'
+elif fault == 'schema' and key == 'schema': value = 'vector(1536)'
+elif fault == 'index' and key == 'index': value = '1'
+elif fault == 'bookmark' and key == 'bookmark': value = 'stale'
+print(value)
+""",
+    }.items():
+        executable = fake_bin / name
+        executable.write_text(f"#!{sys.executable}\n" + body)
+        executable.chmod(0o755)
+    # Keep the generated suffix byte-for-byte. The real negative group probe
+    # starts a held setsid shim; release it, then return that SAME failed probe
+    # only after the attested worker exits. Never manufacture a success result.
+    instrumentation = (
+        'mktemp() { local path; path=$(command mktemp "$@") || return; '
+        'printf %s "$path" > "$FAKE_STATE_REF"; printf %s "$path"; }\n'
+        'kill() { local rc=0; builtin kill "$@" || rc=$?; '
+        'if [ "${1:-}" = -0 ] && [ "${2:-}" = -- ] '
+        '&& [ "${3:-}" = "-$SYNC_PID" ] && [ "$rc" -ne 0 ] '
+        '&& [ ! -e "$FAKE_GROUP_GATE" ]; then '
+        ': > "$FAKE_GROUP_GATE"; '
+        'for _ in $(seq 1 300); do '
+        'if [ -e "$FAKE_WORKER_DONE" ] && ! builtin kill -0 "$SYNC_PID" 2>/dev/null; '
+        'then break; fi; sleep 0.01; done; '
+        '[ -e "$FAKE_WORKER_DONE" ] || return 99; '
+        '[ "$(cat "$WATCHDOG_STATE")" = "ready:$SYNC_PID" ] || return 98; '
+        'printf "attested-fast\n" >> "$FAKE_EVENTS"; sleep 0.1; '
+        'fi; return "$rc"; }\n'
+    )
+    result = subprocess.run(
+        ["bash", "-c", "set -euo pipefail\n" + instrumentation + sync_suffix],
+        env=env, text=True, capture_output=True, timeout=12,
+    )
+    observed = events.read_text().splitlines() if events.exists() else []
+    assert done.exists() and gate.exists() and "attested-fast" in observed, (result.stderr, observed)
+    assert reached in observed, (fault, result.returncode, result.stderr, observed)
+    assert (result.returncode == 0) == (fault == "none"), (fault, result.stderr, observed)
+    if fault == "none":
+        assert "candidate-build head=abc bookmark=abc" in result.stdout
+        assert all(name in observed for name in (
+            "git-status-post", "git-head-post", "gbrain-status", "psql-pages",
+            "psql-paths", "psql-chunks", "psql-bad-vector", "psql-schema",
+            "psql-index", "psql-bookmark")), observed
+    assert not os.path.exists(state_ref.read_text())
 
 
 def test_candidate_full_source_gates_reject_missing_or_stale_rows(tmp_path):
