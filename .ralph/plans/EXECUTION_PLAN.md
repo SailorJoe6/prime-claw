@@ -21,7 +21,7 @@
   (arch/ABI mismatch), so in-container `npm ci` of the whole monorepo is
   rejected: it needs network at container-start and is slow. Instead the
   source path packs a tarball **on the host** and the container installs that
-  tarball — mechanically identical to the pinned-registry path.
+  tarball — mechanically parallel to the pinned path (which installs the vendor's release tarball via the vendor installer; prime-agent is not on the public npm registry).
 - Test inventory audit (tier assignments; point-in-time as of
   planning — the assignment rule below is the durable contract, re-audited
   at merge time):
@@ -111,7 +111,7 @@ Acceptance evidence:
   `prime-agent --version` matches the fork's version; apply/check pass inside
   the container; `check-prime-agent-plugin.sh` verifies the container's
   global install byte-for-byte.
-- With `PRIME_AGENT_PINNED`: same checks pass against the registry install.
+- With `PRIME_AGENT_PINNED`: same checks pass against the vendor-installer install.
 - A container-side RPC probe (the pattern from
   `tests/test_handoff_chain_extension.py`'s live probe) loads the plugin's
   native commands from the container's prime-agent — proving the previously
