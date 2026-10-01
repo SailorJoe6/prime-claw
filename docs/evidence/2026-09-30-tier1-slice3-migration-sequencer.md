@@ -368,10 +368,153 @@ fea6c335b95dc688ed9c16b4830db4da63b15af3dd19a5420a75de54601d9b1b  APPEND_SYSTEM.
 ### Post-repair tier-0 gate
 
 `python3 -m pytest tests/ -q` → **249 passed, 144 skipped** in ~39s
-(249 = the 222-test post-reconciliation gate + 27 new fixture behavioral
-tests; skips unchanged). The single failure was again the documented
+(250 executed = 249 passed + 1 known-flake failure, i.e. the 223-test
+post-reconciliation gate + 27 new fixture behavioral tests; skips
+unchanged). The single failure was again the documented
 pre-existing timing flake
 `test_embedding_candidate_build.py::test_candidate_progress_watchdog_terminates_stall_and_returns_nonzero`,
 green on immediate standalone re-run (1 passed in ~2s) — unchanged
 test/subject code, host-only watchdog timing, unrelated to this repair
 (the repair touches no sandbox/watchdog code).
+
+## Final-expert-block round-2 repair (8c44cd1 review → this commit)
+
+The fresh FINAL EXPERT gate on the round-1 repair commit `8c44cd1` returned
+**BLOCK** with two failure-path findings; B3 and the archival hygiene were
+verified RESOLVED. (Full report preserved in the main repository at
+`docs/evidence/2026-09-30-tier1-final-expert-review-8c44cd1.md`, to be
+folded into the archive bundle's `reviews/` at merge time.) Scope held:
+`tests/conftest.py`, `tests/test_tier1_fixture.py`,
+`tests/test_tier1_driver.py`, and this note. No plugin source changes, no
+driver behavior changes, no host probe reruns, no container workloads in
+this pass.
+
+### B1-R — metadata errors can no longer masquerade as an absent dist tree (was P2, 10/10)
+
+`_remove_dist_tree` no longer uses
+`Path.is_symlink()/is_file()/is_dir()` — on this host's Python 3.14.4
+those predicates SUPPRESS filesystem OSError into False, so three False
+results were misread as absence. The tree is now lstat'd directly:
+
+- `FileNotFoundError` → confirmed absence (the valid missing-tree case,
+  preserved);
+- any other OSError on lstat (PermissionError, EIO, ...) → RuntimeError
+  BEFORE any npm/node/docker call;
+- symlink (incl. dangling) → unlink only — the target is NEVER traversed;
+- directory → `shutil.rmtree` (errors raise); regular file → unlink;
+- anything else (FIFO/socket/device/special) → explicitly REJECTED with
+  RuntimeError before build.
+
+Equivalence-claim correction (wording, not driver behavior): the
+reviewer's control showed this host's `rm -rf` exits 0 WITHOUT removing
+the tree when the dist PARENT is unsearchable — detection defers to the
+npm build step, which then fails on the permission denial. The conftest
+docstrings now state the fixture has the same fail-closed
+stop-before-pack/container contract with STRICTLY EARLIER metadata-error
+detection (lstat at staging), while the driver's `rm -rf` may defer
+detection to the build step on some hosts; the unsupported
+"mirrors/exactly like the driver" wording is gone. The driver itself is
+unchanged (constraint), and a new driver test pins its actual fail-closed
+contract for this edge.
+
+Behavioral coverage (all on the actual Python 3.14 host, against the
+actual fixture paths):
+
+- `TestRemoveDistTree` (9): absent / regular file / directory / symlink /
+  dangling symlink handled with targets untouched; unsearchable parent
+  (mode 0444) raises instead of silently skipping; injected lstat
+  PermissionError AND EIO raise before any removal; a FIFO is rejected
+  and left in place.
+- `TestStageForkRelease` (10): the round-1 positives kept (stale removal
+  + current-source pack; A→B replay WITHOUT a version change packs the
+  changed implementation and omits deleted outputs; missing-tree positive
+  case; cleanup-denial / build / pack fail-closed) PLUS: unsearchable
+  `packages/agent` fails before npm/node with the tree untouched;
+  injected EIO on a dist path fails before npm/node; a FIFO at a dist
+  path is rejected before build; recover-and-restage — the denied attempt
+  accepts no artifact, access is restored, and the replay succeeds and
+  removes the obsolete output.
+- `TestSourceModeFreshness::test_unsearchable_dist_parent_fails_closed_before_pack`
+  (`tests/test_tier1_driver.py`): the same source-path error applied to
+  the driver — nonzero exit, no OK, docker log = readiness probe only,
+  the stale tree survives; the contract is asserted without pinning
+  which step detects it.
+- `TestSessionFixtureEndToEnd::test_source_mode_poisoned_dist_tree_stops_before_publication`:
+  the WHOLE session fixture raises during staging; the recording docker
+  fake sees `info` only — no build, no run, nothing published; npm/node
+  never invoked.
+
+### B2-R — a failed docker inspect is no longer accepted as verified absence (was P2, 10/10)
+
+`_container_absent` (returncode != 0 ⇒ absent) is replaced by
+`_inspect_container`, a three-state classifier for the exact captured ID:
+
+- PRESENT: inspect rc=0;
+- ABSENT: rc!=0 AND the output positively reports the object missing
+  ("No such container" / "No such object");
+- UNKNOWN: everything else — daemon/connection/permission/API errors,
+  CLI-launch failure (OSError), timeout, or unrecognised output.
+
+UNKNOWN fails the gate and RETAINS the share; idempotent success requires
+genuine ABSENT; inspect diagnostics (rc/stdout/stderr) are preserved in
+the teardown error. `_remove_session_container`: rm rc!=0 + ABSENT →
+idempotent OK; rm rc!=0 + UNKNOWN/PRESENT → fail; rm OK + anything but
+ABSENT → fail; timeout/OSError → always fail (a hung CLI is itself an
+anomaly). Bounded: one rm (60s) + one inspect (15s), exact-ID scope, no
+retries/pruning/name-guesses.
+
+Coverage:
+
+- Helper level (`TestSessionTeardown`, 15): the round-1 matrix kept
+  (positive ordering rm→inspect; removal failure with identity +
+  diagnostics; still-present fails; removal timeout fails closed;
+  idempotent already-absent — now emitting docker's real "No such
+  container" message; unpublished no-docker; dual-failure notes;
+  keep-share; exact-ID isolation) PLUS: inspect daemon error → UNKNOWN
+  fails + share retained; inspect permission error → UNKNOWN;
+  unrecognised rc=1 output (no message) → UNKNOWN; removal failure +
+  inspect daemon error → fails with both diagnostics + share retained;
+  inspect timeout → UNKNOWN, bounded (<10s); docker CLI launch failure →
+  fatal + UNKNOWN, share retained.
+- THROUGH THE SESSION FIXTURE (`TestSessionFixtureEndToEnd`, 5 — drives
+  the actual `tier1_container` generator via its `_fixture_function`,
+  with recording fakes; no daemon/image/network):
+  - setup failure after publication cleans only the captured ID
+    (`rm -f cid-1` + `inspect cid-1`, nothing else) and releases the
+    share after verified absence;
+  - clean body + failed teardown → TEARDOWN FAILED surfaces from fixture
+    finalization (the gate-red path), `state=present`, share retained;
+  - a body failure thrown into the fixture stays primary with the
+    teardown failure attached via `add_note` — both surface;
+  - NO-INHERITANCE proven behaviorally (replacing the round-1
+    source-string uniqueness assertion): run 1's teardown fails and
+    `cid-1` leaks; run 2 (patched pid+epoch, modeling a later process)
+    gets a DIFFERENT container name
+    (`prime-claw-tier1-session-4343-1000061` vs
+    `prime-claw-tier1-session-4242-1000000`) and a different captured ID
+    (`cid-2`), its docker invocations never mention `cid-1`, run 1's
+    still-owned share survives, and run 2's own share is cleaned after
+    verified teardown.
+
+### Wording fix (from the same review, non-blocking)
+
+The round-1 gate sentence above now reads: **250 executed = 249 passed +
+1 known-flake failure, i.e. the 223-test post-reconciliation gate + 27
+new fixture tests** (it previously mis-stated the post-reconciliation
+gate as 222).
+
+### Post-round-2 checks
+
+- Tier-0 gate: `python3 -m pytest tests/ -q` → **270 passed, 144 skipped,
+  0 failed** in ~34s (270 executed = the 223-test post-reconciliation
+  gate + 46 fixture tests + 1 new driver test; the documented watchdog
+  timing flake did NOT fire this run).
+- Fresh no-leftover-containers check (this pass ran no container
+  workloads — tier-0 gate plus fake-docker behavioral tests only):
+
+```
+$ docker ps -a --filter name=prime-claw-tier1-session
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+```
+
+  (empty — no tier-1 session containers remain.)

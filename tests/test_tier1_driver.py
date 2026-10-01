@@ -471,6 +471,36 @@ class TestSourceModeFreshness(_FakeEnvMixin, unittest.TestCase):
             invocations = docker_log.read_text().splitlines()
             self.assertEqual([l.split()[0] for l in invocations], ["info"])
 
+    def test_unsearchable_dist_parent_fails_closed_before_pack(self):
+        """B1-R driver edge: an unsearchable dist PARENT (packages/agent
+        not searchable). On this host rm -rf exits 0 WITHOUT removing the
+        tree (detection defers to npm build, which fails on the
+        permission denial); on hosts where rm -rf reports the error,
+        set -e stops even earlier. Either way the driver fails closed
+        BEFORE pack/image-build/container — this test asserts that
+        contract without pinning which step detects it."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            fork = self._make_fake_fork(tmp, with_dist=True)
+            blocked = fork / "packages" / "agent"
+            blocked.chmod(0o444)  # readable, NOT searchable
+            try:
+                out, _, node_log, docker_log = self._source_run(
+                    tmp, fork=fork)
+            finally:
+                blocked.chmod(0o755)
+            self.assertNotEqual(out.returncode, 0,
+                                f"driver must fail closed; stdout={out.stdout!r}")
+            self.assertNotIn("OK", out.stdout)
+            self.assertFalse(node_log.exists(),
+                             "must fail before release:pack")
+            self.assertEqual(
+                [l.split()[0] for l in docker_log.read_text().splitlines()],
+                ["info"], "no image build, no container run")
+            self.assertTrue(
+                (blocked / "dist" / "stale-output.js").exists(),
+                "the unremovable stale tree survives — nothing packed it")
+
 
 class TestProbeDeadline(_FakeEnvMixin, unittest.TestCase):
     """B3: the generated container command carries a hard, scaled deadline."""

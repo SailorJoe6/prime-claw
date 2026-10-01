@@ -36,6 +36,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import time
@@ -131,20 +132,54 @@ def _load_install_selection() -> tuple[str, str]:
 
 
 def _remove_dist_tree(path: Path) -> None:
-    """Fail-closed `rm -rf` equivalent for one pack-consumed dist tree.
+    """Fail-closed removal of one pack-consumed dist tree.
 
-    Mirrors the driver's `rm -rf` under `set -e` (scripts/test-tier1.sh):
-    absence is fine; a symlink or plain file is unlinked; a directory is
-    removed recursively; any permission/IO/type error raises, so the run
-    stops BEFORE build/pack/image-build/container creation — a possibly
-    stale tree never reaches the packer.
+    Same fail-closed contract as the driver's `rm -rf` under `set -e`
+    (scripts/test-tier1.sh) — the run stops before pack/image-build/
+    container creation when stale output cannot be cleared — but with
+    STRICTLY EARLIER metadata-error detection: the path is lstat'd
+    directly at staging time, so an inspection failure (PermissionError,
+    EIO, ...) raises HERE. The driver's rm -rf can defer detection of an
+    unsearchable dist parent to the npm build step on some hosts (BSD
+    rm -rf may exit 0 without removing the tree; the build then fails on
+    the permission denial). Both stop before pack/container creation;
+    the fixture simply detects the metadata error sooner.
+
+    Error-preserving semantics — on Python 3.14 the Path.is_symlink() /
+    is_file() / is_dir() predicates SUPPRESS filesystem OSError into
+    False, so they cannot distinguish absence from inspection failure.
+    lstat directly instead:
+    - FileNotFoundError          -> confirmed absence: nothing to do.
+    - any other OSError on lstat -> RAISE: the dist state is unknown.
+    - symlink (incl. dangling)   -> unlink; the target is NEVER traversed.
+    - directory                  -> shutil.rmtree (errors raise).
+    - regular file               -> unlink.
+    - anything else (FIFO, socket, device, ...) -> explicitly REJECTED:
+      a special object at a pack-consumed dist path is an anomaly the
+      fixture refuses to build over.
     """
     try:
-        if path.is_symlink() or path.is_file():
-            path.unlink()
-        elif path.is_dir():
-            shutil.rmtree(path)
-        # else: absent — nothing to remove
+        st = path.lstat()
+    except FileNotFoundError:
+        return  # confirmed absent — the valid missing-tree case
+    except OSError as exc:
+        raise RuntimeError(
+            f"tier-1 fixture: cannot inspect stale build output {path} "
+            f"({exc}) — refusing to build/pack with unknown dist state"
+        ) from exc
+    mode = st.st_mode
+    if stat.S_ISLNK(mode) or stat.S_ISREG(mode):
+        action = path.unlink
+    elif stat.S_ISDIR(mode):
+        action = lambda: shutil.rmtree(path)  # noqa: E731
+    else:
+        raise RuntimeError(
+            f"tier-1 fixture: {path} is a special filesystem object "
+            f"(st_mode {oct(mode)}) at a pack-consumed dist path — "
+            "refusing to build/pack over it; remove it manually"
+        )
+    try:
+        action()
     except OSError as exc:
         raise RuntimeError(
             f"tier-1 fixture: cannot remove stale build output {path} "
@@ -156,10 +191,14 @@ def _stage_fork_release(source: str) -> tuple[str, Path]:
     """Mirror of the driver's B1 source staging: FRESH build on every run.
 
     The fork build (tsgo + asset copies) does NOT clean dist, so the four
-    pack-consumed dist dirs are removed first — fail-closed, exactly like
-    the driver's rm -rf under set -e; freshness is never inferred from
-    version equality or directory existence. release:pack wipes its
-    out-dir before writing, so a failed run leaves no fallback artifacts.
+    pack-consumed dist dirs are removed first — fail-closed with the same
+    stop-before-pack/container contract as the driver's rm -rf under
+    set -e, but with strictly earlier metadata-error detection (the
+    fixture lstat's each tree at staging; the driver's rm -rf may defer
+    detection of an unsearchable parent to the npm build step on some
+    hosts). Freshness is never inferred from version equality or
+    directory existence. release:pack wipes its out-dir before writing,
+    so a failed run leaves no fallback artifacts.
     """
     src = Path(source)
     print(f"tier-1 fixture: fresh fork build (rm dist dirs; npm run build in {source})")
@@ -395,33 +434,57 @@ def _is_relative_to(path: Path, root: Path) -> bool:
         return False
 
 
-def _container_absent(container_id: str, timeout: float = 15) -> bool:
-    """True only when docker POSITIVELY reports the container absent.
+def _inspect_container(container_id: str, timeout: float = 15) -> tuple:
+    """Three-state presence classification for the ONE captured container.
 
-    A nonzero `docker inspect` means absent; a timeout or local error
-    means absence is NOT established (conservative — B2).
+    Returns (state, diagnostics) with state in {"present", "absent",
+    "unknown"}:
+
+    - "present": docker inspect exited 0 — the object exists;
+    - "absent":  nonzero exit AND the output POSITIVELY reports the
+      object missing ("No such container"/"No such object"). A bare
+      nonzero exit is NOT proof of absence — daemon, connection,
+      permission, and API failures exit nonzero too;
+    - "unknown": everything else — daemon/connection/permission/API
+      errors, CLI-launch failure (OSError), timeout, or unrecognised
+      output. UNKNOWN never satisfies a teardown gate: the caller must
+      fail and retain the session share.
     """
     try:
         out = subprocess.run(["docker", "inspect", container_id],
                              capture_output=True, text=True, timeout=timeout)
-    except (subprocess.TimeoutExpired, OSError):
-        return False
-    return out.returncode != 0
+    except subprocess.TimeoutExpired:
+        return "unknown", f"docker inspect timed out after {timeout}s"
+    except OSError as exc:
+        return "unknown", f"docker inspect could not run: {exc}"
+    diag = (f"rc={out.returncode} stdout={out.stdout.strip()!r} "
+            f"stderr={out.stderr.strip()!r}")
+    if out.returncode == 0:
+        return "present", diag
+    blob = f"{out.stdout}\n{out.stderr}".lower()
+    if "no such container" in blob or "no such object" in blob:
+        return "absent", diag
+    return "unknown", diag
 
 
 def _remove_session_container(container_id: str, *,
-                              rm_timeout: float = 60) -> None:
+                              rm_timeout: float = 60,
+                              inspect_timeout: float = 15) -> None:
     """Remove the ONE captured session container and verify absence (B2).
 
     Bounded: exactly one forced removal plus one inspect verification,
     both scoped to the captured container ID — no docker-wide pruning,
     no name-based guesses, no retries. Idempotent: a nonzero removal exit
-    (e.g. "No such container") with positively verified absence succeeds —
-    the container is already gone. A timeout or launch failure always
-    fails closed, even when a later inspect reports absence: a hung docker
-    CLI is itself a teardown anomaly worth surfacing. Otherwise raises
-    RuntimeError with the exact container identity and diagnostics, so
-    the gate can never go green with a leaked container.
+    (e.g. "No such container") with POSITIVELY established absence
+    succeeds — the container is already gone. Absence is established only
+    by an explicit "No such container"/"No such object" inspect result —
+    a bare nonzero inspect exit is UNKNOWN (daemon/connection/permission/
+    API failure), which fails the gate and retains the share. A timeout
+    or launch failure always fails closed, even when a later inspect
+    reports absence: a hung docker CLI is itself a teardown anomaly worth
+    surfacing. Otherwise raises RuntimeError with the exact container
+    identity and full diagnostics, so the gate can never go green with a
+    leaked or unaccounted container.
     """
     diagnostics = []
     fatal = None    # timeout / launch failure: always fails closed
@@ -440,21 +503,29 @@ def _remove_session_container(container_id: str, *,
     except OSError as exc:
         fatal = f"docker rm -f could not run: {exc}"
         diagnostics.append(fatal)
-    absent = _container_absent(container_id)
-    diagnostics.append(f"docker inspect: absent={absent}")
+    state, inspect_diag = _inspect_container(container_id,
+                                             timeout=inspect_timeout)
+    diagnostics.append(f"docker inspect: state={state} ({inspect_diag})")
+    absent = state == "absent"
     if fatal is None and absent:
         if rm_error:
             print(f"tier-1 fixture: {rm_error}, but container absence is "
-                  "verified — treating teardown as idempotent success")
+                  "positively established — treating teardown as "
+                  "idempotent success")
         return
     reasons = [r for r in (fatal, rm_error) if r]
-    if not absent:
+    if state == "present":
         reasons.append("the container is still present afterwards")
+    elif state == "unknown":
+        reasons.append("container absence could not be positively "
+                       "established (inspect unknown: daemon/connection/"
+                       "permission/API error, launch failure, timeout, or "
+                       "unrecognised output)")
     raise RuntimeError(
         "tier-1 fixture: TEARDOWN FAILED — could not establish clean "
         f"removal of the session container. container_id={container_id}. "
         f"Reasons: {'; '.join(reasons)}. Final absence check: "
-        f"absent={absent}. Diagnostics: {'; '.join(diagnostics) or 'none'}. "
+        f"state={state}. Diagnostics: {'; '.join(diagnostics) or 'none'}. "
         f"Remove it manually: docker rm -f {container_id}"
     )
 
