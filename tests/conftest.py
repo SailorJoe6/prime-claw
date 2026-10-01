@@ -572,7 +572,10 @@ def tier1_container(request):
     against the container's own ~/.prime/agent. The container is destroyed
     — and its absence verified — at session end; a teardown failure fails
     the run with the exact container identity (B2), and the session share
-    evidence is preserved while a container may still own it.
+    evidence is preserved while a container may still own it. The share is
+    freshly and exclusively allocated per session (mkdtemp), so one
+    session can never inherit — or delete — another session's share
+    (B2-R2).
     """
     if shutil.which("docker") is None:
         pytest.skip("tier 1 requires Docker: no docker executable on PATH")
@@ -582,9 +585,19 @@ def tier1_container(request):
 
     mode, value = _load_install_selection()
 
-    share = RESULTS / f"share-{os.getpid()}"
-    share.mkdir(parents=True, exist_ok=True)
-    RESULTS.mkdir(exist_ok=True)
+    RESULTS.mkdir(parents=True, exist_ok=True)
+    # Unique, exclusively allocated per session (B2-R2): mkdtemp always
+    # creates a FRESH directory owned by this session. A later session —
+    # PID reuse, or several pytest sessions in one process — never reuses
+    # a retained failed session's share, so finalization can only ever
+    # remove this session's own evidence. A pre-existing directory (for
+    # example a legacy share-<pid>) is neither used nor removed.
+    run_id = f"{os.getpid()}-{int(time.time())}"
+    share = Path(tempfile.mkdtemp(prefix=f"share-{run_id}-", dir=RESULTS))
+    # mkdtemp creates 0700; normalize to the former mkdir default so the
+    # container's access through the same-absolute-path mount is unchanged.
+    share.chmod(0o755)
+    share_token = share.name.rsplit("-", 1)[-1]
     setup_log = RESULTS / "tier1-session-setup.log"
     log_lines = [f"mode={mode} value={value}", f"share={share}"]
 
@@ -613,9 +626,11 @@ def tier1_container(request):
             check=True, capture_output=True, text=True, timeout=1200,
         )
 
-        # Unique per run (pid + epoch): a later run never collides with —
-        # and therefore never inherits — a failed run's leftover container.
-        name = f"prime-claw-tier1-session-{os.getpid()}-{int(time.time())}"
+        # Unique per session — pid + epoch + the share's allocation token,
+        # keeping the container identity aligned with the share identity
+        # (B2-R2): a later run never collides with — and therefore never
+        # inherits — a failed run's leftover container or share.
+        name = f"prime-claw-tier1-session-{run_id}-{share_token}"
         started = subprocess.run(
             ["docker", "run", "-d", "--name", name, *mounts,
              IMAGE, "sleep", "infinity"],

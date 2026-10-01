@@ -921,14 +921,16 @@ class TestSessionFixtureEndToEnd(unittest.TestCase):
                             "share retained while teardown is unverified")
 
     def test_failed_run_leaves_no_inheritance_for_the_next_run(self):
-        """BEHAVIORAL uniqueness/no-inheritance proof (replaces the old
-        source-string assertion): run 1's teardown fails and its container
-        leaks; run 2 — a new 'process' (patched pid/epoch) — gets a
-        DIFFERENT container name and ID, never targets the leaked ID, and
-        does not delete run 1's still-owned share."""
+        """BEHAVIORAL no-inheritance proof at the ownership seam (B2-R2):
+        run 1's teardown fails (container still PRESENT) and its share is
+        retained with a witness; run 2 — the SAME pid (PID reuse), a
+        different epoch — gets a DISTINCT exclusively-allocated share and
+        a distinct container name/ID, never targets the leaked ID, never
+        even mounts run 1's share, and its verified teardown removes only
+        its own share. Run 1's witness survives byte-identical."""
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
-            # --- run 1: teardown fails, cid-1 leaks -------------------
+            # --- run 1: teardown fails, cid-1 leaks, share retained ---
             gen1, record, results = self._begin(
                 tmp, self.PINNED_ENV,
                 docker_kw={"rm_rc": 1, "rm_stderr": "daemon said no",
@@ -936,38 +938,232 @@ class TestSessionFixtureEndToEnd(unittest.TestCase):
                 pid=4242, epoch=1_000_000)
             container1 = next(gen1)
             self.assertEqual(container1.id, "cid-1")
+            share1 = container1.share
+            witness = share1 / "run1-recovery-evidence.txt"
+            witness.write_text("run 1 failed; keep me for post-mortem\n")
             with self.assertRaises(RuntimeError) as ctx1:
                 gen1.throw(RuntimeError("run 1 body failed"))
             self.assertIn("teardown also failed",
                           "".join(getattr(ctx1.exception, "__notes__", [])))
-            run1_lines = record.read_text().splitlines()
-            run1_run = [l for l in run1_lines if l.startswith("run ")][0]
-            self.assertIn("prime-claw-tier1-session-4242-1000000", run1_run)
-            share1 = results / "share-4242"
             self.assertTrue(share1.exists(),
                             "run 1's share is retained — its container "
                             "still owns it")
-            # --- run 2: a later process, clean teardown ---------------
+            run1_lines = record.read_text().splitlines()
+            run1_run = [l for l in run1_lines if l.startswith("run ")][0]
+            self.assertIn("prime-claw-tier1-session-4242-1000000-",
+                          run1_run)
+            self.assertIn(f"-v {share1}:{share1}", run1_run,
+                          "same-absolute-path host/container mount kept")
+            # --- run 2: SAME pid, different epoch, clean teardown -----
             gen2, _, _ = self._begin(tmp, self.PINNED_ENV,
-                                     pid=4343, epoch=1_000_061)
+                                     pid=4242, epoch=1_000_061)
             container2 = next(gen2)
-            self.assertNotEqual(container1.id, container2.id,
-                                "each run captures a distinct container")
+            share2 = container2.share
             self.assertEqual(container2.id, "cid-2")
+            self.assertNotEqual(share1, share2,
+                                "each session gets a DISTINCT share even "
+                                "when the PID is reused")
+            self.assertTrue(share2.name.startswith("share-4242-1000061-"),
+                            f"share identity carries the run id: {share2}")
+            self.assertFalse((share2 / witness.name).exists(),
+                             "no run-1 evidence is visible through "
+                             "run 2's share")
             with self.assertRaises(StopIteration):
                 next(gen2)  # clean teardown
             run2_lines = record.read_text().splitlines()[len(run1_lines):]
             run2_run = [l for l in run2_lines if l.startswith("run ")][0]
-            self.assertIn("prime-claw-tier1-session-4343-1000061", run2_run)
+            self.assertIn("prime-claw-tier1-session-4242-1000061-",
+                          run2_run)
+            self.assertIn(f"-v {share2}:{share2}", run2_run)
             for line in run2_lines:
                 self.assertNotIn("cid-1", line,
                                  "run 2 never targets the leaked container")
-            self.assertTrue(share1.exists(),
-                            "run 2 does not delete run 1's still-owned "
-                            "share")
-            self.assertFalse((results / "share-4343").exists(),
+                self.assertNotIn(str(share1), line,
+                                 "run 2 never even mounts run 1's share")
+            self.assertFalse(share2.exists(),
                              "run 2 cleans its own share after verified "
                              "teardown")
+            self.assertEqual(
+                witness.read_text(),
+                "run 1 failed; keep me for post-mortem\n",
+                "run 1's retained witness is byte-identical afterward")
+
+    def test_same_pid_same_epoch_collision_allocates_fresh_owned_state(self):
+        """Collision: two CONCURRENT sessions with the same pid AND the
+        same coarse epoch, plus a pre-existing legacy share-<pid>
+        directory. Each session must get fresh, exclusively owned state —
+        the legacy directory is neither used nor removed, and the two
+        sessions never see each other's state."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            results = tmp / "results"
+            results.mkdir(parents=True)
+            legacy = results / "share-4242"
+            legacy.mkdir()
+            legacy_witness = legacy / "legacy-evidence.txt"
+            legacy_witness.write_text("pre-existing; do not adopt\n")
+            # Session A starts; session B starts with IDENTICAL pid+epoch
+            # while A is still alive.
+            genA, record, _ = self._begin(tmp, self.PINNED_ENV,
+                                          pid=4242, epoch=1_000_000)
+            containerA = next(genA)
+            shareA = containerA.share
+            genB, _, _ = self._begin(tmp, self.PINNED_ENV,
+                                     pid=4242, epoch=1_000_000)
+            containerB = next(genB)
+            shareB = containerB.share
+            self.assertNotEqual(shareA, shareB,
+                                "identical pid+epoch still yields "
+                                "distinct shares")
+            self.assertNotEqual(containerA.id, containerB.id)
+            self.assertNotIn(legacy, (shareA, shareB),
+                             "a pre-existing legacy share-<pid> is never "
+                             "adopted")
+            run_lines = [l for l in record.read_text().splitlines()
+                         if l.startswith("run ")]
+            self.assertEqual(len(run_lines), 2)
+            self.assertNotEqual(
+                run_lines[0].split("--name ")[1].split()[0],
+                run_lines[1].split("--name ")[1].split()[0],
+                "container identities stay distinct too")
+            (shareB / "b-only.txt").write_text("b\n")
+            self.assertFalse((shareA / "b-only.txt").exists(),
+                             "no cross-session visibility")
+            # Both sessions finalize cleanly; only their own shares go.
+            with self.assertRaises(StopIteration):
+                next(genA)
+            with self.assertRaises(StopIteration):
+                next(genB)
+            self.assertFalse(shareA.exists())
+            self.assertFalse(shareB.exists())
+            self.assertEqual(legacy_witness.read_text(),
+                             "pre-existing; do not adopt\n",
+                             "the legacy directory is neither used nor "
+                             "removed")
+
+    def test_retained_share_survives_later_setup_failures(self):
+        """After a retained failed run, later sessions that fail setup —
+        BEFORE publication (image build) or AFTER (in-container setup) —
+        finalize only their own newly allocated share (and their own
+        freshly captured container); the retained share survives
+        byte-identical, and a later clean session still succeeds without
+        touching it."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            # --- run 1: teardown fails, share retained ----------------
+            gen1, record, results = self._begin(
+                tmp, self.PINNED_ENV,
+                docker_kw={"rm_rc": 1, "rm_stderr": "daemon said no",
+                           "inspect_rc": 0},
+                pid=4242, epoch=1_000_000)
+            container1 = next(gen1)
+            share1 = container1.share
+            witness = share1 / "run1-recovery-evidence.txt"
+            witness.write_text("run 1 failed; keep me\n")
+            with self.assertRaises(RuntimeError):
+                gen1.throw(RuntimeError("run 1 body failed"))
+            run1_count = len(record.read_text().splitlines())
+            # --- run 2: setup fails BEFORE publication (image build) --
+            gen2, _, _ = self._begin(tmp, self.PINNED_ENV,
+                                     docker_kw={"build_rc": 1},
+                                     pid=4242, epoch=1_000_061)
+            with self.assertRaises(subprocess.CalledProcessError):
+                next(gen2)
+            run2_lines = record.read_text().splitlines()[run1_count:]
+            self.assertEqual([l.split()[0] for l in run2_lines],
+                             ["info", "build"],
+                             "pre-publication failure: no container was "
+                             "ever created, nothing to finalize")
+            self.assertEqual(list(results.glob("share-*")), [share1],
+                             "run 2's own share is released; only the "
+                             "retained share remains")
+            self.assertEqual(witness.read_text(), "run 1 failed; keep me\n")
+            # --- run 3: setup fails AFTER publication (in-container) --
+            gen3, _, _ = self._begin(tmp, self.PINNED_ENV,
+                                     docker_kw={"exec_rc": 1},
+                                     pid=4242, epoch=1_000_122)
+            with self.assertRaises(RuntimeError) as ctx3:
+                next(gen3)
+            self.assertIn("container setup failed", str(ctx3.exception))
+            run3_lines = record.read_text().splitlines()[
+                run1_count + len(run2_lines):]
+            self.assertEqual([l.split()[0] for l in run3_lines],
+                             ["info", "build", "run", "exec",
+                              "rm", "inspect"])
+            self.assertEqual(run3_lines[4], "rm -f cid-2",
+                             "only the newly captured container is "
+                             "finalized")
+            for line in run3_lines:
+                self.assertNotIn("cid-1", line)
+                self.assertNotIn(str(share1), line)
+            self.assertEqual(witness.read_text(), "run 1 failed; keep me\n")
+            # --- run 4: a clean session still succeeds ----------------
+            gen4, _, _ = self._begin(tmp, self.PINNED_ENV,
+                                     pid=4242, epoch=1_000_183)
+            container4 = next(gen4)
+            share4 = container4.share
+            with self.assertRaises(StopIteration):
+                next(gen4)
+            self.assertFalse(share4.exists())
+            self.assertEqual(witness.read_text(), "run 1 failed; keep me\n",
+                             "the retained share is never touched by "
+                             "later sessions")
+
+    def test_already_absent_replay_succeeds_and_removes_only_own_share(self):
+        """Positive replay: teardown finds its own container already
+        absent (rm fails, inspect says No such container) — the session
+        succeeds and removes only its own share, leaving a pre-existing
+        neighbour share untouched."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            results = tmp / "results"
+            results.mkdir(parents=True)
+            neighbour = results / "share-4242-999999-legacy"
+            neighbour.mkdir()
+            note = neighbour / "keep.txt"
+            note.write_text("not mine\n")
+            gen, record, _ = self._begin(
+                tmp, self.PINNED_ENV,
+                docker_kw={"rm_rc": 1, "rm_stderr": "No such container"},
+                pid=4242, epoch=1_000_000)
+            container = next(gen)
+            own_share = container.share
+            self.assertNotEqual(own_share, neighbour)
+            with self.assertRaises(StopIteration):
+                next(gen)  # idempotent OK: inspect proves absence
+            self.assertFalse(own_share.exists(),
+                             "the session removes its own share")
+            self.assertEqual(note.read_text(), "not mine\n",
+                             "the neighbour share is untouched")
+            lines = record.read_text().splitlines()
+            self.assertIn("rm -f cid-1", lines)
+            self.assertEqual(lines[-1], "inspect cid-1")
+
+    def test_keep_share_retains_only_this_sessions_artifacts(self):
+        """Positive: TIER1_KEEP_SHARE preserves THIS session's share with
+        its artifacts after a clean run (debugging aid) — it neither
+        retains nor removes any other session's share."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            results = tmp / "results"
+            results.mkdir(parents=True)
+            neighbour = results / "share-4242-999999-legacy"
+            neighbour.mkdir()
+            (neighbour / "keep.txt").write_text("not mine\n")
+            gen, record, _ = self._begin(tmp, self.PINNED_ENV,
+                                         pid=4242, epoch=1_000_000)
+            with mock.patch.dict(os.environ, {"TIER1_KEEP_SHARE": "1"}):
+                container = next(gen)
+                own_share = container.share
+                artifact = own_share / "session-artifact.log"
+                artifact.write_text("debug me\n")
+                with self.assertRaises(StopIteration):
+                    next(gen)
+            self.assertEqual(artifact.read_text(), "debug me\n",
+                             "KEEP_SHARE retains this session's share and "
+                             "its artifacts")
+            self.assertEqual((neighbour / "keep.txt").read_text(),
+                             "not mine\n")
 
 
 class TestDryRunEquivalent(unittest.TestCase):

@@ -494,7 +494,11 @@ Coverage:
     `prime-claw-tier1-session-4242-1000000`) and a different captured ID
     (`cid-2`), its docker invocations never mention `cid-1`, run 1's
     still-owned share survives, and run 2's own share is cleaned after
-    verified teardown.
+    verified teardown. (SUPERSEDED by the round-3 section below: the
+    share itself is now uniquely allocated per session — mkdtemp, with
+    the container name carrying the same allocation token — and this
+    proof now runs with the SAME pid + different epochs, distinct-share
+    assertions, and a byte-identical witness check.)
 
 ### Wording fix (from the same review, non-blocking)
 
@@ -509,6 +513,99 @@ gate as 222).
   0 failed** in ~34s (270 executed = the 223-test post-reconciliation
   gate + 46 fixture tests + 1 new driver test; the documented watchdog
   timing flake did NOT fire this run).
+- Fresh no-leftover-containers check (this pass ran no container
+  workloads — tier-0 gate plus fake-docker behavioral tests only):
+
+```
+$ docker ps -a --filter name=prime-claw-tier1-session
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+```
+
+  (empty — no tier-1 session containers remain.)
+
+## Final-expert-block round-3 repair (82dd087 review → this commit)
+
+The fresh FINAL EXPERT gate on the round-2 repair commit `82dd087`
+returned **BLOCK** with exactly ONE ownership-seam finding; B1-R, B2-R,
+B3, and the archival hygiene were all verified RESOLVED. (Full report
+preserved in the main repository at
+`docs/evidence/2026-09-30-tier1-final-expert-review-82dd087.md`, to be
+folded into the archive bundle's `reviews/` at merge time.) Scope held:
+`tests/conftest.py`, its behavioral tests (`tests/test_tier1_fixture.py`),
+and this note. No plugin source changes, no driver changes, no host probe
+reruns, no container workloads in this pass.
+
+### B2-R2 — a later session can no longer inherit (or delete) a failed session's share (was P2)
+
+The seam: the container name was unique per run (pid + epoch) but the
+session SHARE was allocated as `.test-results/share-<pid>` with
+`exist_ok=True` — no per-session identity. On PID reuse (or several
+pytest sessions in one process), a later session reused the earlier
+share, and its finalizer deleted the entire share after proving only its
+OWN captured container absent — destroying a retained failed session's
+recovery evidence.
+
+The repair:
+
+- Every session's share is now allocated with
+  `tempfile.mkdtemp(prefix=f"share-{pid}-{epoch}-", dir=RESULTS)` — a
+  FRESH, exclusively owned directory, guaranteed distinct even for
+  identical pid+epoch. A pre-existing directory (for example a legacy
+  `share-<pid>`) is neither used nor removed.
+- The container identity is aligned with the share identity: the name is
+  now `prime-claw-tier1-session-{pid}-{epoch}-{token}`, where `{token}`
+  is the share's mkdtemp allocation token.
+- Cleanup stays restricted to the exact owned share (finalization only
+  ever rmtrees the share IT allocated); mkdtemp's 0700 mode is normalized
+  to the former 0755 mkdir default so container access through the
+  same-absolute-path mount is unchanged.
+- Constraints preserved: same-absolute-path host/container mounts
+  (`-v share:share`), exact-ID bounded rm→inspect, the three-state
+  UNKNOWN behavior, teardown diagnostics, TIER1_KEEP_SHARE, no
+  deletion/adoption of existing shares, no container pruning, no name
+  searches, no host-process kills, no retries to make a later run green,
+  and the B1-R fail-closed staging repair is untouched.
+
+Acceptance coverage (all in `TestSessionFixtureEndToEnd`, which drives
+the ACTUAL `tier1_container` generator via its `_fixture_function` with
+recording fakes; the class now has 9 tests):
+
+- (positive) ordinary setup/body/verified teardown removes only that
+  session's share; already-absent replay succeeds
+  (`test_already_absent_replay_succeeds_and_removes_only_own_share` — rm
+  fails, inspect says No such container → idempotent OK, own share
+  removed, pre-existing neighbour share untouched); TIER1_KEEP_SHARE
+  retains the session's own artifacts
+  (`test_keep_share_retains_only_this_sessions_artifacts`).
+- (negative/replay) `test_failed_run_leaves_no_inheritance_for_the_next_run`
+  now runs with the SAME pid (4242) and DIFFERENT epochs: run 1's
+  teardown fails as PRESENT and a witness file is planted in its retained
+  share; run 2 gets a DISTINCT share and a distinct container name/ID; no
+  run-1 evidence is visible through run 2's share; run 2's docker calls
+  are scoped only to `cid-2` and never even mount run 1's share; and run
+  1's witness is byte-identical afterward.
+- (collision)
+  `test_same_pid_same_epoch_collision_allocates_fresh_owned_state`: two
+  CONCURRENT sessions with the same pid AND the same coarse epoch, plus a
+  pre-existing legacy `share-4242` directory — both sessions get fresh,
+  distinct, exclusively owned shares and distinct container names; the
+  legacy directory is neither used nor removed (byte-identical witness).
+- (failure) `test_retained_share_survives_later_setup_failures`: after a
+  retained run, the next setup fails BEFORE publication (image build →
+  no container ever created, the session's own share released, the
+  retained share untouched) and AFTER publication (in-container setup →
+  only the newly captured `cid-2` is rm/inspect-finalized; `cid-1` and
+  the retained share untouched); a later clean session still succeeds
+  without touching the retained share.
+
+### Post-round-3 checks
+
+- Tier-0 gate: `python3 -m pytest tests/ -q` → **274 passed, 144 skipped,
+  0 failed** in ~38s (274 = the 270-test round-2 gate + 4 new round-3
+  acceptance tests; the documented watchdog timing flake did not fire).
+- Targeted: `pytest tests/test_tier1_fixture.py
+  tests/test_tier1_driver.py -q` → **84 passed** (50 fixture + 34
+  driver).
 - Fresh no-leftover-containers check (this pass ran no container
   workloads — tier-0 gate plus fake-docker behavioral tests only):
 
