@@ -837,3 +837,9 @@ authorization and exact full-source file/page/path parity. This assessment
 changed no source, ref, registration, index, or database, and it did not run
 Qwen, cut over, route a write, merge, or clean up. Source `.5`, parent, and
 routed-write `.4` remain BLOCKED.
+
+## 2026-10-01 owner pauses source-current execution after read-only review
+
+The owner independently reconciled the exact read-only readiness receipt SHA-256 `1912356b45543f1941e7817473367828373ece708d7fe62bc6a34f679fa581ae` at clean pushed project `6089e417921b03f7e97366efa67baac173c1cb68`: live brain `main` and tracking remain at published `83eee06e4322b3264bb812959a2a5482bce13151`, but the clean registered checkout and both source registrations still use older accepted `5c47c067e93eb633da8a8dcb28221e23eea7685b`. Effective base policy matched its prior canonical hash; no source build ran; owner read-only database queries matched the receipt for both stores. The canonical bookmark is not the published commit, Qwen bookmark is absent, and no published-tree dry-run or eligible-file/page/path parity proof exists. No ref, source registration, policy, index, database or provider was changed.
+
+The [separate owner PAUSE decision](../evidence/phase3a-slice2-source-current-owner-paused-83eee-20261001.md) SHA-256 `bd7692ca0a25164ed5a15d2486bd717e512b4fe0d0fd3a23323f97a463c43311` accepts **only this read-only finding**, not source-current/index/build eligibility. Future lossless registered-source reconciliation preserving the accepted checkout/refs and independent same-version hermetic dry-run no-write proof each require a separate owner decision and fresh exact remote/ref/clean checkout/no-active-build/policy/BOTH DB gates. No checkout/ref/registration change or unproven probe, Qwen retry/index/build/cutover, routed write, merge, plugin overwrite or cleanup is authorized. Source `.5`, parent, `.4` and blocked plan/spec remain BLOCKED; retain the exact EPISODE idle.
