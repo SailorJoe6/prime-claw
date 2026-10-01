@@ -26,7 +26,7 @@ def test_native_run_paths_and_real_child_precedence(tmp_path):
  rows=[json.loads(x) for x in records.read_text().splitlines()]
  parent=[r for r in rows if not r["depth1"]];child=[r for r in rows if r["depth1"]]
  assert len(parent)>=8
- assert all(r["kernel"]==1 and r["package"]==1 for r in parent)
+ assert all(r["kernel"]==1 and r["package"]==0 for r in parent)
  assert len(child)==1 and child[0]["kernel"]==0 and child[0]["package"]==0
  assert not any("CANCELLED" in r["tail"] for r in rows)
 
@@ -49,4 +49,4 @@ def test_native_auto_compaction_restores_first_real_active_call(tmp_path):
     rows=[json.loads(x) for x in records.read_text().splitlines()]
     assert any(r["kernel"]==0 and r["package"]==0 for r in rows)
     after=[r for r in rows if r["after"] and r["kernel"]==1]
-    assert after and after[0]["package"]==1
+    assert after and after[0]["package"]==0
