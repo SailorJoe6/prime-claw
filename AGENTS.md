@@ -21,6 +21,24 @@ behind the design (and the origin session id) is in
 phase skills → episode mechanics → conversation/episode boundary →
 upgrade command → orchestrator LAST.
 
+## Prime Agent is an upstream dependency — never a development target
+
+This repository develops the **prime-claw plugin** and the sandboxed Docker
+runtime that installs Prime Agent plus that plugin. It does **not** develop,
+patch, fork, or maintain the Prime Agent codebase.
+
+For prime-claw work:
+
+- Never propose or make changes in a Prime Agent source checkout as the solution.
+- Never propose an unsolicited Prime Agent pull request. Prime Agent does not
+  accept unsolicited PRs.
+- Do not treat a local Prime Agent checkout or worktree as an implementation
+  surface. It may be read only to understand documented/runtime behavior.
+- Solve compatibility problems within prime-claw's plugin, container, scripts,
+  configuration, or supported public Prime Agent interfaces.
+- If the public interface cannot support a correct solution, report that product
+  constraint to the operator. Do not convert it into a Prime Agent patch plan.
+
 ## Prime Agent plugin source and testing
 
 The prime-claw plugin source is inert under `src/prime-agent-plugin/`. Never put
