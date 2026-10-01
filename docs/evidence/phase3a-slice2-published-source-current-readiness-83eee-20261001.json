@@ -1,0 +1,78 @@
+{
+  "assessment_mode": "READ_ONLY_NO_SOURCE_RECONCILIATION_NO_DRY_RUN",
+  "authority": {
+    "accepted_only_publication": true,
+    "accepted_publication_commit": "83eee06e4322b3264bb812959a2a5482bce13151",
+    "publication_owner_acceptance_path": "docs/evidence/phase3a-slice2-joe-a-publication-owner-accepted-83eee-20261001.md",
+    "publication_owner_acceptance_sha256": "72d4b0da8bcd050ab30d3028cf183dd540f27045a720865a0f5befa7fbb918b5"
+  },
+  "database_aggregate_snapshots": {
+    "canonical": "1059,3031,0,1536,1536,5a477eaa5b311b9b45324591dd308e83ddcd1ded",
+    "qwen4096": "1057,3029,0,4096,4096,"
+  },
+  "decision_boundary": {
+    "dry_run_executed": false,
+    "index_or_build_accepted": false,
+    "qwen_retry_index_build_cutover_routed_write_or_cleanup": false,
+    "registration_or_ref_changed": false,
+    "separate_owner_decision_required": true,
+    "source_current_accepted": false,
+    "source_parent_and_routed_write_beads_blocked": true
+  },
+  "eligibility_probe": {
+    "candidate_native_no_fix_frontmatter_proof_is_not_a_sync_bookmark": true,
+    "cli_help_claims_dry_run_no_writes": true,
+    "installed_binary_sha256": "8cb261cdbeb476ab25b369a36a67915ee51b2d2d0bc6c1b743b16ae152bf91cc",
+    "installed_gbrain_version": "0.50.0.0",
+    "prior_no_write_dry_run_applied_only_to_older_registered_checkout": true,
+    "published_tree_index_eligibility_known": false,
+    "published_tree_probe_executed": false
+  },
+  "episode_session_id": "01a0da00-3403-77ae-930a-919658d7d1f8",
+  "fresh_gates": {
+    "accepted_checkout_clean": true,
+    "canonical_db_aggregate_unchanged": true,
+    "effective_base_policy_unchanged": true,
+    "live_main_exact_published": true,
+    "no_active_sync_embed_index_build": true,
+    "qwen4096_db_aggregate_unchanged": true,
+    "refs_expected_no_change": true
+  },
+  "fresh_post_gates": {
+    "accepted_checkout_clean": true,
+    "canonical_db_aggregate_unchanged": true,
+    "effective_base_policy_unchanged": true,
+    "live_main_exact_published": true,
+    "no_active_sync_embed_index_build": true,
+    "qwen4096_db_aggregate_unchanged": true,
+    "refs_expected_no_change": true
+  },
+  "future_prerequisites_not_authorization": [
+    "separate owner-approved lossless registered-source reconciliation preserving accepted checkout and original refs",
+    "fresh exact live remote and candidate tree, clean/no-sync registered checkout/refs, effective policy and both DB aggregates at any later action",
+    "independent same-version hermetic proof of dry-run no writes to source/ref/config/index/DB/provider plus pre/post database and filesystem snapshots before any published-tree eligibility probe",
+    "only after separately approved reconciliation and demonstrated no-write behavior, exact published-tree full-source eligible-file/page/path dry-run with no pull and no skip-failed; keep source-current acceptance separate"
+  ],
+  "gaps": {
+    "canonical_bookmark_not_current": true,
+    "full_published_tree_eligible_file_page_path_parity_not_demonstrated": true,
+    "no_write_semantics_for_published_tree_probe_not_independently_proven": true,
+    "qwen_bookmark_absent": true,
+    "registered_source_still_older_than_published_main": true
+  },
+  "observed_at_utc": "2026-10-01T00:55:21.372699+00:00",
+  "observed_source": {
+    "candidate_ref_and_exact_parent_preserved": true,
+    "canonical_bookmark": "5a477eaa5b311b9b45324591dd308e83ddcd1ded",
+    "canonical_source_path_equals_accepted_checkout": true,
+    "live_remote_main": "83eee06e4322b3264bb812959a2a5482bce13151",
+    "local_main_and_original_repair_refs_preserved": true,
+    "local_origin_main_tracking": "83eee06e4322b3264bb812959a2a5482bce13151",
+    "qwen_bookmark": "",
+    "qwen_source_path_equals_accepted_checkout": true,
+    "registered_checkout_clean": true,
+    "registered_checkout_head": "5c47c067e93eb633da8a8dcb28221e23eea7685b"
+  },
+  "post_observed_at_utc": "2026-10-01T01:02:01.798744+00:00",
+  "schema": "phase3a-slice2-published-source-current-readiness-v1"
+}

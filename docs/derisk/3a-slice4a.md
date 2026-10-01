@@ -802,3 +802,38 @@ separately before any next Slice 2 decision.
 The fresh independent `openai-codex/gpt-6-astra`/`max` EXPERT **PASS** on exact pushed project `97a678693db887040fd00d273b671c13e7602144` and published brain main `83eee06e4322b3264bb812959a2a5482bce13151` has complete owner-private report SHA-256 `85babad6ea4f61827ff4a6f3507fe2758646af5c6def05be1f403caad1de4b11`. It independently classified all 44 publication-window tool calls and found only one ordinary non-force push exit 0, with no retry/fetch/rebase/checkout/source edit. Original Markdown suffixes on all 20 paths, two accepted Slice 1 blobs, 82 newer disjoint paths, all 1,224 candidate blobs, clean checkout, effective policy, both database aggregates and no active source build remained safe. Historical raw pre/post policy stdout was not durably retained; exact executed whole-policy comparisons plus matching historical/current canonical hashes supplied the bounded proof, not a claim that raw snapshots exist.
 
 The owner separately [accepts **source publication only**](../evidence/phase3a-slice2-joe-a-publication-owner-accepted-83eee-20261001.md) SHA-256 `72d4b0da8bcd050ab30d3028cf183dd540f27045a720865a0f5befa7fbb918b5` after fresh live project/brain verification. The active registered checkout is still accepted Slice 1 HEAD `5c47c067e93eb633da8a8dcb28221e23eea7685b`; prior no-write dry-run eligibility was for that older checkout. **Slice 2 source-current/index eligibility is NOT accepted.** A separate read-only exact published-source readiness assessment may now proceed under fresh live remote/ref/clean checkout/no-sync/policy/BOTH DB gates. No active source checkout/ref/registration change, unproven no-write dry-run, Qwen retry, index/build/cutover, routed write, merge, plugin overwrite or cleanup is authorized. Source `.5`, parent and `.4` Beads remain BLOCKED.
+
+## 2026-10-01 published-source readiness: read-only assessment
+
+After separate acceptance of the exact Joe-A source publication, a fresh
+read-only assessment verified brain `main` and local tracking at
+`83eee06e4322b3264bb812959a2a5482bce13151`. The active registered
+checkout is still the clean older accepted HEAD
+`5c47c067e93eb633da8a8dcb28221e23eea7685b`. The local main,
+inspection, original repair, old candidate, and accepted candidate refs are
+preserved. Direct read-only registration queries found both canonical and
+isolated Qwen source paths still pointing at the older checkout. No active
+sync/embed/index/build was seen; the effective base policy and **both**
+database aggregates matched their accepted snapshots.
+
+The canonical bookmark remains `5a477eaa5b311b9b45324591dd308e83ddcd1ded`
+(1,059 pages, 3,031 1536d chunks, zero null embeddings); the isolated
+4096d Qwen database still has no bookmark (1,057 pages, 3,029 chunks,
+zero null embeddings). The installed `gbrain 0.50.0.0` binary advertises
+`sync --dry-run` as no-write, but an independent no-write proof for the
+published-tree eligibility probe is missing. The older registered-checkout
+dry-run and published-candidate no-fix frontmatter validation do not establish
+published-tree eligible-file/page/path parity or an index bookmark. **No
+published-tree dry-run was executed.** The [sanitized readiness receipt]
+(../evidence/phase3a-slice2-published-source-current-readiness-83eee-20261001.json)
+SHA-256 `1912356b45543f1941e7817473367828373ece708d7fe62bc6a34f679fa581ae` records the checks and scope.
+
+A separate owner decision is needed before any lossless registered-source
+reconciliation. Fresh exact-live-ref, clean checkout/refs, policy and both DB
+gates must precede later action. A same-version hermetic no-write proof with
+pre/post source/ref/config/index/database/provider checks must precede any
+published-tree eligibility probe; the probe would still require separate
+authorization and exact full-source file/page/path parity. This assessment
+changed no source, ref, registration, index, or database, and it did not run
+Qwen, cut over, route a write, merge, or clean up. Source `.5`, parent, and
+routed-write `.4` remain BLOCKED.
