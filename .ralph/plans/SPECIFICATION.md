@@ -1,6 +1,6 @@
 # Future Specification — Official lean session protocol
 
-> **Status:** Reviewed; planning authorized
+> **Status:** Reviewed; implementation authorized
 >
 > **Scope:** Promote the dogfooded lean conversation/episode and goal/heartbeat
 > protocol from a reversible POC to Prime Claw's supported default without

@@ -1,6 +1,6 @@
 # Execution Plan — Official lean session protocol
 
-> **Status:** Draft for operator review
+> **Status:** Active; implementation authorized
 >
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 >
