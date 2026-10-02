@@ -85,6 +85,15 @@ post-compaction call. Missing or duplicate managed blocks and corrupt or
 disagreeing trusted state call `ctx.abort()` before provider dispatch. Missing
 old compatibility skill files do not affect the current generation.
 
+Provider-boundary acceptance keeps the two retired channels distinct. It checks
+converted provider-visible user messages for historical oversight packages and
+the effective system prompt for the old detailed goal/heartbeat policy. A
+fixture-only `before_agent_start` injector proves the historical system overlay
+is detectable; production does not scrub that overlay. The seven-file generation
+prevents it by not installing the retired injector. Ordinary user quotations of
+its identifier remain ordinary user content and are not treated as system-policy
+leaks.
+
 ## Lean model-facing protocol
 
 The managed APPEND_SYSTEM block is the current policy. It tells an owner to

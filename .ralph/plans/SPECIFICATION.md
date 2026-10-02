@@ -169,13 +169,21 @@ The migration must pass:
 - installer migration tests for stale retired files, unsafe destination types,
   unrelated-file preservation, convergence, and diagnostics;
 - provider-context coverage at the actual post-conversion provider seam proving
-  one managed system block and zero provider-visible user-shaped oversight
-  packages or legacy work-control overlays, with controlled positive detectors
-  and a filter-bypass failure control;
+  one managed system block, zero provider-visible user-shaped oversight
+  packages, and zero retired work-control overlay in the effective system prompt;
+  the shared capture/assertion helper and all six spies must inspect user messages
+  and `systemPrompt` as separate channels;
+- independent controlled failures: bypass the oversight filter to prove the
+  user-shaped detector, and inject a historical-shaped
+  `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` policy through a fixture-only
+  `before_agent_start`/system-prompt seam to prove the system-overlay detector;
+  the clean seven-file generation has neither leak, and removal of the retired
+  injector—not a new runtime scrubber—is the product mechanism;
 - lifecycle and replay coverage for active ownership, recovery, bounded episodes,
   handoff, finalization, reload/resume, first post-compaction turns, tool and
   heartbeat continuations, agent-message and queued turns, and ordinary-user
-  preservation without the old skill; and
+  preservation without the old skill; every provider row produced by saved-
+  session recovery and legacy migration is asserted, not only initial/final rows; and
 - `git diff --check` plus current-documentation and reference audits.
 
 Known unrelated failures must be independently reproduced or tracked, never

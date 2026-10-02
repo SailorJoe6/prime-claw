@@ -1,6 +1,6 @@
 # Execution Plan — Official lean session protocol
 
-> **Status:** Active; Slice 1 candidate `9d01cfc` rejected, bounded revision authorized
+> **Status:** Active; Slice 1 candidate `7369829` rejected, bounded OL-011 revision authorized
 >
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 >
@@ -239,6 +239,24 @@ constraint OL-008:
   failure, primary-`main`-only `--user-global`, and linked-worktree refusal are
   retained together with the seven-file transition and stronger loaded-
   generation UAT rule. No host-global apply/check or host probe was run.
+- **OL-011 — effective system-prompt channel.** Candidate
+  `736982955b9a45daffd67e4b3078d02ccd8486fd` (tree
+  `156ee7ee7be44810b3728712c7d8d52e77700cda`) is rejected by the canonical
+  BLOCK report
+  `/Users/jlanders/.prime/agent/session-artifacts/01a0f51d-d51b-7649-a28a-844879e42aec/sub-264c127a/official-lean-slice1-review-7369829.md`
+  (SHA256 `ffd1bb9b0b68efd1bb8fa4643afde9d599ef9fb08450afdb0aa22d7f3cc7c5bb`).
+  Preserve the working post-conversion user-shaped oversight controls. Extend
+  the shared helper and all six spies to capture the effective `systemPrompt`
+  separately. Through a fixture-only `before_agent_start` seam, append the
+  historical-shaped detailed `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1`
+  overlay plus a unique controlled system token and prove that work-control
+  alone fails the shared assertion, independently of the oversight bypass.
+  The unchanged official seven-file generation must produce one lean block and
+  no retired system overlay. Do not add a runtime scrubber: deleting the retired
+  injector is the production mechanism. Assert every provider row added by
+  saved-session recovery and legacy migration, not only the initial and final
+  rows. Preserve all OL-007 lifecycle/replay/dispatch-prevention coverage and
+  refresh complete exact-candidate OL-009 Docker receipts and teardown.
 
 Preserve `.ralph/skills/oversee-episode/SKILL.md`,
 `.agents/skills/oversee-episode`, and
@@ -554,7 +572,7 @@ Update this section during execution; do not rely on chat history.
   candidate validation is Docker-only, explicit roots are required, and
   `--user-global` is primary-`main` only and refused from linked worktrees.
 - Exact candidate `197cb541b140e70a66b286c966df377742be44a0` ran the canonical
-  `scripts/test-all.sh`: tier 0 passed (`275 passed, 152 skipped`) in 37s;
+  `scripts/test-all.sh`: tier 0 passed (`276 passed, 155 skipped`) in 37s;
   tier 1 failed after 101s (`1 failed, 47 passed, 383 deselected`) because the
   no-skill installer fixture copied apply/check and the APPEND manager but not
   the new OL-008 `prime-agent-plugin-target.sh`. Raw logs are
@@ -569,8 +587,35 @@ Update this section during execution; do not rely on chat history.
   `709274734acc80f8ebec3161460a182c3fdb38c2053983979227d60a101a1bc4`)
   with no owned container/share remaining. A later complete exact-candidate
   receipt, not this focused proof, must supersede the failed full gate.
+- Candidate `736982955b9a45daffd67e4b3078d02ccd8486fd` and its passing but
+  incomplete OL-009 gate are superseded by accepted OL-011. The canonical
+  BLOCK report and hash are recorded in the revision boundary above and on
+  `prime-claw-h6w.25`; no other material candidate finding was accepted.
+- The OL-011 repair changes tests/evidence only. The shared provider helper now
+  captures provider-visible user text and effective `systemPrompt` separately.
+  All six spies inherit and assert the system-channel fields. The oversight
+  filter-bypass and historical-shaped `before_agent_start` work-control overlay
+  fail independently, ordinary quoted-user identifiers remain preserved, and
+  clean source/installed seven-file probes have no retired system overlay. Every
+  row emitted by saved-session recovery and legacy migration is asserted. No
+  runtime scrubber or managed plugin source change was added.
+- The first exact control run failed before provider dispatch because generated
+  TypeScript contained an unescaped newline. Preserved receipt
+  `.test-results/ol011/system-channel-control.log`, SHA256
+  `9fe7c462f6e00eee0949dcf801713b2f9fd5df5051c3ae9d751a2635cde9c516`.
+  After correcting the generator escape, the exact control passed `1 passed in
+  47.88s`: `system-channel-control-rerun.log`, SHA256
+  `dec8f88412d9de50c8e019fb736a415756ee99f0f218f138468654c9e98f2b20`.
+- Complete focused native provider/lifecycle validation passed `11 passed, 7
+  deselected in 79.52s`: `.test-results/ol011/native-provider-lifecycle.log`,
+  SHA256 `f32b53abaeafa10f19f7f69b8536b0ec68ae2c3de7cf3b356c3d2b0a4d5178ed`.
+  Both passing runs and the failed predecessor left no owned container/share.
+  Focused tier 0 also passed `9 passed, 12 deselected in 0.54s` at
+  `.test-results/ol011/focused-tier0.log` (SHA256
+  `345d5ef972159ac813ab8b9834124a8775a50bcfba9f257a50d5d460fb00c382`).
+  These focused receipts do not replace the pending exact-candidate full gate.
 - Final exact-candidate OL-009 receipts will be retained under
-  `.test-results/ol009-final-replacement/` after the replacement commit exists.
+  `.test-results/ol011-final/` after the replacement commit exists.
   They must include raw tier-0/tier-1 output, exit status, command, elapsed time,
   commit/tree and dependency SHA/selector, supersession map, and before/after
   container/share teardown. The exact post-commit result and push receipt belong

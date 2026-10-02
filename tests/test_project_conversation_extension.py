@@ -16,6 +16,7 @@ from provider_context_assertions import (
     LEGACY_PACKAGE_SENTINEL,
     ORDINARY_USER_SENTINEL,
     RETIRED_WORK_CONTROL_CONTROL,
+    RETIRED_WORK_CONTROL_POLICY,
     RETIRED_WORK_CONTROL_SENTINEL,
     assert_provider_context_clean,
     provider_capture_expression,
@@ -119,20 +120,28 @@ streamSimple(model,context){const messages=context.messages??[],capture=PROVIDER
 
 def _provider_control_extension(path: Path):
     source = r'''const packageSentinel=__PACKAGE_SENTINEL__;
-const workSentinel=__WORK_SENTINEL__;
-const workControl=__WORK_CONTROL__;
 export default function control(pi){
   pi.on("context",event=>({messages:[...event.messages,
-    {role:"custom",customType:"prime-claw-oversee-episode-package",content:packageSentinel,display:false,timestamp:Date.now()},
-    {role:"custom",customType:"prime-claw-oversee-episode-package",content:`${workSentinel}\n${workControl}`,display:false,timestamp:Date.now()}
+    {role:"custom",customType:"prime-claw-oversee-episode-package",content:packageSentinel,display:false,timestamp:Date.now()}
   ]}));
 }'''
     path.write_text(
         source.replace("__PACKAGE_SENTINEL__", json.dumps(LEGACY_PACKAGE_SENTINEL))
-        .replace("__WORK_CONTROL__", json.dumps(RETIRED_WORK_CONTROL_CONTROL))
-        .replace("__WORK_SENTINEL__", json.dumps(RETIRED_WORK_CONTROL_SENTINEL))
     )
 
+
+def _work_control_extension(path: Path):
+    source = r'''const historicalPolicy=__HISTORICAL_POLICY__;
+const controlledToken=__CONTROLLED_TOKEN__;
+export default function workControl(pi){
+  pi.on("before_agent_start",event=>({
+    systemPrompt:`${event.systemPrompt}\n\n${historicalPolicy}\n${controlledToken}`
+  }));
+}'''
+    path.write_text(
+        source.replace("__HISTORICAL_POLICY__", json.dumps(RETIRED_WORK_CONTROL_POLICY))
+        .replace("__CONTROLLED_TOKEN__", json.dumps(RETIRED_WORK_CONTROL_CONTROL))
+    )
 
 def _run_provider_control(tier1_container, case: Path, order: str):
     project = case / "project"
@@ -142,13 +151,16 @@ def _run_provider_control(tier1_container, case: Path, order: str):
     )
     records = case / "records.jsonl"
     provider = case / "provider.ts"
-    control = case / "control.ts"
+    oversight_control = case / "oversight-control.ts"
+    work_control = case / "work-control.ts"
     _provider_extension(provider, records)
-    _provider_control_extension(control)
+    _provider_control_extension(oversight_control)
+    _work_control_extension(work_control)
     extensions = {
-        "positive": [provider, control],
-        "bypass": [provider, Path(WS_EXTENSION), control],
-        "official": [provider, control, Path(WS_EXTENSION)],
+        "positive": [provider, oversight_control, work_control],
+        "oversight-bypass": [provider, Path(WS_EXTENSION), oversight_control],
+        "work-control": [provider, Path(WS_EXTENSION), work_control],
+        "official": [provider, oversight_control, Path(WS_EXTENSION)],
     }[order]
     command = [
         "prime-agent", "--mode", "text", "--offline", "--no-session",
@@ -157,7 +169,11 @@ def _run_provider_control(tier1_container, case: Path, order: str):
     ]
     for extension in extensions:
         command.extend(["-e", str(extension)])
-    command.extend(["--provider", "poc", "--model", "m", "-p", ORDINARY_USER_SENTINEL])
+    ordinary = (
+        f"{ORDINARY_USER_SENTINEL}\n"
+        f"Ordinary quoted discussion: {RETIRED_WORK_CONTROL_SENTINEL}"
+    )
+    command.extend(["--provider", "poc", "--model", "m", "-p", ordinary])
     env = {
         "PRIME_AGENT_CODING_AGENT_DIR": str(case / "agent"),
         "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1",
@@ -168,32 +184,55 @@ def _run_provider_control(tier1_container, case: Path, order: str):
     assert len(rows) == 1, rows
     return rows[0]
 
-
 def test_provider_visible_detector_controls_and_real_hook_removal(tier1_container, ctmp):
     positive_case = ctmp / "positive"
     positive_case.mkdir()
     positive = _run_provider_control(tier1_container, positive_case, "positive")
     assert positive["legacyOversightUserCount"] == 1
-    assert positive["retiredWorkControlUserCount"] == 1
+    assert positive["retiredWorkControlSystemSentinelCount"] == 1
+    assert positive["retiredWorkControlSystemStartCount"] == 1
+    assert positive["retiredWorkControlSystemEndCount"] == 1
+    assert positive["retiredWorkControlSystemControlCount"] == 1
     assert positive["ordinaryUserCount"] == 1
+    assert positive["retiredWorkControlQuotedUserCount"] == 1
     assert positive["controlledSentinelCustomCount"] == 0
 
-    bypass_case = ctmp / "bypass"
+    bypass_case = ctmp / "oversight-bypass"
     bypass_case.mkdir()
-    bypass = _run_provider_control(tier1_container, bypass_case, "bypass")
+    bypass = _run_provider_control(
+        tier1_container, bypass_case, "oversight-bypass"
+    )
     assert bypass["legacyOversightUserCount"] == 1
-    assert bypass["retiredWorkControlUserCount"] == 1
+    assert bypass["retiredWorkControlSystemSentinelCount"] == 0
     assert bypass["ordinaryUserCount"] == 1
-    assert bypass["controlledSentinelCustomCount"] == 0
-    with pytest.raises(AssertionError, match="provider-visible"):
-        assert_provider_context_clean(bypass, ordinary_count=1)
+    assert bypass["retiredWorkControlQuotedUserCount"] == 1
+    with pytest.raises(AssertionError, match="oversight package sentinel"):
+        assert_provider_context_clean(
+            bypass, ordinary_count=1, quoted_work_control_user_count=1
+        )
+
+    work_case = ctmp / "work-control"
+    work_case.mkdir()
+    work = _run_provider_control(tier1_container, work_case, "work-control")
+    assert work["legacyOversightUserCount"] == 0
+    assert work["retiredWorkControlSystemSentinelCount"] == 1
+    assert work["retiredWorkControlSystemStartCount"] == 1
+    assert work["retiredWorkControlSystemEndCount"] == 1
+    assert work["retiredWorkControlSystemControlCount"] == 1
+    assert work["ordinaryUserCount"] == 1
+    assert work["retiredWorkControlQuotedUserCount"] == 1
+    with pytest.raises(AssertionError, match="system prompt contains retired"):
+        assert_provider_context_clean(
+            work, ordinary_count=1, quoted_work_control_user_count=1
+        )
 
     official_case = ctmp / "official"
     official_case.mkdir()
     official = _run_provider_control(tier1_container, official_case, "official")
     assert official["kernel"] == 1
-    assert_provider_context_clean(official, ordinary_count=1)
-
+    assert_provider_context_clean(
+        official, ordinary_count=1, quoted_work_control_user_count=1
+    )
 
 def _run_native(tier1_container, ctmp, with_kernel: bool):
     project = ctmp / "project"; project.mkdir()
