@@ -1,6 +1,6 @@
 # Execution Plan — Compaction-first phase transitions
 
-> **Status:** TERMINAL RECONCILIATION — Slice 1 accepted at exact `200be5744003ac47cecd2d79a337df3e4c4aeebc`; Slice 2 accepted at exact replacement `c4de0a89c84aa02f1035f0f3f6ed4bc838223949` (runtime predecessor `94e4488ade82e1a2a8ce74cf956993870759d1f3`). The planned operator end-to-end dogfood gate remains outstanding.
+> **Status:** ARCHIVED — Slice 1 accepted at exact `200be5744003ac47cecd2d79a337df3e4c4aeebc`; Slice 2 accepted at exact replacement `c4de0a89c84aa02f1035f0f3f6ed4bc838223949` (runtime predecessor `94e4488ade82e1a2a8ce74cf956993870759d1f3`). Joe explicitly deferred the unrun post-candidate operator dogfood to `prime-claw-h6w.28`.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Future folder:** `.ralph/plans/future/compaction-first-phase-transitions/`
 > **Bead chain:** `prime-claw-h6w.26` (Slice 1) → `prime-claw-h6w.27` (Slice 2),
@@ -107,9 +107,9 @@ internals. Prime Agent remains an upstream dependency.
 
 **Implementation status:** Owner-accepted at exact pushed commit
 `200be5744003ac47cecd2d79a337df3e4c4aeebc` on 2026-10-02. Its dependency gate
-for Slice 2 is satisfied. Exact Slice 2 candidate
-`94e4488ade82e1a2a8ce74cf956993870759d1f3` is delivered and pending owner
-review.
+for Slice 2 was satisfied. Slice 2 was later owner-accepted at documentation
+replacement `c4de0a89c84aa02f1035f0f3f6ed4bc838223949`, with runtime predecessor
+`94e4488ade82e1a2a8ce74cf956993870759d1f3`.
 
 ### Working capability
 
@@ -329,16 +329,16 @@ agent's job, Phase 4 narrative).
 
 ## Final review and delivery gate
 
-**Current gate status:** NOT COMPLETED. Both planned slices are owner-accepted,
-but the post-candidate operator end-to-end dogfood has not run. Do not infer
-this evidence from implementation tests or claim terminal completion.
+**Current gate disposition:** DEFERRED. Both planned slices are owner-accepted,
+and Joe explicitly selected deferral of the unrun post-candidate operator
+end-to-end dogfood to `prime-claw-h6w.28` on 2026-10-02. That P1 Bead remains
+BLOCKED on separate merge authorization and deliberate post-merge activation
+from primary `main`; it is not completed dogfood evidence.
 
-The project `/execute` policy archives active artifacts only when the plan is
-truly finished. The prior `prime-claw-h6w.15` exception followed an explicit
-owner deferral to separately tracked future work; no equivalent disposition has
-been made here. Keep this specification and plan active until the operator runs
-and records this dogfood, or explicitly defers the gate to separately tracked
-work.
+This explicit separately tracked deferral matches the prior
+`prime-claw-h6w.15` archival precedent and satisfies this episode's disposition
+requirement. Final docs-only archival records that disposition; it does not
+claim dogfood completion, merge readiness, activation, merge, or episode cleanup.
 
 After both slices land, the operator dogfoods end-to-end: a real `/plan` on
 a real reviewed specification and a real `/implement-spec` promotion, with

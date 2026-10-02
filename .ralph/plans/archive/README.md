@@ -7,6 +7,29 @@ Older sets contain specification, requirements, decisions, and execution-plan
 files; newer project-customized sets may contain a different reviewed artifact
 collection.
 
+## compaction-first-phase-transitions/ — Compaction-first phase transitions ✅ COMPLETE (2026-10-02)
+
+Delivered project-local compaction-first transitions for reviewed `/plan` and
+`/implement-spec` flows. Each command now admits a minimal prep turn, requests
+best-effort compaction, and queues exactly one canonical phase turn while
+preserving existing location, readiness, approval, and replay boundaries.
+
+- Slice 1 accepted at `200be5744003ac47cecd2d79a337df3e4c4aeebc`
+  (`prime-claw-h6w.26`).
+- Slice 2 accepted at documentation replacement
+  `c4de0a89c84aa02f1035f0f3f6ed4bc838223949`, with runtime predecessor
+  `94e4488ade82e1a2a8ce74cf956993870759d1f3` (`prime-claw-h6w.27`).
+- [Archived specification](compaction-first-phase-transitions/SPECIFICATION.md)
+- [Archived execution plan](compaction-first-phase-transitions/EXECUTION_PLAN.md)
+- [Prep-chain operator contract](../../../docs/prep-chain.md)
+
+Joe explicitly deferred the planned human-operated `/plan` + `/implement-spec`
+dogfood to P1/BLOCKED Bead `prime-claw-h6w.28`, pending separate merge
+authorization and deliberate activation from primary `main`. That disposition
+matches the `prime-claw-h6w.15` precedent and is not completed dogfood evidence.
+This archive does not claim merge readiness, host-global activation, merge,
+episode cleanup, or any product-scope change.
+
 ## plugin-test-container/ — Test tier architecture + tier-1 plugin test container ✅ COMPLETE (2026-09-30)
 
 Delivered the three-tier test architecture and the tier-1 plugin test container
