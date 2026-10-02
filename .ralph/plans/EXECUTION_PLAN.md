@@ -1,6 +1,6 @@
 # Execution Plan — Compaction-first phase transitions
 
-> **Status:** DRAFT — pending operator plan review.
+> **Status:** IMPLEMENTING — Slice 1 Docker-only candidate ready for owner review; Slice 2 not started.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Future folder:** `.ralph/plans/future/compaction-first-phase-transitions/`
 > **Bead chain:** `prime-claw-h6w.26` (Slice 1) → `prime-claw-h6w.27` (Slice 2),
@@ -105,6 +105,10 @@ internals. Prime Agent remains an upstream dependency.
 
 **Bead:** `prime-claw-h6w.26`
 
+**Implementation status:** Rebased onto the accepted Docker-only guardrail
+repair and fully revalidated on 2026-10-02. The candidate awaits independent
+owner review. Slice 2 remains blocked on explicit acceptance.
+
 ### Working capability
 
 `/plan <folder>` and the `ralph_plan` tool admit a `plan-prep` turn first.
@@ -167,6 +171,39 @@ envelope content, and the queued plan prompt are byte-identical to today.
 - `docs/prep-chain.md` updated in the same commit; bead `prime-claw-h6w.26`
   updated with commit and evidence.
 
+### Candidate evidence (2026-10-02)
+
+The earlier host/user-global apply, check, startup, and behavioral-probe claims
+from candidate `ef9c401` are superseded and are not acceptance evidence. The
+rebased candidate was validated only in Docker tier 1:
+
+- Rebased onto `origin/main` `f85680f`, which contains accepted authority tip
+  `ded4a8c` and guardrail implementation `672be3b`.
+- Focused tier-0 policy/bridge checks: 22 passed, 7 environment-skipped.
+- `python3 -m pytest tests/ -q -m container`: 41 passed, 385 deselected;
+  11 existing deprecation warnings.
+- Container behavioral test
+  `test_container_installed_native_plan_runs_prep_then_one_plan_followup`
+  loaded `/root/.prime/agent/extensions/reviewed-plan.ts`, executed one real
+  container-local `compact.run()` call with truthful `scheduled: false`, saw
+  exactly one `plan-prep` prompt and one canonical `plan` prompt, emitted one
+  completion marker, and exited without an unexpected model call. Its Python
+  runtime bootstrap used `PRIME_AGENT_INSTALL_UV=1` inside the ephemeral
+  container only.
+- `scripts/test-tier1.sh --probe`: PASS with pinned Prime Agent `0.9.3`;
+  explicit-root apply/check succeeded at `/root/.prime/agent`, `handoff`,
+  `plan`, and `implement-spec` were each discovered exactly once from the
+  container-installed extension tree, and the container was destroyed.
+- `scripts/test-all.sh`: PASS — tier 0 had 278 passed and 148 skipped; tier 1
+  had 41 passed and 385 deselected; tier 2 was intentionally not requested.
+  One preceding final-tree attempt hit two unrelated timing-sensitive
+  `test_embedding_candidate_build.py` watchdog tests; a bounded isolated check
+  passed one and reproduced one, and the single bounded unified rerun passed
+  without changing watchdog code.
+- No resumed candidate validation applied, checked, or probed the host
+  user-global `~/.prime/agent`. The ignored local `.env` selected pinned
+  Prime Agent `0.9.3` and is not part of the candidate.
+
 ### Explicit non-goals
 
 No `/implement-spec` changes (Slice 2), no guidance argument, no bespoke
@@ -209,11 +246,12 @@ cancelled chain leaves no usable approval beyond the next `agent_end`.
   deletes; `session_start`/`session_shutdown` still clear; a cancelled chain
   (no implement-spec turn) leaves the approval dead after the next
   `agent_end`; `create_spec_episode` without any admission still fails.
-- A live probe through `scripts/run-prime-agent-probe.sh` proves the full
-  chain on installed Prime Agent: prep turn, requested compaction, exactly
-  one implement-spec turn, successful episode creation (or its truthful
-  existing-identity return), empty queue at end.
-- Plugin apply/check + fresh startup probe, same as Slice 1.
+- A container behavioral probe against the tier-1 installed Prime Agent proves
+  the full chain: prep turn, requested compaction, exactly one implement-spec
+  turn, successful episode creation (or its truthful existing-identity return),
+  and an empty queue at exit.
+- Explicit container-root apply/check plus the tier-1 startup probe pass, same
+  as Slice 1. No candidate validation touches the host user-global generation.
 - Run the same focused and full suites as Slice 1; `git diff --check`.
 - Bead `prime-claw-h6w.27` updated with commit and evidence.
 
@@ -239,8 +277,8 @@ the episode; per-slice acceptance follows the execute protocol.
 - Slice 2 depends on Slice 1 (shared helper and established seam evidence).
 - No Prime Agent changes. Prime Agent is an upstream dependency; any
   capability gap is reported to the operator, never patched upstream.
-- Live probes require the installed Prime Agent and
-  `scripts/run-prime-agent-probe.sh` isolation.
+- Live probes require the tier-1 container-installed Prime Agent. Candidate
+  probes never load or mutate the host user-global generation.
 
 ## Explicit non-goals (plan-wide)
 

@@ -1,6 +1,6 @@
 # Compaction-First Phase Transitions (`/plan`, `/implement-spec`)
 
-> Status: DRAFT — pending operator review.
+> Status: APPROVED — active implementation; Slice 1 candidate awaiting owner review.
 > Source: design conversation between Joe and prime-agent, 2026-10-01.
 
 ## Summary

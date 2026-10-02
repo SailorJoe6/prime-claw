@@ -91,11 +91,17 @@ function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPro
   return { commands, tools, events, ctx, messages, deliveries, notices, confirmations, entries };
 }
 
-function fixture(t, { skill = "canonical plan body", folder = true, throwOnSend = 0 } = {}) {
+function fixture(t, {
+  skill = "canonical plan body",
+  prepSkill = "canonical plan-prep body",
+  folder = true,
+  throwOnSend = 0,
+} = {}) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, ".ralph", "plans", "future"), { recursive: true });
   if (folder) mkdirSync(join(cwd, LOCATION), { recursive: true });
+  if (prepSkill !== null) writeSkill(cwd, prepSkill, "plan-prep");
   if (skill !== null) writeSkill(cwd, skill);
   writeSkill(cwd, "---\nname: oversee-episode\ndescription: test package\n---\ncanonical oversight", "oversee-episode");
   mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
@@ -112,6 +118,19 @@ function writeSkill(cwd, body, name = "plan") {
 function expectedPrompt(cwd, body, location = LOCATION) {
   const path = join(cwd, ".ralph", "skills", "plan", "SKILL.md");
   return `<skill name="plan" location="${path}">
+References are relative to ${dirname(path)}.
+
+${body}
+</skill>
+
+<operator-plan-location>
+${location}
+</operator-plan-location>`;
+}
+
+function expectedPrepPrompt(cwd, body, location = LOCATION) {
+  const path = join(cwd, ".ralph", "skills", "plan-prep", "SKILL.md");
+  return `<skill name="plan-prep" location="${path}">
 References are relative to ${dirname(path)}.
 
 ${body}
@@ -164,23 +183,32 @@ test("registers native reviewed commands, planning tool, and native-only impleme
   assert.doesNotMatch(handoffTool.description + handoffTool.promptGuidelines.join(" "), /only when the operator clearly asks|only operator-supplied/);
 });
 
-test("loads current canonical markdown and injects exact location once", async (t) => {
-  const f = fixture(t, { skill: "old body" });
+test("native planning admits plan-prep first and canonical plan as the sole follow-up", async (t) => {
+  const f = fixture(t, { skill: "old body", prepSkill: "old prep body" });
   writeSkill(f.cwd, "current project-customized plan body");
+  writeSkill(f.cwd, "current project-customized plan-prep body", "plan-prep");
 
   await f.commands.get("plan").handler(LOCATION, f.ctx);
 
-  const prompt = expectedPrompt(f.cwd, "current project-customized plan body");
-  assert.deepEqual(f.messages, [prompt]);
-  assert.deepEqual(f.deliveries, [{ message: prompt, options: undefined }]);
-  assert.equal(count(f.messages[0], "<operator-plan-location>"), 1);
-  assert.equal(count(f.messages[0], LOCATION), 1);
+  const prep = expectedPrepPrompt(f.cwd, "current project-customized plan-prep body");
+  const plan = expectedPrompt(f.cwd, "current project-customized plan body");
+  assert.deepEqual(f.messages, [prep, plan]);
+  assert.deepEqual(f.deliveries, [
+    { message: prep, options: undefined },
+    { message: plan, options: { deliverAs: "followUp" } },
+  ]);
+  assert.equal(f.deliveries.filter(({ options }) => options?.deliverAs === "followUp").length, 1);
+  for (const prompt of f.messages) {
+    assert.equal(count(prompt, "<operator-plan-location>"), 1);
+    assert.equal(count(prompt, LOCATION), 1);
+  }
   assert.deepEqual(f.notices, []);
 });
 
-test("conversational planning queues current canonical markdown once as a follow-up", async (t) => {
-  const f = fixture(t, { skill: "old body" });
+test("conversational planning steers plan-prep and queues canonical plan as the sole follow-up", async (t) => {
+  const f = fixture(t, { skill: "old body", prepSkill: "old prep body" });
   writeSkill(f.cwd, "current project-customized plan body");
+  writeSkill(f.cwd, "current project-customized plan-prep body", "plan-prep");
 
   const result = await f.tools.get("ralph_plan").execute(
     "plan-call-1",
@@ -190,19 +218,26 @@ test("conversational planning queues current canonical markdown once as a follow
     f.ctx,
   );
 
-  const prompt = expectedPrompt(f.cwd, "current project-customized plan body");
-  assert.deepEqual(f.messages, [prompt]);
-  assert.deepEqual(f.deliveries, [{
-    message: prompt,
-    options: { deliverAs: "followUp" },
-  }]);
-  assert.equal(count(f.messages[0], "<operator-plan-location>"), 1);
-  assert.equal(count(f.messages[0], LOCATION), 1);
+  const prep = expectedPrepPrompt(f.cwd, "current project-customized plan-prep body");
+  const plan = expectedPrompt(f.cwd, "current project-customized plan body");
+  assert.deepEqual(f.messages, [prep, plan]);
+  assert.deepEqual(f.deliveries, [
+    { message: prep, options: { deliverAs: "steer" } },
+    { message: plan, options: { deliverAs: "followUp" } },
+  ]);
+  assert.equal(f.deliveries.filter(({ options }) => options?.deliverAs === "followUp").length, 1);
+  for (const prompt of f.messages) {
+    assert.equal(count(prompt, "<operator-plan-location>"), 1);
+    assert.equal(count(prompt, LOCATION), 1);
+  }
   assert.equal(result.isError, undefined);
   assert.deepEqual(result.details, { admitted: true, location: LOCATION });
   assert.match(result.content[0].text, /Planning admitted/);
+  assert.match(result.content[0].text, /plan-prep was steered/);
+  assert.match(result.content[0].text, /sole follow-up/);
   assert.match(result.content[0].text, /has not completed/);
   assert.match(result.content[0].text, /implementation is not authorized/);
+  assert.doesNotMatch(result.content[0].text, /compaction (?:completed|confirmed)/i);
   assert.deepEqual(f.notices, []);
 
   const unauthorized = await f.tools.get("create_spec_episode").execute(
@@ -275,6 +310,19 @@ test("conversational planning rejects a resolved symlink escape", async (t) => {
   assert.deepEqual(f.messages, []);
 });
 
+test("conversational planning reports missing plan-prep before any send", async (t) => {
+  const f = fixture(t, { prepSkill: null });
+
+  const result = await f.tools.get("ralph_plan").execute(
+    "missing-prep", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /\.ralph\/skills\/plan-prep\/SKILL\.md not found/);
+  assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
+});
+
 test("conversational planning reports missing canonical skill", async (t) => {
   const f = fixture(t, { skill: null });
 
@@ -285,23 +333,44 @@ test("conversational planning reports missing canonical skill", async (t) => {
   assert.equal(result.isError, true);
   assert.match(result.content[0].text, /\.ralph\/skills\/plan\/SKILL\.md not found/);
   assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
 });
 
-test("conversational planning reports follow-up queue failure without claiming admission", async (t) => {
+test("conversational planning reports plan-prep admission failure", async (t) => {
   const f = fixture(t, { throwOnSend: 1 });
 
   const result = await f.tools.get("ralph_plan").execute(
-    "send-failure", { location: LOCATION }, undefined, undefined, f.ctx,
+    "prep-send-failure", { location: LOCATION }, undefined, undefined, f.ctx,
   );
 
   assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /canonical plan could not be queued/);
+  assert.match(result.content[0].text, /canonical plan-prep could not be admitted/);
   assert.deepEqual(result.details, {
     admitted: false,
-    error: "reviewed-plan: canonical plan could not be queued",
+    error: "reviewed-plan: canonical plan-prep could not be admitted",
   });
   assert.deepEqual(f.messages, []);
   assert.deepEqual(f.deliveries, []);
+});
+
+test("conversational planning reports plan follow-up failure without claiming admission", async (t) => {
+  const f = fixture(t, { throwOnSend: 2 });
+
+  const result = await f.tools.get("ralph_plan").execute(
+    "plan-send-failure", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+
+  const prep = expectedPrepPrompt(f.cwd, "canonical plan-prep body");
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /canonical plan follow-up could not be queued/);
+  assert.match(result.content[0].text, /transition is incomplete/);
+  assert.doesNotMatch(result.content[0].text, /Planning admitted/);
+  assert.deepEqual(result.details, {
+    admitted: false,
+    error: "reviewed-plan: canonical plan follow-up could not be queued; transition is incomplete",
+  });
+  assert.deepEqual(f.messages, [prep]);
+  assert.deepEqual(f.deliveries, [{ message: prep, options: { deliverAs: "steer" } }]);
 });
 
 test("missing argument shows usage without model injection", async (t) => {
@@ -347,13 +416,48 @@ test("nonexistent folder shows usage without model injection", async (t) => {
   assert.deepEqual(f.notices, [{ message: USAGE, level: "warning" }]);
 });
 
+test("missing plan-prep warns before native planning sends anything", async (t) => {
+  const f = fixture(t, { prepSkill: null });
+  await f.commands.get("plan").handler(LOCATION, f.ctx);
+  assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
+  assert.deepEqual(f.notices, [{
+    message: "reviewed-plan: .ralph/skills/plan-prep/SKILL.md not found",
+    level: "warning",
+  }]);
+});
+
 test("missing canonical skill warns without model injection", async (t) => {
   const f = fixture(t, { skill: null });
   await f.commands.get("plan").handler(LOCATION, f.ctx);
   assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
   assert.deepEqual(f.notices, [{
     message: "reviewed-plan: .ralph/skills/plan/SKILL.md not found",
     level: "warning",
+  }]);
+});
+
+test("native planning reports plan-prep admission failure", async (t) => {
+  const f = fixture(t, { throwOnSend: 1 });
+  await f.commands.get("plan").handler(LOCATION, f.ctx);
+  assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
+  assert.deepEqual(f.notices, [{
+    message: "reviewed-plan: canonical plan-prep could not be admitted",
+    level: "error",
+  }]);
+});
+
+test("native planning reports plan follow-up failure after prep admission", async (t) => {
+  const f = fixture(t, { throwOnSend: 2 });
+  await f.commands.get("plan").handler(LOCATION, f.ctx);
+  const prep = expectedPrepPrompt(f.cwd, "canonical plan-prep body");
+  assert.deepEqual(f.messages, [prep]);
+  assert.deepEqual(f.deliveries, [{ message: prep, options: undefined }]);
+  assert.deepEqual(f.notices, [{
+    message: "reviewed-plan: canonical plan follow-up could not be queued; transition is incomplete",
+    level: "error",
   }]);
 });
 

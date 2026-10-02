@@ -11,6 +11,10 @@ import {
   wrapCanonicalSkill,
 } from "../extension-support/reviewed-plan-support.ts";
 import {
+  admitPrepChain,
+  type PrepChainWorkflow,
+} from "../extension-support/prep-chain.ts";
+import {
   appendActiveOversight,
   assertConversationPromotionReady,
   currentOversightMarkerForClose,
@@ -34,6 +38,12 @@ const PLAN_WORKFLOW = {
   usage: PLAN_USAGE,
   skillName: "plan",
   locationTag: "operator-plan-location",
+};
+const PLAN_PREP_WORKFLOW: PrepChainWorkflow = {
+  usage: PLAN_USAGE,
+  prepSkillName: "plan-prep",
+  phaseSkillName: PLAN_WORKFLOW.skillName,
+  locationTag: PLAN_WORKFLOW.locationTag,
 };
 const IMPLEMENT_WORKFLOW = {
   usage: IMPLEMENT_USAGE,
@@ -132,6 +142,29 @@ function registerSkillCommand(
   });
 }
 
+function registerPrepChainCommand(
+  pi: ExtensionAPI,
+  options: {
+    command: string;
+    description: string;
+    workflow: PrepChainWorkflow;
+  },
+): void {
+  pi.registerCommand(options.command, {
+    description: options.description,
+    handler: async (args, ctx) => {
+      const result = admitPrepChain(
+        pi,
+        ctx,
+        args,
+        options.workflow,
+        "native",
+      );
+      if (!result.ok) ctx.ui.notify(result.message, result.level);
+    },
+  });
+}
+
 type ReviewedPlanDependencies = EpisodeDependencies & {
   createEpisode?: typeof createSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
@@ -141,10 +174,10 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
   return function reviewedPlan(pi: ExtensionAPI): void {
     registerConversationOversight(pi);
     const approvedLocationBySession = new Map<string, string>();
-    registerSkillCommand(pi, {
+    registerPrepChainCommand(pi, {
       command: "plan",
       description: "Plan a reviewed specification from an explicit .ralph/plans/future/<slug> folder",
-      workflow: PLAN_WORKFLOW,
+      workflow: PLAN_PREP_WORKFLOW,
     });
     registerSkillCommand(pi, {
       command: "implement-spec",
@@ -180,12 +213,12 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         additionalProperties: false,
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-        const result = admitCanonicalSkill(
+        const result = admitPrepChain(
           pi,
           ctx,
           params.location,
-          PLAN_WORKFLOW,
-          "followUp",
+          PLAN_PREP_WORKFLOW,
+          "tool",
         );
         if (!result.ok) {
           return {
@@ -197,7 +230,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         return {
           content: [{
             type: "text",
-            text: `Planning admitted for ${result.location}: the canonical workflow was queued as a follow-up. Planning has not completed, and implementation is not authorized.`,
+            text: `Planning admitted for ${result.location}: canonical plan-prep was steered and canonical plan was queued as the sole follow-up. Planning has not completed, and implementation is not authorized.`,
           }],
           details: { admitted: true, location: result.location },
         };

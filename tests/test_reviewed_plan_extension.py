@@ -26,6 +26,7 @@ EPISODE_NODE_SUITE = REPO / "tests" / "spec_episode_extension.test.mjs"
 FAKE_PUBLICATION_ROUTE = "fake-publication-route"
 # Container paths (repo bind-mounted read-only at /workspace).
 WS_EXTENSION = "/workspace/src/prime-agent-plugin/extensions/reviewed-plan.ts"
+CONTAINER_INSTALLED_EXTENSION = "/root/.prime/agent/extensions/reviewed-plan.ts"
 WS_EPISODE_EXTENSION = "/workspace/src/prime-agent-plugin/extension-support/spec-episode.ts"
 WS_REVIEWED_PLAN_NODE_SUITE = "/workspace/tests/reviewed_plan_extension.test.mjs"
 WS_SPEC_EPISODE_NODE_SUITE = "/workspace/tests/spec_episode_extension.test.mjs"
@@ -153,6 +154,159 @@ export default function probe(pi) {
     assert [command["name"] for command in commands].count(
         "probe-reviewed-plan-tools"
     ) == 1
+
+
+def test_container_installed_native_plan_runs_prep_then_one_plan_followup(
+    tier1_container, ctmp,
+) -> None:
+    """Exercise the full plan-prep chain without touching the host generation."""
+    project = ctmp / "plan-prep-project"
+    for skill_name in ("plan-prep", "plan"):
+        skill = project / ".ralph" / "skills" / skill_name / "SKILL.md"
+        skill.parent.mkdir(parents=True, exist_ok=True)
+        skill.write_text(tier1_container.read_repo(
+            f".ralph/skills/{skill_name}/SKILL.md"
+        ))
+    bundle = project / ".ralph" / "plans" / "future" / "probe"
+    bundle.mkdir(parents=True)
+    (bundle / "SPECIFICATION.md").write_text(
+        "# Probe specification\n\n"
+        "## Outcome\n\n"
+        "Prove the Docker-only native planning preparation chain.\n"
+    )
+
+    provider_source = r"""import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
+
+let modelCalls = 0;
+function message(model, content, reason) {
+  return {
+    role: "assistant", content, api: model.api, provider: model.provider,
+    model: model.id,
+    usage: {
+      input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: reason, timestamp: Date.now(),
+  };
+}
+function streamProbe(model) {
+  const stream = createAssistantMessageEventStream();
+  queueMicrotask(() => {
+    modelCalls += 1;
+    if (modelCalls === 1) {
+      const call = {
+        type: "toolCall", id: "compact-probe-call", name: "ipython",
+        arguments: {
+          code: 'focus_hint = "Docker tier-1 native plan-prep probe"\ncompaction_result = await compact.run(focus_hint)\nprint(compaction_result)',
+        },
+      };
+      const output = message(model, [call], "toolUse");
+      stream.push({ type: "start", partial: output });
+      stream.push({ type: "toolcall_start", contentIndex: 0, partial: output });
+      stream.push({ type: "toolcall_end", contentIndex: 0, toolCall: call, partial: output });
+      stream.push({ type: "done", reason: "toolUse", message: output });
+    } else {
+      const text = modelCalls === 2
+        ? "Status\nprep complete\nEvidence\ncompact.run returned above\nNext Step\ncanonical plan follow-up"
+        : modelCalls === 3
+          ? "PLAN_PROBE_COMPLETED"
+          : `UNEXPECTED_MODEL_CALL_${modelCalls}`;
+      const output = message(model, [{ type: "text", text }], "stop");
+      stream.push({ type: "start", partial: output });
+      stream.push({ type: "text_start", contentIndex: 0, partial: output });
+      stream.push({ type: "text_delta", contentIndex: 0, delta: text, partial: output });
+      stream.push({ type: "text_end", contentIndex: 0, content: text, partial: output });
+      stream.push({ type: "done", reason: "stop", message: output });
+    }
+    stream.end();
+  });
+  return stream;
+}
+export default function probe(pi) {
+  pi.registerProvider("prep-probe", {
+    baseUrl: "http://127.0.0.1.invalid", apiKey: "unused", api: "prep-probe-api",
+    streamSimple: streamProbe,
+    models: [{
+      id: "prep-probe-model", name: "Prep Probe", reasoning: false,
+      input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 200000, maxTokens: 1000,
+    }],
+  });
+}
+"""
+    provider = ctmp / "plan-prep-provider.ts"
+    provider.write_text(provider_source)
+    result = tier1_container.run(
+        "prime-agent",
+        "--mode", "json", "--offline", "--no-session",
+        "--no-extensions", "--no-prompt-templates", "--no-context-files",
+        "--cwd", str(project),
+        "-e", CONTAINER_INSTALLED_EXTENSION,
+        "-e", str(provider),
+        "--provider", "prep-probe", "--model", "prep-probe-model",
+        "--", "/plan .ralph/plans/future/probe",
+        timeout=300,
+        workdir=None,
+        env={"PRIME_AGENT_INSTALL_UV": "1"},
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    events = []
+    for line in result.stdout.splitlines():
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+
+    user_skills = []
+    compact_calls = 0
+    compact_results = []
+    completion_markers = 0
+    for event in events:
+        if (event.get("type") == "tool_execution_end"
+                and event.get("toolCallId") == "compact-probe-call"):
+            compact_results.append(event)
+        if event.get("type") != "message_start":
+            continue
+        message = event.get("message", {})
+        content = message.get("content", [])
+        if message.get("role") == "user":
+            text = "".join(
+                item.get("text", "") for item in content
+                if isinstance(item, dict)
+            )
+            match = re.search(r'<skill name="([^"]+)"', text)
+            if match:
+                user_skills.append(match.group(1))
+        elif message.get("role") == "assistant":
+            compact_calls += sum(
+                item.get("type") == "toolCall"
+                and item.get("name") == "ipython"
+                and "compact.run" in item.get("arguments", {}).get("code", "")
+                for item in content if isinstance(item, dict)
+            )
+            completion_markers += sum(
+                item.get("text") == "PLAN_PROBE_COMPLETED"
+                for item in content if isinstance(item, dict)
+            )
+
+    assert user_skills == ["plan-prep", "plan"]
+    assert compact_calls == 1
+    assert len(compact_results) == 1, json.dumps(compact_results, indent=2)
+    compact_result = compact_results[0]
+    assert compact_result.get("isError") is False, json.dumps(
+        compact_result, indent=2,
+    )
+    result_text = "".join(
+        item.get("text", "")
+        for item in compact_result.get("result", {}).get("content", [])
+        if isinstance(item, dict)
+    )
+    # The immediate compact.run() return is the cross-version contract. Older
+    # supported Prime Agent releases do not also emit a custom threshold event.
+    assert "scheduled" in result_text and "False" in result_text, result_text
+    assert completion_markers == 1
+    assert "UNEXPECTED_MODEL_CALL" not in result.stdout
 
 
 def test_installed_rpc_characterizes_confirmed_steer_lifecycle_order(
