@@ -274,6 +274,7 @@ def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container,
         "apply-prime-agent-plugin.sh",
         "check-prime-agent-plugin.sh",
         "manage-prime-agent-append-system.py",
+        "prime-agent-plugin-target.sh",
     ):
         shutil.copy2(REPO / "scripts" / name, scripts / name)
     assert not (fixture / ".ralph/skills/oversee-episode/SKILL.md").exists()

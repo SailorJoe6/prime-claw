@@ -553,6 +553,22 @@ Update this section during execution; do not rely on chat history.
   `70c2558a0299b304e3cad97796eaa1c0aef5257e`. Bare apply/check now fail,
   candidate validation is Docker-only, explicit roots are required, and
   `--user-global` is primary-`main` only and refused from linked worktrees.
+- Exact candidate `197cb541b140e70a66b286c966df377742be44a0` ran the canonical
+  `scripts/test-all.sh`: tier 0 passed (`275 passed, 152 skipped`) in 37s;
+  tier 1 failed after 101s (`1 failed, 47 passed, 383 deselected`) because the
+  no-skill installer fixture copied apply/check and the APPEND manager but not
+  the new OL-008 `prime-agent-plugin-target.sh`. Raw logs are
+  `.test-results/20261002-140439-40316/{tier0,tier1}.log`; sequencer receipt is
+  `.test-results/ol009-final-replacement/sequencer.log`; metadata and hashes are
+  in `failed-candidate-197cb541.json`. Teardown left no owned container or
+  `share-*` directory. This candidate is superseded, not accepted.
+- The exact failing test was repaired by copying the target selector into its
+  isolated fixture. Docker receipt
+  `.test-results/ol009-final-replacement/focused-installer-repair.log` passed
+  `1 passed in 37.86s` (SHA256
+  `709274734acc80f8ebec3161460a182c3fdb38c2053983979227d60a101a1bc4`)
+  with no owned container/share remaining. A later complete exact-candidate
+  receipt, not this focused proof, must supersede the failed full gate.
 - Final exact-candidate OL-009 receipts will be retained under
   `.test-results/ol009-final-replacement/` after the replacement commit exists.
   They must include raw tier-0/tier-1 output, exit status, command, elapsed time,
