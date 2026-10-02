@@ -1,505 +1,380 @@
 # Project-wide testing strategy — isolation-first test architecture
 
-> **Status:** FUTURE specification, awaiting operator review.
+> **Status:** FUTURE specification, operator-reviewed for planning and
+> refactored alongside its execution plan on 2026-10-02. Implementation is
+> not authorized until a separate `/implement-spec` command.
 > **Origin:** operator charter, 2026-10-02 (independent planning-only
 > conversation `01a0fe09-9641-73af-9889-b44e302490d1`).
-> **Tracking:** `prime-claw-5v7`.
-> **Authority:** this specification approves no implementation. Planning
-> requires the separate `/plan` workflow; implementation requires
-> `/implement-spec`.
+> **Tracking:** planning bead `prime-claw-5v7`.
+> **Execution plan:** [EXECUTION_PLAN.md](EXECUTION_PLAN.md).
 
-## 1. Purpose and core invariant
+## 1. Purpose and invariant
 
-prime-claw's tests grew around one developer machine. The plugin-tier work
-(archived `plugin-test-container` spec) proved the value of physically
-isolating the prime-agent under test from the harness doing the development,
-but only solved it for the plugin suite. This specification extends that
-proof into a **project-wide testing strategy** whose core invariant is:
+prime-claw's tests grew around one developer machine. The archived
+`plugin-test-container` work proved that the Prime Agent under test can be
+physically isolated from the harness doing development. This specification
+extends that proof to every environment-dependent test.
 
-> **A test body must not be able to observe, mutate, or depend on the
-> operator's running Prime Agent harness, gbrain installation, PostgreSQL
-> databases, Docker/OpenShell runtime state, credentials, or live source
-> checkouts — unless that test is an explicitly justified, individually
-> reviewed exception.**
+**R-TEST-1 — isolation invariant.** A test assertion must not observe,
+mutate, or depend on unrelated or operator-owned Prime Agent, gbrain,
+PostgreSQL, Docker/OpenShell resources, credentials, or writable external
+source checkouts unless it is an explicitly justified, individually reviewed
+host acceptance observer (§8). A host launcher may check daemon readiness and
+inspect only exact run-owned resources. The prime-claw repository under test is
+an allowed read-only input; its exact commit and dirty state are recorded. An
+operator-selected external source is allowed only as a read-only,
+provenance-recorded input that is copied to an immutable run-owned snapshot.
 
-The default realization of the invariant is that test bodies run inside
-**disposable Docker environments**: containers created for a test run,
-destroyed after it, with their own Prime Agent installs, their own gbrain
-executable, their own fixture-owned PostgreSQL, and no credential material.
-The invariant is about *effects and dependencies*, not about where a Python
-assertion physically executes: a host-side launcher that only drives `docker`
-and asserts over returned artifacts is compatible with the invariant, while
-an in-container test that reaches the host daemon through a mounted socket is
-not.
+The default realization is a disposable Docker environment created for one
+test run and destroyed afterward. It owns its Prime Agent installation,
+gbrain executable, synthetic fixtures, PostgreSQL data, Git remotes, home,
+and configuration. It receives no credentials.
 
-This is **not** a rigid ban on host processes. The strategy distinguishes
-three honest categories and gives each a name, so a test's placement is a
-reviewable claim rather than an accident:
+The invariant governs dependencies and effects, not the physical location of
+every Python comparison. A host process may launch containers and verify a
+bounded result envelope made only from the disposable environment's exit
+status and exported artifacts. It may not make a product claim from host
+behavior, inspect live operator state, or let the container reach such state.
 
-- **Test body** — the code whose assertions constitute the test. Default:
-  inside a disposable container.
-- **Host launcher** — code that builds images, starts/stops containers, and
-  collects results. Runs on the host by necessity; contains no product
-  assertions. Its *own* tests run in containers against fakes.
-- **Host acceptance observer** — a narrow, individually justified test that
-  must observe real host behavior (e.g. real macOS Docker Desktop/virtiofs
-  mount or teardown semantics). Requires the exception criteria in §8.
+### 1.1 Terms
 
-### 1.1 Decisions locked with the operator (2026-10-02)
+- **Container-driven test** — the subject behavior executes in a disposable
+  container. A host-side pytest bridge may verify its exit status and exported
+  artifacts when those are the complete evidence surface. Existing tier-1
+  bridges use this pattern.
+- **Host launcher** — code that builds images, starts/stops uniquely owned
+  resources, executes commands, collects artifacts, applies deadlines, and
+  verifies teardown. It may test its own orchestration contract with fakes and
+  may validate result-envelope integrity; it does not substitute host behavior
+  for the product behavior being claimed.
+- **Host acceptance observer** — a narrow, registered exception whose subject
+  is the real host Docker/OpenShell/macOS stack and therefore cannot be proved
+  in an ordinary Linux container. It must satisfy §8.
+- **Test fixture** — synthetic or operator-approved non-private input owned by
+  a test run. It never means a copy of the live brain, database, credential
+  store, or configured production sandbox.
 
-1. **Binaries and databases are not the lifecycle-test risk.** Verified in
-   code: the host prime-agent install is only ever *read* (models.json /
-   settings.json mirrored hash-verified); the sandbox bakes its own gbrain
-   compiled from a staged checkout; the sandbox PostgreSQL lives inside the
-   sandbox (`/sandbox/pgdata`, own daemon, own socket) with no host volume,
-   no host port, and deny-by-default egress. `bin/prime-claw destroy`
-   deletes only the named sandbox container and optionally the image. The
-   genuine risk of real lifecycle tests is **shared control-plane state**:
-   sandbox names, attached OpenShell providers and egress policy, the
-   credentialed L7 Git rule, and the real private brain Git remote. The
-   lifecycle-test design (§6) therefore centers on *isolated control scope*,
-   not on protecting binaries.
-2. **No CI workflow.** The strategy defines the CI *interface* (one entry
-   command, exit contract, evidence layout) so any future CI can adopt it;
-   no GitHub Actions (or other) workflow is authored in this work.
-3. **Tier-0 static tests stay host-executed.** They read repository files
-   and touch nothing live; containerizing them buys no isolation. The
-   disposable-Docker default applies to tests with environment dependencies,
-   not to pure static checks.
+### 1.2 Operator-locked decisions
 
-### 1.2 Non-goals
+1. **Lifecycle risk is shared control-plane state.** The host Prime Agent
+   install is read-only in production staging, the sandbox bakes its own
+   gbrain, sandbox PostgreSQL is private to `/sandbox`, and destroy targets a
+   named sandbox. The material lifecycle risk is collision with sandbox names,
+   providers, egress policy, L7 rules, or the real brain remote. Tier 3 must
+   isolate those identities and fail closed.
+2. **No CI workflow is authored.** This work defines one stable command, exit
+   contract, and evidence layout for a future CI system to consume.
+3. **Tier-0 static tests stay on the host.** Pure repository checks have no
+   environment dependency, so containerizing them adds cost without improving
+   isolation.
 
-- No implementation in this phase; this is a specification only.
-- No production Phase 3a dry-run, probe, build, cutover, or routed write.
-  Phase 3a remains blocked on its own owner/operator gates; this strategy
-  only designs the testing *interface* that can later support them (§10).
-- No general test-orchestration framework. Drivers stay dumb sequencers;
-  fixtures stay boring. Any component that smells like a framework must be
-  justified against this clause.
-- No changes to plugin source behavior, `bin/prime-claw` behavior, or the
-  OpenShell runtime image's behavior. Test infrastructure only.
-- No Docker-in-Docker as a default mechanism. DinD was considered for
-  lifecycle tests and rejected as unjustified: decision 1.1.1 establishes
-  that binaries/DBs are not at risk, and DinD would not isolate the real
-  risk (host control-plane identity) anyway. Recorded here so the question
-  stays settled unless new evidence appears.
-- No credential material in any test artifact, image, fixture, or evidence
-  file. Private brain *content* stays out of tracked evidence; fixture
-  corpora are synthetic or operator-approved excerpts.
+### 1.3 Non-goals
 
-## 2. Current system (audited 2026-10-02, main @ eb77ca2)
+- No production Phase 3a dry-run, model probe, build, cutover, routed write, or
+  owner handoff. Phase 3a keeps its own operator gates.
+- No general test-orchestration framework. Drivers remain dumb sequencers and
+  fixtures remain explicit.
+- No change to plugin behavior, `bin/prime-claw` production behavior, or the
+  OpenShell runtime image's behavior.
+- No Docker-in-Docker and no host Docker socket mounted into a test container.
+- No credential material, private endpoints, or private brain content in an
+  image, fixture, log, evidence file, or tracked artifact.
+- No CI provider configuration.
+- No shared Docker-base extraction in this work. `prime-claw-blw.4` remains a
+  separate, non-blocking follow-up because changing the proven OpenShell base
+  is not required for test isolation.
 
-Full evidence: `.test-results/testing-strategy-audit/python-tests.md` and
-`mjs-scripts-infra.md` (untracked audit working notes; the load-bearing
-facts are restated here).
+## 2. Required tier architecture
 
-### 2.1 Tier model today
+**R-TEST-2 — lowest sufficient tier.** Every test is assigned to the lowest
+numbered tier that supplies its real dependencies. A marker is a selection
+mechanism, not proof that placement is correct.
 
-| Tier | Marker | Meaning today | Runs where |
-|---|---|---|---|
-| 0 | (unmarked) | static checks, no environment | host pytest |
-| 1 | `container` | needs Node / prime-agent / plugin | one session-scoped slim container (`docker/test.Dockerfile`, Ubuntu 24.04 + Node 22 + Python/pytest); host pytest drives via `docker exec` |
-| 2 | `sandbox` | labelled "host-orchestrated OpenShell" | host pytest |
-
-`tests/conftest.py` auto-marks `tier1_container`/`ctmp`/`croot` users as
-`container` and skips tier-1/2 without an explicit `-m`. `scripts/test-all.sh`
-sequences tier 0 → tier 1 (→ tier 2 with `--with-sandbox`), fail-fast.
-
-### 2.2 Audited classification of all current tests
-
-27 Python modules + 6 Node suites + drivers, each classified by execution
-locus, host-state contact, and containerizability (audit files carry
-file:line evidence per claim):
-
-- **Already compliant (test body in disposable container):** all six
-  `.test.mjs` Node suites via their four pytest bridges
-  (`test_reviewed_plan_extension`, `test_handoff_chain_extension`,
-  `test_project_conversation_extension`,
-  `test_goal_heartbeat_work_control_extension`); the in-container halves of
-  `test_prime_agent_plugin_install`, `test_conversation_oversight_native`,
-  `test_reviewed_plan_native_discovery`. These are "host-launcher" shaped:
-  host pytest asserts over in-container execution and shared artifacts.
-- **Tier-0 static (stay host per 1.1.3):** `test_execute_skill`,
-  `test_future_plan_skills`, `test_inventory_integrity`,
-  `test_oversee_episode_skill`, `test_container_helpers_static`,
-  `test_brain_query` (fully mocked), `test_brain_repo_config`,
-  `test_embedding_preflight`, `test_portable_provider_defaults`,
-  `test_prime_agent_probe_isolation` (python child, not real prime-agent),
-  `test_runtime_destroy`, `test_runtime_image`, `test_runtime_recover`,
-  `test_runtime_status`, `test_runtime_validate`.
-  Note: none of these has *any* environment dependency; several carry the
-  `sandbox` marker purely as an opt-in grouping label, not a live-sandbox
-  requirement. No gbrain, Postgres, network, credentials, or Docker contact
-  exists in any of them (endpoints are `.invalid`; SQL is asserted as
-  generated strings).
-- **Mis-tiered or locus-wrong under the invariant (move with work):**
-  - `test_embedding_candidate_build` — spawns real host bash/setsid process
-    groups and sends TERM/KILL to prove watchdog semantics. This is POSIX
-    behavior that belongs *inside* the Linux container (the sandbox's real
-    target), not on macOS.
-  - `test_runtime_converge` — mostly in-process/mocked, but one test runs a
-    real host `node -e` with the npm-onload preload and a stubbed fetch.
-    Needs only Node; belongs in the tier-1 container.
-  - `test_tier1_driver`, `test_tier1_fixture`, `test_tier1_image` — meta-
-    tests of the driver/fixture/image. They need no real Docker (recording
-    fakes on a controlled PATH), but on the host a PATH-override failure can
-    reach the real daemon. Inside a container the failure domain collapses.
-- **Genuinely host-bound (keep, justify, bound):**
-  - `scripts/run-prime-agent-probe.sh` and its test — its purpose is probing
-    the *native host* prime-agent through its real resolution paths with
-    isolated config stores. Containerizing it defeats it. Kept under the
-    existing AGENTS.md guard policy.
-  - The launcher layer itself (§4): `scripts/test-all.sh`,
-    `scripts/test-tier1.sh`, the conftest session fixture's Docker
-    orchestration. Launchers are not test bodies.
-  - `scripts/apply-prime-agent-plugin.sh` on the host — an *operator action*
-    that intentionally mutates the live `~/.prime/agent`; never a test path
-    (tests already exercise it in-container).
-  - `bin/prime-claw` production verbs — the product under test is itself a
-    host-side orchestrator; its current tests are in-process with mocked
-    transport, which is correct.
-- **Host-mutation residual to eliminate:** the source-mode fork rebuild —
-  `_stage_fork_release` / driver B1 staging runs `rm -rf` of four dist dirs
-  plus `npm run build` and `release:pack` **inside the operator's local
-  prime-agent fork checkout on the host**. This is the largest remaining
-  host-mutation surface in the test path.
-
-### 2.3 Coverage gaps the audit surfaced
-
-- **No real end-to-end lifecycle coverage exists.** Every `test_runtime_*`
-  module is offline/mocked; no automated test has ever driven a real
-  create/validate/destroy against OpenShell. The `sandbox` tier label
-  advertises a capability the suite does not currently have.
-- **No integration environment carries gbrain + PostgreSQL.** The slim
-  tier-1 image deliberately excludes the brain stack; the runtime image
-  bakes it but derives from the OpenShell base and is a *product* artifact,
-  not a disposable test environment. Phase 3a's blocked gates (§10) have no
-  fixture to run against.
-- **No CI exists** (no `.github/`, no other CI config). Greenfield, and per
-  1.1.2 this work defines the interface only.
-- **Shared-base extraction is deferred** (`prime-claw-blw.4`): the two
-  Dockerfiles share only Ubuntu 24.04 lineage. This strategy does not
-  require resolving it, but the new integration image (§3.2) creates a
-  third consumer that strengthens the case; planning may revisit `blw.4` as
-  an option, not a prerequisite.
-
-## 3. Required change: the environment architecture
-
-### 3.1 Tier model, evolved
-
-Four named tiers. Names and markers are chosen so existing muscle memory
-survives; re-labeling happens in the migration (§9).
-
-| Tier | Name | Environment | Marker | Default? |
+| Tier | Name | Environment | Pytest marker | Default whole-suite gate |
 |---|---|---|---|---|
-| 0 | **static** | none (host) | unmarked | yes (default gate) |
-| 1 | **unit-env** | slim disposable container (existing image) | `container` | yes, in `test-all.sh` |
-| 2 | **integration** | disposable brain-stack container (new image, §3.2) | `integration` | yes, in `test-all.sh` |
-| 3 | **lifecycle** | host launcher + isolated OpenShell control scope (§6) | `lifecycle` | explicit only |
+| 0 | **static** | host, repository-only | unmarked | yes |
+| 1 | **unit-env** | existing slim disposable container | `container` | yes |
+| 2 | **integration** | disposable gbrain + PostgreSQL container | `integration` | yes |
+| 3 | **lifecycle** | real host Docker/OpenShell control plane, guarded by §6 and §8 | `lifecycle` | no; explicit only |
 
-Placement rule: a test lands in the *lowest* tier whose environment supplies
-its real dependencies. Marker labels are never proof of placement; the audit
-table (§2.2) is the initial placement record, and each moved test carries
-its classification rationale in a short module docstring header.
+Plain `python3 -m pytest tests/ -q` remains tier 0 and must not require Docker,
+Node, Prime Agent, gbrain, PostgreSQL, OpenShell, network, credentials, or a
+local `.env` selector.
 
-### 3.2 New disposable environments
+### 2.1 Tier 1 — unit-env
 
-**Integration image (`docker/test-integration.Dockerfile`, name TBD in
-planning).** A test-only image carrying the brain stack so that
-gbrain/Postgres-dependent test bodies run disposably:
+Tier 1 remains the slim Ubuntu 24.04 + Node + Python/pytest environment proven
+by `docker/test.Dockerfile`. It supplies Prime Agent through the existing
+exactly-one selector contract (`PRIME_AGENT_PINNED` or
+`PRIME_AGENT_SOURCE`) and runs plugin, Node, POSIX-process, wrapper, and test-
+infrastructure behavior without the brain stack.
 
-- Base: Ubuntu 24.04 lineage shared with the existing images (reuse the
-  tier-1 toolchain layer; do **not** derive from the OpenShell base — no
-  OpenShell policy layer, no egress mediation, plain Docker only).
-- Contents: PostgreSQL 16 + pgvector, and an **exact gbrain executable**
-  built from a pinned source (provenance per §5). prime-agent is *not*
-  baked; when a test needs one it is installed per-run by the same selector
-  contract the tier-1 fixture already uses (`.env`, exactly one of
-  `PRIME_AGENT_PINNED` / `PRIME_AGENT_SOURCE`), keeping one install
-  mechanism across tiers.
-- PostgreSQL is **fixture-owned**: a fresh `initdb` data directory per
-  session (per-test when a test declares mutation risk), owned by the
-  container user, on container-local storage, destroyed with the container.
-  No host port publishing, no host mounts for data.
-- The git "remote" for any push/sync test is a **fixture-owned local bare
-  repository** created inside the same disposable environment. No real
-  remote, no L7 provider, no credentials — by construction there is nothing
-  to leak.
-- Network: build-time package install only; test-time offline by default.
-  Tests needing controlled "remote" behavior use the fixture bare repo or
-  in-process fakes.
+Environment-dependent bodies that need only this toolchain belong here,
+including the embedding watchdog process-group tests, the npm-onload Node
+probe, and tests of launcher/fixture code against recording fakes.
 
-**Controller / target separation.** Where a test's subject is itself a
-container lifecycle (image build, run, teardown semantics — e.g. the tier-1
-meta-tests), the test body runs in a **controller container** and the
-objects it manages are **targets**. The controller must not receive the host
-Docker socket (§7); targets are either real containers on the host daemon
-driven by the *host launcher* on the controller's behalf (thin, bounded
-command channel), or fakes. Planning chooses the minimal mechanism with
-evidence; the specification's requirement is only that the *assertion
-logic* runs in the disposable environment and the *irreversible operations*
-are performed by the launcher against uniquely-named, test-labelled
-resources.
+Tier-1 setup installs and checks the plugin only inside the disposable
+container with `PRIME_AGENT_PLUGIN_ROOT=/root/.prime/agent`. Containerized gates
+must never require a prior host-global apply/check run, inherit the host `HOME`,
+or use the operator's installed copy. Bare apply/check fail closed. The
+user-global path requires deliberate `--user-global` activation from the primary
+`main` checkout after acceptance; it is not a prerequisite for Docker testing.
 
-### 3.3 Evidence-backed alternative statement
+### 2.2 Tier 2 — integration
 
-If investigation during planning shows the integration image cannot support
-a required gbrain behavior (e.g. a Bun-compiled binary assumption that fails
-on the test base), the documented fallback is a **session-scoped disposable
-OpenShell sandbox** as the integration environment — still disposable, still
-credential-free, still fixture-owned Postgres — with the added cost recorded
-explicitly. "We couldn't make it work" without evidence is not an accepted
-alternative.
+**R-TEST-3 — disposable brain stack.** Tier 2 is a plain-Docker Ubuntu 24.04
+image, not an OpenShell runtime image. It provides:
 
-## 4. Host launcher vs host-executed test
+- PostgreSQL 16 and pgvector;
+- an exact gbrain executable compiled from an explicitly selected Git source
+  revision;
+- a fresh fixture-owned database and data directory per session, or per test
+  when mutation isolation requires it;
+- a synthetic source corpus and a fixture-owned local bare Git remote;
+- a deterministic local fake for any embedding response needed by an offline
+  property test;
+- a container-owned home and configuration; and
+- optional per-run Prime Agent installation through the same selector contract
+  as tier 1 when a future integration test actually needs Prime Agent.
 
-The boundary rule:
+No database port is published. No host data directory is mounted. Test-time
+external network is disabled. Build-time package/source acquisition is the
+only networked phase.
 
-- A **host launcher** may: build images; create/start/stop/destroy uniquely
-  test-labelled containers; exec into them; read result artifacts from the
-  session share; enforce timeouts and teardown. It contains **no product
-  assertions**.
-- A **host-executed test** is permitted only when it is tier-0 static
-  (1.1.3) or a §8 exception. Everything else runs in a disposable
-  environment.
-- Launcher code gets its own tests (as `test_tier1_*` do today with
-  recording fakes) — and those tests move into containers per §2.2.
-- The whole-suite entry stays a dumb sequencer (`scripts/test-all.sh`):
-  tier 0 → tier 1 → tier 2, fail-fast, tier 3 only on explicit request. No
-  growth into a framework (§1.2).
+A local bare remote tests gbrain/Git fixture behavior only. It does not widen
+`bin/prime-claw`'s production `owner/repository` interface and is not used to
+fake a production lifecycle flow.
 
-## 5. Exact artifact provenance
+### 2.3 Controller/target boundary
 
-Every test run that touches an installed or built artifact must record, in
-the gitignored evidence directory (`.test-results/`), a provenance record
-containing:
+**R-TEST-4 — no implicit host control.** A test container never receives the
+host Docker socket. Launcher and fixture meta-tests use recording fakes inside
+tier 1. If a future in-container assertion body must control a real target
+container, a separately reviewed bounded launcher channel is required; that
+mechanism is not needed or implemented by this plan. Real OpenShell behavior
+uses the registered host-observer exception instead (§8).
 
-- **Prime Agent:** install mode (pinned release version / source checkout),
-  exact version string, and for source mode the fork's HEAD commit SHA plus
-  the tarball SHA256 staged into the container. This directly supports
-  Phase 3a's B2 finding (installed-binary provenance) by making "which
-  binary produced this evidence" a recorded fact, not an assumption.
-- **gbrain:** source origin (upstream/fork), exact commit or version, build
-  tool version, and executable SHA256, recorded at image build and re-
-  recorded (hash only) at session start.
-- **Images:** Docker image ID/digest of every test image used, plus the
-  Dockerfile path and build-context hash inputs that produced it.
-- **Fixtures:** for any brain-source fixture, the source snapshot identity
-  (commit or synthetic-corpus manifest hash) and the whole-source file
-  inventory hash, so "what the index saw" is exactly reconstructible
-  (supports B3, whole-source path/slug coverage).
-- Evidence files keep the project's existing convention: sanitized,
-  SHA256-recorded, no private endpoints or brain content.
+## 3. Host launcher contract
 
-## 6. Isolated Docker/OpenShell control for real lifecycle tests
+**R-TEST-5 — narrow launcher.** A host launcher may only:
 
-This tier does not exist yet; this section is the **contract any future
-real lifecycle test must satisfy before it may run**. It exists because
-decision 1.1.1 identifies the real risk as control-plane state, and because
-Phase 3a's remaining acceptance gates will eventually need bounded live
-proof.
+- build test images;
+- create/start/stop/destroy uniquely identified test resources;
+- execute bounded commands in them;
+- export sanitized artifacts into a fresh `.test-results/<run-id>/` directory;
+- enforce hard deadlines and TERM→KILL escalation; and
+- verify absence with a three-state result: present, absent, or unknown.
 
-A tier-3 lifecycle test must:
+Unknown is failure. Launchers never use global prune, broad name matching, or
+operator-configured production identities. Their own behavioral tests run in
+tier 1 against recording fakes so a broken PATH override cannot reach the real
+Docker/OpenShell CLI.
 
-1. **Never address the operator's configured instance.** It may not use the
-   `sandbox_name` or image tag from `config/runtime.json` (currently
-   `prime-claw`). It must use its own unique, label-carried identity (e.g.
-   `prime-claw-test-<run-id>`) and fail fast if that identity collides with
-   an existing sandbox it did not create.
-2. **Own its control-plane scope.** Providers, egress policy, and any L7
-   rules it creates are test-scoped and removed at teardown. It must not
-   modify providers or policies attached to any non-test sandbox.
-3. **Use fake or fixture remotes.** No push to the real brain remote; Git
-   push targets are fixture bare repositories.
-4. **Carry no real credentials.** If a credential-shaped value is needed,
-   it is a synthetic placeholder that never resolves.
-5. **Verify teardown like the tier-1 fixture does**: bounded removal
-   scoped to the captured identity, three-state inspect (present/absent/
-   unknown), unknown fails the gate, evidence preserved on failure.
-6. **Fail closed on environment ambiguity**: unreachable daemon, unexpected
-   pre-existing resources, or a dirty host state stops the run before any
-   mutation.
+## 4. Exact artifact provenance
 
-The host launcher performs the irreversible verbs; assertion logic lives in
-the test body. Planning decides whether tier-3 bodies run in a controller
-container driving the launcher through the bounded channel (§3.2) or remain
-carefully scoped host-executed tests; either is acceptable *if* the six
-requirements above hold, and the choice must be justified with evidence in
-the plan.
+**R-TEST-6 — provenance manifest.** Every run that installs or builds an
+artifact emits a sanitized machine-readable manifest under `.test-results/`.
+It records:
 
-## 7. Isolation boundary rules (all tiers)
+- **repository under test:** HEAD plus a sanitized dirty-state/content
+  identity for the read-only prime-claw input;
+- **Prime Agent:** selector mode, requested version, installed version, and,
+  for source mode, source HEAD, dirty-state/content identity, staged release
+  SHA256, and installed package identity;
+- **gbrain:** upstream/fork origin, source HEAD or release version, source
+  archive/inventory SHA256, build tool version, executable version, and
+  executable SHA256;
+- **images:** immutable image ID/digest, Dockerfile path, and the declared
+  build-input hash;
+- **fixtures:** synthetic-corpus manifest hash, whole-source path/slug
+  inventory hash, and local bare-remote identity; and
+- **lifecycle scope:** OpenShell gateway/workspace identity, workspace and
+  sandbox ownership labels, captured target/sentinel identities, and fixture
+  image ID/labels when tier 3 runs; and
+- **run metadata:** run id, tier, UTC timestamps, command contract version,
+  and sanitized evidence-file hashes.
 
-- **No host Docker socket in any test container.** The socket makes the
-  container a host launcher with none of the review surface; forbidden as a
-  shortcut. Controller/target separation (§3.2) is the sanctioned pattern.
-- **No live mounts.** Test containers mount the repository read-only and a
-  fresh per-session share; nothing else from the host filesystem. The
-  existing same-absolute-path share technique (conftest) is retained.
-- **Temporary homes and config.** Any Prime Agent under test gets a
-  container-owned `$HOME` and config roots; any host-side probe keeps using
-  the `run-prime-agent-probe.sh` temp-root wrapper. No test may set
-  `PRIME_AGENT_*` redirects at a live operator path.
-- **No real credentials, live brain, or live sandbox contact.** Credential
-  isolation stays exactly as the runtime defines it (OpenShell L7, never on
-  disk); tests carry only synthetic placeholders. The production work-life
-  brain (local CLI/DB) and personal brain (remote MCP) are out of scope for
-  all test tiers; gbrain tests use fixture-owned Postgres only.
-- **The source-mode fork rebuild moves off the host** (§2.2 residual):
-  planning must provide a builder-container or build-inside-target
-  mechanism so the operator's fork checkout is never mutated by a test run.
-  Until that lands, source mode remains an operator-acknowledged exception,
-  documented in DEVELOPERS.md.
+A source commit alone is not exact when the source tree is dirty. Source-mode
+Prime Agent tests may exercise dirty work, but must stage it read-only into a
+builder container and record a deterministic content hash. gbrain integration
+builds use an explicit committed revision/archive so the image input is pinned.
 
-## 8. macOS-specific acceptance exception criteria
+No manifest contains source content, credentials, private endpoint values, or
+private repository identity.
 
-Today **zero** tests require the real macOS host (audit-verified). A future
-test may claim the exception only when *all* of the following hold:
+## 5. Isolation rules shared by all container tiers
 
-1. The behavior under test is a property of the macOS hosting stack itself
-   (Docker Desktop, virtiofs/gRPC-FUSE mount semantics, macOS process/
-   signal behavior) that cannot be faithfully reproduced in a Linux
-   container.
-2. The claim is written down with the specific seam (e.g. "guest-created
-   file `cpSync` EACCES through gRPC-FUSE" — conftest's `croot` rationale)
-   and the failed container-based attempt or equivalent evidence.
-3. The test is marked `macos-host` (new marker), excluded from all default
-   and CI-interface runs, and listed in a registry section of
-   DEVELOPERS.md with its justification.
-4. The test is read-only against host state wherever physically possible;
-   any mutation is scoped to test-owned, uniquely named resources with
-   verified teardown.
+**R-TEST-7 — container boundary.** Tier 1 and tier 2 enforce all of the
+following:
 
-Conversely, the spec records explicitly: **all** current host-boundary
-claims (plugin apply/check correctness, RPC behavior, watchdog semantics,
-daemon protocol exchange, brain indexing/query, embedding build) are
-provable in containers. The only claims requiring a real host observer are
-claims *about* the host Docker/OpenShell/macOS stack itself.
+- repository mount read-only;
+- only a fresh run-owned share mounted read/write;
+- no Docker/OpenShell socket, host `$HOME`, live config root, database volume,
+  browser store, credential store, or arbitrary checkout mount;
+- explicit environment allow-list rather than inherited host environment;
+- container-owned `$HOME`, Prime Agent roots, gbrain home, PostgreSQL data,
+  temp directories, and Git config;
+- test-time offline by default; synthetic in-container services for controlled
+  remote behavior; and
+- bounded teardown with evidence preserved when ownership or absence is
+  uncertain.
 
-## 9. Migration order, acceptance, rollback, and developer entry
+**R-TEST-8 — source-build isolation.** Prime Agent source mode may read an
+operator-selected checkout only through a read-only mount. Build and pack occur
+in a disposable builder container against a container-local copy. A test run
+must leave the selected checkout byte-identical before/after.
 
-Intended slice order (planning owns the details):
+The native `scripts/run-prime-agent-probe.sh` remains a guarded operator tool.
+Tests of its isolation contract can run in tier 1; no automated suite invokes
+the host's real Prime Agent through it.
 
-1. **Foundations:** provenance recording (§5) in the existing tier-1
-   fixture/driver; integration image skeleton with fixture-owned Postgres
-   and exact gbrain; no test moves yet. Acceptance: image builds
-   reproducibly, provenance records emitted, existing suites unchanged and
-   green.
-2. **House moves:** relocate the mis-tiered tests (§2.2):
-   `test_embedding_candidate_build` watchdog tests, the npm-onload
-   `node -e`, and the `test_tier1_*` meta-tests into containers; re-mark
-   the offline `test_runtime_*` modules out of the misleading `sandbox`
-   tier (they are tier-0-shaped mocked tests; exact marker scheme in
-   planning). Acceptance: per-test red-green proof (prove each moved test
-   can fail in its new home before trusting it), same total count, plain
-   `pytest tests/ -q` unchanged as the no-Docker default.
-3. **Fork-build isolation:** move the source-mode staging build into a
-   builder container (§7). Acceptance: source-mode tier-1 run leaves the
-   operator fork checkout byte-identical (recorded tree hash before/after).
-4. **Lifecycle contract + first occupant:** implement §6 guardrails and, if
-   planning finds a justified candidate, one bounded real lifecycle test
-   behind the `lifecycle` marker. Acceptance: the guardrails themselves are
-   tested (fail-closed on default config, on collision, on dirty state)
-   before any real sandbox is touched.
-5. **Phase 3a interface admission:** the integration environment is offered
-   to the Phase 3a owner as the fixture for B1/B2/B3 support (§10) — as a
-   proposal, not a handoff.
+## 6. Tier-3 lifecycle contract
 
-**Rollback** is structural at every slice: each slice lands behind markers
-and new files; reverting a slice restores the previous tier assignments
-without touching other slices. No slice may make an existing default run
-slower by more than a planning-set budget or require Docker where it
-previously did not.
+**R-TEST-9 — isolated lifecycle scope.** Before any real lifecycle test may
+mutate the host control plane, it must satisfy all of these:
 
-**Developer entry (CLI/CI interface):** one documented command per
-audience, unchanged in spirit from today:
+1. Generate a unique run identity, a non-default OpenShell workspace, and
+   test-prefixed sandbox/resource names. Workspace and sandbox labels carry the
+   full run identity; provider ownership, if ever added, is workspace plus a
+   unique name. It must never read a production `sandbox_name` or image tag as
+   its target.
+2. Pin every OpenShell call to the selected gateway and owned workspace. Query
+   by exact identity/selector and fail before mutation on collision,
+   ambiguous state, unreachable daemon, incompatible OpenShell CLI behavior,
+   or an unowned pre-existing resource.
+3. Use a test-owned config, tracked minimal lifecycle-only policy, image
+   reference, provider set, and evidence directory. Sandbox creation disables
+   automatic providers explicitly. The first lifecycle occupant uses no
+   provider and no brain remote; future provider/L7 tests require a separate
+   review.
+4. Carry no real credentials. Credential-shaped values are non-resolving
+   synthetic placeholders only.
+5. Compare generated identities against a sanitized offline forbidden list,
+   then audit the captured command transcript to prove no operator sandbox,
+   image, provider, policy, or default workspace was ever addressed. The test
+   does not query the production sandbox.
+6. Remove only captured test-owned identities, then verify absence with the
+   present/absent/unknown contract. Unknown or teardown failure is a failure,
+   and evidence is retained.
+7. Test every destructive guard with fakes before enabling the live path:
+   default-name rejection, collision, selector ambiguity, daemon failure,
+   teardown failure, and unknown inspect.
 
-- `python3 -m pytest tests/ -q` — tier 0, zero dependencies (unchanged).
-- `scripts/test-all.sh` — tiers 0+1, adding tier 2 when its image exists
-  (fail-fast, logs under `.test-results/`).
-- `scripts/test-all.sh --with-lifecycle` — explicit tier 3 (replaces
-  `--with-sandbox`; planning owns the compat shim/renaming).
-- CI interface contract (no workflow per 1.1.2): any future CI runs exactly
-  `scripts/test-all.sh` on a Linux Docker host and consumes its exit code
-  and `.test-results/` evidence layout. That contract is the whole CI
-  deliverable.
+Lifecycle acceptance is explicit-only. A lifecycle test must carry the marker,
+request the scoped fixture, and receive pytest's dedicated `--run-lifecycle`
+option; `-m lifecycle` alone is insufficient. It never runs from plain pytest,
+the default whole-suite command, or the future CI interface. `macos_host` has a
+separate explicit opt-in.
 
-Every migration step updates `config/requirements-inventory.json`
-traceability per the project's apply/check/validate/test discipline.
+## 7. Cleanup, failure injection, and no-write claims
 
-## 10. Phase 3a dependency interface (proposal, not handoff)
+**R-TEST-10 — prove safety can fail.** Each component claiming a safety
+property has at least one negative test. The required failure set, applied
+where relevant, is:
 
-Phase 3a is a **dependent consumer**, blocked on its own owner/operator
-gates; nothing in this strategy unblocks, runs, or handoffs any of it. The
-independent method review found three testing-relevant gaps in its evidence
-base. This strategy designs the interface that can later support them:
+- teardown refusal;
+- daemon loss mid-run;
+- unknown inspect state;
+- interrupted/partial write;
+- stale artifact or pre-existing output;
+- both/neither artifact selectors;
+- resource-name collision; and
+- unexpected host-state drift.
 
-- **B1 — no admitted isolated integration fixture.** The tier-2 integration
-  environment (§3.2) *is* that fixture: disposable, gbrain + fixture-owned
-  Postgres, exact-executable provenance, fixture git remote, offline at
-  test time. Admission criteria for Phase 3a use: the fixture builds
-  reproducibly, its provenance record is emitted, and its no-write claims
-  are self-tested (failure injection, §11).
-- **B2 — installed-binary provenance and dry-run lock/migration effects.**
-  The provenance contract (§5) records exactly which gbrain binary produced
-  any evidence. Dry-run safety claims (e.g. `gbrain sync --dry-run` truly
-  writing nothing — no locks retained, no migration applied, no bookmark
-  movement) become *testable properties* in the fixture: snapshot the
-  fixture DB (schema + data + lock state) before/after a dry-run and assert
-  byte-level equivalence. A green count never proves source eligibility;
-  only the named property tests do.
-- **B3 — whole-source path/slug coverage.** The fixture's source corpus
-  supports arbitrary snapshots (real brain *structure* with synthetic or
-  operator-approved content), and the whole-source inventory hash (§5)
-  makes coverage claims exact: every path/slug in the corpus is either
-  indexed or explicitly accounted for.
+Every external wait has a hard deadline. Teardown has its own bounded budget,
+independent of the test deadline.
 
-**Proposed narrow amendment for the Phase 3a owner to review** (text for
-`prime-claw-zwg.5` / the owner note; this conversation does not modify that
-episode's plan):
+A gbrain `--dry-run` no-write claim is proved with an exact **logical** before/
+after snapshot: schema/migration identity, relevant row sets, source bookmark,
+persistent lock ownership, and configuration/source hashes. Raw PostgreSQL
+storage bytes and WAL are not compared because they can change without a
+logical product mutation.
 
-> "When prime-claw's tier-2 integration fixture is admitted (per
-> `project-wide-testing-strategy` §3.2/§5/§10), Phase 3a Slice 2/5
-> acceptance may cite fixture-produced evidence for: (a) installed-binary
-> provenance (B2a), (b) dry-run no-write property including lock and
-> migration state (B2b), and (c) whole-source path/slug coverage parity
-> (B3). Fixture evidence supports — and never replaces — the separately
-> authorized live gates: host/in-sandbox exact-model probes, operator
-> clearance, and the single bounded resumed build remain owner-gated. No
-> production dry-run runs under this amendment; eligibility of a source
-> tree is never inferred from fixture test counts."
+## 8. Host acceptance observer exceptions
 
-## 11. Bounded cleanup and failure injection
+**R-TEST-11 — reviewed host observer.** A host-executed assertion body is
+allowed only when all of these hold:
 
-- **Cleanup** everywhere follows the tier-1 fixture's proven contract:
-  uniquely identified resources, bounded single removal, three-state
-  presence verification (present/absent/unknown — unknown fails), evidence
-  share preserved while ownership is uncertain, no global prunes, no
-  name-based guesses. The integration environment adds: Postgres data-dir
-  lifecycle bounded by the container's own; fixture bare repos destroyed
-  with the session.
-- **Failure injection** is a first-class requirement for any component that
-  claims a safety property. Minimum injected-failure set per such
-  component: teardown failure (container/sandbox refuses to die), daemon
-  unreachable mid-run, unknown-state inspect, partial write (interrupted
-  sync), stale artifact (pre-existing dist/output), and selector ambiguity
-  (both/neither install selectors). Each safety claim in §5–§7 ships with
-  at least one test that makes it fail. This mirrors the existing
-  prove-it-can-fail discipline in DEVELOPERS.md.
-- **Timeout policy:** every external wait has a hard deadline with kill
-  escalation (the existing `timeout --kill-after` pattern); teardown paths
-  carry their own bounded budgets independent of test timeouts.
+1. The subject is a property of the real hosting stack (for example OpenShell
+   control-plane lifecycle, Docker Desktop, virtiofs/gRPC-FUSE, or macOS
+   process behavior) that a Linux container or recording fake cannot prove.
+2. The exact seam and the inadequate container/fake alternative are recorded.
+3. The test is individually listed in the DEVELOPERS.md exception registry,
+   marked `lifecycle`, and excluded from default and CI-interface runs.
+4. Reads are preferred. Any mutation uses unique, test-owned resources and
+   satisfies §6 teardown.
+5. The test cannot load live credentials, brain content, or production config
+   as fixture input.
 
-## 12. Boundaries and review gates
+A specifically macOS-only observer additionally uses the `macos_host` marker.
+At specification time no current test needs that marker.
 
-- Planning-only until the operator approves this specification; execution
-  planning via `/plan`; implementation only via `/implement-spec`.
-- The plan must not grow a general orchestration framework; any component
-  beyond dumb sequencer + boring fixtures requires explicit justification
-  against §1.2.
-- Open questions explicitly left to planning (with evidence requirements):
-  the exact controller/target channel mechanism (§3.2); whether tier-3
-  bodies run in-container or scoped-host (§6); marker renaming details and
-  `--with-sandbox` compat (§9); whether `prime-claw-blw.4` shared-base
-  extraction is revisited (§2.3).
-- Private brain content, private endpoints, and credential material never
-  enter tracked files, images, fixtures, or evidence.
+The first justified host observer creates an owned workspace, fixture image,
+tracked minimal policy, and two `--no-auto-providers` sandboxes: a target and a
+sentinel. It runs the product's bounded `destroy --yes` path against the
+generated target config, proves the target absent and sentinel present, then
+removes the remaining owned scope. The captured transcript proves the operator
+sandbox and default workspace were never addressed. Full production
+`create`/`validate` is not part of this work because those paths structurally
+require real providers and a production-shaped remote.
+
+## 9. Developer and future-CI interface
+
+**R-TEST-12 — stable entry contract.** The documented interfaces are:
+
+```bash
+python3 -m pytest tests/ -q              # tier 0 only; no Docker
+scripts/test-all.sh                      # tiers 0 + 1 + 2, fail-fast
+scripts/test-all.sh --with-lifecycle     # tiers 0 + 1 + 2 + explicit tier 3
+```
+
+`--with-sandbox` is not aliased to a newly mutating action. During migration it
+hard-errors with guidance to use `--with-lifecycle`, whose separate preflight
+and explicit pytest opt-in protect the live path.
+
+A future Linux-Docker CI system runs exactly `scripts/test-all.sh`, consumes its
+exit code, and archives `.test-results/`. This specification creates no CI
+workflow and excludes lifecycle/host-observer tests from that contract.
+
+Default-run performance budgets are execution-plan decisions measured from a
+recorded baseline. A cold image build is reported separately from warm-cache
+suite time.
+
+## 10. Phase 3a dependency interface
+
+**R-TEST-13 — evidence support, not authorization.** After tier 2 meets this
+specification, the Phase 3a owner may review fixture-produced evidence for:
+
+- exact installed gbrain binary provenance;
+- logical no-write behavior of
+  `gbrain sync --source fixture --dry-run --no-pull --no-embed --yes` on a
+  fully migrated baseline, including migration identity, bookmark, row,
+  and persistent-lock state; and
+- whole-source path/slug accounting against the synthetic fixture manifest.
+
+Fixture evidence supports but never replaces live owner-gated proof. It does
+not authorize a production dry-run, exact-model probe, resumed build, policy
+application, cutover, or routed write. The fixture's local bare Git remote is
+not evidence that the production L7 Git path works.
+
+The proposed owner-note wording is maintained in the execution plan. Applying
+that wording to another episode remains that episode owner's decision.
+
+## 11. Completion criteria
+
+The strategy is complete when:
+
+1. all `R-TEST-*` requirements are represented in
+   `config/requirements-inventory.json` with executable coverage;
+2. every environment-dependent body is container-driven or appears in the
+   explicit host-observer registry;
+3. tier 2 proves its exact artifact, fixture-owned database, offline synthetic
+   corpus, and local bare-remote contracts;
+4. source-mode Prime Agent builds leave the selected checkout byte-identical;
+5. the lifecycle guardrails fail closed under injected failures and the first
+   credential-free observer passes when explicitly invoked;
+6. the three documented entry commands have stable exit/evidence contracts;
+7. DEVELOPERS.md and test architecture documentation match the implementation;
+   and
+8. every implementation slice is reviewed, committed, pushed, and reflected in
+   its bead.
