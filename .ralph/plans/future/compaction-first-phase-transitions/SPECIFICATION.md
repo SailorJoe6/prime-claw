@@ -88,13 +88,27 @@ pressure and reduces drift across the episode's lifetime.
    operator-supplied, and v1 does not require bespoke per-invocation hint
    authoring. The hint's purpose is **prospective role-priming** (in contrast
    to the handoff hint's retrospective continuity). Requirements for its
-   content (exact wording is an implementation detail):
+   content (exact wording is owned by the skill Markdown, per the prompt
+   ownership principle below):
    - names the exact selected future folder;
    - names the upcoming role: for plan, "you are about to plan this
      specification and then own and supervise its episode to completion"; for
      implement-spec, the owner-supervision role;
    - directs preservation of operator review decisions, constraints,
      non-goals, and the locations of durable artifacts.
+
+   **Prompt ownership principle (explicit).** All instructions to the LLM —
+   including the exact standard-hint text and when to pass it to
+   `compact.run()` — live in the project-local prep-skill Markdown under
+   `.ralph/skills/`. Plugin code owns mechanics only: argument validation,
+   file preflight, prompt loading and wrapping, admission ordering, and
+   follow-up queueing. The extension loads the skill file verbatim (the same
+   loader pattern used for `handoff`, `execute`, `plan`, and
+   `implement-spec`) and contains no prompt text of its own. This preserves
+   the two properties the pattern has served well: (a) prompts iterate
+   quickly with no plugin rebuild or release, and (b) each project can
+   customize the hint and prep behavior to its own quirks by editing its
+   local skill copy.
 6. **Safety properties inherited from the handoff chain, explicitly:**
    compaction is best-effort and never the continuation trigger; the
    follow-up is queued at admission regardless of compaction outcome
