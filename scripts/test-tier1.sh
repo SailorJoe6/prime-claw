@@ -3,8 +3,8 @@
 #
 # Scope (see .ralph/plans/EXECUTION_PLAN.md): build the slim tier-1 image
 # (cached), start ONE ephemeral container, install prime-agent per .env,
-# apply + check the plugin INSIDE the container against the container's own
-# ~/.prime/agent, destroy the container. No cleverness, no growing harness.
+# apply + check the plugin INSIDE the container against the explicitly selected
+# /root/.prime/agent, destroy the container. No cleverness, no growing harness.
 # Slice 3 adds the actual suite execution on top of this contract.
 #
 # Install selection (.env at the repo root, gitignored; see .env.example).
@@ -61,6 +61,10 @@ ENV_FILE="${TIER1_ENV_FILE:-$REPO_ROOT/.env}"
 # release:pack refuses --out-dir outside the fork's own (gitignored)
 # packages/coding-agent/release tree; stage in a named subdirectory of it.
 STAGE_SUBDIR="packages/coding-agent/release/tier1"
+# Explicit target inside the ephemeral container. This is the container user's
+# real discovery root, but the Docker filesystem boundary keeps host HOME and
+# the operator's user-global generation out of reach.
+CONTAINER_PLUGIN_ROOT=/root/.prime/agent
 
 usage() {
     sed -n '2,53p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -289,7 +293,7 @@ if [ "$SMOKE" -eq 1 ]; then
     exit 0
 fi
 
-CONTAINER_CMD="set -euo pipefail; $INSTALL && prime-agent --version && /workspace/scripts/apply-prime-agent-plugin.sh && /workspace/scripts/check-prime-agent-plugin.sh"
+CONTAINER_CMD="set -euo pipefail; $INSTALL && prime-agent --version && PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT /workspace/scripts/apply-prime-agent-plugin.sh && PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT /workspace/scripts/check-prime-agent-plugin.sh"
 if [ "$PROBE" -eq 1 ]; then
     # Container-side RPC probe: load the container's real installed
     # extensions (no --no-extensions) and ask for the native command list.

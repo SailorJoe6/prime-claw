@@ -1222,6 +1222,12 @@ class TestFixtureStatics(unittest.TestCase):
         driver = (REPO / "scripts/test-tier1.sh").read_text()
         self.assertIn('rm -rf "${SOURCE:?}/$p/dist"', driver)
 
+    def test_fixture_uses_explicit_container_plugin_target_without_host_home(self):
+        body = CONFTEST_SRC[CONFTEST_SRC.index("def tier1_container"):]
+        self.assertIn('"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT', body)
+        self.assertNotIn('os.environ.get("HOME")', body)
+        self.assertNotIn('env=os.environ', body)
+
     def test_teardown_has_no_docker_wide_operations(self):
         self.assertNotIn("prune", CONFTEST_SRC)
         self.assertNotIn('"--all"', CONFTEST_SRC)

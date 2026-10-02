@@ -34,14 +34,40 @@ Project-specific Ralph policy remains under each project's `.ralph/` tree.
 
 ## Apply or refresh
 
-The candidate is first validated through the isolated tier-1 Docker gate. After
-owner acceptance of an exact deployment checkpoint, run from that candidate
-worktree:
+The zero-argument scripts intentionally fail. Every invocation must select one
+of two target modes:
 
-```bash
-scripts/apply-prime-agent-plugin.sh
-scripts/check-prime-agent-plugin.sh
-```
+1. **Development/test:** use tier 1 so Prime Agent and the plugin stay inside an
+   ephemeral Docker container. The driver and pytest fixture explicitly target
+   the container's `/root/.prime/agent`:
+
+   ```bash
+   scripts/test-tier1.sh --probe
+   python3 -m pytest tests/ -q -m container
+   ```
+
+   For a script-only diagnostic that does not run Prime Agent, an explicitly
+   isolated destination is also valid:
+
+   ```bash
+   PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test scripts/apply-prime-agent-plugin.sh
+   PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test scripts/check-prime-agent-plugin.sh
+   ```
+
+2. **Accepted user-global activation:** after the matching plugin mechanics and
+   project-local `.ralph/skills` have landed, run from the primary `main`
+   checkout only:
+
+   ```bash
+   scripts/apply-prime-agent-plugin.sh --user-global
+   scripts/check-prime-agent-plugin.sh --user-global
+   ```
+
+   `--user-global` is refused from linked Git worktrees and from any branch
+   other than `main`. Supplying `PRIME_AGENT_PLUGIN_ROOT` with the flag is an
+   error. On a host, spelling `~/.prime/agent` as the explicit root is also
+   refused; the conspicuous flag is required. Tier 1 may use that same path
+   inside Docker because the container filesystem is the isolation boundary.
 
 Apply copies only the seven allowlisted TypeScript files. It treats these former
 managed paths as retired:
@@ -53,28 +79,25 @@ managed paths as retired:
 The destination root, managed directories, and every current, redundant, and
 retired leaf are type-checked before the first delete or copy. Apply rejects
 symlinked or non-directory managed parents, removes only regular stale managed
-files, and preserves unrelated global extensions.
-Check rejects any stale retired entry and verifies each current installed file
-byte-for-byte. The installer no longer reads or preflights
-`.ralph/skills/oversee-episode/SKILL.md`.
+files, and preserves unrelated installed extensions. Check rejects any stale
+retired entry and verifies each current installed file byte-for-byte. Apply
+forwards its explicit target mode to that required full check, so an interrupted
+or mixed sequential generation cannot report success.
+
+The installer no longer reads, preflights, or globally copies
+`.ralph/skills/oversee-episode/SKILL.md`. The skill, discovery link, and reviewer
+profile remain project-local loaded-generation compatibility resources through
+the accepted cutover gate. The plugin provides no fallback when a required
+project phase skill is missing.
 
 The APPEND manager preserves unrelated user bytes and file mode, serializes
 concurrent writes, rejects malformed markers and unsafe destinations, and
-converges byte-for-byte. TypeScript copies remain sequential rather than an
-atomic generation swap; the final complete check detects interruption or a mixed
-generation before apply reports success.
-
-For an isolated destination:
-
-```bash
-PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test scripts/apply-prime-agent-plugin.sh
-PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test scripts/check-prime-agent-plugin.sh
-```
+converges byte-for-byte.
 
 ## Cutover and rollback
 
 A successful apply/check proves installed bytes, not the loaded generation.
-`/reload`, elapsed time, a fresh probe, or container evidence alone is not
+`/reload`, elapsed time, a fresh process, or container evidence alone is not
 cutover proof. Preserve the old oversight skill, discovery link, and reviewer
 profile while any old generation may still be loaded.
 
@@ -95,7 +118,10 @@ same quiesce/full-restart discipline.
 
 ## Verify runtime discovery
 
-The installed generation should expose:
+Candidate discovery is proved only by tier-1 Docker. After an accepted
+user-global refresh from primary `main` and the coordinated restart above, use
+the resumed sessions for cutover UAT; do not substitute a linked-worktree or
+host candidate probe. The accepted installed generation should expose:
 
 - native `/handoff`, `/plan`, and `/implement-spec` commands;
 - structured `ralph_handoff`, `ralph_plan`, `create_spec_episode`,

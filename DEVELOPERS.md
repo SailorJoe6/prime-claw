@@ -52,6 +52,17 @@ python3 -m pytest tests/ -q          # tier 0 (host, no environment)
 Prove a new test can fail before trusting it: add the assertion, run it
 against the pre-fix state, confirm it goes red, then fix.
 
+Plugin development and all pre-merge Prime Agent/plugin execution are tier 1
+only. Do not apply, check, or probe a candidate against the host user-global
+`~/.prime/agent`. Both plugin scripts fail without an explicit target:
+
+- tier 1 supplies `PRIME_AGENT_PLUGIN_ROOT=/root/.prime/agent` inside its
+  ephemeral container;
+- script-only diagnostics may supply another explicit isolated
+  `PRIME_AGENT_PLUGIN_ROOT`;
+- `--user-global` is a deliberate post-acceptance operation from the primary
+  `main` checkout and is refused from linked worktrees.
+
 ### Test tiers
 
 - **Tier 0 — host, no environment.** Static checks: no Node, no

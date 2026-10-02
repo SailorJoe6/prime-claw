@@ -83,6 +83,12 @@ class TestDriverSlice2Statics(unittest.TestCase):
         self.assertIn("/workspace:ro", text)  # repo bind-mounted read-only
         self.assertIn("apply-prime-agent-plugin.sh", text)
         self.assertIn("check-prime-agent-plugin.sh", text)
+        self.assertIn("CONTAINER_PLUGIN_ROOT=/root/.prime/agent", text)
+        self.assertGreaterEqual(
+            text.count('PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT'), 2,
+            "apply and check must each receive the explicit container target",
+        )
+        self.assertNotIn("-e HOME=", text)
         self.assertIn("file:///stage", text)  # tarball staging base URL
         self.assertIn("pack-prime-agent-release.mjs", text)
 
@@ -359,6 +365,9 @@ class TestDriverSelectorBehavior(_FakeEnvMixin, unittest.TestCase):
             self.assertIn("install.sh", run_line)
             self.assertIn("apply-prime-agent-plugin.sh", run_line)
             self.assertIn("check-prime-agent-plugin.sh", run_line)
+            self.assertGreaterEqual(
+                run_line.count("PRIME_AGENT_PLUGIN_ROOT=/root/.prime/agent"), 2)
+            self.assertNotIn("-e HOME=", run_line)
 
     def test_smoke_mode_skips_env_validation(self):
         with tempfile.TemporaryDirectory() as td:

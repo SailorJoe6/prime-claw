@@ -46,21 +46,29 @@ plugin source or a copy under this repository's `.prime/agent/extensions/`
 path while the user-global plugin is installed; current Prime Agent versions can
 fail startup when the same extension is discovered at both scopes.
 
-After every plugin-source change, validate the complete candidate with the
-isolated tier-1 Docker gate. Do not refresh the user-global plugin until the
-candidate reaches an accepted deployment checkpoint. At that checkpoint use the
-normal apply/check pair:
+**Plugin development and pre-merge validation are Docker-only.** After every
+plugin-source change, run tier 1 (`scripts/test-tier1.sh --probe`,
+`python3 -m pytest tests/ -q -m container`, or `scripts/test-all.sh`). Never run
+host/user-global apply, check, or Prime Agent plugin probes for a candidate.
+The Docker driver and fixture pass an explicit container-local
+`PRIME_AGENT_PLUGIN_ROOT`; an explicitly isolated scratch root is also valid for
+script-only diagnostics.
+
+Bare apply/check fail closed. A deliberate post-acceptance user-global refresh
+must run from the primary `main` checkout and spell out `--user-global`:
 
 ```bash
-scripts/apply-prime-agent-plugin.sh
-scripts/check-prime-agent-plugin.sh
+scripts/apply-prime-agent-plugin.sh --user-global
+scripts/check-prime-agent-plugin.sh --user-global
 ```
 
-A loaded process can retain old extension code while rereading project files.
-Keep every resource that the loaded generation may read until a coordinated full
-Prime Agent restart and resumed owner, episode, and designated ordinary-session
-UAT prove the new generation is active. `/reload`, elapsed time, copy success,
-and a fresh probe alone are not cutover proof.
+`--user-global` is refused from linked worktrees. A loaded process can retain old
+extension code while rereading project files. After an approved global refresh,
+let affected work quiesce and perform one coordinated full Prime Agent restart.
+Keep every resource that the loaded generation may read until resumed owner,
+episode, and designated ordinary-session UAT prove the new generation is active.
+`/reload`, elapsed time, copy success, and a fresh probe alone are not cutover
+proof.
 
 ## Non-Interactive Shell Commands
 

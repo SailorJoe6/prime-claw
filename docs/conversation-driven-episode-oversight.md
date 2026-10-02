@@ -9,11 +9,14 @@ Prime Agent behavior.
 
 The inert builder resource `src/prime-agent-plugin/APPEND_SYSTEM.md` contains the
 short managed block identified by `PRIME_CLAW_CONVERSATION_IDENTITY_V1`.
-`scripts/apply-prime-agent-plugin.sh` merges that block into the user-global
+`scripts/apply-prime-agent-plugin.sh --user-global` deliberately merges that
+block from the primary `main` checkout into the user-global
 `~/.prime/agent/APPEND_SYSTEM.md` while preserving unrelated user append content.
-The check script verifies exactly one byte-current block. The normalized block
-stays at or below 250 words and is the sole model-facing protocol for both
-conversation/episode oversight and goal/heartbeat work control.
+Bare apply/check fail closed, linked worktrees cannot select user-global mode,
+and pre-merge execution stays inside Docker tier 1. The check script verifies
+exactly one byte-current block. The normalized block stays at or below 250 words
+and is the sole model-facing protocol for both conversation/episode oversight
+and goal/heartbeat work control.
 
 Prime Agent chooses a project `.prime/agent/APPEND_SYSTEM.md` before the global
 file, and `--append-system-prompt` overrides file discovery. A truly inactive

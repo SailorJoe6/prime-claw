@@ -1248,6 +1248,33 @@
     ]
    },
    "evidence": "docs/evidence/2026-09-30-tier1-slice3-migration-sequencer.md"
+  },
+  {
+   "id": "R-T1-6",
+   "priority": "P1",
+   "summary": "Plugin target and development isolation guardrail: bare apply/check fail before touching a destination; explicit isolated roots are supported; --user-global is deliberate primary-main-only activation and is refused from linked worktrees; tier-1 driver/fixture pass an explicit container-local plugin root and never use host HOME; incident-topology regression preserves the sibling generation.",
+   "status": "met (prime-claw-4mw)",
+   "plan": "prime-claw-4mw (shared plugin install/test guardrail repair)",
+   "proven_by": {
+    "apply": [
+     "scripts/apply-prime-agent-plugin.sh",
+     "scripts/prime-agent-plugin-target.sh"
+    ],
+    "check": [
+     "scripts/check-prime-agent-plugin.sh",
+     "scripts/prime-agent-plugin-target.sh"
+    ],
+    "validate": [
+     "scripts/test-tier1.sh",
+     "tests/conftest.py"
+    ],
+    "tests": [
+     "tests/test_prime_agent_plugin_install.py",
+     "tests/test_tier1_driver.py",
+     "tests/test_tier1_fixture.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-10-02-plugin-install-test-guardrail.md"
   }
  ],
  "phase2": {}

@@ -2,8 +2,10 @@
 set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=prime-agent-plugin-target.sh
+source "$repo_root/scripts/prime-agent-plugin-target.sh"
+select_prime_agent_plugin_target "$@"
 source_root="$repo_root/src/prime-agent-plugin"
-destination_root="${PRIME_AGENT_PLUGIN_ROOT:-${HOME:?HOME must be set}/.prime/agent}"
 files=(
   extensions/handoff-chain.ts
   extensions/reviewed-plan.ts
@@ -72,10 +74,15 @@ done
 python3 "$repo_root/scripts/manage-prime-agent-append-system.py" apply "$kernel_source" "$destination_root/APPEND_SYSTEM.md"
 
 # Installation is sequential, not an atomic generation swap. The required final
-# check detects any incomplete or mixed generation before apply reports success.
-"$repo_root/scripts/check-prime-agent-plugin.sh"
+# check detects any incomplete or mixed generation before apply reports success,
+# using the same explicit target semantics selected above.
+if [[ "$plugin_target_mode" == "user-global" ]]; then
+  "$repo_root/scripts/check-prime-agent-plugin.sh" --user-global
+else
+  PRIME_AGENT_PLUGIN_ROOT="$destination_root" \
+    "$repo_root/scripts/check-prime-agent-plugin.sh"
+fi
 
-printf 'prime-claw plugin applied: %s
-' "$destination_root"
-printf 'restart Prime Agent before treating this generation as active
-'
+printf 'prime-claw plugin applied: %s\n' "$destination_root"
+printf 'target mode: %s\n' "$plugin_target_mode"
+printf 'restart Prime Agent before treating this generation as active\n'

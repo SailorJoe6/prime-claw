@@ -1,4 +1,4 @@
-"""Regression coverage for inert plugin source and explicit global installation.
+"""Regression coverage for inert plugin source and explicit safe target selection.
 
 Tier policy: the layout test is tier 0. Everything that runs the
 apply/check/manager install scripts is tier 1 and executes INSIDE the
@@ -71,6 +71,159 @@ def _run_manager(tier1_container, mode: str, destination: Path):
     )
 
 
+def _tree_snapshot(root: Path) -> dict[str, bytes]:
+    if not root.exists():
+        return {}
+    return {
+        str(path.relative_to(root)): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def test_bare_apply_and_check_require_an_explicit_target_without_mutation(
+    tier1_container, ctmp,
+) -> None:
+    for script in (WS_APPLY, WS_CHECK):
+        home = ctmp / Path(script).stem
+        destination = home / ".prime" / "agent"
+        sentinel = destination / "extensions" / "reviewed-plan.ts"
+        sentinel.parent.mkdir(parents=True)
+        sentinel.write_bytes(b"operator generation must remain unchanged\n")
+        before = _tree_snapshot(home)
+
+        result = tier1_container.run(
+            script,
+            env={"HOME": str(home)},
+            workdir=None,
+            timeout=60,
+        )
+
+        assert result.returncode != 0
+        assert "explicit PRIME_AGENT_PLUGIN_ROOT or --user-global required" in result.stderr
+        assert _tree_snapshot(home) == before
+
+
+def _create_primary_fixture(tier1_container, base: str):
+    """Create a real primary-main fixture without using /workspace Git metadata.
+
+    A validation checkout may itself be a host linked worktree whose .git file
+    points outside the read-only Docker mount. Copy only the install surface,
+    then initialize fresh container-local Git metadata so the tests exercise
+    primary-vs-linked semantics rather than host mount topology.
+    """
+    return tier1_container.run(
+        "bash", "-lc",
+        "set -euo pipefail; "
+        'mkdir -p "$1/primary/.ralph/skills"; '
+        'cp -a /workspace/scripts "$1/primary/"; '
+        'cp -a /workspace/src "$1/primary/"; '
+        'cp -a /workspace/.ralph/skills/oversee-episode '
+        '"$1/primary/.ralph/skills/"; '
+        'git -C "$1/primary" init -q -b main; '
+        'git -C "$1/primary" config user.name "Tier One"; '
+        'git -C "$1/primary" config user.email tier1@example.invalid; '
+        'git -C "$1/primary" add .; '
+        'git -C "$1/primary" commit -qm "fixture source"',
+        "primary-setup", base,
+        workdir=None,
+        timeout=120,
+    )
+
+
+def test_primary_main_user_global_mode_is_deliberate_and_container_only(
+    tier1_container, croot,
+) -> None:
+    base = f"{croot}/primary-user-global"
+    setup = _create_primary_fixture(tier1_container, base)
+    assert setup.returncode == 0, setup.stdout + setup.stderr
+    home = f"{base}/home"
+    apply = f"{base}/primary/scripts/apply-prime-agent-plugin.sh"
+    check = f"{base}/primary/scripts/check-prime-agent-plugin.sh"
+    applied = tier1_container.run(
+        apply, "--user-global", env={"HOME": home}, workdir=None, timeout=60,
+    )
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    assert "target mode: user-global" in applied.stdout
+    checked = tier1_container.run(
+        check, "--user-global", env={"HOME": home}, workdir=None, timeout=60,
+    )
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+
+
+def test_linked_worktree_cannot_activate_shared_generation_and_isolated_works(
+    tier1_container, croot,
+) -> None:
+    base = f"{croot}/incident-topology"
+    setup = _create_primary_fixture(tier1_container, base)
+    assert setup.returncode == 0, setup.stdout + setup.stderr
+    setup = tier1_container.run(
+        "bash", "-lc",
+        "set -euo pipefail; "
+        'git -C "$1/primary" worktree add -q -b candidate "$1/candidate"; '
+        'mkdir -p "$1/candidate/.ralph/skills/plan-prep"; '
+        'printf "candidate-only skill\n" > '
+        '"$1/candidate/.ralph/skills/plan-prep/SKILL.md"; '
+        'mkdir -p "$1/shared-home/.prime/agent/extensions"; '
+        'printf "sibling installed generation\n" > '
+        '"$1/shared-home/.prime/agent/extensions/reviewed-plan.ts"',
+        "topology-setup", base,
+        workdir=None,
+        timeout=120,
+    )
+    assert setup.returncode == 0, setup.stdout + setup.stderr
+
+    primary_skill = tier1_container.run(
+        "test", "!", "-e", f"{base}/primary/.ralph/skills/plan-prep/SKILL.md",
+        workdir=None,
+    )
+    assert primary_skill.returncode == 0
+    before = tier1_container.run(
+        "sha256sum", f"{base}/shared-home/.prime/agent/extensions/reviewed-plan.ts",
+        workdir=None,
+    )
+    assert before.returncode == 0
+
+    blocked = tier1_container.run(
+        f"{base}/candidate/scripts/apply-prime-agent-plugin.sh",
+        "--user-global",
+        env={"HOME": f"{base}/shared-home"},
+        workdir=None,
+        timeout=60,
+    )
+    assert blocked.returncode != 0
+    assert "linked Git worktree" in blocked.stderr
+    after = tier1_container.run(
+        "sha256sum", f"{base}/shared-home/.prime/agent/extensions/reviewed-plan.ts",
+        workdir=None,
+    )
+    assert after.returncode == 0
+    assert after.stdout == before.stdout
+
+    isolated = f"{base}/isolated-agent"
+    applied = tier1_container.run(
+        f"{base}/candidate/scripts/apply-prime-agent-plugin.sh",
+        env={"PRIME_AGENT_PLUGIN_ROOT": isolated},
+        workdir=None,
+        timeout=60,
+    )
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    checked = tier1_container.run(
+        f"{base}/candidate/scripts/check-prime-agent-plugin.sh",
+        env={"PRIME_AGENT_PLUGIN_ROOT": isolated},
+        workdir=None,
+        timeout=60,
+    )
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    compared = tier1_container.run(
+        "cmp", "-s",
+        f"{base}/candidate/src/prime-agent-plugin/extensions/reviewed-plan.ts",
+        f"{isolated}/extensions/reviewed-plan.ts",
+        workdir=None,
+    )
+    assert compared.returncode == 0
+
+
 def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     tier1_container, ctmp,
 ) -> None:
@@ -79,7 +232,7 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     (destination / "APPEND_SYSTEM.md").write_text("unrelated user append\n")
     applied = _run_script(tier1_container, WS_APPLY, destination)
     assert applied.returncode == 0, applied.stdout + applied.stderr
-    assert "global copy is current" in applied.stdout
+    assert "selected copy is current" in applied.stdout
     for relative in FILES:
         expected = tier1_container.read_repo(f"src/prime-agent-plugin/{relative}")
         assert (destination / relative).read_text() == expected, relative

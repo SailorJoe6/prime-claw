@@ -54,31 +54,33 @@ retired managed destinations:
 - every current and retired destination is checked before the first mutation;
 - apply removes a stale regular installed copy and rejects directories or symlinks;
 - check rejects any surviving stale or unsafe copy; and
-- unrelated global extensions and unmanaged APPEND_SYSTEM bytes are preserved.
+- unrelated installed extensions and unmanaged APPEND_SYSTEM bytes are preserved.
 
 The installer no longer reads or validates the project-local `oversee-episode`
 skill. That skill, its discovery link, and its reviewer profile remain temporary
 loaded-generation compatibility resources until accepted cutover evidence.
 
-## Activation and rollback
-
-Candidate tests use an isolated `PRIME_AGENT_PLUGIN_ROOT` and the complete tier-1
-Docker gate. Only an accepted deployment checkpoint may be applied to the
-user-global installation:
+Apply/check are safe to test under an explicitly isolated
+`PRIME_AGENT_PLUGIN_ROOT`; all Prime Agent/plugin execution remains Docker tier
+1. Bare commands fail closed. Only an accepted deployment checkpoint may be
+installed user-globally, from the primary `main` checkout with explicit
+`--user-global`:
 
 ```sh
-scripts/apply-prime-agent-plugin.sh
-scripts/check-prime-agent-plugin.sh
+scripts/apply-prime-agent-plugin.sh --user-global
+scripts/check-prime-agent-plugin.sh --user-global
 ```
 
-Installation is not activation. `/reload`, elapsed time, copy success, or
-container evidence alone cannot prove the loaded generation changed. Quiesce
-active work, perform one coordinated full Prime Agent daemon/harness restart,
-and resume the exact owner, exact episode, and preidentified ordinary project
-conversation. The operator accepts that UAT before compatibility cleanup. On
-failure, retain or restore compatibility resources, reapply the known-good
-plugin generation, and repeat the same full-restart discipline. Saved sessions
-are resumed, never deleted.
+`--user-global` is refused from linked worktrees.
+
+Installation is not activation. `/reload`, elapsed time, copy success, a fresh
+process, or container evidence alone cannot prove the loaded generation changed.
+Quiesce active work, perform one coordinated full Prime Agent daemon/harness
+restart, and resume the exact owner, exact episode, and preidentified ordinary
+project conversation. The operator accepts that UAT before compatibility
+cleanup. On failure, retain or restore compatibility resources, reapply the
+known-good plugin generation, and repeat the same full-restart discipline. Saved
+sessions are resumed, never deleted.
 
 ## Automated evidence
 
