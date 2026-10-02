@@ -104,13 +104,17 @@ all managed paths are safe regular files or absent. Check rejects a stale old
 file. Unrelated global extensions and unmanaged `APPEND_SYSTEM.md` bytes are
 preserved.
 
-Apply/check are safe to test under an isolated `PRIME_AGENT_PLUGIN_ROOT`. For
-the managed user-global installation run:
+Apply/check are safe to test under an explicitly isolated
+`PRIME_AGENT_PLUGIN_ROOT`; all Prime Agent/plugin execution remains Docker tier
+1. For a deliberate post-acceptance managed user-global installation from the
+primary `main` checkout, run:
 
 ```sh
-scripts/apply-prime-agent-plugin.sh
-scripts/check-prime-agent-plugin.sh
+scripts/apply-prime-agent-plugin.sh --user-global
+scripts/check-prime-agent-plugin.sh --user-global
 ```
+
+Bare commands fail closed, and linked worktrees cannot select `--user-global`.
 
 Installation is not activation. The already loaded Prime Agent process may
 retain its old extension generation. Do not use `/reload` as an activation

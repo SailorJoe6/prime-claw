@@ -84,12 +84,11 @@ ordering, queueing).
 Implement as two dependency-ordered vertical slices. Each slice must:
 
 - remain inside its stated scope;
-- run `scripts/apply-prime-agent-plugin.sh` and
-  `scripts/check-prime-agent-plugin.sh` after any plugin-source change, then
-  verify the new generation with a fresh builder-rooted startup probe;
-- route any live Prime Agent probe through
-  `scripts/run-prime-agent-probe.sh` (config-mutating RPC never runs
-  unguarded);
+- validate every plugin-source change only in Docker tier 1 with
+  `scripts/test-tier1.sh --probe` and the `container` pytest gate; never apply,
+  check, or probe a candidate against the host user-global generation;
+- keep any additional live Prime Agent probe inside Docker and preserve the
+  probe isolation contract (config-mutating RPC never runs unguarded);
 - update its own bead with the exact commit and evidence;
 - run focused tests plus the active repository suite;
 - update operator documentation in the same commit;
@@ -150,19 +149,18 @@ envelope content, and the queued plan prompt are byte-identical to today.
 - Skill-content tests (`test_future_plan_skills.py` style) pin `plan-prep`
   policy invariants: exactly-once `compact.run`, standard-hint presence,
   no self-invocation of `plan`, Status/Evidence/Next Step contract.
-- A live probe through `scripts/run-prime-agent-probe.sh` on the installed
-  Prime Agent proves: compaction requested (or a truthful
-  `scheduled: false`), then exactly one plan turn, empty queue at end — an
-  evidence table mirroring `docs/handoff-chain.md`.
-- `scripts/apply-prime-agent-plugin.sh` + `scripts/check-prime-agent-plugin.sh`
-  pass, followed by a fresh builder-rooted startup probe showing the new
-  generation active.
+- A container behavioral `/plan` probe from `/workspace` proves: compaction
+  requested (or a truthful `scheduled: false`), then exactly one plan turn,
+  empty queue at end — an evidence table mirroring `docs/handoff-chain.md`.
+- The explicit container-root apply/check performed by tier 1 passes, followed
+  by the container startup probe showing the candidate generation active.
 - Run:
 
   ```sh
-  node --experimental-strip-types --test tests/reviewed_plan_extension.test.mjs
-  pytest -q tests/test_reviewed_plan_extension.py tests/test_future_plan_skills.py
-  pytest -q tests
+  python3 -m pytest -q tests/test_reviewed_plan_extension.py tests/test_future_plan_skills.py
+  python3 -m pytest -q tests -m container
+  scripts/test-tier1.sh --probe
+  scripts/test-all.sh
   git diff --check
   ```
 

@@ -2,8 +2,10 @@
 set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=prime-agent-plugin-target.sh
+source "$repo_root/scripts/prime-agent-plugin-target.sh"
+select_prime_agent_plugin_target "$@"
 source_root="$repo_root/src/prime-agent-plugin"
-destination_root="${PRIME_AGENT_PLUGIN_ROOT:-${HOME:?HOME must be set}/.prime/agent}"
 files=(
   extensions/goal-heartbeat-work-control.ts
   extensions/handoff-chain.ts
@@ -84,5 +86,5 @@ fi
 if [[ "$status" -ne 0 ]]; then
   exit "$status"
 fi
-printf 'prime-claw plugin source is inert and global copy is current: %s
-' "$destination_root"
+printf 'prime-claw plugin source is inert and selected copy is current: %s\n' "$destination_root"
+printf 'target mode: %s\n' "$plugin_target_mode"

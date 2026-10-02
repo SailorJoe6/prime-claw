@@ -17,8 +17,8 @@ The session fixture mirrors scripts/test-tier1.sh (the driver is the
 contract): same .env selection semantics (exactly one of PRIME_AGENT_PINNED /
 PRIME_AGENT_SOURCE; TIER1_ENV_FILE override), same fail-fast ladder (docker
 readiness -> source staging -> image build -> container run), same install
-commands, same in-container apply/check against the container's own
-~/.prime/agent. Host-side fork staging in source mode duplicates the
+commands, same in-container apply/check against the explicit container-local
+/root/.prime/agent. Host-side fork staging in source mode duplicates the
 driver's B1 contract (fresh build every run after FAIL-CLOSED removal of
 the four pack-consumed dist dirs); if the driver's staging contract
 changes, change it there first and mirror it here.
@@ -46,6 +46,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 WORKSPACE = "/workspace"
+CONTAINER_PLUGIN_ROOT = "/root/.prime/agent"
 IMAGE = "prime-claw-test-tier1:latest"
 DOCKERFILE = "docker/test.Dockerfile"
 RESULTS = REPO / ".test-results"
@@ -569,7 +570,8 @@ def tier1_container(request):
 
     Driver-equivalent setup runs ONCE here: build the image (cached),
     stage/install prime-agent per .env, then apply + check the plugin
-    against the container's own ~/.prime/agent. The container is destroyed
+    against explicit container-local /root/.prime/agent. The container is
+    destroyed
     — and its absence verified — at session end; a teardown failure fails
     the run with the exact container identity (B2), and the session share
     evidence is preserved while a container may still own it. The share is
@@ -649,6 +651,7 @@ def tier1_container(request):
             + " && /workspace/scripts/apply-prime-agent-plugin.sh"
             + " && /workspace/scripts/check-prime-agent-plugin.sh",
             timeout=600, workdir=None,
+            env={"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT},
         )
         log_lines.append(result.stdout)
         if result.returncode != 0:

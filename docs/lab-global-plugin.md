@@ -55,12 +55,40 @@ tree. Do not copy the plugin into each managed project.
 
 ## Apply or refresh
 
-From the prime-claw builder repository, run:
+The zero-argument scripts intentionally fail. Every invocation must select one
+of two target modes:
 
-```bash
-scripts/apply-prime-agent-plugin.sh
-scripts/check-prime-agent-plugin.sh
-```
+1. **Development/test:** use tier 1 so Prime Agent and the plugin stay inside an
+   ephemeral Docker container. The driver and pytest fixture explicitly target
+   the container's `/root/.prime/agent`:
+
+   ```bash
+   scripts/test-tier1.sh --probe
+   python3 -m pytest tests/ -q -m container
+   ```
+
+   For a script-only diagnostic that does not run Prime Agent, an explicitly
+   isolated destination is also valid:
+
+   ```bash
+   PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test scripts/apply-prime-agent-plugin.sh
+   PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test scripts/check-prime-agent-plugin.sh
+   ```
+
+2. **Accepted user-global activation:** after the matching plugin mechanics and
+   project-local `.ralph/skills` have landed, run from the primary `main`
+   checkout only:
+
+   ```bash
+   scripts/apply-prime-agent-plugin.sh --user-global
+   scripts/check-prime-agent-plugin.sh --user-global
+   ```
+
+   `--user-global` is refused from linked Git worktrees and from any branch
+   other than `main`. Supplying `PRIME_AGENT_PLUGIN_ROOT` with the flag is an
+   error. On a host, spelling `~/.prime/agent` as the explicit root is also
+   refused; the conspicuous flag is required. Tier 1 may use that same path
+   inside Docker because the container filesystem is the isolation boundary.
 
 The apply script copies only the eight allowlisted Prime Claw TypeScript files. It
 removes two formerly managed obsolete files with the same destination-type
@@ -81,31 +109,21 @@ uncatchable interruption is reconciled on the next run rather than promised
 away. Repeated and concurrent applies converge byte-for-byte.
 
 TypeScript files are applied sequentially, not as one atomic generation swap.
-All destination types are preflighted before mutation and apply runs the required
-full check before reporting success, so a partial/mixed generation is detected
-and must not be activated. The canonical project-local
-`.ralph/skills/oversee-episode/SKILL.md` is preflighted but not globally copied.
-
-For an isolated test destination, set `PRIME_AGENT_PLUGIN_ROOT` to the directory
-that should contain `extensions/` and `extension-support/`:
-
-```bash
-PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test   scripts/apply-prime-agent-plugin.sh
-PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test   scripts/check-prime-agent-plugin.sh
-```
-
-Refresh the global installation after every source change and before testing a
-new plugin generation. Copying the complete managed set avoids mixed-version
-entry points and support code.
+All destination types are preflighted before mutation and apply forwards its
+selected target mode to the required full check before reporting success, so a
+partial/mixed generation is detected and must not be activated. The canonical
+project-local `.ralph/skills/oversee-episode/SKILL.md` is preflighted but not
+globally copied. Project-local phase skills remain the only prompt-policy source;
+the plugin does not supply a fallback when a required skill is missing.
 
 Do not rely on `/reload` to replace an already loaded plugin generation. Let
 affected work quiesce, restart the Prime Agent process or session, and verify
-with a fresh process before treating the refreshed global copy as active.
+with a fresh process before treating an approved user-global copy as active.
 
 ## Verify runtime discovery
 
-After `scripts/check-prime-agent-plugin.sh` passes, start a fresh Prime Agent
-process from the builder or another repository and inspect its registered
+After `scripts/check-prime-agent-plugin.sh --user-global` passes, start a fresh
+Prime Agent process from the builder or another repository and inspect its registered
 commands and tools.
 
 Expected native commands:

@@ -238,18 +238,20 @@ compatibility file.
    - exact ordinary-session identity and successful pre-restart turn; and
    - the successful Slice 1 tier-0/tier-1 evidence.
 5. Re-run `git diff --check` and `scripts/test-all.sh` against the accepted tree.
-6. From the episode worktree run:
+6. From the episode worktree run the Docker-only candidate gates:
 
    ```bash
-   scripts/apply-prime-agent-plugin.sh
-   scripts/check-prime-agent-plugin.sh
+   python3 -m pytest tests/ -q -m container
+   scripts/test-tier1.sh --probe
    ```
 
-7. Verify the installed global copy matches the accepted seven-file candidate,
-   the retired goal/heartbeat entry is absent, the managed APPEND_SYSTEM block is
-   current, and the old project compatibility resources are still present.
+7. Verify the explicit container installation matches the accepted seven-file
+   candidate, the retired goal/heartbeat entry is absent, the managed
+   APPEND_SYSTEM block is current, and the old project compatibility resources
+   are still present. Do not mutate the host user-global generation from the
+   episode worktree.
 
-A successful apply does not prove the loaded generation changed.
+A successful container apply does not prove the host loaded generation changed.
 
 ### Slice completion
 
@@ -367,17 +369,17 @@ Run again from the episode worktree:
 ```bash
 git diff --check
 scripts/test-all.sh
-scripts/apply-prime-agent-plugin.sh
-scripts/check-prime-agent-plugin.sh
+scripts/test-tier1.sh --probe
 ```
 
 Required results:
 
 - tier 0 and complete tier 1 pass;
 - no owned container or scratch artifact remains;
-- apply/check passes without the old skill or inert extension source;
-- the installed managed TypeScript and APPEND_SYSTEM bytes are unchanged from
-  the accepted transition generation; and
+- explicit container-root apply/check passes without the old skill or inert
+  extension source;
+- the container-installed managed TypeScript and APPEND_SYSTEM bytes are
+  unchanged from the accepted transition generation; and
 - the reference audit contains only intentional current legacy-filter names and
   immutable historical mentions.
 
@@ -405,8 +407,9 @@ resume the episode for more work. The owning conversation completes landing from
 clean `main` in this order:
 
 1. `git pull --rebase` and verify the expected final commit is present.
-2. Run `scripts/check-prime-agent-plugin.sh`; it must accept the already installed
-   generation from final `main`.
+2. From the primary `main` checkout, deliberately activate and check the accepted
+   generation with `scripts/apply-prime-agent-plugin.sh --user-global` followed
+   by `scripts/check-prime-agent-plugin.sh --user-global`.
 3. Verify Slice 3 changed no managed plugin or system-prompt bytes from the
    accepted transition. If it did, stop: another restart gate is required.
 4. Add the post-merge check and terminal disposition to `prime-claw-h6w.25`, then
