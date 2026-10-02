@@ -1,6 +1,6 @@
 # Execution Plan — Official lean session protocol
 
-> **Status:** Active; implementation authorized
+> **Status:** Active; Slice 1 candidate awaiting owner review
 >
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 >
@@ -422,6 +422,51 @@ must not be reported as completed work or close the bead as successful.
 ## Progress and evidence
 
 Update this section during execution; do not rely on chat history.
+
+### Slice 1 transition evidence
+
+- Candidate source is the seven-file managed TypeScript set; the retired
+  `goal-heartbeat-work-control.ts` source is absent and apply/check migrate any
+  stale installed regular copy after complete destination preflight.
+- `src/prime-agent-plugin/APPEND_SYSTEM.md` is unchanged from `44d83db`, remains
+  byte-equal to the TypeScript expectation, and normalizes to 241 words.
+- Independent final review initially BLOCKed unsafe symlinked plugin roots or
+  managed parent directories. The repaired apply/check scripts now reject the
+  destination root, `extensions`, and `extension-support` unless absent or real
+  directories before any mutation; three parameterized no-mutation regressions
+  cover the root and both managed parents.
+- Final repaired-candidate tier 0: `python3 -m pytest tests/ -q` PASS in 39.21
+  seconds (`275 passed, 151 skipped`). Final complete tier 1:
+  `python3 -m pytest tests/ -q -m container` PASS in 105.47 seconds
+  (`44 passed, 382 deselected`). Tier 2 is intentionally out of scope.
+- A post-review combined rerun passed tier 0, then exposed and drove the managed
+  root diagnostic repair. The next combined rerun encountered only the known
+  unrelated macOS process-group watchdog timeout before tier 1. That flake was
+  not hidden or deselected; it is tracked as `prime-claw-zwg.5.1`, and the
+  subsequent complete current-tree tier 0 run above passed.
+- Tier 1 used a disposable clean source copy of Prime Agent dependency commit
+  `a1faacd53ac4473a75de1d434afaf50945c2f647`; the upstream checkout remained
+  clean. Final teardown left no `prime-claw-tier1-session` container or owned
+  `share-*` directory.
+- The compatibility skill and reviewer profile retain SHA256
+  `2e20d8fc7794cf97e9bfd21eaa6e68c7d6514439c6e62dfb024723b8de41a32f` and
+  `d9f8b14954da36df3d9051b4e25f8a76b6d16a0a2c27f9b29cfab262b5efe6f6`;
+  `.agents/skills/oversee-episode` remains the same
+  `../../.ralph/skills/oversee-episode` symlink.
+- The required reference audit classifies remaining hits as: current legacy
+  provider-message filtering; retired-entry migration/docs/tests; temporary
+  loaded-generation skill/link/profile compatibility; active plan text; or
+  immutable archives/evidence. No current runtime or installer package-source
+  dependency remains.
+- Pinned Prime Agent 0.9.8 installed successfully but its non-interactive
+  binary path was not exported by the existing tier-1 driver/fixture. That
+  independent framework defect is tracked as `prime-claw-blw.5`; final
+  acceptance used supported source mode instead.
+- Known-good rollback source generation remains `44d83db`. No global apply,
+  restart, compatibility cleanup, merge, or Prime Agent source change occurred.
+
+- Exact transition commit and push receipt remain pending in this pre-commit
+  record; the real SHA is recorded on `prime-claw-h6w.25` only after push.
 
 - [ ] Slice 1 transition commit pushed; tier 0 and complete tier 1 pass.
 - [ ] Owner accepted the exact transition commit.

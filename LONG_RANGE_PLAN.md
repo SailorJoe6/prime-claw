@@ -155,10 +155,11 @@ phase policy in project-customizable Markdown, drive it across real work, and
 codify only transitions that repeated use proves deterministic.
 
 Capability placement follows the manual proof boundary. The builder keeps
-plugin source inert under `src/prime-agent-plugin/`; explicit apply/check tooling
-installs one global copy for the personal lab POC and refreshes it after every
-source change. Neither the builder nor a managed project keeps a project-local
-copy while that global installation is active. The final sandbox uses the same
+plugin source inert under `src/prime-agent-plugin/`; every source change is
+validated as an isolated candidate, and explicit apply/check tooling updates the
+one global lab copy only at an accepted deployment checkpoint. Neither the
+builder nor a managed project keeps a project-local copy while that global
+installation is active. The final sandbox uses the same
 environment-global placement inside its isolated home. In both stages the
 universal agent ensures
 every managed project has a local `.ralph/plans/` tree and a complete
@@ -180,7 +181,8 @@ asking the operator to verify them.
   plan placement, and owner/episode identity. The episode starts the
   customizable execute workflow and stays resumable through implementation, PR
   review, updates, and rebasing. Its owner reaps the session and worktree only
-  after merge or explicit abandonment.
+  after the operator authorizes merge or abandonment and terminal work is
+  verified.
 - **4c — reviewed conversation → episode workflow.** `/design` and
   `/spec-it-out` retain different customizable starting assumptions, but both
   write to a named `.ralph/plans/future/<slug>/` folder and stop for operator
@@ -188,9 +190,10 @@ asking the operator to verify them.
   written to that same folder and receives a second operator review. Only
   `/implement-spec <future-folder>` authorizes implementation and creates the
   worktree-rooted episode. Manually prove that the owning conversation retains
-  the returned identity, coordinates execute/handoff iterations and any required
-  EXPERT reviews, recognizes archived plans as a readiness claim, decides
-  whether to merge, and cleans up safely.
+  the returned identity, coordinates execute/handoff iterations and any useful
+  EXPERT reviews, recognizes archived plans as a readiness claim, presents the
+  evidence for the operator's merge or abandonment decision, and then performs
+  and verifies only the authorized cleanup.
 - **4d — `upgrade-this-to-prime-agent` command.** Convert a Ralph
   codex/claude-skills project to prime-agent skills without manual copy-paste;
   dogfood on the ralph repo.

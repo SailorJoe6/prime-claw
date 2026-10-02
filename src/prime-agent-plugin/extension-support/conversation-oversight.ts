@@ -44,9 +44,8 @@ narrate this policy or routine context restoration.
 <!-- prime-claw:conversation-identity:end -->`;
 export const OVERSIGHT_MARKER_TYPE = "prime-claw-conversation-oversight";
 export const BOUNDED_IDENTITY_TYPE = "prime-claw-bounded-identity";
-export const OVERSIGHT_PACKAGE_TYPE = "prime-claw-oversee-episode-package";
+export const LEGACY_OVERSIGHT_PACKAGE_TYPE = "prime-claw-oversee-episode-package";
 export const BOUNDED_PACKAGE_TYPE = "prime-claw-bounded-identity-package";
-export const OVERSIGHT_PACKAGE_PATH = join(".ralph", "skills", "oversee-episode", "SKILL.md");
 const MARKER_VERSION = 2;
 
 export type OversightMarker = {
@@ -98,59 +97,6 @@ function canonicalProjectRoot(cwd: string): string {
   try { return realpathSync(cwd); }
   catch (error) { throw new Error(`project root is unavailable: ${error instanceof Error ? error.message : String(error)}`); }
 }
-const FRONTMATTER_CONTROL_CHARACTER = /[\u0000-\u001f\u007f-\u009f]/;
-function assertFrontmatterText(value: string, key: string, path: string): void {
-  if (FRONTMATTER_CONTROL_CHARACTER.test(value)) {
-    throw new Error(`oversight package ${key} scalar contains a control character at ${path}`);
-  }
-}
-function parseFrontmatterScalar(value: string, key: string, path: string): string {
-  if (!value) throw new Error(`oversight package ${key} scalar is empty at ${path}`);
-  assertFrontmatterText(value, key, path);
-  if (/^"(?:[^"\\]|\\.)*"$/.test(value)) {
-    let parsed: unknown;
-    try { parsed = JSON.parse(value); }
-    catch { throw new Error(`oversight package ${key} scalar is malformed at ${path}`); }
-    if (typeof parsed !== "string" || !parsed) throw new Error(`oversight package ${key} scalar is malformed at ${path}`);
-    assertFrontmatterText(parsed, key, path);
-    return parsed;
-  }
-  if (/^'[^']*'$/.test(value)) {
-    const parsed = value.slice(1, -1);
-    if (parsed) return parsed;
-  }
-  if (/^[-?:,\[\]{}#&*!|>'"%@`]/.test(value) || /[\[\]{}'"\t]/.test(value) || /:\s|\s#/.test(value)) {
-    throw new Error(`oversight package ${key} scalar uses unsupported YAML syntax at ${path}`);
-  }
-  return value;
-}
-function parseSkillFrontmatter(text: string, path: string): { name: string; body: string } {
-  const parsed = /^---\n([\s\S]*?)\n---\n([\s\S]+)$/.exec(text);
-  if (!parsed) throw new Error(`oversight package frontmatter or procedure is incomplete at ${path}`);
-  const lines = parsed[1].split("\n");
-  if (lines.length !== 2) throw new Error(`oversight package frontmatter requires exactly name and description lines at ${path}`);
-  const values = new Map<string, string>();
-  for (const raw of lines) {
-    if (/^[ \t]/.test(raw) || raw.startsWith("-")) throw new Error(`oversight package frontmatter nesting or sequences are unsupported at ${path}`);
-    const match = /^(name|description):[ ](\S(?:.*\S)?)$/.exec(raw);
-    if (!match || values.has(match[1])) throw new Error(`oversight package frontmatter is malformed or ambiguous at ${path}`);
-    values.set(match[1], parseFrontmatterScalar(match[2], match[1], path));
-  }
-  const name = values.get("name"); const description = values.get("description");
-  if (name !== "oversee-episode" || !description) throw new Error(`oversight package requires exact name and nonempty description at ${path}`);
-  const body = parsed[2].trim();
-  if (!body) throw new Error(`oversight package procedure is empty at ${path}`);
-  return { name, body };
-}
-function packageBody(cwd: string): string {
-  const path = join(canonicalProjectRoot(cwd), OVERSIGHT_PACKAGE_PATH);
-  let raw: string;
-  try { raw = readFileSync(path, "utf8"); }
-  catch (error) { throw new Error(`oversight package unavailable at ${path}: ${error instanceof Error ? error.message : String(error)}`); }
-  parseSkillFrontmatter(raw, path);
-  return raw.trim();
-}
-
 function stateRoot(cwd: string): string { return resolve(canonicalProjectRoot(cwd), ".prime", "agent", "state", "spec-episodes"); }
 function expectedWorktree(cwd: string, slug: string): string {
   const root = canonicalProjectRoot(cwd);
@@ -320,7 +266,6 @@ function assertLegacyAgreement(marker: LegacyMarker, identity: EpisodeIdentity):
 
 export function assertConversationPromotionReady(ctx: ExtensionContext, requestedLocation?: string): void {
   assertIdentityKernel(ctx);
-  packageBody(ctx.cwd);
   const root = stateRoot(ctx.cwd); mkdirSync(root, { recursive: true }); accessSync(root, constants.R_OK | constants.W_OK);
   const state = classifyLifecycle(ctx);
   if (state.mode === "ordinary") {
@@ -349,7 +294,6 @@ function currentBoundedIdentity(ctx: ExtensionContext): { role: "EPISODE"; sessi
 
 export function appendActiveOversight(pi: ExtensionAPI, ctx: ExtensionContext, episode: EpisodeResult): OversightMarker {
   assertIdentityKernel(ctx);
-  packageBody(ctx.cwd);
   const root = stateRoot(ctx.cwd); mkdirSync(root, { recursive: true }); accessSync(root, constants.R_OK | constants.W_OK);
   const identity = validateProjectBinding(parseEpisodeIdentity(episode, "created episode result"), ctx.cwd);
   if (!episodeBootstrapReady(identity)) throw new Error("created episode expectation is not bootstrap-ready");
@@ -443,7 +387,6 @@ export async function reconcileOversightAtSessionStart(
     let state = classifyLifecycle(ctx);
     if (state.mode !== "ordinary" || currentBoundedIdentity(ctx)) {
       assertIdentityKernel(ctx);
-      packageBody(ctx.cwd);
     }
     if (state.mode === "recovery") {
       const recovery = state.recovery!;
@@ -463,7 +406,7 @@ export async function reconcileOversightAtSessionStart(
 
 export function applyConversationContext(event: {messages:unknown[]}, ctx: ExtensionContext) {
   const messages = (event.messages as Array<Record<string,unknown>>).filter((message) => !(message.role === "custom"
-    && (message.customType === OVERSIGHT_PACKAGE_TYPE || message.customType === BOUNDED_PACKAGE_TYPE)));
+    && (message.customType === LEGACY_OVERSIGHT_PACKAGE_TYPE || message.customType === BOUNDED_PACKAGE_TYPE)));
   try {
     const bounded = currentBoundedIdentity(ctx);
     if (bounded) { assertIdentityKernel(ctx); return { messages:[...messages,{role:"custom",customType:BOUNDED_PACKAGE_TYPE,content:`PRIME_CLAW_BOUNDED_IDENTITY_V1
@@ -473,7 +416,6 @@ sessionId=${bounded.sessionId}`,display:false,timestamp:Date.now()}] }; }
     if (state.mode === "ordinary") return { messages };
     if (state.mode === "recovery") throw new Error(`oversight lifecycle requires ${state.recovery!.kind} recovery before provider dispatch`);
     assertIdentityKernel(ctx);
-    packageBody(ctx.cwd);
     return { messages };
   } catch (error) { visibleFailure(ctx, error instanceof Error ? error.message : String(error)); }
 }

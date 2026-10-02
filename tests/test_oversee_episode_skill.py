@@ -188,7 +188,22 @@ def test_oversee_skill_trusts_idle_status_and_retains_the_intended_retry_watch()
     assert retry.index("keep the pre-armed intended-generation watch") < retry.index("Before any owner retry")
 
 
-def test_current_documentation_explains_project_expert_policy():
+def test_current_docs_separate_lean_policy_from_loaded_generation_compatibility():
+    text = " ".join(DOC.read_text().split())
+    current = text.index("## Managed lean session protocol")
+    compatibility = text.index("## Loaded-generation compatibility reference (temporary)")
+    expert = text.index("### Explicit EXPERT reviewer policy")
+    assert current < compatibility < expert
+    for phrase in (
+        "sole model-facing protocol",
+        "do not read, parse, validate, or inject `.ralph/skills/oversee-episode/SKILL.md`",
+        "They are not current runtime or installer prerequisites",
+        "retained as migration evidence, not as current activation requirements",
+    ):
+        assert phrase in text
+
+
+def test_loaded_generation_compatibility_docs_preserve_project_expert_policy():
     text = " ".join(DOC.read_text().split())
     for phrase in [
         "names `expert-reviewer`",
@@ -278,7 +293,7 @@ def test_oversee_skill_requires_final_review_renewal_and_bounds_one_technical_re
         assert phrase in text
 
 
-def test_current_documentation_explains_final_review_and_one_replacement_limits():
+def test_loaded_generation_compatibility_docs_preserve_final_review_and_one_replacement_limits():
     text = " ".join(DOC.read_text().split())
     for phrase in [
         "confirmed terminal after a purely technical failure",

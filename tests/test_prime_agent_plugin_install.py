@@ -14,6 +14,7 @@ cross a docker exec boundary; both runners operate on container-local
 
 import json
 from pathlib import Path
+import shutil
 import time
 
 import pytest
@@ -31,8 +32,8 @@ WS_CONCURRENT_PROBE = "/workspace/tests/container/concurrent_apply_probe.py"
 # The image's default PATH (Ubuntu base); tests that shadow a tool prepend
 # their fake bin dir to this.
 CONTAINER_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+RETIRED = "extensions/goal-heartbeat-work-control.ts"
 FILES = (
-    "extensions/goal-heartbeat-work-control.ts",
     "extensions/handoff-chain.ts",
     "extensions/reviewed-plan.ts",
     "extension-support/conversation-oversight.ts",
@@ -48,6 +49,8 @@ def test_source_is_outside_project_extension_discovery() -> None:
     assert not (REPO / ".prime" / "agent" / "extensions").exists()
     assert not (REPO / ".prime" / "agent" / "extensions-bak").exists()
     assert not (REPO / ".prime" / "agent" / "extension-support").exists()
+    assert not (SOURCE / RETIRED).exists()
+    assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*.ts")} == set(FILES)
 
 
 def _run_script(tier1_container, script: str, destination: Path):
@@ -87,9 +90,53 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     assert checked.returncode == 0, checked.stdout + checked.stderr
 
 
+def test_apply_is_convergent_and_preserves_unrelated_files(tier1_container, ctmp) -> None:
+    destination = ctmp / "agent"
+    unrelated = destination / "extensions" / "unrelated.ts"
+    unrelated.parent.mkdir(parents=True)
+    unrelated.write_bytes(b"preserve me exactly\n")
+    first = _run_script(tier1_container, WS_APPLY, destination)
+    assert first.returncode == 0, first.stdout + first.stderr
+    snapshot = {
+        relative: (destination / relative).read_bytes()
+        for relative in (*FILES, "APPEND_SYSTEM.md", "extensions/unrelated.ts")
+    }
+    second = _run_script(tier1_container, WS_APPLY, destination)
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    assert second.returncode == 0, second.stdout + second.stderr
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    assert {
+        relative: (destination / relative).read_bytes()
+        for relative in snapshot
+    } == snapshot
+    assert not (destination / RETIRED).exists()
+
+
+def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container, ctmp) -> None:
+    fixture = ctmp / "repo"
+    shutil.copytree(SOURCE, fixture / "src" / "prime-agent-plugin")
+    scripts = fixture / "scripts"
+    scripts.mkdir(parents=True)
+    for name in (
+        "apply-prime-agent-plugin.sh",
+        "check-prime-agent-plugin.sh",
+        "manage-prime-agent-append-system.py",
+    ):
+        shutil.copy2(REPO / "scripts" / name, scripts / name)
+    assert not (fixture / ".ralph/skills/oversee-episode/SKILL.md").exists()
+    destination = ctmp / "agent-without-skill"
+    applied = _run_script(tier1_container, str(scripts / "apply-prime-agent-plugin.sh"), destination)
+    checked = _run_script(tier1_container, str(scripts / "check-prime-agent-plugin.sh"), destination)
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+
+
+
 @pytest.mark.parametrize(
     "relative,diagnostic",
     [
+        (RETIRED,
+         "stale retired goal heartbeat work-control extension"),
         ("extensions/goal-blocker-control.ts",
          "stale obsolete goal blocker control extension"),
         ("extension-support/episode-finalization.ts",
@@ -115,30 +162,75 @@ def test_apply_removes_and_check_rejects_obsolete_managed_files(
     assert unrelated.read_text() == "preserve me\n"
 
 
+@pytest.mark.parametrize("relative", [RETIRED, "extensions/goal-blocker-control.ts"])
 @pytest.mark.parametrize("unsafe_kind", ["directory", "symlink"])
-def test_apply_rejects_unsafe_obsolete_goal_extension_before_mutation(
-    tier1_container, ctmp, unsafe_kind,
+def test_apply_rejects_unsafe_retired_destination_before_mutation(
+    tier1_container, ctmp, relative, unsafe_kind,
 ) -> None:
     destination = ctmp / "agent"
-    obsolete = destination / "extensions" / "goal-blocker-control.ts"
-    obsolete.parent.mkdir(parents=True)
+    unsafe = destination / relative
+    unsafe.parent.mkdir(parents=True)
+    first = destination / FILES[0]
+    first.write_bytes(b"existing generation remains untouched\n")
+    append = destination / "APPEND_SYSTEM.md"
+    append.write_bytes(b"unrelated append remains untouched\n")
     unrelated = destination / "extensions" / "unrelated.ts"
     unrelated.write_text("preserve me\n")
     if unsafe_kind == "directory":
-        obsolete.mkdir()
+        unsafe.mkdir()
     else:
         target = ctmp / "outside.ts"
         target.write_text("outside remains untouched\n")
-        obsolete.symlink_to(target)
+        unsafe.symlink_to(target)
 
+    checked = _run_script(tier1_container, WS_CHECK, destination)
     applied = _run_script(tier1_container, WS_APPLY, destination)
 
+    assert checked.returncode != 0
+    assert "unsafe managed plugin destination" in checked.stderr
     assert applied.returncode != 0
     assert "unsafe managed plugin destination" in applied.stderr
+    assert first.read_bytes() == b"existing generation remains untouched\n"
+    assert append.read_bytes() == b"unrelated append remains untouched\n"
     assert unrelated.read_text() == "preserve me\n"
     if unsafe_kind == "symlink":
-        assert obsolete.is_symlink()
+        assert unsafe.is_symlink()
         assert target.read_text() == "outside remains untouched\n"
+
+
+
+@pytest.mark.parametrize("managed_directory", ["root", "extensions", "extension-support"])
+def test_apply_and_check_reject_symlinked_managed_directories_before_mutation(
+    tier1_container, ctmp, managed_directory,
+) -> None:
+    destination = ctmp / "agent"
+    outside = ctmp / f"outside-{managed_directory}"
+    outside.mkdir()
+    (outside / "sentinel").write_bytes(b"outside remains untouched\n")
+    if managed_directory == "root":
+        destination.symlink_to(outside, target_is_directory=True)
+    else:
+        destination.mkdir()
+        (destination / managed_directory).symlink_to(
+            outside, target_is_directory=True,
+        )
+    append = destination / "APPEND_SYSTEM.md"
+    append.write_bytes(b"unrelated append remains untouched\n")
+
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+
+    assert checked.returncode != 0
+    assert "unsafe managed plugin directory" in checked.stderr
+    assert applied.returncode != 0
+    assert "unsafe managed plugin directory" in applied.stderr
+    assert append.read_bytes() == b"unrelated append remains untouched\n"
+    assert (outside / "sentinel").read_bytes() == b"outside remains untouched\n"
+    assert not list(outside.glob("*.ts"))
+    if managed_directory == "root":
+        assert destination.is_symlink()
+    else:
+        assert (destination / managed_directory).is_symlink()
 
 
 def test_check_rejects_a_stale_global_file(tier1_container, ctmp) -> None:

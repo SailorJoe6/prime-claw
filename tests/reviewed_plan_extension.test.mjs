@@ -97,7 +97,6 @@ function fixture(t, { skill = "canonical plan body", folder = true, throwOnSend 
   mkdirSync(join(cwd, ".ralph", "plans", "future"), { recursive: true });
   if (folder) mkdirSync(join(cwd, LOCATION), { recursive: true });
   if (skill !== null) writeSkill(cwd, skill);
-  writeSkill(cwd, "---\nname: oversee-episode\ndescription: test package\n---\ncanonical oversight", "oversee-episode");
   mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
   return { cwd, ...createHarness(cwd, reviewedPlan, throwOnSend) };
 }
@@ -411,29 +410,11 @@ test("invalid implement-spec input shows usage without model injection", async (
 });
 
 
-test("invalid raw oversight delimiters block promotion before episode creation", async (t) => {
-  const invalid=[
-    " ---\nname: oversee-episode\ndescription: valid package\n---\nbody",
-    "\t---\nname: oversee-episode\ndescription: valid package\n---\nbody",
-    "--- \nname: oversee-episode\ndescription: valid package\n---\nbody",
-    "---\nname: oversee-episode\ndescription: valid package\n ---\nbody",
-    "---\nname: oversee-episode\ndescription: valid package\n\t---\nbody",
-    "---\nname: oversee-episode\ndescription: valid package\n--- \nbody",
-  ];
-  for(const raw of invalid){
-    const cwd=realpathSync(mkdtempSync(join(tmpdir(),"prime-claw-reviewed-plan-raw-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));mkdirSync(join(cwd,LOCATION),{recursive:true});writeSkill(cwd,"implementation readiness","implement-spec");writeSkill(cwd,raw,"oversee-episode");const state=join(cwd,".prime/agent/state/spec-episodes");mkdirSync(state,{recursive:true});let createCalls=0;const extension=createReviewedPlanExtension({async createEpisode(){createCalls+=1;throw new Error("episode creation must not run")}}),f=createHarness(cwd,extension);
-    const beforeEntries=structuredClone(f.entries),beforeMessages=structuredClone(f.messages);
-    await assert.rejects(()=>f.commands.get("implement-spec").handler(LOCATION,f.ctx),/frontmatter/);
-    assert.equal(createCalls,0);assert.deepEqual(f.entries,beforeEntries);assert.deepEqual(f.messages,beforeMessages);assert.deepEqual(readdirSync(state),[]);
-  }
-});
-
-test("successful create activates exact owner oversight without unsolicited message", async (t) => {
+test("successful create activates exact owner oversight without an oversight skill or unsolicited message", async (t) => {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-activate-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, LOCATION), { recursive: true });
   writeSkill(cwd, "implementation readiness", "implement-spec");
-  writeSkill(cwd, "---\nname: oversee-episode\ndescription: test package\n---\ncanonical oversight", "oversee-episode");
   mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
   let createCalls = 0;
   const episode = {
@@ -473,7 +454,7 @@ test("successful create activates exact owner oversight without unsolicited mess
 
 test("registered bookkeeping close is no-UI, exact, and idempotent", async (t) => {
   const cwd=realpathSync(mkdtempSync(join(tmpdir(),"prime-claw-reviewed-plan-close-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
-  mkdirSync(join(cwd,LOCATION),{recursive:true});writeSkill(cwd,"---\nname: oversee-episode\ndescription: test package\n---\nprocedure","oversee-episode");
+  mkdirSync(join(cwd,LOCATION),{recursive:true});
   const state=join(cwd,".prime/agent/state/spec-episodes");mkdirSync(state,{recursive:true});
   const slug="alpha-plan",worktree=resolve(dirname(cwd),`${basename(cwd)}-${slug}-episode`),identity={version:2,slug,sourceLocation:LOCATION,ownerSessionId:"owner-session",episodeId:"33333333-3333-4333-8333-333333333333",episodeActiveSessionId:"route",episodeSessionFile:join(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"};
   const identityPath=join(state,`${slug}.json`);writeFileSync(identityPath,JSON.stringify(identity));
@@ -498,7 +479,6 @@ test("historical bookkeeping replay stays alpha-scoped while beta remains active
   const cwd=realpathSync(mkdtempSync(join(tmpdir(),"prime-claw-reviewed-plan-historical-close-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
   const alphaLocation=LOCATION,betaLocation=".ralph/plans/future/beta-plan";
   mkdirSync(join(cwd,alphaLocation),{recursive:true});mkdirSync(join(cwd,betaLocation),{recursive:true});
-  writeSkill(cwd,"---\nname: oversee-episode\ndescription: test package\n---\nprocedure","oversee-episode");
   const state=join(cwd,".prime/agent/state/spec-episodes");mkdirSync(state,{recursive:true});
   const make=(slug,sourceLocation,episodeId)=>{const worktree=resolve(dirname(cwd),`${basename(cwd)}-${slug}-episode`);return{version:2,slug,sourceLocation,ownerSessionId:"owner-session",episodeId,episodeActiveSessionId:`${slug}-route`,episodeSessionFile:join(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"}};
   const alpha=make("alpha-plan",alphaLocation,"33333333-3333-4333-8333-333333333333"),beta=make("beta-plan",betaLocation,"44444444-4444-4444-8444-444444444444");
@@ -518,7 +498,7 @@ test("historical bookkeeping replay stays alpha-scoped while beta remains active
 
 test("registered actual handoff reopen refresh preserves ordinary owner oversight", async (t) => {
   const cwd=realpathSync(mkdtempSync(join(tmpdir(),"prime-claw-reviewed-plan-route-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
-  mkdirSync(join(cwd,LOCATION),{recursive:true});writeSkill(cwd,"---\nname: oversee-episode\ndescription: test package\n---\nprocedure","oversee-episode");
+  mkdirSync(join(cwd,LOCATION),{recursive:true});
   const slug="alpha-plan",worktree=resolve(dirname(cwd),`${basename(cwd)}-${slug}-episode`);t.after(()=>rmSync(worktree,{recursive:true,force:true}));mkdirSync(worktree,{recursive:true});writeSkill(worktree,"handoff","handoff");writeSkill(worktree,"execute","execute");
   const state=join(cwd,".prime/agent/state/spec-episodes");mkdirSync(state,{recursive:true});let identity={version:2,slug,sourceLocation:LOCATION,ownerSessionId:"owner-session",episodeId:"33333333-3333-4333-8333-333333333333",episodeActiveSessionId:"old-route",episodeSessionFile:join(cwd,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"};const identityPath=join(state,`${slug}.json`);writeFileSync(identityPath,JSON.stringify(identity));
   const publisher={async list(){return[{sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:false}]},async reopen(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile}},async getState(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:false,isStreaming:false,isCompacting:false,isBashRunning:false,isRunningTools:false,hasRunningRlmChildren:false,unfinishedActionCount:0,sessionActions:{queuedCount:0,steering:[],followUps:[]}}},async deliverHandoff(){},close(){}};
@@ -633,7 +613,6 @@ test("fresh native implement-spec runs can sequentially arm different reviewed f
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, LOCATION), { recursive: true });
   writeSkill(cwd, "implementation readiness", "implement-spec");
-  writeSkill(cwd, "---\nname: oversee-episode\ndescription: test package\n---\ncanonical oversight", "oversee-episode");
   mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
   const dependencies = {
     git: { repositoryRoot() { throw new Error("authorized tool reached host capability"); } },

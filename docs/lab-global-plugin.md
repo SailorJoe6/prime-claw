@@ -1,18 +1,18 @@
 # Lab-global prime-claw plugin
 
-> Scope: manual POC on Joe's personal DGX Spark only. The final sandbox uses the
-> same environment-global placement inside its isolated home.
+> Scope: supported user-global installation for the builder/lab runtime. The
+> final sandbox uses the same environment-global placement inside its isolated
+> home. Deployment follows the staged transition and restart gate below.
 
 ## Source and installed layouts
 
-The builder source is deliberately inert. It lives outside Prime Agent's
-project extension discovery path:
+The builder source is deliberately inert and contains seven managed TypeScript
+files plus one managed APPEND_SYSTEM block:
 
 ```text
 src/prime-agent-plugin/
   APPEND_SYSTEM.md
   extensions/
-    goal-heartbeat-work-control.ts
     handoff-chain.ts
     reviewed-plan.ts
   extension-support/
@@ -23,132 +23,94 @@ src/prime-agent-plugin/
     spec-episode.ts
 ```
 
-The installed copy preserves the inner relative layout under
-`~/.prime/agent/`:
-
-```text
-APPEND_SYSTEM.md  # managed block; unrelated content is preserved
-extensions/
-  goal-heartbeat-work-control.ts
-  handoff-chain.ts
-  reviewed-plan.ts
-extension-support/
-  conversation-oversight.ts
-  episode-close.ts
-  handoff-prompts.ts
-  reviewed-plan-support.ts
-  spec-episode.ts
-```
-
-Prime Agent auto-discovers the installed extension entry points. Their relative
-imports resolve through the installed `extension-support/` files.
+The installed copy preserves that inner layout under `~/.prime/agent/`. Prime
+Agent auto-discovers the two installed extension entry points; their relative
+imports resolve through the five installed `extension-support/` files.
 
 Do not keep plugin source or a second copy under this repository's or a managed
-project's `.prime/agent/extensions/` path. After a Prime Agent update, loading
-the same extension at project and user scope was observed to prevent startup.
-The old duplicate-command behavior is therefore not a safe compatibility mode.
-Renaming the directory to `extensions-bak` is only an emergency recovery step;
-the durable source belongs under `src/prime-agent-plugin/`.
-
-Project-specific Ralph policy continues to live under each project's `.ralph/`
-tree. Do not copy the plugin into each managed project.
+project's `.prime/agent/extensions/` path. Cross-scope duplicate discovery can
+prevent startup. The durable source belongs under `src/prime-agent-plugin/`.
+Project-specific Ralph policy remains under each project's `.ralph/` tree.
 
 ## Apply or refresh
 
-From the prime-claw builder repository, run:
+The candidate is first validated through the isolated tier-1 Docker gate. After
+owner acceptance of an exact deployment checkpoint, run from that candidate
+worktree:
 
 ```bash
 scripts/apply-prime-agent-plugin.sh
 scripts/check-prime-agent-plugin.sh
 ```
 
-The apply script copies only the eight allowlisted Prime Claw TypeScript files. It
-removes two formerly managed obsolete files with the same destination-type
-safety checks:
-`extension-support/episode-finalization.ts` and
-`extensions/goal-blocker-control.ts`. It does not remove or overwrite unrelated
-global extensions. The check script verifies that
-all eight installed TypeScript files match the inert builder source byte-for-byte and that
-this repository has no project-local plugin tree. The same workflow merges and
-checks one managed CONVERSATION identity block in global `APPEND_SYSTEM.md`
-without overwriting unrelated user append content. APPEND updates hold a
-same-directory advisory lock across read/validate/write, reject unsafe symlink or
-malformed-marker destinations, preserve unmanaged bytes and file mode, fsync a
-unique temporary file, and atomically replace the destination. Under the same
-lock, a later run removes only exact-pattern orphan temps whose writer PID is no
-longer alive; live-writer temps are preserved. SIGTERM/retry is tested, while an
-uncatchable interruption is reconciled on the next run rather than promised
-away. Repeated and concurrent applies converge byte-for-byte.
+Apply copies only the seven allowlisted TypeScript files. It treats these former
+managed paths as retired:
 
-TypeScript files are applied sequentially, not as one atomic generation swap.
-All destination types are preflighted before mutation and apply runs the required
-full check before reporting success, so a partial/mixed generation is detected
-and must not be activated. The canonical project-local
-`.ralph/skills/oversee-episode/SKILL.md` is preflighted but not globally copied.
+- `extensions/goal-heartbeat-work-control.ts`;
+- `extensions/goal-blocker-control.ts`; and
+- `extension-support/episode-finalization.ts`.
 
-For an isolated test destination, set `PRIME_AGENT_PLUGIN_ROOT` to the directory
-that should contain `extensions/` and `extension-support/`:
+The destination root, managed directories, and every current, redundant, and
+retired leaf are type-checked before the first delete or copy. Apply rejects
+symlinked or non-directory managed parents, removes only regular stale managed
+files, and preserves unrelated global extensions.
+Check rejects any stale retired entry and verifies each current installed file
+byte-for-byte. The installer no longer reads or preflights
+`.ralph/skills/oversee-episode/SKILL.md`.
+
+The APPEND manager preserves unrelated user bytes and file mode, serializes
+concurrent writes, rejects malformed markers and unsafe destinations, and
+converges byte-for-byte. TypeScript copies remain sequential rather than an
+atomic generation swap; the final complete check detects interruption or a mixed
+generation before apply reports success.
+
+For an isolated destination:
 
 ```bash
-PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test   scripts/apply-prime-agent-plugin.sh
-PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test   scripts/check-prime-agent-plugin.sh
+PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test scripts/apply-prime-agent-plugin.sh
+PRIME_AGENT_PLUGIN_ROOT=/tmp/prime-agent-plugin-test scripts/check-prime-agent-plugin.sh
 ```
 
-Refresh the global installation after every source change and before testing a
-new plugin generation. Copying the complete managed set avoids mixed-version
-entry points and support code.
+## Cutover and rollback
 
-Do not rely on `/reload` to replace an already loaded plugin generation. Let
-affected work quiesce, restart the Prime Agent process or session, and verify
-with a fresh process before treating the refreshed global copy as active.
+A successful apply/check proves installed bytes, not the loaded generation.
+`/reload`, elapsed time, a fresh probe, or container evidence alone is not
+cutover proof. Preserve the old oversight skill, discovery link, and reviewer
+profile while any old generation may still be loaded.
+
+For cutover:
+
+1. record the accepted candidate commit, installed hashes/check, known-good
+   rollback generation, and one exact ordinary saved conversation;
+2. let active work become idle or durably checkpointed;
+3. perform one coordinated full Prime Agent daemon/harness restart;
+4. resume the exact owner, exact episode, and designated ordinary conversation;
+5. verify one managed lean block, zero new historical oversight packages, no
+   detailed work-control overlay, and intact lifecycle authority; and
+6. obtain operator acceptance before removing compatibility resources.
+
+Saved sessions are resumed, never deleted. On failure, retain or restore every
+compatibility resource, reapply/check the known-good generation, and repeat the
+same quiesce/full-restart discipline.
 
 ## Verify runtime discovery
 
-After `scripts/check-prime-agent-plugin.sh` passes, start a fresh Prime Agent
-process from the builder or another repository and inspect its registered
-commands and tools.
+The installed generation should expose:
 
-Expected native commands:
+- native `/handoff`, `/plan`, and `/implement-spec` commands;
+- structured `ralph_handoff`, `ralph_plan`, `create_spec_episode`,
+  `handoff_spec_episode`, and `finalize_spec_episode` tools;
+- exactly one managed `PRIME_CLAW_CONVERSATION_IDENTITY_V1` block containing the
+  lean conversation/episode and goal/heartbeat protocol;
+- no separate `goal-heartbeat-work-control.ts` entry or
+  `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` overlay; and
+- lifecycle hooks from `reviewed-plan.ts` that filter historical
+  `prime-claw-oversee-episode-package` messages without producing new ones.
 
-- `/handoff`
-- `/plan`
-- `/implement-spec`
-
-Expected default identity and work-control resources:
-
-- exactly one managed `PRIME_CLAW_CONVERSATION_IDENTITY_V1` block in `APPEND_SYSTEM.md`
-- one transient, capability-gated goal/heartbeat policy from `goal-heartbeat-work-control.ts`
-- no explicit CONVERSATION launch flag
-- oversight hooks registered by the normally discovered `reviewed-plan.ts` entry
-
-Expected structured tools:
-
-- `ralph_handoff`
-- `ralph_plan`
-- `create_spec_episode`
-- `handoff_spec_episode`
-- `finalize_spec_episode` — location-only, no-UI episode bookkeeping close after verified terminal work
-
-The work-control entry registers no tool and sends no message. On each compatible
-`before_agent_start` run it adds exactly one
-`PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block. Compatibility requires the
-selected `ipython` tool plus model-visible Python skills `goal` / `goal` and
-`rlm-heartbeat` / `rlm_heartbeat`. Missing capabilities are a silent no-op;
-pre-existing or malformed work-control markers fail closed. Its event-driven
-policy gives the current active-work epoch a goal without predicting the next
-gate. After an operation actually starts, a verified heartbeat owns any ongoing
-wait and the epoch goal completes even if the broader requested outcome remains;
-a human-only blocker instead ends the epoch with one resumable checkpoint and no
-person-polling heartbeat. The obsolete installed
-`extensions/goal-blocker-control.ts` is removed by apply and rejected by check.
-Apply preserves unrelated extension files.
-
-Each command source path must resolve under `~/.prime/agent/extensions/`.
-Starting from the builder repository is an important collision check: the
-builder's source path must remain inert and must not register a second scope.
-Plugin verification does not prove a project is ready for Ralph. The project's
-`.ralph/` policy and direct skill exposure are separate `PROJECT_CONTEXT`
-preparation concerns.
+`finalize_spec_episode` remains a location-only, no-UI bookkeeping close after
+verified terminal work. It grants no Git, merge, abandonment, session, worktree,
+branch, cleanup, scope, or product authority. Plugin verification also does not
+replace project `.ralph/` readiness.
 
 ## Evidence history
 

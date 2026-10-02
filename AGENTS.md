@@ -46,16 +46,21 @@ plugin source or a copy under this repository's `.prime/agent/extensions/`
 path while the user-global plugin is installed; current Prime Agent versions can
 fail startup when the same extension is discovered at both scopes.
 
-After every plugin-source change, refresh and verify the complete user-global
-copy before testing the new generation:
+After every plugin-source change, validate the complete candidate with the
+isolated tier-1 Docker gate. Do not refresh the user-global plugin until the
+candidate reaches an accepted deployment checkpoint. At that checkpoint use the
+normal apply/check pair:
 
 ```bash
 scripts/apply-prime-agent-plugin.sh
 scripts/check-prime-agent-plugin.sh
 ```
 
-A loaded process can retain the old generation. Restart Prime Agent and use a
-fresh builder-rooted startup probe before claiming the new generation is active.
+A loaded process can retain old extension code while rereading project files.
+Keep every resource that the loaded generation may read until a coordinated full
+Prime Agent restart and resumed owner, episode, and designated ordinary-session
+UAT prove the new generation is active. `/reload`, elapsed time, copy success,
+and a fresh probe alone are not cutover proof.
 
 ## Non-Interactive Shell Commands
 

@@ -5,121 +5,106 @@ CONVERSATION capability. No launch flag or unique project-owner session is
 required. Ordinary discussion, design, specification, and planning remain native
 Prime Agent behavior.
 
-## Managed identity kernel
+## Managed lean session protocol
 
-The inert builder resource `src/prime-agent-plugin/APPEND_SYSTEM.md` contains a
+The inert builder resource `src/prime-agent-plugin/APPEND_SYSTEM.md` contains the
 short managed block identified by `PRIME_CLAW_CONVERSATION_IDENTITY_V1`.
 `scripts/apply-prime-agent-plugin.sh` merges that block into the user-global
 `~/.prime/agent/APPEND_SYSTEM.md` while preserving unrelated user append content.
-The check script verifies exactly one current managed block.
+The check script verifies exactly one byte-current block. The normalized block
+stays at or below 250 words and is the sole model-facing protocol for both
+conversation/episode oversight and goal/heartbeat work control.
 
 Prime Agent chooses a project `.prime/agent/APPEND_SYSTEM.md` before the global
-file, and `--append-system-prompt` overrides file discovery. Those supported
-configurations can shadow the kernel. A truly inactive ordinary conversation
-remains available under such a shadow. `/implement-spec` readiness, explicit
-EPISODE state, active ownership, and recovery require exactly one intact canonical
-managed block. A native depth-positive delegated/RLM child may instead rely on
-Prime Agent's trusted bounded task prompt under an intentional shadow; it receives
-zero CONVERSATION ownership and zero oversight packages. No prose heuristic is
-used.
+file, and `--append-system-prompt` overrides file discovery. A truly inactive
+ordinary conversation remains available under such a shadow. `/implement-spec`
+readiness, explicit EPISODE state, active ownership, and recovery require exactly
+one intact canonical block. A native depth-positive delegated/RLM child instead
+follows its trusted bounded task prompt under an intentional shadow; it receives
+zero CONVERSATION ownership. No prose heuristic grants ownership.
 
-The kernel defines precedence rather than detailed procedure:
+The managed block establishes these rules:
 
-- an independent depth-zero project session has default CONVERSATION capability;
-- an explicit EPISODE, EXPERT, or delegated/depth-positive child remains bounded;
-- copied history never copies exact episode ownership; and
-- oversight mode exists only while exact-session state agrees with a durable
-  spec-episode ownership expectation.
+- every independent depth-zero project session has default CONVERSATION capability;
+- reviewed design/specification and planning may promote one bounded EPISODE;
+- its owner supervises one reviewable vertical slice at a time and may accept,
+  request an in-scope revision, pause, consult the operator, or seek optional
+  independent EXPERT judgment;
+- canonical handoff preserves durable context, requests focused compaction, and
+  starts the next `execute` pass;
+- product scope, merge, abandonment, and destructive cleanup remain operator
+  decisions; and
+- substantive active work owns a goal, exact observable waits own a heartbeat,
+  human waits own neither heartbeat nor an active-work goal, and completed work
+  retains neither.
 
-Native automatic compaction remains unchanged; native compaction stays the default. Its internal summarizer uses its
-own runtime prompt. The first real conversation call after compaction receives
-the normal identity kernel and, when active, the current oversight package.
-Reload and resume rebuild the kernel from current resources.
+Native automatic compaction remains unchanged. Its internal summarizer owns its
+runtime prompt. The first real conversation call after compaction receives the
+normal managed block and no detailed oversight or work-control overlay. Reload
+and resume rebuild the block from current managed resources.
 
-## Oversight activation and package
+## Oversight activation and lifecycle mechanics
 
 Native `/implement-spec` remains the only promotion authority boundary. Before
-queuing its canonical readiness workflow, the extension verifies:
+queuing its canonical readiness workflow, the extension verifies exactly one
+effective managed block, active restoration mechanics, a writable durable
+spec-episode state directory, and canonical agreement among CWD, state, and the
+expected worktree. The current runtime and installer do not read, parse,
+validate, or inject `.ralph/skills/oversee-episode/SKILL.md`.
 
-- exactly one effective identity kernel;
-- the restoration extension is active for this session;
-- `.ralph/skills/oversee-episode/SKILL.md` follows the deliberately bounded,
-  closed frontmatter grammar: the raw file is validated before whole-file
-  whitespace normalization, with exact unindented first/closing `---` lines and
-  exactly one `name` line plus one `description` line between them, with no blank,
-  comment, unknown, duplicate, nested, or sequence metadata lines. Each key has exactly
-  one ASCII space after its colon; `name` must equal `oversee-episode`;
-  `description` and the procedure body must be nonempty. Double-quoted values
-  use a nonempty JSON-string subset;
-  single-quoted values have no escapes; and unquoted values reject YAML reserved
-  leading indicators, flow delimiters, quotes, mapping/comment forms, tabs, and
-  C0/C1 control characters. Decoded quoted controls are rejected too.
-  Indentation/nested maps, sequences, block scalars, malformed quotes/brackets,
-  and duplicate keys are unsupported and rejected. This is not a general YAML
-  parser; and
-- the durable spec-episode state directory is writable; and
-- CWD, state, and expected worktree bindings resolve from one canonical project
-  root, accepting benign filesystem aliases/symlink roots while rejecting
-  noncontained or unavailable roots before publication.
+After `create_spec_episode` durably establishes and delivers a strictly parsed
+spec-episode identity, the same tool turn appends and verifies one full active
+marker bound to every stable owner, location, episode, session, branch, worktree,
+and bootstrap field. The daemon `episodeActiveSessionId` is mutable routing, not
+stable ownership. A verified reopen may refresh that route without invalidating
+oversight.
 
-After `create_spec_episode` has durably established and delivered a strictly
-parsed spec-episode identity, the same tool turn appends and verifies one full
-active marker bound to every owner, location, episode, session, branch, worktree,
-and stable bootstrap field. The daemon `episodeActiveSessionId` is mutable routing,
-not stable ownership; exact session UUID/file ownership remains stable while a
-verified reopen may refresh the durable route without invalidating oversight.
-Activation sends no separate model message. On restart, a
-valid bootstrap-ready exact-owner expectation with no marker is recovered to an
-active marker with a visible durable recovery message. The known rejected v1
-marker schema is recognized only after exact owner filtering and migrated by
-appending a full v2 evidence marker; foreign copied v1 history is inert, and the
-newer v2 marker supersedes its generation history. Only a positively identified,
-nonempty foreign owner is ignored; missing, null, numeric, or empty owner fields
-are unclassifiable corruption. Every exact-owner generation is reconciled before
-selecting the current package or declaring ordinary mode, so an orphan active marker cannot hide behind another
-active episode. Historical inactive markers are inert when no matching identity
-exists. An inactive marker with its exact identity still present is a visible,
-retryable bookkeeping-close boundary. Corrupt or disagreeing current-owner state
-blocks; a copied marker in a different fork UUID remains inert.
+On restart, a bootstrap-ready exact-owner expectation with no marker recovers to
+an active marker with a visible durable recovery message. The rejected v1 marker
+schema is recognized only after exact owner filtering and migrates by appending
+full v2 evidence. Positively identified foreign copied history is inert. Missing,
+null, numeric, or empty owner fields are unclassifiable corruption. Every
+exact-owner generation is reconciled before ordinary mode, so orphan, duplicate,
+or disagreeing current-owner state fails closed.
 
 On every real provider context, the restoration extension:
 
-1. validates the identity kernel;
-2. finds the latest marker for the exact current session branch;
-3. requires an exact match with `.prime/agent/state/spec-episodes/<slug>.json`;
-4. removes older `prime-claw-oversee-episode-package` representations;
-5. rereads the canonical `oversee-episode` skill; and
-6. supplies exactly one fresh package.
+1. validates one byte-current managed block whenever trusted active state requires it;
+2. reconciles the latest exact-session marker with
+   `.prime/agent/state/spec-episodes/<slug>.json`;
+3. removes historical `prime-claw-oversee-episode-package` messages;
+4. never reads, parses, validates, or injects the old project-local skill; and
+5. preserves the exact bounded-identity message for an explicit EPISODE.
 
-This universal context path covers normal input, extension triggers, queues,
-native follow-ups, heartbeats, agent messages, tool continuation, reload,
-resume, and the first real post-compaction call. Missing or duplicate kernels,
-corrupt markers, ownership disagreement, or missing/malformed packages call
-`ctx.abort()` before provider dispatch and surface an exact error.
+This path covers normal input, extension triggers, queues, native follow-ups,
+heartbeats, agent messages, tool continuation, reload, resume, and the first real
+post-compaction call. Missing or duplicate managed blocks and corrupt or
+disagreeing trusted state call `ctx.abort()` before provider dispatch. Missing
+old compatibility skill files do not affect the current generation.
 
-An ordinary fork still sees the identity kernel, but a copied owner marker is
-inert because its session UUID differs. The implement-spec fork receives an
-explicit EPISODE identity entry. EXPERT and delegated RLM children follow their
-bounded task and runtime depth rather than assuming owner authority.
+## Lean model-facing protocol
 
-## Canonical oversight procedure
+The managed APPEND_SYSTEM block is the current policy. It tells an owner to
+review evidence rather than implement its episode, use optional independent
+EXPERT judgment when useful, and advance only through canonical handoff. Reports
+are evidence, never approval or native-command dispatch. Deterministic plugin
+code owns identity, lifecycle, admission, handoff, and idempotent bookkeeping
+mechanics; the model exercises bounded review judgment.
 
-`.ralph/skills/oversee-episode/SKILL.md` is both the project-customizable skill
-and the sole active package source. It requires:
+## Loaded-generation compatibility reference (temporary)
 
-- one direct owner-coordination message;
-- exactly one non-steering 15-minute heartbeat per active bootstrap,
-  continuation, repair, review-rework, or evidence generation;
-- exact session/Git/commit/test/doc/plan/Bead/worktree reconciliation;
-- independent exact-commit review and owner-ledger evidence;
-- `advance`, `revise`, `consult`, or `pause` within approved scope;
-- explicit operator authority for merge, abandonment, unresolved product scope,
-  and destructive cleanup; and
-- return to ordinary CONVERSATION mode after exact bookkeeping close.
+`.ralph/skills/oversee-episode/SKILL.md`, its
+`.agents/skills/oversee-episode` discovery symlink, and
+`.prime/agent/profiles/expert-reviewer.md` remain byte-current only because an
+already-loaded old extension generation rereads live project files. They are not
+current runtime or installer prerequisites and are not the supported model-facing
+policy. Keep them until one coordinated full restart plus resumed owner, episode,
+and designated ordinary-conversation UAT is accepted. A failed cutover restores
+the known-good installed generation and all compatibility resources.
 
-Reports are evidence, never approval or native-command dispatch. The heartbeat
-is the missed-report safety net and is cancelled when its generation is
-reconciled or waiting only for owner/operator action.
+The following dogfood chronology and detailed owner/EXPERT procedure document the
+old loaded generation. They are retained as migration evidence, not as current
+activation requirements.
 
 ### Completed dogfood evidence
 
@@ -284,12 +269,14 @@ merge or another terminal disposition.
 
 ## Exact bookkeeping close
 
-After a fresh final EXPERT `PASS`, the owning CONVERSATION presents readiness in
-ordinary conversation. The operator's merge, revise, pause, or abandon response
-is the sole terminal decision. Revision and pause retain the episode. For merge
-or abandonment, the owner inspects live state, performs the applicable Git,
-session, worktree, branch-retention, and cleanup actions with ordinary tools, and
-verifies their outcome. Ambiguity blocks destructive cleanup.
+After the approved plan is fully implemented and its exact evidence is reviewed,
+the owning CONVERSATION presents readiness in ordinary conversation. An
+independent EXPERT review is optional evidence, not a mandatory gate or merge
+authority. The operator's merge, revise, pause, or abandon response is the sole
+terminal decision. Revision and pause retain the episode. For merge or
+abandonment, the owner performs and verifies only the authorized Git, session,
+worktree, branch-retention, and cleanup actions. Ambiguity blocks destructive
+cleanup.
 
 Only after terminal work is verified does the owner call
 `finalize_spec_episode(location)`. Despite its compatibility name, this is a
@@ -325,19 +312,28 @@ removes every registered resource.
 
 ## Installation boundaries
 
-Builder sources remain inert under `src/prime-agent-plugin/`. The apply/check
-workflow manages eight TypeScript files plus one APPEND_SYSTEM block. The managed
-`goal-heartbeat-work-control.ts` registers one transient, capability-gated
-`before_agent_start` policy and no model-facing pause/resume tools. Its generic,
-event-driven lifecycle treats an actual monitored wait or human-only blocker as
-an ownership transfer; completing that active-work epoch is not a claim that the
-broader requested outcome finished. This remains independent of Ralph's execute
-skill. Oversight registration remains co-located with the normally discovered
+Builder sources remain inert under `src/prime-agent-plugin/`. The transition
+apply/check workflow manages seven TypeScript files plus one APPEND_SYSTEM block.
+There is no separate `goal-heartbeat-work-control.ts` entry point and no
+`before_agent_start` work-control overlay. Apply treats a stale installed copy as
+a retired managed file: all managed and retired destinations are type-checked
+before the first mutation, then a regular stale copy is removed. Check rejects
+any surviving copy. The current installer does not preflight or copy the old
+`oversee-episode` skill.
+
+Oversight registration remains co-located with the normally discovered
 `reviewed-plan.ts` entry point; there is no redundant production
-`project-conversation.ts` entry. The
-`oversee-episode` skill remains project-local and is validated before apply; it
-is not copied into the global agent directory. `.agents/skills/oversee-episode`
-exposes that same canonical file through normal project skill discovery.
+`project-conversation.ts` entry. Historical package messages are filtered by
+`conversation-oversight.ts`, but no new package is produced.
+
+Installation is not runtime cutover. Apply the accepted candidate, verify it,
+then perform one coordinated full Prime Agent daemon/harness restart. Resume the
+exact owner, exact episode, and a preidentified ordinary project conversation
+before accepting cutover. `/reload`, file-copy success, elapsed time, and
+container evidence alone are insufficient. Saved sessions are resumed, never
+deleted. Keep the temporary compatibility skill, link, and profile until this
+resumed-session evidence is accepted; on failure restore the known-good plugin
+generation and resources before another attempt.
 
 The extension registers no CONVERSATION launch flag and emits no startup turn.
 It does not replace `/prepare`, `/design`, `/spec-it-out`, `/plan`,

@@ -1,39 +1,27 @@
 # Goal and heartbeat work control
 
-Prime Claw supplies one plugin-global policy for deciding whether useful work is
-owned by a persistent goal or an agent-owned heartbeat. The policy is generic;
-Ralph `/execute` owns only plan execution and does not duplicate it.
+Prime Claw's one managed lean session block in
+`src/prime-agent-plugin/APPEND_SYSTEM.md` owns the model-facing goal and heartbeat
+rules. Ralph `/execute` applies those generic rules while implementing plans; it
+does not install a second policy.
 
 ## Supported runtime boundary
 
-The implementation targets the installed Prime Agent `0.9.7` downstream build
-`cwd-fix-v0.9.7-r1` at
-`c094b9eea32173d7c4dd0c0a444a332ebac8f5d8`. Prime Agent `0.9.6` appears only
-in the incident history below. Prime Claw does not patch or roll back Prime
-Agent.
+The APPEND_SYSTEM block is installed with the managed Prime Claw plugin and is
+validated byte-for-byte by the conversation lifecycle extension whenever trusted
+active state requires it. There is no separate `before_agent_start` overlay,
+capability gate, `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block, tool, message,
+or autonomous slash-command transport.
 
-`src/prime-agent-plugin/extensions/goal-heartbeat-work-control.ts` uses the
-public `before_agent_start` hook. It returns a replacement system prompt for the
-current run only. It does not register a tool, send a message, or write session
-state. A project `APPEND_SYSTEM.md` is already part of the base prompt and
-cannot suppress the later contribution.
+The block states the bounded control contract directly:
 
-A run is compatible only when structured runtime data shows all three:
-
-- `ipython` is selected (or Prime Agent supplies its documented default tool
-  set);
-- the model-visible Python skill `goal` has import name `goal`; and
-- the model-visible Python skill `rlm-heartbeat` has import name
-  `rlm_heartbeat`.
-
-Missing or disabled capabilities are a silent no-op. The extension does not
-infer capability by parsing rendered prose or checking files. Compatibility is
-re-evaluated for every run, including after resource reload.
-
-The deterministic block is bounded to 4,000 UTF-8 bytes excluding markers. It
-contains exactly one `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` sentinel. Any
-pre-existing start marker, end marker, or sentinel is a collision and fails
-closed rather than accumulating or accepting malformed policy state.
+- substantive active work maintains one compatible goal so interrupted work can resume;
+- before waiting on an exact observable process or agent, establish its heartbeat
+  and complete the active-work goal;
+- after a terminal observation, remove the heartbeat and create a fresh goal only
+  if substantive work remains;
+- waiting on a person completes the current goal and creates no heartbeat; and
+- completed work retains neither object.
 
 ## Ownership model
 
@@ -43,129 +31,78 @@ Ownership follows the next useful action:
 |---|---|---|
 | Active agent work | Agent | One compatible bounded goal |
 | Observable external wait | Exact process, job, deployment, or worker | One bounded heartbeat per independent wait |
-| Human-only blocker | Operator or external authority | Current epoch goal completes at the actionable handoff; no person-polling heartbeat |
+| Human-only blocker | Operator or external authority | No polling heartbeat; close the active-work epoch at the actionable handoff |
 | Finished | Nobody | No outcome-owned goal or heartbeat remains |
 
-A goal may overlap a heartbeat only during the short safe transfer that creates
-and verifies monitoring before completing the active-work goal, or when each
-owns independent work.
-
-### Active work
-
-For substantive multi-step work, inspect current goal state and create one
-bounded goal for the current active-work epoch unless a compatible active goal
-already owns the same authorized work. The epoch advances the broader requested
-outcome, but completing it does not claim that outcome is complete. Goal creation
-does not require predicting the next gate or ownership boundary. Do not create
-goals for quick answers. Never complete, replace, or reinterpret an incompatible
-pending goal merely to make room.
-
-### Observable waits
-
-When the agent actually starts a long-running or background operation such as a
-subagent, build or test, download, deployment, or container startup:
-
-1. Retain an inspectable handle and output or status location.
-2. Create one `rlm_heartbeat` monitor with exact running, success, failure,
-   staleness, cleanup, and resumable-checkpoint conditions.
-3. Verify the heartbeat ID and recheck the operation.
-4. If it is already terminal, delete and verify the monitor and handle the
-   result now.
-5. If it is still running, complete the current epoch goal even when requested
-   work remains, report the handoff, and end the turn.
-
-A non-terminal check reports only meaningful change, creates no goal, and never
-restarts work. Routine monitors use follow-up delivery. The first terminal
-observer captures evidence, deletes and verifies the exact monitor, performs
-bounded cleanup, and acts idempotently. It creates a fresh goal only when
-substantive agent work remains. A completed epoch is never resumed.
-
-### Human blockers
-
-When blocked or waiting for user input, credentials, permission, physical
-action, a product decision, or another human-only dependency, stop only monitors
-that cannot produce useful evidence. Complete the current epoch goal even when
-the requested outcome remains unfinished. Report the exact blocker, external
-action, process state, and one resumable checkpoint, then stop without creating
-a heartbeat merely to poll the person. After the blocker clears, create a fresh
-goal before substantive work resumes.
+A goal and heartbeat may overlap only during the short transfer that verifies
+monitoring before completing the active-work goal, or when each owns independent
+work. A nonterminal observation reports only meaningful change and never restarts
+work. Terminal handling captures evidence, deletes the exact monitor, performs
+bounded cleanup, and proceeds idempotently.
 
 Prime Claw never injects, simulates, or calls native `/goal pause` or
-`/goal resume` for autonomous work control. Human use of Prime Agent's native
-goal commands remains authoritative.
+`/goal resume`. Human use of Prime Agent's native goal commands remains
+authoritative.
 
-## Migration and activation
+## Retired extension migration
 
-The obsolete model-facing `pause_thread_goal` and `resume_thread_goal` tools and
-`src/prime-agent-plugin/extensions/goal-blocker-control.ts` are removed. Apply
-removes the formerly managed installed file
-`extensions/goal-blocker-control.ts` only when destination preflight confirms
-all managed paths are safe regular files or absent. Check rejects a stale old
-file. Unrelated global extensions and unmanaged `APPEND_SYSTEM.md` bytes are
-preserved.
+`src/prime-agent-plugin/extensions/goal-heartbeat-work-control.ts` is retired and
+absent from the seven-file managed source set. The older
+`extensions/goal-blocker-control.ts` is also absent. Apply/check treat both as
+retired managed destinations:
 
-Apply/check are safe to test under an isolated `PRIME_AGENT_PLUGIN_ROOT`. For
-the managed user-global installation run:
+- every current and retired destination is checked before the first mutation;
+- apply removes a stale regular installed copy and rejects directories or symlinks;
+- check rejects any surviving stale or unsafe copy; and
+- unrelated global extensions and unmanaged APPEND_SYSTEM bytes are preserved.
+
+The installer no longer reads or validates the project-local `oversee-episode`
+skill. That skill, its discovery link, and its reviewer profile remain temporary
+loaded-generation compatibility resources until accepted cutover evidence.
+
+## Activation and rollback
+
+Candidate tests use an isolated `PRIME_AGENT_PLUGIN_ROOT` and the complete tier-1
+Docker gate. Only an accepted deployment checkpoint may be applied to the
+user-global installation:
 
 ```sh
 scripts/apply-prime-agent-plugin.sh
 scripts/check-prime-agent-plugin.sh
 ```
 
-Installation is not activation. The already loaded Prime Agent process may
-retain its old extension generation. Do not use `/reload` as an activation
-claim. The operator must restart Prime Agent once work is quiescent and perform
-the manual checks below in a fresh session.
+Installation is not activation. `/reload`, elapsed time, copy success, or
+container evidence alone cannot prove the loaded generation changed. Quiesce
+active work, perform one coordinated full Prime Agent daemon/harness restart,
+and resume the exact owner, exact episode, and preidentified ordinary project
+conversation. The operator accepts that UAT before compatibility cleanup. On
+failure, retain or restore compatibility resources, reapply the known-good
+plugin generation, and repeat the same full-restart discipline. Saved sessions
+are resumed, never deleted.
 
-Apply does not mutate stored goal state or purge already queued old-generation
-messages. A legacy paused or budget-limited goal requires human recovery with
-native goal controls or a fresh clean session.
+## Automated evidence
 
-## Acceptance evidence
+Coverage proves:
 
-Proportionate automated coverage is intentionally non-native:
+- the managed block contains the required goal/heartbeat rules and stays within
+  its 250-word bound;
+- the managed plugin has exactly seven TypeScript files and no retired source,
+  overlay sentinel, pause/resume tool, or autonomous slash-command transport;
+- installer migration removes a stale regular retired entry, rejects unsafe
+  destination types before mutation, preserves unrelated files, and converges;
+- provider contexts contain one managed lean block and no separate detailed
+  work-control overlay; and
+- lifecycle tests cover active work, waits, reload/resume, and post-compaction
+  operation without the old oversight skill.
 
-- direct Node tests cover capability gating before collision validation,
-  incompatible-plus-marker unchanged no-op with zero notification/abort,
-  default tool selection, deterministic bounded content, compatible marker
-  collisions, transient behavior, no message/state mutation, and project-append
-  coexistence;
-- Python static tests prove the obsolete tools, source entry, and autonomous
-  slash-command transport are absent;
-- isolated installer tests prove safe obsolete-file migration, unsafe-path
-  rejection, unrelated-file preservation, convergence, and check behavior;
-- the safe non-native Python suite and `git diff --check` provide regression
-  coverage.
-
-The prior native provider-capture run on rejected commit
-`3f2072e3f6031f688a1dcb437da79f278df2f254` was informative but violated the
-machine's single-instance rule and is not acceptance evidence. Its standalone
-RPC framework and machine-readable evidence matrix were removed. No concurrent
-Prime Agent process, broad version matrix, or repeated native suite is required.
+## Historical evidence and incident lineage
 
 The operator-controlled restart and visible manual UAT completed on 2026-09-30
-against the installed generation from accepted repair
-`486f4af62b7c1088a0ad10eb9ca05a2e0f735401`:
+against accepted repair `486f4af62b7c1088a0ad10eb9ca05a2e0f735401`. It proved
+the then-current no-steering goal/heartbeat semantics and remains durable on
+`prime-claw-h6w.24.2`; it does not replace this transition's restart gate.
 
-1. Joe confirmed `pause_thread_goal` and `resume_thread_goal` were absent.
-2. Goal `1cac0599-adbd-4ed1-9e84-24d854a277e5` transferred an observable PID
-   `46498` wait to heartbeat `6c244df4-97ab-4c95-8e8d-0521215322e6`. The goal
-   completed while the broader UAT remained unfinished; a nonterminal check did
-   not create a goal or restart work; terminal handling observed exit 0, deleted
-   and verified absence of the heartbeat, and removed the marker.
-3. Human-blocker goal `4c5fcf18-3f69-4f8c-99de-d68bbef7f721` completed with an
-   empty heartbeat inventory and one resumable checkpoint. Joe supplied the
-   requested `human-blocker-uat-cleared` token before fresh substantive work.
-
-The exact visible receipts are durable on `prime-claw-h6w.24.2`. Hidden
-capability gating and non-accumulation remain direct-test contracts, not claims
-from manual observation.
-
-## Incident lineage
-
-On Prime Agent `0.9.6`, operator-observed queued pause/resume transport produced
-two unsafe outcomes: a pause steer interrupted the very work that needed to
-create monitoring, and a queued resume outlived its premise and arrived after
-later work had already completed. Those incidents motivated the no-steering,
-fresh-goal design. They do not establish behavior on `0.9.7` and are retained
-only as design provenance.
+On Prime Agent `0.9.6`, queued pause/resume transport interrupted active work and
+later delivered after its premise expired. Those incidents motivated the
+no-steering, fresh-goal design. They are design provenance, not claims about the
+current managed generation. Prime Claw does not patch or roll back Prime Agent.

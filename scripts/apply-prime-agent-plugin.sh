@@ -5,7 +5,6 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source_root="$repo_root/src/prime-agent-plugin"
 destination_root="${PRIME_AGENT_PLUGIN_ROOT:-${HOME:?HOME must be set}/.prime/agent}"
 files=(
-  extensions/goal-heartbeat-work-control.ts
   extensions/handoff-chain.ts
   extensions/reviewed-plan.ts
   extension-support/conversation-oversight.ts
@@ -24,19 +23,30 @@ for relative in "${files[@]}"; do
 done
 
 kernel_source="$source_root/APPEND_SYSTEM.md"
-oversee_skill="$repo_root/.ralph/skills/oversee-episode/SKILL.md"
 if [[ ! -s "$kernel_source" ]]; then
   printf 'missing or empty identity kernel: %s\n' "$kernel_source" >&2
   exit 1
 fi
-if [[ ! -s "$oversee_skill" ]]; then
-  printf 'missing or empty canonical oversight package: %s\n' "$oversee_skill" >&2
-  exit 1
-fi
+# Reject symlinked or non-directory managed roots before inspecting leaf paths.
+managed_directories=(
+  "$destination_root"
+  "$destination_root/extensions"
+  "$destination_root/extension-support"
+)
+for directory in "${managed_directories[@]}"; do
+  if [[ -e "$directory" || -L "$directory" ]]; then
+    if [[ ! -d "$directory" || -L "$directory" ]]; then
+      printf 'unsafe managed plugin directory (expected absent or real directory): %s\n' "$directory" >&2
+      exit 1
+    fi
+  fi
+done
+
 python3 "$repo_root/scripts/manage-prime-agent-append-system.py" validate "$kernel_source" "$destination_root/APPEND_SYSTEM.md"
 
 # Reject every unsafe managed TypeScript destination before the first delete or copy.
 obsolete_files=(
+  extensions/goal-heartbeat-work-control.ts
   extensions/goal-blocker-control.ts
   extension-support/episode-finalization.ts
 )
