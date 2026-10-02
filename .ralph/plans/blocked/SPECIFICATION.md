@@ -1,12 +1,24 @@
 # Future Specification — Official lean session protocol
 
-> **Status:** Reviewed; implementation authorized
+> **Status:** BLOCKED during OL-011 acceptance validation
 >
 > **Scope:** Promote the dogfooded lean conversation/episode and goal/heartbeat
 > protocol from a reversible POC to Prime Claw's supported default without
 > breaking sessions that still run an older loaded plugin generation.
 >
 > **Tracking:** `prime-claw-h6w.25`
+
+## Current validation blocker
+
+The accepted OL-011 test-only repair is implemented at `6322a18e1bb921478a7d9e7c67a8eff4088481a3`, but the
+required complete Tier 0/Tier 1 sequencer cannot finish because the independently
+tracked Darwin watchdog defect `prime-claw-zwg.5.1` failed Tier 0 on three bounded
+exact-candidate attempts. Complete selected Tier 1 and all focused OL-011 tests
+pass. This specification does not authorize folding that unrelated watchdog
+repair into Slice 1, excluding it, or retrying indefinitely. Resume only after an
+independent accepted fix is authorized for integration, or the operator explicitly
+revises the gate contract. Full receipts and the resumable checkpoint are in the
+blocked execution plan and `prime-claw-h6w.25`.
 
 ## Summary
 

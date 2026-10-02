@@ -1,6 +1,6 @@
 # Execution Plan — Official lean session protocol
 
-> **Status:** Active; Slice 1 candidate `7369829` rejected, bounded OL-011 revision authorized
+> **Status:** BLOCKED; OL-011 code proof passes, exact full gate blocked by `prime-claw-zwg.5.1`
 >
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 >
@@ -10,6 +10,40 @@
 > and one operator-controlled full runtime restart before cleanup. The episode
 > branch remains unmerged through the cutover so `main` continues to provide all
 > compatibility files to old loaded sessions.
+
+## Current execution blocker
+
+Exact OL-011 code candidate `6322a18e1bb921478a7d9e7c67a8eff4088481a3` (tree `68125ad163dc9a9bb72e296b05af2b913b9210f6`) is committed
+locally. The accepted provider-boundary repair passes its exact system-channel
+control and the complete focused native provider/lifecycle set. The complete
+selected Tier 1 suite also passes: `48 passed, 383 deselected` in 98.42s, receipt
+`.test-results/ol011-final/tier1-diagnostic-after-watchdog.log`, SHA256
+`365c8198150db62faaa448b25a3328d2bbd297889223cea74532d27282629830`.
+
+The required canonical `scripts/test-all.sh` gate cannot complete because the
+independent Darwin process-group watchdog defect tracked as
+`prime-claw-zwg.5.1` failed Tier 0 on three bounded attempts against the exact
+candidate. The attempts produced the two previously baseline-reproduced
+signatures; OL-011 changes neither `tests/test_embedding_candidate_build.py` nor
+`bin/prime-claw`. No attempt reached Tier 1:
+
+1. `.test-results/ol011-final/failed-gate-watchdog.json`: stall-test
+   `TimeoutExpired`; raw Tier 0 SHA256
+   `9b92f402b592af11bfa0c13b708c2a0648b59f5ffbfc58985ba3ae7a2d5c513f`.
+2. `.test-results/ol011-final/failed-gate-watchdog-rerun.json`: progress-reset
+   test returned 124; raw Tier 0 SHA256
+   `53ab940fea2081e28c293c026f9d73fdc623c7bd9f30482e09fcd9f1c82657c4`.
+3. `.test-results/ol011-final/blocked-final-gate.json`: stall-test
+   `TimeoutExpired`; raw Tier 0 SHA256
+   `dbf3830c7c3443dece2962a52c8876ddc3e59436abfd4208079667546af73916`.
+
+No broad exclusion, watchdog change, host-global operation, or additional retry
+is authorized in this Slice 1 repair. Unblock by independently repairing and
+accepting `prime-claw-zwg.5.1`, then obtaining owner authorization to integrate
+that repair and rerun the complete exact-candidate gate; alternatively, the
+operator may explicitly revise the acceptance contract. Until then the OL-011
+commit is not a replacement candidate for owner acceptance, despite its green
+focused and complete Tier 1 evidence.
 
 ## Outcome
 
