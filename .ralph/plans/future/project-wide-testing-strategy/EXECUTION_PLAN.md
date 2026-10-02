@@ -1,7 +1,7 @@
 # Execution plan — project-wide isolation-first testing strategy
 
-> **Status:** FUTURE plan, awaiting operator review; implementation readiness
-> is blocked only on open prerequisite `prime-claw-blw.5`.
+> **Status:** FUTURE plan, operator-approved and implementation-ready. External
+> prerequisites are closed in `3bf9059` / `927b394`; no episode exists yet.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md).
 > **Selected future folder:**
 > `.ralph/plans/future/project-wide-testing-strategy`.
@@ -40,13 +40,15 @@ Planning began at `main` commit `2f4fde2`. The reconciled baseline is
 
 - The original `python3 -m pytest tests/ -q` baseline was **274 passed,
   144 skipped** in 37.89s across 418 cases.
-- From a clean `ded4a8c` archive, pytest collects **422 cases**: 40
+- From a clean `ded4a8c` archive, pytest collected **422 cases**: 40
   `container`, 107 `sandbox`, and 275 neither. The full tier-0 run was **274
-  passed, 147 skipped, 1 failed** in 34.70s because the known timing-sensitive
+  passed, 147 skipped, 1 failed** in 34.70s because the timing-sensitive
   `test_candidate_progress_watchdog_resets_and_signal_cleanup_reaps_group`
-  tripped; its immediate isolated rerun passed. The landed repair evidence
-  records the same unrelated flake. This is baseline disclosure, not permission
-  for automatic retry or for weakening the assertion.
+  tripped. `prime-claw-zwg.5.1` later proved a pre-`setsid` readiness race that
+  also caused the enclosing-process timeout signature; `3bf9059` repaired both
+  before implementation admission. Its clean post-fix gate collected **430
+  cases**: tier 0 **283 passed, 147 skipped** and tier 1 **40 passed, 390
+  deselected**. No retry or weakened assertion was used.
 - The six `test_runtime_*` modules account for all 107 `sandbox` cases, but
   are offline/mocked. One case alone runs real host Node.
 - Tier 1 is one session container driven by host pytest. The repository is
@@ -133,9 +135,9 @@ plan and the revised specification contain every load-bearing finding.
 Strict order:
 
 ```text
-✓ prime-claw-4mw  landed guardrail baseline (`672be3b` / `ded4a8c`)
-
-prime-claw-blw.5  remaining external prerequisite
+✓ prime-claw-4mw     guardrail baseline (`672be3b` / `ded4a8c`)
+✓ prime-claw-blw.5   pinned installer PATH (`3bf9059` / `927b394`)
+✓ prime-claw-zwg.5.1 watchdog readiness race (`3bf9059` / `927b394`)
   ↓
 S1  prime-claw-5v7.2  pinned provenance + source fail-close
   ↓
@@ -154,10 +156,9 @@ S7  prime-claw-5v7.6  real destroy target/sentinel proof
 S8  prime-claw-5v7.3  gbrain no-write/source-coverage evidence
 ```
 
-`prime-claw-4mw` is closed and included in the planning baseline.
-`prime-claw-blw.5` must close before S1 begins. The episode rebases and preserves
-both fixes; it does not reimplement them. `prime-claw-blw.4` is explicitly
-non-blocking.
+`prime-claw-4mw`, `prime-claw-blw.5`, and `prime-claw-zwg.5.1` are closed
+and included in the implementation baseline. The episode preserves their fixes;
+it does not reimplement them. `prime-claw-blw.4` is explicitly non-blocking.
 
 ### 3.2 Per-slice operating rules
 
@@ -226,7 +227,7 @@ exist, and the final slice adds a completeness assertion that every normative
 
 **Bead:** `prime-claw-5v7.2`
 
-**Blocker:** `prime-claw-blw.5` must close before pinned acceptance.
+**Satisfied prerequisite:** `prime-claw-blw.5` landed in `3bf9059`.
 
 **Outcome:** pinned tier-1 runs have exact, concurrent-safe provenance, test
 execution is offline, and the unsafe source selector fails before the external
@@ -268,8 +269,8 @@ checkout is inspected or mutated.
 
 - Red proof uses fakes and detects current shared log/no-manifest behavior; it
   never runs the current source pack path against a real checkout.
-- After `prime-claw-blw.5` closes, the pinned run produces a valid manifest and
-  launches the exact iidfile image ID.
+- With the landed `prime-claw-blw.5` PATH repair preserved, the pinned run
+  produces a valid manifest and launches the exact iidfile image ID.
 - A source selector exits nonzero before any read or write below the checkout;
   a recording fake proves zero source commands.
 - Apply/check/probes execute only after network absence is verified.

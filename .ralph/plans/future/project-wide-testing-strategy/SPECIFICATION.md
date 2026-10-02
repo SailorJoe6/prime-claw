@@ -1,8 +1,10 @@
 # Project-wide testing strategy — isolation-first test architecture
 
-> **Status:** FUTURE specification, operator-reviewed for planning and
-> refactored alongside its execution plan on 2026-10-02. Implementation is
-> not authorized until a separate `/implement-spec` command.
+> **Status:** FUTURE specification, operator-approved for implementation by
+> `/implement-spec` on 2026-10-02. Episode creation was held while external
+> blockers were repaired; they are now satisfied by `3bf9059` / `927b394`.
+> No implementation episode has been created. Replay `/implement-spec` to
+> create it from the current approved bundle.
 > **Origin:** operator charter, 2026-10-02 (independent planning-only
 > conversation `01a0fe09-9641-73af-9889-b44e302490d1`).
 > **Tracking:** planning bead `prime-claw-5v7`.
