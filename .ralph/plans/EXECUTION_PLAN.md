@@ -1,6 +1,6 @@
 # Execution Plan — Official lean session protocol
 
-> **Status:** BLOCKED; OL-011 code proof passes, exact full gate blocked by `prime-claw-zwg.5.1`
+> **Status:** Active; bounded watchdog/PATH unblock accepted for exact OL-011 continuation
 >
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 >
@@ -11,7 +11,7 @@
 > branch remains unmerged through the cutover so `main` continues to provide all
 > compatibility files to old loaded sessions.
 
-## Current execution blocker
+## Resolved execution blocker and authorized continuation
 
 Exact OL-011 code candidate `6322a18e1bb921478a7d9e7c67a8eff4088481a3` (tree `68125ad163dc9a9bb72e296b05af2b913b9210f6`) is committed
 locally. The accepted provider-boundary repair passes its exact system-channel
@@ -37,13 +37,20 @@ signatures; OL-011 changes neither `tests/test_embedding_candidate_build.py` nor
    `TimeoutExpired`; raw Tier 0 SHA256
    `dbf3830c7c3443dece2962a52c8876ddc3e59436abfd4208079667546af73916`.
 
-No broad exclusion, watchdog change, host-global operation, or additional retry
-is authorized in this Slice 1 repair. Unblock by independently repairing and
-accepting `prime-claw-zwg.5.1`, then obtaining owner authorization to integrate
-that repair and rerun the complete exact-candidate gate; alternatively, the
-operator may explicitly revise the acceptance contract. Until then the OL-011
-commit is not a replacement candidate for owner acceptance, despite its green
-focused and complete Tier 1 evidence.
+Those failures remain preserved and are not accepted as a successful canonical
+gate. The operator subsequently accepted a bounded unblock. The next execute pass
+must integrate accepted `origin/main` through
+`eca48f8b284c990a8e030062ef70192313781b7f`, including watchdog/PATH repair
+`3bf905976a1a489d93e81619a838b34fc7ed8a31` and bead closures
+`927b3941ebab281c18ceacfc3c922f82e75db9fc`, reconcile only resulting in-scope
+progress/evidence, and rerun `scripts/test-all.sh` against the resulting exact
+candidate. Retain correlatable raw logs, commit/tree/dependency identity,
+supersession mapping, and teardown proof, then stop for exact-candidate owner
+review.
+
+Preserve the OL-011 provider-`systemPrompt` proof, OL-008 isolation, and every
+compatibility resource. Do not perform host-global apply/check, Slice 2, restart,
+cleanup, merge, or deployment-topology changes.
 
 ## Outcome
 

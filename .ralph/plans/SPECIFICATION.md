@@ -1,6 +1,6 @@
 # Future Specification — Official lean session protocol
 
-> **Status:** BLOCKED during OL-011 acceptance validation
+> **Status:** Active; operator accepted bounded OL-011 unblock and continuation
 >
 > **Scope:** Promote the dogfooded lean conversation/episode and goal/heartbeat
 > protocol from a reversible POC to Prime Claw's supported default without
@@ -8,17 +8,22 @@
 >
 > **Tracking:** `prime-claw-h6w.25`
 
-## Current validation blocker
+## Accepted bounded unblock
 
-The accepted OL-011 test-only repair is implemented at `6322a18e1bb921478a7d9e7c67a8eff4088481a3`, but the
-required complete Tier 0/Tier 1 sequencer cannot finish because the independently
-tracked Darwin watchdog defect `prime-claw-zwg.5.1` failed Tier 0 on three bounded
-exact-candidate attempts. Complete selected Tier 1 and all focused OL-011 tests
-pass. This specification does not authorize folding that unrelated watchdog
-repair into Slice 1, excluding it, or retrying indefinitely. Resume only after an
-independent accepted fix is authorized for integration, or the operator explicitly
-revises the gate contract. Full receipts and the resumable checkpoint are in the
-blocked execution plan and `prime-claw-h6w.25`.
+The accepted OL-011 test-only repair remains implemented at
+`6322a18e1bb921478a7d9e7c67a8eff4088481a3`. Its focused and complete selected
+Tier 1 evidence is green. Three canonical full-gate attempts were blocked only by
+the independently tracked Darwin watchdog defect `prime-claw-zwg.5.1`; those
+receipts remain durable and are not relabeled.
+
+The operator accepted the bounded unblock and authorized continuation: integrate
+accepted `origin/main` through `eca48f8b284c990a8e030062ef70192313781b7f`,
+including watchdog/PATH repair `3bf905976a1a489d93e81619a838b34fc7ed8a31`
+and bead closures `927b3941ebab281c18ceacfc3c922f82e75db9fc`; preserve
+the OL-011 provider-`systemPrompt` proof and all compatibility resources; then
+rerun the complete canonical Tier 0/Tier 1 gate with exact receipts and teardown.
+This authority does not extend to host-global apply/check, Slice 2, restart,
+cleanup, merge, or deployment-topology changes.
 
 ## Summary
 
