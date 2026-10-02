@@ -1,6 +1,6 @@
 # Execution Plan — Compaction-first phase transitions
 
-> **Status:** IMPLEMENTING — Slice 1 Docker-only candidate ready for owner review; Slice 2 not started.
+> **Status:** OWNER REVIEW — Slice 1 accepted at exact pushed commit `200be5744003ac47cecd2d79a337df3e4c4aeebc`; exact Slice 2 candidate `94e4488ade82e1a2a8ce74cf956993870759d1f3` delivered and pending owner review.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Future folder:** `.ralph/plans/future/compaction-first-phase-transitions/`
 > **Bead chain:** `prime-claw-h6w.26` (Slice 1) → `prime-claw-h6w.27` (Slice 2),
@@ -105,9 +105,11 @@ internals. Prime Agent remains an upstream dependency.
 
 **Bead:** `prime-claw-h6w.26`
 
-**Implementation status:** Rebased onto the accepted Docker-only guardrail
-repair and fully revalidated on 2026-10-02. The candidate awaits independent
-owner review. Slice 2 remains blocked on explicit acceptance.
+**Implementation status:** Owner-accepted at exact pushed commit
+`200be5744003ac47cecd2d79a337df3e4c4aeebc` on 2026-10-02. Its dependency gate
+for Slice 2 is satisfied. Exact Slice 2 candidate
+`94e4488ade82e1a2a8ce74cf956993870759d1f3` is delivered and pending owner
+review.
 
 ### Working capability
 
