@@ -137,6 +137,13 @@ and respect episode terminality. It may use separately pushed commits within one
 unmerged episode when that keeps the canonical checkout safe; it must not assume
 an episode continues after merge.
 
+The isolation-first installer guard now refuses user-global activation from a
+linked episode worktree and permits it only from primary `main`. That conflicts
+with the previously planned unmerged transition install/restart/cleanup topology.
+Slice 1 remains independently reviewable, but no later deployment, early merge,
+terminality change, or cleanup topology is authorized until the owner/operator
+reviews a revised plan. The guard must not be bypassed to preserve the old plan.
+
 ## Cleanup boundary
 
 After accepted cutover evidence, audit current nonhistorical references before
@@ -161,17 +168,23 @@ The migration must pass:
 - the complete selected tier-1 Docker plugin gate;
 - installer migration tests for stale retired files, unsafe destination types,
   unrelated-file preservation, convergence, and diagnostics;
-- provider-context coverage proving one managed system block and zero current
-  full oversight packages or legacy work-control overlays;
-- lifecycle coverage for active ownership, recovery, bounded episodes, handoff,
-  finalization, reload/resume, and post-compaction operation without the old
-  skill; and
+- provider-context coverage at the actual post-conversion provider seam proving
+  one managed system block and zero provider-visible user-shaped oversight
+  packages or legacy work-control overlays, with controlled positive detectors
+  and a filter-bypass failure control;
+- lifecycle and replay coverage for active ownership, recovery, bounded episodes,
+  handoff, finalization, reload/resume, first post-compaction turns, tool and
+  heartbeat continuations, agent-message and queued turns, and ordinary-user
+  preservation without the old skill; and
 - `git diff --check` plus current-documentation and reference audits.
 
 Known unrelated failures must be independently reproduced or tracked, never
-hidden by broad deselection. Host activity is limited to the authorized global
-apply/check, coordinated restart, and resumed-session UAT; tests must not launch
-a second host Prime Agent instance.
+hidden by broad deselection. The Slice 1 rejected-candidate revision runs complete
+tier 0 and selected tier 1 only through the Docker-isolated boundary and retains
+correlatable raw stdout, stderr, exit, tested-tree/dependency identity, superseded-
+failure disposition, and teardown receipts. Later host activity remains limited
+to the separately authorized global apply/check, coordinated restart, and
+resumed-session UAT; tests must not launch a second host Prime Agent instance.
 
 Current normative documentation must describe the lean default, separate
 model-facing policy from lifecycle mechanics, identify historical package

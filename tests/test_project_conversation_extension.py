@@ -10,6 +10,17 @@ binaries; scratch lives on the same-path session share (ctmp).
 import json
 from pathlib import Path
 
+import pytest
+
+from provider_context_assertions import (
+    LEGACY_PACKAGE_SENTINEL,
+    ORDINARY_USER_SENTINEL,
+    RETIRED_WORK_CONTROL_CONTROL,
+    RETIRED_WORK_CONTROL_SENTINEL,
+    assert_provider_context_clean,
+    provider_capture_expression,
+)
+
 REPO = Path(__file__).resolve().parents[1]
 KERNEL = REPO / "src/prime-agent-plugin/APPEND_SYSTEM.md"
 EXTENSION = REPO / "src/prime-agent-plugin/extensions/reviewed-plan.ts"
@@ -98,8 +109,90 @@ def _provider_extension(path: Path, records: Path):
 import {createAssistantMessageEventStream} from "@earendil-works/pi-ai";
 const records=RECORDS;
 export default function p(pi){pi.registerProvider("poc",{baseUrl:"x",apiKey:"x",api:"poc",
-streamSimple(model,context){const messages=context.messages??[];appendFileSync(records,JSON.stringify({kernel:context.systemPrompt.split("PRIME_CLAW_CONVERSATION_IDENTITY_V1").length-1,package:messages.filter(message=>message?.role==="custom"&&message.customType==="prime-claw-oversee-episode-package").length})+"\n");const s=createAssistantMessageEventStream();queueMicrotask(()=>{const m={role:"assistant",content:[{type:"text",text:"ok"}],api:model.api,provider:model.provider,model:model.id,usage:{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}},stopReason:"stop",timestamp:Date.now()};s.push({type:"start",partial:m});s.push({type:"done",reason:"stop",message:m});s.end()});return s},models:[{id:"m",name:"M",reasoning:false,input:["text"],cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:10000,maxTokens:1000}]})}'''
-    path.write_text(source.replace("RECORDS", json.dumps(str(records))))
+streamSimple(model,context){const messages=context.messages??[],capture=PROVIDER_CAPTURE;appendFileSync(records,JSON.stringify({kernel:context.systemPrompt.split("PRIME_CLAW_CONVERSATION_IDENTITY_V1").length-1,...capture})+"\n");const s=createAssistantMessageEventStream();queueMicrotask(()=>{const m={role:"assistant",content:[{type:"text",text:"ok"}],api:model.api,provider:model.provider,model:model.id,usage:{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}},stopReason:"stop",timestamp:Date.now()};s.push({type:"start",partial:m});s.push({type:"done",reason:"stop",message:m});s.end()});return s},models:[{id:"m",name:"M",reasoning:false,input:["text"],cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:10000,maxTokens:1000}]})}'''
+    path.write_text(
+        source.replace("RECORDS", json.dumps(str(records))).replace(
+            "PROVIDER_CAPTURE", provider_capture_expression()
+        )
+    )
+
+
+def _provider_control_extension(path: Path):
+    source = r'''const packageSentinel=__PACKAGE_SENTINEL__;
+const workSentinel=__WORK_SENTINEL__;
+const workControl=__WORK_CONTROL__;
+export default function control(pi){
+  pi.on("context",event=>({messages:[...event.messages,
+    {role:"custom",customType:"prime-claw-oversee-episode-package",content:packageSentinel,display:false,timestamp:Date.now()},
+    {role:"custom",customType:"prime-claw-oversee-episode-package",content:`${workSentinel}\n${workControl}`,display:false,timestamp:Date.now()}
+  ]}));
+}'''
+    path.write_text(
+        source.replace("__PACKAGE_SENTINEL__", json.dumps(LEGACY_PACKAGE_SENTINEL))
+        .replace("__WORK_CONTROL__", json.dumps(RETIRED_WORK_CONTROL_CONTROL))
+        .replace("__WORK_SENTINEL__", json.dumps(RETIRED_WORK_CONTROL_SENTINEL))
+    )
+
+
+def _run_provider_control(tier1_container, case: Path, order: str):
+    project = case / "project"
+    (project / ".prime/agent").mkdir(parents=True)
+    (project / ".prime/agent/APPEND_SYSTEM.md").write_text(
+        tier1_container.read_repo(WS_KERNEL)
+    )
+    records = case / "records.jsonl"
+    provider = case / "provider.ts"
+    control = case / "control.ts"
+    _provider_extension(provider, records)
+    _provider_control_extension(control)
+    extensions = {
+        "positive": [provider, control],
+        "bypass": [provider, Path(WS_EXTENSION), control],
+        "official": [provider, control, Path(WS_EXTENSION)],
+    }[order]
+    command = [
+        "prime-agent", "--mode", "text", "--offline", "--no-session",
+        "--no-skills", "--no-prompt-templates", "--no-context-files",
+        "--no-extensions", "--cwd", str(project),
+    ]
+    for extension in extensions:
+        command.extend(["-e", str(extension)])
+    command.extend(["--provider", "poc", "--model", "m", "-p", ORDINARY_USER_SENTINEL])
+    env = {
+        "PRIME_AGENT_CODING_AGENT_DIR": str(case / "agent"),
+        "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1",
+    }
+    completed = tier1_container.run(*command, env=env, timeout=40)
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    rows = [json.loads(line) for line in records.read_text().splitlines()]
+    assert len(rows) == 1, rows
+    return rows[0]
+
+
+def test_provider_visible_detector_controls_and_real_hook_removal(tier1_container, ctmp):
+    positive_case = ctmp / "positive"
+    positive_case.mkdir()
+    positive = _run_provider_control(tier1_container, positive_case, "positive")
+    assert positive["legacyOversightUserCount"] == 1
+    assert positive["retiredWorkControlUserCount"] == 1
+    assert positive["ordinaryUserCount"] == 1
+    assert positive["controlledSentinelCustomCount"] == 0
+
+    bypass_case = ctmp / "bypass"
+    bypass_case.mkdir()
+    bypass = _run_provider_control(tier1_container, bypass_case, "bypass")
+    assert bypass["legacyOversightUserCount"] == 1
+    assert bypass["retiredWorkControlUserCount"] == 1
+    assert bypass["ordinaryUserCount"] == 1
+    assert bypass["controlledSentinelCustomCount"] == 0
+    with pytest.raises(AssertionError, match="provider-visible"):
+        assert_provider_context_clean(bypass, ordinary_count=1)
+
+    official_case = ctmp / "official"
+    official_case.mkdir()
+    official = _run_provider_control(tier1_container, official_case, "official")
+    assert official["kernel"] == 1
+    assert_provider_context_clean(official, ordinary_count=1)
 
 
 def _run_native(tier1_container, ctmp, with_kernel: bool):
@@ -108,7 +201,10 @@ def _run_native(tier1_container, ctmp, with_kernel: bool):
         (project / ".prime/agent").mkdir(parents=True)
         (project / ".prime/agent/APPEND_SYSTEM.md").write_text(tier1_container.read_repo(WS_KERNEL))
     records = ctmp / "records.jsonl"; provider = ctmp / "provider.ts"; _provider_extension(provider, records)
-    env = {"PRIME_AGENT_CODING_AGENT_DIR": str(ctmp / "agent")}
+    env = {
+        "PRIME_AGENT_CODING_AGENT_DIR": str(ctmp / "agent"),
+        "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1",
+    }
     completed = tier1_container.run("prime-agent", "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-extensions", "--cwd", str(project), "-e", str(provider), "-e", WS_EXTENSION, "--provider", "poc", "--model", "m", "-p", "probe", env=env, timeout=40)
     return completed, records
 
@@ -116,13 +212,17 @@ def _run_native(tier1_container, ctmp, with_kernel: bool):
 def test_native_inactive_shadowed_kernel_keeps_ordinary_conversation(tier1_container, ctmp):
     completed, records = _run_native(tier1_container, ctmp, False)
     assert completed.returncode == 0, completed.stdout + completed.stderr
-    assert json.loads(records.read_text()) == {"kernel": 0, "package": 0}
+    row = json.loads(records.read_text())
+    assert row["kernel"] == 0
+    assert_provider_context_clean(row)
 
 
 def test_native_inactive_conversation_gets_one_kernel_and_no_package(tier1_container, ctmp):
     completed, records = _run_native(tier1_container, ctmp, True)
     assert completed.returncode == 0, completed.stdout + completed.stderr
-    assert json.loads(records.read_text()) == {"kernel": 1, "package": 0}
+    row = json.loads(records.read_text())
+    assert row["kernel"] == 1
+    assert_provider_context_clean(row)
 
 
 def _active_setup(path: Path):
@@ -163,7 +263,9 @@ def test_native_active_promotion_and_recovery_need_no_oversight_skill(tier1_cont
         case = ctmp / mode; case.mkdir()
         completed, records, identity, project = _run_native_active(tier1_container, case, mode)
         assert completed.returncode == 0, completed.stdout + completed.stderr
-        assert json.loads(records.read_text()) == {"kernel": 1, "package": 0}
+        row = json.loads(records.read_text())
+        assert row["kernel"] == 1
+        assert_provider_context_clean(row)
         assert identity.read_bytes() == (project / "expected-identity.json").read_bytes()
         assert not (project / ".ralph/skills/oversee-episode/SKILL.md").exists()
 

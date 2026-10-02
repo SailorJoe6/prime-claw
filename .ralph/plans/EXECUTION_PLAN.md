@@ -1,6 +1,6 @@
 # Execution Plan — Official lean session protocol
 
-> **Status:** Active; Slice 1 candidate awaiting owner review
+> **Status:** Active; Slice 1 candidate `9d01cfc` rejected, bounded revision authorized
 >
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 >
@@ -203,6 +203,51 @@ or immutable history. Do not edit history to make the search empty.
 - Stop for owner review. Do not apply globally, restart, clean up, or merge in the
   same execute pass.
 
+## Slice 1 rejected-candidate revision boundary
+
+Candidate `9d01cfc8bb40cc427895e9b862344985db81075a` is rejected. The
+canonical BLOCK report is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0f51d-d51b-7649-a28a-844879e42aec/sub-2f26a16a/official-lean-slice1-review-9d01cfc.md`
+(SHA256 `60a9f22060ad6fab4882761afaadbce7ee4cc0358e2a57509cdd99510b18e858`).
+Revise Slice 1 only for accepted OL-007 and OL-009 plus operator safety
+constraint OL-008:
+
+- **OL-007 — effective provider spies.** Prime Agent conversion drops
+  `customType` and exposes unfiltered custom messages to `streamSimple` as
+  user-shaped text. Repair every native spy to inspect the actual
+  provider-visible representation. Use unique controlled sentinels so ordinary
+  quoted user discussion is not a false positive. Include a positive detector
+  and fixture-only filter-bypass control that prove an unfiltered oversight
+  package and retired work-control overlay are detected, then prove the real
+  official hook removes them while keeping one managed block and ordinary user
+  content. Cover saved-history resume/reload, first post-compaction turn,
+  repeated active/tool/heartbeat continuations, agent messages, queued turns,
+  bounded children, corrupt ownership, and missing/duplicated block dispatch
+  prevention. Keep no-skill fixtures and all previously passing lifecycle,
+  handoff, finalization, installer, and compatibility behavior.
+- **OL-009 — correlatable gate receipts.** Run complete tier 0 and selected tier
+  1 only through the Docker-isolated boundary. Preserve raw stdout, stderr, exit
+  status, exact tested tree/hash, dependency SHA and selector, commands, counts,
+  elapsed time, superseded-failure disposition, and owned container/share
+  teardown in durable run artifacts. Retain failed receipts and identify the
+  concrete later receipt that supersedes each one. Do not call separately
+  completed gates a successful `scripts/test-all.sh` run.
+- **OL-008 — isolation-first AGENTS safety.** The pushed correction
+  `672be3bef8dc76412d8085a240e3ebdebedfbeff` (authority tip `ded4a8c`) was
+  integrated by merge commit `70c2558a0299b304e3cad97796eaa1c0aef5257e`.
+  Docker-only candidate validation, explicit isolated roots, bare-command
+  failure, primary-`main`-only `--user-global`, and linked-worktree refusal are
+  retained together with the seven-file transition and stronger loaded-
+  generation UAT rule. No host-global apply/check or host probe was run.
+
+Preserve `.ralph/skills/oversee-episode/SKILL.md`,
+`.agents/skills/oversee-episode`, and
+`.prime/agent/profiles/expert-reviewer.md`. Do not use host-global apply/check,
+launch or restart host Prime Agent, remove compatibility resources, merge, or
+begin Slice 2. `prime-claw-blw.5` and `prime-claw-zwg.5.1` remain independent;
+add the BLOCK report's distinct watchdog signature to existing tracking without
+folding its repair into this revision.
+
 ## Slice 2 — Deploy the accepted transition and checkpoint rollback
 
 ### Dependency
@@ -210,6 +255,16 @@ or immutable history. Do not edit history to make the search empty.
 The owner has accepted the exact pushed Slice 1 commit and all in-scope revision
 findings are already incorporated. This slice must not change runtime, installer,
 managed-system-block, or test bytes.
+
+**Topology blocker introduced by OL-008:** the accepted isolation guard refuses
+user-global activation from this linked episode worktree and permits it only from
+the primary `main` checkout. The original unmerged-branch topology expected
+Slice 2 to install the candidate before merge so the episode could survive the
+restart and later remove compatibility files. Docker validation cannot deliver
+that host-installed capability. Do not bypass the guard, merge early, change
+terminality, or silently redefine the restart/cleanup sequence. After Slice 1 is
+accepted, stop for an owner/operator decision and a reviewed plan revision before
+any Slice 2 action.
 
 ### Capability delivered
 
@@ -467,6 +522,43 @@ Update this section during execution; do not rely on chat history.
   acceptance used supported source mode instead.
 - Known-good rollback source generation remains `44d83db`. No global apply,
   restart, compatibility cleanup, merge, or Prime Agent source change occurred.
+
+### Rejected-candidate revision evidence
+
+- OL-007 now uses `tests/provider_context_assertions.py` at the actual
+  post-conversion provider seam. Six native spies count unique oversight-package
+  and retired-work-control sentinels only in provider-visible `role=user` text.
+  A no-hook positive control proves conversion drops `customType`; a post-hook
+  fixture bypass proves the shared clean assertion fails for both leak classes;
+  the real hook removes both while preserving one managed block and ordinary
+  user content. Saved resume/reload, recovery, first post-compaction, repeated
+  active/tool/heartbeat, agent-message, queued-turn, bounded-child,
+  finalization-replay, corrupt ownership, and missing/token-only/duplicate block
+  cases remain covered.
+- Focused Docker-native acceptance passed `11 passed, 7 deselected in 106.52s`.
+  Receipt `.test-results/ol007-focused/native-full-repaired.log`, SHA256
+  `099ef6d8523579f7e7f1b912625499e2ef0a5d43eced66531e2190d3bacbbe23`.
+  It supersedes, without deleting: initial `/var` alias setup failure
+  `native.log` (`ec3b46591d579359410c5e8ffe264d18ff64dde2a12770444e5ab1a7244d6289`); first repaired run `native-rerun.log`
+  (`a0af0dcb8e80d79f795b3520fcdfcce5bd9acec35a13e1b690b6a512253ed1e6`, four fixture/race failures); and bounded failed-case rerun
+  `failed-tests-rerun.log` (`bdd843a0c6a507f4b72e68752392455037473798a5874e5e6739469c9df7c6f3`, one daemon-socket race). The final
+  run includes the no-session isolation repair and every selected native test.
+- Pre-integration complete tier 0 passed `275 passed, 152 skipped` in 36.62s at
+  `.test-results/ol009-preintegration/tier0.log` (SHA256
+  `59938aab5166edbab2bc03b02903afe096b0c5b2746c47636342bc540ae68ce8`).
+  This is diagnostic only because OL-008 was integrated afterward; it cannot
+  satisfy final candidate acceptance.
+- OL-008 upstream repair `672be3bef8dc76412d8085a240e3ebdebedfbeff`
+  (authority tip `ded4a8c`) is preserved through merge
+  `70c2558a0299b304e3cad97796eaa1c0aef5257e`. Bare apply/check now fail,
+  candidate validation is Docker-only, explicit roots are required, and
+  `--user-global` is primary-`main` only and refused from linked worktrees.
+- Final exact-candidate OL-009 receipts will be retained under
+  `.test-results/ol009-final-replacement/` after the replacement commit exists.
+  They must include raw tier-0/tier-1 output, exit status, command, elapsed time,
+  commit/tree and dependency SHA/selector, supersession map, and before/after
+  container/share teardown. The exact post-commit result and push receipt belong
+  on `prime-claw-h6w.25`; this pre-commit plan must not predict them.
 
 - Exact transition commit and push receipt remain pending in this pre-commit
   record; the real SHA is recorded on `prime-claw-h6w.25` only after push.
