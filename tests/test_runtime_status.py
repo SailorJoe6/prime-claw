@@ -8,6 +8,8 @@ import json, os, subprocess, sys, types
 import importlib.util
 import pytest
 
+pytestmark = pytest.mark.sandbox
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BIN = os.path.join(REPO, "bin", "prime-claw")
 

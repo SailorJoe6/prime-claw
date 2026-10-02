@@ -1,35 +1,39 @@
-"""Regression bridge for the Prime Agent handoff-chain extension."""
+"""Regression bridge for the Prime Agent handoff-chain extension.
+
+Tier policy: the node suite bridge and the live RPC probe are tier 1 —
+they run INSIDE the session's tier-1 container via the `tier1_container`
+fixture (auto-marked `container`; see tests/conftest.py). The two skill
+policy checks are static repo checks and stay tier 0.
+"""
 
 import json
 from pathlib import Path
-import shutil
-import subprocess
-import tempfile
 
 
 REPO = Path(__file__).resolve().parents[1]
+# Tier-0 static reference (host repo path).
 EXTENSION = REPO / "src" / "prime-agent-plugin" / "extensions" / "handoff-chain.ts"
-NODE_SUITE = REPO / "tests" / "handoff_chain_extension.test.mjs"
+# Container paths: the repo is bind-mounted read-only at /workspace in the
+# tier-1 container. Tier-1 test code never references host paths or host
+# binaries.
+WS_EXTENSION = "/workspace/src/prime-agent-plugin/extensions/handoff-chain.ts"
+WS_NODE_SUITE = "/workspace/tests/handoff_chain_extension.test.mjs"
 
 
-def test_handoff_chain_node_suite():
+def test_handoff_chain_node_suite(tier1_container):
     """Run the real TypeScript extension against a mocked ExtensionAPI."""
-    node = shutil.which("node")
-    assert node, "Node.js is required because prime-agent itself requires Node >=22.8"
-    result = subprocess.run(
-        [node, "--experimental-strip-types", "--test", str(NODE_SUITE)],
-        cwd=REPO,
-        text=True,
-        capture_output=True,
-        check=False,
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", WS_NODE_SUITE,
+        timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_prime_agent_rpc_loads_native_handoff_command_and_conversational_tool():
-    """Probe installed offline Prime Agent for both explicit entry surfaces."""
-    prime_agent = shutil.which("prime-agent")
-    assert prime_agent, "prime-agent is a documented developer prerequisite"
+def test_prime_agent_rpc_loads_native_handoff_command_and_conversational_tool(
+    tier1_container, ctmp,
+):
+    """Probe the container's installed offline Prime Agent for both explicit
+    entry surfaces."""
     request = json.dumps({"id": "loader", "type": "get_commands"}) + "\n"
     probe_source = """export default function probe(pi) {
   pi.on("session_start", () => {
@@ -42,37 +46,31 @@ def test_prime_agent_rpc_loads_native_handoff_command_and_conversational_tool():
   });
 }
 """
-    with tempfile.TemporaryDirectory(prefix="prime-claw-handoff-loader-") as cwd:
-        probe = Path(cwd) / "tool-probe.ts"
-        probe.write_text(probe_source)
-        result = subprocess.run(
-            [
-                prime_agent,
-                "--mode", "rpc",
-                "--offline",
-                "--no-session",
-                "--no-skills",
-                "--no-prompt-templates",
-                "--no-context-files",
-                "--no-extensions",
-                "--cwd", cwd,
-                "-e", str(EXTENSION),
-                "-e", str(probe),
-            ],
-            cwd=REPO,
-            input=request,
-            text=True,
-            capture_output=True,
-            timeout=30,
-            check=False,
-        )
+    probe = ctmp / "tool-probe.ts"
+    probe.write_text(probe_source)
+    result = tier1_container.run(
+        "prime-agent",
+        "--mode", "rpc",
+        "--offline",
+        "--no-session",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-context-files",
+        "--no-extensions",
+        "--cwd", str(ctmp),
+        "-e", WS_EXTENSION,
+        "-e", str(probe),
+        input_text=request,
+        timeout=40,
+        workdir=None,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     response = json.loads(result.stdout.strip().splitlines()[-1])
     assert response["success"] is True
     commands = response["data"]["commands"]
     handoff = [command for command in commands if command["name"] == "handoff"]
     assert len(handoff) == 1
-    assert Path(handoff[0]["sourceInfo"]["path"]).resolve() == EXTENSION.resolve()
+    assert handoff[0]["sourceInfo"]["path"] == WS_EXTENSION
     assert [command["name"] for command in commands].count(
         "probe-ralph-handoff-tool"
     ) == 1

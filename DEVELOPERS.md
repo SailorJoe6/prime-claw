@@ -37,12 +37,81 @@ openclaw-setup:
 
 ## Testing
 
+Tests are organized into three tiers (see `.ralph/plans/archive/plugin-test-container/SPECIFICATION.md`
+"Test tiers"). Tier assignment is by **pytest marker** (`pytest.ini`):
+unmarked tests are tier 0, `container` tests are tier 1, `sandbox` tests
+are tier 2. `tests/conftest.py` auto-marks any test that requests the
+`tier1_container`/`ctmp` fixtures as `container`, and skips tier-1/tier-2
+tests unless an explicit `-m` mark expression selects them — so the plain
+command is always the tier-0 default with no Docker dependency:
+
 ```bash
-pytest tests/ -q
+python3 -m pytest tests/ -q          # tier 0 (host, no environment)
 ```
 
 Prove a new test can fail before trusting it: add the assertion, run it
 against the pre-fix state, confirm it goes red, then fix.
+
+### Test tiers
+
+- **Tier 0 — host, no environment.** Static checks: no Node, no
+  prime-agent, no Docker, no plugin install. This is the default gate.
+- **Tier 1 — slim container.** Anything needing Node, a prime-agent
+  install, or the plugin runs inside a plain-Docker container, so the
+  prime-agent under test can never touch the host's `~/.prime/agent/`.
+  One container per pytest run: the session fixture in
+  `tests/conftest.py` builds the image (`docker/test.Dockerfile`), starts
+  one container with the repo bind-mounted read-only at `/workspace`,
+  installs prime-agent per `.env`, applies + checks the plugin against
+  the container's own `~/.prime/agent/`, hands tests an exec helper, and
+  destroys the container at session end. Test scratch lives on a
+  same-path session share under the gitignored `.test-results/` so files
+  and paths are identical on both sides; fake daemons run in-container
+  (`tests/container/`) because a host-bound Unix socket is unreachable
+  from the container through the macOS virtiofs mount.
+
+  ```bash
+  python3 -m pytest tests/ -q -m container   # tier 1 (requires Docker + .env)
+  ```
+
+  Install selection lives in a gitignored `.env` at the repo root (copy
+  `.env.example`; set EXACTLY ONE selector — the driver and the session
+  fixture fail fast on neither/both):
+
+  - `PRIME_AGENT_PINNED=<version>` — install a released version via the
+    vendor installer (`install.sh`; the same mechanism `bin/prime-claw`
+    uses — prime-agent is not on the public npm registry).
+  - `PRIME_AGENT_SOURCE=/absolute/path/to/prime-agent` — build from a
+    local fork checkout: the host runs the fork's `release:pack` from a
+    FRESH build (the four pack-consumed dist dirs are removed first), the
+    tarballs are staged into the container over a `file:` URL base, and
+    the container installs from them.
+
+  `scripts/test-tier1.sh` remains the standalone tier-1 driver (image
+  build + one ephemeral install/apply/check container, `--smoke`,
+  `--probe` with a validated `get_commands` reply under a hard
+  `timeout --kill-after` deadline, `--dry-run`, `--rebuild`). The pytest
+  session fixture mirrors its contract; the driver is the source of
+  truth. Network is used only at image build and the in-container
+  prime-agent install step.
+- **Tier 2 — host, OpenShell.** `tests/test_runtime_*.py` orchestrate
+  sandboxes from the host and stay outside any container. They run only
+  on explicit request:
+
+  ```bash
+  python3 -m pytest tests/ -q -m sandbox     # tier 2 (explicit only)
+  ```
+
+### Whole-suite sequencer
+
+```bash
+scripts/test-all.sh                    # tier 0 + tier 1 (fail-fast)
+scripts/test-all.sh --with-sandbox     # + tier 2
+```
+
+The sequencer is deliberately dumb: it runs each tier with plain pytest,
+stops at the first failing tier, prints a tier summary, and leaves logs
+in the gitignored `.test-results/` directory.
 
 ## Local-state rules
 

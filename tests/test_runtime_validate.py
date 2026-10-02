@@ -8,6 +8,8 @@ import json, os, subprocess, sys, base64, re
 from importlib.machinery import SourceFileLoader
 import pytest
 
+pytestmark = pytest.mark.sandbox
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BIN = os.path.join(REPO, "bin", "prime-claw")
 pc = SourceFileLoader("primeclaw", BIN).load_module()

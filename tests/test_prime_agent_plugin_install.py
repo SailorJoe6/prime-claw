@@ -1,21 +1,36 @@
-"""Regression coverage for inert plugin source and explicit global installation."""
+"""Regression coverage for inert plugin source and explicit global installation.
 
-import fcntl
-import os
+Tier policy: the layout test is tier 0. Everything that runs the
+apply/check/manager install scripts is tier 1 and executes INSIDE the
+session's tier-1 container (Linux — the scripts' real target platform)
+via the `tier1_container` fixture (auto-marked `container`; see
+tests/conftest.py). Scratch lives on the same-path session share (ctmp).
+Two choreography-heavy scenarios (SIGTERM-orphan reconciliation and
+concurrent-apply serialization) run as self-verifying in-container runners
+(tests/container/) because their pipe/pass_fds/flock choreography cannot
+cross a docker exec boundary; both runners operate on container-local
+/tmp paths and print a JSON verdict.
+"""
+
+import json
 from pathlib import Path
-import signal
-import subprocess
-import sys
-import tempfile
-import textwrap
-import unittest
+import time
+
+import pytest
 
 
 REPO = Path(__file__).resolve().parents[1]
 SOURCE = REPO / "src" / "prime-agent-plugin"
-APPLY = REPO / "scripts" / "apply-prime-agent-plugin.sh"
-CHECK = REPO / "scripts" / "check-prime-agent-plugin.sh"
-MANAGER = REPO / "scripts" / "manage-prime-agent-append-system.py"
+# Container paths (repo bind-mounted read-only at /workspace).
+WS_APPLY = "/workspace/scripts/apply-prime-agent-plugin.sh"
+WS_CHECK = "/workspace/scripts/check-prime-agent-plugin.sh"
+WS_MANAGER = "/workspace/scripts/manage-prime-agent-append-system.py"
+WS_APPEND_SOURCE = "/workspace/src/prime-agent-plugin/APPEND_SYSTEM.md"
+WS_SIGTERM_PROBE = "/workspace/tests/container/sigterm_orphan_probe.py"
+WS_CONCURRENT_PROBE = "/workspace/tests/container/concurrent_apply_probe.py"
+# The image's default PATH (Ubuntu base); tests that shadow a tool prepend
+# their fake bin dir to this.
+CONTAINER_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 FILES = (
     "extensions/goal-heartbeat-work-control.ts",
     "extensions/handoff-chain.ts",
@@ -28,358 +43,310 @@ FILES = (
 )
 
 
-class PrimeAgentPluginInstallTests(unittest.TestCase):
-    def run_script(self, script: Path, destination: Path) -> subprocess.CompletedProcess[str]:
-        env = os.environ.copy()
-        env["PRIME_AGENT_PLUGIN_ROOT"] = str(destination)
-        return subprocess.run(
-            [str(script)],
-            cwd=REPO,
-            env=env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-
-    def test_source_is_outside_project_extension_discovery(self) -> None:
-        self.assertTrue((SOURCE / "extensions").is_dir())
-        self.assertFalse((REPO / ".prime" / "agent" / "extensions").exists())
-        self.assertFalse((REPO / ".prime" / "agent" / "extensions-bak").exists())
-        self.assertFalse((REPO / ".prime" / "agent" / "extension-support").exists())
-
-    def test_apply_copies_the_complete_allowlist_and_check_accepts_it(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-install-") as tmp:
-            destination = Path(tmp) / "agent"
-            destination.mkdir(parents=True)
-            (destination / "APPEND_SYSTEM.md").write_text("unrelated user append\n")
-            applied = self.run_script(APPLY, destination)
-            self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
-            self.assertIn("global copy is current", applied.stdout)
-            for relative in FILES:
-                self.assertEqual(
-                    (destination / relative).read_bytes(),
-                    (SOURCE / relative).read_bytes(),
-                    relative,
-                )
-            append = (destination / "APPEND_SYSTEM.md").read_text()
-            self.assertIn("unrelated user append", append)
-            self.assertEqual(append.count("PRIME_CLAW_CONVERSATION_IDENTITY_V1"), 1)
-            checked = self.run_script(CHECK, destination)
-            self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
-
-    def test_apply_removes_and_check_rejects_obsolete_managed_files(self) -> None:
-        obsolete_cases = (
-            ("extensions/goal-blocker-control.ts", "stale obsolete goal blocker control extension"),
-            ("extension-support/episode-finalization.ts", "stale obsolete episode finalization support file"),
-        )
-        for relative, diagnostic in obsolete_cases:
-            with self.subTest(relative=relative), tempfile.TemporaryDirectory(
-                prefix="prime-claw-plugin-obsolete-"
-            ) as tmp:
-                destination = Path(tmp) / "agent"
-                obsolete = destination / relative
-                obsolete.parent.mkdir(parents=True)
-                obsolete.write_text("legacy machinery\n")
-                unrelated = destination / "extensions/unrelated.ts"
-                unrelated.parent.mkdir(parents=True, exist_ok=True)
-                unrelated.write_text("preserve me\n")
-                checked = self.run_script(CHECK, destination)
-                self.assertNotEqual(checked.returncode, 0)
-                self.assertIn(diagnostic, checked.stderr)
-                applied = self.run_script(APPLY, destination)
-                self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
-                self.assertFalse(obsolete.exists())
-                self.assertEqual(unrelated.read_text(), "preserve me\n")
-
-    def test_apply_rejects_unsafe_obsolete_goal_extension_before_mutation(self) -> None:
-        for unsafe_kind in ("directory", "symlink"):
-            with self.subTest(unsafe_kind=unsafe_kind), tempfile.TemporaryDirectory(
-                prefix="prime-claw-plugin-obsolete-unsafe-"
-            ) as tmp:
-                destination = Path(tmp) / "agent"
-                obsolete = destination / "extensions/goal-blocker-control.ts"
-                obsolete.parent.mkdir(parents=True)
-                unrelated = destination / "extensions/unrelated.ts"
-                unrelated.write_text("preserve me\n")
-                if unsafe_kind == "directory":
-                    obsolete.mkdir()
-                else:
-                    target = Path(tmp) / "outside.ts"
-                    target.write_text("outside remains untouched\n")
-                    obsolete.symlink_to(target)
-
-                applied = self.run_script(APPLY, destination)
-
-                self.assertNotEqual(applied.returncode, 0)
-                self.assertIn("unsafe managed plugin destination", applied.stderr)
-                self.assertEqual(unrelated.read_text(), "preserve me\n")
-                if unsafe_kind == "symlink":
-                    self.assertTrue(obsolete.is_symlink())
-                    self.assertEqual(target.read_text(), "outside remains untouched\n")
-
-    def test_check_rejects_a_stale_global_file(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-stale-") as tmp:
-            destination = Path(tmp) / "agent"
-            applied = self.run_script(APPLY, destination)
-            self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
-            stale = destination / FILES[0]
-            stale.write_text("stale generation\n")
-            checked = self.run_script(CHECK, destination)
-            self.assertNotEqual(checked.returncode, 0)
-            self.assertIn("stale installed plugin file", checked.stderr)
-
-    def test_check_rejects_missing_or_stale_identity_block(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-kernel-") as tmp:
-            destination = Path(tmp) / "agent"
-            applied = self.run_script(APPLY, destination)
-            self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
-            append = destination / "APPEND_SYSTEM.md"
-            append.write_text("unrelated only\n")
-            checked = self.run_script(CHECK, destination)
-            self.assertNotEqual(checked.returncode, 0)
-            self.assertIn("missing managed identity block", checked.stderr)
-
-    def test_apply_rejects_duplicate_managed_blocks_before_copying(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-duplicate-") as tmp:
-            destination = Path(tmp) / "agent"
-            destination.mkdir(parents=True)
-            block = (SOURCE / "APPEND_SYSTEM.md").read_text()
-            (destination / "APPEND_SYSTEM.md").write_text(block + "\n" + block)
-            applied = self.run_script(APPLY, destination)
-            self.assertNotEqual(applied.returncode, 0)
-            self.assertIn("duplicate prime-claw identity blocks", applied.stderr)
-            self.assertFalse((destination / FILES[0]).exists())
-
-    def test_apply_preflights_all_managed_destinations_before_mutation(self) -> None:
-        for unsafe_kind in ("directory", "symlink"):
-            with self.subTest(unsafe_kind=unsafe_kind), tempfile.TemporaryDirectory(
-                prefix="prime-claw-plugin-unsafe-destination-"
-            ) as tmp:
-                destination = Path(tmp) / "agent"
-                (destination / "extensions").mkdir(parents=True)
-                (destination / "extension-support").mkdir()
-                first = destination / FILES[0]
-                sentinel = b"existing generation remains untouched\n"
-                first.write_bytes(sentinel)
-                unsafe = destination / FILES[-1]
-                if unsafe_kind == "directory":
-                    unsafe.mkdir()
-                else:
-                    target = Path(tmp) / "outside.ts"
-                    target.write_bytes(b"outside remains untouched\n")
-                    unsafe.symlink_to(target)
-                append = destination / "APPEND_SYSTEM.md"
-                append.write_bytes(b"unrelated append remains untouched\n")
-
-                applied = self.run_script(APPLY, destination)
-
-                self.assertNotEqual(applied.returncode, 0)
-                self.assertIn("unsafe managed plugin destination", applied.stderr)
-                self.assertEqual(first.read_bytes(), sentinel)
-                self.assertEqual(append.read_bytes(), b"unrelated append remains untouched\n")
-                if unsafe_kind == "symlink":
-                    self.assertTrue(unsafe.is_symlink())
-                    self.assertEqual(unsafe.resolve().read_bytes(), b"outside remains untouched\n")
-
-    def test_interrupted_sequential_install_is_not_atomic_and_check_detects_generation(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-partial-generation-") as tmp:
-            root = Path(tmp)
-            destination = root / "agent"
-            tools = root / "tools"
-            tools.mkdir()
-            counter = root / "install-count"
-            fake_install = tools / "install"
-            fake_install.write_text(
-                "#!/usr/bin/env python3\n"
-                "import os, pathlib, shutil, sys\n"
-                "counter = pathlib.Path(os.environ['INSTALL_COUNTER'])\n"
-                "count = int(counter.read_text()) + 1 if counter.exists() else 1\n"
-                "counter.write_text(str(count))\n"
-                "if count == 3: raise SystemExit(23)\n"
-                "source, destination = pathlib.Path(sys.argv[-2]), pathlib.Path(sys.argv[-1])\n"
-                "shutil.copyfile(source, destination)\n"
-                "destination.chmod(0o644)\n"
-            )
-            fake_install.chmod(0o755)
-            env = os.environ.copy()
-            env["PRIME_AGENT_PLUGIN_ROOT"] = str(destination)
-            env["INSTALL_COUNTER"] = str(counter)
-            env["PATH"] = str(tools) + os.pathsep + env["PATH"]
-
-            applied = subprocess.run(
-                [str(APPLY)], cwd=REPO, env=env, text=True, capture_output=True, check=False
-            )
-
-            self.assertEqual(applied.returncode, 23, applied.stdout + applied.stderr)
-            self.assertTrue((destination / FILES[0]).is_file())
-            self.assertTrue((destination / FILES[1]).is_file())
-            self.assertFalse((destination / FILES[2]).exists())
-            checked = self.run_script(CHECK, destination)
-            self.assertNotEqual(checked.returncode, 0)
-            self.assertIn("missing installed plugin file", checked.stderr)
-
-    def run_manager(self, mode: str, destination: Path) -> subprocess.CompletedProcess[bytes]:
-        return subprocess.run(
-            [sys.executable, str(MANAGER), mode, str(SOURCE / "APPEND_SYSTEM.md"), str(destination)],
-            cwd=REPO,
-            capture_output=True,
-            check=False,
-        )
-
-    def test_managed_append_is_byte_stable_and_preserves_unmanaged_bytes_and_mode(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-bytes-") as tmp:
-            destination = Path(tmp) / "APPEND_SYSTEM.md"
-            sentinel = b"prefix\x00\xff  \n"
-            destination.write_bytes(sentinel)
-            destination.chmod(0o640)
-            first = self.run_manager("apply", destination)
-            self.assertEqual(first.returncode, 0, first.stderr.decode(errors="replace"))
-            installed = destination.read_bytes()
-            self.assertTrue(installed.startswith(sentinel))
-            self.assertEqual(destination.stat().st_mode & 0o777, 0o640)
-            second = self.run_manager("apply", destination)
-            self.assertEqual(second.returncode, 0, second.stderr.decode(errors="replace"))
-            self.assertEqual(destination.read_bytes(), installed)
-            checked = self.run_manager("check", destination)
-            self.assertEqual(checked.returncode, 0, checked.stderr.decode(errors="replace"))
-            self.assertEqual(list(destination.parent.glob(".*.tmp")), [])
-
-    def test_manager_rejects_every_malformed_marker_shape_without_mutation(self) -> None:
-        source_block = (SOURCE / "APPEND_SYSTEM.md").read_bytes().strip()
-        start = b"<!-- prime-claw:conversation-identity:start -->"
-        end = b"<!-- prime-claw:conversation-identity:end -->"
-        malformed = {
-            "start-only": b"sentinel\n" + start,
-            "end-only": b"sentinel\n" + end,
-            "reversed": b"sentinel\n" + end + b"\n" + start,
-            "duplicate": source_block + b"\n" + source_block,
-            "overlap": start + b"\n" + start + b"\n" + end + b"\n" + end,
-        }
-        for label, original in malformed.items():
-            with self.subTest(label=label), tempfile.TemporaryDirectory(prefix="prime-claw-plugin-malformed-") as tmp:
-                destination = Path(tmp) / "APPEND_SYSTEM.md"
-                destination.write_bytes(original)
-                applied = self.run_manager("apply", destination)
-                self.assertNotEqual(applied.returncode, 0)
-                self.assertEqual(destination.read_bytes(), original)
-
-    def test_manager_rejects_destination_symlink_without_mutating_target(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-symlink-") as tmp:
-            root = Path(tmp)
-            target = root / "target.md"
-            sentinel = b"do not modify\n"
-            target.write_bytes(sentinel)
-            destination = root / "APPEND_SYSTEM.md"
-            destination.symlink_to(target)
-            applied = self.run_manager("apply", destination)
-            self.assertNotEqual(applied.returncode, 0)
-            self.assertIn(b"destination symlink", applied.stderr)
-            self.assertTrue(destination.is_symlink())
-            self.assertEqual(target.read_bytes(), sentinel)
-
-    def test_manager_rejects_symlink_parent_without_creating_destination(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-parent-symlink-") as tmp:
-            root = Path(tmp)
-            real_parent = root / "real-agent"
-            real_parent.mkdir()
-            linked_parent = root / "linked-agent"
-            linked_parent.symlink_to(real_parent, target_is_directory=True)
-            destination = linked_parent / "APPEND_SYSTEM.md"
-            applied = self.run_manager("apply", destination)
-            self.assertNotEqual(applied.returncode, 0)
-            self.assertIn(b"parent symlink", applied.stderr)
-            self.assertFalse((real_parent / "APPEND_SYSTEM.md").exists())
-
-    def test_sigterm_orphan_is_reconciled_on_retry_without_deleting_live_writer_temp(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-sigterm-") as tmp:
-            root = Path(tmp)
-            destination = root / "APPEND_SYSTEM.md"
-            destination.write_bytes(b"sentinel before interrupted apply\n")
-            read_fd, write_fd = os.pipe()
-            helper = textwrap.dedent(
-                f"""                import importlib.util
-                import os
-                import signal
-                import sys
-
-                spec = importlib.util.spec_from_file_location("append_manager", {str(MANAGER)!r})
-                manager = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(manager)
-                ready_fd = {write_fd}
-
-                def stop_before_replace(*args, **kwargs):
-                    os.write(ready_fd, b"1")
-                    signal.pause()
-
-                manager.os.replace = stop_before_replace
-                sys.argv = [
-                    str(manager.__file__),
-                    "apply",
-                    {str(SOURCE / "APPEND_SYSTEM.md")!r},
-                    {str(destination)!r},
-                ]
-                raise SystemExit(manager.main())
-                """
-            )
-            process = subprocess.Popen(
-                [sys.executable, "-c", helper],
-                cwd=REPO,
-                pass_fds=(write_fd,),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-            os.close(write_fd)
-            try:
-                self.assertEqual(os.read(read_fd, 1), b"1")
-            finally:
-                os.close(read_fd)
-            orphan_pattern = f".APPEND_SYSTEM.md.prime-claw-{process.pid}-*.tmp"
-            orphans = list(root.glob(orphan_pattern))
-            self.assertEqual(len(orphans), 1)
-            live_temp = root / f".APPEND_SYSTEM.md.prime-claw-{os.getpid()}-0123456789abcdef.tmp"
-            live_temp.write_bytes(b"owned by live test process")
-            near_match = root / ".APPEND_SYSTEM.md.prime-claw-999999-not-hex.tmp"
-            near_match.write_bytes(b"not an exact transaction pattern")
-
-            process.send_signal(signal.SIGTERM)
-            stdout, stderr = process.communicate(timeout=10)
-            self.assertEqual(process.returncode, -signal.SIGTERM, (stdout, stderr))
-            self.assertEqual(destination.read_bytes(), b"sentinel before interrupted apply\n")
-
-            retried = self.run_manager("apply", destination)
-            self.assertEqual(retried.returncode, 0, retried.stderr.decode(errors="replace"))
-            self.assertFalse(orphans[0].exists())
-            self.assertTrue(live_temp.exists())
-            self.assertTrue(near_match.exists())
-            self.assertEqual(destination.read_bytes().count(b"PRIME_CLAW_CONVERSATION_IDENTITY_V1"), 1)
-
-    def test_concurrent_apply_serializes_before_read_and_preserves_sentinel(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="prime-claw-plugin-concurrent-") as tmp:
-            root = Path(tmp)
-            destination = root / "APPEND_SYSTEM.md"
-            destination.write_bytes(b"initial\n")
-            lock_path = root / ".prime-claw-append-system.lock"
-            with lock_path.open("a+b") as lock:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
-                command = [
-                    sys.executable,
-                    str(MANAGER),
-                    "apply",
-                    str(SOURCE / "APPEND_SYSTEM.md"),
-                    str(destination),
-                ]
-                processes = [subprocess.Popen(command, cwd=REPO, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(4)]
-                sentinel = b"initial\nadded-while-contenders-wait\n"
-                destination.write_bytes(sentinel)
-                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
-            results = [process.communicate(timeout=10) + (process.returncode,) for process in processes]
-            self.assertTrue(all(returncode == 0 for _, _, returncode in results), results)
-            installed = destination.read_bytes()
-            self.assertTrue(installed.startswith(sentinel))
-            self.assertEqual(installed.count(b"PRIME_CLAW_CONVERSATION_IDENTITY_V1"), 1)
-            checked = self.run_manager("check", destination)
-            self.assertEqual(checked.returncode, 0, checked.stderr.decode(errors="replace"))
+def test_source_is_outside_project_extension_discovery() -> None:
+    assert (SOURCE / "extensions").is_dir()
+    assert not (REPO / ".prime" / "agent" / "extensions").exists()
+    assert not (REPO / ".prime" / "agent" / "extensions-bak").exists()
+    assert not (REPO / ".prime" / "agent" / "extension-support").exists()
 
 
-if __name__ == "__main__":
-    unittest.main()
+def _run_script(tier1_container, script: str, destination: Path):
+    """Run an install script in-container with the plugin root redirected."""
+    return tier1_container.run(
+        script,
+        env={"PRIME_AGENT_PLUGIN_ROOT": str(destination)},
+        workdir=None,
+        timeout=60,
+    )
+
+
+def _run_manager(tier1_container, mode: str, destination: Path):
+    return tier1_container.run(
+        "python3", WS_MANAGER, mode, WS_APPEND_SOURCE, str(destination),
+        workdir=None,
+        timeout=60,
+    )
+
+
+def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
+    tier1_container, ctmp,
+) -> None:
+    destination = ctmp / "agent"
+    destination.mkdir(parents=True)
+    (destination / "APPEND_SYSTEM.md").write_text("unrelated user append\n")
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    assert "global copy is current" in applied.stdout
+    for relative in FILES:
+        expected = tier1_container.read_repo(f"src/prime-agent-plugin/{relative}")
+        assert (destination / relative).read_text() == expected, relative
+    append = (destination / "APPEND_SYSTEM.md").read_text()
+    assert "unrelated user append" in append
+    assert append.count("PRIME_CLAW_CONVERSATION_IDENTITY_V1") == 1
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+
+
+@pytest.mark.parametrize(
+    "relative,diagnostic",
+    [
+        ("extensions/goal-blocker-control.ts",
+         "stale obsolete goal blocker control extension"),
+        ("extension-support/episode-finalization.ts",
+         "stale obsolete episode finalization support file"),
+    ],
+)
+def test_apply_removes_and_check_rejects_obsolete_managed_files(
+    tier1_container, ctmp, relative, diagnostic,
+) -> None:
+    destination = ctmp / "agent"
+    obsolete = destination / relative
+    obsolete.parent.mkdir(parents=True)
+    obsolete.write_text("legacy machinery\n")
+    unrelated = destination / "extensions" / "unrelated.ts"
+    unrelated.parent.mkdir(parents=True, exist_ok=True)
+    unrelated.write_text("preserve me\n")
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    assert checked.returncode != 0
+    assert diagnostic in checked.stderr
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    assert not obsolete.exists()
+    assert unrelated.read_text() == "preserve me\n"
+
+
+@pytest.mark.parametrize("unsafe_kind", ["directory", "symlink"])
+def test_apply_rejects_unsafe_obsolete_goal_extension_before_mutation(
+    tier1_container, ctmp, unsafe_kind,
+) -> None:
+    destination = ctmp / "agent"
+    obsolete = destination / "extensions" / "goal-blocker-control.ts"
+    obsolete.parent.mkdir(parents=True)
+    unrelated = destination / "extensions" / "unrelated.ts"
+    unrelated.write_text("preserve me\n")
+    if unsafe_kind == "directory":
+        obsolete.mkdir()
+    else:
+        target = ctmp / "outside.ts"
+        target.write_text("outside remains untouched\n")
+        obsolete.symlink_to(target)
+
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+
+    assert applied.returncode != 0
+    assert "unsafe managed plugin destination" in applied.stderr
+    assert unrelated.read_text() == "preserve me\n"
+    if unsafe_kind == "symlink":
+        assert obsolete.is_symlink()
+        assert target.read_text() == "outside remains untouched\n"
+
+
+def test_check_rejects_a_stale_global_file(tier1_container, ctmp) -> None:
+    destination = ctmp / "agent"
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    stale = destination / FILES[0]
+    stale.write_text("stale generation\n")
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    assert checked.returncode != 0
+    assert "stale installed plugin file" in checked.stderr
+
+
+def test_check_rejects_missing_or_stale_identity_block(tier1_container, ctmp) -> None:
+    destination = ctmp / "agent"
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    append = destination / "APPEND_SYSTEM.md"
+    append.write_text("unrelated only\n")
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    assert checked.returncode != 0
+    assert "missing managed identity block" in checked.stderr
+
+
+def test_apply_rejects_duplicate_managed_blocks_before_copying(
+    tier1_container, ctmp,
+) -> None:
+    destination = ctmp / "agent"
+    destination.mkdir(parents=True)
+    block = tier1_container.read_repo("src/prime-agent-plugin/APPEND_SYSTEM.md")
+    (destination / "APPEND_SYSTEM.md").write_text(block + "\n" + block)
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+    assert applied.returncode != 0
+    assert "duplicate prime-claw identity blocks" in applied.stderr
+    assert not (destination / FILES[0]).exists()
+
+
+@pytest.mark.parametrize("unsafe_kind", ["directory", "symlink"])
+def test_apply_preflights_all_managed_destinations_before_mutation(
+    tier1_container, ctmp, unsafe_kind,
+) -> None:
+    destination = ctmp / "agent"
+    (destination / "extensions").mkdir(parents=True)
+    (destination / "extension-support").mkdir()
+    first = destination / FILES[0]
+    sentinel = b"existing generation remains untouched\n"
+    first.write_bytes(sentinel)
+    unsafe = destination / FILES[-1]
+    if unsafe_kind == "directory":
+        unsafe.mkdir()
+    else:
+        target = ctmp / "outside.ts"
+        target.write_bytes(b"outside remains untouched\n")
+        unsafe.symlink_to(target)
+    append = destination / "APPEND_SYSTEM.md"
+    append.write_bytes(b"unrelated append remains untouched\n")
+
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+
+    assert applied.returncode != 0
+    assert "unsafe managed plugin destination" in applied.stderr
+    assert first.read_bytes() == sentinel
+    assert append.read_bytes() == b"unrelated append remains untouched\n"
+    if unsafe_kind == "symlink":
+        assert unsafe.is_symlink()
+        assert unsafe.resolve().read_bytes() == b"outside remains untouched\n"
+
+
+def test_interrupted_sequential_install_is_not_atomic_and_check_detects_generation(
+    tier1_container, ctmp,
+) -> None:
+    root = ctmp
+    destination = root / "agent"
+    tools = root / "tools"
+    tools.mkdir()
+    counter = root / "install-count"
+    fake_install = tools / "install"
+    fake_install.write_text(
+        "#!/usr/bin/env python3\n"
+        "import os, pathlib, shutil, sys\n"
+        "counter = pathlib.Path(os.environ['INSTALL_COUNTER'])\n"
+        "count = int(counter.read_text()) + 1 if counter.exists() else 1\n"
+        "counter.write_text(str(count))\n"
+        "if count == 3: raise SystemExit(23)\n"
+        "source, destination = pathlib.Path(sys.argv[-2]), pathlib.Path(sys.argv[-1])\n"
+        "shutil.copyfile(source, destination)\n"
+        "destination.chmod(0o644)\n"
+    )
+    fake_install.chmod(0o755)
+
+    applied = tier1_container.run(
+        WS_APPLY,
+        env={
+            "PRIME_AGENT_PLUGIN_ROOT": str(destination),
+            "INSTALL_COUNTER": str(counter),
+            "PATH": str(tools) + ":" + CONTAINER_PATH,
+        },
+        workdir=None,
+        timeout=60,
+    )
+
+    assert applied.returncode == 23, applied.stdout + applied.stderr
+    assert (destination / FILES[0]).is_file()
+    assert (destination / FILES[1]).is_file()
+    assert not (destination / FILES[2]).exists()
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    assert checked.returncode != 0
+    assert "missing installed plugin file" in checked.stderr
+
+
+def test_managed_append_is_byte_stable_and_preserves_unmanaged_bytes_and_mode(
+    tier1_container, ctmp,
+) -> None:
+    destination = ctmp / "APPEND_SYSTEM.md"
+    sentinel = b"prefix\x00\xff  \n"
+    destination.write_bytes(sentinel)
+    destination.chmod(0o640)
+    first = _run_manager(tier1_container, "apply", destination)
+    assert first.returncode == 0, first.stderr
+    installed = destination.read_bytes()
+    assert installed.startswith(sentinel)
+    assert destination.stat().st_mode & 0o777 == 0o640
+    second = _run_manager(tier1_container, "apply", destination)
+    assert second.returncode == 0, second.stderr
+    assert destination.read_bytes() == installed
+    checked = _run_manager(tier1_container, "check", destination)
+    assert checked.returncode == 0, checked.stderr
+    assert list(destination.parent.glob(".*.tmp")) == []
+
+
+def test_manager_rejects_every_malformed_marker_shape_without_mutation(
+    tier1_container, ctmp,
+) -> None:
+    source_block = tier1_container.read_repo(
+        "src/prime-agent-plugin/APPEND_SYSTEM.md"
+    ).encode().strip()
+    start = b"<!-- prime-claw:conversation-identity:start -->"
+    end = b"<!-- prime-claw:conversation-identity:end -->"
+    malformed = {
+        "start-only": b"sentinel\n" + start,
+        "end-only": b"sentinel\n" + end,
+        "reversed": b"sentinel\n" + end + b"\n" + start,
+        "duplicate": source_block + b"\n" + source_block,
+        "overlap": start + b"\n" + start + b"\n" + end + b"\n" + end,
+    }
+    for label, original in malformed.items():
+        case = ctmp / label
+        case.mkdir()
+        destination = case / "APPEND_SYSTEM.md"
+        destination.write_bytes(original)
+        applied = _run_manager(tier1_container, "apply", destination)
+        assert applied.returncode != 0, label
+        assert destination.read_bytes() == original, label
+
+
+def test_manager_rejects_destination_symlink_without_mutating_target(
+    tier1_container, ctmp,
+) -> None:
+    target = ctmp / "target.md"
+    sentinel = b"do not modify\n"
+    target.write_bytes(sentinel)
+    destination = ctmp / "APPEND_SYSTEM.md"
+    destination.symlink_to(target)
+    applied = _run_manager(tier1_container, "apply", destination)
+    assert applied.returncode != 0
+    assert "destination symlink" in applied.stderr
+    assert destination.is_symlink()
+    assert target.read_bytes() == sentinel
+
+
+def test_manager_rejects_symlink_parent_without_creating_destination(
+    tier1_container, ctmp,
+) -> None:
+    real_parent = ctmp / "real-agent"
+    real_parent.mkdir()
+    linked_parent = ctmp / "linked-agent"
+    linked_parent.symlink_to(real_parent, target_is_directory=True)
+    destination = linked_parent / "APPEND_SYSTEM.md"
+    applied = _run_manager(tier1_container, "apply", destination)
+    assert applied.returncode != 0
+    assert "parent symlink" in applied.stderr
+    assert not (real_parent / "APPEND_SYSTEM.md").exists()
+
+
+def test_sigterm_orphan_is_reconciled_on_retry_without_deleting_live_writer_temp(
+    tier1_container,
+) -> None:
+    """Runs as a self-verifying in-container runner (see module docstring)."""
+    workdir = f"/tmp/pc-sigterm-{time.time_ns()}"
+    result = tier1_container.run(
+        "python3", WS_SIGTERM_PROBE, WS_MANAGER, WS_APPEND_SOURCE, workdir,
+        workdir=None, timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    verdict = json.loads(result.stdout.strip().splitlines()[-1])
+    assert verdict == {"ok": True, "orphan_reconciled": True,
+                       "decoys_preserved": True}
+
+
+def test_concurrent_apply_serializes_before_read_and_preserves_sentinel(
+    tier1_container,
+) -> None:
+    """Runs as a self-verifying in-container runner (see module docstring)."""
+    workdir = f"/tmp/pc-concurrent-{time.time_ns()}"
+    result = tier1_container.run(
+        "python3", WS_CONCURRENT_PROBE, WS_MANAGER, WS_APPEND_SOURCE, workdir,
+        workdir=None, timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    verdict = json.loads(result.stdout.strip().splitlines()[-1])
+    assert verdict == {"ok": True, "contenders": 4}
