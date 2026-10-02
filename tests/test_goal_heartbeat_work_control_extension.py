@@ -15,6 +15,7 @@ OBSOLETE = REPO / "src/prime-agent-plugin/extensions/goal-blocker-control.ts"
 # Container path (repo bind-mounted read-only at /workspace).
 WS_NODE_SUITE = "/workspace/tests/goal_heartbeat_work_control_extension.test.mjs"
 MANAGED_SOURCE = REPO / "src/prime-agent-plugin"
+KERNEL = MANAGED_SOURCE / "APPEND_SYSTEM.md"
 
 
 def test_goal_heartbeat_work_control_node_suite(tier1_container) -> None:
@@ -26,22 +27,20 @@ def test_goal_heartbeat_work_control_node_suite(tier1_container) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_event_driven_epoch_semantics_are_explicit_and_non_predictive() -> None:
-    source = EXTENSION.read_text()
+def test_lean_append_system_owns_goal_heartbeat_semantics() -> None:
+    raw = KERNEL.read_text()
+    source = " ".join(raw.split())
     required = (
-        "current active-work epoch toward the broader requested outcome",
-        "Completing an epoch does not claim the requested outcome is complete",
-        "does not require predicting the next gate or ownership boundary",
-        "actually starts a long-running or background operation",
-        "if it is still running, complete the current goal even when requested work remains",
-        "blocked or waiting for user input, credentials, permission, physical action",
-        "complete the current goal even when the requested outcome remains unfinished",
-        "After the blocker clears, create a fresh goal before substantive work resumes",
+        "maintain a goal so interrupted work resumes",
+        "establish a heartbeat for that exact wait and complete the goal",
+        "remove the heartbeat and create a new goal if work remains",
+        "When waiting for the user, complete the goal and create no heartbeat",
+        "When all work is complete, retain neither",
     )
     for phrase in required:
         assert phrase in source
-    assert "identify the next known" not in source
-    assert "objective must be true when ownership transfers" not in source
+    assert len(source.split()) <= 250
+    assert "PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL" not in EXTENSION.read_text()
 
 
 def test_obsolete_tools_and_autonomous_pause_resume_transport_are_absent() -> None:
@@ -56,4 +55,4 @@ def test_obsolete_tools_and_autonomous_pause_resume_transport_are_absent() -> No
     assert 'name: "resume_thread_goal"' not in source
     assert 'sendUserMessage("/goal pause"' not in source
     assert 'sendUserMessage("/goal resume"' not in source
-    assert source.count("PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1") == 1
+    assert source.count("PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1") == 0

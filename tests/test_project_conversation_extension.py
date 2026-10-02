@@ -26,13 +26,25 @@ WS_SKILL = ".ralph/skills/oversee-episode/SKILL.md"
 WS_NODE_SUITE = "/workspace/tests/project_conversation_extension.test.mjs"
 
 
-def test_managed_identity_kernel_is_small_and_routes_bounded_roles():
-    text = KERNEL.read_text()
-    for phrase in ["PRIME_CLAW_CONVERSATION_IDENTITY_V1", "CONVERSATION", "EPISODE", "EXPERT", "delegated", "exact-session", "compaction"]:
+def test_managed_session_contract_is_lean_and_covers_the_poc_protocol():
+    text = " ".join(KERNEL.read_text().split())
+    for phrase in [
+        "PRIME_CLAW_CONVERSATION_IDENTITY_V1",
+        "CONVERSATION",
+        "EPISODE",
+        "EXPERT",
+        "delegated",
+        "vertical slice",
+        "canonical handoff protocol",
+        "focused compaction",
+        "maintain a goal",
+        "establish a heartbeat",
+        "waiting for the user",
+        "Do not narrate",
+    ]:
         assert phrase in text
-    assert "oversee-episode" in text
     assert "daemon protocol" not in text
-    assert len(text.splitlines()) < 30
+    assert len(text.split()) <= 250
 
 
 def test_oversee_episode_is_exposed_through_normal_project_skill_discovery():
@@ -171,7 +183,7 @@ def test_native_bounded_frontmatter_blocks_before_provider_and_keeps_expectation
         case = ctmp / f"valid-{index}"; case.mkdir()
         completed, records, identity = _run_native_active_package(tier1_container, case, description)
         assert completed.returncode == 0, completed.stdout + completed.stderr
-        assert json.loads(records.read_text()) == {"kernel": 1, "package": 1}
+        assert json.loads(records.read_text()) == {"kernel": 1, "package": 0}
         assert identity.read_bytes() == (case / "project/expected-identity.json").read_bytes()
 
 
@@ -201,7 +213,7 @@ def test_native_raw_package_delimiters_block_active_promotion_and_recovery(tier1
             tier1_container, case, raw_package=canonical, promote=mode == "promotion", recover=mode == "recovery",
         )
         assert completed.returncode == 0, completed.stdout + completed.stderr
-        assert json.loads(records.read_text()) == {"kernel": 1, "package": 1}
+        assert json.loads(records.read_text()) == {"kernel": 1, "package": 0}
         assert identity.read_bytes() == (case / "project/expected-identity.json").read_bytes()
 
 
