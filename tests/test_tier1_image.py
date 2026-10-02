@@ -40,6 +40,10 @@ class TestTier1Dockerfile(unittest.TestCase):
         # Node >= 22.8 prerequisite must be enforced (build-time assertion).
         self.assertRegex(text, r"node --version")
 
+    def test_dockerfile_exposes_native_installer_public_bin(self):
+        text = DOCKERFILE.read_text()
+        self.assertIn('ENV PATH="/root/.local/bin:${PATH}"', text)
+
     def test_dockerfile_stays_slim(self):
         # Instructions only — comments explain the deferral decision and
         # legitimately name what the image excludes.

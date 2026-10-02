@@ -19,6 +19,7 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/root/.local/bin:${PATH}"
 
 # --- Base tooling: curl for the NodeSource setup, Python 3 + pytest for the
 # --- bridge/test layer, ca-certificates for TLS. Nothing else. ---
