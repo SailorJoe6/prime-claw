@@ -1,6 +1,6 @@
 # Execution Plan — Official lean session protocol
 
-> **Status:** Active; bounded watchdog/PATH unblock accepted for exact OL-011 continuation
+> **Status:** Active; accepted watchdog/PATH unblock integrated, exact canonical gate pending
 >
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 >
@@ -38,15 +38,17 @@ signatures; OL-011 changes neither `tests/test_embedding_candidate_build.py` nor
    `dbf3830c7c3443dece2962a52c8876ddc3e59436abfd4208079667546af73916`.
 
 Those failures remain preserved and are not accepted as a successful canonical
-gate. The operator subsequently accepted a bounded unblock. The next execute pass
-must integrate accepted `origin/main` through
-`eca48f8b284c990a8e030062ef70192313781b7f`, including watchdog/PATH repair
+gate. After the operator accepted the bounded unblock, this episode integrated
+accepted `origin/main` through
+`eca48f8b284c990a8e030062ef70192313781b7f`. The resulting history includes the
+independent watchdog/PATH repair
 `3bf905976a1a489d93e81619a838b34fc7ed8a31` and bead closures
-`927b3941ebab281c18ceacfc3c922f82e75db9fc`, reconcile only resulting in-scope
-progress/evidence, and rerun `scripts/test-all.sh` against the resulting exact
-candidate. Retain correlatable raw logs, commit/tree/dependency identity,
-supersession mapping, and teardown proof, then stop for exact-candidate owner
-review.
+`927b3941ebab281c18ceacfc3c922f82e75db9fc`; `prime-claw-zwg.5.1` is closed.
+The merge was conflict-free, preserves every OL-011 implementation/test file,
+and retains the exact compatibility skill, symlink, and reviewer-profile bytes.
+The resulting commit must now run `scripts/test-all.sh` with correlatable raw
+logs, commit/tree/dependency identity, supersession mapping, and teardown proof,
+then stop for exact-candidate owner review.
 
 Preserve the OL-011 provider-`systemPrompt` proof, OL-008 isolation, and every
 compatibility resource. Do not perform host-global apply/check, Slice 2, restart,

@@ -1,6 +1,6 @@
 # Future Specification — Official lean session protocol
 
-> **Status:** Active; operator accepted bounded OL-011 unblock and continuation
+> **Status:** Active; accepted bounded unblock integrated, exact canonical gate pending
 >
 > **Scope:** Promote the dogfooded lean conversation/episode and goal/heartbeat
 > protocol from a reversible POC to Prime Claw's supported default without
@@ -16,14 +16,16 @@ Tier 1 evidence is green. Three canonical full-gate attempts were blocked only b
 the independently tracked Darwin watchdog defect `prime-claw-zwg.5.1`; those
 receipts remain durable and are not relabeled.
 
-The operator accepted the bounded unblock and authorized continuation: integrate
-accepted `origin/main` through `eca48f8b284c990a8e030062ef70192313781b7f`,
-including watchdog/PATH repair `3bf905976a1a489d93e81619a838b34fc7ed8a31`
-and bead closures `927b3941ebab281c18ceacfc3c922f82e75db9fc`; preserve
-the OL-011 provider-`systemPrompt` proof and all compatibility resources; then
-rerun the complete canonical Tier 0/Tier 1 gate with exact receipts and teardown.
-This authority does not extend to host-global apply/check, Slice 2, restart,
-cleanup, merge, or deployment-topology changes.
+The operator accepted the bounded unblock and authorized continuation. This
+episode integrated accepted `origin/main` through
+`eca48f8b284c990a8e030062ef70192313781b7f`, including watchdog/PATH repair
+`3bf905976a1a489d93e81619a838b34fc7ed8a31` and bead closures
+`927b3941ebab281c18ceacfc3c922f82e75db9fc`. The integration preserves the OL-011
+provider-`systemPrompt` proof and all compatibility resources. The resulting exact
+commit must rerun the complete canonical Tier 0/Tier 1 gate with correlatable
+receipts and teardown before owner review. This authority does not extend to
+host-global apply/check, Slice 2, restart, cleanup, merge, or deployment-topology
+changes.
 
 ## Summary
 
