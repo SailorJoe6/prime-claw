@@ -1,6 +1,6 @@
 # Compaction-First Phase Transitions (`/plan`, `/implement-spec`)
 
-> Status: APPROVED — Slice 1 accepted; Slice 2 candidate ready for owner review.
+> Status: APPROVED AND IMPLEMENTED — Slice 1 accepted at exact `200be5744003ac47cecd2d79a337df3e4c4aeebc`; Slice 2 accepted at exact replacement `c4de0a89c84aa02f1035f0f3f6ed4bc838223949` (runtime predecessor `94e4488ade82e1a2a8ce74cf956993870759d1f3`). The planned operator end-to-end dogfood gate remains outstanding before terminal completion.
 > Source: design conversation between Joe and prime-agent, 2026-10-01.
 
 ## Summary
