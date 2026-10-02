@@ -7,10 +7,6 @@ import {
   type EpisodeDependencies,
 } from "../extension-support/spec-episode.ts";
 import {
-  validateFutureLocation,
-  wrapCanonicalSkill,
-} from "../extension-support/reviewed-plan-support.ts";
-import {
   admitPrepChain,
   type PrepChainWorkflow,
 } from "../extension-support/prep-chain.ts";
@@ -45,102 +41,17 @@ const PLAN_PREP_WORKFLOW: PrepChainWorkflow = {
   phaseSkillName: PLAN_WORKFLOW.skillName,
   locationTag: PLAN_WORKFLOW.locationTag,
 };
-const IMPLEMENT_WORKFLOW = {
+const IMPLEMENT_PREP_WORKFLOW: PrepChainWorkflow = {
   usage: IMPLEMENT_USAGE,
-  skillName: "implement-spec",
+  prepSkillName: "implement-prep",
+  phaseSkillName: "implement-spec",
   locationTag: "operator-implementation-location",
 };
 
-function warn(ctx: ExtensionContext, message: string): void {
-  ctx.ui.notify(message, "warning");
-}
-
-type SkillWorkflow = {
-  usage: string;
-  skillName: string;
-  locationTag: string;
+type ImplementationApproval = {
+  location: string;
+  skipNextAgentEnd: boolean;
 };
-
-type SkillAdmissionResult =
-  | { ok: true; location: string }
-  | { ok: false; message: string };
-
-function admitCanonicalSkill(
-  pi: ExtensionAPI,
-  ctx: ExtensionContext,
-  rawLocation: string,
-  workflow: SkillWorkflow,
-  delivery: "native" | "followUp",
-  onValidated?: (ctx: ExtensionContext, location: string) => void,
-  preflight?: (ctx: ExtensionContext, location: string) => void,
-): SkillAdmissionResult {
-  let selected;
-  try {
-    selected = validateFutureLocation(ctx.cwd, rawLocation);
-  } catch {
-    selected = null;
-  }
-  if (!selected) return { ok: false, message: workflow.usage };
-
-  preflight?.(ctx, selected.location);
-
-  const prompt = wrapCanonicalSkill(
-    selected.projectRoot,
-    workflow.skillName,
-    workflow.locationTag,
-    selected.location,
-  );
-  if (!prompt) {
-    return {
-      ok: false,
-      message: `reviewed-plan: .ralph/skills/${workflow.skillName}/SKILL.md not found`,
-    };
-  }
-
-  try {
-    if (delivery === "followUp") {
-      pi.sendUserMessage(prompt, { deliverAs: "followUp" });
-    } else {
-      pi.sendUserMessage(prompt);
-    }
-  } catch (error) {
-    if (delivery === "native") throw error;
-    return {
-      ok: false,
-      message: `reviewed-plan: canonical ${workflow.skillName} could not be queued`,
-    };
-  }
-
-  onValidated?.(ctx, selected.location);
-  return { ok: true, location: selected.location };
-}
-
-function registerSkillCommand(
-  pi: ExtensionAPI,
-  options: {
-    command: string;
-    description: string;
-    workflow: SkillWorkflow;
-    onValidated?: (ctx: ExtensionContext, location: string) => void;
-    preflight?: (ctx: ExtensionContext, location: string) => void;
-  },
-): void {
-  pi.registerCommand(options.command, {
-    description: options.description,
-    handler: async (args, ctx) => {
-      const result = admitCanonicalSkill(
-        pi,
-        ctx,
-        args,
-        options.workflow,
-        "native",
-        options.onValidated,
-        options.preflight,
-      );
-      if (!result.ok) warn(ctx, result.message);
-    },
-  });
-}
 
 function registerPrepChainCommand(
   pi: ExtensionAPI,
@@ -148,6 +59,8 @@ function registerPrepChainCommand(
     command: string;
     description: string;
     workflow: PrepChainWorkflow;
+    onValidated?: (ctx: ExtensionContext, location: string) => void;
+    preflight?: (ctx: ExtensionContext, location: string) => void;
   },
 ): void {
   pi.registerCommand(options.command, {
@@ -159,6 +72,8 @@ function registerPrepChainCommand(
         args,
         options.workflow,
         "native",
+        options.onValidated,
+        options.preflight,
       );
       if (!result.ok) ctx.ui.notify(result.message, result.level);
     },
@@ -173,19 +88,22 @@ type ReviewedPlanDependencies = EpisodeDependencies & {
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
     registerConversationOversight(pi);
-    const approvedLocationBySession = new Map<string, string>();
+    const implementationApprovalBySession = new Map<string, ImplementationApproval>();
     registerPrepChainCommand(pi, {
       command: "plan",
       description: "Plan a reviewed specification from an explicit .ralph/plans/future/<slug> folder",
       workflow: PLAN_PREP_WORKFLOW,
     });
-    registerSkillCommand(pi, {
+    registerPrepChainCommand(pi, {
       command: "implement-spec",
       description: "Review and promote an approved future bundle into an isolated implementation episode",
-      workflow: IMPLEMENT_WORKFLOW,
+      workflow: IMPLEMENT_PREP_WORKFLOW,
       preflight: (ctx, location) => assertConversationPromotionReady(ctx, location),
       onValidated: (ctx, location) => {
-        approvedLocationBySession.set(ctx.sessionManager.getSessionId(), location);
+        implementationApprovalBySession.set(ctx.sessionManager.getSessionId(), {
+          location,
+          skipNextAgentEnd: true,
+        });
       },
     });
 
@@ -238,13 +156,23 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     });
 
     pi.on("session_start", (_event, ctx) => {
-      approvedLocationBySession.delete(ctx.sessionManager.getSessionId());
+      implementationApprovalBySession.delete(ctx.sessionManager.getSessionId());
     });
     pi.on("agent_end", (_event, ctx) => {
-      approvedLocationBySession.delete(ctx.sessionManager.getSessionId());
+      const sessionId = ctx.sessionManager.getSessionId();
+      const approval = implementationApprovalBySession.get(sessionId);
+      if (!approval) return;
+      if (approval.skipNextAgentEnd) {
+        implementationApprovalBySession.set(sessionId, {
+          ...approval,
+          skipNextAgentEnd: false,
+        });
+        return;
+      }
+      implementationApprovalBySession.delete(sessionId);
     });
     pi.on("session_shutdown", (_event, ctx) => {
-      approvedLocationBySession.delete(ctx.sessionManager.getSessionId());
+      implementationApprovalBySession.delete(ctx.sessionManager.getSessionId());
     });
 
     pi.registerTool({
@@ -270,14 +198,15 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       } as any,
       async execute(toolCallId, params, _signal, _onUpdate, ctx) {
         const sessionId = ctx.sessionManager.getSessionId();
-        if (approvedLocationBySession.get(sessionId) !== params.location) {
+        const approval = implementationApprovalBySession.get(sessionId);
+        if (approval?.location !== params.location || approval.skipNextAgentEnd) {
           return {
             content: [{ type: "text", text: "Episode creation failed: no matching active /implement-spec approval" }],
             details: { error: "no matching active /implement-spec approval" },
             isError: true,
           };
         }
-        approvedLocationBySession.delete(sessionId);
+        implementationApprovalBySession.delete(sessionId);
         try {
           assertConversationPromotionReady(ctx, params.location);
           const createEpisode = dependencies?.createEpisode ?? createSpecEpisode;

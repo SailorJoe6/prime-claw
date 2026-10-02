@@ -141,16 +141,14 @@ Implementation promotion remains native-only. A fresh project conversation does
 not register `ralph_implement_spec`; the operator must use the explicit native
 command below. This is a deliberate fail-closed result, not a missing adapter.
 
-The installed Prime Agent 0.9.5 RPC characterization confirmed host approval,
-`steer`, and matching `input` with `event.source === "extension"`. It also
-showed `agent_end` after that matching input and before the readiness agent turn.
-The approved conversational design clears pending and active authority on
-`agent_end`, so its one-use arm cannot safely reach `create_spec_episode` without
-adding forbidden cross-run lifecycle state. Rejection, cancellation, absent UI,
-and non-UI modes consequently have no conversational implementation path or
-episode side effect. Confirmation UX can be reconsidered only with a simpler
-public runtime ordering; it must not be emulated with durable approvals, leases,
-nonces, timers, or private runtime patches.
+The installed Prime Agent RPC characterization confirmed that a model-called
+confirmation tool would cross `agent_end` before a steered readiness turn. That
+surface remains intentionally absent: rejection, cancellation, absent UI, and
+non-UI modes have no conversational implementation path or episode side effect.
+The explicit native command is the operator authority boundary and uses only a
+bounded in-memory one-deep lifecycle flag for its own admitted prep chain. It
+does not add durable approvals, leases, nonces, timers, or private runtime
+patches. Conversational confirmation UX remains a separate deferred design.
 
 Implementation remains unauthorized until the operator selects an approved,
 planned bundle with:
@@ -161,15 +159,33 @@ planned bundle with:
 
 The native handler applies the same relative-path, safe-slug, directory,
 containment, and realpath checks as `/plan`. Invalid input displays concise
-usage and never invokes the model. Valid input loads the current customizable
-readiness policy from `.ralph/skills/implement-spec/SKILL.md` and supplies only
-the validated location. The policy either explains every readiness deficiency
-and stops without calling a tool, or calls `create_spec_episode` exactly once.
+usage and never invokes the model. A valid command preflights both current
+project policies, `.ralph/skills/implement-prep/SKILL.md` and
+`.ralph/skills/implement-spec/SKILL.md`, plus the existing conversation identity
+boundary before sending either message. It admits wrapped `implement-prep` as
+an ordinary message and queues wrapped canonical `implement-spec` exactly once
+as the sole `followUp`, with the same validated location envelope.
 
-`create_spec_episode` accepts only that location. The native command arms that
-exact location for one model turn; an unarmed, different, late, or repeated tool
-call is rejected. The capability also runs only from a persisted, daemon-backed,
-top-level project conversation. Trusted host code derives all other values:
+`implement-prep` performs only the project-owned light bundle-presence sniff
+and one best-effort focused compaction request. It cannot cancel or reconstruct
+the independently queued phase workflow. Canonical `implement-spec` runs
+`prepare`, performs the authoritative semantic readiness review, and either
+explains every deficiency without a tool call or calls `create_spec_episode`
+exactly once.
+
+Approval is recorded only after both messages are admitted, bound to the exact
+session and location, and carries one non-accumulating `agent_end` skip. The prep
+turn consumes that skip; the approval is unusable before that boundary, and
+the queued implementation turn can then use it. `create_spec_episode` consumes it before any later readiness check or
+host mutation, even on failure. A second `agent_end`, `session_start`, or
+`session_shutdown` clears an unused approval. A cancelled chain therefore dies
+at the next `agent_end` after its one prep-turn skip. Missing skills, failed
+preflight, or either transport failure never arm approval.
+
+`create_spec_episode` accepts only that exact location. An unarmed, different,
+late, or repeated tool call is rejected. The capability also runs only from a
+persisted, daemon-backed, top-level project conversation. Trusted host code
+derives all other values:
 
 | Identity | Derived value |
 |---|---|
@@ -335,8 +351,10 @@ scripts/test-all.sh
 ```
 
 The Node suites, executed by the container-marked Python bridge, cover native
-and conversational planning registration,
-validation, canonical Markdown loading, controlled publisher acknowledgements and
+and conversational planning registration, native implementation prep ordering,
+fail-closed dual-skill loading, exactly-one-`agent_end` approval survival,
+cancellation, lifecycle clearing, consume-on-use, validation, canonical Markdown
+loading, controlled publisher acknowledgements and
 rejections, failure isolation, opaque temporary-Git promotion,
 lifecycle-directory preservation, promotion commits, inherited context,
 protocol-7 daemon envelopes, durable handoff-first bootstrap admission,

@@ -204,6 +204,17 @@ rebased candidate was validated only in Docker tier 1:
   user-global `~/.prime/agent`. The ignored local `.env` selected pinned
   Prime Agent `0.9.3` and is not part of the candidate.
 
+### Owner acceptance (2026-10-02)
+
+The project conversation accepted exact pushed commit
+`200be5744003ac47cecd2d79a337df3e4c4aeebc` and closed
+`prime-claw-h6w.26`. Fresh EXPERT `expert-reviewer-compaction-slice1-200be574`
+(session `01a0fe94-c76e-7044-9d6a-892fffcde77f`, Astra/max) returned PASS;
+the preserved report is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0fdbc-eaa1-75cb-a44b-86787dfeb048/expert-review-slice1-200be574.md`.
+This acceptance authorizes only the already-approved Slice 2. It is not merge
+approval and does not expand scope.
+
 ### Explicit non-goals
 
 No `/implement-spec` changes (Slice 2), no guidance argument, no bespoke
@@ -212,8 +223,9 @@ hint authoring, no queue-cancellation capability, no retries, no changes to
 
 ## Slice 2 — Compaction-first `/implement-spec` and the approval-token fix
 
-**Bead:** `prime-claw-h6w.27` — **Depends on:** Slice 1 accepted by the
-project conversation.
+**Bead:** `prime-claw-h6w.27` — **Dependency satisfied:** Slice 1 was
+owner-accepted at exact commit `200be5744003ac47cecd2d79a337df3e4c4aeebc` and
+`prime-claw-h6w.26` is closed.
 
 ### Working capability
 
@@ -255,10 +267,60 @@ cancelled chain leaves no usable approval beyond the next `agent_end`.
 - Run the same focused and full suites as Slice 1; `git diff --check`.
 - Bead `prime-claw-h6w.27` updated with commit and evidence.
 
+### Implementation checkpoint (2026-10-02)
+
+- Added project-local `.ralph/skills/implement-prep/SKILL.md`; it owns the
+  cheap bundle sniff, fixed owner-supervision hint, exactly-once
+  `compact.run(focus_hint)` request, and bounded Status / Evidence / Next Step
+  report.
+- Routed native `/implement-spec` through the shared two-message prep chain.
+  Both project-local skills and the existing conversation-promotion boundary
+  preflight before either message; approval is recorded only after both sends
+  and remains unusable until the prep turn's `agent_end` consumes its skip.
+- Replaced the per-session location string with exact location plus one
+  non-accumulating `agent_end` skip. The prep end consumes the skip; the next
+  end clears unused authority. Consume-on-use, `session_start`, and
+  `session_shutdown` remain clearing boundaries.
+- Added positive, wrong-location, missing-skill, partial-send, cancellation,
+  repeated-admission, lifecycle-clear, consume/replay, and fresh-rearm Node
+  coverage plus an installed-container native `/implement-spec` behavioral
+  probe that requires exactly one observed intervening `agent_end` before its
+  controlled episode creation succeeds.
+- Updated `docs/prep-chain.md`, `docs/future-specification-bundles.md`, the docs
+  index, and the handoff-chain cross-reference.
+
+### Candidate evidence (2026-10-02)
+
+- Focused tier-0 policy/documentation checks: 23 passed, 8 container tests
+  deselected.
+- Container node bridge for the reviewed-plan suite: PASS.
+- Installed-container native `/implement-spec` behavioral probe: PASS; one
+  `implement-prep`, one canonical `implement-spec`, one real container-local
+  `compact.run()` call, exactly one observed intervening `agent_end`, one
+  authorized controlled episode creation, and no unexpected model call.
+- Updated native-discovery activation/lifecycle fixtures: 2 focused container
+  tests passed through the two-turn chain.
+- Independent static review: PASS after one blocking finding was repaired by
+  making approval unusable before the prep-turn `agent_end` and adding the
+  matching regression.
+- `python3 -m pytest tests/ -q -m container`: 42 passed, 386 deselected;
+  11 existing deprecation warnings.
+- `scripts/test-tier1.sh --probe`: PASS with pinned Prime Agent `0.9.3`;
+  explicit-root apply/check succeeded at `/root/.prime/agent`, `handoff`, `plan`,
+  and `implement-spec` each registered exactly once, and the container was
+  destroyed.
+- `scripts/test-all.sh`: PASS — tier 0 had 279 passed and 149 skipped;
+  tier 1 had 42 passed and 386 deselected; tier 2 was intentionally not
+  requested.
+- No candidate validation applied, checked, or probed the host user-global
+  `~/.prime/agent`. The ignored local `.env` selected pinned Prime Agent
+  `0.9.3` and is not part of the candidate.
+
 ### Explicit non-goals
 
 No conversational `/implement-spec` tool (none exists; `create_spec_episode`
-is not an entry surface and is unchanged), no turn-start re-arm unless
+remains not an entry surface, and its signature and episode-resource behavior
+are unchanged beyond the planned approval gate), no turn-start re-arm unless
 Decision 1 is falsified by probe, no changes to the episode fork's existing
 handoff-first compaction, no multi-project template installation (universal
 agent's job, Phase 4 narrative).

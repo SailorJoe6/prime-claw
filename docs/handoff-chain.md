@@ -21,8 +21,9 @@ It automates only this narrow seam. It does not choose work, decide that an
 iteration is complete, or implement the episode orchestrator.
 
 The related [phase prep chain](prep-chain.md) applies the same compaction-first,
-queued-follow-up shape at the reviewed planning boundary while keeping its
-project-specific instructions in `plan-prep/SKILL.md`.
+queued-follow-up shape at the reviewed planning and implementation-promotion
+boundaries while keeping project-specific instructions in `plan-prep/SKILL.md`
+and `implement-prep/SKILL.md`.
 
 ## Entry contracts
 

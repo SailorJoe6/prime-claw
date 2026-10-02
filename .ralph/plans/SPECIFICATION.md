@@ -1,6 +1,6 @@
 # Compaction-First Phase Transitions (`/plan`, `/implement-spec`)
 
-> Status: APPROVED — active implementation; Slice 1 candidate awaiting owner review.
+> Status: APPROVED — Slice 1 accepted; Slice 2 candidate ready for owner review.
 > Source: design conversation between Joe and prime-agent, 2026-10-01.
 
 ## Summary

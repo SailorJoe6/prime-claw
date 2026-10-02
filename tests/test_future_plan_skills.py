@@ -135,7 +135,58 @@ def test_plan_prep_skill_owns_compaction_prompt_and_bounded_continuation() -> No
         assert "implementation episode to completion" not in source
 
 
-def test_plan_prep_documentation_requires_docker_only_plugin_validation() -> None:
+def test_implement_prep_skill_owns_compaction_prompt_and_bounded_continuation() -> None:
+    """Implement prep owns model policy while approval mechanics stay in TS."""
+    skill = (
+        ROOT / ".ralph" / "skills" / "implement-prep" / "SKILL.md"
+    ).read_text()
+
+    assert "name: implement-prep" in skill
+    for fragment in (
+        "operator implementation location",
+        "operator-selected path",
+        "Do not guess, substitute, search for, or select another",
+        "selected folder exists",
+        "readable, non-empty `SPECIFICATION.md` and `EXECUTION_PLAN.md`",
+        "not the authoritative implementation-readiness review",
+        "do not request compaction",
+        "Standard compaction request",
+        "review and promote the operator-approved specification",
+        "operator-selected future folder",
+        "operator review decisions",
+        "constraints",
+        "material non-goals",
+        "durable artifact and bead references",
+        "create its isolated implementation episode",
+        "owner-supervision role",
+        "supervises the episode to completion",
+        "Status",
+        "Evidence",
+        "Next Step",
+        "compaction requested",
+        "compaction confirmed",
+        "sole follow-up",
+        "cannot cancel, replace, reconstruct, retry, or",
+    ):
+        assert fragment in skill
+
+    assert skill.count("await compact.run(focus_hint)") == 1
+    assert "Do not run `prepare`" in skill
+    assert "Do not wait for a compaction event" in skill
+
+    extension = (
+        ROOT / "src" / "prime-agent-plugin" / "extensions" / "reviewed-plan.ts"
+    ).read_text()
+    support = (
+        ROOT / "src" / "prime-agent-plugin" / "extension-support" / "prep-chain.ts"
+    ).read_text()
+    for source in (extension, support):
+        assert "operator review decisions" not in source
+        assert "compact.run" not in source
+        assert "owner-supervision role" not in source
+
+
+def test_phase_prep_documentation_requires_docker_only_plugin_validation() -> None:
     docs = (ROOT / "docs" / "prep-chain.md").read_text()
     normalized = " ".join(docs.split())
 
@@ -146,7 +197,9 @@ def test_plan_prep_documentation_requires_docker_only_plugin_validation() -> Non
         "scripts/test-tier1.sh --probe",
         "scripts/test-all.sh",
         "container-marked reviewed-plan coverage",
-        "exactly one `plan-prep` prompt and one canonical `plan` prompt",
+        "behavioral native `/plan` and `/implement-spec` probes",
+        "one-deep `agent_end` skip",
+        "`create_spec_episode` still requires exact session and location equality",
     ):
         assert fragment in normalized
 
