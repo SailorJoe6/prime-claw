@@ -1,6 +1,6 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Future specification; awaiting operator review
+> **Status:** Operator-approved for implementation by `/implement-spec` on 2026-10-03; episode creation awaits an explicit replay after the reviewed planning bundle is committed and pushed.
 >
 > **Tracking:** `prime-claw-h6w.30`
 >
