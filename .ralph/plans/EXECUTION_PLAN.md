@@ -1,7 +1,8 @@
 # Execution plan — project-wide isolation-first testing strategy
 
-> **Status:** FUTURE plan, operator-approved and implementation-ready. External
-> prerequisites are closed in `3bf9059` / `927b394`; no episode exists yet.
+> **Status:** ACTIVE episode. Slice 1 (`prime-claw-5v7.2`) is implemented and
+> awaiting owner review; later slices remain unstarted. External prerequisites
+> are closed in `3bf9059` / `927b394`.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md).
 > **Selected future folder:**
 > `.ralph/plans/future/project-wide-testing-strategy`.
@@ -277,6 +278,22 @@ checkout is inspected or mutated.
 - Existing tier-0 and pinned tier-1 suites plus standalone `--smoke`/`--probe`
   pass with exact teardown evidence.
 - Durable evidence: `docs/evidence/...-slice1-pinned-provenance.md`.
+
+### Implementation receipt
+
+- **State:** implemented on the episode branch; awaiting owner review.
+- **Delivered:** schema-v1 sanitized provenance; run-owned result trees;
+  iidfile/cidfile execution identity; exact sanitized repository snapshots;
+  online pinned install followed by verified network absence; bounded offline
+  apply/check/probe/tests; captured-ID teardown; partial-failure manifests;
+  immediate source-mode fail-close.
+- **Durable docs:** `docs/testing-strategy.md` and
+  `docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md`.
+- **Executable coverage:** `tests/test_testing_provenance.py`,
+  `tests/test_tier1_driver.py`, `tests/test_tier1_fixture.py`, and
+  `tests/test_tier1_image.py`.
+- **Remaining scope:** the isolated source builder stays in S2
+  (`prime-claw-5v7.1`); later tiers and taxonomy stay in their planned slices.
 
 ### Rollback
 
@@ -735,8 +752,8 @@ Stop and return to the owning conversation when:
 
 ## 16. Operator review gate
 
-Review this plan and the refactored specification together. Planning changes
-may be made only in this selected future folder. Approval of this plan still
-does not authorize implementation; use the separate explicit
-`/implement-spec .ralph/plans/future/project-wide-testing-strategy` command
-only after the bundle is accepted.
+The operator approved and promoted this bundle through `/implement-spec`.
+The active episode delivers one pushed vertical slice at a time. After each
+slice, the owner conversation reviews the exact commit and evidence, then
+accepts it, requests an in-scope revision, pauses, or consults the operator.
+The episode never infers acceptance or starts the next slice on its own.

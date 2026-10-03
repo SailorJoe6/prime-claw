@@ -33,6 +33,9 @@ prime-claw builds on four prior projects. Read these before designing:
   multi-store routing layer: which store owns a durable fact (brain vs. docs
   vs. harness vs. beads vs. reports), the two-level routing split, and the
   report guard. Orthogonal to the three-horizon context model.
+- [testing-strategy.md](testing-strategy.md) — isolation tiers, the current
+  exact-image/offline tier-1 contract, provenance schema, source-mode safety
+  boundary, teardown rules, and reproduction commands.
 - [handoff-chain.md](handoff-chain.md) — the Phase 4a native `/handoff` →
   focused compaction → next-skill transition, its legacy Ralph-loop lineage,
   marker lifecycle, regression tests, evidence, and short-session recovery.

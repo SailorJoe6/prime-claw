@@ -1,10 +1,9 @@
 # Project-wide testing strategy — isolation-first test architecture
 
-> **Status:** FUTURE specification, operator-approved for implementation by
-> `/implement-spec` on 2026-10-02. Episode creation was held while external
-> blockers were repaired; they are now satisfied by `3bf9059` / `927b394`.
-> No implementation episode has been created. Replay `/implement-spec` to
-> create it from the current approved bundle.
+> **Status:** ACTIVE implementation episode created from the operator-approved
+> bundle on 2026-10-02. Slice 1 (`prime-claw-5v7.2`) is implemented on the
+> episode branch and awaiting owner review; later slices remain unstarted.
+> External prerequisites remain satisfied by `3bf9059` / `927b394`.
 > **Origin:** operator charter, 2026-10-02 (independent planning-only
 > conversation `01a0fe09-9641-73af-9889-b44e302490d1`).
 > **Tracking:** planning bead `prime-claw-5v7`.

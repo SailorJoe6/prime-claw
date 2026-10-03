@@ -1,7 +1,7 @@
 {
  "version": 1,
  "project": "prime-claw",
- "phase": "1 \u2014 de-risk gate",
+ "phase": "1 — de-risk gate",
  "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
  "requirements": [
   {
@@ -837,7 +837,7 @@
    "priority": "NICE",
    "phase": 2,
    "slice": 6,
-   "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
+   "summary": "Host exposure of sandboxed Postgres on localhost:5433 — documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
    "status": "documented (Slice 6; no host forward by design)",
    "proven_by": {
     "check": [
@@ -1135,7 +1135,7 @@
    "id": "R-T1-1",
    "priority": "P1",
    "summary": "Tier-1 slim test container image + standalone driver: docker/test.Dockerfile (Ubuntu 24.04 + Node 22 + python3/pytest), scripts/test-tier1.sh builds the image and runs one ephemeral container; --smoke, --dry-run (never contacts Docker), --rebuild; informational paths are Docker-free.",
-   "status": "met (slice 1, EXPERT PASS on 2666843 \u2261 b2f6b86)",
+   "status": "met (slice 1, EXPERT PASS on 2666843 ≡ b2f6b86)",
    "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
    "proven_by": {
     "apply": [
@@ -1156,8 +1156,8 @@
   {
    "id": "R-T1-2",
    "priority": "P1",
-   "summary": "Tier-1 install selection + in-container plugin apply/check: .env (exactly one of PRIME_AGENT_PINNED via vendor installer / PRIME_AGENT_SOURCE via fresh fork release:pack staged over file: URLs; fail fast on neither/both), plugin apply+check against the container's own ~/.prime/agent, --probe validates the get_commands reply semantically under a hard timeout --kill-after deadline.",
-   "status": "met (slice 2 + rework, EXPERT PASS on bc00cba)",
+   "summary": "Tier-1 pinned install selection and offline plugin apply/check: exactly one selector is required; PRIME_AGENT_PINNED installs through the vendor installer, then all captured networks are disconnected and verified absent before artifact identity, explicit-root apply/check, or the validated host and in-container hard-deadline RPC probe. PRIME_AGENT_SOURCE fails before checkout or Docker access pending the isolated Slice-2 builder.",
+   "status": "met for pinned mode; source mode safely disabled pending prime-claw-5v7.1",
    "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
    "proven_by": {
     "apply": [
@@ -1167,7 +1167,8 @@
      "scripts/test-tier1.sh"
     ],
     "validate": [
-     "scripts/test-tier1.sh"
+     "scripts/test-tier1.sh",
+     "scripts/testing/bounded.py"
     ],
     "tests": [
      "tests/test_tier1_driver.py"
@@ -1200,8 +1201,8 @@
   {
    "id": "R-T1-4",
    "priority": "P1",
-   "summary": "Session-scoped tier-1 container fixture + migrated plugin suites: one container per pytest run with driver-equivalent setup (install prime-agent per .env, apply+check plugin once), exec/popen helpers with in-container hard timeouts, same-path session share for scratch, in-container fake daemon + self-verifying choreography runners (tests/container/); every node suite has a pytest bridge (episode_close and project_conversation bridges added); no tier-1 test code resolves host binaries.",
-   "status": "met (slice 3)",
+   "summary": "Session-scoped tier-1 container fixture + migrated plugin suites: one exact iidfile image and cidfile container per pytest run, read-only repository, run-owned share, online pinned install followed by verified network absence, offline explicit-root plugin apply/check, exec/popen helpers with hard timeouts, and captured-ID teardown with absent/present/unknown evidence.",
+   "status": "met; strengthened by project-wide testing Slice 1",
    "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
    "proven_by": {
     "apply": [
@@ -1275,6 +1276,154 @@
     ]
    },
    "evidence": "docs/evidence/2026-10-02-plugin-install-test-guardrail.md"
+  },
+  {
+   "id": "R-TEST-1",
+   "priority": "GATE",
+   "summary": "Environment-dependent tier-1 behavior runs in one disposable exact-image container with a read-only repository and run-owned writable evidence/share only.",
+   "status": "proven for tier 1; later tiers pending",
+   "plan": ".ralph/plans/SPECIFICATION.md",
+   "proven_by": {
+    "apply": [
+     "scripts/test-tier1.sh",
+     "tests/conftest.py"
+    ],
+    "check": [
+     "scripts/testing/provenance.py"
+    ],
+    "validate": [
+     "docs/testing-strategy.md"
+    ],
+    "tests": [
+     "tests/test_tier1_driver.py",
+     "tests/test_tier1_fixture.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
+  },
+  {
+   "id": "R-TEST-5",
+   "priority": "GATE",
+   "summary": "Tier-1 host launchers build and target only run-owned iidfile/cidfile resources, export sanitized evidence, enforce deadlines, and classify teardown as present/absent/unknown.",
+   "status": "proven for tier 1",
+   "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
+   "proven_by": {
+    "apply": [
+     "scripts/test-tier1.sh",
+     "tests/conftest.py"
+    ],
+    "check": [
+     "scripts/testing/provenance.py"
+    ],
+    "validate": [
+     "docs/testing-strategy.md"
+    ],
+    "tests": [
+     "tests/test_tier1_driver.py",
+     "tests/test_tier1_fixture.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
+  },
+  {
+   "id": "R-TEST-6",
+   "priority": "GATE",
+   "summary": "Pinned tier-1 runs emit a sanitized schema-v1 manifest with repository, requested/installed Prime Agent version and executable SHA-256, immutable image, platform, network, teardown, and evidence-file identities.",
+   "status": "proven for pinned tier 1",
+   "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
+   "proven_by": {
+    "apply": [
+     "scripts/testing/provenance.py"
+    ],
+    "check": [
+     "docs/testing-strategy.md"
+    ],
+    "validate": [
+     "scripts/test-tier1.sh",
+     "tests/conftest.py"
+    ],
+    "tests": [
+     "tests/test_testing_provenance.py",
+     "tests/test_tier1_driver.py",
+     "tests/test_tier1_fixture.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
+  },
+  {
+   "id": "R-TEST-7",
+   "priority": "GATE",
+   "summary": "Tier-1 uses a read-only repository, fresh run-owned writable share, no host home/socket/credentials, and verified network absence before product checks and tests; every Docker wait is deadline-bounded with TERM-to-KILL escalation.",
+   "status": "proven for tier 1; tier 2 pending",
+   "plan": ".ralph/plans/SPECIFICATION.md",
+   "proven_by": {
+    "apply": [
+     "scripts/test-tier1.sh",
+     "tests/conftest.py",
+     "scripts/testing/bounded.py"
+    ],
+    "check": [
+     "docs/testing-strategy.md"
+    ],
+    "validate": [
+     "scripts/testing/provenance.py"
+    ],
+    "tests": [
+     "tests/test_tier1_driver.py",
+     "tests/test_tier1_fixture.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
+  },
+  {
+   "id": "R-TEST-8",
+   "priority": "GATE",
+   "summary": "Prime Agent source selection fails before checkout stat/read/write/build/cleanup/pack or Docker access until the disposable source builder lands.",
+   "status": "safety boundary proven; isolated builder pending prime-claw-5v7.1",
+   "plan": ".ralph/plans/EXECUTION_PLAN.md (Slices 1-2)",
+   "proven_by": {
+    "apply": [
+     "scripts/test-tier1.sh",
+     "tests/conftest.py"
+    ],
+    "check": [
+     ".env.example",
+     "docs/testing-strategy.md"
+    ],
+    "validate": [
+     "DEVELOPERS.md"
+    ],
+    "tests": [
+     "tests/test_tier1_driver.py",
+     "tests/test_tier1_fixture.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
+  },
+  {
+   "id": "R-TEST-10",
+   "priority": "GATE",
+   "summary": "Tier-1 provenance and launcher safety include negative tests for schema drift, stale/tampered evidence, selector ambiguity, image mismatch, attached network, partial publication, teardown present/unknown, and concurrent run allocation.",
+   "status": "proven for Slice-1 components; later component failures pending their slices",
+   "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
+   "proven_by": {
+    "apply": [
+     "scripts/testing/provenance.py"
+    ],
+    "check": [
+     "docs/testing-strategy.md"
+    ],
+    "validate": [
+     "scripts/test-tier1.sh",
+     "tests/conftest.py"
+    ],
+    "tests": [
+     "tests/test_testing_provenance.py",
+     "tests/test_tier1_driver.py",
+     "tests/test_tier1_fixture.py"
+    ]
+   },
+   "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
   }
  ],
  "phase2": {}

@@ -67,44 +67,38 @@ only. Do not apply, check, or probe a candidate against the host user-global
 
 - **Tier 0 — host, no environment.** Static checks: no Node, no
   prime-agent, no Docker, no plugin install. This is the default gate.
-- **Tier 1 — slim container.** Anything needing Node, a prime-agent
-  install, or the plugin runs inside a plain-Docker container, so the
-  prime-agent under test can never touch the host's `~/.prime/agent/`.
-  One container per pytest run: the session fixture in
-  `tests/conftest.py` builds the image (`docker/test.Dockerfile`), starts
-  one container with the repo bind-mounted read-only at `/workspace`,
-  installs prime-agent per `.env`, applies + checks the plugin against
-  the container's own `~/.prime/agent/`, hands tests an exec helper, and
-  destroys the container at session end. Test scratch lives on a
-  same-path session share under the gitignored `.test-results/` so files
-  and paths are identical on both sides; fake daemons run in-container
-  (`tests/container/`) because a host-bound Unix socket is unreachable
-  from the container through the macOS virtiofs mount.
+- **Tier 1 — slim container.** Anything needing Node, a Prime Agent
+  install, or the plugin runs inside one run-owned plain-Docker container.
+  A sanitized run-owned snapshot of tracked and nonignored inputs is mounted
+  read-only at `/workspace`; ignored local state is never mounted. A fresh
+  same-path share is the only writable host mount. Each direct driver or pytest run
+  allocates `.test-results/<run-id>/tier1/`, builds from an empty context,
+  captures the immutable image ID with `--iidfile`, and launches that exact
+  ID with a run-owned `--cidfile`.
 
   ```bash
   python3 -m pytest tests/ -q -m container   # tier 1 (requires Docker + .env)
   ```
 
-  Install selection lives in a gitignored `.env` at the repo root (copy
-  `.env.example`; set EXACTLY ONE selector — the driver and the session
-  fixture fail fast on neither/both):
+  Copy `.env.example` to the ignored `.env` and set exactly one selector:
 
-  - `PRIME_AGENT_PINNED=<version>` — install a released version via the
-    vendor installer (`install.sh`; the same mechanism `bin/prime-claw`
-    uses — prime-agent is not on the public npm registry).
-  - `PRIME_AGENT_SOURCE=/absolute/path/to/prime-agent` — build from a
-    local fork checkout: the host runs the fork's `release:pack` from a
-    FRESH build (the four pack-consumed dist dirs are removed first), the
-    tarballs are staged into the container over a `file:` URL base, and
-    the container installs from them.
+  - `PRIME_AGENT_PINNED=<version>` is executable. The vendor install is the
+    only online container phase. The fixture then disconnects every captured
+    network and verifies the set is empty before version/artifact identity,
+    plugin apply/check, probes, or tests run.
+  - `PRIME_AGENT_SOURCE=/absolute/path/to/prime-agent` is intentionally
+    fail-closed in Slice 1. It exits before stat/read/build/cleanup/pack or
+    Docker access and never echoes the checkout path. The disposable source
+    builder is Slice 2 (`prime-claw-5v7.1`).
 
-  `scripts/test-tier1.sh` remains the standalone tier-1 driver (image
-  build + one ephemeral install/apply/check container, `--smoke`,
-  `--probe` with a validated `get_commands` reply under a hard
-  `timeout --kill-after` deadline, `--dry-run`, `--rebuild`). The pytest
-  session fixture mirrors its contract; the driver is the source of
-  truth. Network is used only at image build and the in-container
-  prime-agent install step.
+  `scripts/test-tier1.sh` is the standalone driver (`--smoke`, `--probe`,
+  `--dry-run`, `--rebuild`). The fixture mirrors its boundary. Teardown targets
+  only the captured container ID and requires an explicit absent result;
+  unknown fails and preserves evidence. Every host Docker wait has a validated
+  positive budget and process-group TERM→KILL escalation through
+  `scripts/testing/bounded.py`. A failed/timed-out launch still tears down an
+  exact recovered cidfile identity; malformed identities never reach removal. See
+  [docs/testing-strategy.md](docs/testing-strategy.md).
 - **Tier 2 — host, OpenShell.** `tests/test_runtime_*.py` orchestrate
   sandboxes from the host and stay outside any container. They run only
   on explicit request:

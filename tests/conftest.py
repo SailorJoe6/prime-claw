@@ -14,14 +14,11 @@ is always the tier-0 default with no Docker dependency, and
 `pytest -m container` selects exactly the migrated plugin suite.
 
 The session fixture mirrors scripts/test-tier1.sh (the driver is the
-contract): same .env selection semantics (exactly one of PRIME_AGENT_PINNED /
-PRIME_AGENT_SOURCE; TIER1_ENV_FILE override), same fail-fast ladder (docker
-readiness -> source staging -> image build -> container run), same install
-commands, same in-container apply/check against the explicit container-local
-/root/.prime/agent. Host-side fork staging in source mode duplicates the
-driver's B1 contract (fresh build every run after FAIL-CLOSED removal of
-the four pack-consumed dist dirs); if the driver's staging contract
-changes, change it there first and mirror it here.
+contract): exact selector semantics, immediate source-mode fail-close, a
+run-owned evidence tree, iidfile image capture, cidfile container capture,
+online pinned installation, verified network removal, and only then offline
+package identity plus apply/check/tests against the explicit container-local
+/root/.prime/agent. TIER1_ENV_FILE selects the env file for tests.
 
 Container/ host file exchange uses a session share directory bind-mounted
 at the SAME absolute path on both sides, so paths embedded in probe sources
@@ -36,18 +33,19 @@ import os
 from pathlib import Path
 import re
 import shutil
-import stat
 import subprocess
 import tempfile
 import time
 
 import pytest
 
+from scripts.testing import provenance
+
 
 REPO = Path(__file__).resolve().parents[1]
 WORKSPACE = "/workspace"
 CONTAINER_PLUGIN_ROOT = "/root/.prime/agent"
-IMAGE = "prime-claw-test-tier1:latest"
+IMAGE_REPO = "prime-claw-test-tier1"
 DOCKERFILE = "docker/test.Dockerfile"
 RESULTS = REPO / ".test-results"
 ENV_FILE = REPO / ".env"
@@ -101,6 +99,15 @@ def _load_install_selection() -> tuple[str, str]:
             f"tier-1 fixture: missing env file {env_file} "
             "(cp .env.example .env and set exactly one selector)"
         )
+    lines = env_file.read_text().splitlines()
+    allowed = ("PRIME_AGENT_PINNED=", "PRIME_AGENT_SOURCE=")
+    if any(line and not line.startswith("#")
+           and not line.startswith(allowed) for line in lines):
+        raise RuntimeError(
+            "tier-1 fixture: env file contains unsupported keys or malformed lines")
+    for key in ("PRIME_AGENT_PINNED=", "PRIME_AGENT_SOURCE="):
+        if sum(line.startswith(key) for line in lines) > 1:
+            raise RuntimeError(f"tier-1 fixture: env file repeats {key[:-1]}")
     pinned = _read_selector(env_file, "PRIME_AGENT_PINNED")
     source = _read_selector(env_file, "PRIME_AGENT_SOURCE")
     if pinned and source:
@@ -114,117 +121,134 @@ def _load_install_selection() -> tuple[str, str]:
             f"is set in {env_file} — set exactly one (see .env.example)"
         )
     if source:
-        src = Path(source)
-        if not src.is_absolute():
-            raise RuntimeError(
-                f"tier-1 fixture: PRIME_AGENT_SOURCE must be an absolute path: {source}"
-            )
-        if not src.is_dir():
-            raise RuntimeError(
-                f"tier-1 fixture: PRIME_AGENT_SOURCE is not a directory: {source}"
-            )
-        if not (src / "scripts" / "pack-prime-agent-release.mjs").is_file():
-            raise RuntimeError(
-                "tier-1 fixture: PRIME_AGENT_SOURCE lacks "
-                f"scripts/pack-prime-agent-release.mjs: {source}"
-            )
-        return "source", source
+        # Slice 1 fail-close boundary. Parsing the selector is allowed; no
+        # stat/read/build/cleanup/pack operation may touch the checkout until
+        # the isolated source builder lands in prime-claw-5v7.1.
+        raise RuntimeError(
+            "tier-1 fixture: PRIME_AGENT_SOURCE is disabled until isolated "
+            "source builder Slice 2 (prime-claw-5v7.1) lands; use "
+            "PRIME_AGENT_PINNED"
+        )
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", pinned):
+        raise RuntimeError(
+            "tier-1 fixture: PRIME_AGENT_PINNED must be an exact semantic version")
     return "pinned", pinned
 
 
-def _remove_dist_tree(path: Path) -> None:
-    """Fail-closed removal of one pack-consumed dist tree.
-
-    Same fail-closed contract as the driver's `rm -rf` under `set -e`
-    (scripts/test-tier1.sh) — the run stops before pack/image-build/
-    container creation when stale output cannot be cleared — but with
-    STRICTLY EARLIER metadata-error detection: the path is lstat'd
-    directly at staging time, so an inspection failure (PermissionError,
-    EIO, ...) raises HERE. The driver's rm -rf can defer detection of an
-    unsearchable dist parent to the npm build step on some hosts (BSD
-    rm -rf may exit 0 without removing the tree; the build then fails on
-    the permission denial). Both stop before pack/container creation;
-    the fixture simply detects the metadata error sooner.
-
-    Error-preserving semantics — on Python 3.14 the Path.is_symlink() /
-    is_file() / is_dir() predicates SUPPRESS filesystem OSError into
-    False, so they cannot distinguish absence from inspection failure.
-    lstat directly instead:
-    - FileNotFoundError          -> confirmed absence: nothing to do.
-    - any other OSError on lstat -> RAISE: the dist state is unknown.
-    - symlink (incl. dangling)   -> unlink; the target is NEVER traversed.
-    - directory                  -> shutil.rmtree (errors raise).
-    - regular file               -> unlink.
-    - anything else (FIFO, socket, device, ...) -> explicitly REJECTED:
-      a special object at a pack-consumed dist path is an anomaly the
-      fixture refuses to build over.
-    """
-    try:
-        st = path.lstat()
-    except FileNotFoundError:
-        return  # confirmed absent — the valid missing-tree case
-    except OSError as exc:
-        raise RuntimeError(
-            f"tier-1 fixture: cannot inspect stale build output {path} "
-            f"({exc}) — refusing to build/pack with unknown dist state"
-        ) from exc
-    mode = st.st_mode
-    if stat.S_ISLNK(mode) or stat.S_ISREG(mode):
-        action = path.unlink
-    elif stat.S_ISDIR(mode):
-        action = lambda: shutil.rmtree(path)  # noqa: E731
-    else:
-        raise RuntimeError(
-            f"tier-1 fixture: {path} is a special filesystem object "
-            f"(st_mode {oct(mode)}) at a pack-consumed dist path — "
-            "refusing to build/pack over it; remove it manually"
-        )
-    try:
-        action()
-    except OSError as exc:
-        raise RuntimeError(
-            f"tier-1 fixture: cannot remove stale build output {path} "
-            f"({exc}) — refusing to build/pack from a possibly-stale tree"
-        ) from exc
-
-
-def _stage_fork_release(source: str) -> tuple[str, Path]:
-    """Mirror of the driver's B1 source staging: FRESH build on every run.
-
-    The fork build (tsgo + asset copies) does NOT clean dist, so the four
-    pack-consumed dist dirs are removed first — fail-closed with the same
-    stop-before-pack/container contract as the driver's rm -rf under
-    set -e, but with strictly earlier metadata-error detection (the
-    fixture lstat's each tree at staging; the driver's rm -rf may defer
-    detection of an unsearchable parent to the npm build step on some
-    hosts). Freshness is never inferred from version equality or
-    directory existence. release:pack wipes its out-dir before writing,
-    so a failed run leaves no fallback artifacts.
-    """
-    src = Path(source)
-    print(f"tier-1 fixture: fresh fork build (rm dist dirs; npm run build in {source})")
-    for pkg in DIST_DIRS:
-        _remove_dist_tree(src / pkg / "dist")
-    subprocess.run(["npm", "run", "build"], cwd=src, check=True, timeout=1800)
-    out_dir = src / FORK_STAGE_SUBDIR
-    print(f"tier-1 fixture: release:pack -> {out_dir}")
+def _build_tier1_image(tier_dir: Path) -> dict:
+    """Build from a run-owned empty context and return exact image identity."""
+    build_context = tier_dir / "build-context"
+    build_context.mkdir()
+    shutil.copy2(REPO / DOCKERFILE, build_context / "Dockerfile")
+    input_hash = provenance.hash_declared_inputs(REPO, [DOCKERFILE])
+    dockerfile_hash = provenance.sha256_file(REPO / DOCKERFILE)
+    tag = f"{IMAGE_REPO}:{input_hash[:12]}"
+    iidfile = tier_dir / "image.iid"
+    started_at = provenance.utc_now()
     subprocess.run(
-        ["node", str(src / "scripts" / "pack-prime-agent-release.mjs"),
-         "--base-url", "file:///stage", "--out-dir", str(out_dir)],
-        check=True, timeout=600,
+        ["docker", "build", "-q", "--iidfile", str(iidfile),
+         "-f", str(build_context / "Dockerfile"), "-t", tag,
+         str(build_context)],
+        check=True, capture_output=True, text=True, timeout=1200,
     )
-    tarballs = sorted(
-        p for p in (out_dir / "artifacts").glob("prime-agent-*.tgz")
-        if not re.match(r"prime-agent-(ai|core|tui)-", p.name)
+    finished_at = provenance.utc_now()
+    try:
+        image_id = iidfile.read_text().strip()
+    except OSError as exc:
+        raise RuntimeError("tier-1 fixture: image iidfile was not published") from exc
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
+        raise RuntimeError(f"tier-1 fixture: invalid image ID in iidfile: {image_id!r}")
+    inspected = subprocess.run(
+        ["docker", "image", "inspect", image_id], check=True,
+        capture_output=True, text=True, timeout=30,
     )
-    if not tarballs:
-        raise RuntimeError(
-            f"tier-1 fixture: release:pack produced no prime-agent tarball in "
-            f"{out_dir}/artifacts"
+    try:
+        rows = json.loads(inspected.stdout)
+        row = rows[0]
+    except (json.JSONDecodeError, IndexError, TypeError) as exc:
+        raise RuntimeError("tier-1 fixture: invalid docker image inspect output") from exc
+    if row.get("Id") != image_id:
+        raise RuntimeError("tier-1 fixture: image inspect identity mismatched iidfile")
+    if not row.get("Os") or not row.get("Architecture"):
+        raise RuntimeError("tier-1 fixture: image inspect omitted platform identity")
+    safe = {
+        "id": image_id,
+        "repo_digests": row.get("RepoDigests") or [],
+        "dockerfile": DOCKERFILE,
+        "dockerfile_sha256": dockerfile_hash,
+        "declared_input_sha256": input_hash,
+        "informational_tag": tag,
+        "os": row["Os"],
+        "architecture": row["Architecture"],
+        "build_started_at": started_at,
+        "build_finished_at": finished_at,
+    }
+    (tier_dir / "image.json").write_text(
+        json.dumps(safe, sort_keys=True, separators=(",", ":")) + "\n")
+    return safe
+
+
+def _container_networks(container_id: str) -> list[str]:
+    """Return captured network names; any inspect ambiguity fails closed."""
+    try:
+        out = subprocess.run(
+            ["docker", "inspect", "--format",
+             "{{json .NetworkSettings.Networks}}", container_id],
+            capture_output=True, text=True, timeout=30,
         )
-    version = tarballs[0].name.removeprefix("prime-agent-").removesuffix(".tgz")
-    print(f"tier-1 fixture: staged fork release v{version}")
-    return version, out_dir / "artifacts"
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError(
+            "tier-1 fixture: container network inspection is unknown") from exc
+    if out.returncode != 0:
+        raise RuntimeError(
+            "tier-1 fixture: container network inspection is unknown: "
+            + out.stderr.strip())
+    try:
+        networks = json.loads(out.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "tier-1 fixture: container network inspection returned invalid JSON") from exc
+    if not isinstance(networks, dict):
+        raise RuntimeError("tier-1 fixture: container network set is not an object")
+    return sorted(networks)
+
+
+def _disconnect_container_networks(container_id: str) -> str:
+    """Disconnect the exact container and prove its network set is empty."""
+    for network in _container_networks(container_id):
+        out = subprocess.run(
+            ["docker", "network", "disconnect", network, container_id],
+            capture_output=True, text=True, timeout=30,
+        )
+        if out.returncode != 0:
+            raise RuntimeError(
+                "tier-1 fixture: network disconnect failed for captured "
+                f"container {container_id}: {out.stderr.strip()}")
+    remaining = _container_networks(container_id)
+    if remaining:
+        raise RuntimeError(
+            "tier-1 fixture: container still has an attached network; "
+            "refusing apply/check/tests")
+    return provenance.utc_now()
+
+
+def _installed_package_identity(container: "Tier1Container") -> dict:
+    version_result = container.run("prime-agent", "--version", wrap=False,
+                                   timeout=30, workdir=None)
+    if version_result.returncode != 0:
+        raise RuntimeError("tier-1 fixture: installed version query failed")
+    match = re.search(r"[0-9]+(?:\.[0-9]+)+", version_result.stdout)
+    if not match:
+        raise RuntimeError("tier-1 fixture: installed version was unparseable")
+    hash_result = container.run(
+        "bash", "-lc", 'sha256sum "$(command -v prime-agent)"',
+        wrap=False, timeout=30, workdir=None,
+    )
+    digest = hash_result.stdout.split()[0] if hash_result.returncode == 0 and hash_result.stdout.split() else ""
+    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise RuntimeError("tier-1 fixture: installed executable hash is invalid")
+    return {"kind": "vendor-binary", "version": match.group(0),
+            "executable_sha256": digest}
 
 
 class ContainerDaemon:
@@ -435,6 +459,12 @@ def _is_relative_to(path: Path, root: Path) -> bool:
         return False
 
 
+class TeardownError(RuntimeError):
+    def __init__(self, state: str, message: str) -> None:
+        super().__init__(message)
+        self.state = state
+
+
 def _inspect_container(container_id: str, timeout: float = 15) -> tuple:
     """Three-state presence classification for the ONE captured container.
 
@@ -522,7 +552,8 @@ def _remove_session_container(container_id: str, *,
                        "established (inspect unknown: daemon/connection/"
                        "permission/API error, launch failure, timeout, or "
                        "unrecognised output)")
-    raise RuntimeError(
+    raise TeardownError(
+        state,
         "tier-1 fixture: TEARDOWN FAILED — could not establish clean "
         f"removal of the session container. container_id={container_id}. "
         f"Reasons: {'; '.join(reasons)}. Final absence check: "
@@ -531,21 +562,16 @@ def _remove_session_container(container_id: str, *,
     )
 
 
-def _finalize_session(container_id, share: Path, in_flight=None) -> None:
-    """Session teardown: verified container removal, then share policy.
-
-    The session share is evidence: it is removed only when no container
-    can still own it (nothing was published, or teardown verified
-    absence). When teardown fails while a setup/test failure is already
-    in flight, the teardown failure is attached to it as a note so BOTH
-    surface; otherwise the teardown failure raises on its own.
-    """
+def _finalize_session(container_id, share: Path, in_flight=None) -> str:
+    """Verify exact-container absence and remove only the run-owned share."""
     teardown_error = None
+    state = "absent"
     if container_id is not None:
         try:
             _remove_session_container(container_id)
-        except RuntimeError as exc:
+        except TeardownError as exc:
             teardown_error = exc
+            state = exc.state
             print(f"tier-1 fixture: {exc}")
     container_gone = container_id is None or teardown_error is None
     if not os.environ.get("TIER1_KEEP_SHARE"):
@@ -562,118 +588,161 @@ def _finalize_session(container_id, share: Path, in_flight=None) -> None:
                 f"tier-1 fixture teardown also failed: {teardown_error}")
         else:
             raise teardown_error
+    return state
 
 
 @pytest.fixture(scope="session")
 def tier1_container(request):
-    """One tier-1 container per pytest session that includes container tests.
-
-    Driver-equivalent setup runs ONCE here: build the image (cached),
-    stage/install prime-agent per .env, then apply + check the plugin
-    against explicit container-local /root/.prime/agent. The container is
-    destroyed
-    — and its absence verified — at session end; a teardown failure fails
-    the run with the exact container identity (B2), and the session share
-    evidence is preserved while a container may still own it. The share is
-    freshly and exclusively allocated per session (mkdtemp), so one
-    session can never inherit — or delete — another session's share
-    (B2-R2).
-    """
+    """One offline, exact-image tier-1 container per selected pytest run."""
+    # Selector safety comes before Docker readiness: source mode must fail
+    # deterministically without touching its checkout even on a Dockerless host.
+    mode, value = _load_install_selection()
     if shutil.which("docker") is None:
         pytest.skip("tier 1 requires Docker: no docker executable on PATH")
     if subprocess.run(["docker", "info"], capture_output=True,
                       timeout=30).returncode != 0:
         pytest.skip("tier 1 requires Docker: docker daemon is not reachable")
 
-    mode, value = _load_install_selection()
-
-    RESULTS.mkdir(parents=True, exist_ok=True)
-    # Unique, exclusively allocated per session (B2-R2): mkdtemp always
-    # creates a FRESH directory owned by this session. A later session —
-    # PID reuse, or several pytest sessions in one process — never reuses
-    # a retained failed session's share, so finalization can only ever
-    # remove this session's own evidence. A pre-existing directory (for
-    # example a legacy share-<pid>) is neither used nor removed.
-    run_id = f"{os.getpid()}-{int(time.time())}"
-    share = Path(tempfile.mkdtemp(prefix=f"share-{run_id}-", dir=RESULTS))
-    # mkdtemp creates 0700; normalize to the former mkdir default so the
-    # container's access through the same-absolute-path mount is unchanged.
-    share.chmod(0o755)
-    share_token = share.name.rsplit("-", 1)[-1]
-    setup_log = RESULTS / "tier1-session-setup.log"
-    log_lines = [f"mode={mode} value={value}", f"share={share}"]
-
+    run_id, tier_dir = provenance.allocate_run_tree(RESULTS, "tier1")
+    run_started = provenance.utc_now()
+    workspace_snapshot = RESULTS / ".workspaces" / run_id
+    repository = provenance.stage_repository_snapshot(REPO, workspace_snapshot)
+    share = tier_dir / "share"
+    share.mkdir(mode=0o755)
+    setup_log = tier_dir / "setup.log"
+    setup_lines = [f"mode={mode}", f"run_id={run_id}"]
     container_id = None
+    container_attempted = False
+    image = None
+    artifact = None
+    network_time = None
     setup_error = None
+    teardown_state = "absent"
+    teardown_time = None
+
     try:
-        mounts = ["-v", f"{REPO}:{WORKSPACE}:ro",
+        print(f"tier-1 fixture: run={run_id}; build exact image")
+        image = _build_tier1_image(tier_dir)
+        name = f"prime-claw-tier1-{run_id}"
+        cidfile = tier_dir / "container.cid"
+        mounts = ["-v", f"{workspace_snapshot}:{WORKSPACE}:ro",
                   "-v", f"{share}:{share}"]
-        if mode == "source":
-            version, artifacts = _stage_fork_release(value)
-            mounts += ["-v", f"{artifacts}:/stage/releases/v{version}:ro"]
-            install = (f"npm install -g "
-                       f"/stage/releases/v{version}/prime-agent-{version}.tgz")
-        else:
-            install = (
-                f"export PRIME_AGENT_VERSION='{value}' "
-                "PRIME_AGENT_INSTALLER_PLAIN=1 "
-                "PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL=0; "
-                "curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh"
-            )
-
-        print("tier-1 fixture: docker build (cached layers make this fast)")
-        subprocess.run(
-            ["docker", "build", "-q", "-f", str(REPO / DOCKERFILE),
-             "-t", IMAGE, str(REPO)],
-            check=True, capture_output=True, text=True, timeout=1200,
-        )
-
-        # Unique per session — pid + epoch + the share's allocation token,
-        # keeping the container identity aligned with the share identity
-        # (B2-R2): a later run never collides with — and therefore never
-        # inherits — a failed run's leftover container or share.
-        name = f"prime-claw-tier1-session-{run_id}-{share_token}"
+        container_attempted = True
         started = subprocess.run(
-            ["docker", "run", "-d", "--name", name, *mounts,
-             IMAGE, "sleep", "infinity"],
-            check=True, capture_output=True, text=True, timeout=60,
+            ["docker", "run", "-d", "--name", name,
+             "--cidfile", str(cidfile), *mounts,
+             image["id"], "sleep", "infinity"],
+            capture_output=True, text=True, timeout=60,
         )
-        container_id = started.stdout.strip()
-        log_lines.append(f"container={name} id={container_id[:12]}")
-
-        print("tier-1 fixture: install prime-agent, apply + check plugin "
-              "(once per session)")
-        setup = container = Tier1Container(container_id, share, mode)
-        result = container.run(
-            "bash", "-lc",
-            "set -euo pipefail; " + install
-            + " && prime-agent --version"
-            + " && /workspace/scripts/apply-prime-agent-plugin.sh"
-            + " && /workspace/scripts/check-prime-agent-plugin.sh",
-            timeout=600, workdir=None,
-            env={"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT},
-        )
-        log_lines.append(result.stdout)
-        if result.returncode != 0:
-            log_lines.append(result.stderr)
-            setup_log.write_text("\n".join(log_lines))
+        raw_container_id = cidfile.read_text().strip() if cidfile.is_file() else ""
+        if started.returncode != 0:
             raise RuntimeError(
-                "tier-1 fixture: container setup failed (see "
-                f"{setup_log}):\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
-            )
-        version_line = [
-            line for line in result.stdout.splitlines() if line.strip()
-        ]
-        log_lines.append(f"prime-agent version: "
-                         f"{version_line and 'see log' or 'unknown'}")
-        setup_log.write_text("\n".join(log_lines))
+                "tier-1 fixture: container start failed: "
+                + started.stderr[-1000:])
+        if not re.fullmatch(r"[0-9a-f]{64}", raw_container_id):
+            raise RuntimeError("tier-1 fixture: invalid or missing captured container ID")
+        container_id = raw_container_id
+        setup_lines.append(f"container_id={container_id}")
+        container = Tier1Container(container_id, share, mode)
 
+        install = "curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh"
+        result = container.run(
+            "bash", "-lc", "set -euo pipefail; " + install,
+            timeout=600, workdir=None,
+            env={"PRIME_AGENT_VERSION": value,
+                 "PRIME_AGENT_INSTALLER_PLAIN": "1",
+                 "PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL": "0"},
+        )
+        if result.returncode != 0:
+            raise RuntimeError("tier-1 fixture: pinned Prime Agent install failed")
+        setup_lines.append("phase=prime-agent-installed")
+
+        network_time = _disconnect_container_networks(container_id)
+        setup_lines.append("phase=network-absent")
+        (tier_dir / "network.json").write_text(
+            '{"verified_absent":true}\n')
+        artifact = _installed_package_identity(container)
+        if artifact["version"] != value:
+            raise RuntimeError(
+                "tier-1 fixture: installed Prime Agent version does not "
+                "match the requested pinned version")
+        (tier_dir / "installed-artifact.json").write_text(
+            json.dumps(artifact, sort_keys=True, separators=(",", ":")) + "\n")
+
+        for script in ("apply-prime-agent-plugin.sh", "check-prime-agent-plugin.sh"):
+            result = container.run(
+                f"{WORKSPACE}/scripts/{script}", timeout=120, workdir=None,
+                env={"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT},
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"tier-1 fixture: offline {script} failed")
+            setup_lines.append(f"phase={script.removesuffix('.sh')}")
+        setup_log.write_text("\n".join(setup_lines))
         yield container
-    except BaseException as exc:  # setup failure or throw-in at the yield
+    except BaseException as exc:
         setup_error = exc
+        setup_lines.append(f"failure_type={type(exc).__name__}")
+        setup_log.write_text("\n".join(setup_lines))
         raise
     finally:
-        _finalize_session(container_id, share, setup_error)
+        finalizer_error = None
+        if container_id is None and container_attempted and cidfile.is_file():
+            recovered_id = cidfile.read_text().strip()
+            if re.fullmatch(r"[0-9a-f]{64}", recovered_id):
+                container_id = recovered_id
+                setup_lines.append("phase=container-identity-recovered")
+                setup_log.write_text("\n".join(setup_lines))
+        if container_id is None and container_attempted:
+            teardown_state = "unknown"
+            print("tier-1 fixture: container publication identity is invalid; "
+                  "refusing destructive teardown and preserving mounted inputs")
+        else:
+            try:
+                teardown_state = _finalize_session(container_id, share, setup_error)
+            except TeardownError as exc:
+                teardown_state = exc.state
+                finalizer_error = exc
+        if teardown_state == "absent":
+            shutil.rmtree(workspace_snapshot)
+        else:
+            print(f"tier-1 fixture: preserving repository snapshot at "
+                  f"{workspace_snapshot} because teardown is {teardown_state}")
+        teardown_time = provenance.utc_now()
+        # Once a run tree exists, publish a manifest even for partial failure.
+        # Unavailable identities stay null/false rather than becoming claims.
+        finished = provenance.utc_now()
+        tests_failed = bool(
+            getattr(getattr(request, "session", None), "testsfailed", 0))
+        passed = (setup_error is None and not tests_failed
+                  and teardown_state == "absent" and image is not None
+                  and artifact is not None and network_time is not None)
+        prime_identity = {
+            "mode": "pinned", "requested_version": value,
+            "installed_version": artifact["version"] if artifact else None,
+            "artifact": artifact,
+        }
+        manifest = {
+            "schema_version": provenance.SCHEMA_VERSION,
+            "command_contract_version": provenance.COMMAND_CONTRACT_VERSION,
+            "run": {"id": run_id, "tier": "tier1", "mode": "pinned",
+                    "started_at": run_started, "finished_at": finished,
+                    "status": "passed" if passed else "failed"},
+            "repository": repository,
+            "prime_agent": prime_identity,
+            "image": image,
+            "network": {"disconnected_at": network_time,
+                        "verified_absent": network_time is not None},
+            "teardown": {"state": teardown_state,
+                         "verified_at": teardown_time},
+            "evidence": {"files": []},
+        }
+        manifest["evidence"]["files"] = provenance.evidence_inventory(tier_dir)
+        provenance.atomic_write_manifest(tier_dir / "manifest.json", manifest)
+        provenance.verify_evidence(tier_dir, manifest)
+        print(f"tier-1 fixture: evidence={tier_dir}")
+        if finalizer_error is not None:
+            raise finalizer_error
 
 
 @pytest.fixture

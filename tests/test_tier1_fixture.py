@@ -1,1237 +1,266 @@
-"""Tier-0 behavioral coverage for the tier-1 session fixture (tests/conftest.py).
-
-The FINAL EXPERT gate on c53972f found two fixture failure-path defects:
-
-- B1: fixture source staging suppressed stale-output removal failures
-  (shutil.rmtree(ignore_errors=True) where the driver fails closed).
-- B2: session-container teardown was unverified — a leaked container could
-  not fail the gate, and share evidence could be deleted under it.
-
-These tests exercise the ACTUAL fixture code paths
-(conftest._remove_dist_tree, conftest._stage_fork_release,
-conftest._remove_session_container, conftest._finalize_session) using
-recording npm/node/docker substitutes on a controlled PATH. They never
-contact real Docker and never run a real fork build; real runs are covered
-by the acceptance evidence note.
-"""
-
+"""Tier-0 behavioral coverage for the Slice-1 tier-1 session fixture."""
 from __future__ import annotations
-
-import os
-import subprocess
-import sys
-import tempfile
-import time
-import unittest
+import json, os, subprocess, tempfile, unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+import conftest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import conftest  # noqa: E402  (the shipped fixture module under test)
+IMAGE_ID="sha256:"+"a"*64; CID="c"*64
 
-REPO = Path(__file__).resolve().parent.parent
-CONFTEST_SRC = Path(conftest.__file__).read_text()
-DIST_DIRS = ("packages/coding-agent", "packages/agent",
-             "packages/ai", "packages/tui")
+def cp(args,rc=0,out="",err=""):
+    return subprocess.CompletedProcess(args,rc,out,err)
 
-
-def _make_fake_npm(tmp: Path, *, build_rc: int = 0) -> Path:
-    """Fake npm: `npm run build` regenerates dist markers from src WITHOUT
-    cleaning dist first (like the real tsgo build) — a planted stale file
-    survives the build unless the fixture removes dist itself."""
-    record = tmp / "npm-invocations.log"
-    script = tmp / "npm"
-    script.write_text(
-        "#!/usr/bin/env bash\n"
-        f'echo "$*" >> "{record}"\n'
-        'if [ "$1" = "run" ] && [ "$2" = "build" ]; then\n'
-        "  for p in packages/coding-agent packages/agent packages/ai packages/tui; do\n"
-        '    mkdir -p "$p/dist"\n'
-        '    cp src/marker.txt "$p/dist/marker.txt" || exit 1\n'
-        "  done\n"
-        f"  exit {build_rc}\n"
-        "fi\n"
-        "exit 0\n"
-    )
-    script.chmod(0o755)
-    return record
-
-
-def _make_fake_node(tmp: Path, *, pack_rc: int = 0) -> Path:
-    """Fake node: models release:pack's copy-existing-dist behavior — wipes
-    --out-dir, then packs the CURRENT dist marker into the tarball, so tests
-    see exactly which compiled output a run packaged."""
-    record = tmp / "node-invocations.log"
-    script = tmp / "node"
-    script.write_text(
-        "#!/usr/bin/env bash\n"
-        f'echo "$*" >> "{record}"\n'
-        'out=""; prev=""\n'
-        'for a in "$@"; do\n'
-        '  if [ "$prev" = "--out-dir" ]; then out="$a"; fi\n'
-        '  prev="$a"\n'
-        "done\n"
-        'if [ -n "$out" ]; then\n'
-        f"  [ {pack_rc} -eq 0 ] || exit {pack_rc}\n"
-        '  rm -rf "$out"\n'
-        '  mkdir -p "$out/artifacts"\n'
-        '  cp "$(dirname "$out")/../dist/marker.txt" "$out/artifacts/prime-agent-0.9.8.tgz"\n'
-        "fi\n"
-        "exit 0\n"
-    )
-    script.chmod(0o755)
-    return record
-
-
-def _make_fake_fork(tmp: Path, *, marker: str = "MARKER-A",
-                    with_dist: bool = True) -> Path:
-    """Minimal fork checkout shape, with planted stale dist leftovers."""
-    fork = tmp / "fork"
-    (fork / "scripts").mkdir(parents=True)
-    (fork / "scripts" / "pack-prime-agent-release.mjs").write_text(
-        "// fake pack entry point — the fake node shim intercepts it\n")
-    (fork / "src").mkdir()
-    (fork / "src" / "marker.txt").write_text(marker)
-    if with_dist:
-        for p in DIST_DIRS:
-            dist = fork / p / "dist"
-            dist.mkdir(parents=True, exist_ok=True)
-            (dist / "marker.txt").write_text("STALE-OLD")
-            (dist / "stale-output.js").write_text("stale")
-    return fork
-
-
-def _path_override(tmp: Path):
-    return mock.patch.dict(
-        os.environ, {"PATH": os.pathsep.join([str(tmp), "/usr/bin", "/bin"])})
-
-
-class TestRemoveDistTree(unittest.TestCase):
-    """B1: fail-closed removal semantics for one pack-consumed dist tree."""
-
-    def test_absent_tree_is_fine(self):
+class TestSelectionFailClose(unittest.TestCase):
+    def test_source_selector_never_stats_or_echoes_checkout(self):
         with tempfile.TemporaryDirectory() as td:
-            conftest._remove_dist_tree(Path(td) / "nope")  # must not raise
-
-    def test_plain_file_is_unlinked(self):
+            tmp=Path(td); source=tmp/"private-source"; source.mkdir(); (source/"sentinel").write_text("keep")
+            envf=tmp/"source.env"; envf.write_text(f"PRIME_AGENT_SOURCE={source}\n")
+            with mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}), mock.patch.object(Path,"is_dir",side_effect=AssertionError("checkout stat")):
+                with self.assertRaisesRegex(RuntimeError,"isolated source builder Slice 2") as ctx: conftest._load_install_selection()
+            self.assertNotIn(str(source),str(ctx.exception)); self.assertEqual((source/"sentinel").read_text(),"keep")
+    def test_pinned_selector_returns_value(self):
         with tempfile.TemporaryDirectory() as td:
-            f = Path(td) / "dist"
-            f.write_text("x")
-            conftest._remove_dist_tree(f)
-            self.assertFalse(f.exists())
+            envf=Path(td)/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
+            with mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}): self.assertEqual(conftest._load_install_selection(),("pinned","0.9.8"))
+    def test_both_and_neither_rejected(self):
+        for text in ("PRIME_AGENT_PINNED=\nPRIME_AGENT_SOURCE=\n","PRIME_AGENT_PINNED=0.9.8\nPRIME_AGENT_SOURCE=/x\n"):
+            with tempfile.TemporaryDirectory() as td:
+                envf=Path(td)/"x.env"; envf.write_text(text)
+                with mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}), self.assertRaises(RuntimeError): conftest._load_install_selection()
 
-    def test_symlink_is_unlinked_and_target_preserved(self):
+    def test_malicious_pinned_values_fail_before_docker(self):
+        for value in ("0.9.8;uname", "0.9.8'", "0.9.8-beta", "0.9.8\nEVIL=1"):
+            with tempfile.TemporaryDirectory() as td:
+                envf=Path(td)/"bad.env"; envf.write_text("PRIME_AGENT_PINNED="+value+"\n")
+                with mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}), mock.patch.object(conftest.subprocess,"run",side_effect=AssertionError("docker contacted")):
+                    with self.assertRaisesRegex(RuntimeError,"exact semantic version|unsupported keys"):
+                        conftest._load_install_selection()
+
+class TestExactImageBuild(unittest.TestCase):
+    def test_build_uses_fresh_context_iidfile_and_inspects_exact_id(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            real = tmp / "real-dist"
-            real.mkdir()
-            (real / "keep.js").write_text("keep")
-            link = tmp / "dist"
-            link.symlink_to(real, target_is_directory=True)
-            conftest._remove_dist_tree(link)
-            self.assertFalse(link.exists() or link.is_symlink())
-            self.assertTrue((real / "keep.js").exists(),
-                            "a symlink must be unlinked, never recursed")
-
-    def test_permission_denied_raises_instead_of_suppressing(self):
+            tier=Path(td)/"tier1"; tier.mkdir(); calls=[]
+            def run(args,**kw):
+                calls.append(args)
+                if args[:2]==["docker","build"]:
+                    Path(args[args.index("--iidfile")+1]).write_text(IMAGE_ID+"\n"); return cp(args)
+                if args[:3]==["docker","image","inspect"]:
+                    return cp(args,out=json.dumps([{"Id":IMAGE_ID,"RepoDigests":[],"Os":"linux","Architecture":"arm64"}]))
+                raise AssertionError(args)
+            with mock.patch.object(conftest.subprocess,"run",side_effect=run): image=conftest._build_tier1_image(tier)
+            build=calls[0]; self.assertIn("--iidfile",build); self.assertEqual(build[-1],str(tier/"build-context")); self.assertNotEqual(build[-1],str(conftest.REPO))
+            self.assertEqual(calls[1][-1],IMAGE_ID); self.assertEqual(image["id"],IMAGE_ID); self.assertTrue((tier/"image.json").is_file())
+    def test_iid_mismatch_fails_closed(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            dist = tmp / "dist"
-            retired = dist / "retired-module"
-            retired.mkdir(parents=True)
-            (retired / "deleted-source.js").write_text("obsolete")
-            retired.chmod(0o555)
-            try:
-                with self.assertRaises(RuntimeError) as ctx:
-                    conftest._remove_dist_tree(dist)
-            finally:
-                retired.chmod(0o755)  # let TemporaryDirectory clean up
-            self.assertIn("cannot remove stale build output",
-                          str(ctx.exception))
-            self.assertTrue((retired / "deleted-source.js").exists(),
-                            "denied cleanup must leave the tree untouched")
+            tier=Path(td)/"tier1"; tier.mkdir()
+            def run(args,**kw):
+                if args[:2]==["docker","build"]: Path(args[args.index("--iidfile")+1]).write_text(IMAGE_ID+"\n"); return cp(args)
+                return cp(args,out=json.dumps([{"Id":"sha256:"+"b"*64,"Os":"linux","Architecture":"arm64"}]))
+            with mock.patch.object(conftest.subprocess,"run",side_effect=run), self.assertRaisesRegex(RuntimeError,"mismatched"): conftest._build_tier1_image(tier)
 
-    def test_dangling_symlink_is_unlinked(self):
-        """A symlink whose target is gone is still unlinked, never followed."""
+    def test_missing_iidfile_fails_closed(self):
         with tempfile.TemporaryDirectory() as td:
-            link = Path(td) / "dist"
-            link.symlink_to(Path(td) / "gone", target_is_directory=True)
-            conftest._remove_dist_tree(link)
-            self.assertFalse(link.is_symlink() or link.exists())
+            tier=Path(td)/"tier1"; tier.mkdir()
+            with mock.patch.object(conftest.subprocess,"run",return_value=cp([])), self.assertRaisesRegex(RuntimeError,"iidfile"):
+                conftest._build_tier1_image(tier)
 
-    def test_inaccessible_parent_raises_instead_of_silent_skip(self):
-        """Unsearchable parent: lstat raises PermissionError -> fail closed.
+class TestInstalledPackageIdentity(unittest.TestCase):
+    def test_records_version_and_executable_hash(self):
+        class FakeContainer:
+            def __init__(self): self.calls=[]
+            def run(self, *args, **kwargs):
+                self.calls.append(args)
+                if args[:2] == ("prime-agent", "--version"):
+                    return cp(args,out="prime-agent 0.9.8\n")
+                return cp(args,out="f"*64+"  /root/.local/bin/prime-agent\n")
+        fake=FakeContainer(); package=conftest._installed_package_identity(fake)
+        self.assertEqual(package,{"kind":"vendor-binary","version":"0.9.8","executable_sha256":"f"*64})
+        self.assertEqual(len(fake.calls),2)
 
-        On Python 3.14 the Path.is_* predicates SUPPRESS this OSError into
-        three False results, which the old code misread as absence; lstat
-        preserves it and the tree is left untouched.
-        """
-        with tempfile.TemporaryDirectory() as td:
-            box = Path(td) / "box"
-            dist = box / "dist"
-            dist.mkdir(parents=True)
-            (dist / "stale.js").write_text("stale")
-            box.chmod(0o444)  # readable, NOT searchable: children unstatable
-            try:
-                with self.assertRaises(RuntimeError) as ctx:
-                    conftest._remove_dist_tree(dist)
-            finally:
-                box.chmod(0o755)  # let TemporaryDirectory clean up
-            self.assertIn("cannot inspect stale build output",
-                          str(ctx.exception))
-            self.assertTrue((dist / "stale.js").exists(),
-                            "an uninspectable tree must be left untouched")
+    def test_invalid_executable_hash_is_rejected(self):
+        class FakeContainer:
+            def run(self,*args,**kwargs):
+                if args[:2] == ("prime-agent","--version"): return cp(args,out="0.9.8\n")
+                return cp(args,out="not-a-hash\n")
+        with self.assertRaisesRegex(RuntimeError,"executable hash"):
+            conftest._installed_package_identity(FakeContainer())
 
-    def test_injected_metadata_permissionerror_raises(self):
-        """An lstat PermissionError (not just an rmtree error) fails closed."""
-        with tempfile.TemporaryDirectory() as td:
-            target = Path(td) / "dist"
-            target.mkdir()
-            real_lstat = Path.lstat
+class TestNetworkBoundary(unittest.TestCase):
+    def test_disconnects_every_captured_network_then_verifies_empty(self):
+        calls=[]; responses=[cp([],out='{"bridge":{},"owned":{}}\n'),cp([]),cp([]),cp([],out='{}\n')]
+        def run(args,**kw): calls.append(args); return responses.pop(0)
+        with mock.patch.object(conftest.subprocess,"run",side_effect=run): when=conftest._disconnect_container_networks(CID)
+        self.assertTrue(when.endswith("Z")); self.assertEqual([c[:3] for c in calls[1:3]],[["docker","network","disconnect"],["docker","network","disconnect"]]); self.assertEqual(calls[-1][1],"inspect")
+    def test_network_still_attached_fails_before_tests(self):
+        responses=[cp([],out='{"bridge":{}}\n'),cp([]),cp([],out='{"bridge":{}}\n')]
+        with mock.patch.object(conftest.subprocess,"run",side_effect=responses), self.assertRaisesRegex(RuntimeError,"still has an attached network"): conftest._disconnect_container_networks(CID)
+    def test_inspect_error_is_unknown_and_fails(self):
+        with mock.patch.object(conftest.subprocess,"run",return_value=cp([],rc=1,err="daemon unavailable")), self.assertRaisesRegex(RuntimeError,"unknown"): conftest._disconnect_container_networks(CID)
 
-            def poisoned(self, *a, **k):
-                if self == target:
-                    raise PermissionError(13, "Permission denied", str(self))
-                return real_lstat(self, *a, **k)
-
-            with mock.patch.object(Path, "lstat", poisoned):
-                with self.assertRaises(RuntimeError) as ctx:
-                    conftest._remove_dist_tree(target)
-            self.assertIn("cannot inspect", str(ctx.exception))
-            self.assertTrue(target.exists(), "nothing was removed")
-
-    def test_injected_metadata_eio_raises(self):
-        """An lstat EIO fails closed the same way (I/O error, not absent)."""
-        with tempfile.TemporaryDirectory() as td:
-            target = Path(td) / "dist"
-            target.mkdir()
-            real_lstat = Path.lstat
-
-            def poisoned(self, *a, **k):
-                if self == target:
-                    raise OSError(5, "Input/output error", str(self))
-                return real_lstat(self, *a, **k)
-
-            with mock.patch.object(Path, "lstat", poisoned):
-                with self.assertRaises(RuntimeError) as ctx:
-                    conftest._remove_dist_tree(target)
-            self.assertIn("cannot inspect", str(ctx.exception))
-            self.assertTrue(target.exists(), "nothing was removed")
-
-    def test_fifo_is_rejected_not_treated_as_absent(self):
-        """A FIFO at a pack-consumed path is an anomaly: reject, don't build."""
-        with tempfile.TemporaryDirectory() as td:
-            fifo = Path(td) / "dist"
-            os.mkfifo(fifo)
-            with self.assertRaises(RuntimeError) as ctx:
-                conftest._remove_dist_tree(fifo)
-            self.assertIn("special filesystem object", str(ctx.exception))
-            self.assertTrue(fifo.exists(),
-                            "a rejected special object is left in place")
-
-
-class TestStageForkRelease(unittest.TestCase):
-    """B1: the fixture's source staging is fail-closed and always fresh."""
-
-    def _run_staging(self, fork: Path, tmp: Path):
-        with _path_override(tmp):
-            return conftest._stage_fork_release(str(fork))
-
-    def test_stale_outputs_removed_and_current_source_packed(self):
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            npm_log = _make_fake_npm(tmp)
-            node_log = _make_fake_node(tmp)
-            fork = _make_fake_fork(tmp, marker="MARKER-A", with_dist=True)
-            version, artifacts = self._run_staging(fork, tmp)
-            self.assertEqual(version, "0.9.8")
-            self.assertEqual(
-                artifacts,
-                fork / "packages/coding-agent/release/tier1/artifacts")
-            self.assertEqual(npm_log.read_text().strip(), "run build")
-            self.assertIn("pack-prime-agent-release.mjs",
-                          node_log.read_text())
-            for p in DIST_DIRS:
-                dist = fork / p / "dist"
-                self.assertFalse((dist / "stale-output.js").exists(),
-                                 f"stale {p} output must be removed")
-                self.assertEqual((dist / "marker.txt").read_text(),
-                                 "MARKER-A")
-            self.assertEqual(
-                (artifacts / "prime-agent-0.9.8.tgz").read_text(),
-                "MARKER-A", "the packed artifact must be the fresh build")
-
-    def test_replay_after_source_change_packs_changed_implementation(self):
-        """Source change WITHOUT a version change: the next staging packs
-        the changed implementation (the B1 replay acceptance)."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_npm(tmp)
-            _make_fake_node(tmp)
-            fork = _make_fake_fork(tmp, marker="MARKER-A", with_dist=True)
-            version1, artifacts = self._run_staging(fork, tmp)
-            tarball = artifacts / "prime-agent-0.9.8.tgz"
-            self.assertEqual(tarball.read_text(), "MARKER-A")
-            (fork / "src" / "marker.txt").write_text("MARKER-B")
-            version2, _ = self._run_staging(fork, tmp)
-            self.assertEqual((version1, version2), ("0.9.8", "0.9.8"))
-            self.assertEqual(tarball.read_text(), "MARKER-B",
-                             "staging after a source change must pack the "
-                             "changed implementation, not a stale replay")
-
-    def test_cleanup_denial_stops_before_build_and_pack(self):
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            npm_log = _make_fake_npm(tmp)
-            node_log = _make_fake_node(tmp)
-            fork = _make_fake_fork(tmp, with_dist=True)
-            retired = fork / "packages/agent/dist/retired-module"
-            retired.mkdir()
-            victim = retired / "deleted-source.js"
-            victim.write_text("obsolete")
-            retired.chmod(0o555)
-            try:
-                with self.assertRaises(RuntimeError) as ctx:
-                    self._run_staging(fork, tmp)
-            finally:
-                retired.chmod(0o755)
-            self.assertIn("cannot remove stale build output",
-                          str(ctx.exception))
-            self.assertFalse(npm_log.exists(),
-                             "cleanup failure must stop BEFORE npm build")
-            self.assertFalse(node_log.exists(),
-                             "cleanup failure must stop BEFORE release:pack")
-            self.assertTrue(victim.exists(),
-                            "denied cleanup leaves the stale tree untouched")
-            self.assertFalse(
-                (fork / "packages/coding-agent/release/tier1").exists(),
-                "no staging artifacts may appear after a cleanup failure")
-
-    def test_build_failure_fails_closed_before_pack(self):
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            npm_log = _make_fake_npm(tmp, build_rc=1)
-            node_log = _make_fake_node(tmp)
-            fork = _make_fake_fork(tmp, with_dist=True)
-            with self.assertRaises(subprocess.CalledProcessError):
-                self._run_staging(fork, tmp)
-            self.assertEqual(npm_log.read_text().strip(), "run build")
-            self.assertFalse(node_log.exists(),
-                             "build failure must stop before release:pack")
-
-    def test_pack_failure_fails_closed_without_fallback_artifacts(self):
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            npm_log = _make_fake_npm(tmp)
-            _make_fake_node(tmp, pack_rc=1)
-            fork = _make_fake_fork(tmp, with_dist=True)
-            with self.assertRaises(subprocess.CalledProcessError):
-                self._run_staging(fork, tmp)
-            self.assertTrue(npm_log.exists(), "build runs before pack")
-            self.assertFalse(
-                (fork / "packages/coding-agent/release/tier1"
-                 "/artifacts/prime-agent-0.9.8.tgz").exists(),
-                "a failed pack leaves no fallback tarball")
-
-    def test_missing_dist_trees_are_a_valid_positive_case(self):
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_npm(tmp)
-            _make_fake_node(tmp)
-            fork = _make_fake_fork(tmp, marker="MARKER-A", with_dist=False)
-            version, artifacts = self._run_staging(fork, tmp)
-            self.assertEqual(version, "0.9.8")
-            self.assertEqual(
-                (artifacts / "prime-agent-0.9.8.tgz").read_text(),
-                "MARKER-A")
-
-    def test_inaccessible_dist_parent_fails_before_npm_and_node(self):
-        """Unsearchable packages/agent: staging raises BEFORE any npm/node
-        call — the lstat detects what the is_* predicates suppressed."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            fork = _make_fake_fork(tmp, with_dist=True)
-            npm_log = _make_fake_npm(tmp)
-            node_log = _make_fake_node(tmp)
-            blocked = fork / "packages" / "agent"
-            blocked.chmod(0o444)  # readable, NOT searchable
-            try:
-                with self.assertRaises(RuntimeError) as ctx:
-                    self._run_staging(fork, tmp)
-            finally:
-                blocked.chmod(0o755)
-            self.assertIn("cannot inspect", str(ctx.exception))
-            self.assertFalse(npm_log.exists(),
-                             "metadata failure must stop before npm build")
-            self.assertFalse(node_log.exists(),
-                             "metadata failure must stop before release:pack")
-            self.assertTrue((blocked / "dist" / "stale-output.js").exists(),
-                            "the uninspectable tree is untouched")
-
-    def test_injected_metadata_error_fails_before_npm_and_node(self):
-        """Injected EIO on one dist path (host Python 3.14 lstat) fails
-        staging before any npm/node call."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            fork = _make_fake_fork(tmp, with_dist=True)
-            npm_log = _make_fake_npm(tmp)
-            node_log = _make_fake_node(tmp)
-            target = fork / "packages" / "coding-agent" / "dist"
-            real_lstat = Path.lstat
-
-            def poisoned(self, *a, **k):
-                if self == target:
-                    raise OSError(5, "Input/output error", str(self))
-                return real_lstat(self, *a, **k)
-
-            with mock.patch.object(Path, "lstat", poisoned):
-                with self.assertRaises(RuntimeError) as ctx:
-                    self._run_staging(fork, tmp)
-            self.assertIn("cannot inspect", str(ctx.exception))
-            self.assertFalse(npm_log.exists())
-            self.assertFalse(node_log.exists())
-
-    def test_fifo_at_dist_path_rejected_before_build(self):
-        """A FIFO where a dist tree should be is rejected before any
-        npm/node call — never silently skipped, never recursed into."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            fork = _make_fake_fork(tmp, with_dist=False)
-            npm_log = _make_fake_npm(tmp)
-            node_log = _make_fake_node(tmp)
-            fifo_parent = fork / "packages" / "agent"
-            fifo_parent.mkdir(parents=True)
-            os.mkfifo(fifo_parent / "dist")
-            with self.assertRaises(RuntimeError) as ctx:
-                self._run_staging(fork, tmp)
-            self.assertIn("special filesystem object", str(ctx.exception))
-            self.assertFalse(npm_log.exists())
-            self.assertFalse(node_log.exists())
-            self.assertTrue((fifo_parent / "dist").exists(),
-                            "the rejected special object is left in place")
-
-    def test_recover_and_restage_after_denied_cleanup(self):
-        """Denied cleanup fails staging; after access is restored, staging
-        succeeds: the failed attempt accepted no artifact, and the replay
-        removes the obsolete output."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            fork = _make_fake_fork(tmp, marker="MARKER-B", with_dist=True)
-            _make_fake_npm(tmp)
-            _make_fake_node(tmp)
-            blocked = fork / "packages" / "agent"
-            blocked.chmod(0o444)
-            try:
-                with self.assertRaises(RuntimeError):
-                    self._run_staging(fork, tmp)
-            finally:
-                blocked.chmod(0o755)
-            out_dir = fork / "packages" / "coding-agent" / "release" / "tier1"
-            self.assertFalse(out_dir.exists(),
-                             "the denied attempt must accept no artifact")
-            version, _ = self._run_staging(fork, tmp)
-            self.assertEqual(version, "0.9.8")
-            for p in DIST_DIRS:
-                dist = fork / p / "dist"
-                self.assertFalse((dist / "stale-output.js").exists(),
-                                 f"replay must remove obsolete {p} output")
-                self.assertEqual((dist / "marker.txt").read_text(),
-                                 "MARKER-B",
-                                 "replay packs the current source")
-
-
-def _make_fake_docker(tmp: Path, *, rm_rc: int = 0, inspect_rc: int = 1,
-                      rm_sleep: int = 0, rm_stderr: str = "",
-                      inspect_sleep: int = 0,
-                      inspect_stderr: str | None = None) -> Path:
-    """Recording docker substitute: rm/inspect behavior is programmable;
-    every invocation is logged, one full argv per line.
-
-    inspect_stderr: when inspect_rc != 0 and inspect_stderr is None, the
-    fake emits docker's genuine positive-absence evidence ("No such
-    container") — real rc=1 absence output. Pass an explicit string (e.g.
-    a daemon connection or permission error) to model an UNKNOWN
-    inspection, or "" for unrecognised output (also UNKNOWN)."""
-    record = tmp / "docker-invocations.log"
-    script = tmp / "docker"
-    if inspect_stderr is None and inspect_rc != 0:
-        inspect_stderr = 'Error: No such container: $2'
-    inspect_line = (f'echo "{inspect_stderr}" >&2\n      '
-                    if inspect_stderr else "")
-    stderr_line = f'echo "{rm_stderr}" >&2\n      ' if rm_stderr else ""
-    script.write_text(
-        "#!/usr/bin/env bash\n"
-        f'echo "$*" >> "{record}"\n'
-        'case "$1" in\n'
-        f"  rm) sleep {rm_sleep}\n"
-        f"      {stderr_line}exit {rm_rc} ;;\n"
-        f"  inspect) sleep {inspect_sleep}\n"
-        f"      {inspect_line}exit {inspect_rc} ;;\n"
-        "  *) exit 0 ;;\n"
-        "esac\n"
-    )
-    script.chmod(0o755)
-    return record
-
-
-def _make_share(tmp: Path) -> Path:
-    share = tmp / "share"
-    (share / "evidence").mkdir(parents=True)
-    (share / "evidence" / "setup.log").write_text("setup log")
-    return share
-
+    def test_disconnect_failure_fails_closed(self):
+        responses=[cp([],out='{"bridge":{}}\n'),cp([],rc=1,err="denied")]
+        with mock.patch.object(conftest.subprocess,"run",side_effect=responses), self.assertRaisesRegex(RuntimeError,"disconnect failed"):
+            conftest._disconnect_container_networks(CID)
 
 class TestSessionTeardown(unittest.TestCase):
-    """B2: container teardown is verified, bounded, and part of the gate."""
-
-    CID = "abc123def456"
-
-    def _finalize(self, container_id, share: Path, tmp: Path, *,
-                  in_flight=None, keep_share: str = ""):
-        env = {"PATH": os.pathsep.join([str(tmp), "/usr/bin", "/bin"]),
-               "TIER1_KEEP_SHARE": keep_share}
-        with mock.patch.dict(os.environ, env):
-            return conftest._finalize_session(container_id, share, in_flight)
-
-    def test_positive_teardown_verifies_absence_and_removes_share(self):
+    def test_absent_after_remove_is_success(self):
+        responses=[cp([],out=CID),cp([],rc=1,err="Error: No such container: "+CID)]
+        with mock.patch.object(conftest.subprocess,"run",side_effect=responses): conftest._remove_session_container(CID)
+    def test_present_after_remove_fails_with_identity(self):
+        responses=[cp([]),cp([],out="[{}]")]
+        with mock.patch.object(conftest.subprocess,"run",side_effect=responses), self.assertRaises(conftest.TeardownError) as ctx: conftest._remove_session_container(CID)
+        self.assertEqual(ctx.exception.state,"present"); self.assertIn(CID,str(ctx.exception))
+    def test_unknown_inspect_fails(self):
+        responses=[cp([]),cp([],rc=1,err="Cannot connect to daemon")]
+        with mock.patch.object(conftest.subprocess,"run",side_effect=responses), self.assertRaises(conftest.TeardownError) as ctx: conftest._remove_session_container(CID)
+        self.assertEqual(ctx.exception.state,"unknown")
+    def test_timeout_fails_even_if_later_absent(self):
+        responses=[subprocess.TimeoutExpired(["docker"],0.1),cp([],rc=1,err="No such container")]
+        with mock.patch.object(conftest.subprocess,"run",side_effect=responses), self.assertRaises(conftest.TeardownError): conftest._remove_session_container(CID,rm_timeout=.1)
+    def test_finalizer_preserves_share_when_absence_unknown(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            record = _make_fake_docker(tmp, rm_rc=0, inspect_rc=1)
-            share = _make_share(tmp)
-            self._finalize(self.CID, share, tmp)
-            self.assertFalse(share.exists(),
-                             "share is removed once absence is verified")
-            self.assertEqual(record.read_text().splitlines(),
-                             [f"rm -f {self.CID}", f"inspect {self.CID}"],
-                             "teardown = one forced removal + one absence "
-                             "verification, in that order")
-
-    def test_removal_failure_fails_gate_with_identity_and_diagnostics(self):
+            share=Path(td)/"share"; share.mkdir(); (share/"evidence").write_text("x")
+            err=conftest.TeardownError("unknown","boom")
+            with mock.patch.object(conftest,"_remove_session_container",side_effect=err), self.assertRaises(conftest.TeardownError): conftest._finalize_session(CID,share)
+            self.assertTrue(share.exists())
+    def test_in_flight_failure_keeps_primary_and_adds_note(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_docker(tmp, rm_rc=1, inspect_rc=0,
-                              rm_stderr="Error: daemon said no")
-            share = _make_share(tmp)
-            with self.assertRaises(RuntimeError) as ctx:
-                self._finalize(self.CID, share, tmp)
-            msg = str(ctx.exception)
-            self.assertIn("TEARDOWN FAILED", msg)
-            self.assertIn(self.CID, msg, "exact container identity required")
-            self.assertIn("exited 1", msg)
-            self.assertIn("daemon said no", msg, "diagnostics retained")
-            self.assertTrue((share / "evidence/setup.log").exists(),
-                            "share evidence must NOT be deleted while the "
-                            "container may still own it")
+            share=Path(td)/"share"; share.mkdir(); original=ValueError("body failed"); err=conftest.TeardownError("unknown","teardown failed")
+            with mock.patch.object(conftest,"_remove_session_container",side_effect=err): state=conftest._finalize_session(CID,share,original)
+            self.assertEqual(state,"unknown"); self.assertTrue(any("teardown also failed" in n for n in original.__notes__))
 
-    def test_unverified_absence_after_successful_rm_fails_gate(self):
+    def test_nonzero_remove_is_idempotent_when_inspect_proves_absent(self):
+        responses=[cp([],rc=1,err="No such container"),cp([],rc=1,err="No such container")]
+        with mock.patch.object(conftest.subprocess,"run",side_effect=responses): conftest._remove_session_container(CID)
+    def test_keep_share_preserves_successful_debug_artifacts(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_docker(tmp, rm_rc=0, inspect_rc=0)
-            share = _make_share(tmp)
-            with self.assertRaises(RuntimeError) as ctx:
-                self._finalize(self.CID, share, tmp)
-            self.assertIn("TEARDOWN FAILED", str(ctx.exception))
+            share=Path(td)/"share"; share.mkdir()
+            with mock.patch.object(conftest,"_remove_session_container"), mock.patch.dict(os.environ,{"TIER1_KEEP_SHARE":"1"}):
+                self.assertEqual(conftest._finalize_session(CID,share),"absent")
             self.assertTrue(share.exists())
 
-    def test_removal_timeout_fails_closed_with_diagnostics(self):
-        """A removal timeout ALWAYS fails the gate — even when a later
-        inspect verifies absence — because a hung docker CLI is itself a
-        teardown anomaly. The message records the verified-absence nuance."""
+    def test_unpublished_container_never_calls_docker(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            record = _make_fake_docker(tmp, rm_sleep=2, inspect_rc=1)
-            with _path_override(tmp):
-                with self.assertRaises(RuntimeError) as ctx:
-                    conftest._remove_session_container(self.CID,
-                                                       rm_timeout=0.5)
-            msg = str(ctx.exception)
-            self.assertIn("timed out", msg)
-            self.assertIn(self.CID, msg)
-            self.assertIn("state=absent", msg,
-                          "the verified-absence nuance is retained in the "
-                          "diagnostics even though the timeout fails closed")
-            self.assertTrue(record.exists(),
-                            "the bounded single removal attempt is recorded")
-
-    def test_idempotent_already_absent_is_success(self):
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            record = _make_fake_docker(
-                tmp, rm_rc=1, inspect_rc=1,
-                rm_stderr=f"Error: No such container: {self.CID}")
-            share = _make_share(tmp)
-            self._finalize(self.CID, share, tmp)  # must not raise
+            share=Path(td)/"share"; share.mkdir()
+            with mock.patch.object(conftest.subprocess,"run",side_effect=AssertionError("docker called")):
+                self.assertEqual(conftest._finalize_session(None,share),"absent")
             self.assertFalse(share.exists())
-            self.assertEqual(record.read_text().splitlines(),
-                             [f"rm -f {self.CID}", f"inspect {self.CID}"],
-                             "already-absent is OK only because absence is "
-                             "positively established")
+    def test_inspect_timeout_is_unknown(self):
+        responses=[cp([]),subprocess.TimeoutExpired(["docker","inspect"],.1)]
+        with mock.patch.object(conftest.subprocess,"run",side_effect=responses), self.assertRaises(conftest.TeardownError) as ctx:
+            conftest._remove_session_container(CID,inspect_timeout=.1)
+        self.assertEqual(ctx.exception.state,"unknown")
+    def test_docker_cli_launch_error_is_unknown(self):
+        with mock.patch.object(conftest.subprocess,"run",side_effect=OSError("missing docker")), self.assertRaises(conftest.TeardownError) as ctx:
+            conftest._remove_session_container(CID)
+        self.assertEqual(ctx.exception.state,"unknown")
+    def test_remove_failure_plus_inspect_unknown_fails(self):
+        responses=[cp([],rc=1,err="rm denied"),cp([],rc=1,err="daemon unavailable")]
+        with mock.patch.object(conftest.subprocess,"run",side_effect=responses), self.assertRaises(conftest.TeardownError) as ctx:
+            conftest._remove_session_container(CID)
+        self.assertEqual(ctx.exception.state,"unknown"); self.assertIn("rm denied",str(ctx.exception))
 
-    def test_unpublished_container_never_touches_docker(self):
+class TestFixtureEndToEnd(unittest.TestCase):
+    def _assert_valid_partial_cid_is_recovered(self, *, timeout):
         with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            record = _make_fake_docker(tmp)
-            share = _make_share(tmp)
-            self._finalize(None, share, tmp)
-            self.assertFalse(share.exists())
-            self.assertFalse(record.exists(),
-                             "no docker call when no container was published")
-
-    def test_setup_failure_plus_teardown_failure_preserves_both(self):
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_docker(tmp, rm_rc=1, inspect_rc=0,
-                              rm_stderr="boom")
-            share = _make_share(tmp)
-            original = ValueError("container setup failed")
-            # Must NOT raise: the in-flight setup failure stays primary.
-            self._finalize(self.CID, share, tmp, in_flight=original)
-            self.assertEqual(str(original), "container setup failed")
-            notes = getattr(original, "__notes__", [])
-            self.assertTrue(
-                any("teardown also failed" in n and self.CID in n
-                    for n in notes),
-                "the teardown failure must be attached to the original "
-                f"failure as a note; got notes={notes!r}")
-            self.assertTrue(share.exists())
-
-    def test_keep_share_env_preserves_share_on_success(self):
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_docker(tmp, rm_rc=0, inspect_rc=1)
-            share = _make_share(tmp)
-            self._finalize(self.CID, share, tmp, keep_share="1")
-            self.assertTrue(share.exists())
-
-    def test_teardown_never_targets_other_containers(self):
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            record = _make_fake_docker(tmp, rm_rc=0, inspect_rc=1)
-            share = _make_share(tmp)
-            self._finalize(self.CID, share, tmp)
-            lines = record.read_text().splitlines()
-            self.assertTrue(lines)
-            for line in lines:
-                self.assertIn(self.CID, line,
-                              "every docker invocation must be scoped to "
-                              "the one captured container ID")
-                self.assertNotIn("prune", line)
-                self.assertNotIn("--all", line)
-
-    def test_inspect_daemon_error_is_unknown_and_fails_gate(self):
-        """rm succeeded but inspect hit a daemon/connection error: a bare
-        nonzero inspect exit is UNKNOWN, not absence — fail + keep share."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_docker(
-                tmp, rm_rc=0, inspect_rc=1,
-                inspect_stderr="Error response from daemon: Cannot connect "
-                               "to the Docker daemon")
-            share = _make_share(tmp)
-            with self.assertRaises(RuntimeError) as ctx:
-                self._finalize(self.CID, share, tmp)
-            msg = str(ctx.exception)
-            self.assertIn("TEARDOWN FAILED", msg)
-            self.assertIn("state=unknown", msg)
-            self.assertIn("Cannot connect to the Docker daemon", msg,
-                          "inspect diagnostics must be preserved")
-            self.assertTrue((share / "evidence/setup.log").exists(),
-                            "share retained while absence is unknown")
-
-    def test_inspect_permission_error_is_unknown_and_fails_gate(self):
-        """Docker socket permission failure on inspect: UNKNOWN -> gate
-        fails, share retained."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_docker(
-                tmp, rm_rc=0, inspect_rc=1,
-                inspect_stderr="permission denied while trying to connect")
-            share = _make_share(tmp)
-            with self.assertRaises(RuntimeError) as ctx:
-                self._finalize(self.CID, share, tmp)
-            self.assertIn("state=unknown", str(ctx.exception))
-            self.assertTrue(share.exists())
-
-    def test_inspect_unrecognised_output_is_unknown(self):
-        """rc=1 with NO output is not proof of absence either."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_docker(tmp, rm_rc=0, inspect_rc=1, inspect_stderr="")
-            share = _make_share(tmp)
-            with self.assertRaises(RuntimeError) as ctx:
-                self._finalize(self.CID, share, tmp)
-            self.assertIn("state=unknown", str(ctx.exception))
-            self.assertTrue(share.exists())
-
-    def test_removal_failure_plus_inspect_daemon_error_fails_closed(self):
-        """Removal failure AND inspect daemon failure: pytest goes red and
-        the share is preserved — no silent bypass via rc!=0."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_docker(
-                tmp, rm_rc=1, rm_stderr="Error: daemon said no",
-                inspect_rc=1,
-                inspect_stderr="Error response from daemon: EOF")
-            share = _make_share(tmp)
-            with self.assertRaises(RuntimeError) as ctx:
-                self._finalize(self.CID, share, tmp)
-            msg = str(ctx.exception)
-            self.assertIn("exited 1", msg)
-            self.assertIn("state=unknown", msg)
-            self.assertIn("daemon said no", msg)
-            self.assertTrue((share / "evidence/setup.log").exists())
-
-    def test_inspect_timeout_fails_closed_boundedly(self):
-        """A hung inspect is UNKNOWN and fails the gate; the bounded
-        timeout keeps the whole call near its deadline."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            _make_fake_docker(tmp, rm_rc=0, inspect_sleep=2)
-            env = {"PATH": os.pathsep.join([str(tmp), "/usr/bin", "/bin"])}
-            started = time.monotonic()
-            with mock.patch.dict(os.environ, env):
-                with self.assertRaises(RuntimeError) as ctx:
-                    conftest._remove_session_container(
-                        self.CID, rm_timeout=15, inspect_timeout=0.5)
-            self.assertLess(time.monotonic() - started, 10,
-                            "inspect timeout must stay bounded")
-            msg = str(ctx.exception)
-            self.assertIn("TEARDOWN FAILED", msg)
-            self.assertIn("state=unknown", msg)
-            self.assertIn("timed out", msg)
-
-    def test_docker_cli_launch_failure_fails_closed(self):
-        """No docker executable at all: rm launch failure is fatal, inspect
-        launch failure is UNKNOWN — fail closed and keep the share."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)  # no docker script on this controlled PATH
-            share = _make_share(tmp)
-            with self.assertRaises(RuntimeError) as ctx:
-                self._finalize(self.CID, share, tmp)
-            msg = str(ctx.exception)
-            self.assertIn("could not run", msg)
-            self.assertIn("state=unknown", msg)
-            self.assertTrue(share.exists())
-
-
-class _FakeItem:
-    """Minimal pytest Item stand-in for the collection-policy hook."""
-
-    def __init__(self, fixturenames):
-        self.fixturenames = fixturenames
-        self.markers = []
-
-    def add_marker(self, marker):
-        self.markers.append(marker)
-
-    def get_closest_marker(self, name):
-        for m in reversed(self.markers):
-            if getattr(m, "name", None) == name:
-                return m
-        return None
-
-
-def _session_fixture_fn():
-    """The raw generator function behind the shipped session fixture.
-
-    pytest 9 wraps the fixture function in a FixtureFunctionDefinition;
-    reaching through _fixture_function (or __wrapped__) lets negative
-    tests drive the ACTUAL fixture setup/yield/finalize flow instead of
-    a re-implemented copy.
-    """
-    for attr in ("_fixture_function", "__wrapped__"):
-        fn = getattr(conftest.tier1_container, attr, None)
-        if callable(fn):
-            return fn
-    raise AssertionError("cannot reach the tier1_container generator")
-
-
-def _make_fake_session_docker(tmp: Path, *, build_rc: int = 0,
-                              exec_rc: int = 0,
-                              rm_rc: int = 0, rm_sleep: int = 0,
-                              rm_stderr: str = "",
-                              inspect_rc: int = 1,
-                              inspect_stderr: str | None = None,
-                              inspect_sleep: int = 0) -> Path:
-    """Recording docker substitute for FULL session-fixture drives.
-
-    Handles the complete fixture conversation — info / build / run -d
-    (prints a unique cid per invocation from a counter file) / exec
-    (install+apply+check succeed) / rm / inspect — each with programmable
-    rc, stderr, and sleep. Every invocation is logged, one full argv per
-    line. Re-running this helper on the same tmp REPROGRAMS the behavior
-    while preserving the counter and the log, so a test can model a
-    failed run followed by a clean run.
-    """
-    if inspect_stderr is None and inspect_rc != 0:
-        inspect_stderr = 'Error: No such container: $2'
-    inspect_line = (f'echo "{inspect_stderr}" >&2\n      '
-                    if inspect_stderr else "")
-    rm_line = f'echo "{rm_stderr}" >&2\n      ' if rm_stderr else ""
-    counter = tmp / "docker-cid-counter"
-    record = tmp / "docker-invocations.log"
-    script = tmp / "docker"
-    script.write_text(
-        "#!/usr/bin/env bash\n"
-        f'echo "$*" >> "{record}"\n'
-        'case "$1" in\n'
-        "  info) exit 0 ;;\n"
-        f"  build) exit {build_rc} ;;\n"
-        f'  run) n=1; [ -f "{counter}" ] && n=$(( $(cat "{counter}") + 1 ))\n'
-        f'       echo "$n" > "{counter}"; echo "cid-$n" ;;\n'
-        f"  exec) echo '0.9.3 applied checked'; exit {exec_rc} ;;\n"
-        f"  rm) sleep {rm_sleep}\n"
-        f"      {rm_line}exit {rm_rc} ;;\n"
-        f"  inspect) sleep {inspect_sleep}\n"
-        f"      {inspect_line}exit {inspect_rc} ;;\n"
-        "  *) exit 0 ;;\n"
-        "esac\n"
-    )
-    script.chmod(0o755)
-    return record
-
-
-class TestSessionFixtureEndToEnd(unittest.TestCase):
-    """Drive the ACTUAL tier1_container generator through failure paths.
-
-    These tests instantiate the shipped session fixture (reached through
-    the fixture wrapper, not a copy) so poisoned staging, setup failure,
-    teardown failure, and cross-run isolation are proven through the real
-    setup/yield/finalize flow — with recording fakes for docker/npm/node
-    (no daemon, no image, no network).
-    """
-
-    PINNED_ENV = "PRIME_AGENT_PINNED=0.9.3\n"
-
-    def _begin(self, tmp, env_text, *, docker_kw=None, pid=None,
-               epoch=None, with_build_fakes=False):
-        """Patch RESULTS/env/PATH (+ run identity) and start one drive of
-        the real session-fixture generator. Returns (gen, record, results).
-        """
-        record = _make_fake_session_docker(tmp, **(docker_kw or {}))
-        if with_build_fakes:
-            _make_fake_npm(tmp)
-            _make_fake_node(tmp)
-        results = tmp / "results"
-        env_file = tmp / "tier1.env"
-        env_file.write_text(env_text)
-        env = {"PATH": os.pathsep.join([str(tmp), "/usr/bin", "/bin"]),
-               "TIER1_ENV_FILE": str(env_file)}
-        patchers = [mock.patch.dict(os.environ, env),
-                    mock.patch.object(conftest, "RESULTS", results)]
-        if pid is not None:
-            patchers.append(mock.patch.object(os, "getpid",
-                                              return_value=pid))
-        if epoch is not None:
-            patchers.append(mock.patch.object(time, "time",
-                                              return_value=epoch))
-        for patcher in patchers:
-            patcher.start()
-            self.addCleanup(patcher.stop)
-        return _session_fixture_fn()(None), record, results
-
-    def test_source_mode_poisoned_dist_tree_stops_before_publication(self):
-        """The WHOLE fixture stops before publication: an uninspectable
-        dist tree raises during staging — docker never builds or runs a
-        container, npm/node never run."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            fork = _make_fake_fork(tmp, with_dist=True)
-            blocked = fork / "packages" / "agent"
-            blocked.chmod(0o444)
-            gen, record, results = self._begin(
-                tmp, f"PRIME_AGENT_SOURCE={fork}\n", with_build_fakes=True)
+            tmp=Path(td); results=tmp/"results"; envf=tmp/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n"); calls=[]
+            image={"id":IMAGE_ID,"repo_digests":[],"dockerfile":"docker/test.Dockerfile","dockerfile_sha256":"d"*64,"declared_input_sha256":"e"*64,"informational_tag":"prime-claw-test-tier1:eeeeeeeeeeee","os":"linux","architecture":"arm64","build_started_at":"2026-10-02T00:00:00Z","build_finished_at":"2026-10-02T00:00:01Z"}
+            repository={"head":"b"*40,"dirty":False,"status_sha256":"a"*64,"content_sha256":"c"*64,"entry_count":1}
+            def stage(repo,dest): Path(dest).mkdir(parents=True); return repository
+            def host_run(args,**kw):
+                calls.append(args)
+                if args==["docker","info"]: return cp(args)
+                if args[:3]==["docker","run","-d"]:
+                    Path(args[args.index("--cidfile")+1]).write_text(CID+"\n")
+                    if timeout: raise subprocess.TimeoutExpired(args,30)
+                    return cp(args,rc=9,err="launch client failed")
+                if args[:3]==["docker","rm","-f"]: return cp(args)
+                if args[:2]==["docker","inspect"]: return cp(args,rc=1,err="Error: No such container: "+CID)
+                raise AssertionError(args)
+            patches=[mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}),mock.patch.object(conftest,"RESULTS",results),mock.patch.object(conftest.shutil,"which",return_value="/fake/docker"),mock.patch.object(conftest.subprocess,"run",side_effect=host_run),mock.patch.object(conftest,"_build_tier1_image",return_value=image),mock.patch.object(conftest.provenance,"stage_repository_snapshot",side_effect=stage)]
+            for p in patches: p.start()
             try:
-                with self.assertRaises(RuntimeError) as ctx:
+                gen=conftest.tier1_container.__wrapped__(SimpleNamespace())
+                with self.assertRaises(subprocess.TimeoutExpired if timeout else RuntimeError): next(gen)
+            finally:
+                for p in reversed(patches): p.stop()
+            self.assertIn(["docker","rm","-f",CID],calls); self.assertIn(["docker","inspect",CID],calls)
+            manifest=json.loads(next(results.glob("*/tier1/manifest.json")).read_text()); self.assertEqual(manifest["teardown"]["state"],"absent"); self.assertEqual(manifest["run"]["status"],"failed"); self.assertEqual(manifest["prime_agent"]["requested_version"],"0.9.8")
+
+    def test_nonzero_run_after_valid_cid_recovers_and_tears_down_exact_id(self): self._assert_valid_partial_cid_is_recovered(timeout=False)
+    def test_timeout_after_valid_cid_recovers_and_tears_down_exact_id(self): self._assert_valid_partial_cid_is_recovered(timeout=True)
+    def test_invalid_cidfile_never_reaches_fixture_teardown(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp=Path(td); results=tmp/"results"; envf=tmp/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
+            image={"id":IMAGE_ID,"repo_digests":[],"dockerfile":"docker/test.Dockerfile","dockerfile_sha256":"d"*64,"declared_input_sha256":"e"*64,"informational_tag":"prime-claw-test-tier1:eeeeeeeeeeee","os":"linux","architecture":"arm64","build_started_at":"2026-10-02T00:00:00Z","build_finished_at":"2026-10-02T00:00:01Z"}
+            repository={"head":"b"*40,"dirty":False,"status_sha256":"a"*64,"content_sha256":"c"*64,"entry_count":1}
+            def stage(repo,dest): Path(dest).mkdir(parents=True); return repository
+            def host_run(args,**kw):
+                if args==["docker","info"]: return cp(args)
+                if args[:3]==["docker","run","-d"]:
+                    Path(args[args.index("--cidfile")+1]).write_text("operator-container\n"); return cp(args)
+                raise AssertionError(args)
+            finalizer=mock.Mock(side_effect=AssertionError("must not teardown untrusted identity"))
+            patches=[mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}),mock.patch.object(conftest,"RESULTS",results),mock.patch.object(conftest.shutil,"which",return_value="/fake/docker"),mock.patch.object(conftest.subprocess,"run",side_effect=host_run),mock.patch.object(conftest,"_build_tier1_image",return_value=image),mock.patch.object(conftest,"_finalize_session",finalizer),mock.patch.object(conftest.provenance,"stage_repository_snapshot",side_effect=stage)]
+            for p in patches: p.start()
+            try:
+                gen=conftest.tier1_container.__wrapped__(SimpleNamespace())
+                with self.assertRaisesRegex(RuntimeError,"invalid or missing captured"):
                     next(gen)
             finally:
-                blocked.chmod(0o755)
-                gen.close()
-            self.assertIn("cannot inspect", str(ctx.exception))
-            invocations = (record.read_text().splitlines()
-                           if record.exists() else [])
-            self.assertEqual([l.split()[0] for l in invocations], ["info"],
-                             "readiness probe only — no build, no run, "
-                             "nothing published")
-            self.assertFalse((tmp / "npm-invocations.log").exists())
-            self.assertFalse((tmp / "node-invocations.log").exists())
-            self.assertFalse(list(results.glob("share-*")),
-                             "nothing published -> share released")
+                for p in reversed(patches): p.stop()
+            finalizer.assert_not_called()
+            manifest=json.loads(next(results.glob("*/tier1/manifest.json")).read_text()); self.assertEqual(manifest["run"]["status"],"failed"); self.assertEqual(manifest["teardown"]["state"],"unknown")
 
-    def test_setup_failure_after_publication_cleans_only_captured_id(self):
-        """In-container setup fails AFTER docker run: teardown removes and
-        verifies exactly the captured container — nothing else."""
+    def test_install_disconnect_identity_apply_check_then_manifest(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            gen, record, results = self._begin(
-                tmp, self.PINNED_ENV, docker_kw={"exec_rc": 1})
-            with self.assertRaises(RuntimeError) as ctx:
-                next(gen)
-            self.assertIn("container setup failed", str(ctx.exception))
-            invocations = record.read_text().splitlines()
-            self.assertEqual([l.split()[0] for l in invocations],
-                             ["info", "build", "run", "exec",
-                              "rm", "inspect"])
-            self.assertEqual(invocations[4], "rm -f cid-1")
-            self.assertEqual(invocations[5], "inspect cid-1",
-                             "teardown verifies only the captured ID")
-            self.assertFalse(list(results.glob("share-*")),
-                             "verified teardown releases the share")
+            tmp=Path(td); results=tmp/"results"; envf=tmp/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n"); events=[]
+            image={"id":IMAGE_ID,"repo_digests":[],"dockerfile":"docker/test.Dockerfile","dockerfile_sha256":"d"*64,"declared_input_sha256":"e"*64,"informational_tag":"prime-claw-test-tier1:eeeeeeeeeeee","os":"linux","architecture":"arm64","build_started_at":"2026-10-02T00:00:00Z","build_finished_at":"2026-10-02T00:00:01Z"}
+            def host_run(args,**kw):
+                if args==["docker","info"]: return cp(args)
+                if args[:3]==["docker","run","-d"]:
+                    Path(args[args.index("--cidfile")+1]).write_text(CID+"\n"); events.append("run"); return cp(args)
+                raise AssertionError(args)
+            def container_run(self,*args,**kw):
+                joined=" ".join(map(str,args))
+                if "install.sh" in joined: events.append("install")
+                elif "apply-prime" in joined: events.append("apply")
+                elif "check-prime" in joined: events.append("check")
+                return cp(args)
+            def disconnect(cid): events.append("disconnect"); return "2026-10-02T00:00:02Z"
+            def package(container): events.append("identity"); return {"kind":"vendor-binary","version":"0.9.8","executable_sha256":"f"*64}
+            repository={"head":"b"*40,"dirty":False,"status_sha256":"a"*64,"content_sha256":"c"*64,"entry_count":1}
+            def stage(repo,dest): Path(dest).mkdir(parents=True); return repository
+            patches=[mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}),mock.patch.object(conftest,"RESULTS",results),mock.patch.object(conftest.shutil,"which",return_value="/fake/docker"),mock.patch.object(conftest.subprocess,"run",side_effect=host_run),mock.patch.object(conftest,"_build_tier1_image",return_value=image),mock.patch.object(conftest,"_disconnect_container_networks",side_effect=disconnect),mock.patch.object(conftest,"_installed_package_identity",side_effect=package),mock.patch.object(conftest.Tier1Container,"run",new=container_run),mock.patch.object(conftest,"_finalize_session",return_value="absent"),mock.patch.object(conftest.provenance,"stage_repository_snapshot",side_effect=stage)]
+            for p in patches: p.start()
+            try:
+                gen=conftest.tier1_container.__wrapped__(SimpleNamespace()); container=next(gen); self.assertEqual(container.id,CID); self.assertEqual(events,["run","install","disconnect","identity","apply","check"])
+                with self.assertRaises(StopIteration): next(gen)
+            finally:
+                for p in reversed(patches): p.stop()
+            manifest_path=next(results.glob("*/tier1/manifest.json")); manifest=json.loads(manifest_path.read_text()); conftest.provenance.validate_manifest(manifest); self.assertEqual(manifest["teardown"]["state"],"absent")
 
-    def test_teardown_failure_after_clean_body_fails_through_fixture(self):
-        """Clean test body, failed teardown: the RuntimeError surfaces
-        from fixture finalization — this is what turns the gate red."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            gen, record, results = self._begin(
-                tmp, self.PINNED_ENV,
-                docker_kw={"rm_rc": 1, "rm_stderr": "daemon said no",
-                           "inspect_rc": 0})
-            container = next(gen)
-            self.assertEqual(container.id, "cid-1")
-            with self.assertRaises(RuntimeError) as ctx:
-                next(gen)  # resume past the yield: teardown runs here
-            msg = str(ctx.exception)
-            self.assertIn("TEARDOWN FAILED", msg)
-            self.assertIn("cid-1", msg)
-            self.assertIn("state=present", msg)
-            self.assertEqual(len(list(results.glob("share-*"))), 1,
-                             "share evidence retained while the container "
-                             "may still own it")
+class _FakeItem:
+    def __init__(self, fixturenames): self.fixturenames=fixturenames; self.markers=[]
+    def add_marker(self, marker): self.markers.append(marker)
+    def get_closest_marker(self, name):
+        return next((m for m in reversed(self.markers) if getattr(m,"name",None)==name),None)
 
-    def test_body_plus_teardown_failure_preserve_both_through_fixture(self):
-        """A test-body failure thrown INTO the fixture stays primary; the
-        teardown failure is attached as a note — both surface."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            gen, record, results = self._begin(
-                tmp, self.PINNED_ENV,
-                docker_kw={"rm_rc": 1, "rm_stderr": "daemon said no",
-                           "inspect_rc": 0})
-            next(gen)
-            with self.assertRaises(ValueError) as ctx:
-                gen.throw(ValueError("test body failed"))
-            notes = getattr(ctx.exception, "__notes__", [])
-            self.assertTrue(
-                any("teardown also failed" in n and "cid-1" in n
-                    for n in notes),
-                f"teardown failure must ride along as a note: {notes!r}")
-            self.assertTrue(list(results.glob("share-*")),
-                            "share retained while teardown is unverified")
-
-    def test_failed_run_leaves_no_inheritance_for_the_next_run(self):
-        """BEHAVIORAL no-inheritance proof at the ownership seam (B2-R2):
-        run 1's teardown fails (container still PRESENT) and its share is
-        retained with a witness; run 2 — the SAME pid (PID reuse), a
-        different epoch — gets a DISTINCT exclusively-allocated share and
-        a distinct container name/ID, never targets the leaked ID, never
-        even mounts run 1's share, and its verified teardown removes only
-        its own share. Run 1's witness survives byte-identical."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            # --- run 1: teardown fails, cid-1 leaks, share retained ---
-            gen1, record, results = self._begin(
-                tmp, self.PINNED_ENV,
-                docker_kw={"rm_rc": 1, "rm_stderr": "daemon said no",
-                           "inspect_rc": 0},
-                pid=4242, epoch=1_000_000)
-            container1 = next(gen1)
-            self.assertEqual(container1.id, "cid-1")
-            share1 = container1.share
-            witness = share1 / "run1-recovery-evidence.txt"
-            witness.write_text("run 1 failed; keep me for post-mortem\n")
-            with self.assertRaises(RuntimeError) as ctx1:
-                gen1.throw(RuntimeError("run 1 body failed"))
-            self.assertIn("teardown also failed",
-                          "".join(getattr(ctx1.exception, "__notes__", [])))
-            self.assertTrue(share1.exists(),
-                            "run 1's share is retained — its container "
-                            "still owns it")
-            run1_lines = record.read_text().splitlines()
-            run1_run = [l for l in run1_lines if l.startswith("run ")][0]
-            self.assertIn("prime-claw-tier1-session-4242-1000000-",
-                          run1_run)
-            self.assertIn(f"-v {share1}:{share1}", run1_run,
-                          "same-absolute-path host/container mount kept")
-            # --- run 2: SAME pid, different epoch, clean teardown -----
-            gen2, _, _ = self._begin(tmp, self.PINNED_ENV,
-                                     pid=4242, epoch=1_000_061)
-            container2 = next(gen2)
-            share2 = container2.share
-            self.assertEqual(container2.id, "cid-2")
-            self.assertNotEqual(share1, share2,
-                                "each session gets a DISTINCT share even "
-                                "when the PID is reused")
-            self.assertTrue(share2.name.startswith("share-4242-1000061-"),
-                            f"share identity carries the run id: {share2}")
-            self.assertFalse((share2 / witness.name).exists(),
-                             "no run-1 evidence is visible through "
-                             "run 2's share")
-            with self.assertRaises(StopIteration):
-                next(gen2)  # clean teardown
-            run2_lines = record.read_text().splitlines()[len(run1_lines):]
-            run2_run = [l for l in run2_lines if l.startswith("run ")][0]
-            self.assertIn("prime-claw-tier1-session-4242-1000061-",
-                          run2_run)
-            self.assertIn(f"-v {share2}:{share2}", run2_run)
-            for line in run2_lines:
-                self.assertNotIn("cid-1", line,
-                                 "run 2 never targets the leaked container")
-                self.assertNotIn(str(share1), line,
-                                 "run 2 never even mounts run 1's share")
-            self.assertFalse(share2.exists(),
-                             "run 2 cleans its own share after verified "
-                             "teardown")
-            self.assertEqual(
-                witness.read_text(),
-                "run 1 failed; keep me for post-mortem\n",
-                "run 1's retained witness is byte-identical afterward")
-
-    def test_same_pid_same_epoch_collision_allocates_fresh_owned_state(self):
-        """Collision: two CONCURRENT sessions with the same pid AND the
-        same coarse epoch, plus a pre-existing legacy share-<pid>
-        directory. Each session must get fresh, exclusively owned state —
-        the legacy directory is neither used nor removed, and the two
-        sessions never see each other's state."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            results = tmp / "results"
-            results.mkdir(parents=True)
-            legacy = results / "share-4242"
-            legacy.mkdir()
-            legacy_witness = legacy / "legacy-evidence.txt"
-            legacy_witness.write_text("pre-existing; do not adopt\n")
-            # Session A starts; session B starts with IDENTICAL pid+epoch
-            # while A is still alive.
-            genA, record, _ = self._begin(tmp, self.PINNED_ENV,
-                                          pid=4242, epoch=1_000_000)
-            containerA = next(genA)
-            shareA = containerA.share
-            genB, _, _ = self._begin(tmp, self.PINNED_ENV,
-                                     pid=4242, epoch=1_000_000)
-            containerB = next(genB)
-            shareB = containerB.share
-            self.assertNotEqual(shareA, shareB,
-                                "identical pid+epoch still yields "
-                                "distinct shares")
-            self.assertNotEqual(containerA.id, containerB.id)
-            self.assertNotIn(legacy, (shareA, shareB),
-                             "a pre-existing legacy share-<pid> is never "
-                             "adopted")
-            run_lines = [l for l in record.read_text().splitlines()
-                         if l.startswith("run ")]
-            self.assertEqual(len(run_lines), 2)
-            self.assertNotEqual(
-                run_lines[0].split("--name ")[1].split()[0],
-                run_lines[1].split("--name ")[1].split()[0],
-                "container identities stay distinct too")
-            (shareB / "b-only.txt").write_text("b\n")
-            self.assertFalse((shareA / "b-only.txt").exists(),
-                             "no cross-session visibility")
-            # Both sessions finalize cleanly; only their own shares go.
-            with self.assertRaises(StopIteration):
-                next(genA)
-            with self.assertRaises(StopIteration):
-                next(genB)
-            self.assertFalse(shareA.exists())
-            self.assertFalse(shareB.exists())
-            self.assertEqual(legacy_witness.read_text(),
-                             "pre-existing; do not adopt\n",
-                             "the legacy directory is neither used nor "
-                             "removed")
-
-    def test_retained_share_survives_later_setup_failures(self):
-        """After a retained failed run, later sessions that fail setup —
-        BEFORE publication (image build) or AFTER (in-container setup) —
-        finalize only their own newly allocated share (and their own
-        freshly captured container); the retained share survives
-        byte-identical, and a later clean session still succeeds without
-        touching it."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            # --- run 1: teardown fails, share retained ----------------
-            gen1, record, results = self._begin(
-                tmp, self.PINNED_ENV,
-                docker_kw={"rm_rc": 1, "rm_stderr": "daemon said no",
-                           "inspect_rc": 0},
-                pid=4242, epoch=1_000_000)
-            container1 = next(gen1)
-            share1 = container1.share
-            witness = share1 / "run1-recovery-evidence.txt"
-            witness.write_text("run 1 failed; keep me\n")
-            with self.assertRaises(RuntimeError):
-                gen1.throw(RuntimeError("run 1 body failed"))
-            run1_count = len(record.read_text().splitlines())
-            # --- run 2: setup fails BEFORE publication (image build) --
-            gen2, _, _ = self._begin(tmp, self.PINNED_ENV,
-                                     docker_kw={"build_rc": 1},
-                                     pid=4242, epoch=1_000_061)
-            with self.assertRaises(subprocess.CalledProcessError):
-                next(gen2)
-            run2_lines = record.read_text().splitlines()[run1_count:]
-            self.assertEqual([l.split()[0] for l in run2_lines],
-                             ["info", "build"],
-                             "pre-publication failure: no container was "
-                             "ever created, nothing to finalize")
-            self.assertEqual(list(results.glob("share-*")), [share1],
-                             "run 2's own share is released; only the "
-                             "retained share remains")
-            self.assertEqual(witness.read_text(), "run 1 failed; keep me\n")
-            # --- run 3: setup fails AFTER publication (in-container) --
-            gen3, _, _ = self._begin(tmp, self.PINNED_ENV,
-                                     docker_kw={"exec_rc": 1},
-                                     pid=4242, epoch=1_000_122)
-            with self.assertRaises(RuntimeError) as ctx3:
-                next(gen3)
-            self.assertIn("container setup failed", str(ctx3.exception))
-            run3_lines = record.read_text().splitlines()[
-                run1_count + len(run2_lines):]
-            self.assertEqual([l.split()[0] for l in run3_lines],
-                             ["info", "build", "run", "exec",
-                              "rm", "inspect"])
-            self.assertEqual(run3_lines[4], "rm -f cid-2",
-                             "only the newly captured container is "
-                             "finalized")
-            for line in run3_lines:
-                self.assertNotIn("cid-1", line)
-                self.assertNotIn(str(share1), line)
-            self.assertEqual(witness.read_text(), "run 1 failed; keep me\n")
-            # --- run 4: a clean session still succeeds ----------------
-            gen4, _, _ = self._begin(tmp, self.PINNED_ENV,
-                                     pid=4242, epoch=1_000_183)
-            container4 = next(gen4)
-            share4 = container4.share
-            with self.assertRaises(StopIteration):
-                next(gen4)
-            self.assertFalse(share4.exists())
-            self.assertEqual(witness.read_text(), "run 1 failed; keep me\n",
-                             "the retained share is never touched by "
-                             "later sessions")
-
-    def test_already_absent_replay_succeeds_and_removes_only_own_share(self):
-        """Positive replay: teardown finds its own container already
-        absent (rm fails, inspect says No such container) — the session
-        succeeds and removes only its own share, leaving a pre-existing
-        neighbour share untouched."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            results = tmp / "results"
-            results.mkdir(parents=True)
-            neighbour = results / "share-4242-999999-legacy"
-            neighbour.mkdir()
-            note = neighbour / "keep.txt"
-            note.write_text("not mine\n")
-            gen, record, _ = self._begin(
-                tmp, self.PINNED_ENV,
-                docker_kw={"rm_rc": 1, "rm_stderr": "No such container"},
-                pid=4242, epoch=1_000_000)
-            container = next(gen)
-            own_share = container.share
-            self.assertNotEqual(own_share, neighbour)
-            with self.assertRaises(StopIteration):
-                next(gen)  # idempotent OK: inspect proves absence
-            self.assertFalse(own_share.exists(),
-                             "the session removes its own share")
-            self.assertEqual(note.read_text(), "not mine\n",
-                             "the neighbour share is untouched")
-            lines = record.read_text().splitlines()
-            self.assertIn("rm -f cid-1", lines)
-            self.assertEqual(lines[-1], "inspect cid-1")
-
-    def test_keep_share_retains_only_this_sessions_artifacts(self):
-        """Positive: TIER1_KEEP_SHARE preserves THIS session's share with
-        its artifacts after a clean run (debugging aid) — it neither
-        retains nor removes any other session's share."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td)
-            results = tmp / "results"
-            results.mkdir(parents=True)
-            neighbour = results / "share-4242-999999-legacy"
-            neighbour.mkdir()
-            (neighbour / "keep.txt").write_text("not mine\n")
-            gen, record, _ = self._begin(tmp, self.PINNED_ENV,
-                                         pid=4242, epoch=1_000_000)
-            with mock.patch.dict(os.environ, {"TIER1_KEEP_SHARE": "1"}):
-                container = next(gen)
-                own_share = container.share
-                artifact = own_share / "session-artifact.log"
-                artifact.write_text("debug me\n")
-                with self.assertRaises(StopIteration):
-                    next(gen)
-            self.assertEqual(artifact.read_text(), "debug me\n",
-                             "KEEP_SHARE retains this session's share and "
-                             "its artifacts")
-            self.assertEqual((neighbour / "keep.txt").read_text(),
-                             "not mine\n")
-
-
-class TestDryRunEquivalent(unittest.TestCase):
-    """The fixture-level dry-run-equivalent: a default `pytest tests/ -q`
-    invocation makes no build/pack/docker call, ever."""
-
-    def test_default_invocation_skips_container_tests_at_collection(self):
-        item = _FakeItem(["tier1_container"])
-        cfg = SimpleNamespace(option=SimpleNamespace(markexpr=""))
-        conftest.pytest_collection_modifyitems(cfg, [item])
-        names = [m.name for m in item.markers]
-        self.assertIn("container", names)
-        self.assertIn("skip", names,
-                      "without an explicit -m, fixture users are skipped "
-                      "at collection — the fixture (and its build/pack/"
-                      "docker calls) never runs")
-
-    def test_unmarked_tier0_test_is_untouched(self):
-        item = _FakeItem([])
-        cfg = SimpleNamespace(option=SimpleNamespace(markexpr=""))
-        conftest.pytest_collection_modifyitems(cfg, [item])
-        self.assertEqual(item.markers, [])
-
+class TestCollectionPolicy(unittest.TestCase):
+    def test_default_fixture_user_is_marked_and_skipped(self):
+        item=_FakeItem(["tier1_container"]); cfg=SimpleNamespace(option=SimpleNamespace(markexpr="")); conftest.pytest_collection_modifyitems(cfg,[item]); names=[m.name for m in item.markers]; self.assertIn("container",names); self.assertIn("skip",names)
+    def test_unmarked_tier0_is_untouched(self):
+        item=_FakeItem([]); cfg=SimpleNamespace(option=SimpleNamespace(markexpr="")); conftest.pytest_collection_modifyitems(cfg,[item]); self.assertEqual(item.markers,[])
     def test_explicit_mark_selection_does_not_skip(self):
-        item = _FakeItem(["tier1_container"])
-        cfg = SimpleNamespace(option=SimpleNamespace(markexpr="container"))
-        conftest.pytest_collection_modifyitems(cfg, [item])
-        names = [m.name for m in item.markers]
-        self.assertIn("container", names)
-        self.assertNotIn("skip", names)
-
-    def test_docker_skip_guards_precede_source_staging(self):
-        """On a docker-less host the fixture skips before any staging."""
-        body = CONFTEST_SRC[CONFTEST_SRC.index("def tier1_container"):]
-        self.assertLess(body.index('shutil.which("docker")'),
-                        body.index("_stage_fork_release(value)"))
-        self.assertLess(body.index('["docker", "info"]'),
-                        body.index("_stage_fork_release(value)"))
-        self.assertEqual(CONFTEST_SRC.count("_stage_fork_release(value)"), 1,
-                         "source staging has exactly one call site: the "
-                         "guarded fixture body")
-
+        item=_FakeItem(["tier1_container"]); cfg=SimpleNamespace(option=SimpleNamespace(markexpr="container")); conftest.pytest_collection_modifyitems(cfg,[item]); names=[m.name for m in item.markers]; self.assertIn("container",names); self.assertNotIn("skip",names)
 
 class TestFixtureStatics(unittest.TestCase):
-    """Static guards pinning the repaired fixture contract."""
+    def test_no_source_build_mutators_and_no_shared_setup_log(self):
+        text=Path(conftest.__file__).read_text(); self.assertNotIn("_stage_fork_release",text); self.assertNotIn("npm run build",text); self.assertNotIn("tier1-session-setup.log",text); self.assertIn("--iidfile",text); self.assertIn("--cidfile",text)
+    def test_explicit_plugin_root_no_host_home_and_no_broad_teardown(self):
+        text=Path(conftest.__file__).read_text(); body=text[text.index("def tier1_container"):]; self.assertIn('"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT',body); self.assertNotIn('os.environ.get("HOME")',body); self.assertNotIn('env=os.environ',body); self.assertNotIn("prune",text); self.assertNotIn('"--all"',text)
 
-    def test_fail_closed_staging_replaces_ignore_errors(self):
-        self.assertNotIn(
-            'shutil.rmtree(src / pkg / "dist", ignore_errors=True)',
-            CONFTEST_SRC)
-        self.assertIn("def _remove_dist_tree", CONFTEST_SRC)
-        self.assertIn('_remove_dist_tree(src / pkg / "dist")', CONFTEST_SRC)
-
-    def test_driver_still_fails_closed(self):
-        """The driver contract the fixture mirrors is unchanged."""
-        driver = (REPO / "scripts/test-tier1.sh").read_text()
-        self.assertIn('rm -rf "${SOURCE:?}/$p/dist"', driver)
-
-    def test_fixture_uses_explicit_container_plugin_target_without_host_home(self):
-        body = CONFTEST_SRC[CONFTEST_SRC.index("def tier1_container"):]
-        self.assertIn('"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT', body)
-        self.assertNotIn('os.environ.get("HOME")', body)
-        self.assertNotIn('env=os.environ', body)
-
-    def test_teardown_has_no_docker_wide_operations(self):
-        self.assertNotIn("prune", CONFTEST_SRC)
-        self.assertNotIn('"--all"', CONFTEST_SRC)
-
-
-if __name__ == "__main__":
-    unittest.main()
+if __name__=="__main__": unittest.main()
