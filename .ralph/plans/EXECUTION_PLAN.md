@@ -1,120 +1,142 @@
 # Execution Plan — Official lean session protocol
 
-> **Status:** Active; accepted watchdog/PATH unblock integrated, exact canonical gate pending
+> **Status:** Active; exact Slice 1 transition accepted, transition-first landing plan pending owner review
 >
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 >
 > **Tracking:** `prime-claw-h6w.25`
 >
-> **Execution shape:** One isolated implementation episode, three pushed slices,
-> and one operator-controlled full runtime restart before cleanup. The episode
-> branch remains unmerged through the cutover so `main` continues to provide all
-> compatibility files to old loaded sessions.
+> **Execution shape:** The accepted Slice 1 transition lands first on primary
+> `main` with all compatibility resources retained. The existing episode then
+> becomes a read-only post-restart UAT fixture. User-global activation runs only
+> from synchronized primary `main`; accepted UAT finalizes this transition
+> episode. Compatibility removal and final documentation move to a separately
+> reviewed future episode and later second merge.
 
-## Resolved execution blocker and authorized continuation
+## Accepted Slice 1 checkpoint and current authority
 
-Exact OL-011 code candidate `6322a18e1bb921478a7d9e7c67a8eff4088481a3` (tree `68125ad163dc9a9bb72e296b05af2b913b9210f6`) is committed
-locally. The accepted provider-boundary repair passes its exact system-channel
-control and the complete focused native provider/lifecycle set. The complete
-selected Tier 1 suite also passes: `48 passed, 383 deselected` in 98.42s, receipt
-`.test-results/ol011-final/tier1-diagnostic-after-watchdog.log`, SHA256
-`365c8198150db62faaa448b25a3328d2bbd297889223cea74532d27282629830`.
+The exact accepted transition candidate is
+`615687aff1aa3549e986cc030073ee2539b836fe` (tree
+`e23e1841fecadabf2f0d85269aeb4535ee2bb056`). It includes accepted `main`
+through `eca48f8b284c990a8e030062ef70192313781b7f`, the independent
+watchdog/PATH repair `3bf905976a1a489d93e81619a838b34fc7ed8a31`, and bead closures
+`927b3941ebab281c18ceacfc3c922f82e75db9fc`. The canonical gate passed:
+Tier 0 `284 passed, 155 skipped`; complete selected Tier 1 `48 passed, 391
+deselected`; structured receipt
+`.test-results/ol011-integrated-final/exact-candidate-pass.json`, SHA256
+`971e66f69108c1b66b0213d8603faa608d2594028b90d92d204b9be152f65588`.
 
-The required canonical `scripts/test-all.sh` gate cannot complete because the
-independent Darwin process-group watchdog defect tracked as
-`prime-claw-zwg.5.1` failed Tier 0 on three bounded attempts against the exact
-candidate. The attempts produced the two previously baseline-reproduced
-signatures; OL-011 changes neither `tests/test_embedding_candidate_build.py` nor
-`bin/prime-claw`. No attempt reached Tier 1:
+The owner accepted this exact commit after independent final review PASS. The
+accepted runtime, installer, managed-system-block, test, compatibility-resource,
+and normative-documentation bytes must not change. This plan-only pass may edit
+only `.ralph/plans/SPECIFICATION.md` and `.ralph/plans/EXECUTION_PLAN.md`, push
+one descendant planning checkpoint, and stop for owner review.
 
-1. `.test-results/ol011-final/failed-gate-watchdog.json`: stall-test
-   `TimeoutExpired`; raw Tier 0 SHA256
-   `9b92f402b592af11bfa0c13b708c2a0648b59f5ffbfc58985ba3ae7a2d5c513f`.
-2. `.test-results/ol011-final/failed-gate-watchdog-rerun.json`: progress-reset
-   test returned 124; raw Tier 0 SHA256
-   `53ab940fea2081e28c293c026f9d73fdc623c7bd9f30482e09fcd9f1c82657c4`.
-3. `.test-results/ol011-final/blocked-final-gate.json`: stall-test
-   `TimeoutExpired`; raw Tier 0 SHA256
-   `dbf3830c7c3443dece2962a52c8876ddc3e59436abfd4208079667546af73916`.
-
-Those failures remain preserved and are not accepted as a successful canonical
-gate. After the operator accepted the bounded unblock, this episode integrated
-accepted `origin/main` through
-`eca48f8b284c990a8e030062ef70192313781b7f`. The resulting history includes the
-independent watchdog/PATH repair
-`3bf905976a1a489d93e81619a838b34fc7ed8a31` and bead closures
-`927b3941ebab281c18ceacfc3c922f82e75db9fc`; `prime-claw-zwg.5.1` is closed.
-The merge was conflict-free, preserves every OL-011 implementation/test file,
-and retains the exact compatibility skill, symlink, and reviewer-profile bytes.
-The resulting commit must now run `scripts/test-all.sh` with correlatable raw
-logs, commit/tree/dependency identity, supersession mapping, and teardown proof,
-then stop for exact-candidate owner review.
-
-Preserve the OL-011 provider-`systemPrompt` proof, OL-008 isolation, and every
-compatibility resource. Do not perform host-global apply/check, Slice 2, restart,
-cleanup, merge, or deployment-topology changes.
+The operator approved the transition-first topology described below for
+planning. That is not authority to merge, run host-global apply/check, restart,
+perform UAT or rollback, finalize or clean the episode, remove compatibility
+resources, or create a future cleanup folder during this pass.
 
 ## Outcome
 
-Promote the dogfooded lean session protocol to the supported default, prove it in
-the tier-1 Docker boundary, install and restart into that transition generation,
-then remove only the compatibility resources that the restarted generation no
-longer uses. Finish with current documentation, a clean global plugin check, a
-closed tracking bead, and a reviewable final branch.
+Land the already accepted seven-file transition on primary `main` while every
+old-generation compatibility resource remains available. Activate and check it
+only from synchronized primary `main`, perform one coordinated full restart,
+and prove the exact owner, exact episode, and a pre-identified ordinary saved
+conversation on the restarted runtime. Fail closed to the known-good installed
+generation from `main` if cutover fails. After accepted UAT, finalize and clean
+this transition episode without changing its post-merge branch or worktree.
+Defer compatibility removal and final documentation to a separately reviewed
+future episode and later second merge.
 
 ## Baseline and invariants
 
-Planning was performed from clean `main` at `44d83db`. Relevant history:
+Relevant accepted history:
 
 - `00ad366` — lean protocol POC;
 - `535f584` — stale package assertions reconciled with the POC;
-- `1442abb` — three-tier plugin test container merged; and
-- `44d83db` — reviewed migration specification committed.
+- `1442abb` — three-tier plugin test container;
+- `44d83db` — current recorded known-good eight-file POC rollback source;
+- `6322a18e1bb921478a7d9e7c67a8eff4088481a3` — OL-011 provider-channel
+  repair; and
+- `615687aff1aa3549e986cc030073ee2539b836fe` — accepted integrated seven-file
+  transition.
 
-The active global plugin matches the current eight-file POC generation. The old
-`.ralph/skills/oversee-episode/SKILL.md` is live compatibility state: old loaded
-conversation hooks reread it on every turn. Its symlink and reviewer profile are
-also retained until cutover.
+The current installed generation must be checked and hashed again before global
+mutation. If it does not match the recorded known-good state, stop and revise
+the rollback input rather than assuming `44d83db` is still installed.
 
-The implementation must preserve these invariants throughout:
+The landing must preserve these invariants:
 
-1. No Prime Agent source change or concurrent host daemon.
-2. Plugin execution tests run through tier 1, not an unguarded host process.
-3. `main` keeps the old skill, symlink, and profile until after accepted cutover.
-4. The episode worktree keeps them through the transition commit and restart.
-5. Historical archived plans, reviews, reports, and evidence are not rewritten.
-6. Cleanup never begins from install success alone; it requires a full restart,
-   resumed-session evidence, and explicit operator acceptance.
-7. If the cutover fails, restore the `44d83db` plugin generation and retain all
-   compatibility resources before trying anything else.
+1. No Prime Agent source change, upstream proposal, or concurrent host daemon.
+2. The accepted transition implementation and evidence remain byte-identical to
+   `615687aff1aa3549e986cc030073ee2539b836fe`.
+3. The compatibility skill, discovery link, and reviewer profile survive the
+   first merge, global activation, restart, UAT, and any rollback.
+4. After the first merge, the existing episode session, branch, and worktree are
+   unchanged and serve only as the exact UAT fixture. They receive no further
+   implementation commit, planning commit, execute pass, or cleanup work.
+5. User-global apply/check runs only from a clean synchronized primary `main`
+   checkout and always spells out `--user-global` while the transition
+   generation is active.
+6. The first landing is a normal no-fast-forward merge with an exact merge
+   commit, so a failure can be reverted without rewriting history.
+7. Cleanup never begins from merge or install success. It requires the one full
+   restart, resumed-session evidence, explicit operator UAT acceptance, and a
+   new separately reviewed future specification and episode.
+8. Archived plans, reviews, reports, and evidence are not rewritten.
+9. A failed cutover retains compatibility resources, reverts the exact first
+   merge on `main`, restores and checks the known-good installed generation from
+   clean synchronized `main`, and repeats the coordinated restart/recovery gate.
 
 ## Delivery topology
 
-Use one episode branch and do not merge the transition commit by itself:
+The approved transition-first topology is:
 
 ```text
-main (old plugin source + compatibility files stay intact)
-  \ episode worktree
-       transition commit ── test ── review
-       deployment-checkpoint commit ── apply candidate globally ── full restart
-                                       │                           │
-                                       └──── rollback to main ─────┘
-       accepted resumed-session UAT
-       cleanup commit ── test ── final review ── merge once
+existing episode branch/worktree
+  accepted transition 615687a
+  + reviewed plan-only checkpoint
+          │
+          └── first no-ff merge ──> synchronized primary main
+                                     compatibility skill/link/profile retained
+                                               │
+                            preflight: ordinary saved conversation
+                            + installed hashes + exact rollback inputs
+                                               │
+                            apply/check --user-global from main only
+                                               │
+                               one coordinated full restart
+                                               │
+                  resume exact owner + exact episode + ordinary conversation
+                              │                              │
+                           UAT PASS                       UAT FAIL
+                              │                              │
+             operator accepts cutover          revert exact merge on main
+                              │                 restore known-good generation
+             finalize/clean transition         restart and verify recovery
+             episode; leave compat intact                 stop
+                              │
+       operator later selects a future spec folder
+                              │
+       separately reviewed cleanup episode/branch
+                              │
+                  later second merge
 ```
 
-The transition commit is independently deployable because it is pushed and
-applied from the isolated worktree. Keeping the branch unmerged prevents the
-canonical checkout from losing compatibility files before the restart. After the
-restart, the same saved owner and episode sessions resume on the new global
-plugin generation. Cleanup then occurs only in the episode worktree. The final
-merge is the first deletion of compatibility files from `main`.
+The plan-only checkpoint is a descendant of the accepted implementation commit;
+it does not replace or amend that commit. The first merge may include that
+reviewed planning checkpoint, but the accepted implementation bytes must match
+`615687a`. Once the first merge completes, no work is committed in or executed
+from the episode again. The episode remains present only so the restarted
+runtime can resume the exact durable session against its exact branch/worktree
+identity.
 
-If this topology cannot be followed exactly, stop and revise the plan. Do not
-improvise a main-checkout deletion or assume the episode can continue after an
-early merge.
+The cleanup episode does not exist yet. Do not infer, name, or create its future
+folder. Its eventual second merge is independent of this transition episode and
+requires the normal specification, plan, implementation, and owner-review gates.
 
-## Slice 1 — Build the compatibility-safe transition generation
+## Slice 1 — Build the compatibility-safe transition generation (complete and accepted)
 
 ### Capability delivered
 
@@ -301,242 +323,182 @@ constraint OL-008:
   rows. Preserve all OL-007 lifecycle/replay/dispatch-prevention coverage and
   refresh complete exact-candidate OL-009 Docker receipts and teardown.
 
-Preserve `.ralph/skills/oversee-episode/SKILL.md`,
+That rejected-candidate revision preserved
+`.ralph/skills/oversee-episode/SKILL.md`,
 `.agents/skills/oversee-episode`, and
-`.prime/agent/profiles/expert-reviewer.md`. Do not use host-global apply/check,
-launch or restart host Prime Agent, remove compatibility resources, merge, or
-begin Slice 2. `prime-claw-blw.5` and `prime-claw-zwg.5.1` remain independent;
-add the BLOCK report's distinct watchdog signature to existing tracking without
-folding its repair into this revision.
+`.prime/agent/profiles/expert-reviewer.md`. It did not authorize host-global
+apply/check, a host launch or restart, compatibility removal, merge, or the next
+landing stage. `prime-claw-blw.5` and `prime-claw-zwg.5.1` remained independent;
+the BLOCK report's distinct watchdog signature stayed in existing tracking
+rather than being folded into OL-011.
 
-## Slice 2 — Deploy the accepted transition and checkpoint rollback
+## Landing stage — First merge and main-only activation
 
-### Dependency
+### Dependency and authority
 
-The owner has accepted the exact pushed Slice 1 commit and all in-scope revision
-findings are already incorporated. This slice must not change runtime, installer,
-managed-system-block, or test bytes.
+The owner must accept the exact pushed plan-only checkpoint before any landing
+step. The operator then separately authorizes the first merge and cutover. Plan
+approval alone does not authorize either action.
 
-**Topology blocker introduced by OL-008:** the accepted isolation guard refuses
-user-global activation from this linked episode worktree and permits it only from
-the primary `main` checkout. The original unmerged-branch topology expected
-Slice 2 to install the candidate before merge so the episode could survive the
-restart and later remove compatibility files. Docker validation cannot deliver
-that host-installed capability. Do not bypass the guard, merge early, change
-terminality, or silently redefine the restart/cleanup sequence. After Slice 1 is
-accepted, stop for an owner/operator decision and a reviewed plan revision before
-any Slice 2 action.
+The accepted implementation remains
+`615687aff1aa3549e986cc030073ee2539b836fe`. Any product-code, plugin,
+installer, managed-system-block, test, compatibility-resource, or normative-doc
+drift returns to owner review rather than entering the landing flow.
 
-### Capability delivered
+### Pre-merge admission
 
-The accepted seven-file transition generation is installed and byte-verified in
-the single host environment, exact rollback inputs are durable, and the system
-is ready for an operator-controlled full restart without having removed any
-compatibility file.
+From the primary `main` checkout:
 
-### Execution
+1. Fetch and synchronize `main`; require a clean checkout and no other active
+   landing operation.
+2. Verify `615687a` is an ancestor of the episode tip and that every change after
+   it is confined to the two reviewed active planning files.
+3. Reconfirm the compatibility skill, discovery link, and reviewer profile are
+   present and byte-current on both the episode tip and current `main`.
+4. Pre-identify one ordinary saved project conversation. Record its session ID,
+   name, canonical project CWD, and a successful normal turn on the current
+   single daemon. If no suitable conversation exists, stop for operator input.
+5. Record the exact currently installed known-good generation and its hashes or
+   successful check receipt. Confirm the rollback input can restore it without
+   deleting compatibility resources.
+6. Record the pre-merge `main` commit, accepted episode tip, and exact planned
+   no-fast-forward merge command. If the merge would include anything outside
+   the accepted transition and reviewed plans, stop.
 
-1. Confirm the episode worktree is clean and the current plugin, scripts, and
-   tests are byte-identical to the accepted Slice 1 commit. A plan-progress edit
-   is allowed; any product-code drift returns to owner review.
-2. Reconfirm the compatibility skill, discovery link, and reviewer profile are
-   present and byte-current.
-3. Identify one exact saved ordinary project conversation for restart UAT and
-   record its session ID, name, and canonical project CWD. It must complete a
-   normal pre-restart turn on the current single daemon. If no suitable saved
-   conversation exists, stop and ask the operator to create or approve one
-   through the normal session flow on that same daemon; cutover stays blocked.
-4. Record:
-   - accepted transition commit and branch;
-   - `44d83db` as the rollback source generation;
-   - current installed managed-file hashes or exact check result;
-   - active episode identity and resumable branch/worktree/session details;
-   - exact ordinary-session identity and successful pre-restart turn; and
-   - the successful Slice 1 tier-0/tier-1 evidence.
-5. Re-run `git diff --check` and `scripts/test-all.sh` against the accepted tree.
-6. From the episode worktree run the Docker-only candidate gates:
+### First merge and activation
+
+1. Create one normal no-fast-forward merge of the accepted episode tip into
+   primary `main`; do not squash, rebase, or amend the accepted candidate.
+2. Verify the resulting merge contains the accepted implementation bytes, the
+   reviewed planning checkpoint, and all compatibility resources. Record the
+   exact merge commit and first parent used by rollback.
+3. Push `main` and verify local/remote equality and a clean working tree.
+4. From that synchronized primary `main` checkout only, run:
 
    ```bash
-   python3 -m pytest tests/ -q -m container
-   scripts/test-tier1.sh --probe
+   scripts/apply-prime-agent-plugin.sh --user-global
+   scripts/check-prime-agent-plugin.sh --user-global
    ```
 
-7. Verify the explicit container installation matches the accepted seven-file
-   candidate, the retired goal/heartbeat entry is absent, the managed
-   APPEND_SYSTEM block is current, and the old project compatibility resources
-   are still present. Do not mutate the host user-global generation from the
-   episode worktree.
+5. Record exact commands, installed hashes, check output, merge identity,
+   rollback identity, and the ordinary-session fixture on `prime-claw-h6w.25`.
 
-A successful container apply does not prove the host loaded generation changed.
+Do not run those commands from this linked episode worktree. Do not commit or
+execute anything else in this episode after the first merge. Apply/check success
+means the installed bytes converged; it is not proof that loaded sessions use
+the new generation.
 
-### Slice completion
-
-- Record the exact commands, results, hashes, test log, and restart-ready
-  checkpoint in `prime-claw-h6w.25` and this plan.
-- Commit and push only the durable deployment-checkpoint/progress update.
-- Stop for owner review and operator restart coordination. Do not use `/reload`,
-  start cleanup, or attempt to restart the harness from the episode.
-
-## Cutover gate — Restart and verify the transition
-
-This is an owner/operator gate between implementation slices, not permission to
-start cleanup automatically.
+## Cutover gate — One restart and three resumed conversations
 
 ### Admission
 
-The owner reviews and accepts the exact pushed Slice 2 deployment checkpoint.
-The global check, installed hashes, rollback source, compatibility resources, and
-resumable episode identity must still match that checkpoint. Any drift returns
-to Slice 2 rather than being accepted informally.
+Before restart, the primary-main merge, user-global check, rollback record,
+compatibility files, exact episode identity, and ordinary-session identity must
+still match the landing receipt. Quiesce active turns, agents, tests, and
+heartbeats and durably checkpoint any necessary work. Drift returns to landing
+preflight.
 
 ### Coordinated restart
 
-- Let active turns, child agents, tests, heartbeats, and other background work
-  become idle or durably checkpointed.
-- Complete active goals that would otherwise imply work is still running.
-- The operator performs one full Prime Agent daemon/harness restart. Do not use
-  `/reload`, start a second daemon, or delete saved sessions.
-- Resume this owning conversation, the exact implementation episode, and the
-  exact ordinary saved conversation recorded in Slice 2. The ordinary session
-  must run from its recorded canonical project CWD and complete a real turn.
+- Perform one full Prime Agent daemon/harness restart. Do not use `/reload`,
+  start a second daemon, or delete saved sessions.
+- Resume the exact owning conversation.
+- Resume this exact episode using its unchanged session, branch, and worktree.
+  It is a UAT fixture only; no execute phase or code/document change is allowed.
+- Resume the pre-identified ordinary saved conversation from its recorded
+  canonical project CWD and complete a real turn.
 
 ### Required UAT evidence
 
 Collect evidence from the restarted single runtime plus the accepted container
 capture:
 
-- the owner conversation resumes with exact episode ownership intact;
-- the episode resumes with its bounded role, branch, worktree, and task intact;
-- an ordinary conversation completes a real turn without promotion or package
-  errors;
-- provider-context evidence contains one managed lean block, no newly injected
-  `prime-claw-oversee-episode-package`, and no legacy detailed work-control
+- the owner resumes with exact episode ownership intact;
+- the episode resumes with bounded role, branch, worktree, and task identity
+  intact, without performing work;
+- the ordinary conversation completes a real turn without promotion, package,
+  or missing-skill errors;
+- provider context contains one managed lean block, no newly injected
+  `prime-claw-oversee-episode-package`, and no retired detailed work-control
   overlay;
-- exact lifecycle state remains fail-closed and handoff/finalize authority has
-  not broadened;
-- goal/heartbeat behavior follows the lean managed protocol during a naturally
+- lifecycle state remains fail-closed and handoff/finalize authority has not
+  broadened;
+- goal/heartbeat behavior follows the lean managed protocol at a naturally
   occurring work/wait boundary; and
-- no session reports a missing oversight skill or requires `/reload` recovery.
+- no session requires `/reload` recovery.
 
-Do not launch an extra host Prime Agent process merely to obtain a cleaner probe.
-Use the running resumed sessions and the tier-1 provider capture. If evidence is
-insufficient, pause rather than violate the single-instance boundary.
+Record the restart and exact evidence on `prime-claw-h6w.25`. The operator must
+explicitly accept UAT before transition-episode finalization. Insufficient or
+ambiguous evidence pauses the cutover; it does not authorize extra probes or a
+second host process.
 
-Record the restart and UAT evidence on `prime-claw-h6w.25`. The operator must
-explicitly accept the cutover before the owner advances the episode to Slice 3.
+## Fail-closed rollback from primary main
 
-### Rollback on failure
+If apply/check, restart, or any required UAT result fails or is uncertain:
 
-If any required UAT fails:
+1. Stop the cutover and retain the compatibility skill, discovery link, and
+   reviewer profile everywhere.
+2. From primary `main`, create a normal history-preserving revert of the exact
+   first merge (`git revert -m 1 <transition-merge>`). Do not reset or rewrite
+   history.
+3. Push the revert and verify primary `main` is clean and synchronized. Its
+   source must now match the recorded known-good generation; otherwise stop for
+   operator review.
+4. From that clean synchronized primary checkout, run the known-good
+   generation's documented user-global apply/check path and verify the exact
+   installed hashes.
+5. Perform the same quiesce and one-full-restart discipline, then verify the
+   owner and ordinary saved conversation recover. Resume the episode only as
+   needed to prove bounded identity; do not execute more work there.
+6. Record the failure, revert commit, restored hashes, restart/recovery evidence,
+   and next decision on `prime-claw-h6w.25`.
 
-1. keep or restore all compatibility files;
-2. from clean `main` at `44d83db`, run the normal apply/check scripts to restore
-   the eight-file POC generation;
-3. perform the same quiesce and full-restart discipline;
-4. verify ordinary and owning sessions recover; and
-5. record the failure, evidence, and resumable checkpoint.
+Do not retry an uncertain lifecycle operation blindly, re-merge automatically,
+or begin cleanup after rollback.
 
-Do not begin cleanup and do not retry uncertain lifecycle operations blindly.
+## Transition episode finalization after accepted UAT
 
-## Slice 3 — Remove compatibility scaffolding and finish the official default
+After the operator explicitly accepts the three-conversation UAT:
 
-### Dependency
+1. Record the accepted cutover and stable primary-main commit on
+   `prime-claw-h6w.25`.
+2. Verify the episode branch and worktree still equal the exact first-merge
+   source tip and contain no post-merge change.
+3. From the owning conversation, carry out only the approved terminal
+   bookkeeping and session/worktree cleanup for this exact transition episode.
+   `finalize_spec_episode` remains location-only bookkeeping and follows
+   verified terminal work; it is not a merge or deletion command.
+4. Leave the compatibility skill, discovery link, reviewer profile, related
+   compatibility tests, and transition-era documentation on `main`.
+5. Complete any minimal main-only plan/archive or bead closure bookkeeping
+   required for the finished transition, without performing future cleanup or
+   changing installed plugin bytes.
+6. Verify `main`, Git remote state, beads, and the installed transition
+   generation are synchronized before reporting the transition complete.
 
-This slice is blocked until the operator's accepted cutover evidence is recorded
-in the bead and delivered to the episode as an approved in-scope continuation.
+The transition episode never receives a cleanup commit and is not reused for
+future implementation.
 
-### Capability delivered
+## Future cleanup stage — Separate review, episode, and second merge
 
-The final branch contains only the supported lean architecture and current
-policy. Compatibility files proven unnecessary are removed without affecting the
-already-restarted runtime, all gates pass again, and the candidate is ready for
-one final merge.
+Compatibility-resource removal and final documentation are a separate future
+product decision. The operator must first select an exact
+`.ralph/plans/future/<slug>` folder; this plan neither names nor creates one.
+The normal workflow then applies:
 
-### Implementation
+1. create and review the future specification;
+2. create and separately review its execution plan;
+3. explicitly promote it into a new episode, branch, and worktree;
+4. audit current nonhistorical references and remove only resources proven
+   compatibility-only;
+5. update final normative documentation and run that episode's full required
+   gates;
+6. obtain owner/operator acceptance; and
+7. land the cleanup through a later second merge.
 
-Start with a fresh nonhistorical reference audit. Expected removal candidates:
-
-- `.ralph/skills/oversee-episode/SKILL.md`;
-- `.agents/skills/oversee-episode`;
-- `.prime/agent/profiles/expert-reviewer.md` when no independent current use is
-  found;
-- `tests/test_oversee_episode_skill.py` and remaining compatibility-only package
-  assertions; and
-- transition-only wording or guards in current docs/tests.
-
-Do not remove an item with a real independent current use. Record the use and
-retain or replace it with an explicit current contract. Do not alter archived
-plans, historical reviews, dogfood reports, or evidence references.
-
-Finalize current docs so they describe the supported lean default rather than an
-active migration. Preserve a concise migration/rollback note where operationally
-useful. Confirm the plugin layout is seven TypeScript files plus the managed
-APPEND_SYSTEM block.
-
-Slice 3 should not change installed plugin bytes. If implementation discovers a
-necessary plugin-code or managed-system-block change, stop: that creates a new
-runtime generation and requires a revised plan plus another restart gate before
-cleanup can be considered safe.
-
-### Verification
-
-Run again from the episode worktree:
-
-```bash
-git diff --check
-scripts/test-all.sh
-scripts/test-tier1.sh --probe
-```
-
-Required results:
-
-- tier 0 and complete tier 1 pass;
-- no owned container or scratch artifact remains;
-- explicit container-root apply/check passes without the old skill or inert
-  extension source;
-- the container-installed managed TypeScript and APPEND_SYSTEM bytes are
-  unchanged from the accepted transition generation; and
-- the reference audit contains only intentional current legacy-filter names and
-  immutable historical mentions.
-
-If global managed bytes changed, the no-second-restart assumption is false. Stop
-and return to the owner before merge.
-
-### Slice completion
-
-- Update normative docs and this plan's progress/evidence.
-- Update `prime-claw-h6w.25` with cleanup evidence and leave it open pending the
-  operator's terminal decision, post-merge main/global verification, and owner
-  closure. Use a follow-up bead for any independently scoped defect.
-- Commit one cleanup/finalization change and push the episode branch.
-- Stop for owner review. Do not merge from the episode.
-
-## Owner final review and landing
-
-The owner reviews the exact final commit, diff, tests, docs, bead state, global
-byte-parity evidence, and cutover record. A fresh independent expert review is
-optional under the lean protocol and should be used if the owner judges that the
-migration risk or evidence warrants it.
-
-Only the operator decides to merge. After that merge is carried out, do not
-resume the episode for more work. The owning conversation completes landing from
-clean `main` in this order:
-
-1. `git pull --rebase` and verify the expected final commit is present.
-2. From the primary `main` checkout, deliberately activate and check the accepted
-   generation with `scripts/apply-prime-agent-plugin.sh --user-global` followed
-   by `scripts/check-prime-agent-plugin.sh --user-global`.
-3. Verify Slice 3 changed no managed plugin or system-prompt bytes from the
-   accepted transition. If it did, stop: another restart gate is required.
-4. Add the post-merge check and terminal disposition to `prime-claw-h6w.25`, then
-   close that bead.
-5. Run `bd sync`, commit and push any resulting tracked change if required, run
-   `git push`, and verify `git status` is clean and up to date with the remote.
-6. Only then call `finalize_spec_episode` for the exact retained future-folder
-   location and perform only the operator-approved session/worktree cleanup.
-
-An abandonment or failed merge follows the operator's explicit disposition and
-must not be reported as completed work or close the bead as successful.
+That future episode must retain or replace anything with an independent current
+use and preserve all historical artifacts. Any managed plugin or system-prompt
+byte change creates a new runtime generation and requires its own cutover plan.
 
 ## Progress and evidence
 
@@ -656,36 +618,63 @@ Update this section during execution; do not rely on chat history.
   Focused tier 0 also passed `9 passed, 12 deselected in 0.54s` at
   `.test-results/ol011/focused-tier0.log` (SHA256
   `345d5ef972159ac813ab8b9834124a8775a50bcfba9f257a50d5d460fb00c382`).
-  These focused receipts do not replace the pending exact-candidate full gate.
-- Final exact-candidate OL-009 receipts will be retained under
-  `.test-results/ol011-final/` after the replacement commit exists.
-  They must include raw tier-0/tier-1 output, exit status, command, elapsed time,
-  commit/tree and dependency SHA/selector, supersession map, and before/after
-  container/share teardown. The exact post-commit result and push receipt belong
-  on `prime-claw-h6w.25`; this pre-commit plan must not predict them.
+  These focused receipts did not replace the later complete exact-candidate
+  gate recorded below.
+- Failed and focused OL-011 receipts remain under `.test-results/ol011/` and
+  `.test-results/ol011-final/`. The accepted integrated-candidate receipt under
+  `.test-results/ol011-integrated-final/` records raw tier-0/tier-1 output, exit
+  status, command, elapsed time, commit/tree and dependency identity,
+  supersession mapping, and before/after container/share teardown. The exact
+  pushed candidate and receipt hashes are also durable on `prime-claw-h6w.25`.
 
-- Exact transition commit and push receipt remain pending in this pre-commit
-  record; the real SHA is recorded on `prime-claw-h6w.25` only after push.
+- Exact accepted candidate `615687aff1aa3549e986cc030073ee2539b836fe`
+  (tree `e23e1841fecadabf2f0d85269aeb4535ee2bb056`) is pushed and synchronized.
+  Canonical `scripts/test-all.sh` passed Tier 0 (`284 passed, 155 skipped`) and
+  complete selected Tier 1 (`48 passed, 391 deselected`). Structured receipt
+  `.test-results/ol011-integrated-final/exact-candidate-pass.json`, SHA256
+  `971e66f69108c1b66b0213d8603faa608d2594028b90d92d204b9be152f65588`.
+- Owner acceptance and independent final review PASS are recorded on
+  `prime-claw-h6w.25`. Review report
+  `/Users/jlanders/.prime/agent/session-artifacts/01a0f51d-d51b-7649-a28a-844879e42aec/sub-283381d7/official-lean-slice1-final-review-615687a.md`,
+  SHA256
+  `9fe07a62f2d8c5fcb8b1bd9a2fb45903cd2ec54ab8d09c02b05872bea9ef78db`.
+- This planning-only revision changes only the active specification and plan.
+  Its pushed commit identity and owner disposition belong on
+  `prime-claw-h6w.25` after the commit exists.
 
-- [ ] Slice 1 transition commit pushed; tier 0 and complete tier 1 pass.
-- [ ] Owner accepted the exact transition commit.
-- [ ] Exact ordinary saved session identified and proved before restart.
-- [ ] Candidate applied globally; seven-file check passed; rollback recorded.
-- [ ] Slice 2 deployment-checkpoint commit pushed.
-- [ ] Owner accepted the exact Slice 2 commit and installed-generation evidence.
+- [x] Slice 1 transition commit pushed; Tier 0 and complete Tier 1 pass.
+- [x] Owner accepted the exact transition commit.
+- [ ] Plan-only transition topology checkpoint pushed and owner accepted.
+- [ ] Operator authorized the first transition merge and cutover.
+- [ ] Exact ordinary saved conversation identified and proved before restart.
+- [ ] Known-good installed generation, merge parent, and rollback inputs recorded.
+- [ ] First no-fast-forward merge landed on synchronized primary `main` with
+      compatibility resources retained.
+- [ ] Main-only `--user-global` apply/check passed and exact hashes were recorded.
 - [ ] Active work quiesced and one coordinated full restart completed.
-- [ ] Resumed owner, episode, and exact ordinary-session UAT passed.
-- [ ] Operator accepted cutover and authorized cleanup continuation.
-- [ ] Slice 3 cleanup commit pushed; repeated gates and global byte parity pass.
-- [ ] Owner final review complete.
-- [ ] Operator terminal merge decision carried out.
-- [ ] Post-merge main/global check passed and `prime-claw-h6w.25` closed.
-- [ ] Beads and Git are synchronized; `main` is clean and up to date.
-- [ ] Exact episode bookkeeping finalized; approved cleanup completed.
+- [ ] Resumed owner, unchanged episode fixture, and exact ordinary conversation
+      UAT passed.
+- [ ] Operator accepted cutover.
+- [ ] Exact transition-episode bookkeeping and approved cleanup completed without
+      a post-merge episode change.
+- [ ] `prime-claw-h6w.25`, beads, Git, primary `main`, and the installed
+      transition generation reached their reviewed terminal state.
+
+Deferred outside this transition episode: compatibility-resource removal and
+final documentation cleanup. Those items receive no checkbox here because they
+require an operator-selected future folder, separate specification and plan
+reviews, a new episode/branch, and a later second merge.
 
 ## Explicit non-goals
 
 - Prime Agent source changes or upstream contribution work.
+- Any amendment or product-byte change to accepted candidate `615687a`.
+- Merge, host-global apply/check, restart, UAT, rollback, finalization, or
+  cleanup during this plan-only pass.
+- Compatibility-resource removal or final documentation cleanup in this
+  transition episode.
+- Naming or creating a future cleanup folder before operator selection.
+- Reusing this episode for implementation after the first merge.
 - A new oversight procedure, owner ledger, mandatory expert model, or fixed
   heartbeat interval.
 - Changes to episode promotion, handoff, merge, abandonment, or finalization

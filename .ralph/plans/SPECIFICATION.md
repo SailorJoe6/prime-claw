@@ -1,6 +1,6 @@
 # Future Specification — Official lean session protocol
 
-> **Status:** Active; accepted bounded unblock integrated, exact canonical gate pending
+> **Status:** Active; exact Slice 1 transition accepted, transition-first landing plan pending owner review
 >
 > **Scope:** Promote the dogfooded lean conversation/episode and goal/heartbeat
 > protocol from a reversible POC to Prime Claw's supported default without
@@ -8,24 +8,32 @@
 >
 > **Tracking:** `prime-claw-h6w.25`
 
-## Accepted bounded unblock
+## Accepted Slice 1 transition
 
-The accepted OL-011 test-only repair remains implemented at
-`6322a18e1bb921478a7d9e7c67a8eff4088481a3`. Its focused and complete selected
-Tier 1 evidence is green. Three canonical full-gate attempts were blocked only by
-the independently tracked Darwin watchdog defect `prime-claw-zwg.5.1`; those
-receipts remain durable and are not relabeled.
+The exact accepted Slice 1 candidate is
+`615687aff1aa3549e986cc030073ee2539b836fe` (tree
+`e23e1841fecadabf2f0d85269aeb4535ee2bb056`). It preserves the OL-011
+provider-`systemPrompt` proof, OL-008 isolation, all lifecycle safeguards, and
+the compatibility skill, discovery link, and reviewer profile. Its canonical
+`scripts/test-all.sh` run passed Tier 0 (`284 passed, 155 skipped`) and complete
+selected Tier 1 (`48 passed, 391 deselected`), with receipt
+`.test-results/ol011-integrated-final/exact-candidate-pass.json` (SHA256
+`971e66f69108c1b66b0213d8603faa608d2594028b90d92d204b9be152f65588`).
 
-The operator accepted the bounded unblock and authorized continuation. This
-episode integrated accepted `origin/main` through
-`eca48f8b284c990a8e030062ef70192313781b7f`, including watchdog/PATH repair
-`3bf905976a1a489d93e81619a838b34fc7ed8a31` and bead closures
-`927b3941ebab281c18ceacfc3c922f82e75db9fc`. The integration preserves the OL-011
-provider-`systemPrompt` proof and all compatibility resources. The resulting exact
-commit must rerun the complete canonical Tier 0/Tier 1 gate with correlatable
-receipts and teardown before owner review. This authority does not extend to
-host-global apply/check, Slice 2, restart, cleanup, merge, or deployment-topology
-changes.
+The owner accepted that exact commit after independent final review PASS. The
+review report is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0f51d-d51b-7649-a28a-844879e42aec/sub-283381d7/official-lean-slice1-final-review-615687a.md`
+(SHA256
+`9fe07a62f2d8c5fcb8b1bd9a2fb45903cd2ec54ab8d09c02b05872bea9ef78db`).
+The accepted implementation commit is immutable. A later planning-only commit
+may revise this specification and plan, but it must not change the accepted
+runtime, installer, managed-system-block, test, compatibility-resource, or
+normative-documentation bytes.
+
+The operator approved a transition-first landing topology for planning. That
+approval authorizes only a specification/plan checkpoint for review. It does not
+authorize merge, host-global apply/check, restart, UAT, rollback, episode
+finalization, compatibility cleanup, or creation of a future cleanup folder.
 
 ## Summary
 
@@ -131,42 +139,51 @@ is allowed.
 
 ## Compatibility and cutover requirements
 
-The implementation must expose two separately reviewable checkpoints:
+The transition and cleanup are now separate landings with separate reviewed
+episodes:
 
-1. **Transition checkpoint.** The complete official runtime and installer
-   behavior is testable and deployable, while every filesystem resource needed
-   by an already-loaded old generation remains present in the canonical
-   checkout and implementation worktree. At minimum this includes the old skill;
-   its discovery link and supporting profile also remain until the reference
-   audit proves they are compatibility-only.
-2. **Cleanup checkpoint.** Compatibility-only resources are removed only after
-   the transition generation is installed, one full Prime Agent daemon/harness
-   restart occurs, the exact owner and episode plus one pre-identified saved
-   ordinary project conversation resume successfully, and the operator accepts
-   the cutover evidence.
+1. **Accepted transition checkpoint.** The accepted seven-file transition is
+   commit `615687aff1aa3549e986cc030073ee2539b836fe`. The first merge lands that
+   transition, plus only reviewed planning state, onto synchronized primary
+   `main`. The compatibility skill, discovery link, and reviewer profile remain
+   present on both `main` and the episode worktree.
+2. **Main-only activation and cutover checkpoint.** After the first merge,
+   user-global apply/check runs only from a clean, synchronized primary `main`
+   checkout. One coordinated full Prime Agent restart then resumes and verifies
+   the exact owner conversation, this exact episode, and one pre-identified
+   ordinary saved project conversation. The operator must accept that UAT before
+   the transition episode is finalized.
+3. **Future cleanup checkpoint.** Compatibility-resource removal and final
+   documentation cleanup occur only in a separately reviewed future
+   specification, episode, branch, and later second merge. No future cleanup
+   folder is named or created until the operator selects it.
 
-`/reload`, elapsed time, file-copy success, or container evidence alone does not
-satisfy the runtime cutover. Saved conversations are resumed, not deleted. A
-failed cutover restores the known-good installed generation and compatibility
-resources before any cleanup.
+After the first merge, this episode's session, branch, and worktree remain
+unchanged solely as the exact post-restart UAT fixture. They receive no further
+implementation commit, planning commit, execute pass, or cleanup work. Merge is
+therefore not treated as proof that the episode can continue producing changes.
 
-The execution plan must keep compatibility files isolated from premature main
-checkout deletion, record exact rollback state, obey the one-host-daemon rule,
-and respect episode terminality. It may use separately pushed commits within one
-unmerged episode when that keeps the canonical checkout safe; it must not assume
-an episode continues after merge.
+`/reload`, elapsed time, file-copy success, a fresh probe, or container evidence
+alone does not satisfy cutover. Saved conversations are resumed, not deleted.
+Before activation, the landing record must identify the current known-good
+installed generation, its exact hashes or check receipt, the first merge commit
+and rollback parent, and the ordinary saved conversation selected for UAT.
 
-The isolation-first installer guard now refuses user-global activation from a
-linked episode worktree and permits it only from primary `main`. That conflicts
-with the previously planned unmerged transition install/restart/cleanup topology.
-Slice 1 remains independently reviewable, but no later deployment, early merge,
-terminality change, or cleanup topology is authorized until the owner/operator
-reviews a revised plan. The guard must not be bypassed to preserve the old plan.
+A failed activation or UAT fails closed from primary `main`: retain every
+compatibility resource, revert the exact first merge with a normal history-
+preserving revert commit, synchronize `main`, re-apply and check the known-good
+installed generation from that clean primary checkout, perform the same
+coordinated restart discipline, and verify recovery. No cleanup starts while
+rollback state is uncertain.
 
 ## Cleanup boundary
 
-After accepted cutover evidence, audit current nonhistorical references before
-removing:
+The transition episode does not remove compatibility resources. After accepted
+restart UAT, its only remaining work is verified terminal bookkeeping and the
+operator-approved session/worktree cleanup; its branch and worktree stay
+unchanged after the first merge.
+
+Only a later, separately approved future specification may audit and remove:
 
 - the project-local `oversee-episode` skill and discovery link;
 - a reviewer profile used only by that skill;
@@ -175,9 +192,11 @@ removing:
 - current documentation or names that still describe the lean default as
   temporary.
 
-Retain or replace any resource with an independent current use. Archived
-specifications, plans, reviews, dogfood reports, and immutable evidence keep
-their original historical descriptions.
+That future work must begin with a fresh nonhistorical reference audit, retain or
+replace anything with an independent current use, pass its own review and test
+gates, and land through a second merge. Archived specifications, plans, reviews,
+dogfood reports, and immutable evidence keep their original historical
+descriptions. This specification does not select or create the future folder.
 
 ## Verification requirements
 
@@ -222,36 +241,47 @@ would otherwise be false. Historical artifacts remain unchanged.
 
 ## Acceptance criteria
 
-The work is accepted only when:
+The transition work is accepted only when:
 
-1. the transition and cleanup checkpoints receive separate owner/operator
-   acceptance;
-2. the managed block is the sole model-facing protocol and stays within 250
-   normalized words;
-3. current runtime code has no old-skill read, parse, validation, or injection;
-4. historical full-package messages are still filtered;
-5. the separate goal/heartbeat extension is absent from the managed set and
-   safely removed/rejected by apply/check;
-6. exact lifecycle, bounded-role, handoff, authority, and finalization invariants
-   remain passing;
-7. compatibility resources remain available throughout the old-generation
-   window;
-8. one full coordinated restart plus resumed owner, episode, and exact saved
-   ordinary-session UAT proves the transition before cleanup;
-9. cleanup removes only resources proven compatibility-only and preserves
-   historical evidence;
-10. tier 0 and the complete tier-1 Docker gate pass with no owned test container
-    or scratch artifact left behind;
-11. the final global apply/check gate passes;
-12. current documentation describes the supported lean design;
-13. `prime-claw-h6w.25` records commands, results, cutover evidence, cleanup,
-    and rollback state; and
-14. both checkpoints are clean commits pushed for review, with final `main`
-    clean and synchronized after landing.
+1. exact Slice 1 candidate `615687aff1aa3549e986cc030073ee2539b836fe`
+   remains unchanged and its accepted evidence remains durable;
+2. the operator accepts the planning-only transition topology before landing;
+3. the first merge lands the accepted transition on synchronized primary
+   `main` while the compatibility skill, link, and profile remain present;
+4. this exact episode session, branch, and worktree remain unchanged after that
+   merge and are used only as the post-restart UAT fixture;
+5. the ordinary saved conversation is identified and proves a normal turn before
+   restart;
+6. rollback identifies the exact first merge, rollback parent, known-good
+   installed generation, and recovery verification before global mutation;
+7. user-global apply/check passes only from clean synchronized primary `main`;
+8. one coordinated full restart plus resumed owner, exact episode, and exact
+   ordinary-session UAT proves the transition;
+9. provider evidence still shows one lean managed block, no new oversight
+   package, and no retired detailed work-control overlay;
+10. lifecycle identity, authority, handoff, finalization, and goal/heartbeat
+    behavior remain fail-closed;
+11. failed cutover, if any, completes the specified history-preserving rollback
+    from `main` with compatibility resources retained;
+12. `prime-claw-h6w.25` records merge, activation, restart, UAT, rollback state,
+    and the operator's cutover decision;
+13. after accepted UAT, the transition episode is finalized and cleaned only as
+    explicitly authorized, without further branch changes; and
+14. primary `main` is clean and synchronized at every landing and terminal gate.
+
+Compatibility-resource removal and final documentation cleanup are deliberately
+not acceptance criteria for this transition episode. They require a separately
+reviewed future specification and episode and a later second merge.
 
 ## Out of scope
 
 - Prime Agent source or runtime changes.
+- Any change to accepted Slice 1 implementation or evidence bytes.
+- Host-global apply/check, merge, restart, UAT, rollback, or episode finalization
+  during the planning-only revision pass.
+- Compatibility-resource removal or final documentation cleanup in this
+  transition episode.
+- Naming or creating the future cleanup folder before operator selection.
 - Universal-agent orchestrator automation.
 - New episode product or merge authority.
 - Changes to reviewed specification/planning gates.
