@@ -91,14 +91,23 @@ function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPro
   return { commands, tools, events, ctx, messages, deliveries, notices, confirmations, entries };
 }
 
-function fixture(t, { skill = "canonical plan body", folder = true, throwOnSend = 0 } = {}) {
+function fixture(t, {
+  skill = "canonical plan body",
+  prepSkill = "canonical plan-prep body",
+  implementPrepSkill = "canonical implement-prep body",
+  folder = true,
+  throwOnSend = 0,
+  extension = reviewedPlan,
+} = {}) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, ".ralph", "plans", "future"), { recursive: true });
   if (folder) mkdirSync(join(cwd, LOCATION), { recursive: true });
+  if (prepSkill !== null) writeSkill(cwd, prepSkill, "plan-prep");
+  if (implementPrepSkill !== null) writeSkill(cwd, implementPrepSkill, "implement-prep");
   if (skill !== null) writeSkill(cwd, skill);
   mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
-  return { cwd, ...createHarness(cwd, reviewedPlan, throwOnSend) };
+  return { cwd, ...createHarness(cwd, extension, throwOnSend) };
 }
 
 function writeSkill(cwd, body, name = "plan") {
@@ -119,6 +128,45 @@ ${body}
 <operator-plan-location>
 ${location}
 </operator-plan-location>`;
+}
+
+function expectedPrepPrompt(cwd, body, location = LOCATION) {
+  const path = join(cwd, ".ralph", "skills", "plan-prep", "SKILL.md");
+  return `<skill name="plan-prep" location="${path}">
+References are relative to ${dirname(path)}.
+
+${body}
+</skill>
+
+<operator-plan-location>
+${location}
+</operator-plan-location>`;
+}
+
+function expectedImplementPrompt(cwd, body, location = LOCATION) {
+  const path = join(cwd, ".ralph", "skills", "implement-spec", "SKILL.md");
+  return `<skill name="implement-spec" location="${path}">
+References are relative to ${dirname(path)}.
+
+${body}
+</skill>
+
+<operator-implementation-location>
+${location}
+</operator-implementation-location>`;
+}
+
+function expectedImplementPrepPrompt(cwd, body, location = LOCATION) {
+  const path = join(cwd, ".ralph", "skills", "implement-prep", "SKILL.md");
+  return `<skill name="implement-prep" location="${path}">
+References are relative to ${dirname(path)}.
+
+${body}
+</skill>
+
+<operator-implementation-location>
+${location}
+</operator-implementation-location>`;
 }
 
 function count(haystack, needle) {
@@ -163,23 +211,32 @@ test("registers native reviewed commands, planning tool, and native-only impleme
   assert.doesNotMatch(handoffTool.description + handoffTool.promptGuidelines.join(" "), /only when the operator clearly asks|only operator-supplied/);
 });
 
-test("loads current canonical markdown and injects exact location once", async (t) => {
-  const f = fixture(t, { skill: "old body" });
+test("native planning admits plan-prep first and canonical plan as the sole follow-up", async (t) => {
+  const f = fixture(t, { skill: "old body", prepSkill: "old prep body" });
   writeSkill(f.cwd, "current project-customized plan body");
+  writeSkill(f.cwd, "current project-customized plan-prep body", "plan-prep");
 
   await f.commands.get("plan").handler(LOCATION, f.ctx);
 
-  const prompt = expectedPrompt(f.cwd, "current project-customized plan body");
-  assert.deepEqual(f.messages, [prompt]);
-  assert.deepEqual(f.deliveries, [{ message: prompt, options: undefined }]);
-  assert.equal(count(f.messages[0], "<operator-plan-location>"), 1);
-  assert.equal(count(f.messages[0], LOCATION), 1);
+  const prep = expectedPrepPrompt(f.cwd, "current project-customized plan-prep body");
+  const plan = expectedPrompt(f.cwd, "current project-customized plan body");
+  assert.deepEqual(f.messages, [prep, plan]);
+  assert.deepEqual(f.deliveries, [
+    { message: prep, options: undefined },
+    { message: plan, options: { deliverAs: "followUp" } },
+  ]);
+  assert.equal(f.deliveries.filter(({ options }) => options?.deliverAs === "followUp").length, 1);
+  for (const prompt of f.messages) {
+    assert.equal(count(prompt, "<operator-plan-location>"), 1);
+    assert.equal(count(prompt, LOCATION), 1);
+  }
   assert.deepEqual(f.notices, []);
 });
 
-test("conversational planning queues current canonical markdown once as a follow-up", async (t) => {
-  const f = fixture(t, { skill: "old body" });
+test("conversational planning steers plan-prep and queues canonical plan as the sole follow-up", async (t) => {
+  const f = fixture(t, { skill: "old body", prepSkill: "old prep body" });
   writeSkill(f.cwd, "current project-customized plan body");
+  writeSkill(f.cwd, "current project-customized plan-prep body", "plan-prep");
 
   const result = await f.tools.get("ralph_plan").execute(
     "plan-call-1",
@@ -189,19 +246,26 @@ test("conversational planning queues current canonical markdown once as a follow
     f.ctx,
   );
 
-  const prompt = expectedPrompt(f.cwd, "current project-customized plan body");
-  assert.deepEqual(f.messages, [prompt]);
-  assert.deepEqual(f.deliveries, [{
-    message: prompt,
-    options: { deliverAs: "followUp" },
-  }]);
-  assert.equal(count(f.messages[0], "<operator-plan-location>"), 1);
-  assert.equal(count(f.messages[0], LOCATION), 1);
+  const prep = expectedPrepPrompt(f.cwd, "current project-customized plan-prep body");
+  const plan = expectedPrompt(f.cwd, "current project-customized plan body");
+  assert.deepEqual(f.messages, [prep, plan]);
+  assert.deepEqual(f.deliveries, [
+    { message: prep, options: { deliverAs: "steer" } },
+    { message: plan, options: { deliverAs: "followUp" } },
+  ]);
+  assert.equal(f.deliveries.filter(({ options }) => options?.deliverAs === "followUp").length, 1);
+  for (const prompt of f.messages) {
+    assert.equal(count(prompt, "<operator-plan-location>"), 1);
+    assert.equal(count(prompt, LOCATION), 1);
+  }
   assert.equal(result.isError, undefined);
   assert.deepEqual(result.details, { admitted: true, location: LOCATION });
   assert.match(result.content[0].text, /Planning admitted/);
+  assert.match(result.content[0].text, /plan-prep was steered/);
+  assert.match(result.content[0].text, /sole follow-up/);
   assert.match(result.content[0].text, /has not completed/);
   assert.match(result.content[0].text, /implementation is not authorized/);
+  assert.doesNotMatch(result.content[0].text, /compaction (?:completed|confirmed)/i);
   assert.deepEqual(f.notices, []);
 
   const unauthorized = await f.tools.get("create_spec_episode").execute(
@@ -274,6 +338,19 @@ test("conversational planning rejects a resolved symlink escape", async (t) => {
   assert.deepEqual(f.messages, []);
 });
 
+test("conversational planning reports missing plan-prep before any send", async (t) => {
+  const f = fixture(t, { prepSkill: null });
+
+  const result = await f.tools.get("ralph_plan").execute(
+    "missing-prep", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /\.ralph\/skills\/plan-prep\/SKILL\.md not found/);
+  assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
+});
+
 test("conversational planning reports missing canonical skill", async (t) => {
   const f = fixture(t, { skill: null });
 
@@ -284,23 +361,44 @@ test("conversational planning reports missing canonical skill", async (t) => {
   assert.equal(result.isError, true);
   assert.match(result.content[0].text, /\.ralph\/skills\/plan\/SKILL\.md not found/);
   assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
 });
 
-test("conversational planning reports follow-up queue failure without claiming admission", async (t) => {
+test("conversational planning reports plan-prep admission failure", async (t) => {
   const f = fixture(t, { throwOnSend: 1 });
 
   const result = await f.tools.get("ralph_plan").execute(
-    "send-failure", { location: LOCATION }, undefined, undefined, f.ctx,
+    "prep-send-failure", { location: LOCATION }, undefined, undefined, f.ctx,
   );
 
   assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /canonical plan could not be queued/);
+  assert.match(result.content[0].text, /canonical plan-prep could not be admitted/);
   assert.deepEqual(result.details, {
     admitted: false,
-    error: "reviewed-plan: canonical plan could not be queued",
+    error: "reviewed-plan: canonical plan-prep could not be admitted",
   });
   assert.deepEqual(f.messages, []);
   assert.deepEqual(f.deliveries, []);
+});
+
+test("conversational planning reports plan follow-up failure without claiming admission", async (t) => {
+  const f = fixture(t, { throwOnSend: 2 });
+
+  const result = await f.tools.get("ralph_plan").execute(
+    "plan-send-failure", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+
+  const prep = expectedPrepPrompt(f.cwd, "canonical plan-prep body");
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /canonical plan follow-up could not be queued/);
+  assert.match(result.content[0].text, /transition is incomplete/);
+  assert.doesNotMatch(result.content[0].text, /Planning admitted/);
+  assert.deepEqual(result.details, {
+    admitted: false,
+    error: "reviewed-plan: canonical plan follow-up could not be queued; transition is incomplete",
+  });
+  assert.deepEqual(f.messages, [prep]);
+  assert.deepEqual(f.deliveries, [{ message: prep, options: { deliverAs: "steer" } }]);
 });
 
 test("missing argument shows usage without model injection", async (t) => {
@@ -346,13 +444,48 @@ test("nonexistent folder shows usage without model injection", async (t) => {
   assert.deepEqual(f.notices, [{ message: USAGE, level: "warning" }]);
 });
 
+test("missing plan-prep warns before native planning sends anything", async (t) => {
+  const f = fixture(t, { prepSkill: null });
+  await f.commands.get("plan").handler(LOCATION, f.ctx);
+  assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
+  assert.deepEqual(f.notices, [{
+    message: "reviewed-plan: .ralph/skills/plan-prep/SKILL.md not found",
+    level: "warning",
+  }]);
+});
+
 test("missing canonical skill warns without model injection", async (t) => {
   const f = fixture(t, { skill: null });
   await f.commands.get("plan").handler(LOCATION, f.ctx);
   assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
   assert.deepEqual(f.notices, [{
     message: "reviewed-plan: .ralph/skills/plan/SKILL.md not found",
     level: "warning",
+  }]);
+});
+
+test("native planning reports plan-prep admission failure", async (t) => {
+  const f = fixture(t, { throwOnSend: 1 });
+  await f.commands.get("plan").handler(LOCATION, f.ctx);
+  assert.deepEqual(f.messages, []);
+  assert.deepEqual(f.deliveries, []);
+  assert.deepEqual(f.notices, [{
+    message: "reviewed-plan: canonical plan-prep could not be admitted",
+    level: "error",
+  }]);
+});
+
+test("native planning reports plan follow-up failure after prep admission", async (t) => {
+  const f = fixture(t, { throwOnSend: 2 });
+  await f.commands.get("plan").handler(LOCATION, f.ctx);
+  const prep = expectedPrepPrompt(f.cwd, "canonical plan-prep body");
+  assert.deepEqual(f.messages, [prep]);
+  assert.deepEqual(f.deliveries, [{ message: prep, options: undefined }]);
+  assert.deepEqual(f.notices, [{
+    message: "reviewed-plan: canonical plan follow-up could not be queued; transition is incomplete",
+    level: "error",
   }]);
 });
 
@@ -364,24 +497,26 @@ test("multiple arguments show usage without model injection", async (t) => {
 });
 
 
-test("implement-spec loads current canonical markdown and wraps exact location once", async (t) => {
+test("implement-spec admits implement-prep first and canonical readiness as the sole follow-up", async (t) => {
   const f = fixture(t);
   const body = "project readiness policy";
-  const path = writeSkill(f.cwd, body, "implement-spec");
+  writeSkill(f.cwd, body, "implement-spec");
+  writeSkill(f.cwd, "project implementation prep", "implement-prep");
 
   await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
 
-  assert.deepEqual(f.messages, [`<skill name="implement-spec" location="${path}">
-References are relative to ${dirname(path)}.
-
-${body}
-</skill>
-
-<operator-implementation-location>
-${LOCATION}
-</operator-implementation-location>`]);
-  assert.equal(count(f.messages[0], "<operator-implementation-location>"), 1);
-  assert.equal(count(f.messages[0], LOCATION), 1);
+  const prep = expectedImplementPrepPrompt(f.cwd, "project implementation prep");
+  const implement = expectedImplementPrompt(f.cwd, body);
+  assert.deepEqual(f.messages, [prep, implement]);
+  assert.deepEqual(f.deliveries, [
+    { message: prep, options: undefined },
+    { message: implement, options: { deliverAs: "followUp" } },
+  ]);
+  assert.equal(f.deliveries.filter(({ options }) => options?.deliverAs === "followUp").length, 1);
+  for (const prompt of f.messages) {
+    assert.equal(count(prompt, "<operator-implementation-location>"), 1);
+    assert.equal(count(prompt, LOCATION), 1);
+  }
   assert.deepEqual(f.notices, []);
 });
 
@@ -410,11 +545,181 @@ test("invalid implement-spec input shows usage without model injection", async (
 });
 
 
+test("implement-spec fails closed on either missing skill without arming approval", async (t) => {
+  for (const missing of ["implement-prep", "implement-spec"]) {
+    let createCalls = 0;
+    const extension = createReviewedPlanExtension({
+      async createEpisode() { createCalls += 1; throw new Error("must stay unauthorized"); },
+    });
+    const f = fixture(t, {
+      implementPrepSkill: missing === "implement-prep" ? null : "implementation prep",
+      extension,
+    });
+    if (missing !== "implement-spec") {
+      writeSkill(f.cwd, "implementation readiness", "implement-spec");
+    }
+
+    await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+
+    assert.deepEqual(f.messages, []);
+    assert.deepEqual(f.deliveries, []);
+    assert.deepEqual(f.notices, [{
+      message: `reviewed-plan: .ralph/skills/${missing}/SKILL.md not found`,
+      level: "warning",
+    }]);
+    const denied = await f.tools.get("create_spec_episode").execute(
+      `missing-${missing}`, { location: LOCATION }, undefined, undefined, f.ctx,
+    );
+    assert.equal(denied.isError, true);
+    assert.match(denied.content[0].text, /no matching active \/implement-spec approval/);
+    assert.equal(createCalls, 0);
+  }
+});
+
+test("implement-spec transport failures never arm approval", async (t) => {
+  for (const throwOnSend of [1, 2]) {
+    let createCalls = 0;
+    const extension = createReviewedPlanExtension({
+      async createEpisode() { createCalls += 1; throw new Error("must stay unauthorized"); },
+    });
+    const f = fixture(t, { throwOnSend, extension });
+    writeSkill(f.cwd, "implementation readiness", "implement-spec");
+
+    await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+
+    const prep = expectedImplementPrepPrompt(f.cwd, "canonical implement-prep body");
+    assert.deepEqual(f.messages, throwOnSend === 1 ? [] : [prep]);
+    assert.deepEqual(f.notices, [{
+      message: throwOnSend === 1
+        ? "reviewed-plan: canonical implement-prep could not be admitted"
+        : "reviewed-plan: canonical implement-spec follow-up could not be queued; transition is incomplete",
+      level: "error",
+    }]);
+    await f.events.get("agent_end")({}, f.ctx);
+    const denied = await f.tools.get("create_spec_episode").execute(
+      `send-failure-${throwOnSend}`, { location: LOCATION }, undefined, undefined, f.ctx,
+    );
+    assert.equal(denied.isError, true);
+    assert.match(denied.content[0].text, /no matching active \/implement-spec approval/);
+    assert.equal(createCalls, 0);
+  }
+});
+
+test("implement approval survives one prep agent_end, stays exact, and is consumed on use", async (t) => {
+  let createCalls = 0;
+  const extension = createReviewedPlanExtension({
+    async createEpisode() {
+      createCalls += 1;
+      throw new Error("authorized episode capability reached");
+    },
+  });
+  const f = fixture(t, { extension });
+  writeSkill(f.cwd, "implementation readiness", "implement-spec");
+  const betaLocation = ".ralph/plans/future/beta-plan";
+  mkdirSync(join(f.cwd, betaLocation), { recursive: true });
+
+  await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+  const tooEarly = await f.tools.get("create_spec_episode").execute(
+    "before-prep-end", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+  assert.equal(tooEarly.isError, true);
+  assert.match(tooEarly.content[0].text, /no matching active \/implement-spec approval/);
+  assert.equal(createCalls, 0);
+
+  await f.events.get("agent_end")({}, f.ctx);
+
+  const wrong = await f.tools.get("create_spec_episode").execute(
+    "wrong-location", { location: betaLocation }, undefined, undefined, f.ctx,
+  );
+  assert.equal(wrong.isError, true);
+  assert.match(wrong.content[0].text, /no matching active \/implement-spec approval/);
+  assert.equal(createCalls, 0);
+
+  const authorized = await f.tools.get("create_spec_episode").execute(
+    "authorized", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+  assert.equal(authorized.isError, true);
+  assert.match(authorized.content[0].text, /authorized episode capability reached/);
+  assert.equal(createCalls, 1);
+
+  const replay = await f.tools.get("create_spec_episode").execute(
+    "consumed-replay", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+  assert.equal(replay.isError, true);
+  assert.match(replay.content[0].text, /no matching active \/implement-spec approval/);
+  assert.equal(createCalls, 1);
+});
+
+test("cancelled implement chain loses approval at the next agent_end after its one skip", async (t) => {
+  let createCalls = 0;
+  const extension = createReviewedPlanExtension({
+    async createEpisode() { createCalls += 1; throw new Error("must stay unauthorized"); },
+  });
+  const f = fixture(t, { extension });
+  writeSkill(f.cwd, "implementation readiness", "implement-spec");
+
+  await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+  await f.events.get("agent_end")({}, f.ctx); // prep turn: the sole bounded skip
+  await f.events.get("agent_end")({}, f.ctx); // next turn after cancellation
+
+  const denied = await f.tools.get("create_spec_episode").execute(
+    "cancelled-chain", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+  assert.equal(denied.isError, true);
+  assert.match(denied.content[0].text, /no matching active \/implement-spec approval/);
+  assert.equal(createCalls, 0);
+});
+
+test("repeated implement admissions still grant only one agent_end skip", async (t) => {
+  let createCalls = 0;
+  const extension = createReviewedPlanExtension({
+    async createEpisode() { createCalls += 1; throw new Error("must stay unauthorized"); },
+  });
+  const f = fixture(t, { extension });
+  writeSkill(f.cwd, "implementation readiness", "implement-spec");
+  const betaLocation = ".ralph/plans/future/beta-plan";
+  mkdirSync(join(f.cwd, betaLocation), { recursive: true });
+
+  await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+  await f.commands.get("implement-spec").handler(betaLocation, f.ctx);
+  await f.events.get("agent_end")({}, f.ctx);
+  await f.events.get("agent_end")({}, f.ctx);
+
+  const denied = await f.tools.get("create_spec_episode").execute(
+    "duplicate-admission", { location: betaLocation }, undefined, undefined, f.ctx,
+  );
+  assert.equal(denied.isError, true);
+  assert.match(denied.content[0].text, /no matching active \/implement-spec approval/);
+  assert.equal(createCalls, 0);
+});
+
+test("session start and shutdown clear implement approval without a skip", async (t) => {
+  for (const boundary of ["session_start", "session_shutdown"]) {
+    let createCalls = 0;
+    const extension = createReviewedPlanExtension({
+      async createEpisode() { createCalls += 1; throw new Error("must stay unauthorized"); },
+    });
+    const f = fixture(t, { extension });
+    writeSkill(f.cwd, "implementation readiness", "implement-spec");
+
+    await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+    await f.events.get(boundary)({}, f.ctx);
+
+    const denied = await f.tools.get("create_spec_episode").execute(
+      `boundary-${boundary}`, { location: LOCATION }, undefined, undefined, f.ctx,
+    );
+    assert.equal(denied.isError, true);
+    assert.match(denied.content[0].text, /no matching active \/implement-spec approval/);
+    assert.equal(createCalls, 0);
+  }
+});
+
 test("successful create activates exact owner oversight without an oversight skill or unsolicited message", async (t) => {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-activate-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, LOCATION), { recursive: true });
   writeSkill(cwd, "implementation readiness", "implement-spec");
+  writeSkill(cwd, "implementation prep", "implement-prep");
   mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
   let createCalls = 0;
   const episode = {
@@ -434,6 +739,7 @@ test("successful create activates exact owner oversight without an oversight ski
   });
   const f = createHarness(cwd, extension);
   await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+  await f.events.get("agent_end")({}, f.ctx);
   const before = f.messages.length;
   const result = await f.tools.get("create_spec_episode").execute(
     "activate-call", { location: LOCATION }, undefined, undefined, f.ctx,
@@ -613,6 +919,7 @@ test("fresh native implement-spec runs can sequentially arm different reviewed f
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, LOCATION), { recursive: true });
   writeSkill(cwd, "implementation readiness", "implement-spec");
+  writeSkill(cwd, "implementation prep", "implement-prep");
   mkdirSync(join(cwd, ".prime", "agent", "state", "spec-episodes"), { recursive: true });
   const dependencies = {
     git: { repositoryRoot() { throw new Error("authorized tool reached host capability"); } },
@@ -627,6 +934,7 @@ test("fresh native implement-spec runs can sequentially arm different reviewed f
   assert.match(unauthorized.content[0].text, /no matching active \/implement-spec approval/);
 
   await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+  await f.events.get("agent_end")({}, f.ctx);
   const authorized = await tool.execute("call-2", { location: LOCATION }, undefined, undefined, f.ctx);
   assert.equal(authorized.isError, true);
   assert.match(authorized.content[0].text, /authorized tool reached host capability/);
@@ -637,6 +945,7 @@ test("fresh native implement-spec runs can sequentially arm different reviewed f
   const betaLocation = ".ralph/plans/future/beta-plan";
   mkdirSync(join(cwd, betaLocation), { recursive: true });
   await f.commands.get("implement-spec").handler(betaLocation, f.ctx);
+  await f.events.get("agent_end")({}, f.ctx);
   const laterAuthorized = await tool.execute("call-4", { location: betaLocation }, undefined, undefined, f.ctx);
   assert.equal(laterAuthorized.isError, true);
   assert.match(laterAuthorized.content[0].text, /authorized tool reached host capability/);

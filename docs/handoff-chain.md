@@ -20,6 +20,11 @@ The mechanism is
 It automates only this narrow seam. It does not choose work, decide that an
 iteration is complete, or implement the episode orchestrator.
 
+The related [phase prep chain](prep-chain.md) applies the same compaction-first,
+queued-follow-up shape at the reviewed planning and implementation-promotion
+boundaries while keeping project-specific instructions in `plan-prep/SKILL.md`
+and `implement-prep/SKILL.md`.
+
 ## Entry contracts
 
 ### Native command
@@ -287,9 +292,10 @@ sole execute `followUp`, absence of prose or compaction admission hooks,
 late-signal safety, visible first- and second-send errors, legacy cleanup, and
 real offline command-and-tool loading.
 
-Run it with:
+Run it only through Docker tier 1:
 
 ```bash
-node --experimental-strip-types --test tests/handoff_chain_extension.test.mjs
-pytest -q tests/test_handoff_chain_extension.py
+python3 -m pytest tests/test_handoff_chain_extension.py -q -m container
+scripts/test-tier1.sh --probe
+scripts/test-all.sh
 ```

@@ -1,17 +1,18 @@
 # Execution Plan — Official lean session protocol
 
-> **Status:** Active; exact Slice 1 transition accepted, transition-first landing plan pending owner review
+> **Status:** Active; accepted transition and plan preserved, authorized main-integration refresh in progress
 >
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 >
 > **Tracking:** `prime-claw-h6w.25`
 >
-> **Execution shape:** The accepted Slice 1 transition lands first on primary
-> `main` with all compatibility resources retained. The existing episode then
-> becomes a read-only post-restart UAT fixture. User-global activation runs only
-> from synchronized primary `main`; accepted UAT finalizes this transition
-> episode. Compatibility removal and final documentation move to a separately
-> reviewed future episode and later second merge.
+> **Execution shape:** Exact remote `main`
+> `92887a40a0b83de2c89971b432e4853c49ab3ab5` is merged into the episode as
+> parent 2 of one normal history-preserving integration merge. After exact-
+> candidate review, primary `main` may fast-forward only from that verified
+> parent to the accepted merge. Compatibility resources remain throughout;
+> activation is main-only; accepted UAT finalizes this transition episode.
+> Compatibility removal remains a separate future episode and second merge.
 
 ## Accepted Slice 1 checkpoint and current authority
 
@@ -26,21 +27,29 @@ deselected`; structured receipt
 `.test-results/ol011-integrated-final/exact-candidate-pass.json`, SHA256
 `971e66f69108c1b66b0213d8603faa608d2594028b90d92d204b9be152f65588`.
 
-The owner accepted this exact commit after independent final review PASS. The
-accepted runtime, installer, managed-system-block, test, compatibility-resource,
-and normative-documentation bytes must not change. This plan-only pass may edit
-only `.ralph/plans/SPECIFICATION.md` and `.ralph/plans/EXECUTION_PLAN.md`, push
-one descendant planning checkpoint, and stop for owner review.
+The owner accepted this exact commit after independent final review PASS and
+then accepted planning-only descendant
+`62551620fb1d55581362392fbcd4e9936a61839d`. Both commits are immutable
+ancestors. The operator subsequently authorized one bounded execute pass to
+merge exact remote `main` `92887a40a0b83de2c89971b432e4853c49ab3ab5`
+into this episode, reconcile the recorded overlaps without weakening either
+side, run the complete canonical gate, push one exact candidate, and stop for
+owner review.
 
-The operator approved the transition-first topology described below for
-planning. That is not authority to merge, run host-global apply/check, restart,
-perform UAT or rollback, finalize or clean the episode, remove compatibility
-resources, or create a future cleanup folder during this pass.
+This integration authority does not authorize landing or modifying primary
+`main`, host-global apply/check, restart, UAT, rollback execution, finalization,
+compatibility cleanup, or a future cleanup folder. The resulting integration
+merge must preserve current-main compaction/prep-chain behavior, the eight-file
+managed generation and reviewed 246-word APPEND_SYSTEM bytes, OL-007/OL-011
+provider controls, OL-008 isolation, lifecycle behavior, and compatibility
+resources.
 
 ## Outcome
 
-Land the already accepted seven-file transition on primary `main` while every
-old-generation compatibility resource remains available. Activate and check it
+Produce one reviewed eight-file integration merge that joins the accepted
+transition and plan checkpoint to exact current `main` while every old-generation
+compatibility resource remains available. After separate acceptance, advance
+primary `main` only by fast-forwarding from the merge's verified parent 2. Activate and check it
 only from synchronized primary `main`, perform one coordinated full restart,
 and prove the exact owner, exact episode, and a pre-identified ordinary saved
 conversation on the restarted runtime. Fail closed to the known-good installed
@@ -69,68 +78,79 @@ the rollback input rather than assuming `44d83db` is still installed.
 The landing must preserve these invariants:
 
 1. No Prime Agent source change, upstream proposal, or concurrent host daemon.
-2. The accepted transition implementation and evidence remain byte-identical to
-   `615687aff1aa3549e986cc030073ee2539b836fe`.
+2. The accepted transition and plan commits remain immutable ancestors. Their
+   historical evidence remains byte-identical; merged current files may differ
+   only through the reviewed integration reconciliation.
 3. The compatibility skill, discovery link, and reviewer profile survive the
-   first merge, global activation, restart, UAT, and any rollback.
-4. After the first merge, the existing episode session, branch, and worktree are
-   unchanged and serve only as the exact UAT fixture. They receive no further
-   implementation commit, planning commit, execute pass, or cleanup work.
+   integration merge and landing, global activation, restart, UAT, and any rollback.
+4. After the accepted integration merge lands on primary `main`, the existing
+   episode session, branch, and worktree are unchanged and serve only as the
+   exact UAT fixture. They receive no further implementation commit, planning
+   commit, execute pass, or cleanup work.
 5. User-global apply/check runs only from a clean synchronized primary `main`
    checkout and always spells out `--user-global` while the transition
    generation is active.
-6. The first landing is a normal no-fast-forward merge with an exact merge
-   commit, so a failure can be reverted without rewriting history.
+6. The episode integration is one normal merge with parent 1 equal to accepted
+   plan checkpoint `6255162` and parent 2 equal to prelanding `main` `92887a4`.
+   Primary-main landing is fast-forward-only from verified parent 2 to that exact
+   accepted merge. Rollback preserves history with `git revert -m 2`.
 7. Cleanup never begins from merge or install success. It requires the one full
    restart, resumed-session evidence, explicit operator UAT acceptance, and a
    new separately reviewed future specification and episode.
 8. Archived plans, reviews, reports, and evidence are not rewritten.
-9. A failed cutover retains compatibility resources, reverts the exact first
-   merge on `main`, restores and checks the known-good installed generation from
+9. A failed cutover retains compatibility resources, verifies parent 2 and
+   reverts the exact integration merge on `main` with `-m 2`, then restores and
+   checks the known-good installed generation from
    clean synchronized `main`, and repeats the coordinated restart/recovery gate.
 
 ## Delivery topology
 
-The approved transition-first topology is:
+The approved integration-first topology is:
 
 ```text
 existing episode branch/worktree
   accepted transition 615687a
-  + reviewed plan-only checkpoint
+  accepted plan checkpoint 6255162 (parent 1)
           │
-          └── first no-ff merge ──> synchronized primary main
-                                     compatibility skill/link/profile retained
-                                               │
-                            preflight: ordinary saved conversation
-                            + installed hashes + exact rollback inputs
-                                               │
-                            apply/check --user-global from main only
-                                               │
-                               one coordinated full restart
-                                               │
-                  resume exact owner + exact episode + ordinary conversation
-                              │                              │
-                           UAT PASS                       UAT FAIL
-                              │                              │
-             operator accepts cutover          revert exact merge on main
-                              │                 restore known-good generation
-             finalize/clean transition         restart and verify recovery
-             episode; leave compat intact                 stop
-                              │
-       operator later selects a future spec folder
-                              │
-       separately reviewed cleanup episode/branch
-                              │
-                  later second merge
+          ├── normal merge exact main 92887a4 (parent 2)
+          │          eight-file generation + 246-word prompt
+          │          compatibility skill/link/profile retained
+          │
+          └── exact integration candidate → canonical Tier 0/Tier 1
+                                                │
+                                    owner/operator acceptance
+                                                │
+primary main still equals verified parent 2 ────┘
+          │
+          └── fast-forward-only landing to exact merge
+                       │
+           preflight + main-only apply/check
+                       │
+            one coordinated full restart
+                       │
+       owner + unchanged episode + ordinary UAT
+              │                         │
+           UAT PASS                  UAT FAIL
+              │                         │
+     finalize transition       git revert -m 2 merge
+     episode; keep compat      restore known-good; stop
+              │
+     separately reviewed future cleanup episode
+              │
+          later second merge
 ```
 
-The plan-only checkpoint is a descendant of the accepted implementation commit;
-it does not replace or amend that commit. The first merge may include that
-reviewed planning checkpoint, but the accepted implementation bytes must match
-`615687a`. Once the first merge completes, no work is committed in or executed
-from the episode again. The episode remains present only so the restarted
-runtime can resume the exact durable session against its exact branch/worktree
-identity.
+The integration merge preserves normal Git history and keeps both accepted
+commits as ancestors. Its parent order is contractual: episode checkpoint first,
+exact prelanding main second. The exact commit and tree are recorded after they
+exist on `prime-claw-h6w.25`; the tracked plan cannot self-name its own commit.
+Before landing, primary `main` must still equal parent 2. Any drift requires a new
+reviewed integration, not a rebase, force-push, or implicit merge.
+
+Once primary `main` fast-forwards to the accepted integration merge, no work is
+committed in or executed from this episode again. The episode remains present
+only so the restarted runtime can resume the exact durable session against its
+exact branch/worktree identity.
 
 The cleanup episode does not exist yet. Do not infer, name, or create its future
 folder. Its eventual second merge is independent of this transition episode and
@@ -332,46 +352,51 @@ landing stage. `prime-claw-blw.5` and `prime-claw-zwg.5.1` remained independent;
 the BLOCK report's distinct watchdog signature stayed in existing tracking
 rather than being folded into OL-011.
 
-## Landing stage — First merge and main-only activation
+## Landing stage — Accepted integration fast-forward and main-only activation
 
 ### Dependency and authority
 
-The owner must accept the exact pushed plan-only checkpoint before any landing
-step. The operator then separately authorizes the first merge and cutover. Plan
-approval alone does not authorize either action.
+The exact episode integration candidate must be pushed and accepted by the owner
+and operator before any primary-main landing step. Integration authority alone
+does not authorize landing, global activation, restart, UAT, rollback execution,
+or finalization.
 
-The accepted implementation remains
-`615687aff1aa3549e986cc030073ee2539b836fe`. Any product-code, plugin,
-installer, managed-system-block, test, compatibility-resource, or normative-doc
-drift returns to owner review rather than entering the landing flow.
+The accepted candidate must be the reviewed normal merge with exact parent order:
+parent 1 `62551620fb1d55581362392fbcd4e9936a61839d`, parent 2
+`92887a40a0b83de2c89971b432e4853c49ab3ab5`. Any later commit, changed parent,
+product drift, missing compatibility resource, or incomplete exact-candidate
+evidence returns to owner review.
 
-### Pre-merge admission
+### Pre-landing admission
 
 From the primary `main` checkout:
 
 1. Fetch and synchronize `main`; require a clean checkout and no other active
    landing operation.
-2. Verify `615687a` is an ancestor of the episode tip and that every change after
-   it is confined to the two reviewed active planning files.
-3. Reconfirm the compatibility skill, discovery link, and reviewer profile are
-   present and byte-current on both the episode tip and current `main`.
-4. Pre-identify one ordinary saved project conversation. Record its session ID,
+2. Verify local and remote `main` still equal the accepted integration merge's
+   second parent, exact `92887a40a0b83de2c89971b432e4853c49ab3ab5`.
+3. Verify the accepted integration merge has exactly the reviewed first and
+   second parents, contains both accepted commits as ancestors, and is a direct
+   descendant of parent 2 suitable for `--ff-only` landing.
+4. Reconfirm the compatibility skill, discovery link, and reviewer profile are
+   present and byte-current on both the integration candidate and current main.
+5. Pre-identify one ordinary saved project conversation. Record its session ID,
    name, canonical project CWD, and a successful normal turn on the current
    single daemon. If no suitable conversation exists, stop for operator input.
-5. Record the exact currently installed known-good generation and its hashes or
-   successful check receipt. Confirm the rollback input can restore it without
-   deleting compatibility resources.
-6. Record the pre-merge `main` commit, accepted episode tip, and exact planned
-   no-fast-forward merge command. If the merge would include anything outside
-   the accepted transition and reviewed plans, stop.
+6. Record the exact currently installed known-good generation and its hashes or
+   successful check receipt. Confirm rollback can restore it without deleting
+   compatibility resources.
+7. Record the exact integration merge, its verified parent 2, and the planned
+   `git merge --ff-only <integration-merge>` command. Any drift stops landing.
 
-### First merge and activation
+### Fast-forward landing and activation
 
-1. Create one normal no-fast-forward merge of the accepted episode tip into
-   primary `main`; do not squash, rebase, or amend the accepted candidate.
-2. Verify the resulting merge contains the accepted implementation bytes, the
-   reviewed planning checkpoint, and all compatibility resources. Record the
-   exact merge commit and first parent used by rollback.
+1. Advance primary `main` only with `git merge --ff-only` from verified parent 2
+   to the exact accepted integration merge. Do not create another merge, squash,
+   rebase, cherry-pick, amend, reset, or force-push.
+2. Verify the landed commit is the exact accepted merge, its parent 2 is the
+   recorded prelanding main commit, the eight-file generation and 246-word
+   managed prompt are intact, and every compatibility resource remains.
 3. Push `main` and verify local/remote equality and a clean working tree.
 4. From that synchronized primary `main` checkout only, run:
 
@@ -380,13 +405,13 @@ From the primary `main` checkout:
    scripts/check-prime-agent-plugin.sh --user-global
    ```
 
-5. Record exact commands, installed hashes, check output, merge identity,
-   rollback identity, and the ordinary-session fixture on `prime-claw-h6w.25`.
+5. Record exact commands, installed hashes, check output, merge and parent
+   identities, `-m 2` rollback identity, and the ordinary-session fixture on
+   `prime-claw-h6w.25`.
 
 Do not run those commands from this linked episode worktree. Do not commit or
-execute anything else in this episode after the first merge. Apply/check success
-means the installed bytes converged; it is not proof that loaded sessions use
-the new generation.
+execute anything else in this episode after primary-main landing. Apply/check
+success proves installed-byte convergence, not the loaded generation.
 
 ## Cutover gate — One restart and three resumed conversations
 
@@ -438,12 +463,13 @@ If apply/check, restart, or any required UAT result fails or is uncertain:
 
 1. Stop the cutover and retain the compatibility skill, discovery link, and
    reviewer profile everywhere.
-2. From primary `main`, create a normal history-preserving revert of the exact
-   first merge (`git revert -m 1 <transition-merge>`). Do not reset or rewrite
+2. Verify the exact integration merge still has prelanding `main` as parent 2,
+   then create a normal history-preserving revert with
+   `git revert -m 2 <integration-merge>`. Do not use `-m 1`, reset, or rewrite
    history.
-3. Push the revert and verify primary `main` is clean and synchronized. Its
-   source must now match the recorded known-good generation; otherwise stop for
-   operator review.
+3. Push the revert and verify primary `main` is clean and synchronized. The
+   reverted source must match verified parent 2 plus the recorded known-good
+   generation contract; otherwise stop for operator review.
 4. From that clean synchronized primary checkout, run the known-good
    generation's documented user-global apply/check path and verify the exact
    installed hashes.
@@ -462,7 +488,7 @@ After the operator explicitly accepts the three-conversation UAT:
 
 1. Record the accepted cutover and stable primary-main commit on
    `prime-claw-h6w.25`.
-2. Verify the episode branch and worktree still equal the exact first-merge
+2. Verify the episode branch and worktree still equal the exact integration-merge
    source tip and contain no post-merge change.
 3. From the owning conversation, carry out only the approved terminal
    bookkeeping and session/worktree cleanup for this exact transition episode.
@@ -503,6 +529,28 @@ byte change creates a new runtime generation and requires its own cutover plan.
 ## Progress and evidence
 
 Update this section during execution; do not rely on chat history.
+
+### Authorized current-main integration refresh
+
+- Exact remote main `92887a40a0b83de2c89971b432e4853c49ab3ab5` was fetched and
+  merged normally into accepted episode checkpoint
+  `62551620fb1d55581362392fbcd4e9936a61839d`; the resulting merge uses episode
+  as parent 1 and prelanding main as parent 2. The exact merge commit/tree are
+  recorded on `prime-claw-h6w.25` after they exist.
+- Six recorded overlap areas are reconciled: `docs/README.md`, apply/check
+  inventories, reviewed-plan Node coverage, installer inventory coverage, and
+  native reviewed-plan discovery. Current-main compaction/prep-chain semantics
+  and the new `extension-support/prep-chain.ts` remain, while OL-007/OL-011
+  provider user/system assertions, OL-008 isolation, lifecycle behavior, and
+  no-skill operation remain.
+- The current managed source is eight TypeScript files; APPEND_SYSTEM is the
+  reviewed 246-word version. The compatibility skill, discovery link, and
+  reviewer profile remain present.
+- Complete canonical Tier 0/Tier 1 exact-candidate receipts, dependency identity,
+  raw hashes, supersession mapping, elapsed time, and teardown are recorded on
+  the tracking bead after the committed candidate passes.
+- No host-global apply/check, primary-main landing, restart, UAT, compatibility
+  cleanup, episode finalization, rebase, or force-push is part of this pass.
 
 ### Slice 1 transition evidence
 
@@ -644,12 +692,14 @@ Update this section during execution; do not rely on chat history.
 
 - [x] Slice 1 transition commit pushed; Tier 0 and complete Tier 1 pass.
 - [x] Owner accepted the exact transition commit.
-- [ ] Plan-only transition topology checkpoint pushed and owner accepted.
-- [ ] Operator authorized the first transition merge and cutover.
+- [x] Plan-only transition topology checkpoint pushed and owner accepted.
+- [x] Operator authorized bounded episode-side integration of exact `92887a4`.
+- [ ] Exact integration merge, full canonical receipts, push, and owner acceptance.
+- [ ] Operator separately authorized primary-main landing and cutover.
 - [ ] Exact ordinary saved conversation identified and proved before restart.
 - [ ] Known-good installed generation, merge parent, and rollback inputs recorded.
-- [ ] First no-fast-forward merge landed on synchronized primary `main` with
-      compatibility resources retained.
+- [ ] Primary `main` fast-forwarded from verified merge parent 2 to the exact
+      accepted integration merge with compatibility resources retained.
 - [ ] Main-only `--user-global` apply/check passed and exact hashes were recorded.
 - [ ] Active work quiesced and one coordinated full restart completed.
 - [ ] Resumed owner, unchanged episode fixture, and exact ordinary conversation
@@ -668,13 +718,13 @@ reviews, a new episode/branch, and a later second merge.
 ## Explicit non-goals
 
 - Prime Agent source changes or upstream contribution work.
-- Any amendment or product-byte change to accepted candidate `615687a`.
-- Merge, host-global apply/check, restart, UAT, rollback, finalization, or
-  cleanup during this plan-only pass.
+- Rewriting or amending accepted commits `615687a` or `6255162`, or historical evidence bytes.
+- Primary-main landing, host-global apply/check, restart, UAT, rollback
+  execution, finalization, or cleanup during this integration-refresh pass.
 - Compatibility-resource removal or final documentation cleanup in this
   transition episode.
 - Naming or creating a future cleanup folder before operator selection.
-- Reusing this episode for implementation after the first merge.
+- Reusing this episode for implementation after the accepted integration merge lands on primary `main`.
 - A new oversight procedure, owner ledger, mandatory expert model, or fixed
   heartbeat interval.
 - Changes to episode promotion, handoff, merge, abandonment, or finalization

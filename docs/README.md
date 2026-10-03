@@ -36,11 +36,15 @@ prime-claw builds on four prior projects. Read these before designing:
 - [handoff-chain.md](handoff-chain.md) — the Phase 4a native `/handoff` →
   focused compaction → next-skill transition, its legacy Ralph-loop lineage,
   marker lifecycle, regression tests, evidence, and short-session recovery.
+- [prep-chain.md](prep-chain.md) — the compaction-first planning and
+  implementation-promotion boundaries: project-owned prep policy, fail-closed
+  two-skill preflight, deterministic admission ordering, one-deep approval
+  survival, and best-effort compaction semantics.
 - [future-specification-bundles.md](future-specification-bundles.md) — operator
   walkthrough for reviewed future-folder authoring, native `/plan`, explicit
   `/implement-spec` promotion, unresolved admission handling, validation scope,
   and archived design provenance.
-- [lab-global-plugin.md](lab-global-plugin.md) — the supported seven-file
+- [lab-global-plugin.md](lab-global-plugin.md) — the supported eight-file
   managed plugin layout, staged deployment, full-restart cutover, and rollback.
 - [conversation-driven-episode-oversight.md](conversation-driven-episode-oversight.md)
   — the lean managed session protocol, deterministic lifecycle mechanics,

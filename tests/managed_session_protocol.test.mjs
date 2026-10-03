@@ -12,6 +12,7 @@ const expected = [
   "extension-support/conversation-oversight.ts",
   "extension-support/episode-close.ts",
   "extension-support/handoff-prompts.ts",
+  "extension-support/prep-chain.ts",
   "extension-support/reviewed-plan-support.ts",
   "extension-support/spec-episode.ts",
 ];
@@ -20,7 +21,7 @@ test("managed APPEND_SYSTEM owns the lean session and work-control protocol", ()
   const source = readFileSync(join(managed, "APPEND_SYSTEM.md"), "utf8").trim().split(/\s+/).join(" ");
   for (const phrase of [
     "one reviewable vertical slice at a time",
-    "Use the canonical handoff protocol",
+    "MUST use the canonical handoff protocol command",
     "maintain a goal so interrupted work resumes",
     "establish a heartbeat for that exact wait and complete the goal",
     "When waiting for the user, complete the goal and create no heartbeat",
@@ -29,7 +30,7 @@ test("managed APPEND_SYSTEM owns the lean session and work-control protocol", ()
   assert.ok(source.split(" ").length <= 250);
 });
 
-test("managed plugin is the seven-file generation without retired transports", () => {
+test("managed plugin is the eight-file generation without retired transports", () => {
   for (const relative of expected) assert.equal(existsSync(join(managed, relative)), true, relative);
   assert.equal(existsSync(join(managed, "extensions/goal-heartbeat-work-control.ts")), false);
   assert.equal(existsSync(join(managed, "extensions/goal-blocker-control.ts")), false);

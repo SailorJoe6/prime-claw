@@ -6,7 +6,7 @@
 
 ## Source and installed layouts
 
-The builder source is deliberately inert and contains seven managed TypeScript
+The builder source is deliberately inert and contains eight managed TypeScript
 files plus one managed APPEND_SYSTEM block:
 
 ```text
@@ -19,13 +19,14 @@ src/prime-agent-plugin/
     conversation-oversight.ts
     episode-close.ts
     handoff-prompts.ts
+    prep-chain.ts
     reviewed-plan-support.ts
     spec-episode.ts
 ```
 
 The installed copy preserves that inner layout under `~/.prime/agent/`. Prime
 Agent auto-discovers the two installed extension entry points; their relative
-imports resolve through the five installed `extension-support/` files.
+imports resolve through the six installed `extension-support/` files.
 
 Do not keep plugin source or a second copy under this repository's or a managed
 project's `.prime/agent/extensions/` path. Cross-scope duplicate discovery can
@@ -69,7 +70,7 @@ of two target modes:
    refused; the conspicuous flag is required. Tier 1 may use that same path
    inside Docker because the container filesystem is the isolation boundary.
 
-Apply copies only the seven allowlisted TypeScript files. It treats these former
+Apply copies only the eight allowlisted TypeScript files. It treats these former
 managed paths as retired:
 
 - `extensions/goal-heartbeat-work-control.ts`;

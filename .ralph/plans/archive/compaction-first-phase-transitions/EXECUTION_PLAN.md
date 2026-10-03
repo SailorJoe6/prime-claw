@@ -1,6 +1,6 @@
 # Execution Plan — Compaction-first phase transitions
 
-> **Status:** DRAFT — pending operator plan review.
+> **Status:** ARCHIVED — Slice 1 accepted at exact `200be5744003ac47cecd2d79a337df3e4c4aeebc`; Slice 2 accepted at exact replacement `c4de0a89c84aa02f1035f0f3f6ed4bc838223949` (runtime predecessor `94e4488ade82e1a2a8ce74cf956993870759d1f3`). Joe explicitly deferred the unrun post-candidate operator dogfood to `prime-claw-h6w.28`.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md)
 > **Future folder:** `.ralph/plans/future/compaction-first-phase-transitions/`
 > **Bead chain:** `prime-claw-h6w.26` (Slice 1) → `prime-claw-h6w.27` (Slice 2),
@@ -105,6 +105,12 @@ internals. Prime Agent remains an upstream dependency.
 
 **Bead:** `prime-claw-h6w.26`
 
+**Implementation status:** Owner-accepted at exact pushed commit
+`200be5744003ac47cecd2d79a337df3e4c4aeebc` on 2026-10-02. Its dependency gate
+for Slice 2 was satisfied. Slice 2 was later owner-accepted at documentation
+replacement `c4de0a89c84aa02f1035f0f3f6ed4bc838223949`, with runtime predecessor
+`94e4488ade82e1a2a8ce74cf956993870759d1f3`.
+
 ### Working capability
 
 `/plan <folder>` and the `ralph_plan` tool admit a `plan-prep` turn first.
@@ -167,6 +173,50 @@ envelope content, and the queued plan prompt are byte-identical to today.
 - `docs/prep-chain.md` updated in the same commit; bead `prime-claw-h6w.26`
   updated with commit and evidence.
 
+### Candidate evidence (2026-10-02)
+
+The earlier host/user-global apply, check, startup, and behavioral-probe claims
+from candidate `ef9c401` are superseded and are not acceptance evidence. The
+rebased candidate was validated only in Docker tier 1:
+
+- Rebased onto `origin/main` `f85680f`, which contains accepted authority tip
+  `ded4a8c` and guardrail implementation `672be3b`.
+- Focused tier-0 policy/bridge checks: 22 passed, 7 environment-skipped.
+- `python3 -m pytest tests/ -q -m container`: 41 passed, 385 deselected;
+  11 existing deprecation warnings.
+- Container behavioral test
+  `test_container_installed_native_plan_runs_prep_then_one_plan_followup`
+  loaded `/root/.prime/agent/extensions/reviewed-plan.ts`, executed one real
+  container-local `compact.run()` call with truthful `scheduled: false`, saw
+  exactly one `plan-prep` prompt and one canonical `plan` prompt, emitted one
+  completion marker, and exited without an unexpected model call. Its Python
+  runtime bootstrap used `PRIME_AGENT_INSTALL_UV=1` inside the ephemeral
+  container only.
+- `scripts/test-tier1.sh --probe`: PASS with pinned Prime Agent `0.9.3`;
+  explicit-root apply/check succeeded at `/root/.prime/agent`, `handoff`,
+  `plan`, and `implement-spec` were each discovered exactly once from the
+  container-installed extension tree, and the container was destroyed.
+- `scripts/test-all.sh`: PASS — tier 0 had 278 passed and 148 skipped; tier 1
+  had 41 passed and 385 deselected; tier 2 was intentionally not requested.
+  One preceding final-tree attempt hit two unrelated timing-sensitive
+  `test_embedding_candidate_build.py` watchdog tests; a bounded isolated check
+  passed one and reproduced one, and the single bounded unified rerun passed
+  without changing watchdog code.
+- No resumed candidate validation applied, checked, or probed the host
+  user-global `~/.prime/agent`. The ignored local `.env` selected pinned
+  Prime Agent `0.9.3` and is not part of the candidate.
+
+### Owner acceptance (2026-10-02)
+
+The project conversation accepted exact pushed commit
+`200be5744003ac47cecd2d79a337df3e4c4aeebc` and closed
+`prime-claw-h6w.26`. Fresh EXPERT `expert-reviewer-compaction-slice1-200be574`
+(session `01a0fe94-c76e-7044-9d6a-892fffcde77f`, Astra/max) returned PASS;
+the preserved report is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0fdbc-eaa1-75cb-a44b-86787dfeb048/expert-review-slice1-200be574.md`.
+This acceptance authorizes only the already-approved Slice 2. It is not merge
+approval and does not expand scope.
+
 ### Explicit non-goals
 
 No `/implement-spec` changes (Slice 2), no guidance argument, no bespoke
@@ -175,8 +225,9 @@ hint authoring, no queue-cancellation capability, no retries, no changes to
 
 ## Slice 2 — Compaction-first `/implement-spec` and the approval-token fix
 
-**Bead:** `prime-claw-h6w.27` — **Depends on:** Slice 1 accepted by the
-project conversation.
+**Bead:** `prime-claw-h6w.27` — **Dependency satisfied:** Slice 1 was
+owner-accepted at exact commit `200be5744003ac47cecd2d79a337df3e4c4aeebc` and
+`prime-claw-h6w.26` is closed.
 
 ### Working capability
 
@@ -209,23 +260,109 @@ cancelled chain leaves no usable approval beyond the next `agent_end`.
   deletes; `session_start`/`session_shutdown` still clear; a cancelled chain
   (no implement-spec turn) leaves the approval dead after the next
   `agent_end`; `create_spec_episode` without any admission still fails.
-- A live probe through `scripts/run-prime-agent-probe.sh` proves the full
-  chain on installed Prime Agent: prep turn, requested compaction, exactly
-  one implement-spec turn, successful episode creation (or its truthful
-  existing-identity return), empty queue at end.
-- Plugin apply/check + fresh startup probe, same as Slice 1.
+- A container behavioral probe against the tier-1 installed Prime Agent proves
+  the full chain: prep turn, requested compaction, exactly one implement-spec
+  turn, successful episode creation (or its truthful existing-identity return),
+  and an empty queue at exit.
+- Explicit container-root apply/check plus the tier-1 startup probe pass, same
+  as Slice 1. No candidate validation touches the host user-global generation.
 - Run the same focused and full suites as Slice 1; `git diff --check`.
 - Bead `prime-claw-h6w.27` updated with commit and evidence.
+
+### Implementation checkpoint (2026-10-02)
+
+- Added project-local `.ralph/skills/implement-prep/SKILL.md`; it owns the
+  cheap bundle sniff, fixed owner-supervision hint, exactly-once
+  `compact.run(focus_hint)` request, and bounded Status / Evidence / Next Step
+  report.
+- Routed native `/implement-spec` through the shared two-message prep chain.
+  Both project-local skills and the existing conversation-promotion boundary
+  preflight before either message; approval is recorded only after both sends
+  and remains unusable until the prep turn's `agent_end` consumes its skip.
+- Replaced the per-session location string with exact location plus one
+  non-accumulating `agent_end` skip. The prep end consumes the skip; the next
+  end clears unused authority. Consume-on-use, `session_start`, and
+  `session_shutdown` remain clearing boundaries.
+- Added positive, wrong-location, missing-skill, partial-send, cancellation,
+  repeated-admission, lifecycle-clear, consume/replay, and fresh-rearm Node
+  coverage plus an installed-container native `/implement-spec` behavioral
+  probe that requires exactly one observed intervening `agent_end` before its
+  controlled episode creation succeeds.
+- Updated `docs/prep-chain.md`, `docs/future-specification-bundles.md`, the docs
+  index, and the handoff-chain cross-reference.
+
+### Candidate evidence (2026-10-02)
+
+- Focused tier-0 policy/documentation checks: 23 passed, 8 container tests
+  deselected.
+- Container node bridge for the reviewed-plan suite: PASS.
+- Installed-container native `/implement-spec` behavioral probe: PASS; one
+  `implement-prep`, one canonical `implement-spec`, one real container-local
+  `compact.run()` call, exactly one observed intervening `agent_end`, one
+  authorized controlled episode creation, and no unexpected model call.
+- Updated native-discovery activation/lifecycle fixtures: 2 focused container
+  tests passed through the two-turn chain.
+- Independent static review: PASS after one blocking finding was repaired by
+  making approval unusable before the prep-turn `agent_end` and adding the
+  matching regression.
+- `python3 -m pytest tests/ -q -m container`: 42 passed, 386 deselected;
+  11 existing deprecation warnings.
+- `scripts/test-tier1.sh --probe`: PASS with pinned Prime Agent `0.9.3`;
+  explicit-root apply/check succeeded at `/root/.prime/agent`, `handoff`, `plan`,
+  and `implement-spec` each registered exactly once, and the container was
+  destroyed.
+- `scripts/test-all.sh`: PASS — tier 0 had 279 passed and 149 skipped;
+  tier 1 had 42 passed and 386 deselected; tier 2 was intentionally not
+  requested.
+- No candidate validation applied, checked, or probed the host user-global
+  `~/.prime/agent`. The ignored local `.env` selected pinned Prime Agent
+  `0.9.3` and is not part of the candidate.
 
 ### Explicit non-goals
 
 No conversational `/implement-spec` tool (none exists; `create_spec_episode`
-is not an entry surface and is unchanged), no turn-start re-arm unless
+remains not an entry surface, and its signature and episode-resource behavior
+are unchanged beyond the planned approval gate), no turn-start re-arm unless
 Decision 1 is falsified by probe, no changes to the episode fork's existing
 handoff-first compaction, no multi-project template installation (universal
 agent's job, Phase 4 narrative).
 
 ## Final review and delivery gate
+
+**Current gate disposition:** DEFERRED. Both planned slices are owner-accepted,
+and Joe explicitly selected deferral of the unrun post-candidate operator
+end-to-end dogfood to `prime-claw-h6w.28` on 2026-10-02. That P1 Bead remains
+BLOCKED on separate merge authorization and deliberate post-merge activation
+from primary `main`; it is not completed dogfood evidence.
+
+This explicit separately tracked deferral matches the prior
+`prime-claw-h6w.15` archival precedent and satisfies this episode's disposition
+requirement. Final docs-only archival records that disposition; it does not
+claim dogfood completion, merge readiness, activation, merge, or episode cleanup.
+
+### Post-acceptance integration rebase (2026-10-03)
+
+The finalized branch was rebased without conflicts from integration base
+`f85680fc87cb4985b84f1650c8ab866ab94733b6` onto current `origin/main`
+`eca48f8b284c990a8e030062ef70192313781b7f`. Original hashes remain the exact
+owner-review provenance above; `git range-diff` reported all six commits as
+patch-equivalent (`=`):
+
+| Reviewed commit | Rebased equivalent | Purpose |
+|---|---|---|
+| `b9c7c4b9821d07278153e50f5dfbf2b26575a67e` | `a88f0803f1bb1d41a1243f5f20c800f345db745f` | specification promotion |
+| `200be5744003ac47cecd2d79a337df3e4c4aeebc` | `e93240aa0dc458203b16c171b5dc5a45525f97b4` | accepted Slice 1 |
+| `94e4488ade82e1a2a8ce74cf956993870759d1f3` | `d7963b28b78afd446878abfa19d54c4315049992` | Slice 2 runtime |
+| `c4de0a89c84aa02f1035f0f3f6ed4bc838223949` | `6fc2bb44f943393241b0dbc2164df8f122bab605` | accepted Slice 2 replacement |
+| `90482d8fd454003319030d0f0f0304d1af66b983` | `fae0daf4a5c2a64c3060dc6c2ff15d88e84c893d` | terminal checkpoint |
+| `b1953ac556328df1e627dc9d578da53df64f5058` | `445ca79b38ccccc79ca857eaaa8d3bf1d575bb34` | final archive |
+
+Reconciliation evidence on rebased archive `445ca79b`: focused checks 27 passed /
+11 skipped; `scripts/test-tier1.sh --probe` PASS using a session-local selector
+for pinned Prime Agent `0.9.3`; `scripts/test-all.sh` PASS with tier 0 at 287
+passed / 149 skipped and tier 1 at 42 passed / 394 deselected. The initial gate
+attempt stopped before testing because the linked worktree lacked its ignored
+`.env`; it is not acceptance evidence. No host user-global plugin was touched.
 
 After both slices land, the operator dogfoods end-to-end: a real `/plan` on
 a real reviewed specification and a real `/implement-spec` promotion, with
@@ -239,8 +376,8 @@ the episode; per-slice acceptance follows the execute protocol.
 - Slice 2 depends on Slice 1 (shared helper and established seam evidence).
 - No Prime Agent changes. Prime Agent is an upstream dependency; any
   capability gap is reported to the operator, never patched upstream.
-- Live probes require the installed Prime Agent and
-  `scripts/run-prime-agent-probe.sh` isolation.
+- Live probes require the tier-1 container-installed Prime Agent. Candidate
+  probes never load or mutate the host user-global generation.
 
 ## Explicit non-goals (plan-wide)
 

@@ -47,7 +47,7 @@ authoritative.
 ## Retired extension migration
 
 `src/prime-agent-plugin/extensions/goal-heartbeat-work-control.ts` is retired and
-absent from the seven-file managed source set. The older
+absent from the eight-file managed source set. The older
 `extensions/goal-blocker-control.ts` is also absent. Apply/check treat both as
 retired managed destinations:
 
@@ -88,7 +88,7 @@ Coverage proves:
 
 - the managed block contains the required goal/heartbeat rules and stays within
   its 250-word bound;
-- the managed plugin has exactly seven TypeScript files and no retired source,
+- the managed plugin has exactly eight TypeScript files and no retired source,
   overlay sentinel, pause/resume tool, or autonomous slash-command transport;
 - installer migration removes a stale regular retired entry, rejects unsafe
   destination types before mutation, preserves unrelated files, and converges;

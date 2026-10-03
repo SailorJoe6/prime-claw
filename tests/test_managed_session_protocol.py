@@ -19,6 +19,7 @@ EXPECTED_TYPESCRIPT = {
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
     "extension-support/handoff-prompts.ts",
+    "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
     "extension-support/spec-episode.ts",
 }
@@ -38,7 +39,7 @@ def test_lean_append_system_owns_session_and_work_control_semantics() -> None:
         "An independent top-level project session is a CONVERSATION",
         "supervises it rather than doing its implementation",
         "one reviewable vertical slice at a time",
-        "Use the canonical handoff protocol",
+        "MUST use the canonical handoff protocol command",
         "maintain a goal so interrupted work resumes",
         "establish a heartbeat for that exact wait and complete the goal",
         "When waiting for the user, complete the goal and create no heartbeat",
@@ -49,7 +50,7 @@ def test_lean_append_system_owns_session_and_work_control_semantics() -> None:
     assert len(source.split()) <= 250
 
 
-def test_managed_plugin_has_seven_files_and_no_retired_work_control_transport() -> None:
+def test_managed_plugin_has_eight_files_and_no_retired_work_control_transport() -> None:
     actual = {
         str(path.relative_to(MANAGED_SOURCE))
         for path in MANAGED_SOURCE.rglob("*.ts")
