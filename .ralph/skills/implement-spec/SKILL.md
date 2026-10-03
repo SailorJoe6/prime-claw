@@ -50,5 +50,5 @@ replay returns that identity without redelivering. Do not begin implementation
 in the owner conversation.
 
 Once the tool reports success, the owner conversation begins its separately
-configured oversight workflow. Stop without implementing or invoking
-`/handoff`.
+configured oversight workflow. Set up a heartbeat to monitor your sibling. Then
+stop without implementing or invoking `/handoff`.
