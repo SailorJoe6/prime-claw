@@ -1,6 +1,7 @@
 # Compaction-First Phase Transitions (`/plan`, `/implement-spec`)
 
 > Status: APPROVED, IMPLEMENTED, AND ARCHIVED — Slice 1 accepted at exact `200be5744003ac47cecd2d79a337df3e4c4aeebc`; Slice 2 accepted at exact replacement `c4de0a89c84aa02f1035f0f3f6ed4bc838223949` (runtime predecessor `94e4488ade82e1a2a8ce74cf956993870759d1f3`). Joe explicitly deferred the unrun post-candidate operator dogfood to blocked post-merge Bead `prime-claw-h6w.28`; this is not completed dogfood evidence.
+> Integration: The original exact review hashes are preserved as provenance. Their patch-equivalent post-acceptance rebase map onto `origin/main` `eca48f8b284c990a8e030062ef70192313781b7f` is recorded in [EXECUTION_PLAN.md](EXECUTION_PLAN.md).
 > Source: design conversation between Joe and prime-agent, 2026-10-01.
 
 ## Summary

@@ -30,6 +30,12 @@ matches the `prime-claw-h6w.15` precedent and is not completed dogfood evidence.
 This archive does not claim merge readiness, host-global activation, merge,
 episode cleanup, or any product-scope change.
 
+Post-acceptance integration rebased the six reviewed commits onto `origin/main`
+`eca48f8b284c990a8e030062ef70192313781b7f`. The original review hashes remain
+acceptance provenance; their patch-equivalent rebased hashes are recorded in the
+archived execution plan. The rebased archive commit is
+`445ca79b38ccccc79ca857eaaa8d3bf1d575bb34`.
+
 ## plugin-test-container/ — Test tier architecture + tier-1 plugin test container ✅ COMPLETE (2026-09-30)
 
 Delivered the three-tier test architecture and the tier-1 plugin test container

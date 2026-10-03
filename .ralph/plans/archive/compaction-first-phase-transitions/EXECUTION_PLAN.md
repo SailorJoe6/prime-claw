@@ -340,6 +340,30 @@ This explicit separately tracked deferral matches the prior
 requirement. Final docs-only archival records that disposition; it does not
 claim dogfood completion, merge readiness, activation, merge, or episode cleanup.
 
+### Post-acceptance integration rebase (2026-10-03)
+
+The finalized branch was rebased without conflicts from integration base
+`f85680fc87cb4985b84f1650c8ab866ab94733b6` onto current `origin/main`
+`eca48f8b284c990a8e030062ef70192313781b7f`. Original hashes remain the exact
+owner-review provenance above; `git range-diff` reported all six commits as
+patch-equivalent (`=`):
+
+| Reviewed commit | Rebased equivalent | Purpose |
+|---|---|---|
+| `b9c7c4b9821d07278153e50f5dfbf2b26575a67e` | `a88f0803f1bb1d41a1243f5f20c800f345db745f` | specification promotion |
+| `200be5744003ac47cecd2d79a337df3e4c4aeebc` | `e93240aa0dc458203b16c171b5dc5a45525f97b4` | accepted Slice 1 |
+| `94e4488ade82e1a2a8ce74cf956993870759d1f3` | `d7963b28b78afd446878abfa19d54c4315049992` | Slice 2 runtime |
+| `c4de0a89c84aa02f1035f0f3f6ed4bc838223949` | `6fc2bb44f943393241b0dbc2164df8f122bab605` | accepted Slice 2 replacement |
+| `90482d8fd454003319030d0f0f0304d1af66b983` | `fae0daf4a5c2a64c3060dc6c2ff15d88e84c893d` | terminal checkpoint |
+| `b1953ac556328df1e627dc9d578da53df64f5058` | `445ca79b38ccccc79ca857eaaa8d3bf1d575bb34` | final archive |
+
+Reconciliation evidence on rebased archive `445ca79b`: focused checks 27 passed /
+11 skipped; `scripts/test-tier1.sh --probe` PASS using a session-local selector
+for pinned Prime Agent `0.9.3`; `scripts/test-all.sh` PASS with tier 0 at 287
+passed / 149 skipped and tier 1 at 42 passed / 394 deselected. The initial gate
+attempt stopped before testing because the linked worktree lacked its ignored
+`.env`; it is not acceptance evidence. No host user-global plugin was touched.
+
 After both slices land, the operator dogfoods end-to-end: a real `/plan` on
 a real reviewed specification and a real `/implement-spec` promotion, with
 observed compaction (or truthful `scheduled: false`) at both boundaries and
