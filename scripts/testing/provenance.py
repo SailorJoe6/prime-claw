@@ -6,21 +6,26 @@ source content, credentials, endpoint values, or operator-local paths.
 """
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
 import re
 import secrets
+import sys
 import shutil
 import stat
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
 SCHEMA_VERSION = 2
 COMMAND_CONTRACT_VERSION = "tier1-v2"
+MAX_EVIDENCE_BYTES = 16 * 1024 * 1024
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _IMAGE_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -41,6 +46,78 @@ _FORBIDDEN_VALUES = (
 
 class ProvenanceError(ValueError):
     """The evidence is incomplete, unsafe, stale, or malformed."""
+
+
+@dataclass(frozen=True)
+class ObjectBinding:
+    dev: int
+    ino: int
+    mode_type: int
+
+    @classmethod
+    def from_stat(cls, value: os.stat_result) -> "ObjectBinding":
+        return cls(value.st_dev, value.st_ino, stat.S_IFMT(value.st_mode))
+
+    @classmethod
+    def decode(cls, raw: str) -> "ObjectBinding":
+        if not re.fullmatch(r"[0-9]+:[0-9]+:[0-9]+", raw):
+            raise ProvenanceError("invalid object binding")
+        return cls(*(int(part) for part in raw.split(":")))
+
+    def encode(self) -> str:
+        return f"{self.dev}:{self.ino}:{self.mode_type}"
+
+
+@dataclass
+class OwnedDirectory:
+    path: Path                 # diagnostic only; descendants use fd
+    fd: int
+    binding: ObjectBinding
+    parent_fd: int | None = None
+    name: str | None = None
+
+    def close(self) -> None:
+        if self.fd >= 0:
+            os.close(self.fd)
+            self.fd = -1
+        if self.parent_fd is not None and self.parent_fd >= 0:
+            os.close(self.parent_fd)
+            self.parent_fd = None
+
+    def __enter__(self) -> "OwnedDirectory":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.close()
+
+
+def open_owned_directory(
+    path: Path | str,
+    binding: str | ObjectBinding,
+    *,
+    retain_parent: bool = False,
+) -> OwnedDirectory:
+    """Open every path component without following links and prove binding."""
+    root = Path(os.path.abspath(path))
+    expected = ObjectBinding.decode(binding) if isinstance(binding, str) else binding
+    parent_fd = None
+    fd = None
+    try:
+        if retain_parent:
+            fd, parent_fd, name = _open_root_fd(root, retain_parent=True)
+        else:
+            fd = _open_root_fd(root)
+            name = root.name or None
+        observed = ObjectBinding.from_stat(os.fstat(fd))
+        if observed != expected or observed.mode_type != stat.S_IFDIR:
+            raise ProvenanceError("owned directory binding changed; refusing access")
+        return OwnedDirectory(root, fd, expected, parent_fd, name)
+    except BaseException:
+        if fd is not None:
+            os.close(fd)
+        if parent_fd is not None:
+            os.close(parent_fd)
+        raise
 
 
 def utc_now() -> str:
@@ -145,40 +222,354 @@ def image_identity(raw: dict[str, Any], *, expected_id: str,
     return safe
 
 
-def write_sanitized_json(path: Path | str, value: Any) -> None:
-    """Validate a bounded JSON value before writing it durably."""
+def artifact_identity(version: str, raw: bytes | str) -> dict[str, str]:
+    """Validate one sha256sum observation before constructing safe metadata."""
+    try:
+        text = raw.decode("utf-8", "strict") if isinstance(raw, bytes) else raw
+    except UnicodeDecodeError as exc:
+        raise ProvenanceError("installed artifact observation has unknown encoding") from exc
+    observed_version = parse_prime_agent_version(version)
+    lines = text.splitlines()
+    if len(lines) != 1:
+        raise ProvenanceError("installed artifact observation is invalid")
+    match = re.fullmatch(r"([0-9a-f]{64})[ \t]+\*?[^\r\n]+", lines[0])
+    if match is None:
+        raise ProvenanceError("installed artifact observation is invalid")
+    safe = {"kind": "vendor-binary", "version": observed_version,
+            "executable_sha256": match.group(1)}
+    _assert_sanitized(safe)
+    return safe
+
+
+def _rename_with_flags(
+    source_fd: int, source: str, target_fd: int, target: str, flag: int,
+) -> None:
+    """Use the platform atomic rename primitive; never emulate it."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    source_b = os.fsencode(source)
+    target_b = os.fsencode(target)
+    try:
+        if sys.platform.startswith("linux"):
+            call = libc.renameat2
+            call.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int,
+                             ctypes.c_char_p, ctypes.c_uint]
+        elif sys.platform == "darwin":
+            call = libc.renameatx_np
+            call.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int,
+                             ctypes.c_char_p, ctypes.c_uint]
+        else:
+            raise ProvenanceError("atomic rename flags are unavailable")
+    except AttributeError as exc:
+        raise ProvenanceError("atomic rename flags are unavailable") from exc
+    call.restype = ctypes.c_int
+    if call(source_fd, source_b, target_fd, target_b, flag) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), target)
+
+
+def _rename_noreplace(source_fd: int, source: str,
+                      target_fd: int, target: str) -> None:
+    # Linux RENAME_NOREPLACE=1; Darwin RENAME_EXCL=4.
+    _rename_with_flags(source_fd, source, target_fd, target,
+                       1 if sys.platform.startswith("linux") else 4)
+
+
+def _rename_exchange(source_fd: int, source: str,
+                     target_fd: int, target: str) -> None:
+    # Linux RENAME_EXCHANGE and Darwin RENAME_SWAP are both 2.
+    _rename_with_flags(source_fd, source, target_fd, target, 2)
+
+
+def _write_all(fd: int, payload: bytes) -> None:
+    view = memoryview(payload)
+    while view:
+        written = os.write(fd, view)
+        if written <= 0:
+            raise ProvenanceError("short evidence write")
+        view = view[written:]
+
+
+def _read_fd_bytes(fd: int, *, label: str) -> bytes:
+    os.lseek(fd, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = os.read(fd, min(1024 * 1024, MAX_EVIDENCE_BYTES + 1 - total))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > MAX_EVIDENCE_BYTES:
+            raise ProvenanceError(f"{label} is too large")
+    return b"".join(chunks)
+
+
+def _publication_directory_fd(root: OwnedDirectory) -> int:
+    created = None
+    try:
+        os.mkdir(".publication", 0o700, dir_fd=root.fd)
+        created = ObjectBinding.from_stat(os.stat(
+            ".publication", dir_fd=root.fd, follow_symlinks=False))
+        os.fsync(root.fd)
+    except FileExistsError:
+        pass
+    try:
+        fd = os.open(
+            ".publication",
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=root.fd,
+        )
+    except OSError as exc:
+        raise ProvenanceError("publication namespace is unsafe") from exc
+    observed = os.fstat(fd)
+    if created is not None and ObjectBinding.from_stat(observed) != created:
+        os.close(fd)
+        raise ProvenanceError("publication namespace changed while opened")
+    if not stat.S_ISDIR(observed.st_mode) or stat.S_IMODE(observed.st_mode) & 0o077:
+        os.close(fd)
+        raise ProvenanceError("publication namespace is not private")
+    return fd
+
+
+def _stage_owned_bytes(root: OwnedDirectory, payload: bytes) -> tuple[int, str, ObjectBinding]:
+    publication_fd = _publication_directory_fd(root)
+    stage = f"stage-{secrets.token_hex(16)}"
+    stage_fd = None
+    try:
+        stage_fd = os.open(
+            stage,
+            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0),
+            0o600,
+            dir_fd=publication_fd,
+        )
+        _write_all(stage_fd, payload)
+        os.fsync(stage_fd)
+        binding = ObjectBinding.from_stat(os.fstat(stage_fd))
+        if binding.mode_type != stat.S_IFREG:
+            raise ProvenanceError("staged evidence is not a regular file")
+        return publication_fd, stage, binding
+    except BaseException:
+        os.close(publication_fd)
+        raise
+    finally:
+        if stage_fd is not None:
+            os.close(stage_fd)
+
+
+def _verify_published_bytes(parent_fd: int, name: str,
+                            binding: ObjectBinding, payload: bytes) -> None:
+    fd = None
+    try:
+        fd = os.open(
+            name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        observed = ObjectBinding.from_stat(os.fstat(fd))
+        if observed != binding or observed.mode_type != stat.S_IFREG:
+            raise ProvenanceError("published evidence binding changed")
+        if _read_fd_bytes(fd, label="published evidence") != payload:
+            raise ProvenanceError("published evidence bytes changed")
+    except OSError as exc:
+        raise ProvenanceError("published evidence is unsafe or unavailable") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _publish_owned_bytes(root: OwnedDirectory, relative: str | Path,
+                         payload: bytes) -> ObjectBinding:
+    """Atomically publish one new file without replacing any target."""
+    parent_fd, name = _open_created_parent_fd(root.fd, relative)
+    publication_fd = None
+    try:
+        publication_fd, stage, binding = _stage_owned_bytes(root, payload)
+        try:
+            _rename_noreplace(publication_fd, stage, parent_fd, name)
+        except FileExistsError as exc:
+            raise ProvenanceError(f"refusing to overwrite evidence: {name}") from exc
+        _verify_published_bytes(parent_fd, name, binding, payload)
+        os.fsync(parent_fd)
+        os.fsync(root.fd)
+        return binding
+    except OSError as exc:
+        if exc.errno == errno.EEXIST:
+            raise ProvenanceError(f"refusing to overwrite evidence: {name}") from exc
+        raise ProvenanceError("atomic evidence publication failed") from exc
+    finally:
+        if publication_fd is not None:
+            os.close(publication_fd)
+        os.close(parent_fd)
+
+
+def write_sanitized_json(root: OwnedDirectory, relative: str | Path,
+                         value: Any) -> ObjectBinding:
+    """Validate and create one sanitized JSON file below a live capability."""
     _assert_sanitized(value)
-    target = Path(path)
-    if target.exists() or target.is_symlink():
-        raise ProvenanceError(f"refusing to overwrite evidence: {target.name}")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    payload = canonical_json(value)
-    with target.open("x", encoding="utf-8") as fh:
-        fh.write(payload)
-        fh.flush()
-        os.fsync(fh.fileno())
+    _verify_owned_public_name(root)
+    published = _publish_owned_bytes(
+        root, relative, canonical_json(value).encode("utf-8"))
+    _verify_owned_public_name(root)
+    return published
 
-def allocate_run_tree(results_root: Path | str, tier: str) -> tuple[str, Path]:
-    """Atomically allocate `.test-results/<run-id>/<tier>/`.
 
-    The random token and exclusive mkdir make concurrent processes safe. The
-    returned run id contains no host/user identity.
-    """
+def read_sanitized_json(root: OwnedDirectory, relative: str | Path) -> Any:
+    parent_fd, name = _open_parent_fd(root, relative)
+    try:
+        raw = _read_evidence_file(parent_fd, name, str(PurePosixPath(relative)))
+    finally:
+        os.close(parent_fd)
+    try:
+        value = json.loads(raw.decode("utf-8", "strict"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ProvenanceError("sanitized JSON is unreadable") from exc
+    _assert_sanitized(value)
+    return value
+
+
+def _directory_open_flags() -> int:
+    return (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+
+
+def _verify_owned_public_name(root: OwnedDirectory) -> None:
+    check_fd = None
+    try:
+        if root.parent_fd is not None and root.name is not None:
+            check_fd = os.open(
+                root.name, _directory_open_flags(), dir_fd=root.parent_fd)
+        else:
+            check_fd = _open_root_fd(root.path)
+        if ObjectBinding.from_stat(os.fstat(check_fd)) != root.binding:
+            raise ProvenanceError("owned directory public binding changed")
+    except (OSError, ProvenanceError) as exc:
+        if (isinstance(exc, ProvenanceError)
+                and str(exc) == "owned directory public binding changed"):
+            raise
+        raise ProvenanceError("owned directory public binding changed") from exc
+    finally:
+        if check_fd is not None:
+            os.close(check_fd)
+
+
+def _create_owned_directory_child(
+    parent: OwnedDirectory, name: str, *, mode: int = 0o700,
+) -> OwnedDirectory:
+    if not name or name in {".", ".."} or "/" in name:
+        raise ProvenanceError("invalid owned directory name")
+    stage = f".prime-claw-directory-{secrets.token_hex(16)}"
+    fd = None
+    try:
+        os.mkdir(stage, mode, dir_fd=parent.fd)
+        created = ObjectBinding.from_stat(os.stat(
+            stage, dir_fd=parent.fd, follow_symlinks=False))
+        fd = os.open(stage, _directory_open_flags(), dir_fd=parent.fd)
+        binding = ObjectBinding.from_stat(os.fstat(fd))
+        if binding != created:
+            raise ProvenanceError(
+                "owned directory changed while it was opened")
+        _rename_noreplace(parent.fd, stage, parent.fd, name)
+        owned = OwnedDirectory(
+            parent.path / name, fd, binding, os.dup(parent.fd), name)
+        fd = None
+        try:
+            _verify_owned_public_name(parent)
+            _verify_owned_public_name(owned)
+            os.fsync(parent.fd)
+            return owned
+        except BaseException:
+            owned.close()
+            raise
+    except OSError as exc:
+        raise ProvenanceError("owned directory publication failed") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _open_or_create_results_root(path: Path | str) -> OwnedDirectory:
+    """Bind an existing root or publish one exact newly-created directory."""
+    root = Path(os.path.abspath(path))
+    if root == Path("/"):
+        fd = _open_root_fd(root)
+        binding = ObjectBinding.from_stat(os.fstat(fd))
+        return OwnedDirectory(root, fd, binding)
+    parent_fd = None
+    parent_parent_fd = None
+    try:
+        parent_fd, parent_parent_fd, parent_name = _open_root_fd(
+            root.parent, retain_parent=True)
+        parent_binding = ObjectBinding.from_stat(os.fstat(parent_fd))
+        parent = OwnedDirectory(
+            root.parent, parent_fd, parent_binding,
+            parent_parent_fd, parent_name)
+        parent_fd = None
+        parent_parent_fd = None
+        with parent:
+            _verify_owned_public_name(parent)
+            try:
+                fd = os.open(root.name, _directory_open_flags(), dir_fd=parent.fd)
+            except FileNotFoundError:
+                return _create_owned_directory_child(
+                    parent, root.name, mode=0o755)
+            binding = ObjectBinding.from_stat(os.fstat(fd))
+            owned = OwnedDirectory(
+                root, fd, binding, os.dup(parent.fd), root.name)
+            try:
+                _verify_owned_public_name(parent)
+                _verify_owned_public_name(owned)
+            except BaseException:
+                owned.close()
+                raise
+            return owned
+    except OSError as exc:
+        raise ProvenanceError("results root is unsafe or unavailable") from exc
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
+        if parent_parent_fd is not None:
+            os.close(parent_parent_fd)
+
+
+def allocate_run_tree(results_root: Path | str, tier: str) -> tuple[str, Path, str]:
+    """Allocate run/tier descendants below one retained results-root fd."""
     if not re.fullmatch(r"[a-z][a-z0-9-]*", tier):
         raise ProvenanceError(f"invalid tier name: {tier!r}")
-    root = Path(results_root)
-    root.mkdir(parents=True, exist_ok=True)
-    for _ in range(32):
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        run_id = f"{stamp}-{os.getpid()}-{secrets.token_hex(4)}"
-        run_root = root / run_id
-        try:
-            run_root.mkdir(mode=0o755)
-        except FileExistsError:
-            continue
-        tier_dir = run_root / tier
-        tier_dir.mkdir(mode=0o755)
-        return run_id, tier_dir
+    with _open_or_create_results_root(results_root) as root:
+        for _ in range(32):
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            run_id = f"{stamp}-{os.getpid()}-{secrets.token_hex(4)}"
+            try:
+                os.mkdir(run_id, 0o755, dir_fd=root.fd)
+            except FileExistsError:
+                continue
+            run_fd = None
+            tier_fd = None
+            try:
+                run_fd = os.open(run_id, _directory_open_flags(), dir_fd=root.fd)
+                run_binding = ObjectBinding.from_stat(os.fstat(run_fd))
+                os.mkdir(tier, 0o755, dir_fd=run_fd)
+                tier_fd = os.open(tier, _directory_open_flags(), dir_fd=run_fd)
+                tier_binding = ObjectBinding.from_stat(os.fstat(tier_fd))
+                if tier_binding.mode_type != stat.S_IFDIR:
+                    raise ProvenanceError("allocated tier root is not a directory")
+                _verify_owned_public_name(root)
+                public_run = ObjectBinding.from_stat(os.stat(
+                    run_id, dir_fd=root.fd, follow_symlinks=False))
+                public_tier = ObjectBinding.from_stat(os.stat(
+                    tier, dir_fd=run_fd, follow_symlinks=False))
+                if public_run != run_binding or public_tier != tier_binding:
+                    raise ProvenanceError("allocated run tree binding changed")
+                tier_dir = root.path / run_id / tier
+                return run_id, tier_dir, tier_binding.encode()
+            finally:
+                if tier_fd is not None:
+                    os.close(tier_fd)
+                if run_fd is not None:
+                    os.close(run_fd)
     raise ProvenanceError("could not allocate a unique run directory")
 
 
@@ -189,15 +580,41 @@ def _relative_file(root: Path, relative: str | Path) -> Path:
     return root / rel
 
 
-def _open_root_fd(root: Path) -> int:
+def _open_root_fd(
+    root: Path, *, retain_parent: bool = False,
+) -> int | tuple[int, int | None, str | None]:
+    """Open an absolute directory one component at a time without symlinks."""
+    absolute = Path(os.path.abspath(root))
     flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-             | getattr(os, "O_NOFOLLOW", 0))
+             | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+    fd = None
+    parent_fd = None
     try:
-        fd = os.open(root, flags)
+        fd = os.open("/", flags)
+        parts = absolute.parts[1:]
+        if not parts:
+            if retain_parent:
+                return fd, None, None
+            return fd
+        for index, part in enumerate(parts):
+            next_fd = os.open(part, flags, dir_fd=fd)
+            if retain_parent and index == len(parts) - 1:
+                parent_fd = fd
+            else:
+                os.close(fd)
+            fd = next_fd
         if not stat.S_ISDIR(os.fstat(fd).st_mode):
             raise ProvenanceError("declared root is not a directory")
+        if retain_parent:
+            return fd, parent_fd, parts[-1]
         return fd
-    except OSError as exc:
+    except (OSError, ProvenanceError) as exc:
+        if fd is not None:
+            os.close(fd)
+        if parent_fd is not None and parent_fd != fd:
+            os.close(parent_fd)
+        if isinstance(exc, ProvenanceError):
+            raise
         raise ProvenanceError("declared root is unsafe or unavailable") from exc
 
 
@@ -216,7 +633,7 @@ def _assert_root_binding(root: Path, root_fd: int) -> None:
         os.close(check_fd)
 
 
-def _open_parent_fd(root: Path, relative: str | Path,
+def _open_path_parent_fd(root: Path, relative: str | Path,
                     *, root_fd: int | None = None) -> tuple[int, str]:
     """Traverse descendants from one retained root fd without following links."""
     rel = Path(relative)
@@ -227,6 +644,25 @@ def _open_parent_fd(root: Path, relative: str | Path,
     try:
         for part in rel.parts[:-1]:
             next_fd = os.open(part, flags | nofollow, dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+        return fd, rel.parts[-1]
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _open_parent_fd(root: OwnedDirectory, relative: str | Path) -> tuple[int, str]:
+    """Traverse descendants only from a retained owned-directory capability."""
+    rel = Path(relative)
+    if rel.is_absolute() or ".." in rel.parts or rel == Path("."):
+        raise ProvenanceError(f"path must stay below the declared root: {relative}")
+    flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+             | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+    fd = os.dup(root.fd)
+    try:
+        for part in rel.parts[:-1]:
+            next_fd = os.open(part, flags, dir_fd=fd)
             os.close(fd)
             fd = next_fd
         return fd, rel.parts[-1]
@@ -266,7 +702,7 @@ def _regular_digest(root: Path, relative: str,
     if destination is not None and destination_root_fd is not None:
         raise ProvenanceError("ambiguous capture destination")
     try:
-        parent_fd, name = _open_parent_fd(root, relative, root_fd=root_fd)
+        parent_fd, name = _open_path_parent_fd(root, relative, root_fd=root_fd)
     except OSError as exc:
         raise ProvenanceError(f"input path is unsafe or unavailable: {relative}") from exc
     source_fd = None
@@ -277,9 +713,14 @@ def _regular_digest(root: Path, relative: str,
         before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
         if not stat.S_ISREG(before.st_mode):
             raise ProvenanceError(f"input is not a regular file: {relative}")
+        # O_NONBLOCK closes the check/open FIFO race: a regular-to-FIFO swap
+        # cannot wait for a writer before the opened-inode type check runs.
         source_fd = os.open(
-            name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=parent_fd)
+            name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0), dir_fd=parent_fd)
         opened = os.fstat(source_fd)
+        if not stat.S_ISREG(opened.st_mode):
+            raise ProvenanceError(f"input is not a regular file: {relative}")
         if (before.st_dev, before.st_ino, before.st_mode) != (
                 opened.st_dev, opened.st_ino, opened.st_mode):
             raise ProvenanceError(f"input changed while it was opened: {relative}")
@@ -340,7 +781,7 @@ def _regular_digest(root: Path, relative: str,
 def _safe_link_target(root: Path, relative: str, *,
                       root_fd: int | None = None) -> str:
     try:
-        parent_fd, name = _open_parent_fd(root, relative, root_fd=root_fd)
+        parent_fd, name = _open_path_parent_fd(root, relative, root_fd=root_fd)
     except OSError as exc:
         raise ProvenanceError(f"repository link path is unsafe: {relative}") from exc
     try:
@@ -397,28 +838,36 @@ def hash_declared_inputs(root: Path | str, relative_paths: Iterable[str]) -> str
     finally:
         os.close(root_fd)
 
-def _git(repo: Path, *args: str) -> bytes:
+def _git(root_fd: int, *args: str) -> bytes:
+    """Run Git from the retained repository directory, never its public alias."""
+    shim = (
+        "import os,sys; "
+        "fd=int(sys.argv[1]); os.fchdir(fd); "
+        "os.execvp('git',['git',*sys.argv[2:]])"
+    )
     try:
         out = subprocess.run(
-            ["git", "-C", str(repo), *args], check=True,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60,
+            [sys.executable, "-c", shim, str(root_fd), *args],
+            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=60, pass_fds=(root_fd,), cwd="/",
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise ProvenanceError(f"cannot establish repository identity: git {' '.join(args)}") from exc
+        raise ProvenanceError(
+            f"cannot establish repository identity: git {' '.join(args)}") from exc
     return out.stdout
 
 
-def _repository_head_status(root: Path) -> tuple[str, bytes]:
-    head = _git(root, "rev-parse", "HEAD").decode("ascii").strip()
+def _repository_head_status(root_fd: int) -> tuple[str, bytes]:
+    head = _git(root_fd, "rev-parse", "HEAD").decode("ascii").strip()
     if not re.fullmatch(r"[0-9a-f]{40,64}", head):
         raise ProvenanceError("git returned an invalid HEAD identity")
-    status_bytes = _git(root, "status", "--porcelain=v1", "-z",
+    status_bytes = _git(root_fd, "status", "--porcelain=v1", "-z",
                         "--untracked-files=all")
     return head, status_bytes
 
 
-def _repository_paths(root: Path) -> list[str]:
-    raw = _git(root, "ls-files", "-z", "--cached", "--others",
+def _repository_paths(root_fd: int) -> list[str]:
+    raw = _git(root_fd, "ls-files", "-z", "--cached", "--others",
                "--exclude-standard")
     return [part.decode("utf-8", "surrogateescape")
             for part in sorted(set(item for item in raw.split(b"\0") if item))]
@@ -426,10 +875,10 @@ def _repository_paths(root: Path) -> list[str]:
 
 def _repository_entries(root: Path, root_fd: int) -> list[tuple[str, str, int]]:
     entries = []
-    for rel in _repository_paths(root):
+    for rel in _repository_paths(root_fd):
         _relative_file(root, rel)
         try:
-            parent_fd, name = _open_parent_fd(root, rel, root_fd=root_fd)
+            parent_fd, name = _open_path_parent_fd(root, rel, root_fd=root_fd)
             try:
                 st = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
             finally:
@@ -528,7 +977,7 @@ def repository_identity(repo: Path | str) -> dict[str, Any]:
     root = Path(os.path.abspath(repo))
     root_fd = _open_root_fd(root)
     try:
-        head, status_bytes = _repository_head_status(root)
+        head, status_bytes = _repository_head_status(root_fd)
         _assert_root_binding(root, root_fd)
         entries = _repository_entries(root, root_fd)
         records = _repository_records(root, root_fd, entries)
@@ -538,91 +987,364 @@ def repository_identity(repo: Path | str) -> dict[str, Any]:
         os.close(root_fd)
 
 
+def _clear_owned_directory_fd(directory_fd: int) -> None:
+    """Remove descendants only after exact entries enter private delete names."""
+    directory_flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                       | getattr(os, "O_NOFOLLOW", 0))
+    for name in os.listdir(directory_fd):
+        before = ObjectBinding.from_stat(os.stat(
+            name, dir_fd=directory_fd, follow_symlinks=False))
+        detached = ".prime-claw-delete-" + secrets.token_hex(16)
+        _rename_noreplace(directory_fd, name, directory_fd, detached)
+        moved = ObjectBinding.from_stat(os.stat(
+            detached, dir_fd=directory_fd, follow_symlinks=False))
+        if moved != before:
+            raise ProvenanceError(
+                "owned snapshot entry changed during rollback")
+        if moved.mode_type == stat.S_IFDIR:
+            child_fd = os.open(detached, directory_flags, dir_fd=directory_fd)
+            try:
+                opened = ObjectBinding.from_stat(os.fstat(child_fd))
+                if opened != moved:
+                    raise ProvenanceError(
+                        "owned snapshot entry changed during rollback")
+                _clear_owned_directory_fd(child_fd)
+                after = ObjectBinding.from_stat(os.stat(
+                    detached, dir_fd=directory_fd, follow_symlinks=False))
+                if opened != after:
+                    raise ProvenanceError(
+                        "owned snapshot entry changed during rollback")
+                os.rmdir(detached, dir_fd=directory_fd)
+            finally:
+                os.close(child_fd)
+        else:
+            after = ObjectBinding.from_stat(os.stat(
+                detached, dir_fd=directory_fd, follow_symlinks=False))
+            if after != moved:
+                raise ProvenanceError(
+                    "owned snapshot entry changed during rollback")
+            os.unlink(detached, dir_fd=directory_fd)
+
+
+def _binding_for_stat(value: os.stat_result) -> str:
+    return ObjectBinding.from_stat(value).encode()
+
+
+def _detach_and_remove_owned(
+    path: Path,
+    expected: ObjectBinding,
+    *,
+    quarantine_parent: Path,
+    quarantine_binding: ObjectBinding | None = None,
+) -> None:
+    """Detach the public name, prove the held root, then clear in quarantine."""
+    root = Path(os.path.abspath(path))
+    quarantine_root = Path(os.path.abspath(quarantine_parent))
+    try:
+        common = Path(os.path.commonpath([root, quarantine_root]))
+    except ValueError as exc:
+        raise ProvenanceError("cleanup quarantine is on an incompatible root") from exc
+    if common == root:
+        raise ProvenanceError("cleanup quarantine must not be inside removed tree")
+    with open_owned_directory(root, expected, retain_parent=True) as owned:
+        if owned.parent_fd is None or owned.name is None:
+            raise ProvenanceError("refusing to remove a filesystem root")
+        if quarantine_binding is None:
+            quarantine_parent_fd = _open_root_fd(quarantine_root)
+        else:
+            with open_owned_directory(
+                    quarantine_root, quarantine_binding) as quarantine_owned:
+                quarantine_parent_fd = os.dup(quarantine_owned.fd)
+        quarantine_fd = None
+        detached_fd = None
+        quarantine_name = f".prime-claw-quarantine-{secrets.token_hex(16)}"
+        quarantine_binding = None
+        try:
+            os.mkdir(quarantine_name, 0o700, dir_fd=quarantine_parent_fd)
+            created_quarantine = ObjectBinding.from_stat(os.stat(
+                quarantine_name, dir_fd=quarantine_parent_fd,
+                follow_symlinks=False))
+            quarantine_fd = os.open(
+                quarantine_name,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=quarantine_parent_fd,
+            )
+            quarantine_stat = os.fstat(quarantine_fd)
+            quarantine_binding = ObjectBinding.from_stat(quarantine_stat)
+            if quarantine_binding != created_quarantine:
+                raise ProvenanceError(
+                    "cleanup quarantine changed while it was opened")
+            if (quarantine_binding.mode_type != stat.S_IFDIR
+                    or stat.S_IMODE(quarantine_stat.st_mode) & 0o077):
+                raise ProvenanceError("cleanup quarantine is not private")
+            detached_name = f"owned-{secrets.token_hex(16)}"
+            _rename_noreplace(
+                owned.parent_fd, owned.name, quarantine_fd, detached_name)
+            try:
+                detached_fd = os.open(
+                    detached_name,
+                    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                    | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=quarantine_fd,
+                )
+            except OSError as exc:
+                raise ProvenanceError(
+                    "cleanup detached a non-directory replacement; preserved in quarantine") from exc
+            if ObjectBinding.from_stat(os.fstat(detached_fd)) != expected:
+                raise ProvenanceError(
+                    "cleanup detached a replacement; preserved in quarantine")
+            # Descendant removal is permitted only after this exact root is
+            # detached below the fresh private quarantine directory.
+            _clear_owned_directory_fd(detached_fd)
+            after = os.stat(detached_name, dir_fd=quarantine_fd,
+                            follow_symlinks=False)
+            if ObjectBinding.from_stat(after) != expected:
+                raise ProvenanceError("quarantined directory changed during cleanup")
+            os.rmdir(detached_name, dir_fd=quarantine_fd)
+            os.fsync(quarantine_fd)
+            os.close(quarantine_fd)
+            quarantine_fd = None
+            current = os.stat(
+                quarantine_name, dir_fd=quarantine_parent_fd,
+                follow_symlinks=False)
+            if ObjectBinding.from_stat(current) != quarantine_binding:
+                raise ProvenanceError("cleanup quarantine binding changed")
+            os.rmdir(quarantine_name, dir_fd=quarantine_parent_fd)
+            os.fsync(quarantine_parent_fd)
+        except OSError as exc:
+            raise ProvenanceError("owned-directory quarantine cleanup failed") from exc
+        finally:
+            for fd in (detached_fd, quarantine_fd, quarantine_parent_fd):
+                if fd is not None:
+                    os.close(fd)
+
+
+def _rollback_owned_snapshot(
+    destination: Path,
+    destination_fd: int,
+    *,
+    parent_binding: ObjectBinding | None = None,
+) -> bool:
+    """Rollback only while the destination parent remains the held authority."""
+    try:
+        if parent_binding is not None:
+            with open_owned_directory(destination.parent, parent_binding) as parent:
+                _verify_owned_public_name(parent)
+        expected = ObjectBinding.from_stat(os.fstat(destination_fd))
+        _detach_and_remove_owned(
+            destination, expected, quarantine_parent=destination.parent,
+            quarantine_binding=parent_binding)
+        return True
+    except (OSError, ProvenanceError):
+        return False
+
+
+def owned_directory_binding(path: Path | str) -> str:
+    """Return a non-secret device/inode/type capability for one directory."""
+    root = Path(os.path.abspath(path))
+    fd = _open_root_fd(root)
+    try:
+        _assert_root_binding(root, fd)
+        binding = ObjectBinding.from_stat(os.fstat(fd))
+        if binding.mode_type != stat.S_IFDIR:
+            raise ProvenanceError("owned object is not a directory")
+        return binding.encode()
+    finally:
+        os.close(fd)
+
+
+def remove_owned_directory(
+    path: Path | str,
+    binding: str,
+    *,
+    quarantine_parent: Path | str,
+    quarantine_binding: str | ObjectBinding | None = None,
+) -> None:
+    """Detach, prove, then remove only the captured directory capability."""
+    expected = ObjectBinding.decode(binding)
+    if expected.mode_type != stat.S_IFDIR:
+        raise ProvenanceError("owned-directory binding is not a directory")
+    quarantine_expected = (ObjectBinding.decode(quarantine_binding)
+                           if isinstance(quarantine_binding, str)
+                           else quarantine_binding)
+    _detach_and_remove_owned(
+        Path(path), expected, quarantine_parent=Path(quarantine_parent),
+        quarantine_binding=quarantine_expected)
+
+
 def stage_repository_snapshot(repo: Path | str,
                               destination: Path | str) -> dict[str, Any]:
-    """Capture repository inputs through retained source/destination root fds."""
+    """Capture repository inputs into an atomically published owned tree."""
     root = Path(os.path.abspath(repo))
     dest = Path(os.path.abspath(destination))
-    if dest.exists() or dest.is_symlink():
-        raise ProvenanceError("repository snapshot destination already exists")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.mkdir(mode=0o700)
     root_fd = None
-    destination_root_fd = None
+    destination_parent = None
+    destination_owned = None
     try:
         root_fd = _open_root_fd(root)
-        destination_root_fd = _open_root_fd(dest)
-        head, status_bytes = _repository_head_status(root)
+        destination_parent = _open_or_create_results_root(dest.parent)
+        _verify_owned_public_name(destination_parent)
+        try:
+            os.stat(dest.name, dir_fd=destination_parent.fd,
+                    follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise ProvenanceError(
+                "repository snapshot destination already exists")
+        destination_owned = _create_owned_directory_child(
+            destination_parent, dest.name, mode=0o700)
+        destination_root_fd = destination_owned.fd
+        _verify_owned_public_name(destination_parent)
+        _verify_owned_public_name(destination_owned)
+        head, status_bytes = _repository_head_status(root_fd)
         _assert_root_binding(root, root_fd)
         entries = _repository_entries(root, root_fd)
         records = _repository_records(
-            root, root_fd, entries, destination_root_fd=destination_root_fd)
+            root, root_fd, entries,
+            destination_root_fd=destination_root_fd)
         captured = _identity(head, status_bytes, records)
         _validate_captured_links(records)
         _assert_root_binding(root, root_fd)
-        _assert_root_binding(dest, destination_root_fd)
+        _verify_owned_public_name(destination_parent)
+        _verify_owned_public_name(destination_owned)
         # HEAD/status/path inventory must stay stable across capture. File bytes
         # and modes are bound to the opened fds and destination writes remain
         # below the retained snapshot fd.
-        after_head, after_status = _repository_head_status(root)
+        after_head, after_status = _repository_head_status(root_fd)
         _assert_root_binding(root, root_fd)
         if (after_head != head or after_status != status_bytes
-                or _repository_paths(root) != [rel for rel, _kind, _mode in entries]):
+                or _repository_paths(root_fd) != [rel for rel, _kind, _mode in entries]):
             raise ProvenanceError(
                 "repository changed while the run-owned snapshot was staged")
         _assert_root_binding(root, root_fd)
-        _assert_root_binding(dest, destination_root_fd)
+        _verify_owned_public_name(destination_parent)
+        _verify_owned_public_name(destination_owned)
         return captured
     except BaseException:
-        shutil.rmtree(dest, ignore_errors=True)
+        if destination_owned is not None:
+            _rollback_owned_snapshot(
+                dest, destination_owned.fd,
+                parent_binding=(destination_parent.binding
+                                if destination_parent is not None else None))
         raise
     finally:
-        if destination_root_fd is not None:
-            os.close(destination_root_fd)
+        if destination_owned is not None:
+            destination_owned.close()
+        if destination_parent is not None:
+            destination_parent.close()
         if root_fd is not None:
             os.close(root_fd)
 
-def evidence_inventory(
-    root: Path | str, *, exclude: Iterable[str] = ("manifest.json",),
-    exclude_prefixes: Iterable[str] = ("share/",),
-) -> list[dict[str, str]]:
-    root_path = Path(root)
-    if root_path.is_symlink():
-        raise ProvenanceError("evidence root must not be a symlink")
-    root = root_path.resolve()
-    excluded = set(exclude)
-    prefixes = tuple(exclude_prefixes)
+
+def _read_evidence_file(parent_fd: int, name: str, relative: str) -> bytes:
+    """Read one retained regular inode without following or blocking on swaps."""
+    try:
+        before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        fd = os.open(
+            name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0), dir_fd=parent_fd)
+    except FileNotFoundError:
+        raise
+    except OSError as exc:
+        raise ProvenanceError(f"evidence entry is unavailable: {relative}") from exc
+    try:
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
+            raise ProvenanceError(f"evidence is not a regular file: {relative}")
+        if (before.st_dev, before.st_ino, before.st_mode) != (
+                opened.st_dev, opened.st_ino, opened.st_mode):
+            raise ProvenanceError(f"evidence changed while it was opened: {relative}")
+        chunks = []
+        while True:
+            chunk = os.read(fd, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(fd)
+        stable = (opened.st_dev, opened.st_ino, opened.st_mode,
+                  opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns)
+        observed = (after.st_dev, after.st_ino, after.st_mode,
+                    after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        if observed != stable:
+            raise ProvenanceError(f"evidence changed while it was read: {relative}")
+        return b"".join(chunks)
+    finally:
+        os.close(fd)
+
+
+def _evidence_rows(directory_fd: int, *, prefix: str,
+                   excluded: set[str], excluded_prefixes: tuple[str, ...]
+                   ) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
-    if not root.is_dir():
-        raise ProvenanceError(f"evidence root is not a directory: {root}")
-    for path in sorted(root.rglob("*")):
-        rel = path.relative_to(root).as_posix()
-        if rel in excluded or any(rel.startswith(prefix) for prefix in prefixes):
-            continue
-        if path.is_symlink():
-            raise ProvenanceError(f"evidence must not contain a symlink: {rel}")
-        if path.is_dir():
+    directory_flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                       | getattr(os, "O_NOFOLLOW", 0))
+    for name in sorted(os.listdir(directory_fd)):
+        relative = f"{prefix}/{name}" if prefix else name
+        if (relative in excluded
+                or any(relative == item.removesuffix("/")
+                       or relative.startswith(item)
+                       for item in excluded_prefixes)):
             continue
         try:
-            mode = path.lstat().st_mode
+            before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
         except OSError as exc:
-            raise ProvenanceError(f"evidence entry is unavailable: {rel}") from exc
-        if not stat.S_ISREG(mode):
-            raise ProvenanceError(f"evidence is not a regular file: {rel}")
+            raise ProvenanceError(
+                f"evidence entry is unavailable: {relative}") from exc
+        if stat.S_ISLNK(before.st_mode):
+            raise ProvenanceError(f"evidence must not contain a symlink: {relative}")
+        if stat.S_ISDIR(before.st_mode):
+            try:
+                child_fd = os.open(name, directory_flags, dir_fd=directory_fd)
+            except OSError as exc:
+                raise ProvenanceError(
+                    f"evidence directory is unsafe or unavailable: {relative}") from exc
+            try:
+                opened = os.fstat(child_fd)
+                if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+                    raise ProvenanceError(
+                        f"evidence directory changed while it was opened: {relative}")
+                rows.extend(_evidence_rows(
+                    child_fd, prefix=relative, excluded=excluded,
+                    excluded_prefixes=excluded_prefixes))
+                after = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+                if (opened.st_dev, opened.st_ino) != (after.st_dev, after.st_ino):
+                    raise ProvenanceError(
+                        f"evidence directory changed while it was read: {relative}")
+            finally:
+                os.close(child_fd)
+            continue
+        if not stat.S_ISREG(before.st_mode):
+            raise ProvenanceError(f"evidence is not a regular file: {relative}")
+        raw = _read_evidence_file(directory_fd, name, relative)
         try:
-            raw = path.read_bytes()
             text = raw.decode("utf-8", "strict")
         except UnicodeDecodeError as exc:
             raise ProvenanceError(
-                f"evidence text has an unknown encoding: {rel}") from exc
-        _assert_sanitized(text, f"evidence:{rel}")
-        rows.append({"path": rel, "sha256": sha256_bytes(raw)})
+                f"evidence text has an unknown encoding: {relative}") from exc
+        _assert_sanitized(text, f"evidence:{relative}")
+        rows.append({"path": relative, "sha256": sha256_bytes(raw)})
     return rows
 
 
-def verify_evidence(root: Path | str, manifest: dict[str, Any]) -> None:
+def evidence_inventory(
+    root: OwnedDirectory, *,
+    exclude: Iterable[str] = ("manifest.json",),
+    exclude_prefixes: Iterable[str] = ("share/", ".publication/"),
+) -> list[dict[str, str]]:
+    _verify_owned_public_name(root)
+    rows = _evidence_rows(
+        root.fd, prefix="", excluded=set(exclude),
+        excluded_prefixes=tuple(exclude_prefixes))
+    _verify_owned_public_name(root)
+    if ObjectBinding.from_stat(os.fstat(root.fd)) != root.binding:
+        raise ProvenanceError("evidence root changed while it was read")
+    return rows
+
+
+def verify_evidence(root: OwnedDirectory, manifest: dict[str, Any]) -> None:
     validate_manifest(manifest)
-    root = Path(root).resolve()
     expected = manifest["evidence"]["files"]
     actual = evidence_inventory(root)
     expected_paths = {row["path"] for row in expected}
@@ -800,7 +1522,7 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
                              "inspect_outcome", "clean"}, "teardown")
     if teardown["state"] not in {"absent", "unknown", "present"}:
         raise ProvenanceError("invalid teardown.state")
-    outcomes = {"clean", "ordinary_nonzero", "timed_out", "interrupted",
+    outcomes = {"clean", "ordinary_nonzero", "signaled", "timed_out", "interrupted",
                 "launch_error", "reap_timeout", "not_needed", "not_run",
                 "identity_refused"}
     if (teardown["remove_outcome"] not in outcomes
@@ -836,35 +1558,207 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
             raise ProvenanceError("invalid evidence sha256")
 
 
-def atomic_write_manifest(path: Path | str, manifest: dict[str, Any]) -> None:
-    validate_manifest(manifest)
-    target = Path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists() or target.is_symlink():
-        raise ProvenanceError(f"refusing to overwrite existing manifest: {target.name}")
-    payload = canonical_json(manifest).encode("utf-8")
-    fd, tmp_name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp",
-                                    dir=target.parent)
-    tmp = Path(tmp_name)
+def _open_manifest_fd(parent_fd: int, name: str, *, writable: bool) -> int:
+    flags = ((os.O_RDWR if writable else os.O_RDONLY)
+             | getattr(os, "O_NOFOLLOW", 0)
+             | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0))
     try:
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(payload)
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(tmp, target)
+        fd = os.open(name, flags, dir_fd=parent_fd)
+    except OSError as exc:
+        raise ProvenanceError("published manifest is unsafe or unavailable") from exc
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        raise ProvenanceError("published manifest is not a regular file")
+    return fd
+
+
+def _decoded_manifest_fd(fd: int) -> dict[str, Any]:
+    raw = _read_fd_bytes(fd, label="published manifest")
+    try:
+        value = json.loads(raw.decode("utf-8", "strict"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ProvenanceError("published manifest is unreadable") from exc
+    if not isinstance(value, dict):
+        raise ProvenanceError("published manifest is not an object")
+    _assert_sanitized(value)
+    return value
+
+
+def _neutralize_manifest_fd(fd: int) -> None:
+    payload = canonical_json({
+        "invalidated": True,
+        "reason": "replaced-by-failed-manifest",
+    }).encode("utf-8")
+    os.ftruncate(fd, 0)
+    os.lseek(fd, 0, os.SEEK_SET)
+    _write_all(fd, payload)
+    os.fsync(fd)
+
+
+def _exchange_manifest_bytes(
+    root: OwnedDirectory,
+    relative: str | Path,
+    payload: bytes,
+    expected: ObjectBinding,
+) -> tuple[ObjectBinding, bool]:
+    """Install failed bytes atomically and preserve every displaced object."""
+    parent_fd, name = _open_parent_fd(root, relative)
+    target_fd = None
+    publication_fd = None
+    mismatch = False
+    try:
+        target_fd = _open_manifest_fd(parent_fd, name, writable=True)
+        opened = ObjectBinding.from_stat(os.fstat(target_fd))
+        mismatch = opened != expected
+        if not mismatch:
+            # The expected object must itself be a valid sanitized manifest.
+            validate_manifest(_decoded_manifest_fd(target_fd))
+        publication_fd, stage, staged = _stage_owned_bytes(root, payload)
+        _rename_exchange(publication_fd, stage, parent_fd, name)
+        _verify_published_bytes(parent_fd, name, staged, payload)
         try:
-            dir_fd = os.open(target.parent, os.O_RDONLY)
-        except OSError:
-            return
-        try:
-            os.fsync(dir_fd)
-        finally:
-            os.close(dir_fd)
+            displaced = ObjectBinding.from_stat(os.stat(
+                stage, dir_fd=publication_fd, follow_symlinks=False))
+        except OSError as exc:
+            raise ProvenanceError("displaced manifest was not preserved") from exc
+        if displaced != opened:
+            mismatch = True
+        # Only the exact expected inode may be neutralized. A raced replacement
+        # remains byte-identical under .publication/ for diagnosis.
+        if opened == expected:
+            _neutralize_manifest_fd(target_fd)
+        os.fsync(publication_fd)
+        os.fsync(parent_fd)
+        os.fsync(root.fd)
+        return staged, mismatch
+    except OSError as exc:
+        raise ProvenanceError("atomic manifest exchange failed") from exc
     finally:
+        if publication_fd is not None:
+            os.close(publication_fd)
+        if target_fd is not None:
+            os.close(target_fd)
+        os.close(parent_fd)
+
+
+def atomic_write_manifest(
+    root: OwnedDirectory,
+    manifest: dict[str, Any],
+    *,
+    expected_existing: ObjectBinding | None = None,
+) -> ObjectBinding:
+    """Publish a new manifest or atomically exchange an expected green one."""
+    validate_manifest(manifest)
+    payload = canonical_json(manifest).encode("utf-8")
+    if expected_existing is None:
+        verify_evidence(root, manifest)
+        published = _publish_owned_bytes(root, "manifest.json", payload)
+        _verify_owned_public_name(root)
+        return published
+    if manifest["run"]["status"] != "failed":
+        raise ProvenanceError("manifest replacement must be non-green")
+    # Close the green-publication window first. Evidence verification after the
+    # exchange can fail truthfully, but can no longer leave a passed manifest.
+    published, mismatch = _exchange_manifest_bytes(
+        root, "manifest.json", payload, expected_existing)
+    try:
+        verify_evidence(root, manifest)
+    except ProvenanceError as exc:
+        raise ProvenanceError(
+            "failed manifest published but evidence verification failed") from exc
+    if mismatch:
+        raise ProvenanceError(
+            "manifest target changed; failed replacement published and object preserved")
+    return published
+
+
+def _exchange_public_entry_bytes(
+    root: OwnedDirectory,
+    relative: str | Path,
+    payload: bytes,
+) -> tuple[ObjectBinding, ObjectBinding]:
+    """Exchange any existing public entry for a regular non-green record."""
+    parent_fd, name = _open_parent_fd(root, relative)
+    publication_fd = None
+    try:
+        publication_fd, stage, staged = _stage_owned_bytes(root, payload)
+        _rename_exchange(publication_fd, stage, parent_fd, name)
+        _verify_published_bytes(parent_fd, name, staged, payload)
+        displaced = ObjectBinding.from_stat(os.stat(
+            stage, dir_fd=publication_fd, follow_symlinks=False))
+        os.fsync(publication_fd)
+        os.fsync(parent_fd)
+        os.fsync(root.fd)
+        _verify_owned_public_name(root)
+        return staged, displaced
+    except OSError as exc:
+        raise ProvenanceError("atomic public-entry invalidation failed") from exc
+    finally:
+        if publication_fd is not None:
+            os.close(publication_fd)
+        os.close(parent_fd)
+
+
+def invalidate_green_manifest(
+    root: OwnedDirectory,
+    *,
+    expected: ObjectBinding | None,
+) -> ObjectBinding | None:
+    """Atomically replace any public green/unsafe entry with non-green JSON."""
+    minimal_payload = canonical_json({
+        "invalidated": True,
+        "reason": "unsafe-public-manifest",
+        "status": "failed",
+    }).encode("utf-8")
+    parent_fd, name = _open_parent_fd(root, "manifest.json")
+    manifest_fd = None
+    try:
         try:
-            tmp.unlink()
-        except FileNotFoundError:
-            pass
+            manifest_fd = _open_manifest_fd(parent_fd, name, writable=True)
+        except ProvenanceError:
+            try:
+                os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return None
+            # A symlink/directory/FIFO/socket cannot be trusted as a manifest,
+            # but it can be atomically displaced without opening or deleting it.
+            os.close(parent_fd)
+            parent_fd = -1
+            published, displaced = _exchange_public_entry_bytes(
+                root, "manifest.json", minimal_payload)
+            if expected is not None and displaced != expected:
+                raise ProvenanceError(
+                    "unsafe manifest entry invalidated; expected binding changed")
+            return published
+        observed = ObjectBinding.from_stat(os.fstat(manifest_fd))
+        try:
+            current = _decoded_manifest_fd(manifest_fd)
+            validate_manifest(current)
+        except ProvenanceError:
+            published, displaced = _exchange_public_entry_bytes(
+                root, "manifest.json", minimal_payload)
+            if expected is not None and observed == expected:
+                _neutralize_manifest_fd(manifest_fd)
+            if expected is not None and displaced != expected:
+                raise ProvenanceError(
+                    "unsafe manifest entry invalidated; expected binding changed")
+            return published
+        if current["run"]["status"] != "passed":
+            return observed
+    finally:
+        if manifest_fd is not None:
+            os.close(manifest_fd)
+        if parent_fd >= 0:
+            os.close(parent_fd)
+    invalidated = json.loads(canonical_json(current))
+    invalidated["run"]["status"] = "failed"
+    codes = list(invalidated["run"]["failure_codes"])
+    if "publication-invalidated" not in codes:
+        codes.append("publication-invalidated")
+    invalidated["run"]["failure_codes"] = codes
+    intended = expected if expected is not None else observed
+    return atomic_write_manifest(
+        root, invalidated, expected_existing=intended)
 
 
 def _main() -> int:
@@ -879,6 +1773,13 @@ def _main() -> int:
     snapshot = sub.add_parser("snapshot")
     snapshot.add_argument("repo")
     snapshot.add_argument("destination")
+    binding = sub.add_parser("directory-binding")
+    binding.add_argument("path")
+    remove_owned = sub.add_parser("remove-owned-directory")
+    remove_owned.add_argument("path")
+    remove_owned.add_argument("binding")
+    remove_owned.add_argument("--quarantine-parent", required=True)
+    remove_owned.add_argument("--quarantine-binding")
     hash_inputs = sub.add_parser("hash-inputs")
     hash_inputs.add_argument("root")
     hash_inputs.add_argument("paths", nargs="+")
@@ -887,8 +1788,14 @@ def _main() -> int:
     build_input = sub.add_parser("build-input")
     build_input.add_argument("root")
     build_input.add_argument("path")
+    write_json = sub.add_parser("write-json")
+    write_json.add_argument("root")
+    write_json.add_argument("binding")
+    write_json.add_argument("relative")
     capture_image = sub.add_parser("capture-image")
-    capture_image.add_argument("path")
+    capture_image.add_argument("root")
+    capture_image.add_argument("binding")
+    capture_image.add_argument("relative")
     capture_image.add_argument("expected_id")
     capture_image.add_argument("dockerfile")
     capture_image.add_argument("dockerfile_sha256")
@@ -896,17 +1803,36 @@ def _main() -> int:
     capture_image.add_argument("informational_tag")
     capture_image.add_argument("build_started_at")
     capture_image.add_argument("build_finished_at")
+    capture_artifact = sub.add_parser("capture-artifact")
+    capture_artifact.add_argument("root")
+    capture_artifact.add_argument("binding")
+    capture_artifact.add_argument("relative")
+    capture_artifact.add_argument("version")
+    invalidate_manifest = sub.add_parser("invalidate-green-manifest")
+    invalidate_manifest.add_argument("root")
+    invalidate_manifest.add_argument("binding")
+    invalidate_manifest.add_argument("relative", nargs="?", default="manifest.json")
+    invalidate_manifest.add_argument("--expected")
     parse_version = sub.add_parser("parse-version")
     now = sub.add_parser("now")
     args = parser.parse_args()
     if args.command == "allocate":
-        run_id, tier_dir = allocate_run_tree(args.results_root, args.tier)
-        print(run_id + "\t" + str(tier_dir.resolve()))
+        run_id, tier_dir, tier_binding = allocate_run_tree(
+            args.results_root, args.tier)
+        # Allocation returned an absolute lexical path whose public binding
+        # was checked. Re-resolving here could follow a later alias swap.
+        print(run_id + "\t" + str(tier_dir) + "\t" + tier_binding)
     elif args.command == "repository":
         print(canonical_json(repository_identity(args.repo)), end="")
     elif args.command == "snapshot":
         print(canonical_json(stage_repository_snapshot(
             args.repo, args.destination)), end="")
+    elif args.command == "directory-binding":
+        print(owned_directory_binding(args.path))
+    elif args.command == "remove-owned-directory":
+        remove_owned_directory(
+            args.path, args.binding, quarantine_parent=args.quarantine_parent,
+            quarantine_binding=args.quarantine_binding)
     elif args.command == "hash-inputs":
         print(hash_declared_inputs(args.root, args.paths))
     elif args.command == "hash-file":
@@ -915,6 +1841,13 @@ def _main() -> int:
         root = Path(args.root)
         print(sha256_file(root / args.path) + "\t" +
               hash_declared_inputs(root, [args.path]))
+    elif args.command == "write-json":
+        try:
+            value = json.load(__import__("sys").stdin)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ProvenanceError("invalid sanitized JSON input") from exc
+        with open_owned_directory(args.root, args.binding) as owned:
+            write_sanitized_json(owned, args.relative, value)
     elif args.command == "capture-image":
         try:
             rows = json.load(__import__("sys").stdin)
@@ -928,9 +1861,22 @@ def _main() -> int:
                 informational_tag=args.informational_tag,
                 build_started_at=args.build_started_at,
                 build_finished_at=args.build_finished_at)
-            write_sanitized_json(args.path, safe)
+            with open_owned_directory(args.root, args.binding) as owned:
+                write_sanitized_json(owned, args.relative, safe)
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError) as exc:
             raise ProvenanceError("invalid image inspect encoding or JSON") from exc
+    elif args.command == "capture-artifact":
+        raw = __import__("sys").stdin.buffer.read()
+        with open_owned_directory(args.root, args.binding) as owned:
+            write_sanitized_json(
+                owned, args.relative, artifact_identity(args.version, raw))
+    elif args.command == "invalidate-green-manifest":
+        with open_owned_directory(args.root, args.binding) as owned:
+            expected = (ObjectBinding.decode(args.expected)
+                        if args.expected is not None else None)
+            invalidated = invalidate_green_manifest(owned, expected=expected)
+            if invalidated is not None:
+                print(invalidated.encode())
     elif args.command == "parse-version":
         print(parse_prime_agent_version(__import__("sys").stdin.read()))
     elif args.command == "now":

@@ -23,8 +23,11 @@ A direct driver or pytest fixture run allocates a fresh
 
 1. Enumerate tracked plus nonignored untracked repository files through
    root-anchored file descriptors. Every ancestor and regular leaf is opened
-   with no-follow semantics; file bytes are hashed and copied from the same
-   checked descriptor. Safe relative leaf links are copied as link text and
+   with no-follow semantics; nonblocking leaf opens reject FIFO/special-file
+   swaps before reads. File bytes are hashed and copied from the same checked
+   descriptor. Rollback and terminal removal require the captured owned
+   directory binding and never recurse through a replacement pathname. Safe
+   relative leaf links are copied as link text and
    validated inside the finished snapshot. Ignored `.env`,
    `.test-results`, credentials, and operator-local files are neither mounted
    nor hashed.
@@ -43,22 +46,44 @@ A direct driver or pytest fixture run allocates a fresh
 7. Disconnect every network reported for that exact container and re-inspect.
    Any remaining network or unknown inspection fails before apply/check/probes
    or test bodies.
-8. Offline, record the exact observed artifact version (including a rejected
-   prerelease) and executable hash, apply and check the plugin against
+8. Offline, pipe image/version/artifact observations directly to allow-listing
+   producers. Require a full lowercase executable SHA-256 before any named
+   artifact write, retain an exact valid rejected version (including a
+   prerelease), then apply and check the plugin against
    `PRIME_AGENT_PLUGIN_ROOT=/root/.prime/agent`, then run the optional probe or
    selected pytest bodies.
 9. Mount only a fresh `share/` scratch directory writable. The durable evidence
    root, iidfile, cidfile, build context, and metadata never enter a writable
    container mount.
 10. Remove only the captured container ID. Presence and command health remain
-   separate: a timeout, interruption, launch error, or reap failure stays a
-   failed teardown even if the final inspect positively reports absence.
+   separate: target signal death, controller interruption, timeout, launch
+   error, or reap failure stays a failed teardown even if the final inspect
+   positively reports absence. Remove the workspace/share only when their
+   captured directory bindings still match.
 
 Every host-side Docker wait uses `scripts/testing/bounded.py` with a validated
 positive deadline, a run-owned process group, TERM→KILL escalation, a bounded
 leader reap, and regular-file output capture that cannot wait on pipe EOF from a
-detached child. The pytest fixture temporarily handles TERM/INT/HUP so exact-ID
-cleanup and failed evidence run before the original signal is redelivered.
+detached child. The controller keeps its post-spawn orphan-race mask while an
+owned exec-in-place shim restores the intended child mask. On every terminal
+outcome it re-blocks TERM/INT/HUP, restores every caller handler, and only then
+restores the exact caller mask. That final mask transition naturally redelivers
+newly pending caller-unblocked signals while preserving caller-blocked pending
+signals. Target signal death is typed separately from controller interruption.
+The standalone supervisor
+keeps TERM/INT/HUP blocked through terminal evidence closure, folds newly
+pending watched signals into the typed nonzero result, invalidates any just-
+published green manifest, then restores the caller's handlers and mask. Signals
+the caller already had blocked remain caller-owned. The pytest fixture captures the caller mask and pending watched signals before
+evidence-capability acquisition, then keeps acquisition, signal ownership,
+partial handler installation, terminal publication, restoration, and capability
+close inside one fail-closed boundary. It attempts every prior-handler
+restoration before restoring the exact caller mask. Signals
+consumed during setup or cleanup are replayed once; kernel-pending signals are
+redelivered naturally; caller-blocked pending signals remain caller-owned. The
+evidence capability closes even when replay or a prior handler raises. Signals
+observed at inventory, manifest write, post-write verification, or restoration
+publish `interrupted` failed evidence (or fail closed with no green manifest).
 Build, install, inspect/disconnect, apply/check, probe, and teardown use explicit
 budgets. A valid cidfile recovered after failed launch is still removed;
 malformed identities never reach a destructive command.
@@ -88,10 +113,13 @@ unsupported schema, malformed hashes, source-mode claims, unsafe paths, common
 credential forms, host-home values, unknown text encodings, directory/file
 links, special evidence, missing evidence, extra stale evidence, changed
 content, contradictory success/teardown claims, and malformed UTC timestamps.
-Setup logs contain only allow-listed phase names,
-not raw tool output. Publication validates first, writes a
+Setup logs contain only allow-listed phase names, not raw tool output. Teardown
+stdout/stderr is classified in memory and never copied into console text,
+exceptions, notes, or evidence. Publication validates first, writes a
 mode-0600 temporary file in the same directory, fsyncs, and atomically renames.
-A pre-existing manifest is never overwritten.
+A producer may replace only its own just-written manifest to turn a stale
+success into terminal failure; it never adopts or overwrites prior-run evidence.
+A publication fault leaves failed or no evidence, never a green contradiction.
 
 Repository digest metadata is deliberately omitted from durable evidence; the
 exact `sha256:...` iidfile image ID is authoritative. The build-input tag is
@@ -109,5 +137,11 @@ and package repositories are external inputs.
 - Reproduce Slice-1 unit coverage with:
 
   ```bash
-  python3 -m pytest     tests/test_testing_provenance.py     tests/test_tier1_driver.py     tests/test_tier1_fixture.py     tests/test_tier1_image.py -q
+  python3 -m pytest \
+    tests/test_testing_provenance.py \
+    tests/test_tier1_driver.py \
+    tests/test_tier1_launch_error.py \
+    tests/test_tier1_network_policy.py \
+    tests/test_tier1_fixture.py \
+    tests/test_tier1_image.py -q
   ```

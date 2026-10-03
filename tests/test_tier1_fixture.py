@@ -14,28 +14,33 @@ def cp(args,rc=0,out="",err="",outcome="exited",signum=None):
     return SimpleNamespace(args=args,returncode=rc,stdout=out,stderr=err,
                            outcome=outcome,signal=signum)
 
+def build_image(tier, snapshot):
+    binding = conftest.provenance.owned_directory_binding(tier)
+    with conftest.provenance.open_owned_directory(tier, binding) as owned:
+        return conftest._build_tier1_image(owned, tier, snapshot)
+
 class TestSelectionFailClose(unittest.TestCase):
     def test_source_selector_never_stats_or_echoes_checkout(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp=Path(td); source=tmp/"private-source"; source.mkdir(); (source/"sentinel").write_text("keep")
+            tmp=Path(td).resolve(); source=tmp/"private-source"; source.mkdir(); (source/"sentinel").write_text("keep")
             envf=tmp/"source.env"; envf.write_text(f"PRIME_AGENT_SOURCE={source}\n")
             with mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}), mock.patch.object(Path,"is_dir",side_effect=AssertionError("checkout stat")):
                 with self.assertRaisesRegex(RuntimeError,"isolated source builder Slice 2") as ctx: conftest._load_install_selection()
             self.assertNotIn(str(source),str(ctx.exception)); self.assertEqual((source/"sentinel").read_text(),"keep")
     def test_pinned_selector_returns_value(self):
         with tempfile.TemporaryDirectory() as td:
-            envf=Path(td)/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
+            envf=Path(td).resolve()/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
             with mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}): self.assertEqual(conftest._load_install_selection(),("pinned","0.9.8"))
     def test_both_and_neither_rejected(self):
         for text in ("PRIME_AGENT_PINNED=\nPRIME_AGENT_SOURCE=\n","PRIME_AGENT_PINNED=0.9.8\nPRIME_AGENT_SOURCE=/x\n"):
             with tempfile.TemporaryDirectory() as td:
-                envf=Path(td)/"x.env"; envf.write_text(text)
+                envf=Path(td).resolve()/"x.env"; envf.write_text(text)
                 with mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}), self.assertRaises(RuntimeError): conftest._load_install_selection()
 
     def test_malicious_pinned_values_fail_before_docker(self):
         for value in ("0.9.8;uname", "0.9.8'", "0.9.8-beta", "0.9.8\nEVIL=1"):
             with tempfile.TemporaryDirectory() as td:
-                envf=Path(td)/"bad.env"; envf.write_text("PRIME_AGENT_PINNED="+value+"\n")
+                envf=Path(td).resolve()/"bad.env"; envf.write_text("PRIME_AGENT_PINNED="+value+"\n")
                 with mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}), mock.patch.object(conftest,"_host_command",side_effect=AssertionError("docker contacted")):
                     with self.assertRaisesRegex(RuntimeError,"exact semantic version|unsupported keys"):
                         conftest._load_install_selection()
@@ -43,7 +48,7 @@ class TestSelectionFailClose(unittest.TestCase):
 class TestExactImageBuild(unittest.TestCase):
     def test_build_uses_fresh_context_iidfile_and_inspects_exact_id(self):
         with tempfile.TemporaryDirectory() as td:
-            tier=Path(td)/"tier1"; tier.mkdir(); snapshot=Path(td)/"snapshot"; (snapshot/"docker").mkdir(parents=True); (snapshot/"docker/test.Dockerfile").write_text("FROM scratch\n"); calls=[]
+            tier=Path(td).resolve()/"tier1"; tier.mkdir(); snapshot=Path(td).resolve()/"snapshot"; (snapshot/"docker").mkdir(parents=True); (snapshot/"docker/test.Dockerfile").write_text("FROM scratch\n"); calls=[]
             def run(args,**kw):
                 calls.append(args)
                 if args[:2]==["docker","build"]:
@@ -51,26 +56,26 @@ class TestExactImageBuild(unittest.TestCase):
                 if args[:3]==["docker","image","inspect"]:
                     return cp(args,out=json.dumps([{"Id":IMAGE_ID,"RepoDigests":[],"Os":"linux","Architecture":"arm64"}]))
                 raise AssertionError(args)
-            with mock.patch.object(conftest,"_host_command",side_effect=run): image=conftest._build_tier1_image(tier,snapshot)
+            with mock.patch.object(conftest,"_host_command",side_effect=run): image=build_image(tier, snapshot)
             build=calls[0]; self.assertIn("--iidfile",build); self.assertEqual(build[-1],str(tier/"build-context")); self.assertNotEqual(build[-1],str(conftest.REPO))
             self.assertEqual(calls[1][-1],IMAGE_ID); self.assertEqual(image["id"],IMAGE_ID); self.assertTrue((tier/"image.json").is_file())
     def test_iid_mismatch_fails_closed(self):
         with tempfile.TemporaryDirectory() as td:
-            tier=Path(td)/"tier1"; tier.mkdir(); snapshot=Path(td)/"snapshot"; (snapshot/"docker").mkdir(parents=True); (snapshot/"docker/test.Dockerfile").write_text("FROM scratch\n")
+            tier=Path(td).resolve()/"tier1"; tier.mkdir(); snapshot=Path(td).resolve()/"snapshot"; (snapshot/"docker").mkdir(parents=True); (snapshot/"docker/test.Dockerfile").write_text("FROM scratch\n")
             def run(args,**kw):
                 if args[:2]==["docker","build"]: Path(args[args.index("--iidfile")+1]).write_text(IMAGE_ID+"\n"); return cp(args)
                 return cp(args,out=json.dumps([{"Id":"sha256:"+"b"*64,"Os":"linux","Architecture":"arm64"}]))
-            with mock.patch.object(conftest,"_host_command",side_effect=run), self.assertRaisesRegex(conftest.provenance.ProvenanceError,"mismatched"): conftest._build_tier1_image(tier,snapshot)
+            with mock.patch.object(conftest,"_host_command",side_effect=run), self.assertRaisesRegex(conftest.provenance.ProvenanceError,"mismatched"): build_image(tier, snapshot)
 
     def test_missing_iidfile_fails_closed(self):
         with tempfile.TemporaryDirectory() as td:
-            tier=Path(td)/"tier1"; tier.mkdir(); snapshot=Path(td)/"snapshot"; (snapshot/"docker").mkdir(parents=True); (snapshot/"docker/test.Dockerfile").write_text("FROM scratch\n")
+            tier=Path(td).resolve()/"tier1"; tier.mkdir(); snapshot=Path(td).resolve()/"snapshot"; (snapshot/"docker").mkdir(parents=True); (snapshot/"docker/test.Dockerfile").write_text("FROM scratch\n")
             with mock.patch.object(conftest,"_host_command",return_value=cp([])), self.assertRaisesRegex(RuntimeError,"iidfile"):
-                conftest._build_tier1_image(tier,snapshot)
+                build_image(tier, snapshot)
 
     def test_build_hashes_the_captured_context_not_mutable_live_input(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td); tier=root/"tier1"; tier.mkdir()
+            root=Path(td).resolve(); tier=root/"tier1"; tier.mkdir()
             snapshot=root/"snapshot"; (snapshot/"docker").mkdir(parents=True)
             captured=snapshot/"docker/test.Dockerfile"; captured.write_bytes(b"FROM captured\n")
             live=root/"live"; (live/"docker").mkdir(parents=True)
@@ -82,14 +87,14 @@ class TestExactImageBuild(unittest.TestCase):
                     return cp(args)
                 return cp(args,out=json.dumps([{"Id":IMAGE_ID,"RepoDigests":[],"Os":"linux","Architecture":"arm64"}]))
             with mock.patch.object(conftest,"REPO",live), mock.patch.object(conftest,"_host_command",side_effect=host):
-                image=conftest._build_tier1_image(tier,snapshot)
+                image=build_image(tier, snapshot)
             context=tier/"build-context"
             self.assertEqual(image["dockerfile_sha256"],conftest.provenance.sha256_file(context/"Dockerfile"))
             self.assertEqual(image["declared_input_sha256"],conftest.provenance.hash_declared_inputs(context,["Dockerfile"]))
 
     def test_unsafe_image_metadata_is_discarded_before_image_json_write(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td); tier=root/"tier1"; tier.mkdir()
+            root=Path(td).resolve(); tier=root/"tier1"; tier.mkdir()
             snapshot=root/"snapshot"; (snapshot/"docker").mkdir(parents=True)
             (snapshot/"docker/test.Dockerfile").write_text("FROM scratch\n")
             def host(args,**kw):
@@ -98,7 +103,7 @@ class TestExactImageBuild(unittest.TestCase):
                     return cp(args)
                 return cp(args,out=json.dumps([{"Id":IMAGE_ID,"RepoDigests":["private.local/team/image"],"Private":"10.0.4.225","Os":"linux","Architecture":"arm64"}]))
             with mock.patch.object(conftest,"_host_command",side_effect=host):
-                image=conftest._build_tier1_image(tier,snapshot)
+                image=build_image(tier, snapshot)
             self.assertEqual(image["repo_digests"],[])
             self.assertTrue((tier/"image.json").is_file())
             for path in tier.rglob("*"):
@@ -162,14 +167,14 @@ class TestSessionTeardown(unittest.TestCase):
         with mock.patch.object(conftest,"_host_command",side_effect=responses), self.assertRaises(conftest.TeardownError): conftest._remove_session_container(CID,rm_timeout=.1)
     def test_finalizer_preserves_share_when_absence_unknown(self):
         with tempfile.TemporaryDirectory() as td:
-            share=Path(td)/"share"; share.mkdir(); (share/"evidence").write_text("x")
+            share=Path(td).resolve()/"share"; share.mkdir(); (share/"evidence").write_text("x")
             result=conftest.TeardownResult("unknown","timed_out","ordinary_nonzero",False)
             err=conftest.TeardownError(result,"boom")
             with mock.patch.object(conftest,"_remove_session_container",side_effect=err), self.assertRaises(conftest.TeardownError): conftest._finalize_session(CID,share)
             self.assertTrue(share.exists())
     def test_in_flight_failure_keeps_primary_and_adds_note(self):
         with tempfile.TemporaryDirectory() as td:
-            share=Path(td)/"share"; share.mkdir(); original=ValueError("body failed")
+            share=Path(td).resolve()/"share"; share.mkdir(); original=ValueError("body failed")
             result=conftest.TeardownResult("unknown","timed_out","ordinary_nonzero",False)
             err=conftest.TeardownError(result,"teardown failed")
             with mock.patch.object(conftest,"_remove_session_container",side_effect=err): state=conftest._finalize_session(CID,share,original)
@@ -180,7 +185,7 @@ class TestSessionTeardown(unittest.TestCase):
         with mock.patch.object(conftest,"_host_command",side_effect=responses): conftest._remove_session_container(CID)
     def test_keep_share_preserves_successful_debug_artifacts(self):
         with tempfile.TemporaryDirectory() as td:
-            share=Path(td)/"share"; share.mkdir()
+            share=Path(td).resolve()/"share"; share.mkdir()
             clean=conftest.TeardownResult("absent","clean","ordinary_nonzero",True)
             with mock.patch.object(conftest,"_remove_session_container",return_value=clean), mock.patch.dict(os.environ,{"TIER1_KEEP_SHARE":"1"}):
                 self.assertTrue(conftest._finalize_session(CID,share).clean)
@@ -188,7 +193,7 @@ class TestSessionTeardown(unittest.TestCase):
 
     def test_unpublished_container_never_calls_docker(self):
         with tempfile.TemporaryDirectory() as td:
-            share=Path(td)/"share"; share.mkdir()
+            share=Path(td).resolve()/"share"; share.mkdir()
             with mock.patch.object(conftest,"_host_command",side_effect=AssertionError("docker called")):
                 self.assertTrue(conftest._finalize_session(None,share).clean)
             self.assertFalse(share.exists())
@@ -209,6 +214,27 @@ class TestSessionTeardown(unittest.TestCase):
             conftest._remove_session_container(CID)
         self.assertEqual(ctx.exception.state,"unknown"); self.assertEqual(ctx.exception.result.remove_outcome,"ordinary_nonzero")
 
+
+    def test_target_signal_death_stays_typed_even_when_absence_is_proven(self):
+        responses=[cp([],rc=-signal.SIGKILL,outcome="signaled",signum=signal.SIGKILL),
+                   cp([],rc=1,err="Error: No such container: "+CID)]
+        with mock.patch.object(conftest,"_host_command",side_effect=responses),              self.assertRaises(conftest.TeardownError) as ctx:
+            conftest._remove_session_container(CID)
+        self.assertEqual(ctx.exception.result.state,"absent")
+        self.assertEqual(ctx.exception.result.remove_outcome,"signaled")
+        self.assertFalse(ctx.exception.result.clean)
+
+    def test_teardown_diagnostics_redact_arbitrary_output_and_non_utf8(self):
+        secret="Authorization: Bearer synthetic-secret-value"
+        responses=[cp([],rc=1,out=secret.encode()+b"\xff",err=secret.encode()),
+                   cp([],rc=1,out=secret.encode(),err=b"daemon \xff unavailable")]
+        with mock.patch.object(conftest,"_host_command",side_effect=responses),              self.assertRaises(conftest.TeardownError) as ctx:
+            conftest._remove_session_container(CID)
+        rendered=str(ctx.exception)+ctx.exception.result.diagnostics
+        self.assertNotIn(secret,rendered)
+        self.assertIn("remove_outcome=ordinary_nonzero",rendered)
+        self.assertIn("state=unknown",rendered)
+
     def test_cleanup_command_interruption_is_deferred_for_fixture_redelivery(self):
         interrupted=cp([],rc=143,outcome="interrupted",signum=signal.SIGTERM)
         conftest._DEFERRED_SIGNAL=None
@@ -221,7 +247,7 @@ class TestSessionTeardown(unittest.TestCase):
 class TestFixtureEndToEnd(unittest.TestCase):
     def _assert_valid_partial_cid_is_recovered(self, *, timeout):
         with tempfile.TemporaryDirectory() as td:
-            tmp=Path(td); results=tmp/"results"; envf=tmp/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n"); calls=[]
+            tmp=Path(td).resolve(); results=tmp/"results"; envf=tmp/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n"); calls=[]
             image={"id":IMAGE_ID,"repo_digests":[],"dockerfile":"docker/test.Dockerfile","dockerfile_sha256":"d"*64,"declared_input_sha256":"e"*64,"declared_input_hash_contract":"framed-sha256-v2","informational_tag":"prime-claw-test-tier1:eeeeeeeeeeee","os":"linux","architecture":"arm64","build_started_at":"2026-10-02T00:00:00Z","build_finished_at":"2026-10-02T00:00:01Z"}
             repository={"head":"b"*40,"dirty":False,"status_sha256":"a"*64,"content_sha256":"c"*64,"entry_count":1,"content_hash_contract":"framed-sha256-v2"}
             def stage(repo,dest): Path(dest).mkdir(parents=True); return repository
@@ -249,7 +275,7 @@ class TestFixtureEndToEnd(unittest.TestCase):
     def test_timeout_after_valid_cid_recovers_and_tears_down_exact_id(self): self._assert_valid_partial_cid_is_recovered(timeout=True)
     def test_invalid_cidfile_never_reaches_fixture_teardown(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp=Path(td); results=tmp/"results"; envf=tmp/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
+            tmp=Path(td).resolve(); results=tmp/"results"; envf=tmp/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
             image={"id":IMAGE_ID,"repo_digests":[],"dockerfile":"docker/test.Dockerfile","dockerfile_sha256":"d"*64,"declared_input_sha256":"e"*64,"declared_input_hash_contract":"framed-sha256-v2","informational_tag":"prime-claw-test-tier1:eeeeeeeeeeee","os":"linux","architecture":"arm64","build_started_at":"2026-10-02T00:00:00Z","build_finished_at":"2026-10-02T00:00:01Z"}
             repository={"head":"b"*40,"dirty":False,"status_sha256":"a"*64,"content_sha256":"c"*64,"entry_count":1,"content_hash_contract":"framed-sha256-v2"}
             def stage(repo,dest): Path(dest).mkdir(parents=True); return repository
@@ -272,7 +298,7 @@ class TestFixtureEndToEnd(unittest.TestCase):
 
     def test_install_disconnect_identity_apply_check_then_manifest(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp=Path(td); results=tmp/"results"; envf=tmp/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n"); events=[]
+            tmp=Path(td).resolve(); results=tmp/"results"; envf=tmp/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n"); events=[]
             image={"id":IMAGE_ID,"repo_digests":[],"dockerfile":"docker/test.Dockerfile","dockerfile_sha256":"d"*64,"declared_input_sha256":"e"*64,"declared_input_hash_contract":"framed-sha256-v2","informational_tag":"prime-claw-test-tier1:eeeeeeeeeeee","os":"linux","architecture":"arm64","build_started_at":"2026-10-02T00:00:00Z","build_finished_at":"2026-10-02T00:00:01Z"}
             def host_run(args,**kw):
                 if args==["docker","info"]: return cp(args)
@@ -348,7 +374,7 @@ class TestFixtureEndToEnd(unittest.TestCase):
         ''')
         for checkpoint in ("run","exec","cleanup"):
             with self.subTest(checkpoint=checkpoint), tempfile.TemporaryDirectory() as td:
-                root=Path(td); child=root/"child.py"; child.write_text(child_source)
+                root=Path(td).resolve(); child=root/"child.py"; child.write_text(child_source)
                 proc=subprocess.Popen([sys.executable,str(child),str(Path(__file__).resolve().parent.parent),str(root),checkpoint],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
                 deadline=time.monotonic()+5
                 while time.monotonic()<deadline and not (root/"ready").exists() and proc.poll() is None:
@@ -367,10 +393,336 @@ class TestFixtureEndToEnd(unittest.TestCase):
                 calls=[json.loads(line) for line in (root/"calls.log").read_text().splitlines()]
                 self.assertEqual(next(call for call in calls if call[:3]==["docker","rm","-f"])[-1],CID)
 
+    @unittest.skipUnless(hasattr(signal, "pthread_sigmask")
+                         and hasattr(signal, "sigpending"),
+                         "requires POSIX pending-signal inspection")
+    def test_fixture_terminal_boundary_matrix(self):
+        controller = r'''
+import json, os, signal, sys, tempfile
+from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, str(Path(sys.argv[1]) / 'tests'))
+import conftest
+checkpoint = sys.argv[2]
+injected_signal = int(sys.argv[3])
+root = Path(sys.argv[4]).resolve()
+results = root / 'results'
+envf = root / 'pinned.env'
+envf.write_text('PRIME_AGENT_PINNED=0.9.8\n')
+watched = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+seen = []
+def prior(signum, _frame):
+    seen.append(int(signum))
+    if checkpoint == 'prior_raises':
+        raise RuntimeError('injected prior handler failure')
+for signum in watched:
+    signal.signal(signum, prior)
+if checkpoint == 'caller_pending':
+    signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM})
+    os.kill(os.getpid(), signal.SIGTERM)
+entry_mask = signal.pthread_sigmask(signal.SIG_BLOCK, [])
+image = {
+    'id': 'sha256:' + 'a' * 64, 'repo_digests': [],
+    'dockerfile': 'docker/test.Dockerfile',
+    'dockerfile_sha256': 'd' * 64,
+    'declared_input_sha256': 'e' * 64,
+    'declared_input_hash_contract': 'framed-sha256-v2',
+    'informational_tag': 'prime-claw-test-tier1:eeeeeeeeeeee',
+    'os': 'linux', 'architecture': 'arm64',
+    'build_started_at': '2026-10-02T00:00:00Z',
+    'build_finished_at': '2026-10-02T00:00:01Z',
+}
+repository = {
+    'head': 'b' * 40, 'dirty': False, 'status_sha256': 'a' * 64,
+    'content_sha256': 'c' * 64, 'entry_count': 1,
+    'content_hash_contract': 'framed-sha256-v2',
+}
+artifact = {
+    'kind': 'vendor-binary', 'version': '0.9.8',
+    'executable_sha256': 'f' * 64,
+}
+def cp(args, rc=0, out='', err='', outcome='exited', signum=None):
+    return SimpleNamespace(args=args, returncode=rc, stdout=out, stderr=err,
+                           outcome=outcome, signal=signum)
+def stage(_repo, dest):
+    Path(dest).mkdir(parents=True)
+    return repository
+def host(args, **_kwargs):
+    if args == ['docker', 'info']:
+        return cp(args)
+    if args[:3] == ['docker', 'run', '-d']:
+        Path(args[args.index('--cidfile') + 1]).write_text('c' * 64 + '\n')
+        return cp(args)
+    raise AssertionError(args)
+def container_run(self, *args, **_kwargs):
+    return cp(args)
+clean = conftest.TeardownResult('absent', 'clean', 'ordinary_nonzero', True)
+real_kill = os.kill
+kill_calls = 0
+def fixture_kill(pid, signum):
+    global kill_calls
+    kill_calls += 1
+    if checkpoint == 'redelivery_failure' and kill_calls == 2:
+        raise OSError('injected redelivery failure')
+    return real_kill(pid, signum)
+def finalize(*_args, **_kwargs):
+    if checkpoint == 'redelivery_failure':
+        os.kill(os.getpid(), injected_signal)
+    return clean
+real_open = conftest.provenance.open_owned_directory
+opened = []
+open_failed = False
+def open_owned(path, binding, **kwargs):
+    global open_failed
+    if checkpoint == 'capability_open_failure' and Path(path).name == 'tier1' and not open_failed:
+        open_failed = True
+        raise conftest.provenance.ProvenanceError('injected capability open failure')
+    cap = real_open(path, binding, **kwargs)
+    if Path(path).name == 'tier1':
+        opened.append(cap)
+    return cap
+real_inventory = conftest.provenance.evidence_inventory
+real_atomic = conftest.provenance.atomic_write_manifest
+real_verify = conftest.provenance.verify_evidence
+injected = False
+def inject_once():
+    global injected
+    if not injected:
+        injected = True
+        os.kill(os.getpid(), injected_signal)
+def inventory(*args, **kwargs):
+    if checkpoint in ('inventory', 'prior_raises'):
+        inject_once()
+    return real_inventory(*args, **kwargs)
+def atomic(*args, **kwargs):
+    global injected
+    if checkpoint == 'atomic':
+        inject_once()
+    result = real_atomic(*args, **kwargs)
+    if checkpoint == 'publication_failure' and not injected:
+        injected = True
+        raise RuntimeError('injected post-publication failure')
+    return result
+def verify(*args, **kwargs):
+    result = real_verify(*args, **kwargs)
+    if checkpoint == 'verify':
+        inject_once()
+    return result
+real_signal = conftest.signal.signal
+real_sigpending = conftest.signal.sigpending
+real_sigmask = conftest.signal.pthread_sigmask
+signal_calls = 0
+sigpending_calls = 0
+sigmask_calls = 0
+def fixture_sigpending():
+    global sigpending_calls
+    sigpending_calls += 1
+    fail_at = {
+        'sigpending_publication_failure': 2,
+        'sigpending_before_restore_failure': 6,
+        'sigpending_after_restore_failure': 7,
+    }.get(checkpoint)
+    if fail_at is not None and sigpending_calls == fail_at:
+        raise RuntimeError('injected terminal pending inspection failure')
+    return real_sigpending()
+def fixture_sigmask(how, mask):
+    global sigmask_calls
+    sigmask_calls += 1
+    if checkpoint == 'initial_block_failure' and sigmask_calls == 2:
+        raise RuntimeError('injected initial block failure')
+    return real_sigmask(how, mask)
+def fixture_signal(signum, handler):
+    global signal_calls
+    signal_calls += 1
+    if checkpoint == 'handler_install_failure' and signal_calls == 2:
+        raise RuntimeError('injected handler install failure')
+    if checkpoint == 'restoration' and signal_calls == len(watched) + 1:
+        inject_once()
+    return real_signal(signum, handler)
+patches = [
+    mock.patch.dict(os.environ, {'TIER1_ENV_FILE': str(envf)}),
+    mock.patch.object(conftest, 'RESULTS', results),
+    mock.patch.object(conftest.shutil, 'which', return_value='/fake/docker'),
+    mock.patch.object(conftest, '_host_command', side_effect=host),
+    mock.patch.object(conftest, '_build_tier1_image', return_value=image),
+    mock.patch.object(conftest, '_disconnect_container_networks',
+                      return_value='2026-10-02T00:00:02Z'),
+    mock.patch.object(conftest, '_installed_package_identity',
+                      return_value=artifact),
+    mock.patch.object(conftest.Tier1Container, 'run', new=container_run),
+    mock.patch.object(conftest, '_finalize_session', side_effect=finalize),
+    mock.patch.object(conftest.os, 'kill', side_effect=fixture_kill),
+    mock.patch.object(conftest.provenance, 'stage_repository_snapshot',
+                      side_effect=stage),
+    mock.patch.object(conftest.provenance, 'open_owned_directory',
+                      side_effect=open_owned),
+    mock.patch.object(conftest.provenance, 'evidence_inventory',
+                      side_effect=inventory),
+    mock.patch.object(conftest.provenance, 'atomic_write_manifest',
+                      side_effect=atomic),
+    mock.patch.object(conftest.provenance, 'verify_evidence',
+                      side_effect=verify),
+    mock.patch.object(conftest.signal, 'signal', side_effect=fixture_signal),
+    mock.patch.object(conftest.signal, 'sigpending',
+                      side_effect=fixture_sigpending),
+    mock.patch.object(conftest.signal, 'pthread_sigmask',
+                      side_effect=fixture_sigmask),
+]
+for patcher in patches:
+    patcher.start()
+error = None
+try:
+    generator = conftest.tier1_container.__wrapped__(SimpleNamespace())
+    next(generator)
+    next(generator)
+except StopIteration:
+    pass
+except BaseException as exc:
+    error = type(exc).__name__
+finally:
+    for patcher in reversed(patches):
+        patcher.stop()
+manifest_paths = list(results.glob('*/tier1/manifest.json'))
+manifest = json.loads(manifest_paths[0].read_text()) if manifest_paths else None
+restored_mask = signal.pthread_sigmask(signal.SIG_BLOCK, [])
+print(json.dumps({
+    'capability_closed': all(cap.fd == -1 for cap in opened),
+    'error': error,
+    'handlers_restored': all(signal.getsignal(sig) is prior for sig in watched),
+    'manifest_codes': [] if manifest is None else manifest.get('run', {}).get('failure_codes', []),
+    'manifest_status': None if manifest is None else manifest.get('run', {}).get('status', manifest.get('status')),
+    'mask_restored': restored_mask == entry_mask,
+    'pending': sorted(map(int, signal.sigpending() & set(watched))),
+    'seen': seen,
+}))
+'''
+        signal_checkpoints = ("inventory", "atomic", "verify", "restoration")
+        for checkpoint in signal_checkpoints:
+            for injected_signal in (signal.SIGTERM, signal.SIGINT,
+                                    signal.SIGHUP):
+                with self.subTest(checkpoint=checkpoint,
+                                  signal=signal.Signals(injected_signal).name), \
+                        tempfile.TemporaryDirectory() as td:
+                    completed = subprocess.run(
+                        [sys.executable, "-c", controller,
+                         str(Path(__file__).resolve().parent.parent), checkpoint,
+                         str(int(injected_signal)), td],
+                        capture_output=True, text=True, timeout=10)
+                    self.assertEqual(completed.returncode, 0,
+                                     completed.stdout + completed.stderr)
+                    row = json.loads(completed.stdout.splitlines()[-1])
+                    self.assertEqual(row["error"], "_FixtureInterrupted")
+                    self.assertTrue(row["capability_closed"])
+                    self.assertTrue(row["handlers_restored"])
+                    self.assertTrue(row["mask_restored"])
+                    self.assertEqual(row["seen"], [injected_signal])
+                    self.assertEqual(row["pending"], [])
+                    self.assertEqual(row["manifest_status"], "failed")
+                    self.assertIn("interrupted", row["manifest_codes"])
+
+        for checkpoint, expected_error in (
+            ("publication_failure", "RuntimeError"),
+            ("prior_raises", "RuntimeError"),
+            ("redelivery_failure", "OSError"),
+            ("handler_install_failure", "RuntimeError"),
+            ("initial_block_failure", "RuntimeError"),
+            ("sigpending_publication_failure", "RuntimeError"),
+            ("sigpending_before_restore_failure", "RuntimeError"),
+            ("sigpending_after_restore_failure", "RuntimeError"),
+            ("capability_open_failure", "ProvenanceError"),
+        ):
+            with self.subTest(checkpoint=checkpoint), \
+                    tempfile.TemporaryDirectory() as td:
+                completed = subprocess.run(
+                    [sys.executable, "-c", controller,
+                     str(Path(__file__).resolve().parent.parent), checkpoint,
+                     str(int(signal.SIGTERM)), td],
+                    capture_output=True, text=True, timeout=10)
+                self.assertEqual(completed.returncode, 0,
+                                 completed.stdout + completed.stderr)
+                row = json.loads(completed.stdout.splitlines()[-1])
+                self.assertEqual(row["error"], expected_error)
+                self.assertTrue(row["capability_closed"])
+                self.assertTrue(row["handlers_restored"])
+                self.assertTrue(row["mask_restored"])
+                self.assertNotEqual(row["manifest_status"], "passed")
+                if checkpoint == "prior_raises":
+                    self.assertEqual(row["seen"], [signal.SIGTERM])
+                    self.assertEqual(row["manifest_status"], "failed")
+                if checkpoint in (
+                    "sigpending_before_restore_failure",
+                    "sigpending_after_restore_failure",
+                ):
+                    self.assertEqual(row["manifest_status"], "failed")
+                    self.assertIn(
+                        "signal-inspection-failed", row["manifest_codes"])
+                if checkpoint == "sigpending_publication_failure":
+                    self.assertIsNone(row["manifest_status"])
+
+        with self.subTest(checkpoint="caller_pending"), \
+                tempfile.TemporaryDirectory() as td:
+            completed = subprocess.run(
+                [sys.executable, "-c", controller,
+                 str(Path(__file__).resolve().parent.parent), "caller_pending",
+                 str(int(signal.SIGTERM)), td],
+                capture_output=True, text=True, timeout=10)
+            self.assertEqual(completed.returncode, 0,
+                             completed.stdout + completed.stderr)
+            row = json.loads(completed.stdout.splitlines()[-1])
+            self.assertIsNone(row["error"])
+            self.assertTrue(row["capability_closed"])
+            self.assertTrue(row["handlers_restored"])
+            self.assertTrue(row["mask_restored"])
+            self.assertEqual(row["seen"], [])
+            self.assertEqual(row["pending"], [signal.SIGTERM])
+            self.assertEqual(row["manifest_status"], "passed")
+
+    def test_signal_during_fixture_publication_never_leaves_green_manifest(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp=Path(td).resolve(); results=tmp/"results"; envf=tmp/"pinned.env"
+            envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
+            image={"id":IMAGE_ID,"repo_digests":[],"dockerfile":"docker/test.Dockerfile","dockerfile_sha256":"d"*64,"declared_input_sha256":"e"*64,"declared_input_hash_contract":"framed-sha256-v2","informational_tag":"prime-claw-test-tier1:eeeeeeeeeeee","os":"linux","architecture":"arm64","build_started_at":"2026-10-02T00:00:00Z","build_finished_at":"2026-10-02T00:00:01Z"}
+            repository={"head":"b"*40,"dirty":False,"status_sha256":"a"*64,"content_sha256":"c"*64,"entry_count":1,"content_hash_contract":"framed-sha256-v2"}
+            artifact={"kind":"vendor-binary","version":"0.9.8","executable_sha256":"f"*64}
+            def stage(_repo,dest): Path(dest).mkdir(parents=True); return repository
+            def host(args,**kw):
+                if args==["docker","info"]: return cp(args)
+                if args[:3]==["docker","run","-d"]:
+                    Path(args[args.index("--cidfile")+1]).write_text(CID+"\n"); return cp(args)
+                raise AssertionError(args)
+            def container_run(self,*args,**kw): return cp(args)
+            clean=conftest.TeardownResult("absent","clean","ordinary_nonzero",True)
+            real_inventory=conftest.provenance.evidence_inventory; injected=False; kill_calls=0
+            def inventory(*args,**kwargs):
+                nonlocal injected
+                if not injected:
+                    injected=True; conftest.os.kill(os.getpid(),signal.SIGTERM)
+                return real_inventory(*args,**kwargs)
+            def fake_kill(_pid,signum):
+                nonlocal kill_calls
+                kill_calls+=1
+                if kill_calls==1:
+                    handler=signal.getsignal(signum); handler(signum,None)
+            previous={sig:signal.getsignal(sig) for sig in (signal.SIGTERM,signal.SIGINT,signal.SIGHUP)}
+            patches=[mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}),mock.patch.object(conftest,"RESULTS",results),mock.patch.object(conftest.shutil,"which",return_value="/fake/docker"),mock.patch.object(conftest,"_host_command",side_effect=host),mock.patch.object(conftest,"_build_tier1_image",return_value=image),mock.patch.object(conftest,"_disconnect_container_networks",return_value="2026-10-02T00:00:02Z"),mock.patch.object(conftest,"_installed_package_identity",return_value=artifact),mock.patch.object(conftest.Tier1Container,"run",new=container_run),mock.patch.object(conftest,"_finalize_session",return_value=clean),mock.patch.object(conftest.provenance,"stage_repository_snapshot",side_effect=stage),mock.patch.object(conftest.provenance,"evidence_inventory",side_effect=inventory),mock.patch.object(conftest.os,"kill",side_effect=fake_kill)]
+            for patcher in patches: patcher.start()
+            try:
+                gen=conftest.tier1_container.__wrapped__(SimpleNamespace()); next(gen)
+                with self.assertRaises(conftest._FixtureInterrupted): next(gen)
+            finally:
+                for patcher in reversed(patches): patcher.stop()
+            manifest=json.loads(next(results.glob("*/tier1/manifest.json")).read_text())
+            conftest.provenance.validate_manifest(manifest)
+            self.assertEqual(manifest["run"]["status"],"failed")
+            self.assertIn("interrupted",manifest["run"]["failure_codes"])
+            self.assertEqual({sig:signal.getsignal(sig) for sig in previous},previous)
+
     def test_failed_version_mismatch_retains_exact_observed_identity(self):
         for observed in ("0.9.7", "0.9.8-beta.1"):
             with self.subTest(observed=observed), tempfile.TemporaryDirectory() as td:
-                tmp=Path(td); results=tmp/"results"; envf=tmp/"pinned.env"
+                tmp=Path(td).resolve(); results=tmp/"results"; envf=tmp/"pinned.env"
                 envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
                 image={"id":IMAGE_ID,"repo_digests":[],"dockerfile":"docker/test.Dockerfile","dockerfile_sha256":"d"*64,"declared_input_sha256":"e"*64,"declared_input_hash_contract":"framed-sha256-v2","informational_tag":"prime-claw-test-tier1:eeeeeeeeeeee","os":"linux","architecture":"arm64","build_started_at":"2026-10-02T00:00:00Z","build_finished_at":"2026-10-02T00:00:01Z"}
                 repository={"head":"b"*40,"dirty":False,"status_sha256":"a"*64,"content_sha256":"c"*64,"entry_count":1,"content_hash_contract":"framed-sha256-v2"}
@@ -401,7 +753,7 @@ class TestFixtureEndToEnd(unittest.TestCase):
 
     def test_finalizer_timeout_plus_absence_publishes_failed_not_passed(self):
         with tempfile.TemporaryDirectory() as td:
-            tmp=Path(td); results=tmp/"results"; envf=tmp/"pinned.env"
+            tmp=Path(td).resolve(); results=tmp/"results"; envf=tmp/"pinned.env"
             envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
             image={"id":IMAGE_ID,"repo_digests":[],"dockerfile":"docker/test.Dockerfile","dockerfile_sha256":"d"*64,"declared_input_sha256":"e"*64,"declared_input_hash_contract":"framed-sha256-v2","informational_tag":"prime-claw-test-tier1:eeeeeeeeeeee","os":"linux","architecture":"arm64","build_started_at":"2026-10-02T00:00:00Z","build_finished_at":"2026-10-02T00:00:01Z"}
             repository={"head":"b"*40,"dirty":False,"status_sha256":"a"*64,"content_sha256":"c"*64,"entry_count":1,"content_hash_contract":"framed-sha256-v2"}

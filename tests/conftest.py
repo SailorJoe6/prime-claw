@@ -166,7 +166,8 @@ def _load_install_selection() -> tuple[str, str]:
     return "pinned", pinned
 
 
-def _build_tier1_image(tier_dir: Path, workspace_snapshot: Path) -> dict:
+def _build_tier1_image(tier_cap: provenance.OwnedDirectory,
+                       tier_dir: Path, workspace_snapshot: Path) -> dict:
     """Build from a run-owned empty context and return exact image identity."""
     build_context = tier_dir / "build-context"
     build_context.mkdir()
@@ -189,7 +190,7 @@ def _build_tier1_image(tier_dir: Path, workspace_snapshot: Path) -> dict:
     except OSError as exc:
         raise RuntimeError("tier-1 fixture: image iidfile was not published") from exc
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
-        raise RuntimeError(f"tier-1 fixture: invalid image ID in iidfile: {image_id!r}")
+        raise RuntimeError("tier-1 fixture: invalid image ID in iidfile")
     inspected = _host_command(
         ["docker", "image", "inspect", image_id], check=True,
         capture_output=True, text=True, timeout=30,
@@ -204,7 +205,7 @@ def _build_tier1_image(tier_dir: Path, workspace_snapshot: Path) -> dict:
         dockerfile_sha256=dockerfile_hash,
         declared_input_sha256=input_hash, informational_tag=tag,
         build_started_at=started_at, build_finished_at=finished_at)
-    provenance.write_sanitized_json(tier_dir / "image.json", safe)
+    provenance.write_sanitized_json(tier_cap, "image.json", safe)
     return safe
 
 
@@ -216,7 +217,9 @@ def _container_networks(container_id: str) -> list[str]:
              "{{json .NetworkSettings.Networks}}", container_id],
             capture_output=True, text=True, timeout=30,
         )
-    except BaseException as exc:
+    except _FixtureInterrupted:
+        raise
+    except Exception as exc:
         raise RuntimeError(
             "tier-1 fixture: container network inspection is unknown") from exc
     if out.outcome != "exited" or out.returncode != 0:
@@ -523,30 +526,34 @@ class TeardownError(RuntimeError):
         self.state = result.state
 
 
+def _output_bytes(value) -> bytes:
+    if value is None:
+        return b""
+    return value if isinstance(value, bytes) else str(value).encode("utf-8", "replace")
+
+
 def _inspect_container(container_id: str, timeout: float = 15) -> tuple:
-    """Return (presence, diagnostics, bounded outcome) for one exact ID."""
+    """Return (presence, safe diagnostics, bounded outcome) for one exact ID."""
     out = _host_command(["docker", "inspect", container_id],
-                        capture_output=True, text=True, timeout=timeout,
+                        capture_output=True, text=False, timeout=timeout,
                         propagate_signal=False)
+    safe_diag = f"outcome={out.outcome} rc={out.returncode}"
     if out.outcome != "exited":
-        return "unknown", (
-            f"docker inspect outcome={out.outcome} rc={out.returncode}"), out.outcome
-    diag = (f"rc={out.returncode} stdout={out.stdout.strip()!r} "
-            f"stderr={out.stderr.strip()!r}")
+        return "unknown", safe_diag, out.outcome
     if out.returncode == 0:
-        return "present", diag, "clean"
-    blob = f"{out.stdout}\n{out.stderr}".lower()
-    if "no such container" in blob or "no such object" in blob:
-        return "absent", diag, "ordinary_nonzero"
-    return "unknown", diag, "ordinary_nonzero"
+        return "present", safe_diag, "clean"
+    blob = (_output_bytes(out.stdout) + b"\n" + _output_bytes(out.stderr)).lower()
+    if b"no such container" in blob or b"no such object" in blob:
+        return "absent", safe_diag, "ordinary_nonzero"
+    return "unknown", safe_diag, "ordinary_nonzero"
 
 
 def _remove_session_container(container_id: str, *,
                               rm_timeout: float = 60,
                               inspect_timeout: float = 15) -> TeardownResult:
-    """Remove one captured ID and keep command health separate from presence."""
+    """Remove one captured ID; arbitrary daemon output never escapes memory."""
     rm = _host_command(["docker", "rm", "-f", container_id],
-                       capture_output=True, text=True, timeout=rm_timeout,
+                       capture_output=True, text=False, timeout=rm_timeout,
                        propagate_signal=False)
     if rm.outcome == "exited":
         remove_outcome = "clean" if rm.returncode == 0 else "ordinary_nonzero"
@@ -558,7 +565,7 @@ def _remove_session_container(container_id: str, *,
              and remove_outcome in {"clean", "ordinary_nonzero"}
              and inspect_outcome == "ordinary_nonzero")
     diagnostics = (
-        f"remove_outcome={remove_outcome} rc={rm.returncode}; "
+        f"remove_outcome={remove_outcome} remove_rc={rm.returncode}; "
         f"inspect_outcome={inspect_outcome} state={state}; {inspect_diag}")
     result = TeardownResult(state, remove_outcome, inspect_outcome,
                             clean, diagnostics)
@@ -571,8 +578,11 @@ def _remove_session_container(container_id: str, *,
         f"manually: docker rm -f {container_id}")
 
 
-def _finalize_session(container_id, share: Path, in_flight=None) -> TeardownResult:
-    """Verify exact-container absence and remove only the run-owned share."""
+def _finalize_session(container_id, share: Path, in_flight=None,
+                      share_binding: str | None = None,
+                      quarantine_parent: Path | None = None,
+                      quarantine_binding: str | None = None) -> TeardownResult:
+    """Verify exact-container absence and remove only the bound owned share."""
     teardown_error = None
     if container_id is None:
         result = TeardownResult("absent", "not_needed", "not_needed", True)
@@ -585,7 +595,21 @@ def _finalize_session(container_id, share: Path, in_flight=None) -> TeardownResu
             print(f"tier-1 fixture: {exc}")
     if not os.environ.get("TIER1_KEEP_SHARE"):
         if result.clean:
-            shutil.rmtree(share, ignore_errors=True)
+            try:
+                binding = share_binding or provenance.owned_directory_binding(share)
+                provenance.remove_owned_directory(
+                    share, binding,
+                    quarantine_parent=quarantine_parent or share.parent,
+                    quarantine_binding=quarantine_binding)
+            except (OSError, provenance.ProvenanceError) as exc:
+                refused = TeardownResult(
+                    result.state, result.remove_outcome,
+                    result.inspect_outcome, False,
+                    "owned share cleanup refused")
+                raise TeardownError(
+                    refused,
+                    "tier-1 fixture: TEARDOWN FAILED — owned share binding "
+                    "changed; refusing cleanup") from exc
         else:
             print(f"tier-1 fixture: session container may still own the "
                   f"share — preserving evidence at {share}")
@@ -615,12 +639,15 @@ def tier1_container(request):
     if docker_info.outcome != "exited" or docker_info.returncode != 0:
         pytest.skip("tier 1 requires Docker: docker daemon is not reachable")
 
-    run_id, tier_dir = provenance.allocate_run_tree(RESULTS, "tier1")
+    run_id, tier_dir, tier_binding = provenance.allocate_run_tree(
+        RESULTS, "tier1")
     run_started = provenance.utc_now()
     workspace_snapshot = RESULTS / ".workspaces" / run_id
     repository = provenance.stage_repository_snapshot(REPO, workspace_snapshot)
+    workspace_binding = provenance.owned_directory_binding(workspace_snapshot)
     share = tier_dir / "share"
     share.mkdir(mode=0o755)
+    share_binding = provenance.owned_directory_binding(share)
     setup_log = tier_dir / "setup.log"
     setup_lines = [f"mode={mode}", f"run_id={run_id}"]
     container_id = None
@@ -638,6 +665,10 @@ def tier1_container(request):
         sig for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
         if sig is not None)
     previous_handlers = {sig: signal.getsignal(sig) for sig in watched_signals}
+    terminal_sigmask = getattr(signal, "pthread_sigmask", None)
+    terminal_sigpending = getattr(signal, "sigpending", None)
+    if terminal_sigmask is None or terminal_sigpending is None:
+        raise RuntimeError("tier-1 fixture requires POSIX signal-mask support")
 
     def on_fixture_signal(signum, _frame):
         nonlocal pending_signal
@@ -645,12 +676,32 @@ def tier1_container(request):
         if not finalizing:
             raise _FixtureInterrupted(signum)
 
-    for watched_signal in watched_signals:
-        signal.signal(watched_signal, on_fixture_signal)
+    # Snapshot caller-owned mask/pending state before acquiring the evidence
+    # capability. Once acquired, any failure while blocking the watched set
+    # restores that exact mask and closes the capability before propagating.
+    caller_mask = terminal_sigmask(signal.SIG_BLOCK, [])
+    caller_owned_pending = set(terminal_sigpending())
+    tier_cap = provenance.open_owned_directory(tier_dir, tier_binding)
+    terminal_signals_blocked = False
+    try:
+        terminal_sigmask(signal.SIG_BLOCK, watched_signals)
+        terminal_signals_blocked = True
+    except BaseException:
+        try:
+            terminal_sigmask(signal.SIG_SETMASK, caller_mask)
+        finally:
+            tier_cap.close()
+        raise
+    handlers_owned = True
 
     try:
+        for watched_signal in watched_signals:
+            signal.signal(watched_signal, on_fixture_signal)
+        terminal_signals_blocked = False
+        terminal_sigmask(signal.SIG_SETMASK, caller_mask)
         print(f"tier-1 fixture: run={run_id}; build exact image")
-        image = _build_tier1_image(tier_dir, workspace_snapshot)
+        image = _build_tier1_image(
+            tier_cap, tier_dir, workspace_snapshot)
         name = f"prime-claw-tier1-{run_id}"
         cidfile = tier_dir / "container.cid"
         mounts = ["-v", f"{workspace_snapshot}:{WORKSPACE}:ro",
@@ -665,8 +716,8 @@ def tier1_container(request):
         raw_container_id = cidfile.read_text().strip() if cidfile.is_file() else ""
         if started.returncode != 0:
             raise RuntimeError(
-                "tier-1 fixture: container start failed: "
-                + started.stderr[-1000:])
+                "tier-1 fixture: container start failed "
+                f"(outcome={started.outcome}, rc={started.returncode})")
         if not re.fullmatch(r"[0-9a-f]{64}", raw_container_id):
             raise RuntimeError("tier-1 fixture: invalid or missing captured container ID")
         container_id = raw_container_id
@@ -687,15 +738,15 @@ def tier1_container(request):
 
         network_time = _disconnect_container_networks(container_id)
         setup_lines.append("phase=network-absent")
-        (tier_dir / "network.json").write_text(
-            '{"verified_absent":true}\n')
+        provenance.write_sanitized_json(
+            tier_cap, "network.json", {"verified_absent": True})
         artifact = _installed_package_identity(container)
         if artifact["version"] != value:
             raise RuntimeError(
                 "tier-1 fixture: installed Prime Agent version does not "
                 "match the requested pinned version")
-        (tier_dir / "installed-artifact.json").write_text(
-            json.dumps(artifact, sort_keys=True, separators=(",", ":")) + "\n")
+        provenance.write_sanitized_json(
+            tier_cap, "installed-artifact.json", artifact)
 
         for script in ("apply-prime-agent-plugin.sh", "check-prime-agent-plugin.sh"):
             result = container.run(
@@ -713,111 +764,293 @@ def tier1_container(request):
         if isinstance(exc, _FixtureInterrupted):
             pending_signal = exc.signum
         setup_lines.append(f"failure_type={type(exc).__name__}")
-        setup_log.write_text("\n".join(setup_lines))
+        try:
+            setup_log.write_text("\n".join(setup_lines))
+        except BaseException as log_exc:
+            if hasattr(exc, "add_note"):
+                exc.add_note(
+                    "tier-1 fixture setup-log write also failed: "
+                    f"{type(log_exc).__name__}")
         raise
     finally:
         finalizing = True
-        finalizer_error = None
+        secondary_errors: list[tuple[str, BaseException]] = []
         publication_error = None
-        if container_id is None and container_attempted and cidfile.is_file():
-            recovered_id = cidfile.read_text().strip()
-            if re.fullmatch(r"[0-9a-f]{64}", recovered_id):
-                container_id = recovered_id
-                setup_lines.append("phase=container-identity-recovered")
-                setup_log.write_text("\n".join(setup_lines))
-        if container_id is None and container_attempted:
-            teardown_result = TeardownResult(
-                "unknown", "identity_refused", "not_run", False)
-            print("tier-1 fixture: container publication identity is invalid; "
-                  "refusing destructive teardown and preserving mounted inputs")
-        else:
+        published_manifest_binding = None
+        def add_secondary(code: str, exc: BaseException) -> None:
+            secondary_errors.append((code, exc))
+            if setup_error is not None and hasattr(setup_error, "add_note"):
+                setup_error.add_note(
+                    f"tier-1 fixture secondary {code}: {type(exc).__name__}")
+
+        def make_manifest() -> dict:
+            tests_failed = bool(
+                getattr(getattr(request, "session", None), "testsfailed", 0))
+            failure_codes = []
+            if setup_error is not None:
+                failure_codes.append("setup-or-body-failed")
+            if tests_failed:
+                failure_codes.append("tests-failed")
+            if (pending_signal is not None or _DEFERRED_SIGNAL is not None
+                    or terminal_signal is not None):
+                failure_codes.append("interrupted")
+            if not teardown_result.clean:
+                failure_codes.append("teardown-command-failed")
+            if teardown_result.state != "absent":
+                failure_codes.append("teardown-not-absent")
+            if artifact is not None and artifact["version"] != value:
+                failure_codes.append("installed-version-mismatch")
+            for code, _exc in secondary_errors:
+                if code not in failure_codes:
+                    failure_codes.append(code)
+            passed = (not failure_codes and teardown_result.clean
+                      and teardown_result.state == "absent"
+                      and image is not None and artifact is not None
+                      and artifact["version"] == value
+                      and network_time is not None)
+            if not failure_codes and not passed:
+                failure_codes.append("incomplete-identity")
+            prime_identity = {
+                "mode": "pinned", "requested_version": value,
+                "installed_version": artifact["version"] if artifact else None,
+                "artifact": artifact,
+            }
+            return {
+                "schema_version": provenance.SCHEMA_VERSION,
+                "command_contract_version": provenance.COMMAND_CONTRACT_VERSION,
+                "run": {"id": run_id, "tier": "tier1", "mode": "pinned",
+                        "started_at": run_started,
+                        "finished_at": provenance.utc_now(),
+                        "status": "passed" if passed else "failed",
+                        "failure_codes": failure_codes},
+                "repository": repository,
+                "prime_agent": prime_identity,
+                "image": image,
+                "network": {"disconnected_at": network_time,
+                            "verified_absent": network_time is not None},
+                "teardown": {"state": teardown_result.state,
+                             "verified_at": teardown_time or provenance.utc_now(),
+                             "remove_outcome": teardown_result.remove_outcome,
+                             "inspect_outcome": teardown_result.inspect_outcome,
+                             "clean": teardown_result.clean},
+                "evidence": {"files": []},
+            }
+
+        terminal_signal = None
+        redeliver_signal = None
+        terminal_manifest_failed = False
+        terminal_observation_failed = False
+
+        def observed_kernel_terminal_signal():
+            waiting = terminal_sigpending()
+            for candidate in watched_signals:
+                # A caller-blocked signal remains caller-owned even when it
+                # arrives during the fixture. Pre-existing pending state is
+                # recorded separately for clarity and must also stay pending.
+                if (candidate in waiting and candidate not in caller_mask
+                        and candidate not in caller_owned_pending):
+                    return candidate
+            return None
+
+        def observe_terminal_safely(code: str):
+            nonlocal terminal_observation_failed
             try:
-                teardown_result = _finalize_session(
-                    container_id, share, setup_error)
-            except TeardownError as exc:
-                teardown_result = exc.result
-                finalizer_error = exc
-        if _DEFERRED_SIGNAL is not None:
-            pending_signal = _DEFERRED_SIGNAL
-        if teardown_result.clean:
-            shutil.rmtree(workspace_snapshot)
-        else:
-            print(f"tier-1 fixture: preserving repository snapshot at "
-                  f"{workspace_snapshot} because teardown is "
-                  f"{teardown_result.state}/{teardown_result.remove_outcome}")
-        teardown_time = provenance.utc_now()
-        finished = provenance.utc_now()
-        tests_failed = bool(
-            getattr(getattr(request, "session", None), "testsfailed", 0))
-        passed = (setup_error is None and finalizer_error is None
-                  and pending_signal is None and not tests_failed
-                  and teardown_result.clean
-                  and teardown_result.state == "absent" and image is not None
-                  and artifact is not None and artifact["version"] == value
-                  and network_time is not None)
-        failure_codes = []
-        if setup_error is not None:
-            failure_codes.append("setup-or-body-failed")
-        if tests_failed:
-            failure_codes.append("tests-failed")
-        if pending_signal is not None:
-            failure_codes.append("interrupted")
-        if not teardown_result.clean:
-            failure_codes.append("teardown-command-failed")
-        if teardown_result.state != "absent":
-            failure_codes.append("teardown-not-absent")
-        if artifact is not None and artifact["version"] != value:
-            failure_codes.append("installed-version-mismatch")
-        if not failure_codes and not passed:
-            failure_codes.append("incomplete-identity")
-        prime_identity = {
-            "mode": "pinned", "requested_version": value,
-            "installed_version": artifact["version"] if artifact else None,
-            "artifact": artifact,
-        }
-        manifest = {
-            "schema_version": provenance.SCHEMA_VERSION,
-            "command_contract_version": provenance.COMMAND_CONTRACT_VERSION,
-            "run": {"id": run_id, "tier": "tier1", "mode": "pinned",
-                    "started_at": run_started, "finished_at": finished,
-                    "status": "passed" if passed else "failed",
-                    "failure_codes": failure_codes},
-            "repository": repository,
-            "prime_agent": prime_identity,
-            "image": image,
-            "network": {"disconnected_at": network_time,
-                        "verified_absent": network_time is not None},
-            "teardown": {"state": teardown_result.state,
-                         "verified_at": teardown_time,
-                         "remove_outcome": teardown_result.remove_outcome,
-                         "inspect_outcome": teardown_result.inspect_outcome,
-                         "clean": teardown_result.clean},
-            "evidence": {"files": []},
-        }
+                return observed_kernel_terminal_signal()
+            except BaseException as exc:
+                terminal_observation_failed = True
+                add_secondary(code, exc)
+                return None
+
+        def publish_terminal_failure() -> dict:
+            nonlocal published_manifest_binding, terminal_manifest_failed
+            failed = make_manifest()
+            failed["evidence"]["files"] = provenance.evidence_inventory(
+                tier_cap)
+            published_manifest_binding = provenance.atomic_write_manifest(
+                tier_cap, failed,
+                expected_existing=published_manifest_binding)
+            provenance.verify_evidence(tier_cap, failed)
+            terminal_manifest_failed = True
+            return failed
+
         try:
-            manifest["evidence"]["files"] = provenance.evidence_inventory(tier_dir)
-            provenance.atomic_write_manifest(tier_dir / "manifest.json", manifest)
-            provenance.verify_evidence(tier_dir, manifest)
-            print(f"tier-1 fixture: evidence={tier_dir}")
-        except BaseException as exc:
-            publication_error = exc
-            primary = setup_error or finalizer_error
-            if primary is not None and hasattr(primary, "add_note"):
-                primary.add_note(
-                    "tier-1 fixture evidence publication also failed: "
-                    f"{type(exc).__name__}")
+            if container_id is None and container_attempted:
+                try:
+                    if cidfile.is_file():
+                        recovered_id = cidfile.read_text().strip()
+                        if re.fullmatch(r"[0-9a-f]{64}", recovered_id):
+                            container_id = recovered_id
+                            setup_lines.append("phase=container-identity-recovered")
+                            setup_log.write_text("\n".join(setup_lines))
+                except BaseException as exc:
+                    add_secondary("identity-read-failed", exc)
+            if container_id is None and container_attempted:
+                teardown_result = TeardownResult(
+                    "unknown", "identity_refused", "not_run", False)
+                print("tier-1 fixture: container publication identity is invalid; "
+                      "refusing destructive teardown and preserving mounted inputs")
+            else:
+                try:
+                    teardown_result = _finalize_session(
+                        container_id, share, setup_error, share_binding,
+                        tier_dir, tier_binding)
+                except TeardownError as exc:
+                    teardown_result = exc.result
+                    add_secondary("teardown-command-failed", exc)
+                except BaseException as exc:
+                    teardown_result = TeardownResult(
+                        "unknown", "launch_error", "not_run", False)
+                    add_secondary("teardown-command-failed", exc)
+            if _DEFERRED_SIGNAL is not None:
+                pending_signal = _DEFERRED_SIGNAL
+            if teardown_result.clean:
+                try:
+                    provenance.remove_owned_directory(
+                        workspace_snapshot, workspace_binding,
+                        quarantine_parent=tier_dir,
+                        quarantine_binding=tier_cap.binding)
+                except BaseException as exc:
+                    add_secondary("snapshot-cleanup-failed", exc)
+            else:
+                print(f"tier-1 fixture: preserving repository snapshot at "
+                      f"{workspace_snapshot} because teardown is "
+                      f"{teardown_result.state}/{teardown_result.remove_outcome}")
+            teardown_time = provenance.utc_now()
+
+            # Establish the terminal boundary before recomputing or publishing
+            # final state. Keep watched signals blocked through publication and
+            # prior-handler restoration so every pre-restoration arrival is
+            # folded into durable non-green terminal truth.
+            if not terminal_signals_blocked:
+                terminal_sigmask(signal.SIG_BLOCK, watched_signals)
+                terminal_signals_blocked = True
+            redeliver_signal = pending_signal or _DEFERRED_SIGNAL
+            terminal_signal = (
+                redeliver_signal or observed_kernel_terminal_signal())
+
+            try:
+                manifest = make_manifest()
+                manifest["evidence"]["files"] = provenance.evidence_inventory(
+                    tier_cap)
+                # Recompute after inventory because a finalization signal is
+                # recorded, not raised, while owned publication is in flight.
+                terminal_signal = (
+                    terminal_signal or observed_kernel_terminal_signal())
+                current = make_manifest()
+                current["evidence"]["files"] = manifest["evidence"]["files"]
+                published_manifest_binding = provenance.atomic_write_manifest(
+                    tier_cap, current)
+                terminal_signal = (
+                    terminal_signal or observed_kernel_terminal_signal())
+                if (terminal_signal is not None
+                        and current["run"]["status"] == "passed"):
+                    current = publish_terminal_failure()
+                elif terminal_signal is not None:
+                    terminal_manifest_failed = True
+                provenance.verify_evidence(tier_cap, current)
+                terminal_signal = (
+                    terminal_signal or observed_kernel_terminal_signal())
+                if (terminal_signal is not None
+                        and current["run"]["status"] == "passed"):
+                    current = publish_terminal_failure()
+                print(f"tier-1 fixture: evidence={tier_dir}")
+            except BaseException as exc:
+                publication_error = exc
+                add_secondary("publication-failed", exc)
+                # An exception after atomic publication may have left stale
+                # green evidence. This run owns the unique manifest path; a
+                # failed or absent manifest is safer than a green contradiction.
+                try:
+                    provenance.invalidate_green_manifest(
+                        tier_cap, expected=published_manifest_binding)
+                except BaseException as invalidation_exc:
+                    add_secondary(
+                        "publication-invalidation-failed", invalidation_exc)
         finally:
-            for watched_signal, previous in previous_handlers.items():
-                signal.signal(watched_signal, previous)
-        if pending_signal is not None:
-            os.kill(os.getpid(), pending_signal)
-            # A restored callable/SIG_IGN handler may return. Never allow that
-            # redelivery path to resume as a green fixture session.
-            raise _FixtureInterrupted(pending_signal)
-        if finalizer_error is not None:
-            raise finalizer_error
-        if publication_error is not None and setup_error is None:
-            raise publication_error
+            # Keep the evidence capability and watched mask through the last
+            # green-manifest check. This closes the late signal window before
+            # every prior handler is restored.
+            if not terminal_signals_blocked:
+                try:
+                    terminal_sigmask(signal.SIG_BLOCK, watched_signals)
+                    terminal_signals_blocked = True
+                except BaseException as exc:
+                    add_secondary("signal-boundary-failed", exc)
+            redeliver_signal = (
+                redeliver_signal or pending_signal or _DEFERRED_SIGNAL)
+            terminal_signal = (
+                terminal_signal or redeliver_signal
+                or observe_terminal_safely("signal-inspection-failed"))
+            if ((terminal_signal is not None or terminal_observation_failed)
+                    and not terminal_manifest_failed):
+                try:
+                    publish_terminal_failure()
+                except BaseException as exc:
+                    add_secondary("terminal-publication-failed", exc)
+                    try:
+                        provenance.invalidate_green_manifest(
+                            tier_cap, expected=published_manifest_binding)
+                    except BaseException as invalidation_exc:
+                        add_secondary(
+                            "publication-invalidation-failed", invalidation_exc)
+
+            restoration_error = None
+            if handlers_owned:
+                for watched_signal, previous in previous_handlers.items():
+                    try:
+                        signal.signal(watched_signal, previous)
+                    except BaseException as exc:
+                        if restoration_error is None:
+                            restoration_error = exc
+            if restoration_error is not None:
+                add_secondary("handler-restoration-failed", restoration_error)
+
+            # A signal can become pending during handler restoration. It is
+            # still part of this fixture's terminal truth and must neutralize
+            # any green manifest before the evidence capability is closed.
+            terminal_signal = (
+                terminal_signal
+                or observe_terminal_safely("signal-inspection-failed"))
+            if ((terminal_signal is not None or terminal_observation_failed)
+                    and not terminal_manifest_failed):
+                try:
+                    publish_terminal_failure()
+                except BaseException as exc:
+                    add_secondary("terminal-publication-failed", exc)
+                    try:
+                        provenance.invalidate_green_manifest(
+                            tier_cap, expected=published_manifest_binding)
+                    except BaseException as invalidation_exc:
+                        add_secondary(
+                            "publication-invalidation-failed", invalidation_exc)
+
+            close_error = None
+            try:
+                try:
+                    # Signals consumed by the fixture handler or a bounded
+                    # cleanup command need one replay. Signals already
+                    # kernel-pending are delivered naturally by exact unmask.
+                    if redeliver_signal is not None:
+                        os.kill(os.getpid(), redeliver_signal)
+                finally:
+                    terminal_signals_blocked = False
+                    terminal_sigmask(signal.SIG_SETMASK, caller_mask)
+            finally:
+                try:
+                    tier_cap.close()
+                except BaseException as exc:
+                    close_error = exc
+            if close_error is not None:
+                add_secondary("capability-close-failed", close_error)
+
+        if terminal_signal is not None:
+            raise _FixtureInterrupted(terminal_signal)
+        if setup_error is None:
+            if secondary_errors:
+                raise secondary_errors[0][1]
+            if publication_error is not None:
+                raise publication_error
+
 
 
 @pytest.fixture

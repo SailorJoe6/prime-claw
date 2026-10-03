@@ -34,11 +34,21 @@ class TestTier1DriverSurface(unittest.TestCase):
             out=subprocess.run([str(DRIVER),"--smoke","--dry-run"],capture_output=True,text=True,env=env)
             self.assertEqual(out.returncode,0,out.stderr); self.assertFalse(marker.exists()); self.assertIn("--iidfile",out.stdout); self.assertIn("--cidfile",out.stdout)
     def test_real_contract_has_captured_identity_not_rm(self):
-        text=DRIVER.read_text(); self.assertNotIn("docker run --rm",text); self.assertIn('docker run -d --name "$NAME" --cidfile "$CIDFILE"',text); self.assertIn('bounded 60 docker rm -f "$CONTAINER_ID"',text); self.assertIn('bounded 15 docker inspect "$CONTAINER_ID"',text)
+        text=DRIVER.read_text()
+        self.assertNotIn("docker run --rm",text)
+        self.assertIn('docker run -d --name "$NAME" --cidfile "$CIDFILE"',text)
+        self.assertRegex(text, re.compile(
+            r'BOUNDED_OUTPUT_POLICY=status bounded "\$REMOVE_TIMEOUT" '
+            r'\\\s+docker rm -f "\$CONTAINER_ID"'))
+        self.assertRegex(text, re.compile(
+            r'BOUNDED_OUTPUT_POLICY=container-presence bounded '
+            r'"\$FINAL_INSPECT_TIMEOUT" \\\s+docker inspect '
+            r'"\$CONTAINER_ID"'))
     def test_real_run_fails_fast_without_docker_cli(self):
         with tempfile.TemporaryDirectory() as td:
             tmp=Path(td); isolated=tmp/"isolated-bin"; isolated.mkdir()
-            for name, source in (("dirname", shutil.which("dirname")),
+            for name, source in (("bash", shutil.which("bash", path="/bin:/usr/bin")),
+                                 ("dirname", shutil.which("dirname")),
                                  ("python3", sys.executable)):
                 self.assertTrue(source, f"missing prerequisite {name}")
                 (isolated/name).symlink_to(source)

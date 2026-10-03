@@ -3,154 +3,193 @@
 **Bead:** `prime-claw-5v7.2`
 **Branch:** `episode/project-wide-testing-strategy`
 **Promoted bundle:** `b71405c`
-**Rejected candidate:** `fd1f2b7c4a6b1fba1bc4671b3baac95248aed09e`
-**Revised delivery commit:** exact pushed SHA is recorded in the Bead receipt
+**Rejected candidates:** `fd1f2b7c4a6b1fba1bc4671b3baac95248aed09e`, `aee5cfe2bf381191024e4d4c2a6bfc52fa0b0cbd`
+**Current candidate:** recorded by exact SHA in the final Bead delivery receipt
 
 ## Revision authority
 
-The owner rejected `fd1f2b7` and reopened the Slice-1 Bead. The accepted repair
-scope is the durable `OWNER REVIEW — REVISE` Bead note: B1–B8 plus the recorded
-R-TEST-7 standalone writable-evidence-root seam. The immutable review report is:
+The owner rejected `aee5cfe` and authorized one bounded Slice-1 repair scope
+containing R1–R6 plus teardown-diagnostic redaction. F1, R2, R4, and R6 were
+accepted only for advancement within that repair; the whole replacement
+candidate remains unaccepted. The immutable authorities are:
 
-`/Users/jlanders/.prime/agent/session-artifacts/01a0fe2e-e0dd-7638-9b4c-0b118182c6e3/sub-61c1b2d1/slice1-fd1f2b7c-review.md`
+- EXPERT report: `/Users/jlanders/.prime/agent/session-artifacts/01a0fe2e-e0dd-7638-9b4c-0b118182c6e3/sub-d5bf5e77/slice1-aee5cfe2-review.md`, SHA-256 `681d4d2300ae35b4ea05be2e3965582af70d95ad06f9838bd2fc74276ab467cb`.
+- Owner report: `/Users/jlanders/.prime/agent/session-artifacts/01a0fe2e-e0dd-7638-9b4c-0b118182c6e3/owner-review-slice1-aee5cfe2/OWNER_REVIEW.md`, SHA-256 `59b6540186446ae4123d2610a50dde1ad0e0127c5a467b767796d074b77bae5a`.
 
-Its SHA-256 is
-`d076887fc09674274d7daa0dd842ce3689fe92ad6bc7260d66131456f56ba79f`.
-The four manifests cited by the rejected candidate remain historical artifacts.
-They do not prove this revision and are not relabeled as revised-candidate runs.
+The earlier candidate manifests, timing summaries, and advisory PASS are
+historical only. They are not evidence for the replacement candidate.
+`prime-claw-5v7.2` remains `in_progress` until explicit owner acceptance.
 
-## Delivered boundary
+## Delivered Slice-1 boundary
 
-Slice 1 gives tier 1 a run-owned evidence tree, immutable image execution,
+Slice 1 supplies a run-owned tier-1 evidence tree, immutable image execution,
 offline product actions, exact-ID teardown, and immediate source-mode
 fail-close. It does not implement the source builder, integration brain stack,
-lifecycle observer, or any later-slice taxonomy work.
+lifecycle observer, or later test-taxonomy slices.
 
-- Repository capture retains one no-follow root descriptor for the full
-  operation and writes through one retained destination descriptor. Root,
-  ancestor, leaf, mode, and destination swaps cannot redirect reads or writes.
-  File bytes are hashed and copied from the same checked descriptor; safe
-  relative leaf links are preserved and link chains are validated abstractly.
-- Repository and declared-input content use unambiguous v2 length-framed digest
-  records. The Dockerfile and declared-input hashes describe the final captured
-  build context submitted to Docker, never a later mutable checkout read.
-- Schema v2 records safe failure codes and keeps teardown presence separate
-  from remove/inspect command health. Failed version validation can retain an
-  exact rejected stable or prerelease identity; passed runs still require exact
-  requested/installed equality.
-- Image metadata is allow-listed and sanitized before `image.json` is created.
-  Arbitrary registry/repository metadata is discarded. Evidence inventory rejects
-  unknown encodings, directory/file links, and special files.
-- The standalone driver mounts only its scratch `share/` writable. The host
-  evidence root, build context, iidfile, cidfile, and durable metadata are never
-  container-writable.
-- Both launcher paths use the shared bounded process-group contract. Every wait,
-  TERM grace, KILL reap, and output capture is bounded. Detached children cannot
-  hold a pipe drain open. The shell tracks each bounded controller, forwards
-  TERM/INT/HUP promptly, and records cleanup-time signals. The fixture handles
-  signals through exact-ID cleanup and terminal evidence before restoring and
-  redelivering them; a returning/ignored prior handler still raises failure.
-- Success is derived only after setup/body success, exact identities, verified
-  network absence, clean teardown, evidence publication, and verification.
-  Interruption or finalizer failure cannot produce a passed manifest or `OK`.
-- `PRIME_AGENT_SOURCE` still fails before checkout or Docker access with Slice-2
-  guidance. No source builder or host-mutating fallback was restored.
+### Descriptor-bound capture and cleanup
 
-## Red-before-green repairs
+- Repository capture retains no-follow source and destination descriptors.
+  Regular leaves are opened nonblocking and then required to be regular, so a
+  regular-to-FIFO swap cannot wait for a peer.
+- Snapshot rollback clears only descendants reached through the retained owned
+  descriptor. A changed destination binding is a preserve-and-refuse outcome;
+  the replacement pathname is never recursively deleted.
+- Terminal workspace/share cleanup requires the captured device/inode binding
+  and removes descendants relative to an opened directory descriptor.
+- Evidence inventory retains its root descriptor, traverses directories with
+  no-follow opens, and reads/sanitizes/hashes the same opened regular inode.
+  Direct inventory and manifest verification enforce the same root policy.
+- Repository and declared-input identities remain schema-v2,
+  domain-separated, length-framed hashes over captured bytes and modes.
 
-- **B1:** the default no-Docker test now constructs an owned PATH with only
-  explicit prerequisites and proves a poison Docker in a fallback directory is
-  never invoked.
-- **B2/B3:** synthetic ancestor-link, root/destination swap, regular-mode swap,
-  safe-link replay, and the report's exact NUL-framing states fail before repair
-  and are now covered by retained-fd secure-capture and framed-digest tests.
-- **B4/B5:** detached-pipe, TERM-ignoring tree, leader-exit, real shell TERM
-  after CID publication and again during cleanup, fixture-signal, teardown-
-  interruption, the post-spawn/pre-handler signal race, failed-manifest, exact
-  version-mismatch, and smoke-failure/replay tests cover the repaired outcomes.
-- **B6/R-TEST-7:** unsafe image metadata, unknown encoding, directory/file links,
-  FIFO evidence, and writable-mount inspection cover pre-write sanitization and
-  scratch-only mounting.
-- **B7:** redundant full-driver process setup was replaced with a lightweight
-  recording shell where process-boundary proof was not the subject. Real bounded
-  subprocess cases remain for timeout, signal, process-tree, and detached-pipe
-  behavior. The required deliberate warm measurements are recorded below.
-- **B8:** `prime-claw-5v7.2` remains `in_progress` and unaccepted. Delivery and
-  advisory review do not close it; only explicit owner acceptance may do so.
+### Bounded command and signal truth
 
-## Revised-candidate runtime evidence
+- The controller blocks TERM/INT/HUP across spawn to close the orphan window.
+  An owned exec-in-place shim restores the caller's intended mask before the
+  target program starts. Ordinary exit, timeout/reap, post-preflight launch
+  error, target signal death, and exceptions all converge on one blocked
+  terminal restoration boundary: every prior handler is attempted before the
+  exact caller mask is restored. Natural unmask redelivers newly pending
+  caller-unblocked signals and preserves caller-blocked pending signals.
+- Target signal death is a distinct `signaled` outcome. Controller
+  interruption, timeout, launch failure, reap failure, and ordinary nonzero
+  exit remain separate.
+- The shell consumes an exact typed status record from the bounded helper.
+  Proven container absence never turns a signaled cleanup client into success.
+  Network-list filtering accepts Docker's template terminator plus CLI-added
+  trailing newline, while still rejecting internal empty rows and unsafe names;
+  this permits the real container to disconnect before every product action.
+- Both public producers keep exact-ID inspection and teardown bounded, restore
+  prior signal state, and retain failure evidence before controller-signal
+  redelivery. The standalone supervisor additionally checks newly pending
+  TERM/INT/HUP while they remain blocked after evidence closure; a closure-time
+  signal forces `128+signal`, a second failed closure that invalidates green
+  evidence, and only then prior-handler/mask restoration. Caller-blocked pending
+  signals are preserved rather than adopted.
 
-Raw manifests and logs stay gitignored below `.test-results/`; this note records
-only sanitized identities, measurements, and verdicts.
+### Pre-write validation and terminal publication
 
-- Standalone smoke `scripts/test-tier1.sh --smoke`: PASS, run
-  `20261003T034958Z-69311-d4455834`, image
-  `sha256:d48b47b41a0d249ed48316f99682b7cfb804f5fd6076f65b55f22426e5aead53`,
-  network absent, remove clean, final inspect absent.
-- Standalone pinned probe with `PRIME_AGENT_PINNED=0.9.8`: PASS, run
-  `20261003T035020Z-70360-6298a94e`, image
-  `sha256:ba5e1d21c996cebf8e65c8c4e08f15c4c73ee80bbc295d02fd540c2eee5521b4`,
-  observed version `0.9.8`, executable SHA-256
-  `e9ec0f8bff00369bac4a92de3acb4683e3bdc58615ee812e998f935992aa69f6`,
-  network absent, remove clean, final inspect absent.
-- Final comparable container samples used runs
-  `20261003T034343Z-52052-b6eb42ea`,
-  `20261003T034538Z-57173-ce08ec2c`, and
-  `20261003T034725Z-62255-d307dd68`. All passed with repository v2 content
-  identity `3bac4a32742c398199ab2bd580c5d83249b1eee137804b5c4d82a2ea5dff36b0`
-  and clean verified-absent teardown.
+- Image-inspect output is piped directly into the allow-listing producer; it is
+  not written to a named evidence-tree temporary file.
+- Installed version and executable observations are parsed in memory. Artifact
+  creation requires one full lowercase SHA-256 record before the exclusive
+  sanitized JSON write.
+- Fixture teardown output is used only for narrow in-memory classification.
+  Exceptions, notes, console output, logs, and evidence contain allow-listed
+  outcomes and return codes, never arbitrary Docker stdout/stderr.
+- Fixture finalization covers CID recovery, exact-ID cleanup, owned-tree
+  cleanup, manifest inventory/write/verification, every prior-handler attempt,
+  exact caller-mask restoration, and unconditional evidence-capability close in
+  one exception-safe boundary. Caller-owned pending signals stay blocked and
+  pending. Consumed fixture signals replay once after prior handlers return.
+  Primary and secondary failures remain distinct.
+- Fixture publication keeps TERM/INT/HUP blocked across inventory, atomic
+  publication, post-write verification, and handler restoration. A signal at
+  any checkpoint republishes `interrupted` failed evidence; publication failure
+  after file creation is invalidated to failed or absent evidence. Shell
+  publication applies the same non-green rule. Neither producer may retain a
+  green contradiction or print an `OK` line.
 
-## Validation and performance
+### Preserved boundaries
 
-### Tier 0
+B1 host-Docker isolation, B3 framed/captured hashes, B8 owner-only acceptance,
+and the scratch-only R-TEST-7 writable mount remain intact. Source mode still
+fails before checkout or Docker access. Installation occurs online, every
+product action occurs after verified network absence, execution uses immutable
+iid/cid identities, and the plugin root remains
+`/root/.prime/agent`. No plugin/product/upstream/credential/global/live action
+or later-slice implementation is included.
 
-Command: `python3 -m pytest tests/ -q`.
+## Retained negative and replay coverage
 
-- Approved planning median: **37.89s**.
-- Reconstructed slice-entry comparator `eca48f8b284c990a8e030062ef70192313781b7f`
-  (clean `git archive`, same interpreter), samples **57.84s, 55.45s, 54.38s**;
-  median **55.45s**. This reconstruction is disclosed separately and does not
-  replace the approved planning baseline.
-- Revised-candidate samples: **41.80s, 42.92s, 42.53s**; median **42.53s**.
-- Gate: **PASS**. The median is 12.25% above the approved 37.89s baseline,
-  below both the accepted 12.5% repair threshold and the 60s absolute ceiling.
-  It is 23.30% faster than the reconstructed slice-entry median.
+Tier-0 tests cover:
 
-Each revised run produced **282 passed, 147 skipped, 17 subtests passed**.
+- real-directory, symlink, root, ancestor, leaf, mode, and FIFO swaps;
+- stable executable/missing/link inputs and fresh-destination replay;
+- child signal-mask restoration, TERM grace, KILL escalation, detached output
+  holders, the post-spawn signal race, and typed target signal death;
+- full standalone build/image/run/install/network/disconnect/apply/check/probe
+  timeout and failure contracts through the actual shell producer;
+- invalid iid/cid refusal, failed launch after CID publication, exact version
+  mismatch, unknown teardown, smoke failure, and fresh-run non-adoption;
+- a deterministic public-standalone post-preflight build exec fault that remains
+  typed `launch_error`, never reaches the fake Docker build, removes only its
+  owned workspace/share, publishes failed evidence with clean absent teardown,
+  emits no success/`OK` line, and permits a fresh successful replay;
+- private image metadata and malformed artifact refusal before named durable
+  output;
+- fixture target-signal truth, non-UTF8/arbitrary teardown redaction, cleanup
+  interruption, and signal injection during terminal publication; and
+- shell signal injection during manifest publication, requiring failed evidence
+  and no green `OK` result.
 
-### Tier 1 preparation and test body
+The table-driven standalone matrix uses one shared immutable mini-repository
+and isolated per-case result/state roots. This preserves actual shell
+sequencing while avoiding redundant full-repository setup. Native process
+cases remain for behavior that depends on real signals, groups, masks, waits,
+or exec.
 
-Command for every sample:
-`TIER1_ENV_FILE=<mode-0600 pinned-0.9.8 file> python3 -m pytest tests/ -q -m container --durations=0`.
-Preparation is the sum of pytest setup durations, body is the sum of call
-durations, and teardown is reported independently. The comparator was a clean
-`git archive` of slice-entry commit `eca48f8b284c990a8e030062ef70192313781b7f`.
-The revised samples share the v2 repository identity recorded above.
+## Exact-input validation and performance records
 
-| Input | Total samples (s) | Preparation samples (s) | Body samples (s) | Teardown samples (s) |
-|---|---|---|---|---|
-| slice entry `eca48f8` | 81.55, 79.82, 77.89 | 14.42, 13.48, 13.27 | 65.26, 64.84, 63.12 | 1.30, 1.30, 1.31 |
-| revised candidate | 97.05, 96.03, 94.10 | 17.54, 16.34, 16.12 | 77.23, 77.39, 75.92 | 2.06, 2.01, 1.80 |
+The final delivery receipt on `prime-claw-5v7.2` is the authoritative index for
+commands, raw record paths, exact candidate SHA/tree, sample exit statuses,
+three deliberate warm Tier-0 samples, comparable Tier-1 preparation/body/
+teardown samples, medians, gate arithmetic, standalone run IDs, aggregate
+results, and independent review. Raw records remain gitignored beneath the
+final run-owned `.test-results/<run-id>/performance/` tree; failed samples are
+retained rather than retried or discarded.
 
-Medians are 79.82/13.48/**64.84**/1.30s at slice entry and
-96.03/16.34/**77.23**/2.01s for the revision. The comparable test-body median
-increased **19.11%**, so the Section 3.3 20% body gate is **PASS**. Preparation
-and teardown growth are reported separately rather than charged to the body.
-All six runs selected and passed 40 container tests.
+The executive sponsor waived the legacy Slice-1 runtime budget after confirming
+that production isolation—not maintaining the pre-repair suite duration—is the
+governing outcome. The retained isolated command
+`python3 -m pytest tests/ -q --durations=20` passed **328 tests**, skipped **147**,
+and passed **90 subtests** in **123.87s**. Its raw output remains at
+`.test-results/final-candidate-preflight/tier0-diagnostic.log`; the result was
+not retried, hidden, or relabeled. This duration is a transparent observation,
+not a candidate gate. Additional advisory assertion expansion was also declined
+unless it directly proves the production-isolation boundary.
 
-### Other gates
+Final acceptance still requires the existing host, standalone Docker smoke and
+probe, container, aggregate, syntax/compile, inventory, and diff checks plus a
+fresh whole-candidate review focused on the approved isolation and safety
+contract. Their exact commands, run IDs, results, and candidate/remote identity
+are recorded in the final Bead receipt. No result from either rejected candidate
+is relabeled as final-candidate proof.
 
-- focused Slice-1 suite — **102 passed, 17 subtests passed** in **19.80s**;
-- inventory/plan checks — **22 passed, 9 skipped**;
-- standalone smoke and pinned offline RPC probe — PASS as recorded above;
-- syntax, Python compilation, and `git diff --check` — PASS during repair;
-- final post-review `scripts/test-all.sh` — tier 0 PASS in **44s**, tier 1
-  PASS in **94s**, overall OK; tier 2 intentionally skipped;
-- independent adversarial rereview after all BLOCK remediations — **PASS**.
+
+## Fresh replacement-candidate isolation validation
+
+The first live smoke attempt is retained as a failed gate rather than hidden or
+retried: run `20261003T201648Z-41904-1d9a87ef` returned 65 before network
+absence because Docker emitted a template-terminated network name plus its own
+final newline. The sanitizer rejected the resulting trailing empty row. The
+minimal fix removes only trailing empty rows; internal empty rows, unsafe names,
+and invalid encodings still fail closed. Focused policy/consumer coverage passed
+**9 tests + 2 subtests**. Corrected live smoke run
+`20261003T202135Z-58769-2f9aacf2` passed with network verified absent and exact-ID
+teardown clean.
+
+Fresh sequential validation of the repaired input then passed without retries:
+
+- pinned standalone probe run `20261003T202232Z-62292-6f0607ae`: PASS in 36.09s;
+- container run `20261003T202308Z-64621-b88887e2`: **40 passed, 438 deselected** in 125.33s;
+- aggregate `.test-results/20261003-132513-71483`: Tier 0 **331 passed, 147 skipped, 92 subtests** in 126.25s; Tier 1 **40 passed, 438 deselected** in 113.57s; overall PASS in 241.60s;
+- both final container manifests record repository content identity
+  `9ddd8fc01e61326309a45653c2faad90301b90fb6cf1cb4d07f5781d55982457`,
+  verified network absence, and clean exact-ID teardown.
+
+Raw command summaries and logs are retained under
+`.test-results/20261003T201638Z-final-s1/`,
+`.test-results/20261003T202133Z-network-fix/`, and
+`.test-results/20261003T202231Z-final-resume/`. The final Bead receipt records
+the exact pushed commit/tree and remote equality after review. Candidate
+publication remains distinct from owner acceptance.
 
 ## Rollback and remaining work
 
-Rollback may remove additive provenance or launcher mechanics only while source
-mode remains fail-closed. Never restore the prior host build/cleanup/pack path.
-Slice 2 (`prime-claw-5v7.1`) remains unstarted and must add the read-only source
-snapshot/disposable builder before source selection can execute.
+Rollback may remove additive Slice-1 provenance or launcher mechanics only
+while source mode remains fail-closed. Never restore the prior host
+build/cleanup/pack path. Slice 2 (`prime-claw-5v7.1`) remains unstarted and must
+add the read-only source snapshot/disposable builder before source selection
+can execute.

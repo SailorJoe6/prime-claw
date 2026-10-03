@@ -1280,8 +1280,8 @@
   {
    "id": "R-TEST-1",
    "priority": "GATE",
-   "summary": "Environment-dependent tier-1 behavior runs in one disposable exact-image container with an fd-secured read-only repository snapshot and only a fresh scratch share writable.",
-   "status": "proven for tier 1; later tiers pending",
+   "summary": "Environment-dependent tier-1 behavior runs in one disposable exact-image container with descriptor-bound repository capture/cleanup and only a fresh scratch share writable.",
+   "status": "proven for replacement candidate tier 1; owner acceptance pending",
    "plan": ".ralph/plans/SPECIFICATION.md",
    "proven_by": {
     "apply": [
@@ -1304,8 +1304,8 @@
   {
    "id": "R-TEST-5",
    "priority": "GATE",
-   "summary": "Tier-1 launchers use exact iidfile/cidfile identities, one bounded group-aware host command contract, signal-safe exact-ID cleanup, and separate teardown command/presence outcomes.",
-   "status": "proven for tier 1",
+   "summary": "Tier-1 launchers use exact iidfile/cidfile identities, child-mask-preserving bounded process groups, typed target/controller signal outcomes, and exception-safe exact-ID cleanup/publication.",
+   "status": "proven for replacement candidate tier 1; owner acceptance pending",
    "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
    "proven_by": {
     "apply": [
@@ -1328,8 +1328,8 @@
   {
    "id": "R-TEST-6",
    "priority": "GATE",
-   "summary": "Pinned tier-1 runs emit a sanitized schema-v2 manifest with v2 framed snapshot/build-input hashes, exact requested/observed Prime Agent identity, immutable image identity, failure codes, and truthful teardown outcomes.",
-   "status": "proven for pinned tier 1",
+   "summary": "Pinned tier-1 runs validate image/artifact metadata before named writes, redact arbitrary teardown output, and emit truthful schema-v2 terminal manifests with captured v2 identities.",
+   "status": "proven for replacement candidate pinned tier 1; owner acceptance pending",
    "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
    "proven_by": {
     "apply": [
@@ -1353,8 +1353,8 @@
   {
    "id": "R-TEST-7",
    "priority": "GATE",
-   "summary": "Tier-1 mounts only an fd-secured repository snapshot read-only plus a fresh scratch share writable; the durable evidence root, host home, sockets, credentials, and arbitrary checkouts are never mounted.",
-   "status": "proven for tier 1; tier 2 pending",
+   "summary": "Tier-1 mounts only a descriptor-secured repository snapshot read-only plus a fresh scratch share writable; durable evidence, host home, sockets, credentials, and arbitrary checkouts are never mounted.",
+   "status": "proven for replacement candidate tier 1; tier 2 and owner acceptance pending",
    "plan": ".ralph/plans/SPECIFICATION.md",
    "proven_by": {
     "apply": [
@@ -1379,7 +1379,7 @@
    "id": "R-TEST-8",
    "priority": "GATE",
    "summary": "Prime Agent source selection fails before checkout stat/read/write/build/cleanup/pack or Docker access until the disposable source builder lands.",
-   "status": "safety boundary proven; isolated builder pending prime-claw-5v7.1",
+   "status": "safety boundary proven for replacement candidate; owner acceptance pending; isolated builder pending prime-claw-5v7.1",
    "plan": ".ralph/plans/EXECUTION_PLAN.md (Slices 1-2)",
    "proven_by": {
     "apply": [
@@ -1403,8 +1403,8 @@
   {
    "id": "R-TEST-10",
    "priority": "GATE",
-   "summary": "Slice-1 safety has negative/replay tests for ancestor links/path swaps, framed identity, pre-write sanitization, unknown encodings/links/special files, detached process pipes/signals, version mismatch, smoke failure, teardown anomalies, stale evidence, and concurrent allocation.",
-   "status": "proven for Slice-1 components; later component failures pending their slices",
+   "summary": "Slice-1 safety has producer-specific negative/replay tests for path/special-file swaps, framed identity, pre-write sanitization/redaction, signal masks/death/publication, every standalone failure/timeout phase, stale evidence, and concurrent allocation.",
+   "status": "proven for replacement candidate Slice-1 components; owner acceptance pending; later component failures pending their slices",
    "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
    "proven_by": {
     "apply": [
@@ -1420,6 +1420,8 @@
     "tests": [
      "tests/test_testing_provenance.py",
      "tests/test_tier1_driver.py",
+     "tests/test_tier1_launch_error.py",
+     "tests/test_tier1_network_policy.py",
      "tests/test_tier1_fixture.py"
     ]
    },

@@ -1,9 +1,39 @@
 # Project-wide testing strategy — isolation-first test architecture
 
+> **EXECUTIVE UNBLOCK — 2026-10-03.** The sponsor explicitly prioritizes
+> production isolation over the legacy Slice-1 runtime budget and additional
+> advisory assertion expansion. The 123.87s isolated sample remains recorded as
+> a non-gating performance observation. The accepted matrices are sufficient for
+> this candidate; finish existing isolation/Docker validation and whole-candidate
+> review without starting later slices. The first real Docker smoke then proved
+> that Docker's extra final network-template newline was rejected before network
+> disconnect. The directly isolation-relevant fix changes only `bounded.py` and
+> adds `tests/test_tier1_network_policy.py`; current bounded+driver ordered
+> SHA-256 is `4192da1fad387c466cd4303410fa36f11c67db3ca6bf712245c8a689e181f69a` and must receive renewed focused review.
+
 > **Status:** ACTIVE implementation episode created from the operator-approved
-> bundle on 2026-10-02. Owner rejected Slice-1 candidate `fd1f2b7`; the
-> accepted B1–B8/R-TEST-7 repairs are implemented, validated, and ready for a
-> new owner-review candidate. Later slices remain unstarted.
+> bundle on 2026-10-02. Owner rejected Slice-1 candidates `fd1f2b7` and
+> `aee5cfe`; the current owner-authorized repair scope is R1–R6 plus
+> diagnostic redaction as recorded on `prime-claw-5v7.2` and the immutable
+> owner/EXPERT reports cited below. Later
+> slices remain unstarted. Resume only from restart checkpoint
+> `/Users/jlanders/.prime/agent/session-artifacts/01a0fee6-4ed7-725a-8cf9-0ba9fbf056b9/restart-checkpoint-2026-10-03T1523Z.md`
+> (SHA-256 `16137944e07febb0231b53d6177604377eeea8396c78c1808350fca558f1f1c4`).
+> The owner accepted F1 at ordered file-set SHA-256
+> `1e050d1044a24cb4e037a774ec524c43a0906a8bb94588be980f9d521713a319`
+> and R2 at ordered file-set SHA-256
+> `e5bfda4579c5fc4d13eebe6aa78dd8901c3b22dd216608a9d827df1ae3a8fa28`.
+> The bounded-controller R4 sub-slice is accepted at ordered two-file SHA-256
+> `8be0ab10267a3ec3173198600647a14e36530f318f3be4c28d4091ea426e583f`.
+> The fixture R4 sub-slice is accepted at ordered two-file SHA-256
+> `96fd0589f346c9db7d5ba3b23ddcd5115fbcab6f8744ddceaab115717e313c55`,
+> completing R4 for advancement only. Preserve F1, R2, and both accepted R4
+> boundaries. R6 public-standalone launch-error coverage is accepted for
+> advancement only at ordered test-file SHA-256
+> `b1e9cb0dbeadbf53315de4f4e9a3bbbe132b627fc0e473516ce9d91eb1039d98`.
+> Keep advancing the same uncommitted generation only through the remaining
+> candidate gates. The generation at rejected base `aee5cfe`
+> remains incomplete and unaccepted as a candidate.
 > External prerequisites remain satisfied by `3bf9059` / `927b394`.
 > **Origin:** operator charter, 2026-10-02 (independent planning-only
 > conversation `01a0fe09-9641-73af-9889-b44e302490d1`).
