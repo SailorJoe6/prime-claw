@@ -86,27 +86,88 @@ BUILD_TIMEOUT="${TIER1_BUILD_TIMEOUT:-1200}"
 INSTALL_TIMEOUT="${TIER1_INSTALL_TIMEOUT:-300}"
 CHECK_TIMEOUT="${TIER1_CHECK_TIMEOUT:-180}"
 
-validate_deadline() {
-    local name="$1" value="$2" max="$3"
-    [[ "$value" =~ ^[1-9][0-9]*$ ]] \
-        || die "$name must be a bounded positive integer"
-    [ "$value" -le "$max" ] \
-        || die "$name exceeds the bounded supported maximum"
+python3 - \
+  TIER1_PROBE_DEADLINE "$PROBE_DEADLINE" 900 \
+  TIER1_PROBE_KILL_GRACE "$PROBE_KILL_GRACE" 60 \
+  TIER1_DOCKER_KILL_GRACE "$DOCKER_KILL_GRACE" 60 \
+  TIER1_DOCKER_TIMEOUT "$DOCKER_TIMEOUT" 1800 \
+  TIER1_BUILD_TIMEOUT "$BUILD_TIMEOUT" 3600 \
+  TIER1_INSTALL_TIMEOUT "$INSTALL_TIMEOUT" 1800 \
+  TIER1_CHECK_TIMEOUT "$CHECK_TIMEOUT" 1800 <<'PYDEADLINES' \
+  || die "deadline must be a bounded positive number within the supported maximum"
+from decimal import Decimal, InvalidOperation
+import sys
+for index in range(1, len(sys.argv), 3):
+    name, raw, maximum = sys.argv[index:index + 3]
+    try:
+        value = Decimal(raw)
+    except InvalidOperation:
+        print(f"invalid bounded deadline: {name}", file=sys.stderr)
+        raise SystemExit(1)
+    if not value.is_finite() or value <= 0 or value > Decimal(maximum):
+        print(f"invalid bounded deadline: {name}", file=sys.stderr)
+        raise SystemExit(1)
+PYDEADLINES
+PROBE_OUTER_TIMEOUT="$(python3 - "$PROBE_DEADLINE" "$PROBE_KILL_GRACE" "$DOCKER_TIMEOUT" <<'PYTOTAL'
+from decimal import Decimal
+import sys
+print(sum(map(Decimal, sys.argv[1:])))
+PYTOTAL
+)"
+
+BOUNDED_PID=""
+PENDING_SIGNAL_NUM=""
+LAST_SIGNAL_NUM=""
+SIGNAL_COUNT=0
+
+record_signal() {
+    local number="$1"
+    [ -n "$PENDING_SIGNAL_NUM" ] || PENDING_SIGNAL_NUM="$number"
+    LAST_SIGNAL_NUM="$number"
+    SIGNAL_COUNT=$((SIGNAL_COUNT + 1))
 }
-validate_deadline TIER1_PROBE_DEADLINE "$PROBE_DEADLINE" 900
-validate_deadline TIER1_PROBE_KILL_GRACE "$PROBE_KILL_GRACE" 60
-validate_deadline TIER1_DOCKER_KILL_GRACE "$DOCKER_KILL_GRACE" 60
-validate_deadline TIER1_DOCKER_TIMEOUT "$DOCKER_TIMEOUT" 1800
-validate_deadline TIER1_BUILD_TIMEOUT "$BUILD_TIMEOUT" 3600
-validate_deadline TIER1_INSTALL_TIMEOUT "$INSTALL_TIMEOUT" 1800
-validate_deadline TIER1_CHECK_TIMEOUT "$CHECK_TIMEOUT" 1800
-PROBE_OUTER_TIMEOUT=$((PROBE_DEADLINE + PROBE_KILL_GRACE + DOCKER_TIMEOUT))
+
+forward_bounded_signal() {
+    local number="$1"
+    if [ -n "$BOUNDED_PID" ]; then
+        kill -"$number" "$BOUNDED_PID" 2>/dev/null || true
+    fi
+}
+
+on_signal() {
+    local number="$1"
+    record_signal "$number"
+    if [ -n "$BOUNDED_PID" ]; then
+        forward_bounded_signal "$number"
+        return
+    fi
+    exit $((128 + number))
+}
+
+on_cleanup_signal() {
+    local number="$1"
+    record_signal "$number"
+    forward_bounded_signal "$number"
+}
 
 bounded() {
-    local timeout="$1"; shift
-    (cd "$REPO_ROOT" && python3 -m scripts.testing.bounded --timeout "$timeout" \
-        --kill-grace "$DOCKER_KILL_GRACE" -- "$@")
+    local timeout="$1" before rc pid; shift
+    before="$SIGNAL_COUNT"
+    (cd "$REPO_ROOT" && exec python3 -m scripts.testing.bounded \
+        --timeout "$timeout" --kill-grace "$DOCKER_KILL_GRACE" -- "$@") &
+    pid=$!
+    BOUNDED_PID="$pid"
+    while :; do
+        if wait "$pid"; then rc=0; else rc=$?; fi
+        kill -0 "$pid" 2>/dev/null || break
+    done
+    BOUNDED_PID=""
+    if [ "$SIGNAL_COUNT" -ne "$before" ]; then
+        return $((128 + LAST_SIGNAL_NUM))
+    fi
+    return "$rc"
 }
+now_utc() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
 
 SMOKE_CMD='node --version && python3 --version && pytest --version'
 
@@ -172,8 +233,8 @@ print("tier-1 probe validation OK: handoff, plan, implement-spec each "
       "registered exactly once from " + EXT_PREFIX)
 PYEOF
 
-BUILD_INPUT_HASH="$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance hash-inputs "$REPO_ROOT" "$DOCKERFILE")"
-IMAGE_TAG="prime-claw-test-tier1:${BUILD_INPUT_HASH:0:12}"
+BUILD_INPUT_HASH=""
+IMAGE_TAG="prime-claw-test-tier1:<captured>"
 echo "tier-1 driver: dockerfile=$DOCKERFILE tag=$IMAGE_TAG"
 if [ "$SMOKE" -eq 1 ]; then
     echo "tier-1 driver: mode=smoke"
@@ -206,7 +267,7 @@ bounded "$DOCKER_TIMEOUT" docker info >/dev/null 2>&1 \
 IFS=$'\t' read -r RUN_ID TIER_DIR <<EOF
 $(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance allocate "$RESULTS_ROOT" tier1)
 EOF
-RUN_STARTED="$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance now)"
+RUN_STARTED="$(now_utc)"
 MODE=pinned
 [ "$SMOKE" -eq 1 ] && MODE=smoke
 WORKSPACE_SNAPSHOT="$RESULTS_ROOT/.workspaces/$RUN_ID"
@@ -214,39 +275,57 @@ WORKSPACE_SNAPSHOT="$RESULTS_ROOT/.workspaces/$RUN_ID"
     "$REPO_ROOT" "$WORKSPACE_SNAPSHOT") > "$TIER_DIR/repository.json"
 BUILD_CONTEXT="$TIER_DIR/build-context"
 mkdir -p "$BUILD_CONTEXT"
-cp "$REPO_ROOT/$DOCKERFILE" "$BUILD_CONTEXT/Dockerfile"
-DOCKERFILE_HASH="$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance hash-file "$REPO_ROOT/$DOCKERFILE")"
+cp "$WORKSPACE_SNAPSHOT/$DOCKERFILE" "$BUILD_CONTEXT/Dockerfile"
+IFS=$'\t' read -r DOCKERFILE_HASH BUILD_INPUT_HASH <<EOF
+$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance build-input "$BUILD_CONTEXT" Dockerfile)
+EOF
+IMAGE_TAG="prime-claw-test-tier1:${BUILD_INPUT_HASH:0:12}"
+echo "tier-1 driver: captured-tag=$IMAGE_TAG"
 IIDFILE="$TIER_DIR/image.iid"
 CIDFILE="$TIER_DIR/container.cid"
 SETUP_LOG="$TIER_DIR/setup.log"
+SHARE="$TIER_DIR/share"
+mkdir -m 700 "$SHARE"
 : > "$SETUP_LOG"
 phase() { printf 'phase=%s\n' "$1" >>"$SETUP_LOG"; }
 phase run-allocated
 IMAGE_META="$TIER_DIR/image.json"
 NETWORK_TMP="$TIER_DIR/.networks.tmp"
+IMAGE_INSPECT_TMP="$TIER_DIR/.image-inspect.tmp"
+NETWORK_JSON_TMP="$TIER_DIR/.network-json.tmp"
+VERSION_TMP="$TIER_DIR/.version.tmp"
+EXECUTABLE_TMP="$TIER_DIR/.executable.tmp"
+TEARDOWN_TMP="$TIER_DIR/.teardown.tmp"
 NETWORK_TIME=""
 BUILD_STARTED=""
 BUILD_FINISHED=""
 CONTAINER_ID=""
 RUN_ATTEMPTED=0
 TEARDOWN_STATE=absent
+TEARDOWN_REMOVE_OUTCOME=not_needed
+TEARDOWN_INSPECT_OUTCOME=not_needed
+TEARDOWN_CLEAN=1
 TEARDOWN_VERIFIED=""
 RUN_STATUS=failed
+FAILURE_CODES="primary-command-failed"
 
 finalize_manifest() {
     [ -n "$TEARDOWN_VERIFIED" ] || return 1
-    FINISHED="$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance now)"
+    FINISHED="$(now_utc)"
     cd "$REPO_ROOT"
     python3 - "$TIER_DIR" "$RUN_ID" "$RUN_STARTED" "$FINISHED" "$RUN_STATUS" \
       "$MODE" "$PINNED" "$BUILD_STARTED" "$BUILD_FINISHED" "$DOCKERFILE_HASH" \
       "$BUILD_INPUT_HASH" "$IMAGE_TAG" "$NETWORK_TIME" "$TEARDOWN_STATE" \
-      "$TEARDOWN_VERIFIED" <<'PYMANIFEST'
+      "$TEARDOWN_VERIFIED" "$TEARDOWN_REMOVE_OUTCOME" \
+      "$TEARDOWN_INSPECT_OUTCOME" "$TEARDOWN_CLEAN" "$FAILURE_CODES" <<'PYMANIFEST'
 import json, sys
 from pathlib import Path
 from scripts.testing import provenance as p
 (tier_s, run_id, started, finished, status, mode, requested,
  build_started, build_finished, dockerfile_hash, input_hash, tag,
- network_time, teardown_state, teardown_time) = sys.argv[1:]
+ network_time, teardown_state, teardown_time, remove_outcome,
+ inspect_outcome, teardown_clean, failure_codes_raw) = sys.argv[1:]
+failure_codes = [code for code in failure_codes_raw.split(",") if code]
 tier = Path(tier_s)
 repo = json.loads((tier / "repository.json").read_text())
 image_path = tier / "image.json"
@@ -262,28 +341,22 @@ if mode == "pinned":
         installed_version = artifact["version"]
     prime = {"mode": "pinned", "requested_version": requested,
              "installed_version": installed_version, "artifact": artifact}
-image = None
-if image_meta is not None:
-    image = {"id": image_meta["Id"],
-             "repo_digests": image_meta.get("RepoDigests") or [],
-             "dockerfile": "docker/test.Dockerfile",
-             "dockerfile_sha256": dockerfile_hash,
-             "declared_input_sha256": input_hash,
-             "informational_tag": tag,
-             "os": image_meta["Os"], "architecture": image_meta["Architecture"],
-             "build_started_at": build_started,
-             "build_finished_at": build_finished}
+image = image_meta
 manifest = {
     "schema_version": p.SCHEMA_VERSION,
     "command_contract_version": p.COMMAND_CONTRACT_VERSION,
     "run": {"id": run_id, "tier": "tier1", "mode": mode,
-             "started_at": started, "finished_at": finished, "status": status},
+             "started_at": started, "finished_at": finished, "status": status,
+             "failure_codes": failure_codes},
     "repository": repo,
     "prime_agent": prime,
     "image": image,
     "network": {"disconnected_at": network_time or None,
                 "verified_absent": bool(network_time)},
-    "teardown": {"state": teardown_state, "verified_at": teardown_time},
+    "teardown": {"state": teardown_state, "verified_at": teardown_time,
+                 "remove_outcome": remove_outcome,
+                 "inspect_outcome": inspect_outcome,
+                 "clean": teardown_clean == "1"},
     "evidence": {"files": []},
 }
 manifest["evidence"]["files"] = p.evidence_inventory(tier)
@@ -294,9 +367,13 @@ PYMANIFEST
 
 cleanup() {
     original_rc=$?
-    trap - EXIT INT TERM
+    trap - EXIT
+    trap 'on_cleanup_signal 2' INT
+    trap 'on_cleanup_signal 15' TERM
+    trap 'on_cleanup_signal 1' HUP
     set +e
-    rm -f "$NETWORK_TMP"
+    rm -f "$NETWORK_TMP" "$IMAGE_INSPECT_TMP" "$NETWORK_JSON_TMP" \
+      "$VERSION_TMP" "$EXECUTABLE_TMP" "$TEARDOWN_TMP"
     cleanup_rc=0
     if [ -z "$CONTAINER_ID" ] && [ -s "$CIDFILE" ]; then
         raw_cid="$(cat "$CIDFILE")"
@@ -305,109 +382,153 @@ cleanup() {
         else
             cleanup_rc=1
             TEARDOWN_STATE=unknown
+            TEARDOWN_REMOVE_OUTCOME=identity_refused
+            TEARDOWN_INSPECT_OUTCOME=not_run
+            TEARDOWN_CLEAN=0
             printf 'teardown refused invalid cidfile identity\n' >>"$SETUP_LOG"
         fi
     fi
     if [ -z "$CONTAINER_ID" ] && [ "$RUN_ATTEMPTED" -eq 1 ]; then
         cleanup_rc=1
         TEARDOWN_STATE=unknown
+        TEARDOWN_REMOVE_OUTCOME=identity_refused
+        TEARDOWN_INSPECT_OUTCOME=not_run
+        TEARDOWN_CLEAN=0
     fi
     if [ -n "$CONTAINER_ID" ]; then
-        TEARDOWN_JSON="$(cd "$REPO_ROOT" && python3 - "$CONTAINER_ID" "$DOCKER_KILL_GRACE" <<'PYTEARDOWN'
-import json, sys
-from scripts.testing.bounded import TIMEOUT_EXIT, run_completed
-cid, grace = sys.argv[1], float(sys.argv[2])
-fatal = None
-try:
-    rm = run_completed(["docker", "rm", "-f", cid], capture_output=True,
-                       text=True, timeout=60, kill_grace=grace)
-    rm_rc = rm.returncode
-    if rm_rc == TIMEOUT_EXIT:
-        fatal = "timeout"
-except OSError:
-    fatal, rm_rc = "launch-error", None
-try:
-    inspected = run_completed(["docker", "inspect", cid],
-                              capture_output=True, text=True,
-                              timeout=15, kill_grace=grace)
-    blob = ((inspected.stdout or "") + "\n" +
-            (inspected.stderr or "")).lower()
-    if inspected.returncode == 0:
-        state = "present"
-    elif inspected.returncode == TIMEOUT_EXIT:
-        state = "unknown"
-    elif "no such container" in blob or "no such object" in blob:
-        state = "absent"
-    else:
-        state = "unknown"
-except OSError:
-    state = "unknown"
-ok = fatal is None and state == "absent"
-print(json.dumps({"state": state, "ok": ok, "rm_rc": rm_rc,
-                  "fatal": fatal}, sort_keys=True))
-raise SystemExit(0 if ok else 1)
-PYTEARDOWN
-)"
-        cleanup_rc=$?
-        TEARDOWN_STATE="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["state"])' "$TEARDOWN_JSON")"
-        printf 'teardown %s\n' "$TEARDOWN_JSON" >>"$SETUP_LOG"
+        if bounded 60 docker rm -f "$CONTAINER_ID" > "$TEARDOWN_TMP" 2>&1; then
+            remove_rc=0
+        else
+            remove_rc=$?
+        fi
+        case "$remove_rc" in
+            0) TEARDOWN_REMOVE_OUTCOME=clean ;;
+            124) TEARDOWN_REMOVE_OUTCOME=timed_out ;;
+            127) TEARDOWN_REMOVE_OUTCOME=launch_error ;;
+            129|130|143) TEARDOWN_REMOVE_OUTCOME=interrupted ;;
+            *) TEARDOWN_REMOVE_OUTCOME=ordinary_nonzero ;;
+        esac
+        if bounded 15 docker inspect "$CONTAINER_ID" > "$TEARDOWN_TMP" 2>&1; then
+            inspect_rc=0
+        else
+            inspect_rc=$?
+        fi
+        case "$inspect_rc" in
+            0)
+                TEARDOWN_STATE=present
+                TEARDOWN_INSPECT_OUTCOME=clean
+                ;;
+            124)
+                TEARDOWN_STATE=unknown
+                TEARDOWN_INSPECT_OUTCOME=timed_out
+                ;;
+            127)
+                TEARDOWN_STATE=unknown
+                TEARDOWN_INSPECT_OUTCOME=launch_error
+                ;;
+            129|130|143)
+                TEARDOWN_STATE=unknown
+                TEARDOWN_INSPECT_OUTCOME=interrupted
+                ;;
+            *)
+                if grep -Eqi 'no such (container|object)' "$TEARDOWN_TMP"; then
+                    TEARDOWN_STATE=absent
+                    TEARDOWN_INSPECT_OUTCOME=ordinary_nonzero
+                else
+                    TEARDOWN_STATE=unknown
+                    TEARDOWN_INSPECT_OUTCOME=ordinary_nonzero
+                fi
+                ;;
+        esac
+        rm -f "$TEARDOWN_TMP"
+        if [ "$TEARDOWN_STATE" = absent ] && \
+           { [ "$TEARDOWN_REMOVE_OUTCOME" = clean ] || \
+             [ "$TEARDOWN_REMOVE_OUTCOME" = ordinary_nonzero ]; } && \
+           [ "$TEARDOWN_INSPECT_OUTCOME" = ordinary_nonzero ]; then
+            TEARDOWN_CLEAN=1
+        else
+            TEARDOWN_CLEAN=0
+            cleanup_rc=1
+        fi
+        printf 'teardown state=%s remove=%s inspect=%s clean=%s\n' \
+          "$TEARDOWN_STATE" "$TEARDOWN_REMOVE_OUTCOME" \
+          "$TEARDOWN_INSPECT_OUTCOME" "$TEARDOWN_CLEAN" >>"$SETUP_LOG"
     fi
-    TEARDOWN_VERIFIED="$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance now)"
-    if [ "$TEARDOWN_STATE" = absent ] && [ -d "$WORKSPACE_SNAPSHOT" ]; then
-        python3 - "$WORKSPACE_SNAPSHOT" <<'PYCLEAN'
-import shutil, sys
-shutil.rmtree(sys.argv[1])
-PYCLEAN
+    TEARDOWN_VERIFIED="$(now_utc)"
+    if [ "$TEARDOWN_CLEAN" -eq 1 ] && [ "$TEARDOWN_STATE" = absent ]; then
+        rm -rf -- "$WORKSPACE_SNAPSHOT" "$SHARE"
         [ $? -eq 0 ] || cleanup_rc=1
-    elif [ -d "$WORKSPACE_SNAPSHOT" ]; then
-        printf 'workspace snapshot preserved because teardown is %s\n' "$TEARDOWN_STATE" >>"$SETUP_LOG"
+    else
+        printf 'owned inputs preserved because teardown is %s/%s
+'           "$TEARDOWN_STATE" "$TEARDOWN_REMOVE_OUTCOME" >>"$SETUP_LOG"
     fi
-    if [ "$original_rc" -eq 0 ] && [ "$cleanup_rc" -eq 0 ]; then RUN_STATUS=passed; fi
+    if [ "$original_rc" -eq 0 ] && [ "$cleanup_rc" -eq 0 ] && \
+       [ "$TEARDOWN_CLEAN" -eq 1 ] && [ -z "$PENDING_SIGNAL_NUM" ]; then
+        RUN_STATUS=passed
+        FAILURE_CODES=""
+    else
+        FAILURE_CODES=""
+        [ "$original_rc" -eq 0 ] || FAILURE_CODES=primary-command-failed
+        if [ -n "$PENDING_SIGNAL_NUM" ]; then
+            [ -z "$FAILURE_CODES" ] || FAILURE_CODES="$FAILURE_CODES,"
+            FAILURE_CODES="${FAILURE_CODES}interrupted"
+        fi
+        if [ "$cleanup_rc" -ne 0 ]; then
+            [ -z "$FAILURE_CODES" ] || FAILURE_CODES="$FAILURE_CODES,"
+            FAILURE_CODES="${FAILURE_CODES}teardown-command-failed"
+        fi
+        if [ "$TEARDOWN_STATE" != absent ]; then
+            [ -z "$FAILURE_CODES" ] || FAILURE_CODES="$FAILURE_CODES,"
+            FAILURE_CODES="${FAILURE_CODES}teardown-not-absent"
+        fi
+        [ -n "$FAILURE_CODES" ] || FAILURE_CODES=incomplete-identity
+    fi
     finalize_manifest >/dev/null 2>&1
     manifest_rc=$?
     if [ "$manifest_rc" -ne 0 ]; then
         cleanup_rc=1
         phase manifest-failed
     fi
-    if [ "$original_rc" -eq 0 ] && [ "$cleanup_rc" -eq 0 ]; then
+    if [ "$original_rc" -eq 0 ] && [ "$cleanup_rc" -eq 0 ] && \
+       [ -z "$PENDING_SIGNAL_NUM" ]; then
         echo "tier-1 driver: OK — immutable image launched, network absent, checks passed, teardown verified, manifest published"
     fi
     echo "tier-1 driver: evidence=$TIER_DIR"
     final_rc=$original_rc
     [ "$final_rc" -ne 0 ] || final_rc=$cleanup_rc
+    if [ -n "$PENDING_SIGNAL_NUM" ]; then
+        final_rc=$((128 + PENDING_SIGNAL_NUM))
+    fi
+    trap - INT TERM HUP
     exit "$final_rc"
 }
 trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
+trap 'on_signal 2' INT
+trap 'on_signal 15' TERM
+trap 'on_signal 1' HUP
 
 BUILD_ARGS=()
 if [ "$NO_CACHE" -eq 1 ]; then BUILD_ARGS+=(--no-cache); fi
-BUILD_STARTED="$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance now)"
+BUILD_STARTED="$(now_utc)"
 phase image-build-started
 bounded "$BUILD_TIMEOUT" docker build ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} --iidfile "$IIDFILE" \
     -f "$BUILD_CONTEXT/Dockerfile" -t "$IMAGE_TAG" "$BUILD_CONTEXT" \
     >/dev/null 2>&1
-BUILD_FINISHED="$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance now)"
+BUILD_FINISHED="$(now_utc)"
 phase image-built
 [ -s "$IIDFILE" ] || die "docker build did not publish the run-owned iidfile"
 IMAGE_ID="$(cat "$IIDFILE")"
 case "$IMAGE_ID" in sha256:[0-9a-f][0-9a-f]*) ;; *) die "invalid image ID in iidfile" ;; esac
 [ "${#IMAGE_ID}" -eq 71 ] || die "invalid image ID length in iidfile"
-bounded "$DOCKER_TIMEOUT" docker image inspect "$IMAGE_ID" | python3 -c \
- 'import json,sys; x=json.load(sys.stdin)[0]; print(json.dumps({k:x.get(k) for k in ("Id","RepoDigests","Os","Architecture")},sort_keys=True))' \
- > "$IMAGE_META"
-python3 - "$IMAGE_META" "$IMAGE_ID" <<'PYIMAGE'
-import json, re, sys
-m=json.load(open(sys.argv[1])); expected=sys.argv[2]
-if m.get("Id") != expected or not re.fullmatch(r"sha256:[0-9a-f]{64}", expected):
-    raise SystemExit("image inspect identity did not match iidfile")
-if not m.get("Os") or not m.get("Architecture"):
-    raise SystemExit("image inspect omitted platform identity")
-PYIMAGE
+bounded "$DOCKER_TIMEOUT" docker image inspect "$IMAGE_ID" > "$IMAGE_INSPECT_TMP"
+(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance capture-image \
+    "$IMAGE_META" "$IMAGE_ID" "$DOCKERFILE" "$DOCKERFILE_HASH" \
+    "$BUILD_INPUT_HASH" "$IMAGE_TAG" "$BUILD_STARTED" "$BUILD_FINISHED") \
+    < "$IMAGE_INSPECT_TMP"
+rm -f "$IMAGE_INSPECT_TMP"
 
 NAME="prime-claw-tier1-${RUN_ID//[^a-zA-Z0-9_.-]/-}"
-MOUNTS=(-v "$WORKSPACE_SNAPSHOT:/workspace:ro" -v "$TIER_DIR:/test-results")
+MOUNTS=(-v "$WORKSPACE_SNAPSHOT:/workspace:ro" -v "$SHARE:/test-results")
 RUN_ATTEMPTED=1
 bounded "$DOCKER_TIMEOUT" docker run -d --name "$NAME" --cidfile "$CIDFILE" \
     ${MOUNTS[@]+"${MOUNTS[@]}"} "$IMAGE_ID" sleep infinity \
@@ -436,11 +557,13 @@ while IFS= read -r network; do
     [ -z "$network" ] || bounded "$DOCKER_TIMEOUT" docker network disconnect "$network" "$CONTAINER_ID" \
         >/dev/null 2>&1
 done < "$NETWORK_TMP"
-NETWORK_JSON="$(bounded "$DOCKER_TIMEOUT" docker inspect --format '{{json .NetworkSettings.Networks}}' \
-    "$CONTAINER_ID")"
+bounded "$DOCKER_TIMEOUT" docker inspect --format '{{json .NetworkSettings.Networks}}' \
+    "$CONTAINER_ID" > "$NETWORK_JSON_TMP"
+IFS= read -r NETWORK_JSON < "$NETWORK_JSON_TMP" || true
+rm -f "$NETWORK_JSON_TMP"
 [ "$NETWORK_JSON" = "{}" ] || die "container still has an attached network; refusing offline steps"
 rm -f "$NETWORK_TMP"
-NETWORK_TIME="$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance now)"
+NETWORK_TIME="$(now_utc)"
 printf '{"verified_absent":true}\n' > "$TIER_DIR/network.json"
 phase network-absent
 
@@ -448,10 +571,14 @@ if [ "$MODE" = smoke ]; then
     bounded "$CHECK_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc "$SMOKE_CMD" >/dev/null 2>&1
     phase smoke-passed
 else
-    VERSION_OUTPUT="$(bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" prime-agent --version 2>/dev/null)"
-    INSTALLED_VERSION="$(python3 -c 'import re,sys; m=re.search(r"[0-9]+(?:\.[0-9]+)+",sys.argv[1]); print(m.group(0) if m else "")' "$VERSION_OUTPUT")"
-    [ "$INSTALLED_VERSION" = "$PINNED" ] || die "installed Prime Agent version does not match requested pinned version"
-    EXECUTABLE_SHA="$(bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc 'sha256sum "$(command -v prime-agent)"' 2>/dev/null | awk '{print $1}')"
+    bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" prime-agent --version \
+        > "$VERSION_TMP" 2>/dev/null
+    INSTALLED_VERSION="$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance parse-version < "$VERSION_TMP")"
+    rm -f "$VERSION_TMP"
+    bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc \
+        'sha256sum "$(command -v prime-agent)"' > "$EXECUTABLE_TMP" 2>/dev/null
+    read -r EXECUTABLE_SHA _ < "$EXECUTABLE_TMP"
+    rm -f "$EXECUTABLE_TMP"
     case "$EXECUTABLE_SHA" in [0-9a-f][0-9a-f]*) ;; *) die "installed Prime Agent executable hash is invalid" ;; esac
     [ "${#EXECUTABLE_SHA}" -eq 64 ] || die "installed Prime Agent executable hash is invalid"
     python3 - "$TIER_DIR/installed-artifact.json" "$INSTALLED_VERSION" "$EXECUTABLE_SHA" <<'PYPACKAGE'
@@ -463,6 +590,7 @@ with open(path, "w", encoding="utf-8") as fh:
               sort_keys=True, separators=(",", ":"))
     fh.write("\n")
 PYPACKAGE
+    [ "$INSTALLED_VERSION" = "$PINNED" ] || die "installed Prime Agent version does not match requested pinned version"
     bounded "$CHECK_TIMEOUT" docker exec -e "PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT" "$CONTAINER_ID" \
       /workspace/scripts/apply-prime-agent-plugin.sh >/dev/null 2>&1
     phase plugin-applied

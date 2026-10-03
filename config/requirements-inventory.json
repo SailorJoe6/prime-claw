@@ -1280,7 +1280,7 @@
   {
    "id": "R-TEST-1",
    "priority": "GATE",
-   "summary": "Environment-dependent tier-1 behavior runs in one disposable exact-image container with a read-only repository and run-owned writable evidence/share only.",
+   "summary": "Environment-dependent tier-1 behavior runs in one disposable exact-image container with an fd-secured read-only repository snapshot and only a fresh scratch share writable.",
    "status": "proven for tier 1; later tiers pending",
    "plan": ".ralph/plans/SPECIFICATION.md",
    "proven_by": {
@@ -1304,7 +1304,7 @@
   {
    "id": "R-TEST-5",
    "priority": "GATE",
-   "summary": "Tier-1 host launchers build and target only run-owned iidfile/cidfile resources, export sanitized evidence, enforce deadlines, and classify teardown as present/absent/unknown.",
+   "summary": "Tier-1 launchers use exact iidfile/cidfile identities, one bounded group-aware host command contract, signal-safe exact-ID cleanup, and separate teardown command/presence outcomes.",
    "status": "proven for tier 1",
    "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
    "proven_by": {
@@ -1328,7 +1328,7 @@
   {
    "id": "R-TEST-6",
    "priority": "GATE",
-   "summary": "Pinned tier-1 runs emit a sanitized schema-v1 manifest with repository, requested/installed Prime Agent version and executable SHA-256, immutable image, platform, network, teardown, and evidence-file identities.",
+   "summary": "Pinned tier-1 runs emit a sanitized schema-v2 manifest with v2 framed snapshot/build-input hashes, exact requested/observed Prime Agent identity, immutable image identity, failure codes, and truthful teardown outcomes.",
    "status": "proven for pinned tier 1",
    "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
    "proven_by": {
@@ -1353,7 +1353,7 @@
   {
    "id": "R-TEST-7",
    "priority": "GATE",
-   "summary": "Tier-1 uses a read-only repository, fresh run-owned writable share, no host home/socket/credentials, and verified network absence before product checks and tests; every Docker wait is deadline-bounded with TERM-to-KILL escalation.",
+   "summary": "Tier-1 mounts only an fd-secured repository snapshot read-only plus a fresh scratch share writable; the durable evidence root, host home, sockets, credentials, and arbitrary checkouts are never mounted.",
    "status": "proven for tier 1; tier 2 pending",
    "plan": ".ralph/plans/SPECIFICATION.md",
    "proven_by": {
@@ -1403,7 +1403,7 @@
   {
    "id": "R-TEST-10",
    "priority": "GATE",
-   "summary": "Tier-1 provenance and launcher safety include negative tests for schema drift, stale/tampered evidence, selector ambiguity, image mismatch, attached network, partial publication, teardown present/unknown, and concurrent run allocation.",
+   "summary": "Slice-1 safety has negative/replay tests for ancestor links/path swaps, framed identity, pre-write sanitization, unknown encodings/links/special files, detached process pipes/signals, version mismatch, smoke failure, teardown anomalies, stale evidence, and concurrent allocation.",
    "status": "proven for Slice-1 components; later component failures pending their slices",
    "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
    "proven_by": {

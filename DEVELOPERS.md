@@ -71,7 +71,9 @@ only. Do not apply, check, or probe a candidate against the host user-global
   install, or the plugin runs inside one run-owned plain-Docker container.
   A sanitized run-owned snapshot of tracked and nonignored inputs is mounted
   read-only at `/workspace`; ignored local state is never mounted. A fresh
-  same-path share is the only writable host mount. Each direct driver or pytest run
+  scratch share is the only writable host mount; the durable evidence root,
+  build context, iidfile, and cidfile are never container-writable. Each direct
+  driver or pytest run
   allocates `.test-results/<run-id>/tier1/`, builds from an empty context,
   captures the immutable image ID with `--iidfile`, and launches that exact
   ID with a run-owned `--cidfile`.
@@ -93,10 +95,12 @@ only. Do not apply, check, or probe a candidate against the host user-global
 
   `scripts/test-tier1.sh` is the standalone driver (`--smoke`, `--probe`,
   `--dry-run`, `--rebuild`). The fixture mirrors its boundary. Teardown targets
-  only the captured container ID and requires an explicit absent result;
-  unknown fails and preserves evidence. Every host Docker wait has a validated
-  positive budget and process-group TERM→KILL escalation through
-  `scripts/testing/bounded.py`. A failed/timed-out launch still tears down an
+  only the captured container ID and requires both explicit absence and clean
+  remove/inspect command outcomes; interruption/timeout remains failure even
+  after positive absence. Every host Docker wait has a validated deadline,
+  process-group TERM→KILL escalation, bounded reap, and pipe-independent output
+  capture through `scripts/testing/bounded.py`. A failed/timed-out launch still
+  tears down an
   exact recovered cidfile identity; malformed identities never reach removal. See
   [docs/testing-strategy.md](docs/testing-strategy.md).
 - **Tier 2 — host, OpenShell.** `tests/test_runtime_*.py` orchestrate

@@ -1,7 +1,8 @@
 # Execution plan — project-wide isolation-first testing strategy
 
-> **Status:** ACTIVE episode. Slice 1 (`prime-claw-5v7.2`) is implemented and
-> awaiting owner review; later slices remain unstarted. External prerequisites
+> **Status:** ACTIVE episode. Owner rejected Slice-1 candidate `fd1f2b7`; the
+> accepted in-scope repair batch is implemented and validated for a new
+> owner-review candidate. Later slices remain unstarted. External prerequisites
 > are closed in `3bf9059` / `927b394`.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md).
 > **Selected future folder:**
@@ -281,8 +282,8 @@ checkout is inspected or mutated.
 
 ### Implementation receipt
 
-- **State:** implemented on the episode branch; awaiting owner review.
-- **Delivered:** schema-v1 sanitized provenance; run-owned result trees;
+- **State:** rejected candidate `fd1f2b7` revised in place; all accepted repair gates pass and the new candidate awaits owner review. B1–B8 plus the recorded R-TEST-7 evidence-root seam are the only repair scope.
+- **Delivered:** schema-v2 sanitized provenance; run-owned result trees;
   iidfile/cidfile execution identity; exact sanitized repository snapshots;
   online pinned install followed by verified network absence; bounded offline
   apply/check/probe/tests; captured-ID teardown; partial-failure manifests;

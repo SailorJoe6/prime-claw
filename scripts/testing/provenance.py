@@ -9,17 +9,18 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import secrets
 import shutil
+import stat
 import subprocess
 import tempfile
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
-SCHEMA_VERSION = 1
-COMMAND_CONTRACT_VERSION = "tier1-v1"
+SCHEMA_VERSION = 2
+COMMAND_CONTRACT_VERSION = "tier1-v2"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _IMAGE_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -64,6 +65,99 @@ def sha256_file(path: Path | str) -> str:
     return digest.hexdigest()
 
 
+
+_OBSERVED_SEMVER_RE = re.compile(
+    r"(?<![0-9A-Za-z.-])([0-9]+\.[0-9]+\.[0-9]+"
+    r"(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?"
+    r"(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?)(?![0-9A-Za-z.-])")
+_SAFE_PLATFORM_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+
+
+def parse_prime_agent_version(output: str) -> str:
+    """Return one exact observed SemVer without normalizing prereleases."""
+    matches = _OBSERVED_SEMVER_RE.findall(output)
+    if len(matches) != 1:
+        raise ProvenanceError("installed Prime Agent version is missing or ambiguous")
+    return matches[0]
+
+
+def _validate_image_fields(image: dict[str, Any]) -> None:
+    dockerfile = image.get("dockerfile")
+    if not isinstance(dockerfile, str):
+        raise ProvenanceError("invalid image.dockerfile")
+    pure = PurePosixPath(dockerfile)
+    if (not dockerfile or dockerfile.startswith("/") or "\\" in dockerfile
+            or pure == PurePosixPath(".") or ".." in pure.parts
+            or pure.as_posix() != dockerfile):
+        raise ProvenanceError("invalid image.dockerfile")
+    if not isinstance(image.get("informational_tag"), str) or not re.fullmatch(
+            r"prime-claw-test-tier1:[0-9a-f]{12}", image["informational_tag"]):
+        raise ProvenanceError("invalid image.informational_tag")
+    for field in ("os", "architecture"):
+        value = image.get(field)
+        if (not isinstance(value, str)
+                or not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", value)):
+            raise ProvenanceError(f"invalid image.{field}")
+
+
+def image_identity(raw: dict[str, Any], *, expected_id: str,
+                   dockerfile: str, dockerfile_sha256: str,
+                   declared_input_sha256: str, informational_tag: str,
+                   build_started_at: str, build_finished_at: str) -> dict[str, Any]:
+    """Validate allow-listed inspect fields before any durable write.
+
+    Repository digests are intentionally not retained: a local test build is
+    identified by its iidfile ID, while registry names can reveal private
+    endpoints or repository identity.
+    """
+    if not isinstance(raw, dict) or raw.get("Id") != expected_id:
+        raise ProvenanceError("image inspect identity mismatched iidfile")
+    if not _IMAGE_ID_RE.fullmatch(expected_id):
+        raise ProvenanceError("invalid image ID")
+    os_name = raw.get("Os")
+    architecture = raw.get("Architecture")
+    if (not isinstance(os_name, str) or not _SAFE_PLATFORM_RE.fullmatch(os_name)
+            or not isinstance(architecture, str)
+            or not _SAFE_PLATFORM_RE.fullmatch(architecture)):
+        raise ProvenanceError("image inspect omitted or invalid platform identity")
+    if (Path(dockerfile).is_absolute() or ".." in Path(dockerfile).parts
+            or not _SHA256_RE.fullmatch(dockerfile_sha256)
+            or not _SHA256_RE.fullmatch(declared_input_sha256)
+            or not re.fullmatch(r"prime-claw-test-tier1:[0-9a-f]{12}", informational_tag)):
+        raise ProvenanceError("invalid captured image build identity")
+    _utc_timestamp(build_started_at, "image.build_started_at")
+    _utc_timestamp(build_finished_at, "image.build_finished_at")
+    safe = {
+        "id": expected_id,
+        "repo_digests": [],
+        "dockerfile": dockerfile,
+        "dockerfile_sha256": dockerfile_sha256,
+        "declared_input_sha256": declared_input_sha256,
+        "declared_input_hash_contract": "framed-sha256-v2",
+        "informational_tag": informational_tag,
+        "os": os_name,
+        "architecture": architecture,
+        "build_started_at": build_started_at,
+        "build_finished_at": build_finished_at,
+    }
+    _validate_image_fields(safe)
+    _assert_sanitized(safe)
+    return safe
+
+
+def write_sanitized_json(path: Path | str, value: Any) -> None:
+    """Validate a bounded JSON value before writing it durably."""
+    _assert_sanitized(value)
+    target = Path(path)
+    if target.exists() or target.is_symlink():
+        raise ProvenanceError(f"refusing to overwrite evidence: {target.name}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = canonical_json(value)
+    with target.open("x", encoding="utf-8") as fh:
+        fh.write(payload)
+        fh.flush()
+        os.fsync(fh.fileno())
+
 def allocate_run_tree(results_root: Path | str, tier: str) -> tuple[str, Path]:
     """Atomically allocate `.test-results/<run-id>/<tier>/`.
 
@@ -92,37 +186,216 @@ def _relative_file(root: Path, relative: str | Path) -> Path:
     rel = Path(relative)
     if rel.is_absolute() or ".." in rel.parts or rel == Path("."):
         raise ProvenanceError(f"path must stay below the declared root: {relative}")
-    path = root / rel
+    return root / rel
+
+
+def _open_root_fd(root: Path) -> int:
+    flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+             | getattr(os, "O_NOFOLLOW", 0))
     try:
-        path.relative_to(root)
-    except ValueError as exc:
-        raise ProvenanceError(f"path escapes declared root: {relative}") from exc
-    return path
+        fd = os.open(root, flags)
+        if not stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise ProvenanceError("declared root is not a directory")
+        return fd
+    except OSError as exc:
+        raise ProvenanceError("declared root is unsafe or unavailable") from exc
+
+
+def _assert_root_binding(root: Path, root_fd: int) -> None:
+    """Require the path to still name the directory held by root_fd."""
+    try:
+        check_fd = _open_root_fd(root)
+    except ProvenanceError as exc:
+        raise ProvenanceError("declared root changed during capture") from exc
+    try:
+        expected = os.fstat(root_fd)
+        observed = os.fstat(check_fd)
+        if (expected.st_dev, expected.st_ino) != (observed.st_dev, observed.st_ino):
+            raise ProvenanceError("declared root changed during capture")
+    finally:
+        os.close(check_fd)
+
+
+def _open_parent_fd(root: Path, relative: str | Path,
+                    *, root_fd: int | None = None) -> tuple[int, str]:
+    """Traverse descendants from one retained root fd without following links."""
+    rel = Path(relative)
+    _relative_file(root, rel)
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    fd = _open_root_fd(root) if root_fd is None else os.dup(root_fd)
+    try:
+        for part in rel.parts[:-1]:
+            next_fd = os.open(part, flags | nofollow, dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+        return fd, rel.parts[-1]
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _open_created_parent_fd(root_fd: int, relative: str | Path) -> tuple[int, str]:
+    """Create/traverse an owned destination below one retained root fd."""
+    rel = Path(relative)
+    if rel.is_absolute() or ".." in rel.parts or rel == Path("."):
+        raise ProvenanceError(f"destination path escapes capture root: {relative}")
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    fd = os.dup(root_fd)
+    try:
+        for part in rel.parts[:-1]:
+            try:
+                os.mkdir(part, 0o700, dir_fd=fd)
+            except FileExistsError:
+                pass
+            next_fd = os.open(part, flags | nofollow, dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+        return fd, rel.parts[-1]
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _regular_digest(root: Path, relative: str,
+                    destination: Path | None = None, *,
+                    root_fd: int | None = None,
+                    destination_root_fd: int | None = None) -> tuple[str, int]:
+    """Hash/copy one file from retained source/destination directory fds."""
+    if destination is not None and destination_root_fd is not None:
+        raise ProvenanceError("ambiguous capture destination")
+    try:
+        parent_fd, name = _open_parent_fd(root, relative, root_fd=root_fd)
+    except OSError as exc:
+        raise ProvenanceError(f"input path is unsafe or unavailable: {relative}") from exc
+    source_fd = None
+    output_fd = None
+    output = None
+    destination_parent_fd = None
+    try:
+        before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode):
+            raise ProvenanceError(f"input is not a regular file: {relative}")
+        source_fd = os.open(
+            name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=parent_fd)
+        opened = os.fstat(source_fd)
+        if (before.st_dev, before.st_ino, before.st_mode) != (
+                opened.st_dev, opened.st_ino, opened.st_mode):
+            raise ProvenanceError(f"input changed while it was opened: {relative}")
+        if destination_root_fd is not None:
+            destination_parent_fd, destination_name = _open_created_parent_fd(
+                destination_root_fd, relative)
+            output_fd = os.open(
+                destination_name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+                0o600, dir_fd=destination_parent_fd)
+        elif destination is not None:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            output = destination.open("xb")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(source_fd, 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+            if output_fd is not None:
+                view = memoryview(chunk)
+                while view:
+                    written = os.write(output_fd, view)
+                    view = view[written:]
+            elif output is not None:
+                output.write(chunk)
+        after = os.fstat(source_fd)
+        stable = (opened.st_dev, opened.st_ino, opened.st_mode,
+                  opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns)
+        observed = (after.st_dev, after.st_ino, after.st_mode,
+                    after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        if observed != stable:
+            raise ProvenanceError(f"input changed while it was read: {relative}")
+        captured_mode = stat.S_IMODE(opened.st_mode)
+        if output_fd is not None:
+            os.fchmod(output_fd, captured_mode)
+            os.fsync(output_fd)
+        elif output is not None:
+            output.flush()
+            output.close()
+            output = None
+            destination.chmod(captured_mode)
+        return digest.hexdigest(), captured_mode
+    except OSError as exc:
+        raise ProvenanceError(f"input path is unsafe or unavailable: {relative}") from exc
+    finally:
+        if output is not None:
+            output.close()
+        if output_fd is not None:
+            os.close(output_fd)
+        if destination_parent_fd is not None:
+            os.close(destination_parent_fd)
+        if source_fd is not None:
+            os.close(source_fd)
+        os.close(parent_fd)
+
+
+def _safe_link_target(root: Path, relative: str, *,
+                      root_fd: int | None = None) -> str:
+    try:
+        parent_fd, name = _open_parent_fd(root, relative, root_fd=root_fd)
+    except OSError as exc:
+        raise ProvenanceError(f"repository link path is unsafe: {relative}") from exc
+    try:
+        before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISLNK(before.st_mode):
+            raise ProvenanceError(f"repository input changed type: {relative}")
+        target = os.readlink(name, dir_fd=parent_fd)
+        after = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if (before.st_dev, before.st_ino, before.st_mode,
+                before.st_mtime_ns, before.st_ctime_ns) != (
+                after.st_dev, after.st_ino, after.st_mode,
+                after.st_mtime_ns, after.st_ctime_ns):
+            raise ProvenanceError(f"repository link changed while read: {relative}")
+    except OSError as exc:
+        raise ProvenanceError(f"repository link is unsafe or unavailable: {relative}") from exc
+    finally:
+        os.close(parent_fd)
+    if os.path.isabs(target):
+        raise ProvenanceError("repository symlink has an absolute target")
+    combined = os.path.normpath(os.path.join(os.path.dirname(relative), target))
+    if combined == ".." or combined.startswith("../"):
+        raise ProvenanceError("repository symlink escapes the checkout")
+    return target
+
+def _framed_hash(records: Iterable[dict[str, Any]], *, domain: str) -> str:
+    """Hash canonical records with a domain and explicit byte lengths."""
+    digest = hashlib.sha256()
+    digest.update(("prime-claw:" + domain + "\0").encode("ascii"))
+    for record in records:
+        payload = canonical_json(record).encode("utf-8")
+        digest.update(len(payload).to_bytes(8, "big"))
+        digest.update(payload)
+    return digest.hexdigest()
 
 
 def hash_declared_inputs(root: Path | str, relative_paths: Iterable[str]) -> str:
-    """Hash an explicit sorted file inventory including names and modes."""
-    root = Path(root).resolve()
-    digest = hashlib.sha256()
+    """Hash an explicit inventory from one no-follow anchored root fd."""
+    root_path = Path(os.path.abspath(root))
     paths = sorted(set(relative_paths))
     if not paths:
         raise ProvenanceError("declared input inventory is empty")
-    for relative in paths:
-        path = _relative_file(root, relative)
-        try:
-            st = path.lstat()
-        except OSError as exc:
-            raise ProvenanceError(f"declared input unavailable: {relative}") from exc
-        if path.is_symlink() or not path.is_file():
-            raise ProvenanceError(f"declared input is not a regular file: {relative}")
-        digest.update(relative.encode("utf-8") + b"\0")
-        digest.update(oct(st.st_mode & 0o777).encode("ascii") + b"\0")
-        with path.open("rb") as fh:
-            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
-                digest.update(chunk)
-        digest.update(b"\0")
-    return digest.hexdigest()
-
+    root_fd = _open_root_fd(root_path)
+    try:
+        records = []
+        for relative in paths:
+            _relative_file(root_path, relative)
+            digest, captured_mode = _regular_digest(
+                root_path, relative, root_fd=root_fd)
+            records.append({"path": Path(relative).as_posix(), "kind": "file",
+                            "mode": captured_mode,
+                            "content_sha256": digest})
+        _assert_root_binding(root_path, root_fd)
+        return _framed_hash(records, domain="declared-inputs-v2")
+    finally:
+        os.close(root_fd)
 
 def _git(repo: Path, *args: str) -> bytes:
     try:
@@ -135,113 +408,188 @@ def _git(repo: Path, *args: str) -> bytes:
     return out.stdout
 
 
-def _repository_entries(root: Path) -> list[tuple[str, Path, str, int]]:
-    raw = _git(root, "ls-files", "-z", "--cached", "--others",
-               "--exclude-standard")
-    entries = []
-    for rel_raw in sorted(set(part for part in raw.split(b"\0") if part)):
-        rel = rel_raw.decode("utf-8", "surrogateescape")
-        path = _relative_file(root, rel)
-        try:
-            st = path.lstat()
-        except FileNotFoundError:
-            entries.append((rel, path, "missing", 0))
-            continue
-        except OSError as exc:
-            raise ProvenanceError("cannot inspect repository input") from exc
-        mode = st.st_mode & 0o777
-        if path.is_symlink():
-            target = os.readlink(path)
-            if os.path.isabs(target):
-                raise ProvenanceError("repository symlink has an absolute target")
-            resolved = (path.parent / target).resolve(strict=False)
-            try:
-                resolved.relative_to(root)
-            except ValueError as exc:
-                raise ProvenanceError("repository symlink escapes the checkout") from exc
-            kind = "symlink"
-        elif path.is_file():
-            kind = "file"
-        else:
-            raise ProvenanceError("repository input is not a regular file or symlink")
-        entries.append((rel, path, kind, mode))
-    return entries
-
-
-def _hash_repository_entries(entries: list[tuple[str, Path, str, int]]) -> str:
-    digest = hashlib.sha256()
-    for rel, path, kind, mode in entries:
-        digest.update(rel.encode("utf-8", "surrogateescape") + b"\0")
-        digest.update(kind.encode("ascii") + b"\0")
-        digest.update(oct(mode).encode("ascii") + b"\0")
-        if kind == "missing":
-            continue
-        if kind == "symlink":
-            digest.update(os.readlink(path).encode("utf-8", "surrogateescape"))
-        else:
-            with path.open("rb") as fh:
-                for chunk in iter(lambda: fh.read(1024 * 1024), b""):
-                    digest.update(chunk)
-        digest.update(b"\0")
-    return digest.hexdigest()
-
-
-def repository_identity(repo: Path | str) -> dict[str, Any]:
-    """Hash the exact sanitized inventory that may be mounted for tier 1."""
-    root = Path(repo).resolve()
+def _repository_head_status(root: Path) -> tuple[str, bytes]:
     head = _git(root, "rev-parse", "HEAD").decode("ascii").strip()
     if not re.fullmatch(r"[0-9a-f]{40,64}", head):
         raise ProvenanceError("git returned an invalid HEAD identity")
-    status = _git(root, "status", "--porcelain=v1", "-z",
-                  "--untracked-files=all")
-    entries = _repository_entries(root)
-    return {"head": head, "dirty": bool(status),
-            "status_sha256": sha256_bytes(status),
-            "content_sha256": _hash_repository_entries(entries),
-            "entry_count": len(entries)}
+    status_bytes = _git(root, "status", "--porcelain=v1", "-z",
+                        "--untracked-files=all")
+    return head, status_bytes
+
+
+def _repository_paths(root: Path) -> list[str]:
+    raw = _git(root, "ls-files", "-z", "--cached", "--others",
+               "--exclude-standard")
+    return [part.decode("utf-8", "surrogateescape")
+            for part in sorted(set(item for item in raw.split(b"\0") if item))]
+
+
+def _repository_entries(root: Path, root_fd: int) -> list[tuple[str, str, int]]:
+    entries = []
+    for rel in _repository_paths(root):
+        _relative_file(root, rel)
+        try:
+            parent_fd, name = _open_parent_fd(root, rel, root_fd=root_fd)
+            try:
+                st = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            finally:
+                os.close(parent_fd)
+        except FileNotFoundError:
+            entries.append((rel, "missing", 0))
+            continue
+        except OSError as exc:
+            raise ProvenanceError(
+                f"repository input path is unsafe or unavailable: {rel}") from exc
+        mode = stat.S_IMODE(st.st_mode)
+        if stat.S_ISLNK(st.st_mode):
+            _safe_link_target(root, rel, root_fd=root_fd)
+            kind = "symlink"
+        elif stat.S_ISREG(st.st_mode):
+            kind = "file"
+        else:
+            raise ProvenanceError(
+                "repository input is not a regular file or symlink")
+        entries.append((rel, kind, mode))
+    return entries
+
+
+def _repository_records(root: Path, root_fd: int,
+                        entries: list[tuple[str, str, int]], *,
+                        destination_root_fd: int | None = None
+                        ) -> list[dict[str, Any]]:
+    records = []
+    for rel, kind, mode in entries:
+        record: dict[str, Any] = {"path": rel, "kind": kind, "mode": mode}
+        if kind == "missing":
+            record["content_sha256"] = None
+        elif kind == "symlink":
+            link_target = _safe_link_target(root, rel, root_fd=root_fd)
+            record["target"] = link_target
+            if destination_root_fd is not None:
+                parent_fd, name = _open_created_parent_fd(destination_root_fd, rel)
+                try:
+                    os.symlink(link_target, name, dir_fd=parent_fd)
+                finally:
+                    os.close(parent_fd)
+        else:
+            digest, captured_mode = _regular_digest(
+                root, rel, root_fd=root_fd,
+                destination_root_fd=destination_root_fd)
+            record["content_sha256"] = digest
+            record["mode"] = captured_mode
+        records.append(record)
+    return records
+
+
+def _validate_captured_links(records: list[dict[str, Any]]) -> None:
+    """Resolve recorded link chains lexically without reopening destination paths."""
+    links = {record["path"]: record["target"] for record in records
+             if record["kind"] == "symlink"}
+    limit = len(links) + 1
+    for original in links:
+        pending = original.split("/")
+        resolved: list[str] = []
+        followed = 0
+        while pending:
+            part = pending.pop(0)
+            if part in ("", "."):
+                continue
+            if part == "..":
+                if not resolved:
+                    raise ProvenanceError(
+                        "repository symlink chain escapes the captured snapshot")
+                resolved.pop()
+                continue
+            resolved.append(part)
+            candidate = "/".join(resolved)
+            if candidate in links:
+                followed += 1
+                if followed > limit:
+                    raise ProvenanceError("repository symlink chain contains a cycle")
+                resolved.pop()
+                target_parts = links[candidate].split("/")
+                pending = target_parts + pending
+        # Direct targets were already checked; this final guard documents the
+        # invariant for chains that consume multiple parent components.
+        if not resolved:
+            continue
+
+def _identity(head: str, status_bytes: bytes,
+              records: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"head": head, "dirty": bool(status_bytes),
+            "status_sha256": sha256_bytes(status_bytes),
+            "content_sha256": _framed_hash(records, domain="repository-v2"),
+            "entry_count": len(records),
+            "content_hash_contract": "framed-sha256-v2"}
+
+
+def repository_identity(repo: Path | str) -> dict[str, Any]:
+    """Hash exact inputs through one retained no-follow repository root fd."""
+    root = Path(os.path.abspath(repo))
+    root_fd = _open_root_fd(root)
+    try:
+        head, status_bytes = _repository_head_status(root)
+        _assert_root_binding(root, root_fd)
+        entries = _repository_entries(root, root_fd)
+        records = _repository_records(root, root_fd, entries)
+        _assert_root_binding(root, root_fd)
+        return _identity(head, status_bytes, records)
+    finally:
+        os.close(root_fd)
 
 
 def stage_repository_snapshot(repo: Path | str,
                               destination: Path | str) -> dict[str, Any]:
-    """Copy only tracked/nonignored inputs into one fresh run-owned snapshot."""
-    root = Path(repo).resolve()
-    dest = Path(destination)
+    """Capture repository inputs through retained source/destination root fds."""
+    root = Path(os.path.abspath(repo))
+    dest = Path(os.path.abspath(destination))
     if dest.exists() or dest.is_symlink():
         raise ProvenanceError("repository snapshot destination already exists")
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.mkdir(mode=0o700)
+    root_fd = None
+    destination_root_fd = None
     try:
-        identity = repository_identity(root)
-        entries = _repository_entries(root)
-        snapshot_entries = []
-        for rel, source, kind, mode in entries:
-            target = dest / rel
-            if kind == "missing":
-                snapshot_entries.append((rel, target, kind, mode))
-                continue
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if kind == "symlink":
-                target.symlink_to(os.readlink(source))
-            else:
-                shutil.copyfile(source, target, follow_symlinks=False)
-                target.chmod(mode)
-            snapshot_entries.append((rel, target, kind, mode))
-        if (_hash_repository_entries(snapshot_entries)
-                != identity["content_sha256"]
-                or repository_identity(root) != identity):
+        root_fd = _open_root_fd(root)
+        destination_root_fd = _open_root_fd(dest)
+        head, status_bytes = _repository_head_status(root)
+        _assert_root_binding(root, root_fd)
+        entries = _repository_entries(root, root_fd)
+        records = _repository_records(
+            root, root_fd, entries, destination_root_fd=destination_root_fd)
+        captured = _identity(head, status_bytes, records)
+        _validate_captured_links(records)
+        _assert_root_binding(root, root_fd)
+        _assert_root_binding(dest, destination_root_fd)
+        # HEAD/status/path inventory must stay stable across capture. File bytes
+        # and modes are bound to the opened fds and destination writes remain
+        # below the retained snapshot fd.
+        after_head, after_status = _repository_head_status(root)
+        _assert_root_binding(root, root_fd)
+        if (after_head != head or after_status != status_bytes
+                or _repository_paths(root) != [rel for rel, _kind, _mode in entries]):
             raise ProvenanceError(
                 "repository changed while the run-owned snapshot was staged")
-        return identity
+        _assert_root_binding(root, root_fd)
+        _assert_root_binding(dest, destination_root_fd)
+        return captured
     except BaseException:
         shutil.rmtree(dest, ignore_errors=True)
         raise
-
+    finally:
+        if destination_root_fd is not None:
+            os.close(destination_root_fd)
+        if root_fd is not None:
+            os.close(root_fd)
 
 def evidence_inventory(
     root: Path | str, *, exclude: Iterable[str] = ("manifest.json",),
     exclude_prefixes: Iterable[str] = ("share/",),
 ) -> list[dict[str, str]]:
-    root = Path(root).resolve()
+    root_path = Path(root)
+    if root_path.is_symlink():
+        raise ProvenanceError("evidence root must not be a symlink")
+    root = root_path.resolve()
     excluded = set(exclude)
     prefixes = tuple(exclude_prefixes)
     rows: list[dict[str, str]] = []
@@ -251,19 +599,24 @@ def evidence_inventory(
         rel = path.relative_to(root).as_posix()
         if rel in excluded or any(rel.startswith(prefix) for prefix in prefixes):
             continue
-        if path.is_dir():
-            continue
         if path.is_symlink():
             raise ProvenanceError(f"evidence must not contain a symlink: {rel}")
-        if not path.is_file():
+        if path.is_dir():
+            continue
+        try:
+            mode = path.lstat().st_mode
+        except OSError as exc:
+            raise ProvenanceError(f"evidence entry is unavailable: {rel}") from exc
+        if not stat.S_ISREG(mode):
             raise ProvenanceError(f"evidence is not a regular file: {rel}")
         try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            text = None
-        if text is not None:
-            _assert_sanitized(text, f"evidence:{rel}")
-        rows.append({"path": rel, "sha256": sha256_file(path)})
+            raw = path.read_bytes()
+            text = raw.decode("utf-8", "strict")
+        except UnicodeDecodeError as exc:
+            raise ProvenanceError(
+                f"evidence text has an unknown encoding: {rel}") from exc
+        _assert_sanitized(text, f"evidence:{rel}")
+        rows.append({"path": rel, "sha256": sha256_bytes(raw)})
     return rows
 
 
@@ -287,8 +640,14 @@ def verify_evidence(root: Path | str, manifest: dict[str, Any]) -> None:
 
 def _require_keys(value: dict[str, Any], required: set[str], where: str) -> None:
     missing = sorted(required - value.keys())
-    if missing:
-        raise ProvenanceError(f"{where} missing keys: {', '.join(missing)}")
+    unknown = sorted(value.keys() - required)
+    if missing or unknown:
+        details = []
+        if missing:
+            details.append(f"missing keys: {', '.join(missing)}")
+        if unknown:
+            details.append(f"unknown keys: {', '.join(unknown)}")
+        raise ProvenanceError(f"{where} " + "; ".join(details))
 
 
 def _assert_sanitized(value: Any, path: str = "manifest") -> None:
@@ -340,25 +699,37 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
                         ("evidence", evidence)):
         if not isinstance(value, dict):
             raise ProvenanceError(f"{name} must be an object")
-    _require_keys(run, {"id", "tier", "mode", "started_at", "finished_at", "status"}, "run")
+    _require_keys(run, {"id", "tier", "mode", "started_at", "finished_at",
+                        "status", "failure_codes"}, "run")
     if (run["tier"] != "tier1" or run["mode"] not in {"pinned", "smoke"}
             or run["status"] not in {"passed", "failed"}):
         raise ProvenanceError("invalid run tier/mode/status")
     if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z-[0-9]+-[0-9a-f]{8}", str(run["id"])):
         raise ProvenanceError("invalid run.id")
+    if (not isinstance(run["failure_codes"], list)
+            or any(not isinstance(code, str)
+                   or not re.fullmatch(r"[a-z][a-z0-9-]{1,63}", code)
+                   for code in run["failure_codes"])
+            or len(set(run["failure_codes"])) != len(run["failure_codes"])):
+        raise ProvenanceError("invalid run.failure_codes")
+    if ((run["status"] == "passed" and run["failure_codes"])
+            or (run["status"] == "failed" and not run["failure_codes"])):
+        raise ProvenanceError("run status and failure_codes disagree")
     run_started = _utc_timestamp(run["started_at"], "run.started_at")
     run_finished = _utc_timestamp(run["finished_at"], "run.finished_at")
     if run_finished < run_started:
         raise ProvenanceError("run.finished_at precedes run.started_at")
     _require_keys(repo, {"head", "dirty", "status_sha256",
-                         "content_sha256", "entry_count"}, "repository")
+                         "content_sha256", "entry_count",
+                         "content_hash_contract"}, "repository")
     if (not re.fullmatch(r"[0-9a-f]{40,64}", str(repo["head"]))
             or not isinstance(repo["dirty"], bool)
             or not _SHA256_RE.fullmatch(str(repo["status_sha256"]))
             or not _SHA256_RE.fullmatch(str(repo["content_sha256"]))
             or isinstance(repo["entry_count"], bool)
             or not isinstance(repo["entry_count"], int)
-            or repo["entry_count"] < 0):
+            or repo["entry_count"] < 0
+            or repo["content_hash_contract"] != "framed-sha256-v2"):
         raise ProvenanceError("invalid repository identity")
     if run["mode"] == "smoke":
         if prime is not None:
@@ -377,15 +748,21 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
             if artifact is not None or run["status"] != "failed":
                 raise ProvenanceError("unavailable installed identity is valid only for failed runs")
         else:
-            if (not _SEMVER_RE.fullmatch(str(installed))
-                    or installed != requested):
-                raise ProvenanceError("requested and installed Prime Agent versions differ")
+            try:
+                observed = parse_prime_agent_version(str(installed))
+            except ProvenanceError as exc:
+                raise ProvenanceError("installed Prime Agent version is invalid") from exc
+            if observed != installed:
+                raise ProvenanceError("installed Prime Agent version is invalid")
             if (not isinstance(artifact, dict)
                     or set(artifact) != {"kind", "version", "executable_sha256"}
                     or artifact.get("kind") != "vendor-binary"
                     or artifact.get("version") != installed
                     or not _SHA256_RE.fullmatch(str(artifact.get("executable_sha256", "")))):
                 raise ProvenanceError("prime_agent.artifact identity is invalid")
+            if run["status"] == "passed" and installed != requested:
+                raise ProvenanceError(
+                    "passed run requested and installed versions differ")
     if image is None:
         if run["status"] != "failed":
             raise ProvenanceError("passed manifests require image identity")
@@ -393,12 +770,16 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         if not isinstance(image, dict):
             raise ProvenanceError("image must be null or an object")
         _require_keys(image, {"id", "repo_digests", "dockerfile", "dockerfile_sha256",
-                              "declared_input_sha256", "informational_tag", "os",
-                              "architecture", "build_started_at", "build_finished_at"}, "image")
+                              "declared_input_sha256", "declared_input_hash_contract",
+                              "informational_tag", "os", "architecture",
+                              "build_started_at", "build_finished_at"}, "image")
         if not _IMAGE_ID_RE.fullmatch(str(image["id"])):
             raise ProvenanceError("invalid image.id")
-        if not isinstance(image["repo_digests"], list):
-            raise ProvenanceError("image.repo_digests must be a list")
+        if image["repo_digests"] != []:
+            raise ProvenanceError("image.repo_digests must be an empty safe list")
+        _validate_image_fields(image)
+        if image["declared_input_hash_contract"] != "framed-sha256-v2":
+            raise ProvenanceError("invalid image declared-input hash contract")
         for key in ("dockerfile_sha256", "declared_input_sha256"):
             if not _SHA256_RE.fullmatch(str(image[key])):
                 raise ProvenanceError(f"invalid image.{key}")
@@ -415,15 +796,29 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         _utc_timestamp(network["disconnected_at"], "network.disconnected_at")
     elif run["status"] != "failed" or network["disconnected_at"] is not None:
         raise ProvenanceError("network absence was not verified")
-    _require_keys(teardown, {"state", "verified_at"}, "teardown")
+    _require_keys(teardown, {"state", "verified_at", "remove_outcome",
+                             "inspect_outcome", "clean"}, "teardown")
     if teardown["state"] not in {"absent", "unknown", "present"}:
         raise ProvenanceError("invalid teardown.state")
+    outcomes = {"clean", "ordinary_nonzero", "timed_out", "interrupted",
+                "launch_error", "reap_timeout", "not_needed", "not_run",
+                "identity_refused"}
+    if (teardown["remove_outcome"] not in outcomes
+            or teardown["inspect_outcome"] not in outcomes
+            or not isinstance(teardown["clean"], bool)):
+        raise ProvenanceError("invalid teardown command accounting")
+    if teardown["clean"] and teardown["state"] != "absent":
+        raise ProvenanceError("clean teardown requires absence")
+    if teardown["clean"] and (
+            teardown["remove_outcome"] not in {"clean", "ordinary_nonzero", "not_needed"}
+            or teardown["inspect_outcome"] not in {"ordinary_nonzero", "not_needed"}):
+        raise ProvenanceError("clean teardown contradicts command outcomes")
     _utc_timestamp(teardown["verified_at"], "teardown.verified_at")
     if run["status"] == "passed":
         if image is None or not network["verified_absent"]:
             raise ProvenanceError("passed runs require image and offline identity")
-        if teardown["state"] != "absent":
-            raise ProvenanceError("passed runs require verified absent teardown")
+        if teardown["state"] != "absent" or not teardown["clean"]:
+            raise ProvenanceError("passed runs require clean verified absent teardown")
         if run["mode"] == "pinned" and (
                 prime["installed_version"] is None or prime["artifact"] is None):
             raise ProvenanceError("passed pinned runs require installed artifact identity")
@@ -489,6 +884,19 @@ def _main() -> int:
     hash_inputs.add_argument("paths", nargs="+")
     hash_file = sub.add_parser("hash-file")
     hash_file.add_argument("path")
+    build_input = sub.add_parser("build-input")
+    build_input.add_argument("root")
+    build_input.add_argument("path")
+    capture_image = sub.add_parser("capture-image")
+    capture_image.add_argument("path")
+    capture_image.add_argument("expected_id")
+    capture_image.add_argument("dockerfile")
+    capture_image.add_argument("dockerfile_sha256")
+    capture_image.add_argument("declared_input_sha256")
+    capture_image.add_argument("informational_tag")
+    capture_image.add_argument("build_started_at")
+    capture_image.add_argument("build_finished_at")
+    parse_version = sub.add_parser("parse-version")
     now = sub.add_parser("now")
     args = parser.parse_args()
     if args.command == "allocate":
@@ -503,6 +911,28 @@ def _main() -> int:
         print(hash_declared_inputs(args.root, args.paths))
     elif args.command == "hash-file":
         print(sha256_file(args.path))
+    elif args.command == "build-input":
+        root = Path(args.root)
+        print(sha256_file(root / args.path) + "\t" +
+              hash_declared_inputs(root, [args.path]))
+    elif args.command == "capture-image":
+        try:
+            rows = json.load(__import__("sys").stdin)
+            if not isinstance(rows, list) or len(rows) != 1:
+                raise ProvenanceError("image inspect must return exactly one row")
+            safe = image_identity(
+                rows[0], expected_id=args.expected_id,
+                dockerfile=args.dockerfile,
+                dockerfile_sha256=args.dockerfile_sha256,
+                declared_input_sha256=args.declared_input_sha256,
+                informational_tag=args.informational_tag,
+                build_started_at=args.build_started_at,
+                build_finished_at=args.build_finished_at)
+            write_sanitized_json(args.path, safe)
+        except (UnicodeDecodeError, json.JSONDecodeError, TypeError) as exc:
+            raise ProvenanceError("invalid image inspect encoding or JSON") from exc
+    elif args.command == "parse-version":
+        print(parse_prime_agent_version(__import__("sys").stdin.read()))
     elif args.command == "now":
         print(utc_now())
     return 0

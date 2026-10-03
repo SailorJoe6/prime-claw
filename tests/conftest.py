@@ -29,10 +29,12 @@ in-container via tests/container/fake_daemon.py; see that file.)
 """
 
 import json
+from dataclasses import dataclass
 import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -40,6 +42,7 @@ import time
 import pytest
 
 from scripts.testing import provenance
+from scripts.testing import bounded as bounded_command
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -51,6 +54,34 @@ RESULTS = REPO / ".test-results"
 ENV_FILE = REPO / ".env"
 FORK_STAGE_SUBDIR = "packages/coding-agent/release/tier1"
 DIST_DIRS = ("packages/coding-agent", "packages/agent", "packages/ai", "packages/tui")
+HOST_KILL_GRACE = 5.0
+_DEFERRED_SIGNAL = None
+
+
+class _FixtureInterrupted(BaseException):
+    def __init__(self, signum: int) -> None:
+        self.signum = signum
+        super().__init__(f"tier-1 fixture interrupted by signal {signum}")
+
+
+def _host_command(argv, *, timeout: float, capture_output: bool = False,
+                  text: bool = False, input_text=None, check: bool = False,
+                  propagate_signal: bool = True):
+    """The only host external-command contract used by the tier-1 fixture."""
+    result = bounded_command.run_completed(
+        [str(arg) for arg in argv], timeout=timeout,
+        kill_grace=HOST_KILL_GRACE, reap_grace=HOST_KILL_GRACE,
+        capture_output=capture_output, text=text, input=input_text)
+    if result.outcome == "interrupted" and result.signal is not None:
+        if propagate_signal:
+            raise _FixtureInterrupted(result.signal)
+        global _DEFERRED_SIGNAL
+        _DEFERRED_SIGNAL = result.signal
+    if check and (result.outcome != "exited" or result.returncode != 0):
+        raise RuntimeError(
+            "tier-1 fixture: bounded host command failed "
+            f"(outcome={result.outcome}, rc={result.returncode})")
+    return result
 
 _SKIP_CONTAINER = (
     "tier 1 (container): requires Docker; run `pytest -m container` "
@@ -135,17 +166,18 @@ def _load_install_selection() -> tuple[str, str]:
     return "pinned", pinned
 
 
-def _build_tier1_image(tier_dir: Path) -> dict:
+def _build_tier1_image(tier_dir: Path, workspace_snapshot: Path) -> dict:
     """Build from a run-owned empty context and return exact image identity."""
     build_context = tier_dir / "build-context"
     build_context.mkdir()
-    shutil.copy2(REPO / DOCKERFILE, build_context / "Dockerfile")
-    input_hash = provenance.hash_declared_inputs(REPO, [DOCKERFILE])
-    dockerfile_hash = provenance.sha256_file(REPO / DOCKERFILE)
+    captured_dockerfile = workspace_snapshot / DOCKERFILE
+    shutil.copy2(captured_dockerfile, build_context / "Dockerfile")
+    input_hash = provenance.hash_declared_inputs(build_context, ["Dockerfile"])
+    dockerfile_hash = provenance.sha256_file(build_context / "Dockerfile")
     tag = f"{IMAGE_REPO}:{input_hash[:12]}"
     iidfile = tier_dir / "image.iid"
     started_at = provenance.utc_now()
-    subprocess.run(
+    _host_command(
         ["docker", "build", "-q", "--iidfile", str(iidfile),
          "-f", str(build_context / "Dockerfile"), "-t", tag,
          str(build_context)],
@@ -158,7 +190,7 @@ def _build_tier1_image(tier_dir: Path) -> dict:
         raise RuntimeError("tier-1 fixture: image iidfile was not published") from exc
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
         raise RuntimeError(f"tier-1 fixture: invalid image ID in iidfile: {image_id!r}")
-    inspected = subprocess.run(
+    inspected = _host_command(
         ["docker", "image", "inspect", image_id], check=True,
         capture_output=True, text=True, timeout=30,
     )
@@ -167,42 +199,30 @@ def _build_tier1_image(tier_dir: Path) -> dict:
         row = rows[0]
     except (json.JSONDecodeError, IndexError, TypeError) as exc:
         raise RuntimeError("tier-1 fixture: invalid docker image inspect output") from exc
-    if row.get("Id") != image_id:
-        raise RuntimeError("tier-1 fixture: image inspect identity mismatched iidfile")
-    if not row.get("Os") or not row.get("Architecture"):
-        raise RuntimeError("tier-1 fixture: image inspect omitted platform identity")
-    safe = {
-        "id": image_id,
-        "repo_digests": row.get("RepoDigests") or [],
-        "dockerfile": DOCKERFILE,
-        "dockerfile_sha256": dockerfile_hash,
-        "declared_input_sha256": input_hash,
-        "informational_tag": tag,
-        "os": row["Os"],
-        "architecture": row["Architecture"],
-        "build_started_at": started_at,
-        "build_finished_at": finished_at,
-    }
-    (tier_dir / "image.json").write_text(
-        json.dumps(safe, sort_keys=True, separators=(",", ":")) + "\n")
+    safe = provenance.image_identity(
+        row, expected_id=image_id, dockerfile=DOCKERFILE,
+        dockerfile_sha256=dockerfile_hash,
+        declared_input_sha256=input_hash, informational_tag=tag,
+        build_started_at=started_at, build_finished_at=finished_at)
+    provenance.write_sanitized_json(tier_dir / "image.json", safe)
     return safe
 
 
 def _container_networks(container_id: str) -> list[str]:
     """Return captured network names; any inspect ambiguity fails closed."""
     try:
-        out = subprocess.run(
+        out = _host_command(
             ["docker", "inspect", "--format",
              "{{json .NetworkSettings.Networks}}", container_id],
             capture_output=True, text=True, timeout=30,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except BaseException as exc:
         raise RuntimeError(
             "tier-1 fixture: container network inspection is unknown") from exc
-    if out.returncode != 0:
+    if out.outcome != "exited" or out.returncode != 0:
         raise RuntimeError(
-            "tier-1 fixture: container network inspection is unknown: "
-            + out.stderr.strip())
+            "tier-1 fixture: container network inspection is unknown "
+            f"(outcome={out.outcome}, rc={out.returncode})")
     try:
         networks = json.loads(out.stdout)
     except json.JSONDecodeError as exc:
@@ -216,14 +236,15 @@ def _container_networks(container_id: str) -> list[str]:
 def _disconnect_container_networks(container_id: str) -> str:
     """Disconnect the exact container and prove its network set is empty."""
     for network in _container_networks(container_id):
-        out = subprocess.run(
+        out = _host_command(
             ["docker", "network", "disconnect", network, container_id],
             capture_output=True, text=True, timeout=30,
         )
-        if out.returncode != 0:
+        if out.outcome != "exited" or out.returncode != 0:
             raise RuntimeError(
                 "tier-1 fixture: network disconnect failed for captured "
-                f"container {container_id}: {out.stderr.strip()}")
+                f"container {container_id} (outcome={out.outcome}, "
+                f"rc={out.returncode})")
     remaining = _container_networks(container_id)
     if remaining:
         raise RuntimeError(
@@ -237,9 +258,10 @@ def _installed_package_identity(container: "Tier1Container") -> dict:
                                    timeout=30, workdir=None)
     if version_result.returncode != 0:
         raise RuntimeError("tier-1 fixture: installed version query failed")
-    match = re.search(r"[0-9]+(?:\.[0-9]+)+", version_result.stdout)
-    if not match:
-        raise RuntimeError("tier-1 fixture: installed version was unparseable")
+    try:
+        observed_version = provenance.parse_prime_agent_version(version_result.stdout)
+    except provenance.ProvenanceError as exc:
+        raise RuntimeError("tier-1 fixture: installed version was unparseable") from exc
     hash_result = container.run(
         "bash", "-lc", 'sha256sum "$(command -v prime-agent)"',
         wrap=False, timeout=30, workdir=None,
@@ -247,7 +269,7 @@ def _installed_package_identity(container: "Tier1Container") -> dict:
     digest = hash_result.stdout.split()[0] if hash_result.returncode == 0 and hash_result.stdout.split() else ""
     if not re.fullmatch(r"[0-9a-f]{64}", digest):
         raise RuntimeError("tier-1 fixture: installed executable hash is invalid")
-    return {"kind": "vendor-binary", "version": match.group(0),
+    return {"kind": "vendor-binary", "version": observed_version,
             "executable_sha256": digest}
 
 
@@ -302,6 +324,32 @@ class ContainerDaemon:
         )
 
 
+class ManagedHostProcess:
+    """Interactive client with exact process-group termination semantics."""
+    def __init__(self, process: subprocess.Popen) -> None:
+        self._process = process
+
+    def __getattr__(self, name):
+        return getattr(self._process, name)
+
+    def wait(self, timeout=None):
+        if timeout is None:
+            raise ValueError("interactive host waits require an explicit timeout")
+        return self._process.wait(timeout=timeout)
+
+    def terminate(self) -> None:
+        try:
+            os.killpg(self._process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+
+    def kill(self) -> None:
+        try:
+            os.killpg(self._process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 class Tier1Container:
     """Exec helper for the one-session tier-1 container."""
 
@@ -345,8 +393,8 @@ class Tier1Container:
         if wrap:
             cmd += ["timeout", "--kill-after=5", str(timeout)]
         cmd += [str(arg) for arg in argv]
-        return subprocess.run(
-            cmd, input=input_text, text=True, capture_output=True,
+        return _host_command(
+            cmd, input_text=input_text, text=True, capture_output=True,
             timeout=timeout + 30,
         )
 
@@ -365,17 +413,17 @@ class Tier1Container:
             cmd += ["-w", workdir]
         cmd += [self.id, "timeout", "--kill-after=5", str(timeout)]
         cmd += [str(arg) for arg in argv]
-        return subprocess.Popen(
+        return ManagedHostProcess(subprocess.Popen(
             cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, bufsize=0,
-        )
+            stderr=subprocess.PIPE, bufsize=0, start_new_session=True,
+        ))
 
     def start_daemon(self, socket_path: str, route: str,
                      log_dir: Path) -> ContainerDaemon:
         """Start tests/container/fake_daemon.py in-container (detached)."""
         log_dir = Path(log_dir)
         log_dir.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
+        _host_command(
             ["docker", "exec", "-d", self.id,
              "python3", f"{WORKSPACE}/tests/container/fake_daemon.py",
              "--socket", socket_path, "--route", route,
@@ -459,123 +507,84 @@ def _is_relative_to(path: Path, root: Path) -> bool:
         return False
 
 
+@dataclass(frozen=True)
+class TeardownResult:
+    state: str
+    remove_outcome: str
+    inspect_outcome: str
+    clean: bool
+    diagnostics: str = ""
+
+
 class TeardownError(RuntimeError):
-    def __init__(self, state: str, message: str) -> None:
+    def __init__(self, result: TeardownResult, message: str) -> None:
         super().__init__(message)
-        self.state = state
+        self.result = result
+        self.state = result.state
 
 
 def _inspect_container(container_id: str, timeout: float = 15) -> tuple:
-    """Three-state presence classification for the ONE captured container.
-
-    Returns (state, diagnostics) with state in {"present", "absent",
-    "unknown"}:
-
-    - "present": docker inspect exited 0 — the object exists;
-    - "absent":  nonzero exit AND the output POSITIVELY reports the
-      object missing ("No such container"/"No such object"). A bare
-      nonzero exit is NOT proof of absence — daemon, connection,
-      permission, and API failures exit nonzero too;
-    - "unknown": everything else — daemon/connection/permission/API
-      errors, CLI-launch failure (OSError), timeout, or unrecognised
-      output. UNKNOWN never satisfies a teardown gate: the caller must
-      fail and retain the session share.
-    """
-    try:
-        out = subprocess.run(["docker", "inspect", container_id],
-                             capture_output=True, text=True, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        return "unknown", f"docker inspect timed out after {timeout}s"
-    except OSError as exc:
-        return "unknown", f"docker inspect could not run: {exc}"
+    """Return (presence, diagnostics, bounded outcome) for one exact ID."""
+    out = _host_command(["docker", "inspect", container_id],
+                        capture_output=True, text=True, timeout=timeout,
+                        propagate_signal=False)
+    if out.outcome != "exited":
+        return "unknown", (
+            f"docker inspect outcome={out.outcome} rc={out.returncode}"), out.outcome
     diag = (f"rc={out.returncode} stdout={out.stdout.strip()!r} "
             f"stderr={out.stderr.strip()!r}")
     if out.returncode == 0:
-        return "present", diag
+        return "present", diag, "clean"
     blob = f"{out.stdout}\n{out.stderr}".lower()
     if "no such container" in blob or "no such object" in blob:
-        return "absent", diag
-    return "unknown", diag
+        return "absent", diag, "ordinary_nonzero"
+    return "unknown", diag, "ordinary_nonzero"
 
 
 def _remove_session_container(container_id: str, *,
                               rm_timeout: float = 60,
-                              inspect_timeout: float = 15) -> None:
-    """Remove the ONE captured session container and verify absence (B2).
-
-    Bounded: exactly one forced removal plus one inspect verification,
-    both scoped to the captured container ID — no docker-wide pruning,
-    no name-based guesses, no retries. Idempotent: a nonzero removal exit
-    (e.g. "No such container") with POSITIVELY established absence
-    succeeds — the container is already gone. Absence is established only
-    by an explicit "No such container"/"No such object" inspect result —
-    a bare nonzero inspect exit is UNKNOWN (daemon/connection/permission/
-    API failure), which fails the gate and retains the share. A timeout
-    or launch failure always fails closed, even when a later inspect
-    reports absence: a hung docker CLI is itself a teardown anomaly worth
-    surfacing. Otherwise raises RuntimeError with the exact container
-    identity and full diagnostics, so the gate can never go green with a
-    leaked or unaccounted container.
-    """
-    diagnostics = []
-    fatal = None    # timeout / launch failure: always fails closed
-    rm_error = None  # nonzero exit: OK only when absence is verified
-    try:
-        rm = subprocess.run(["docker", "rm", "-f", container_id],
-                            capture_output=True, text=True, timeout=rm_timeout)
-        diagnostics.append(
-            f"docker rm -f rc={rm.returncode} "
-            f"stdout={rm.stdout.strip()!r} stderr={rm.stderr.strip()!r}")
-        if rm.returncode != 0:
-            rm_error = f"docker rm -f exited {rm.returncode}"
-    except subprocess.TimeoutExpired:
-        fatal = f"docker rm -f timed out after {rm_timeout}s"
-        diagnostics.append(fatal)
-    except OSError as exc:
-        fatal = f"docker rm -f could not run: {exc}"
-        diagnostics.append(fatal)
-    state, inspect_diag = _inspect_container(container_id,
-                                             timeout=inspect_timeout)
-    diagnostics.append(f"docker inspect: state={state} ({inspect_diag})")
-    absent = state == "absent"
-    if fatal is None and absent:
-        if rm_error:
-            print(f"tier-1 fixture: {rm_error}, but container absence is "
-                  "positively established — treating teardown as "
-                  "idempotent success")
-        return
-    reasons = [r for r in (fatal, rm_error) if r]
-    if state == "present":
-        reasons.append("the container is still present afterwards")
-    elif state == "unknown":
-        reasons.append("container absence could not be positively "
-                       "established (inspect unknown: daemon/connection/"
-                       "permission/API error, launch failure, timeout, or "
-                       "unrecognised output)")
+                              inspect_timeout: float = 15) -> TeardownResult:
+    """Remove one captured ID and keep command health separate from presence."""
+    rm = _host_command(["docker", "rm", "-f", container_id],
+                       capture_output=True, text=True, timeout=rm_timeout,
+                       propagate_signal=False)
+    if rm.outcome == "exited":
+        remove_outcome = "clean" if rm.returncode == 0 else "ordinary_nonzero"
+    else:
+        remove_outcome = rm.outcome
+    state, inspect_diag, inspect_outcome = _inspect_container(
+        container_id, timeout=inspect_timeout)
+    clean = (state == "absent"
+             and remove_outcome in {"clean", "ordinary_nonzero"}
+             and inspect_outcome == "ordinary_nonzero")
+    diagnostics = (
+        f"remove_outcome={remove_outcome} rc={rm.returncode}; "
+        f"inspect_outcome={inspect_outcome} state={state}; {inspect_diag}")
+    result = TeardownResult(state, remove_outcome, inspect_outcome,
+                            clean, diagnostics)
+    if clean:
+        return result
     raise TeardownError(
-        state,
-        "tier-1 fixture: TEARDOWN FAILED — could not establish clean "
-        f"removal of the session container. container_id={container_id}. "
-        f"Reasons: {'; '.join(reasons)}. Final absence check: "
-        f"state={state}. Diagnostics: {'; '.join(diagnostics) or 'none'}. "
-        f"Remove it manually: docker rm -f {container_id}"
-    )
+        result,
+        "tier-1 fixture: TEARDOWN FAILED — exact container cleanup was not "
+        f"clean. container_id={container_id}. {diagnostics}. Remove it "
+        f"manually: docker rm -f {container_id}")
 
 
-def _finalize_session(container_id, share: Path, in_flight=None) -> str:
+def _finalize_session(container_id, share: Path, in_flight=None) -> TeardownResult:
     """Verify exact-container absence and remove only the run-owned share."""
     teardown_error = None
-    state = "absent"
-    if container_id is not None:
+    if container_id is None:
+        result = TeardownResult("absent", "not_needed", "not_needed", True)
+    else:
         try:
-            _remove_session_container(container_id)
+            result = _remove_session_container(container_id)
         except TeardownError as exc:
             teardown_error = exc
-            state = exc.state
+            result = exc.result
             print(f"tier-1 fixture: {exc}")
-    container_gone = container_id is None or teardown_error is None
     if not os.environ.get("TIER1_KEEP_SHARE"):
-        if container_gone:
+        if result.clean:
             shutil.rmtree(share, ignore_errors=True)
         else:
             print(f"tier-1 fixture: session container may still own the "
@@ -588,7 +597,7 @@ def _finalize_session(container_id, share: Path, in_flight=None) -> str:
                 f"tier-1 fixture teardown also failed: {teardown_error}")
         else:
             raise teardown_error
-    return state
+    return result
 
 
 @pytest.fixture(scope="session")
@@ -596,11 +605,14 @@ def tier1_container(request):
     """One offline, exact-image tier-1 container per selected pytest run."""
     # Selector safety comes before Docker readiness: source mode must fail
     # deterministically without touching its checkout even on a Dockerless host.
+    global _DEFERRED_SIGNAL
+    _DEFERRED_SIGNAL = None
     mode, value = _load_install_selection()
     if shutil.which("docker") is None:
         pytest.skip("tier 1 requires Docker: no docker executable on PATH")
-    if subprocess.run(["docker", "info"], capture_output=True,
-                      timeout=30).returncode != 0:
+    docker_info = _host_command(["docker", "info"], capture_output=True,
+                                timeout=30)
+    if docker_info.outcome != "exited" or docker_info.returncode != 0:
         pytest.skip("tier 1 requires Docker: docker daemon is not reachable")
 
     run_id, tier_dir = provenance.allocate_run_tree(RESULTS, "tier1")
@@ -617,18 +629,34 @@ def tier1_container(request):
     artifact = None
     network_time = None
     setup_error = None
-    teardown_state = "absent"
+    teardown_result = TeardownResult(
+        "absent", "not_needed", "not_needed", True)
     teardown_time = None
+    pending_signal = None
+    finalizing = False
+    watched_signals = tuple(
+        sig for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+        if sig is not None)
+    previous_handlers = {sig: signal.getsignal(sig) for sig in watched_signals}
+
+    def on_fixture_signal(signum, _frame):
+        nonlocal pending_signal
+        pending_signal = signum
+        if not finalizing:
+            raise _FixtureInterrupted(signum)
+
+    for watched_signal in watched_signals:
+        signal.signal(watched_signal, on_fixture_signal)
 
     try:
         print(f"tier-1 fixture: run={run_id}; build exact image")
-        image = _build_tier1_image(tier_dir)
+        image = _build_tier1_image(tier_dir, workspace_snapshot)
         name = f"prime-claw-tier1-{run_id}"
         cidfile = tier_dir / "container.cid"
         mounts = ["-v", f"{workspace_snapshot}:{WORKSPACE}:ro",
                   "-v", f"{share}:{share}"]
         container_attempted = True
-        started = subprocess.run(
+        started = _host_command(
             ["docker", "run", "-d", "--name", name,
              "--cidfile", str(cidfile), *mounts,
              image["id"], "sleep", "infinity"],
@@ -682,11 +710,15 @@ def tier1_container(request):
         yield container
     except BaseException as exc:
         setup_error = exc
+        if isinstance(exc, _FixtureInterrupted):
+            pending_signal = exc.signum
         setup_lines.append(f"failure_type={type(exc).__name__}")
         setup_log.write_text("\n".join(setup_lines))
         raise
     finally:
+        finalizing = True
         finalizer_error = None
+        publication_error = None
         if container_id is None and container_attempted and cidfile.is_file():
             recovered_id = cidfile.read_text().strip()
             if re.fullmatch(r"[0-9a-f]{64}", recovered_id):
@@ -694,29 +726,50 @@ def tier1_container(request):
                 setup_lines.append("phase=container-identity-recovered")
                 setup_log.write_text("\n".join(setup_lines))
         if container_id is None and container_attempted:
-            teardown_state = "unknown"
+            teardown_result = TeardownResult(
+                "unknown", "identity_refused", "not_run", False)
             print("tier-1 fixture: container publication identity is invalid; "
                   "refusing destructive teardown and preserving mounted inputs")
         else:
             try:
-                teardown_state = _finalize_session(container_id, share, setup_error)
+                teardown_result = _finalize_session(
+                    container_id, share, setup_error)
             except TeardownError as exc:
-                teardown_state = exc.state
+                teardown_result = exc.result
                 finalizer_error = exc
-        if teardown_state == "absent":
+        if _DEFERRED_SIGNAL is not None:
+            pending_signal = _DEFERRED_SIGNAL
+        if teardown_result.clean:
             shutil.rmtree(workspace_snapshot)
         else:
             print(f"tier-1 fixture: preserving repository snapshot at "
-                  f"{workspace_snapshot} because teardown is {teardown_state}")
+                  f"{workspace_snapshot} because teardown is "
+                  f"{teardown_result.state}/{teardown_result.remove_outcome}")
         teardown_time = provenance.utc_now()
-        # Once a run tree exists, publish a manifest even for partial failure.
-        # Unavailable identities stay null/false rather than becoming claims.
         finished = provenance.utc_now()
         tests_failed = bool(
             getattr(getattr(request, "session", None), "testsfailed", 0))
-        passed = (setup_error is None and not tests_failed
-                  and teardown_state == "absent" and image is not None
-                  and artifact is not None and network_time is not None)
+        passed = (setup_error is None and finalizer_error is None
+                  and pending_signal is None and not tests_failed
+                  and teardown_result.clean
+                  and teardown_result.state == "absent" and image is not None
+                  and artifact is not None and artifact["version"] == value
+                  and network_time is not None)
+        failure_codes = []
+        if setup_error is not None:
+            failure_codes.append("setup-or-body-failed")
+        if tests_failed:
+            failure_codes.append("tests-failed")
+        if pending_signal is not None:
+            failure_codes.append("interrupted")
+        if not teardown_result.clean:
+            failure_codes.append("teardown-command-failed")
+        if teardown_result.state != "absent":
+            failure_codes.append("teardown-not-absent")
+        if artifact is not None and artifact["version"] != value:
+            failure_codes.append("installed-version-mismatch")
+        if not failure_codes and not passed:
+            failure_codes.append("incomplete-identity")
         prime_identity = {
             "mode": "pinned", "requested_version": value,
             "installed_version": artifact["version"] if artifact else None,
@@ -727,22 +780,44 @@ def tier1_container(request):
             "command_contract_version": provenance.COMMAND_CONTRACT_VERSION,
             "run": {"id": run_id, "tier": "tier1", "mode": "pinned",
                     "started_at": run_started, "finished_at": finished,
-                    "status": "passed" if passed else "failed"},
+                    "status": "passed" if passed else "failed",
+                    "failure_codes": failure_codes},
             "repository": repository,
             "prime_agent": prime_identity,
             "image": image,
             "network": {"disconnected_at": network_time,
                         "verified_absent": network_time is not None},
-            "teardown": {"state": teardown_state,
-                         "verified_at": teardown_time},
+            "teardown": {"state": teardown_result.state,
+                         "verified_at": teardown_time,
+                         "remove_outcome": teardown_result.remove_outcome,
+                         "inspect_outcome": teardown_result.inspect_outcome,
+                         "clean": teardown_result.clean},
             "evidence": {"files": []},
         }
-        manifest["evidence"]["files"] = provenance.evidence_inventory(tier_dir)
-        provenance.atomic_write_manifest(tier_dir / "manifest.json", manifest)
-        provenance.verify_evidence(tier_dir, manifest)
-        print(f"tier-1 fixture: evidence={tier_dir}")
+        try:
+            manifest["evidence"]["files"] = provenance.evidence_inventory(tier_dir)
+            provenance.atomic_write_manifest(tier_dir / "manifest.json", manifest)
+            provenance.verify_evidence(tier_dir, manifest)
+            print(f"tier-1 fixture: evidence={tier_dir}")
+        except BaseException as exc:
+            publication_error = exc
+            primary = setup_error or finalizer_error
+            if primary is not None and hasattr(primary, "add_note"):
+                primary.add_note(
+                    "tier-1 fixture evidence publication also failed: "
+                    f"{type(exc).__name__}")
+        finally:
+            for watched_signal, previous in previous_handlers.items():
+                signal.signal(watched_signal, previous)
+        if pending_signal is not None:
+            os.kill(os.getpid(), pending_signal)
+            # A restored callable/SIG_IGN handler may return. Never allow that
+            # redelivery path to resume as a green fixture session.
+            raise _FixtureInterrupted(pending_signal)
         if finalizer_error is not None:
             raise finalizer_error
+        if publication_error is not None and setup_error is None:
+            raise publication_error
 
 
 @pytest.fixture

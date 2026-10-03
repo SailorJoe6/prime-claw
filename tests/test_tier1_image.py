@@ -1,6 +1,6 @@
 """Static and informational-path coverage for the slim tier-1 image."""
 from __future__ import annotations
-import os, re, stat, subprocess, tempfile, unittest
+import os, re, shutil, stat, subprocess, sys, tempfile, unittest
 from pathlib import Path
 REPO=Path(__file__).resolve().parent.parent
 DOCKERFILE=REPO/"docker/test.Dockerfile"; DRIVER=REPO/"scripts/test-tier1.sh"
@@ -34,12 +34,28 @@ class TestTier1DriverSurface(unittest.TestCase):
             out=subprocess.run([str(DRIVER),"--smoke","--dry-run"],capture_output=True,text=True,env=env)
             self.assertEqual(out.returncode,0,out.stderr); self.assertFalse(marker.exists()); self.assertIn("--iidfile",out.stdout); self.assertIn("--cidfile",out.stdout)
     def test_real_contract_has_captured_identity_not_rm(self):
-        text=DRIVER.read_text(); self.assertNotIn("docker run --rm",text); self.assertIn('docker run -d --name "$NAME" --cidfile "$CIDFILE"',text); self.assertIn('["docker", "rm", "-f", cid]',text); self.assertIn('["docker", "inspect", cid]',text)
+        text=DRIVER.read_text(); self.assertNotIn("docker run --rm",text); self.assertIn('docker run -d --name "$NAME" --cidfile "$CIDFILE"',text); self.assertIn('bounded 60 docker rm -f "$CONTAINER_ID"',text); self.assertIn('bounded 15 docker inspect "$CONTAINER_ID"',text)
     def test_real_run_fails_fast_without_docker_cli(self):
         with tempfile.TemporaryDirectory() as td:
-            env=dict(os.environ); env["PATH"]="/usr/bin:/bin"; env["TIER1_RESULTS_ROOT"]=str(Path(td)/"results")
-            out=subprocess.run([str(DRIVER),"--smoke"],capture_output=True,text=True,env=env)
-            self.assertNotEqual(out.returncode,0); self.assertIn("docker not found",out.stderr)
+            tmp=Path(td); isolated=tmp/"isolated-bin"; isolated.mkdir()
+            for name, source in (("dirname", shutil.which("dirname")),
+                                 ("python3", sys.executable)):
+                self.assertTrue(source, f"missing prerequisite {name}")
+                (isolated/name).symlink_to(source)
+            poison_dir=tmp/"system-fallback"; poison_dir.mkdir()
+            marker=tmp/"poison-docker-called"
+            poison=poison_dir/"docker"
+            poison.write_text(f'#!/bin/sh\ntouch "{marker}"\nexit 99\n')
+            poison.chmod(0o755)
+            isolated_path=str(isolated)
+            self.assertIsNone(shutil.which("docker", path=isolated_path))
+            env=dict(os.environ); env["PATH"]=isolated_path
+            env["TIER1_RESULTS_ROOT"]=str(tmp/"results")
+            out=subprocess.run(["/bin/bash",str(DRIVER),"--smoke"],
+                               capture_output=True,text=True,env=env,timeout=10)
+            self.assertNotEqual(out.returncode,0)
+            self.assertIn("docker not found",out.stderr)
+            self.assertFalse(marker.exists())
     def test_real_run_fails_fast_with_unreachable_daemon(self):
         with tempfile.TemporaryDirectory() as td:
             tmp=Path(td); docker=tmp/"docker"; docker.write_text('#!/bin/sh\n[ "$1" = info ] && exit 1\nexit 0\n'); docker.chmod(0o755)

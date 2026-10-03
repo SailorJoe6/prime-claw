@@ -21,16 +21,20 @@ not part of the default command and is not enabled by this slice.
 A direct driver or pytest fixture run allocates a fresh
 `.test-results/<run-id>/tier1/` tree. It never adopts a stale tree.
 
-1. Enumerate tracked plus nonignored untracked repository files, hash each
-   path/type/mode/content (or safe relative symlink target), and stage that exact
-   sanitized inventory into a run-owned snapshot. Ignored `.env`,
+1. Enumerate tracked plus nonignored untracked repository files through
+   root-anchored file descriptors. Every ancestor and regular leaf is opened
+   with no-follow semantics; file bytes are hashed and copied from the same
+   checked descriptor. Safe relative leaf links are copied as link text and
+   validated inside the finished snapshot. Ignored `.env`,
    `.test-results`, credentials, and operator-local files are neither mounted
    nor hashed.
-2. Record repository HEAD, dirty/status hash, exact snapshot content hash, and
-   entry count. Mount only the snapshot read-only at `/workspace`.
-3. Copy `docker/test.Dockerfile` into an otherwise empty run-owned build
-   context. The Dockerfile is the current declared input because it contains no
-   `COPY` or `ADD` instruction.
+2. Record repository HEAD, dirty/status hash, entry count, and a v2
+   length-framed digest identity for the captured snapshot. Mount only the
+   snapshot read-only at `/workspace`.
+3. Copy `docker/test.Dockerfile` from that snapshot into an otherwise empty
+   run-owned build context. Hash the final captured context file used by Docker,
+   not the mutable checkout path. The Dockerfile is the current declared input
+   because it contains no `COPY` or `ADD` instruction.
 4. Build with an informational input-hash tag and a fresh `--iidfile`.
 5. Inspect and launch the immutable iidfile image ID. The tag is never used as
    execution identity.
@@ -39,17 +43,25 @@ A direct driver or pytest fixture run allocates a fresh
 7. Disconnect every network reported for that exact container and re-inspect.
    Any remaining network or unknown inspection fails before apply/check/probes
    or test bodies.
-8. Offline, record installed artifact version/hash, apply and check the plugin
-   against `PRIME_AGENT_PLUGIN_ROOT=/root/.prime/agent`, then run the optional
-   probe or selected pytest bodies.
-9. Remove only the captured container ID. A positive “absent” inspection is
-   required. Present or unknown fails and preserves the run evidence.
+8. Offline, record the exact observed artifact version (including a rejected
+   prerelease) and executable hash, apply and check the plugin against
+   `PRIME_AGENT_PLUGIN_ROOT=/root/.prime/agent`, then run the optional probe or
+   selected pytest bodies.
+9. Mount only a fresh `share/` scratch directory writable. The durable evidence
+   root, iidfile, cidfile, build context, and metadata never enter a writable
+   container mount.
+10. Remove only the captured container ID. Presence and command health remain
+   separate: a timeout, interruption, launch error, or reap failure stays a
+   failed teardown even if the final inspect positively reports absence.
 
 Every host-side Docker wait uses `scripts/testing/bounded.py` with a validated
-positive deadline and process-group TERM→KILL escalation. Build, install,
-inspect/disconnect, apply/check, probe, and teardown use explicit budgets. An
-exact cidfile identity recovered after a failed or timed-out launch is still
-removed; malformed identities never reach a destructive command.
+positive deadline, a run-owned process group, TERM→KILL escalation, a bounded
+leader reap, and regular-file output capture that cannot wait on pipe EOF from a
+detached child. The pytest fixture temporarily handles TERM/INT/HUP so exact-ID
+cleanup and failed evidence run before the original signal is redelivered.
+Build, install, inspect/disconnect, apply/check, probe, and teardown use explicit
+budgets. A valid cidfile recovered after failed launch is still removed;
+malformed identities never reach a destructive command.
 
 `PRIME_AGENT_SOURCE` is deliberately unavailable in Slice 1. After selector
 parsing it fails with Slice-2 guidance before any checkout stat, read, build,
@@ -58,28 +70,32 @@ source builder; rollback must never restore the old host-mutating path.
 
 ## Provenance evidence
 
-`manifest.json` uses schema version 1 and canonical sorted JSON. It records:
+`manifest.json` uses schema version 2 and canonical sorted JSON. It records:
 
-- run ID, mode, status, UTC bounds, and command-contract version;
-- repository HEAD, dirty boolean, status/content SHA-256, and exact snapshot entry count without exposing paths or content;
+- run ID, mode, status, safe failure codes, UTC bounds, and command-contract version;
+- repository HEAD, dirty boolean, status/content SHA-256, v2 hash contract, and exact snapshot entry count without exposing paths or content;
 - requested pinned Prime Agent version on every pinned attempt, plus installed
   version and executable SHA-256 once those identities are available;
-- immutable image ID, optional local repo digests, platform, Dockerfile hash,
-  declared-input hash, informational tag, and build bounds;
-- verified network-removal time and teardown state; and
+- immutable image ID, allow-listed platform, captured Dockerfile and declared-
+  input hashes, v2 hash contract, informational tag, and build bounds; arbitrary
+  registry/repository metadata is discarded and never written;
+- verified network-removal time plus teardown presence, remove outcome, inspect
+  outcome, and clean boolean; and
 - SHA-256 for every other regular evidence file below the tier directory.
 
 The manifest excludes itself and the optional scratch `share/` from its evidence inventory. Validation rejects an
 unsupported schema, malformed hashes, source-mode claims, unsafe paths, common
-credential forms, host-home values, symlink/special evidence, missing evidence,
-extra stale evidence, changed content, contradictory success/teardown claims,
-and malformed UTC timestamps. Setup logs contain only allow-listed phase names,
+credential forms, host-home values, unknown text encodings, directory/file
+links, special evidence, missing evidence, extra stale evidence, changed
+content, contradictory success/teardown claims, and malformed UTC timestamps.
+Setup logs contain only allow-listed phase names,
 not raw tool output. Publication validates first, writes a
 mode-0600 temporary file in the same directory, fsyncs, and atomically renames.
 A pre-existing manifest is never overwritten.
 
-A locally built image can have no `RepoDigests`; its exact `sha256:...` image ID
-is authoritative. The build-input tag is informational because the Ubuntu tag
+Repository digest metadata is deliberately omitted from durable evidence; the
+exact `sha256:...` iidfile image ID is authoritative. The build-input tag is
+informational because the Ubuntu tag
 and package repositories are external inputs.
 
 ## Safety and reproduction

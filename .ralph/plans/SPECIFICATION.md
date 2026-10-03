@@ -1,8 +1,9 @@
 # Project-wide testing strategy — isolation-first test architecture
 
 > **Status:** ACTIVE implementation episode created from the operator-approved
-> bundle on 2026-10-02. Slice 1 (`prime-claw-5v7.2`) is implemented on the
-> episode branch and awaiting owner review; later slices remain unstarted.
+> bundle on 2026-10-02. Owner rejected Slice-1 candidate `fd1f2b7`; the
+> accepted B1–B8/R-TEST-7 repairs are implemented, validated, and ready for a
+> new owner-review candidate. Later slices remain unstarted.
 > External prerequisites remain satisfied by `3bf9059` / `927b394`.
 > **Origin:** operator charter, 2026-10-02 (independent planning-only
 > conversation `01a0fe09-9641-73af-9889-b44e302490d1`).

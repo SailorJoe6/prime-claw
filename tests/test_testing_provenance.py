@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import os
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -26,6 +28,7 @@ def _manifest(evidence=None):
             "started_at": "2026-10-02T23:00:00Z",
             "finished_at": "2026-10-02T23:01:00Z",
             "status": "passed",
+            "failure_codes": [],
         },
         "repository": {
             "head": "b" * 40,
@@ -33,6 +36,7 @@ def _manifest(evidence=None):
             "status_sha256": "a" * 64,
             "content_sha256": "c" * 64,
             "entry_count": 1,
+            "content_hash_contract": "framed-sha256-v2",
         },
         "prime_agent": {
             "mode": "pinned",
@@ -46,6 +50,7 @@ def _manifest(evidence=None):
             "dockerfile": "docker/test.Dockerfile",
             "dockerfile_sha256": "d" * 64,
             "declared_input_sha256": "e" * 64,
+            "declared_input_hash_contract": "framed-sha256-v2",
             "informational_tag": "prime-claw-test-tier1:e" + "e" * 11,
             "os": "linux",
             "architecture": "arm64",
@@ -56,7 +61,9 @@ def _manifest(evidence=None):
             "disconnected_at": "2026-10-02T23:00:45Z",
             "verified_absent": True,
         },
-        "teardown": {"state": "absent", "verified_at": "2026-10-02T23:01:00Z"},
+        "teardown": {"state": "absent", "verified_at": "2026-10-02T23:01:00Z",
+                     "remove_outcome": "clean",
+                     "inspect_outcome": "ordinary_nonzero", "clean": True},
         "evidence": {"files": evidence or []},
     }
 
@@ -94,6 +101,7 @@ class TestManifestValidation(unittest.TestCase):
     def test_failed_partial_manifest_records_evidence_without_false_identity(self):
         manifest = _manifest()
         manifest["run"]["status"] = "failed"
+        manifest["run"]["failure_codes"] = ["incomplete-identity"]
         manifest["prime_agent"] = {
             "mode": "pinned", "requested_version": "0.9.8",
             "installed_version": None, "artifact": None,
@@ -102,6 +110,7 @@ class TestManifestValidation(unittest.TestCase):
         manifest["network"] = {"disconnected_at": None, "verified_absent": False}
         provenance.validate_manifest(manifest)
         manifest["run"]["status"] = "passed"
+        manifest["run"]["failure_codes"] = []
         with self.assertRaises(provenance.ProvenanceError):
             provenance.validate_manifest(manifest)
 
@@ -135,12 +144,23 @@ class TestManifestValidation(unittest.TestCase):
     def test_tampered_installed_identity_is_rejected(self):
         manifest = _manifest()
         manifest["prime_agent"]["installed_version"] = "0.9.7"
+        manifest["prime_agent"]["artifact"]["version"] = "0.9.7"
         with self.assertRaisesRegex(provenance.ProvenanceError, "versions differ"):
             provenance.validate_manifest(manifest)
         manifest = _manifest()
         manifest["prime_agent"]["artifact"]["executable_sha256"] = "bad"
         with self.assertRaisesRegex(provenance.ProvenanceError, "artifact identity"):
             provenance.validate_manifest(manifest)
+
+    def test_failed_manifest_retains_exact_mismatched_or_prerelease_version(self):
+        for observed in ("0.9.7", "0.9.8-beta.1"):
+            with self.subTest(observed=observed):
+                manifest = _manifest()
+                manifest["run"].update(
+                    status="failed", failure_codes=["installed-version-mismatch"])
+                manifest["prime_agent"]["installed_version"] = observed
+                manifest["prime_agent"]["artifact"]["version"] = observed
+                provenance.validate_manifest(manifest)
 
     def test_success_claims_require_absent_teardown_and_complete_identity(self):
         for mutate in (
@@ -182,6 +202,24 @@ class TestManifestValidation(unittest.TestCase):
                 provenance.atomic_write_manifest(target, bad)
             self.assertEqual(target.read_text(), "old\n")
             self.assertEqual(list(target.parent.glob(".manifest.json.*.tmp")), [])
+
+
+    def test_unknown_keys_and_impossible_image_fields_are_rejected(self):
+        mutations = (
+            lambda item: item.__setitem__("unexpected", True),
+            lambda item: item["run"].__setitem__("unexpected", True),
+            lambda item: item["image"].__setitem__("dockerfile", "../Dockerfile"),
+            lambda item: item["image"].__setitem__("dockerfile", "./docker/test.Dockerfile"),
+            lambda item: item["image"].__setitem__("informational_tag", "private/repo:latest"),
+            lambda item: item["image"].__setitem__("os", 7),
+            lambda item: item["image"].__setitem__("architecture", "arm64 private"),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate):
+                manifest = _manifest()
+                mutate(manifest)
+                with self.assertRaises(provenance.ProvenanceError):
+                    provenance.validate_manifest(manifest)
 
 
 class TestHashes(unittest.TestCase):
@@ -275,6 +313,268 @@ class TestHashes(unittest.TestCase):
                 provenance.hash_declared_inputs(root, ["missing"])
             with self.assertRaises(provenance.ProvenanceError):
                 provenance.hash_declared_inputs(root, ["../escape"])
+
+
+class TestSecureCaptureRegressions(unittest.TestCase):
+    def _repo(self, root: Path) -> Path:
+        repo = root / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        subprocess.run(["git", "-C", str(repo), "config", "user.email",
+                        "test@example.invalid"], check=True)
+        subprocess.run(["git", "-C", str(repo), "config", "user.name", "Test"],
+                       check=True)
+        return repo
+
+    def test_ancestor_symlink_never_reads_or_copies_outside_root(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            repo = self._repo(root)
+            alias = repo / "alias"
+            alias.mkdir()
+            (alias / "input.txt").write_text("inside\n")
+            subprocess.run(["git", "-C", str(repo), "add", "alias/input.txt"],
+                           check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-qm", "base"],
+                           check=True)
+            outside = root / "outside"
+            outside.mkdir()
+            sentinel = outside / "input.txt"
+            sentinel.write_text("synthetic-outside-sentinel\n")
+            (alias / "input.txt").unlink()
+            alias.rmdir()
+            alias.symlink_to(outside, target_is_directory=True)
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.repository_identity(repo)
+            snapshot = root / "snapshot"
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.stage_repository_snapshot(repo, snapshot)
+            self.assertFalse(snapshot.exists())
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.hash_declared_inputs(repo, ["alias/input.txt"])
+            self.assertEqual(sentinel.read_text(), "synthetic-outside-sentinel\n")
+
+    def test_ancestor_swap_between_enumeration_and_copy_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            repo = self._repo(root)
+            directory = repo / "alias"
+            directory.mkdir()
+            (directory / "input.txt").write_text("inside\n")
+            subprocess.run(["git", "-C", str(repo), "add", "alias/input.txt"],
+                           check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-qm", "base"],
+                           check=True)
+            outside = root / "outside"
+            outside.mkdir()
+            sentinel = outside / "input.txt"
+            sentinel.write_text("outside\n")
+            original = provenance._regular_digest
+            swapped = False
+
+            def swap_then_read(repo_root, relative, destination=None, **kwargs):
+                nonlocal swapped
+                if relative == "alias/input.txt" and not swapped:
+                    swapped = True
+                    (directory / "input.txt").unlink()
+                    directory.rmdir()
+                    directory.symlink_to(outside, target_is_directory=True)
+                return original(repo_root, relative, destination, **kwargs)
+
+            snapshot = root / "snapshot"
+            with mock.patch.object(provenance, "_regular_digest", swap_then_read):
+                with self.assertRaises(provenance.ProvenanceError):
+                    provenance.stage_repository_snapshot(repo, snapshot)
+            self.assertFalse(snapshot.exists())
+            self.assertEqual(sentinel.read_text(), "outside\n")
+            directory.unlink()
+            directory.mkdir()
+            (directory / "input.txt").write_text("inside\n")
+            replay = provenance.stage_repository_snapshot(repo, snapshot)
+            self.assertEqual(replay["content_hash_contract"], "framed-sha256-v2")
+
+    def test_declared_input_root_swap_never_reads_replacement_tree(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            root = base / "declared"
+            root.mkdir(); (root / "input.txt").write_text("inside\n")
+            moved = base / "declared-moved"
+            outside = base / "outside"
+            outside.mkdir(); sentinel = outside / "input.txt"
+            sentinel.write_text("outside-sentinel\n")
+            original = provenance._regular_digest
+            swapped = False
+
+            def swap_root(repo_root, relative, destination=None, **kwargs):
+                nonlocal swapped
+                if not swapped:
+                    swapped = True
+                    root.rename(moved)
+                    root.symlink_to(outside, target_is_directory=True)
+                return original(repo_root, relative, destination, **kwargs)
+
+            with mock.patch.object(provenance, "_regular_digest", swap_root):
+                with self.assertRaisesRegex(provenance.ProvenanceError,
+                                            "root changed"):
+                    provenance.hash_declared_inputs(root, ["input.txt"])
+            self.assertEqual(sentinel.read_text(), "outside-sentinel\n")
+
+    def test_repository_and_destination_root_swaps_never_escape_anchors(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            repo = self._repo(base)
+            (repo / "input.txt").write_text("inside\n")
+            subprocess.run(["git", "-C", str(repo), "add", "input.txt"], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-qm", "base"], check=True)
+            outside = base / "outside"
+            outside.mkdir(); sentinel = outside / "input.txt"
+            sentinel.write_text("outside-sentinel\n")
+            moved_repo = base / "repo-moved"
+            original_records = provenance._repository_records
+
+            def swap_repo(repo_root, root_fd, entries, **kwargs):
+                repo.rename(moved_repo)
+                repo.symlink_to(outside, target_is_directory=True)
+                return original_records(repo_root, root_fd, entries, **kwargs)
+
+            snapshot = base / "snapshot"
+            with mock.patch.object(provenance, "_repository_records", swap_repo):
+                with self.assertRaisesRegex(provenance.ProvenanceError,
+                                            "root changed"):
+                    provenance.stage_repository_snapshot(repo, snapshot)
+            self.assertEqual(sentinel.read_text(), "outside-sentinel\n")
+            self.assertFalse(snapshot.exists())
+            repo.unlink(); moved_repo.rename(repo)
+
+            outside_destination = base / "outside-destination"
+            outside_destination.mkdir()
+            moved_snapshot = base / "snapshot-moved"
+            original_digest = provenance._regular_digest
+            swapped = False
+
+            def swap_destination(repo_root, relative, destination=None, **kwargs):
+                nonlocal swapped
+                if not swapped and kwargs.get("destination_root_fd") is not None:
+                    swapped = True
+                    snapshot.rename(moved_snapshot)
+                    snapshot.symlink_to(outside_destination, target_is_directory=True)
+                return original_digest(repo_root, relative, destination, **kwargs)
+
+            with mock.patch.object(provenance, "_regular_digest", swap_destination):
+                with self.assertRaisesRegex(provenance.ProvenanceError,
+                                            "root changed"):
+                    provenance.stage_repository_snapshot(repo, snapshot)
+            self.assertFalse((outside_destination / "input.txt").exists())
+            self.assertEqual((moved_snapshot / "input.txt").read_text(), "inside\n")
+
+    def test_regular_mode_swap_binds_identity_to_opened_inode(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            repo = self._repo(root)
+            (repo / ".gitignore").write_text(".ignored\n")
+            subprocess.run(["git", "-C", str(repo), "add", ".gitignore"], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-qm", "base"], check=True)
+            source = repo / "scratch.txt"
+            source.write_text("captured\n")
+            source.chmod(0o644)
+            original = provenance._regular_digest
+            swapped = False
+
+            def chmod_then_read(repo_root, relative, destination=None, **kwargs):
+                nonlocal swapped
+                if relative == "scratch.txt" and not swapped:
+                    swapped = True
+                    source.chmod(0o600)
+                return original(repo_root, relative, destination, **kwargs)
+
+            snapshot = root / "snapshot"
+            with mock.patch.object(provenance, "_regular_digest", chmod_then_read):
+                identity = provenance.stage_repository_snapshot(repo, snapshot)
+            self.assertEqual(stat.S_IMODE((snapshot / "scratch.txt").stat().st_mode),
+                             0o600)
+            self.assertEqual(identity["content_sha256"],
+                             provenance.repository_identity(repo)["content_sha256"])
+
+    def test_framed_hash_distinguishes_old_nul_boundary_collision(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            a = root / "a.txt"
+            b = root / "b.txt"
+            boundary = b"\0b.txt\0file\0" + b"0o644\0"
+            a.write_bytes(b"A")
+            b.write_bytes(b"B" + boundary + b"C")
+            first = provenance.hash_declared_inputs(root, ["a.txt", "b.txt"])
+            a.write_bytes(b"A" + boundary + b"B")
+            b.write_bytes(b"C")
+            second = provenance.hash_declared_inputs(root, ["b.txt", "a.txt"])
+            self.assertNotEqual(first, second)
+            self.assertEqual(
+                second,
+                provenance.hash_declared_inputs(root, ["a.txt", "b.txt"]))
+
+    def test_safe_relative_leaf_symlink_is_preserved(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            repo = self._repo(root)
+            (repo / "target.txt").write_text("safe\n")
+            (repo / "link.txt").symlink_to("target.txt")
+            subprocess.run(["git", "-C", str(repo), "add", "target.txt", "link.txt"],
+                           check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-qm", "base"],
+                           check=True)
+            snapshot = root / "snapshot"
+            provenance.stage_repository_snapshot(repo, snapshot)
+            self.assertTrue((snapshot / "link.txt").is_symlink())
+            self.assertEqual(os.readlink(snapshot / "link.txt"), "target.txt")
+
+
+class TestEvidenceCaptureBoundary(unittest.TestCase):
+    def test_unknown_encoding_directory_link_and_fifo_fail_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bad = root / "bad.log"
+            bad.write_bytes(b"TOKEN=synthetic-marker\xff")
+            with self.assertRaisesRegex(provenance.ProvenanceError, "encoding"):
+                provenance.evidence_inventory(root)
+            bad.unlink()
+            real = root / "real"
+            real.mkdir()
+            (root / "dir-link").symlink_to(real, target_is_directory=True)
+            with self.assertRaisesRegex(provenance.ProvenanceError, "symlink"):
+                provenance.evidence_inventory(root)
+            (root / "dir-link").unlink()
+            if hasattr(os, "mkfifo"):
+                os.mkfifo(root / "fifo")
+                with self.assertRaisesRegex(provenance.ProvenanceError, "regular"):
+                    provenance.evidence_inventory(root)
+
+    def test_image_metadata_is_allow_listed_before_durable_write(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            kwargs = dict(
+                expected_id=ZERO_ID, dockerfile="docker/test.Dockerfile",
+                dockerfile_sha256="d" * 64,
+                declared_input_sha256="e" * 64,
+                informational_tag="prime-claw-test-tier1:" + "e" * 12,
+                build_started_at="2026-10-02T23:00:01Z",
+                build_finished_at="2026-10-02T23:00:30Z")
+            raw = {"Id": ZERO_ID, "RepoDigests": [],
+                   "Os": "linux", "Architecture": "arm64"}
+            safe = provenance.image_identity(raw, **kwargs)
+            self.assertEqual(safe["repo_digests"], [])
+            path = root / "image.json"
+            provenance.write_sanitized_json(path, safe)
+            self.assertNotIn("private.local", path.read_text())
+            unsafe = dict(raw, RepoDigests=[
+                "private.local/team/image@sha256:" + "f" * 64],
+                PrivateEndpoint="10.0.4.225")
+            sanitized = provenance.image_identity(unsafe, **kwargs)
+            private = root / "sanitized.json"
+            provenance.write_sanitized_json(private, sanitized)
+            written = private.read_text()
+            self.assertEqual(sanitized["repo_digests"], [])
+            self.assertNotIn("private.local", written)
+            self.assertNotIn("10.0.4.225", written)
 
 
 if __name__ == "__main__":
