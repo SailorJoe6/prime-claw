@@ -168,7 +168,8 @@ def _validate_image_fields(image: dict[str, Any]) -> None:
             or pure.as_posix() != dockerfile):
         raise ProvenanceError("invalid image.dockerfile")
     if not isinstance(image.get("informational_tag"), str) or not re.fullmatch(
-            r"prime-claw-test-tier1:[0-9a-f]{12}", image["informational_tag"]):
+            r"prime-claw-test-(?:tier1|prime-agent-builder):[0-9a-f]{12}",
+            image["informational_tag"]):
         raise ProvenanceError("invalid image.informational_tag")
     for field in ("os", "architecture"):
         value = image.get(field)
@@ -200,7 +201,9 @@ def image_identity(raw: dict[str, Any], *, expected_id: str,
     if (Path(dockerfile).is_absolute() or ".." in Path(dockerfile).parts
             or not _SHA256_RE.fullmatch(dockerfile_sha256)
             or not _SHA256_RE.fullmatch(declared_input_sha256)
-            or not re.fullmatch(r"prime-claw-test-tier1:[0-9a-f]{12}", informational_tag)):
+            or not re.fullmatch(
+                r"prime-claw-test-(?:tier1|prime-agent-builder):[0-9a-f]{12}",
+                informational_tag)):
         raise ProvenanceError("invalid captured image build identity")
     _utc_timestamp(build_started_at, "image.build_started_at")
     _utc_timestamp(build_finished_at, "image.build_finished_at")
@@ -414,6 +417,50 @@ def write_sanitized_json(root: OwnedDirectory, relative: str | Path,
         root, relative, canonical_json(value).encode("utf-8"))
     _verify_owned_public_name(root)
     return published
+
+
+def replace_sanitized_json(
+    root: OwnedDirectory,
+    relative: str | Path,
+    value: Any,
+    *,
+    expected_existing: ObjectBinding,
+) -> ObjectBinding:
+    """Atomically replace one exact owned JSON object with a non-green record."""
+    _assert_sanitized(value)
+    if not isinstance(value, dict) or value.get("status") != "failed":
+        raise ProvenanceError("sanitized JSON replacement must be non-green")
+    payload = canonical_json(value).encode("utf-8")
+    published, displaced = _exchange_public_entry_bytes(root, relative, payload)
+    if displaced != expected_existing:
+        raise ProvenanceError(
+            "sanitized JSON target changed; failed replacement published")
+    return published
+
+
+def invalidate_sanitized_json(
+    root: OwnedDirectory,
+    relative: str | Path,
+    *,
+    reason: str,
+) -> ObjectBinding | None:
+    """Atomically displace any public entry with a minimal failed record."""
+    if not re.fullmatch(r"[a-z][a-z0-9-]{1,63}", reason):
+        raise ProvenanceError("invalid sanitized JSON invalidation reason")
+    payload = canonical_json({
+        "invalidated": True,
+        "reason": reason,
+        "status": "failed",
+    }).encode("utf-8")
+    try:
+        published, _displaced = _exchange_public_entry_bytes(
+            root, relative, payload)
+        return published
+    except ProvenanceError as exc:
+        cause = exc.__cause__
+        if isinstance(cause, OSError) and cause.errno == errno.ENOENT:
+            return None
+        raise
 
 
 def read_sanitized_json(root: OwnedDirectory, relative: str | Path) -> Any:
@@ -846,10 +893,12 @@ def _git(root_fd: int, *args: str) -> bytes:
         "os.execvp('git',['git',*sys.argv[2:]])"
     )
     try:
+        git_env = os.environ.copy()
+        git_env["GIT_OPTIONAL_LOCKS"] = "0"
         out = subprocess.run(
             [sys.executable, "-c", shim, str(root_fd), *args],
             check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            timeout=60, pass_fds=(root_fd,), cwd="/",
+            timeout=60, pass_fds=(root_fd,), cwd="/", env=git_env,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise ProvenanceError(
@@ -974,6 +1023,16 @@ def _identity(head: str, status_bytes: bytes,
 
 def repository_identity(repo: Path | str) -> dict[str, Any]:
     """Hash exact inputs through one retained no-follow repository root fd."""
+    return repository_source_manifest(repo)["identity"]
+
+
+def repository_source_manifest(repo: Path | str) -> dict[str, Any]:
+    """Describe the exact tracked/non-ignored source set without copying it.
+
+    The caller may mount the checkout read-only and use ``records`` to copy and
+    re-verify only build-relevant inputs inside a disposable builder. Generated
+    dependency/build caches remain excluded by Git's normal ignore contract.
+    """
     root = Path(os.path.abspath(repo))
     root_fd = _open_root_fd(root)
     try:
@@ -981,8 +1040,125 @@ def repository_identity(repo: Path | str) -> dict[str, Any]:
         _assert_root_binding(root, root_fd)
         entries = _repository_entries(root, root_fd)
         records = _repository_records(root, root_fd, entries)
+        _validate_captured_links(records)
         _assert_root_binding(root, root_fd)
-        return _identity(head, status_bytes, records)
+        after_head, after_status = _repository_head_status(root_fd)
+        after_paths = _repository_paths(root_fd)
+        if (after_head != head or after_status != status_bytes
+                or after_paths != [rel for rel, _kind, _mode in entries]):
+            raise ProvenanceError(
+                "repository changed while source manifest was captured")
+        return {
+            "schema_version": 1,
+            "identity": _identity(head, status_bytes, records),
+            "include_rule": "git-cached-plus-nonignored-untracked-v1",
+            "exclude_rule": "git-standard-ignored-and-dotgit-v1",
+            "records": records,
+        }
+    finally:
+        os.close(root_fd)
+
+
+def checkout_inventory(repo: Path | str) -> dict[str, Any]:
+    """Hash the complete checkout tree without following links.
+
+    Unlike ``repository_source_manifest``, this includes ignored dependency and
+    build output trees. Only a framed hash and aggregate counts are returned, so
+    private source paths and link targets never enter durable evidence.
+    """
+    root = Path(os.path.abspath(repo))
+    root_fd = _open_root_fd(root)
+    records: list[dict[str, Any]] = []
+    counts: dict[str, int] = {}
+    directory_flags = _directory_open_flags()
+
+    def visit(directory_fd: int, prefix: str) -> None:
+        try:
+            names = sorted(os.listdir(directory_fd), key=os.fsencode)
+        except OSError as exc:
+            raise ProvenanceError("checkout inventory cannot list directory") from exc
+        for name in names:
+            if name in {".", ".."} or "/" in name or "\0" in name:
+                raise ProvenanceError("checkout inventory found unsafe entry name")
+            relative = f"{prefix}/{name}" if prefix else name
+            try:
+                before = os.stat(name, dir_fd=directory_fd,
+                                 follow_symlinks=False)
+            except OSError as exc:
+                raise ProvenanceError(
+                    "checkout inventory entry is unavailable") from exc
+            mode = stat.S_IMODE(before.st_mode)
+            if stat.S_ISDIR(before.st_mode):
+                kind = "directory"
+                record = {"path": relative, "kind": kind, "mode": mode}
+                child_fd = None
+                try:
+                    child_fd = os.open(name, directory_flags,
+                                       dir_fd=directory_fd)
+                    opened = os.fstat(child_fd)
+                    if ObjectBinding.from_stat(opened) != ObjectBinding.from_stat(before):
+                        raise ProvenanceError(
+                            "checkout directory changed while opened")
+                    records.append(record)
+                    counts[kind] = counts.get(kind, 0) + 1
+                    visit(child_fd, relative)
+                    after = os.fstat(child_fd)
+                    if ObjectBinding.from_stat(after) != ObjectBinding.from_stat(opened):
+                        raise ProvenanceError(
+                            "checkout directory changed while inventoried")
+                finally:
+                    if child_fd is not None:
+                        os.close(child_fd)
+            elif stat.S_ISREG(before.st_mode):
+                kind = "file"
+                digest, captured_mode = _regular_digest(
+                    root, relative, root_fd=root_fd)
+                records.append({"path": relative, "kind": kind,
+                                "mode": captured_mode,
+                                "content_sha256": digest})
+                counts[kind] = counts.get(kind, 0) + 1
+            elif stat.S_ISLNK(before.st_mode):
+                kind = "symlink"
+                try:
+                    target = os.readlink(name, dir_fd=directory_fd)
+                    after = os.stat(name, dir_fd=directory_fd,
+                                    follow_symlinks=False)
+                except OSError as exc:
+                    raise ProvenanceError(
+                        "checkout link changed while inventoried") from exc
+                if ObjectBinding.from_stat(after) != ObjectBinding.from_stat(before):
+                    raise ProvenanceError(
+                        "checkout link changed while inventoried")
+                records.append({
+                    "path": relative, "kind": kind, "mode": mode,
+                    "target_sha256": sha256_bytes(os.fsencode(target)),
+                })
+                counts[kind] = counts.get(kind, 0) + 1
+            else:
+                kind = "special"
+                records.append({
+                    "path": relative, "kind": kind, "mode": mode,
+                    "type": stat.S_IFMT(before.st_mode),
+                    "device": int(before.st_rdev),
+                })
+                counts[kind] = counts.get(kind, 0) + 1
+
+    try:
+        root_stat = os.fstat(root_fd)
+        records.append({"path": ".", "kind": "directory",
+                        "mode": stat.S_IMODE(root_stat.st_mode)})
+        counts["directory"] = 1
+        visit(root_fd, "")
+        _assert_root_binding(root, root_fd)
+        if stat.S_IMODE(os.fstat(root_fd).st_mode) != stat.S_IMODE(root_stat.st_mode):
+            raise ProvenanceError("checkout root mode changed while inventoried")
+        return {
+            "content_sha256": _framed_hash(
+                records, domain="checkout-inventory-v1"),
+            "entry_count": len(records),
+            "kind_counts": dict(sorted(counts.items())),
+            "content_hash_contract": "framed-sha256-checkout-v1",
+        }
     finally:
         os.close(root_fd)
 
@@ -1397,6 +1573,146 @@ def _utc_timestamp(value: Any, path: str) -> datetime:
         raise ProvenanceError(f"invalid {path}") from exc
 
 
+def _validate_repository_shape(value: Any, where: str) -> None:
+    if not isinstance(value, dict):
+        raise ProvenanceError(f"{where} must be an object")
+    _require_keys(value, {"head", "dirty", "status_sha256",
+                          "content_sha256", "entry_count",
+                          "content_hash_contract"}, where)
+    if (not re.fullmatch(r"[0-9a-f]{40,64}", str(value["head"]))
+            or not isinstance(value["dirty"], bool)
+            or not _SHA256_RE.fullmatch(str(value["status_sha256"]))
+            or not _SHA256_RE.fullmatch(str(value["content_sha256"]))
+            or isinstance(value["entry_count"], bool)
+            or not isinstance(value["entry_count"], int)
+            or value["entry_count"] < 0
+            or value["content_hash_contract"] != "framed-sha256-v2"):
+        raise ProvenanceError(f"invalid {where}")
+
+
+def _validate_checkout_inventory(value: Any, where: str) -> None:
+    if not isinstance(value, dict):
+        raise ProvenanceError(f"{where} must be an object")
+    _require_keys(value, {"content_sha256", "entry_count", "kind_counts",
+                          "content_hash_contract"}, where)
+    counts = value["kind_counts"]
+    if (not _SHA256_RE.fullmatch(str(value["content_sha256"]))
+            or isinstance(value["entry_count"], bool)
+            or not isinstance(value["entry_count"], int)
+            or value["entry_count"] < 0
+            or not isinstance(counts, dict)
+            or any(kind not in {"directory", "file", "symlink", "special"}
+                   or isinstance(count, bool) or not isinstance(count, int)
+                   or count < 0 for kind, count in counts.items())
+            or sum(counts.values()) != value["entry_count"]
+            or value["content_hash_contract"] != "framed-sha256-checkout-v1"):
+        raise ProvenanceError(f"invalid {where}")
+
+
+def _validate_source_release(value: Any) -> None:
+    if not isinstance(value, dict):
+        raise ProvenanceError("prime_agent.staged_release must be an object")
+    _require_keys(value, {"schema_version", "source", "source_rules",
+                          "package_version", "pack_command_sha256", "artifact",
+                          "output_inventory", "output_inventory_sha256"},
+                  "prime_agent.staged_release")
+    if value["schema_version"] != 1:
+        raise ProvenanceError("invalid source release schema")
+    _validate_repository_shape(value["source"], "prime_agent.staged_release.source")
+    rules = value["source_rules"]
+    if (not isinstance(rules, dict)
+            or rules != {"include": "git-cached-plus-nonignored-untracked-v1",
+                         "exclude": "git-standard-ignored-and-dotgit-v1"}):
+        raise ProvenanceError("invalid source release rules")
+    if (not _SEMVER_RE.fullmatch(str(value["package_version"]))
+            or not _SHA256_RE.fullmatch(str(value["pack_command_sha256"]))
+            or not _SHA256_RE.fullmatch(str(value["output_inventory_sha256"]))):
+        raise ProvenanceError("invalid source release identity")
+    records = value["output_inventory"]
+    if not isinstance(records, list) or not records:
+        raise ProvenanceError("source release inventory is empty")
+    previous = None
+    for record in records:
+        if not isinstance(record, dict):
+            raise ProvenanceError("invalid source release record")
+        _require_keys(record, {"path", "kind", "mode", "size",
+                               "content_sha256"}, "source release record")
+        path = record["path"]
+        if (not isinstance(path, str) or not path.startswith("artifacts/")
+                or path.startswith("/") or "/../" in f"/{path}/"
+                or previous is not None and path <= previous
+                or record["kind"] != "file" or record["mode"] != 0o644
+                or isinstance(record["size"], bool)
+                or not isinstance(record["size"], int) or record["size"] < 0
+                or not _SHA256_RE.fullmatch(str(record["content_sha256"]))):
+            raise ProvenanceError("invalid source release record")
+        previous = path
+    version = value["package_version"]
+    expected_tarballs = {
+        f"prime-agent-{version}.tgz",
+        f"prime-agent-ai-{version}.tgz",
+        f"prime-agent-core-{version}.tgz",
+        f"prime-agent-tui-{version}.tgz",
+    }
+    expected_paths = {
+        *(f"artifacts/{name}" for name in expected_tarballs),
+        "artifacts/SHA256SUMS", "artifacts/stable", "artifacts/latest.json",
+    }
+    if {record["path"] for record in records} != expected_paths:
+        raise ProvenanceError("source release output set is not exact")
+    calculated_inventory = _framed_hash(
+        records, domain="source-builder-output-v1")
+    if calculated_inventory != value["output_inventory_sha256"]:
+        raise ProvenanceError("source release inventory hash mismatch")
+    expected_main = f"artifacts/prime-agent-{version}.tgz"
+    matches = [record for record in records if record["path"] == expected_main]
+    if len(matches) != 1 or value["artifact"] != matches[0]:
+        raise ProvenanceError("source release primary artifact is invalid")
+
+
+def _validate_source_builder(value: Any) -> None:
+    if not isinstance(value, dict):
+        raise ProvenanceError("prime_agent.builder must be an object")
+    _require_keys(value, {"image", "teardown", "checkout_inventory_before",
+                          "checkout_inventory_after"}, "prime_agent.builder")
+    image = value["image"]
+    if not isinstance(image, dict):
+        raise ProvenanceError("source builder image is unavailable")
+    _require_keys(image, {"id", "repo_digests", "dockerfile",
+                          "dockerfile_sha256", "declared_input_sha256",
+                          "declared_input_hash_contract", "informational_tag",
+                          "os", "architecture", "build_started_at",
+                          "build_finished_at"}, "prime_agent.builder.image")
+    if (not _IMAGE_ID_RE.fullmatch(str(image["id"]))
+            or image["repo_digests"] != []
+            or image["dockerfile"] != "docker/test-prime-agent-builder.Dockerfile"
+            or image["declared_input_hash_contract"] != "framed-sha256-v2"
+            or not _SHA256_RE.fullmatch(str(image["dockerfile_sha256"]))
+            or not _SHA256_RE.fullmatch(str(image["declared_input_sha256"]))):
+        raise ProvenanceError("invalid source builder image")
+    _validate_image_fields(image)
+    _utc_timestamp(image["build_started_at"], "source builder image start")
+    _utc_timestamp(image["build_finished_at"], "source builder image finish")
+    teardown = value["teardown"]
+    if not isinstance(teardown, dict):
+        raise ProvenanceError("source builder teardown must be an object")
+    _require_keys(teardown, {"container_id", "state", "remove_outcome",
+                             "inspect_outcome", "clean", "verified_at"},
+                  "prime_agent.builder.teardown")
+    if (not re.fullmatch(r"[0-9a-f]{64}", str(teardown["container_id"]))
+            or teardown["state"] != "absent" or not teardown["clean"]
+            or teardown["remove_outcome"] not in {"clean", "ordinary_nonzero"}
+            or teardown["inspect_outcome"] != "ordinary_nonzero"):
+        raise ProvenanceError("source builder teardown is not clean")
+    _utc_timestamp(teardown["verified_at"], "source builder teardown time")
+    before = value["checkout_inventory_before"]
+    after = value["checkout_inventory_after"]
+    _validate_checkout_inventory(before, "source builder checkout before")
+    _validate_checkout_inventory(after, "source builder checkout after")
+    if before != after:
+        raise ProvenanceError("source builder changed the selected checkout")
+
+
 def validate_manifest(manifest: dict[str, Any]) -> None:
     if not isinstance(manifest, dict):
         raise ProvenanceError("manifest must be an object")
@@ -1423,7 +1739,7 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
             raise ProvenanceError(f"{name} must be an object")
     _require_keys(run, {"id", "tier", "mode", "started_at", "finished_at",
                         "status", "failure_codes"}, "run")
-    if (run["tier"] != "tier1" or run["mode"] not in {"pinned", "smoke"}
+    if (run["tier"] != "tier1" or run["mode"] not in {"pinned", "source", "smoke"}
             or run["status"] not in {"passed", "failed"}):
         raise ProvenanceError("invalid run tier/mode/status")
     if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z-[0-9]+-[0-9a-f]{8}", str(run["id"])):
@@ -1441,34 +1757,20 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
     run_finished = _utc_timestamp(run["finished_at"], "run.finished_at")
     if run_finished < run_started:
         raise ProvenanceError("run.finished_at precedes run.started_at")
-    _require_keys(repo, {"head", "dirty", "status_sha256",
-                         "content_sha256", "entry_count",
-                         "content_hash_contract"}, "repository")
-    if (not re.fullmatch(r"[0-9a-f]{40,64}", str(repo["head"]))
-            or not isinstance(repo["dirty"], bool)
-            or not _SHA256_RE.fullmatch(str(repo["status_sha256"]))
-            or not _SHA256_RE.fullmatch(str(repo["content_sha256"]))
-            or isinstance(repo["entry_count"], bool)
-            or not isinstance(repo["entry_count"], int)
-            or repo["entry_count"] < 0
-            or repo["content_hash_contract"] != "framed-sha256-v2"):
-        raise ProvenanceError("invalid repository identity")
+    _validate_repository_shape(repo, "repository")
     if run["mode"] == "smoke":
         if prime is not None:
             raise ProvenanceError("smoke manifests require prime_agent=null")
     else:
         if not isinstance(prime, dict):
             raise ProvenanceError(
-                "pinned manifests require requested selector provenance")
-        _require_keys(prime, {"mode", "requested_version", "installed_version", "artifact"}, "prime_agent")
-        requested = prime["requested_version"]
-        installed = prime["installed_version"]
-        artifact = prime["artifact"]
-        if prime["mode"] != "pinned" or not _SEMVER_RE.fullmatch(str(requested)):
-            raise ProvenanceError("invalid pinned Prime Agent selector")
+                "non-smoke manifests require requested selector provenance")
+        installed = prime.get("installed_version")
+        artifact = prime.get("artifact")
         if installed is None:
             if artifact is not None or run["status"] != "failed":
-                raise ProvenanceError("unavailable installed identity is valid only for failed runs")
+                raise ProvenanceError(
+                    "unavailable installed identity is valid only for failed runs")
         else:
             try:
                 observed = parse_prime_agent_version(str(installed))
@@ -1482,9 +1784,37 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
                     or artifact.get("version") != installed
                     or not _SHA256_RE.fullmatch(str(artifact.get("executable_sha256", "")))):
                 raise ProvenanceError("prime_agent.artifact identity is invalid")
+        if run["mode"] == "pinned":
+            _require_keys(prime, {"mode", "requested_version", "installed_version",
+                                  "artifact"}, "prime_agent")
+            requested = prime["requested_version"]
+            if prime["mode"] != "pinned" or not _SEMVER_RE.fullmatch(str(requested)):
+                raise ProvenanceError("invalid pinned Prime Agent selector")
             if run["status"] == "passed" and installed != requested:
                 raise ProvenanceError(
                     "passed run requested and installed versions differ")
+        else:
+            _require_keys(prime, {"mode", "requested_version", "installed_version",
+                                  "artifact", "source", "source_rules",
+                                  "staged_release", "builder"}, "prime_agent")
+            if prime["mode"] != "source":
+                raise ProvenanceError("invalid source Prime Agent selector")
+            if run["status"] == "passed":
+                requested = prime["requested_version"]
+                if not _SEMVER_RE.fullmatch(str(requested)) or installed != requested:
+                    raise ProvenanceError("source requested and installed versions differ")
+                _validate_repository_shape(prime["source"], "prime_agent.source")
+                rules = prime["source_rules"]
+                if rules != {"include": "git-cached-plus-nonignored-untracked-v1",
+                             "exclude": "git-standard-ignored-and-dotgit-v1"}:
+                    raise ProvenanceError("invalid source rules")
+                _validate_source_release(prime["staged_release"])
+                if (prime["staged_release"]["source"] != prime["source"]
+                        or prime["staged_release"]["source_rules"] != rules
+                        or prime["staged_release"]["package_version"] != requested):
+                    raise ProvenanceError("source release lineage disagrees")
+                _validate_source_builder(prime["builder"])
+
     if image is None:
         if run["status"] != "failed":
             raise ProvenanceError("passed manifests require image identity")

@@ -20,13 +20,13 @@ def build_image(tier, snapshot):
         return conftest._build_tier1_image(owned, tier, snapshot)
 
 class TestSelectionFailClose(unittest.TestCase):
-    def test_source_selector_never_stats_or_echoes_checkout(self):
+    def test_source_selector_is_lexically_validated_without_checkout_stat(self):
         with tempfile.TemporaryDirectory() as td:
             tmp=Path(td).resolve(); source=tmp/"private-source"; source.mkdir(); (source/"sentinel").write_text("keep")
             envf=tmp/"source.env"; envf.write_text(f"PRIME_AGENT_SOURCE={source}\n")
             with mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}), mock.patch.object(Path,"is_dir",side_effect=AssertionError("checkout stat")):
-                with self.assertRaisesRegex(RuntimeError,"isolated source builder Slice 2") as ctx: conftest._load_install_selection()
-            self.assertNotIn(str(source),str(ctx.exception)); self.assertEqual((source/"sentinel").read_text(),"keep")
+                mode, selected = conftest._load_install_selection()
+            self.assertEqual((mode,selected),("source",str(source))); self.assertEqual((source/"sentinel").read_text(),"keep")
     def test_pinned_selector_returns_value(self):
         with tempfile.TemporaryDirectory() as td:
             envf=Path(td).resolve()/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
@@ -124,6 +124,19 @@ class TestInstalledPackageIdentity(unittest.TestCase):
         fake=FakeContainer(); package=conftest._installed_package_identity(fake)
         self.assertEqual(package,{"kind":"vendor-binary","version":"0.9.8","executable_sha256":"f"*64})
         self.assertEqual(len(fake.calls),2)
+
+    def test_source_reads_installed_package_metadata_without_launching_cli(self):
+        class FakeContainer:
+            mode="source"
+            def __init__(self): self.calls=[]
+            def run(self,*args,**kwargs):
+                self.calls.append(args)
+                if args[:2] == ("node","-e"): return cp(args,out="0.9.8")
+                return cp(args,out="f"*64+"  /usr/local/bin/prime-agent\n")
+        fake=FakeContainer(); package=conftest._installed_package_identity(fake)
+        self.assertEqual(package["version"],"0.9.8")
+        self.assertEqual(fake.calls[0][:2],("node","-e"))
+        self.assertNotIn(("prime-agent","--version"),fake.calls)
 
     def test_invalid_executable_hash_is_rejected(self):
         class FakeContainer:

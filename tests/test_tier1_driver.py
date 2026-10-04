@@ -341,11 +341,11 @@ class TestSelectorFailClose(unittest.TestCase):
                 self.assertNotEqual(out.returncode,0); self.assertFalse(h.log.exists())
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
             list(pool.map(check,values))
-    def test_source_fails_before_checkout_or_docker_without_path_echo(self):
+    def test_source_dry_run_describes_builder_without_checkout_or_docker_contact(self):
         with tempfile.TemporaryDirectory() as td:
             tmp=Path(td).resolve().resolve(); h=DriverHarness(tmp); source=tmp/"sentinel-source"; source.mkdir(); sentinel=source/"must-stay"; sentinel.write_text("unchanged")
-            envf=tmp/"source.env"; envf.write_text(f"PRIME_AGENT_SOURCE={source}\n"); out=h.run(env=h.env(envf))
-            self.assertNotEqual(out.returncode,0); self.assertIn("isolated source builder Slice 2",out.stderr); self.assertNotIn(str(source),out.stdout+out.stderr)
+            envf=tmp/"source.env"; envf.write_text(f"PRIME_AGENT_SOURCE={source}\n"); out=h.run("--dry-run",env=h.env(envf))
+            self.assertEqual(out.returncode,0,out.stderr); self.assertIn("disposable source builder",out.stdout); self.assertNotIn(str(source),out.stdout+out.stderr)
             self.assertEqual(sentinel.read_text(),"unchanged"); self.assertFalse(h.log.exists())
 
     def test_malicious_pinned_versions_fail_before_docker(self):

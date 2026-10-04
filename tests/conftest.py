@@ -14,9 +14,9 @@ is always the tier-0 default with no Docker dependency, and
 `pytest -m container` selects exactly the migrated plugin suite.
 
 The session fixture mirrors scripts/test-tier1.sh (the driver is the
-contract): exact selector semantics, immediate source-mode fail-close, a
+contract): exact selector semantics, disposable read-only source building, a
 run-owned evidence tree, iidfile image capture, cidfile container capture,
-online pinned installation, verified network removal, and only then offline
+online pinned/local release installation, verified network removal, and only then offline
 package identity plus apply/check/tests against the explicit container-local
 /root/.prime/agent. TIER1_ENV_FILE selects the env file for tests.
 
@@ -52,8 +52,6 @@ IMAGE_REPO = "prime-claw-test-tier1"
 DOCKERFILE = "docker/test.Dockerfile"
 RESULTS = REPO / ".test-results"
 ENV_FILE = REPO / ".env"
-FORK_STAGE_SUBDIR = "packages/coding-agent/release/tier1"
-DIST_DIRS = ("packages/coding-agent", "packages/agent", "packages/ai", "packages/tui")
 HOST_KILL_GRACE = 5.0
 _DEFERRED_SIGNAL = None
 
@@ -66,11 +64,12 @@ class _FixtureInterrupted(BaseException):
 
 def _host_command(argv, *, timeout: float, capture_output: bool = False,
                   text: bool = False, input_text=None, check: bool = False,
-                  propagate_signal: bool = True):
+                  propagate_signal: bool = True,
+                  kill_grace: float = HOST_KILL_GRACE):
     """The only host external-command contract used by the tier-1 fixture."""
     result = bounded_command.run_completed(
         [str(arg) for arg in argv], timeout=timeout,
-        kill_grace=HOST_KILL_GRACE, reap_grace=HOST_KILL_GRACE,
+        kill_grace=kill_grace, reap_grace=kill_grace,
         capture_output=capture_output, text=text, input=input_text)
     if result.outcome == "interrupted" and result.signal is not None:
         if propagate_signal:
@@ -152,18 +151,43 @@ def _load_install_selection() -> tuple[str, str]:
             f"is set in {env_file} — set exactly one (see .env.example)"
         )
     if source:
-        # Slice 1 fail-close boundary. Parsing the selector is allowed; no
-        # stat/read/build/cleanup/pack operation may touch the checkout until
-        # the isolated source builder lands in prime-claw-5v7.1.
-        raise RuntimeError(
-            "tier-1 fixture: PRIME_AGENT_SOURCE is disabled until isolated "
-            "source builder Slice 2 (prime-claw-5v7.1) lands; use "
-            "PRIME_AGENT_PINNED"
-        )
+        if (not os.path.isabs(source)
+                or any(char in source for char in (",", "\n", "\r", "\0"))):
+            raise RuntimeError(
+                "tier-1 fixture: PRIME_AGENT_SOURCE must be a safe absolute path")
+        return "source", source
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", pinned):
         raise RuntimeError(
             "tier-1 fixture: PRIME_AGENT_PINNED must be an exact semantic version")
     return "pinned", pinned
+
+
+def _build_source_release(source: str, tier_cap: provenance.OwnedDirectory,
+                          tier_dir: Path, tier_binding: str,
+                          share: Path, share_binding: str,
+                          workspace_snapshot: Path) -> dict:
+    """Invoke the one canonical disposable source builder and read its receipt."""
+    result = _host_command(
+        [str(workspace_snapshot / "scripts/build-prime-agent-test-release.sh"),
+         "--source", source, "--workspace", str(workspace_snapshot),
+         "--tier-dir", str(tier_dir), "--tier-binding", tier_binding,
+         "--share", str(share), "--share-binding", share_binding,
+         "--image-timeout", "600", "--build-timeout", "600"],
+        timeout=600, kill_grace=120, capture_output=True, text=True,
+    )
+    if result.outcome != "exited" or result.returncode != 0:
+        raise RuntimeError(
+            "tier-1 fixture: disposable source builder failed "
+            f"(outcome={result.outcome}, rc={result.returncode})")
+    receipt = provenance.read_sanitized_json(tier_cap, "source-build.json")
+    release = receipt.get("release") if isinstance(receipt, dict) else None
+    if receipt.get("status") != "passed" or not isinstance(release, dict):
+        raise RuntimeError("tier-1 fixture: validated source builder receipt unavailable")
+    version = release.get("package_version")
+    if not isinstance(version, str) or not re.fullmatch(
+            r"[0-9]+\.[0-9]+\.[0-9]+", version):
+        raise RuntimeError("tier-1 fixture: source release version is invalid")
+    return receipt
 
 
 def _build_tier1_image(tier_cap: provenance.OwnedDirectory,
@@ -257,8 +281,18 @@ def _disconnect_container_networks(container_id: str) -> str:
 
 
 def _installed_package_identity(container: "Tier1Container") -> dict:
-    version_result = container.run("prime-agent", "--version", wrap=False,
-                                   timeout=30, workdir=None)
+    if getattr(container, "mode", "pinned") == "source":
+        version_script = (
+            'const{execFileSync}=require("child_process");'
+            'const r=execFileSync("npm",["root","-g"],{encoding:"utf8"}).trim();'
+            'const p=require(r+"/prime-agent/package.json");'
+            'process.stdout.write(String(p.version))'
+        )
+        version_result = container.run(
+            "node", "-e", version_script, wrap=False, timeout=30, workdir=None)
+    else:
+        version_result = container.run(
+            "prime-agent", "--version", wrap=False, timeout=30, workdir=None)
     if version_result.returncode != 0:
         raise RuntimeError("tier-1 fixture: installed version query failed")
     try:
@@ -654,6 +688,8 @@ def tier1_container(request):
     container_attempted = False
     image = None
     artifact = None
+    source_build = None
+    install_version = value if mode == "pinned" else None
     network_time = None
     setup_error = None
     teardown_result = TeardownResult(
@@ -699,6 +735,13 @@ def tier1_container(request):
             signal.signal(watched_signal, on_fixture_signal)
         terminal_signals_blocked = False
         terminal_sigmask(signal.SIG_SETMASK, caller_mask)
+        if mode == "source":
+            print(f"tier-1 fixture: run={run_id}; build source release in disposable builder")
+            source_build = _build_source_release(
+                value, tier_cap, tier_dir, tier_binding,
+                share, share_binding, workspace_snapshot)
+            install_version = source_build["release"]["package_version"]
+            setup_lines.append("phase=source-builder-passed")
         print(f"tier-1 fixture: run={run_id}; build exact image")
         image = _build_tier1_image(
             tier_cap, tier_dir, workspace_snapshot)
@@ -706,6 +749,9 @@ def tier1_container(request):
         cidfile = tier_dir / "container.cid"
         mounts = ["-v", f"{workspace_snapshot}:{WORKSPACE}:ro",
                   "-v", f"{share}:{share}"]
+        if mode == "source":
+            mounts += ["-v", (f"{share}/source-release/artifacts:"
+                              f"/stage/releases/v{install_version}:ro")]
         container_attempted = True
         started = _host_command(
             ["docker", "run", "-d", "--name", name,
@@ -724,27 +770,45 @@ def tier1_container(request):
         setup_lines.append(f"container_id={container_id}")
         container = Tier1Container(container_id, share, mode)
 
-        install = "curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh"
-        result = container.run(
-            "bash", "-lc", "set -euo pipefail; " + install,
-            timeout=600, workdir=None,
-            env={"PRIME_AGENT_VERSION": value,
-                 "PRIME_AGENT_INSTALLER_PLAIN": "1",
-                 "PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL": "0"},
-        )
+        if mode == "pinned":
+            install = "curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh"
+            result = container.run(
+                "bash", "-lc", "set -euo pipefail; " + install,
+                timeout=600, workdir=None,
+                env={"PRIME_AGENT_VERSION": value,
+                     "PRIME_AGENT_INSTALLER_PLAIN": "1",
+                     "PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL": "0"},
+            )
+            install_label = "pinned"
+        else:
+            sums_rows = [row for row in source_build["release"]["output_inventory"]
+                         if row.get("path") == "artifacts/SHA256SUMS"]
+            if len(sums_rows) != 1:
+                raise RuntimeError("tier-1 fixture: source release inventory is invalid")
+            sums_sha = sums_rows[0]["content_sha256"]
+            result = container.run(
+                "bash", "-lc",
+                (f"set -euo pipefail; cd /stage/releases/v{install_version}; "
+                 f"printf '%s  SHA256SUMS\\n' '{sums_sha}' | sha256sum -c - >/dev/null; "
+                 "sha256sum -c SHA256SUMS >/dev/null; "
+                 f"npm install -g ./prime-agent-{install_version}.tgz"),
+                timeout=600, workdir=None,
+            )
+            install_label = "source"
         if result.returncode != 0:
-            raise RuntimeError("tier-1 fixture: pinned Prime Agent install failed")
-        setup_lines.append("phase=prime-agent-installed")
+            raise RuntimeError(
+                f"tier-1 fixture: {install_label} Prime Agent install failed")
+        setup_lines.append(f"phase=prime-agent-{install_label}-installed")
 
         network_time = _disconnect_container_networks(container_id)
         setup_lines.append("phase=network-absent")
         provenance.write_sanitized_json(
             tier_cap, "network.json", {"verified_absent": True})
         artifact = _installed_package_identity(container)
-        if artifact["version"] != value:
+        if artifact["version"] != install_version:
             raise RuntimeError(
                 "tier-1 fixture: installed Prime Agent version does not "
-                "match the requested pinned version")
+                "match the validated requested version")
         provenance.write_sanitized_json(
             tier_cap, "installed-artifact.json", artifact)
 
@@ -798,27 +862,54 @@ def tier1_container(request):
                 failure_codes.append("teardown-command-failed")
             if teardown_result.state != "absent":
                 failure_codes.append("teardown-not-absent")
-            if artifact is not None and artifact["version"] != value:
+            if (artifact is not None
+                    and artifact["version"] != install_version):
                 failure_codes.append("installed-version-mismatch")
             for code, _exc in secondary_errors:
                 if code not in failure_codes:
                     failure_codes.append(code)
+            source_ready = (mode == "pinned" or (
+                isinstance(source_build, dict)
+                and source_build.get("status") == "passed"
+                and isinstance(source_build.get("release"), dict)))
             passed = (not failure_codes and teardown_result.clean
                       and teardown_result.state == "absent"
                       and image is not None and artifact is not None
-                      and artifact["version"] == value
-                      and network_time is not None)
+                      and artifact["version"] == install_version
+                      and network_time is not None and source_ready)
             if not failure_codes and not passed:
                 failure_codes.append("incomplete-identity")
-            prime_identity = {
-                "mode": "pinned", "requested_version": value,
-                "installed_version": artifact["version"] if artifact else None,
-                "artifact": artifact,
-            }
+            if mode == "pinned":
+                prime_identity = {
+                    "mode": "pinned", "requested_version": value,
+                    "installed_version": artifact["version"] if artifact else None,
+                    "artifact": artifact,
+                }
+            else:
+                release = (source_build.get("release")
+                           if isinstance(source_build, dict) else None)
+                prime_identity = {
+                    "mode": "source", "requested_version": install_version,
+                    "installed_version": artifact["version"] if artifact else None,
+                    "artifact": artifact,
+                    "source": (source_build.get("source")
+                               if isinstance(source_build, dict) else None),
+                    "source_rules": (source_build.get("source_rules")
+                                     if isinstance(source_build, dict) else None),
+                    "staged_release": release,
+                    "builder": ({
+                        "image": source_build.get("builder_image"),
+                        "teardown": source_build.get("builder_teardown"),
+                        "checkout_inventory_before": source_build.get(
+                            "checkout_inventory_before"),
+                        "checkout_inventory_after": source_build.get(
+                            "checkout_inventory_after"),
+                    } if isinstance(source_build, dict) else None),
+                }
             return {
                 "schema_version": provenance.SCHEMA_VERSION,
                 "command_contract_version": provenance.COMMAND_CONTRACT_VERSION,
-                "run": {"id": run_id, "tier": "tier1", "mode": "pinned",
+                "run": {"id": run_id, "tier": "tier1", "mode": mode,
                         "started_at": run_started,
                         "finished_at": provenance.utc_now(),
                         "status": "passed" if passed else "failed",

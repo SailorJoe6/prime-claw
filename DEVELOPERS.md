@@ -88,10 +88,12 @@ only. Do not apply, check, or probe a candidate against the host user-global
     only online container phase. The fixture then disconnects every captured
     network and verifies the set is empty before version/artifact identity,
     plugin apply/check, probes, or tests run.
-  - `PRIME_AGENT_SOURCE=/absolute/path/to/prime-agent` is intentionally
-    fail-closed in Slice 1. It exits before stat/read/build/cleanup/pack or
-    Docker access and never echoes the checkout path. The disposable source
-    builder is Slice 2 (`prime-claw-5v7.1`).
+  - `PRIME_AGENT_SOURCE=/absolute/path/to/prime-agent` builds in a separate
+    disposable container. The checkout is mounted read-only and copied to
+    container-local storage; complete before/after inventory equality is
+    mandatory. Only a validated run-owned release is mounted read-only into the
+    tier-1 runtime. No source checkout, host home, socket, credentials, or live
+    state is exposed. The source path is never written to evidence or echoed.
 
   `scripts/test-tier1.sh` is the standalone driver (`--smoke`, `--probe`,
   `--dry-run`, `--rebuild`). The fixture mirrors its boundary. Teardown targets

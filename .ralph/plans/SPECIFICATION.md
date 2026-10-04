@@ -1,24 +1,17 @@
 # Project-wide testing strategy — isolation-first test architecture
 
-> **EXECUTIVE UNBLOCK — 2026-10-03.** The sponsor explicitly prioritizes
-> production isolation over the legacy Slice-1 runtime budget and additional
-> advisory assertion expansion. The 123.87s isolated sample remains recorded as
-> a non-gating performance observation. The accepted matrices are sufficient for
-> this candidate; finish existing isolation/Docker validation and whole-candidate
-> review without starting later slices. The first real Docker smoke then proved
-> that Docker's extra final network-template newline was rejected before network
-> disconnect. The directly isolation-relevant fix changes only `bounded.py` and
-> adds `tests/test_tier1_network_policy.py`; current bounded+driver ordered
-> SHA-256 is `4192da1fad387c466cd4303410fa36f11c67db3ca6bf712245c8a689e181f69a` and must receive renewed focused review.
+> **SLICE 1 ACCEPTED — 2026-10-03.** Exact commit
+> `4cca0989475d7bd670620f31b67260342b3aac5d`, tree
+> `9c11db2e8c0499b0cac5c14b46d4000796ac7bef`, is owner-accepted;
+> `prime-claw-5v7.2` is closed. Exact Astra/max PASS report SHA-256:
+> `a267b83a37bdf45a650d29c07b5dc51b78fd16391d5087c9c18b8fa1710e389e`.
+> Preserve every accepted Slice-1 boundary. Advance only Slice 2 /
+> `prime-claw-5v7.1`, using the approved disposable read-only-source builder;
+> do not start later slices or touch upstream/live/global resources.
 
 > **Status:** ACTIVE implementation episode created from the operator-approved
-> bundle on 2026-10-02. Owner rejected Slice-1 candidates `fd1f2b7` and
-> `aee5cfe`; the current owner-authorized repair scope is R1–R6 plus
-> diagnostic redaction as recorded on `prime-claw-5v7.2` and the immutable
-> owner/EXPERT reports cited below. Later
-> slices remain unstarted. Resume only from restart checkpoint
-> `/Users/jlanders/.prime/agent/session-artifacts/01a0fee6-4ed7-725a-8cf9-0ba9fbf056b9/restart-checkpoint-2026-10-03T1523Z.md`
-> (SHA-256 `16137944e07febb0231b53d6177604377eeea8396c78c1808350fca558f1f1c4`).
+> bundle on 2026-10-02. Slice 1 is accepted and closed. Slice 2 /
+> `prime-claw-5v7.1` is the only active next slice; later slices remain unstarted.
 > The owner accepted F1 at ordered file-set SHA-256
 > `1e050d1044a24cb4e037a774ec524c43a0906a8bb94588be980f9d521713a319`
 > and R2 at ordered file-set SHA-256

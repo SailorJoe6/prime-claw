@@ -1,36 +1,20 @@
 # Execution plan — project-wide isolation-first testing strategy
 
-> **EXECUTIVE UNBLOCK — 2026-10-03.** The executive sponsor reaffirmed the
-> governing outcome: move environment-dependent testing behind disposable
-> boundaries so production gbrain, PostgreSQL, and Prime Agent workloads are
-> never test targets. The sponsor waived the legacy Slice-1 runtime budget and
-> declined additional advisory assertion expansion unless it directly proves
-> that isolation outcome. The isolated **123.87s** sample remains retained at
-> `.test-results/final-candidate-preflight/tier0-diagnostic.log` as an honest
-> observation, not a release gate. The existing owner-accepted producer matrices
-> are sufficient for this Slice-1 candidate. Complete only existing host/Docker
-> isolation validation, a fresh scope-aligned whole-candidate review, and one
-> commit/push for owner review. No Slice 2 or Phase 3a in this pass.
->
-> The first live Docker smoke exposed one direct isolation defect: Docker adds a
-> CLI newline after the network-name template's own terminator, producing a
-> trailing empty row that the sanitizer rejected with rc 65 before disconnect.
-> The executive isolation authorization covers the minimal normalization and
-> focused regression. Current bounded+driver ordered SHA-256 is
-> `4192da1fad387c466cd4303410fa36f11c67db3ca6bf712245c8a689e181f69a` (`bounded.py` `e1e2f54c76808cf3192b8eb0606eed90bf1c1f675faf0edcca0ef12cebb5eaaa`; unchanged driver
-> `359ba83ac574b0b9ca97d15ff61f0f8da2a44ee499967203ebd1d0b116ccf0cf`).
-> The historical accepted bounded-R4 hash remains recorded below; this new
-> isolation-only delta requires focused and whole-candidate review before push.
+> **SLICE 1 ACCEPTED — 2026-10-03.** Owner accepted exact commit
+> `4cca0989475d7bd670620f31b67260342b3aac5d`, tree
+> `9c11db2e8c0499b0cac5c14b46d4000796ac7bef`; `prime-claw-5v7.2` is closed.
+> Exact Astra/max whole-candidate PASS report SHA-256
+> `a267b83a37bdf45a650d29c07b5dc51b78fd16391d5087c9c18b8fa1710e389e`.
+> Preserve all accepted Slice-1 isolation, provenance, signal, cleanup, source
+> fail-close, truthful lineage, and sponsor-recorded performance boundaries.
+> The next execute pass is authorized only for Slice 2 / `prime-claw-5v7.1`:
+> isolate Prime Agent source builds from the host checkout with the approved
+> disposable read-only-source builder. Return one reviewable pushed Slice-2
+> candidate and stop. Do not start later slices or touch upstream Prime Agent,
+> live/global credentials, or live services.
 
-> **Status:** ACTIVE episode. Owner rejected Slice-1 candidates `fd1f2b7` and
-> `aee5cfe`; implement only the owner-authorized R1–R6 repair plus diagnostic
-> redaction recorded on `prime-claw-5v7.2` and in the immutable owner/EXPERT
-> reports. Later slices remain unstarted.
-> Resume the uncommitted repair only from restart checkpoint
-> `/Users/jlanders/.prime/agent/session-artifacts/01a0fee6-4ed7-725a-8cf9-0ba9fbf056b9/restart-checkpoint-2026-10-03T1523Z.md`
-> (SHA-256 `16137944e07febb0231b53d6177604377eeea8396c78c1808350fca558f1f1c4`).
-> It records incomplete F1/F4/F5 and performance work at rejected base
-> `aee5cfe`; it is not acceptance or delivery evidence.
+> **Status:** ACTIVE episode. Slice 1 is accepted and closed. The sole active
+> vertical slice is Slice 2 / `prime-claw-5v7.1`; later slices remain unstarted.
 > External prerequisites
 > are closed in `3bf9059` / `927b394`.
 > **Specification:** [SPECIFICATION.md](SPECIFICATION.md).
@@ -311,13 +295,13 @@ checkout is inspected or mutated.
 
 ### Implementation receipt
 
-- **State:** candidates `fd1f2b7` and `aee5cfe` are rejected. The current bounded revision is R1–R6 plus owner diagnostic-redaction repair under the exact report authorities recorded on `prime-claw-5v7.2` and `prime-claw-h6w.22`; preserve B1/B3/B8 and scratch-only R-TEST-7. The Bead remains `in_progress` and later slices remain unstarted.
+- **State:** candidates `fd1f2b7` and `aee5cfe` remain rejected; replacement `4cca0989475d7bd670620f31b67260342b3aac5d` is owner-accepted and `prime-claw-5v7.2` is closed. Preserve B1/B3/B8, scratch-only R-TEST-7, and every accepted Slice-1 boundary while advancing only `prime-claw-5v7.1`.
 - **F1 accepted only:** the owner accepted the descriptor/capability, no-replace/exchange, quarantine, allocation, snapshot, retained-root Git-read, producer-call-site, and deterministic adversarial coverage repair at ordered file-set SHA-256 `1e050d1044a24cb4e037a774ec524c43a0906a8bb94588be980f9d521713a319`. Preserve every F1 repair while advancing the same uncommitted generation. Independent report `/Users/jlanders/.prime/agent/session-artifacts/01a0fee6-4ed7-725a-8cf9-0ba9fbf056b9/sub-30d8087b/F1_FINAL_REAUDIT.md`, SHA-256 `4ce0c3e96bff44a3761b0614247dab419985ee5756411ebc2f1dde1ea0d80cbc`; owner exact-hash replay **54 passed + 30 subtests in 8.82s**, with the file-set hash unchanged afterward. Fixture **43 passed + 5 subtests** and driver **33 passed + 14 subtests** were also green. This acceptance closes F1 only; it is not candidate acceptance or publication authority.
 - **R2 accepted only:** the owner accepted the supervisor closure-time pending-signal boundary at ordered file-set SHA-256 `e5bfda4579c5fc4d13eebe6aa78dd8901c3b22dd216608a9d827df1ae3a8fa28`. Preserve it with F1 while advancing the remaining R6 and candidate gates. The supervisor keeps TERM/INT/HUP blocked through evidence closure, classifies newly pending caller-unblocked signals before its terminal boundary, re-closes evidence as failed before handler restoration, returns `128+signal`, restores/redelivers prior handlers and the exact caller mask, and preserves caller-blocked pending signals. The authoritative `closure-signal-repro.py` (SHA-256 `77348f3bee01eb6e723c94b461b4133a641f34bea77098884b8ff31c671bb0c3`) returns `{"rc": 143, "seen": [15]}`. Owner exact-hash focused replay: **3 passed + 3 subtests in 6.59s**, with the file-set hash unchanged afterward; independent reviewer `sub-63bf67c5` reported PASS. This acceptance closes R2 only; it is not candidate acceptance or publication authority.
 - **Bounded-controller R4 accepted only:** the owner accepted the bounded terminal-restoration sub-slice at ordered two-file SHA-256 `8be0ab10267a3ec3173198600647a14e36530f318f3be4c28d4091ea426e583f` (`bounded.py` `29009843a0ef8a968701d9ad95af33b35d46d3a755a72db9cc7fa345b1708d7a`, driver `359ba83ac574b0b9ca97d15ff61f0f8da2a44ee499967203ebd1d0b116ccf0cf`). All typed terminal outcomes converge on one blocked restoration boundary that attempts every prior handler before restoring the exact caller mask; natural unmask redelivers newly pending caller-unblocked signals and leaves caller-blocked pending signals pending. The authoritative `bounded-restoration-signal-repro.py` (SHA-256 `6ae7cf27b858bced61cde731f67a26ee9aa4b63c00a4dd784b4b5d3ec219281f`) returns `{"error": null, "prior_handlers_restored": [true, true, true], "prior_seen": [15]}`. Owner exact-hash focused replay: **2 passed + 16 subtests in 3.78s**, with hashes unchanged afterward; independent reviewer `sub-5adc91e6` reported PASS. Preserve F1, R2, and this bounded-R4 behavior. The separately accepted fixture boundary now completes full R4 for advancement only; this is not candidate acceptance or publication authority.
 - **Fixture R4 and full R4 accepted for advancement only:** the owner accepted the fixture terminal restoration/publication boundary at ordered two-file SHA-256 `96fd0589f346c9db7d5ba3b23ddcd5115fbcab6f8744ddceaab115717e313c55` (`tests/conftest.py` `f34f94bff15b9f31e99e874fb6d46003642cea4a24ed95e8617fb473f3479904`, `tests/test_tier1_fixture.py` `9de47880bae1a7269baab404b2fdf3b018e48be0769017e8f0af6c624c91b5de`). Caller mask/pending capture precedes capability acquisition; every post-acquisition setup, terminal-observation, publication, restoration, replay, prior-handler, and close failure converges on non-green/absent evidence, every prior-handler restoration attempt, exact caller-mask restoration, and unconditional capability close. Signals at inventory, atomic write, post-write verification, and handler restoration persist `interrupted` failed evidence; caller-blocked pending signals remain caller-owned. The authoritative repro (SHA-256 `7acc7b41fda1c135aa6c8d512cc61cbbd07f23515a21bfeeff03dfee6dc42556`) returns `{"error":"ProvenanceError","prior_handlers_restored":[true,true,true]}`. Owner exact-hash matrix **1 passed + 22 subtests in 5.37s** and fixture+provenance **98 passed + 57 subtests in 13.53s**, hashes unchanged; fresh independent `fixture-final-expert` PASS. Together with the separately accepted bounded-controller hash, this completes R4 for advancement only; it is not candidate acceptance or publication authority.
 - **R6 accepted for advancement only:** the owner accepted the public-standalone coverage at ordered two-file SHA-256 `b1e9cb0dbeadbf53315de4f4e9a3bbbe132b627fc0e473516ce9d91eb1039d98` (`tests/test_tier1_launch_error.py` `382c13776a823f981147a23f7ef340d990dba60b857ec43e609d08b991b1f1c5`, `tests/test_tier1_image.py` `b020909689309a9377f608ab8ea4a14a7ae3f01b7846c15c76ef98d42bc25a3e`). The test invokes the public outer supervisor, passes `docker info`, then injects an exec-handshake failure only for the first post-preflight fake `docker build`. The real bounded controller reports exact `{"outcome":"launch_error","returncode":127,"signal":null}`; the target fake Docker build is never reached. The failed run publishes one validated `primary-command-failed` manifest with `image=null`, network unverified, exact `absent/not_needed/not_needed/clean` teardown, no workspace/share/iid/cid/image/network remnants, and no success/`OK` line. Fresh replay passes while failed evidence remains byte-identical. Owner focused replay **1 passed in 8.64s**, all accepted hashes unchanged; independent `slice1-r6-expert` PASS. This is advancement authority only, not candidate acceptance or publication acceptance.
-- **Final validation complete; review/publication pending:** sponsor-authorized isolation validation passed after the direct network-list normalization: corrected standalone smoke PASS; pinned probe PASS in 36.09s; container **40 passed, 438 deselected** in 125.33s; aggregate Tier 0 **331 passed, 147 skipped, 92 subtests** in 126.25s and Tier 1 **40 passed, 438 deselected** in 113.57s, overall PASS in 241.60s. The earlier rc65 smoke is retained with its root cause and is not relabeled. Remaining gates are a fresh scope-aligned whole-candidate PASS, exactly one commit, exactly one push, remote-equality proof, and the final Bead/owner packet. No Slice 2 or Phase 3a; publication is not acceptance.
+- **Final Slice-1 disposition:** validation passed after the direct network-list normalization: corrected standalone smoke PASS; pinned probe PASS in 36.09s; container **40 passed, 438 deselected** in 125.33s; aggregate Tier 0 **331 passed, 147 skipped, 92 subtests** and Tier 1 **40 passed, 438 deselected**, overall PASS. Exact commit `4cca0989475d7bd670620f31b67260342b3aac5d` and Astra/max review are owner-accepted. Slice 2 is now the only authorized next vertical slice.
 - **Implemented replacement-generation scope pending final gates and owner acceptance:** schema-v2 sanitized provenance; run-owned result trees;
   iidfile/cidfile execution identity; exact sanitized repository snapshots;
   online pinned install followed by verified network absence; bounded offline
@@ -382,6 +366,30 @@ writing any byte, type, mode, or link in the selected checkout.
 - Source and pinned tier-1 runs pass offline after preparation, with runtime
   identity matching provenance and within §3.3 budgets.
 - Durable evidence: `docs/evidence/...-slice2-source-builder.md`.
+
+### Implementation receipt
+
+- **Candidate implementation:** canonical shell-to-Python builder, minimal
+  builder Dockerfile/payload, complete checkout inventory, strict release
+  validation, source provenance, and both consumers are implemented in the
+  current uncommitted generation. Slice-1 boundaries remain intact.
+- **Hermetic gates:** focused repair **17 passed**; broader source/provenance/
+  driver/fixture/image gate **162 passed + 92 subtests** before live validation.
+- **Live proof:** the first source probe is retained red because CLI-based
+  installed-version discovery was unparseable after an otherwise successful
+  isolated build/install. The bounded repair uses installed package metadata in
+  source mode. Corrected source probe `20261003T232815Z-32114-a77fb9ec` passed
+  in 101s; builder interval 67s; complete 34,038-entry checkout inventory was
+  byte/type/mode/link identical; builder/runtime exact-ID teardown and runtime
+  network absence were green.
+- **Final review repair validated:** unconditional failed-entry exchange covers
+  initial publication and failed-replacement exceptions; affected gate **168
+  passed + 92 subtests**. Exact host **348 passed, 147 skipped, 92 subtests**;
+  source **40 passed, 455 deselected**. After operator Xcode-license acceptance,
+  authoritative `/usr/bin/git` checks and pinned **40 passed, 455 deselected**;
+  the earlier substituted-Git retry is non-authoritative. Remaining gates are a
+  fresh exact-files PASS, exactly one commit/push, and remote-equality/Bead
+  receipt. Stop after Slice 2; do not begin Slice 3 or Phase 3a.
 
 ### Rollback
 

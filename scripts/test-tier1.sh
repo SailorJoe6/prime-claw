@@ -4,8 +4,9 @@
 # Pinned mode installs Prime Agent while the run-owned container is online,
 # disconnects every captured network, verifies the network set is empty, and
 # only then runs version/artifact capture, plugin apply/check, and the optional
-# RPC probe. Source mode is intentionally disabled until Slice 2 supplies a
-# disposable builder. Every real run records sanitized provenance below
+# RPC probe. Source mode builds only inside a disposable container from a
+# read-only selected checkout and exports validated release artifacts to the
+# fresh run-owned share. Every real run records sanitized provenance below
 # .test-results/<run-id>/tier1 and launches the image by its iidfile identity.
 #
 # Usage:
@@ -71,12 +72,15 @@ if [ "$SMOKE" -eq 0 ]; then
     if [ -z "$PINNED" ] && [ -z "$SOURCE" ]; then
         die "neither PRIME_AGENT_PINNED nor PRIME_AGENT_SOURCE is set — set exactly one"
     fi
-    # Slice 1 safety boundary: do not stat, echo, build, clean, pack, or mount
-    # the selected checkout. Slice 2 replaces this stop with an isolated builder.
     if [ -n "$SOURCE" ]; then
-        die "PRIME_AGENT_SOURCE is disabled until isolated source builder Slice 2 (prime-claw-5v7.1) lands; use PRIME_AGENT_PINNED"
-    fi
-    if ! [[ "$PINNED" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        case "$SOURCE" in
+            /*) ;;
+            *) die "PRIME_AGENT_SOURCE must be an absolute path" ;;
+        esac
+        case "$SOURCE" in
+            *','*|*$'\n'*|*$'\r'*) die "PRIME_AGENT_SOURCE contains unsupported path bytes" ;;
+        esac
+    elif ! [[ "$PINNED" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         die "PRIME_AGENT_PINNED must be an exact semantic version"
     fi
 fi
@@ -88,6 +92,7 @@ DOCKER_TIMEOUT="${TIER1_DOCKER_TIMEOUT:-60}"
 BUILD_TIMEOUT="${TIER1_BUILD_TIMEOUT:-1200}"
 INSTALL_TIMEOUT="${TIER1_INSTALL_TIMEOUT:-300}"
 CHECK_TIMEOUT="${TIER1_CHECK_TIMEOUT:-180}"
+SOURCE_BUILDER_TIMEOUT="${TIER1_SOURCE_BUILDER_TIMEOUT:-600}"
 PUBLICATION_TIMEOUT="${TIER1_PUBLICATION_TIMEOUT:-60}"
 REMOVE_TIMEOUT="${TIER1_REMOVE_TIMEOUT:-60}"
 FINAL_INSPECT_TIMEOUT="${TIER1_FINAL_INSPECT_TIMEOUT:-15}"
@@ -100,6 +105,7 @@ python3 - \
   TIER1_BUILD_TIMEOUT "$BUILD_TIMEOUT" 3600 \
   TIER1_INSTALL_TIMEOUT "$INSTALL_TIMEOUT" 1800 \
   TIER1_CHECK_TIMEOUT "$CHECK_TIMEOUT" 1800 \
+  TIER1_SOURCE_BUILDER_TIMEOUT "$SOURCE_BUILDER_TIMEOUT" 600 \
   TIER1_PUBLICATION_TIMEOUT "$PUBLICATION_TIMEOUT" 180 \
   TIER1_REMOVE_TIMEOUT "$REMOVE_TIMEOUT" 180 \
   TIER1_FINAL_INSPECT_TIMEOUT "$FINAL_INSPECT_TIMEOUT" 180 <<'PYDEADLINES' \
@@ -167,8 +173,9 @@ bounded() {
     status_file="$(mktemp "${TMPDIR:-/tmp}/prime-claw-bounded-status.XXXXXX")" \
         || return 127
     rm -f "$status_file"
+    local bounded_kill_grace="${BOUNDED_KILL_GRACE_OVERRIDE:-$DOCKER_KILL_GRACE}"
     (cd "$REPO_ROOT" && exec python3 -m scripts.testing.bounded \
-        --timeout "$timeout" --kill-grace "$DOCKER_KILL_GRACE" \
+        --timeout "$timeout" --kill-grace "$bounded_kill_grace" \
         --status-file "$status_file" \
         --output-policy "${BOUNDED_OUTPUT_POLICY:-passthrough}" -- "$@") &
     pid=$!
@@ -269,6 +276,8 @@ IMAGE_TAG="prime-claw-test-tier1:<captured>"
 echo "tier-1 driver: dockerfile=$DOCKERFILE tag=$IMAGE_TAG"
 if [ "$SMOKE" -eq 1 ]; then
     echo "tier-1 driver: mode=smoke"
+elif [ -n "$SOURCE" ]; then
+    echo "tier-1 driver: mode=source selected checkout=<redacted>"
 else
     echo "tier-1 driver: mode=pinned PRIME_AGENT_VERSION=$PINNED"
 fi
@@ -278,7 +287,10 @@ if [ "$DRY_RUN" -eq 1 ]; then
     echo "dry-run: allocate .test-results/<run-id>/tier1"
     echo "dry-run: docker build --iidfile <run>/tier1/image.iid -f <run>/tier1/build-context/Dockerfile -t $IMAGE_TAG <run>/tier1/build-context"
     echo "dry-run: docker run -d --cidfile <run>/tier1/container.cid <captured-image-id> sleep infinity"
-    if [ "$SMOKE" -eq 0 ]; then
+    if [ -n "$SOURCE" ]; then
+        echo "dry-run: disposable source builder mounts <selected-source>:ro and exports a validated release"
+        echo "dry-run: online local-tarball install; runtime network absence precedes product actions"
+    elif [ "$SMOKE" -eq 0 ]; then
         echo "dry-run: online vendor install for PRIME_AGENT_VERSION=$PINNED"
     fi
     echo "dry-run: disconnect captured networks; verify empty network set"
@@ -307,6 +319,7 @@ if [ -n "${PRIME_CLAW_TIER1_STATUS:-}" ]; then
 fi
 MODE=pinned
 [ "$SMOKE" -eq 1 ] && MODE=smoke
+[ -n "$SOURCE" ] && MODE=source
 WORKSPACE_SNAPSHOT="$RESULTS_ROOT/.workspaces/$RUN_ID"
 (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance snapshot \
     "$REPO_ROOT" "$WORKSPACE_SNAPSHOT") | \
@@ -366,14 +379,38 @@ with p.open_owned_directory(tier, tier_binding) as owned:
     prime = None
     artifact = None
     installed_version = None
-    if mode == "pinned":
+    if mode in {"pinned", "source"}:
         try:
             artifact = p.read_sanitized_json(owned, "installed-artifact.json")
             installed_version = artifact["version"]
         except FileNotFoundError:
             pass
-        prime = {"mode": "pinned", "requested_version": requested,
-                 "installed_version": installed_version, "artifact": artifact}
+        if mode == "pinned":
+            prime = {"mode": "pinned", "requested_version": requested,
+                     "installed_version": installed_version, "artifact": artifact}
+        else:
+            try:
+                source_build = p.read_sanitized_json(owned, "source-build.json")
+            except FileNotFoundError:
+                source_build = None
+            release = source_build.get("release") if isinstance(source_build, dict) else None
+            requested_source = (release.get("package_version")
+                                if isinstance(release, dict) else None)
+            prime = {
+                "mode": "source", "requested_version": requested_source,
+                "installed_version": installed_version, "artifact": artifact,
+                "source": (source_build.get("source")
+                           if isinstance(source_build, dict) else None),
+                "source_rules": (source_build.get("source_rules")
+                                 if isinstance(source_build, dict) else None),
+                "staged_release": release,
+                "builder": ({
+                    "image": source_build.get("builder_image"),
+                    "teardown": source_build.get("builder_teardown"),
+                    "checkout_inventory_before": source_build.get("checkout_inventory_before"),
+                    "checkout_inventory_after": source_build.get("checkout_inventory_after"),
+                } if isinstance(source_build, dict) else None),
+            }
     image = image_meta
     manifest = {
         "schema_version": p.SCHEMA_VERSION,
@@ -607,6 +644,39 @@ trap 'on_signal 2' INT
 trap 'on_signal 15' TERM
 trap 'on_signal 1' HUP
 
+PA_VERSION="$PINNED"
+if [ "$MODE" = source ]; then
+    phase source-builder-started
+    BOUNDED_KILL_GRACE_OVERRIDE=120 bounded "$SOURCE_BUILDER_TIMEOUT" \
+        "$WORKSPACE_SNAPSHOT/scripts/build-prime-agent-test-release.sh" \
+        --source "$SOURCE" --workspace "$WORKSPACE_SNAPSHOT" \
+        --tier-dir "$TIER_DIR" --tier-binding "$TIER_BINDING" \
+        --share "$SHARE" --share-binding "$SHARE_BINDING" \
+        --image-timeout "$SOURCE_BUILDER_TIMEOUT" \
+        --build-timeout "$SOURCE_BUILDER_TIMEOUT" >/dev/null 2>&1
+    IFS=$'\t' read -r PA_VERSION SOURCE_SUMS_SHA <<EOF
+$(cd "$REPO_ROOT" && python3 -c '
+from pathlib import Path
+from scripts.testing import provenance as p
+import sys
+with p.open_owned_directory(Path(sys.argv[1]), sys.argv[2]) as owned:
+    value=p.read_sanitized_json(owned,"source-build.json")
+release=value.get("release")
+if value.get("status") != "passed" or not isinstance(release,dict):
+    raise SystemExit(1)
+sums=[row for row in release.get("output_inventory",[]) if row.get("path")=="artifacts/SHA256SUMS"]
+if len(sums) != 1:
+    raise SystemExit(1)
+print(release["package_version"]+"\t"+sums[0]["content_sha256"])
+' "$TIER_DIR" "$TIER_BINDING")
+EOF
+    [[ "$PA_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
+        || die "validated source builder version is invalid"
+    [[ "$SOURCE_SUMS_SHA" =~ ^[0-9a-f]{64}$ ]] \
+        || die "validated source release inventory is invalid"
+    phase source-builder-passed
+fi
+
 BUILD_ARGS=()
 if [ "$NO_CACHE" -eq 1 ]; then BUILD_ARGS+=(--no-cache); fi
 BUILD_STARTED="$(now_utc)"
@@ -627,6 +697,9 @@ BOUNDED_OUTPUT_POLICY=image-inspect bounded "$DOCKER_TIMEOUT" \
 
 NAME="prime-claw-tier1-${RUN_ID//[^a-zA-Z0-9_.-]/-}"
 MOUNTS=(-v "$WORKSPACE_SNAPSHOT:/workspace:ro" -v "$SHARE:/test-results")
+if [ "$MODE" = source ]; then
+    MOUNTS+=(-v "$SHARE/source-release/artifacts:/stage/releases/v$PA_VERSION:ro")
+fi
 RUN_ATTEMPTED=1
 bounded "$DOCKER_TIMEOUT" docker run -d --name "$NAME" --cidfile "$CIDFILE" \
     ${MOUNTS[@]+"${MOUNTS[@]}"} "$IMAGE_ID" sleep infinity \
@@ -645,6 +718,11 @@ if [ "$MODE" = pinned ]; then
         "$CONTAINER_ID" bash -lc "set -euo pipefail; $INSTALL" \
         >/dev/null 2>&1
     phase prime-agent-installed
+elif [ "$MODE" = source ]; then
+    bounded "$INSTALL_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc \
+        "set -euo pipefail; cd /stage/releases/v$PA_VERSION; printf '%s  SHA256SUMS\n' '$SOURCE_SUMS_SHA' | sha256sum -c - >/dev/null; sha256sum -c SHA256SUMS >/dev/null; npm install -g ./prime-agent-$PA_VERSION.tgz" \
+        >/dev/null 2>&1
+    phase prime-agent-source-installed
 fi
 
 # Capture only the exact run-owned container's networks. Names are needed for
@@ -674,14 +752,21 @@ if [ "$MODE" = smoke ]; then
     bounded "$CHECK_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc "$SMOKE_CMD" >/dev/null 2>&1
     phase smoke-passed
 else
-    INSTALLED_VERSION="$(bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" \
-        prime-agent --version 2>/dev/null | \
-        (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance parse-version))"
+    if [ "$MODE" = source ]; then
+        VERSION_COMMAND='const{execFileSync}=require("child_process");const r=execFileSync("npm",["root","-g"],{encoding:"utf8"}).trim();const p=require(r+"/prime-agent/package.json");process.stdout.write(String(p.version))'
+        INSTALLED_VERSION="$(bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" \
+            node -e "$VERSION_COMMAND" 2>/dev/null | \
+            (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance parse-version))"
+    else
+        INSTALLED_VERSION="$(bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" \
+            prime-agent --version 2>/dev/null | \
+            (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance parse-version))"
+    fi
     bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc \
         'sha256sum "$(command -v prime-agent)"' 2>/dev/null | \
         (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance capture-artifact \
             "$TIER_DIR" "$TIER_BINDING" installed-artifact.json "$INSTALLED_VERSION")
-    [ "$INSTALLED_VERSION" = "$PINNED" ] || die "installed Prime Agent version does not match requested pinned version"
+    [ "$INSTALLED_VERSION" = "$PA_VERSION" ] || die "installed Prime Agent version does not match validated requested version"
     bounded "$CHECK_TIMEOUT" docker exec -e "PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT" "$CONTAINER_ID" \
       /workspace/scripts/apply-prime-agent-plugin.sh >/dev/null 2>&1
     phase plugin-applied

@@ -3,7 +3,7 @@
 prime-claw uses the lowest sufficient isolation tier. Pure repository checks
 stay on the host. Any test that needs Prime Agent or the plugin runs inside a
 disposable container. Later slices add the integration brain stack and the
-explicit OpenShell lifecycle observer; they are not implemented by Slice 1.
+explicit OpenShell lifecycle observer; they are not implemented by Slice 2.
 
 ## Current tiers
 
@@ -88,10 +88,46 @@ Build, install, inspect/disconnect, apply/check, probe, and teardown use explici
 budgets. A valid cidfile recovered after failed launch is still removed;
 malformed identities never reach a destructive command.
 
-`PRIME_AGENT_SOURCE` is deliberately unavailable in Slice 1. After selector
-parsing it fails with Slice-2 guidance before any checkout stat, read, build,
-cleanup, pack, Docker call, or path echo. `prime-claw-5v7.1` owns the isolated
-source builder; rollback must never restore the old host-mutating path.
+## Tier-1 source run
+
+`PRIME_AGENT_SOURCE` now uses the same runtime boundary as pinned mode plus a
+separate disposable preparation container:
+
+1. Before Docker contact, the host reads Git with `GIT_OPTIONAL_LOCKS=0` through
+   a retained no-follow checkout descriptor. It records tracked plus nonignored
+   untracked files, including dirty content, modes, safe relative links, and
+   missing tracked inputs. Ignored dependency/build caches are excluded from the
+   selected-source identity.
+2. A second no-follow inventory hashes the complete checkout, including the root,
+   ignored `node_modules`, every package `dist`, prior `release/tier1` output,
+   modes, and link-target bytes. Only the aggregate hash/counts become durable.
+3. `docker/test-prime-agent-builder.Dockerfile` is built from a fresh context
+   containing only that Dockerfile and `source_builder_payload.py`. The image is
+   captured by iidfile and launched by exact ID with a cidfile.
+4. The selected checkout and sanitized source manifest are mounted read-only.
+   Only `share/source-release` is writable. The controller inspects the exact
+   container and requires precisely those two read-only mounts plus the fresh
+   writable export; it passes no host home, socket, credentials, config, or
+   repository workspace.
+5. Inside the builder, selected inputs are rehashed while copied to container-
+   local `/work`. Dependency install, stale-output cleanup, build, and
+   `release:pack` operate only on that local copy. Output is restricted to the
+   four release tarballs, `SHA256SUMS`, `stable`, `latest.json`, and a manifest
+   published last.
+6. The host removes and inspects only the captured builder CID, recomputes the
+   complete checkout inventory, and requires exact before/after equality.
+   Failure, interruption, invalid identities, unknown teardown, missing/extra
+   artifacts, special files, stale output, or any hash mismatch cannot green.
+7. The tier-1 runtime mounts only the validated artifact directory read-only.
+   It rehashes the expected `SHA256SUMS`, verifies every tarball, installs the
+   local package during preparation, removes the network, records installed
+   package metadata and executable identity, and then performs apply/check/probe
+   or pytest bodies offline. The source checkout is never mounted into runtime.
+
+Both `scripts/test-tier1.sh` and `tests/conftest.py` invoke only
+`scripts/build-prime-agent-test-release.sh`; no fallback host build or old
+`source/.../release/tier1` path exists. Rollback must leave source mode
+fail-closed rather than restore host mutation.
 
 ## Provenance evidence
 
@@ -99,8 +135,10 @@ source builder; rollback must never restore the old host-mutating path.
 
 - run ID, mode, status, safe failure codes, UTC bounds, and command-contract version;
 - repository HEAD, dirty boolean, status/content SHA-256, v2 hash contract, and exact snapshot entry count without exposing paths or content;
-- requested pinned Prime Agent version on every pinned attempt, plus installed
-  version and executable SHA-256 once those identities are available;
+- requested pinned Prime Agent version on pinned attempts; source attempts add
+  HEAD/dirty/content identity, versioned include/exclude rules, complete checkout
+  equality, pack-command/output hashes, immutable builder image/CID teardown,
+  validated release identity, installed version, and executable SHA-256;
 - immutable image ID, allow-listed platform, captured Dockerfile and declared-
   input hashes, v2 hash contract, informational tag, and build bounds; arbitrary
   registry/repository metadata is discarded and never written;
@@ -109,7 +147,7 @@ source builder; rollback must never restore the old host-mutating path.
 - SHA-256 for every other regular evidence file below the tier directory.
 
 The manifest excludes itself and the optional scratch `share/` from its evidence inventory. Validation rejects an
-unsupported schema, malformed hashes, source-mode claims, unsafe paths, common
+unsupported schema, malformed hashes, incomplete or contradictory source lineage, unsafe paths, common
 credential forms, host-home values, unknown text encodings, directory/file
 links, special evidence, missing evidence, extra stale evidence, changed
 content, contradictory success/teardown claims, and malformed UTC timestamps.
@@ -134,14 +172,21 @@ and package repositories are external inputs.
 - Set `TIER1_ENV_FILE` to an ignored file containing exactly one selector.
 - Set `TIER1_KEEP_SHARE=1` only when debugging; durable manifest and setup
   evidence remain even when the scratch share is removed normally.
-- Reproduce Slice-1 unit coverage with:
+- Reproduce Slice-2 host coverage with:
 
   ```bash
   python3 -m pytest \
+    tests/test_source_builder.py \
     tests/test_testing_provenance.py \
     tests/test_tier1_driver.py \
     tests/test_tier1_launch_error.py \
     tests/test_tier1_network_policy.py \
     tests/test_tier1_fixture.py \
     tests/test_tier1_image.py -q
+  ```
+- Run source mode with an ignored selector file:
+
+  ```bash
+  TIER1_ENV_FILE=/path/to/source.env scripts/test-tier1.sh --probe
+  TIER1_ENV_FILE=/path/to/source.env python3 -m pytest tests/ -q -m container
   ```
