@@ -5,11 +5,13 @@ Tier policy (see DEVELOPERS.md "Testing" and pytest.ini):
 - unmarked tests are tier 0 (host, no environment) and always run;
 - `container` tests (tier 1) run inside ONE long-lived tier-1 container per
   pytest session via the `tier1_container` fixture below;
-- `sandbox` tests (tier 2, tests/test_runtime_*.py) stay host-orchestrated.
+- `integration` marks the explicit disposable brain-stack body; its non-default
+  filename is never collected by plain host pytest;
+- `sandbox` tests remain host-orchestrated pending the later taxonomy slice.
 
 Any test that requests the `tier1_container` or `ctmp` fixture is
 auto-marked `container`. Unless pytest is invoked with an explicit -m mark
-expression, container/sandbox tests are SKIPPED — so plain `pytest tests/ -q`
+expression, container/integration/sandbox tests are SKIPPED — so plain `pytest tests/ -q`
 is always the tier-0 default with no Docker dependency, and
 `pytest -m container` selects exactly the migrated plugin suite.
 
@@ -86,14 +88,18 @@ _SKIP_CONTAINER = (
     "tier 1 (container): requires Docker; run `pytest -m container` "
     "or scripts/test-all.sh"
 )
+_SKIP_INTEGRATION = (
+    "tier 2 (integration): explicit disposable brain-stack body; run "
+    "scripts/test-integration.sh"
+)
 _SKIP_SANDBOX = (
-    "tier 2 (sandbox): host-orchestrated OpenShell tests; run "
-    "`pytest -m sandbox` or scripts/test-all.sh --with-sandbox"
+    "sandbox: host-orchestrated OpenShell tests remain explicit pending the "
+    "lifecycle taxonomy slice"
 )
 
 
 def pytest_collection_modifyitems(config, items):
-    """Auto-mark tier-1 fixture users; skip tier 1/2 unless -m selects them."""
+    """Auto-mark tier-1 fixture users; skip environment tiers unless -m selects them."""
     for item in items:
         if any(name in item.fixturenames for name in ("tier1_container", "ctmp", "croot")):
             item.add_marker(pytest.mark.container)
@@ -103,6 +109,8 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if item.get_closest_marker("container") is not None:
             item.add_marker(pytest.mark.skip(reason=_SKIP_CONTAINER))
+        if item.get_closest_marker("integration") is not None:
+            item.add_marker(pytest.mark.skip(reason=_SKIP_INTEGRATION))
         if item.get_closest_marker("sandbox") is not None:
             item.add_marker(pytest.mark.skip(reason=_SKIP_SANDBOX))
 

@@ -1,5 +1,23 @@
 # Project-wide testing strategy — isolation-first test architecture
 
+> **ACTIVE SLICE 3 CONTRACT — Slice 2 owner-accepted.** Exact accepted Slice-2
+> commit/tree: `56afd99d3a4b5411eb37fb42210ffb36c8bf2b84` /
+> `034765f6c8f1a3d027e010ebb751538d55fabdaf`. Owner PASS report SHA-256:
+> `76f96316416fb03a6993e21b23d9e49b9a651b6cd99fb9bebd04946e8e474408`.
+> Slice 1 and Slice 2 are closed; preserve their isolation, fail-close,
+> provenance, signal, cleanup, typed-ownership, replay, evidence-truth, and
+> accepted evidence-limit contracts.
+>
+> Implement only `prime-claw-5v7.5`: a disposable plain-Docker PostgreSQL 16 +
+> pgvector + exact-gbrain integration tier. Its database, home, corpus, and bare
+> remote are fixture-owned. Execution is offline/local-only. It exposes no host
+> ports or host data mounts, receives no credentials, contacts no live gbrain,
+> PostgreSQL, or Prime Agent target, and mutates no operator/upstream state.
+> Teardown is bounded and exact-identity; provenance is truthful across setup,
+> execution, ownership, and cleanup. Complete tests, docs, inventory, evidence,
+> and the Bead; publish one reviewable Slice-3 candidate and stop. Slice 4 and
+> later work remain closed.
+
 > **LATEST SLICE 2 REVISION CONTRACT — owner-rejected `f0441325`.** Candidate
 > `f0441325f72224b6cc67802bfb917bfead6efb31` / tree
 > `eced51e62925d016953569c55acedf075ad72e83` is revision history, not accepted.

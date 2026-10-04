@@ -1,5 +1,29 @@
 # Execution plan — project-wide isolation-first testing strategy
 
+> **SLICE 2 OWNER ACCEPT — ADVANCE TO SLICE 3 (2026-10-04).** Exact Slice-2
+> commit `56afd99d3a4b5411eb37fb42210ffb36c8bf2b84`, tree
+> `034765f6c8f1a3d027e010ebb751538d55fabdaf`, is accepted and
+> `prime-claw-5v7.1` is closed. The fresh Astra/max owner PASS report is retained
+> as an external session artifact with SHA-256
+> `76f96316416fb03a6993e21b23d9e49b9a651b6cd99fb9bebd04946e8e474408`.
+> Preserve every accepted Slice-1 and Slice-2 boundary: isolation, fail-close,
+> provenance, signals, exact cleanup identity, B1/B2 typed ownership, B3 replay
+> proof, truthful evidence, and accepted non-blocking evidence limits.
+>
+> The next execute pass is authorized only for Slice 3 / `prime-claw-5v7.5`:
+>
+> 1. Build the approved disposable brain-stack integration tier with plain Docker
+>    PostgreSQL 16 plus pgvector and the exact-gbrain environment.
+> 2. Keep the database, home, corpus, and bare Git remote fixture-owned. Execute
+>    offline and local-only with no host ports, host data mounts, credentials, or
+>    contact with live gbrain, PostgreSQL, or Prime Agent targets.
+> 3. Do not mutate operator or upstream state. Use bounded exact-identity teardown
+>    and publish truthful provenance for setup, execution, ownership, and cleanup.
+> 4. Add the required tests, docs, inventory, evidence, and Bead receipts. Return
+>    one reviewable pushed Slice-3 candidate and stop for owner review.
+>
+> Do not start Slice 4 or later work.
+
 > **SLICE 2 OWNER DISPOSITION — REVISE `f0441325` (2026-10-04).** Exact
 > candidate `f0441325f72224b6cc67802bfb917bfead6efb31`, tree
 > `eced51e62925d016953569c55acedf075ad72e83`, is rejected for advancement.
@@ -526,6 +550,39 @@ PostgreSQL/gbrain environment with exact provenance and fixture-owned Git.
 - If plain Docker cannot run the locked artifact, stop for spec revision; do
   not switch to OpenShell or patch gbrain.
 - Durable evidence: `docs/evidence/...-slice3-integration-environment.md`.
+
+### Implementation receipt
+
+- **Locked environment:** the committed lock selects exact gbrain commit/tree/
+  archive/package, native Bun archives, and native Ubuntu digests. The two-stage
+  image embeds those values plus the compiled executable hash and selected base
+  digest. Host evidence independently cross-binds the lock, exact inspected
+  tag/local digest, body attestation, and runtime executable.
+- **Owned/offline boundary:** the assertion container is unprivileged,
+  `--network none`, portless, provider-free, and receives only the run-owned
+  repository snapshot read-only plus result share read/write. PGDATA, database,
+  gbrain home, corpus Git worktree, and bare remote exist only inside that
+  container. Direct host execution and plain pytest collection fail without
+  side effects.
+- **Fail-closed lifecycle:** preparation, container, image, context, snapshot,
+  and share have explicit three-state teardown rows. Lost iid/cid recovery uses
+  only exact run-labelled tag/name selectors. Deferred TERM/INT/HUP cannot skip
+  cleanup or terminal invalidation. Public recording-fake matrices cover partial
+  creation, identity drift, ordinary-nonzero/unknown cleanup, retained mounts,
+  publication races, and `128+signal` behavior through the real bounded wrapper.
+- **Development proof:** retained red runs document the sanitizer and local
+  digest assumptions. Repaired real run
+  `20261004T193111Z-86606-6ebbc3e5` passed on native `linux/arm64` with
+  PostgreSQL `16.15`, pgvector `0.6.0`, schema `149`, 69 public tables, local
+  sync/get/search and Git round trip, all six teardown rows clean, and no
+  remaining labelled Docker object. Its manifest SHA-256 is
+  `ad5cbc53fc3e9a906fef9e3de084222b358d2724b72520b3d750d3727ebbc439`.
+- **Terminal gate contract:** publish one reviewable candidate only after full
+  host validation, one clean local commit, two independently verified disjoint
+  exact-commit integration receipts, their successful comparison, and fresh
+  independent review. The Bead and owner packet record commit/tree, receipt
+  hashes, one push, and remote equality so this tracked receipt needs no
+  post-validation edit. Stop before Slice 4 or Phase 3a.
 
 ### Rollback
 

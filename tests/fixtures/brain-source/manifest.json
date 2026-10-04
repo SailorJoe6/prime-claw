@@ -1,0 +1,16 @@
+{
+  "fixture": "prime-claw-synthetic-brain-v1",
+  "pages": [
+    {
+      "path": "people/ada-example.md",
+      "sha256": "503db254d183fd3422ae300ae7338325438fcb59a2019a320aa31c8eeb3d87a2",
+      "slug": "people/ada-example"
+    },
+    {
+      "path": "projects/meridian.md",
+      "sha256": "0f8c39bb9dd6fad44f6b5733e15c56b012a5e42b676bf69172acaee4371a8a9d",
+      "slug": "projects/meridian"
+    }
+  ],
+  "schema_version": 1
+}

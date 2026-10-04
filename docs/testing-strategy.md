@@ -1,9 +1,10 @@
 # Testing strategy
 
 prime-claw uses the lowest sufficient isolation tier. Pure repository checks
-stay on the host. Any test that needs Prime Agent or the plugin runs inside a
-disposable container. Later slices add the integration brain stack and the
-explicit OpenShell lifecycle observer; they are not implemented by Slice 2.
+stay on the host. Tests that need Prime Agent or the plugin run in the slim
+disposable tier. Tests that need gbrain and PostgreSQL run in a separate
+credential-free brain-stack image. The later lifecycle slice owns the explicit
+OpenShell observer; Slice 3 does not authorize or run it.
 
 ## Current tiers
 
@@ -11,10 +12,103 @@ explicit OpenShell lifecycle observer; they are not implemented by Slice 2.
 |---|---|---|
 | 0 | `python3 -m pytest tests/ -q` | Host-only static and recording-fake tests; no Docker. |
 | 1 | `python3 -m pytest tests/ -q -m container` or `scripts/test-tier1.sh` | One disposable Docker container; read-only repository; run-owned writable share; no credentials or host home. |
-| 2 | `python3 -m pytest tests/ -q -m sandbox` | Existing explicit runtime tests. The future integration-tier conversion is not complete. |
+| 2 | `scripts/test-integration.sh` | Plain-Docker PostgreSQL 16 + pgvector + exact gbrain; offline assertions; fixture-owned state. |
+| transition | `python3 -m pytest tests/ -q -m sandbox` | Existing explicit host OpenShell tests pending the Slice-4 taxonomy change. |
 
-`scripts/test-all.sh` remains the fail-fast default sequencer. Lifecycle work is
-not part of the default command and is not enabled by this slice.
+`scripts/test-all.sh` remains the current tier-0/tier-1 fail-fast sequencer.
+Slice 3 exposes tier 2 through its standalone launcher; Slice 4 owns the
+sequencer/taxonomy migration. Lifecycle work is not part of the default command
+and is not enabled by this slice.
+
+## Tier-2 disposable brain stack
+
+`config/test-artifacts.lock.json` is the only input selector. It pins upstream
+`garrytan/gbrain` commit `a6be012a3bcfac42e279630aedec5cda4a450e29`,
+tree `68bed6c798259e641172b9c4b277fc524b06f3f2`, package `0.50.0.0`,
+and exact Git-archive SHA-256. It also pins Bun `1.3.11` release archives and
+Ubuntu 24.04 image digests for native `linux/arm64` and `linux/amd64`.
+Unsupported platforms fail. The launcher never silently uses emulation.
+
+Source preparation and image build are the only networked phases. Product
+assertions are offline:
+
+1. Allocate a fresh descriptor-bound result tree and repository snapshot.
+2. Fetch the locked public commit into a run-owned temporary bare repository,
+   or use `INTEGRATION_GBRAIN_MIRROR` only as a transport cache. Verify commit,
+   tree, package version, and `git archive` hash. Never copy a mirror working
+   tree.
+3. Download the platform's official Bun archive and verify its locked hash.
+4. Generate a fresh context containing only the locked archive contents, Bun,
+   lock, run identity, and `docker/test-integration.Dockerfile`.
+5. Build with a native platform, run-owned iidfile, immutable base digest, and
+   run ownership labels. Require the exact local tag from image inspection,
+   normalize only the allow-listed local repository digest, capture executable
+   and embedded base/source lineage, then delete the context through its exact
+   owned-directory binding.
+
+The launcher then creates one exact iid image with a run-owned cidfile and
+`--network none`. Host inspection requires:
+
+- labels and image/container identities for this run;
+- unprivileged user `tester`;
+- no published or exposed ports, privileged mode, Docker/OpenShell socket,
+  host home, data directory, or credential/provider environment;
+- exactly `/workspace` from the run-owned snapshot read-only and `/results`
+  from the run-owned share read/write; and
+- only fixed `PATH`, `HOME`, and `LANG` image environment.
+
+Only after that inspection does the launcher invoke
+`tests/integration/environment_body.py` with a run/container/image attestation.
+The body is intentionally not named `test_*.py`, so plain host pytest cannot
+collect it. Direct invocation fails before fixture creation unless the exact
+container attestation and mounts exist.
+
+Inside the already-offline container, the body proves:
+
+- non-root execution, read-only repository, writable result share, and refused
+  external TCP while loopback remains usable;
+- exact embedded gbrain/Bun/source hashes and gbrain `0.50.0.0`;
+- fixture-owned PGDATA/socket/database with PostgreSQL 16 and `vector`,
+  `pg_trgm`, and `pgcrypto` extensions;
+- idempotent public migrations at gbrain schema version 149;
+- a synthetic committed corpus, fixture-owned bare remote and round-trip clone,
+  local-only source registration/sync, and keyless get/search; and
+- bounded PostgreSQL fast-stop before the assertion process succeeds.
+
+The host validates and promotes only the sanitized body receipt. It re-inspects
+the unchanged boundary, removes the exact labelled container and image, and
+requires successful removal plus an exact allow-listed not-found inspection.
+Ordinary nonzero removal remains non-clean even if absence is later proved.
+Malformed identity, label drift, daemon/transport error, timeout, signal,
+presence, or unknown state preserves possibly mounted state and keeps the run
+red. A lost iid/cid may fall back only to the exact expected tag/name; immutable
+ID plus run/contract labels and image/name bindings must match before deletion.
+The driver defers TERM/INT/HUP across ordinary Python phases, freezes them for
+exact cleanup, then returns `128+signal`. The supervisor owns the same signals
+through terminal publication and replaces any just-published success with failed
+evidence if interruption wins the boundary.
+
+`manifest.json` uses the separate `integration-v1` contract. It cross-binds the
+artifact lock, repository snapshot, immutable image, inspected container,
+inner receipt, platform, exact gbrain binary, PG/vector/migration identity,
+synthetic-corpus hashes, local Git identities, offline proof, normalized local
+image digest, immutable base digest, and preparation/container/image/context/
+snapshot/share teardown. The scratch share, workspace snapshot, preparation
+repository, and generated context are never accepted as durable evidence. A
+passed receipt requires all six exact teardown rows to be clean. Passed
+manifests can be compared with:
+
+```bash
+python3 -m scripts.testing.integration_provenance compare-runs \
+  .test-results/<first>/<run>/integration/manifest.json \
+  .test-results/<second>/<run>/integration/manifest.json
+```
+
+The comparison loads and independently verifies both complete evidence trees,
+rejects the same directory, requires disjoint run/image/container/database/
+PGDATA/gbrain-home/bare-remote/Git identities, and requires equal repository,
+platform, lock, Dockerfile, base image, gbrain, corpus, PostgreSQL, extension,
+migration, and schema identities.
 
 ## Tier-1 pinned run
 

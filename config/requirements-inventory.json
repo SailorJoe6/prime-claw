@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "prime-claw",
-  "phase": "1 — de-risk gate",
+  "phase": "1 \u2014 de-risk gate",
   "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
   "requirements": [
     {
@@ -837,7 +837,7 @@
       "priority": "NICE",
       "phase": 2,
       "slice": 6,
-      "summary": "Host exposure of sandboxed Postgres on localhost:5433 — documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
+      "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
       "status": "documented (Slice 6; no host forward by design)",
       "proven_by": {
         "check": [
@@ -1135,7 +1135,7 @@
       "id": "R-T1-1",
       "priority": "P1",
       "summary": "Tier-1 slim test container image + standalone driver: docker/test.Dockerfile (Ubuntu 24.04 + Node 22 + python3/pytest), scripts/test-tier1.sh builds the image and runs one ephemeral container; --smoke, --dry-run (never contacts Docker), --rebuild; informational paths are Docker-free.",
-      "status": "met (slice 1, EXPERT PASS on 2666843 ≡ b2f6b86)",
+      "status": "met (slice 1, EXPERT PASS on 2666843 \u2261 b2f6b86)",
       "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
       "proven_by": {
         "apply": [
@@ -1285,7 +1285,7 @@
       "id": "R-TEST-1",
       "priority": "GATE",
       "summary": "Environment-dependent tier-1 behavior runs in one disposable exact-image container with descriptor-bound repository capture/cleanup and only a fresh scratch share writable.",
-      "status": "proven for owner-accepted Slice-1 pinned tier 1; published Slice-2 candidate f0441325 owner-rejected for cleanup/receipt correction; replacement and later tiers pending",
+      "status": "proven for owner-accepted Slice 1 and Slice 2 tier-1 boundaries; Slice-3 disposable integration tier implemented with owner acceptance pending",
       "plan": ".ralph/plans/SPECIFICATION.md",
       "proven_by": {
         "apply": [
@@ -1304,86 +1304,168 @@
         ]
       },
       "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
+    },
+    {
+      "id": "R-TEST-2",
+      "priority": "GATE",
+      "summary": "Tests use the lowest sufficient static, unit-env, integration, or lifecycle tier; Slice 3 registers a non-default integration body without widening plain host pytest.",
+      "status": "tier 0/tier 1 preserved and tier 2 integration registered; remaining environment-body moves and lifecycle taxonomy pending later slices",
+      "plan": ".ralph/plans/SPECIFICATION.md",
+      "proven_by": {
+        "apply": [
+          "pytest.ini",
+          "tests/conftest.py"
+        ],
+        "check": [
+          "docs/testing-strategy.md"
+        ],
+        "validate": [
+          "scripts/test-integration.sh"
+        ],
+        "tests": [
+          "tests/test_integration_tier.py"
+        ]
+      },
+      "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
+    },
+    {
+      "id": "R-TEST-3",
+      "priority": "GATE",
+      "summary": "Tier 2 provides a credential-free plain-Docker PostgreSQL 16, pgvector, exact-gbrain environment with fixture-owned database, home, corpus, and local bare remote.",
+      "status": "implemented and empirically green on native linux/arm64; owner acceptance pending",
+      "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 3)",
+      "proven_by": {
+        "apply": [
+          "scripts/test-integration.sh",
+          "scripts/testing/integration_driver.py"
+        ],
+        "check": [
+          "docker/test-integration.Dockerfile",
+          "config/test-artifacts.lock.json"
+        ],
+        "validate": [
+          "tests/integration/environment_body.py",
+          "scripts/testing/integration_provenance.py",
+          "docs/testing-strategy.md"
+        ],
+        "tests": [
+          "tests/test_integration_tier.py"
+        ]
+      },
+      "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
+    },
+    {
+      "id": "R-TEST-4",
+      "priority": "GATE",
+      "summary": "The integration assertion container receives no Docker/OpenShell socket or host-control broker; host launcher behavior is covered through pure recording fakes.",
+      "status": "implemented for Slice 3; later real lifecycle observer remains pending",
+      "plan": ".ralph/plans/SPECIFICATION.md",
+      "proven_by": {
+        "apply": [
+          "scripts/testing/integration_driver.py"
+        ],
+        "check": [
+          "scripts/testing/integration_provenance.py"
+        ],
+        "validate": [
+          "docs/testing-strategy.md"
+        ],
+        "tests": [
+          "tests/test_integration_tier.py"
+        ]
+      },
+      "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
     },
     {
       "id": "R-TEST-5",
       "priority": "GATE",
       "summary": "Tier-1 launchers use exact iidfile/cidfile identities, child-mask-preserving bounded process groups, typed target/controller signal outcomes, and exception-safe exact-ID cleanup/publication.",
-      "status": "proven for owner-accepted Slice-1 pinned tier 1; Slice-2 builder absence/share cleanup repaired with owner acceptance pending",
+      "status": "proven for owner-accepted tier 1 and Slice-3 exact iid/cid image/container lifecycle with owner acceptance pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh",
-          "tests/conftest.py"
+          "tests/conftest.py",
+          "scripts/test-integration.sh"
         ],
         "check": [
-          "scripts/testing/provenance.py"
+          "scripts/testing/provenance.py",
+          "scripts/testing/integration_provenance.py"
         ],
         "validate": [
           "docs/testing-strategy.md"
         ],
         "tests": [
           "tests/test_tier1_driver.py",
-          "tests/test_tier1_fixture.py"
+          "tests/test_tier1_fixture.py",
+          "tests/test_integration_tier.py"
         ]
       },
-      "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
+      "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
     },
     {
       "id": "R-TEST-6",
       "priority": "GATE",
       "summary": "Pinned tier-1 runs validate image/artifact metadata before named writes, redact arbitrary teardown output, and emit truthful schema-v2 terminal manifests with captured v2 identities.",
-      "status": "proven for owner-accepted Slice-1 pinned tier 1; later provenance components pending",
+      "status": "proven for owner-accepted tier 1; Slice-3 gbrain/platform/fixture/integration manifest cross-binding implemented with owner acceptance pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
-          "scripts/testing/provenance.py"
+          "scripts/testing/provenance.py",
+          "scripts/test-integration.sh"
         ],
         "check": [
-          "docs/testing-strategy.md"
+          "docs/testing-strategy.md",
+          "scripts/testing/integration_provenance.py"
         ],
         "validate": [
           "scripts/test-tier1.sh",
-          "tests/conftest.py"
+          "tests/conftest.py",
+          "docs/testing-strategy.md"
         ],
         "tests": [
           "tests/test_testing_provenance.py",
           "tests/test_tier1_driver.py",
-          "tests/test_tier1_fixture.py"
+          "tests/test_tier1_fixture.py",
+          "tests/test_integration_tier.py"
         ]
       },
-      "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
+      "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
     },
     {
       "id": "R-TEST-7",
       "priority": "GATE",
       "summary": "Tier-1 mounts only a descriptor-secured repository snapshot read-only plus a fresh scratch share writable; durable evidence, host home, sockets, credentials, and arbitrary checkouts are never mounted.",
-      "status": "proven for owner-accepted Slice-1 pinned tier 1; Slice-2 source cleanup replacement owner acceptance and tier 2 pending",
+      "status": "proven for owner-accepted tier 1; Slice-3 repository:ro plus results:rw offline boundary implemented with owner acceptance pending",
       "plan": ".ralph/plans/SPECIFICATION.md",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh",
           "tests/conftest.py",
-          "scripts/testing/bounded.py"
+          "scripts/testing/bounded.py",
+          "scripts/test-integration.sh"
         ],
         "check": [
-          "docs/testing-strategy.md"
+          "docs/testing-strategy.md",
+          "scripts/testing/integration_provenance.py"
         ],
         "validate": [
-          "scripts/testing/provenance.py"
+          "scripts/testing/provenance.py",
+          "docs/testing-strategy.md"
         ],
         "tests": [
           "tests/test_tier1_driver.py",
-          "tests/test_tier1_fixture.py"
+          "tests/test_tier1_fixture.py",
+          "tests/test_integration_tier.py"
         ]
       },
-      "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
+      "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
     },
     {
       "id": "R-TEST-8",
       "priority": "GATE",
       "summary": "Prime Agent source mode reads the selected checkout only through a read-only builder mount, copies selected tracked/dirty/untracked inputs to container-local storage, builds and packs there, exports only a strict hashed release, and requires complete before/after checkout inventory equality.",
-      "status": "B3 installed-generation proof corroborated; published candidate f0441325 owner-rejected for ordinary-nonzero cleanup and typed-receipt finalization; replacement pending",
+      "status": "owner-accepted at Slice-2 commit 56afd99d3a4b5411eb37fb42210ffb36c8bf2b84; preserved by Slice 3",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slices 1-2)",
       "proven_by": {
         "apply": [
@@ -1416,28 +1498,32 @@
       "id": "R-TEST-10",
       "priority": "GATE",
       "summary": "Slice-1 safety has producer-specific negative/replay tests for path/special-file swaps, framed identity, pre-write sanitization/redaction, signal masks/death/publication, every standalone failure/timeout phase, stale evidence, and concurrent allocation.",
-      "status": "proven for owner-accepted Slice-1 components; Slice-2 replacement owner acceptance and later component failures pending",
+      "status": "proven for owner-accepted Slice-1/Slice-2 components; Slice-3 identity, drift, absence, cleanup, and two-run negative coverage implemented with owner acceptance pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
-          "scripts/testing/provenance.py"
+          "scripts/testing/provenance.py",
+          "scripts/test-integration.sh"
         ],
         "check": [
-          "docs/testing-strategy.md"
+          "docs/testing-strategy.md",
+          "scripts/testing/integration_provenance.py"
         ],
         "validate": [
           "scripts/test-tier1.sh",
-          "tests/conftest.py"
+          "tests/conftest.py",
+          "docs/testing-strategy.md"
         ],
         "tests": [
           "tests/test_testing_provenance.py",
           "tests/test_tier1_driver.py",
           "tests/test_tier1_launch_error.py",
           "tests/test_tier1_network_policy.py",
-          "tests/test_tier1_fixture.py"
+          "tests/test_tier1_fixture.py",
+          "tests/test_integration_tier.py"
         ]
       },
-      "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
+      "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
     }
   ],
   "phase2": {}

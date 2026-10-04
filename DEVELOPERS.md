@@ -37,13 +37,14 @@ openclaw-setup:
 
 ## Testing
 
-Tests are organized into three tiers (see `.ralph/plans/archive/plugin-test-container/SPECIFICATION.md`
-"Test tiers"). Tier assignment is by **pytest marker** (`pytest.ini`):
-unmarked tests are tier 0, `container` tests are tier 1, `sandbox` tests
-are tier 2. `tests/conftest.py` auto-marks any test that requests the
-`tier1_container`/`ctmp` fixtures as `container`, and skips tier-1/tier-2
-tests unless an explicit `-m` mark expression selects them — so the plain
-command is always the tier-0 default with no Docker dependency:
+Tests use the isolation tiers in `.ralph/plans/SPECIFICATION.md`. Tier
+assignment is by **pytest marker** (`pytest.ini`): unmarked tests are tier 0,
+`container` tests are tier 1, and the explicit non-default integration body is
+tier 2. The older `sandbox` marker remains explicit until the later taxonomy
+slice moves lifecycle tests. `tests/conftest.py` auto-marks any test that
+requests the `tier1_container`/`ctmp` fixtures as `container` and skips every
+environment marker unless it is selected. The plain command is therefore
+always the tier-0 default with no Docker dependency:
 
 ```bash
 python3 -m pytest tests/ -q          # tier 0 (host, no environment)
@@ -111,19 +112,43 @@ only. Do not apply, check, or probe a candidate against the host user-global
   tears down an
   exact recovered cidfile identity; malformed identities never reach removal. See
   [docs/testing-strategy.md](docs/testing-strategy.md).
-- **Tier 2 — host, OpenShell.** `tests/test_runtime_*.py` orchestrate
-  sandboxes from the host and stay outside any container. They run only
-  on explicit request:
+- **Tier 2 — disposable brain-stack integration.**
+  `scripts/test-integration.sh` prepares the exact locked upstream gbrain
+  archive and Bun artifact, builds native `linux/arm64` or `linux/amd64`, and
+  runs PostgreSQL 16 + pgvector + gbrain as an unprivileged user. The assertion
+  container starts with `--network none`, publishes no port, receives no
+  credential or host home, and mounts only a run-owned repository snapshot
+  read-only plus one result share read/write. Database, PGDATA, gbrain home,
+  corpus worktree, and local bare Git remote live only inside the container.
 
   ```bash
-  python3 -m pytest tests/ -q -m sandbox     # tier 2 (explicit only)
+  scripts/test-integration.sh --dry-run
+  scripts/test-integration.sh
+  # optional transport cache; its working tree is never copied
+  INTEGRATION_GBRAIN_MIRROR=/absolute/path/to/gbrain scripts/test-integration.sh
   ```
+
+  The explicit body is `tests/integration/environment_body.py`. Its filename is
+  intentionally not pytest-collectable, and direct host invocation fails before
+  side effects. The launcher captures exact iid/cid identities, verifies tags,
+  normalized local digests, immutable base lineage, labels, mounts, environment,
+  ports, network mode, and runtime hashes, then removes only positively owned
+  objects. A nonzero removal stays non-clean even after absence. Deferred
+  TERM/INT/HUP cannot bypass exact cleanup. The terminal manifest records clean
+  preparation, container, image, context, snapshot, and share teardown. Compare
+  two passed, independently verified evidence trees with
+  `python3 -m scripts.testing.integration_provenance compare-runs <first> <second>`.
+
+- **Legacy explicit sandbox suite.** `python3 -m pytest tests/ -q -m sandbox`
+  remains host-orchestrated and outside default runs. Slice 4 owns its taxonomy
+  change; Slice 3 does not widen or run it.
 
 ### Whole-suite sequencer
 
 ```bash
-scripts/test-all.sh                    # tier 0 + tier 1 (fail-fast)
-scripts/test-all.sh --with-sandbox     # + tier 2
+scripts/test-all.sh                    # current tier 0 + tier 1 (fail-fast)
+scripts/test-all.sh --with-sandbox     # current legacy explicit sandbox suite
+scripts/test-integration.sh            # new standalone tier 2
 ```
 
 The sequencer is deliberately dumb: it runs each tier with plain pytest,
