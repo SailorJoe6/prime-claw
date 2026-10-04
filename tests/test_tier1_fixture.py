@@ -19,6 +19,51 @@ def build_image(tier, snapshot):
     with conftest.provenance.open_owned_directory(tier, binding) as owned:
         return conftest._build_tier1_image(owned, tier, snapshot)
 
+
+def source_builder_receipt(state="unknown", clean=False):
+    remove = "clean" if state in {"absent", "present"} else "ordinary_nonzero"
+    inspect = "ordinary_nonzero" if state in {"absent", "unknown"} else "clean"
+    inventory = {
+        "content_sha256": "1" * 64, "entry_count": 1,
+        "kind_counts": {"file": 1},
+        "content_hash_contract": "framed-sha256-checkout-v1",
+    }
+    source = {
+        "head": "b" * 40, "dirty": True, "status_sha256": "a" * 64,
+        "content_sha256": "c" * 64, "entry_count": 1,
+        "content_hash_contract": "framed-sha256-v2",
+    }
+    return {
+        "schema_version": 1, "status": "failed",
+        "started_at": "2026-10-04T00:00:00Z",
+        "finished_at": "2026-10-04T00:00:01Z",
+        "failure_codes": ["builder-failed"], "source": source,
+        "source_rules": {
+            "include": "git-cached-plus-nonignored-untracked-v1",
+            "exclude": "git-standard-ignored-and-dotgit-v1",
+        },
+        "checkout_inventory_before": inventory,
+        "checkout_inventory_after": inventory,
+        "builder_image": {
+            "id": IMAGE_ID, "repo_digests": [],
+            "dockerfile": "docker/test-prime-agent-builder.Dockerfile",
+            "dockerfile_sha256": "d" * 64,
+            "declared_input_sha256": "e" * 64,
+            "declared_input_hash_contract": "framed-sha256-v2",
+            "informational_tag": "prime-claw-test-prime-agent-builder:eeeeeeeeeeee",
+            "os": "linux", "architecture": "arm64",
+            "build_started_at": "2026-10-04T00:00:00Z",
+            "build_finished_at": "2026-10-04T00:00:01Z",
+        },
+        "builder_teardown": {
+            "container_id": CID, "state": state,
+            "remove_outcome": remove, "inspect_outcome": inspect,
+            "clean": clean, "verified_at": "2026-10-04T00:00:01Z",
+        },
+        "release": None,
+    }
+
+
 class TestSelectionFailClose(unittest.TestCase):
     def test_source_selector_is_lexically_validated_without_checkout_stat(self):
         with tempfile.TemporaryDirectory() as td:
@@ -256,6 +301,90 @@ class TestSessionTeardown(unittest.TestCase):
                                          propagate_signal=False)
         self.assertEqual(result.outcome,"interrupted")
         self.assertEqual(conftest._DEFERRED_SIGNAL,signal.SIGTERM)
+
+class TestSourceBuilderShareOwnership(unittest.TestCase):
+    def _run_failed_builder(self, scenario):
+        temporary = tempfile.TemporaryDirectory()
+        root = Path(temporary.name).resolve()
+        results = root / "results"
+        source = root / "source"; source.mkdir()
+        envf = root / "source.env"
+        envf.write_text(f"PRIME_AGENT_SOURCE={source}\n")
+        unrelated = root / "unrelated"; unrelated.write_text("keep")
+        repository = {
+            "head": "b" * 40, "dirty": False,
+            "status_sha256": "a" * 64, "content_sha256": "c" * 64,
+            "entry_count": 1, "content_hash_contract": "framed-sha256-v2",
+        }
+
+        def stage(_repo, destination):
+            Path(destination).mkdir(parents=True)
+            return repository
+
+        def failed_builder(_source, tier_cap, _tier_dir, _tier_binding,
+                           share, _share_binding, _snapshot):
+            (share / "source-release").mkdir()
+            (share / "source-release" / "sentinel").write_text("builder-evidence")
+            if scenario == "invalid":
+                conftest.provenance.write_sanitized_json(
+                    tier_cap, "source-build.json", {"status": "failed"})
+            elif scenario != "missing":
+                state = scenario if scenario in {"present", "unknown"} else "absent"
+                conftest.provenance.write_sanitized_json(
+                    tier_cap, "source-build.json",
+                    source_builder_receipt(state=state, clean=scenario == "clean"))
+            raise RuntimeError("controlled source builder failure")
+
+        def host(args, **_kwargs):
+            if args == ["docker", "info"]:
+                return cp(args)
+            raise AssertionError(f"runtime Docker must not start: {args}")
+
+        patches = [
+            mock.patch.dict(os.environ, {"TIER1_ENV_FILE": str(envf)}),
+            mock.patch.object(conftest, "RESULTS", results),
+            mock.patch.object(conftest.shutil, "which", return_value="/fake/docker"),
+            mock.patch.object(conftest, "_host_command", side_effect=host),
+            mock.patch.object(conftest.provenance, "stage_repository_snapshot",
+                              side_effect=stage),
+            mock.patch.object(conftest, "_build_source_release",
+                              side_effect=failed_builder),
+            mock.patch.object(conftest, "_build_tier1_image",
+                              side_effect=AssertionError("runtime image built")),
+        ]
+        for patcher in patches:
+            patcher.start()
+        try:
+            generator = conftest.tier1_container.__wrapped__(SimpleNamespace())
+            with self.assertRaisesRegex(RuntimeError, "controlled source builder"):
+                next(generator)
+        finally:
+            for patcher in reversed(patches):
+                patcher.stop()
+        tier = next(results.glob("*/tier1"))
+        manifests = list(tier.glob("manifest.json"))
+        if manifests:
+            self.assertEqual(json.loads(manifests[0].read_text())["run"]["status"],
+                             "failed")
+        self.assertEqual(unrelated.read_text(), "keep")
+        return temporary, tier
+
+    def test_public_fixture_retains_share_for_uncertain_builder_receipts(self):
+        for scenario in ("present", "unknown", "missing", "invalid"):
+            with self.subTest(scenario=scenario):
+                temporary, tier = self._run_failed_builder(scenario)
+                with temporary:
+                    share = tier / "share"
+                    self.assertTrue(share.is_dir())
+                    self.assertEqual(
+                        (share / "source-release" / "sentinel").read_text(),
+                        "builder-evidence")
+
+    def test_public_fixture_deletes_share_after_clean_builder_and_no_runtime(self):
+        temporary, tier = self._run_failed_builder("clean")
+        with temporary:
+            self.assertFalse((tier / "share").exists())
+
 
 class TestFixtureEndToEnd(unittest.TestCase):
     def _assert_valid_partial_cid_is_recovered(self, *, timeout):

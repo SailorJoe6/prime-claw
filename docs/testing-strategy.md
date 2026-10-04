@@ -114,15 +114,20 @@ separate disposable preparation container:
    `release:pack` operate only on that local copy. Output is restricted to the
    four release tarballs, `SHA256SUMS`, `stable`, `latest.json`, and a manifest
    published last.
-6. The host removes and inspects only the captured builder CID, recomputes the
-   complete checkout inventory, and requires exact before/after equality.
-   Failure, interruption, invalid identities, unknown teardown, missing/extra
-   artifacts, special files, stale output, or any hash mismatch cannot green.
-7. The tier-1 runtime mounts only the validated artifact directory read-only.
-   It rehashes the expected `SHA256SUMS`, verifies every tarball, installs the
-   local package during preparation, removes the network, records installed
-   package metadata and executable identity, and then performs apply/check/probe
-   or pytest bodies offline. The source checkout is never mounted into runtime.
+6. The host removes and inspects only the captured builder CID. Absence is
+   established only by an allow-listed Docker `no such container/object`
+   diagnostic. Daemon, permission, transport, malformed or non-UTF8, timeout,
+   signal, launch, present, and unknown results remain unknown and non-clean.
+   The complete checkout inventory must remain exactly equal before/after.
+7. Builder and runtime share ownership are tracked independently. The writable
+   share is deleted only after every possible owner is positively clean and
+   absent; a missing, unreadable, invalid, present, or unknown builder receipt
+   preserves it and keeps the run red. The runtime mounts the run-owned scratch
+   share read/write for ordinary results and separately exposes the validated
+   artifact subtree read-only at `/stage`; installation rehashes and reads only
+   `/stage`. It then removes the network, records installed package metadata and
+   executable identity, and performs apply/check/probe or pytest bodies offline.
+   The source checkout is never mounted into runtime.
 
 Both `scripts/test-tier1.sh` and `tests/conftest.py` invoke only
 `scripts/build-prime-agent-test-release.sh`; no fallback host build or old
@@ -145,6 +150,12 @@ fail-closed rather than restore host mutation.
 - verified network-removal time plus teardown presence, remove outcome, inspect
   outcome, and clean boolean; and
 - SHA-256 for every other regular evidence file below the tier directory.
+
+On a dirty source run, `repository.head` names only the base commit and
+`repository.content_sha256` binds the tested snapshot. Evidence may call a run
+an exact-candidate execution only when it records a clean exact HEAD or retains
+an independently reviewable tested-generation path/hash inventory whose digest
+is verified against the candidate and before/after every cited run.
 
 The manifest excludes itself and the optional scratch `share/` from its evidence inventory. Validation rejects an
 unsupported schema, malformed hashes, incomplete or contradictory source lineage, unsafe paths, common
@@ -182,7 +193,8 @@ and package repositories are external inputs.
     tests/test_tier1_launch_error.py \
     tests/test_tier1_network_policy.py \
     tests/test_tier1_fixture.py \
-    tests/test_tier1_image.py -q
+    tests/test_tier1_image.py \
+    tests/test_source_builder_real_install.py -q
   ```
 - Run source mode with an ignored selector file:
 
@@ -190,3 +202,9 @@ and package repositories are external inputs.
   TIER1_ENV_FILE=/path/to/source.env scripts/test-tier1.sh --probe
   TIER1_ENV_FILE=/path/to/source.env python3 -m pytest tests/ -q -m container
   ```
+
+  The source-selected container gate includes the disposable two-generation
+  real-install proof. It installs and invokes generation A and then dirty
+  generation B at the same version/path, with a stale A artifact present, and
+  retains `source-generations/two-generation-summary.json` under the selected
+  results root.

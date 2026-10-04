@@ -13,6 +13,41 @@
 > candidate and stop. Do not start later slices or touch upstream Prime Agent,
 > live/global credentials, or live services.
 
+> **SLICE 2 OWNER DISPOSITION — REVISE `c0ebdc4` (2026-10-04).** Exact
+> candidate `c0ebdc4d497ce142b22bf9aaea083ce0a6fa3a58`, tree
+> `662e0def18c757296a5ef25977ab0797c149cbfc`, is rejected for advancement.
+> Authoritative owner findings are in `prime-claw-5v7.1` and
+> `/Users/jlanders/.prime/agent/session-artifacts/01a0fe2e-e0dd-7638-9b4c-0b118182c6e3/slice2-c0ebdc4-owner-disposition.md`
+> (SHA-256 `4f2ccdf200588fb11897dc325a2d1c03e880d0a712d50a5da00adc94855f9de0`),
+> reconciled with Astra/max report
+> `/Users/jlanders/.prime/agent/session-artifacts/01a10795-fe90-756d-820c-8db714670af5/slice2-c0ebdc4-owner-review.md`
+> (SHA-256 `b1ad6b25ec327aeceebf4c06052cf494e89b563b753cf6ee7e276f16aef125a8`).
+> The next execute pass repairs Slice 2 only:
+>
+> 1. Builder absence is proven only by explicit allow-listed Docker not-found
+>    diagnostics. Daemon, permission, transport, malformed/non-UTF8, timeout,
+>    signal, launch, present, and unknown results remain typed unknown/non-clean.
+> 2. Both public consumers track builder ownership separately from runtime
+>    ownership. The writable share is preserved unless every possible builder
+>    and runtime owner is positively clean and absent; missing, unreadable, or
+>    invalid receipts preserve evidence and keep the run red. Add through-public
+>    positive deletion and negative retention regressions.
+> 3. Add a disposable real-installable two-generation dirty fixture through the
+>    canonical producer/consumer boundary. Install and invoke both artifacts to
+>    prove changed behavior, distinct source/release/artifact identities, no
+>    stale replay, and unchanged input inventories without operator/upstream
+>    mutation.
+> 4. Correct Docker lineage claims: retained Docker runs bind their recorded
+>    dirty base snapshots, not exact `c0ebdc4` execution. Retain a reviewable
+>    tested-generation binding for the repair. Correct the stale npm-ci failure
+>    claim or add its regression; include network-policy/launch-error files in
+>    reproduction; refresh `.env.example`, plan receipt, and inherited inventory
+>    acceptance wording.
+>
+> The RW scratch alias remains optional hardening. Do not broaden prerelease
+> behavior. Revalidate sequentially, update docs/inventory/evidence/Bead,
+> publish one new exact candidate, and stop. Slice 3 and Phase 3a remain closed.
+
 > **Status:** ACTIVE episode. Slice 1 is accepted and closed. The sole active
 > vertical slice is Slice 2 / `prime-claw-5v7.1`; later slices remain unstarted.
 > External prerequisites
@@ -369,27 +404,29 @@ writing any byte, type, mode, or link in the selected checkout.
 
 ### Implementation receipt
 
-- **Candidate implementation:** canonical shell-to-Python builder, minimal
-  builder Dockerfile/payload, complete checkout inventory, strict release
-  validation, source provenance, and both consumers are implemented in the
-  current uncommitted generation. Slice-1 boundaries remain intact.
-- **Hermetic gates:** focused repair **17 passed**; broader source/provenance/
-  driver/fixture/image gate **162 passed + 92 subtests** before live validation.
-- **Live proof:** the first source probe is retained red because CLI-based
-  installed-version discovery was unparseable after an otherwise successful
-  isolated build/install. The bounded repair uses installed package metadata in
-  source mode. Corrected source probe `20261003T232815Z-32114-a77fb9ec` passed
-  in 101s; builder interval 67s; complete 34,038-entry checkout inventory was
-  byte/type/mode/link identical; builder/runtime exact-ID teardown and runtime
-  network absence were green.
-- **Final review repair validated:** unconditional failed-entry exchange covers
-  initial publication and failed-replacement exceptions; affected gate **168
-  passed + 92 subtests**. Exact host **348 passed, 147 skipped, 92 subtests**;
-  source **40 passed, 455 deselected**. After operator Xcode-license acceptance,
-  authoritative `/usr/bin/git` checks and pinned **40 passed, 455 deselected**;
-  the earlier substituted-Git retry is non-authoritative. Remaining gates are a
-  fresh exact-files PASS, exactly one commit/push, and remote-equality/Bead
-  receipt. Stop after Slice 2; do not begin Slice 3 or Phase 3a.
+- **Owner-rejected base:** candidate
+  `c0ebdc4d497ce142b22bf9aaea083ce0a6fa3a58`, tree
+  `662e0def18c757296a5ef25977ab0797c149cbfc`, was committed and pushed, then
+  rejected for B1–B3. It is the revision base, not accepted evidence.
+- **Historical gates only:** the retained host/source/pinned results listed in
+  the evidence document support the old generation. The source and pinned
+  Docker manifests record dirty base HEAD `4cca098…` with content hashes
+  `911bd361…` and `e3252015…`; they are not exact-`c0ebdc4` executions.
+- **Active bounded repair:** builder absence now requires an exact allow-listed
+  Docker not-found response; both consumers hold independent builder/runtime
+  ownership and retain the writable share on any uncertain receipt or owner;
+  deterministic public retention/deletion regressions are present. The
+  disposable two-generation fixture builds real installable packages through
+  the canonical producer/public fixture consumer and proves behavior A then B,
+  distinct source/release/artifact/executable identities, no replay of stale A,
+  and equal before/after input inventories. Its focused real run passed once in
+  29.04s; durable final-gate evidence remains pending.
+- **Terminal gate contract:** the replacement is reviewable only after
+  sequential affected/host validation, a clean local candidate commit, exact-
+  commit source and pinned Docker manifests, and a fresh exact-files independent
+  PASS. The Bead records the terminal run IDs, commit/tree, one push, remote
+  equality, and owner-pending disposition so this tracked receipt needs no
+  post-validation edit. Stop before Slice 3 or Phase 3a.
 
 ### Rollback
 

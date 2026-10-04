@@ -265,6 +265,30 @@ def _attest_builder_mounts(container_id: str) -> None:
         raise BuilderError("builder mount isolation contract is not satisfied")
 
 
+def _explicit_container_not_found(result: Any, container_id: str) -> bool:
+    """Accept only Docker's exact allow-listed not-found diagnostic."""
+    if result.outcome != "exited" or result.returncode == 0:
+        return False
+    stdout = result.stdout if isinstance(result.stdout, bytes) else str(
+        result.stdout or "").encode("utf-8")
+    stderr = result.stderr if isinstance(result.stderr, bytes) else str(
+        result.stderr or "").encode("utf-8")
+    try:
+        stdout_text = stdout.decode("utf-8", "strict").strip()
+        stderr_text = stderr.decode("utf-8", "strict").strip()
+    except UnicodeDecodeError:
+        return False
+    # Docker inspect writes an empty JSON array to stdout for a missing
+    # object on some releases; no other stdout is accepted.
+    if (stdout_text not in {"", "[]"} or not stderr_text
+            or "\n" in stderr_text or "\r" in stderr_text):
+        return False
+    expected = re.escape(container_id)
+    return bool(re.fullmatch(
+        rf"(?:Error: No such object|Error response from daemon: No such container): {expected}",
+        stderr_text, flags=re.IGNORECASE))
+
+
 def _remove_container(container_id: str) -> dict[str, Any]:
     removed = _run(["docker", "rm", "-f", container_id], timeout=60)
     remove_outcome = ("clean" if removed.outcome == "exited"
@@ -272,16 +296,21 @@ def _remove_container(container_id: str) -> dict[str, Any]:
                       "ordinary_nonzero" if removed.outcome == "exited" else
                       removed.outcome)
     inspected = _run(["docker", "inspect", container_id], timeout=30)
-    if inspected.outcome == "exited" and inspected.returncode != 0:
-        state = "absent"
-        inspect_outcome = "ordinary_nonzero"
-    elif inspected.outcome == "exited" and inspected.returncode == 0:
+    if inspected.outcome == "exited" and inspected.returncode == 0:
         state = "present"
         inspect_outcome = "clean"
+    elif _explicit_container_not_found(inspected, container_id):
+        state = "absent"
+        inspect_outcome = "ordinary_nonzero"
+    elif inspected.outcome == "exited":
+        state = "unknown"
+        inspect_outcome = "ordinary_nonzero"
     else:
         state = "unknown"
         inspect_outcome = inspected.outcome
-    clean = (state == "absent" and remove_outcome in {"clean", "ordinary_nonzero"})
+    clean = (state == "absent"
+             and remove_outcome in {"clean", "ordinary_nonzero"}
+             and inspect_outcome == "ordinary_nonzero")
     return {"container_id": container_id, "state": state,
             "remove_outcome": remove_outcome,
             "inspect_outcome": inspect_outcome, "clean": clean,

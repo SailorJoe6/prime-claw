@@ -50,7 +50,7 @@ WORKSPACE = "/workspace"
 CONTAINER_PLUGIN_ROOT = "/root/.prime/agent"
 IMAGE_REPO = "prime-claw-test-tier1"
 DOCKERFILE = "docker/test.Dockerfile"
-RESULTS = REPO / ".test-results"
+RESULTS = Path(os.environ.get("TIER1_RESULTS_ROOT") or REPO / ".test-results").resolve()
 ENV_FILE = REPO / ".env"
 HOST_KILL_GRACE = 5.0
 _DEFERRED_SIGNAL = None
@@ -180,8 +180,14 @@ def _build_source_release(source: str, tier_cap: provenance.OwnedDirectory,
             "tier-1 fixture: disposable source builder failed "
             f"(outcome={result.outcome}, rc={result.returncode})")
     receipt = provenance.read_sanitized_json(tier_cap, "source-build.json")
+    try:
+        teardown = provenance.source_builder_share_teardown(receipt)
+    except provenance.ProvenanceError as exc:
+        raise RuntimeError(
+            "tier-1 fixture: validated source builder receipt unavailable") from exc
     release = receipt.get("release") if isinstance(receipt, dict) else None
-    if receipt.get("status") != "passed" or not isinstance(release, dict):
+    if (receipt.get("status") != "passed" or not isinstance(release, dict)
+            or teardown["state"] != "absent" or not teardown["clean"]):
         raise RuntimeError("tier-1 fixture: validated source builder receipt unavailable")
     version = release.get("package_version")
     if not isinstance(version, str) or not re.fullmatch(
@@ -560,6 +566,22 @@ class TeardownError(RuntimeError):
         self.state = result.state
 
 
+def _read_source_builder_teardown(
+        tier_cap: provenance.OwnedDirectory) -> TeardownResult:
+    """Return typed builder share ownership; invalid receipts stay unknown."""
+    try:
+        receipt = provenance.read_sanitized_json(tier_cap, "source-build.json")
+        value = provenance.source_builder_share_teardown(receipt)
+    except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError,
+            provenance.ProvenanceError):
+        return TeardownResult(
+            "unknown", "identity_refused", "not_run", False,
+            "source builder receipt unavailable or invalid")
+    return TeardownResult(
+        value["state"], value["remove_outcome"], value["inspect_outcome"],
+        value["clean"], "source builder receipt validated")
+
+
 def _output_bytes(value) -> bytes:
     if value is None:
         return b""
@@ -615,8 +637,9 @@ def _remove_session_container(container_id: str, *,
 def _finalize_session(container_id, share: Path, in_flight=None,
                       share_binding: str | None = None,
                       quarantine_parent: Path | None = None,
-                      quarantine_binding: str | None = None) -> TeardownResult:
-    """Verify exact-container absence and remove only the bound owned share."""
+                      quarantine_binding: str | None = None,
+                      builder_teardown: TeardownResult | None = None) -> TeardownResult:
+    """Remove a bound share only after every possible owner is clean/absent."""
     teardown_error = None
     if container_id is None:
         result = TeardownResult("absent", "not_needed", "not_needed", True)
@@ -627,8 +650,11 @@ def _finalize_session(container_id, share: Path, in_flight=None,
             teardown_error = exc
             result = exc.result
             print(f"tier-1 fixture: {exc}")
+    runtime_released = result.clean and result.state == "absent"
+    builder_released = (builder_teardown is None or (
+        builder_teardown.clean and builder_teardown.state == "absent"))
     if not os.environ.get("TIER1_KEEP_SHARE"):
-        if result.clean:
+        if runtime_released and builder_released:
             try:
                 binding = share_binding or provenance.owned_directory_binding(share)
                 provenance.remove_owned_directory(
@@ -645,8 +671,9 @@ def _finalize_session(container_id, share: Path, in_flight=None,
                     "tier-1 fixture: TEARDOWN FAILED — owned share binding "
                     "changed; refusing cleanup") from exc
         else:
-            print(f"tier-1 fixture: session container may still own the "
-                  f"share — preserving evidence at {share}")
+            owner = "runtime" if not runtime_released else "source builder"
+            print(f"tier-1 fixture: {owner} may still own the share — "
+                  f"preserving evidence at {share}")
     else:
         print(f"tier-1 fixture: TIER1_KEEP_SHARE set — preserving {share}")
     if teardown_error is not None:
@@ -689,6 +716,10 @@ def tier1_container(request):
     image = None
     artifact = None
     source_build = None
+    builder_teardown_result = (
+        TeardownResult("unknown", "identity_refused", "not_run", False)
+        if mode == "source" else
+        TeardownResult("absent", "not_needed", "not_needed", True))
     install_version = value if mode == "pinned" else None
     network_time = None
     setup_error = None
@@ -740,6 +771,11 @@ def tier1_container(request):
             source_build = _build_source_release(
                 value, tier_cap, tier_dir, tier_binding,
                 share, share_binding, workspace_snapshot)
+            builder_teardown_result = _read_source_builder_teardown(tier_cap)
+            if (not builder_teardown_result.clean
+                    or builder_teardown_result.state != "absent"):
+                raise RuntimeError(
+                    "tier-1 fixture: source builder ownership is not released")
             install_version = source_build["release"]["package_version"]
             setup_lines.append("phase=source-builder-passed")
         print(f"tier-1 fixture: run={run_id}; build exact image")
@@ -862,6 +898,10 @@ def tier1_container(request):
                 failure_codes.append("teardown-command-failed")
             if teardown_result.state != "absent":
                 failure_codes.append("teardown-not-absent")
+            if mode == "source" and not builder_teardown_result.clean:
+                failure_codes.append("builder-teardown-command-failed")
+            if mode == "source" and builder_teardown_result.state != "absent":
+                failure_codes.append("builder-teardown-not-absent")
             if (artifact is not None
                     and artifact["version"] != install_version):
                 failure_codes.append("installed-version-mismatch")
@@ -872,8 +912,12 @@ def tier1_container(request):
                 isinstance(source_build, dict)
                 and source_build.get("status") == "passed"
                 and isinstance(source_build.get("release"), dict)))
+            builder_released = (mode != "source" or (
+                builder_teardown_result.clean
+                and builder_teardown_result.state == "absent"))
             passed = (not failure_codes and teardown_result.clean
                       and teardown_result.state == "absent"
+                      and builder_released
                       and image is not None and artifact is not None
                       and artifact["version"] == install_version
                       and network_time is not None and source_ready)
@@ -965,6 +1009,8 @@ def tier1_container(request):
             return failed
 
         try:
+            if mode == "source":
+                builder_teardown_result = _read_source_builder_teardown(tier_cap)
             if container_id is None and container_attempted:
                 try:
                     if cidfile.is_file():
@@ -984,7 +1030,9 @@ def tier1_container(request):
                 try:
                     teardown_result = _finalize_session(
                         container_id, share, setup_error, share_binding,
-                        tier_dir, tier_binding)
+                        tier_dir, tier_binding,
+                        builder_teardown=(builder_teardown_result
+                                          if mode == "source" else None))
                 except TeardownError as exc:
                     teardown_result = exc.result
                     add_secondary("teardown-command-failed", exc)

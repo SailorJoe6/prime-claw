@@ -205,6 +205,10 @@ class TestBuilderPayload(unittest.TestCase):
 
 class TestHostBuilderLifecycle(unittest.TestCase):
     def _run(self, *, builder_exit: int = 0,
+             inspect_outcome: str = "exited", inspect_rc: int = 1,
+             inspect_stdout: str | bytes = "",
+             inspect_stderr: str | bytes = f"Error: No such object: {CID}",
+             remove_outcome: str = "exited", remove_rc: int = 0,
              signal_during_validation: bool = False,
              signal_after_publication: bool = False,
              fail_after_publication: bool = False,
@@ -254,9 +258,14 @@ class TestHostBuilderLifecycle(unittest.TestCase):
                 return SimpleNamespace(outcome="exited", returncode=0,
                                        stdout=str(builder_exit) + "\n", stderr="")
             if argv[1:3] == ["rm", "-f"]:
-                return SimpleNamespace(outcome="exited", returncode=0, stdout="", stderr="")
+                return SimpleNamespace(outcome=remove_outcome,
+                                       returncode=remove_rc,
+                                       stdout="", stderr="")
             if argv[1] == "inspect":
-                return SimpleNamespace(outcome="exited", returncode=1, stdout="", stderr="absent")
+                return SimpleNamespace(outcome=inspect_outcome,
+                                       returncode=inspect_rc,
+                                       stdout=inspect_stdout,
+                                       stderr=inspect_stderr)
             raise AssertionError(argv)
 
         args = argparse.Namespace(
@@ -312,6 +321,73 @@ class TestHostBuilderLifecycle(unittest.TestCase):
             self.assertEqual(run[-1], IMAGE)
             self.assertIn(["docker", "rm", "-f", CID], calls)
             self.assertIn(["docker", "inspect", CID], calls)
+
+    def test_builder_absence_requires_exact_allowlisted_diagnostic(self):
+        for diagnostic, stdout in (
+                (f"Error: No such object: {CID}", ""),
+                (f"error: no such object: {CID}", "[]\n"),
+                (f"Error response from daemon: No such container: {CID}", "")):
+            with self.subTest(diagnostic=diagnostic, stdout=stdout):
+                temporary, _repo, _tier, calls, receipt, rc = self._run(
+                    inspect_stdout=stdout, inspect_stderr=diagnostic)
+                with temporary:
+                    self.assertEqual(rc, 0)
+                    self.assertEqual(receipt["status"], "passed")
+                    self.assertEqual(receipt["builder_teardown"]["state"], "absent")
+                    self.assertTrue(receipt["builder_teardown"]["clean"])
+                    self.assertEqual(
+                        [call for call in calls if call[1] in {"rm", "inspect"}
+                         and call[:3] != ["docker", "inspect", "--format"]][-2:],
+                        [["docker", "rm", "-f", CID],
+                         ["docker", "inspect", CID]])
+
+    def test_unknown_builder_inspection_never_greens_or_leaks_diagnostics(self):
+        cases = (
+            ("daemon", "exited", 1, "", "Cannot connect to the Docker daemon", "unknown", "ordinary_nonzero"),
+            ("permission", "exited", 1, "", "permission denied", "unknown", "ordinary_nonzero"),
+            ("unrecognized", "exited", 1, "", "absent", "unknown", "ordinary_nonzero"),
+            ("non_utf8", "exited", 1, b"", b"\xffno such object: " + CID.encode(), "unknown", "ordinary_nonzero"),
+            ("timed_out", "timed_out", 124, "", "", "unknown", "timed_out"),
+            ("signaled", "signaled", -15, "", "", "unknown", "signaled"),
+            ("launch_error", "launch_error", 127, "", "", "unknown", "launch_error"),
+            ("present", "exited", 0, "[{}]", "", "present", "clean"),
+        )
+        for name, outcome, rc_value, stdout, stderr, state, inspect_result in cases:
+            with self.subTest(case=name):
+                temporary, _repo, _tier, calls, receipt, rc = self._run(
+                    inspect_outcome=outcome, inspect_rc=rc_value,
+                    inspect_stdout=stdout, inspect_stderr=stderr)
+                with temporary:
+                    self.assertNotEqual(rc, 0)
+                    self.assertEqual(receipt["status"], "failed")
+                    self.assertIn("teardown-failed", receipt["failure_codes"])
+                    teardown = receipt["builder_teardown"]
+                    self.assertEqual(teardown["state"], state)
+                    self.assertEqual(teardown["inspect_outcome"], inspect_result)
+                    self.assertFalse(teardown["clean"])
+                    serialized = json.dumps(receipt, sort_keys=True)
+                    self.assertNotIn("Cannot connect", serialized)
+                    self.assertNotIn("permission denied", serialized)
+                    teardown_calls = [call for call in calls
+                                      if call[:3] == ["docker", "rm", "-f"]
+                                      or call[:2] == ["docker", "inspect"]
+                                      and call[:3] != ["docker", "inspect", "--format"]]
+                    self.assertEqual(teardown_calls[-2:], [
+                        ["docker", "rm", "-f", CID],
+                        ["docker", "inspect", CID]])
+
+    def test_remove_failure_stays_nonclean_even_when_inspect_proves_absence(self):
+        for outcome, rc_value in (("timed_out", 124), ("signaled", -15)):
+            with self.subTest(outcome=outcome):
+                temporary, _repo, _tier, _calls, receipt, rc = self._run(
+                    remove_outcome=outcome, remove_rc=rc_value)
+                with temporary:
+                    self.assertNotEqual(rc, 0)
+                    teardown = receipt["builder_teardown"]
+                    self.assertEqual(teardown["state"], "absent")
+                    self.assertEqual(teardown["remove_outcome"], outcome)
+                    self.assertFalse(teardown["clean"])
+                    self.assertEqual(receipt["status"], "failed")
 
     def test_nonzero_builder_cannot_green_or_skip_exact_cleanup(self):
         temporary, _repo, _tier, calls, receipt, rc = self._run(builder_exit=9)

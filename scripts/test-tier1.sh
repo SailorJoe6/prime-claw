@@ -356,6 +356,16 @@ TEARDOWN_REMOVE_OUTCOME=not_needed
 TEARDOWN_INSPECT_OUTCOME=not_needed
 TEARDOWN_CLEAN=1
 TEARDOWN_VERIFIED=""
+BUILDER_TEARDOWN_STATE=absent
+BUILDER_TEARDOWN_REMOVE_OUTCOME=not_needed
+BUILDER_TEARDOWN_INSPECT_OUTCOME=not_needed
+BUILDER_TEARDOWN_CLEAN=1
+if [ "$MODE" = source ]; then
+    BUILDER_TEARDOWN_STATE=unknown
+    BUILDER_TEARDOWN_REMOVE_OUTCOME=identity_refused
+    BUILDER_TEARDOWN_INSPECT_OUTCOME=not_run
+    BUILDER_TEARDOWN_CLEAN=0
+fi
 RUN_STATUS=failed
 FAILURE_CODES="primary-command-failed"
 MANIFEST_BINDING=""
@@ -450,6 +460,31 @@ finalize_manifest() {
       "$MANIFEST_BINDING"
 }
 
+capture_builder_receipt() {
+    [ "$MODE" = source ] || return 0
+    local row
+    row="$(cd "$REPO_ROOT" && python3 -c '
+from pathlib import Path
+from scripts.testing import provenance as p
+import sys
+with p.open_owned_directory(Path(sys.argv[1]), sys.argv[2]) as owned:
+    value = p.read_sanitized_json(owned, "source-build.json")
+    teardown = p.source_builder_share_teardown(value)
+release = value.get("release")
+version = release.get("package_version", "-") if isinstance(release, dict) else "-"
+sums = [record for record in release.get("output_inventory", [])
+        if record.get("path") == "artifacts/SHA256SUMS"] if isinstance(release, dict) else []
+sums_sha = sums[0]["content_sha256"] if len(sums) == 1 else "-"
+print("|".join((value["status"], version, sums_sha,
+                teardown["state"], teardown["remove_outcome"],
+                teardown["inspect_outcome"], "1" if teardown["clean"] else "0")))
+' "$TIER_DIR" "$TIER_BINDING" 2>/dev/null)" || return 1
+    IFS='|' read -r BUILDER_STATUS PA_VERSION SOURCE_SUMS_SHA \
+        BUILDER_TEARDOWN_STATE BUILDER_TEARDOWN_REMOVE_OUTCOME \
+        BUILDER_TEARDOWN_INSPECT_OUTCOME BUILDER_TEARDOWN_CLEAN <<<"$row"
+    [ -n "$BUILDER_STATUS" ] && [ -n "$BUILDER_TEARDOWN_STATE" ]
+}
+
 cleanup() {
     original_rc=$?
     trap - EXIT
@@ -458,6 +493,14 @@ cleanup() {
     trap 'on_cleanup_signal 1' HUP
     set +e
     cleanup_rc=0
+    if [ "$MODE" = source ]; then
+        BUILDER_STATUS=unknown
+        BUILDER_TEARDOWN_STATE=unknown
+        BUILDER_TEARDOWN_REMOVE_OUTCOME=identity_refused
+        BUILDER_TEARDOWN_INSPECT_OUTCOME=not_run
+        BUILDER_TEARDOWN_CLEAN=0
+        capture_builder_receipt || cleanup_rc=1
+    fi
     if [ -z "$CONTAINER_ID" ] && [ -s "$CIDFILE" ]; then
         raw_cid="$(cat "$CIDFILE")"
         if [[ "$raw_cid" =~ ^[0-9a-f]{64}$ ]]; then
@@ -547,23 +590,41 @@ cleanup() {
           "$TEARDOWN_INSPECT_OUTCOME" "$TEARDOWN_CLEAN" >>"$SETUP_LOG"
     fi
     TEARDOWN_VERIFIED="$(now_utc)"
+    runtime_released=0
+    builder_released=1
     if [ "$TEARDOWN_CLEAN" -eq 1 ] && [ "$TEARDOWN_STATE" = absent ]; then
+        runtime_released=1
         (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance \
             remove-owned-directory "$WORKSPACE_SNAPSHOT" "$WORKSPACE_BINDING" \
             --quarantine-parent "$TIER_DIR" \
             --quarantine-binding "$TIER_BINDING") \
             || cleanup_rc=1
+    else
+        printf 'repository snapshot preserved because runtime teardown is %s/%s
+' \
+            "$TEARDOWN_STATE" "$TEARDOWN_REMOVE_OUTCOME" >>"$SETUP_LOG"
+    fi
+    if [ "$MODE" = source ] && \
+       { [ "$BUILDER_TEARDOWN_CLEAN" -ne 1 ] || \
+         [ "$BUILDER_TEARDOWN_STATE" != absent ]; }; then
+        builder_released=0
+        cleanup_rc=1
+    fi
+    if [ "$runtime_released" -eq 1 ] && [ "$builder_released" -eq 1 ]; then
         (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance \
             remove-owned-directory "$SHARE" "$SHARE_BINDING" \
             --quarantine-parent "$TIER_DIR" \
             --quarantine-binding "$TIER_BINDING") \
             || cleanup_rc=1
     else
-        printf 'owned inputs preserved because teardown is %s/%s
-'           "$TEARDOWN_STATE" "$TEARDOWN_REMOVE_OUTCOME" >>"$SETUP_LOG"
+        printf 'writable share preserved because runtime=%s/%s builder=%s/%s
+' \
+            "$TEARDOWN_STATE" "$TEARDOWN_CLEAN" \
+            "$BUILDER_TEARDOWN_STATE" "$BUILDER_TEARDOWN_CLEAN" >>"$SETUP_LOG"
     fi
     if [ "$original_rc" -eq 0 ] && [ "$cleanup_rc" -eq 0 ] && \
-       [ "$TEARDOWN_CLEAN" -eq 1 ] && [ -z "$PENDING_SIGNAL_NUM" ]; then
+       [ "$runtime_released" -eq 1 ] && [ "$builder_released" -eq 1 ] && \
+       [ -z "$PENDING_SIGNAL_NUM" ]; then
         RUN_STATUS=passed
         FAILURE_CODES=""
     else
@@ -580,6 +641,14 @@ cleanup() {
         if [ "$TEARDOWN_STATE" != absent ]; then
             [ -z "$FAILURE_CODES" ] || FAILURE_CODES="$FAILURE_CODES,"
             FAILURE_CODES="${FAILURE_CODES}teardown-not-absent"
+        fi
+        if [ "$MODE" = source ] && [ "$BUILDER_TEARDOWN_CLEAN" -ne 1 ]; then
+            [ -z "$FAILURE_CODES" ] || FAILURE_CODES="$FAILURE_CODES,"
+            FAILURE_CODES="${FAILURE_CODES}builder-teardown-command-failed"
+        fi
+        if [ "$MODE" = source ] && [ "$BUILDER_TEARDOWN_STATE" != absent ]; then
+            [ -z "$FAILURE_CODES" ] || FAILURE_CODES="$FAILURE_CODES,"
+            FAILURE_CODES="${FAILURE_CODES}builder-teardown-not-absent"
         fi
         [ -n "$FAILURE_CODES" ] || FAILURE_CODES=incomplete-identity
     fi
@@ -654,22 +723,12 @@ if [ "$MODE" = source ]; then
         --share "$SHARE" --share-binding "$SHARE_BINDING" \
         --image-timeout "$SOURCE_BUILDER_TIMEOUT" \
         --build-timeout "$SOURCE_BUILDER_TIMEOUT" >/dev/null 2>&1
-    IFS=$'\t' read -r PA_VERSION SOURCE_SUMS_SHA <<EOF
-$(cd "$REPO_ROOT" && python3 -c '
-from pathlib import Path
-from scripts.testing import provenance as p
-import sys
-with p.open_owned_directory(Path(sys.argv[1]), sys.argv[2]) as owned:
-    value=p.read_sanitized_json(owned,"source-build.json")
-release=value.get("release")
-if value.get("status") != "passed" or not isinstance(release,dict):
-    raise SystemExit(1)
-sums=[row for row in release.get("output_inventory",[]) if row.get("path")=="artifacts/SHA256SUMS"]
-if len(sums) != 1:
-    raise SystemExit(1)
-print(release["package_version"]+"\t"+sums[0]["content_sha256"])
-' "$TIER_DIR" "$TIER_BINDING")
-EOF
+    capture_builder_receipt \
+        || die "validated source builder receipt is unavailable"
+    [ "$BUILDER_STATUS" = passed ] && \
+       [ "$BUILDER_TEARDOWN_STATE" = absent ] && \
+       [ "$BUILDER_TEARDOWN_CLEAN" -eq 1 ] \
+        || die "validated source builder ownership is not released"
     [[ "$PA_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
         || die "validated source builder version is invalid"
     [[ "$SOURCE_SUMS_SHA" =~ ^[0-9a-f]{64}$ ]] \

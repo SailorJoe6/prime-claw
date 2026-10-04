@@ -2,7 +2,7 @@
 
 Date: 2026-10-03
 Bead: `prime-claw-5v7.1`
-State: candidate evidence; owner acceptance pending
+State: replacement repair evidence; owner acceptance pending
 
 ## Isolation contract
 
@@ -23,14 +23,21 @@ producer for the standalone driver and pytest fixture. The host controller:
   cleans, builds, and packs only the container-local copy;
 - accepts exactly four release tarballs plus `SHA256SUMS`, `stable`, and
   `latest.json`, with a strict manifest and no special/link/extra files;
-- removes and inspects only the captured builder CID; and
+- removes and inspects only the captured builder CID, accepting absence only
+  for an allow-listed Docker `no such container/object` diagnostic; every
+  daemon, permission, transport, malformed/non-UTF8, timeout, signal, launch,
+  present, or unknown result remains non-clean; and
 - requires the complete post-build checkout inventory to equal the pre-build
   inventory before source mode can green.
 
-The runtime never mounts the selected checkout. It mounts only validated
-artifacts read-only, verifies the expected `SHA256SUMS` identity and every
-listed tarball, installs during preparation, removes all networks, and then
-runs identity, plugin apply/check, and probe/test actions offline.
+Builder and runtime ownership are tracked independently. The writable share is
+removed only when every possible owner is positively clean and absent; missing,
+unreadable, invalid, present, or unknown builder receipts retain it and keep the
+run red. The runtime never mounts the selected checkout. It mounts the run-owned
+scratch share read/write for ordinary results and exposes the validated artifact
+subtree separately as read-only `/stage`; installation rehashes and reads only
+`/stage`, removes all networks, and then runs identity, plugin apply/check, and
+probe/test actions offline. Separating the alias further remains optional.
 
 ## Hermetic proof
 
@@ -41,7 +48,7 @@ Focused Slice-2 coverage exercises:
   safe links;
 - stale `dist`, `release/tier1`, and dependency caches without reuse or source
   mutation;
-- dependency/build and pack failures with identical checkout inventory;
+- build and pack failures with identical checkout inventory;
 - run-owned iid/cid execution, exact-ID teardown, and read-only mount shape;
 - nonzero builder exit, tampered tarball, extra output, contradictory lineage,
   unclean teardown, and private-path rejection;
@@ -78,8 +85,10 @@ The run proved:
   before and after, with 34,038 entries (3,066 directories, 30,928 files,
   44 links);
 - builder image ID captured from a run-owned iidfile;
-- builder and runtime containers both verified absent with clean exact-ID
-  teardown;
+- the then-current receipts recorded builder and runtime containers absent with
+  exact-ID teardown; owner review later showed the old builder classifier could
+  misclassify daemon errors, so these historical receipts are not proof of the
+  repaired absence boundary;
 - runtime network verified absent before installed identity, apply/check, and
   RPC probe; and
 - sanitized schema-v2 source lineage with 15 hashed evidence files.
@@ -91,15 +100,20 @@ endpoint values were written to durable evidence.
 ## Reproduction
 
 ```bash
-python3 -m pytest tests/test_source_builder.py   tests/test_testing_provenance.py tests/test_tier1_driver.py   tests/test_tier1_fixture.py tests/test_tier1_image.py -q
+python3 -m pytest \
+  tests/test_source_builder.py tests/test_testing_provenance.py \
+  tests/test_tier1_driver.py tests/test_tier1_launch_error.py \
+  tests/test_tier1_network_policy.py tests/test_tier1_fixture.py \
+  tests/test_tier1_image.py tests/test_source_builder_real_install.py -q
 
 TIER1_ENV_FILE=/path/to/ignored-source.env scripts/test-tier1.sh --probe
-TIER1_ENV_FILE=/path/to/ignored-source.env   python3 -m pytest tests/ -q -m container
+TIER1_ENV_FILE=/path/to/ignored-source.env \
+  python3 -m pytest tests/ -q -m container
 ```
 
-## Pre-review candidate validation
+## Historical pre-owner validation for rejected `c0ebdc4`
 
-The final frozen implementation passed all sequential gates without retries:
+The generation later published as `c0ebdc4` passed these supporting gates before owner review. They do not close the accepted B1–B3 findings:
 
 - Docker-free host suite: **343 passed, 147 skipped, 92 subtests** in 133.52s;
 - source-mode container suite: **40 passed, 450 deselected** in 215.10s,
@@ -172,9 +186,9 @@ receipt is failed while the displaced passed object remains private. The
 affected gate passed **168 tests and 92 subtests**. Exact-generation replay and
 renewed review remain required.
 
-## Exact final repaired-generation validation
+## Owner-rejected `c0ebdc4` supporting validation
 
-After all review repairs, the exact final files passed the full gates:
+Before owner review, the files later committed as `c0ebdc4` passed these gates. They are supporting historical evidence, not proof of the corrected B1–B3 boundaries:
 
 - affected source/provenance/driver/fixture/image gate: **168 passed, 92
   subtests** in 103.85s;
@@ -188,6 +202,16 @@ After all review repairs, the exact final files passed the full gates:
 - final syntax/compile/JSON/inventory/source-builder gate: **18 passed** in
   5.67s.
 
+The retained source manifest `20261004T005155Z-71627-5d0a0e9c` and pinned
+manifest `20261004T150637Z-6967-5b2ce894` identify dirty base HEAD
+`4cca0989475d7bd670620f31b67260342b3aac5d` with repository content hashes
+`911bd361e7955d329c1a04e82a6fb10adaa9f4490e5a9204b05ef43e0e05152f`
+(source) and
+`e325201576b401338257784855d066bc173301fa28f840b109e132e789958d0f`
+(pinned). They do not prove exact-`c0ebdc4` Docker execution. The separate
+exact-commit archive host gate passed **168 tests and 92 subtests**; it does not
+change that Docker-lineage boundary.
+
 The first final pinned attempt is retained red at manifest
 `20261004T005510Z-96783-edc0c264`: **1 failed, 39 passed, 455 deselected** in
 99.10s. Its only failure was a host-side fixture `git init` refused by the
@@ -198,6 +222,41 @@ it changed no system or candidate state. After the operator accepted the
 license, `/usr/bin/git` 2.54.0 passed version, status, and HEAD checks, and the
 unchanged candidate passed the authoritative pinned gate recorded above.
 
-Exact candidate commit/tree, renewed review, and remote-equality proof are
-appended to the Bead receipt before publication. Later slices and Phase 3a
+Candidate `c0ebdc4d497ce142b22bf9aaea083ce0a6fa3a58`, tree
+`662e0def18c757296a5ef25977ab0797c149cbfc`, was published and then rejected by
+the owner for B1–B3. A tested-generation-bound replacement candidate, renewed
+review, and remote-equality proof remain pending. Later slices and Phase 3a
 remain unstarted.
+
+## Owner-required bounded repair contract
+
+The owner rejected `c0ebdc4` and authorized only these corrections:
+
+- builder absence now requires an exact, strict-UTF8, allow-listed Docker
+  `no such container/object` diagnostic bound to the captured CID. Arbitrary
+  nonzero, daemon, permission, malformed/non-UTF8, timeout, signal, launch,
+  present, and unknown results remain non-clean and cannot publish green;
+- standalone and pytest consumers reread and validate the builder receipt at
+  terminal cleanup, track builder ownership separately from runtime ownership,
+  and preserve the writable share unless every possible owner is positively
+  clean and absent. Public-path regressions cover present, unknown, missing, and
+  invalid receipts plus positive deletion after clean release; and
+- `tests/test_source_builder_real_install.py` drives two child runs through the
+  canonical producer and public pytest consumer. A disposable zero-dependency
+  source fixture builds four real npm tarballs. Generation A installs and emits
+  `A|none`; dirty generation B uses the same version and artifact coordinate,
+  with A deliberately present in ignored stale output, then installs and emits
+  `B|extra-B`. The proof requires distinct source, release, primary-artifact,
+  and installed-executable identities plus equal complete input inventories.
+  Its focused real run passed **1 test in 29.04s**. Final source-selected
+  validation retains a sanitized `source-generations/two-generation-summary.json`
+  below the selected results root.
+
+For the replacement, final Docker validation runs only after one clean local
+candidate commit exists. The source and pinned manifests must therefore record
+that exact clean repository HEAD/content generation. No tracked file may change
+between those runs, independent review, and publication. Exact run IDs,
+manifest hashes, commit/tree, remote equality, and owner-pending state are
+recorded on `prime-claw-5v7.1`; the Bead is the terminal receipt rather than a
+post-validation tracked-doc edit. The RW scratch alias remains optional and no
+prerelease behavior is added.

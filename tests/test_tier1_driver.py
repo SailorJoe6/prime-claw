@@ -21,9 +21,15 @@ class DriverHarness:
         tmp = tmp.resolve()
         self.tmp=tmp
         self.repo=tmp/"repo"
-        for relative in ("scripts/test-tier1.sh", "scripts/testing/__init__.py",
+        for relative in ("scripts/test-tier1.sh",
+                         "scripts/build-prime-agent-test-release.sh",
+                         "scripts/testing/__init__.py",
                          "scripts/testing/bounded.py", "scripts/testing/provenance.py",
-                         "scripts/testing/tier1_supervisor.py", "docker/test.Dockerfile"):
+                         "scripts/testing/source_builder.py",
+                         "scripts/testing/source_builder_payload.py",
+                         "scripts/testing/tier1_supervisor.py",
+                         "docker/test.Dockerfile",
+                         "docker/test-prime-agent-builder.Dockerfile"):
             source=REPO/relative; target=self.repo/relative
             target.parent.mkdir(parents=True,exist_ok=True)
             shutil.copy2(source,target)
@@ -46,6 +52,10 @@ if [ "$1" = - ] && [ "${FAKE_FAST_PYTHON:-0}" = 1 ]; then
   awk -v a="$a" -v b="$b" -v c="$c" 'BEGIN { print a+b+c }'
   exit 0
 fi
+if [ "$1" = -m ] && [ "$2" = scripts.testing.source_builder ] && [ -n "${FAKE_SOURCE_BUILDER:-}" ]; then
+  shift 2
+  exec "$real_python" "$FAKE_SOURCE_BUILDER" "$@"
+fi
 if [ "$1" = -m ] && [ "$2" = scripts.testing.provenance ] && [ "${FAKE_USE_REAL_PROVENANCE:-0}" != 1 ]; then
   shift 2
   command=$1; shift
@@ -59,7 +69,9 @@ if [ "$1" = -m ] && [ "$2" = scripts.testing.provenance ] && [ "${FAKE_USE_REAL_
       printf '%s\t%s\t%s\n' "$run" "$root/$run/$tier" "$binding" ;;
     snapshot)
       repo=$1; dest=$2; mkdir -p "$dest/docker"
+      cp -R "$repo/scripts" "$dest/scripts"
       cp "$repo/docker/test.Dockerfile" "$dest/docker/test.Dockerfile"
+      cp "$repo/docker/test-prime-agent-builder.Dockerfile" "$dest/docker/test-prime-agent-builder.Dockerfile"
       printf '%s\n' '{"content_hash_contract":"framed-sha256-v2","content_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","dirty":false,"entry_count":1,"head":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","status_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}' ;;
     directory-binding)
       stat -f '%d:%i:16384' "$1" 2>/dev/null || stat -c '%d:%i:16384' "$1" ;;
@@ -311,6 +323,55 @@ exit 2
         docker.write_text('#!/bin/sh\n. "$FAKE_DOCKER_IMPL"\n')
         docker.chmod(0o755)
         self.docker_impl=docker_impl
+        fake_builder=tmp/"fake-source-builder.py"
+        fake_builder.write_text(r'''#!/usr/bin/env python3
+import argparse, os, sys
+from pathlib import Path
+parser=argparse.ArgumentParser()
+parser.add_argument("--source",required=True); parser.add_argument("--workspace",required=True)
+parser.add_argument("--tier-dir",required=True); parser.add_argument("--tier-binding",required=True)
+parser.add_argument("--share",required=True); parser.add_argument("--share-binding",required=True)
+parser.add_argument("--image-timeout"); parser.add_argument("--build-timeout")
+args=parser.parse_args()
+sys.path.insert(0,args.workspace)
+from scripts.testing import provenance as p
+scenario=os.environ.get("FAKE_SOURCE_BUILDER_SCENARIO","missing")
+share=Path(args.share); release=share/"source-release"; release.mkdir(parents=True)
+(release/"sentinel").write_text("builder-evidence")
+if scenario == "missing": raise SystemExit(1)
+with p.open_owned_directory(Path(args.tier_dir),args.tier_binding) as owned:
+    if scenario == "invalid":
+        p.write_sanitized_json(owned,"source-build.json",{"status":"failed"})
+    else:
+        source=p.repository_source_manifest(Path(args.source))
+        inventory=p.checkout_inventory(Path(args.source))
+        state=scenario if scenario in {"present","unknown"} else "absent"
+        clean=scenario == "clean"
+        receipt={
+            "schema_version":1,"status":"failed",
+            "started_at":"2026-10-04T00:00:00Z","finished_at":"2026-10-04T00:00:01Z",
+            "failure_codes":["builder-failed"],"source":source["identity"],
+            "source_rules":{"include":source["include_rule"],"exclude":source["exclude_rule"]},
+            "checkout_inventory_before":inventory,"checkout_inventory_after":inventory,
+            "builder_image":{"id":"sha256:"+"a"*64,"repo_digests":[],
+                "dockerfile":"docker/test-prime-agent-builder.Dockerfile",
+                "dockerfile_sha256":"d"*64,"declared_input_sha256":"e"*64,
+                "declared_input_hash_contract":"framed-sha256-v2",
+                "informational_tag":"prime-claw-test-prime-agent-builder:eeeeeeeeeeee",
+                "os":"linux","architecture":"arm64",
+                "build_started_at":"2026-10-04T00:00:00Z",
+                "build_finished_at":"2026-10-04T00:00:01Z"},
+            "builder_teardown":{"container_id":"c"*64,"state":state,
+                "remove_outcome":"clean" if state in {"absent","present"} else "ordinary_nonzero",
+                "inspect_outcome":"ordinary_nonzero" if state in {"absent","unknown"} else "clean",
+                "clean":clean,"verified_at":"2026-10-04T00:00:01Z"},
+            "release":None,
+        }
+        p.write_sanitized_json(owned,"source-build.json",receipt)
+raise SystemExit(1)
+''')
+        fake_builder.chmod(0o755)
+        self.fake_source_builder=fake_builder
     def init_git(self):
         subprocess.run(["git","init","-q",str(self.repo)],check=True)
         subprocess.run(["git","-C",str(self.repo),"config","user.email","test@example.invalid"],check=True)
@@ -319,7 +380,7 @@ exit 2
         subprocess.run(["git","-C",str(self.repo),"commit","-qm","fixture"],check=True)
 
     def env(self,env_file=None,**extra):
-        env=dict(os.environ); env.update({"PATH":os.pathsep.join([str(self.bin),"/usr/bin","/bin"]),"FAKE_DOCKER_LOG":str(self.log),"FAKE_DOCKER_STATE":str(self.state),"TIER1_RESULTS_ROOT":str(self.tmp/"results"),"FAKE_FAST_PYTHON":"1","FAKE_DOCKERFILE_SHA":self.dockerfile_sha,"FAKE_BUILD_INPUT_SHA":self.build_input_sha,"FAKE_DOCKER_IMPL":str(self.docker_impl),
+        env=dict(os.environ); env.update({"PATH":os.pathsep.join([str(self.bin),"/usr/bin","/bin"]),"FAKE_DOCKER_LOG":str(self.log),"FAKE_DOCKER_STATE":str(self.state),"TIER1_RESULTS_ROOT":str(self.tmp/"results"),"FAKE_FAST_PYTHON":"1","FAKE_DOCKERFILE_SHA":self.dockerfile_sha,"FAKE_BUILD_INPUT_SHA":self.build_input_sha,"FAKE_DOCKER_IMPL":str(self.docker_impl),"FAKE_SOURCE_BUILDER":str(self.fake_source_builder),
             "BASH_FUNC_python3%%":self.python_function,
             "PRIME_CLAW_TIER1_INNER":"1"})
         if env_file is not None: env["TIER1_ENV_FILE"]=str(env_file)
@@ -359,6 +420,42 @@ class TestSelectorFailClose(unittest.TestCase):
                 self.assertFalse(h.log.exists())
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             list(pool.map(check,values))
+
+class TestSourceBuilderOwnership(unittest.TestCase):
+    def _run(self, scenario):
+        temporary=tempfile.TemporaryDirectory(); tmp=Path(temporary.name).resolve()
+        h=DriverHarness(tmp); h.init_git()
+        envf=tmp/"source.env"; envf.write_text(f"PRIME_AGENT_SOURCE={h.repo}\n")
+        unrelated=tmp/"unrelated"; unrelated.write_text("keep")
+        out=h.run(env=h.env(envf,FAKE_SOURCE_BUILDER_SCENARIO=scenario))
+        self.assertNotEqual(out.returncode,0,out.stdout+out.stderr)
+        self.assertEqual(unrelated.read_text(),"keep")
+        self.assertFalse(any(call and call[0]=="run" for call in h.calls()))
+        tier=next((tmp/"results").glob("*/tier1"))
+        manifests=list(tier.glob("manifest.json"))
+        if manifests:
+            self.assertNotEqual(json.loads(manifests[0].read_text())["run"]["status"],"passed")
+        return temporary,tier,out
+
+    def test_public_driver_retains_share_for_uncertain_builder_receipts(self):
+        for scenario in ("present","unknown","missing","invalid"):
+            with self.subTest(scenario=scenario):
+                temporary,tier,out=self._run(scenario)
+                with temporary:
+                    share=tier/"share"
+                    self.assertTrue(share.is_dir(),out.stdout+out.stderr)
+                    self.assertEqual((share/"source-release"/"sentinel").read_text(),
+                                     "builder-evidence")
+                    rendered=out.stdout+out.stderr+"".join(
+                        path.read_text(errors="replace") for path in tier.rglob("*")
+                        if path.is_file())
+                    self.assertNotIn("synthetic-secret",rendered)
+
+    def test_public_driver_deletes_share_after_clean_builder_and_no_runtime(self):
+        temporary,tier,_out=self._run("clean")
+        with temporary:
+            self.assertFalse((tier/"share").exists())
+
 
 class TestInformationalAndSelectorEdges(unittest.TestCase):
     def test_missing_env_fails_before_docker(self):

@@ -91,13 +91,17 @@ only. Do not apply, check, or probe a candidate against the host user-global
   - `PRIME_AGENT_SOURCE=/absolute/path/to/prime-agent` builds in a separate
     disposable container. The checkout is mounted read-only and copied to
     container-local storage; complete before/after inventory equality is
-    mandatory. Only a validated run-owned release is mounted read-only into the
-    tier-1 runtime. No source checkout, host home, socket, credentials, or live
-    state is exposed. The source path is never written to evidence or echoed.
+    mandatory. The runtime mounts its run-owned scratch share read/write and
+    exposes the validated release subtree separately as read-only `/stage`;
+    installation verifies and reads only `/stage`. No source checkout, host
+    home, socket, credentials, or live state is exposed. The source path is
+    never written to evidence or echoed.
 
   `scripts/test-tier1.sh` is the standalone driver (`--smoke`, `--probe`,
-  `--dry-run`, `--rebuild`). The fixture mirrors its boundary. Teardown targets
-  only the captured container ID and requires both explicit absence and clean
+  `--dry-run`, `--rebuild`). The fixture mirrors its boundary. Builder and
+  runtime ownership are independent; the writable share is removed only after
+  every possible owner is positively clean and absent. Teardown targets only
+  the captured container ID and requires both explicit absence and clean
   remove/inspect command outcomes; interruption/timeout remains failure even
   after positive absence. Every host Docker wait has a validated deadline,
   process-group TERM→KILL escalation, bounded reap, and pipe-independent output

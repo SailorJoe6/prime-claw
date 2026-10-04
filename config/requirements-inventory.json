@@ -1157,7 +1157,7 @@
       "id": "R-T1-2",
       "priority": "P1",
       "summary": "Tier-1 exact selector and offline product boundary: PRIME_AGENT_PINNED uses the vendor installer; PRIME_AGENT_SOURCE uses the canonical disposable read-only-source builder and validated run-owned release. Runtime networks are verified absent before artifact identity, explicit-root apply/check, or validated RPC probes.",
-      "status": "proven for pinned and isolated source modes in Slice-2 candidate; owner acceptance pending",
+      "status": "pinned mode owner-accepted in Slice 1; source mode repaired in replacement candidate with owner acceptance pending",
       "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
       "proven_by": {
         "apply": [
@@ -1285,7 +1285,7 @@
       "id": "R-TEST-1",
       "priority": "GATE",
       "summary": "Environment-dependent tier-1 behavior runs in one disposable exact-image container with descriptor-bound repository capture/cleanup and only a fresh scratch share writable.",
-      "status": "proven for replacement candidate tier 1; owner acceptance pending",
+      "status": "proven for owner-accepted Slice-1 pinned tier 1; Slice-2 source replacement owner acceptance and later tiers pending",
       "plan": ".ralph/plans/SPECIFICATION.md",
       "proven_by": {
         "apply": [
@@ -1309,7 +1309,7 @@
       "id": "R-TEST-5",
       "priority": "GATE",
       "summary": "Tier-1 launchers use exact iidfile/cidfile identities, child-mask-preserving bounded process groups, typed target/controller signal outcomes, and exception-safe exact-ID cleanup/publication.",
-      "status": "proven for replacement candidate tier 1; owner acceptance pending",
+      "status": "proven for owner-accepted Slice-1 pinned tier 1; Slice-2 builder absence/share cleanup repaired with owner acceptance pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
@@ -1333,7 +1333,7 @@
       "id": "R-TEST-6",
       "priority": "GATE",
       "summary": "Pinned tier-1 runs validate image/artifact metadata before named writes, redact arbitrary teardown output, and emit truthful schema-v2 terminal manifests with captured v2 identities.",
-      "status": "proven for replacement candidate pinned tier 1; owner acceptance pending",
+      "status": "proven for owner-accepted Slice-1 pinned tier 1; later provenance components pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
@@ -1358,7 +1358,7 @@
       "id": "R-TEST-7",
       "priority": "GATE",
       "summary": "Tier-1 mounts only a descriptor-secured repository snapshot read-only plus a fresh scratch share writable; durable evidence, host home, sockets, credentials, and arbitrary checkouts are never mounted.",
-      "status": "proven for replacement candidate tier 1; tier 2 and owner acceptance pending",
+      "status": "proven for owner-accepted Slice-1 pinned tier 1; Slice-2 source cleanup replacement owner acceptance and tier 2 pending",
       "plan": ".ralph/plans/SPECIFICATION.md",
       "proven_by": {
         "apply": [
@@ -1383,7 +1383,7 @@
       "id": "R-TEST-8",
       "priority": "GATE",
       "summary": "Prime Agent source mode reads the selected checkout only through a read-only builder mount, copies selected tracked/dirty/untracked inputs to container-local storage, builds and packs there, exports only a strict hashed release, and requires complete before/after checkout inventory equality.",
-      "status": "proven for Slice-2 candidate; owner acceptance pending",
+      "status": "owner-rejected c0ebdc4 repaired in replacement candidate for builder absence, share ownership, and installed-generation proof; owner acceptance pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slices 1-2)",
       "proven_by": {
         "apply": [
@@ -1403,6 +1403,8 @@
         ],
         "tests": [
           "tests/test_source_builder.py",
+          "tests/test_source_builder_real_install.py",
+          "tests/container/test_source_generation_probe.py",
           "tests/test_tier1_driver.py",
           "tests/test_tier1_fixture.py",
           "tests/test_testing_provenance.py"
@@ -1414,7 +1416,7 @@
       "id": "R-TEST-10",
       "priority": "GATE",
       "summary": "Slice-1 safety has producer-specific negative/replay tests for path/special-file swaps, framed identity, pre-write sanitization/redaction, signal masks/death/publication, every standalone failure/timeout phase, stale evidence, and concurrent allocation.",
-      "status": "proven for replacement candidate Slice-1 components; owner acceptance pending; later component failures pending their slices",
+      "status": "proven for owner-accepted Slice-1 components; Slice-2 replacement owner acceptance and later component failures pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [

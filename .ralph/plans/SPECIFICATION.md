@@ -9,6 +9,30 @@
 > `prime-claw-5v7.1`, using the approved disposable read-only-source builder;
 > do not start later slices or touch upstream/live/global resources.
 
+> **SLICE 2 REVISION CONTRACT — owner-rejected candidate `c0ebdc4`.** The
+> accepted repair scope is authoritative in `prime-claw-5v7.1`, the owner
+> disposition report SHA-256
+> `4f2ccdf200588fb11897dc325a2d1c03e880d0a712d50a5da00adc94855f9de0`, and
+> the reconciled Astra/max report SHA-256
+> `b1ad6b25ec327aeceebf4c06052cf494e89b563b753cf6ee7e276f16aef125a8`.
+> The corrected source-build contract additionally requires:
+>
+> - exact builder absence only from allow-listed Docker not-found diagnostics;
+>   every daemon, permission, transport, malformed/non-UTF8, timeout, signal,
+>   launch, present, or unknown result is non-clean;
+> - independent builder and runtime ownership in both public consumers, with
+>   writable-share deletion only after all possible owners are positively clean
+>   and absent; missing/unreadable/invalid receipts preserve the share and fail;
+> - a disposable, real-installable two-generation dirty proof through the
+>   canonical producer/consumer boundary that observes changed installed
+>   behavior, distinct identities, no stale replay, and unchanged inputs; and
+> - truthful Docker tested-generation lineage plus corrected stale evidence,
+>   reproduction, `.env.example`, plan-receipt, and inventory wording.
+>
+> The RW scratch alias is optional hardening. Prerelease behavior is not expanded.
+> Repair and publish one new Slice-2 candidate only; Slice 3 and Phase 3a remain
+> closed.
+
 > **Status:** ACTIVE implementation episode created from the operator-approved
 > bundle on 2026-10-02. Slice 1 is accepted and closed. Slice 2 /
 > `prime-claw-5v7.1` is the only active next slice; later slices remain unstarted.

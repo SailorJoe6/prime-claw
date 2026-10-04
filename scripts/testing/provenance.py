@@ -1713,6 +1713,101 @@ def _validate_source_builder(value: Any) -> None:
         raise ProvenanceError("source builder changed the selected checkout")
 
 
+def source_builder_share_teardown(value: Any) -> dict[str, Any]:
+    """Validate a source-build receipt and return its share-owner teardown.
+
+    Consumers use this before deleting the writable export share. Only a
+    complete receipt with one exact builder CID and positively clean absence
+    can release ownership; every malformed or contradictory receipt fails
+    closed without exposing raw Docker diagnostics.
+    """
+    _assert_sanitized(value, "source-build")
+    if not isinstance(value, dict):
+        raise ProvenanceError("source-build receipt must be an object")
+    _require_keys(value, {
+        "schema_version", "status", "started_at", "finished_at",
+        "failure_codes", "source", "source_rules",
+        "checkout_inventory_before", "checkout_inventory_after",
+        "builder_image", "builder_teardown", "release",
+    }, "source-build receipt")
+    if value["schema_version"] != 1 or value["status"] not in {"passed", "failed"}:
+        raise ProvenanceError("invalid source-build receipt status")
+    _utc_timestamp(value["started_at"], "source-build start")
+    _utc_timestamp(value["finished_at"], "source-build finish")
+    failure_codes = value["failure_codes"]
+    if (not isinstance(failure_codes, list)
+            or any(not isinstance(code, str) or not code
+                   for code in failure_codes)
+            or len(failure_codes) != len(set(failure_codes))
+            or (value["status"] == "passed") != (not failure_codes)):
+        raise ProvenanceError("invalid source-build failure codes")
+
+    source = value["source"]
+    if source is not None:
+        _validate_repository_shape(source, "source-build source")
+    rules = value["source_rules"]
+    expected_rules = {
+        "include": "git-cached-plus-nonignored-untracked-v1",
+        "exclude": "git-standard-ignored-and-dotgit-v1",
+    }
+    if rules is not None and rules != expected_rules:
+        raise ProvenanceError("invalid source-build source rules")
+    for key in ("checkout_inventory_before", "checkout_inventory_after"):
+        if value[key] is not None:
+            _validate_checkout_inventory(value[key], f"source-build {key}")
+
+    release = value["release"]
+    if release is not None:
+        _validate_source_release(release)
+        if source is None or release["source"] != source:
+            raise ProvenanceError("source-build release lineage mismatch")
+
+    teardown = value["builder_teardown"]
+    if not isinstance(teardown, dict):
+        raise ProvenanceError("source-build teardown must be an object")
+    _require_keys(teardown, {"container_id", "state", "remove_outcome",
+                             "inspect_outcome", "clean", "verified_at"},
+                  "source-build teardown")
+    _utc_timestamp(teardown["verified_at"], "source-build teardown time")
+    if (teardown["state"] not in {"absent", "present", "unknown"}
+            or teardown["remove_outcome"] not in {
+                "clean", "ordinary_nonzero", "not_needed", "identity_refused",
+                "cleanup_failed", "interrupted", "signaled", "timed_out",
+                "launch_error", "reap_timeout",
+            }
+            or teardown["inspect_outcome"] not in {
+                "clean", "ordinary_nonzero", "not_needed", "not_run",
+                "cleanup_failed", "interrupted", "signaled", "timed_out",
+                "launch_error", "reap_timeout",
+            }
+            or not isinstance(teardown["clean"], bool)):
+        raise ProvenanceError("invalid source-build teardown outcome")
+    exact_cid = isinstance(teardown["container_id"], str) and bool(
+        re.fullmatch(r"[0-9a-f]{64}", teardown["container_id"]))
+    positively_released = (
+        exact_cid and teardown["state"] == "absent" and teardown["clean"]
+        and teardown["remove_outcome"] in {"clean", "ordinary_nonzero"}
+        and teardown["inspect_outcome"] == "ordinary_nonzero")
+    if teardown["clean"] != positively_released:
+        raise ProvenanceError("source-build teardown clean flag is contradictory")
+    if positively_released:
+        _validate_source_builder({
+            "image": value["builder_image"], "teardown": teardown,
+            "checkout_inventory_before": value["checkout_inventory_before"],
+            "checkout_inventory_after": value["checkout_inventory_after"],
+        })
+    if value["status"] == "passed":
+        if (source is None or rules != expected_rules or release is None
+                or value["builder_image"] is None
+                or value["checkout_inventory_before"] is None
+                or value["checkout_inventory_after"] is None
+                or value["checkout_inventory_before"]
+                    != value["checkout_inventory_after"]
+                or not positively_released):
+            raise ProvenanceError("passed source-build receipt is incomplete")
+    return dict(teardown)
+
+
 def validate_manifest(manifest: dict[str, Any]) -> None:
     if not isinstance(manifest, dict):
         raise ProvenanceError("manifest must be an object")
