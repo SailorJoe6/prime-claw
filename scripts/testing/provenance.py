@@ -1670,6 +1670,48 @@ def _validate_source_release(value: Any) -> None:
         raise ProvenanceError("source release primary artifact is invalid")
 
 
+def _validate_source_builder_teardown(value: Any, where: str) -> bool:
+    """Validate typed builder ownership and return positive release truth."""
+    if not isinstance(value, dict):
+        raise ProvenanceError(f"{where} must be an object")
+    _require_keys(value, {"container_id", "state", "remove_outcome",
+                          "inspect_outcome", "clean", "verified_at"}, where)
+    if not isinstance(value["verified_at"], str):
+        raise ProvenanceError(f"invalid {where} time")
+    _utc_timestamp(value["verified_at"], f"{where} time")
+    container_id = value["container_id"]
+    if (container_id is not None
+            and (not isinstance(container_id, str)
+                 or not re.fullmatch(r"[0-9a-f]{64}", container_id))):
+        raise ProvenanceError(f"invalid {where} container identity")
+    remove_outcomes = {
+        "clean", "ordinary_nonzero", "not_needed", "identity_refused",
+        "cleanup_failed", "interrupted", "signaled", "timed_out",
+        "launch_error", "reap_timeout",
+    }
+    inspect_outcomes = {
+        "clean", "ordinary_nonzero", "not_needed", "not_run",
+        "cleanup_failed", "interrupted", "signaled", "timed_out",
+        "launch_error", "reap_timeout",
+    }
+    if (not isinstance(value["state"], str)
+            or value["state"] not in {"absent", "present", "unknown"}
+            or not isinstance(value["remove_outcome"], str)
+            or value["remove_outcome"] not in remove_outcomes
+            or not isinstance(value["inspect_outcome"], str)
+            or value["inspect_outcome"] not in inspect_outcomes
+            or not isinstance(value["clean"], bool)):
+        raise ProvenanceError(f"invalid {where} outcome")
+    exact_cid = container_id is not None
+    positively_released = (
+        exact_cid and value["state"] == "absent" and value["clean"]
+        and value["remove_outcome"] == "clean"
+        and value["inspect_outcome"] == "ordinary_nonzero")
+    if value["clean"] != positively_released:
+        raise ProvenanceError(f"{where} clean flag is contradictory")
+    return positively_released
+
+
 def _validate_source_builder(value: Any) -> None:
     if not isinstance(value, dict):
         raise ProvenanceError("prime_agent.builder must be an object")
@@ -1694,17 +1736,9 @@ def _validate_source_builder(value: Any) -> None:
     _utc_timestamp(image["build_started_at"], "source builder image start")
     _utc_timestamp(image["build_finished_at"], "source builder image finish")
     teardown = value["teardown"]
-    if not isinstance(teardown, dict):
-        raise ProvenanceError("source builder teardown must be an object")
-    _require_keys(teardown, {"container_id", "state", "remove_outcome",
-                             "inspect_outcome", "clean", "verified_at"},
-                  "prime_agent.builder.teardown")
-    if (not re.fullmatch(r"[0-9a-f]{64}", str(teardown["container_id"]))
-            or teardown["state"] != "absent" or not teardown["clean"]
-            or teardown["remove_outcome"] not in {"clean", "ordinary_nonzero"}
-            or teardown["inspect_outcome"] != "ordinary_nonzero"):
+    if not _validate_source_builder_teardown(
+            teardown, "prime_agent.builder.teardown"):
         raise ProvenanceError("source builder teardown is not clean")
-    _utc_timestamp(teardown["verified_at"], "source builder teardown time")
     before = value["checkout_inventory_before"]
     after = value["checkout_inventory_after"]
     _validate_checkout_inventory(before, "source builder checkout before")
@@ -1730,7 +1764,11 @@ def source_builder_share_teardown(value: Any) -> dict[str, Any]:
         "checkout_inventory_before", "checkout_inventory_after",
         "builder_image", "builder_teardown", "release",
     }, "source-build receipt")
-    if value["schema_version"] != 1 or value["status"] not in {"passed", "failed"}:
+    if (not isinstance(value["schema_version"], int)
+            or isinstance(value["schema_version"], bool)
+            or value["schema_version"] != 1
+            or not isinstance(value["status"], str)
+            or value["status"] not in {"passed", "failed"}):
         raise ProvenanceError("invalid source-build receipt status")
     _utc_timestamp(value["started_at"], "source-build start")
     _utc_timestamp(value["finished_at"], "source-build finish")
@@ -1763,33 +1801,8 @@ def source_builder_share_teardown(value: Any) -> dict[str, Any]:
             raise ProvenanceError("source-build release lineage mismatch")
 
     teardown = value["builder_teardown"]
-    if not isinstance(teardown, dict):
-        raise ProvenanceError("source-build teardown must be an object")
-    _require_keys(teardown, {"container_id", "state", "remove_outcome",
-                             "inspect_outcome", "clean", "verified_at"},
-                  "source-build teardown")
-    _utc_timestamp(teardown["verified_at"], "source-build teardown time")
-    if (teardown["state"] not in {"absent", "present", "unknown"}
-            or teardown["remove_outcome"] not in {
-                "clean", "ordinary_nonzero", "not_needed", "identity_refused",
-                "cleanup_failed", "interrupted", "signaled", "timed_out",
-                "launch_error", "reap_timeout",
-            }
-            or teardown["inspect_outcome"] not in {
-                "clean", "ordinary_nonzero", "not_needed", "not_run",
-                "cleanup_failed", "interrupted", "signaled", "timed_out",
-                "launch_error", "reap_timeout",
-            }
-            or not isinstance(teardown["clean"], bool)):
-        raise ProvenanceError("invalid source-build teardown outcome")
-    exact_cid = isinstance(teardown["container_id"], str) and bool(
-        re.fullmatch(r"[0-9a-f]{64}", teardown["container_id"]))
-    positively_released = (
-        exact_cid and teardown["state"] == "absent" and teardown["clean"]
-        and teardown["remove_outcome"] in {"clean", "ordinary_nonzero"}
-        and teardown["inspect_outcome"] == "ordinary_nonzero")
-    if teardown["clean"] != positively_released:
-        raise ProvenanceError("source-build teardown clean flag is contradictory")
+    positively_released = _validate_source_builder_teardown(
+        teardown, "source-build teardown")
     if positively_released:
         _validate_source_builder({
             "image": value["builder_image"], "teardown": teardown,
@@ -1834,7 +1847,10 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
             raise ProvenanceError(f"{name} must be an object")
     _require_keys(run, {"id", "tier", "mode", "started_at", "finished_at",
                         "status", "failure_codes"}, "run")
-    if (run["tier"] != "tier1" or run["mode"] not in {"pinned", "source", "smoke"}
+    if (run["tier"] != "tier1"
+            or not isinstance(run["mode"], str)
+            or run["mode"] not in {"pinned", "source", "smoke"}
+            or not isinstance(run["status"], str)
             or run["status"] not in {"passed", "failed"}):
         raise ProvenanceError("invalid run tier/mode/status")
     if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z-[0-9]+-[0-9a-f]{8}", str(run["id"])):
@@ -1894,6 +1910,12 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
                                   "staged_release", "builder"}, "prime_agent")
             if prime["mode"] != "source":
                 raise ProvenanceError("invalid source Prime Agent selector")
+            builder = prime["builder"]
+            if builder is not None:
+                if not isinstance(builder, dict) or "teardown" not in builder:
+                    raise ProvenanceError("source builder evidence is invalid")
+                _validate_source_builder_teardown(
+                    builder["teardown"], "prime_agent.builder.teardown")
             if run["status"] == "passed":
                 requested = prime["requested_version"]
                 if not _SEMVER_RE.fullmatch(str(requested)) or installed != requested:
@@ -1945,19 +1967,22 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         raise ProvenanceError("network absence was not verified")
     _require_keys(teardown, {"state", "verified_at", "remove_outcome",
                              "inspect_outcome", "clean"}, "teardown")
-    if teardown["state"] not in {"absent", "unknown", "present"}:
+    if (not isinstance(teardown["state"], str)
+            or teardown["state"] not in {"absent", "unknown", "present"}):
         raise ProvenanceError("invalid teardown.state")
     outcomes = {"clean", "ordinary_nonzero", "signaled", "timed_out", "interrupted",
                 "launch_error", "reap_timeout", "not_needed", "not_run",
                 "identity_refused"}
-    if (teardown["remove_outcome"] not in outcomes
+    if (not isinstance(teardown["remove_outcome"], str)
+            or teardown["remove_outcome"] not in outcomes
+            or not isinstance(teardown["inspect_outcome"], str)
             or teardown["inspect_outcome"] not in outcomes
             or not isinstance(teardown["clean"], bool)):
         raise ProvenanceError("invalid teardown command accounting")
     if teardown["clean"] and teardown["state"] != "absent":
         raise ProvenanceError("clean teardown requires absence")
     if teardown["clean"] and (
-            teardown["remove_outcome"] not in {"clean", "ordinary_nonzero", "not_needed"}
+            teardown["remove_outcome"] not in {"clean", "not_needed"}
             or teardown["inspect_outcome"] not in {"ordinary_nonzero", "not_needed"}):
         raise ProvenanceError("clean teardown contradicts command outcomes")
     _utc_timestamp(teardown["verified_at"], "teardown.verified_at")
@@ -1976,7 +2001,10 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
     for row in evidence["files"]:
         if not isinstance(row, dict) or set(row) != {"path", "sha256"}:
             raise ProvenanceError("invalid evidence file row")
-        if row["path"] in seen or Path(row["path"]).is_absolute() or ".." in Path(row["path"]).parts:
+        if (not isinstance(row["path"], str)
+                or row["path"] in seen
+                or Path(row["path"]).is_absolute()
+                or ".." in Path(row["path"]).parts):
             raise ProvenanceError("invalid or duplicate evidence path")
         seen.add(row["path"])
         if not _SHA256_RE.fullmatch(str(row["sha256"])):

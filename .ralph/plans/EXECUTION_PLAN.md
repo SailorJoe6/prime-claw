@@ -1,5 +1,34 @@
 # Execution plan — project-wide isolation-first testing strategy
 
+> **SLICE 2 OWNER DISPOSITION — REVISE `f0441325` (2026-10-04).** Exact
+> candidate `f0441325f72224b6cc67802bfb917bfead6efb31`, tree
+> `eced51e62925d016953569c55acedf075ad72e83`, is rejected for advancement.
+> The authoritative bounded findings are recorded on `prime-claw-5v7.1` and in
+> `/Users/jlanders/.prime/agent/session-artifacts/01a0fe2e-e0dd-7638-9b4c-0b118182c6e3/sub-e7ba2207/slice2-f0441325-owner-review.md`
+> (SHA-256 `f56ea2a3064c92e0ddc7b5d29ef995de72344078c9c936461bc27188aa2910d5`).
+> Preserve the corroborated B3 proof and exact retained lineage/evidence. Repair
+> only these accepted Slice-2 blockers:
+>
+> 1. **F1/P1:** an ordinary nonzero exact-CID `docker rm -f` remains non-clean
+>    even when later strict allow-listed inspection proves absence. Align the
+>    whole producer, source-build receipt validator, manifest validator, and both
+>    public consumers. Add whole-producer plus standalone and pytest-fixture
+>    regressions proving retention for failed removal, while preserving positive
+>    deletion after successful removal and proved absence.
+> 2. **F2/P2:** validate JSON field types before set membership. Convert every
+>    type-invalid terminal receipt into typed unknown without letting receipt
+>    failure bypass independent runtime exact-ID cleanup or failed terminal
+>    publication. Add a post-runtime-yield public fixture regression proving
+>    runtime cleanup attempted, share retained, and failed evidence attempted.
+> 3. Update docs, inventory, evidence, and the Bead truthfully. Re-run only gates
+>    invalidated by these corrections, then the required sequential exact-clean-
+>    candidate source and pinned validation and fresh independent review. Retain
+>    raw repaired-gate output where practical; prior aggregate counts remain
+>    reported-only because their raw pytest stdout was not retained.
+>
+> The RW scratch alias stays optional and prerelease behavior is unchanged.
+> Publish one replacement candidate and stop. Do not start Slice 3 or Phase 3a.
+
 > **SLICE 1 ACCEPTED — 2026-10-03.** Owner accepted exact commit
 > `4cca0989475d7bd670620f31b67260342b3aac5d`, tree
 > `9c11db2e8c0499b0cac5c14b46d4000796ac7bef`; `prime-claw-5v7.2` is closed.

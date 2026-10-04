@@ -102,8 +102,10 @@ only. Do not apply, check, or probe a candidate against the host user-global
   runtime ownership are independent; the writable share is removed only after
   every possible owner is positively clean and absent. Teardown targets only
   the captured container ID and requires both explicit absence and clean
-  remove/inspect command outcomes; interruption/timeout remains failure even
-  after positive absence. Every host Docker wait has a validated deadline,
+  remove/inspect command outcomes; ordinary nonzero removal, interruption, or
+  timeout remains failure even after positive absence. Invalid final receipt
+  types become unknown ownership without skipping runtime cleanup or failed
+  evidence publication. Every host Docker wait has a validated deadline,
   process-group TERM→KILL escalation, bounded reap, and pipe-independent output
   capture through `scripts/testing/bounded.py`. A failed/timed-out launch still
   tears down an

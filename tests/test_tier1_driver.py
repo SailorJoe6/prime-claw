@@ -362,7 +362,8 @@ with p.open_owned_directory(Path(args.tier_dir),args.tier_binding) as owned:
                 "build_started_at":"2026-10-04T00:00:00Z",
                 "build_finished_at":"2026-10-04T00:00:01Z"},
             "builder_teardown":{"container_id":"c"*64,"state":state,
-                "remove_outcome":"clean" if state in {"absent","present"} else "ordinary_nonzero",
+                "remove_outcome":("ordinary_nonzero" if scenario == "ordinary_nonzero" else
+                    "clean" if state in {"absent","present"} else "ordinary_nonzero"),
                 "inspect_outcome":"ordinary_nonzero" if state in {"absent","unknown"} else "clean",
                 "clean":clean,"verified_at":"2026-10-04T00:00:01Z"},
             "release":None,
@@ -450,6 +451,11 @@ class TestSourceBuilderOwnership(unittest.TestCase):
                         path.read_text(errors="replace") for path in tier.rglob("*")
                         if path.is_file())
                     self.assertNotIn("synthetic-secret",rendered)
+
+    def test_public_driver_retains_share_for_ordinary_nonzero_builder_removal(self):
+        temporary,tier,out=self._run("ordinary_nonzero")
+        with temporary:
+            self.assertTrue((tier/"share").is_dir(),out.stdout+out.stderr)
 
     def test_public_driver_deletes_share_after_clean_builder_and_no_runtime(self):
         temporary,tier,_out=self._run("clean")
@@ -708,18 +714,19 @@ print(json.dumps({
                 self.assertEqual(manifest["teardown"]["remove_outcome"],"signaled")
                 self.assertFalse(manifest["teardown"]["clean"])
 
-    def test_rm_ordinary_nonzero_with_proven_absence_is_clean(self):
+    def test_rm_ordinary_nonzero_with_proven_absence_is_nonclean(self):
         with tempfile.TemporaryDirectory() as td:
             tmp=Path(td).resolve().resolve(); h=DriverHarness(tmp)
             out=h.run("--smoke",env=h.env(None,
                 FAKE_USE_REAL_BOUNDED="fast", FAKE_RM_FAIL="1"))
-            self.assertEqual(out.returncode,0,out.stdout+out.stderr)
+            self.assertNotEqual(out.returncode,0,out.stdout+out.stderr)
             path=next((tmp/"results").glob("*/tier1/manifest.json"))
             manifest=json.loads(path.read_text()); provenance.validate_manifest(manifest)
-            self.assertEqual(manifest["run"]["status"],"passed")
+            self.assertEqual(manifest["run"]["status"],"failed")
             self.assertEqual(manifest["teardown"]["state"],"absent")
             self.assertEqual(manifest["teardown"]["remove_outcome"],"ordinary_nonzero")
-            self.assertTrue(manifest["teardown"]["clean"])
+            self.assertFalse(manifest["teardown"]["clean"])
+            self.assertTrue((path.parent/"share").is_dir())
 
     def _exercise_matrix_row(self, harness, matrix_root, label, extra, args=()):
         tmp=matrix_root/label; tmp.mkdir(); envf=tmp/"pinned.env"

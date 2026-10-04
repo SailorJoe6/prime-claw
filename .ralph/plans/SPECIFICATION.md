@@ -1,5 +1,29 @@
 # Project-wide testing strategy — isolation-first test architecture
 
+> **LATEST SLICE 2 REVISION CONTRACT — owner-rejected `f0441325`.** Candidate
+> `f0441325f72224b6cc67802bfb917bfead6efb31` / tree
+> `eced51e62925d016953569c55acedf075ad72e83` is revision history, not accepted.
+> The authoritative report SHA-256 is
+> `f56ea2a3064c92e0ddc7b5d29ef995de72344078c9c936461bc27188aa2910d5`.
+> B3 and the retained clean-candidate evidence are preserved. The remaining
+> bounded contract is:
+>
+> - ordinary nonzero exact-CID container removal is non-clean regardless of a
+>   later positive absence inspection; producer, receipt/manifest validators,
+>   and both public consumers must agree and retain the share;
+> - JSON receipt field types are checked before membership or comparison;
+>   malformed-but-JSON-valid terminal receipts normalize to typed unknown and
+>   cannot skip independent runtime exact-ID cleanup or failed publication; and
+> - whole-producer, standalone, and fixture regressions prove the failed-removal
+>   retention boundary; a post-runtime-yield fixture regression proves malformed
+>   type handling still attempts runtime cleanup and failed evidence while
+>   retaining the share. Existing successful cleanup/deletion proof remains.
+>
+> Revalidate only affected gates plus final sequential exact-candidate source and
+> pinned Docker gates, obtain fresh independent review, publish one replacement,
+> and stop for owner review. Optional RW-alias and prerelease boundaries do not
+> change. Slice 3 and Phase 3a remain closed.
+
 > **SLICE 1 ACCEPTED — 2026-10-03.** Exact commit
 > `4cca0989475d7bd670620f31b67260342b3aac5d`, tree
 > `9c11db2e8c0499b0cac5c14b46d4000796ac7bef`, is owner-accepted;

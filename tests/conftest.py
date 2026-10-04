@@ -573,7 +573,7 @@ def _read_source_builder_teardown(
         receipt = provenance.read_sanitized_json(tier_cap, "source-build.json")
         value = provenance.source_builder_share_teardown(receipt)
     except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError,
-            provenance.ProvenanceError):
+            TypeError, ValueError, provenance.ProvenanceError):
         return TeardownResult(
             "unknown", "identity_refused", "not_run", False,
             "source builder receipt unavailable or invalid")
@@ -618,7 +618,7 @@ def _remove_session_container(container_id: str, *,
     state, inspect_diag, inspect_outcome = _inspect_container(
         container_id, timeout=inspect_timeout)
     clean = (state == "absent"
-             and remove_outcome in {"clean", "ordinary_nonzero"}
+             and remove_outcome == "clean"
              and inspect_outcome == "ordinary_nonzero")
     diagnostics = (
         f"remove_outcome={remove_outcome} remove_rc={rm.returncode}; "
@@ -932,6 +932,27 @@ def tier1_container(request):
             else:
                 release = (source_build.get("release")
                            if isinstance(source_build, dict) else None)
+                builder = None
+                if isinstance(source_build, dict):
+                    builder_teardown = source_build.get("builder_teardown")
+                    if (not builder_teardown_result.clean
+                            or builder_teardown_result.state != "absent"):
+                        builder_teardown = {
+                            "container_id": None,
+                            "state": builder_teardown_result.state,
+                            "remove_outcome": builder_teardown_result.remove_outcome,
+                            "inspect_outcome": builder_teardown_result.inspect_outcome,
+                            "clean": False,
+                            "verified_at": provenance.utc_now(),
+                        }
+                    builder = {
+                        "image": source_build.get("builder_image"),
+                        "teardown": builder_teardown,
+                        "checkout_inventory_before": source_build.get(
+                            "checkout_inventory_before"),
+                        "checkout_inventory_after": source_build.get(
+                            "checkout_inventory_after"),
+                    }
                 prime_identity = {
                     "mode": "source", "requested_version": install_version,
                     "installed_version": artifact["version"] if artifact else None,
@@ -941,14 +962,7 @@ def tier1_container(request):
                     "source_rules": (source_build.get("source_rules")
                                      if isinstance(source_build, dict) else None),
                     "staged_release": release,
-                    "builder": ({
-                        "image": source_build.get("builder_image"),
-                        "teardown": source_build.get("builder_teardown"),
-                        "checkout_inventory_before": source_build.get(
-                            "checkout_inventory_before"),
-                        "checkout_inventory_after": source_build.get(
-                            "checkout_inventory_after"),
-                    } if isinstance(source_build, dict) else None),
+                    "builder": builder,
                 }
             return {
                 "schema_version": provenance.SCHEMA_VERSION,
@@ -1010,7 +1024,18 @@ def tier1_container(request):
 
         try:
             if mode == "source":
-                builder_teardown_result = _read_source_builder_teardown(tier_cap)
+                try:
+                    builder_teardown_result = _read_source_builder_teardown(tier_cap)
+                except Exception as exc:
+                    builder_teardown_result = TeardownResult(
+                        "unknown", "identity_refused", "not_run", False,
+                        "source builder receipt reread failed")
+                    add_secondary("builder-receipt-read-failed", exc)
+                if (not builder_teardown_result.clean
+                        or builder_teardown_result.state != "absent"):
+                    add_secondary(
+                        "builder-receipt-invalid",
+                        RuntimeError("terminal source builder receipt is invalid"))
             if container_id is None and container_attempted:
                 try:
                     if cidfile.is_file():

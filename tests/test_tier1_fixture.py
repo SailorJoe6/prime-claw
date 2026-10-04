@@ -1,6 +1,6 @@
 """Tier-0 behavioral coverage for the Slice-1 tier-1 session fixture."""
 from __future__ import annotations
-import json, os, signal, subprocess, tempfile, textwrap, time, unittest
+import hashlib, json, os, signal, subprocess, tempfile, textwrap, time, unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -20,8 +20,9 @@ def build_image(tier, snapshot):
         return conftest._build_tier1_image(owned, tier, snapshot)
 
 
-def source_builder_receipt(state="unknown", clean=False):
-    remove = "clean" if state in {"absent", "present"} else "ordinary_nonzero"
+def source_builder_receipt(state="unknown", clean=False, remove_outcome=None):
+    remove = (remove_outcome if remove_outcome is not None else
+              "clean" if state in {"absent", "present"} else "ordinary_nonzero")
     inspect = "ordinary_nonzero" if state in {"absent", "unknown"} else "clean"
     inventory = {
         "content_sha256": "1" * 64, "entry_count": 1,
@@ -238,9 +239,14 @@ class TestSessionTeardown(unittest.TestCase):
             with mock.patch.object(conftest,"_remove_session_container",side_effect=err): state=conftest._finalize_session(CID,share,original)
             self.assertEqual(state.state,"unknown"); self.assertFalse(state.clean); self.assertTrue(any("teardown also failed" in n for n in original.__notes__))
 
-    def test_nonzero_remove_is_idempotent_when_inspect_proves_absent(self):
+    def test_nonzero_remove_stays_nonclean_when_inspect_proves_absent(self):
         responses=[cp([],rc=1,err="No such container"),cp([],rc=1,err="No such container")]
-        with mock.patch.object(conftest,"_host_command",side_effect=responses): conftest._remove_session_container(CID)
+        with mock.patch.object(conftest,"_host_command",side_effect=responses), \
+                self.assertRaises(conftest.TeardownError) as ctx:
+            conftest._remove_session_container(CID)
+        self.assertEqual(ctx.exception.result.state,"absent")
+        self.assertEqual(ctx.exception.result.remove_outcome,"ordinary_nonzero")
+        self.assertFalse(ctx.exception.result.clean)
     def test_keep_share_preserves_successful_debug_artifacts(self):
         with tempfile.TemporaryDirectory() as td:
             share=Path(td).resolve()/"share"; share.mkdir()
@@ -332,7 +338,11 @@ class TestSourceBuilderShareOwnership(unittest.TestCase):
                 state = scenario if scenario in {"present", "unknown"} else "absent"
                 conftest.provenance.write_sanitized_json(
                     tier_cap, "source-build.json",
-                    source_builder_receipt(state=state, clean=scenario == "clean"))
+                    source_builder_receipt(
+                        state=state,
+                        clean=scenario == "clean",
+                        remove_outcome=("ordinary_nonzero"
+                                        if scenario == "ordinary_nonzero" else None)))
             raise RuntimeError("controlled source builder failure")
 
         def host(args, **_kwargs):
@@ -379,6 +389,11 @@ class TestSourceBuilderShareOwnership(unittest.TestCase):
                     self.assertEqual(
                         (share / "source-release" / "sentinel").read_text(),
                         "builder-evidence")
+
+    def test_public_fixture_retains_share_for_ordinary_nonzero_builder_removal(self):
+        temporary, tier = self._run_failed_builder("ordinary_nonzero")
+        with temporary:
+            self.assertTrue((tier / "share").is_dir())
 
     def test_public_fixture_deletes_share_after_clean_builder_and_no_runtime(self):
         temporary, tier = self._run_failed_builder("clean")
@@ -465,6 +480,225 @@ class TestFixtureEndToEnd(unittest.TestCase):
             finally:
                 for p in reversed(patches): p.stop()
             manifest_path=next(results.glob("*/tier1/manifest.json")); manifest=json.loads(manifest_path.read_text()); conftest.provenance.validate_manifest(manifest); self.assertEqual(manifest["teardown"]["state"],"absent")
+
+    def test_public_fixture_retains_share_for_ordinary_nonzero_runtime_removal(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td).resolve(); results = tmp / "results"
+            envf = tmp / "pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")
+            calls = []
+            image = {
+                "id": IMAGE_ID, "repo_digests": [],
+                "dockerfile": "docker/test.Dockerfile",
+                "dockerfile_sha256": "d" * 64,
+                "declared_input_sha256": "e" * 64,
+                "declared_input_hash_contract": "framed-sha256-v2",
+                "informational_tag": "prime-claw-test-tier1:eeeeeeeeeeee",
+                "os": "linux", "architecture": "arm64",
+                "build_started_at": "2026-10-04T00:00:00Z",
+                "build_finished_at": "2026-10-04T00:00:01Z",
+            }
+            repository = {
+                "head": "b" * 40, "dirty": False,
+                "status_sha256": "a" * 64, "content_sha256": "c" * 64,
+                "entry_count": 1, "content_hash_contract": "framed-sha256-v2",
+            }
+            artifact = {"kind": "vendor-binary", "version": "0.9.8",
+                        "executable_sha256": "f" * 64}
+
+            def stage(_repo, dest):
+                Path(dest).mkdir(parents=True)
+                return repository
+
+            def host(args, **_kwargs):
+                calls.append(args)
+                if args == ["docker", "info"]:
+                    return cp(args)
+                if args[:3] == ["docker", "run", "-d"]:
+                    Path(args[args.index("--cidfile") + 1]).write_text(CID + "\n")
+                    return cp(args)
+                if args == ["docker", "rm", "-f", CID]:
+                    return cp(args, rc=1, err="removal denied")
+                if args == ["docker", "inspect", CID]:
+                    return cp(args, rc=1,
+                              err="Error: No such container: " + CID)
+                raise AssertionError(args)
+
+            def container_run(self, *args, **_kwargs):
+                return cp(args)
+
+            patches = [
+                mock.patch.dict(os.environ, {"TIER1_ENV_FILE": str(envf)}),
+                mock.patch.object(conftest, "RESULTS", results),
+                mock.patch.object(conftest.shutil, "which", return_value="/fake/docker"),
+                mock.patch.object(conftest, "_host_command", side_effect=host),
+                mock.patch.object(conftest, "_build_tier1_image", return_value=image),
+                mock.patch.object(conftest, "_disconnect_container_networks",
+                                  return_value="2026-10-04T00:00:02Z"),
+                mock.patch.object(conftest, "_installed_package_identity",
+                                  return_value=artifact),
+                mock.patch.object(conftest.Tier1Container, "run", new=container_run),
+                mock.patch.object(conftest.provenance, "stage_repository_snapshot",
+                                  side_effect=stage),
+            ]
+            for patcher in patches:
+                patcher.start()
+            try:
+                generator = conftest.tier1_container.__wrapped__(SimpleNamespace())
+                self.assertEqual(next(generator).id, CID)
+                with self.assertRaises(conftest.TeardownError):
+                    next(generator)
+            finally:
+                for patcher in reversed(patches):
+                    patcher.stop()
+
+            self.assertIn(["docker", "rm", "-f", CID], calls)
+            self.assertIn(["docker", "inspect", CID], calls)
+            tier = next(results.glob("*/tier1"))
+            self.assertTrue((tier / "share").is_dir())
+            manifest = json.loads((tier / "manifest.json").read_text())
+            conftest.provenance.validate_manifest(manifest)
+            self.assertEqual(manifest["run"]["status"], "failed")
+            self.assertEqual(manifest["teardown"]["state"], "absent")
+            self.assertEqual(manifest["teardown"]["remove_outcome"],
+                             "ordinary_nonzero")
+            self.assertFalse(manifest["teardown"]["clean"])
+
+    def test_malformed_final_source_receipt_cannot_bypass_cleanup_or_publication(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td).resolve(); results = tmp / "results"
+            source = tmp / "source"; source.mkdir()
+            envf = tmp / "source.env"
+            envf.write_text(f"PRIME_AGENT_SOURCE={source}\n")
+            calls = []
+            image = {
+                "id": IMAGE_ID, "repo_digests": [],
+                "dockerfile": "docker/test.Dockerfile",
+                "dockerfile_sha256": "d" * 64,
+                "declared_input_sha256": "e" * 64,
+                "declared_input_hash_contract": "framed-sha256-v2",
+                "informational_tag": "prime-claw-test-tier1:eeeeeeeeeeee",
+                "os": "linux", "architecture": "arm64",
+                "build_started_at": "2026-10-04T00:00:00Z",
+                "build_finished_at": "2026-10-04T00:00:01Z",
+            }
+            repository = {
+                "head": "b" * 40, "dirty": False,
+                "status_sha256": "a" * 64, "content_sha256": "c" * 64,
+                "entry_count": 1, "content_hash_contract": "framed-sha256-v2",
+            }
+            artifact = {"kind": "vendor-binary", "version": "0.9.8",
+                        "executable_sha256": "f" * 64}
+
+            def stage(_repo, dest):
+                Path(dest).mkdir(parents=True)
+                return repository
+
+            def build_source(_source, tier_cap, _tier_dir, _tier_binding,
+                             share, _share_binding, _snapshot):
+                artifacts = share / "source-release" / "artifacts"
+                artifacts.mkdir(parents=True)
+                tar_names = [
+                    "prime-agent-0.9.8.tgz", "prime-agent-ai-0.9.8.tgz",
+                    "prime-agent-core-0.9.8.tgz", "prime-agent-tui-0.9.8.tgz",
+                ]
+                tar_hashes = {}
+                for name in tar_names:
+                    data = name.encode()
+                    (artifacts / name).write_bytes(data)
+                    tar_hashes[name] = hashlib.sha256(data).hexdigest()
+                (artifacts / "SHA256SUMS").write_text("".join(
+                    f"{tar_hashes[name]}  {name}\n" for name in tar_names))
+                (artifacts / "stable").write_text("v0.9.8\n")
+                (artifacts / "latest.json").write_text('{"version":"0.9.8"}\n')
+                rows = []
+                for path in sorted(artifacts.iterdir(), key=lambda item: item.name):
+                    path.chmod(0o644)
+                    rows.append({
+                        "path": f"artifacts/{path.name}", "kind": "file",
+                        "mode": 0o644, "size": path.stat().st_size,
+                        "content_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                    })
+                receipt = source_builder_receipt(state="absent", clean=True)
+                receipt["status"] = "passed"
+                receipt["failure_codes"] = []
+                receipt["release"] = {
+                    "schema_version": 1, "source": receipt["source"],
+                    "source_rules": receipt["source_rules"],
+                    "package_version": "0.9.8",
+                    "pack_command_sha256": "9" * 64,
+                    "artifact": next(row for row in rows if row["path"] ==
+                                     "artifacts/prime-agent-0.9.8.tgz"),
+                    "output_inventory": rows,
+                    "output_inventory_sha256": conftest.provenance._framed_hash(
+                        rows, domain="source-builder-output-v1"),
+                }
+                conftest.provenance.write_sanitized_json(
+                    tier_cap, "source-build.json", receipt)
+                return receipt
+
+            def host(args, **_kwargs):
+                calls.append(args)
+                if args == ["docker", "info"]:
+                    return cp(args)
+                if args[:3] == ["docker", "run", "-d"]:
+                    Path(args[args.index("--cidfile") + 1]).write_text(CID + "\n")
+                    return cp(args)
+                if args == ["docker", "rm", "-f", CID]:
+                    return cp(args)
+                if args == ["docker", "inspect", CID]:
+                    return cp(args, rc=1,
+                              err="Error: No such container: " + CID)
+                raise AssertionError(args)
+
+            def container_run(self, *args, **_kwargs):
+                return cp(args)
+
+            real_atomic = conftest.provenance.atomic_write_manifest
+            with mock.patch.dict(os.environ, {"TIER1_ENV_FILE": str(envf)}), \
+                    mock.patch.object(conftest, "RESULTS", results), \
+                    mock.patch.object(conftest.shutil, "which", return_value="/fake/docker"), \
+                    mock.patch.object(conftest, "_host_command", side_effect=host), \
+                    mock.patch.object(conftest.provenance, "stage_repository_snapshot",
+                                      side_effect=stage), \
+                    mock.patch.object(conftest, "_build_source_release",
+                                      side_effect=build_source), \
+                    mock.patch.object(conftest, "_build_tier1_image", return_value=image), \
+                    mock.patch.object(conftest, "_disconnect_container_networks",
+                                      return_value="2026-10-04T00:00:02Z"), \
+                    mock.patch.object(conftest, "_installed_package_identity",
+                                      return_value=artifact), \
+                    mock.patch.object(conftest.Tier1Container, "run", new=container_run), \
+                    mock.patch.object(conftest.provenance, "atomic_write_manifest",
+                                      wraps=real_atomic) as atomic:
+                generator = conftest.tier1_container.__wrapped__(SimpleNamespace())
+                container = next(generator)
+                self.assertEqual(container.id, CID)
+                tier = next(results.glob("*/tier1"))
+                receipt_path = tier / "source-build.json"
+                terminal_receipt = json.loads(receipt_path.read_text())
+                terminal_receipt["status"] = []
+                receipt_path.write_text(json.dumps(terminal_receipt) + "\n")
+                with self.assertRaisesRegex(
+                        RuntimeError, "terminal source builder receipt is invalid"):
+                    next(generator)
+
+            self.assertIn(["docker", "rm", "-f", CID], calls)
+            self.assertIn(["docker", "inspect", CID], calls)
+            self.assertGreaterEqual(atomic.call_count, 1)
+            tier = next(results.glob("*/tier1"))
+            self.assertTrue((tier / "share").is_dir())
+            manifest = json.loads((tier / "manifest.json").read_text())
+            conftest.provenance.validate_manifest(manifest)
+            self.assertEqual(manifest["run"]["status"], "failed")
+            self.assertIn("builder-receipt-invalid",
+                          manifest["run"]["failure_codes"])
+            self.assertIn("builder-teardown-command-failed",
+                          manifest["run"]["failure_codes"])
+            terminal_builder = manifest["prime_agent"]["builder"]["teardown"]
+            self.assertEqual(terminal_builder["state"], "unknown")
+            self.assertEqual(terminal_builder["remove_outcome"],
+                             "identity_refused")
+            self.assertFalse(terminal_builder["clean"])
 
     def test_sigterm_after_cid_during_exec_and_cleanup_publishes_failed_evidence(self):
         child_source=textwrap.dedent(r'''

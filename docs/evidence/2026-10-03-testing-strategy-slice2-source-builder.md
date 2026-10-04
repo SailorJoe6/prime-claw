@@ -4,6 +4,47 @@ Date: 2026-10-03
 Bead: `prime-claw-5v7.1`
 State: replacement repair evidence; owner acceptance pending
 
+## Owner revision of published `f0441325`
+
+The owner rejected published candidate
+`f0441325f72224b6cc67802bfb917bfead6efb31`, tree
+`eced51e62925d016953569c55acedf075ad72e83`, for two bounded findings. The
+exact owner report SHA-256 is
+`f56ea2a3064c92e0ddc7b5d29ef995de72344078c9c936461bc27188aa2910d5`.
+
+This replacement correction keeps absence and command health distinct. An
+ordinary nonzero exact-CID `docker rm -f` is non-clean even if later strict
+inspection proves absence. The producer, receipt and manifest validators,
+standalone driver, and pytest fixture apply the same rule. Their public
+regressions prove the share is retained after failed removal while the existing
+successful-removal/positive-absence controls still prove deletion.
+
+JSON field types are validated before enum membership. A type-invalid but
+JSON-valid terminal source-build receipt normalizes to typed unknown builder
+ownership. The public fixture regression mutates the final receipt after a real
+fixture yield and proves exact runtime cleanup is still attempted, the writable
+share is retained, and failed terminal publication is attempted before the
+controlled error escapes.
+
+The earlier exact-`f0441325` source and pinned manifests and the real A/B B3
+proof remain corroborating lineage. They are not relabeled as execution of this
+replacement. Prior aggregate pytest counts remain reported-only because their
+raw stdout was not retained; repaired-gate output is retained separately where
+practical. Exact replacement Docker run IDs and hashes belong in the terminal
+`prime-claw-5v7.1` receipt after one clean candidate commit exists.
+
+## Bounded F1/F2 repair gates
+
+Initial repaired-boundary validation passed:
+
+- focused producer/validator/standalone/fixture gate: **11 passed, 19 subtests**;
+- affected source/provenance/driver/fixture gate: **166 passed, 128 subtests**.
+
+Raw stdout is retained under `.test-results/slice2-f1f2-repair-20261004T173602Z`. SHA-256 values are
+`2bab34fa7c073bf1ba02b3ec402327460faea8d563aa3918820ea2993409c3e5` for `focused-host.txt` and
+`193547655bfd9e80961fa3878cc2a54fc0c3e0aecbd2bad35cddb376c43fe62d` for `affected-host.txt`. These are
+host-side correction gates, not replacement exact-commit Docker evidence.
+
 ## Isolation contract
 
 Source mode uses `scripts/build-prime-agent-test-release.sh` as the single

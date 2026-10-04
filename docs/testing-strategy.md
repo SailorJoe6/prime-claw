@@ -56,10 +56,11 @@ A direct driver or pytest fixture run allocates a fresh
    root, iidfile, cidfile, build context, and metadata never enter a writable
    container mount.
 10. Remove only the captured container ID. Presence and command health remain
-   separate: target signal death, controller interruption, timeout, launch
-   error, or reap failure stays a failed teardown even if the final inspect
-   positively reports absence. Remove the workspace/share only when their
-   captured directory bindings still match.
+   separate: any ordinary nonzero removal, target signal death, controller
+   interruption, timeout, launch error, or reap failure stays a failed teardown
+   even if the final inspect positively reports absence. Remove the workspace/
+   share only when teardown is positively clean and every captured directory
+   binding still matches.
 
 Every host-side Docker wait uses `scripts/testing/bounded.py` with a validated
 positive deadline, a run-owned process group, TERM→KILL escalation, a bounded
@@ -116,13 +117,17 @@ separate disposable preparation container:
    published last.
 6. The host removes and inspects only the captured builder CID. Absence is
    established only by an allow-listed Docker `no such container/object`
-   diagnostic. Daemon, permission, transport, malformed or non-UTF8, timeout,
-   signal, launch, present, and unknown results remain unknown and non-clean.
-   The complete checkout inventory must remain exactly equal before/after.
+   diagnostic. An ordinary nonzero removal remains non-clean even when that
+   later inspection proves absence. Daemon, permission, transport, malformed or
+   non-UTF8, timeout, signal, launch, present, and unknown results also remain
+   non-clean. The complete checkout inventory must remain exactly equal before/
+   after.
 7. Builder and runtime share ownership are tracked independently. The writable
    share is deleted only after every possible owner is positively clean and
-   absent; a missing, unreadable, invalid, present, or unknown builder receipt
-   preserves it and keeps the run red. The runtime mounts the run-owned scratch
+   absent; a missing, unreadable, JSON-invalid, type-invalid, present, unknown,
+   or failed-removal builder receipt preserves it and keeps the run red. A
+   terminal receipt failure cannot bypass independent exact-ID runtime cleanup
+   or failed evidence publication. The runtime mounts the run-owned scratch
    share read/write for ordinary results and separately exposes the validated
    artifact subtree read-only at `/stage`; installation rehashes and reads only
    `/stage`. It then removes the network, records installed package metadata and

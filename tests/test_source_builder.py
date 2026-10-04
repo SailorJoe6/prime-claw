@@ -377,7 +377,10 @@ class TestHostBuilderLifecycle(unittest.TestCase):
                         ["docker", "inspect", CID]])
 
     def test_remove_failure_stays_nonclean_even_when_inspect_proves_absence(self):
-        for outcome, rc_value in (("timed_out", 124), ("signaled", -15)):
+        cases = (("exited", 1, "ordinary_nonzero"),
+                 ("timed_out", 124, "timed_out"),
+                 ("signaled", -15, "signaled"))
+        for outcome, rc_value, expected in cases:
             with self.subTest(outcome=outcome):
                 temporary, _repo, _tier, _calls, receipt, rc = self._run(
                     remove_outcome=outcome, remove_rc=rc_value)
@@ -385,7 +388,7 @@ class TestHostBuilderLifecycle(unittest.TestCase):
                     self.assertNotEqual(rc, 0)
                     teardown = receipt["builder_teardown"]
                     self.assertEqual(teardown["state"], "absent")
-                    self.assertEqual(teardown["remove_outcome"], outcome)
+                    self.assertEqual(teardown["remove_outcome"], expected)
                     self.assertFalse(teardown["clean"])
                     self.assertEqual(receipt["status"], "failed")
 
@@ -544,6 +547,94 @@ class TestSourceManifestSchema(unittest.TestCase):
 
     def test_complete_source_lineage_is_accepted(self):
         provenance.validate_manifest(self._manifest())
+
+    def _receipt(self):
+        manifest = self._manifest()
+        builder = manifest["prime_agent"]["builder"]
+        return {
+            "schema_version": 1, "status": "passed",
+            "started_at": "2026-10-03T20:00:00Z",
+            "finished_at": "2026-10-03T20:02:00Z",
+            "failure_codes": [],
+            "source": manifest["prime_agent"]["source"],
+            "source_rules": manifest["prime_agent"]["source_rules"],
+            "checkout_inventory_before": builder["checkout_inventory_before"],
+            "checkout_inventory_after": builder["checkout_inventory_after"],
+            "builder_image": builder["image"],
+            "builder_teardown": builder["teardown"],
+            "release": manifest["prime_agent"]["staged_release"],
+        }
+
+    def test_ordinary_nonzero_removal_never_releases_builder_ownership(self):
+        receipt = self._receipt()
+        receipt["builder_teardown"]["remove_outcome"] = "ordinary_nonzero"
+        with self.assertRaises(provenance.ProvenanceError):
+            provenance.source_builder_share_teardown(receipt)
+
+        receipt["status"] = "failed"
+        receipt["failure_codes"] = ["teardown-failed"]
+        receipt["builder_teardown"]["clean"] = False
+        teardown = provenance.source_builder_share_teardown(receipt)
+        self.assertEqual(teardown["state"], "absent")
+        self.assertEqual(teardown["remove_outcome"], "ordinary_nonzero")
+        self.assertFalse(teardown["clean"])
+
+        manifest = self._manifest()
+        manifest["prime_agent"]["builder"]["teardown"]["remove_outcome"] = \
+            "ordinary_nonzero"
+        with self.assertRaises(provenance.ProvenanceError):
+            provenance.validate_manifest(manifest)
+
+        manifest["run"]["status"] = "failed"
+        manifest["run"]["failure_codes"] = ["controlled-failure"]
+        with self.assertRaises(provenance.ProvenanceError):
+            provenance.validate_manifest(manifest)
+        manifest["prime_agent"]["builder"]["teardown"]["clean"] = False
+        provenance.validate_manifest(manifest)
+
+    def test_unhashable_receipt_and_manifest_fields_are_typed_rejections(self):
+        receipt_mutations = (
+            ("status",),
+            ("builder_teardown", "container_id"),
+            ("builder_teardown", "state"),
+            ("builder_teardown", "remove_outcome"),
+            ("builder_teardown", "inspect_outcome"),
+            ("builder_teardown", "verified_at"),
+        )
+        for path in receipt_mutations:
+            with self.subTest(receipt=path):
+                receipt = self._receipt()
+                target = receipt
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = []
+                with self.assertRaises(provenance.ProvenanceError):
+                    provenance.source_builder_share_teardown(receipt)
+
+        manifest_mutations = (
+            ("run", "mode"), ("run", "status"),
+            ("prime_agent", "builder", "teardown", "container_id"),
+            ("prime_agent", "builder", "teardown", "state"),
+            ("prime_agent", "builder", "teardown", "remove_outcome"),
+            ("prime_agent", "builder", "teardown", "inspect_outcome"),
+            ("prime_agent", "builder", "teardown", "verified_at"),
+            ("teardown", "state"), ("teardown", "remove_outcome"),
+            ("teardown", "inspect_outcome"),
+        )
+        for path in manifest_mutations:
+            with self.subTest(manifest=path):
+                manifest = self._manifest()
+                target = manifest
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = []
+                with self.assertRaises(provenance.ProvenanceError):
+                    provenance.validate_manifest(manifest)
+
+        manifest = self._manifest()
+        manifest["evidence"]["files"] = [{"path": [], "sha256": "a" * 64}]
+        with self.assertRaises(provenance.ProvenanceError):
+            provenance.validate_manifest(manifest)
 
     def test_changed_checkout_or_release_lineage_is_rejected(self):
         manifest = self._manifest()

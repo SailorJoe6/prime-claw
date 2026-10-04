@@ -309,7 +309,7 @@ def _remove_container(container_id: str) -> dict[str, Any]:
         state = "unknown"
         inspect_outcome = inspected.outcome
     clean = (state == "absent"
-             and remove_outcome in {"clean", "ordinary_nonzero"}
+             and remove_outcome == "clean"
              and inspect_outcome == "ordinary_nonzero")
     return {"container_id": container_id, "state": state,
             "remove_outcome": remove_outcome,

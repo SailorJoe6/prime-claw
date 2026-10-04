@@ -577,8 +577,7 @@ cleanup() {
                 ;;
         esac
         if [ "$TEARDOWN_STATE" = absent ] && \
-           { [ "$TEARDOWN_REMOVE_OUTCOME" = clean ] || \
-             [ "$TEARDOWN_REMOVE_OUTCOME" = ordinary_nonzero ]; } && \
+           [ "$TEARDOWN_REMOVE_OUTCOME" = clean ] && \
            [ "$TEARDOWN_INSPECT_OUTCOME" = ordinary_nonzero ]; then
             TEARDOWN_CLEAN=1
         else
