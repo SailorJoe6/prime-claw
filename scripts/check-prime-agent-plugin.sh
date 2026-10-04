@@ -14,6 +14,7 @@ files=(
   extension-support/handoff-prompts.ts
   extension-support/prep-chain.ts
   extension-support/reviewed-plan-support.ts
+  extension-support/role-kernel.generated.ts
   extension-support/spec-episode.ts
 )
 
@@ -22,6 +23,7 @@ managed_directories=(
   "$destination_root"
   "$destination_root/extensions"
   "$destination_root/extension-support"
+  "$destination_root/.prime-claw"
 )
 for directory in "${managed_directories[@]}"; do
   if [[ -e "$directory" || -L "$directory" ]]; then
@@ -92,8 +94,16 @@ for relative in "${files[@]}"; do
   fi
 done
 
-kernel_source="$source_root/APPEND_SYSTEM.md"
-if ! python3 "$repo_root/scripts/manage-prime-agent-append-system.py" check "$kernel_source" "$destination_root/APPEND_SYSTEM.md"; then
+legacy_append_source="$source_root/APPEND_SYSTEM.md"
+role_kernel_source="$source_root/ROLE_KERNEL.md"
+role_protocol_source="$source_root/role-protocol.json"
+role_kernel_generated="$source_root/extension-support/role-kernel.generated.ts"
+if ! python3 "$repo_root/scripts/generate-prime-agent-role-kernel.py" check \
+  "$role_kernel_source" "$role_kernel_generated"; then
+  status=1
+fi
+if ! python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" check \
+  "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"; then
   status=1
 fi
 

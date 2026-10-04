@@ -44,8 +44,9 @@ prime-claw builds on four prior projects. Read these before designing:
   walkthrough for reviewed future-folder authoring, native `/plan`, explicit
   `/implement-spec` promotion, unresolved admission handling, validation scope,
   and archived design provenance.
-- [lab-global-plugin.md](lab-global-plugin.md) — the supported eight-file
-  managed plugin layout, staged deployment, full-restart cutover, and rollback.
+- [lab-global-plugin.md](lab-global-plugin.md) — the bridge plugin layout,
+  selected-global-context ownership, receipt-driven recovery, staged deployment,
+  full-restart cutover, and rollback.
 - [conversation-driven-episode-oversight.md](conversation-driven-episode-oversight.md)
   — the lean managed session protocol, deterministic lifecycle mechanics,
   historical-package filtering, and temporary loaded-generation compatibility.

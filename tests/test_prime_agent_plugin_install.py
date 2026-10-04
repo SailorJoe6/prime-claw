@@ -41,6 +41,7 @@ FILES = (
     "extension-support/handoff-prompts.ts",
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
+    "extension-support/role-kernel.generated.ts",
     "extension-support/spec-episode.ts",
 )
 
@@ -240,6 +241,12 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     append = (destination / "APPEND_SYSTEM.md").read_text()
     assert "unrelated user append" in append
     assert append.count("PRIME_CLAW_CONVERSATION_IDENTITY_V1") == 1
+    context = (destination / "AGENTS.md").read_bytes()
+    kernel = (SOURCE / "ROLE_KERNEL.md").read_bytes()
+    assert context == kernel
+    manifest = json.loads((destination / ".prime-claw/role-protocol-state.json").read_text())
+    assert manifest["generation"] == "bridge"
+    assert manifest["selectedContext"]["path"] == "AGENTS.md"
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode == 0, checked.stdout + checked.stderr
 
@@ -253,7 +260,13 @@ def test_apply_is_convergent_and_preserves_unrelated_files(tier1_container, ctmp
     assert first.returncode == 0, first.stdout + first.stderr
     snapshot = {
         relative: (destination / relative).read_bytes()
-        for relative in (*FILES, "APPEND_SYSTEM.md", "extensions/unrelated.ts")
+        for relative in (
+            *FILES,
+            "AGENTS.md",
+            "APPEND_SYSTEM.md",
+            ".prime-claw/role-protocol-state.json",
+            "extensions/unrelated.ts",
+        )
     }
     second = _run_script(tier1_container, WS_APPLY, destination)
     checked = _run_script(tier1_container, WS_CHECK, destination)
@@ -274,7 +287,9 @@ def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container,
     for name in (
         "apply-prime-agent-plugin.sh",
         "check-prime-agent-plugin.sh",
+        "generate-prime-agent-role-kernel.py",
         "manage-prime-agent-append-system.py",
+        "manage-prime-agent-role-protocol.py",
         "prime-agent-plugin-target.sh",
     ):
         shutil.copy2(REPO / "scripts" / name, scripts / name)
@@ -407,7 +422,7 @@ def test_check_rejects_missing_or_stale_identity_block(tier1_container, ctmp) ->
     append.write_text("unrelated only\n")
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode != 0
-    assert "missing managed identity block" in checked.stderr
+    assert "missing or stale managed legacy APPEND block" in checked.stderr
 
 
 def test_apply_rejects_duplicate_managed_blocks_before_copying(
@@ -419,7 +434,7 @@ def test_apply_rejects_duplicate_managed_blocks_before_copying(
     (destination / "APPEND_SYSTEM.md").write_text(block + "\n" + block)
     applied = _run_script(tier1_container, WS_APPLY, destination)
     assert applied.returncode != 0
-    assert "duplicate prime-claw identity blocks" in applied.stderr
+    assert "duplicate managed markers" in applied.stderr
     assert not (destination / FILES[0]).exists()
 
 

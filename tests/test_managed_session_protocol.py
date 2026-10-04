@@ -21,6 +21,7 @@ EXPECTED_TYPESCRIPT = {
     "extension-support/handoff-prompts.ts",
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
+    "extension-support/role-kernel.generated.ts",
     "extension-support/spec-episode.ts",
 }
 
@@ -50,7 +51,7 @@ def test_lean_append_system_owns_session_and_work_control_semantics() -> None:
     assert len(source.split()) <= 250
 
 
-def test_managed_plugin_has_eight_files_and_no_retired_work_control_transport() -> None:
+def test_managed_plugin_has_nine_files_and_no_retired_work_control_transport() -> None:
     actual = {
         str(path.relative_to(MANAGED_SOURCE))
         for path in MANAGED_SOURCE.rglob("*.ts")

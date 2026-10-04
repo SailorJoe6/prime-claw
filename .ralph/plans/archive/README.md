@@ -7,6 +7,26 @@ Older sets contain specification, requirements, decisions, and execution-plan
 files; newer project-customized sets may contain a different reviewed artifact
 collection.
 
+## official-lean-session-protocol/ — Accepted predecessor lean protocol ✅ HISTORICAL (2026-10-04)
+
+These two files are the exact active plan/spec blobs replaced by promotion commit
+`6fcc4bf03b2beb09802ea9fed66a3c956be1d687`. They were recovered only from its
+sole parent `001cd228f6fca8ddd708bfde06823b0641bcfdf0`; their historical status text
+and references are intentionally unchanged.
+
+- [Archived specification](official-lean-session-protocol/SPECIFICATION.md) —
+  SHA256 `09cce8ae0898da292fb34f843b3e99b3a5144898934c7e13408a29e76ae2802a`.
+- [Archived execution plan](official-lean-session-protocol/EXECUTION_PLAN.md) —
+  SHA256 `cf9a75e45d4ccabb42e3c36feed05ef9678227bc58d9e8514aea99145cabe888`.
+- Accepted cutover commit:
+  `d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`.
+- Terminal main/bookkeeping checkpoint:
+  `62ee095cc9cfc7e88a884edec03024edf87953f0`.
+
+This archive preserves predecessor lineage only. The active official lean
+compatibility-cleanup specification and plan govern the replacement protocol.
+Nothing here authorizes landing, activation, rollback, or cleanup.
+
 ## compaction-first-phase-transitions/ — Compaction-first phase transitions ✅ COMPLETE (2026-10-02)
 
 Delivered project-local compaction-first transitions for reviewed `/plan` and

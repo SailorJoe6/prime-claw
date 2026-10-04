@@ -14,6 +14,7 @@ files=(
   extension-support/handoff-prompts.ts
   extension-support/prep-chain.ts
   extension-support/reviewed-plan-support.ts
+  extension-support/role-kernel.generated.ts
   extension-support/spec-episode.ts
 )
 
@@ -25,16 +26,24 @@ for relative in "${files[@]}"; do
   fi
 done
 
-kernel_source="$source_root/APPEND_SYSTEM.md"
-if [[ ! -s "$kernel_source" ]]; then
-  printf 'missing or empty identity kernel: %s\n' "$kernel_source" >&2
-  exit 1
-fi
+legacy_append_source="$source_root/APPEND_SYSTEM.md"
+role_kernel_source="$source_root/ROLE_KERNEL.md"
+role_protocol_source="$source_root/role-protocol.json"
+role_kernel_generated="$source_root/extension-support/role-kernel.generated.ts"
+for source_file in "$legacy_append_source" "$role_kernel_source" "$role_protocol_source" "$role_kernel_generated"; do
+  if [[ ! -s "$source_file" ]]; then
+    printf 'missing or empty role-protocol source: %s\n' "$source_file" >&2
+    exit 1
+  fi
+done
+python3 "$repo_root/scripts/generate-prime-agent-role-kernel.py" check \
+  "$role_kernel_source" "$role_kernel_generated"
 # Reject symlinked or non-directory managed roots before inspecting leaf paths.
 managed_directories=(
   "$destination_root"
   "$destination_root/extensions"
   "$destination_root/extension-support"
+  "$destination_root/.prime-claw"
 )
 for directory in "${managed_directories[@]}"; do
   if [[ -e "$directory" || -L "$directory" ]]; then
@@ -45,7 +54,8 @@ for directory in "${managed_directories[@]}"; do
   fi
 done
 
-python3 "$repo_root/scripts/manage-prime-agent-append-system.py" validate "$kernel_source" "$destination_root/APPEND_SYSTEM.md"
+python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" preflight \
+  "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"
 
 # Reject every unsafe managed TypeScript destination before the first delete or copy.
 obsolete_files=(
@@ -65,6 +75,8 @@ for relative in "${managed_destinations[@]}"; do
 done
 
 mkdir -p "$destination_root/extensions" "$destination_root/extension-support"
+python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" apply \
+  "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"
 rm -f "$destination_root/extensions/project-conversation.ts"
 for relative in "${obsolete_files[@]}"; do
   rm -f "$destination_root/$relative"
@@ -72,8 +84,6 @@ done
 for relative in "${files[@]}"; do
   install -m 0644 "$source_root/$relative" "$destination_root/$relative"
 done
-python3 "$repo_root/scripts/manage-prime-agent-append-system.py" apply "$kernel_source" "$destination_root/APPEND_SYSTEM.md"
-
 # Installation is sequential, not an atomic generation swap. The required final
 # check detects any incomplete or mixed generation before apply reports success,
 # using the same explicit target semantics selected above.

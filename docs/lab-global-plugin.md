@@ -6,12 +6,15 @@
 
 ## Source and installed layouts
 
-The builder source is deliberately inert and contains eight managed TypeScript
-files plus one managed APPEND_SYSTEM block:
+The builder source is deliberately inert. The bridge generation has one authored
+neutral kernel, one machine-readable generation selector, the retained legacy
+APPEND block, and nine managed TypeScript files:
 
 ```text
 src/prime-agent-plugin/
-  APPEND_SYSTEM.md
+  ROLE_KERNEL.md
+  role-protocol.json              # schema 1, generation=bridge
+  APPEND_SYSTEM.md                # retained compatibility block
   extensions/
     handoff-chain.ts
     reviewed-plan.ts
@@ -21,12 +24,16 @@ src/prime-agent-plugin/
     handoff-prompts.ts
     prep-chain.ts
     reviewed-plan-support.ts
+    role-kernel.generated.ts      # generated exact bytes + SHA256
     spec-episode.ts
 ```
 
-The installed copy preserves that inner layout under `~/.prime/agent/`. Prime
-Agent auto-discovers the two installed extension entry points; their relative
-imports resolve through the six installed `extension-support/` files.
+`ROLE_KERNEL.md` is the only authored neutral-kernel policy. Apply, check, Tier
+0, and Tier 1 run `scripts/generate-prime-agent-role-kernel.py check`; a stale
+checked-in generated file fails before installation. The installed copy keeps
+the TypeScript layout under `~/.prime/agent/`. Prime Agent auto-discovers the
+two extension entry points; their relative imports resolve through the seven
+installed `extension-support/` files.
 
 Do not keep plugin source or a second copy under this repository's or a managed
 project's `.prime/agent/extensions/` path. Cross-scope duplicate discovery can
@@ -70,8 +77,22 @@ of two target modes:
    refused; the conspicuous flag is required. Tier 1 may use that same path
    inside Docker because the container filesystem is the isolation boundary.
 
-Apply copies only the eight allowlisted TypeScript files. It treats these former
-managed paths as retired:
+Apply copies only the nine allowlisted TypeScript files. Before the first copy,
+`scripts/manage-prime-agent-role-protocol.py` selects exactly one global context
+candidate in Prime Agent priority order: `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`,
+then `CLAUDE.MD`. It creates `AGENTS.md` only when none exists. The manager owns
+only its distinct `prime-claw:role-kernel` marker region and introduced
+separators. It preserves unrelated bytes, LF/CRLF style, final-newline state,
+mode, uid, and gid. It records the selected path and ownership in mode-0600
+`$agentDir/.prime-claw/role-protocol-state.json`.
+
+Selection drift, a latent block in an unselected candidate, malformed or
+unowned markers, unsafe files/directories, or source/generated disagreement
+fails closed before plugin copy. Apply and check do not migrate a selected file
+implicitly. The bridge manager also retains and checks the exact legacy
+APPEND block; removing it is not part of this generation.
+
+The installer treats these former managed paths as retired:
 
 - `extensions/goal-heartbeat-work-control.ts`;
 - `extensions/goal-blocker-control.ts`; and
@@ -91,9 +112,37 @@ profile remain project-local loaded-generation compatibility resources through
 the accepted cutover gate. The plugin provides no fallback when a required
 project phase skill is missing.
 
-The APPEND manager preserves unrelated user bytes and file mode, serializes
-concurrent writes, rejects malformed markers and unsafe destinations, and
-converges byte-for-byte.
+The predecessor APPEND-only manager remains in source for bridge rollback. New
+apply/check use the role-protocol manager for both selected context and retained
+APPEND ownership. Writes serialize under one agent-root lock, reread after the
+lock, use same-directory fsync plus atomic replace, reconcile only exact dead-
+writer temp names, and converge byte-for-byte.
+
+### Selected-context recovery receipts
+
+The manager can capture a mode-0600 receipt outside `agentDir` before an isolated
+apply and restore only when every managed postimage still matches:
+
+```bash
+python3 scripts/manage-prime-agent-role-protocol.py apply \
+  src/prime-agent-plugin/role-protocol.json \
+  src/prime-agent-plugin/ROLE_KERNEL.md \
+  src/prime-agent-plugin/APPEND_SYSTEM.md \
+  /explicit/isolated/agent-dir \
+  --receipt /external/private/bridge-preimage.json
+
+python3 scripts/manage-prime-agent-role-protocol.py restore \
+  /external/private/bridge-preimage.json \
+  /explicit/isolated/agent-dir
+```
+
+Restore verifies the destination binding, receipt status, current postimage
+bytes and metadata, then recreates exact preimages. An installer-created
+`AGENTS.md` or `APPEND_SYSTEM.md` is deleted only when the receipt proves it was
+absent and its current postimage is unchanged. Any operator edit or receipt
+mismatch blocks restoration rather than deleting shared state. Gate activation
+will retain receipts in the owner-private evidence location through the external
+cutover coordinator; Slice 1 does not apply or restore the host generation.
 
 ## Cutover and rollback
 

@@ -537,6 +537,14 @@ blocks; no fallback model is allowed.
 
 ## 6. Slice 1 — Canonical kernel, safe selected-context installation, and lineage
 
+**Implementation status (2026-10-04):** candidate implemented and pushed for
+owning-Conversation review; not yet accepted. Canonical kernel SHA256 is
+`fd370726c28097b4201f538958e32ddc0af8abdb7c72d675412df0c698bb328e`.
+Evidence is recorded in
+[`docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md`](../../docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md).
+Exact candidate commit and owner disposition remain Beads/private-review facts;
+this plan does not self-reference a later commit.
+
 **Dependency:** implementation promotion only.
 
 **Capability delivered:** an isolated apply/check can install exactly one neutral
