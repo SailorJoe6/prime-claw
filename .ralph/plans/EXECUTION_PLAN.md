@@ -537,13 +537,25 @@ blocks; no fallback model is allowed.
 
 ## 6. Slice 1 — Canonical kernel, safe selected-context installation, and lineage
 
-**Implementation status (2026-10-04):** candidate implemented and pushed for
-owning-Conversation review; not yet accepted. Canonical kernel SHA256 is
-`fd370726c28097b4201f538958e32ddc0af8abdb7c72d675412df0c698bb328e`.
-Evidence is recorded in
-[`docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md`](../../docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md).
-Exact candidate commit and owner disposition remain Beads/private-review facts;
-this plan does not self-reference a later commit.
+**Revision status (2026-10-05):** candidate
+`1eba414c2157740afb45dba4661a95d9a6d63785` remains the immutable rejected
+candidate. The owning Conversation accepted five in-scope repairs on
+`prime-claw-h6w.30`: (R1) descriptor-bound no-follow safety across every
+managed parent/file and apply/check/restore; (R2) durable phase-aware apply and
+recovery across replace/fsync/receipt/final-check failures without discarded
+rollback uncertainty; (R3) complete pre-mutation receipt schema/inventory/
+destination/selection/manifest/pre/postimage validation; (R4) commit-time
+metadata, inode/identity, candidate-selection, lock, and receipt revalidation
+that preserves external changes; and (R5) adoption of only the exact accepted
+predecessor legacy APPEND block. This repaired candidate implements all five,
+adds positive, negative, fault-injection, concurrency, durability, restore, and
+replay proofs, and received PASS from the bounded independent repair rereview.
+Exact final gates are 291 Tier-0 passes, 12 native-Linux manager scenarios,
+62 Docker container passes, and a pinned Prime Agent 0.9.8 runtime-probe PASS.
+It remains unaccepted pending fresh exact-candidate owner review. Exact original
+EXPERT report SHA256 is
+`409e6a838d5da82b387fb45f6e2696892af405a636b9afc5be6ccd9d6ddacb83`;
+full chronology is on `prime-claw-h6w.30`. Do not enter Slice 2 or Gate A.
 
 **Dependency:** implementation promotion only.
 

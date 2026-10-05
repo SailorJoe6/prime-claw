@@ -4,7 +4,8 @@ Tier policy: the layout test is tier 0. Everything that runs the
 apply/check/manager install scripts is tier 1 and executes INSIDE the
 session's tier-1 container (Linux — the scripts' real target platform)
 via the `tier1_container` fixture (auto-marked `container`; see
-tests/conftest.py). Scratch lives on the same-path session share (ctmp).
+tests/conftest.py). Host fixtures are mirrored to container-native `/tmp`
+before script execution so Linux inode/uid semantics remain authoritative.
 Two choreography-heavy scenarios (SIGTERM-orphan reconciliation and
 concurrent-apply serialization) run as self-verifying in-container runners
 (tests/container/) because their pipe/pass_fds/flock choreography cannot
@@ -12,6 +13,7 @@ cross a docker exec boundary; both runners operate on container-local
 /tmp paths and print a JSON verdict.
 """
 
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -55,14 +57,45 @@ def test_source_is_outside_project_extension_discovery() -> None:
     assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*.ts")} == set(FILES)
 
 
-def _run_script(tier1_container, script: str, destination: Path):
-    """Run an install script in-container with the plugin root redirected."""
-    return tier1_container.run(
-        script,
-        env={"PRIME_AGENT_PLUGIN_ROOT": str(destination)},
+def _run_script(tier1_container, script: str, destination: Path, *, env=None):
+    """Run an install script on native Linux storage, mirroring test state.
+
+    Docker Desktop bind mounts can asynchronously remap inode and uid metadata
+    and cannot represent all case-distinct candidate names. Mirror the fixture
+    before and after the invocation so identity checks run on native storage
+    while host assertions still inspect the resulting bytes and metadata.
+    """
+    key = hashlib.sha256(str(destination).encode()).hexdigest()[:20]
+    native = f"/tmp/prime-claw-plugin-install/{key}"
+    staged = tier1_container.run(
+        "bash", "-lc",
+        'set -euo pipefail; rm -rf -- "$1"; mkdir -p -- "$(dirname "$1")"; '
+        'if [[ -e "$2" || -L "$2" ]]; then cp -a -- "$2" "$1"; fi',
+        "plugin-stage", native, str(destination),
         workdir=None,
         timeout=60,
     )
+    assert staged.returncode == 0, staged.stdout + staged.stderr
+    script_env = {"PRIME_AGENT_PLUGIN_ROOT": native}
+    if env is not None:
+        script_env.update(env)
+    result = tier1_container.run(
+        script,
+        env=script_env,
+        workdir=None,
+        timeout=60,
+    )
+    mirrored = tier1_container.run(
+        "bash", "-lc",
+        'set -euo pipefail; rm -rf -- "$2"; '
+        'if [[ -e "$1" || -L "$1" ]]; then mkdir -p -- "$(dirname "$2")"; cp -a -- "$1" "$2"; fi; '
+        'rm -rf -- "$1"',
+        "plugin-mirror", native, str(destination),
+        workdir=None,
+        timeout=60,
+    )
+    assert mirrored.returncode == 0, mirrored.stdout + mirrored.stderr
+    return result
 
 
 def _run_manager(tier1_container, mode: str, destination: Path):
@@ -491,15 +524,14 @@ def test_interrupted_sequential_install_is_not_atomic_and_check_detects_generati
     )
     fake_install.chmod(0o755)
 
-    applied = tier1_container.run(
+    applied = _run_script(
+        tier1_container,
         WS_APPLY,
+        destination,
         env={
-            "PRIME_AGENT_PLUGIN_ROOT": str(destination),
             "INSTALL_COUNTER": str(counter),
             "PATH": str(tools) + ":" + CONTAINER_PATH,
         },
-        workdir=None,
-        timeout=60,
     )
 
     assert applied.returncode == 23, applied.stdout + applied.stderr

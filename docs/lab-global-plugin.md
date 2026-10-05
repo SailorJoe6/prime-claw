@@ -89,8 +89,11 @@ mode, uid, and gid. It records the selected path and ownership in mode-0600
 Selection drift, a latent block in an unselected candidate, malformed or
 unowned markers, unsafe files/directories, or source/generated disagreement
 fails closed before plugin copy. Apply and check do not migrate a selected file
-implicitly. The bridge manager also retains and checks the exact legacy
-APPEND block; removing it is not part of this generation.
+implicitly. First bridge adoption accepts only the byte-exact predecessor
+legacy APPEND block from `src/prime-agent-plugin/APPEND_SYSTEM.md`; marker-shaped
+stale or disagreeing policy is not provenance and is rejected before the lock
+or any shared-file/plugin-copy mutation. Removing the accepted block is not
+part of this generation.
 
 The installer treats these former managed paths as retired:
 
@@ -114,9 +117,31 @@ project phase skill is missing.
 
 The predecessor APPEND-only manager remains in source for bridge rollback. New
 apply/check use the role-protocol manager for both selected context and retained
-APPEND ownership. Writes serialize under one agent-root lock, reread after the
-lock, use same-directory fsync plus atomic replace, reconcile only exact dead-
-writer temp names, and converge byte-for-byte.
+APPEND ownership. The destination, state directory, lock, candidates, APPEND,
+manifest, transaction journal, temporary files, and receipt parent/leaf are
+opened through descriptor-bound no-follow directory authorities. After
+`flock`, the lock pathname must still name the exact flocked device/inode; the
+same binding is checked at every mutation boundary so replacing the lock cannot
+create split-brain writers. Each commit and each final success seam revalidates
+the destination and state-directory identities, all four context candidates,
+the target's bytes/mode/uid/gid/device/inode, and any external receipt identity.
+A late chmod/chown, inode replacement, candidate creation or removal, parent
+swap, symlink, FIFO, or special file is preserved and fails closed instead of
+being overwritten or followed.
+
+Writes serialize under one agent-root lock. Before a shared replacement the
+manager durably records exact preimages, staged postimage identities, the exact
+three-file inventory, destination/selection binding, candidate-set snapshots,
+and transaction phase in mode-0600
+`$agentDir/.prime-claw/role-protocol-transaction.json`. Replacement, file and
+directory fsync, final installed-state validation, and receipt publication are
+inside that transaction. Receipt success always publishes mode 0600 and
+includes an external-parent directory fsync; interrupted recovery repeats that
+durability barrier before deleting the only journal. A recognized interruption
+is replayed to the exact safe side; an unknown mixed state retains an explicit
+uncertainty journal and is never guessed away. Pre-journal staging errors clean
+their temps, and restart recovery reconciles only unreferenced, exact-pattern
+dead-writer temporary files.
 
 ### Selected-context recovery receipts
 
@@ -136,13 +161,23 @@ python3 scripts/manage-prime-agent-role-protocol.py restore \
   /explicit/isolated/agent-dir
 ```
 
-Restore verifies the destination binding, receipt status, current postimage
-bytes and metadata, then recreates exact preimages. An installer-created
-`AGENTS.md` or `APPEND_SYSTEM.md` is deleted only when the receipt proves it was
-absent and its current postimage is unchanged. Any operator edit or receipt
-mismatch blocks restoration rather than deleting shared state. Gate activation
-will retain receipts in the owner-private evidence location through the external
-cutover coordinator; Slice 1 does not apply or restore the host generation.
+Receipt schema 2 is validated completely before mutation: exact top-level
+schema, destination device/inode, selected-context priority, manifest binding,
+unique `context`/`append`/`manifest` inventory, exact relative paths, candidate
+pre/postimages, regular-file types, base64, digests, mode/uid/gid, and
+file identities must all agree. The receipt must be a mode-0600 regular file
+outside `agentDir`, reached through a no-follow parent chain.
+
+Restore first validates every receipt field and every current state. It then
+uses its own durable transaction to recreate exact preimage bytes and metadata.
+An installer-created `AGENTS.md` or `APPEND_SYSTEM.md` is deleted only when the
+receipt proves it was absent and its exact current postimage is unchanged.
+Malformed inventories, unrelated in-root targets, corrupt late preimages,
+operator edits, or unknown partial states block before destructive recovery.
+A completed restore is replay-safe; an interrupted one resumes from its exact
+recorded phase. Gate activation will retain receipts in the owner-private
+evidence location through the external cutover coordinator; Slice 1 does not
+apply or restore the host generation.
 
 ## Cutover and rollback
 

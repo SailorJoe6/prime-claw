@@ -15,10 +15,26 @@ WS_PROBE = "/workspace/tests/container/role_protocol_probe.py"
 
 @pytest.mark.parametrize(
     "scenario",
-    ["priority", "preserve", "malformed", "drift", "receipt", "unsafe", "concurrent"],
+    [
+        "priority",
+        "preserve",
+        "malformed",
+        "drift",
+        "receipt",
+        "unsafe",
+        "concurrent",
+        "descriptor-safety",
+        "receipt-validation",
+        "legacy-adoption",
+        "concurrency-races",
+        "fault-recovery",
+    ],
 )
 def test_role_protocol_manager_matrix(tier1_container, croot, scenario) -> None:
-    workdir = f"{croot}/role-protocol-{scenario}-{time.time_ns()}"
+    # Filesystem identity and no-follow behavior must run on the container's
+    # native Linux filesystem. Docker Desktop bind mounts can remap inode/uid
+    # metadata asynchronously and cannot represent all case-distinct names.
+    workdir = f"/tmp/role-protocol-{scenario}-{time.time_ns()}"
     result = tier1_container.run(
         "python3",
         WS_PROBE,
@@ -29,7 +45,7 @@ def test_role_protocol_manager_matrix(tier1_container, croot, scenario) -> None:
         workdir,
         scenario,
         workdir=None,
-        timeout=120,
+        timeout=240,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     verdict = json.loads(result.stdout.strip().splitlines()[-1])

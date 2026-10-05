@@ -117,3 +117,71 @@ Raw manifest SHA256: `c8df1543224dd0b29497d6a1af77d18140b1780374e7a9ff8beb0face8
 
 No user-global apply, restart, provider call, landing, or compatibility removal
 occurred in Slice 1.
+
+
+## Repaired Slice 1 candidate after rejected `1eba414`
+
+The owning Conversation rejected candidate
+`1eba414c2157740afb45dba4661a95d9a6d63785`. Its commit, tree, review report,
+and raw evidence remain immutable. This repair implements only the five accepted
+findings recorded on `prime-claw-h6w.30`:
+
+1. descriptor-bound, no-follow authority for every managed parent and leaf;
+2. a phase-aware, fsync-backed apply/restore journal that preserves uncertainty;
+3. complete receipt schema, inventory, destination, selection, preimage,
+   postimage, identity, metadata, and ownership validation before mutation;
+4. exact commit/final-success revalidation of bytes, metadata, candidate
+   priority, parent identity, lock binding, and receipt state; and
+5. adoption of only the byte-exact predecessor APPEND marker region.
+
+The repaired manager also binds recovery to the exact staged receipt recorded in
+the journal. Old valid receipts, same-byte new-inode receipts, metadata drift,
+lock-path replacement, and unjournaled external receipt temps fail closed or are
+reconciled only by the next canonical lock holder. Prepared and applied receipt
+publication both cover synchronous journal errors and hard exits.
+
+### Repair validation
+
+Native-Linux manager matrix (container-local `/tmp`, not a Docker Desktop bind
+mount): **12 passed**. The scenarios were `priority`, `preserve`, `malformed`,
+`drift`, `receipt`, `unsafe`, `concurrent`, `descriptor-safety`,
+`receipt-validation`, `legacy-adoption`, `concurrency-races`, and
+`fault-recovery`. They include positive, negative, fault-injection,
+concurrency, durability, restore, and replay proofs.
+
+Focused plugin integration on mirrored native-Linux storage:
+**28 passed, 1 deselected** in 100.84 seconds. Docker Desktop bind mounts are
+not used as the inode/uid/case authority; host fixtures are mirrored so their
+byte and metadata assertions remain observable.
+
+Exact final Tier 0:
+
+```bash
+python3 -m pytest tests/ -q
+```
+
+Result: **291 passed, 169 skipped**, 11 deprecation warnings, 55.57 seconds.
+
+Exact final Docker-authoritative gate and pinned runtime probe:
+
+```bash
+python3 -m pytest tests/ -q -m container && scripts/test-tier1.sh --probe
+```
+
+Result: **62 passed, 398 deselected**, 11 deprecation warnings, 457.85 seconds,
+followed by PASS from the Prime Agent 0.9.8 installed-runtime probe. The
+probe installed the pinned release, applied and checked the bridge generation,
+verified `handoff`, `plan`, and `implement-spec` exactly once, and destroyed its
+ephemeral container.
+
+The independent repair rereview returned PASS after verifying exact
+journal/receipt binding, lock guarding across mutation seams, and symmetric
+prepared/applied staged-temp cleanup across error and exit replay. It made no
+repository edits.
+
+Raw ignored repair logs:
+`.test-results/official-lean-role-protocol/20261005T034700Z-slice1-repair/`
+Raw manifest SHA256: `0f8092175c9bb83bbf0ebe223f7d8be0312e8e37ac2bfef336247f902ea66d24`.
+
+No user-global apply, Prime Agent restart, provider call, landing,
+compatibility removal, finalization, or cleanup occurred in this repair pass.
