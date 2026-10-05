@@ -133,9 +133,17 @@ only. Do not apply, check, or probe a candidate against the host user-global
   side effects. The launcher captures exact iid/cid identities, verifies tags,
   normalized local digests, immutable base lineage, labels, mounts, environment,
   ports, network mode, and runtime hashes, then removes only positively owned
-  objects. A nonzero removal stays non-clean even after absence. Deferred
-  TERM/INT/HUP cannot bypass exact cleanup. The terminal manifest records clean
-  preparation, container, image, context, snapshot, and share teardown. Compare
+  objects. Directory component capabilities remain live across preparation,
+  build, mount verification, bounded no-follow iid/cid/body/status reads, and
+  cleanup; replaced aliases and special files fail closed. Before any real run
+  can publish green, a nonce handshake lets the supervisor verify the full tier
+  chain and retain a separate exact descriptor-only closure capability. Terminal
+  status/tier drift is red, while the retained fd still invalidates green in the
+  detached original inode. A nonzero removal stays non-clean even after absence.
+  Caller-owned pending signals remain caller state, while run-owned TERM/INT/HUP
+  cannot bypass exact cleanup or leave green terminal evidence. Malformed inspect structures become typed unknown and each
+  safe finalizer stage still runs independently. The terminal manifest records
+  clean preparation, container, image, context, snapshot, and share teardown. Compare
   two passed, independently verified evidence trees with
   `python3 -m scripts.testing.integration_provenance compare-runs <first> <second>`.
 

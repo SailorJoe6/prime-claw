@@ -32,7 +32,10 @@ Unsupported platforms fail. The launcher never silently uses emulation.
 Source preparation and image build are the only networked phases. Product
 assertions are offline:
 
-1. Allocate a fresh descriptor-bound result tree and repository snapshot.
+1. Allocate a fresh descriptor-bound result tree and repository snapshot. Keep
+   every public path-component descriptor and binding live through preparation,
+   build, mount verification, receipt reads, and terminal cleanup; a replaced
+   root or ancestor is rejected rather than re-resolved as new authority.
 2. Fetch the locked public commit into a run-owned temporary bare repository,
    or use `INTEGRATION_GBRAIN_MIRROR` only as a transport cache. Verify commit,
    tree, package version, and `git archive` hash. Never copy a mirror working
@@ -75,18 +78,35 @@ Inside the already-offline container, the body proves:
   local-only source registration/sync, and keyless get/search; and
 - bounded PostgreSQL fast-stop before the assertion process succeeds.
 
-The host validates and promotes only the sanitized body receipt. It re-inspects
-the unchanged boundary, removes the exact labelled container and image, and
-requires successful removal plus an exact allow-listed not-found inspection.
+The host reads iid, cid, body, and supervisor status only through bounded,
+no-follow, nonblocking regular-file primitives rooted in retained directory
+capabilities. FIFOs, links, directories, devices, oversized files, mutation, or
+root/ancestor replacement become typed failure without blocking cleanup. For a
+real run, the driver publishes a nonce-bound status record and cannot begin work
+or publish green until the supervisor has verified the full tier chain, retained
+an exact descriptor-only closure capability, and atomically acknowledged that
+nonce. Terminal and post-unmask status/tier-chain drift makes the run red; the
+fd-only capability can still exchange or neutralize a green manifest in the
+original detached inode. Dry-run is an explicit exact-launcher path and never
+claims manifest verification. The host validates and promotes only the sanitized body receipt. It re-inspects the
+unchanged capability-bound mount boundary, removes the exact labelled container
+and image, and requires successful removal plus an exact allow-listed not-found
+inspection.
 Ordinary nonzero removal remains non-clean even if absence is later proved.
-Malformed identity, label drift, daemon/transport error, timeout, signal,
-presence, or unknown state preserves possibly mounted state and keeps the run
-red. A lost iid/cid may fall back only to the exact expected tag/name; immutable
-ID plus run/contract labels and image/name bindings must match before deletion.
-The driver defers TERM/INT/HUP across ordinary Python phases, freezes them for
-exact cleanup, then returns `128+signal`. The supervisor owns the same signals
-through terminal publication and replaces any just-published success with failed
-evidence if interruption wins the boundary.
+Malformed identity, inspect row, `Config`, or `Labels`, label drift,
+daemon/transport error, timeout, signal, presence, or unknown state normalizes to
+typed unknown, preserves possibly mounted state, and keeps the run red. Recovery,
+container cleanup, image cleanup, directory cleanup, and failed publication are
+exception-isolated so one malformed stage cannot skip another independently safe
+stage. A lost iid/cid may fall back only to the exact expected tag/name;
+immutable ID plus run/contract labels and image/name bindings must match before
+deletion. The driver quarantines caller-preexisting pending TERM/INT/HUP, owns
+only signals arriving during the run, freezes and drains those signals for exact
+cleanup, then restores the caller's exact handlers, mask, and pending ownership.
+The supervisor keeps its ownership handler installed across the single terminal
+unmask, closes any signal delivered at that edge, then defines the caller-mask
+cutoff and restores each exact prior handler. Replacement failure falls back to
+neutralization, so an owned late signal cannot leave durable green evidence.
 
 `manifest.json` uses the separate `integration-v1` contract. It cross-binds the
 artifact lock, repository snapshot, immutable image, inspected container,

@@ -91,6 +91,131 @@ class OwnedDirectory:
         self.close()
 
 
+@dataclass
+class RetainedDirectory:
+    """Descriptor-only capability retained after a full-chain authorization."""
+    path: Path                 # diagnostic only; never re-resolved
+    fd: int
+    binding: ObjectBinding
+
+    def close(self) -> None:
+        if self.fd >= 0:
+            os.close(self.fd)
+            self.fd = -1
+
+    def __enter__(self) -> "RetainedDirectory":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.close()
+
+
+@dataclass
+class DirectoryAuthority:
+    """Retained descriptor chain for every public path component."""
+
+    path: Path
+    fd: int
+    binding: ObjectBinding
+    edges: list[tuple[int, str, ObjectBinding]]
+    parent_fd: int | None = None
+    name: str | None = None
+
+    def close(self) -> None:
+        descriptors = {self.fd}
+        descriptors.update(parent_fd for parent_fd, _name, _binding in self.edges)
+        if self.parent_fd is not None:
+            descriptors.add(self.parent_fd)
+        for descriptor in descriptors:
+            if descriptor is not None and descriptor >= 0:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+        self.fd = -1
+        self.parent_fd = None
+        self.edges = []
+
+    def __enter__(self) -> "DirectoryAuthority":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.close()
+
+
+def open_directory_authority(
+    path: Path | str,
+    binding: str | ObjectBinding,
+) -> DirectoryAuthority:
+    """Capture every no-follow path edge and require the expected final inode."""
+    absolute = Path(os.path.abspath(path))
+    expected = ObjectBinding.decode(binding) if isinstance(binding, str) else binding
+    flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+             | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+    opened: list[int] = []
+    edges: list[tuple[int, str, ObjectBinding]] = []
+    try:
+        current = os.open("/", flags)
+        opened.append(current)
+        for part in absolute.parts[1:]:
+            child = os.open(part, flags, dir_fd=current)
+            opened.append(child)
+            observed = ObjectBinding.from_stat(os.fstat(child))
+            if observed.mode_type != stat.S_IFDIR:
+                raise ProvenanceError("directory-authority edge is not a directory")
+            edges.append((current, part, observed))
+            current = child
+        observed = ObjectBinding.from_stat(os.fstat(current))
+        if observed != expected or observed.mode_type != stat.S_IFDIR:
+            raise ProvenanceError("directory-authority binding changed")
+        parent_fd = os.dup(edges[-1][0]) if edges else None
+        return DirectoryAuthority(
+            absolute, current, expected, edges, parent_fd,
+            edges[-1][1] if edges else None)
+    except BaseException:
+        for descriptor in set(opened):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        raise
+
+
+def verify_directory_authority(root: DirectoryAuthority) -> None:
+    """Verify every retained edge without resolving a fresh path alias."""
+    if root.fd < 0:
+        raise ProvenanceError("directory authority is closed")
+    if ObjectBinding.from_stat(os.fstat(root.fd)) != root.binding:
+        raise ProvenanceError("directory authority changed")
+    flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+             | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+    for parent_fd, name, expected in root.edges:
+        check_fd = None
+        try:
+            check_fd = os.open(name, flags, dir_fd=parent_fd)
+            if ObjectBinding.from_stat(os.fstat(check_fd)) != expected:
+                raise ProvenanceError("directory authority public edge changed")
+        except OSError as exc:
+            raise ProvenanceError("directory authority public edge changed") from exc
+        finally:
+            if check_fd is not None:
+                os.close(check_fd)
+
+
+def retain_directory_authority(root: DirectoryAuthority) -> RetainedDirectory:
+    """Freeze one fully verified authority into an exact fd-only capability."""
+    verify_directory_authority(root)
+    fd = os.dup(root.fd)
+    try:
+        observed = ObjectBinding.from_stat(os.fstat(fd))
+        if observed != root.binding or observed.mode_type != stat.S_IFDIR:
+            raise ProvenanceError("retained directory capability changed")
+        return RetainedDirectory(path=root.path, fd=fd, binding=observed)
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 def open_owned_directory(
     path: Path | str,
     binding: str | ObjectBinding,
@@ -412,10 +537,10 @@ def write_sanitized_json(root: OwnedDirectory, relative: str | Path,
                          value: Any) -> ObjectBinding:
     """Validate and create one sanitized JSON file below a live capability."""
     _assert_sanitized(value)
-    _verify_owned_public_name(root)
+    verify_owned_directory(root)
     published = _publish_owned_bytes(
         root, relative, canonical_json(value).encode("utf-8"))
-    _verify_owned_public_name(root)
+    verify_owned_directory(root)
     return published
 
 
@@ -463,12 +588,17 @@ def invalidate_sanitized_json(
         raise
 
 
-def read_sanitized_json(root: OwnedDirectory, relative: str | Path) -> Any:
+def read_sanitized_json(
+    root: OwnedDirectory | DirectoryAuthority,
+    relative: str | Path,
+) -> Any:
+    verify_owned_directory(root)
     parent_fd, name = _open_parent_fd(root, relative)
     try:
         raw = _read_evidence_file(parent_fd, name, str(PurePosixPath(relative)))
     finally:
         os.close(parent_fd)
+    verify_owned_directory(root)
     try:
         value = json.loads(raw.decode("utf-8", "strict"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -482,7 +612,15 @@ def _directory_open_flags() -> int:
             | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
 
 
-def _verify_owned_public_name(root: OwnedDirectory) -> None:
+def _verify_owned_public_name(
+    root: OwnedDirectory | DirectoryAuthority | RetainedDirectory,
+) -> None:
+    if isinstance(root, DirectoryAuthority):
+        verify_directory_authority(root)
+        return
+    if isinstance(root, RetainedDirectory):
+        verify_owned_directory(root)
+        return
     check_fd = None
     try:
         if root.parent_fd is not None and root.name is not None:
@@ -716,6 +854,151 @@ def _open_parent_fd(root: OwnedDirectory, relative: str | Path) -> tuple[int, st
     except BaseException:
         os.close(fd)
         raise
+
+
+def verify_owned_directory(
+    root: OwnedDirectory | DirectoryAuthority | RetainedDirectory,
+) -> None:
+    """Prove a retained capability is live under its authorization model."""
+    if isinstance(root, DirectoryAuthority):
+        verify_directory_authority(root)
+        return
+    if root.fd < 0:
+        raise ProvenanceError("owned directory capability is closed")
+    observed = ObjectBinding.from_stat(os.fstat(root.fd))
+    if observed != root.binding or observed.mode_type != stat.S_IFDIR:
+        raise ProvenanceError("owned directory capability changed")
+    if isinstance(root, RetainedDirectory):
+        return
+    try:
+        _assert_root_binding(root.path, root.fd)
+    except ProvenanceError as exc:
+        raise ProvenanceError("owned directory public binding changed") from exc
+
+
+def read_owned_regular_bytes(
+    root: OwnedDirectory,
+    relative: str | Path,
+    *,
+    max_bytes: int = 1024 * 1024,
+) -> bytes:
+    """Read one bounded regular file through a retained directory capability."""
+    if not isinstance(max_bytes, int) or max_bytes < 0:
+        raise ProvenanceError("invalid owned-file size limit")
+    verify_owned_directory(root)
+    parent_fd, name = _open_parent_fd(root, relative)
+    fd = None
+    try:
+        before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        fd = os.open(
+            name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
+            raise ProvenanceError("owned file is not a regular file")
+        before_key = (before.st_dev, before.st_ino, before.st_mode)
+        opened_key = (opened.st_dev, opened.st_ino, opened.st_mode)
+        if before_key != opened_key:
+            raise ProvenanceError("owned file changed while it was opened")
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(fd, min(64 * 1024, max_bytes + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > max_bytes:
+                raise ProvenanceError("owned file exceeds its size limit")
+        after = os.fstat(fd)
+        stable = (opened.st_dev, opened.st_ino, opened.st_mode,
+                  opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns)
+        final = (after.st_dev, after.st_ino, after.st_mode,
+                 after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        if final != stable:
+            raise ProvenanceError("owned file changed while it was read")
+        verify_owned_directory(root)
+        return b"".join(chunks)
+    except FileNotFoundError:
+        raise
+    except OSError as exc:
+        raise ProvenanceError("owned file is unsafe or unavailable") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+        os.close(parent_fd)
+
+
+def read_owned_regular_text(
+    root: OwnedDirectory,
+    relative: str | Path,
+    *,
+    max_bytes: int = 1024 * 1024,
+) -> str:
+    try:
+        return read_owned_regular_bytes(
+            root, relative, max_bytes=max_bytes).decode("utf-8", "strict")
+    except UnicodeDecodeError as exc:
+        raise ProvenanceError("owned file is not valid UTF-8") from exc
+
+
+def require_owned_entry_absent(
+    root: OwnedDirectory | DirectoryAuthority,
+    relative: str | Path,
+) -> None:
+    """Require a descendant name to be absent without following any object."""
+    verify_owned_directory(root)
+    parent_fd, name = _open_parent_fd(root, relative)
+    try:
+        try:
+            os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            verify_owned_directory(root)
+            return
+        raise ProvenanceError("owned entry already exists")
+    except OSError as exc:
+        raise ProvenanceError("owned entry absence is unknown") from exc
+    finally:
+        os.close(parent_fd)
+
+
+def write_owned_regular_bytes(
+    root: OwnedDirectory | DirectoryAuthority,
+    relative: str | Path,
+    payload: bytes,
+    *,
+    mode: int = 0o600,
+) -> ObjectBinding:
+    """Create one regular file relative to a retained directory capability."""
+    if not isinstance(payload, bytes):
+        raise ProvenanceError("owned-file payload must be bytes")
+    verify_owned_directory(root)
+    parent_fd, name = _open_created_parent_fd(root.fd, relative)
+    fd = None
+    try:
+        fd = os.open(
+            name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            mode,
+            dir_fd=parent_fd,
+        )
+        binding = ObjectBinding.from_stat(os.fstat(fd))
+        if binding.mode_type != stat.S_IFREG:
+            raise ProvenanceError("owned-file target is not regular")
+        _write_all(fd, payload)
+        os.fsync(fd)
+        verify_owned_directory(root)
+        return binding
+    except OSError as exc:
+        raise ProvenanceError("owned regular-file creation failed") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+        os.close(parent_fd)
 
 
 def _open_created_parent_fd(root_fd: int, relative: str | Path) -> tuple[int, str]:
@@ -1347,6 +1630,75 @@ def remove_owned_directory(
     _detach_and_remove_owned(
         Path(path), expected, quarantine_parent=Path(quarantine_parent),
         quarantine_binding=quarantine_expected)
+
+
+def remove_directory_authority(
+    root: DirectoryAuthority,
+    *,
+    quarantine: DirectoryAuthority,
+) -> None:
+    """Detach and clear one exact child using only retained parent capabilities."""
+    verify_directory_authority(root)
+    verify_directory_authority(quarantine)
+    if root.parent_fd is None or root.name is None:
+        raise ProvenanceError("refusing to remove a filesystem root")
+    quarantine_parent_fd = os.dup(quarantine.fd)
+    quarantine_fd = None
+    detached_fd = None
+    quarantine_name = f".prime-claw-quarantine-{secrets.token_hex(16)}"
+    created_binding = None
+    try:
+        os.mkdir(quarantine_name, 0o700, dir_fd=quarantine_parent_fd)
+        created_binding = ObjectBinding.from_stat(os.stat(
+            quarantine_name, dir_fd=quarantine_parent_fd,
+            follow_symlinks=False))
+        quarantine_fd = os.open(
+            quarantine_name,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=quarantine_parent_fd,
+        )
+        quarantine_stat = os.fstat(quarantine_fd)
+        if (ObjectBinding.from_stat(quarantine_stat) != created_binding
+                or created_binding.mode_type != stat.S_IFDIR
+                or stat.S_IMODE(quarantine_stat.st_mode) & 0o077):
+            raise ProvenanceError("cleanup quarantine is not private")
+        detached_name = f"owned-{secrets.token_hex(16)}"
+        _rename_noreplace(
+            root.parent_fd, root.name, quarantine_fd, detached_name)
+        detached_fd = os.open(
+            detached_name,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=quarantine_fd,
+        )
+        if ObjectBinding.from_stat(os.fstat(detached_fd)) != root.binding:
+            raise ProvenanceError(
+                "cleanup detached a replacement; preserved in quarantine")
+        _clear_owned_directory_fd(detached_fd)
+        if ObjectBinding.from_stat(os.stat(
+                detached_name, dir_fd=quarantine_fd,
+                follow_symlinks=False)) != root.binding:
+            raise ProvenanceError("quarantined directory changed during cleanup")
+        os.rmdir(detached_name, dir_fd=quarantine_fd)
+        os.fsync(quarantine_fd)
+        os.close(quarantine_fd)
+        quarantine_fd = None
+        if ObjectBinding.from_stat(os.stat(
+                quarantine_name, dir_fd=quarantine_parent_fd,
+                follow_symlinks=False)) != created_binding:
+            raise ProvenanceError("cleanup quarantine binding changed")
+        os.rmdir(quarantine_name, dir_fd=quarantine_parent_fd)
+        os.fsync(quarantine_parent_fd)
+    except OSError as exc:
+        raise ProvenanceError("owned-directory authority cleanup failed") from exc
+    finally:
+        for descriptor in (detached_fd, quarantine_fd, quarantine_parent_fd):
+            if descriptor is not None:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
 
 
 def stage_repository_snapshot(repo: Path | str,

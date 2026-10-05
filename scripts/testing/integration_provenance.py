@@ -6,6 +6,7 @@ from datetime import datetime
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 from typing import Any
@@ -207,7 +208,8 @@ def safe_image_identity(raw: Any, *, expected_id: str, run_id: str,
 
 def safe_container_boundary(raw: Any, *, expected_id: str, image_id: str,
                             run_id: str, name: str,
-                            repository_source: Path, result_source: Path) -> dict[str, Any]:
+                            repository_authority: p.DirectoryAuthority,
+                            result_authority: p.DirectoryAuthority) -> dict[str, Any]:
     if not isinstance(raw, dict) or raw.get("Id") != expected_id or not _CID.fullmatch(expected_id):
         raise p.ProvenanceError("container inspect identity mismatched cidfile")
     if raw.get("Image") != image_id or raw.get("Name") != "/" + name:
@@ -241,9 +243,11 @@ def safe_container_boundary(raw: Any, *, expected_id: str, image_id: str,
     if observed_env != expected_env or any(re.search(r"TOKEN|SECRET|PASSWORD|COOKIE|CREDENTIAL|API_KEY", key, re.I) for key in observed_env):
         raise p.ProvenanceError("container environment is not allow-listed")
     mounts = raw.get("Mounts")
+    p.verify_directory_authority(repository_authority)
+    p.verify_directory_authority(result_authority)
     expected = {
-        "/workspace": (repository_source.resolve(), False, "bind"),
-        "/results": (result_source.resolve(), True, "bind"),
+        "/workspace": (Path(os.path.abspath(repository_authority.path)), False, "bind"),
+        "/results": (Path(os.path.abspath(result_authority.path)), True, "bind"),
     }
     if not isinstance(mounts, list) or len(mounts) != 2:
         raise p.ProvenanceError("container mount set drifted")
@@ -256,7 +260,11 @@ def safe_container_boundary(raw: Any, *, expected_id: str, image_id: str,
             raise p.ProvenanceError("container mount set repeats a destination")
         seen_destinations.add(mount["Destination"])
         source, rw, kind = expected[mount["Destination"]]
-        if Path(str(mount.get("Source"))).resolve() != source or mount.get("RW") is not rw or mount.get("Type") != kind:
+        observed_source = mount.get("Source")
+        if (not isinstance(observed_source, str)
+                or not Path(observed_source).is_absolute()
+                or Path(os.path.abspath(observed_source)) != source
+                or mount.get("RW") is not rw or mount.get("Type") != kind):
             raise p.ProvenanceError("container mount set drifted")
         safe_mounts.append({"destination": mount["Destination"], "read_write": rw, "type": kind})
     if seen_destinations != set(expected):

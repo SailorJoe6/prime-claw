@@ -49,6 +49,18 @@ prevented terminal-manifest publication. The incomplete red root is retained at
 `.test-results/slice3-dev1-20261004T184717Z/`. It is not acceptance evidence.
 The repair uses a non-sensitive key and has a direct sanitizer regression.
 
+### Revision status-IPC red
+
+The first exact run of the owner-requested revision stopped before any image
+build or container creation. The supervisor status channel used the sanitized
+evidence writer for its ephemeral local `tier_dir`; the evidence sanitizer
+correctly rejected that host path. Retained outer log:
+`.test-results/slice3-replacement-43e594068d98-run1/outer.log` SHA-256 `fa2cd9dbd48607172ff237d9b455f7529833ed4043bcb59f504b0aa278b25652`. Run `20261005T002723Z-27261-03a52d18` published only a
+non-green preparation receipt, and exact label-filter checks found no container
+or image for that run. The repair keeps the channel descriptor-bound and bounded
+but writes canonical private IPC bytes rather than treating the local path as
+durable sanitized evidence. A direct status round-trip regression covers it.
+
 ### First green environment proof
 
 Run `20261004T185004Z-50970-05ca4d85` passed under
@@ -100,33 +112,80 @@ tables, exact body attestation, and clean preparation/container/image/context/
 snapshot/share teardown. Independent label-filter inspection found no remaining
 run-owned Docker object.
 
-This is repaired implementation evidence, not the final exact-candidate pair,
-because documentation and receipts were still changing. Final exact-candidate
-two-run receipts will be appended before publication.
+This run is repaired development evidence. The later exact candidate
+`6d6f7ee7bbb208b88c798fe4c469188930f07579` produced two independently
+verified manifests (`7dafc77e8c44031ca5bf7d29f75a9b006f0179b90b6000b8526a8c7bb5987dcc`
+and `f8cbc622598ab5e5bc163f1916115610c281a2f61f8e4d2530cc113fa73eefcb`),
+but the owner rejected that candidate for failure-path defects. Those receipts
+remain regression baselines, not acceptance evidence. Terminal exact-candidate
+receipts are recorded in the Bead and owner packet after a candidate is frozen;
+the tracked document is not edited after exact-commit validation.
+
+### Owner-requested failure-path revision
+
+The authoritative owner report SHA-256 is
+`1e8e1f94f19221e6682a1dc17b4cc0e56fc78f9b503445f05bd591523ca5c759`.
+The bounded revision:
+
+- retains a no-follow descriptor/binding chain for every public directory
+  component through preparation, build, mount validation, reads, and cleanup;
+- reads iid, cid, body, and supervisor status as bounded, stable regular files
+  with `O_NOFOLLOW|O_NONBLOCK`, rejecting links, FIFOs, directories, devices,
+  oversized content, mutation, and replaced ancestors; a nonce ACK prevents any
+  real driver from publishing green before the supervisor retains both the full
+  tier chain and an fd-only terminal-closure capability;
+- quarantines and restores caller-preexisting pending signals while owning only
+  run-arrival TERM/INT/HUP, and closes green evidence through supervisor handler
+  restoration with descriptor-only invalidation even after status/tier root or
+  ancestor replacement;
+- normalizes malformed Docker inspect row/`Config`/`Labels` structures to typed
+  unknown; and
+- isolates recovery, exact container/image cleanup, directory cleanup, and
+  failed-manifest publication so one malformed stage cannot skip another safe
+  stage.
 
 ## Contract tests
 
-The focused pure gate covers lock shape, exact absence diagnostics,
-ordinary-nonzero cleanup, boundary drift, sanitizer safety, verified run
-disjointness, manifest/body tampering and cross-binding, explicit-body
-placement, pinned Dockerfile, dry-run isolation, partial build/create recovery,
-exact tag/name/ID cleanup, directory retention, deferred signals through the
-real bounded wrapper, supervisor closure, and plain-host collection/direct
-invocation.
+The current focused Slice-3 file covers **124 tests**: lock and boundary shape,
+exact absence, ordinary-nonzero cleanup, sanitizer and evidence cross-binding,
+two-run disjointness, root/ancestor republishing, mount alias replacement,
+FIFO/special-file reads, iid/cid/body/status authority, caller pending/mask/
+handler ownership, real TERM/INT/HUP restoration races, replacement-failure
+neutralization, malformed inspect matrices, partial-create cleanup, and
+exception-isolated public finalization.
 
 ## Host gates
 
-- Focused Slice-3 file: **33 passed**.
-- Integration plus accepted Tier-1 signal regression: **124 passed, 68
-  subtests passed**. This specifically proved the test harness restores the
-  caller signal mask/handlers after simulating production process exit.
-- Full Docker-free host suite: **394 passed, 149 skipped, 130 subtests passed**
-  in 169.81 seconds. Skips are explicit environment tiers.
-- Both read-only preflight reviewers reported PASS after the signal-finalizer
-  and exact-tag fallback repairs.
+Fresh revision gates before candidate freeze:
 
-These are pre-commit gates. Exact-candidate Docker receipts are recorded below
-only after the candidate commit is frozen.
+- focused Slice-3: **124 passed**; and
+- integration plus Tier-1 signal set: **269 passed, 98 subtests passed**.
+
+The final retained-tier-handshake source full-host gate passed **485 tests,
+149 skipped, 130 subtests** in 179.88 seconds. Retained raw log:
+`.test-results/slice3-final-b12-host-20261005T040024Z/full-host.log` SHA-256
+`ae072fc715c31f8f2c5a73bf406424509ca026cda97f1263609fa58aaa540376`.
+The prior 424-, 433-, and 434-test checkpoints remain retained history but are
+superseded by this final source run.
+
+The earlier **89 + 30**, **124 + 68**, and full-host **394 passed / 149 skipped /
+130 subtests** totals belong to the rejected candidate and lack retained raw
+stdout. They remain historical reported-only context, not replayed revision
+evidence. Replacement full-host and exact-Docker evidence is recorded only after
+those sequential gates run on the final source and frozen commit.
+
+### Final-review repair checkpoint
+
+Independent review report SHA-256
+`d745fb257eff01c82b0f97aefe03fdb314f5a8151014a4a5e337169807d13baa`
+blocked the first replacement on a shadowed unsafe identity helper and a
+status-loss false-green boundary. The unsafe duplicate was removed. Producer
+iid/cid tests now exercise special leaves and replaced roots through the real
+build/create consumers. Real runs use the nonce ACK and retained tier closure
+capability described above. Seeded-green tests cover status and tier root/
+ancestor loss, child exit 0/7, and late TERM/INT/HUP; every detached original
+manifest becomes failed. The same reviewer returned PASS for the repaired B1/B2
+boundary before final source freeze.
 
 ## Accepted boundaries and limitations
 

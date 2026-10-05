@@ -1,5 +1,20 @@
 # Project-wide testing strategy — isolation-first test architecture
 
+> **ACTIVE SLICE 3 REVISION CONTRACT — owner-rejected `6d6f7ee`.** Candidate
+> `6d6f7ee7bbb208b88c798fe4c469188930f07579` / tree
+> `5f17a2dd25fda6d47eef00771575bd5c4802a402` is revision history, not accepted.
+> Authoritative owner report SHA-256:
+> `1e8e1f94f19221e6682a1dc17b4cc0e56fc78f9b503445f05bd591523ca5c759`.
+> Preserve the exact lock and validated ordinary integration behavior. The
+> bounded revision is F1 retained descriptor/binding authority plus bounded
+> no-follow regular-file iid/cid/body/status reads and swap/FIFO tests; F2 signal
+> ownership through restoration/unmask with non-green late-signal evidence; F3
+> typed malformed-inspect recovery plus exception-isolated finalizer stages; and
+> F4 exact separation/restoration of caller-blocked or pre-existing pending
+> signal state. Missing raw output remains reported-only and stale future tense
+> must be corrected truthfully. Implement only Slice 3, produce one fully
+> revalidated pushed replacement, and stop. Slice 4 and later remain closed.
+
 > **ACTIVE SLICE 3 CONTRACT — Slice 2 owner-accepted.** Exact accepted Slice-2
 > commit/tree: `56afd99d3a4b5411eb37fb42210ffb36c8bf2b84` /
 > `034765f6c8f1a3d027e010ebb751538d55fabdaf`. Owner PASS report SHA-256:

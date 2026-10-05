@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "prime-claw",
-  "phase": "1 \u2014 de-risk gate",
+  "phase": "1 — de-risk gate",
   "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
   "requirements": [
     {
@@ -837,7 +837,7 @@
       "priority": "NICE",
       "phase": 2,
       "slice": 6,
-      "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
+      "summary": "Host exposure of sandboxed Postgres on localhost:5433 — documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
       "status": "documented (Slice 6; no host forward by design)",
       "proven_by": {
         "check": [
@@ -1135,7 +1135,7 @@
       "id": "R-T1-1",
       "priority": "P1",
       "summary": "Tier-1 slim test container image + standalone driver: docker/test.Dockerfile (Ubuntu 24.04 + Node 22 + python3/pytest), scripts/test-tier1.sh builds the image and runs one ephemeral container; --smoke, --dry-run (never contacts Docker), --rebuild; informational paths are Docker-free.",
-      "status": "met (slice 1, EXPERT PASS on 2666843 \u2261 b2f6b86)",
+      "status": "met (slice 1, EXPERT PASS on 2666843 ≡ b2f6b86)",
       "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
       "proven_by": {
         "apply": [
@@ -1331,7 +1331,7 @@
     {
       "id": "R-TEST-3",
       "priority": "GATE",
-      "summary": "Tier 2 provides a credential-free plain-Docker PostgreSQL 16, pgvector, exact-gbrain environment with fixture-owned database, home, corpus, and local bare remote.",
+      "summary": "Tier 2 provides a credential-free plain-Docker PostgreSQL 16, pgvector, exact-gbrain environment with fixture-owned database, home, corpus, and local bare remote, retaining component-bound filesystem authority through build, mount, reads, and teardown.",
       "status": "implemented and empirically green on native linux/arm64; owner acceptance pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 3)",
       "proven_by": {
@@ -1379,7 +1379,7 @@
     {
       "id": "R-TEST-5",
       "priority": "GATE",
-      "summary": "Tier-1 launchers use exact iidfile/cidfile identities, child-mask-preserving bounded process groups, typed target/controller signal outcomes, and exception-safe exact-ID cleanup/publication.",
+      "summary": "Tier launchers use exact iidfile/cidfile identities, bounded process groups, typed target/controller outcomes, caller-owned pending-signal preservation, nonce-acknowledged retained tier closure, through-restoration terminal invalidation, and exception-safe exact-ID cleanup/publication.",
       "status": "proven for owner-accepted tier 1 and Slice-3 exact iid/cid image/container lifecycle with owner acceptance pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
@@ -1435,7 +1435,7 @@
     {
       "id": "R-TEST-7",
       "priority": "GATE",
-      "summary": "Tier-1 mounts only a descriptor-secured repository snapshot read-only plus a fresh scratch share writable; durable evidence, host home, sockets, credentials, and arbitrary checkouts are never mounted.",
+      "summary": "Tier-1 and integration launchers mount only a component-capability-bound repository snapshot read-only plus a fresh result share writable; replaced roots/ancestors and special receipts are rejected, while an acknowledged fd-only tier capability can invalidate detached green evidence without authorizing replacement aliases; host home, sockets, credentials, and arbitrary checkouts remain excluded.",
       "status": "proven for owner-accepted tier 1; Slice-3 repository:ro plus results:rw offline boundary implemented with owner acceptance pending",
       "plan": ".ralph/plans/SPECIFICATION.md",
       "proven_by": {
@@ -1497,7 +1497,7 @@
     {
       "id": "R-TEST-10",
       "priority": "GATE",
-      "summary": "Slice-1 safety has producer-specific negative/replay tests for path/special-file swaps, framed identity, pre-write sanitization/redaction, signal masks/death/publication, every standalone failure/timeout phase, stale evidence, and concurrent allocation.",
+      "summary": "Safety coverage includes status/tier root/ancestor/leaf and special-file swaps, nonce ACK typing, fd-only detached-evidence invalidation, framed identity, sanitization/redaction, signal mask/pending/handler ownership, late-signal publication closure, malformed inspect typing, partial-create finalizer isolation, stale evidence, and concurrent allocation.",
       "status": "proven for owner-accepted Slice-1/Slice-2 components; Slice-3 identity, drift, absence, cleanup, and two-run negative coverage implemented with owner acceptance pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {

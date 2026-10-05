@@ -1,5 +1,41 @@
 # Execution plan — project-wide isolation-first testing strategy
 
+> **SLICE 3 OWNER DISPOSITION — REVISE `6d6f7ee` (2026-10-04).** Exact
+> candidate `6d6f7ee7bbb208b88c798fe4c469188930f07579`, tree
+> `5f17a2dd25fda6d47eef00771575bd5c4802a402`, is rejected for advancement.
+> The authoritative owner report is retained externally with SHA-256
+> `1e8e1f94f19221e6682a1dc17b4cc0e56fc78f9b503445f05bd591523ca5c759`;
+> the accepted findings are also recorded on `prime-claw-5v7.5`. Preserve the
+> validated normal gbrain/PostgreSQL/pgvector/local-Git behavior, exact lock
+> identities, two-run disjointness contract, manifests, and all accepted
+> Slice-1/Slice-2 boundaries. Repair only these Slice-3 findings:
+>
+> 1. **F1/P1 — retained filesystem authority:** carry captured descriptor/binding
+>    authority through preparation, build, mount, and receipt-read boundaries.
+>    Never authorize a freshly resolved replacement root or ancestor. Read
+>    iid/cid/body/status only with bounded no-follow regular-file primitives.
+>    Add producer-level root/ancestor/file swap and FIFO/special-file regressions,
+>    including signal-blocked cleanup.
+> 2. **F2/P1 — complete signal closure:** own TERM/INT/HUP through prior-handler
+>    restoration and unmask. Every owned late signal must make public evidence
+>    non-green even if replacement/publication fails. Add a real-signal boundary
+>    matrix covering each closure edge.
+> 3. **F3/P2 — typed recovery and isolated finalization:** type-check and
+>    normalize malformed Docker inspect row/Config/Labels values to typed unknown.
+>    Isolate finalizer stages so malformed recovery cannot skip independently safe
+>    container/image cleanup or truthful failed publication. Exercise malformed
+>    partial-create cases through the public launcher.
+> 4. **F4/P2 — caller signal ownership:** distinguish caller-blocked and
+>    pre-existing pending watched signals from run-owned signals. Preserve the
+>    caller's exact mask, pending ownership, and handlers on every exit, with
+>    deterministic ownership tests.
+>
+> Treat missing raw host/compare/label stdout and stale evidence future tense
+> truthfully; retain repaired raw evidence where practical. Re-run invalidated
+> and final gates sequentially, update docs/inventory/evidence/Bead, publish one
+> clean pushed replacement candidate, and stop for owner review. Do not start
+> Slice 4 or later work.
+
 > **SLICE 2 OWNER ACCEPT — ADVANCE TO SLICE 3 (2026-10-04).** Exact Slice-2
 > commit `56afd99d3a4b5411eb37fb42210ffb36c8bf2b84`, tree
 > `034765f6c8f1a3d027e010ebb751538d55fabdaf`, is accepted and
@@ -553,6 +589,12 @@ PostgreSQL/gbrain environment with exact provenance and fixture-owned Git.
 
 ### Implementation receipt
 
+- **Owner-revision host checkpoint:** F1-F4 are implemented against owner report
+  SHA-256 `1e8e1f94f19221e6682a1dc17b4cc0e56fc78f9b503445f05bd591523ca5c759`. Fresh no-Docker gates passed: Slice-3 **124**,
+  integration/Tier-1 signal set **269 + 98 subtests**, and full host **485
+  passed, 149 skipped, 130 subtests**. Terminal raw full-host log SHA-256:
+  `ae072fc715c31f8f2c5a73bf406424509ca026cda97f1263609fa58aaa540376`.
+  Exact-commit Docker receipts and final replacement review remain pending.
 - **Locked environment:** the committed lock selects exact gbrain commit/tree/
   archive/package, native Bun archives, and native Ubuntu digests. The two-stage
   image embeds those values plus the compiled executable hash and selected base
@@ -566,8 +608,10 @@ PostgreSQL/gbrain environment with exact provenance and fixture-owned Git.
   side effects.
 - **Fail-closed lifecycle:** preparation, container, image, context, snapshot,
   and share have explicit three-state teardown rows. Lost iid/cid recovery uses
-  only exact run-labelled tag/name selectors. Deferred TERM/INT/HUP cannot skip
-  cleanup or terminal invalidation. Public recording-fake matrices cover partial
+  only exact run-labelled tag/name selectors. A nonce ACK prevents green
+  publication until the supervisor holds full-chain and fd-only tier authority;
+  status/tier alias loss and deferred TERM/INT/HUP cannot skip cleanup or
+  terminal invalidation. Public recording-fake matrices cover partial
   creation, identity drift, ordinary-nonzero/unknown cleanup, retained mounts,
   publication races, and `128+signal` behavior through the real bounded wrapper.
 - **Development proof:** retained red runs document the sanitizer and local
