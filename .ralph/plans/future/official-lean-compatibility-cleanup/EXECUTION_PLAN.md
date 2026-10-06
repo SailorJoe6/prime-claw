@@ -1,30 +1,26 @@
 # Execution Plan — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Independently reviewed and operator-approved for implementation by
-> `/implement-spec` on 2026-10-03. The first readiness pass correctly stopped
-> before episode creation pending final review and a durable planning commit; a
-> separate explicit `/implement-spec` replay is required.
+> **Status:** Operator-approved scope correction on 2026-10-06. Existing episode
+> `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode.
+> Paused Slice 1 must be simplified before any later slice can begin.
 >
-> **Plan review:** Prime Agent Expert PASS on exact content SHA256
-> `f3089ed84f774e95cffc8a18e82940804bdf05c750f0f19435986a17d99fdb9e` against specification SHA256
-> `c7de8047f09a2f26c45260b5b7ebe41b010c39a0208d4f23df7bbcbf18f25eec`. The only later plan changes are status/review and
-> terminal replay-gate bookkeeping plus the specification status-hash reference
-> below.
+> **Superseded review:** the 2026-10-03 plan PASS and both later Slice-1 BLOCK
+> reports remain historical evidence, but their hostile same-UID and exhaustive
+> crash-consistency assumptions no longer define acceptance.
 >
-> **Specification:** [SPECIFICATION.md](SPECIFICATION.md), current SHA256
-> `632c848c820b8979b634e33d13b741eefc8cb4cf505c91caf74096c1a63b2f6d`. The only change from independently reviewed content SHA256
-> `0428a99c18e5823bea8e863d94b084598c46476bb8126286052484683cb3f7f6` is the
-> status line recording the subsequent `/plan` and `/implement-spec` decisions.
+> **Specification:** [SPECIFICATION.md](SPECIFICATION.md), operator-corrected for
+> a trusted-local ordinary-failure model and DONE-over-perfect delivery.
 >
 > **Selected future folder:**
 > `.ralph/plans/future/official-lean-compatibility-cleanup`.
 >
-> **Tracking:** `prime-claw-h6w.30`.
+> **Tracking:** implementation `prime-claw-h6w.30`; incident
+> `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
-> **Execution shape:** one fresh `/implement-spec` episode, seven bounded
-> implementation slices, two separately authorized main/user-global activation
-> generations, one interim acceptance gate, one final acceptance gate, then
-> finalization and separately authorized physical cleanup.
+> **Execution shape:** the existing episode completes seven bounded slices only
+> as needed, with two separately authorized activation generations. Scope,
+> landing, user-global mutation, restart, UAT, finalization, bookkeeping, and
+> cleanup retain their separate authority boundaries.
 
 ## 1. Outcome
 
@@ -50,6 +46,27 @@ At completion, Prime Claw has one progressive, fail-closed role protocol:
 The same episode remains active from first implementation through bridge UAT,
 compatibility removal, final UAT, and documentation reconciliation. Passing the
 bridge does not complete or finalize the episode.
+
+### 1.1 Operator scope correction and complexity budget
+
+The 2026-10-06 operator decision supersedes incompatible later text in this
+plan. The product trusts the host, checkout, installer, destination account, and
+same-UID user during a local operation. It handles ordinary malformed state,
+accidental edits, cooperative concurrency, interrupted commands, and normal
+filesystem failure. It does not promise hostile same-UID race resistance or
+power-loss consistency at every syscall boundary.
+
+Bias toward **DONE over perfect**. The selected-context manager should remain a
+straightforward stdlib installer using ordinary validation, one cooperative
+lock, same-directory atomic replacement, and a simple fixed-inventory receipt.
+Ambiguous recovery stops and asks the operator. Descriptor chains, continuous
+inode authority, exchange/restore protocols, multi-phase journals, and exhaustive
+race/crash harnesses exceed the Slice-1 complexity budget.
+
+Review findings outside this model are recorded as advisory hardening candidates
+with promotion triggers. They do not block or silently expand scope. One normal
+review is sufficient. A third repair/review cycle is forbidden without fresh
+operator scope/architecture consultation.
 
 ## 2. Planning readiness and repository audit
 
@@ -154,38 +171,39 @@ The legacy APPEND markers remain distinct throughout the bridge. Marker-looking
 project context counts during integrity parsing and causes managed work to fail
 closed rather than being silently deduplicated.
 
-### 3.2 One guarded role-protocol manager
+### 3.2 One practical role-protocol manager
 
-Add `scripts/manage-prime-agent-role-protocol.py` as the final shared-state
-manager. It uses stdlib only and owns these exact surfaces:
+Use `scripts/manage-prime-agent-role-protocol.py` as the small stdlib manager for:
 
-- the sole managed neutral-kernel region in the selected user-global context
-  file;
-- the exact two managed global skill directories;
-- a private `$agentDir/.prime-claw/role-protocol-state.json` ownership manifest;
-- bridge retention and final removal of the exact legacy APPEND region; and
-- recovery from an externally retained installation/preimage receipt.
+- one managed neutral-kernel region in the selected global context file;
+- the two managed global skill directories;
+- a private ownership manifest with a fixed managed inventory;
+- bridge retention and later exact removal of the legacy APPEND region; and
+- simple receipt-based manual or guarded restore.
 
-Selection uses Prime Agent's exact priority: `AGENTS.md`, `AGENTS.MD`,
-`CLAUDE.md`, `CLAUDE.MD`; `AGENTS.md` is created only when none exists. The
-manager locks at the destination `agentDir`, opens parents and files with
-no-follow/regular-file checks, rereads after locking, writes temp files in the
-same directory, preserves mode/uid/gid/newline/final-newline and unrelated
-bytes, fsyncs, and atomically replaces. It records whether the selected context
-file was installer-created. Selection drift blocks apply/check; it is never
-silently repaired.
+Selection follows Prime Agent priority: `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`,
+`CLAUDE.MD`; create `AGENTS.md` only when none exists. Under one cooperative
+`agentDir` lock, validate the selected target, reread it, preserve unrelated
+bytes/newline form/ordinary metadata, and perform an ordinary same-directory
+atomic replacement. Reject malformed markers and obvious symlink, non-regular,
+or unreadable targets visible during validation. Detect an ordinary changed
+preimage before final replacement and stop.
 
-A tracked `src/prime-agent-plugin/role-protocol.json` declares exactly one
-source generation: `bridge` in Generation A and `final` in Generation B. Shell
-apply/check does not accept a phase override that could activate the wrong
-behavior. Bridge installs the neutral context and both skills while retaining
-and checking the legacy APPEND block. Final installs the same neutral context
-and skills while removing only the exact legacy APPEND region.
+The receipt records the fixed owned inventory, pre/post hashes, preimages, and
+whether the context file was installer-created. Restore only known pre/post
+states. Unknown state causes refusal and manual instructions. Never delete a
+pre-existing context file; delete an installer-created file only when it still
+matches its known created state.
 
-The existing append manager remains available during bridge rollback. Final
-source may remove it only after the new manager proves exact legacy removal and
-receipt-driven restoration. Installer-created empty files are deleted only when
-the manifest proves ownership and no unrelated bytes remain.
+The receipt is diagnostic recovery material, not a tamper-proof authority
+against the local owner. Do not implement multi-phase transaction journals,
+continuous descriptor/inode authority, hostile same-UID ABA/FIFO defenses, or
+power-loss proofs. Preserve such ideas only as advisory hardening candidates.
+
+`src/prime-agent-plugin/role-protocol.json` still declares `bridge` for
+Generation A and `final` for Generation B. Shell apply/check does not accept a
+phase override. Bridge retains the legacy APPEND block; final removes only its
+exact managed region after accepted interim UAT.
 
 ### 3.3 Managed Conversation activation
 
@@ -349,48 +367,28 @@ sole current authority after bridge UAT.
 
 ### 3.6 External cutover coordinator
 
-Implement `scripts/coordinate-prime-agent-role-cutover.py` as a bounded,
-operator-launched one-shot transaction driver for Gate A and Gate B. It is not an
-autonomous agent or product orchestrator and makes no discretionary review,
-merge, rollback, or acceptance decision. It may execute only the operator-
-preauthorized phase table, including exact in-transaction compensation, from
-journaled facts and mutation receipts. The operator starts it from a separate
-terminal before quiescence with exact reviewed generation, candidate, prelanding
-main, primary checkout, owner/episode/ordinary session IDs, expected Prime Agent
-executable path/build/version, and private receipt directory.
+Use `scripts/coordinate-prime-agent-role-cutover.py` as a bounded,
+operator-launched helper for the separately authorized Gate A/B sequence. It is
+not an autonomous agent, product orchestrator, or transaction engine. It makes no
+review, merge, rollback, or acceptance decision.
 
-The coordinator has explicit preflight/dry-run and execute modes and uses a
-write-ahead journal outside the runtime being restarted. The journal records
-preflight, shutdown start/completion, local landing, push start and independently
-observed local/remote refs, per-surface apply touch-intent/completion, runtime
-start, and UAT handoff. It must:
+The helper performs a dry-run/preflight, records simple durable checkpoints, and
+executes only the authorized sequence: verify reviewed refs and runtime identity,
+confirm affected clients are quiescent, stop the old runtime, run the approved
+landing and apply/check steps, start one expected runtime, and print the ordered
+owner/episode/ordinary-session resume checklist.
 
-- inventory all resident Prime Agent daemon, worker, TUI, client, launcher, and
-  wrapper processes plus executable realpath/build/version and daemon socket;
-- require durable checkpoints and operator-confirmed exit of every client/TUI or
-  launcher capable of recovering an old daemon;
-- prove zero stale launcher/client remains before shutdown and again before
-  starting the new runtime;
-- use the supported `prime-agent shutdown --force --json` boundary, verify all
-  old daemon/workers and sockets are gone, and never accept a surviving or
-  auto-recovered old process;
-- verify candidate/main topology, perform only the preauthorized landing, run
-  apply/check, and preserve installation plus per-surface mutation receipts and
-  exact rollback inputs;
-- start exactly one expected Prime Agent daemon/runtime from the recorded
-  executable/build, verify `prime-agent status --json`, and block on duplicate or
-  mismatched runtime; and
-- emit the exact ordered resume checklist: owner first, unchanged episode
-  second, designated ordinary session third. Post-restart model UAT produces
-  guidance/EXPERT activation receipts; the coordinator produces none.
+It records observed local/remote refs, apply receipts, runtime identity, and the
+last completed checkpoint. On failure or uncertainty it stops. It automatically
+restores only a fixed-inventory surface whose current content matches a known
+postimage; all other recovery is an operator-guided normal Git/global restore
+from preserved preimages. It never retries an uncertain push or restart.
 
-Recording-fake tests cover every transition and specifically failure before
-shutdown, after shutdown/before landing, after proven local landing/before push,
-uncertain push, and partial per-surface apply. They also cover stale-client
-recovery attempts, wrong executable/build, a second daemon, shutdown/start
-failure, journal corruption, and the separately authorized recovery handoff.
-Real Gate runs are operator-launched; no active model attempts to restart itself
-or verify its own death.
+Focused fake tests cover ordinary failure before shutdown, after shutdown,
+before/after confirmed landing, during apply, and during runtime start. They do
+not attempt exhaustive signal timing, journal corruption, or every possible
+partial transaction state. Real Gate runs remain operator-launched; no active
+model restarts itself or verifies its own death.
 
 ### 3.7 Evidence locations
 
@@ -423,8 +421,8 @@ terminal disposition.
 ### 4.1 Strict sequence
 
 ```text
-reviewed specification + reviewed plan
-  ↓ explicit /implement-spec (one fresh episode)
+operator-corrected specification + plan
+  ↓ existing episode resumes through canonical owner handoff
 S1  canonical kernel + selected-context installer + predecessor archive
   ↓
 S2  managed-role integrity + Conversation activation + forwarding shim
@@ -453,59 +451,47 @@ finalization occurs between generations.
 
 ### 4.2 Per-slice rules
 
-Every implementation slice is one execute/handoff iteration and must:
+Each implementation slice is one small end-to-end capability and must:
 
-1. verify exact episode identity, promotion parent, branch/worktree, approved
-   specification and plan, and current `prime-claw-h6w.30` state;
-2. inspect latest `origin/main` and concurrent work without modifying foreign
-   branches or sessions;
-3. add a failing focused test or other explicit red proof before the production
-   change when feasible;
-4. implement only the named vertical capability and keep rollback local;
-5. update current documentation and the Bead in the same slice;
-6. run `git diff --check`, focused tests, full Tier 0, and at least one complete
-   Docker Tier-1 path after every plugin-source change; use only
-   `scripts/run-prime-agent-probe.sh` for native Prime Agent probes;
-7. write raw logs and a sanitized durable evidence summary;
-8. commit a reviewable capability, synchronize safely with its own remote branch,
-   push, and verify the branch is clean/up to date; and
-9. stop for owning-Conversation review. Only accepted work advances through
-   canonical handoff.
+1. verify episode identity, branch/worktree, corrected specification/plan, and Bead state;
+2. inspect current `origin/main` without modifying foreign work;
+3. prefer deletion or topology simplification over another defensive layer;
+4. add focused proof for retained behavior, not speculative adversarial matrices;
+5. update current docs and Beads with concise evidence;
+6. run the gates invalidated by the change, including complete Tier 0 and Docker Tier 1 after plugin-source changes;
+7. commit and push one reviewable capability with clean branch equality; and
+8. stop for owner review.
 
-Do not close `prime-claw-h6w.30` per slice. Record slice status in its notes and
-close it only after accepted final UAT, terminal bookkeeping, and documentation
-reconciliation.
+Potential out-of-model hazards are logged with a concrete promotion trigger. They
+are not implemented automatically. After two repair/review cycles on a slice,
+stop for operator consultation. If support machinery grows materially faster
+than product behavior or introduces a new transaction/recovery protocol, reopen
+the architecture and simplify.
 
-Published/accepted commits are never rebased, amended, reset, or force-pushed.
-If `main` advances, integrate it with a normal history-preserving merge at the
-candidate-freeze slice, preserve parent order in evidence, and rerun the complete
-candidate gates.
+Do not close `prime-claw-h6w.30` per slice. Published accepted commits are never
+rewritten. Integrate later `main` only through normal history-preserving Git and
+rerun gates invalidated by that integration.
 
 ### 4.3 Candidate gates
 
-Both Generation A and Generation B exact candidates require:
+Each Generation A/B candidate requires:
 
-- complete Tier 0: `python3 -m pytest tests/ -q`;
-- complete selected Tier 1: `python3 -m pytest tests/ -q -m container`;
-- `scripts/test-tier1.sh --probe`;
-- focused native provider-capture and Python-skill tests through the isolated
-  wrapper/container paths;
-- `git diff --check` and clean candidate status;
-- exact commit and tree hashes, main topology, dependency revision, elapsed
-  times, raw-log paths, and teardown evidence;
-- one independent semantic read-only exact-commit review; and
-- owner acceptance before any landing request.
+- complete Tier 0 and selected Docker Tier 1;
+- the pinned Prime Agent probe and focused tests for changed retained behavior;
+- `git diff --check`, a clean candidate, and local/remote equality;
+- concise commit/tree, dependency, log, and teardown evidence;
+- one independent normal exact-commit review bounded by the approved threat model; and
+- owner acceptance before landing.
 
-Generation A uses one exact preactivation route: the owning Conversation in the
-still-accepted primary `main` checkout loads the unmodified legacy skill SHA256
-`2e20d8fc7794cf97e9bfd21eaa6e68c7d6514439c6e62dfb024723b8de41a32f` and profile SHA256 `d9f8b14954da36df3d9051b4e25f8a76b6d16a0a2c27f9b29cfab262b5efe6f6`, admits a fresh
-reviewer from that primary-main CWD, and sends the immutable episode-worktree
-candidate packet. Record source checkout/commit/CWD, both hashes, exact model,
-reviewer session, packet/delivery, and pre/post subject state. The profile alone
-is never treated as executable admission. Generation B must use the installed
-`prime-claw-official-expert-review` plus native reservation/binding protocol and
-preserve its complete admission/report record. Any unavailable required reviewer
-blocks; no fallback model is allowed.
+A reviewer may `BLOCK` only for a concrete retained functional/safety failure.
+Plausible out-of-model edge cases are `ADVISORY`; scope questions return to the
+operator. No recursive red-team workers or material-finding-free adversarial
+review are required.
+
+Generation A continues to use the accepted primary-main admission path and exact
+configured reviewer. Generation B uses the installed official EXPERT package.
+Unavailable required admission blocks honestly; no fallback model is selected.
+The admission mechanism remains exact, but the review rubric is proportional.
 
 ## 5. Requirement traceability
 
@@ -535,54 +521,65 @@ blocks; no fallback model is allowed.
 | ORP-022 current documentation | S1–S3, S6 | audited current docs/index/runbooks in same commits |
 | ORP-023 immutable history | S1, all slices | exact predecessor archive, no historical rewrites |
 
-## 6. Slice 1 — Canonical kernel, safe selected-context installation, and lineage
+## 6. Slice 1 — Simplify and complete the neutral-kernel installer
 
-**Dependency:** implementation promotion only.
+**Dependency:** operator-approved 2026-10-06 scope correction.
 
-**Capability delivered:** an isolated apply/check can install exactly one neutral
-role kernel into Prime Agent's selected global context file while retaining the
-accepted legacy APPEND block and preserving predecessor plan history.
+**Capability delivered:** isolated apply/check installs one neutral role kernel in
+the selected global context, retains legacy APPEND, preserves ordinary user
+content, and provides simple known-state restore without an adversarial
+filesystem transaction engine.
+
+### Preserved incident evidence
+
+Before simplification, preserve the paused F1–F9 draft outside the worktree with
+its status and hash. Keep `1eba414`, `f4b858c`, both BLOCK reports, and incident
+`prime-claw-gv7.1` as history. Do not continue or selectively finish the F1–F9
+state machine merely because code already exists.
 
 ### Changes
 
-- Record promotion parent, promoted bundle hash, owner/episode identity, and
-  current main/remote topology.
-- Restore the predecessor active plan/spec bytes from the promotion parent,
-  verify the two planned SHA256 values, and archive them under
-  `.ralph/plans/archive/official-lean-session-protocol/`. Stop if the parent or
-  bytes differ; never reconstruct from chat.
-- Add `ROLE_KERNEL.md`, its deterministic generator/checker, generated TypeScript
-  constants, and exact parity tests.
-- Add bridge `role-protocol.json` and the guarded role-protocol manager with
-  selected-file priority, locking, ownership manifest, atomic write, and receipt
-  restore primitives.
-- Extend apply/check to preflight every managed file/directory before mutation,
-  install/check the neutral context region, and retain/check legacy APPEND.
-- Add fixture matrices for AGENTS/CLAUDE priority/case combinations, none/both,
-  selected-file drift, unsafe paths, concurrent edits, LF/CRLF, no final newline,
-  mode/uid/gid, unrelated bytes, malformed markers, idempotence, orphan temps,
-  rollback, and installer-created empty-file cleanup.
-- Update `docs/lab-global-plugin.md`, recovery guidance, and current indexes for
-  the bridge installer and selected-context ownership model.
+- Start from the smallest useful implementation already in history, retaining the
+  canonical kernel, generator parity, selected-file priority, practical marker
+  ownership, ordinary atomic replacement, and concrete unrelated-file deletion
+  fix.
+- Remove multi-phase journal/recovery, continuous inode/descriptor authority,
+  atomic-exchange restoration, hostile ABA/FIFO race defenses, and tests whose
+  only purpose is the excluded adversarial model.
+- Keep one cooperative lock, validation/reread, changed-preimage check, fixed
+  receipt inventory, exact known-state restore, and safe refusal with manual
+  recovery instructions.
+- Ensure malformed receipt inventory can never nominate or delete an unrelated
+  file. Retain obvious symlink/non-regular rejection visible during validation.
+- Preserve LF/CRLF, final-newline form, unrelated bytes, and ordinary mode and
+  ownership metadata where the platform supports it.
+- Retain the bridge `role-protocol.json`, legacy APPEND checks, predecessor
+  archive, and current user-facing docs.
+- Update evidence and Beads to distinguish retained blockers from advisory
+  hardening candidates.
 
 ### Acceptance
 
-- The authored Markdown and generated runtime block match byte-for-byte and by
-  digest.
-- Isolated apply produces one neutral context block and one retained legacy
-  APPEND block; repeated apply is byte-stable.
-- Check rejects every unsafe/malformed/drifted shape before plugin copy.
-- Restore from a captured receipt reproduces exact preimages and metadata in an
-  isolated destination.
-- Existing unrelated plugin files and global instructions remain exact.
-- Focused installer tests, full Tier 0, and Docker Tier 1/probe pass.
-- The predecessor archive matches the two recorded SHA256 values.
+- Authored and generated kernel bytes match.
+- Isolated apply produces one neutral block plus retained legacy APPEND and is
+  idempotent.
+- Ordinary AGENTS/CLAUDE selection, malformed markers, obvious unsafe target
+  types, cooperative lock/edit detection, byte/newline preservation, fixed
+  inventory, known-state restore, unknown-state refusal, and created-file cleanup
+  pass focused tests.
+- A malformed/tampered inventory cannot delete an unrelated file.
+- The manager and tests are materially simpler than the paused F1–F9 draft and do
+  not retain dead adversarial machinery under new names.
+- Complete Tier 0, Docker Tier 1/probe, and one normal reduced-contract review pass.
+- Candidate is committed once, pushed, clean, and reported for owner acceptance.
 
 ### Rollback
 
-Revert only S1 files on the episode branch. In scratch installs, use the captured
-receipt restore; never delete or rewrite a real user-global context. Legacy APPEND
-remains authoritative, so S1 rollback does not require host activation.
+Revert Slice-1 files normally on the episode branch. In isolated installs, use a
+known-good receipt only when current files match known pre/post states. Otherwise
+preserve the destination and receipt and give manual recovery instructions. Never
+delete or rewrite a real user-global context automatically from ambiguous state.
+Legacy APPEND remains authoritative, so Slice-1 rollback needs no host activation.
 
 ## 7. Slice 2 — Managed role integrity and progressive Conversation activation
 
@@ -726,7 +723,7 @@ retaining every compatibility resource required by old source history.
 - Implement and recording-fake-test the external coordinator from Section 3.6,
   including resident client/launcher inventory, executable/build mapping,
   `shutdown --force --json`, zero-stale-process gates, exact landing/apply/check,
-  single-runtime start/status, journal recovery, and ordered resume checklist.
+  single-runtime start/status, practical checkpoint recovery, and ordered resume checklist.
 - Reconcile all S1–S3 docs/tests, requirement traceability, managed inventories,
   recovery runbook, provider assertions, and coordinator operator instructions.
 - Audit that bridge source contains: neutral context kernel, both global skills,
@@ -780,12 +777,12 @@ handoff for an in-scope revision. It never mutates main or host-global state.
 
 S4 acceptance does not authorize this gate. Obtain explicit operator authority
 for the exact candidate and one invocation of the external cutover coordinator.
-That authority includes the exact journal-phase-aware compensating actions in
-Section 10.4 only while they remain part of this one transaction. A second
+That authority includes only the practical known-state handling in Section 10.4
+while it remains part of this one operation. A second
 coordinator invocation, or any additional `main`/user-global mutation after the
 transaction stops, requires separate explicit operator authority. The operator
 starts the authorized transaction from a separate terminal before quiescence
-with the exact reviewed inputs and private journal directory.
+with the reviewed inputs and private checkpoint/evidence directory.
 
 The coordinator must:
 
@@ -811,8 +808,8 @@ owning model does not land, apply, stop, start, or verify its own runtime.
 
 ### 10.2 Coordinator landing, installation, and restart sequence
 
-After authorization and zero stale clients, the external coordinator journals
-and performs this exact sequence:
+After authorization and zero stale clients, the external coordinator records
+checkpoints and performs this sequence:
 
 1. shut down every old agent/background service with supported
    `prime-agent shutdown --force --json` and prove old daemons, workers, and
@@ -875,80 +872,52 @@ Ask the operator to explicitly accept or reject interim UAT. Only after explicit
 acceptance may the owner invoke canonical `handoff_spec_episode` once to begin S5.
 That post-acceptance handoff is not part of UAT.
 
-### 10.4 Journal-phase-aware failure recovery
+### 10.4 Practical failure recovery
 
-On failure or uncertainty, stop forward progress, retain every compatibility
-resource/evidence item, and read only the durable journal plus exact mutation
-receipts. Never infer a completed landing, push, or global write.
+On failure or uncertainty, stop forward progress and preserve source state,
+preimages, receipts, compatibility resources, and evidence. Do not infer that a
+landing, push, global write, or restart completed.
 
-Apply this table inside the authorized transaction:
+- Before shutdown, record the failure and leave the accepted generation running.
+- After shutdown but before landing, restart only the proven unchanged accepted generation.
+- After a proven landing but before global apply, use normal history-preserving Git recovery only with separately confirmed local/remote refs.
+- After apply begins, restore only fixed-inventory surfaces whose current contents match a known installed postimage; otherwise stop for manual operator recovery.
+- After runtime start or during UAT, follow the same known-state rule, then recover owner, episode, and ordinary sessions in order.
 
-1. **Before shutdown:** perform no source revert, global restore, apply/check, or
-   restart. Record the failure; the accepted generation never stopped.
-2. **After shutdown but before a proven local landing:** perform no source revert
-   or global restore. Prove source/global state is still the accepted predecessor,
-   start exactly that unchanged generation, and resume/verify owner, episode, and
-   ordinary recovery.
-3. **After a proven local landing but before apply starts:** inspect journaled
-   local refs and independently fetch/observe the remote ref. Apply the
-   precomputed topology-aware normal revert only because landing is proven. If
-   push is proven complete, publish the revert normally. If the remote is proven
-   still at prelanding main, publish the history-preserving candidate+revert
-   recovery only as the authorized compensation. If push outcome is uncertain,
-   never retry or infer remote state; resolve it read-only to one exact ref or
-   stop for separate operator authority. Do not touch global surfaces. Verify
-   accepted source/global state, then restart and recover all three sessions.
-4. **After apply begins:** first establish the proven source/remote state as in
-   step 3. Restore only global surfaces whose write-ahead touch-intent or
-   completion receipt proves they may have changed, using their exact preimages;
-   do not rewrite untouched surfaces. Then run the accepted predecessor
-   generation's apply/check and verify exact bytes/metadata. Restart and recover
-   all three sessions.
-5. **After runtime start or during UAT:** use step 4 because apply is proven,
-   then recover owner, episode, and ordinary in order.
+One authorized coordinator invocation does not authorize retrying an uncertain
+mutation. Record the observed phase and return to the operator. A detailed
+write-ahead transaction journal and automatic compensation of ambiguous states
+are explicitly unnecessary.
 
-Every recovery journal records failure phase, observed refs, revert identity when
-applicable, touched-surface receipts, restoration, restart, and three-session
-recovery. If the transaction cannot prove the state needed for its authorized
-compensation, it stops without mutation. A second coordinator invocation or any
-later main/user-global repair needs separate explicit operator authority. Never
-retry an uncertain boundary or begin S5.
-
-## 11. Slice 5 — Exact final legacy-removal and restoration mechanism
+## 11. Slice 5 — Practical final legacy removal and restore
 
 **Dependency:** explicit accepted Gate A UAT.
 
-**Capability delivered:** the bridge source gains a tested final-mode operation
-that can remove only Prime Claw's managed legacy APPEND region and restore it
-exactly, without yet deleting repository compatibility resources.
+**Capability delivered:** final mode can remove only Prime Claw's exact managed
+legacy APPEND region and restore a known accepted bridge preimage in isolated
+tests, without deleting repository compatibility resources yet.
 
 ### Changes
 
-- Extend the role-protocol manager with final-mode legacy APPEND removal,
-  exact separator ownership, installer-created-empty-file cleanup, and
-  receipt-driven restoration.
-- Add red/failure tests for unrelated prefix/suffix, CRLF/LF, no final newline,
-  mode/uid/gid, duplicate/malformed legacy markers, concurrent change, symlink,
-  non-regular path, absent block, already-removed replay, and restore mismatch.
-- Add final-mode dry-run/check output that names selected context, legacy APPEND
-  disposition, both skill hashes, and ownership manifest without printing user
-  content.
-- Keep `role-protocol.json` in bridge mode, keep all compatibility files, and do
-  not run final mode against the host. This slice proves the removal path in
-  isolated destinations only.
-- Update recovery/operator docs for Generation B preimages and bridge restoration.
+- Extend the practical manager with exact-marker legacy removal and the same fixed-inventory known-state receipt rules used by Slice 1.
+- Cover unrelated prefix/suffix, LF/CRLF, final-newline form, malformed/duplicate markers, absent/already-removed replay, and unknown-state refusal.
+- Preserve ordinary metadata where supported and reject obvious unsafe target types at validation.
+- Keep `role-protocol.json` in bridge mode and do not run final mode against the host.
+- Update concise manual recovery instructions.
+
+Do not add hostile same-UID race defenses, continuous inode authority, or an
+exhaustive restore-state matrix.
 
 ### Acceptance
 
-- An isolated final apply removes only the exact legacy region, preserves all
-  unrelated bytes/metadata, and converges.
-- Isolated restoration recreates the exact accepted bridge generation.
-- Bridge default behavior remains unchanged after the slice.
-- Focused removal/restore tests, full Tier 0, and Docker Tier 1/probe pass.
+- Isolated final apply removes only the managed legacy region and preserves unrelated content.
+- Known-state restoration recreates the accepted bridge preimage; unknown state refuses safely.
+- Bridge default behavior remains unchanged.
+- Focused practical tests, complete Tier 0, and Docker Tier 1/probe pass.
 
 ### Rollback
 
-Revert S5 as one unit. The active host remains the accepted bridge generation,
+Revert Slice 5 normally. The active host remains the accepted bridge generation,
 so no user-global or restart rollback is required.
 
 ## 12. Slice 6 — Remove compatibility and reconcile the final source tree
@@ -1058,8 +1027,8 @@ main or host-global mutation occurs.
 ### 14.1 External-coordinator preflight and operation
 
 Obtain explicit operator authority for the exact S7 candidate and one exact Gate
-B coordinator invocation. That authority includes the exact journal-phase-aware
-compensating actions in Section 14.3 only inside this one transaction. A second
+B coordinator invocation. That authority includes only the practical known-state
+handling in Section 14.3 inside this one operation. A second
 coordinator invocation, or any additional `main`/user-global mutation after the
 transaction stops, requires separate explicit operator authority. The operator
 launches the transaction from a separate terminal before quiescence. Repeat the
@@ -1116,42 +1085,17 @@ Record private receipts and Bead evidence without mutating the reviewed candidat
 or tracked docs. Ask the operator to accept or reject the completed target state.
 Live finalization is forbidden during UAT.
 
-### 14.3 Journal-phase-aware failure recovery
+### 14.3 Practical failure recovery
 
-On failure or uncertainty, stop forward progress and use only the durable journal
-and exact mutation receipts. Preserve the episode and every evidence item.
+Use the same known-state recovery rule as Gate A. Preserve the accepted bridge,
+fixed-inventory preimages, episode, and evidence. Before apply, recover Git only
+from confirmed refs using normal history. After apply begins, automatically
+restore a surface only when its current bytes match the known final-generation
+postimage; otherwise stop for manual operator recovery. Restart and resume only a
+proven generation.
 
-Apply this table inside the authorized transaction:
-
-1. **Before shutdown:** perform no source revert, global restore, apply/check, or
-   restart; the accepted bridge generation remains active.
-2. **After shutdown but before a proven local landing:** perform no source revert
-   or global restore. Prove source/global state is still the accepted bridge,
-   restart exactly that generation, and resume/verify owner, episode, and
-   ordinary recovery.
-3. **After a proven local landing but before apply starts:** independently
-   establish local and remote refs. Apply the precomputed topology-aware normal
-   revert to bridge only because landing is proven. Publish it when candidate
-   push is proven; when remote is proven at prelanding bridge, publish only the
-   authorized history-preserving candidate+revert recovery. An uncertain push is
-   never retried or inferred: resolve it read-only to an exact ref or stop for
-   separate authority. Do not touch global surfaces. Verify bridge source/global
-   state, restart, and recover all three sessions.
-4. **After apply begins:** first establish/recover source and remote state as in
-   step 3. Restore only selected-context, APPEND, ownership-manifest, managed-
-   skill, or installed-state surfaces whose write-ahead touch-intent/completion
-   receipts prove possible mutation, using exact bridge preimages. Do not rewrite
-   untouched surfaces. Run bridge apply/check and verify exact bytes/metadata,
-   then restart and recover all three sessions.
-5. **After runtime start or during UAT:** use step 4 and verify exact owner,
-   episode, and ordinary recovery in order.
-
-Record failure phase, observed refs, revert identity when applicable,
-touched-surface receipts, restoration, restart, and recovery. If the state needed
-for authorized compensation cannot be proven, stop without mutation. A second
-coordinator invocation or later main/user-global repair needs separate explicit
-operator authority. Do not finalize, physically clean, or retry an uncertain
-boundary.
+Do not retry an uncertain coordinator boundary, finalize, or physically clean.
+No exhaustive phase journal or autonomous mixed-state recovery is required.
 
 ## 15. Accepted completion, deterministic bookkeeping, and cleanup boundary
 
@@ -1190,60 +1134,49 @@ inferred from final UAT or bookkeeping acceptance.
 
 ## 16. Plan-wide stop conditions and rollback rules
 
-Stop and return to the owning Conversation/operator when any of these occurs:
+Stop and return to the owner/operator for real contract failures: specification
+drift, missing trusted identity, practical unsafe path or unknown receipt state,
+provider-channel leakage, required test failure, unavailable required reviewer,
+unconfirmed Git/global mutation, incomplete restart/UAT, or inability to restore
+a known accepted generation.
 
-- specification/plan drift or an unreviewed product decision;
-- Prime Agent public behavior disagrees with the reviewed source-backed contract;
-- missing/duplicate/corrupt/disagreeing owner, episode, role, activation, or
-  kernel identity;
-- unsafe global file/skill path, selection drift, concurrent edit, or incomplete
-  preimage;
-- required custom-kernel module unavailable or official reviewer unavailable;
-- provider evidence cannot prove system-only delivery and zero user/custom leak;
-- a candidate fails complete Tier 0/Tier 1/probe or independent review;
-- primary main or candidate topology changes after review;
-- any affected foreign owner cannot safely quiesce for restart;
-- any active foreign worktree/session can still consume stale compatibility at
-  S6/S7/Gate B;
-- user-global apply/check, restart, or resumed-session UAT is incomplete or
-  uncertain; or
-- rollback cannot reproduce the exact prior accepted generation.
+Also stop for a **process** failure when a third repair cycle is proposed, support
+machinery grows materially faster than delivered behavior, a new custom
+transaction/recovery protocol appears, or an EXPERT finding would expand the
+approved threat model. These conditions trigger simplification or a product
+decision, not more automatic hardening.
 
-Never resolve a stop by patching Prime Agent, weakening an assertion, choosing a
-fallback reviewer, silently provisioning an external Python interpreter,
-normalizing user files, force-pushing, resetting accepted history, deleting
-foreign resources, or retrying an uncertain mutation.
+Never resolve a stop by patching Prime Agent, weakening a retained assertion,
+choosing a fallback reviewer, force-pushing, resetting accepted history, deleting
+foreign resources, or retrying uncertainty. Preserve evidence and ask the
+operator when automatic recovery is not clearly safe.
 
 ## 17. Explicit non-goals
 
-- No Prime Agent source modification, fork maintenance, or unsolicited upstream
-  pull request.
-- No capability sandbox claim for EXPERT children.
-- No redesign of `execute`, episode creation, canonical handoff, or finalization.
-- No autonomous orchestrator, fixed heartbeat schedule, monolithic always-on
-  oversight package, or provider-payload repair hook.
-- No solution for `prime-claw-h6w.29` probable-hung detection.
-- No Project-Wide Testing or Phase 3a implementation, landing, finalization, or
-  cleanup.
-- No credential access, browser/Keychain inspection, user-global candidate probe,
-  or host configuration mutation before explicit activation authority.
-- No rewrite of archived plans/specifications, historical evidence, accepted
-  commits, Beads chronology, or prior activation/cleanup receipts.
+- No Prime Agent source modification, fork, or unsolicited upstream pull request.
+- No capability-sandbox claim for EXPERT children.
+- No redesign of episode creation, execute, handoff, or finalization.
+- No autonomous orchestrator, monolithic oversight package, or provider-payload repair hook.
+- No hostile same-UID filesystem race, ABA/FIFO swap, continuous inode authority, or tamper-proof local receipt guarantee.
+- No proof of durability at every syscall/power-loss boundary or automatic recovery of every mixed state.
+- No implementation of an advisory edge case until dogfood, a user report, near miss, changed boundary, or approved hard requirement promotes it.
+- No Project-Wide Testing, Phase 3a, `prime-claw-h6w.29`, credential, Keychain, browser-store, or premature host-global work.
+- No rewrite of archives, accepted commits, Beads chronology, or historical evidence.
 
-## 18. Implementation-promotion replay gate
+## 18. Existing-episode continuation gate
 
-The operator accepted this plan with `/implement-spec` on 2026-10-03. That first
-readiness pass correctly created no episode because final expert review and a
-durable planning commit were still pending. This planning commit records those
-resolved prerequisites but does not itself promote the bundle.
+The episode already exists and remains bound to this specification. Do not create
+or replace it. Before canonical continuation, the owner must:
 
-After this exact bundle is committed, pushed, and verified on synchronized
-`main`, the only implementation promotion is a fresh explicit replay:
+1. preserve the paused F1–F9 draft and hashes outside the worktree;
+2. commit and push this corrected specification/plan on primary `main` without
+   including unrelated concurrent changes;
+3. update the active episode specification and plan to the same reduced contract;
+4. record the operator decision, incident, epic, and artifact hashes on
+   `prime-claw-h6w.30`; and
+5. use exactly one canonical handoff to resume Slice 1.
 
-```text
-/implement-spec .ralph/plans/future/official-lean-compatibility-cleanup
-```
-
-The replay must perform its own current-state readiness review and create one
-fresh isolated episode. Do not reuse the finalized/deleted official-lean
-transition episode.
+The next execute pass removes obsolete adversarial machinery, runs proportional
+gates, publishes one simplified candidate, and stops. It must not begin Slice 2,
+land, mutate user-global state, restart Prime Agent, or seek perfection through
+another red-team loop.
