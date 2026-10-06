@@ -14,6 +14,7 @@ import tempfile
 REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
+from scripts.testing import integration_provenance as ip
 from scripts.testing import provenance as p
 
 WATCHED = tuple(sig for sig in (
@@ -60,37 +61,79 @@ def _retain_and_acknowledge(
         return None
 
 
+def _load_candidate(root: p.DirectoryAuthority) -> dict[str, object] | None:
+    try:
+        candidate = p.read_sanitized_json(
+            root, "candidate.json", max_bytes=ip.MANIFEST_MAX_BYTES)
+        return ip.validate_manifest(candidate)
+    except (FileNotFoundError, p.ProvenanceError):
+        return None
+
+
+def _failed_manifest(
+    manifest: dict[str, object], *, code: str,
+) -> dict[str, object]:
+    failed = copy.deepcopy(manifest)
+    failed["status"] = "failed"
+    failed["run"]["status"] = "failed"
+    codes = list(failed["run"]["failure_codes"])
+    if code not in codes:
+        codes.append(code)
+    failed["run"]["failure_codes"] = codes
+    return ip.validate_manifest(failed)
+
+
+def _neutralize_retained(
+    retained: p.RetainedRegularFile | None,
+    manifest: dict[str, object] | None,
+    *,
+    code: str,
+) -> bool:
+    if retained is None:
+        return False
+    try:
+        if manifest is not None:
+            failed = _failed_manifest(manifest, code=code)
+            ip.overwrite_retained_manifest_failed(retained, failed)
+        else:
+            ip.neutralize_retained_manifest(retained, reason=code)
+        return True
+    except BaseException:
+        try:
+            ip.neutralize_retained_manifest(
+                retained, reason="terminal-closure-failed")
+        except BaseException:
+            return False
+        return True
+
+
 def _close_evidence(owned: p.RetainedDirectory | p.OwnedDirectory | None,
                     failed: bool) -> bool:
+    """Compatibility closure using only one retained exact manifest inode."""
     if owned is None:
         return False
-    repo = Path(__file__).resolve().parents[2]
-    sys.path.insert(0, str(repo))
-    from scripts.testing import integration_provenance as ip
+    retained = None
+    manifest = None
     try:
-        manifest = p.read_sanitized_json(owned, "manifest.json")
-        ip.validate_manifest(manifest)
+        retained = p.retain_owned_regular_file(
+            owned, "manifest.json", max_bytes=ip.MANIFEST_MAX_BYTES,
+            writable=True)
+        manifest = ip.read_retained_manifest(retained)
         if failed and manifest["status"] == "passed":
-            current = p.ObjectBinding.from_stat(os.stat(
-                "manifest.json", dir_fd=owned.fd,
-                follow_symlinks=False))
-            replacement = copy.deepcopy(manifest)
-            replacement["status"] = "failed"
-            replacement["run"]["status"] = "failed"
-            replacement["run"]["failure_codes"] = [
-                "publication-invalidated"]
-            try:
-                ip.publish_manifest(
-                    owned, replacement, expected_existing=current)
-            except Exception:
-                p.invalidate_green_manifest(owned, expected=current)
+            if not _neutralize_retained(
+                    retained, manifest, code="publication-invalidated"):
                 return False
-            manifest = p.read_sanitized_json(owned, "manifest.json")
-        ip.validate_manifest(manifest)
+            manifest = ip.read_retained_manifest(retained)
         ip.verify_evidence(owned, manifest)
         return manifest["status"] == ("failed" if failed else "passed")
     except Exception:
+        if manifest is not None and manifest.get("status") == "passed":
+            _neutralize_retained(
+                retained, manifest, code="terminal-closure-failed")
         return False
+    finally:
+        if retained is not None:
+            retained.close()
 
 
 def _owned_pending(sigpending, prior_mask) -> int | None:
@@ -100,7 +143,13 @@ def _owned_pending(sigpending, prior_mask) -> int | None:
                  if sig not in caller_blocked and sig in pending), None)
 
 
-def supervise(script: str, argv: list[str]) -> int:
+def supervise(
+    script: str,
+    argv: list[str],
+    *,
+    final_owner: bool = False,
+) -> int:
+    """Run one provisional driver; only final_owner may expose green evidence."""
     requested_dry_run = "--dry-run" in argv
     expected_launcher = REPO / "scripts/test-integration.sh"
     dry_run = (requested_dry_run
@@ -110,13 +159,16 @@ def supervise(script: str, argv: list[str]) -> int:
     if sigmask is None or sigpending is None:
         print("error: atomic integration signal boundary is unavailable",
               file=sys.stderr)
+        if final_owner:
+            os._exit(1)
         return 1
-    previous = {sig: signal.getsignal(sig) for sig in WATCHED}
+
     prior_mask = sigmask(signal.SIG_BLOCK, WATCHED)
+    owned = tuple(sig for sig in WATCHED if sig not in set(prior_mask or ()))
+    previous = {sig: signal.getsignal(sig) for sig in owned}
     received: list[int] = []
     process: subprocess.Popen[bytes] | None = None
     handlers_installed = False
-    mask_restored = False
     ownership_open = True
     status_path: Path | None = None
     status_parent: p.DirectoryAuthority | None = None
@@ -124,35 +176,50 @@ def supervise(script: str, argv: list[str]) -> int:
     status_record: tuple[Path, str, str] | None = None
     tier_authority: p.DirectoryAuthority | None = None
     retained_tier: p.RetainedDirectory | None = None
+    manifest_lease: p.RetainedRegularFile | None = None
+    published_manifest: dict[str, object] | None = None
+    terminal_exit = False
+    result = 1
+    pending_error: BaseException | None = None
 
-    def dispatch_previous(signum, frame):
-        handler = previous[signal.Signals(signum)]
-        if handler == signal.SIG_IGN:
-            return
-        if handler == signal.SIG_DFL:
-            signal.signal(signum, signal.SIG_DFL)
-            signal.raise_signal(signum)
-            return
-        handler(signum, frame)
+    def poison(code: str) -> bool:
+        nonlocal published_manifest
+        if manifest_lease is None:
+            return False
+        was_green = (published_manifest is not None
+                     and published_manifest.get("status") == "passed")
+        okay = _neutralize_retained(
+            manifest_lease, published_manifest, code=code)
+        if okay and was_green and published_manifest is not None:
+            try:
+                published_manifest = _failed_manifest(
+                    published_manifest, code=code)
+            except Exception:
+                published_manifest = None
+        return okay
 
-    def forward(signum, frame):
-        nonlocal ownership_open
-        if not ownership_open:
-            dispatch_previous(signum, frame)
+    def forward(signum, _frame):
+        if signal.Signals(signum) not in owned:
             return
-        if not received:
+        if ownership_open and not received:
             received.append(signum)
         if process is not None and process.poll() is None:
             try:
                 os.killpg(process.pid, signum)
             except ProcessLookupError:
                 pass
+        if (manifest_lease is not None and published_manifest is not None
+                and published_manifest.get("status") == "passed"):
+            poison("publication-invalidated")
+        if terminal_exit:
+            try:
+                sys.stdout.flush(); sys.stderr.flush()
+            finally:
+                os._exit(128 + signum)
 
     try:
-        # Mark first so a partial installation failure still restores every
-        # exact caller handler in the outer finalizer.
         handlers_installed = True
-        for sig in WATCHED:
+        for sig in owned:
             signal.signal(sig, forward)
 
         status_path = Path(os.path.realpath(tempfile.mkdtemp(
@@ -181,16 +248,13 @@ def supervise(script: str, argv: list[str]) -> int:
         if dry_run:
             rc = process.wait()
         else:
-            # A real driver cannot proceed to green publication until the
-            # supervisor has retained the exact tier inode and acknowledged
-            # the nonce through the bounded status authority.
             while retained_tier is None:
-                candidate = _load_status(status_root)
-                if candidate is not None:
-                    retained = _retain_and_acknowledge(status_root, candidate)
+                status = _load_status(status_root)
+                if status is not None:
+                    retained = _retain_and_acknowledge(status_root, status)
                     if retained is not None:
                         tier_authority, retained_tier = retained
-                        status_record = candidate
+                        status_record = status
                         break
                 try:
                     rc = process.wait(timeout=0.02)
@@ -200,8 +264,12 @@ def supervise(script: str, argv: list[str]) -> int:
             if retained_tier is not None:
                 rc = process.wait()
 
-        terminal_mask = sigmask(signal.SIG_BLOCK, WATCHED)
+        terminal_mask = sigmask(signal.SIG_BLOCK, owned)
         observed = received[0] if received else None
+        closure_signal = _owned_pending(sigpending, prior_mask)
+        if observed is None and closure_signal is not None:
+            observed = closure_signal
+
         terminal_status = _load_status(status_root)
         status_intact = (terminal_status is None if dry_run
                          else status_record is not None
@@ -213,25 +281,48 @@ def supervise(script: str, argv: list[str]) -> int:
                 tier_intact = True
             except p.ProvenanceError:
                 tier_intact = False
-        closure_signal = _owned_pending(sigpending, prior_mask)
-        if observed is None and closure_signal is not None:
-            observed = closure_signal
-        failed = (observed is not None or rc != 0
-                  or not status_intact or not tier_intact)
-        # Dry-run deliberately creates no run/evidence tree. Every real run
-        # requires the retained tier capability and verified terminal manifest.
-        evidence_ok = ((not failed and terminal_status is None) if dry_run
-                       else _close_evidence(retained_tier, failed))
 
-        # Keep forwarding handlers installed across the only terminal unmask.
-        # A signal pending or injected at this edge is delivered to `forward`
-        # before SIG_SETMASK returns, while evidence authority is still live.
+        candidate = None if dry_run else _load_candidate(status_root)
+        candidate_ok = False
+        if candidate is not None and retained_tier is not None:
+            try:
+                ip.verify_evidence(retained_tier, candidate)
+                candidate_ok = True
+            except p.ProvenanceError:
+                candidate_ok = False
+        failed = (observed is not None or rc != 0
+                  or not status_intact or not tier_intact
+                  or (not dry_run and (not candidate_ok
+                                       or candidate["status"] != "passed")))
+        evidence_ok = dry_run and not failed
+
+        if not dry_run and candidate_ok and retained_tier is not None:
+            final_manifest = candidate
+            if failed and candidate["status"] == "passed":
+                final_manifest = _failed_manifest(
+                    candidate, code="supervisor-terminal-failed")
+            try:
+                manifest_lease = ip.publish_final_manifest(
+                    retained_tier, final_manifest)
+                published_manifest = final_manifest
+                evidence_ok = final_manifest["status"] == (
+                    "failed" if failed else "passed")
+            except Exception:
+                failed = True
+                evidence_ok = False
+        elif not dry_run and retained_tier is not None:
+            # Compatibility for a pre-provisional failed child: close an exact
+            # already-public manifest, but never authorize success from it.
+            failed = True
+            evidence_ok = _close_evidence(retained_tier, True)
+
+        # The final owner remains installed across this unmask. Any signal at
+        # the transition is recorded and exact-fd neutralization is immediate.
         sigmask(signal.SIG_SETMASK, terminal_mask)
-        mask_restored = True
-        ownership_open = False
         post_unmask = received[0] if received else None
         if observed is None and post_unmask is not None:
             observed = post_unmask
+
         post_status = _load_status(status_root)
         post_status_intact = (post_status is None if dry_run
                               else status_record is not None
@@ -243,28 +334,69 @@ def supervise(script: str, argv: list[str]) -> int:
                 post_tier_intact = True
             except p.ProvenanceError:
                 post_tier_intact = False
-        if (observed is not None or not post_status_intact
-                or not post_tier_intact) and not failed:
-            failed = True
-            evidence_ok = _close_evidence(retained_tier, True) and evidence_ok
-        if failed or not evidence_ok:
-            rc = rc or 1
-        if observed is not None:
-            rc = 128 + observed
+        post_candidate_intact = dry_run
+        if not dry_run and candidate is not None:
+            post_candidate_intact = _load_candidate(status_root) == candidate
+        post_publication_intact = dry_run or published_manifest is None
+        if (manifest_lease is not None and retained_tier is not None
+                and published_manifest is not None):
+            try:
+                ip.verify_final_publication(
+                    retained_tier, manifest_lease, published_manifest)
+                post_publication_intact = True
+            except (OSError, ValueError, p.ProvenanceError):
+                post_publication_intact = False
 
-        # The caller mask is now the ownership cutoff. Until each handler is
-        # restored, `forward` delegates new caller-owned signals exactly.
-        for sig, handler in previous.items():
-            signal.signal(sig, handler)
-        handlers_installed = False
-        if rc == 0 and evidence_ok:
-            if dry_run:
+        if (observed is not None or not post_status_intact
+                or not post_tier_intact or not post_candidate_intact
+                or not post_publication_intact):
+            failed = True
+            if published_manifest is not None and published_manifest.get("status") == "passed":
+                evidence_ok = poison("publication-invalidated") and evidence_ok
+        if failed or not evidence_ok:
+            result = rc or 1
+        else:
+            result = 0
+        if observed is not None:
+            result = 128 + observed
+
+        if not final_owner:
+            # A state-transparent callable sits below a final owner. It may
+            # return dry-run success, but it must never expose authoritative
+            # green evidence across its own handler restoration.
+            if (manifest_lease is not None and published_manifest is not None
+                    and published_manifest.get("status") == "passed"):
+                poison("library-owner-ended")
+                result = result or 1
+            transfer_mask = sigmask(signal.SIG_BLOCK, owned)
+            pending_transfer = _owned_pending(sigpending, prior_mask)
+            if pending_transfer is not None:
+                poison("publication-invalidated")
+                result = 128 + pending_transfer
+            restore_error = None
+            for sig, handler in previous.items():
+                try:
+                    signal.signal(sig, handler)
+                except BaseException as exc:
+                    if restore_error is None:
+                        restore_error = exc
+            handlers_installed = False
+            ownership_open = False
+            try:
+                sigmask(signal.SIG_SETMASK, transfer_mask)
+            except BaseException as exc:
+                if restore_error is None:
+                    restore_error = exc
+            if restore_error is not None:
+                poison("handler-restoration-failed")
+                raise restore_error
+            if result == 0 and dry_run:
                 print("integration driver: OK — dry-run contract verified; "
                       "no manifest was created")
-            else:
-                print("integration driver: OK — exact image, offline assertions, "
-                      "teardown, and manifest verified")
-        return rc
+    except BaseException as exc:
+        poison("terminal-closure-failed")
+        result = 1
+        pending_error = exc
     finally:
         if process is not None and process.poll() is None:
             try:
@@ -279,23 +411,38 @@ def supervise(script: str, argv: list[str]) -> int:
                 except ProcessLookupError:
                     pass
                 process.wait()
-        if not mask_restored:
+
+        if not final_owner:
             try:
-                # On every early exceptional exit, keep forwarding handlers
-                # active across restoration of the exact caller mask.
-                sigmask(signal.SIG_SETMASK, prior_mask)
-            finally:
-                mask_restored = True
+                current = sigmask(signal.SIG_BLOCK, owned)
+                pending_transfer = _owned_pending(sigpending, prior_mask)
+                if pending_transfer is not None:
+                    poison("publication-invalidated")
+                    result = 128 + pending_transfer
+                if handlers_installed:
+                    for sig, handler in previous.items():
+                        try:
+                            signal.signal(sig, handler)
+                        except BaseException as exc:
+                            poison("handler-restoration-failed")
+                            if pending_error is None:
+                                pending_error = exc
+                    handlers_installed = False
                 ownership_open = False
-        if handlers_installed:
-            for sig, handler in previous.items():
                 try:
-                    signal.signal(sig, handler)
-                except BaseException:
-                    pass
-        if retained_tier is not None:
+                    sigmask(signal.SIG_SETMASK, prior_mask)
+                except BaseException as exc:
+                    poison("handler-restoration-failed")
+                    if pending_error is None:
+                        pending_error = exc
+            except BaseException as exc:
+                poison("handler-restoration-failed")
+                if pending_error is None:
+                    pending_error = exc
+
+        if retained_tier is not None and not final_owner:
             retained_tier.close()
-        if tier_authority is not None:
+        if tier_authority is not None and not final_owner:
             tier_authority.close()
         if status_root is not None and status_parent is not None:
             try:
@@ -307,12 +454,55 @@ def supervise(script: str, argv: list[str]) -> int:
             status_root.close()
         if status_parent is not None:
             status_parent.close()
+        if manifest_lease is not None and not final_owner:
+            manifest_lease.close()
+
+    if final_owner:
+        # Close the last check-to-exit race. Signals arriving while this set is
+        # blocked are still owned; the final unmask either records them here or
+        # invokes `forward` with terminal_exit already true.
+        try:
+            exit_mask = sigmask(signal.SIG_BLOCK, owned)
+            if (result == 0 and manifest_lease is not None
+                    and tier_authority is not None
+                    and published_manifest is not None):
+                try:
+                    p.verify_directory_authority(tier_authority)
+                    ip.verify_final_publication(
+                        tier_authority, manifest_lease, published_manifest)
+                except (OSError, ValueError, p.ProvenanceError):
+                    poison("terminal-publication-drift")
+                    result = 1
+            final_pending = _owned_pending(sigpending, prior_mask)
+            if final_pending is not None and not received:
+                received.append(final_pending)
+            if received:
+                if (published_manifest is not None
+                        and published_manifest.get("status") == "passed"):
+                    poison("publication-invalidated")
+                result = 128 + received[0]
+            terminal_exit = True
+            sigmask(signal.SIG_SETMASK, exit_mask)
+        except BaseException:
+            poison("terminal-exit-failed")
+            result = 1
+            terminal_exit = True
+        try:
+            sys.stdout.flush(); sys.stderr.flush()
+        finally:
+            os._exit(result)
+    if pending_error is not None:
+        raise pending_error
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    return supervise(args[0], args[1:]) if args else 2
+    if not args:
+        return 2
+    supervise(args[0], args[1:], final_owner=True)
+    return 1
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

@@ -133,16 +133,39 @@ only. Do not apply, check, or probe a candidate against the host user-global
   side effects. The launcher captures exact iid/cid identities, verifies tags,
   normalized local digests, immutable base lineage, labels, mounts, environment,
   ports, network mode, and runtime hashes, then removes only positively owned
-  objects. Directory component capabilities remain live across preparation,
-  build, mount verification, bounded no-follow iid/cid/body/status reads, and
-  cleanup; replaced aliases and special files fail closed. Before any real run
-  can publish green, a nonce handshake lets the supervisor verify the full tier
-  chain and retain a separate exact descriptor-only closure capability. Terminal
-  status/tier drift is red, while the retained fd still invalidates green in the
-  detached original inode. A nonzero removal stays non-clean even after absence.
-  Caller-owned pending signals remain caller state, while run-owned TERM/INT/HUP
-  cannot bypass exact cleanup or leave green terminal evidence. Malformed inspect structures become typed unknown and each
-  safe finalizer stage still runs independently. The terminal manifest records
+  objects. One continuously acquired and retained snapshot/ancestor capability
+  supplies Dockerfile and artifact-lock bytes read from their exact capture-time
+  regular-file bindings, preparation inventory/hash, repeated whole-snapshot
+  verification, and cleanup; no consumer
+  recaptures ownership from a public path. All control, body, manifest, and
+  evidence rereads are bounded, stable, no-follow regular reads with path-specific
+  limits plus aggregate entry/file/byte/depth limits. Replaced aliases, regular
+  inode replacement, special files, oversized input, and read-time mutation fail
+  closed.
+
+  Docker's host bind/build APIs accept pathnames rather than client file
+  descriptors. The driver verifies retained authority and captured content before
+  and after each Docker call and rejects persistent replacement. It does not claim
+  to prevent a hostile same-UID process from replacing and restoring a pathname
+  only while the daemon resolves it; concurrent mutation of the private run-owned
+  results tree is outside this test harness's trust boundary.
+
+  A nonce handshake lets the supervisor retain the full tier chain before the
+  real driver begins. The driver cleans its exact resources and writes only a
+  private `candidate.json`. In the disposable supervised child it deliberately
+  keeps its owned handlers installed through process exit rather than restoring a
+  returning or ignored handler; a non-supervised callable restores provisional
+  caller state. The outer CLI supervisor is the sole final publisher through
+  child terminal handoff/exit, candidate validation, final publication, terminal
+  unmasking, and its own process exit. It retains the exact writable manifest
+  inode and publishes a binding sidecar. A late failure neutralizes that inode
+  without reopening its path or using the publication namespace; a raced
+  replacement remains untouched but fails binding-aware public validation. No real-run
+  PASS/OK line precedes this boundary. Signals the caller already blocked remain
+  pending caller state; only initially unblocked watched signals are run-owned.
+  A nonzero removal stays non-clean even after absence. Malformed inspect
+  structures become typed unknown and each safe finalizer stage still runs
+  independently. The terminal manifest records
   clean preparation, container, image, context, snapshot, and share teardown. Compare
   two passed, independently verified evidence trees with
   `python3 -m scripts.testing.integration_provenance compare-runs <first> <second>`.

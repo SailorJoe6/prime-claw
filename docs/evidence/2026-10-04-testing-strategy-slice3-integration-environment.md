@@ -121,71 +121,119 @@ remain regression baselines, not acceptance evidence. Terminal exact-candidate
 receipts are recorded in the Bead and owner packet after a candidate is frozen;
 the tracked document is not edited after exact-commit validation.
 
-### Owner-requested failure-path revision
+### Owner-requested B1-B5 failure-path revision
 
-The authoritative owner report SHA-256 is
-`1e8e1f94f19221e6682a1dc17b4cc0e56fc78f9b503445f05bd591523ca5c759`.
-The bounded revision:
+The authoritative owner BLOCK report is
+`/Users/jlanders/.prime/agent/session-artifacts/01a0fe2e-e0dd-7638-9b4c-0b118182c6e3/sub-791d8992/slice3-22e41a0-owner-review.md`,
+SHA-256
+`155ec9b098df03b4cdbdfded7a52cbfd61d460dcc099edf0b1c32cb2c8ad1eb1`.
+It rejected candidate `22e41a0ed39070017a92b7beddc4b2440ed33b05` for B1-B5.
+That commit and all of its receipts remain regression baselines only.
 
-- retains a no-follow descriptor/binding chain for every public directory
-  component through preparation, build, mount validation, reads, and cleanup;
-- reads iid, cid, body, and supervisor status as bounded, stable regular files
-  with `O_NOFOLLOW|O_NONBLOCK`, rejecting links, FIFOs, directories, devices,
-  oversized content, mutation, and replaced ancestors; a nonce ACK prevents any
-  real driver from publishing green before the supervisor retains both the full
-  tier chain and an fd-only terminal-closure capability;
-- quarantines and restores caller-preexisting pending signals while owning only
-  run-arrival TERM/INT/HUP, and closes green evidence through supervisor handler
-  restoration with descriptor-only invalidation even after status/tier root or
-  ancestor replacement;
-- normalizes malformed Docker inspect row/`Config`/`Labels` structures to typed
-  unknown; and
-- isolates recovery, exact container/image cleanup, directory cleanup, and
-  failed-manifest publication so one malformed stage cannot skip another safe
-  stage.
+The current bounded repair is still an uncommitted, unpublished candidate. A
+read-only adversarial checkpoint audit BLOCK is retained at
+`/Users/jlanders/.prime/agent/session-artifacts/01a0fee6-4ed7-725a-8cf9-0ba9fbf056b9/sub-750168dc/b1-b5-current-audit.md`, SHA-256
+`5d1d49e626a272a3e6354c0525eb911a8e254f486f5897da154a5d80893ce419`.
+Its concrete B1/B2/B3/B5 reproductions were accepted and repaired; B4 remained
+closed. A subsequent adversarial re-audit BLOCK is retained at
+`/Users/jlanders/.prime/agent/session-artifacts/01a0fee6-4ed7-725a-8cf9-0ba9fbf056b9/sub-4048acc1/b1-b5-repair-reaudit.md`, SHA-256
+`ff716ecb824a3f89b74b8fb557e407871130abf11e45e34b22229b639d6a752d`.
+It found B2/B3/B5 materially closed and B4/F3 preserved, but reproduced one
+remaining B1 transient leaf replace/read/restore gap. That finding is accepted
+and repaired below. Targeted independent recheck
+`/Users/jlanders/.prime/agent/session-artifacts/01a0fee6-4ed7-725a-8cf9-0ba9fbf056b9/sub-a3938430/b1-exact-leaf-recheck.md`, SHA-256
+`cb6e9708124c0bd0fbfe1ff6d9952e9e17ec47751ce8868c31a681f7bb643b84`,
+returns **PASS** and closes B1 without reopening B2-B5/F3.
 
-## Contract tests
+The repaired working tree now:
 
-The current focused Slice-3 file covers **124 tests**: lock and boundary shape,
-exact absence, ordinary-nonzero cleanup, sanitizer and evidence cross-binding,
-two-run disjointness, root/ancestor republishing, mount alias replacement,
-FIFO/special-file reads, iid/cid/body/status authority, caller pending/mask/
-handler ownership, real TERM/INT/HUP restoration races, replacement-failure
-neutralization, malformed inspect matrices, partial-create cleanup, and
-exception-isolated public finalization.
+- acquires/creates the snapshot parent through one continuous descriptor chain,
+  retains exact destination regular-file bindings in capture records, and rejects
+  root/ancestor republishing or copied regular/link/mode/content changes. Each
+  Dockerfile/lock read retains and matches its exact capture-time inode before
+  returning digest-checked bytes, closing transient replace/read/restore ABA;
+- treats Docker's client/daemon pathname consumption truthfully: retained checks
+  reject persistent replacement, while a hostile same-UID transient
+  replace-and-restore during daemon path resolution is outside the run-owned
+  results-tree trust boundary rather than claimed as impossible;
+- makes the inner driver provisional and keeps owned handlers installed through
+  disposable child exit, so direct-child TERM/INT/HUP cannot be consumed by a
+  restored returning/ignored/default/throwing prior handler;
+- makes the outer CLI supervisor the sole final publisher through child exit,
+  candidate/evidence validation, final publication, terminal unmasking, and
+  `os._exit`;
+- retains the exact writable final-manifest inode and writes a binding sidecar.
+  Descriptor-only neutralization leaves a raced replacement untouched, while
+  binding-aware public validation rejects that replacement as unauthoritative;
+- owns only watched signals absent from the caller's original mask. Pre-existing
+  and later caller-blocked signals remain pending through run, cleanup, and
+  restoration; and
+- uses stable bounded no-follow reads with iid/cid/body-specific limits and
+  aggregate evidence entry/file/byte/depth limits before sorting or hashing.
+  Final publication and evidence are revalidated after unmask and again at exit.
 
-## Host gates
+F3 remains closed and unchanged: malformed Docker shapes become typed unknown,
+and every independently safe recovery/cleanup/failure-publication stage is still
+attempted.
 
-Fresh revision gates before candidate freeze:
+## Current repair regressions
 
-- focused Slice-3: **124 passed**; and
-- integration plus Tier-1 signal set: **269 passed, 98 subtests passed**.
+The focused B1-B5 set now covers the audit reproductions as well as the original
+owner matrices:
 
-The final retained-tier-handshake source full-host gate passed **485 tests,
-149 skipped, 130 subtests** in 179.88 seconds. Retained raw log:
-`.test-results/slice3-final-b12-host-20261005T040024Z/full-host.log` SHA-256
+- capture-time ancestor transfer, post-capture root/ancestor republishing, and
+  capture-bound regular-inode replacement;
+- direct-child TERM/INT/HUP with returning, ignored, default, and throwing prior
+  handlers, proving the supervised driver retains ownership through exit;
+- public-manifest replacement outside the tier with byte-identical passed JSON,
+  exact old-inode neutralization, and binding-aware rejection of the untouched
+  replacement;
+- iid/cid/body path-specific inventory budgets, bounded directory fan-out/depth,
+  append-under-read rejection, and public post-unmask evidence mutation; and
+- the previously recorded B4 timing matrix, namespace failures, special-file
+  deadlines, typed recovery, exact cleanup, and two-run invariants.
+
+Post-B1 source evidence now passes:
+
+- focused: **252 tests + 30 subtests** in 40.87 seconds, log
+  `.test-results/slice3-b1-final-source-20261006T024136Z/focused.log`, SHA-256 `148a78b090cf4e3c37b0c18f504f56bd44e70adb06c7ba3d94b1550bce7e3d23`; and
+- affected: **343 tests + 98 subtests** in 134.87 seconds, log
+  `.test-results/slice3-b1-final-source-20261006T024136Z/affected.log`, SHA-256 `9e87e4dc3f8d126cb706adfa7833e55f1e5240d0c39647eec11dffc5803fef5f`.
+
+The independent B1 recheck additionally passed 12 selected tests and the same
+252-test focused pair. The full host gate then passed **559 tests / 149 skipped /
+130 subtests** in 188.51 seconds, log `.test-results/slice3-b1-final-source-20261006T024136Z/full-host.log`, SHA-256
+`f7a87ae165cd3acfc63e45650954ee8c3dc5af3b18e4100f38c41345041ccbb9`. These source and review results are not yet frozen-candidate
+Docker acceptance.
+
+The earlier affected source gate passed **317 tests + 98 subtests** and the full
+host gate passed **533 tests / 149 skipped / 130 subtests**, but both ran before
+the audit repairs and are therefore superseded. Their retained raw logs are:
+
+- `.test-results/slice3-b1b5-repair-20261006T015957Z/affected.log`, SHA-256
+  `5ca033e99bd8cee1c598cf95b40eb8284fb7722e93da5134022b1ccdfb219bc6`; and
+- `.test-results/slice3-b1b5-repair-20261006T015957Z/full-host.log`, SHA-256
+  `724271268924e6763ae31238f04257fdf5922e6d96af56c79ae57205540c63cd`.
+
+Fresh affected/full source gates, independent re-audit, exact-commit two-run
+Docker validation, manifest comparison, cleanup proof, and final independent
+review remain required before publication.
+
+## Historical host and Docker evidence
+
+The rejected `22e41a0…` generation passed focused **124**, affected **269 + 98
+subtests**, and full host **485 passed / 149 skipped / 130 subtests**. Its retained
+full-host log SHA-256 is
 `ae072fc715c31f8f2c5a73bf406424509ca026cda97f1263609fa58aaa540376`.
-The prior 424-, 433-, and 434-test checkpoints remain retained history but are
-superseded by this final source run.
+Its two ordinary Docker manifests and pair summary remain useful regression
+baselines, but the owner BLOCK supersedes every earlier PASS recommendation.
+None is acceptance evidence for the current B1-B5 repair.
 
-The earlier **89 + 30**, **124 + 68**, and full-host **394 passed / 149 skipped /
-130 subtests** totals belong to the rejected candidate and lack retained raw
-stdout. They remain historical reported-only context, not replayed revision
-evidence. Replacement full-host and exact-Docker evidence is recorded only after
-those sequential gates run on the final source and frozen commit.
-
-### Final-review repair checkpoint
-
-Independent review report SHA-256
-`d745fb257eff01c82b0f97aefe03fdb314f5a8151014a4a5e337169807d13baa`
-blocked the first replacement on a shadowed unsafe identity helper and a
-status-loss false-green boundary. The unsafe duplicate was removed. Producer
-iid/cid tests now exercise special leaves and replaced roots through the real
-build/create consumers. Real runs use the nonce ACK and retained tier closure
-capability described above. Seeded-green tests cover status and tier root/
-ancestor loss, child exit 0/7, and late TERM/INT/HUP; every detached original
-manifest becomes failed. The same reviewer returned PASS for the repaired B1/B2
-boundary before final source freeze.
+Fresh terminal evidence will be recorded only after the repair passes the
+sequential source gates, is frozen to one clean commit, completes two exact-commit
+`--rebuild` Docker runs, passes manifest validation/comparison and cleanup checks,
+and receives independent review. The Bead and owner packet remain the terminal
+receipt authorities.
 
 ## Accepted boundaries and limitations
 

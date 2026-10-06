@@ -1331,5 +1331,102 @@ class TestOwnedCapabilityAndManifestExchange(unittest.TestCase):
                 len(list(quarantine.rglob("original"))), 1)
 
 
+    def test_evidence_inventory_enforces_aggregate_file_and_byte_budgets(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td).resolve()
+            (root / "one.log").write_bytes(b"1234")
+            (root / "two.log").write_bytes(b"5678")
+            binding = provenance.owned_directory_binding(root)
+            with provenance.open_owned_directory(root, binding) as owned:
+                with self.assertRaisesRegex(
+                        provenance.ProvenanceError, "file-count limit"):
+                    provenance.evidence_inventory(
+                        owned, max_files=1, max_total_bytes=100)
+                with self.assertRaisesRegex(
+                        provenance.ProvenanceError, "byte limit"):
+                    provenance.evidence_inventory(
+                        owned, max_files=10, max_file_bytes=10,
+                        max_total_bytes=7)
+
+    def test_bounded_regular_reader_rejects_oversize_before_reading(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td).resolve(); leaf = root / "large.json"
+            leaf.write_bytes(b"x" * 1024)
+            binding = provenance.owned_directory_binding(root)
+            reads = []
+            real_read = provenance.os.read
+            def counted(fd, size):
+                reads.append(size)
+                return real_read(fd, size)
+            with provenance.open_owned_directory(root, binding) as owned:
+                with mock.patch.object(provenance.os, "read", counted):
+                    with self.assertRaisesRegex(
+                            provenance.ProvenanceError, "too large"):
+                        provenance.read_owned_regular_bytes(
+                            owned, "large.json", max_bytes=32)
+            self.assertEqual(reads, [])
+
+    def test_bounded_regular_reader_rejects_append_during_read(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td).resolve(); leaf = root / "receipt.json"
+            leaf.write_bytes(b"inside")
+            binding = provenance.owned_directory_binding(root)
+            real_read = provenance.os.read
+            fired = False
+            def append_after_read(fd, size):
+                nonlocal fired
+                data = real_read(fd, size)
+                if data and not fired:
+                    fired = True
+                    with leaf.open("ab") as stream:
+                        stream.write(b"-raced")
+                        stream.flush(); os.fsync(stream.fileno())
+                return data
+            with provenance.open_owned_directory(root, binding) as owned:
+                with mock.patch.object(
+                        provenance.os, "read", append_after_read):
+                    with self.assertRaisesRegex(
+                            provenance.ProvenanceError, "changed while it was read"):
+                        provenance.read_owned_regular_bytes(
+                            owned, "receipt.json", max_bytes=128)
+            self.assertTrue(fired)
+
+
+    def test_evidence_inventory_bounds_directory_entries_before_sorting(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td).resolve()
+            for name in ("one", "two", "three"):
+                (root / name).mkdir()
+            binding = provenance.owned_directory_binding(root)
+            with provenance.open_owned_directory(root, binding) as owned:
+                with self.assertRaisesRegex(
+                        provenance.ProvenanceError, "entry-count limit"):
+                    provenance.evidence_inventory(
+                        owned, max_files=10, max_entries=2)
+
+    def test_evidence_inventory_bounds_empty_directory_depth(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td).resolve(); current = root
+            for name in ("one", "two", "three", "four"):
+                current = current / name; current.mkdir()
+            binding = provenance.owned_directory_binding(root)
+            with provenance.open_owned_directory(root, binding) as owned:
+                with self.assertRaisesRegex(
+                        provenance.ProvenanceError, "depth limit"):
+                    provenance.evidence_inventory(
+                        owned, max_files=10, max_entries=10, max_depth=2)
+
+    def test_evidence_inventory_applies_path_specific_budget_on_reread(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td).resolve()
+            (root / "container.cid").write_bytes(b"x" * 257)
+            binding = provenance.owned_directory_binding(root)
+            with provenance.open_owned_directory(root, binding) as owned:
+                with self.assertRaisesRegex(
+                        provenance.ProvenanceError, "too large"):
+                    provenance.evidence_inventory(
+                        owned, path_limits={"container.cid": 256})
+
+
 if __name__ == "__main__":
     unittest.main()

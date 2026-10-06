@@ -40,37 +40,30 @@ class LifecycleInterrupted(BaseException):
 
 
 class LifecycleSignals:
-    """Own run signals without adopting the caller's blocked pending state."""
+    """Own only watched signals that the caller did not already block."""
 
     def __init__(self) -> None:
         self.watched = tuple(signal.Signals(value) for value in (
             signal.SIGTERM, signal.SIGINT, signal.SIGHUP))
         self.first: int | None = None
-        self.previous = {sig: signal.getsignal(sig) for sig in self.watched}
         self.sigmask = getattr(signal, "pthread_sigmask", None)
         self.sigpending = getattr(signal, "sigpending", None)
         self.sigwait = getattr(signal, "sigwait", None)
-        self.raise_signal = getattr(signal, "raise_signal", None)
         if any(value is None for value in (
-                self.sigmask, self.sigpending, self.sigwait,
-                self.raise_signal)):
+                self.sigmask, self.sigpending, self.sigwait)):
             raise DriverError("POSIX signal ownership is required")
         self.old_mask = self.sigmask(signal.SIG_BLOCK, self.watched)
-        self.caller_pending: set[signal.Signals] = set()
+        self.owned = tuple(sig for sig in self.watched if sig not in self.old_mask)
+        self.previous = {sig: signal.getsignal(sig) for sig in self.owned}
         self.enabled = False
         self.restored = False
         self.ownership_open = True
+        self.terminal_exit = False
         try:
-            baseline = set(self.sigpending()).intersection(self.watched)
-            if any(sig not in self.old_mask for sig in baseline):
+            baseline = set(self.sigpending()).intersection(self.owned)
+            if baseline:
                 raise DriverError("unblocked caller signal was already pending")
-            for sig in self.watched:
-                if sig in baseline:
-                    info = self.sigwait({sig})
-                    if info is None:
-                        raise DriverError("caller pending signal could not be quarantined")
-                    self.caller_pending.add(sig)
-            for sig in self.watched:
+            for sig in self.owned:
                 signal.signal(sig, self._record)
         except BaseException:
             self._restore_after_init_failure()
@@ -82,33 +75,32 @@ class LifecycleSignals:
                 signal.signal(sig, previous)
             except BaseException:
                 pass
-        for sig in self.caller_pending:
-            try:
-                self.raise_signal(sig)
-            except BaseException:
-                pass
         try:
             self.sigmask(signal.SIG_SETMASK, self.old_mask)
         except BaseException:
             pass
+        self.ownership_open = False
 
     def _record(self, signum: int, frame: Any) -> None:
-        if self.ownership_open:
+        sig = signal.Signals(signum)
+        if self.ownership_open and sig in self.owned:
             if self.first is None:
                 self.first = signum
+            if self.terminal_exit:
+                os._exit(128 + signum)
             return
-        previous = self.previous[signal.Signals(signum)]
+        previous = self.previous.get(sig, signal.getsignal(sig))
         if previous == signal.SIG_IGN:
             return
         if previous == signal.SIG_DFL:
             signal.signal(signum, signal.SIG_DFL)
-            self.raise_signal(signum)
+            signal.raise_signal(signum)
             return
         previous(signum, frame)
 
     def _capture_owned_pending(self) -> None:
-        pending = set(self.sigpending()).intersection(self.watched)
-        for sig in self.watched:
+        pending = set(self.sigpending()).intersection(self.owned)
+        for sig in self.owned:
             if sig not in pending:
                 continue
             info = self.sigwait({sig})
@@ -124,7 +116,7 @@ class LifecycleSignals:
         self.sigmask(signal.SIG_SETMASK, self.old_mask)
 
     def checkpoint(self) -> None:
-        current = self.sigmask(signal.SIG_BLOCK, self.watched)
+        current = self.sigmask(signal.SIG_BLOCK, self.owned)
         try:
             self._capture_owned_pending()
         finally:
@@ -135,9 +127,17 @@ class LifecycleSignals:
     def freeze(self) -> int | None:
         if self.restored:
             return self.first
-        self.sigmask(signal.SIG_BLOCK, self.watched)
+        self.sigmask(signal.SIG_BLOCK, self.owned)
         self._capture_owned_pending()
         return self.first
+
+    def retain_to_process_exit(self) -> None:
+        """Keep owned handlers authoritative in the disposable supervised child."""
+        if self.restored:
+            raise DriverError("signal owner was already restored")
+        self.freeze()
+        self.terminal_exit = True
+        self.sigmask(signal.SIG_SETMASK, self.old_mask)
 
     def restore(self) -> None:
         if self.restored:
@@ -147,33 +147,31 @@ class LifecycleSignals:
             self.freeze()
         except BaseException as exc:
             first_error = exc
-        # Requeue quarantined caller signals while every watched signal remains
-        # blocked. They were caller-blocked before this owner existed.
-        for sig in self.watched:
-            if sig not in self.caller_pending:
-                continue
-            try:
-                self.raise_signal(sig)
-            except BaseException as exc:
-                if first_error is None:
-                    first_error = exc
-        # Keep the ownership handlers installed across the one mask transition.
-        # Any run signal pending or injected immediately before/during unmask is
-        # delivered to _record before this call returns and remains run-owned.
+        # Transfer the mask once while the owner handlers remain installed.
+        # The outer supervisor still owns the whole child-restoration interval.
         try:
             self.sigmask(signal.SIG_SETMASK, self.old_mask)
         except BaseException as exc:
             if first_error is None:
                 first_error = exc
-        self.ownership_open = False
-        # The caller mask is now the ownership cutoff. Signals arriving after it
-        # are delegated by _record until each exact prior handler is restored.
+        try:
+            self.sigmask(signal.SIG_BLOCK, self.owned)
+            self._capture_owned_pending()
+        except BaseException as exc:
+            if first_error is None:
+                first_error = exc
         for sig, previous in self.previous.items():
             try:
                 signal.signal(sig, previous)
             except BaseException as exc:
                 if first_error is None:
                     first_error = exc
+        try:
+            self.sigmask(signal.SIG_SETMASK, self.old_mask)
+        except BaseException as exc:
+            if first_error is None:
+                first_error = exc
+        self.ownership_open = False
         self.restored = True
         if first_error is not None:
             raise first_error
@@ -282,12 +280,7 @@ def _unknown() -> dict[str, Any]:
 
 def _create_owned_child(parent: p.DirectoryAuthority,
                         name: str) -> p.DirectoryAuthority:
-    p.verify_directory_authority(parent)
-    child = p._create_owned_directory_child(parent, name, mode=0o700)
-    path = child.path
-    binding = child.binding
-    child.close()
-    return p.open_directory_authority(path, binding)
+    return p.create_directory_authority_child(parent, name, mode=0o700)
 
 
 def _platform() -> str:
@@ -300,11 +293,29 @@ def _platform() -> str:
     return value
 
 
+def _read_snapshot_inputs(
+    snapshot: p.DirectoryAuthority,
+    records: tuple[dict[str, Any], ...],
+) -> tuple[bytes, bytes, dict[str, Any]]:
+    """Read capture-bound Dockerfile and lock bytes from retained authority."""
+    p.verify_repository_snapshot(snapshot, records)
+    dockerfile = p.read_captured_repository_file(
+        snapshot, records, DOCKERFILE, max_bytes=1024 * 1024)
+    lock_bytes = p.read_captured_repository_file(
+        snapshot, records, LOCK_PATH, max_bytes=ip.LOCK_MAX_BYTES)
+    lock = ip.load_lock_bytes(lock_bytes)
+    p.verify_repository_snapshot(snapshot, records)
+    return dockerfile, lock_bytes, lock
+
+
 def _prepare_context(context: p.DirectoryAuthority,
                      tier: p.DirectoryAuthority,
                      prep: p.DirectoryAuthority,
+                     snapshot: p.DirectoryAuthority,
+                     snapshot_records: tuple[dict[str, Any], ...],
                      run_id: str, platform: str,
-                     lock: dict[str, Any], mirror: str | None,
+                     lock: dict[str, Any], lock_bytes: bytes,
+                     dockerfile_bytes: bytes, mirror: str | None,
                      teardown_state: dict[str, Any]) -> tuple[str, str]:
     teardown_state.clear()
     teardown_state.update(_unknown())
@@ -312,7 +323,8 @@ def _prepare_context(context: p.DirectoryAuthority,
     git_dir = None
     gbrain_dir = None
     try:
-        _verify_authorities(context, tier, prep)
+        _verify_authorities(context, tier, prep, snapshot)
+        p.verify_repository_snapshot(snapshot, snapshot_records)
         clean_home = _create_owned_child(prep, "home")
         git_dir = _create_owned_child(prep, "gbrain.git")
         env = _clean_env(clean_home.path)
@@ -378,22 +390,24 @@ def _prepare_context(context: p.DirectoryAuthority,
         if p.sha256_bytes(bun_bytes) != bun["sha256"]:
             raise DriverError("Bun artifact hash mismatched artifact lock")
         p.write_owned_regular_bytes(context, "bun-artifact.zip", bun_bytes)
+        p.verify_directory_authority(snapshot)
         p.write_owned_regular_bytes(
-            context, "Dockerfile", (REPO / DOCKERFILE).read_bytes(), mode=0o644)
+            context, "Dockerfile", dockerfile_bytes, mode=0o644)
         p.write_owned_regular_bytes(
-            context, "artifact-lock.json", (REPO / LOCK_PATH).read_bytes(), mode=0o644)
+            context, "artifact-lock.json", lock_bytes, mode=0o644)
+        p.verify_directory_authority(snapshot)
         p.write_owned_regular_bytes(
             context, "integration-run.json",
             (json.dumps({"run_id": run_id, "platform": platform},
                         sort_keys=True, separators=(",", ":")) + "\n").encode(),
             mode=0o644)
-        _verify_authorities(context)
-        inputs = sorted(str(path.relative_to(context.path))
-                        for path in context.path.rglob("*") if path.is_file())
-        input_hash = p.hash_declared_inputs(context.path, inputs)
+        _verify_authorities(context, snapshot)
+        inputs = p.owned_regular_paths(context)
+        input_hash = p.hash_declared_inputs_authority(context, inputs)
         dockerfile_hash = p.sha256_bytes(p.read_owned_regular_bytes(
             context, "Dockerfile", max_bytes=1024 * 1024))
-        _verify_authorities(context)
+        _verify_authorities(context, snapshot)
+        p.verify_repository_snapshot(snapshot, snapshot_records)
     finally:
         prep_result = _remove_owned(prep, tier)
         teardown_state.clear()
@@ -481,11 +495,15 @@ def _create_container(tier: p.DirectoryAuthority,
         raise DriverError("integration cidfile was not safely published") from exc
     if not re.fullmatch(r"[0-9a-f]{64}", container_id):
         raise DriverError("integration cidfile identity is invalid")
-    started = _run(["docker", "start", container_id], timeout=60)
+    started = _run_authorized(
+        (tier, snapshot, share),
+        ["docker", "start", container_id], timeout=60)
     if (started.stdout or "").strip() != container_id:
         raise DriverError("docker start identity mismatched captured container")
     rows = _json_result(
-        _run(["docker", "inspect", container_id], timeout=60),
+        _run_authorized(
+            (tier, snapshot, share),
+            ["docker", "inspect", container_id], timeout=60),
         "container inspect")
     if not isinstance(rows, list) or len(rows) != 1:
         raise DriverError("container inspect returned the wrong row count")
@@ -501,7 +519,9 @@ def _verify_container(container_id: str, *, image_id: str, run_id: str,
                       share: p.DirectoryAuthority) -> dict[str, Any]:
     _verify_authorities(snapshot, share)
     rows = _json_result(
-        _run(["docker", "inspect", container_id], timeout=60),
+        _run_authorized(
+            (snapshot, share),
+            ["docker", "inspect", container_id], timeout=60),
         "container inspect")
     if not isinstance(rows, list) or len(rows) != 1:
         raise DriverError("container inspect returned the wrong row count")
@@ -712,8 +732,12 @@ def _await_supervisor_ack(
 
 def _run_owned(args: argparse.Namespace, owner: LifecycleSignals | None) -> int:
     global _ACTIVE_SIGNALS
-    lock = ip.load_lock(REPO / LOCK_PATH)
+    lock: dict[str, Any] | None = None
+    lock_bytes: bytes | None = None
+    dockerfile_bytes: bytes | None = None
+    snapshot_records: tuple[dict[str, Any], ...] = ()
     if args.dry_run:
+        ip.load_lock(REPO / LOCK_PATH)
         print("integration driver: validate locked gbrain/Bun/base identities")
         print("integration driver: allocate run-owned snapshot/context/share/iid/cid")
         print("integration driver: build exact native-platform image; delete verified context")
@@ -736,6 +760,7 @@ def _run_owned(args: argparse.Namespace, owner: LifecycleSignals | None) -> int:
     repository: dict[str, Any] | None = None
     snapshot_path = results_root / ".workspaces" / run_id
     snapshot: p.DirectoryAuthority | None = None
+    status_owned: p.DirectoryAuthority | None = None
     share: p.DirectoryAuthority | None = None
     context: p.DirectoryAuthority | None = None
     prep: p.DirectoryAuthority | None = None
@@ -757,33 +782,35 @@ def _run_owned(args: argparse.Namespace, owner: LifecycleSignals | None) -> int:
     try:
         status_root = os.environ.get("PRIME_CLAW_INTEGRATION_STATUS_ROOT")
         status_binding = os.environ.get("PRIME_CLAW_INTEGRATION_STATUS_BINDING")
-        if status_root or status_binding:
-            if not status_root or not status_binding:
-                raise DriverError("integration status authority is incomplete")
-            with p.open_directory_authority(status_root, status_binding) as status_owned:
-                nonce = secrets.token_hex(32)
-                p.write_owned_regular_bytes(
-                    status_owned, "status.json",
-                    p.canonical_json({
-                        "tier_dir": str(tier.path),
-                        "binding": tier.binding.encode(),
-                        "nonce": nonce,
-                    }).encode("utf-8"),
-                    mode=0o600)
-                _await_supervisor_ack(status_owned, nonce)
+        if not status_root or not status_binding:
+            raise DriverError("integration final-owner status authority is required")
+        status_owned = p.open_directory_authority(status_root, status_binding)
+        nonce = secrets.token_hex(32)
+        p.write_owned_regular_bytes(
+            status_owned, "status.json",
+            p.canonical_json({
+                "tier_dir": str(tier.path),
+                "binding": tier.binding.encode(),
+                "nonce": nonce,
+            }).encode("utf-8"),
+            mode=0o600)
+        _await_supervisor_ack(status_owned, nonce)
         owner.enable()
         owner.checkpoint()
         repository = p.repository_identity(REPO)
         p.write_sanitized_json(tier, "repository.json", repository)
-        p.write_sanitized_json(tier, "artifact-lock.json", lock)
 
         snapshot_teardown = _unknown()
         p.verify_directory_authority(tier)
-        snapshot_repository = p.stage_repository_snapshot(REPO, snapshot_path)
-        snapshot_binding = p.owned_directory_binding(snapshot_path)
-        snapshot = p.open_directory_authority(snapshot_path, snapshot_binding)
+        snapshot_capture = p.capture_repository_snapshot(REPO, snapshot_path)
+        snapshot = snapshot_capture.authority
+        snapshot_repository = snapshot_capture.identity
+        snapshot_records = snapshot_capture.records
         if snapshot_repository != repository:
             raise DriverError("repository changed while the run snapshot was staged")
+        dockerfile_bytes, lock_bytes, lock = _read_snapshot_inputs(
+            snapshot, snapshot_records)
+        p.write_sanitized_json(tier, "artifact-lock.json", lock)
 
         share_teardown = _unknown()
         share = _create_owned_child(tier, "share")
@@ -791,8 +818,10 @@ def _run_owned(args: argparse.Namespace, owner: LifecycleSignals | None) -> int:
         context = _create_owned_child(tier, "build-context")
         prep = _create_owned_child(tier, "preparation")
         input_hash, dockerfile_hash = _prepare_context(
-            context, tier, prep, run_id, platform, lock,
-            args.gbrain_mirror, preparation_teardown)
+            context, tier, prep, snapshot, snapshot_records,
+            run_id, platform, lock,
+            lock_bytes, dockerfile_bytes, args.gbrain_mirror,
+            preparation_teardown)
         image_tag = f"{IMAGE_REPO}:{input_hash[:12]}"
         image_safe, image_id = _build_image(
             tier, context, run_id, platform, lock, input_hash, image_tag,
@@ -802,20 +831,24 @@ def _run_owned(args: argparse.Namespace, owner: LifecycleSignals | None) -> int:
         context_teardown = _remove_owned(context, tier)
         if not context_teardown["clean"]:
             raise DriverError("verified build context could not be removed")
+        p.verify_repository_snapshot(snapshot, snapshot_records)
         container_safe, container_id, container_name = _create_container(
             tier, snapshot, share, run_id, image_id, container_name)
+        p.verify_repository_snapshot(snapshot, snapshot_records)
         container_owned = True
         p.write_sanitized_json(tier, "boundary.json", container_safe)
         attestation = hashlib.sha256(
             f"{run_id}:{container_id}:{image_id}".encode()).hexdigest()
         p.require_owned_entry_absent(share, "body.json")
-        executed = _run([
+        p.verify_repository_snapshot(snapshot, snapshot_records)
+        executed = _run_authorized((tier, snapshot, share), [
             "docker", "exec", "--env",
             f"PRIME_CLAW_INTEGRATION_ATTESTATION={attestation}",
             "--env", f"PRIME_CLAW_INTEGRATION_RUN_ID={run_id}", container_id,
             "python3", "/workspace/tests/integration/environment_body.py",
             "--attestation", attestation, "--run-id", run_id,
         ], timeout=300, echo=True)
+        p.verify_repository_snapshot(snapshot, snapshot_records)
         if executed.outcome != "exited" or executed.returncode != 0:
             raise DriverError("integration body failed")
         try:
@@ -985,8 +1018,11 @@ def _run_owned(args: argparse.Namespace, owner: LifecycleSignals | None) -> int:
                         p.canonical_json(lock).encode()).hexdigest(),
                     body=body, image=image_safe, container=container_safe,
                     teardown=teardown, files=files)
-                manifest_binding = ip.publish_manifest(tier, manifest)
                 ip.verify_evidence(tier, manifest)
+                if status_owned is None:
+                    raise DriverError("integration final-owner status authority was lost")
+                p.write_sanitized_json(
+                    status_owned, "candidate.json", manifest)
                 publication_ok = True
             except Exception as exc:
                 print(f"integration driver: manifest publication failed: {exc}",
@@ -994,26 +1030,9 @@ def _run_owned(args: argparse.Namespace, owner: LifecycleSignals | None) -> int:
 
     _ACTIVE_SIGNALS = None
     interrupted = owner.freeze()
-    if (interrupted is not None and publication_ok and manifest is not None
-            and manifest_binding is not None and manifest["status"] == "passed"):
-        failed = json.loads(p.canonical_json(manifest))
-        failed["status"] = "failed"
-        failed["run"]["status"] = "failed"
-        failed["run"]["failure_codes"] = ["interrupted"]
-        try:
-            ip.publish_manifest(tier, failed,
-                                expected_existing=manifest_binding)
-            manifest = failed
-        except Exception:
-            try:
-                p.invalidate_green_manifest(tier, expected=manifest_binding)
-            except Exception:
-                pass
     result = (128 + interrupted if interrupted is not None
               else 0 if primary_ok and clean and publication_ok else 1)
-    if result == 0:
-        print("integration driver: PASS — offline brain stack and exact teardown verified")
-    for authority in (prep, context, share, snapshot, tier):
+    for authority in (prep, context, share, snapshot, tier, status_owned):
         if authority is not None:
             authority.close()
     return result
@@ -1025,11 +1044,21 @@ def run(args: argparse.Namespace) -> int:
         return _run_owned(args, None)
     owner = LifecycleSignals()
     _ACTIVE_SIGNALS = owner
-    result = 1
+    supervised = os.environ.get("PRIME_CLAW_INTEGRATION_INNER") == "1"
     try:
         result = _run_owned(args, owner)
-    finally:
+    except BaseException:
         _ACTIVE_SIGNALS = None
+        owner.restore()
+        raise
+    _ACTIVE_SIGNALS = None
+    if supervised:
+        # This process is disposable. Do not restore a returning/ignored prior
+        # handler and create an unobservable direct-child signal window. The
+        # outer supervisor remains the final publisher while these handlers
+        # stay active through interpreter exit.
+        owner.retain_to_process_exit()
+    else:
         owner.restore()
     if owner.first is not None:
         return 128 + owner.first

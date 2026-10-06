@@ -1379,7 +1379,7 @@
     {
       "id": "R-TEST-5",
       "priority": "GATE",
-      "summary": "Tier launchers use exact iidfile/cidfile identities, bounded process groups, typed target/controller outcomes, caller-owned pending-signal preservation, nonce-acknowledged retained tier closure, through-restoration terminal invalidation, and exception-safe exact-ID cleanup/publication.",
+      "summary": "Tier launchers use exact iidfile/cidfile identities, bounded process groups, typed target/controller outcomes, and exception-safe exact-ID cleanup. The Slice-3 driver emits only a private candidate and retains initially unblocked watched-signal handlers through disposable child exit. The outer CLI supervisor publishes the sole final manifest plus a binding sidecar, revalidates public binding/evidence through its terminal exit, and neutralizes the exact retained inode without modifying raced replacements; caller-blocked pending signals remain caller-owned.",
       "status": "proven for owner-accepted tier 1 and Slice-3 exact iid/cid image/container lifecycle with owner acceptance pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
@@ -1435,7 +1435,7 @@
     {
       "id": "R-TEST-7",
       "priority": "GATE",
-      "summary": "Tier-1 and integration launchers mount only a component-capability-bound repository snapshot read-only plus a fresh result share writable; replaced roots/ancestors and special receipts are rejected, while an acknowledged fd-only tier capability can invalidate detached green evidence without authorizing replacement aliases; host home, sockets, credentials, and arbitrary checkouts remain excluded.",
+      "summary": "Tier-1 and integration launchers mount only a component-capability-bound repository snapshot read-only plus a fresh result share writable. Slice 3 acquires and keeps one continuous snapshot/ancestor authority, retains capture-time destination inode bindings, reads Dockerfile/lock bytes only through matching exact retained bindings, and revalidates leaves/modes/links/content around every consumer phase. Persistent root/ancestor/leaf replacement and special receipts are rejected. Docker path APIs cannot receive the client descriptor, so hostile same-UID transient replace-and-restore during daemon resolution is explicitly outside the private run-tree trust boundary. Binding-aware manifest validation never authorizes raced replacement aliases. Host home, sockets, credentials, and arbitrary checkouts remain excluded.",
       "status": "proven for owner-accepted tier 1; Slice-3 repository:ro plus results:rw offline boundary implemented with owner acceptance pending",
       "plan": ".ralph/plans/SPECIFICATION.md",
       "proven_by": {
@@ -1497,7 +1497,7 @@
     {
       "id": "R-TEST-10",
       "priority": "GATE",
-      "summary": "Safety coverage includes status/tier root/ancestor/leaf and special-file swaps, nonce ACK typing, fd-only detached-evidence invalidation, framed identity, sanitization/redaction, signal mask/pending/handler ownership, late-signal publication closure, malformed inspect typing, partial-create finalizer isolation, stale evidence, and concurrent allocation.",
+      "summary": "Safety coverage includes capture-transfer and snapshot root/ancestor/regular-inode swaps; live-input mutation/symlink/FIFO replacement; nonce ACK and private-candidate typing; direct-child real signals through disposable process exit; exact-inode invalidation plus binding-aware rejection of byte-identical raced replacements; path-specific and aggregate entry/file/byte/depth limits; post-unmask evidence mutation; caller-blocked pending preservation; malformed inspect typing; partial-create finalizer isolation; stale evidence; and concurrent allocation.",
       "status": "proven for owner-accepted Slice-1/Slice-2 components; Slice-3 identity, drift, absence, cleanup, and two-run negative coverage implemented with owner acceptance pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {

@@ -1,6 +1,53 @@
 # Project-wide testing strategy — isolation-first test architecture
 
-> **ACTIVE SLICE 3 REVISION CONTRACT — owner-rejected `6d6f7ee`.** Candidate
+> **ACTIVE SLICE 3 REVISION CONTRACT — owner-rejected `22e41a0`.** Candidate
+> `22e41a0ed39070017a92b7beddc4b2440ed33b05` / tree
+> `4e87df045e97c4c69961bee6e0d94fed347a4f9f` is revision history, not accepted.
+> The authoritative owner BLOCK report SHA-256 is
+> `155ec9b098df03b4cdbdfded7a52cbfd61d460dcc099edf0b1c32cb2c8ad1eb1`.
+> Preserve materially closed F3 malformed-inspect cleanup; exact locked gbrain,
+> PostgreSQL, pgvector, local-Git, fixture-corpus, comparator, teardown, evidence,
+> isolation, and accepted Slice-1/Slice-2 behavior. The bounded revision requires:
+>
+> - continuous open snapshot destination and ancestor authority across capture,
+>   preparation, build, mount, read, and cleanup, with Dockerfile and lock
+>   consumed from that exact snapshot and no path recapture or replacement
+>   adoption/deletion;
+> - one final-owner terminal transaction through process exit, owning
+>   TERM/INT/HUP across every restoration/unmask/exception slot and exposing no
+>   PASS early;
+> - retained exact writable manifest inode/binding with non-green neutralization
+>   independent of `.publication`, staging, or path re-resolution, without
+>   modifying raced replacements;
+> - driver ownership of only watched signals outside the caller's old mask,
+>   preserving caller-blocked pre-existing and later pending signals; and
+> - stable no-follow regular-file rereads with finite control/body/manifest/
+>   inventory/sanitized budgets, capped hashing, and inode/size mutation checks.
+>
+> Prove the revision through public root/ancestor republish, live mutation,
+> symlink, FIFO, permission/type/alias, pre-exchange failure, restoration-handler,
+> signal-timing, oversized, and append-under-read deadline matrices. Correct only
+> related docs/evidence ambiguity, re-run invalidated gates sequentially, publish
+> one fully revalidated clean Slice-3 replacement, and stop for owner review.
+> Slice 4 and later remain closed.
+
+> **CURRENT UNPUBLISHED IMPLEMENTATION CHECKPOINT — 2026-10-06.** The latest
+> read-only re-audit (SHA-256
+> `ff716ecb824a3f89b74b8fb557e407871130abf11e45e34b22229b639d6a752d`)
+> confirms B2/B3/B5 materially closed and B4/F3 preserved, but blocked the
+> prior repair on a transient B1 copied-leaf read ABA. Capture records now bind
+> each destination regular inode, and Dockerfile/lock consumers retain and match
+> that exact binding, mode, and digest before returning bytes. The B1 target
+> passes 7 tests; all broader pre-repair gates are superseded. No replacement
+> commit, Docker evidence, recheck, publication, or acceptance is claimed; all
+> terminal gates in the active revision contract remain pending. Targeted B1
+> independent recheck now passes (report SHA-256
+> `cb6e9708124c0bd0fbfe1ff6d9952e9e17ec47751ce8868c31a681f7bb643b84`),
+> as do fresh focused **252 + 30 subtests** and affected **343 + 98 subtests**
+> gates. The sequential full-host gate passes **559 tests / 149 skipped / 130
+> subtests**; exact-commit Docker and terminal review remain pending.
+
+> **PRIOR SLICE 3 REVISION CONTRACT — owner-rejected `6d6f7ee`.** Candidate
 > `6d6f7ee7bbb208b88c798fe4c469188930f07579` / tree
 > `5f17a2dd25fda6d47eef00771575bd5c4802a402` is revision history, not accepted.
 > Authoritative owner report SHA-256:

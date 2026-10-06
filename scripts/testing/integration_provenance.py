@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 from typing import Any
 
 from scripts.testing import provenance as p
@@ -16,6 +17,17 @@ from scripts.testing import provenance as p
 CONTRACT = "integration-v1"
 BODY_CONTRACT = "integration-body-v1"
 SUPPORTED_PLATFORMS = {"linux/amd64", "linux/arm64"}
+LOCK_MAX_BYTES = 1024 * 1024
+RECEIPT_MAX_BYTES = 1024 * 1024
+BODY_MAX_BYTES = 2 * 1024 * 1024
+MANIFEST_MAX_BYTES = p.MAX_MANIFEST_BYTES
+MANIFEST_BINDING_NAME = "manifest.binding.json"
+MANIFEST_BINDING_CONTRACT = "integration-manifest-binding-v1"
+MANIFEST_BINDING_MAX_BYTES = 4096
+CONTROL_MAX_BYTES = 256
+INVENTORY_MAX_FILE_BYTES = p.MAX_EVIDENCE_BYTES
+INVENTORY_MAX_TOTAL_BYTES = p.MAX_EVIDENCE_TOTAL_BYTES
+INVENTORY_MAX_FILES = p.MAX_EVIDENCE_FILES
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 _CID = re.compile(r"^[0-9a-f]{64}$")
 _IMAGE_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -75,12 +87,26 @@ def validate_lock(value: Any) -> dict[str, Any]:
     return root
 
 
-def load_lock(path: Path | str) -> dict[str, Any]:
+def load_lock_bytes(raw: bytes) -> dict[str, Any]:
+    if len(raw) > LOCK_MAX_BYTES:
+        raise p.ProvenanceError("artifact lock is oversized")
     try:
-        value = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        value = json.loads(raw.decode("utf-8", "strict"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
         raise p.ProvenanceError("artifact lock is unreadable") from exc
     return validate_lock(value)
+
+
+def load_lock(path: Path | str) -> dict[str, Any]:
+    candidate = Path(os.path.abspath(path))
+    try:
+        binding = p.owned_directory_binding(candidate.parent)
+        with p.open_directory_authority(candidate.parent, binding) as owned:
+            raw = p.read_owned_regular_bytes(
+                owned, candidate.name, max_bytes=LOCK_MAX_BYTES)
+    except (OSError, p.ProvenanceError) as exc:
+        raise p.ProvenanceError("artifact lock is unreadable") from exc
+    return load_lock_bytes(raw)
 
 
 def validate_body(value: Any, lock: dict[str, Any], *, run_id: str,
@@ -516,8 +542,23 @@ def validate_manifest(value: Any) -> dict[str, Any]:
 def evidence_inventory(owned: p.OwnedDirectory) -> list[dict[str, str]]:
     return p.evidence_inventory(
         owned,
-        exclude=("manifest.json",),
+        exclude=("manifest.json", MANIFEST_BINDING_NAME),
         exclude_prefixes=("share/", "build-context/", "preparation/", ".publication/"),
+        max_file_bytes=INVENTORY_MAX_FILE_BYTES,
+        max_total_bytes=INVENTORY_MAX_TOTAL_BYTES,
+        max_files=INVENTORY_MAX_FILES,
+        max_entries=INVENTORY_MAX_FILES,
+        max_depth=32,
+        path_limits={
+            "image.iid": CONTROL_MAX_BYTES,
+            "container.cid": CONTROL_MAX_BYTES,
+            "body.json": BODY_MAX_BYTES,
+            "artifact-lock.json": LOCK_MAX_BYTES,
+            "repository.json": RECEIPT_MAX_BYTES,
+            "preparation.json": RECEIPT_MAX_BYTES,
+            "image.json": RECEIPT_MAX_BYTES,
+            "boundary.json": RECEIPT_MAX_BYTES,
+        },
     )
 
 
@@ -535,7 +576,7 @@ def verify_evidence(owned: p.OwnedDirectory, manifest: dict[str, Any]) -> None:
         raise p.ProvenanceError("integration evidence is missing a mandatory receipt")
     if by_path.get("artifact-lock.json") != manifest["artifact_lock_sha256"]:
         raise p.ProvenanceError("artifact lock evidence is not cross-bound")
-    lock = validate_lock(p.read_sanitized_json(owned, "artifact-lock.json"))
+    lock = validate_lock(p.read_sanitized_json(owned, "artifact-lock.json", max_bytes=LOCK_MAX_BYTES))
     if manifest["image"] is not None:
         if manifest["image"]["base_image_digest"] != lock["base_image"]["platforms"][manifest["platform"]]:
             raise p.ProvenanceError("manifest base-image digest disagrees with lock")
@@ -544,20 +585,20 @@ def verify_evidence(owned: p.OwnedDirectory, manifest: dict[str, Any]) -> None:
                   ("origin", "commit", "tree", "archive_sha256", "package_version")}
         if locked != lock["gbrain"]:
             raise p.ProvenanceError("manifest gbrain lineage disagrees with lock")
-    repository = p.read_sanitized_json(owned, "repository.json")
+    repository = p.read_sanitized_json(owned, "repository.json", max_bytes=RECEIPT_MAX_BYTES)
     if repository != manifest["repository"]:
         raise p.ProvenanceError("repository evidence is not cross-bound")
-    preparation = p.read_sanitized_json(owned, "preparation.json")
+    preparation = p.read_sanitized_json(owned, "preparation.json", max_bytes=RECEIPT_MAX_BYTES)
     if preparation != manifest["teardown"]["preparation"]:
         raise p.ProvenanceError("preparation teardown evidence is not cross-bound")
     if manifest["image"] is not None:
-        if p.read_sanitized_json(owned, "image.json") != manifest["image"]:
+        if p.read_sanitized_json(owned, "image.json", max_bytes=RECEIPT_MAX_BYTES) != manifest["image"]:
             raise p.ProvenanceError("image evidence is not cross-bound")
     if manifest["container"] is not None:
-        if p.read_sanitized_json(owned, "boundary.json") != manifest["container"]:
+        if p.read_sanitized_json(owned, "boundary.json", max_bytes=RECEIPT_MAX_BYTES) != manifest["container"]:
             raise p.ProvenanceError("container evidence is not cross-bound")
     if manifest["gbrain"] is not None:
-        body_raw = p.read_sanitized_json(owned, "body.json")
+        body_raw = p.read_sanitized_json(owned, "body.json", max_bytes=BODY_MAX_BYTES)
         attestation = hashlib.sha256(
             f"{manifest['run']['id']}:{manifest['container']['id']}:{manifest['image']['id']}".encode()
         ).hexdigest()
@@ -577,6 +618,134 @@ def verify_evidence(owned: p.OwnedDirectory, manifest: dict[str, Any]) -> None:
         if not (run_started <= _utc(body["started_at"], "body.started_at")
                 <= _utc(body["finished_at"], "body.finished_at") <= run_finished):
             raise p.ProvenanceError("body evidence timestamps escape the run interval")
+
+
+def read_retained_manifest(
+    retained: p.RetainedRegularFile,
+) -> dict[str, Any]:
+    raw = p.read_retained_regular_bytes(
+        retained, label="retained integration manifest")
+    try:
+        value = json.loads(raw.decode("utf-8", "strict"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise p.ProvenanceError("retained integration manifest is unreadable") from exc
+    return validate_manifest(value)
+
+
+def _manifest_binding_receipt(
+    retained: p.RetainedRegularFile,
+) -> dict[str, Any]:
+    raw = p.read_retained_regular_bytes(
+        retained, label="retained integration manifest")
+    return {
+        "schema_version": 1,
+        "contract": MANIFEST_BINDING_CONTRACT,
+        "binding": retained.binding.encode(),
+    }
+
+
+def _validate_manifest_binding_receipt(value: Any) -> dict[str, Any]:
+    row = _keys(value, {
+        "schema_version", "contract", "binding",
+    }, "manifest binding receipt")
+    if row["schema_version"] != 1 or row["contract"] != MANIFEST_BINDING_CONTRACT:
+        raise p.ProvenanceError("unsupported manifest binding receipt")
+    if not isinstance(row["binding"], str):
+        raise p.ProvenanceError("invalid manifest binding receipt")
+    binding = p.ObjectBinding.decode(row["binding"])
+    if binding.mode_type != stat.S_IFREG:
+        raise p.ProvenanceError("invalid manifest binding type")
+    return row
+
+
+def verify_final_publication(
+    owned: p.OwnedDirectory | p.DirectoryAuthority | p.RetainedDirectory,
+    retained: p.RetainedRegularFile,
+    manifest: dict[str, Any],
+) -> None:
+    """Verify exact public binding, retained bytes, sidecar, and evidence."""
+    validate_manifest(manifest)
+    raw = p.read_retained_regular_bytes(
+        retained, label="retained integration manifest")
+    if json.loads(raw.decode("utf-8", "strict")) != manifest:
+        raise p.ProvenanceError("retained integration manifest changed")
+    public = p.retain_owned_regular_file(
+        owned, "manifest.json", max_bytes=MANIFEST_MAX_BYTES)
+    try:
+        if public.binding != retained.binding:
+            raise p.ProvenanceError("public integration manifest binding changed")
+        if p.read_retained_regular_bytes(
+                public, label="public integration manifest") != raw:
+            raise p.ProvenanceError("public integration manifest bytes changed")
+    finally:
+        public.close()
+    receipt = _validate_manifest_binding_receipt(p.read_sanitized_json(
+        owned, MANIFEST_BINDING_NAME,
+        max_bytes=MANIFEST_BINDING_MAX_BYTES))
+    if receipt["binding"] != retained.binding.encode():
+        raise p.ProvenanceError("manifest binding receipt mismatched publication")
+    verify_evidence(owned, manifest)
+
+
+def publish_final_manifest(
+    owned: p.OwnedDirectory | p.DirectoryAuthority | p.RetainedDirectory,
+    manifest: dict[str, Any],
+) -> p.RetainedRegularFile:
+    """Publish the sole final manifest and retain its exact writable inode."""
+    validate_manifest(manifest)
+    verify_evidence(owned, manifest)
+    retained = p.publish_sanitized_json_retained(
+        owned, "manifest.json", manifest, max_bytes=MANIFEST_MAX_BYTES)
+    try:
+        if read_retained_manifest(retained) != manifest:
+            raise p.ProvenanceError("retained integration manifest changed")
+        p.write_sanitized_json(
+            owned, MANIFEST_BINDING_NAME,
+            _manifest_binding_receipt(retained))
+        verify_final_publication(owned, retained, manifest)
+        return retained
+    except BaseException:
+        try:
+            p.overwrite_retained_regular_bytes(
+                retained,
+                p.canonical_json({"invalidated": True,
+                                  "reason": "final-publication-failed",
+                                  "status": "failed"}).encode("utf-8"),
+                label="retained integration manifest")
+        finally:
+            retained.close()
+        raise
+
+
+def overwrite_retained_manifest_failed(
+    retained: p.RetainedRegularFile,
+    manifest: dict[str, Any],
+) -> None:
+    """Make only the retained exact manifest inode a verified failed manifest."""
+    validate_manifest(manifest)
+    if manifest["status"] != "failed":
+        raise p.ProvenanceError("retained manifest replacement must be failed")
+    p.overwrite_retained_regular_bytes(
+        retained, p.canonical_json(manifest).encode("utf-8"),
+        label="retained integration manifest")
+    observed = read_retained_manifest(retained)
+    if observed["status"] != "failed":
+        raise p.ProvenanceError("retained manifest remained green")
+
+
+def neutralize_retained_manifest(
+    retained: p.RetainedRegularFile,
+    *,
+    reason: str,
+) -> None:
+    """Destroy green on one exact retained inode without any namespace access."""
+    if not re.fullmatch(r"[a-z][a-z0-9-]{1,63}", reason):
+        raise p.ProvenanceError("invalid retained-manifest failure reason")
+    p.overwrite_retained_regular_bytes(
+        retained,
+        p.canonical_json({"invalidated": True, "reason": reason,
+                          "status": "failed"}).encode("utf-8"),
+        label="retained integration manifest")
 
 
 def publish_manifest(owned: p.OwnedDirectory, manifest: dict[str, Any], *, expected_existing: p.ObjectBinding | None = None) -> p.ObjectBinding:
@@ -601,14 +770,32 @@ def publish_manifest(owned: p.OwnedDirectory, manifest: dict[str, Any], *, expec
 
 
 def load_verified_manifest(path: Path | str) -> tuple[dict[str, Any], str]:
-    candidate = Path(path).resolve()
+    candidate = Path(os.path.abspath(path))
     if candidate.name != "manifest.json":
         raise p.ProvenanceError("integration manifest path must end in manifest.json")
     binding = p.owned_directory_binding(candidate.parent)
     with p.open_owned_directory(candidate.parent, binding) as owned:
-        manifest = p.read_sanitized_json(owned, "manifest.json")
-        validate_manifest(manifest)
-        verify_evidence(owned, manifest)
+        retained = p.retain_owned_regular_file(
+            owned, "manifest.json", max_bytes=MANIFEST_MAX_BYTES)
+        try:
+            raw = p.read_retained_regular_bytes(
+                retained, label="integration manifest")
+            try:
+                manifest = json.loads(raw.decode("utf-8", "strict"))
+            except (UnicodeError, json.JSONDecodeError) as exc:
+                raise p.ProvenanceError(
+                    "integration manifest is unreadable") from exc
+            validate_manifest(manifest)
+            receipt = _validate_manifest_binding_receipt(
+                p.read_sanitized_json(
+                    owned, MANIFEST_BINDING_NAME,
+                    max_bytes=MANIFEST_BINDING_MAX_BYTES))
+            if receipt["binding"] != retained.binding.encode():
+                raise p.ProvenanceError(
+                    "integration manifest public binding mismatched receipt")
+            verify_evidence(owned, manifest)
+        finally:
+            retained.close()
     return manifest, binding
 
 

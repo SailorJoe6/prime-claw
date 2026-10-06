@@ -1,6 +1,70 @@
 # Execution plan — project-wide isolation-first testing strategy
 
-> **SLICE 3 OWNER DISPOSITION — REVISE `6d6f7ee` (2026-10-04).** Exact
+> **ACTIVE SLICE 3 OWNER DISPOSITION — REVISE `22e41a0` (2026-10-05).**
+> Exact candidate `22e41a0ed39070017a92b7beddc4b2440ed33b05`, tree
+> `4e87df045e97c4c69961bee6e0d94fed347a4f9f`, is rejected for advancement.
+> The authoritative owner BLOCK report is retained at
+> `/Users/jlanders/.prime/agent/session-artifacts/01a0fe2e-e0dd-7638-9b4c-0b118182c6e3/sub-791d8992/slice3-22e41a0-owner-review.md`
+> with SHA-256
+> `155ec9b098df03b4cdbdfded7a52cbfd61d460dcc099edf0b1c32cb2c8ad1eb1`;
+> its accepted findings are recorded on `prime-claw-5v7.5`. Preserve materially
+> closed F3 malformed-inspect cleanup, exact gbrain/PostgreSQL/pgvector/local-Git
+> behavior and pins, fixture corpus, two-run comparison, truthful teardown and
+> evidence, isolation, and all accepted Slice-1/Slice-2 boundaries. Repair only:
+>
+> 1. **B1/P1 — continuous snapshot destination authority:** retain the open
+>    destination and every ancestor authority continuously across capture,
+>    preparation, build, mount, reads, and cleanup. Never recapture by path or
+>    adopt/delete a replacement alias. Consume Dockerfile and artifact lock from
+>    the exact captured snapshot. Regress root/ancestor republish plus live
+>    mutation, symlink, and FIFO producer cases.
+> 2. **B2/P1 — one final-owner terminal transaction:** own TERM/INT/HUP through
+>    every prior-handler restoration, unmask, restoration exception, and process
+>    exit. Never print or expose PASS before that transaction completes. Regress
+>    every restoration slot with returning, ignored, and default handlers.
+> 3. **B3/P1 — namespace-independent green neutralization:** retain the exact
+>    verified writable manifest inode/binding and make it non-green without
+>    depending on `.publication`, staging, or path re-resolution when exchange
+>    fails. Never modify raced replacement entries. Regress natural permission,
+>    type, and alias failures plus injected pre-exchange failures for
+>    TERM/INT/HUP.
+> 4. **B4/P2 — exact signal provenance:** the driver owns only watched signals
+>    not present in the caller's old mask. Preserve caller-blocked pre-existing
+>    and later pending signals on every exit. Add deterministic before/during
+>    cleanup/restoration timing coverage.
+> 5. **B5/P2 — bounded stable rereads:** every control, body, manifest,
+>    inventory, and sanitized reread is a stable no-follow regular-file read with
+>    finite byte budgets, capped hashing, and inode/size mutation detection. Add
+>    through-public oversized, FIFO, and append-under-read deadline regressions.
+>
+> Correct only related docs/evidence claims and older ambiguous headers or
+> performance truth as needed. Re-run invalidated gates sequentially, retain raw
+> evidence, publish one clean pushed Slice-3 replacement with a Bead receipt,
+> and stop for owner review. Do not start Slice 4 or later work.
+
+> **CURRENT UNPUBLISHED B1-B5 CHECKPOINT — 2026-10-06.** Checkpoint audit
+> `b1-b5-current-audit.md` (SHA-256
+> `5d1d49e626a272a3e6354c0525eb911a8e254f486f5897da154a5d80893ce419`)
+> blocked B1/B2/B3/B5; its repairs passed 248 focused tests + 30 subtests. The
+> next re-audit (SHA-256
+> `ff716ecb824a3f89b74b8fb557e407871130abf11e45e34b22229b639d6a752d`)
+> found B2/B3/B5 materially closed and B4/F3 preserved, but reproduced a final B1
+> transient copied-leaf replace/read/restore gap. The accepted B1 finding is now
+> repaired with capture-time destination inode bindings and exact retained-file,
+> mode, and digest checks on every Dockerfile/lock read; its focused target passes
+> 7 tests. This invalidates the prior focused/affected/full source gates. This is
+> not a frozen candidate or acceptance: fresh full focused, affected, and host
+> gates, independent B1 recheck, two exact-commit Docker runs, manifest
+> comparison/cleanup proof, final review, one push, remote-equality proof, and the
+> terminal Bead receipt remain required. Targeted independent B1 recheck
+> `b1-exact-leaf-recheck.md` (SHA-256
+> `cb6e9708124c0bd0fbfe1ff6d9952e9e17ec47751ce8868c31a681f7bb643b84`)
+> now returns PASS. Fresh focused/affected gates pass **252 + 30 subtests** and
+> **343 + 98 subtests** respectively. The sequential full-host gate passes **559
+> tests / 149 skipped / 130 subtests**; exact-commit Docker and terminal review
+> remain pending.
+
+> **PRIOR SLICE 3 OWNER DISPOSITION — REVISE `6d6f7ee` (2026-10-04).** Exact
 > candidate `6d6f7ee7bbb208b88c798fe4c469188930f07579`, tree
 > `5f17a2dd25fda6d47eef00771575bd5c4802a402`, is rejected for advancement.
 > The authoritative owner report is retained externally with SHA-256

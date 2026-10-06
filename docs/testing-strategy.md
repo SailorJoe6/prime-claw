@@ -78,35 +78,55 @@ Inside the already-offline container, the body proves:
   local-only source registration/sync, and keyless get/search; and
 - bounded PostgreSQL fast-stop before the assertion process succeeds.
 
-The host reads iid, cid, body, and supervisor status only through bounded,
-no-follow, nonblocking regular-file primitives rooted in retained directory
-capabilities. FIFOs, links, directories, devices, oversized files, mutation, or
-root/ancestor replacement become typed failure without blocking cleanup. For a
-real run, the driver publishes a nonce-bound status record and cannot begin work
-or publish green until the supervisor has verified the full tier chain, retained
-an exact descriptor-only closure capability, and atomically acknowledged that
-nonce. Terminal and post-unmask status/tier-chain drift makes the run red; the
-fd-only capability can still exchange or neutralize a green manifest in the
-original detached inode. Dry-run is an explicit exact-launcher path and never
-claims manifest verification. The host validates and promotes only the sanitized body receipt. It re-inspects the
-unchanged capability-bound mount boundary, removes the exact labelled container
-and image, and requires successful removal plus an exact allow-listed not-found
-inspection.
-Ordinary nonzero removal remains non-clean even if absence is later proved.
-Malformed identity, inspect row, `Config`, or `Labels`, label drift,
-daemon/transport error, timeout, signal, presence, or unknown state normalizes to
-typed unknown, preserves possibly mounted state, and keeps the run red. Recovery,
-container cleanup, image cleanup, directory cleanup, and failed publication are
-exception-isolated so one malformed stage cannot skip another independently safe
-stage. A lost iid/cid may fall back only to the exact expected tag/name;
-immutable ID plus run/contract labels and image/name bindings must match before
-deletion. The driver quarantines caller-preexisting pending TERM/INT/HUP, owns
-only signals arriving during the run, freezes and drains those signals for exact
-cleanup, then restores the caller's exact handlers, mask, and pending ownership.
-The supervisor keeps its ownership handler installed across the single terminal
-unmask, closes any signal delivered at that edge, then defines the caller-mask
-cutoff and restores each exact prior handler. Replacement failure falls back to
-neutralization, so an owned late signal cannot leave durable green evidence.
+The host reads iid, cid, body, candidate, manifest, and supervisor status only
+through bounded, no-follow, nonblocking regular-file primitives rooted in
+retained capabilities. Stable before/open/after metadata checks reject mutation.
+Path-specific limits for iid/cid/body/control records plus aggregate evidence
+entry, file, byte, and depth limits reject unbounded growth before sorting or
+hashing. FIFOs, links, directories, devices, oversized files, mutation, or
+root/ancestor replacement become typed failure without blocking independently
+safe cleanup.
+
+For a real run, the driver publishes a nonce-bound status record and cannot begin
+work until the supervisor has verified the full tier chain and acknowledged that
+nonce. A continuously acquired snapshot/ancestor chain carries exact capture
+records. The driver revalidates the complete leaf set, modes, links, and content
+before and after every consumer phase. Dockerfile/lock reads retain and match the
+exact capture-time regular-file binding before returning digest-checked bytes, so
+a transient leaf replace/read/restore cannot enter the build context. Docker's
+client/daemon interface still consumes host pathnames;
+therefore retained checks reject persistent replacement but do not claim defense
+against a hostile same-UID process that swaps and restores a private run path only
+during daemon resolution. Concurrent mutation of the run-owned results tree is
+outside this harness's trust boundary.
+
+The driver never publishes `manifest.json`: after exact teardown it writes only
+the private `candidate.json`. In the disposable supervised child, its owned
+handlers remain installed through process exit, so direct-child TERM/INT/HUP
+cannot be consumed by a restored returning/ignored handler. The outer CLI
+supervisor validates the candidate and evidence, publishes the sole final
+manifest plus an exact-inode binding sidecar, revalidates both public binding and
+evidence after terminal unmask and again at exit, and never prints early PASS/OK.
+Terminal status/tier/candidate/evidence drift is red. If a late failure follows
+publication, the supervisor neutralizes the retained inode without reopening
+`manifest.json` or depending on `.publication`; a raced replacement is not
+modified but cannot pass binding-aware public validation. Dry-run is an explicit
+exact-launcher path and never claims manifest verification.
+
+The host validates and promotes only the sanitized body receipt. It re-inspects
+the unchanged capability-bound mount boundary, removes the exact labelled
+container and image, and requires successful removal plus an exact allow-listed
+not-found inspection. Ordinary nonzero removal remains non-clean even if absence
+is later proved. Malformed identity, inspect row, `Config`, or `Labels`, label
+drift, daemon/transport error, timeout, signal, presence, or unknown state
+normalizes to typed unknown, preserves possibly mounted state, and keeps the run
+red. Recovery, container cleanup, image cleanup, directory cleanup, and failed
+publication are exception-isolated so one malformed stage cannot skip another
+independently safe stage. A lost iid/cid may fall back only to the exact expected
+tag/name; immutable ID plus run/contract labels and image/name bindings must
+match before deletion. The driver and supervisor own only watched signals absent
+from the caller's original mask. Caller-blocked signals—whether already pending
+or arriving during work, cleanup, or restoration—remain pending caller state.
 
 `manifest.json` uses the separate `integration-v1` contract. It cross-binds the
 artifact lock, repository snapshot, immutable image, inspected container,

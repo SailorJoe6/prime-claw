@@ -26,6 +26,9 @@ from typing import Any, Iterable
 SCHEMA_VERSION = 2
 COMMAND_CONTRACT_VERSION = "tier1-v2"
 MAX_EVIDENCE_BYTES = 16 * 1024 * 1024
+MAX_EVIDENCE_TOTAL_BYTES = 64 * 1024 * 1024
+MAX_EVIDENCE_FILES = 256
+MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _IMAGE_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -111,6 +114,26 @@ class RetainedDirectory:
 
 
 @dataclass
+class RetainedRegularFile:
+    """Exact regular-file inode retained independently of its public name."""
+    fd: int
+    binding: ObjectBinding
+    max_bytes: int
+    writable: bool = False
+
+    def close(self) -> None:
+        if self.fd >= 0:
+            os.close(self.fd)
+            self.fd = -1
+
+    def __enter__(self) -> "RetainedRegularFile":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.close()
+
+
+@dataclass
 class DirectoryAuthority:
     """Retained descriptor chain for every public path component."""
 
@@ -137,6 +160,24 @@ class DirectoryAuthority:
         self.edges = []
 
     def __enter__(self) -> "DirectoryAuthority":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.close()
+
+
+@dataclass
+class RepositorySnapshotCapture:
+    """Captured identity, exact records, and retained destination authority."""
+
+    identity: dict[str, Any]
+    authority: DirectoryAuthority
+    records: tuple[dict[str, Any], ...] = ()
+
+    def close(self) -> None:
+        self.authority.close()
+
+    def __enter__(self) -> "RepositorySnapshotCapture":
         return self
 
     def __exit__(self, *_args: object) -> None:
@@ -181,6 +222,76 @@ def open_directory_authority(
         raise
 
 
+def open_or_create_directory_authority(
+    path: Path | str, *, mode: int = 0o755,
+) -> DirectoryAuthority:
+    """Acquire/create one absolute directory through one continuous fd chain."""
+    absolute = Path(os.path.abspath(path))
+    flags = _directory_open_flags()
+    opened: list[int] = []
+    edges: list[tuple[int, str, ObjectBinding]] = []
+    try:
+        current = os.open("/", flags)
+        opened.append(current)
+        for part in absolute.parts[1:]:
+            child = None
+            try:
+                child = os.open(part, flags, dir_fd=current)
+            except FileNotFoundError:
+                stage = f".prime-claw-directory-{secrets.token_hex(16)}"
+                stage_fd = None
+                published = False
+                try:
+                    os.mkdir(stage, mode, dir_fd=current)
+                    stage_fd = os.open(stage, flags, dir_fd=current)
+                    created = ObjectBinding.from_stat(os.fstat(stage_fd))
+                    if created.mode_type != stat.S_IFDIR:
+                        raise ProvenanceError(
+                            "created directory-authority edge is not a directory")
+                    _rename_noreplace(current, stage, current, part)
+                    published = True
+                    child = stage_fd
+                    stage_fd = None
+                    if ObjectBinding.from_stat(os.stat(
+                            part, dir_fd=current,
+                            follow_symlinks=False)) != created:
+                        raise ProvenanceError(
+                            "created directory-authority edge changed")
+                    os.fsync(current)
+                finally:
+                    if stage_fd is not None:
+                        os.close(stage_fd)
+                    if not published:
+                        try:
+                            os.rmdir(stage, dir_fd=current)
+                        except OSError:
+                            pass
+            observed = ObjectBinding.from_stat(os.fstat(child))
+            if observed.mode_type != stat.S_IFDIR:
+                raise ProvenanceError(
+                    "directory-authority edge is not a directory")
+            edges.append((current, part, observed))
+            current = child
+            opened.append(current)
+        binding = ObjectBinding.from_stat(os.fstat(current))
+        parent_fd = os.dup(edges[-1][0]) if edges else None
+        authority = DirectoryAuthority(
+            absolute, current, binding, edges, parent_fd,
+            edges[-1][1] if edges else None)
+        opened = []
+        verify_directory_authority(authority)
+        return authority
+    except OSError as exc:
+        raise ProvenanceError(
+            "directory authority is unsafe or unavailable") from exc
+    finally:
+        for descriptor in set(opened):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+
 def verify_directory_authority(root: DirectoryAuthority) -> None:
     """Verify every retained edge without resolving a fresh path alias."""
     if root.fd < 0:
@@ -194,9 +305,9 @@ def verify_directory_authority(root: DirectoryAuthority) -> None:
         try:
             check_fd = os.open(name, flags, dir_fd=parent_fd)
             if ObjectBinding.from_stat(os.fstat(check_fd)) != expected:
-                raise ProvenanceError("directory authority public edge changed")
+                raise ProvenanceError("directory authority public binding changed (public edge changed)")
         except OSError as exc:
-            raise ProvenanceError("directory authority public edge changed") from exc
+            raise ProvenanceError("directory authority public binding changed (public edge changed)") from exc
         finally:
             if check_fd is not None:
                 os.close(check_fd)
@@ -417,19 +528,74 @@ def _write_all(fd: int, payload: bytes) -> None:
         view = view[written:]
 
 
-def _read_fd_bytes(fd: int, *, label: str) -> bytes:
+def _stable_file_stat(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
+    return (value.st_dev, value.st_ino, value.st_mode, value.st_size,
+            value.st_mtime_ns, value.st_ctime_ns)
+
+
+def _read_fd_bytes(
+    fd: int, *, label: str, max_bytes: int = MAX_EVIDENCE_BYTES,
+) -> bytes:
+    """Read one retained regular inode with a finite, mutation-stable budget."""
+    if not isinstance(max_bytes, int) or max_bytes < 0:
+        raise ProvenanceError(f"{label} has an invalid size limit")
+    before = os.fstat(fd)
+    if not stat.S_ISREG(before.st_mode):
+        raise ProvenanceError(f"{label} is not a regular file")
+    if before.st_size > max_bytes:
+        raise ProvenanceError(f"{label} is too large")
     os.lseek(fd, 0, os.SEEK_SET)
     chunks: list[bytes] = []
     total = 0
     while True:
-        chunk = os.read(fd, min(1024 * 1024, MAX_EVIDENCE_BYTES + 1 - total))
+        chunk = os.read(fd, min(64 * 1024, max_bytes + 1 - total))
         if not chunk:
             break
         chunks.append(chunk)
         total += len(chunk)
-        if total > MAX_EVIDENCE_BYTES:
+        if total > max_bytes:
             raise ProvenanceError(f"{label} is too large")
+    after = os.fstat(fd)
+    if _stable_file_stat(after) != _stable_file_stat(before):
+        raise ProvenanceError(f"{label} changed while it was read")
     return b"".join(chunks)
+
+
+def _read_regular_at(
+    parent_fd: int, name: str, *, label: str,
+    max_bytes: int = MAX_EVIDENCE_BYTES,
+) -> bytes:
+    """Read one public regular name without following, blocking, or racing it."""
+    fd = None
+    try:
+        before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode):
+            raise ProvenanceError(f"{label} is not a regular file")
+        if before.st_size > max_bytes:
+            raise ProvenanceError(f"{label} is too large")
+        fd = os.open(
+            name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(fd)
+        if _stable_file_stat(opened) != _stable_file_stat(before):
+            raise ProvenanceError(f"{label} changed while it was opened")
+        raw = _read_fd_bytes(fd, label=label, max_bytes=max_bytes)
+        public_after = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if _stable_file_stat(public_after) != _stable_file_stat(opened):
+            raise ProvenanceError(f"{label} public binding changed while it was read")
+        return raw
+    except FileNotFoundError:
+        raise
+    except ProvenanceError:
+        raise
+    except OSError as exc:
+        raise ProvenanceError(f"{label} is unsafe or unavailable") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def _publication_directory_fd(root: OwnedDirectory) -> int:
@@ -499,7 +665,9 @@ def _verify_published_bytes(parent_fd: int, name: str,
         observed = ObjectBinding.from_stat(os.fstat(fd))
         if observed != binding or observed.mode_type != stat.S_IFREG:
             raise ProvenanceError("published evidence binding changed")
-        if _read_fd_bytes(fd, label="published evidence") != payload:
+        if _read_fd_bytes(
+                fd, label="published evidence",
+                max_bytes=max(len(payload), 1)) != payload:
             raise ProvenanceError("published evidence bytes changed")
     except OSError as exc:
         raise ProvenanceError("published evidence is unsafe or unavailable") from exc
@@ -542,6 +710,81 @@ def write_sanitized_json(root: OwnedDirectory, relative: str | Path,
         root, relative, canonical_json(value).encode("utf-8"))
     verify_owned_directory(root)
     return published
+
+
+def publish_sanitized_json_retained(
+    root: OwnedDirectory | DirectoryAuthority | RetainedDirectory,
+    relative: str | Path,
+    value: Any,
+    *,
+    max_bytes: int = MAX_MANIFEST_BYTES,
+) -> RetainedRegularFile:
+    """Publish one new JSON object and retain its exact writable inode."""
+    _assert_sanitized(value)
+    payload = canonical_json(value).encode("utf-8")
+    if len(payload) > max_bytes:
+        raise ProvenanceError("retained JSON publication is too large")
+    verify_owned_directory(root)
+    parent_fd, name = _open_created_parent_fd(root.fd, relative)
+    publication_fd = None
+    stage_fd = None
+    stage = f"stage-{secrets.token_hex(16)}"
+    binding = None
+    published = False
+    try:
+        publication_fd = _publication_directory_fd(root)
+        stage_fd = os.open(
+            stage,
+            os.O_RDWR | os.O_CREAT | os.O_EXCL
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            0o600, dir_fd=publication_fd)
+        _write_all(stage_fd, payload)
+        os.fsync(stage_fd)
+        binding = ObjectBinding.from_stat(os.fstat(stage_fd))
+        if binding.mode_type != stat.S_IFREG:
+            raise ProvenanceError("retained JSON stage is not regular")
+        _rename_noreplace(publication_fd, stage, parent_fd, name)
+        published = True
+        retained = RetainedRegularFile(
+            fd=stage_fd, binding=binding, max_bytes=max_bytes, writable=True)
+        if read_retained_regular_bytes(
+                retained, label="retained JSON publication") != payload:
+            raise ProvenanceError("retained JSON publication bytes changed")
+        public = ObjectBinding.from_stat(os.stat(
+            name, dir_fd=parent_fd, follow_symlinks=False))
+        if public != binding:
+            raise ProvenanceError("retained JSON public binding changed")
+        os.fsync(parent_fd)
+        os.fsync(root.fd)
+        verify_owned_directory(root)
+        stage_fd = None
+        return retained
+    except BaseException:
+        if published and stage_fd is not None and binding is not None:
+            retained = RetainedRegularFile(
+                fd=stage_fd, binding=binding,
+                max_bytes=max_bytes, writable=True)
+            try:
+                overwrite_retained_regular_bytes(
+                    retained,
+                    canonical_json({"invalidated": True,
+                                    "reason": "retained-publication-failed",
+                                    "status": "failed"}).encode("utf-8"),
+                    label="retained JSON publication")
+            except BaseException:
+                pass
+        elif publication_fd is not None:
+            try:
+                os.unlink(stage, dir_fd=publication_fd)
+            except OSError:
+                pass
+        raise
+    finally:
+        if stage_fd is not None:
+            os.close(stage_fd)
+        if publication_fd is not None:
+            os.close(publication_fd)
+        os.close(parent_fd)
 
 
 def replace_sanitized_json(
@@ -589,13 +832,17 @@ def invalidate_sanitized_json(
 
 
 def read_sanitized_json(
-    root: OwnedDirectory | DirectoryAuthority,
+    root: OwnedDirectory | DirectoryAuthority | RetainedDirectory,
     relative: str | Path,
+    *,
+    max_bytes: int = MAX_EVIDENCE_BYTES,
 ) -> Any:
     verify_owned_directory(root)
     parent_fd, name = _open_parent_fd(root, relative)
     try:
-        raw = _read_evidence_file(parent_fd, name, str(PurePosixPath(relative)))
+        raw = _read_evidence_file(
+            parent_fd, name, str(PurePosixPath(relative)),
+            max_bytes=max_bytes)
     finally:
         os.close(parent_fd)
     verify_owned_directory(root)
@@ -641,7 +888,7 @@ def _verify_owned_public_name(
 
 
 def _create_owned_directory_child(
-    parent: OwnedDirectory, name: str, *, mode: int = 0o700,
+    parent: OwnedDirectory | DirectoryAuthority, name: str, *, mode: int = 0o700,
 ) -> OwnedDirectory:
     if not name or name in {".", ".."} or "/" in name:
         raise ProvenanceError("invalid owned directory name")
@@ -673,6 +920,53 @@ def _create_owned_directory_child(
     finally:
         if fd is not None:
             os.close(fd)
+
+
+def create_directory_authority_child(
+    parent: DirectoryAuthority, name: str, *, mode: int = 0o700,
+) -> DirectoryAuthority:
+    """Create a child and transfer a duplicate of the parent's full authority."""
+    verify_directory_authority(parent)
+    child = _create_owned_directory_child(parent, name, mode=mode)
+    authority = None
+    duplicated_edges: list[tuple[int, str, ObjectBinding]] = []
+    child_fd = None
+    retained_parent_fd = None
+    try:
+        for edge_parent_fd, edge_name, edge_binding in parent.edges:
+            duplicated_edges.append(
+                (os.dup(edge_parent_fd), edge_name, edge_binding))
+        retained_parent_fd = os.dup(parent.fd)
+        duplicated_edges.append(
+            (retained_parent_fd, name, child.binding))
+        child_fd = os.dup(child.fd)
+        authority = DirectoryAuthority(
+            path=child.path, fd=child_fd, binding=child.binding,
+            edges=duplicated_edges, parent_fd=retained_parent_fd,
+            name=name)
+        child_fd = None
+        retained_parent_fd = None
+        duplicated_edges = []
+        verify_directory_authority(authority)
+        return authority
+    except BaseException:
+        if authority is not None:
+            authority.close()
+        for descriptor, _edge_name, _edge_binding in duplicated_edges:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        if child_fd is not None:
+            os.close(child_fd)
+        if retained_parent_fd is not None:
+            try:
+                os.close(retained_parent_fd)
+            except OSError:
+                pass
+        raise
+    finally:
+        child.close()
 
 
 def _open_or_create_results_root(path: Path | str) -> OwnedDirectory:
@@ -877,63 +1171,27 @@ def verify_owned_directory(
 
 
 def read_owned_regular_bytes(
-    root: OwnedDirectory,
+    root: OwnedDirectory | DirectoryAuthority | RetainedDirectory,
     relative: str | Path,
     *,
     max_bytes: int = 1024 * 1024,
 ) -> bytes:
-    """Read one bounded regular file through a retained directory capability."""
+    """Read one bounded, stable regular file through a retained capability."""
     if not isinstance(max_bytes, int) or max_bytes < 0:
         raise ProvenanceError("invalid owned-file size limit")
     verify_owned_directory(root)
     parent_fd, name = _open_parent_fd(root, relative)
-    fd = None
     try:
-        before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        fd = os.open(
-            name,
-            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-            | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
-            dir_fd=parent_fd,
-        )
-        opened = os.fstat(fd)
-        if not stat.S_ISREG(opened.st_mode):
-            raise ProvenanceError("owned file is not a regular file")
-        before_key = (before.st_dev, before.st_ino, before.st_mode)
-        opened_key = (opened.st_dev, opened.st_ino, opened.st_mode)
-        if before_key != opened_key:
-            raise ProvenanceError("owned file changed while it was opened")
-        chunks: list[bytes] = []
-        total = 0
-        while True:
-            chunk = os.read(fd, min(64 * 1024, max_bytes + 1 - total))
-            if not chunk:
-                break
-            chunks.append(chunk)
-            total += len(chunk)
-            if total > max_bytes:
-                raise ProvenanceError("owned file exceeds its size limit")
-        after = os.fstat(fd)
-        stable = (opened.st_dev, opened.st_ino, opened.st_mode,
-                  opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns)
-        final = (after.st_dev, after.st_ino, after.st_mode,
-                 after.st_size, after.st_mtime_ns, after.st_ctime_ns)
-        if final != stable:
-            raise ProvenanceError("owned file changed while it was read")
+        raw = _read_regular_at(
+            parent_fd, name, label="owned file", max_bytes=max_bytes)
         verify_owned_directory(root)
-        return b"".join(chunks)
-    except FileNotFoundError:
-        raise
-    except OSError as exc:
-        raise ProvenanceError("owned file is unsafe or unavailable") from exc
+        return raw
     finally:
-        if fd is not None:
-            os.close(fd)
         os.close(parent_fd)
 
 
 def read_owned_regular_text(
-    root: OwnedDirectory,
+    root: OwnedDirectory | DirectoryAuthority | RetainedDirectory,
     relative: str | Path,
     *,
     max_bytes: int = 1024 * 1024,
@@ -943,6 +1201,87 @@ def read_owned_regular_text(
             root, relative, max_bytes=max_bytes).decode("utf-8", "strict")
     except UnicodeDecodeError as exc:
         raise ProvenanceError("owned file is not valid UTF-8") from exc
+
+
+def retain_owned_regular_file(
+    root: OwnedDirectory | DirectoryAuthority | RetainedDirectory,
+    relative: str | Path,
+    *,
+    max_bytes: int = MAX_EVIDENCE_BYTES,
+    writable: bool = False,
+) -> RetainedRegularFile:
+    """Retain one exact verified regular inode without trusting its name later."""
+    verify_owned_directory(root)
+    parent_fd, name = _open_parent_fd(root, relative)
+    fd = None
+    try:
+        before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > max_bytes:
+            raise ProvenanceError("retained file is unsafe or oversized")
+        fd = os.open(
+            name,
+            (os.O_RDWR if writable else os.O_RDONLY)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(fd)
+        if _stable_file_stat(opened) != _stable_file_stat(before):
+            raise ProvenanceError("retained file changed while it was opened")
+        _read_fd_bytes(fd, label="retained file", max_bytes=max_bytes)
+        public_after = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if _stable_file_stat(public_after) != _stable_file_stat(opened):
+            raise ProvenanceError("retained file public binding changed")
+        verify_owned_directory(root)
+        retained = RetainedRegularFile(
+            fd=fd, binding=ObjectBinding.from_stat(opened),
+            max_bytes=max_bytes, writable=writable)
+        fd = None
+        return retained
+    except FileNotFoundError:
+        raise
+    except ProvenanceError:
+        raise
+    except OSError as exc:
+        raise ProvenanceError("retained file is unsafe or unavailable") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+        os.close(parent_fd)
+
+
+def read_retained_regular_bytes(
+    retained: RetainedRegularFile, *, label: str = "retained file",
+) -> bytes:
+    if retained.fd < 0:
+        raise ProvenanceError(f"{label} authority is closed")
+    observed = ObjectBinding.from_stat(os.fstat(retained.fd))
+    if observed != retained.binding or observed.mode_type != stat.S_IFREG:
+        raise ProvenanceError(f"{label} binding changed")
+    return _read_fd_bytes(
+        retained.fd, label=label, max_bytes=retained.max_bytes)
+
+
+def overwrite_retained_regular_bytes(
+    retained: RetainedRegularFile,
+    payload: bytes,
+    *,
+    label: str = "retained file",
+) -> None:
+    """Overwrite only an exact retained writable inode; truncate closes green first."""
+    if not retained.writable or retained.fd < 0:
+        raise ProvenanceError(f"{label} is not retained writable authority")
+    if len(payload) > retained.max_bytes:
+        raise ProvenanceError(f"{label} replacement is too large")
+    observed = ObjectBinding.from_stat(os.fstat(retained.fd))
+    if observed != retained.binding or observed.mode_type != stat.S_IFREG:
+        raise ProvenanceError(f"{label} binding changed")
+    os.ftruncate(retained.fd, 0)
+    os.lseek(retained.fd, 0, os.SEEK_SET)
+    _write_all(retained.fd, payload)
+    os.fsync(retained.fd)
+    if read_retained_regular_bytes(retained, label=label) != payload:
+        raise ProvenanceError(f"{label} replacement verification failed")
 
 
 def require_owned_entry_absent(
@@ -1027,7 +1366,7 @@ def _open_created_parent_fd(root_fd: int, relative: str | Path) -> tuple[int, st
 def _regular_digest(root: Path, relative: str,
                     destination: Path | None = None, *,
                     root_fd: int | None = None,
-                    destination_root_fd: int | None = None) -> tuple[str, int]:
+                    destination_root_fd: int | None = None) -> tuple[str, int, str]:
     """Hash/copy one file from retained source/destination directory fds."""
     if destination is not None and destination_root_fd is not None:
         raise ProvenanceError("ambiguous capture destination")
@@ -1093,7 +1432,8 @@ def _regular_digest(root: Path, relative: str,
             output.close()
             output = None
             destination.chmod(captured_mode)
-        return digest.hexdigest(), captured_mode
+        return (digest.hexdigest(), captured_mode,
+                ObjectBinding.from_stat(opened).encode())
     except OSError as exc:
         raise ProvenanceError(f"input path is unsafe or unavailable: {relative}") from exc
     finally:
@@ -1158,7 +1498,7 @@ def hash_declared_inputs(root: Path | str, relative_paths: Iterable[str]) -> str
         records = []
         for relative in paths:
             _relative_file(root_path, relative)
-            digest, captured_mode = _regular_digest(
+            digest, captured_mode, _source_binding = _regular_digest(
                 root_path, relative, root_fd=root_fd)
             records.append({"path": Path(relative).as_posix(), "kind": "file",
                             "mode": captured_mode,
@@ -1167,6 +1507,68 @@ def hash_declared_inputs(root: Path | str, relative_paths: Iterable[str]) -> str
         return _framed_hash(records, domain="declared-inputs-v2")
     finally:
         os.close(root_fd)
+
+def owned_regular_paths(
+    root: OwnedDirectory | DirectoryAuthority | RetainedDirectory,
+) -> list[str]:
+    """List regular descendants using only one retained directory capability."""
+    verify_owned_directory(root)
+    paths: list[str] = []
+    flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+             | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+
+    def walk(directory_fd: int, prefix: str) -> None:
+        before_directory = os.fstat(directory_fd)
+        for name in sorted(os.listdir(directory_fd)):
+            relative = f"{prefix}/{name}" if prefix else name
+            before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            if stat.S_ISDIR(before.st_mode):
+                child_fd = os.open(name, flags, dir_fd=directory_fd)
+                try:
+                    if _stable_file_stat(os.fstat(child_fd)) != _stable_file_stat(before):
+                        raise ProvenanceError(
+                            f"declared input directory changed: {relative}")
+                    walk(child_fd, relative)
+                    after = os.stat(
+                        name, dir_fd=directory_fd, follow_symlinks=False)
+                    if _stable_file_stat(after) != _stable_file_stat(before):
+                        raise ProvenanceError(
+                            f"declared input directory changed: {relative}")
+                finally:
+                    os.close(child_fd)
+            elif stat.S_ISREG(before.st_mode):
+                paths.append(relative)
+            else:
+                raise ProvenanceError(
+                    f"declared input is not a regular file: {relative}")
+        if _stable_file_stat(os.fstat(directory_fd)) != _stable_file_stat(before_directory):
+            raise ProvenanceError("declared input directory changed while listed")
+
+    walk(root.fd, "")
+    verify_owned_directory(root)
+    return paths
+
+
+def hash_declared_inputs_authority(
+    root: OwnedDirectory | DirectoryAuthority | RetainedDirectory,
+    relative_paths: Iterable[str],
+) -> str:
+    """Hash an explicit inventory without reopening its retained root path."""
+    paths = sorted(set(relative_paths))
+    if not paths:
+        raise ProvenanceError("declared input inventory is empty")
+    verify_owned_directory(root)
+    records = []
+    for relative in paths:
+        _relative_file(root.path, relative)
+        digest, captured_mode, _source_binding = _regular_digest(
+            root.path, relative, root_fd=root.fd)
+        records.append({"path": Path(relative).as_posix(), "kind": "file",
+                        "mode": captured_mode,
+                        "content_sha256": digest})
+    verify_owned_directory(root)
+    return _framed_hash(records, domain="declared-inputs-v2")
+
 
 def _git(root_fd: int, *args: str) -> bytes:
     """Run Git from the retained repository directory, never its public alias."""
@@ -1253,11 +1655,18 @@ def _repository_records(root: Path, root_fd: int,
                 finally:
                     os.close(parent_fd)
         else:
-            digest, captured_mode = _regular_digest(
+            digest, captured_mode, _source_binding = _regular_digest(
                 root, rel, root_fd=root_fd,
                 destination_root_fd=destination_root_fd)
             record["content_sha256"] = digest
             record["mode"] = captured_mode
+            if destination_root_fd is not None:
+                copied_digest, copied_mode, copied_binding = _regular_digest(
+                    root, rel, root_fd=destination_root_fd)
+                if (copied_digest != digest or copied_mode != captured_mode):
+                    raise ProvenanceError(
+                        f"captured repository copy changed: {rel}")
+                record["captured_binding"] = copied_binding
         records.append(record)
     return records
 
@@ -1297,9 +1706,17 @@ def _validate_captured_links(records: list[dict[str, Any]]) -> None:
 
 def _identity(head: str, status_bytes: bytes,
               records: list[dict[str, Any]]) -> dict[str, Any]:
+    # Destination inode bindings authorize the disposable captured copy but are
+    # intentionally excluded from the portable repository content identity.
+    identity_records = [
+        {key: value for key, value in record.items()
+         if key != "captured_binding"}
+        for record in records
+    ]
     return {"head": head, "dirty": bool(status_bytes),
             "status_sha256": sha256_bytes(status_bytes),
-            "content_sha256": _framed_hash(records, domain="repository-v2"),
+            "content_sha256": _framed_hash(
+                identity_records, domain="repository-v2"),
             "entry_count": len(records),
             "content_hash_contract": "framed-sha256-v2"}
 
@@ -1394,7 +1811,7 @@ def checkout_inventory(repo: Path | str) -> dict[str, Any]:
                         os.close(child_fd)
             elif stat.S_ISREG(before.st_mode):
                 kind = "file"
-                digest, captured_mode = _regular_digest(
+                digest, captured_mode, _source_binding = _regular_digest(
                     root, relative, root_fd=root_fd)
                 records.append({"path": relative, "kind": kind,
                                 "mode": captured_mode,
@@ -1701,18 +2118,21 @@ def remove_directory_authority(
                     pass
 
 
-def stage_repository_snapshot(repo: Path | str,
-                              destination: Path | str) -> dict[str, Any]:
-    """Capture repository inputs into an atomically published owned tree."""
+def capture_repository_snapshot(
+    repo: Path | str,
+    destination: Path | str,
+) -> RepositorySnapshotCapture:
+    """Capture repository inputs and retain destination/ancestor authority."""
     root = Path(os.path.abspath(repo))
     dest = Path(os.path.abspath(destination))
     root_fd = None
     destination_parent = None
-    destination_owned = None
+    destination_authority = None
+    completed = False
     try:
         root_fd = _open_root_fd(root)
-        destination_parent = _open_or_create_results_root(dest.parent)
-        _verify_owned_public_name(destination_parent)
+        destination_parent = open_or_create_directory_authority(dest.parent)
+        verify_directory_authority(destination_parent)
         try:
             os.stat(dest.name, dir_fd=destination_parent.fd,
                     follow_symlinks=False)
@@ -1721,94 +2141,257 @@ def stage_repository_snapshot(repo: Path | str,
         else:
             raise ProvenanceError(
                 "repository snapshot destination already exists")
-        destination_owned = _create_owned_directory_child(
+        destination_authority = create_directory_authority_child(
             destination_parent, dest.name, mode=0o700)
-        destination_root_fd = destination_owned.fd
-        _verify_owned_public_name(destination_parent)
-        _verify_owned_public_name(destination_owned)
+        verify_directory_authority(destination_parent)
+        verify_directory_authority(destination_authority)
         head, status_bytes = _repository_head_status(root_fd)
         _assert_root_binding(root, root_fd)
         entries = _repository_entries(root, root_fd)
         records = _repository_records(
             root, root_fd, entries,
-            destination_root_fd=destination_root_fd)
+            destination_root_fd=destination_authority.fd)
         captured = _identity(head, status_bytes, records)
         _validate_captured_links(records)
         _assert_root_binding(root, root_fd)
-        _verify_owned_public_name(destination_parent)
-        _verify_owned_public_name(destination_owned)
-        # HEAD/status/path inventory must stay stable across capture. File bytes
-        # and modes are bound to the opened fds and destination writes remain
-        # below the retained snapshot fd.
+        verify_directory_authority(destination_parent)
+        verify_directory_authority(destination_authority)
         after_head, after_status = _repository_head_status(root_fd)
         _assert_root_binding(root, root_fd)
         if (after_head != head or after_status != status_bytes
-                or _repository_paths(root_fd) != [rel for rel, _kind, _mode in entries]):
+                or _repository_paths(root_fd)
+                != [rel for rel, _kind, _mode in entries]):
             raise ProvenanceError(
                 "repository changed while the run-owned snapshot was staged")
         _assert_root_binding(root, root_fd)
-        _verify_owned_public_name(destination_parent)
-        _verify_owned_public_name(destination_owned)
-        return captured
+        verify_directory_authority(destination_parent)
+        verify_directory_authority(destination_authority)
+        verify_repository_snapshot(destination_authority, records)
+        completed = True
+        return RepositorySnapshotCapture(
+            captured, destination_authority,
+            tuple(json.loads(canonical_json(record)) for record in records))
     except BaseException:
-        if destination_owned is not None:
-            _rollback_owned_snapshot(
-                dest, destination_owned.fd,
-                parent_binding=(destination_parent.binding
-                                if destination_parent is not None else None))
+        if destination_authority is not None and destination_parent is not None:
+            try:
+                remove_directory_authority(
+                    destination_authority, quarantine=destination_parent)
+            except (OSError, ProvenanceError):
+                pass
         raise
     finally:
-        if destination_owned is not None:
-            destination_owned.close()
+        if destination_authority is not None and not completed:
+            destination_authority.close()
         if destination_parent is not None:
             destination_parent.close()
         if root_fd is not None:
             os.close(root_fd)
 
 
-def _read_evidence_file(parent_fd: int, name: str, relative: str) -> bytes:
-    """Read one retained regular inode without following or blocking on swaps."""
+def verify_repository_snapshot(
+    root: DirectoryAuthority,
+    records: Iterable[dict[str, Any]],
+) -> None:
+    """Re-verify every captured leaf against the capture-time record set."""
+    expected_records = [json.loads(canonical_json(row)) for row in records]
+    by_path: dict[str, dict[str, Any]] = {}
+    expected_dirs: set[str] = set()
+    for record in expected_records:
+        relative = record.get("path")
+        kind = record.get("kind")
+        if (not isinstance(relative, str) or relative in by_path
+                or kind not in {"file", "symlink", "missing"}):
+            raise ProvenanceError("invalid captured repository record")
+        _relative_file(root.path, relative)
+        by_path[relative] = record
+        parts = Path(relative).parts[:-1]
+        for index in range(1, len(parts) + 1):
+            expected_dirs.add(Path(*parts[:index]).as_posix())
+    expected_present = {
+        path for path, record in by_path.items()
+        if record["kind"] != "missing"}
+    seen: set[str] = set()
+    entry_limit = len(expected_present) + len(expected_dirs)
+    visited = 0
+    directory_flags = _directory_open_flags()
+
+    def walk(directory_fd: int, prefix: str) -> None:
+        nonlocal visited
+        directory_before = os.fstat(directory_fd)
+        names: list[str] = []
+        try:
+            with os.scandir(directory_fd) as iterator:
+                for entry in iterator:
+                    visited += 1
+                    if visited > entry_limit:
+                        raise ProvenanceError(
+                            "captured repository contains unexpected entries")
+                    names.append(entry.name)
+        except OSError as exc:
+            raise ProvenanceError(
+                "captured repository directory is unavailable") from exc
+        for name in sorted(names, key=os.fsencode):
+            if name in {".", ".."} or "/" in name or "\0" in name:
+                raise ProvenanceError(
+                    "captured repository contains an unsafe entry")
+            relative = f"{prefix}/{name}" if prefix else name
+            before = os.stat(name, dir_fd=directory_fd,
+                             follow_symlinks=False)
+            if stat.S_ISDIR(before.st_mode):
+                if relative not in expected_dirs:
+                    raise ProvenanceError(
+                        "captured repository contains an unexpected directory")
+                child_fd = os.open(name, directory_flags, dir_fd=directory_fd)
+                try:
+                    if _stable_file_stat(os.fstat(child_fd)) != _stable_file_stat(before):
+                        raise ProvenanceError(
+                            "captured repository directory changed")
+                    walk(child_fd, relative)
+                    after = os.stat(name, dir_fd=directory_fd,
+                                    follow_symlinks=False)
+                    if _stable_file_stat(after) != _stable_file_stat(before):
+                        raise ProvenanceError(
+                            "captured repository directory changed")
+                finally:
+                    os.close(child_fd)
+                continue
+            if relative not in expected_present:
+                raise ProvenanceError(
+                    "captured repository contains an unexpected leaf")
+            seen.add(relative)
+        if _stable_file_stat(os.fstat(directory_fd)) != _stable_file_stat(directory_before):
+            raise ProvenanceError(
+                "captured repository directory changed while verified")
+
+    verify_directory_authority(root)
+    walk(root.fd, "")
+    if seen != expected_present:
+        raise ProvenanceError("captured repository leaf set changed")
+    for relative in sorted(expected_present):
+        record = by_path[relative]
+        parent_fd, name = _open_path_parent_fd(
+            root.path, relative, root_fd=root.fd)
+        try:
+            observed = os.stat(name, dir_fd=parent_fd,
+                               follow_symlinks=False)
+        finally:
+            os.close(parent_fd)
+        if stat.S_IMODE(observed.st_mode) != record.get("mode"):
+            raise ProvenanceError(
+                f"captured repository mode changed: {relative}")
+        if record["kind"] == "symlink":
+            if not stat.S_ISLNK(observed.st_mode):
+                raise ProvenanceError(
+                    f"captured repository kind changed: {relative}")
+            if _safe_link_target(
+                    root.path, relative,
+                    root_fd=root.fd) != record.get("target"):
+                raise ProvenanceError(
+                    f"captured repository link changed: {relative}")
+        else:
+            if not stat.S_ISREG(observed.st_mode):
+                raise ProvenanceError(
+                    f"captured repository kind changed: {relative}")
+            digest, mode, current_binding = _regular_digest(
+                root.path, relative, root_fd=root.fd)
+            if (digest != record.get("content_sha256")
+                    or mode != record.get("mode")):
+                raise ProvenanceError(
+                    f"captured repository content changed: {relative}")
+            captured_binding = record.get("captured_binding")
+            if (not isinstance(captured_binding, str)
+                    or current_binding != captured_binding):
+                raise ProvenanceError(
+                    f"captured repository binding changed: {relative}")
+    verify_directory_authority(root)
+
+
+
+def read_captured_repository_file(
+    root: DirectoryAuthority,
+    records: Iterable[dict[str, Any]],
+    relative: str,
+    *,
+    max_bytes: int = MAX_EVIDENCE_BYTES,
+) -> bytes:
+    """Read bytes from the exact regular inode authorized during capture."""
+    normalized = Path(relative).as_posix()
+    matches = [record for record in records
+               if record.get("path") == normalized]
+    if len(matches) != 1 or matches[0].get("kind") != "file":
+        raise ProvenanceError(
+            f"captured repository file is not authorized: {normalized}")
+    record = matches[0]
+    encoded_binding = record.get("captured_binding")
+    if not isinstance(encoded_binding, str):
+        raise ProvenanceError(
+            f"captured repository binding is unavailable: {normalized}")
+    expected_binding = ObjectBinding.decode(encoded_binding)
+    retained = retain_owned_regular_file(
+        root, normalized, max_bytes=max_bytes, writable=False)
     try:
-        before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        fd = os.open(
-            name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-            | getattr(os, "O_NONBLOCK", 0), dir_fd=parent_fd)
-    except FileNotFoundError:
-        raise
-    except OSError as exc:
-        raise ProvenanceError(f"evidence entry is unavailable: {relative}") from exc
-    try:
-        opened = os.fstat(fd)
-        if not stat.S_ISREG(opened.st_mode):
-            raise ProvenanceError(f"evidence is not a regular file: {relative}")
-        if (before.st_dev, before.st_ino, before.st_mode) != (
-                opened.st_dev, opened.st_ino, opened.st_mode):
-            raise ProvenanceError(f"evidence changed while it was opened: {relative}")
-        chunks = []
-        while True:
-            chunk = os.read(fd, 1024 * 1024)
-            if not chunk:
-                break
-            chunks.append(chunk)
-        after = os.fstat(fd)
-        stable = (opened.st_dev, opened.st_ino, opened.st_mode,
-                  opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns)
-        observed = (after.st_dev, after.st_ino, after.st_mode,
-                    after.st_size, after.st_mtime_ns, after.st_ctime_ns)
-        if observed != stable:
-            raise ProvenanceError(f"evidence changed while it was read: {relative}")
-        return b"".join(chunks)
+        if retained.binding != expected_binding:
+            raise ProvenanceError(
+                f"captured repository binding changed: {normalized}")
+        observed = os.fstat(retained.fd)
+        if stat.S_IMODE(observed.st_mode) != record.get("mode"):
+            raise ProvenanceError(
+                f"captured repository mode changed: {normalized}")
+        payload = read_retained_regular_bytes(
+            retained, label=f"captured repository file:{normalized}")
+        if sha256_bytes(payload) != record.get("content_sha256"):
+            raise ProvenanceError(
+                f"captured repository content changed: {normalized}")
+        verify_directory_authority(root)
+        return payload
     finally:
-        os.close(fd)
+        retained.close()
 
 
-def _evidence_rows(directory_fd: int, *, prefix: str,
-                   excluded: set[str], excluded_prefixes: tuple[str, ...]
-                   ) -> list[dict[str, str]]:
+def stage_repository_snapshot(repo: Path | str,
+                              destination: Path | str) -> dict[str, Any]:
+    """Compatibility wrapper that stages a snapshot without retaining authority."""
+    capture = capture_repository_snapshot(repo, destination)
+    try:
+        return capture.identity
+    finally:
+        capture.close()
+
+
+def _read_evidence_file(
+    parent_fd: int, name: str, relative: str, *,
+    max_bytes: int = MAX_EVIDENCE_BYTES,
+) -> bytes:
+    """Read one bounded retained regular name without following or blocking."""
+    return _read_regular_at(
+        parent_fd, name, label=f"evidence:{relative}", max_bytes=max_bytes)
+
+
+def _evidence_rows(
+    directory_fd: int, *, prefix: str,
+    excluded: set[str], excluded_prefixes: tuple[str, ...],
+    budget: dict[str, int], max_file_bytes: int,
+    path_limits: dict[str, int], depth: int, max_depth: int,
+) -> list[dict[str, str]]:
+    if depth > max_depth:
+        raise ProvenanceError("evidence inventory exceeds its depth limit")
     rows: list[dict[str, str]] = []
     directory_flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-                       | getattr(os, "O_NOFOLLOW", 0))
-    for name in sorted(os.listdir(directory_fd)):
+                       | getattr(os, "O_NOFOLLOW", 0)
+                       | getattr(os, "O_CLOEXEC", 0))
+    directory_before = os.fstat(directory_fd)
+    names: list[str] = []
+    try:
+        with os.scandir(directory_fd) as iterator:
+            for entry in iterator:
+                if budget["entries"] >= budget["max_entries"]:
+                    raise ProvenanceError(
+                        "evidence inventory exceeds its entry-count limit")
+                budget["entries"] += 1
+                names.append(entry.name)
+    except OSError as exc:
+        raise ProvenanceError("evidence directory cannot be enumerated") from exc
+    for name in sorted(names, key=os.fsencode):
         relative = f"{prefix}/{name}" if prefix else name
         if (relative in excluded
                 or any(relative == item.removesuffix("/")
@@ -1830,14 +2413,16 @@ def _evidence_rows(directory_fd: int, *, prefix: str,
                     f"evidence directory is unsafe or unavailable: {relative}") from exc
             try:
                 opened = os.fstat(child_fd)
-                if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+                if _stable_file_stat(opened) != _stable_file_stat(before):
                     raise ProvenanceError(
                         f"evidence directory changed while it was opened: {relative}")
                 rows.extend(_evidence_rows(
                     child_fd, prefix=relative, excluded=excluded,
-                    excluded_prefixes=excluded_prefixes))
+                    excluded_prefixes=excluded_prefixes, budget=budget,
+                    max_file_bytes=max_file_bytes, path_limits=path_limits,
+                    depth=depth + 1, max_depth=max_depth))
                 after = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-                if (opened.st_dev, opened.st_ino) != (after.st_dev, after.st_ino):
+                if _stable_file_stat(after) != _stable_file_stat(opened):
                     raise ProvenanceError(
                         f"evidence directory changed while it was read: {relative}")
             finally:
@@ -1845,7 +2430,19 @@ def _evidence_rows(directory_fd: int, *, prefix: str,
             continue
         if not stat.S_ISREG(before.st_mode):
             raise ProvenanceError(f"evidence is not a regular file: {relative}")
-        raw = _read_evidence_file(directory_fd, name, relative)
+        if budget["files"] >= budget["max_files"]:
+            raise ProvenanceError("evidence inventory exceeds its file-count limit")
+        remaining = budget["max_bytes"] - budget["bytes"]
+        if remaining < 0 or before.st_size > remaining:
+            raise ProvenanceError("evidence inventory exceeds its byte limit")
+        file_limit = min(max_file_bytes, path_limits.get(relative, max_file_bytes))
+        if before.st_size > file_limit:
+            raise ProvenanceError(f"evidence file is too large: {relative}")
+        raw = _read_evidence_file(
+            directory_fd, name, relative,
+            max_bytes=min(file_limit, remaining))
+        budget["files"] += 1
+        budget["bytes"] += len(raw)
         try:
             text = raw.decode("utf-8", "strict")
         except UnicodeDecodeError as exc:
@@ -1853,18 +2450,44 @@ def _evidence_rows(directory_fd: int, *, prefix: str,
                 f"evidence text has an unknown encoding: {relative}") from exc
         _assert_sanitized(text, f"evidence:{relative}")
         rows.append({"path": relative, "sha256": sha256_bytes(raw)})
+    directory_after = os.fstat(directory_fd)
+    if _stable_file_stat(directory_after) != _stable_file_stat(directory_before):
+        raise ProvenanceError("evidence directory changed while it was inventoried")
     return rows
 
 
 def evidence_inventory(
-    root: OwnedDirectory, *,
+    root: OwnedDirectory | DirectoryAuthority | RetainedDirectory, *,
     exclude: Iterable[str] = ("manifest.json",),
     exclude_prefixes: Iterable[str] = ("share/", ".publication/"),
+    max_file_bytes: int = MAX_EVIDENCE_BYTES,
+    max_total_bytes: int = MAX_EVIDENCE_TOTAL_BYTES,
+    max_files: int = MAX_EVIDENCE_FILES,
+    max_entries: int = MAX_EVIDENCE_FILES,
+    max_depth: int = 32,
+    path_limits: dict[str, int] | None = None,
 ) -> list[dict[str, str]]:
+    limits = dict(path_limits or {})
+    if (not isinstance(max_file_bytes, int) or max_file_bytes < 0
+            or not isinstance(max_total_bytes, int) or max_total_bytes < 0
+            or not isinstance(max_files, int) or max_files < 0
+            or not isinstance(max_entries, int) or max_entries < 0
+            or not isinstance(max_depth, int) or max_depth < 0
+            or any(not isinstance(path, str) or not path
+                   or not isinstance(limit, int) or limit < 0
+                   for path, limit in limits.items())):
+        raise ProvenanceError("invalid evidence inventory budget")
+    for path in limits:
+        _relative_file(root.path, path)
     _verify_owned_public_name(root)
+    budget = {"bytes": 0, "files": 0, "entries": 0,
+              "max_bytes": max_total_bytes, "max_files": max_files,
+              "max_entries": max_entries}
     rows = _evidence_rows(
         root.fd, prefix="", excluded=set(exclude),
-        excluded_prefixes=tuple(exclude_prefixes))
+        excluded_prefixes=tuple(exclude_prefixes), budget=budget,
+        max_file_bytes=max_file_bytes, path_limits=limits,
+        depth=0, max_depth=max_depth)
     _verify_owned_public_name(root)
     if ObjectBinding.from_stat(os.fstat(root.fd)) != root.binding:
         raise ProvenanceError("evidence root changed while it was read")
@@ -2378,7 +3001,8 @@ def _open_manifest_fd(parent_fd: int, name: str, *, writable: bool) -> int:
 
 
 def _decoded_manifest_fd(fd: int) -> dict[str, Any]:
-    raw = _read_fd_bytes(fd, label="published manifest")
+    raw = _read_fd_bytes(
+        fd, label="published manifest", max_bytes=MAX_MANIFEST_BYTES)
     try:
         value = json.loads(raw.decode("utf-8", "strict"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
