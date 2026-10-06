@@ -12,6 +12,8 @@ import {
 } from "../extension-support/prep-chain.ts";
 import {
   appendActiveOversight,
+  ConversationGuideReadinessError,
+  assertConversationGuideReady,
   assertConversationPromotionReady,
   currentOversightMarkerForClose,
   OVERSIGHT_MARKER_TYPE,
@@ -83,11 +85,12 @@ function registerPrepChainCommand(
 type ReviewedPlanDependencies = EpisodeDependencies & {
   createEpisode?: typeof createSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
+  guideRoot?: string;
 };
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
-    registerConversationOversight(pi);
+    registerConversationOversight(pi, { guideRoot: dependencies?.guideRoot });
     const implementationApprovalBySession = new Map<string, ImplementationApproval>();
     registerPrepChainCommand(pi, {
       command: "plan",
@@ -250,6 +253,9 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         try {
           const marker = currentOversightMarkerForClose(ctx, params.location);
           if (!marker) throw new Error("No exact oversight marker exists for this conversation");
+          if (marker.status === "active") {
+            assertConversationGuideReady(ctx, { guideRoot: dependencies?.guideRoot });
+          }
           const result = closeEpisodeOversight(
             params.location,
             ctx,
@@ -269,6 +275,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             details: { location: params.location, reused: result.reused, episodeId: result.marker.episodeId, status: "inactive" },
           };
         } catch (error) {
+          if (error instanceof ConversationGuideReadinessError) throw error;
           const message = error instanceof Error ? error.message : String(error);
           return { content: [{ type: "text", text: `Episode bookkeeping close failed: ${message}` }], details: { error: message }, isError: true };
         }
@@ -305,6 +312,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         try {
+          assertConversationGuideReady(ctx, { guideRoot: dependencies?.guideRoot });
           const handoffEpisode = dependencies?.handoffEpisode ?? handoffSpecEpisode;
           const result = await handoffEpisode(
             params.location,
@@ -320,6 +328,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             details: result,
           };
         } catch (error) {
+          if (error instanceof ConversationGuideReadinessError) throw error;
           return {
             content: [{ type: "text", text: `Episode handoff failed: ${error instanceof Error ? error.message : String(error)}` }],
             details: { error: error instanceof Error ? error.message : String(error) },

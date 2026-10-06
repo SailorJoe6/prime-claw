@@ -105,9 +105,9 @@ Current behavior and files are:
   uses `ctx.abort()` from the `context` hook after caught classification errors.
 - Ordinary sessions currently tolerate a missing/shadowed block; managed owner
   and bounded EPISODE paths do not.
-- `.ralph/skills/oversee-episode/SKILL.md` is the 1,547-word combined legacy
-  procedure. `.agents/skills/oversee-episode` is a symlink to that same
-  directory.
+- At the audited predecessor baseline, `.ralph/skills/oversee-episode/SKILL.md`
+  was the 1,547-word combined legacy procedure and
+  `.agents/skills/oversee-episode` linked to that directory.
 - `.prime/agent/profiles/expert-reviewer.md` contains the exact model, reasoning,
   and rubric, but Prime Agent does not natively discover profile files.
 - Plugin source remains inert under `src/prime-agent-plugin/`. There is no
@@ -661,6 +661,34 @@ context opt-out remain safe.
   `--no-context-files`, and SDK override paths.
 - Update Conversation oversight, handoff, future-bundle, and work-control docs to
   separate neutral invariants, on-demand judgment, and deterministic gates.
+
+### Bounded implementation checkpoint — active-owner disclosure
+
+Accepted candidate 1 is immutable at
+`7107d1143330417333bfe6105b18832129d6439f` / tree
+`fc382abb394865bfa122abf45987da5e1848a41d`.
+
+This next candidate deliberately implements only one complete receipt subject:
+the exact active owner and its current episode generation. It includes the
+managed 300–600 word guide source and guarded install/check path, public
+name/version/hash metadata, one sequential activation tool, issued-to-consumed
+private in-memory receipt, one intended tool-result disclosure, later-context
+redaction, project-name collision rejection, read-only status, and pre-mutation
+handoff plus first-finalization gates. The project `oversee-episode` body becomes
+a policy-free compatibility shim while its discovery symlink remains. The
+Slice-1 role-protocol manager and fixed three-file restore receipt are unchanged.
+
+A session start/shutdown or process replacement discards the receipt and requires
+fresh activation. Compaction in the same loaded session may retain the consumed
+receipt, but transcript text alone never restores it. Identical replay of an
+already inactive finalization remains idempotent.
+
+Deferred within Slice 2: prospective-location activation and the promotion gate,
+EXPERT admission, broad resume/reload/retry matrices beyond ordinary failure
+proof, and any cutover coordinator work. `create_spec_episode` therefore remains
+ungated in this candidate rather than being made unusable without a matching
+prospective receipt. No user-global apply, restart, UAT, landing, or cleanup is
+part of this implementation pass.
 
 ### Acceptance
 
@@ -1226,3 +1254,27 @@ and pushes once, reports, and stops. The current candidate is limited to generat
 neutral-kernel enforcement and private managed-role context as recorded in
 Section 5.2. It must not begin activation receipts or Slice 3, land, mutate
 user-global state, restart Prime Agent, run UAT, finalize, or clean up.
+
+## 19. Authorized continuation after Slice 2 stop-loss
+
+The owner independently accepted the cycle-2 duplicate-ID disclosure finding and
+authorized one bounded repair pass. Change only `applyGuideDisclosure` and its
+filter/validation tests as needed to require one occurrence of the issued ID in
+assistant calls and one in all tool results, verify activation names and exact
+bound result bytes, and authorize only that validated record. Add the two alias
+regressions named in the specification. Rerun invalidated focused checks, complete
+Tier 0, Docker Tier 1, and the pinned Prime Agent 0.9.8 probe. Compare the repair
+only with the accepted finding; do not run a third independent/adversarial review
+or accept another finding. Commit and push one candidate, report it, and stop.
+Do not begin prospective-location/create gating, EXPERT admission, later Slice 2
+work, Slice 3, landing, global mutation, restart, UAT, finalization, or cleanup.
+
+### 19.1 Implementation result
+
+The authorized duplicate-ID repair is complete. Focused Docker tests passed
+17/17, complete Tier 0 passed 287 tests with 172 skipped, Docker Tier 1 passed
+65 tests with 394 deselected, and the pinned Prime Agent 0.9.8 probe passed.
+Exact commands, log hashes, and the accepted-finding disposition are recorded in
+`docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-conversation-guide-activation.md`.
+This commit is the single reviewable candidate for the authorized pass. No third
+independent review or later-slice work was performed.

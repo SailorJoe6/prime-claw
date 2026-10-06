@@ -16,6 +16,7 @@ WS_NODE_SUITE = "/workspace/tests/managed_session_protocol.test.mjs"
 EXPECTED_TYPESCRIPT = {
     "extensions/handoff-chain.ts",
     "extensions/reviewed-plan.ts",
+    "extension-support/conversation-guide-metadata.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
     "extension-support/handoff-prompts.ts",
@@ -51,7 +52,7 @@ def test_lean_append_system_owns_session_and_work_control_semantics() -> None:
     assert len(source.split()) <= 250
 
 
-def test_managed_plugin_has_nine_files_and_no_retired_work_control_transport() -> None:
+def test_managed_plugin_has_ten_typescript_files_and_no_retired_work_control_transport() -> None:
     actual = {
         str(path.relative_to(MANAGED_SOURCE))
         for path in MANAGED_SOURCE.rglob("*.ts")

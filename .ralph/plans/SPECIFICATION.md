@@ -264,6 +264,16 @@ The plan may realize this through a small plugin activation tool or equivalent s
 
 Representative model UAT must show the exact managed guidance is read or returned before the first oversight decision. A project skill with the same name or import must not silently shadow the managed authority.
 
+Implementation is intentionally staged inside Slice 2. Accepted candidate 1
+established exact neutral-kernel and private-role integrity. The next bounded
+candidate installs the sole guide, implements the active-owner issued-to-consumed
+disclosure path plus read-only status, and gates active-owner handoff and first
+finalization. Prospective future-location activation and the promotion gate remain
+required later Slice 2 work; `create_spec_episode` must remain usable until that
+matching receipt subject exists. A resumed process without a current private
+receipt must activate again rather than reconstructing authority from transcript
+content.
+
 ### ORP-008 — Existing EPISODE execution role remains
 
 The existing `execute` skill remains the EPISODE implementation procedure. This work may update routing names and documentation but does not broaden or rewrite its implementation policy unless a separately reviewed requirement proves necessary.
@@ -531,3 +541,18 @@ unobserved adversarial edge cases. The existing episode chooses the smallest
 readable implementation consistent with this corrected contract. Any proposal to
 restore hostile same-UID guarantees, exhaustive crash recovery, or a third
 repair/review cycle is a new product decision and must return to the operator.
+
+### Operator-authorized duplicate-ID repair exception (2026-10-06)
+
+After the required two-cycle stop, the owner independently confirmed the cycle-2
+finding and authorized one exact in-contract repair. The repair is limited to the
+active-owner Conversation-guide disclosure seam: before consumption, the issued
+tool-call ID must occur exactly once across all assistant tool-call items and
+exactly once across all tool-result messages regardless of name; the unique call
+and result must use the activation tool name and match the bound text/details;
+and only that exact validated result record is authorized. Focused regressions
+cover same-ID/different-name assistant-call and result aliases while preserving
+normal one-time disclosure, later omission, pairing, and abort-before-dispatch.
+This is an operator-approved exception to the automatic review stop-loss, not a
+threat-model or scope expansion. This pass performs no third independent review
+and accepts no additional finding.

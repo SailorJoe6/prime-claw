@@ -63,3 +63,50 @@ def test_native_auto_compaction_restores_first_real_active_call(tier1_container,
     after=[r for r in active_rows if r["after"]]
     assert after
     assert_provider_context_clean(after[0])
+
+
+def test_native_managed_conversation_guide_is_disclosed_once_and_status_is_ready(
+    tier1_container, ctmp,
+):
+    project = ctmp / "guide-project"
+    (project / ".prime/agent").mkdir(parents=True)
+    (project / ".prime/agent/APPEND_SYSTEM.md").write_text(
+        tier1_container.read_repo(WS_KERNEL)
+    )
+    records = ctmp / "guide-records.jsonl"
+    provider = ctmp / "guide-provider.ts"
+    provider.write_text(rf'''import {{appendFileSync}} from "node:fs";
+import {{createAssistantMessageEventStream}} from "@earendil-works/pi-ai";
+const records={json.dumps(str(records))};
+let calls=0;
+function message(model,content,reason="stop"){{return{{role:"assistant",content,api:model.api,provider:model.provider,model:model.id,usage:{{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,cost:{{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}}}},stopReason:reason,timestamp:Date.now()}}}}
+export default function probe(pi){{pi.registerProvider("guide",{{baseUrl:"x",apiKey:"x",api:"guide",streamSimple(model,context){{
+  calls+=1;const messages=context.messages??[],encoded=JSON.stringify(messages),activationResults=messages.filter(m=>m.role==="toolResult"&&m.toolName==="prime_claw_activate_conversation_guide");
+  appendFileSync(records,JSON.stringify({{call:calls,kernel:(context.systemPrompt.match(/PRIME_CLAW_ROLE_KERNEL_V1/g)||[]).length,systemGuide:context.systemPrompt.includes("PRIME_CLAW_CONVERSATION_GUIDE_V1"),guideCount:(encoded.match(/PRIME_CLAW_CONVERSATION_GUIDE_V1/g)||[]).length,activationResults:activationResults.map(m=>({{text:m.content?.[0]?.text,details:m.details??null}})),statusReady:messages.some(m=>m.role==="toolResult"&&m.toolName==="prime_claw_conversation_guide_status"&&m.details?.ready===true)}})+"\n");
+  const stream=createAssistantMessageEventStream();queueMicrotask(()=>{{let output;if(calls===1){{const tc={{type:"toolCall",id:"activate-guide",name:"prime_claw_activate_conversation_guide",arguments:{{}}}};output=message(model,[tc],"toolUse");stream.push({{type:"start",partial:output}});stream.push({{type:"toolcall_start",contentIndex:0,partial:output}});stream.push({{type:"toolcall_end",contentIndex:0,toolCall:tc,partial:output}});stream.push({{type:"done",reason:"toolUse",message:output}})}}else if(calls===2){{const tc={{type:"toolCall",id:"guide-status",name:"prime_claw_conversation_guide_status",arguments:{{}}}};output=message(model,[tc],"toolUse");stream.push({{type:"start",partial:output}});stream.push({{type:"toolcall_start",contentIndex:0,partial:output}});stream.push({{type:"toolcall_end",contentIndex:0,toolCall:tc,partial:output}});stream.push({{type:"done",reason:"toolUse",message:output}})}}else{{output=message(model,[{{type:"text",text:"GUIDE_PROBE_DONE"}}]);stream.push({{type:"start",partial:output}});stream.push({{type:"text_start",contentIndex:0,partial:output}});stream.push({{type:"text_delta",contentIndex:0,delta:"GUIDE_PROBE_DONE",partial:output}});stream.push({{type:"text_end",contentIndex:0,content:"GUIDE_PROBE_DONE",partial:output}});stream.push({{type:"done",reason:"stop",message:output}})}}stream.end()}});return stream;
+}},models:[{{id:"m",name:"M",reasoning:false,input:["text"],cost:{{input:0,output:0,cacheRead:0,cacheWrite:0}},contextWindow:100000,maxTokens:1000}}]}})}}''')
+    setup = ctmp / "guide-setup.ts"
+    setup.write_text(r'''import {mkdirSync,writeFileSync} from "node:fs";
+import {basename,dirname,join,resolve} from "node:path";
+export default function setup(pi){pi.on("session_start",(_event,ctx)=>{const slug="alpha",ownerSessionId=ctx.sessionManager.getSessionId(),worktree=resolve(dirname(ctx.cwd),`${basename(ctx.cwd)}-${slug}-episode`),identity={version:2,slug,sourceLocation:`.ralph/plans/future/${slug}`,ownerSessionId,episodeId:"11111111-1111-4111-8111-111111111111",episodeActiveSessionId:"active",episodeSessionFile:join(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"};const root=join(ctx.cwd,".prime/agent/state/spec-episodes");mkdirSync(root,{recursive:true});writeFileSync(join(root,`${slug}.json`),JSON.stringify(identity));pi.appendEntry("prime-claw-conversation-oversight",{markerVersion:2,status:"active",ownerSessionId,slug,sourceLocation:identity.sourceLocation,episodeId:identity.episodeId,episodeSessionFile:identity.episodeSessionFile,branch:identity.branch,worktree:identity.worktree,sessionName:identity.sessionName,identityVersion:2,admission:"delivered"})})}''')
+    completed = tier1_container.run(
+        "prime-agent", "--mode", "text", "--offline", "--no-session",
+        "--no-skills", "--no-prompt-templates", "--no-context-files",
+        "--no-extensions", "--cwd", str(project), "-e", str(provider),
+        "-e", str(setup), "-e", WS_EXT,
+        "--provider", "guide", "--model", "m", "-p", "activate",
+        env={"PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1"},
+        timeout=45,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert "GUIDE_PROBE_DONE" in completed.stdout
+    rows = [json.loads(line) for line in records.read_text().splitlines()]
+    assert [row["call"] for row in rows] == [1, 2, 3]
+    assert [row["guideCount"] for row in rows] == [0, 1, 0]
+    assert all(row["kernel"] == 1 and not row["systemGuide"] for row in rows)
+    assert rows[0]["activationResults"] == []
+    assert "name: prime-claw-oversee-episode" in rows[1]["activationResults"][0]["text"]
+    assert rows[1]["activationResults"][0]["details"]["version"] == 1
+    assert "omitted after its single authorized continuation" in rows[2]["activationResults"][0]["text"]
+    assert rows[2]["activationResults"][0]["details"] is None
+    assert rows[2]["statusReady"] is True

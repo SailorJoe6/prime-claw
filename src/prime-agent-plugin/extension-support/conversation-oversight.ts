@@ -1,13 +1,22 @@
+import { createHash } from "node:crypto";
 import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
   PRIME_CLAW_ROLE_KERNEL_END,
   PRIME_CLAW_ROLE_KERNEL_SENTINEL,
+  PRIME_CLAW_ROLE_KERNEL_SHA256,
   PRIME_CLAW_ROLE_KERNEL_START,
   PRIME_CLAW_ROLE_KERNEL_TEXT,
 } from "./role-kernel.generated.ts";
+import {
+  PRIME_CLAW_CONVERSATION_GUIDE_NAME,
+  PRIME_CLAW_CONVERSATION_GUIDE_SENTINEL,
+  PRIME_CLAW_CONVERSATION_GUIDE_SHA256,
+  PRIME_CLAW_CONVERSATION_GUIDE_VERSION,
+} from "./conversation-guide-metadata.ts";
 import {
   episodeBootstrapReady,
   parseEpisodeIdentity,
@@ -41,6 +50,22 @@ export type OversightMarker = {
   identityVersion: 1 | 2;
   admission: string;
 };
+
+export const CONVERSATION_GUIDE_ACTIVATION_TOOL = "prime_claw_activate_conversation_guide";
+export const CONVERSATION_GUIDE_STATUS_TOOL = "prime_claw_conversation_guide_status";
+
+type GuideReceipt = {
+  status: "issued" | "consumed";
+  toolCallId: string;
+  sessionId: string;
+  lifecycleFingerprint: string;
+  guidePath: string;
+  version: number;
+  sha256: string;
+  resultText: string;
+};
+
+const guideReceipts = new Map<string, GuideReceipt>();
 
 function visibleFailure(ctx: ExtensionContext, message: string): never {
   const full = `prime-claw conversation blocked: ${message}`;
@@ -357,7 +382,206 @@ function classifyLifecycle(ctx: ExtensionContext): LifecycleClassification {
   return { mode: "ordinary", expectation: null, marker: null, recovery: null };
 }
 
-export type ConversationOversightRegistration = Record<string, never>;
+export type ConversationOversightRegistration = {
+  guideRoot?: string;
+};
+
+function pluginRoot(options: ConversationOversightRegistration): string {
+  return resolve(options.guideRoot ?? resolve(dirname(fileURLToPath(import.meta.url)), ".."));
+}
+
+function guidePath(options: ConversationOversightRegistration): string {
+  return join(pluginRoot(options), "skills", PRIME_CLAW_CONVERSATION_GUIDE_NAME, "SKILL.md");
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function assertNoProjectGuideCollision(ctx: ExtensionContext): void {
+  for (const relative of [
+    join(".agents", "skills", PRIME_CLAW_CONVERSATION_GUIDE_NAME),
+    join(".ralph", "skills", PRIME_CLAW_CONVERSATION_GUIDE_NAME),
+  ]) {
+    const candidate = resolve(ctx.cwd, relative);
+    try {
+      lstatSync(candidate);
+      throw new Error(`project Conversation guide collision: ${candidate}`);
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== "ENOENT") throw error;
+    }
+  }
+}
+
+function readExactConversationGuide(
+  ctx: ExtensionContext,
+  options: ConversationOversightRegistration,
+): { path: string; text: string } {
+  assertNoProjectGuideCollision(ctx);
+  const path = guidePath(options);
+  const stat = lstatSync(path);
+  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`managed Conversation guide is not a regular file: ${path}`);
+  if (realpathSync(path) !== path) throw new Error(`managed Conversation guide path is not canonical: ${path}`);
+  const text = readFileSync(path, "utf8");
+  if (sha256(text) !== PRIME_CLAW_CONVERSATION_GUIDE_SHA256) {
+    throw new Error(`managed Conversation guide hash mismatch: ${path}`);
+  }
+  return { path, text };
+}
+
+function activeConversationFingerprint(ctx: ExtensionContext): string {
+  if (currentBoundedIdentity(ctx)) throw new Error("EPISODE cannot activate Conversation guidance");
+  const state = classifyLifecycle(ctx);
+  if (state.mode !== "active" || !state.marker || state.marker.status !== "active") {
+    throw new Error("managed Conversation guidance requires one exact active owner episode");
+  }
+  assertIdentityKernel(ctx);
+  const marker = state.marker;
+  return sha256(JSON.stringify([
+    ctx.sessionManager.getSessionId(), marker.ownerSessionId, marker.slug,
+    marker.sourceLocation, marker.episodeId, marker.episodeSessionFile,
+    marker.branch, marker.worktree, marker.sessionName, marker.identityVersion,
+    marker.admission, PRIME_CLAW_ROLE_KERNEL_SHA256,
+  ]));
+}
+
+function expectedGuideResult(text: string): string {
+  return `${PRIME_CLAW_CONVERSATION_GUIDE_SENTINEL}\nversion=${PRIME_CLAW_CONVERSATION_GUIDE_VERSION}\nsha256=${PRIME_CLAW_CONVERSATION_GUIDE_SHA256}\n\n${text}`;
+}
+
+function currentGuideReceipt(
+  ctx: ExtensionContext,
+  options: ConversationOversightRegistration,
+): GuideReceipt {
+  const sessionId = ctx.sessionManager.getSessionId();
+  const receipt = guideReceipts.get(sessionId);
+  if (!receipt || receipt.status !== "consumed") throw new Error("managed Conversation guide has not been activated and consumed");
+  const guide = readExactConversationGuide(ctx, options);
+  const fingerprint = activeConversationFingerprint(ctx);
+  if (receipt.sessionId !== sessionId || receipt.lifecycleFingerprint !== fingerprint
+    || receipt.guidePath !== guide.path || receipt.version !== PRIME_CLAW_CONVERSATION_GUIDE_VERSION
+    || receipt.sha256 !== PRIME_CLAW_CONVERSATION_GUIDE_SHA256
+    || receipt.resultText !== expectedGuideResult(guide.text)) {
+    guideReceipts.delete(sessionId);
+    throw new Error("managed Conversation guide receipt is stale or mismatched");
+  }
+  return receipt;
+}
+
+export class ConversationGuideReadinessError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConversationGuideReadinessError";
+  }
+}
+
+export function assertConversationGuideReady(
+  ctx: ExtensionContext,
+  options: ConversationOversightRegistration = {},
+): void {
+  try { currentGuideReceipt(ctx, options); }
+  catch (error) {
+    throw new ConversationGuideReadinessError(error instanceof Error ? error.message : String(error));
+  }
+}
+
+function textContent(message: Record<string, unknown>): string {
+  const content = message.content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((item) => item && typeof item === "object"
+    && (item as { type?: unknown }).type === "text"
+    && typeof (item as { text?: unknown }).text === "string"
+    ? (item as { text: string }).text : "").join("\n");
+}
+
+function filterGuideMessages(
+  rawMessages: unknown[],
+  allowedToolResult: Record<string, unknown> | null,
+  exactGuideText?: string,
+): Array<Record<string, unknown>> {
+  const messages = rawMessages as Array<Record<string, unknown>>;
+  const guideResultIds = new Set(messages.flatMap((message) => {
+    if (message.role !== "toolResult") return [];
+    const text = textContent(message);
+    return message.toolName === CONVERSATION_GUIDE_ACTIVATION_TOOL
+      || text.includes(PRIME_CLAW_CONVERSATION_GUIDE_SENTINEL)
+      ? [String(message.toolCallId ?? "")] : [];
+  }));
+  return messages.map((message) => {
+    if (message.role === "toolResult") {
+      const id = String(message.toolCallId ?? "");
+      if (guideResultIds.has(id) && message !== allowedToolResult) {
+        const { details: _details, ...publicMessage } = message;
+        return {
+          ...publicMessage,
+          content: [{ type: "text", text: "Managed Conversation guide disclosure omitted after its single authorized continuation." }],
+        };
+      }
+      return message;
+    }
+    const visibleText = textContent(message);
+    if (visibleText.includes(PRIME_CLAW_CONVERSATION_GUIDE_SENTINEL)
+      || (exactGuideText && visibleText.includes(exactGuideText))) {
+      return {
+        ...message,
+        content: typeof message.content === "string"
+          ? "[managed Conversation guide disclosure omitted]"
+          : [{ type: "text", text: "[managed Conversation guide disclosure omitted]" }],
+      };
+    }
+    return message;
+  });
+}
+
+function applyGuideDisclosure(
+  messages: unknown[],
+  ctx: ExtensionContext,
+  options: ConversationOversightRegistration,
+): Array<Record<string, unknown>> {
+  const sessionId = ctx.sessionManager.getSessionId();
+  const receipt = guideReceipts.get(sessionId);
+  if (!receipt || receipt.status === "consumed") {
+    let exactGuideText: string | undefined;
+    try { exactGuideText = readExactConversationGuide(ctx, options).text; }
+    catch { /* readiness gates report missing/colliding guide; context still removes the public sentinel */ }
+    return filterGuideMessages(messages, null, exactGuideText);
+  }
+  const guide = readExactConversationGuide(ctx, options);
+  const fingerprint = activeConversationFingerprint(ctx);
+  if (receipt.sessionId !== sessionId || receipt.lifecycleFingerprint !== fingerprint
+    || receipt.guidePath !== guide.path || receipt.version !== PRIME_CLAW_CONVERSATION_GUIDE_VERSION
+    || receipt.sha256 !== PRIME_CLAW_CONVERSATION_GUIDE_SHA256) {
+    guideReceipts.delete(sessionId);
+    throw new Error("issued Conversation guide receipt is stale or mismatched");
+  }
+  const allMessages = messages as Array<Record<string, unknown>>;
+  const results = allMessages.filter((message) =>
+    message.role === "toolResult" && message.toolCallId === receipt.toolCallId);
+  const calls = allMessages.flatMap((message) =>
+    message.role === "assistant" && Array.isArray(message.content)
+      ? message.content.filter((item) => item && typeof item === "object"
+        && (item as { type?: unknown }).type === "toolCall"
+        && (item as { id?: unknown }).id === receipt.toolCallId)
+      : []);
+  const result = results[0];
+  const call = calls[0] as { name?: unknown } | undefined;
+  const details = result?.details;
+  const exactDetails = details && typeof details === "object" && !Array.isArray(details)
+    ? details as Record<string, unknown> : null;
+  if (results.length !== 1 || calls.length !== 1
+    || result.toolName !== CONVERSATION_GUIDE_ACTIVATION_TOOL
+    || call?.name !== CONVERSATION_GUIDE_ACTIVATION_TOOL
+    || textContent(result) !== receipt.resultText
+    || !exactDetails || Object.keys(exactDetails).length !== 2
+    || exactDetails.version !== PRIME_CLAW_CONVERSATION_GUIDE_VERSION
+    || exactDetails.sha256 !== PRIME_CLAW_CONVERSATION_GUIDE_SHA256) {
+    guideReceipts.delete(sessionId);
+    throw new Error("issued Conversation guide tool call/result pair is missing or malformed");
+  }
+  guideReceipts.set(sessionId, { ...receipt, status: "consumed" });
+  return filterGuideMessages(messages, result, guide.text);
+}
 
 export async function reconcileOversightAtSessionStart(
   pi: ExtensionAPI,
@@ -385,12 +609,17 @@ export async function reconcileOversightAtSessionStart(
   }
 }
 
-export function applyConversationContext(event: {messages:unknown[]}, ctx: ExtensionContext) {
-  const messages = (event.messages as Array<Record<string,unknown>>).filter((message) => !(message.role === "custom"
+export function applyConversationContext(
+  event: { messages: unknown[] },
+  ctx: ExtensionContext,
+  options: ConversationOversightRegistration = {},
+) {
+  const historical = (event.messages as Array<Record<string,unknown>>).filter((message) => !(message.role === "custom"
     && (message.customType === LEGACY_OVERSIGHT_PACKAGE_TYPE
       || message.customType === BOUNDED_PACKAGE_TYPE
       || message.customType === BOUNDED_IDENTITY_TYPE)));
   try {
+    const messages = applyGuideDisclosure(historical, ctx, options);
     const bounded = currentBoundedIdentity(ctx);
     if (bounded) { assertIdentityKernel(ctx); return { messages }; }
     const state = classifyLifecycle(ctx);
@@ -415,6 +644,72 @@ export function currentOversightMarkerForClose(ctx: ExtensionContext, sourceLoca
   return locationMarker;
 }
 export function registerConversationOversight(pi: ExtensionAPI, options: ConversationOversightRegistration = {}): void {
-  pi.on("session_start", (_event, ctx) => reconcileOversightAtSessionStart(pi, ctx, options));
-  pi.on("context", (event, ctx) => applyConversationContext(event, ctx));
+  pi.registerTool({
+    name: CONVERSATION_GUIDE_ACTIVATION_TOOL,
+    label: "Activate managed Conversation guide",
+    description: "Disclose the exact managed Prime Claw Conversation guide once for the current trusted active owner episode.",
+    promptSnippet: "Activate the managed Conversation oversight guide before an owner lifecycle decision",
+    promptGuidelines: [
+      "Call prime_claw_activate_conversation_guide only as the exact trusted owner of one active episode, before the first oversight decision after session start or guide invalidation.",
+      "Treat the returned guide as judgment guidance only; it grants no product, scope, merge, abandonment, cleanup, or transport authority.",
+      "After the guide continuation, use prime_claw_conversation_guide_status when a read-only readiness proof is needed; never copy or replay the guide text.",
+    ],
+    executionMode: "sequential",
+    parameters: { type: "object", properties: {}, additionalProperties: false } as any,
+    async execute(toolCallId, _params, _signal, _onUpdate, ctx) {
+      try {
+        const sessionId = ctx.sessionManager.getSessionId();
+        const previous = guideReceipts.get(sessionId);
+        if (previous?.status === "issued") throw new Error("a Conversation guide disclosure is already awaiting its first continuation");
+        const guide = readExactConversationGuide(ctx, options);
+        const lifecycleFingerprint = activeConversationFingerprint(ctx);
+        const resultText = expectedGuideResult(guide.text);
+        guideReceipts.set(sessionId, {
+          status: "issued", toolCallId, sessionId, lifecycleFingerprint,
+          guidePath: guide.path, version: PRIME_CLAW_CONVERSATION_GUIDE_VERSION,
+          sha256: PRIME_CLAW_CONVERSATION_GUIDE_SHA256, resultText,
+        });
+        return {
+          content: [{ type: "text", text: resultText }],
+          details: { version: PRIME_CLAW_CONVERSATION_GUIDE_VERSION, sha256: PRIME_CLAW_CONVERSATION_GUIDE_SHA256 },
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Conversation guide activation failed: ${message}`);
+      }
+    },
+  });
+  pi.registerTool({
+    name: CONVERSATION_GUIDE_STATUS_TOOL,
+    label: "Inspect Conversation guide readiness",
+    description: "Read-only readiness check for the exact managed Conversation guide and current trusted active owner episode.",
+    promptSnippet: "Inspect managed Conversation guide readiness without lifecycle mutation",
+    promptGuidelines: [
+      "Use prime_claw_conversation_guide_status for read-only readiness evidence before handoff or final bookkeeping UAT.",
+      "A not-ready result requires fresh activation or operator consultation; it never authorizes bypass or replay.",
+    ],
+    executionMode: "sequential",
+    parameters: { type: "object", properties: {}, additionalProperties: false } as any,
+    async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+      try {
+        currentGuideReceipt(ctx, options);
+        return {
+          content: [{ type: "text", text: `Conversation guide ready: version=${PRIME_CLAW_CONVERSATION_GUIDE_VERSION} sha256=${PRIME_CLAW_CONVERSATION_GUIDE_SHA256}` }],
+          details: { ready: true, version: PRIME_CLAW_CONVERSATION_GUIDE_VERSION, sha256: PRIME_CLAW_CONVERSATION_GUIDE_SHA256 },
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: "text", text: `Conversation guide not ready: ${message}` }],
+          details: { ready: false, error: message },
+        };
+      }
+    },
+  });
+  pi.on("session_start", (_event, ctx) => {
+    guideReceipts.delete(ctx.sessionManager.getSessionId());
+    return reconcileOversightAtSessionStart(pi, ctx, options);
+  });
+  pi.on("session_shutdown", (_event, ctx) => { guideReceipts.delete(ctx.sessionManager.getSessionId()); });
+  pi.on("context", (event, ctx) => applyConversationContext(event, ctx, options));
 }

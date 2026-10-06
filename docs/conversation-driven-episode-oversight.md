@@ -49,10 +49,42 @@ Native `/implement-spec` remains the only promotion authority boundary. Before
 queuing its canonical readiness workflow, the extension verifies exactly one
 exact generated neutral block, active restoration mechanics, a writable durable
 spec-episode state directory, and canonical agreement among CWD, state, and the
-expected worktree. This first Slice 2 capability does not yet install or activate
-the managed Conversation guide; that on-demand capability remains the next
-Slice 2 vertical change. The current runtime and installer do not read, parse,
-validate, or inject `.ralph/skills/oversee-episode/SKILL.md`.
+expected worktree. Prospective promotion activation remains deferred: this
+candidate does not gate `create_spec_episode` until a later Slice 2 pass can bind
+a receipt to the exact operator-selected future location without inventing a
+second authority path.
+
+The installer now owns one plugin-managed global `prime-claw-oversee-episode`
+guide at `skills/prime-claw-oversee-episode/SKILL.md`. Its checked-in Markdown is
+the sole current Conversation-judgment policy. TypeScript stores only its public
+name, version, sentinel, and SHA-256 digest. Apply/check reject a missing, stale,
+symlinked, non-regular, or mixed-directory installed copy. The Slice 1
+role-protocol manager and its fixed three-file receipt remain unchanged.
+
+For an exact active owner, `prime_claw_activate_conversation_guide` reads the
+direct managed path, rejects a project skill with the managed name, verifies the
+exact hash, and returns the guide only as one intended tool-result continuation.
+A private in-memory receipt moves from issued to consumed immediately before that
+first provider context. It binds the trusted session and active lifecycle
+generation, role-kernel generation, guide path, version/hash, tool-call ID, and
+exact result. A provider failure does not make the disclosure replayable.
+`prime_claw_conversation_guide_status` provides a read-only readiness check
+without lifecycle mutation.
+
+Later provider contexts keep the assistant/tool-result pairing but replace the
+guide result with a fixed omission marker and remove its details. Copied guide
+sentinels are likewise omitted. The guide never enters the system, user, or
+custom channels. Session start/shutdown, owner or episode generation change,
+path/hash change, role change, or project collision invalidates readiness. A
+fresh activation is then required.
+
+The active-owner handoff and first finalization gates now require a current
+consumed receipt before `handoff_spec_episode` or the first close can mutate any
+route, identity, transport, or bookkeeping state.
+Identical replay of an already inactive close remains idempotent without reviving
+an obsolete receipt. Promotion remains deliberately ungated until prospective
+activation is implemented. EXPERT admission also remains a later Slice 2
+capability.
 
 After `create_spec_episode` durably establishes and delivers a strictly parsed
 spec-episode identity, the same tool turn appends and verifies one full active
@@ -77,48 +109,43 @@ On every real provider context, the restoration extension:
    `.prime/agent/state/spec-episodes/<slug>.json`;
 3. recognizes bounded EPISODE identity only from the exact private session entry;
 4. removes historical `prime-claw-oversee-episode-package` messages and private
-   bounded-identity records from provider messages; and
-5. never injects a role or identity package into provider-visible user or custom
-   content.
+   bounded-identity records;
+5. permits one exact issued guide tool result, consumes its receipt before
+   dispatch, and redacts that disclosure on all later contexts; and
+6. never injects a role, identity, or guide package into provider-visible system,
+   user, or custom content.
 
-This path covers normal input, extension triggers, queues, native follow-ups,
-heartbeats, agent messages, tool continuation, reload, resume, and the first real
-post-compaction call. Missing or malformed managed kernels and corrupt or
-disagreeing trusted state call `ctx.abort()` before provider dispatch. Ordinary
-no-context sessions continue without managed authority.
-
-Provider-boundary acceptance keeps the two retired channels distinct. It checks
-converted provider-visible user messages for historical oversight packages and
-the effective system prompt for the old detailed goal/heartbeat policy. A
-fixture-only `before_agent_start` injector proves the historical system overlay
-is detectable; production does not scrub that overlay. The eight-file generation
-prevents it by not installing the retired injector. Ordinary user quotations of
-its identifier remain ordinary user content and are not treated as system-policy
-leaks.
+Missing or malformed managed kernels, corrupt or disagreeing trusted state, and
+malformed issued disclosure pairs call `ctx.abort()` before provider dispatch.
+Ordinary no-context sessions continue without managed authority.
 
 ## Lean model-facing protocol
 
-The selected global role kernel is the current neutral invariant floor. The
-legacy APPEND block remains a temporary bridge until managed Conversation guide
-activation is delivered and Gate A is separately authorized. Reports are
-evidence, never approval or native-command dispatch. Deterministic plugin code
-owns identity, lifecycle, admission, handoff, and idempotent bookkeeping; the
-model exercises bounded judgment only through the currently available guidance.
+The selected global role kernel is the current neutral invariant floor. Detailed
+Conversation judgment is progressively disclosed from the exact managed guide,
+not copied into the kernel or extension. The project `oversee-episode` entry is
+a compatibility shim with no supervision or EXPERT policy; its existing discovery
+symlink remains valid. Reports are evidence, never approval or native-command
+dispatch. Deterministic plugin code owns identity, receipt validation, lifecycle,
+admission, handoff, and idempotent bookkeeping. The model chooses only among the
+bounded oversight dispositions described by the activated guide.
 
 ## Loaded-generation compatibility reference (temporary)
 
-`.ralph/skills/oversee-episode/SKILL.md`, its
-`.agents/skills/oversee-episode` discovery symlink, and
-`.prime/agent/profiles/expert-reviewer.md` remain byte-current only because an
-already-loaded old extension generation rereads live project files. They are not
-current runtime or installer prerequisites and are not the supported model-facing
-policy. Keep them until one coordinated full restart plus resumed owner, episode,
-and designated ordinary-conversation UAT is accepted. A failed cutover restores
-the known-good installed generation and all compatibility resources.
+The accepted predecessor generation may remain loaded until Gate A. Its detailed
+project skill and standalone EXPERT profile are migration evidence, not authority
+for the new generation. The source-tree project skill is now only the forwarding
+shim, while the discovery symlink is retained. The external cutover coordinator
+must quiesce every old client before this candidate reaches `main`, install the
+managed global guide, and start one new runtime; no loaded old process may reread
+the shim during that gap.
 
-The following dogfood chronology and detailed owner/EXPERT procedure document the
-old loaded generation. They are retained as migration evidence, not as current
-activation requirements.
+Keep the standalone profile and historical records until one coordinated full
+restart plus resumed owner, episode, and designated ordinary-conversation UAT is
+accepted. A failed cutover restores the known-good installed generation and all
+required compatibility resources. The following chronology documents the old
+loaded generation and is retained as migration evidence, not current activation
+policy.
 
 ### Completed dogfood evidence
 

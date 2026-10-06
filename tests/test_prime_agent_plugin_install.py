@@ -38,6 +38,7 @@ RETIRED = "extensions/goal-heartbeat-work-control.ts"
 FILES = (
     "extensions/handoff-chain.ts",
     "extensions/reviewed-plan.ts",
+    "extension-support/conversation-guide-metadata.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
     "extension-support/handoff-prompts.ts",
@@ -46,6 +47,7 @@ FILES = (
     "extension-support/role-kernel.generated.ts",
     "extension-support/spec-episode.ts",
 )
+SKILL_FILES = ("skills/prime-claw-oversee-episode/SKILL.md",)
 
 
 def test_source_is_outside_project_extension_discovery() -> None:
@@ -55,6 +57,7 @@ def test_source_is_outside_project_extension_discovery() -> None:
     assert not (REPO / ".prime" / "agent" / "extension-support").exists()
     assert not (SOURCE / RETIRED).exists()
     assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*.ts")} == set(FILES)
+    assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("SKILL.md")} == set(SKILL_FILES)
 
 
 def _run_script(tier1_container, script: str, destination: Path, *, env=None):
@@ -268,7 +271,7 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     applied = _run_script(tier1_container, WS_APPLY, destination)
     assert applied.returncode == 0, applied.stdout + applied.stderr
     assert "selected copy is current" in applied.stdout
-    for relative in FILES:
+    for relative in (*FILES, *SKILL_FILES):
         expected = tier1_container.read_repo(f"src/prime-agent-plugin/{relative}")
         assert (destination / relative).read_text() == expected, relative
     append = (destination / "APPEND_SYSTEM.md").read_text()
@@ -295,6 +298,7 @@ def test_apply_is_convergent_and_preserves_unrelated_files(tier1_container, ctmp
         relative: (destination / relative).read_bytes()
         for relative in (
             *FILES,
+            *SKILL_FILES,
             "AGENTS.md",
             "APPEND_SYSTEM.md",
             ".prime-claw/role-protocol-state.json",
@@ -402,21 +406,20 @@ def test_apply_rejects_unsafe_retired_destination_before_mutation(
 
 
 
-@pytest.mark.parametrize("managed_directory", ["root", "extensions", "extension-support"])
+@pytest.mark.parametrize("managed_directory", ["root", "extensions", "extension-support", "skills", "skills/prime-claw-oversee-episode"])
 def test_apply_and_check_reject_symlinked_managed_directories_before_mutation(
     tier1_container, ctmp, managed_directory,
 ) -> None:
     destination = ctmp / "agent"
-    outside = ctmp / f"outside-{managed_directory}"
+    outside = ctmp / f"outside-{managed_directory.replace('/', '-')}"
     outside.mkdir()
     (outside / "sentinel").write_bytes(b"outside remains untouched\n")
     if managed_directory == "root":
         destination.symlink_to(outside, target_is_directory=True)
     else:
-        destination.mkdir()
-        (destination / managed_directory).symlink_to(
-            outside, target_is_directory=True,
-        )
+        link = destination / managed_directory
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(outside, target_is_directory=True)
     append = destination / "APPEND_SYSTEM.md"
     append.write_bytes(b"unrelated append remains untouched\n")
 
@@ -434,6 +437,33 @@ def test_apply_and_check_reject_symlinked_managed_directories_before_mutation(
         assert destination.is_symlink()
     else:
         assert (destination / managed_directory).is_symlink()
+
+
+
+def test_check_rejects_stale_managed_conversation_skill(tier1_container, ctmp) -> None:
+    destination = ctmp / "agent"
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    skill = destination / SKILL_FILES[0]
+    skill.write_text("stale guide\n")
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    assert checked.returncode != 0
+    assert "stale installed managed Conversation skill" in checked.stderr
+
+
+def test_apply_and_check_reject_unexpected_managed_skill_entry(tier1_container, ctmp) -> None:
+    destination = ctmp / "agent"
+    extra = destination / "skills/prime-claw-oversee-episode/foreign.md"
+    extra.parent.mkdir(parents=True)
+    extra.write_text("foreign content must not be adopted\n")
+    before = extra.read_bytes()
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    assert applied.returncode != 0
+    assert checked.returncode != 0
+    assert "unexpected entry in managed Conversation skill directory" in applied.stderr
+    assert "unexpected entry in managed Conversation skill directory" in checked.stderr
+    assert extra.read_bytes() == before
 
 
 def test_check_rejects_a_stale_global_file(tier1_container, ctmp) -> None:

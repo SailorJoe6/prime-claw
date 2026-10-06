@@ -9,6 +9,7 @@ source_root="$repo_root/src/prime-agent-plugin"
 files=(
   extensions/handoff-chain.ts
   extensions/reviewed-plan.ts
+  extension-support/conversation-guide-metadata.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-close.ts
   extension-support/handoff-prompts.ts
@@ -23,6 +24,8 @@ managed_directories=(
   "$destination_root"
   "$destination_root/extensions"
   "$destination_root/extension-support"
+  "$destination_root/skills"
+  "$destination_root/skills/prime-claw-oversee-episode"
   "$destination_root/.prime-claw"
 )
 for directory in "${managed_directories[@]}"; do
@@ -93,6 +96,39 @@ for relative in "${files[@]}"; do
     status=1
   fi
 done
+
+managed_skill_relative="skills/prime-claw-oversee-episode/SKILL.md"
+managed_skill_source="$source_root/$managed_skill_relative"
+managed_skill_dir="$destination_root/skills/prime-claw-oversee-episode"
+managed_skill_installed="$destination_root/$managed_skill_relative"
+if [[ ! -s "$managed_skill_source" ]]; then
+  printf 'missing or empty managed Conversation skill source: %s
+' "$managed_skill_source" >&2
+  status=1
+fi
+if [[ -d "$managed_skill_dir" ]]; then
+  unexpected_entry="$(find "$managed_skill_dir" -mindepth 1 -maxdepth 1 ! -name SKILL.md -print -quit)"
+  if [[ -n "$unexpected_entry" ]]; then
+    printf 'unexpected entry in managed Conversation skill directory: %s
+' "$unexpected_entry" >&2
+    status=1
+  fi
+fi
+if [[ -e "$managed_skill_installed" || -L "$managed_skill_installed" ]]; then
+  if [[ ! -f "$managed_skill_installed" || -L "$managed_skill_installed" ]]; then
+    printf 'unsafe managed Conversation skill destination: %s
+' "$managed_skill_installed" >&2
+    status=1
+  elif ! cmp -s "$managed_skill_source" "$managed_skill_installed"; then
+    printf 'stale installed managed Conversation skill: %s
+' "$managed_skill_installed" >&2
+    status=1
+  fi
+else
+  printf 'missing installed managed Conversation skill: %s
+' "$managed_skill_installed" >&2
+  status=1
+fi
 
 legacy_append_source="$source_root/APPEND_SYSTEM.md"
 role_kernel_source="$source_root/ROLE_KERNEL.md"

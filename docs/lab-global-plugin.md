@@ -109,11 +109,16 @@ retired entry and verifies each current installed file byte-for-byte. Apply
 forwards its explicit target mode to that required full check, so an interrupted
 or mixed sequential generation cannot report success.
 
-The installer no longer reads, preflights, or globally copies
-`.ralph/skills/oversee-episode/SKILL.md`. The skill, discovery link, and reviewer
-profile remain project-local loaded-generation compatibility resources through
-the accepted cutover gate. The plugin provides no fallback when a required
-project phase skill is missing.
+The installer owns the uniquely named global
+`skills/prime-claw-oversee-episode/SKILL.md` beside the TypeScript plugin files.
+It validates real managed `skills/` directories, refuses extra entries in that
+exact managed directory, installs mode 0644 bytes, and requires an exact check.
+This ordinary plugin-file ownership does not widen the role-protocol manager's
+fixed context/legacy-APPEND/manifest receipt. The project
+`.ralph/skills/oversee-episode/SKILL.md` is only a policy-free compatibility shim;
+its `.agents` discovery symlink remains for transition diagnostics. The
+standalone reviewer profile remains migration evidence until the later official
+EXPERT slice.
 
 The predecessor APPEND-only manager remains in source for bridge rollback. New
 apply/check use the role-protocol manager for both selected context and retained
@@ -127,8 +132,10 @@ parent directory, and refuses a changed preimage.
 The first Slice 2 provider guard imports the generated role-kernel bytes rather
 than trusting the retained legacy APPEND body. Ordinary explicit no-context
 sessions remain ordinary; promotion, active-owner, and bounded-EPISODE paths
-require the exact neutral block. The managed Conversation guide and its one-shot
-activation receipt are intentionally not part of this first Slice 2 candidate.
+require the exact neutral block. The accepted first Slice 2 candidate stopped at that provider guard. The next
+bounded candidate adds one active-owner Conversation-guide disclosure and gates
+handoff plus first finalization; prospective promotion activation remains later
+Slice 2 work.
 
 This is intentionally not a hostile-filesystem transaction engine. The manager
 does not maintain a multi-phase journal, continuous descriptor/inode authority,

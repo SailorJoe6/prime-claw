@@ -5,16 +5,17 @@ import { basename, dirname, join, resolve } from "node:path";
 import test from "node:test";
 import {
   appendActiveOversight, applyConversationContext, assertConversationPromotionReady,
+  CONVERSATION_GUIDE_ACTIVATION_TOOL, CONVERSATION_GUIDE_STATUS_TOOL,
   EXPECTED_IDENTITY_KERNEL_BLOCK, LEGACY_OVERSIGHT_PACKAGE_TYPE, OVERSIGHT_MARKER_TYPE,
   registerConversationOversight, currentOversightMarkerForClose,
 } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
 
 function fixture(t,{sessionId="owner",prompt=EXPECTED_IDENTITY_KERNEL_BLOCK,entries=[]}={}){
   const cwd=realpathSync(mkdtempSync(join(tmpdir(),"pc-oversight-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
-  const branch=structuredClone(entries),events=new Map(),notifications=[];let aborts=0,currentPrompt=prompt;
+  const branch=structuredClone(entries),events=new Map(),tools=new Map(),notifications=[];let aborts=0,currentPrompt=prompt;
   const ctx={cwd,ui:{notify(message,level){notifications.push({message,level})}},abort(){aborts++},getSystemPrompt(){return currentPrompt},sessionManager:{getSessionId(){return sessionId},getBranch(){return branch}}};
-  const pi={on(name,handler){events.set(name,handler)},appendEntry(customType,data){branch.push({type:"custom",customType,data})},sendMessage(message){branch.push({type:"custom_message",...message})}};
-  registerConversationOversight(pi);return{cwd,branch,events,notifications,get aborts(){return aborts},setPrompt(value){currentPrompt=value},ctx,pi};
+  const pi={registerTool(definition){tools.set(definition.name,definition)},on(name,handler){events.set(name,handler)},appendEntry(customType,data){branch.push({type:"custom",customType,data})},sendMessage(message){branch.push({type:"custom_message",...message})}};
+  registerConversationOversight(pi);return{cwd,branch,events,tools,notifications,get aborts(){return aborts},setPrompt(value){currentPrompt=value},ctx,pi};
 }
 function identity(f,{episodeId="11111111-1111-4111-8111-111111111111",slug="alpha",owner=f.ctx.sessionManager.getSessionId(),admission="delivered"}={}){
   const worktree=resolve(dirname(f.cwd),`${basename(f.cwd)}-${slug}-episode`),value={version:2,slug,sourceLocation:`.ralph/plans/future/${slug}`,ownerSessionId:owner,episodeId,episodeActiveSessionId:"active",episodeSessionFile:join(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:admission};
@@ -24,7 +25,7 @@ function marker(value,status="active"){return{markerVersion:2,status,ownerSessio
 function context(f,messages=[]){return f.events.get("context")({messages},f.ctx);}
 
 test("managed kernel source equals the generated canonical role block",()=>{assert.equal(readFileSync(new URL("../src/prime-agent-plugin/ROLE_KERNEL.md",import.meta.url),"utf8").trim(),EXPECTED_IDENTITY_KERNEL_BLOCK)});
-test("registers only session recovery and context hooks",()=>{const events=new Map();registerConversationOversight({on(n,h){events.set(n,h)},appendEntry(){}});assert.deepEqual([...events.keys()],["session_start","context"])});
+test("registers activation/status tools plus recovery and context hooks",()=>{const events=new Map(),tools=new Map();registerConversationOversight({registerTool(d){tools.set(d.name,d)},on(n,h){events.set(n,h)},appendEntry(){}});assert.deepEqual([...tools.keys()],[CONVERSATION_GUIDE_ACTIVATION_TOOL,CONVERSATION_GUIDE_STATUS_TOOL]);assert.deepEqual([...events.keys()],["session_start","session_shutdown","context"])});
 test("truly inactive conversation tolerates project or CLI kernel shadowing",t=>{for(const prompt of ["BASE","CLI SHADOW"]){const f=fixture(t,{prompt});assert.deepEqual(context(f,[{role:"user",content:"hello"}]),{messages:[{role:"user",content:"hello"}]});assert.equal(f.aborts,0)}});
 test("promotion requires one exact generated role kernel",t=>{const f=fixture(t);assert.doesNotThrow(()=>appendActiveOversight(f.pi,f.ctx,identity(f)));const reversed="<!-- prime-claw:role-kernel:end -->\nPRIME_CLAW_ROLE_KERNEL_V1\n<!-- prime-claw:role-kernel:start -->",nested=EXPECTED_IDENTITY_KERNEL_BLOCK.replace("PRIME_CLAW_ROLE_KERNEL_V1","<!-- prime-claw:role-kernel:start -->\nPRIME_CLAW_ROLE_KERNEL_V1");for(const prompt of ["PRIME_CLAW_ROLE_KERNEL_V1",`${EXPECTED_IDENTITY_KERNEL_BLOCK}\n${EXPECTED_IDENTITY_KERNEL_BLOCK}`,reversed,nested,EXPECTED_IDENTITY_KERNEL_BLOCK.replace("_V1","_V2"),EXPECTED_IDENTITY_KERNEL_BLOCK+"\n<!-- prime-claw:role-kernel:stale -->"]){const bad=fixture(t,{prompt});assert.throws(()=>appendActiveOversight(bad.pi,bad.ctx,identity(bad)),/exact managed role kernel/)}});
 test("active exact expectation validates state without injecting the oversight package",t=>{const f=fixture(t),episode=identity(f);appendActiveOversight(f.pi,f.ctx,episode);const legacy={role:"custom",customType:LEGACY_OVERSIGHT_PACKAGE_TYPE,content:"legacy",display:false,timestamp:1};const result=context(f,[{role:"user",content:"x"},legacy]);assert.deepEqual(result.messages,[{role:"user",content:"x"}]);assert.equal(currentOversightMarkerForClose(f.ctx,episode.sourceLocation).episodeId,episode.episodeId)});

@@ -9,6 +9,7 @@ source_root="$repo_root/src/prime-agent-plugin"
 files=(
   extensions/handoff-chain.ts
   extensions/reviewed-plan.ts
+  extension-support/conversation-guide-metadata.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-close.ts
   extension-support/handoff-prompts.ts
@@ -25,6 +26,14 @@ for relative in "${files[@]}"; do
     exit 1
   fi
 done
+
+managed_skill_relative="skills/prime-claw-oversee-episode/SKILL.md"
+managed_skill_source="$source_root/$managed_skill_relative"
+if [[ ! -s "$managed_skill_source" ]]; then
+  printf 'missing or empty managed Conversation skill source: %s
+' "$managed_skill_source" >&2
+  exit 1
+fi
 
 legacy_append_source="$source_root/APPEND_SYSTEM.md"
 role_kernel_source="$source_root/ROLE_KERNEL.md"
@@ -43,6 +52,8 @@ managed_directories=(
   "$destination_root"
   "$destination_root/extensions"
   "$destination_root/extension-support"
+  "$destination_root/skills"
+  "$destination_root/skills/prime-claw-oversee-episode"
   "$destination_root/.prime-claw"
 )
 for directory in "${managed_directories[@]}"; do
@@ -60,7 +71,7 @@ obsolete_files=(
   extensions/goal-blocker-control.ts
   extension-support/episode-finalization.ts
 )
-managed_destinations=("${files[@]}" extensions/project-conversation.ts "${obsolete_files[@]}")
+managed_destinations=("${files[@]}" "$managed_skill_relative" extensions/project-conversation.ts "${obsolete_files[@]}")
 for relative in "${managed_destinations[@]}"; do
   destination="$destination_root/$relative"
   if [[ -e "$destination" || -L "$destination" ]]; then
@@ -71,7 +82,17 @@ for relative in "${managed_destinations[@]}"; do
   fi
 done
 
-mkdir -p "$destination_root/extensions" "$destination_root/extension-support"
+managed_skill_dir="$destination_root/skills/prime-claw-oversee-episode"
+if [[ -d "$managed_skill_dir" ]]; then
+  unexpected_entry="$(find "$managed_skill_dir" -mindepth 1 -maxdepth 1 ! -name SKILL.md -print -quit)"
+  if [[ -n "$unexpected_entry" ]]; then
+    printf 'unexpected entry in managed Conversation skill directory: %s
+' "$unexpected_entry" >&2
+    exit 1
+  fi
+fi
+
+mkdir -p "$destination_root/extensions" "$destination_root/extension-support" "$managed_skill_dir"
 python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" apply \
   "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"
 rm -f "$destination_root/extensions/project-conversation.ts"
@@ -81,6 +102,7 @@ done
 for relative in "${files[@]}"; do
   install -m 0644 "$source_root/$relative" "$destination_root/$relative"
 done
+install -m 0644 "$managed_skill_source" "$destination_root/$managed_skill_relative"
 # Installation is sequential, not an atomic generation swap. The required final
 # check detects any incomplete or mixed generation before apply reports success,
 # using the same explicit target semantics selected above.

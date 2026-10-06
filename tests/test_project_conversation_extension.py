@@ -28,6 +28,7 @@ ROLE_KERNEL = REPO / "src/prime-agent-plugin/ROLE_KERNEL.md"
 EXTENSION = REPO / "src/prime-agent-plugin/extensions/reviewed-plan.ts"
 SUPPORT = REPO / "src/prime-agent-plugin/extension-support/conversation-oversight.ts"
 SKILL = REPO / ".ralph/skills/oversee-episode/SKILL.md"
+MANAGED_GUIDE = REPO / "src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md"
 DOC = REPO / "docs/conversation-driven-episode-oversight.md"
 DOGFOOD = REPO / "reports/reviews/conversation-driven-episode-oversight-dogfood.md"
 
@@ -66,15 +67,21 @@ def test_oversee_episode_is_exposed_through_normal_project_skill_discovery():
     assert (link / "SKILL.md").read_bytes() == SKILL.read_bytes()
 
 
-def test_canonical_oversight_package_contains_reviewed_policy():
-    text = " ".join(SKILL.read_text().split())
-    for phrase in ["name: oversee-episode", "one owner-coordination message", "15-minute", "exact pushed candidate", "owner ledger", "advance", "revise", "consult", "pause", "finalize_spec_episode", "Only the operator", "ordinary CONVERSATION work", "sole terminal decision", "no-UI, idempotent"]:
-        assert phrase in text
+def test_canonical_managed_guide_replaces_project_policy_without_breaking_discovery():
+    shim = " ".join(SKILL.read_text().split())
+    guide = " ".join(MANAGED_GUIDE.read_text().split())
+    assert "compatibility shim" in shim
+    assert "plugin-managed global `prime-claw-oversee-episode` skill" in shim
+    assert "one reported vertical slice at a time" in guide
+    assert "Accept and advance" in guide
+    assert "Consult the operator" in guide
+    assert "one owner-coordination message" not in shim
+    assert "rlm.spawn" not in shim
 
 
 def test_extension_uses_context_and_exact_state_without_rejected_flag_profile():
     extension = EXTENSION.read_text(); support = SUPPORT.read_text()
-    assert "registerConversationOversight(pi);" in extension
+    assert "registerConversationOversight(pi, { guideRoot: dependencies?.guideRoot });" in extension
     assert "recoverCompleting:" not in extension
     assert "episode-finalization" not in extension + support
     assert "authorization receipt" not in extension + support
@@ -317,7 +324,8 @@ def test_current_documentation_describes_lean_default_and_transition_compatibili
         "PRIME_CLAW_ROLE_KERNEL_V1",
         "one reviewable vertical slice at a time",
         "historical `prime-claw-oversee-episode-package` messages",
-        "do not read, parse, validate, or inject `.ralph/skills/oversee-episode/SKILL.md`",
+        "plugin-managed global `prime-claw-oversee-episode` guide",
+        "project `oversee-episode` entry is a compatibility shim",
         "Loaded-generation compatibility reference (temporary)",
         "one coordinated full restart",
         "designated ordinary-conversation UAT",

@@ -17,7 +17,11 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import reviewedPlan, { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
-import { EXPECTED_IDENTITY_KERNEL_BLOCK } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
+import {
+  CONVERSATION_GUIDE_ACTIVATION_TOOL,
+  CONVERSATION_GUIDE_STATUS_TOOL,
+  EXPECTED_IDENTITY_KERNEL_BLOCK,
+} from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -173,12 +177,42 @@ function count(haystack, needle) {
   return haystack.split(needle).length - 1;
 }
 
+async function activateConversationGuide(f, toolCallId = "guide-call") {
+  const activation = f.tools.get(CONVERSATION_GUIDE_ACTIVATION_TOOL);
+  const issued = await activation.execute(toolCallId, {}, undefined, undefined, f.ctx);
+  assert.equal(issued.isError, undefined, JSON.stringify(issued));
+  const messages = [
+    {
+      role: "assistant",
+      content: [{ type: "toolCall", id: toolCallId, name: CONVERSATION_GUIDE_ACTIVATION_TOOL, arguments: {} }],
+    },
+    {
+      role: "toolResult",
+      toolCallId,
+      toolName: CONVERSATION_GUIDE_ACTIVATION_TOOL,
+      content: issued.content,
+      details: issued.details,
+      isError: false,
+      timestamp: Date.now(),
+    },
+  ];
+  const first = await f.events.get("context")({ messages }, f.ctx);
+  assert.equal(first.messages.filter((message) => message.role === "toolResult")[0].content[0].text, issued.content[0].text);
+  const status = await f.tools.get(CONVERSATION_GUIDE_STATUS_TOOL).execute("status", {}, undefined, undefined, f.ctx);
+  assert.equal(status.details.ready, true, JSON.stringify(status));
+  return { issued, messages, first, status };
+}
+
 test("registers native reviewed commands, planning tool, and native-only implementation", (t) => {
   const f = fixture(t);
   assert.deepEqual([...f.commands.keys()], ["plan", "implement-spec"]);
-  assert.deepEqual([...f.tools.keys()], ["ralph_plan", "create_spec_episode", "finalize_spec_episode", "handoff_spec_episode"]);
+  assert.deepEqual([...f.tools.keys()], [
+    CONVERSATION_GUIDE_ACTIVATION_TOOL,
+    CONVERSATION_GUIDE_STATUS_TOOL,
+    "ralph_plan", "create_spec_episode", "finalize_spec_episode", "handoff_spec_episode",
+  ]);
   assert.equal(f.tools.has("ralph_implement_spec"), false);
-  assert.deepEqual([...f.events.keys()], ["session_start", "context", "agent_end", "session_shutdown"]);
+  assert.deepEqual([...f.events.keys()], ["session_start", "session_shutdown", "context", "agent_end"]);
   assert.match(f.commands.get("plan").description, /explicit .*future/);
   const planTool = f.tools.get("ralph_plan");
   assert.equal(planTool.executionMode, "sequential");
@@ -756,6 +790,51 @@ test("successful create activates exact owner oversight without an oversight ski
     branch: "episode/alpha-plan", worktree: episode.worktree,
     sessionName: "alpha-plan-episode", identityVersion: 2, admission: "delivered",
   });
+  const disclosure = await activateConversationGuide(f, "activate-guide-call");
+  assert.equal(count(disclosure.issued.content[0].text, "PRIME_CLAW_CONVERSATION_GUIDE_V1"), 1);
+  assert.match(disclosure.issued.content[0].text, /name: prime-claw-oversee-episode/);
+  const later = await f.events.get("context")({ messages: disclosure.messages }, f.ctx);
+  const laterResult = later.messages.find((message) => message.role === "toolResult");
+  assert.doesNotMatch(laterResult.content[0].text, /PRIME_CLAW_CONVERSATION_GUIDE_V1|name: prime-claw-oversee-episode/);
+  assert.match(laterResult.content[0].text, /omitted after its single authorized continuation/);
+  assert.equal(laterResult.details, undefined);
+  const copiedBody = readFileSync(join(REPO_ROOT, "src", "prime-agent-plugin", "skills", "prime-claw-oversee-episode", "SKILL.md"), "utf8");
+  const copied = await f.events.get("context")({ messages: [{ role: "user", content: copiedBody }] }, f.ctx);
+  assert.equal(copied.messages[0].content, "[managed Conversation guide disclosure omitted]");
+  await f.events.get("session_start")({}, f.ctx);
+  const reset = await f.tools.get(CONVERSATION_GUIDE_STATUS_TOOL).execute("status-after-start", {}, undefined, undefined, f.ctx);
+  assert.equal(reset.details.ready, false);
+  const malformedIssued = await f.tools.get(CONVERSATION_GUIDE_ACTIVATION_TOOL).execute("malformed-guide", {}, undefined, undefined, f.ctx);
+  const malformedMessages = [
+    { role: "assistant", content: [{ type: "toolCall", id: "malformed-guide", name: CONVERSATION_GUIDE_ACTIVATION_TOOL, arguments: {} }] },
+    { role: "toolResult", toolCallId: "malformed-guide", toolName: CONVERSATION_GUIDE_ACTIVATION_TOOL, content: malformedIssued.content, details: { ...malformedIssued.details, sha256: "wrong" }, isError: false, timestamp: Date.now() },
+  ];
+  assert.throws(() => f.events.get("context")({ messages: malformedMessages }, f.ctx), /tool call\/result pair is missing or malformed/);
+  const afterMalformed = await f.tools.get(CONVERSATION_GUIDE_STATUS_TOOL).execute("status-after-malformed", {}, undefined, undefined, f.ctx);
+  assert.equal(afterMalformed.details.ready, false);
+  for (const alias of ["result", "call"]) {
+    const toolCallId = `same-id-${alias}-alias`;
+    const issued = await f.tools.get(CONVERSATION_GUIDE_ACTIVATION_TOOL).execute(toolCallId, {}, undefined, undefined, f.ctx);
+    const messages = [
+      { role: "assistant", content: [{ type: "toolCall", id: toolCallId, name: CONVERSATION_GUIDE_ACTIVATION_TOOL, arguments: {} }] },
+      { role: "toolResult", toolCallId, toolName: CONVERSATION_GUIDE_ACTIVATION_TOOL, content: issued.content, details: issued.details, isError: false, timestamp: Date.now() },
+    ];
+    if (alias === "result") {
+      messages.push({ role: "toolResult", toolCallId, toolName: CONVERSATION_GUIDE_STATUS_TOOL, content: issued.content, details: issued.details, isError: false, timestamp: Date.now() });
+    } else {
+      messages[0].content.push({ type: "toolCall", id: toolCallId, name: CONVERSATION_GUIDE_STATUS_TOOL, arguments: {} });
+    }
+    assert.throws(() => f.events.get("context")({ messages }, f.ctx), /tool call\/result pair is missing or malformed/);
+    assert.match(f.notices.at(-1).message, /conversation blocked: issued Conversation guide tool call\/result pair is missing or malformed/);
+    const status = await f.tools.get(CONVERSATION_GUIDE_STATUS_TOOL).execute(`status-after-${alias}-alias`, {}, undefined, undefined, f.ctx);
+    assert.equal(status.details.ready, false);
+  }
+  const collision = join(f.ctx.cwd, ".agents", "skills", "prime-claw-oversee-episode");
+  mkdirSync(collision, { recursive: true });
+  await assert.rejects(
+    () => f.tools.get(CONVERSATION_GUIDE_ACTIVATION_TOOL).execute("collision-guide", {}, undefined, undefined, f.ctx),
+    /Conversation guide activation failed: project Conversation guide collision/,
+  );
 });
 
 test("registered bookkeeping close is no-UI, exact, and idempotent", async (t) => {
@@ -765,7 +844,10 @@ test("registered bookkeeping close is no-UI, exact, and idempotent", async (t) =
   const slug="alpha-plan",worktree=resolve(dirname(cwd),`${basename(cwd)}-${slug}-episode`),identity={version:2,slug,sourceLocation:LOCATION,ownerSessionId:"owner-session",episodeId:"33333333-3333-4333-8333-333333333333",episodeActiveSessionId:"route",episodeSessionFile:join(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:"delivered"};
   const identityPath=join(state,`${slug}.json`);writeFileSync(identityPath,JSON.stringify(identity));
   const f=createHarness(cwd);f.entries.push({type:"custom",customType:"prime-claw-conversation-oversight",data:{markerVersion:2,status:"active",ownerSessionId:identity.ownerSessionId,slug,sourceLocation:LOCATION,episodeId:identity.episodeId,episodeSessionFile:identity.episodeSessionFile,branch:identity.branch,worktree:identity.worktree,sessionName:identity.sessionName,identityVersion:2,admission:"delivered"}});
-  const tool=f.tools.get("finalize_spec_episode"),closed=await tool.execute("close",{location:LOCATION},undefined,undefined,f.ctx);
+  const tool=f.tools.get("finalize_spec_episode");
+  await assert.rejects(() => tool.execute("close-before-guide",{location:LOCATION},undefined,undefined,f.ctx),/guide has not been activated and consumed/);assert.equal(existsSync(identityPath),true);assert.equal(f.entries.at(-1).data.status,"active");
+  await activateConversationGuide(f,"close-guide");
+  const closed=await tool.execute("close",{location:LOCATION},undefined,undefined,f.ctx);
   assert.equal(closed.isError,undefined);assert.equal(closed.details.reused,false);assert.equal(existsSync(identityPath),false);assert.equal(f.confirmations.length,0);assert.equal(f.entries.at(-1).data.status,"inactive");
   const before=structuredClone(f.entries),replay=await tool.execute("replay",{location:LOCATION},undefined,undefined,f.ctx);
   assert.equal(replay.isError,undefined);assert.equal(replay.details.reused,true);assert.deepEqual(f.entries,before);assert.match(replay.content[0].text,/already closed/);
@@ -810,6 +892,8 @@ test("registered actual handoff reopen refresh preserves ordinary owner oversigh
   const publisher={async list(){return[{sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:false}]},async reopen(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile}},async getState(){return{activeSessionId:"new-route",sessionId:identity.episodeId,sessionFile:identity.episodeSessionFile,sessionName:identity.sessionName,cwd:worktree,isSessionActive:false,isStreaming:false,isCompacting:false,isBashRunning:false,isRunningTools:false,hasRunningRlmChildren:false,unfinishedActionCount:0,sessionActions:{queuedCount:0,steering:[],followUps:[]}}},async deliverHandoff(){},close(){}};
   const dependencies={git:{repositoryRoot(){return cwd},hasBranch(){return true},worktrees(){return[{path:worktree,branch:identity.branch}]}},filesystem:{readIdentity(){return identity},writeIdentity(_path,value){identity=value;writeFileSync(identityPath,JSON.stringify(value))},exists(){return true}},publisher};
   const f=createHarness(cwd,createReviewedPlanExtension(dependencies));f.entries.push({type:"custom",customType:"prime-claw-conversation-oversight",data:{markerVersion:2,status:"active",ownerSessionId:"owner-session",slug,sourceLocation:LOCATION,episodeId:identity.episodeId,episodeSessionFile:identity.episodeSessionFile,branch:identity.branch,worktree,sessionName:identity.sessionName,identityVersion:2,admission:"delivered"}});
+  await assert.rejects(() => f.tools.get("handoff_spec_episode").execute("handoff-before-guide",{location:LOCATION,guidance:""},undefined,undefined,f.ctx),/guide has not been activated and consumed/);assert.equal(identity.episodeActiveSessionId,"old-route");
+  await activateConversationGuide(f,"handoff-guide");
   const result=await f.tools.get("handoff_spec_episode").execute("handoff",{location:LOCATION,guidance:""},undefined,undefined,f.ctx);assert.equal(result.isError,undefined);assert.equal(identity.episodeActiveSessionId,"new-route");const context=await f.events.get("context")({messages:[]},f.ctx);assert.equal(context.messages.filter(m=>m.customType==="prime-claw-oversee-episode-package").length,0);
 });
 
@@ -872,6 +956,17 @@ test("owner handoff tool success text agrees with prompt delivery details", asyn
     },
   };
   const f = createHarness(cwd, createReviewedPlanExtension(dependencies));
+  const state = join(cwd, ".prime", "agent", "state", "spec-episodes");
+  mkdirSync(state, { recursive: true });
+  writeFileSync(join(state, "alpha-plan.json"), JSON.stringify(identity));
+  f.entries.push({ type: "custom", customType: "prime-claw-conversation-oversight", data: {
+    markerVersion: 2, status: "active", ownerSessionId: identity.ownerSessionId,
+    slug: identity.slug, sourceLocation: identity.sourceLocation, episodeId: identity.episodeId,
+    episodeSessionFile: identity.episodeSessionFile, branch: identity.branch,
+    worktree: identity.worktree, sessionName: identity.sessionName,
+    identityVersion: 2, admission: "delivered",
+  } });
+  await activateConversationGuide(f, "handoff-success-guide");
 
   const result = await f.tools.get("handoff_spec_episode").execute(
     "handoff-call-success",
@@ -901,16 +996,16 @@ test("owner handoff tool requires a durable identity for the exact location", as
   };
   const f = createHarness(cwd, createReviewedPlanExtension(dependencies));
 
-  const result = await f.tools.get("handoff_spec_episode").execute(
-    "handoff-call-1",
-    { location: LOCATION, guidance: "operator focus" },
-    undefined,
-    undefined,
-    f.ctx,
+  await assert.rejects(
+    () => f.tools.get("handoff_spec_episode").execute(
+      "handoff-call-1",
+      { location: LOCATION, guidance: "operator focus" },
+      undefined,
+      undefined,
+      f.ctx,
+    ),
+    /requires one exact active owner episode/,
   );
-
-  assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /No durable episode identity exists/);
   assert.deepEqual(f.messages, []);
 });
 
