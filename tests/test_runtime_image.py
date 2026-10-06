@@ -1,13 +1,12 @@
 """Tests for bin/prime-claw Slice 2: image stage (build).
 
-Offline: no docker daemon, no zbrain compile. Staging tested against a fake
+Host-safe tier-0 unit tests. Offline: no docker daemon, no zbrain compile. Staging tested against a fake
 zbrain checkout in tmp_path; docker build + image-exists are monkeypatched.
 """
 import json, os, subprocess, sys
 from importlib.machinery import SourceFileLoader
 import pytest
 
-pytestmark = pytest.mark.sandbox
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BIN = os.path.join(REPO, "bin", "prime-claw")

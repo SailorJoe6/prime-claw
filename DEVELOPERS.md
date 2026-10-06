@@ -37,14 +37,13 @@ openclaw-setup:
 
 ## Testing
 
-Tests use the isolation tiers in `.ralph/plans/SPECIFICATION.md`. Tier
-assignment is by **pytest marker** (`pytest.ini`): unmarked tests are tier 0,
-`container` tests are tier 1, and the explicit non-default integration body is
-tier 2. The older `sandbox` marker remains explicit until the later taxonomy
-slice moves lifecycle tests. `tests/conftest.py` auto-marks any test that
-requests the `tier1_container`/`ctmp` fixtures as `container` and skips every
-environment marker unless it is selected. The plain command is therefore
-always the tier-0 default with no Docker dependency:
+Tests use the isolation tiers in `.ralph/plans/SPECIFICATION.md`. Unmarked
+mock/static tests are tier 0. Real Prime Agent/plugin execution is tier 1 under
+the `container` marker. The explicit real-stack launcher is tier 2.
+`tests/conftest.py` auto-marks every tier-1 fixture user and admits it only for
+the exact selector `-m container`; arbitrary, negated, grouped, or compound
+marker expressions cannot authorize an environment tier. The plain command is
+therefore always the tier-0 default and never contacts Docker:
 
 ```bash
 python3 -m pytest tests/ -q          # tier 0 (host, no environment)
@@ -66,10 +65,11 @@ only. Do not apply, check, or probe a candidate against the host user-global
 
 ### Test tiers
 
-- **Tier 0 — host, no environment.** Static checks: no Node, no
-  prime-agent, no Docker, no plugin install. This is the default gate.
-- **Tier 1 — slim container.** Anything needing Node, a Prime Agent
-  install, or the plugin runs inside one run-owned plain-Docker container.
+- **Tier 0 — host-safe unit/static.** No Docker, OpenShell, Prime Agent
+  execution, plugin install, PostgreSQL, or gbrain. Recording fakes and pure
+  local-tool checks belong here. This is the default gate.
+- **Tier 1 — slim container.** Anything executing Prime Agent, the plugin, or
+  the plugin's Node suites runs inside one run-owned plain-Docker container.
   A sanitized run-owned snapshot of tracked and nonignored inputs is mounted
   read-only at `/workspace`; ignored local state is never mounted. A fresh
   scratch share is the only writable host mount; the durable evidence root,
@@ -140,21 +140,23 @@ only. Do not apply, check, or probe a candidate against the host user-global
   tier's acceptance boundary. The explicit body filename is not pytest-
   collectable, and direct host invocation fails before side effects.
 
-- **Legacy explicit sandbox suite.** `python3 -m pytest tests/ -q -m sandbox`
-  remains host-orchestrated and outside default runs. Slice 4 owns its taxonomy
-  change; Slice 3 does not widen or run it.
+- **Lifecycle execution — disabled.** The former `sandbox` tests are recording-
+  fake host unit tests and now belong to tier 0. No pytest marker or
+  `scripts/test-all.sh` option runs real OpenShell lifecycle work. Both
+  `--with-sandbox` and `--with-lifecycle` are non-mutating usage errors.
 
 ### Whole-suite sequencer
 
 ```bash
-scripts/test-all.sh                    # current tier 0 + tier 1 (fail-fast)
-scripts/test-all.sh --with-sandbox     # current legacy explicit sandbox suite
-scripts/test-integration.sh            # new standalone tier 2
+scripts/test-all.sh          # tier 0 -> tier 1 -> tier 2, sequential/fail-fast
+scripts/test-integration.sh  # tier 2 alone
 ```
 
-The sequencer is deliberately dumb: it runs each tier with plain pytest,
-stops at the first failing tier, prints a tier summary, and leaves logs
-in the gitignored `.test-results/` directory.
+The sequencer is deliberately dumb. It runs plain host pytest, exact
+`-m container`, then the real integration launcher. It stops at the first
+failure, prints a tier summary, and leaves logs in the gitignored
+`.test-results/` directory. Plugin development remains Docker-only: never apply,
+check, or probe a candidate against the host/user-global Prime Agent install.
 
 ## Local-state rules
 

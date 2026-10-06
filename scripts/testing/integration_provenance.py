@@ -145,10 +145,13 @@ def validate_container(raw: Any, *, container_id: str, image_id: str,
     if not isinstance(env_rows, list):
         raise IntegrationEvidenceError("container environment is unavailable")
     allowed = {"PATH", "HOME", "LANG", "PRIME_CLAW_INTEGRATION_ATTESTATION",
-               "PRIME_CLAW_INTEGRATION_RUN_ID"}
-    names = {row.split("=", 1)[0] for row in env_rows if isinstance(row, str) and "=" in row}
-    if names != allowed:
+               "PRIME_CLAW_INTEGRATION_RUN_ID", "PRIME_CLAW_INTEGRATION_CONTAINER"}
+    env = {entry.split("=", 1)[0]: entry.split("=", 1)[1]
+           for entry in env_rows if isinstance(entry, str) and "=" in entry}
+    if set(env) != allowed or len(env_rows) != len(allowed):
         raise IntegrationEvidenceError("container environment is not allow-listed")
+    if env["PRIME_CLAW_INTEGRATION_CONTAINER"] != "1":
+        raise IntegrationEvidenceError("container entry marker is invalid")
     return {"id": container_id, "image_id": image_id, "name": name,
             "network_mode": "none", "non_root": True,
             "host_mounts_absent": True, "ports_absent": True,

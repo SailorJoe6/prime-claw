@@ -21,10 +21,20 @@ def test_container_helper_scripts_compile():
         py_compile.compile(str(helper), doraise=True)
 
 
-def test_pytest_registers_container_and_sandbox_markers():
+def test_pytest_registers_only_supported_and_reserved_environment_markers():
     ini = (REPO / "pytest.ini").read_text()
     assert "container:" in ini
-    assert "sandbox:" in ini
+    assert "integration:" in ini
+    assert "lifecycle:" in ini
+
+
+def test_mocked_runtime_tests_are_host_safe_tier0():
+    runtime_tests = sorted((REPO / "tests").glob("test_runtime_*.py"))
+    assert runtime_tests
+    for test_file in runtime_tests:
+        text = test_file.read_text()
+        assert "pytestmark = pytest.mark.sandbox" not in text
+        assert "Offline:" in text or "host-safe" in text
 
 
 def test_results_dir_is_gitignored():

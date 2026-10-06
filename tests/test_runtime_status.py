@@ -1,6 +1,6 @@
 """Tests for bin/prime-claw Slice 1: CLI skeleton + status.
 
-Offline: probes are mocked via a fake openshell runner. No live sandbox, no
+Host-safe tier-0 unit tests. Offline: probes are mocked via a fake openshell runner. No live sandbox, no
 network, no credentials. Covers CLI parsing, config loading, probe shaping,
 status aggregation, and the not-implemented verb stubs.
 """
@@ -8,7 +8,6 @@ import json, os, subprocess, sys, types
 import importlib.util
 import pytest
 
-pytestmark = pytest.mark.sandbox
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BIN = os.path.join(REPO, "bin", "prime-claw")

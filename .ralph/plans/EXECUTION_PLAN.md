@@ -1,103 +1,83 @@
 # Execution plan — project-wide isolation-first testing strategy
 
-## Active decision: finish Slice 3 with a trusted-host Docker contract
+## Active decision: Slice 4 truthful test entry and taxonomy
 
-The operator reduced Slice 3 on 2026-10-06. The host, checkout, launcher process,
-and same-UID user are trusted during a run. Bias for DONE over adversarial
-hardening. The durable decision is on `prime-claw-5v7.5`.
+Slice 3 is owner-accepted at exact commit
+`5d3db2f961d843a11289c38f5d60f646a8f65c9e` (tree
+`5be779043b3e45f8f759ce9340467ee92a2fb42f`). Its simple trusted-host,
+zero-runtime-host-mount integration launcher and retained isolation are the
+foundation. Slice 4 is tracked by `prime-claw-5v7.4`.
 
-The rejected high-assurance candidate remains published as
-`659a293b461f5bbcc7c9b2424085a4af08848e7a` (tree
-`1c786cc7548495df3dd192abe7d70bb32819cc38`). Its uncommitted follow-up draft was
-preserved before reset at:
+## Practical threat model and non-goals
 
-- patch: `/Users/jlanders/.prime/agent/session-artifacts/01a0fee6-4ed7-725a-8cf9-0ba9fbf056b9/scope-reduction-f1-draft-20261006T035100Z/paused-f1-draft.patch`
-- patch SHA-256: `9cf1083f39c1ab82c95262a11efc73f5a89f13e92b925bb2faf8be40239280d1`
-- metadata: `/Users/jlanders/.prime/agent/session-artifacts/01a0fee6-4ed7-725a-8cf9-0ba9fbf056b9/scope-reduction-f1-draft-20261006T035100Z/status.json`
-- metadata SHA-256: `a0216c057d596cd908757414cb8dd652798bd2d4320a0011c4129e8cc0da8012`
+The host, checkout, Docker daemon, launcher, and same-UID operator are trusted.
+The product boundary is accidental host execution and misleading test selection,
+not hostile local tampering. Bias for DONE over perfect. Do not add adversarial
+same-UID races, security attestation, custom policy engines, recursive red-team
+reviews, or security-grade receipts. Use one normal bounded final review. After at
+most two repair/review cycles, stop for operator scope consultation.
 
-Those artifacts are historical recovery material, not requirements.
+## Slice 4 objective
+
+Make the public tier taxonomy, pytest collection policy, and default test entry
+truthful and safe:
+
+1. Plain `pytest` stays Docker-free and runs only host-safe unit/static tests.
+2. Arbitrary marker expressions cannot bypass the safety guard.
+3. The real integration body never executes directly on the host; it runs only
+   inside the Slice-3 Docker image through the integration launcher.
+4. Mocked tests of Docker/runtime orchestration are classified as host-safe unit
+   tests rather than as real container or integration execution.
+5. `scripts/test-all.sh` runs tiers 0, 1, and 2 sequentially by default and stops
+   on the first failure.
+6. Prime Agent plugin development and pre-merge validation remain Docker-only.
+7. Lifecycle execution remains disabled. Both historical and current flags that
+   might imply lifecycle enablement fail with clear, non-mutating errors.
 
 ## Accepted foundation
 
+Preserve:
+
 - Slice 1: `4cca0989475d7bd670620f31b67260342b3aac5d`
 - Slice 2: `56afd99d3a4b5411eb37fb42210ffb36c8bf2b84`
+- Slice 3: `5d3db2f961d843a11289c38f5d60f646a8f65c9e`
+- Docker-only plugin development policy in `AGENTS.md`
+- the simple Slice-3 integration topology and isolation contract
 
-Preserve their accepted tier-1 isolation, pinned/source build behavior, tests, and
-documentation. Prime Agent remains an upstream dependency. Do not change or patch
-Prime Agent.
-
-## Slice 3 objective
-
-Deliver one readable, credential-free Docker integration test that proves the
-real locked gbrain binary against PostgreSQL 16 + pgvector and the synthetic local
-Git/corpus fixture.
-
-### Runtime contract
-
-1. Stage only trusted public inputs into a temporary Docker build context:
-   locked gbrain source, locked Bun artifact, artifact lock, assertion body, and
-   synthetic fixture corpus.
-2. Bake the assertion body and fixture into the image. Do not mount the checkout,
-   results, host home, Docker/OpenShell socket, credentials, or production data.
-3. Run the container as a nonroot image user with container-local writable HOME,
-   PostgreSQL data, scratch, Git remote, and results.
-4. Create/start with `--network none`, no published ports, no privilege, and exact
-   run/contract labels.
-5. Run the explicit assertion body with a bounded timeout. Ordinary command
-   failure, timeout, SIGINT, or SIGTERM is nonzero.
-6. Stop the container, copy one JSON body receipt out with `docker cp`, validate a
-   small result schema, then remove the labelled container and image best-effort.
-7. Publish one simple host manifest containing run status, tested repository
-   commit/content identity, platform, locked versions, immutable image/container
-   IDs, body receipt, and cleanup outcomes.
-
-### Retained functional proof
-
-The body must prove:
-
-- exact gbrain `0.50.0.0` executable built from locked commit/tree/archive;
-- PostgreSQL major 16 and pgvector available;
-- real schema initialization/migration;
-- synthetic source sync plus get/search;
-- fixture-owned bare Git push/clone round trip;
-- nonroot execution and runtime external TCP refusal.
-
-## Explicit non-requirements
-
-Do not implement or block completion on hostile same-UID pathname races,
-descriptor/ancestor chains, exact-inode publication transactions, instruction-level
-signal timing, caller pending-signal proofs, exhaustive malformed-daemon fuzz,
-cryptographic binding sidecars, tamper-proof rereads of every intermediate file,
-or permanent two-run comparison machinery. These are optional future hardening.
+Prime Agent remains an upstream dependency. Do not change or patch it.
 
 ## Implementation steps
 
-1. Replace the Slice-3 supervisor/driver/provenance path with a small trusted-host
-   launcher and validator.
-2. Update the integration Dockerfile and body for baked assets and container-local
-   writable state.
-3. Replace adversarial Slice-3 tests with readable ordinary success/failure,
-   isolation, receipt, timeout/signal, and cleanup tests. Do not weaken accepted
-   Slice-1/Slice-2 tests.
-4. Update `DEVELOPERS.md`, `docs/testing-strategy.md`, the Slice-3 evidence page,
-   and `config/requirements-inventory.json` to this contract.
-5. Run sequentially:
-   - focused ordinary Slice-3 tests;
-   - full host suite;
-   - one native end-to-end Docker acceptance run;
-   - one normal read-only final review limited to this reduced contract.
-6. Commit and push one clean replacement, record exact evidence on
-   `prime-claw-5v7.5`, notify the owning Conversation, and stop for owner review.
+1. Repair `pytest.ini` and `tests/conftest.py` so selection is based on explicit
+   tier intent, not a truthy arbitrary `-m` string. Fail or skip safely when an
+   environment-requiring test was not selected through its supported tier entry.
+2. Make the integration assertion body host-inert by construction and test that
+   direct host collection/execution cannot run it.
+3. Reclassify mocked Docker/runtime tests as tier 0. Keep only tests that really
+   enter the tier-1 container under `container`, and the real stack under
+   `integration`.
+4. Make `scripts/test-all.sh` run tier 0, tier 1, then tier 2 sequentially without
+   a lifecycle-enabling option. Keep fail-fast logs and summaries.
+5. Make legacy and replacement lifecycle-enable flags deterministic usage errors
+   before any Docker, OpenShell, or lifecycle mutation.
+6. Update `DEVELOPERS.md`, `docs/testing-strategy.md`, the Slice-4 evidence page,
+   and `config/requirements-inventory.json`.
+7. Run focused policy tests, plain pytest/no-Docker proof, full host tier 0, Docker
+   tier 1, real integration tier 2, then one normal bounded final review.
+8. Produce one clean commit and push, record the exact receipt on
+   `prime-claw-5v7.4`, and stop for owner review.
 
 ## Completion boundary
 
-One native platform is sufficient acceptance evidence. State the observed platform
-truthfully; do not require remote Linux/amd64 proof. Do not start Slice 4 or later
-work.
+Do not start Slice 5 or later work. Do not enable lifecycle execution. Do not
+refresh a user-global plugin. Stop after one published Slice-4 candidate for owner
+review.
 
 ## Current validation checkpoint — 2026-10-06
 
-- Focused reduced-contract gate: 24 passed (log SHA-256 `1d27a19d7a90c6ab4a4e471426b6a5f0d5e152ea9845d479d1ab2acc06b4ff7e`).
-- Full host gate: 389 passed, 149 skipped, 130 subtests (log SHA-256 `3b5817e9b8e16bcae99726c7eb9cf1444bcd8fe466b61a289500594e2279d3ea`).
-- Native Docker acceptance, bounded final review, publication, and owner decision remain pending.
+- Test-first failure was observed for the pre-fix marker/taxonomy/sequencer state.
+- Final focused host policy/runtime set: 148 passed plus 8 subtests; log SHA-256
+  `66f1729918750b306d9a81e6f51664317a5ab9051d554646c5fd2085fb9bbbcf`.
+- Final stable-tree plain-pytest Docker-sentinel run: 504 passed, 42 skipped,
+  138 subtests; no Docker contact; log SHA-256 `79211c952ed6b0713d409633a301a73cb6090da93c29d6f1a43b41871e0745de`.
+- Tier 1, tier 2, normal final review, commit/push, and owner decision remain.

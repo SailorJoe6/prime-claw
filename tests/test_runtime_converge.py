@@ -1,6 +1,6 @@
 """Tests for bin/prime-claw Slice 3a: runtime stages + create.
 
-Offline: openshell + docker + sandbox_exec are monkeypatched. Covers stage
+Host-safe tier-0 unit tests. Offline: openshell + docker + sandbox_exec are monkeypatched. Covers stage
 idempotency, create ordering, dry-run, and credential isolation (key never
 written to disk or echoed).
 """
@@ -8,7 +8,6 @@ import json, os, subprocess, sys, base64
 from importlib.machinery import SourceFileLoader
 import pytest
 
-pytestmark = pytest.mark.sandbox
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BIN = os.path.join(REPO, "bin", "prime-claw")

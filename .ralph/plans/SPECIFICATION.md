@@ -1,83 +1,65 @@
-# Project-wide testing strategy — Slice 3 reduced specification
+# Project-wide testing strategy — Slice 4 truthful tier specification
 
 ## Status
 
-Slice 1 and Slice 2 are owner-accepted. Slice 3 is active on
-`prime-claw-5v7.5`. The operator replaced the prior adversarial-security contract
-with this trusted-host ordinary-failure contract on 2026-10-06.
+Slices 1–3 are owner-accepted. Slice 4 is active on `prime-claw-5v7.4` from
+accepted commit `5d3db2f961d843a11289c38f5d60f646a8f65c9e`.
 
-## Trust model
+## Threat model
 
-Trusted during a test run:
+The local host, checkout, Docker daemon, launcher, and same-UID operator are
+trusted. This slice prevents accidental unsafe test execution and false claims
+about which environment ran a test. It does not defend against hostile local
+mutation and does not create attestation or adversarial-race machinery.
 
-- the local host and Docker daemon;
-- the selected checkout and launcher process;
-- the same-UID operator;
-- the temporary build context before it is removed.
+## Tier contract
 
-Untrusted and excluded:
+- **Tier 0 — host unit/static.** Plain `pytest` runs this tier only. It must not
+  require or invoke Docker, OpenShell, Prime Agent, PostgreSQL, or gbrain.
+  Mocked tests of orchestration belong here.
+- **Tier 1 — Docker plugin/runtime tests.** These run through the existing
+  tier-1 Docker fixture/entry and retain the Docker-only plugin-development
+  policy. They may never become host execution through marker tricks.
+- **Tier 2 — real integration.** This is the disposable Slice-3
+  PostgreSQL 16 + pgvector + locked-gbrain environment. The assertion body is
+  not a host pytest entry and runs only inside its purpose-built Docker image.
+- **Lifecycle.** Real OpenShell/lifecycle execution remains disabled. Tests may
+  cover lifecycle code through mocks or isolated Docker probes, but no public
+  test flag enables lifecycle mutation.
 
-- credentials, provider environment, private/operator data, host homes;
-- production gbrain/PostgreSQL/Prime Agent services;
-- Docker/OpenShell sockets inside the assertion container;
-- network access during assertion execution.
+## Collection and entry requirements
 
-Hostile same-UID races and corrupted local namespaces are outside the acceptance
-boundary. Ordinary failures must still be truthful and nonzero.
+1. With no `-m`, pytest collects/runs only tier 0 and does not call Docker.
+2. A random or compound marker expression is not authorization to run protected
+   tests. Only the supported tier selection can admit that tier, and the wrong
+   entry fails or skips closed before its body or environment fixture runs.
+3. Tests requiring tier-1 fixtures are marked consistently and can only run
+   through the supported tier-1 path.
+4. The integration assertion module cannot be collected or executed directly on
+   the host.
+5. Mock-only orchestration tests remain tier 0 and describe themselves as mocks,
+   not Docker/integration proof.
+6. `scripts/test-all.sh` is the default complete entry: tier 0, then tier 1,
+   then tier 2, sequential and fail-fast.
 
-## Required behavior
+## Lifecycle and plugin boundaries
 
-### Build
+Plugin source stays inert under `src/prime-agent-plugin/`. Candidate validation is
+Docker-only; no host/user-global apply, check, or native plugin probe is permitted.
+Any old or new CLI option that purports to enable lifecycle tests returns a clear
+nonzero usage error before mutation. Slice 4 does not enable lifecycle execution.
 
-- Select only native `linux/arm64` or `linux/amd64`; no emulation fallback.
-- Verify locked public gbrain commit/tree/archive/package, Bun artifact, and base
-  image identities.
-- Build an image containing the exact gbrain executable, assertion body, artifact
-  lock, and synthetic fixture corpus.
-- Record the tested Git HEAD, clean/dirty state, and a deterministic content hash
-  for the selected assertion inputs.
+## Acceptance
 
-### Run
+Tests cover collection behavior, arbitrary marker expressions, host-inert
+integration bodies, mocked-test classification, sequential `test-all`, legacy and
+current lifecycle flags, and non-mutation. Docs, requirements inventory, and a
+Slice-4 evidence record match the behavior. Run the real supported tiers and one
+normal review against this practical contract.
 
-- Use one nonroot container.
-- Use no host bind mounts and publish no ports.
-- Pass no provider credentials or arbitrary host environment.
-- Use `--network none` for the assertion runtime.
-- Keep HOME, PostgreSQL data/socket, synthetic Git repositories, scratch, and
-  results inside the container.
-- Bound build, start, assertion, stop, copy, and cleanup commands.
+## Guardrails and boundary
 
-### Result and cleanup
-
-- The body writes one JSON receipt under its container-local results directory.
-- After the assertion finishes, the host stops the container and copies that
-  receipt with `docker cp`.
-- The host validates required identities and functional results, then writes one
-  readable manifest.
-- Cleanup targets only the captured immutable IDs or exact run labels. Removal is
-  best-effort and its outcome is recorded. A passed functional receipt cannot hide
-  an ordinary assertion failure or interrupted launcher.
-
-## Acceptance checks
-
-The integration run proves real locked gbrain + PostgreSQL 16 + pgvector,
-synthetic source sync/get/search, and local Git round trip. Unit tests cover the
-normal launcher, receipt validation, no-mount/no-port/network-none create command,
-timeout and ordinary signal failure, and best-effort labelled cleanup.
-
-Run focused tests, the full host suite, and one native Docker acceptance run in
-that order. A normal review checks only this specification and blocks only real
-functional failure, retained isolation violations, unsafe deletion of unowned
-resources, ordinary false-green behavior, or missing real-stack coverage.
-
-## Excluded hardening
-
-Descriptor chains, inode binding sidecars, ABA/symlink/FIFO adversaries,
-micro-signal matrices, exhaustive malformed-Docker payloads, terminal publication
-transactions, and permanent two-run comparison are not required and must not block
-completion.
-
-## Boundary
-
-Preserve owner-accepted Slice 1 and Slice 2. Do not implement Slice 4 or modify
-Prime Agent. Publish one replacement and stop for owner review.
+Bias for DONE over perfect. Excluded same-UID attacks and security attestation are
+not blockers. Do not launch recursive red-team review. If two repair/review cycles
+still find material in-scope defects, stop for operator scope consultation.
+Preserve accepted Slices 1–3 and do not start Slice 5+.

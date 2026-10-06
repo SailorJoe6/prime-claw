@@ -62,6 +62,7 @@ def _container_row(run_id=RUN_ID, name=None):
             "Env": [
                 "PATH=/usr/lib/postgresql/16/bin:/usr/local/bin:/usr/bin:/bin",
                 "HOME=/home/tester", "LANG=C.UTF-8",
+                "PRIME_CLAW_INTEGRATION_CONTAINER=1",
                 "PRIME_CLAW_INTEGRATION_ATTESTATION=" + "a" * 64,
                 "PRIME_CLAW_INTEGRATION_RUN_ID=" + run_id,
             ],
@@ -221,6 +222,19 @@ def test_container_boundary_is_offline_unprivileged_and_mount_free():
                 run_id=RUN_ID, name="prime-claw-integration-" + RUN_ID.lower())
 
 
+def test_container_boundary_requires_exact_body_entry_marker():
+    row = _container_row()
+    row["Config"]["Env"] = [
+        "PRIME_CLAW_INTEGRATION_CONTAINER=0" if value.startswith(
+            "PRIME_CLAW_INTEGRATION_CONTAINER=") else value
+        for value in row["Config"]["Env"]
+    ]
+    with pytest.raises(ip.IntegrationEvidenceError, match="entry marker"):
+        ip.validate_container(
+            row, container_id=CONTAINER_ID, image_id=IMAGE_ID,
+            run_id=RUN_ID, name="prime-claw-integration-" + RUN_ID.lower())
+
+
 def test_body_receipt_validates_real_stack_versions_and_repository_identity():
     lock = _lock()
     body = ip.validate_body(
@@ -238,12 +252,19 @@ def test_body_receipt_validates_real_stack_versions_and_repository_identity():
 def test_body_is_not_collected_or_runnable_as_a_host_test():
     body = REPO / "tests/integration/environment_body.py"
     assert not body.name.startswith("test_")
+    assert "import pytest" not in body.read_text()
     result = subprocess.run(
         [sys.executable, str(body), "--attestation", "a" * 64,
          "--run-id", RUN_ID], cwd=REPO, text=True,
         capture_output=True, timeout=10)
     assert result.returncode != 0
+    assert "container entry marker is missing" in result.stderr
     assert "integration body PASS" not in result.stdout
+
+
+def test_launcher_supplies_the_container_only_entry_marker():
+    source = (REPO / "scripts/testing/integration_driver.py").read_text()
+    assert "PRIME_CLAW_INTEGRATION_CONTAINER=1" in source
 
 
 def _install_recording_run(monkeypatch, tmp_path, *, failure=None):

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "prime-claw",
-  "phase": "1 — de-risk gate",
+  "phase": "1 \u2014 de-risk gate",
   "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
   "requirements": [
     {
@@ -837,7 +837,7 @@
       "priority": "NICE",
       "phase": 2,
       "slice": 6,
-      "summary": "Host exposure of sandboxed Postgres on localhost:5433 — documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
+      "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
       "status": "documented (Slice 6; no host forward by design)",
       "proven_by": {
         "check": [
@@ -1135,7 +1135,7 @@
       "id": "R-T1-1",
       "priority": "P1",
       "summary": "Tier-1 slim test container image + standalone driver: docker/test.Dockerfile (Ubuntu 24.04 + Node 22 + python3/pytest), scripts/test-tier1.sh builds the image and runs one ephemeral container; --smoke, --dry-run (never contacts Docker), --rebuild; informational paths are Docker-free.",
-      "status": "met (slice 1, EXPERT PASS on 2666843 ≡ b2f6b86)",
+      "status": "met (slice 1, EXPERT PASS on 2666843 \u2261 b2f6b86)",
       "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
       "proven_by": {
         "apply": [
@@ -1183,9 +1183,9 @@
     {
       "id": "R-T1-3",
       "priority": "P1",
-      "summary": "Tier markers and default-skip policy: pytest.ini registers container (tier 1) and sandbox (tier 2); unmarked = tier 0; tests/conftest.py auto-marks tier1_container/ctmp users and skips tier 1/2 without an explicit -m, so plain pytest is always the Docker-free tier-0 default; tests/test_runtime_*.py are marked sandbox.",
-      "status": "met (slice 3)",
-      "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
+      "summary": "Truthful marker and collection policy: unmarked recording-fake/static tests are tier 0; real tier-1 fixture users are auto-marked container and admitted only by exact `-m container`; arbitrary expressions cannot bypass environment guards; integration/lifecycle markers are never host-admitted.",
+      "status": "implemented in project-wide testing Slice 4; final gates pending",
+      "plan": ".ralph/plans/SPECIFICATION.md (Slice 4)",
       "proven_by": {
         "apply": [],
         "check": [
@@ -1200,7 +1200,7 @@
           "tests/test_tier1_fixture.py"
         ]
       },
-      "evidence": "docs/evidence/2026-09-30-tier1-slice3-migration-sequencer.md"
+      "evidence": "docs/evidence/2026-10-06-testing-strategy-slice4-truthful-tiers.md"
     },
     {
       "id": "R-T1-4",
@@ -1237,9 +1237,9 @@
     {
       "id": "R-T1-5",
       "priority": "P1",
-      "summary": "Dumb whole-suite sequencer: scripts/test-all.sh runs tier 0 -> tier 1 (tier 2 only on explicit --with-sandbox), fail-fast, prints a tier summary, logs into the gitignored .test-results/ directory. No retries, no parallelism, no CI wiring.",
-      "status": "met (slice 3)",
-      "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
+      "summary": "Dumb whole-suite sequencer: scripts/test-all.sh runs tier 0 -> tier 1 -> tier 2 sequentially, fail-fast, prints a tier summary, and logs under .test-results; lifecycle flags are non-mutating usage errors.",
+      "status": "implemented in project-wide testing Slice 4; final gates pending",
+      "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 4)",
       "proven_by": {
         "apply": [],
         "check": [
@@ -1249,10 +1249,11 @@
           "scripts/test-all.sh"
         ],
         "tests": [
+          "tests/test_test_all.py",
           "tests/test_container_helpers_static.py"
         ]
       },
-      "evidence": "docs/evidence/2026-09-30-tier1-slice3-migration-sequencer.md"
+      "evidence": "docs/evidence/2026-10-06-testing-strategy-slice4-truthful-tiers.md"
     },
     {
       "id": "R-T1-6",
@@ -1308,31 +1309,37 @@
     {
       "id": "R-TEST-2",
       "priority": "GATE",
-      "summary": "Tests use the lowest sufficient static, unit-env, integration, or lifecycle tier; Slice 3 registers a non-default integration body without widening plain host pytest.",
-      "status": "tier 0/tier 1 preserved and tier 2 integration registered; remaining environment-body moves and lifecycle taxonomy pending later slices",
-      "plan": ".ralph/plans/SPECIFICATION.md",
+      "summary": "Tests use the lowest sufficient tier: host-safe mocked/static tests are tier 0, real Prime Agent/plugin execution is Docker tier 1, and the guarded real-stack body is Docker tier 2; lifecycle execution remains disabled.",
+      "status": "Slice-4 truthful taxonomy implemented; final gates pending",
+      "plan": ".ralph/plans/SPECIFICATION.md (Slice 4)",
       "proven_by": {
         "apply": [
           "pytest.ini",
-          "tests/conftest.py"
+          "tests/conftest.py",
+          "scripts/test-all.sh"
         ],
         "check": [
           "docs/testing-strategy.md"
         ],
         "validate": [
-          "scripts/test-integration.sh"
+          "scripts/test-integration.sh",
+          "tests/integration/environment_body.py",
+          "docs/testing-strategy.md"
         ],
         "tests": [
-          "tests/test_integration_tier.py"
+          "tests/test_tier1_fixture.py",
+          "tests/test_container_helpers_static.py",
+          "tests/test_integration_tier.py",
+          "tests/test_test_all.py"
         ]
       },
-      "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
+      "evidence": "docs/evidence/2026-10-06-testing-strategy-slice4-truthful-tiers.md"
     },
     {
       "id": "R-TEST-3",
       "priority": "GATE",
       "summary": "Tier 2 provides a credential-free Docker PostgreSQL 16 + pgvector + exact-gbrain environment with the synthetic corpus/body baked into the image, nonroot container-local HOME/database/results/Git state, and a copied result receipt.",
-      "status": "reduced trusted-host contract implemented; fresh focused/full-host/native acceptance and owner review pending",
+      "status": "owner-accepted at reduced-contract Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e; preserved by Slice 4",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 3)",
       "proven_by": {
         "apply": [
@@ -1358,7 +1365,7 @@
       "id": "R-TEST-4",
       "priority": "GATE",
       "summary": "The integration assertion container receives no Docker/OpenShell socket or host-control broker; host launcher behavior is covered through pure recording fakes.",
-      "status": "implemented for Slice 3; later real lifecycle observer remains pending",
+      "status": "owner-accepted for Slice 3; real lifecycle execution remains disabled",
       "plan": ".ralph/plans/SPECIFICATION.md",
       "proven_by": {
         "apply": [
@@ -1380,7 +1387,7 @@
       "id": "R-TEST-5",
       "priority": "GATE",
       "summary": "Tier-1 retains its owner-accepted exact-ID lifecycle. Slice 3 uses bounded ordinary commands, immutable iid/cid capture, normal timeout/SIGINT/SIGTERM nonzero behavior, exact run labels, and best-effort label-verified cleanup without an outer publication supervisor.",
-      "status": "proven for owner-accepted Tier 1; reduced Slice-3 lifecycle implemented with final validation pending",
+      "status": "proven for owner-accepted Tier 1; reduced Slice-3 lifecycle owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
@@ -1408,7 +1415,7 @@
       "id": "R-TEST-6",
       "priority": "GATE",
       "summary": "Tier-1 retains truthful schema-v2 pinned/source provenance. Slice 3 emits one simple receipt containing tested commit/content identity, locked versions, immutable runtime IDs, real-stack result, and cleanup outcomes.",
-      "status": "proven for owner-accepted Tier 1; reduced Slice-3 receipt implemented with final validation pending",
+      "status": "proven for owner-accepted Tier 1; reduced Slice-3 receipt owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
@@ -1437,7 +1444,7 @@
       "id": "R-TEST-7",
       "priority": "GATE",
       "summary": "Tier-1 retains its owner-accepted read-only snapshot plus writable-share mounts. Slice 3 instead has zero runtime host mounts: public source/body/fixtures are baked into the image and HOME, PostgreSQL, results, and synthetic Git state are container-local; host home, sockets, credentials, provider state, and arbitrary checkouts remain excluded.",
-      "status": "proven for owner-accepted Tier 1; reduced mount-free Slice-3 boundary implemented with final validation pending",
+      "status": "proven for owner-accepted Tier 1; reduced mount-free Slice-3 boundary owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
       "plan": ".ralph/plans/SPECIFICATION.md",
       "proven_by": {
         "apply": [
@@ -1496,10 +1503,36 @@
       "evidence": "docs/evidence/2026-10-03-testing-strategy-slice2-source-builder.md"
     },
     {
+      "id": "R-TEST-9",
+      "priority": "GATE",
+      "summary": "Lifecycle execution stays disabled: mocked runtime orchestration is tier 0, plugin development stays Docker-only, and legacy/current lifecycle-enable flags fail before mutation.",
+      "status": "implemented in project-wide testing Slice 4; final gates pending",
+      "plan": ".ralph/plans/SPECIFICATION.md (Slice 4)",
+      "proven_by": {
+        "apply": [
+          "scripts/test-all.sh"
+        ],
+        "check": [
+          "AGENTS.md",
+          "DEVELOPERS.md",
+          "docs/testing-strategy.md"
+        ],
+        "validate": [
+          "pytest.ini",
+          "tests/conftest.py"
+        ],
+        "tests": [
+          "tests/test_test_all.py",
+          "tests/test_container_helpers_static.py"
+        ]
+      },
+      "evidence": "docs/evidence/2026-10-06-testing-strategy-slice4-truthful-tiers.md"
+    },
+    {
       "id": "R-TEST-10",
       "priority": "GATE",
       "summary": "Safety coverage preserves accepted Slice-1/Slice-2 cases. Reduced Slice-3 coverage targets ordinary build/create/body/copy failure, timeout and SIGINT/SIGTERM nonzero behavior, label mismatch, partial-resource recovery, cleanup refusal, malformed/missing result, and real mount-free stack execution; hostile same-UID races and publication micro-transactions are excluded optional hardening.",
-      "status": "proven for owner-accepted Slice 1/2; reduced ordinary-failure Slice-3 coverage implemented with final validation pending",
+      "status": "proven for owner-accepted Slice 1/2; reduced ordinary-failure Slice-3 coverage owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [

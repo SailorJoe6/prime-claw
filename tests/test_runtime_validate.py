@@ -1,6 +1,6 @@
 """Tests for bin/prime-claw Slice 4: validate (acceptance gate) + version recording.
 
-Offline: probe_sandbox / sandbox_exec / run are monkeypatched. Covers the verb
+Host-safe tier-0 unit tests. Offline: probe_sandbox / sandbox_exec / run are monkeypatched. Covers the verb
 wiring, dry-run, the absent-sandbox guard, check aggregation, credential
 isolation, and evidence recording.
 """
@@ -8,7 +8,6 @@ import json, os, subprocess, sys, base64, re
 from importlib.machinery import SourceFileLoader
 import pytest
 
-pytestmark = pytest.mark.sandbox
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BIN = os.path.join(REPO, "bin", "prime-claw")

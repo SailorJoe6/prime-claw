@@ -1,24 +1,27 @@
 # Testing strategy
 
-prime-claw uses the lowest sufficient isolation tier. Pure repository checks
-stay on the host. Tests that need Prime Agent or the plugin run in the slim
-disposable tier. Tests that need gbrain and PostgreSQL run in a separate
-credential-free brain-stack image. The later lifecycle slice owns the explicit
-OpenShell observer; Slice 3 does not authorize or run it.
+prime-claw uses the lowest sufficient isolation tier. Pure and recording-fake
+unit tests stay on the host. Tests that execute Prime Agent or the plugin run in
+the slim disposable Docker tier. Tests that execute gbrain and PostgreSQL run in
+a separate credential-free Docker image. Real OpenShell lifecycle execution is
+disabled; no marker or test-all option enables it.
 
 ## Current tiers
 
 | Tier | Current command | Boundary |
 |---|---|---|
-| 0 | `python3 -m pytest tests/ -q` | Host-only static and recording-fake tests; no Docker. |
-| 1 | `python3 -m pytest tests/ -q -m container` or `scripts/test-tier1.sh` | One disposable Docker container; read-only repository; run-owned writable share; no credentials or host home. |
-| 2 | `scripts/test-integration.sh` | Plain-Docker PostgreSQL 16 + pgvector + exact gbrain; offline assertions; fixture-owned state. |
-| transition | `python3 -m pytest tests/ -q -m sandbox` | Existing explicit host OpenShell tests pending the Slice-4 taxonomy change. |
+| 0 | `python3 -m pytest tests/ -q` | Host-safe static, pure unit, and recording-fake orchestration tests; no Docker. |
+| 1 | `python3 -m pytest tests/ -q -m container` or `scripts/test-tier1.sh` | Real Prime Agent/plugin execution in one disposable Docker container; no credentials or host home. |
+| 2 | `scripts/test-integration.sh` | Real PostgreSQL 16 + pgvector + exact gbrain in plain Docker; offline assertions; fixture-owned state. |
+| lifecycle | disabled | No real OpenShell lifecycle test entry. Mocked lifecycle behavior is tier 0. |
 
-`scripts/test-all.sh` remains the current tier-0/tier-1 fail-fast sequencer.
-Slice 3 exposes tier 2 through its standalone launcher; Slice 4 owns the
-sequencer/taxonomy migration. Lifecycle work is not part of the default command
-and is not enabled by this slice.
+Plain pytest is Docker-free. Only the exact marker expression `-m container`
+authorizes tier 1; arbitrary or compound expressions keep protected tests
+skipped. Tier 2 is not a pytest body: its non-collectable assertion program has
+an explicit container-entry guard and runs only through
+`scripts/test-integration.sh`. `scripts/test-all.sh` runs tiers 0, 1, and 2 in
+that order and stops on the first failure. The legacy `--with-sandbox` and the
+replacement `--with-lifecycle` both return a non-mutating usage error.
 
 ## Tier-2 disposable brain stack
 

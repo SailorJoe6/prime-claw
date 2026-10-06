@@ -1,33 +1,17 @@
-"""prime-claw test-tier fixtures (slice 3, prime-claw-blw.3).
+"""prime-claw test-tier fixtures.
 
-Tier policy (see DEVELOPERS.md "Testing" and pytest.ini):
+Unmarked tests are tier 0 and host-safe. Tests that request `tier1_container`,
+`ctmp`, or `croot` are auto-marked `container` and run only when pytest receives
+the exact supported selector `-m container`. A random, negated, grouped, or
+compound marker expression never authorizes an environment tier.
 
-- unmarked tests are tier 0 (host, no environment) and always run;
-- `container` tests (tier 1) run inside ONE long-lived tier-1 container per
-  pytest session via the `tier1_container` fixture below;
-- `integration` marks the explicit disposable brain-stack body; its non-default
-  filename is never collected by plain host pytest;
-- `sandbox` tests remain host-orchestrated pending the later taxonomy slice.
+Tier 2 is not a host pytest suite. `scripts/test-integration.sh` invokes a
+non-collectable assertion body inside the purpose-built Slice-3 image. Lifecycle
+execution remains disabled; `integration`, `lifecycle`, and deprecated `sandbox`
+markers are always skipped by host pytest.
 
-Any test that requests the `tier1_container` or `ctmp` fixture is
-auto-marked `container`. Unless pytest is invoked with an explicit -m mark
-expression, container/integration/sandbox tests are SKIPPED — so plain `pytest tests/ -q`
-is always the tier-0 default with no Docker dependency, and
-`pytest -m container` selects exactly the migrated plugin suite.
-
-The session fixture mirrors scripts/test-tier1.sh (the driver is the
-contract): exact selector semantics, disposable read-only source building, a
-run-owned evidence tree, iidfile image capture, cidfile container capture,
-online pinned/local release installation, verified network removal, and only then offline
-package identity plus apply/check/tests against the explicit container-local
-/root/.prime/agent. TIER1_ENV_FILE selects the env file for tests.
-
-Container/ host file exchange uses a session share directory bind-mounted
-at the SAME absolute path on both sides, so paths embedded in probe sources
-and daemon protocol payloads resolve identically in either process.
-(Connecting to a host-bound Unix socket through the macOS virtiofs mount
-does NOT work — connect(2) fails with EOPNOTSUPP — so daemon fakes run
-in-container via tests/container/fake_daemon.py; see that file.)
+The session fixture mirrors scripts/test-tier1.sh and preserves the accepted
+Slice-1/Slice-2 build, isolation, evidence, and cleanup contract.
 """
 
 import json
@@ -92,27 +76,27 @@ _SKIP_INTEGRATION = (
     "tier 2 (integration): explicit disposable brain-stack body; run "
     "scripts/test-integration.sh"
 )
-_SKIP_SANDBOX = (
-    "sandbox: host-orchestrated OpenShell tests remain explicit pending the "
-    "lifecycle taxonomy slice"
+_SKIP_LIFECYCLE = (
+    "lifecycle execution is disabled; mocked runtime tests belong in tier 0"
 )
 
 
 def pytest_collection_modifyitems(config, items):
-    """Auto-mark tier-1 fixture users; skip environment tiers unless -m selects them."""
+    """Admit tier 1 only through exact `-m container`; fail closed otherwise."""
     for item in items:
         if any(name in item.fixturenames for name in ("tier1_container", "ctmp", "croot")):
             item.add_marker(pytest.mark.container)
     markexpr = (getattr(config.option, "markexpr", "") or "").strip()
-    if markexpr:
-        return
+    tier1_selected = markexpr == "container"
     for item in items:
-        if item.get_closest_marker("container") is not None:
+        if (item.get_closest_marker("container") is not None
+                and not tier1_selected):
             item.add_marker(pytest.mark.skip(reason=_SKIP_CONTAINER))
         if item.get_closest_marker("integration") is not None:
             item.add_marker(pytest.mark.skip(reason=_SKIP_INTEGRATION))
-        if item.get_closest_marker("sandbox") is not None:
-            item.add_marker(pytest.mark.skip(reason=_SKIP_SANDBOX))
+        if (item.get_closest_marker("lifecycle") is not None
+                or item.get_closest_marker("sandbox") is not None):
+            item.add_marker(pytest.mark.skip(reason=_SKIP_LIFECYCLE))
 
 
 def _read_selector(env_file: Path, key: str) -> str:

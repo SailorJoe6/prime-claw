@@ -1166,12 +1166,38 @@ class _FakeItem:
         return next((m for m in reversed(self.markers) if getattr(m,"name",None)==name),None)
 
 class TestCollectionPolicy(unittest.TestCase):
+    def _names(self, fixtures, expression="", markers=()):
+        item = _FakeItem(fixtures)
+        for marker in markers:
+            item.add_marker(getattr(conftest.pytest.mark, marker))
+        cfg = SimpleNamespace(option=SimpleNamespace(markexpr=expression))
+        conftest.pytest_collection_modifyitems(cfg, [item])
+        return [marker.name for marker in item.markers]
+
     def test_default_fixture_user_is_marked_and_skipped(self):
-        item=_FakeItem(["tier1_container"]); cfg=SimpleNamespace(option=SimpleNamespace(markexpr="")); conftest.pytest_collection_modifyitems(cfg,[item]); names=[m.name for m in item.markers]; self.assertIn("container",names); self.assertIn("skip",names)
+        names = self._names(["tier1_container"])
+        self.assertIn("container", names)
+        self.assertIn("skip", names)
+
     def test_unmarked_tier0_is_untouched(self):
-        item=_FakeItem([]); cfg=SimpleNamespace(option=SimpleNamespace(markexpr="")); conftest.pytest_collection_modifyitems(cfg,[item]); self.assertEqual(item.markers,[])
-    def test_explicit_mark_selection_does_not_skip(self):
-        item=_FakeItem(["tier1_container"]); cfg=SimpleNamespace(option=SimpleNamespace(markexpr="container")); conftest.pytest_collection_modifyitems(cfg,[item]); names=[m.name for m in item.markers]; self.assertIn("container",names); self.assertNotIn("skip",names)
+        self.assertEqual(self._names([]), [])
+
+    def test_exact_container_selection_admits_tier1(self):
+        names = self._names(["tier1_container"], "container")
+        self.assertIn("container", names)
+        self.assertNotIn("skip", names)
+
+    def test_arbitrary_marker_expressions_cannot_admit_tier1(self):
+        for expression in ("foo", "not sandbox", "container or foo",
+                           "container and foo", "(container)"):
+            with self.subTest(expression=expression):
+                self.assertIn("skip", self._names(
+                    ["tier1_container"], expression))
+
+    def test_integration_and_lifecycle_markers_are_never_host_admitted(self):
+        for marker in ("integration", "sandbox", "lifecycle"):
+            with self.subTest(marker=marker):
+                self.assertIn("skip", self._names([], marker, (marker,)))
 
 class TestFixtureStatics(unittest.TestCase):
     def test_no_source_build_mutators_and_no_shared_setup_log(self):

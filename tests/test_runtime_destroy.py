@@ -1,13 +1,12 @@
 """Tests for bin/prime-claw Slice 6a: destroy verb.
 
-Offline: probe_sandbox, run, and _docker_image_exists are monkeypatched. No live
+Host-safe tier-0 unit tests. Offline: probe_sandbox, run, and _docker_image_exists are monkeypatched. No live
 sandbox, no network, no credentials. Covers dry-run, non-destructive default,
 confirmed teardown, idempotency (absent resources are no-ops), and --image.
 """
 import os, json
 import pytest
 
-pytestmark = pytest.mark.sandbox
 from importlib.machinery import SourceFileLoader
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

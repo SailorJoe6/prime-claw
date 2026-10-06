@@ -1,6 +1,6 @@
 """Tests for bin/prime-claw Slice 5: recover (the operability slice).
 
-Offline: probe_sandbox / sandbox_exec / run / stage_sandbox / cmd_converge /
+Host-safe tier-0 unit tests. Offline: probe_sandbox / sandbox_exec / run / stage_sandbox / cmd_converge /
 _sleep are monkeypatched. Covers verb wiring, dry-run, the healthy no-op, each
 degradation signature's detection, and each recovery path.
 """
@@ -8,7 +8,6 @@ import json, os, subprocess, sys
 from importlib.machinery import SourceFileLoader
 import pytest
 
-pytestmark = pytest.mark.sandbox
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BIN = os.path.join(REPO, "bin", "prime-claw")

@@ -18,12 +18,6 @@ import subprocess
 import sys
 import time
 
-try:
-    import pytest
-    pytestmark = pytest.mark.integration
-except ImportError:  # pragma: no cover - image installs pytest; import is inert
-    pytestmark = None
-
 ASSETS = Path("/opt/prime-claw-test/assets")
 RESULTS = Path("/home/tester/results")
 FIXTURE = ASSETS / "fixtures/brain-source"
@@ -32,6 +26,7 @@ LOCK_COPY = Path("/opt/prime-claw-test/artifact-lock.json")
 _ALLOWED_ENV = {
     "HOME", "HOSTNAME", "LANG", "PATH", "PWD", "SHLVL", "_",
     "PRIME_CLAW_INTEGRATION_ATTESTATION", "PRIME_CLAW_INTEGRATION_RUN_ID",
+    "PRIME_CLAW_INTEGRATION_CONTAINER",
 }
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _RUN_ID = re.compile(r"^[0-9]{8}T[0-9]{6}Z-[0-9]+-[0-9a-f]{8}$")
@@ -54,6 +49,8 @@ def _run(argv: list[str], *, env: dict[str, str], timeout: int = 120,
 
 
 def _verify_entry_boundary(attestation: str, run_id: str) -> list[str]:
+    if os.environ.get("PRIME_CLAW_INTEGRATION_CONTAINER") != "1":
+        raise RuntimeError("integration container entry marker is missing")
     if os.environ.get("PRIME_CLAW_INTEGRATION_ATTESTATION") != attestation:
         raise RuntimeError("integration attestation mismatch")
     if os.environ.get("PRIME_CLAW_INTEGRATION_RUN_ID") != run_id:
