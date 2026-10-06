@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Operator-approved for implementation by `/implement-spec` on 2026-10-03; episode creation awaits an explicit replay after the reviewed planning bundle is committed and pushed.
+> **Status:** Operator-approved scope correction on 2026-10-06. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode and must simplify paused Slice 1 under the reduced contract below.
 >
-> **Tracking:** `prime-claw-h6w.30`
+> **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
-> **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`
+> **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** none. Planning, episode creation, landing, user-global mutation, restart, acceptance, finalization, and physical cleanup remain separately authorized.
+> **Implementation authority:** the existing episode may complete only the corrected Slice 1 after canonical owner handoff. Slice 2+, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical cleanup remain separately authorized.
 
 ## Summary
 
@@ -18,7 +18,7 @@ Review of the proposed compatibility cleanup found that simple deletion would ov
 2. deleting `.prime/agent/profiles/expert-reviewer.md` would remove the only concrete definition of the official EXPERT without replacing its non-native admission mechanism; and
 3. user-global `APPEND_SYSTEM.md` is only a fallback in Prime Agent v0.9.8, so an exact-CWD project `APPEND_SYSTEM.md` can structurally replace the lean kernel.
 
-This specification completes the role protocol and removes compatibility in **one fresh episode**. The episode first installs and proves the replacement architecture while retaining legacy resources, then removes those resources after an explicit interim UAT gate, and ends only when the clean target state passes final UAT. Intermediate deployments and restarts are vertical slices within the same episode; they are not separate episodes.
+This specification completes the role protocol and removes compatibility in **the one existing episode**. The episode first installs and proves the replacement architecture while retaining legacy resources, then removes those resources after an explicit interim UAT gate, and ends only when the clean target state passes final UAT. Intermediate deployments and restarts are vertical slices within the same episode; they are not separate episodes.
 
 The target architecture is:
 
@@ -100,6 +100,44 @@ The reviewer definition and its admission mechanics must migrate into a supporte
 - Solving probable hung-tool detection (`prime-claw-h6w.29`).
 - Changing the scope of Project-Wide Testing or any foreign episode.
 - Rewriting immutable archives, evidence, Beads history, or accepted Git history.
+- Defending against a malicious or non-cooperative same-UID process racing individual filesystem syscalls.
+- Proving crash or power-loss consistency at every write, rename, directory-sync, or receipt-publication boundary.
+- Automatically recovering every mixed or ambiguous transaction state; safe refusal and manual recovery are acceptable.
+- Treating diagnostic receipts as tamper-proof security attestations.
+
+## Product operating model and delivery principle
+
+This is a local developer-tool migration, not a security boundary against the
+operator or another process running as the same user. The host, checkout,
+installer process, destination account, and same-UID user are trusted during an
+operation. The product must handle ordinary failures: malformed managed state,
+unsupported file types visible during validation, accidental edits, cooperative
+concurrency, interrupted commands, write/rename failure, and uncertain state
+that can be preserved for an operator.
+
+Bias toward **DONE over perfect**. Deliver the smallest readable implementation
+that protects user content in ordinary operation. When recovery cannot prove a
+safe automatic action, preserve the receipt/preimage and stop with clear manual
+instructions. Do not build a transaction database, hostile-filesystem defense,
+or exhaustive crash-recovery state machine.
+
+Plausible edge cases discovered outside this operating model are documented as
+non-blocking hardening candidates. They become requirements only after an
+observed failure or near miss, a credible user report, a changed deployment
+boundary, or a separately approved hard requirement.
+
+The qualitative complexity budget for selected-context installation is one
+straightforward stdlib manager using ordinary locking, validation, same-directory
+atomic replacement, and a simple receipt. Growth into descriptor chains,
+continuous inode authority, exchange/restore protocols, multi-phase journals,
+or syscall-by-syscall race simulation is a stop condition requiring operator
+consultation, not an invitation to add more machinery.
+
+Review is proportional to this contract. A finding blocks only when it shows a
+concrete failure under the trusted-local ordinary-failure model or violates an
+explicit retained safety boundary. Other findings are advisory hardening or a
+product question. After two repair/review cycles, work pauses for operator
+scope/architecture review rather than starting a third automatic repair.
 
 ## Required target architecture
 
@@ -120,28 +158,39 @@ The neutral block must not claim that a session owns a particular episode or inc
 
 The canonical source should be named for its actual role, such as `ROLE_KERNEL.md`, rather than implying final delivery through APPEND. Runtime and installed bytes must derive from one authority or have exact generated/parity validation; manually drifting copies are not acceptable.
 
-### ORP-002 — Guarded selected-global-context installation
+### ORP-002 — Practical selected-global-context installation
 
-The guarded installer must place exactly one managed neutral-kernel region into the context file Prime Agent actually selects under the active destination `agentDir`.
+The installer places one managed neutral-kernel region into the context file
+Prime Agent selects under the active destination `agentDir`.
 
-Selection follows Prime Agent's exact per-directory priority. Required behavior:
+Selection follows Prime Agent's documented per-directory priority:
 
-- patch `AGENTS.md` when it is selected;
+- patch `AGENTS.md` when selected;
 - otherwise patch `AGENTS.MD`, `CLAUDE.md`, or `CLAUDE.MD` in order;
-- create `AGENTS.md` only when none of the four candidates exists;
+- create `AGENTS.md` only when none exists;
 - never create AGENTS when a selected CLAUDE file exists;
-- when multiple candidates already exist, patch only the file Prime Agent selects;
-- detect later selection drift and block or migrate the exact owned region rather than leaving latent copies.
+- patch only the selected file when multiple candidates exist; and
+- report selection drift rather than leaving or deleting latent copies silently.
 
-The file is shared user-owned state. Apply/check/recovery must:
+The file is shared user-owned state. Under the trusted-local operating model the
+manager must:
 
-- own only the exact marker region and separators the installer introduced;
-- preserve every unrelated byte, newline style, final-newline state, mode, and ownership;
-- reject unsafe symlinks, non-regular files, unreadable files, malformed/duplicate/disagreeing markers, selection drift, and concurrent changes;
-- lock, reread, validate, and write atomically in the same directory;
-- retain exact preimage hashes and rollback metadata;
-- never delete a pre-existing file; and
-- delete an installer-created empty file only when ownership metadata proves no unrelated content remains.
+- own only its exact marker region and separators;
+- preserve unrelated bytes, newline/final-newline form, and ordinary mode and ownership metadata;
+- reject malformed or duplicate markers and obvious symlink, non-regular, or unreadable targets visible during validation;
+- use one cooperative destination lock, reread before mutation, and use ordinary same-directory atomic replacement;
+- detect an ordinary edit observed between its locked preflight and final replacement and stop without overwriting it;
+- write a simple receipt with the fixed owned-file inventory plus pre/post hashes and preimages needed for manual or guarded restore;
+- restore only when every current owned surface is a known preimage or installed postimage, and refuse ambiguity;
+- never delete a pre-existing context file; and
+- delete an installer-created file only when the receipt identifies it and its current contents are exactly the known installer-created empty/preimage state.
+
+The receipt is diagnostic recovery material, not a tamper-resistant authority
+against the local owner. No acceptance guarantee exists for hostile same-UID
+path/ABA/FIFO substitution after ordinary validation, continuous descriptor or
+inode authority, malicious receipt replacement, or power loss between individual
+filesystem durability operations. These may be recorded as hardening candidates
+but cannot block this specification without a new operator-approved requirement.
 
 ### ORP-003 — System channel only
 
@@ -227,29 +276,39 @@ Install one uniquely named plugin-managed global Python-backed skill:
 
 `prime-claw-official-expert-review`
 
-with the import name `prime_claw_official_expert_review`. Its managed directory contains `SKILL.md`, `pyproject.toml`, the exact Python package, and one canonical reviewer definition. A package manifest is not required; direct guarded installation under the destination `agentDir/skills` is a supported Prime Agent interface.
+with import name `prime_claw_official_expert_review`. Its managed directory
+contains `SKILL.md`, `pyproject.toml`, the Python package, and one canonical
+reviewer definition. The skill owns the official reviewer configuration formerly
+held by `.prime/agent/profiles/expert-reviewer.md` and uses only supported Prime
+Agent interfaces.
 
-The skill must own and validate the official reviewer configuration and rubric formerly held by `.prime/agent/profiles/expert-reviewer.md`.
+The skill must validate a full configured model selector and reasoning level,
+resolve one exact model, spawn one fresh reviewer with the startup-race-safe
+bootstrap, validate the returned model, and deliver one self-contained immutable
+commit packet exactly once. It records reviewer/session identity, selected model,
+requested reasoning, commit, packet digest, delivery result, report, and owner
+disposition. Unavailable or uncertain admission/delivery blocks the required
+review; it never silently chooses a fallback model or claims review occurred.
 
-Direct guarded installation makes the skill discoverable but does not guarantee that every active Python interpreter can import it. When `PRIME_AGENT_KERNEL_PYTHON` is unset, Prime Agent manages Python-skill installation in its kernel environment. When that variable selects an external interpreter, Prime Agent does not install discovered Python skills there. Apply/check and EXPERT admission must detect the active kernel mode and verify that the exact managed module imports from the interpreter that will execute it. Prime Claw must not silently provision an external interpreter. A missing, stale, or mismatched module in custom-kernel mode produces deterministic `UNAVAILABLE` before model, message, or lifecycle mutation; a required review gate then blocks.
+The review packet includes the approved product outcomes, threat model, trusted
+assumptions, non-goals, and complexity budget. The reviewer returns:
 
-`prime-agent-runtime` and `agent_message` are host-provided runtime modules, not dependencies to add to this skill's `pyproject.toml`. Import `agent_message` lazily and fail closed when its visible host capability is unavailable.
+- `PASS` when no blocker remains inside that approved contract;
+- `BLOCK` only for a concrete retained functional/safety failure with realistic impact and a proportionate repair direction;
+- `ADVISORY` for plausible hardening outside the approved model; or
+- `SPEC_QUESTION` when resolution would change product scope.
 
-The skill must:
+An EXPERT recommends; it does not ratchet acceptance scope. Advisory findings are
+recorded with a scenario and promotion trigger, not automatically implemented.
+A scope-changing finding returns to the operator. One normal final review is
+sufficient for a candidate; unrestricted adversarial/red-team review requires
+explicit operator authorization and cannot redefine baseline acceptance.
 
-1. require a full configured model selector and reasoning level;
-2. call `rlm.find_models` and require one case-normalized exact selector match;
-3. spawn one fresh uniquely named child with a harmless bootstrap and explicit model/thinking;
-4. verify the returned handle model exactly matches the requested selector;
-5. send the validated rubric plus one self-contained exact-commit packet exactly once through guarded `agent_message.send`;
-6. accept only a definite delivered or queued receipt;
-7. return a structured admission record containing child/session identity, exact returned canonical model, exact requested reasoning, successful spawn admission, commit, packet digest, and delivery result;
-8. require an explicit complete PASS or actionable BLOCK reply; and
-9. preserve the report and disposition before deleting the settled child.
-
-`RlmSpawnHandle` does not return admitted reasoning. Successful spawn admission is evidence that Prime Agent validated and accepted the explicit reasoning request; the record must not claim the handle independently returned that value. If independently returned reasoning ever becomes an acceptance requirement, treat it as unavailable through the current public API until proven otherwise.
-
-Lazy-import and preflight `agent_message`. In runtimes where messaging is unavailable, model selection is missing/ambiguous/expired, reasoning is unsupported, handle identity disagrees, delivery is uncertain, or the report is incomplete, record `UNAVAILABLE` or `BLOCKED`. Never inherit the current/default model, lower reasoning, choose a close selector, retry uncertain delivery, or claim EXPERT ran.
+When `PRIME_AGENT_KERNEL_PYTHON` selects an external interpreter, admission checks
+that the exact managed module is already importable and reports deterministic
+`UNAVAILABLE` otherwise. Prime Claw does not provision that interpreter.
+`prime-agent-runtime` and `agent_message` remain host-provided modules; messaging
+is imported lazily and must be available before mutation.
 
 ### ORP-010 — EXPERT read-only limitation is explicit
 
@@ -359,33 +418,47 @@ The operator explicitly accepts or rejects the completed target state. Only acce
 
 ## Test and evidence requirements
 
-### ORP-019 — Complete isolated gates
+### ORP-019 — Complete proportional isolated gates
 
-Every exact candidate must pass complete Tier 0, selected complete Tier 1 in Docker, `git diff --check`, focused behavioral tests, and independent read-only exact-candidate review. Bare host-global candidate probing is prohibited.
+Each exact generation candidate passes complete Tier 0, the selected complete
+Tier 1 path in Docker, the pinned Prime Agent probe, `git diff --check`, focused
+behavioral tests, and one independent read-only exact-candidate review. Bare
+host-global candidate probing remains prohibited.
 
-Focused coverage includes:
+Focused Slice-1 coverage is intentionally practical:
 
-- global candidate selection: AGENTS only, CLAUDE only, neither, both, case variants, unreadable/non-regular/symlink, and selection drift;
-- byte preservation: LF/CRLF, no final newline, file mode/ownership, atomic write, lock/concurrent edit, rollback, and installer-created empty-file cleanup;
-- neutral markers: missing, unmatched, reversed, nested, duplicate, stale, disagreeing, and exact replay;
-- global plus project AGENTS/CLAUDE hierarchy;
-- project SYSTEM and APPEND shadow cases;
-- `--no-context-files` and SDK context override fail-closed behavior;
-- normal direct, queued, injected, direct idle agent message, custom trigger, retry, tool loop, post-compaction continuation, resume, reload, and recovered queue;
-- root Conversation, active owner, EPISODE, EXPERT, generic child, daemon child, and inline child without role leakage;
-- managed skill discovery, collision/shadow defense, activation version/hash, and stale receipt;
-- EXPERT exact model, unavailable/expired model, unsupported reasoning, malformed configuration, handle mismatch, exactly-once delivery, uncertain receipt, incomplete report, and mutation detection;
-- default managed kernel plus custom `PRIME_AGENT_KERNEL_PYTHON` with exact module present, missing, stale, or mismatched, including deterministic `UNAVAILABLE` before other mutation;
-- legacy saved-session provider filtering; and
-- no full role-skill body or reviewer rubric in ordinary provider prompts.
+- selected AGENTS/CLAUDE priority and creation behavior;
+- ordinary symlink/non-regular/unreadable rejection at validation;
+- LF/CRLF, final-newline, unrelated-byte, and ordinary mode preservation;
+- malformed/duplicate markers, idempotence, cooperative locking, and an ordinary detected concurrent edit;
+- exact fixed receipt inventory, known-state restore, refusal on unknown current content, and safe installer-created-file cleanup;
+- a regression proving a malformed/tampered inventory cannot delete an unrelated file;
+- bridge retention of the legacy APPEND region; and
+- honest documentation and isolated apply/check behavior.
 
-Extension exceptions must be shown fail-open in a control, while production rejection uses explicit abort and proves zero provider calls.
+Delete or stop enforcing tests whose sole purpose is hostile same-UID
+syscall-by-syscall races, continuous inode authority, exhaustive crash points,
+or autonomous recovery of every journal state. Passing those cases is optional
+hardening, not acceptance evidence.
 
-### ORP-020 — Correlatable evidence
+Later slices retain focused coverage for system-only provider delivery, role
+isolation, context opt-out, managed skill discovery, exact model admission,
+custom-kernel availability, historical filtering, and absence of full policy
+bodies in ordinary prompts. Extension exceptions remain fail-open controls while
+production managed rejection proves zero provider calls.
 
-Receipts must correlate exact commit/tree, main parent/topology, dependency revision, selected global context path, pre/post hashes, installed managed files, commands, raw logs, provider captures, counts, elapsed time, superseded failures, and teardown.
+### ORP-020 — Useful, correlatable evidence
 
-Review evidence records actual reviewer session identity, exact returned canonical model, exact requested reasoning, successful spawn admission, packet digest, report artifact, and disposition. It must not claim that `RlmSpawnHandle` returned reasoning. A profile or skill name alone is not evidence that review ran.
+Evidence is diagnostic, not a security attestation protocol. Record enough to
+reproduce and review the result: exact commit/tree, relevant dependency version,
+selected context path, owned-file pre/post hashes, commands, concise raw-log
+locations, test counts, reviewer identity/report, and teardown result.
+
+Do not add cryptographic cross-binding, per-step sidecars, permanent comparator
+machinery, or repeated rereads unless a later observed failure or approved
+security requirement justifies them. The reviewer record states the actual
+returned model and requested reasoning without claiming `RlmSpawnHandle` returned
+reasoning when it did not.
 
 ### ORP-021 — Two rollback points
 
@@ -420,25 +493,27 @@ When planning replaces the predecessor active plan/spec, preserve those predeces
 
 ## Acceptance criteria
 
-The one episode is complete only when all of the following are true:
+The one existing episode is complete only when all of the following are true:
 
-1. `prime-claw-h6w.30` links the reviewed specification, plan, bridge/removal candidates, evidence, both activation gates, final decision, and terminal disposition.
-2. The selected user-global context file contains exactly one exact managed neutral block while every unrelated byte and file attribute is preserved.
-3. Local project AGENTS/CLAUDE, SYSTEM, and APPEND files do not structurally remove the neutral floor.
-4. Managed work fails closed when context files are explicitly disabled or trusted role state disagrees.
-5. Provider evidence shows the neutral kernel only in system instructions and zero fresh user/custom oversight package.
-6. `prime-claw-oversee-episode` is the sole current Conversation policy and is activated on demand rather than always injected.
-7. `execute` remains the bounded EPISODE procedure.
-8. `prime-claw-official-expert-review` is the sole official EXPERT authority and satisfies exact-model, exactly-once, evidence, and unavailable behavior.
-9. The bridge generation passes complete tests/review, separately authorized landing/apply/restart, and accepted interim UAT.
-10. Compatibility removal does not begin before criterion 9 is recorded.
-11. The final generation has no Prime Claw-managed global APPEND block, old project oversight skill/link, standalone expert profile, duplicate policy copy, or broken symlink.
-12. Historical provider-message filtering, deterministic lifecycle behavior, and retired-overlay regression controls remain.
-13. The removal generation passes complete tests/review, separately authorized landing/apply/restart, and accepted final three-context UAT.
-14. Both rollback points are exact, history-preserving, and recovery-tested.
-15. No active foreign worktree/session can exercise stale compatibility behavior at final acceptance.
-16. Primary `main` is clean and synchronized after every landing and at completion.
-17. The episode remains active through the clean target state, is finalized only after explicit final acceptance, and is physically cleaned only after separate operator authority.
+1. `prime-claw-h6w.30`, incident `prime-claw-gv7.1`, and epic `prime-claw-gv7` link the corrected contract, candidates, evidence, activation gates, and final disposition.
+2. The selected global context contains one managed neutral block while unrelated user content and ordinary file metadata are preserved.
+3. Slice 1 uses a readable practical installer and simple receipt; obsolete F1–F9 adversarial transaction machinery and tests are removed or no longer enforced.
+4. Local project AGENTS/CLAUDE, SYSTEM, and APPEND files do not structurally remove the neutral floor.
+5. Managed work fails closed when context files are explicitly disabled or trusted role state disagrees.
+6. Provider evidence shows the neutral kernel only in system instructions and no fresh user/custom oversight package.
+7. `prime-claw-oversee-episode` remains the on-demand Conversation policy and `execute` remains the bounded EPISODE procedure.
+8. `prime-claw-official-expert-review` provides exact-model admission plus contract-bounded `PASS`/`BLOCK` and non-blocking `ADVISORY`/`SPEC_QUESTION` outcomes.
+9. Slice 1 passes focused practical tests, complete Tier 0, Docker Tier 1/probe, and one normal review under the trusted-local model.
+10. The bridge generation passes complete tests/review, separately authorized landing/apply/restart, and accepted interim UAT.
+11. Compatibility removal does not begin before criterion 10 is recorded.
+12. The final generation has no Prime Claw-managed global APPEND block, old project oversight skill/link, standalone expert profile, duplicate policy copy, or broken symlink.
+13. Historical provider filtering, deterministic lifecycle behavior, and retired-overlay regression controls remain.
+14. The removal generation passes complete tests/review, separately authorized landing/apply/restart, and accepted final three-context UAT.
+15. Both rollback points preserve accepted history and provide practical preimages plus manual stop/recovery when state is ambiguous; exhaustive adversarial crash recovery is not required.
+16. No active foreign worktree/session can exercise stale compatibility behavior at final acceptance.
+17. Primary `main` is clean and synchronized after every landing and at completion.
+18. Plausible excluded hazards are documented with promotion triggers rather than silently ignored or automatically implemented.
+19. The episode remains active through the clean target state, is finalized only after explicit final acceptance, and is physically cleaned only after separate operator authority.
 
 ## Dependencies and sequencing
 
@@ -448,6 +523,11 @@ The one episode is complete only when all of the following are true:
 - `prime-claw-h6w.29` remains independent and receives no implementation authority from this specification.
 - Prime Agent public interfaces are constraints. Unsupported behavior is reported as a product limitation, not converted into an upstream patch plan.
 
-## Open decisions for planning
+## Open decisions for implementation
 
-No product decision remains about splitting episodes: one episode reaches the final clean state. The later execution plan must select exact vertical slices, candidate/landing topologies, activation receipt implementation, canonical kernel source/generation method, evidence paths, UAT fixtures, rollback commands, and terminal sequence without weakening these requirements.
+The operator resolved the Slice-1 threat model and delivery tradeoff on 2026-10-06:
+trusted local host, ordinary failures, DONE over perfect, and advisory backlog for
+unobserved adversarial edge cases. The existing episode chooses the smallest
+readable implementation consistent with this corrected contract. Any proposal to
+restore hostile same-UID guarantees, exhaustive crash recovery, or a third
+repair/review cycle is a new product decision and must return to the operator.

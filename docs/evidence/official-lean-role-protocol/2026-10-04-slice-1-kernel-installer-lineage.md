@@ -185,3 +185,146 @@ Raw manifest SHA256: `0f8092175c9bb83bbf0ebe223f7d8be0312e8e37ac2bfef336247f902e
 
 No user-global apply, Prime Agent restart, provider call, landing,
 compatibility removal, finalization, or cleanup occurred in this repair pass.
+
+## Superseded F1-F9 draft after blocked `f4b858c`
+
+The owning Conversation retained `f4b858cbd92cf43c86fac49de60d43e9daa9342b`
+as immutable baseline evidence and accepted only the nine Slice 1 findings from
+EXPERT report SHA256
+`15f7fb824428cafb17ad1a08148c3499eaae682f3eef650b65f7f7f9e00d77b5`.
+This uncommitted checkpoint attempted to repair those findings symmetrically across
+apply, rollback, restore, replay, and check. The operator later stopped this
+approach as disproportionate. Its exact patch is preserved outside the worktree
+under the incident artifact described below; it is not the active acceptance
+contract.
+
+The schema-3 manager now:
+
+- binds every regular-file snapshot to Linux `statx` birth time as stable inode
+  generation authority, failing closed when it is unavailable;
+- publishes from a retained no-follow descriptor through a private
+  `linkat(AT_EMPTY_PATH)` alias and atomic `renameat2`, with no callback between
+  final authority checks and rename;
+- preserves every unjournaled temp/alias lookalike instead of inferring ownership
+  from a filename or dead PID;
+- validates exact locked and journal-bound receipt authority before mutation;
+- validates complete ownership, preimage, manifest, candidate, phase, metadata,
+  durability, and final-state contracts at their mutation boundaries;
+- owns final validation inside terminal journal disposal and republishes an
+  exact `uncertain` journal after synchronous post-unlink drift; and
+- durably canonicalizes and retires one exact prepared/applied receipt stage
+  before it can journal a rollback/restore terminal stage.
+
+The first fresh final review found the last composed F5 defect and returned
+BLOCK in report SHA256
+`0c5dcd21838956b01e9da61a5ea865376e663f5827622da327b1e026889a2f22`.
+Its exact sequence — prepared publication hard exit, terminal rollback
+publication hard exit, then both replay entrypoints — now succeeds. A native-
+Linux composition matrix covers six prepared/applied predecessor interruption
+shapes against ten terminal interruption shapes. Negative controls replace the
+predecessor or terminal stage with a same-byte new inode and retain uncertainty
+without managed mutation.
+
+### Final pre-review validation
+
+- Syntax and whitespace: `py_compile` and `git diff --check` PASS.
+- Tier 0: **291 passed, 170 skipped**, 11 warnings, 44.61 seconds.
+- Native-Linux manager matrix: **13 passed** in 138.17 seconds.
+- Accepted-review regression scenario: PASS.
+- Expanded fault-recovery scenario: PASS in 56.56 seconds.
+- Full Docker-authoritative gate: **63 passed, 398 deselected**, 11 warnings,
+  278.72 seconds.
+- Prime Agent 0.9.8 Tier-1 installed-runtime probe: PASS; `handoff`, `plan`, and
+  `implement-spec` were each registered exactly once and the ephemeral container
+  was destroyed.
+- Exact prior F7 publication-race reproducer leaves a regular target and exact
+  outside sentinel; F8 disposal-gap reproducer rejects drift and retains an
+  `uncertain` journal; unowned alias reproducer preserves external bytes.
+
+Raw ignored logs:
+`.test-results/official-lean-role-protocol/20261005T053500Z-f1-f9-repair/`
+
+Raw manifest SHA256:
+`fac95f20d5ae93601b13fa3276ea9d0ffed92cb265be4fcac2d6c1c3092c73d1`.
+
+This evidence is intentionally a pre-review candidate record. The fresh exact-
+tree disposition and eventual commit/tree belong in the external Bead/owner
+review record so the reviewed candidate does not make self-referential claims.
+No user-global apply, restart, provider call, landing, compatibility removal,
+finalization, or cleanup occurred.
+
+
+## 2026-10-06 operator scope correction and reduced candidate
+
+The operator replaced the adversarial F1–F9 acceptance model with a trusted-local,
+ordinary-failure contract and directed this episode to simplify rather than finish
+the transaction engine. The corrected specification and plan are recorded on
+`main` at `c24ba6c1e76585193d4f34f0b0b0233846780442` and linked from
+`prime-claw-h6w.30`, incident `prime-claw-gv7.1`, and epic `prime-claw-gv7`.
+
+Before simplification, the exact six-file F1–F9 draft was preserved at:
+
+`/Users/jlanders/.prime/agent/session-artifacts/01a0f51d-d51b-7649-a28a-844879e42aec/official-lean-scope-reduction-20261006T041523Z`
+
+- Patch SHA256: `15c8399ac44c642484997716a08e85827bcc72bed1f29587cad9531ffee4ba1b`.
+- Manifest SHA256: `d58d4c1c8a34d84f89d88ab19741e035a82e158133cce0546b0f1557c2fca2a8`.
+
+The reduced candidate starts from the practical `1eba414` manager shape and
+retains the concrete receipt-inventory repair learned from `f4b858c`. It provides:
+
+- deterministic context selection, marker validation, one cooperative lock, and
+  an ordinary changed-preimage reread;
+- same-directory atomic replacement with file and parent fsync;
+- unrelated-byte, LF/CRLF, final-newline, mode, uid, and gid preservation;
+- exact legacy APPEND adoption and bridge retention;
+- a fixed three-path receipt inventory that cannot nominate an unrelated file;
+- complete receipt validation before mutation; and
+- known pre/post-state restore, safe installer-created cleanup, and manual
+  refusal for unknown state.
+
+The manager intentionally has no transaction journal, descriptor chain,
+continuous inode authority, `statx` birth-time binding, hardlink/rename-exchange
+publication, uncertainty state machine, or exhaustive crash/race hooks. The
+container scenario matrix likewise removes the F1–F9, exchange, descriptor,
+and syscall-fault matrices and keeps practical selection, preservation,
+validation, cooperative concurrency, receipt, restore, legacy, and ordinary
+write-failure coverage.
+
+### Advisory hardening, not Slice-1 blockers
+
+The stopped reviews identified plausible races involving a non-cooperating
+same-UID writer between individual filesystem syscalls, same-byte inode
+replacement, receipt/journal substitution, staged-source rebinding, and hard
+exit or power loss at precise rename/fsync boundaries. Those hazards are outside
+the approved local-product model. Promote one only after a repeatable dogfood
+failure, near miss, credible user report, changed deployment boundary, or a
+separately approved hard requirement.
+
+### Reduced-candidate validation
+
+The reduced focused manager matrix passed all 10 practical native-Linux
+scenarios. A complete preliminary gate then passed:
+
+- Tier 0: **291 passed, 167 skipped**, 11 warnings in 44.79 seconds.
+- Docker Tier 1: **60 passed, 398 deselected**, 11 warnings in 198.43 seconds.
+- Gate logs: `.test-results/20261005-213652-50813/` (gitignored).
+
+The sole bounded reduced-contract review examined patch SHA256
+`ce9efae1c6ff52a1b6367aa7501f3bd2c2177aa78fa053dfd438390124dc03c9` and
+returned one actionable in-model BLOCK. A second cooperating apply could inspect
+the first writer's context-without-manifest intermediate state because mutable
+preflight ran before `flock`. Report SHA256:
+`ed310237272b1ac1c30f1d677428ab88b436268064f07869a6c0a8545b0b4ab1`.
+
+The bounded repair moves mutable destination validation behind the same lock,
+removes the shell wrapper's separate unlocked preflight, and adds an exact
+interleaving regression proving the second writer waits and then succeeds. The
+review's receipt/interruption wording advisory is reflected in the operator docs;
+no transaction or adversarial-race machinery was added. No second review is run.
+
+Exact commit/tree, final log hashes, and repair gate results are recorded in
+`prime-claw-h6w.30` and reported to the owning Conversation so this tracked
+evidence does not make a self-referential exact-commit claim.
+
+No user-global apply, restart, provider call, landing, compatibility removal,
+finalization, or cleanup is authorized by this evidence.

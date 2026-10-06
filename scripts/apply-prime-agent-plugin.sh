@@ -54,9 +54,6 @@ for directory in "${managed_directories[@]}"; do
   fi
 done
 
-python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" preflight \
-  "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"
-
 # Reject every unsafe managed TypeScript destination before the first delete or copy.
 obsolete_files=(
   extensions/goal-heartbeat-work-control.ts

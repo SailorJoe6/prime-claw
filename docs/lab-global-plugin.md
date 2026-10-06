@@ -117,36 +117,26 @@ project phase skill is missing.
 
 The predecessor APPEND-only manager remains in source for bridge rollback. New
 apply/check use the role-protocol manager for both selected context and retained
-APPEND ownership. The destination, state directory, lock, candidates, APPEND,
-manifest, transaction journal, temporary files, and receipt parent/leaf are
-opened through descriptor-bound no-follow directory authorities. After
-`flock`, the lock pathname must still name the exact flocked device/inode; the
-same binding is checked at every mutation boundary so replacing the lock cannot
-create split-brain writers. Each commit and each final success seam revalidates
-the destination and state-directory identities, all four context candidates,
-the target's bytes/mode/uid/gid/device/inode, and any external receipt identity.
-A late chmod/chown, inode replacement, candidate creation or removal, parent
-swap, symlink, FIFO, or special file is preserved and fails closed instead of
-being overwritten or followed.
+APPEND ownership. The manager follows a trusted-local operating model: it rejects
+obvious symlinks, non-regular or unreadable leaves visible during validation,
+then serializes cooperating writers with one agent-root `flock`. It rereads each
+ordinary byte-and-metadata preimage immediately before same-directory
+`os.replace`, preserves mode/uid/gid where supported, fsyncs the new file and its
+parent directory, and refuses a changed preimage.
 
-Writes serialize under one agent-root lock. Before a shared replacement the
-manager durably records exact preimages, staged postimage identities, the exact
-three-file inventory, destination/selection binding, candidate-set snapshots,
-and transaction phase in mode-0600
-`$agentDir/.prime-claw/role-protocol-transaction.json`. Replacement, file and
-directory fsync, final installed-state validation, and receipt publication are
-inside that transaction. Receipt success always publishes mode 0600 and
-includes an external-parent directory fsync; interrupted recovery repeats that
-durability barrier before deleting the only journal. A recognized interruption
-is replayed to the exact safe side; an unknown mixed state retains an explicit
-uncertainty journal and is never guessed away. Pre-journal staging errors clean
-their temps, and restart recovery reconciles only unreferenced, exact-pattern
-dead-writer temporary files.
+This is intentionally not a hostile-filesystem transaction engine. The manager
+does not maintain a multi-phase journal, continuous descriptor/inode authority,
+atomic-exchange rollback, or syscall-by-syscall crash protocol. An in-process
+ordinary write failure attempts rollback only from exact known pre/post states.
+An abrupt interruption can require guarded manual recovery; unknown state is left
+untouched. The supported wrapper does not itself retain an external receipt, so
+Gate A must keep the separately captured coordinator preimages before mutation. A
+non-cooperating same-UID process can race individual checks; that is outside the
+approved local-product threat model.
 
 ### Selected-context recovery receipts
 
-The manager can capture a mode-0600 receipt outside `agentDir` before an isolated
-apply and restore only when every managed postimage still matches:
+An isolated apply can capture a mode-0600 diagnostic receipt outside `agentDir`:
 
 ```bash
 python3 scripts/manage-prime-agent-role-protocol.py apply \
@@ -161,23 +151,28 @@ python3 scripts/manage-prime-agent-role-protocol.py restore \
   /explicit/isolated/agent-dir
 ```
 
-Receipt schema 2 is validated completely before mutation: exact top-level
-schema, destination device/inode, selected-context priority, manifest binding,
-unique `context`/`append`/`manifest` inventory, exact relative paths, candidate
-pre/postimages, regular-file types, base64, digests, mode/uid/gid, and
-file identities must all agree. The receipt must be a mode-0600 regular file
-outside `agentDir`, reached through a no-follow parent chain.
+The simple schema-1 receipt has a fixed inventory of exactly the selected context,
+`APPEND_SYSTEM.md`, and `.prime-claw/role-protocol-state.json`. Before any restore
+mutation, the manager validates the complete schema, exact paths, unique labels,
+base64/digests, ordinary metadata, selected-context/manifest relationship, and
+creation ownership. Every current destination must match its recorded preimage or
+postimage. An unknown file, marker drift, malformed inventory, contradictory
+ownership, or unrelated nominated path refuses the whole restore before mutation.
 
-Restore first validates every receipt field and every current state. It then
-uses its own durable transaction to recreate exact preimage bytes and metadata.
-An installer-created `AGENTS.md` or `APPEND_SYSTEM.md` is deleted only when the
-receipt proves it was absent and its exact current postimage is unchanged.
-Malformed inventories, unrelated in-root targets, corrupt late preimages,
-operator edits, or unknown partial states block before destructive recovery.
-A completed restore is replay-safe; an interrupted one resumes from its exact
-recorded phase. Gate activation will retain receipts in the owner-private
-evidence location through the external cutover coordinator; Slice 1 does not
-apply or restore the host generation.
+Restore writes exact recorded bytes and ordinary metadata, and deletes a missing
+preimage only at its fixed managed path from an exact known postimage. In
+particular, a receipt cannot nominate an unrelated file for deletion, and a
+pre-existing context is not deleted by an accidentally contradictory creation
+record. A partially restored set made only of recorded states is safely
+repeatable. The receipt is recovery material, not a tamper-proof attestation
+against the trusted local owner.
+
+Plausible excluded hazards remain advisory hardening: parent or leaf replacement
+between individual validation and mutation syscalls, same-UID receipt
+substitution, hard exits at every rename/fsync boundary, and power-loss durability.
+Promote one only after repeatable dogfood failure, a near miss or user report, a
+changed trust boundary, or a separately approved hard requirement. Slice 1 does
+not apply or restore the host generation.
 
 ## Cutover and rollback
 
