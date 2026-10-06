@@ -581,3 +581,44 @@ store, transaction journal, adversarial race matrix, duplicate policy, cutover
 coordination, Slice 3, landing, user-global mutation, restart, UAT, finalization,
 and cleanup remain outside this candidate. Remaining provider-route coverage may
 remain for one final bounded Slice 2 pass if it is not required here.
+
+### Accepted prospective-create candidate and final Slice 2 coverage reconciliation
+
+The owner accepted prospective create-readiness candidate
+`29b8932e3e576d0068194e44a5494af98474d8bf` / tree
+`a5a16cacce0fad56f546a565475cefe519761b0a`. The next and final bounded Slice 2
+candidate is coverage reconciliation only. Map existing static, Node, native
+installed-runtime, and provider-capture proof to the Section 7 route and
+acceptance list. Treat routes that converge on the same proven `context` seam as
+equivalence classes; do not build a combinatorial matrix.
+
+Add only the smallest representative tests for material uncovered paths, with
+priority on queued/injected/direct-idle agent-message continuation, tool loop and
+retry, compaction/resume/reload/recovered queue, project SYSTEM/APPEND and
+global/project AGENTS/CLAUDE shadows, CLI `--no-context-files`, and SDK override.
+Reuse existing assertions for exactly one system kernel, no guide or private
+identity in user/custom channels, exactly one intended guide tool result, later
+omission, and abort before provider dispatch on managed defects.
+
+Production code remains unchanged unless a representative test exposes a
+concrete in-contract defect. Any such defect is recorded and repaired only at
+its root seam under owner-delegated triage without broadening architecture. Mark
+Slice 2 complete only when the approved acceptance contract is actually covered.
+Run proportional focused checks plus complete Tier 0, Docker Tier 1, and the
+pinned runtime probe. Freeze one commit. Use at most one independent exact-patch
+review only if production code changes; otherwise owner/test evidence is
+sufficient. Commit/push, report, and stop. EXPERT admission, Slice 3, landing,
+user-global mutation, restart, UAT, finalization, and cleanup remain excluded.
+
+### Slice 2 completion result
+
+Final route reconciliation is recorded in
+`docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md`. Static, Node, installed-runtime, and provider-capture
+proof now cover the Section 7 route and acceptance list through explicit
+`context`-seam equivalence classes and the smallest distinct restoration,
+loader-override, retry, and receipt representatives. Complete Tier 0, Docker
+Tier 1, and pinned Prime Agent 0.9.8 gates passed. The candidate changes tests
+and documentation only; production code, managed guide bytes, and canonical
+`execute` bytes remain unchanged. Slice 2 is complete. Official EXPERT admission
+begins only in a later owner-authorized Slice 3 pass; no operational cutover or
+terminal lifecycle action is authorized by this result.

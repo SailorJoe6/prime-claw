@@ -357,6 +357,22 @@ command IDs, exact fake route, mutation acknowledgments, and the `steer` then
 session files, and lifecycle fixture state is registered before publication. A deliberate post-creation assertion failure proves that cleanup still
 removes every registered resource.
 
+
+### Slice 2 route-equivalence coverage
+
+The final Slice 2 coverage pass maps every approved route to the single
+provider `context` guard instead of multiplying ingress, role, lifecycle, and
+prompt-source combinations. Native representatives cover direct, custom,
+heartbeat, idle and queued agent messages, queued follow-up, recovered queue,
+tool loop, provider retry after one-time guide disclosure, compaction, resume,
+reload, project SYSTEM/APPEND plus global/project AGENTS/CLAUDE composition,
+CLI no-context, and preserving/replacing SDK prompt overrides. Shared provider
+assertions require one neutral system kernel and exclude the guide, bounded
+identity, private receipt fields, historical oversight package, and retired
+work-control policy from unintended channels. Exact commands, equivalence
+rationale, and hashes are recorded in
+`docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md`.
+
 ## Installation boundaries
 
 Builder sources remain inert under `src/prime-agent-plugin/`. The transition

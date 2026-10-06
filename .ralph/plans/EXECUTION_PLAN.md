@@ -1324,3 +1324,51 @@ Docker Tier 1 passed 65 tests with 394 deselected, and the pinned Prime Agent
 The managed guide and canonical `execute` skill are byte-identical to the
 accepted parent. Remaining provider-route coverage stays deferred to one final
 bounded Slice 2 pass.
+
+## 21. Final bounded Slice 2 coverage reconciliation
+
+The owner accepted `29b8932e3e576d0068194e44a5494af98474d8bf` / tree
+`a5a16cacce0fad56f546a565475cefe519761b0a`. Complete one coverage-only
+candidate:
+
+1. Build a concise route-to-proof map for the Section 7 route and acceptance
+   list from existing static, Node, native installed-runtime, and provider
+   capture tests.
+2. Collapse routes that exercise the same `context` restoration/filtering seam
+   into documented equivalence classes rather than a combinatorial matrix.
+3. Add only the smallest representative proof for material gaps, prioritizing
+   queued/injected/direct-idle agent-message continuation; tool loop and retry;
+   compaction/resume/reload/recovered queue; project SYSTEM/APPEND and
+   global/project AGENTS/CLAUDE shadows; CLI `--no-context-files`; and SDK
+   override.
+4. Reuse existing assertions for one exact system kernel, no guide/private
+   identity in user/custom channels, one intended guide tool result, later
+   omission, and managed abort before provider dispatch.
+5. Do not change production code unless a representative test exposes a concrete
+   in-contract defect. Record and repair only that seam under delegated triage;
+   do not broaden architecture.
+6. Update docs/evidence/Bead and mark Slice 2 complete only if the approved
+   acceptance contract is covered. Run focused checks, complete Tier 0, Docker
+   Tier 1, and pinned-runtime probe. Freeze one commit. Use at most one exact
+   independent review only if production code changed; otherwise owner/test
+   evidence is sufficient. Commit/push, report, and stop.
+
+Do not begin official EXPERT admission or Slice 3. Do not land, mutate
+user-global state, restart, run UAT, finalize, or clean up.
+
+### 21.1 Completion result
+
+The route map and equivalence rationale are recorded in
+`docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md`. Representative native coverage now identifies direct,
+custom, injected heartbeat, direct-idle and queued agent message, queued
+follow-up, recovered queue, provider retry, tool loop, compaction, installed
+resume/reload/restart, prompt-source shadows, explicit no-context, and SDK
+override behavior. Shared provider assertions cover the neutral kernel, guide,
+private bounded identity, historical package, retired overlay, and guide receipt
+fields/correlation. Focused native passed 5 tests; focused static/Node passed 27
+with 25 deselected; complete Tier 0 passed 287 with 174 skipped; Docker Tier 1
+passed 67 with 394 deselected; the pinned Prime Agent 0.9.8 probe passed.
+Production code, the managed guide, and `execute` are unchanged. Under the
+owner-approved test/docs-only rule, no independent patch review was required.
+Slice 2 is complete at this candidate. Slice 3, landing, activation/restart, UAT,
+finalization, and cleanup remain separately gated.

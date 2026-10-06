@@ -18,6 +18,7 @@ RETIRED_WORK_CONTROL_CONTROL = "PRIME_CLAW_TEST_RETIRED_WORK_CONTROL_91B3DF1D12C
 ORDINARY_USER_SENTINEL = "PRIME_CLAW_TEST_ORDINARY_USER_2F625A178B6B4FD0"
 ROLE_KERNEL_SENTINEL = "PRIME_CLAW_ROLE_KERNEL_V1"
 CONVERSATION_GUIDE_SENTINEL = "PRIME_CLAW_CONVERSATION_GUIDE_V1"
+BOUNDED_IDENTITY_SENTINEL = "PRIME_CLAW_BOUNDED_IDENTITY_V1"
 
 # Historical-shaped test fixture copied from the retired injector's policy. It
 # intentionally stays in tests: production proves absence by not installing the
@@ -47,7 +48,8 @@ def provider_capture_expression(context_var: str = "context") -> str:
     ordinary = json.dumps(ORDINARY_USER_SENTINEL)
     role_kernel = json.dumps(ROLE_KERNEL_SENTINEL)
     conversation_guide = json.dumps(CONVERSATION_GUIDE_SENTINEL)
-    return f"""(()=>{{const providerMessages={context_var}.messages??[],systemPrompt=typeof {context_var}.systemPrompt==="string"?{context_var}.systemPrompt:"",text=value=>typeof value==="string"?value:Array.isArray(value)?value.map(part=>typeof part==="string"?part:part?.type==="text"?part.text??"":"").join(""):"",userText=providerMessages.filter(message=>message?.role==="user").map(message=>text(message.content)).join("\\n"),userCount=token=>userText.split(token).length-1,systemCount=token=>systemPrompt.split(token).length-1,customText=providerMessages.filter(message=>message?.role==="custom").map(message=>JSON.stringify(message)).join("\\n"),customCount=token=>customText.split(token).length-1;return{{legacyOversightUserCount:userCount({package}),retiredWorkControlQuotedUserCount:userCount({retired_sentinel}),ordinaryUserCount:userCount({ordinary}),roleKernelSystemCount:systemCount({role_kernel}),roleKernelUserCount:userCount({role_kernel}),roleKernelCustomCount:customCount({role_kernel}),conversationGuideSystemCount:systemCount({conversation_guide}),conversationGuideUserCount:userCount({conversation_guide}),conversationGuideCustomCount:customCount({conversation_guide}),controlledSentinelCustomCount:[{package},{retired_control}].reduce((total,token)=>total+customCount(token),0),retiredWorkControlSystemSentinelCount:systemCount({retired_sentinel}),retiredWorkControlSystemStartCount:systemCount({retired_start}),retiredWorkControlSystemEndCount:systemCount({retired_end}),retiredWorkControlSystemControlCount:systemCount({retired_control})}}}})()"""
+    bounded_identity = json.dumps(BOUNDED_IDENTITY_SENTINEL)
+    return f"""(()=>{{const providerMessages={context_var}.messages??[],systemPrompt=typeof {context_var}.systemPrompt==="string"?{context_var}.systemPrompt:"",text=value=>typeof value==="string"?value:Array.isArray(value)?value.map(part=>typeof part==="string"?part:part?.type==="text"?part.text??"":"").join(""):"",userText=providerMessages.filter(message=>message?.role==="user").map(message=>text(message.content)).join("\\n"),userCount=token=>userText.split(token).length-1,systemCount=token=>systemPrompt.split(token).length-1,customText=providerMessages.filter(message=>message?.role==="custom").map(message=>JSON.stringify(message)).join("\\n"),customCount=token=>customText.split(token).length-1;return{{legacyOversightUserCount:userCount({package}),retiredWorkControlQuotedUserCount:userCount({retired_sentinel}),ordinaryUserCount:userCount({ordinary}),roleKernelSystemCount:systemCount({role_kernel}),roleKernelUserCount:userCount({role_kernel}),roleKernelCustomCount:customCount({role_kernel}),conversationGuideSystemCount:systemCount({conversation_guide}),conversationGuideUserCount:userCount({conversation_guide}),conversationGuideCustomCount:customCount({conversation_guide}),boundedIdentitySystemCount:systemCount({bounded_identity}),boundedIdentityUserCount:userCount({bounded_identity}),boundedIdentityCustomCount:customCount({bounded_identity}),controlledSentinelCustomCount:[{package},{retired_control}].reduce((total,token)=>total+customCount(token),0),retiredWorkControlSystemSentinelCount:systemCount({retired_sentinel}),retiredWorkControlSystemStartCount:systemCount({retired_start}),retiredWorkControlSystemEndCount:systemCount({retired_end}),retiredWorkControlSystemControlCount:systemCount({retired_control})}}}})()"""
 
 
 def assert_provider_context_clean(
@@ -64,6 +66,9 @@ def assert_provider_context_clean(
     assert row["conversationGuideSystemCount"] == 0, f"Conversation guide leaked into provider system prompt: {row}"
     assert row["conversationGuideUserCount"] == 0, f"Conversation guide leaked into provider user text: {row}"
     assert row["conversationGuideCustomCount"] == 0, f"Conversation guide leaked into provider custom text: {row}"
+    assert row["boundedIdentitySystemCount"] == 0, f"private bounded identity leaked into provider system prompt: {row}"
+    assert row["boundedIdentityUserCount"] == 0, f"private bounded identity leaked into provider user text: {row}"
+    assert row["boundedIdentityCustomCount"] == 0, f"private bounded identity leaked into provider custom text: {row}"
     for field in (
         "retiredWorkControlSystemSentinelCount",
         "retiredWorkControlSystemStartCount",
