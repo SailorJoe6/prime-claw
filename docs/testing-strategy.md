@@ -22,133 +22,80 @@ and is not enabled by this slice.
 
 ## Tier-2 disposable brain stack
 
-`config/test-artifacts.lock.json` is the only input selector. It pins upstream
-`garrytan/gbrain` commit `a6be012a3bcfac42e279630aedec5cda4a450e29`,
-tree `68bed6c798259e641172b9c4b277fc524b06f3f2`, package `0.50.0.0`,
-and exact Git-archive SHA-256. It also pins Bun `1.3.11` release archives and
-Ubuntu 24.04 image digests for native `linux/arm64` and `linux/amd64`.
-Unsupported platforms fail. The launcher never silently uses emulation.
-
-Source preparation and image build are the only networked phases. Product
-assertions are offline:
-
-1. Allocate a fresh descriptor-bound result tree and repository snapshot. Keep
-   every public path-component descriptor and binding live through preparation,
-   build, mount verification, receipt reads, and terminal cleanup; a replaced
-   root or ancestor is rejected rather than re-resolved as new authority.
-2. Fetch the locked public commit into a run-owned temporary bare repository,
-   or use `INTEGRATION_GBRAIN_MIRROR` only as a transport cache. Verify commit,
-   tree, package version, and `git archive` hash. Never copy a mirror working
-   tree.
-3. Download the platform's official Bun archive and verify its locked hash.
-4. Generate a fresh context containing only the locked archive contents, Bun,
-   lock, run identity, and `docker/test-integration.Dockerfile`.
-5. Build with a native platform, run-owned iidfile, immutable base digest, and
-   run ownership labels. Require the exact local tag from image inspection,
-   normalize only the allow-listed local repository digest, capture executable
-   and embedded base/source lineage, then delete the context through its exact
-   owned-directory binding.
-
-The launcher then creates one exact iid image with a run-owned cidfile and
-`--network none`. Host inspection requires:
-
-- labels and image/container identities for this run;
-- unprivileged user `tester`;
-- no published or exposed ports, privileged mode, Docker/OpenShell socket,
-  host home, data directory, or credential/provider environment;
-- exactly `/workspace` from the run-owned snapshot read-only and `/results`
-  from the run-owned share read/write; and
-- only fixed `PATH`, `HOME`, and `LANG` image environment.
-
-Only after that inspection does the launcher invoke
-`tests/integration/environment_body.py` with a run/container/image attestation.
-The body is intentionally not named `test_*.py`, so plain host pytest cannot
-collect it. Direct invocation fails before fixture creation unless the exact
-container attestation and mounts exist.
-
-Inside the already-offline container, the body proves:
-
-- non-root execution, read-only repository, writable result share, and refused
-  external TCP while loopback remains usable;
-- exact embedded gbrain/Bun/source hashes and gbrain `0.50.0.0`;
-- fixture-owned PGDATA/socket/database with PostgreSQL 16 and `vector`,
-  `pg_trgm`, and `pgcrypto` extensions;
-- idempotent public migrations at gbrain schema version 149;
-- a synthetic committed corpus, fixture-owned bare remote and round-trip clone,
-  local-only source registration/sync, and keyless get/search; and
-- bounded PostgreSQL fast-stop before the assertion process succeeds.
-
-The host reads iid, cid, body, candidate, manifest, and supervisor status only
-through bounded, no-follow, nonblocking regular-file primitives rooted in
-retained capabilities. Stable before/open/after metadata checks reject mutation.
-Path-specific limits for iid/cid/body/control records plus aggregate evidence
-entry, file, byte, and depth limits reject unbounded growth before sorting or
-hashing. FIFOs, links, directories, devices, oversized files, mutation, or
-root/ancestor replacement become typed failure without blocking independently
-safe cleanup.
-
-For a real run, the driver publishes a nonce-bound status record and cannot begin
-work until the supervisor has verified the full tier chain and acknowledged that
-nonce. A continuously acquired snapshot/ancestor chain carries exact capture
-records. The driver revalidates the complete leaf set, modes, links, and content
-before and after every consumer phase. Dockerfile/lock reads retain and match the
-exact capture-time regular-file binding before returning digest-checked bytes, so
-a transient leaf replace/read/restore cannot enter the build context. Docker's
-client/daemon interface still consumes host pathnames;
-therefore retained checks reject persistent replacement but do not claim defense
-against a hostile same-UID process that swaps and restores a private run path only
-during daemon resolution. Concurrent mutation of the run-owned results tree is
-outside this harness's trust boundary.
-
-The driver never publishes `manifest.json`: after exact teardown it writes only
-the private `candidate.json`. In the disposable supervised child, its owned
-handlers remain installed through process exit, so direct-child TERM/INT/HUP
-cannot be consumed by a restored returning/ignored handler. The outer CLI
-supervisor validates the candidate and evidence, publishes the sole final
-manifest plus an exact-inode binding sidecar, revalidates both public binding and
-evidence after terminal unmask and again at exit, and never prints early PASS/OK.
-Terminal status/tier/candidate/evidence drift is red. If a late failure follows
-publication, the supervisor neutralizes the retained inode without reopening
-`manifest.json` or depending on `.publication`; a raced replacement is not
-modified but cannot pass binding-aware public validation. Dry-run is an explicit
-exact-launcher path and never claims manifest verification.
-
-The host validates and promotes only the sanitized body receipt. It re-inspects
-the unchanged capability-bound mount boundary, removes the exact labelled
-container and image, and requires successful removal plus an exact allow-listed
-not-found inspection. Ordinary nonzero removal remains non-clean even if absence
-is later proved. Malformed identity, inspect row, `Config`, or `Labels`, label
-drift, daemon/transport error, timeout, signal, presence, or unknown state
-normalizes to typed unknown, preserves possibly mounted state, and keeps the run
-red. Recovery, container cleanup, image cleanup, directory cleanup, and failed
-publication are exception-isolated so one malformed stage cannot skip another
-independently safe stage. A lost iid/cid may fall back only to the exact expected
-tag/name; immutable ID plus run/contract labels and image/name bindings must
-match before deletion. The driver and supervisor own only watched signals absent
-from the caller's original mask. Caller-blocked signals—whether already pending
-or arriving during work, cleanup, or restoration—remain pending caller state.
-
-`manifest.json` uses the separate `integration-v1` contract. It cross-binds the
-artifact lock, repository snapshot, immutable image, inspected container,
-inner receipt, platform, exact gbrain binary, PG/vector/migration identity,
-synthetic-corpus hashes, local Git identities, offline proof, normalized local
-image digest, immutable base digest, and preparation/container/image/context/
-snapshot/share teardown. The scratch share, workspace snapshot, preparation
-repository, and generated context are never accepted as durable evidence. A
-passed receipt requires all six exact teardown rows to be clean. Passed
-manifests can be compared with:
+Run the explicit real-stack integration tier with:
 
 ```bash
-python3 -m scripts.testing.integration_provenance compare-runs \
-  .test-results/<first>/<run>/integration/manifest.json \
-  .test-results/<second>/<run>/integration/manifest.json
+scripts/test-integration.sh
+# force a fresh native build
+scripts/test-integration.sh --rebuild
+# optional local public-source cache; the checkout itself is never mounted
+INTEGRATION_GBRAIN_MIRROR=/absolute/path/to/gbrain scripts/test-integration.sh
 ```
 
-The comparison loads and independently verifies both complete evidence trees,
-rejects the same directory, requires disjoint run/image/container/database/
-PGDATA/gbrain-home/bare-remote/Git identities, and requires equal repository,
-platform, lock, Dockerfile, base image, gbrain, corpus, PostgreSQL, extension,
-migration, and schema identities.
+This tier assumes the local host, checkout, launcher, Docker daemon, and same-UID
+operator are trusted during the run. It tests ordinary functionality and isolation;
+it is not a defense against hostile local pathname or process races.
+
+### Build and inputs
+
+The launcher verifies `config/test-artifacts.lock.json`, selects only the native
+`linux/arm64` or `linux/amd64` identities, and stages a private temporary build
+context containing only:
+
+- the exact locked gbrain Git archive;
+- the exact locked Bun archive;
+- `docker/test-integration.Dockerfile` and the artifact lock;
+- `tests/integration/environment_body.py`; and
+- the synthetic `tests/fixtures/brain-source/` corpus.
+
+The assertion body and fixtures are baked into the image. The tested repository
+HEAD, dirty state, and a deterministic selected-input content hash are recorded.
+The build may use the network to install public locked dependencies. There is no
+cross-platform emulation fallback.
+
+### Runtime isolation
+
+The image runs as fixed nonroot user `tester`. Its HOME, PostgreSQL data/socket,
+results, temporary files, and synthetic Git repositories are all container-local.
+The launcher creates the container with:
+
+- `--network none`;
+- no bind mounts or volumes from the host;
+- no published ports;
+- no privileged, host PID, or host IPC mode;
+- no Docker/OpenShell socket, host home, credentials, provider environment, or
+  production data/service connection; and
+- exact run and contract labels.
+
+The body proves real gbrain `0.50.0.0` initialization/migration against PostgreSQL
+16 + pgvector, fixture sync/get/search, and a fixture-owned bare Git push/clone
+round trip. It also proves nonroot execution, baked inputs are non-writable, local
+result storage is writable, and external TCP fails under `--network none`.
+
+### Result and cleanup
+
+After the body finishes, the launcher stops the container and uses `docker cp` to
+copy `/home/tester/results/body.json` into the run directory. It validates the
+receipt and writes one readable `manifest.json` with tested commit/content,
+platform and locked versions, immutable image/container IDs, result details, and
+cleanup outcomes.
+
+Cleanup is best-effort but ownership-safe: the launcher inspects the exact captured
+ID (or the unique run name/tag after a partial create/build), requires matching
+run/contract labels, and only then removes that object. It never prunes or deletes
+an unverified resource. Command failure, timeout, SIGINT/SIGTERM interruption,
+missing/malformed copied output, label mismatch, or cleanup failure is nonzero and
+cannot publish a passed manifest.
+
+Validate a retained manifest with:
+
+```bash
+python3 -m scripts.testing.integration_provenance   .test-results/<run-id>/integration/manifest.json
+```
+
+One successful native run is acceptance evidence. State the observed platform
+truthfully. A second-run comparison can be used during review, but it is not
+permanent launcher machinery or a completion requirement.
 
 ## Tier-1 pinned run
 

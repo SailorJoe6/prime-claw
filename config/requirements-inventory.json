@@ -1284,7 +1284,7 @@
     {
       "id": "R-TEST-1",
       "priority": "GATE",
-      "summary": "Environment-dependent tier-1 behavior runs in one disposable exact-image container with descriptor-bound repository capture/cleanup and only a fresh scratch share writable.",
+      "summary": "Environment-dependent Tier-1 behavior retains its owner-accepted exact-image snapshot/share boundary; the separate Slice-3 integration tier bakes public test inputs into a disposable image and uses no runtime host mounts.",
       "status": "proven for owner-accepted Slice 1 and Slice 2 tier-1 boundaries; Slice-3 disposable integration tier implemented with owner acceptance pending",
       "plan": ".ralph/plans/SPECIFICATION.md",
       "proven_by": {
@@ -1331,8 +1331,8 @@
     {
       "id": "R-TEST-3",
       "priority": "GATE",
-      "summary": "Tier 2 provides a credential-free plain-Docker PostgreSQL 16, pgvector, exact-gbrain environment with fixture-owned database, home, corpus, and local bare remote, retaining component-bound filesystem authority through build, mount, reads, and teardown.",
-      "status": "implemented and empirically green on native linux/arm64; owner acceptance pending",
+      "summary": "Tier 2 provides a credential-free Docker PostgreSQL 16 + pgvector + exact-gbrain environment with the synthetic corpus/body baked into the image, nonroot container-local HOME/database/results/Git state, and a copied result receipt.",
+      "status": "reduced trusted-host contract implemented; fresh focused/full-host/native acceptance and owner review pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 3)",
       "proven_by": {
         "apply": [
@@ -1379,14 +1379,15 @@
     {
       "id": "R-TEST-5",
       "priority": "GATE",
-      "summary": "Tier launchers use exact iidfile/cidfile identities, bounded process groups, typed target/controller outcomes, and exception-safe exact-ID cleanup. The Slice-3 driver emits only a private candidate and retains initially unblocked watched-signal handlers through disposable child exit. The outer CLI supervisor publishes the sole final manifest plus a binding sidecar, revalidates public binding/evidence through its terminal exit, and neutralizes the exact retained inode without modifying raced replacements; caller-blocked pending signals remain caller-owned.",
-      "status": "proven for owner-accepted tier 1 and Slice-3 exact iid/cid image/container lifecycle with owner acceptance pending",
+      "summary": "Tier-1 retains its owner-accepted exact-ID lifecycle. Slice 3 uses bounded ordinary commands, immutable iid/cid capture, normal timeout/SIGINT/SIGTERM nonzero behavior, exact run labels, and best-effort label-verified cleanup without an outer publication supervisor.",
+      "status": "proven for owner-accepted Tier 1; reduced Slice-3 lifecycle implemented with final validation pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh",
           "tests/conftest.py",
-          "scripts/test-integration.sh"
+          "scripts/test-integration.sh",
+          "scripts/testing/integration_driver.py"
         ],
         "check": [
           "scripts/testing/provenance.py",
@@ -1406,8 +1407,8 @@
     {
       "id": "R-TEST-6",
       "priority": "GATE",
-      "summary": "Pinned tier-1 runs validate image/artifact metadata before named writes, redact arbitrary teardown output, and emit truthful schema-v2 terminal manifests with captured v2 identities.",
-      "status": "proven for owner-accepted tier 1; Slice-3 gbrain/platform/fixture/integration manifest cross-binding implemented with owner acceptance pending",
+      "summary": "Tier-1 retains truthful schema-v2 pinned/source provenance. Slice 3 emits one simple receipt containing tested commit/content identity, locked versions, immutable runtime IDs, real-stack result, and cleanup outcomes.",
+      "status": "proven for owner-accepted Tier 1; reduced Slice-3 receipt implemented with final validation pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
@@ -1435,8 +1436,8 @@
     {
       "id": "R-TEST-7",
       "priority": "GATE",
-      "summary": "Tier-1 and integration launchers mount only a component-capability-bound repository snapshot read-only plus a fresh result share writable. Slice 3 acquires and keeps one continuous snapshot/ancestor authority, retains capture-time destination inode bindings, reads Dockerfile/lock bytes only through matching exact retained bindings, and revalidates leaves/modes/links/content around every consumer phase. Persistent root/ancestor/leaf replacement and special receipts are rejected. Docker path APIs cannot receive the client descriptor, so hostile same-UID transient replace-and-restore during daemon resolution is explicitly outside the private run-tree trust boundary. Binding-aware manifest validation never authorizes raced replacement aliases. Host home, sockets, credentials, and arbitrary checkouts remain excluded.",
-      "status": "proven for owner-accepted tier 1; Slice-3 repository:ro plus results:rw offline boundary implemented with owner acceptance pending",
+      "summary": "Tier-1 retains its owner-accepted read-only snapshot plus writable-share mounts. Slice 3 instead has zero runtime host mounts: public source/body/fixtures are baked into the image and HOME, PostgreSQL, results, and synthetic Git state are container-local; host home, sockets, credentials, provider state, and arbitrary checkouts remain excluded.",
+      "status": "proven for owner-accepted Tier 1; reduced mount-free Slice-3 boundary implemented with final validation pending",
       "plan": ".ralph/plans/SPECIFICATION.md",
       "proven_by": {
         "apply": [
@@ -1497,8 +1498,8 @@
     {
       "id": "R-TEST-10",
       "priority": "GATE",
-      "summary": "Safety coverage includes capture-transfer and snapshot root/ancestor/regular-inode swaps; live-input mutation/symlink/FIFO replacement; nonce ACK and private-candidate typing; direct-child real signals through disposable process exit; exact-inode invalidation plus binding-aware rejection of byte-identical raced replacements; path-specific and aggregate entry/file/byte/depth limits; post-unmask evidence mutation; caller-blocked pending preservation; malformed inspect typing; partial-create finalizer isolation; stale evidence; and concurrent allocation.",
-      "status": "proven for owner-accepted Slice-1/Slice-2 components; Slice-3 identity, drift, absence, cleanup, and two-run negative coverage implemented with owner acceptance pending",
+      "summary": "Safety coverage preserves accepted Slice-1/Slice-2 cases. Reduced Slice-3 coverage targets ordinary build/create/body/copy failure, timeout and SIGINT/SIGTERM nonzero behavior, label mismatch, partial-resource recovery, cleanup refusal, malformed/missing result, and real mount-free stack execution; hostile same-UID races and publication micro-transactions are excluded optional hardening.",
+      "status": "proven for owner-accepted Slice 1/2; reduced ordinary-failure Slice-3 coverage implemented with final validation pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [

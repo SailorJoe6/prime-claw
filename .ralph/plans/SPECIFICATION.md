@@ -1,533 +1,83 @@
-# Project-wide testing strategy — isolation-first test architecture
+# Project-wide testing strategy — Slice 3 reduced specification
 
-> **ACTIVE SLICE 3 REVISION CONTRACT — owner-rejected `22e41a0`.** Candidate
-> `22e41a0ed39070017a92b7beddc4b2440ed33b05` / tree
-> `4e87df045e97c4c69961bee6e0d94fed347a4f9f` is revision history, not accepted.
-> The authoritative owner BLOCK report SHA-256 is
-> `155ec9b098df03b4cdbdfded7a52cbfd61d460dcc099edf0b1c32cb2c8ad1eb1`.
-> Preserve materially closed F3 malformed-inspect cleanup; exact locked gbrain,
-> PostgreSQL, pgvector, local-Git, fixture-corpus, comparator, teardown, evidence,
-> isolation, and accepted Slice-1/Slice-2 behavior. The bounded revision requires:
->
-> - continuous open snapshot destination and ancestor authority across capture,
->   preparation, build, mount, read, and cleanup, with Dockerfile and lock
->   consumed from that exact snapshot and no path recapture or replacement
->   adoption/deletion;
-> - one final-owner terminal transaction through process exit, owning
->   TERM/INT/HUP across every restoration/unmask/exception slot and exposing no
->   PASS early;
-> - retained exact writable manifest inode/binding with non-green neutralization
->   independent of `.publication`, staging, or path re-resolution, without
->   modifying raced replacements;
-> - driver ownership of only watched signals outside the caller's old mask,
->   preserving caller-blocked pre-existing and later pending signals; and
-> - stable no-follow regular-file rereads with finite control/body/manifest/
->   inventory/sanitized budgets, capped hashing, and inode/size mutation checks.
->
-> Prove the revision through public root/ancestor republish, live mutation,
-> symlink, FIFO, permission/type/alias, pre-exchange failure, restoration-handler,
-> signal-timing, oversized, and append-under-read deadline matrices. Correct only
-> related docs/evidence ambiguity, re-run invalidated gates sequentially, publish
-> one fully revalidated clean Slice-3 replacement, and stop for owner review.
-> Slice 4 and later remain closed.
+## Status
 
-> **CURRENT UNPUBLISHED IMPLEMENTATION CHECKPOINT — 2026-10-06.** The latest
-> read-only re-audit (SHA-256
-> `ff716ecb824a3f89b74b8fb557e407871130abf11e45e34b22229b639d6a752d`)
-> confirms B2/B3/B5 materially closed and B4/F3 preserved, but blocked the
-> prior repair on a transient B1 copied-leaf read ABA. Capture records now bind
-> each destination regular inode, and Dockerfile/lock consumers retain and match
-> that exact binding, mode, and digest before returning bytes. The B1 target
-> passes 7 tests; all broader pre-repair gates are superseded. No replacement
-> commit, Docker evidence, recheck, publication, or acceptance is claimed; all
-> terminal gates in the active revision contract remain pending. Targeted B1
-> independent recheck now passes (report SHA-256
-> `cb6e9708124c0bd0fbfe1ff6d9952e9e17ec47751ce8868c31a681f7bb643b84`),
-> as do fresh focused **252 + 30 subtests** and affected **343 + 98 subtests**
-> gates. The sequential full-host gate passes **559 tests / 149 skipped / 130
-> subtests**; exact-commit Docker and terminal review remain pending.
+Slice 1 and Slice 2 are owner-accepted. Slice 3 is active on
+`prime-claw-5v7.5`. The operator replaced the prior adversarial-security contract
+with this trusted-host ordinary-failure contract on 2026-10-06.
 
-> **PRIOR SLICE 3 REVISION CONTRACT — owner-rejected `6d6f7ee`.** Candidate
-> `6d6f7ee7bbb208b88c798fe4c469188930f07579` / tree
-> `5f17a2dd25fda6d47eef00771575bd5c4802a402` is revision history, not accepted.
-> Authoritative owner report SHA-256:
-> `1e8e1f94f19221e6682a1dc17b4cc0e56fc78f9b503445f05bd591523ca5c759`.
-> Preserve the exact lock and validated ordinary integration behavior. The
-> bounded revision is F1 retained descriptor/binding authority plus bounded
-> no-follow regular-file iid/cid/body/status reads and swap/FIFO tests; F2 signal
-> ownership through restoration/unmask with non-green late-signal evidence; F3
-> typed malformed-inspect recovery plus exception-isolated finalizer stages; and
-> F4 exact separation/restoration of caller-blocked or pre-existing pending
-> signal state. Missing raw output remains reported-only and stale future tense
-> must be corrected truthfully. Implement only Slice 3, produce one fully
-> revalidated pushed replacement, and stop. Slice 4 and later remain closed.
+## Trust model
 
-> **ACTIVE SLICE 3 CONTRACT — Slice 2 owner-accepted.** Exact accepted Slice-2
-> commit/tree: `56afd99d3a4b5411eb37fb42210ffb36c8bf2b84` /
-> `034765f6c8f1a3d027e010ebb751538d55fabdaf`. Owner PASS report SHA-256:
-> `76f96316416fb03a6993e21b23d9e49b9a651b6cd99fb9bebd04946e8e474408`.
-> Slice 1 and Slice 2 are closed; preserve their isolation, fail-close,
-> provenance, signal, cleanup, typed-ownership, replay, evidence-truth, and
-> accepted evidence-limit contracts.
->
-> Implement only `prime-claw-5v7.5`: a disposable plain-Docker PostgreSQL 16 +
-> pgvector + exact-gbrain integration tier. Its database, home, corpus, and bare
-> remote are fixture-owned. Execution is offline/local-only. It exposes no host
-> ports or host data mounts, receives no credentials, contacts no live gbrain,
-> PostgreSQL, or Prime Agent target, and mutates no operator/upstream state.
-> Teardown is bounded and exact-identity; provenance is truthful across setup,
-> execution, ownership, and cleanup. Complete tests, docs, inventory, evidence,
-> and the Bead; publish one reviewable Slice-3 candidate and stop. Slice 4 and
-> later work remain closed.
+Trusted during a test run:
 
-> **LATEST SLICE 2 REVISION CONTRACT — owner-rejected `f0441325`.** Candidate
-> `f0441325f72224b6cc67802bfb917bfead6efb31` / tree
-> `eced51e62925d016953569c55acedf075ad72e83` is revision history, not accepted.
-> The authoritative report SHA-256 is
-> `f56ea2a3064c92e0ddc7b5d29ef995de72344078c9c936461bc27188aa2910d5`.
-> B3 and the retained clean-candidate evidence are preserved. The remaining
-> bounded contract is:
->
-> - ordinary nonzero exact-CID container removal is non-clean regardless of a
->   later positive absence inspection; producer, receipt/manifest validators,
->   and both public consumers must agree and retain the share;
-> - JSON receipt field types are checked before membership or comparison;
->   malformed-but-JSON-valid terminal receipts normalize to typed unknown and
->   cannot skip independent runtime exact-ID cleanup or failed publication; and
-> - whole-producer, standalone, and fixture regressions prove the failed-removal
->   retention boundary; a post-runtime-yield fixture regression proves malformed
->   type handling still attempts runtime cleanup and failed evidence while
->   retaining the share. Existing successful cleanup/deletion proof remains.
->
-> Revalidate only affected gates plus final sequential exact-candidate source and
-> pinned Docker gates, obtain fresh independent review, publish one replacement,
-> and stop for owner review. Optional RW-alias and prerelease boundaries do not
-> change. Slice 3 and Phase 3a remain closed.
+- the local host and Docker daemon;
+- the selected checkout and launcher process;
+- the same-UID operator;
+- the temporary build context before it is removed.
 
-> **SLICE 1 ACCEPTED — 2026-10-03.** Exact commit
-> `4cca0989475d7bd670620f31b67260342b3aac5d`, tree
-> `9c11db2e8c0499b0cac5c14b46d4000796ac7bef`, is owner-accepted;
-> `prime-claw-5v7.2` is closed. Exact Astra/max PASS report SHA-256:
-> `a267b83a37bdf45a650d29c07b5dc51b78fd16391d5087c9c18b8fa1710e389e`.
-> Preserve every accepted Slice-1 boundary. Advance only Slice 2 /
-> `prime-claw-5v7.1`, using the approved disposable read-only-source builder;
-> do not start later slices or touch upstream/live/global resources.
+Untrusted and excluded:
 
-> **SLICE 2 REVISION CONTRACT — owner-rejected candidate `c0ebdc4`.** The
-> accepted repair scope is authoritative in `prime-claw-5v7.1`, the owner
-> disposition report SHA-256
-> `4f2ccdf200588fb11897dc325a2d1c03e880d0a712d50a5da00adc94855f9de0`, and
-> the reconciled Astra/max report SHA-256
-> `b1ad6b25ec327aeceebf4c06052cf494e89b563b753cf6ee7e276f16aef125a8`.
-> The corrected source-build contract additionally requires:
->
-> - exact builder absence only from allow-listed Docker not-found diagnostics;
->   every daemon, permission, transport, malformed/non-UTF8, timeout, signal,
->   launch, present, or unknown result is non-clean;
-> - independent builder and runtime ownership in both public consumers, with
->   writable-share deletion only after all possible owners are positively clean
->   and absent; missing/unreadable/invalid receipts preserve the share and fail;
-> - a disposable, real-installable two-generation dirty proof through the
->   canonical producer/consumer boundary that observes changed installed
->   behavior, distinct identities, no stale replay, and unchanged inputs; and
-> - truthful Docker tested-generation lineage plus corrected stale evidence,
->   reproduction, `.env.example`, plan-receipt, and inventory wording.
->
-> The RW scratch alias is optional hardening. Prerelease behavior is not expanded.
-> Repair and publish one new Slice-2 candidate only; Slice 3 and Phase 3a remain
-> closed.
+- credentials, provider environment, private/operator data, host homes;
+- production gbrain/PostgreSQL/Prime Agent services;
+- Docker/OpenShell sockets inside the assertion container;
+- network access during assertion execution.
 
-> **Status:** ACTIVE implementation episode created from the operator-approved
-> bundle on 2026-10-02. Slice 1 is accepted and closed. Slice 2 /
-> `prime-claw-5v7.1` is the only active next slice; later slices remain unstarted.
-> The owner accepted F1 at ordered file-set SHA-256
-> `1e050d1044a24cb4e037a774ec524c43a0906a8bb94588be980f9d521713a319`
-> and R2 at ordered file-set SHA-256
-> `e5bfda4579c5fc4d13eebe6aa78dd8901c3b22dd216608a9d827df1ae3a8fa28`.
-> The bounded-controller R4 sub-slice is accepted at ordered two-file SHA-256
-> `8be0ab10267a3ec3173198600647a14e36530f318f3be4c28d4091ea426e583f`.
-> The fixture R4 sub-slice is accepted at ordered two-file SHA-256
-> `96fd0589f346c9db7d5ba3b23ddcd5115fbcab6f8744ddceaab115717e313c55`,
-> completing R4 for advancement only. Preserve F1, R2, and both accepted R4
-> boundaries. R6 public-standalone launch-error coverage is accepted for
-> advancement only at ordered test-file SHA-256
-> `b1e9cb0dbeadbf53315de4f4e9a3bbbe132b627fc0e473516ce9d91eb1039d98`.
-> Keep advancing the same uncommitted generation only through the remaining
-> candidate gates. The generation at rejected base `aee5cfe`
-> remains incomplete and unaccepted as a candidate.
-> External prerequisites remain satisfied by `3bf9059` / `927b394`.
-> **Origin:** operator charter, 2026-10-02 (independent planning-only
-> conversation `01a0fe09-9641-73af-9889-b44e302490d1`).
-> **Tracking:** planning bead `prime-claw-5v7`.
-> **Execution plan:** [EXECUTION_PLAN.md](EXECUTION_PLAN.md).
+Hostile same-UID races and corrupted local namespaces are outside the acceptance
+boundary. Ordinary failures must still be truthful and nonzero.
 
-## 1. Purpose and invariant
+## Required behavior
 
-prime-claw's tests grew around one developer machine. The archived
-`plugin-test-container` work proved that the Prime Agent under test can be
-physically isolated from the harness doing development. This specification
-extends that proof to every environment-dependent test.
+### Build
 
-**R-TEST-1 — isolation invariant.** A test assertion must not observe,
-mutate, or depend on unrelated or operator-owned Prime Agent, gbrain,
-PostgreSQL, Docker/OpenShell resources, credentials, or writable external
-source checkouts unless it is an explicitly justified, individually reviewed
-host acceptance observer (§8). A host launcher may check daemon readiness and
-inspect only exact run-owned resources. The prime-claw repository under test is
-an allowed read-only input; its exact commit and dirty state are recorded. An
-operator-selected external source is allowed only as a read-only,
-provenance-recorded input that is copied to an immutable run-owned snapshot.
+- Select only native `linux/arm64` or `linux/amd64`; no emulation fallback.
+- Verify locked public gbrain commit/tree/archive/package, Bun artifact, and base
+  image identities.
+- Build an image containing the exact gbrain executable, assertion body, artifact
+  lock, and synthetic fixture corpus.
+- Record the tested Git HEAD, clean/dirty state, and a deterministic content hash
+  for the selected assertion inputs.
 
-The default realization is a disposable Docker environment created for one
-test run and destroyed afterward. It owns its Prime Agent installation,
-gbrain executable, synthetic fixtures, PostgreSQL data, Git remotes, home,
-and configuration. It receives no credentials.
+### Run
 
-The invariant governs dependencies and effects, not the physical location of
-every Python comparison. A host process may launch containers and verify a
-bounded result envelope made only from the disposable environment's exit
-status and exported artifacts. It may not make a product claim from host
-behavior, inspect live operator state, or let the container reach such state.
+- Use one nonroot container.
+- Use no host bind mounts and publish no ports.
+- Pass no provider credentials or arbitrary host environment.
+- Use `--network none` for the assertion runtime.
+- Keep HOME, PostgreSQL data/socket, synthetic Git repositories, scratch, and
+  results inside the container.
+- Bound build, start, assertion, stop, copy, and cleanup commands.
 
-### 1.1 Terms
+### Result and cleanup
 
-- **Container-driven test** — the subject behavior executes in a disposable
-  container. A host-side pytest bridge may verify its exit status and exported
-  artifacts when those are the complete evidence surface. Existing tier-1
-  bridges use this pattern.
-- **Host launcher** — code that builds images, starts/stops uniquely owned
-  resources, executes commands, collects artifacts, applies deadlines, and
-  verifies teardown. It may test its own orchestration contract with fakes and
-  may validate result-envelope integrity; it does not substitute host behavior
-  for the product behavior being claimed.
-- **Host acceptance observer** — a narrow, registered exception whose subject
-  is the real host Docker/OpenShell/macOS stack and therefore cannot be proved
-  in an ordinary Linux container. It must satisfy §8.
-- **Test fixture** — synthetic or operator-approved non-private input owned by
-  a test run. It never means a copy of the live brain, database, credential
-  store, or configured production sandbox.
+- The body writes one JSON receipt under its container-local results directory.
+- After the assertion finishes, the host stops the container and copies that
+  receipt with `docker cp`.
+- The host validates required identities and functional results, then writes one
+  readable manifest.
+- Cleanup targets only the captured immutable IDs or exact run labels. Removal is
+  best-effort and its outcome is recorded. A passed functional receipt cannot hide
+  an ordinary assertion failure or interrupted launcher.
 
-### 1.2 Operator-locked decisions
+## Acceptance checks
 
-1. **Lifecycle risk is shared control-plane state.** The host Prime Agent
-   install is read-only in production staging, the sandbox bakes its own
-   gbrain, sandbox PostgreSQL is private to `/sandbox`, and destroy targets a
-   named sandbox. The material lifecycle risk is collision with sandbox names,
-   providers, egress policy, L7 rules, or the real brain remote. Tier 3 must
-   isolate those identities and fail closed.
-2. **No CI workflow is authored.** This work defines one stable command, exit
-   contract, and evidence layout for a future CI system to consume.
-3. **Tier-0 static tests stay on the host.** Pure repository checks have no
-   environment dependency, so containerizing them adds cost without improving
-   isolation.
+The integration run proves real locked gbrain + PostgreSQL 16 + pgvector,
+synthetic source sync/get/search, and local Git round trip. Unit tests cover the
+normal launcher, receipt validation, no-mount/no-port/network-none create command,
+timeout and ordinary signal failure, and best-effort labelled cleanup.
 
-### 1.3 Non-goals
+Run focused tests, the full host suite, and one native Docker acceptance run in
+that order. A normal review checks only this specification and blocks only real
+functional failure, retained isolation violations, unsafe deletion of unowned
+resources, ordinary false-green behavior, or missing real-stack coverage.
 
-- No production Phase 3a dry-run, model probe, build, cutover, routed write, or
-  owner handoff. Phase 3a keeps its own operator gates.
-- No general test-orchestration framework. Drivers remain dumb sequencers and
-  fixtures remain explicit.
-- No change to plugin behavior, `bin/prime-claw` production behavior, or the
-  OpenShell runtime image's behavior.
-- No Docker-in-Docker and no host Docker socket mounted into a test container.
-- No credential material, private endpoints, or private brain content in an
-  image, fixture, log, evidence file, or tracked artifact.
-- No CI provider configuration.
-- No shared Docker-base extraction in this work. `prime-claw-blw.4` remains a
-  separate, non-blocking follow-up because changing the proven OpenShell base
-  is not required for test isolation.
+## Excluded hardening
 
-## 2. Required tier architecture
+Descriptor chains, inode binding sidecars, ABA/symlink/FIFO adversaries,
+micro-signal matrices, exhaustive malformed-Docker payloads, terminal publication
+transactions, and permanent two-run comparison are not required and must not block
+completion.
 
-**R-TEST-2 — lowest sufficient tier.** Every test is assigned to the lowest
-numbered tier that supplies its real dependencies. A marker is a selection
-mechanism, not proof that placement is correct.
+## Boundary
 
-| Tier | Name | Environment | Pytest marker | Default whole-suite gate |
-|---|---|---|---|---|
-| 0 | **static** | host, repository-only | unmarked | yes |
-| 1 | **unit-env** | existing slim disposable container | `container` | yes |
-| 2 | **integration** | disposable gbrain + PostgreSQL container | `integration` | yes |
-| 3 | **lifecycle** | real host Docker/OpenShell control plane, guarded by §6 and §8 | `lifecycle` | no; explicit only |
-
-Plain `python3 -m pytest tests/ -q` remains tier 0 and must not require Docker,
-Node, Prime Agent, gbrain, PostgreSQL, OpenShell, network, credentials, or a
-local `.env` selector.
-
-### 2.1 Tier 1 — unit-env
-
-Tier 1 remains the slim Ubuntu 24.04 + Node + Python/pytest environment proven
-by `docker/test.Dockerfile`. It supplies Prime Agent through the existing
-exactly-one selector contract (`PRIME_AGENT_PINNED` or
-`PRIME_AGENT_SOURCE`) and runs plugin, Node, POSIX-process, wrapper, and test-
-infrastructure behavior without the brain stack.
-
-Environment-dependent bodies that need only this toolchain belong here,
-including the embedding watchdog process-group tests, the npm-onload Node
-probe, and tests of launcher/fixture code against recording fakes.
-
-Tier-1 setup installs and checks the plugin only inside the disposable
-container with `PRIME_AGENT_PLUGIN_ROOT=/root/.prime/agent`. Containerized gates
-must never require a prior host-global apply/check run, inherit the host `HOME`,
-or use the operator's installed copy. Bare apply/check fail closed. The
-user-global path requires deliberate `--user-global` activation from the primary
-`main` checkout after acceptance; it is not a prerequisite for Docker testing.
-
-### 2.2 Tier 2 — integration
-
-**R-TEST-3 — disposable brain stack.** Tier 2 is a plain-Docker Ubuntu 24.04
-image, not an OpenShell runtime image. It provides:
-
-- PostgreSQL 16 and pgvector;
-- an exact gbrain executable compiled from an explicitly selected Git source
-  revision;
-- a fresh fixture-owned database and data directory per session, or per test
-  when mutation isolation requires it;
-- a synthetic source corpus and a fixture-owned local bare Git remote;
-- a deterministic local fake for any embedding response needed by an offline
-  property test;
-- a container-owned home and configuration; and
-- optional per-run Prime Agent installation through the same selector contract
-  as tier 1 when a future integration test actually needs Prime Agent.
-
-No database port is published. No host data directory is mounted. Test-time
-external network is disabled. Build-time package/source acquisition is the
-only networked phase.
-
-A local bare remote tests gbrain/Git fixture behavior only. It does not widen
-`bin/prime-claw`'s production `owner/repository` interface and is not used to
-fake a production lifecycle flow.
-
-### 2.3 Controller/target boundary
-
-**R-TEST-4 — no implicit host control.** A test container never receives the
-host Docker socket. Launcher and fixture meta-tests use recording fakes inside
-tier 1. If a future in-container assertion body must control a real target
-container, a separately reviewed bounded launcher channel is required; that
-mechanism is not needed or implemented by this plan. Real OpenShell behavior
-uses the registered host-observer exception instead (§8).
-
-## 3. Host launcher contract
-
-**R-TEST-5 — narrow launcher.** A host launcher may only:
-
-- build test images;
-- create/start/stop/destroy uniquely identified test resources;
-- execute bounded commands in them;
-- export sanitized artifacts into a fresh `.test-results/<run-id>/` directory;
-- enforce hard deadlines and TERM→KILL escalation; and
-- verify absence with a three-state result: present, absent, or unknown.
-
-Unknown is failure. Launchers never use global prune, broad name matching, or
-operator-configured production identities. Their own behavioral tests run in
-tier 1 against recording fakes so a broken PATH override cannot reach the real
-Docker/OpenShell CLI.
-
-## 4. Exact artifact provenance
-
-**R-TEST-6 — provenance manifest.** Every run that installs or builds an
-artifact emits a sanitized machine-readable manifest under `.test-results/`.
-It records:
-
-- **repository under test:** HEAD plus a sanitized dirty-state/content
-  identity for the read-only prime-claw input;
-- **Prime Agent:** selector mode, requested version, installed version, and,
-  for source mode, source HEAD, dirty-state/content identity, staged release
-  SHA256, and installed package identity;
-- **gbrain:** upstream/fork origin, source HEAD or release version, source
-  archive/inventory SHA256, build tool version, executable version, and
-  executable SHA256;
-- **images:** immutable image ID/digest, Dockerfile path, and the declared
-  build-input hash;
-- **fixtures:** synthetic-corpus manifest hash, whole-source path/slug
-  inventory hash, and local bare-remote identity; and
-- **lifecycle scope:** OpenShell gateway/workspace identity, workspace and
-  sandbox ownership labels, captured target/sentinel identities, and fixture
-  image ID/labels when tier 3 runs; and
-- **run metadata:** run id, tier, UTC timestamps, command contract version,
-  and sanitized evidence-file hashes.
-
-A source commit alone is not exact when the source tree is dirty. Source-mode
-Prime Agent tests may exercise dirty work, but must stage it read-only into a
-builder container and record a deterministic content hash. gbrain integration
-builds use an explicit committed revision/archive so the image input is pinned.
-
-No manifest contains source content, credentials, private endpoint values, or
-private repository identity.
-
-## 5. Isolation rules shared by all container tiers
-
-**R-TEST-7 — container boundary.** Tier 1 and tier 2 enforce all of the
-following:
-
-- repository mount read-only;
-- only a fresh run-owned share mounted read/write;
-- no Docker/OpenShell socket, host `$HOME`, live config root, database volume,
-  browser store, credential store, or arbitrary checkout mount;
-- explicit environment allow-list rather than inherited host environment;
-- container-owned `$HOME`, Prime Agent roots, gbrain home, PostgreSQL data,
-  temp directories, and Git config;
-- test-time offline by default; synthetic in-container services for controlled
-  remote behavior; and
-- bounded teardown with evidence preserved when ownership or absence is
-  uncertain.
-
-**R-TEST-8 — source-build isolation.** Prime Agent source mode may read an
-operator-selected checkout only through a read-only mount. Build and pack occur
-in a disposable builder container against a container-local copy. A test run
-must leave the selected checkout byte-identical before/after.
-
-The native `scripts/run-prime-agent-probe.sh` remains a guarded operator tool.
-Tests of its isolation contract can run in tier 1; no automated suite invokes
-the host's real Prime Agent through it.
-
-## 6. Tier-3 lifecycle contract
-
-**R-TEST-9 — isolated lifecycle scope.** Before any real lifecycle test may
-mutate the host control plane, it must satisfy all of these:
-
-1. Generate a unique run identity, a non-default OpenShell workspace, and
-   test-prefixed sandbox/resource names. Workspace and sandbox labels carry the
-   full run identity; provider ownership, if ever added, is workspace plus a
-   unique name. It must never read a production `sandbox_name` or image tag as
-   its target.
-2. Pin every OpenShell call to the selected gateway and owned workspace. Query
-   by exact identity/selector and fail before mutation on collision,
-   ambiguous state, unreachable daemon, incompatible OpenShell CLI behavior,
-   or an unowned pre-existing resource.
-3. Use a test-owned config, tracked minimal lifecycle-only policy, image
-   reference, provider set, and evidence directory. Sandbox creation disables
-   automatic providers explicitly. The first lifecycle occupant uses no
-   provider and no brain remote; future provider/L7 tests require a separate
-   review.
-4. Carry no real credentials. Credential-shaped values are non-resolving
-   synthetic placeholders only.
-5. Compare generated identities against a sanitized offline forbidden list,
-   then audit the captured command transcript to prove no operator sandbox,
-   image, provider, policy, or default workspace was ever addressed. The test
-   does not query the production sandbox.
-6. Remove only captured test-owned identities, then verify absence with the
-   present/absent/unknown contract. Unknown or teardown failure is a failure,
-   and evidence is retained.
-7. Test every destructive guard with fakes before enabling the live path:
-   default-name rejection, collision, selector ambiguity, daemon failure,
-   teardown failure, and unknown inspect.
-
-Lifecycle acceptance is explicit-only. A lifecycle test must carry the marker,
-request the scoped fixture, and receive pytest's dedicated `--run-lifecycle`
-option; `-m lifecycle` alone is insufficient. It never runs from plain pytest,
-the default whole-suite command, or the future CI interface. `macos_host` has a
-separate explicit opt-in.
-
-## 7. Cleanup, failure injection, and no-write claims
-
-**R-TEST-10 — prove safety can fail.** Each component claiming a safety
-property has at least one negative test. The required failure set, applied
-where relevant, is:
-
-- teardown refusal;
-- daemon loss mid-run;
-- unknown inspect state;
-- interrupted/partial write;
-- stale artifact or pre-existing output;
-- both/neither artifact selectors;
-- resource-name collision; and
-- unexpected host-state drift.
-
-Every external wait has a hard deadline. Teardown has its own bounded budget,
-independent of the test deadline.
-
-A gbrain `--dry-run` no-write claim is proved with an exact **logical** before/
-after snapshot: schema/migration identity, relevant row sets, source bookmark,
-persistent lock ownership, and configuration/source hashes. Raw PostgreSQL
-storage bytes and WAL are not compared because they can change without a
-logical product mutation.
-
-## 8. Host acceptance observer exceptions
-
-**R-TEST-11 — reviewed host observer.** A host-executed assertion body is
-allowed only when all of these hold:
-
-1. The subject is a property of the real hosting stack (for example OpenShell
-   control-plane lifecycle, Docker Desktop, virtiofs/gRPC-FUSE, or macOS
-   process behavior) that a Linux container or recording fake cannot prove.
-2. The exact seam and the inadequate container/fake alternative are recorded.
-3. The test is individually listed in the DEVELOPERS.md exception registry,
-   marked `lifecycle`, and excluded from default and CI-interface runs.
-4. Reads are preferred. Any mutation uses unique, test-owned resources and
-   satisfies §6 teardown.
-5. The test cannot load live credentials, brain content, or production config
-   as fixture input.
-
-A specifically macOS-only observer additionally uses the `macos_host` marker.
-At specification time no current test needs that marker.
-
-The first justified host observer creates an owned workspace, fixture image,
-tracked minimal policy, and two `--no-auto-providers` sandboxes: a target and a
-sentinel. It runs the product's bounded `destroy --yes` path against the
-generated target config, proves the target absent and sentinel present, then
-removes the remaining owned scope. The captured transcript proves the operator
-sandbox and default workspace were never addressed. Full production
-`create`/`validate` is not part of this work because those paths structurally
-require real providers and a production-shaped remote.
-
-## 9. Developer and future-CI interface
-
-**R-TEST-12 — stable entry contract.** The documented interfaces are:
-
-```bash
-python3 -m pytest tests/ -q              # tier 0 only; no Docker
-scripts/test-all.sh                      # tiers 0 + 1 + 2, fail-fast
-scripts/test-all.sh --with-lifecycle     # tiers 0 + 1 + 2 + explicit tier 3
-```
-
-`--with-sandbox` is not aliased to a newly mutating action. During migration it
-hard-errors with guidance to use `--with-lifecycle`, whose separate preflight
-and explicit pytest opt-in protect the live path.
-
-A future Linux-Docker CI system runs exactly `scripts/test-all.sh`, consumes its
-exit code, and archives `.test-results/`. This specification creates no CI
-workflow and excludes lifecycle/host-observer tests from that contract.
-
-Default-run performance budgets are execution-plan decisions measured from a
-recorded baseline. A cold image build is reported separately from warm-cache
-suite time.
-
-## 10. Phase 3a dependency interface
-
-**R-TEST-13 — evidence support, not authorization.** After tier 2 meets this
-specification, the Phase 3a owner may review fixture-produced evidence for:
-
-- exact installed gbrain binary provenance;
-- logical no-write behavior of
-  `gbrain sync --source fixture --dry-run --no-pull --no-embed --yes` on a
-  fully migrated baseline, including migration identity, bookmark, row,
-  and persistent-lock state; and
-- whole-source path/slug accounting against the synthetic fixture manifest.
-
-Fixture evidence supports but never replaces live owner-gated proof. It does
-not authorize a production dry-run, exact-model probe, resumed build, policy
-application, cutover, or routed write. The fixture's local bare Git remote is
-not evidence that the production L7 Git path works.
-
-The proposed owner-note wording is maintained in the execution plan. Applying
-that wording to another episode remains that episode owner's decision.
-
-## 11. Completion criteria
-
-The strategy is complete when:
-
-1. all `R-TEST-*` requirements are represented in
-   `config/requirements-inventory.json` with executable coverage;
-2. every environment-dependent body is container-driven or appears in the
-   explicit host-observer registry;
-3. tier 2 proves its exact artifact, fixture-owned database, offline synthetic
-   corpus, and local bare-remote contracts;
-4. source-mode Prime Agent builds leave the selected checkout byte-identical;
-5. the lifecycle guardrails fail closed under injected failures and the first
-   credential-free observer passes when explicitly invoked;
-6. the three documented entry commands have stable exit/evidence contracts;
-7. DEVELOPERS.md and test architecture documentation match the implementation;
-   and
-8. every implementation slice is reviewed, committed, pushed, and reflected in
-   its bead.
+Preserve owner-accepted Slice 1 and Slice 2. Do not implement Slice 4 or modify
+Prime Agent. Publish one replacement and stop for owner review.

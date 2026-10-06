@@ -113,62 +113,32 @@ only. Do not apply, check, or probe a candidate against the host user-global
   exact recovered cidfile identity; malformed identities never reach removal. See
   [docs/testing-strategy.md](docs/testing-strategy.md).
 - **Tier 2 — disposable brain-stack integration.**
-  `scripts/test-integration.sh` prepares the exact locked upstream gbrain
-  archive and Bun artifact, builds native `linux/arm64` or `linux/amd64`, and
-  runs PostgreSQL 16 + pgvector + gbrain as an unprivileged user. The assertion
-  container starts with `--network none`, publishes no port, receives no
-  credential or host home, and mounts only a run-owned repository snapshot
-  read-only plus one result share read/write. Database, PGDATA, gbrain home,
-  corpus worktree, and local bare Git remote live only inside the container.
+  `scripts/test-integration.sh` prepares the exact locked upstream gbrain archive
+  and Bun artifact, builds native `linux/arm64` or `linux/amd64`, and runs
+  PostgreSQL 16 + pgvector + gbrain as unprivileged image user `tester`.
 
   ```bash
   scripts/test-integration.sh --dry-run
   scripts/test-integration.sh
-  # optional transport cache; its working tree is never copied
+  # optional public-source transport cache; never mounted into the container
   INTEGRATION_GBRAIN_MIRROR=/absolute/path/to/gbrain scripts/test-integration.sh
   ```
 
-  The explicit body is `tests/integration/environment_body.py`. Its filename is
-  intentionally not pytest-collectable, and direct host invocation fails before
-  side effects. The launcher captures exact iid/cid identities, verifies tags,
-  normalized local digests, immutable base lineage, labels, mounts, environment,
-  ports, network mode, and runtime hashes, then removes only positively owned
-  objects. One continuously acquired and retained snapshot/ancestor capability
-  supplies Dockerfile and artifact-lock bytes read from their exact capture-time
-  regular-file bindings, preparation inventory/hash, repeated whole-snapshot
-  verification, and cleanup; no consumer
-  recaptures ownership from a public path. All control, body, manifest, and
-  evidence rereads are bounded, stable, no-follow regular reads with path-specific
-  limits plus aggregate entry/file/byte/depth limits. Replaced aliases, regular
-  inode replacement, special files, oversized input, and read-time mutation fail
-  closed.
+  The assertion body and synthetic fixture are baked into the image. Runtime uses
+  `--network none`, no host mounts or published ports, and no host home, socket,
+  credentials, provider environment, private data, or production service. HOME,
+  PostgreSQL state, results, and synthetic Git repositories are container-local.
+  After the body exits, the launcher stops the container and copies its JSON
+  result with `docker cp`.
 
-  Docker's host bind/build APIs accept pathnames rather than client file
-  descriptors. The driver verifies retained authority and captured content before
-  and after each Docker call and rejects persistent replacement. It does not claim
-  to prevent a hostile same-UID process from replacing and restoring a pathname
-  only while the daemon resolves it; concurrent mutation of the private run-owned
-  results tree is outside this test harness's trust boundary.
-
-  A nonce handshake lets the supervisor retain the full tier chain before the
-  real driver begins. The driver cleans its exact resources and writes only a
-  private `candidate.json`. In the disposable supervised child it deliberately
-  keeps its owned handlers installed through process exit rather than restoring a
-  returning or ignored handler; a non-supervised callable restores provisional
-  caller state. The outer CLI supervisor is the sole final publisher through
-  child terminal handoff/exit, candidate validation, final publication, terminal
-  unmasking, and its own process exit. It retains the exact writable manifest
-  inode and publishes a binding sidecar. A late failure neutralizes that inode
-  without reopening its path or using the publication namespace; a raced
-  replacement remains untouched but fails binding-aware public validation. No real-run
-  PASS/OK line precedes this boundary. Signals the caller already blocked remain
-  pending caller state; only initially unblocked watched signals are run-owned.
-  A nonzero removal stays non-clean even after absence. Malformed inspect
-  structures become typed unknown and each safe finalizer stage still runs
-  independently. The terminal manifest records
-  clean preparation, container, image, context, snapshot, and share teardown. Compare
-  two passed, independently verified evidence trees with
-  `python3 -m scripts.testing.integration_provenance compare-runs <first> <second>`.
+  The launcher records the tested HEAD/content identity, platform, locked
+  versions, immutable image/container IDs, functional result, and cleanup
+  outcomes in one `manifest.json`. It removes only exact IDs whose run/contract
+  labels match. Cleanup, command, timeout, interrupt, copied-result, or ownership
+  failures stay nonzero. The local host and same-UID operator are trusted; hostile
+  local races and inode/publication hardening are intentionally outside this
+  tier's acceptance boundary. The explicit body filename is not pytest-
+  collectable, and direct host invocation fails before side effects.
 
 - **Legacy explicit sandbox suite.** `python3 -m pytest tests/ -q -m sandbox`
   remains host-orchestrated and outside default runs. Slice 4 owns its taxonomy

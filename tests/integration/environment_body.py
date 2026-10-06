@@ -24,9 +24,9 @@ try:
 except ImportError:  # pragma: no cover - image installs pytest; import is inert
     pytestmark = None
 
-WORKSPACE = Path("/workspace")
-RESULTS = Path("/results")
-FIXTURE = WORKSPACE / "tests/fixtures/brain-source"
+ASSETS = Path("/opt/prime-claw-test/assets")
+RESULTS = Path("/home/tester/results")
+FIXTURE = ASSETS / "fixtures/brain-source"
 BUILD_META = Path("/opt/prime-claw-test/integration-build.json")
 LOCK_COPY = Path("/opt/prime-claw-test/artifact-lock.json")
 _ALLOWED_ENV = {
@@ -53,14 +53,6 @@ def _run(argv: list[str], *, env: dict[str, str], timeout: int = 120,
     )
 
 
-def _mount_options(destination: str) -> set[str]:
-    for raw in Path("/proc/self/mountinfo").read_text().splitlines():
-        left = raw.split(" - ", 1)[0].split()
-        if len(left) >= 6 and left[4] == destination:
-            return set(left[5].split(","))
-    raise RuntimeError(f"required mount is absent: {destination}")
-
-
 def _verify_entry_boundary(attestation: str, run_id: str) -> list[str]:
     if os.environ.get("PRIME_CLAW_INTEGRATION_ATTESTATION") != attestation:
         raise RuntimeError("integration attestation mismatch")
@@ -70,24 +62,25 @@ def _verify_entry_boundary(attestation: str, run_id: str) -> list[str]:
         raise RuntimeError("integration attestation is malformed")
     if os.geteuid() == 0:
         raise RuntimeError("integration body must run unprivileged")
-    if not WORKSPACE.is_dir() or not RESULTS.is_dir():
-        raise RuntimeError("integration mounts are unavailable")
-    unexpected = sorted(set(os.environ) - _ALLOWED_ENV)
-    if unexpected:
-        raise RuntimeError("integration process environment is not allow-listed")
-    if "ro" not in _mount_options("/workspace"):
-        raise RuntimeError("repository mount is not read-only")
-    if "rw" not in _mount_options("/results"):
-        raise RuntimeError("result mount is not writable")
-    probe = WORKSPACE / ".prime-claw-integration-write-probe"
+    if not ASSETS.is_dir() or not FIXTURE.is_dir():
+        raise RuntimeError("baked integration assets are unavailable")
+    asset_probe = ASSETS / ".write-probe"
     try:
-        fd = os.open(probe, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        asset_probe.write_text("unexpected\n")
     except OSError:
         pass
     else:
-        os.close(fd)
-        probe.unlink(missing_ok=True)
-        raise RuntimeError("repository write unexpectedly succeeded")
+        asset_probe.unlink(missing_ok=True)
+        raise RuntimeError("baked integration assets are unexpectedly writable")
+    if Path.home() != Path("/home/tester"):
+        raise RuntimeError("integration HOME is not container-local tester home")
+    RESULTS.mkdir(parents=True, exist_ok=True)
+    probe = RESULTS / ".write-probe"
+    probe.write_text("ok\n")
+    probe.unlink()
+    unexpected = sorted(set(os.environ) - _ALLOWED_ENV)
+    if unexpected:
+        raise RuntimeError("integration process environment is not allow-listed")
     return sorted(os.environ)
 
 
@@ -292,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
     stack = _postgres_and_gbrain(root, args.run_id, root / "brain", base_env)
     receipt = {
         "schema_version": 1,
-        "contract": "integration-body-v1",
+        "contract": "integration-body-v2",
         "run_id": args.run_id,
         "started_at": started,
         "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -300,7 +293,8 @@ def main(argv: list[str] | None = None) -> int:
         "platform": build["platform"],
         "non_root": True,
         "uid": os.geteuid(),
-        "repository_read_only": True,
+        "source_baked": True,
+        "repository": build["repository"],
         "external_tcp_refused": True,
         "environment_names_sha256": _sha(_canonical(env_names)),
         "artifact_lock_sha256": _sha(_canonical(lock)),
