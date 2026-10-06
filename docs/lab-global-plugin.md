@@ -124,6 +124,12 @@ ordinary byte-and-metadata preimage immediately before same-directory
 `os.replace`, preserves mode/uid/gid where supported, fsyncs the new file and its
 parent directory, and refuses a changed preimage.
 
+The first Slice 2 provider guard imports the generated role-kernel bytes rather
+than trusting the retained legacy APPEND body. Ordinary explicit no-context
+sessions remain ordinary; promotion, active-owner, and bounded-EPISODE paths
+require the exact neutral block. The managed Conversation guide and its one-shot
+activation receipt are intentionally not part of this first Slice 2 candidate.
+
 This is intentionally not a hostile-filesystem transaction engine. The manager
 does not maintain a multi-phase journal, continuous descriptor/inode authority,
 atomic-exchange rollback, or syscall-by-syscall crash protocol. An in-process
@@ -206,12 +212,16 @@ host candidate probe. The accepted installed generation should expose:
 - native `/handoff`, `/plan`, and `/implement-spec` commands;
 - structured `ralph_handoff`, `ralph_plan`, `create_spec_episode`,
   `handoff_spec_episode`, and `finalize_spec_episode` tools;
-- exactly one managed `PRIME_CLAW_CONVERSATION_IDENTITY_V1` block containing the
-  lean conversation/episode and goal/heartbeat protocol;
+- exactly one managed `PRIME_CLAW_ROLE_KERNEL_V1` block from the selected global
+  AGENTS/CLAUDE context, byte-identical to the generated neutral kernel;
+- no neutral-kernel copy in provider-visible user or custom messages, and no
+  provider-visible bounded EPISODE identity package;
 - no separate `goal-heartbeat-work-control.ts` entry or
   `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` overlay; and
-- lifecycle hooks from `reviewed-plan.ts` that filter historical
-  `prime-claw-oversee-episode-package` messages without producing new ones.
+- lifecycle hooks from `reviewed-plan.ts` that filter historical oversight and
+  private identity records, require the exact neutral kernel for managed owner or
+  EPISODE calls, and explicitly abort malformed managed context before provider
+  dispatch.
 
 `finalize_spec_episode` remains a location-only, no-UI bookkeeping close after
 verified terminal work. It grants no Git, merge, abandonment, session, worktree,

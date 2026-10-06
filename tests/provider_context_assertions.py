@@ -16,6 +16,7 @@ RETIRED_WORK_CONTROL_START = "<!-- prime-claw:goal-heartbeat-work-control:start 
 RETIRED_WORK_CONTROL_END = "<!-- prime-claw:goal-heartbeat-work-control:end -->"
 RETIRED_WORK_CONTROL_CONTROL = "PRIME_CLAW_TEST_RETIRED_WORK_CONTROL_91B3DF1D12C44C5A"
 ORDINARY_USER_SENTINEL = "PRIME_CLAW_TEST_ORDINARY_USER_2F625A178B6B4FD0"
+ROLE_KERNEL_SENTINEL = "PRIME_CLAW_ROLE_KERNEL_V1"
 
 # Historical-shaped test fixture copied from the retired injector's policy. It
 # intentionally stays in tests: production proves absence by not installing the
@@ -36,14 +37,15 @@ Goal and heartbeat work control:
 
 
 def provider_capture_expression(context_var: str = "context") -> str:
-    """Return a TypeScript expression that inspects both provider channels."""
+    """Return a TypeScript expression that inspects provider-visible channels."""
     package = json.dumps(LEGACY_PACKAGE_SENTINEL)
     retired_sentinel = json.dumps(RETIRED_WORK_CONTROL_SENTINEL)
     retired_start = json.dumps(RETIRED_WORK_CONTROL_START)
     retired_end = json.dumps(RETIRED_WORK_CONTROL_END)
     retired_control = json.dumps(RETIRED_WORK_CONTROL_CONTROL)
     ordinary = json.dumps(ORDINARY_USER_SENTINEL)
-    return f"""(()=>{{const providerMessages={context_var}.messages??[],systemPrompt=typeof {context_var}.systemPrompt==="string"?{context_var}.systemPrompt:"",text=value=>typeof value==="string"?value:Array.isArray(value)?value.map(part=>typeof part==="string"?part:part?.type==="text"?part.text??"":"").join(""):"",userText=providerMessages.filter(message=>message?.role==="user").map(message=>text(message.content)).join("\\n"),userCount=token=>userText.split(token).length-1,systemCount=token=>systemPrompt.split(token).length-1,customText=providerMessages.filter(message=>message?.role==="custom").map(message=>JSON.stringify(message)).join("\\n");return{{legacyOversightUserCount:userCount({package}),retiredWorkControlQuotedUserCount:userCount({retired_sentinel}),ordinaryUserCount:userCount({ordinary}),controlledSentinelCustomCount:[{package},{retired_control}].reduce((total,token)=>total+customText.split(token).length-1,0),retiredWorkControlSystemSentinelCount:systemCount({retired_sentinel}),retiredWorkControlSystemStartCount:systemCount({retired_start}),retiredWorkControlSystemEndCount:systemCount({retired_end}),retiredWorkControlSystemControlCount:systemCount({retired_control})}}}})()"""
+    role_kernel = json.dumps(ROLE_KERNEL_SENTINEL)
+    return f"""(()=>{{const providerMessages={context_var}.messages??[],systemPrompt=typeof {context_var}.systemPrompt==="string"?{context_var}.systemPrompt:"",text=value=>typeof value==="string"?value:Array.isArray(value)?value.map(part=>typeof part==="string"?part:part?.type==="text"?part.text??"":"").join(""):"",userText=providerMessages.filter(message=>message?.role==="user").map(message=>text(message.content)).join("\\n"),userCount=token=>userText.split(token).length-1,systemCount=token=>systemPrompt.split(token).length-1,customText=providerMessages.filter(message=>message?.role==="custom").map(message=>JSON.stringify(message)).join("\\n"),customCount=token=>customText.split(token).length-1;return{{legacyOversightUserCount:userCount({package}),retiredWorkControlQuotedUserCount:userCount({retired_sentinel}),ordinaryUserCount:userCount({ordinary}),roleKernelSystemCount:systemCount({role_kernel}),roleKernelUserCount:userCount({role_kernel}),roleKernelCustomCount:customCount({role_kernel}),controlledSentinelCustomCount:[{package},{retired_control}].reduce((total,token)=>total+customCount(token),0),retiredWorkControlSystemSentinelCount:systemCount({retired_sentinel}),retiredWorkControlSystemStartCount:systemCount({retired_start}),retiredWorkControlSystemEndCount:systemCount({retired_end}),retiredWorkControlSystemControlCount:systemCount({retired_control})}}}})()"""
 
 
 def assert_provider_context_clean(
@@ -55,6 +57,8 @@ def assert_provider_context_clean(
     """Assert that controlled retired content is absent from its real channel."""
     assert row["legacyOversightUserCount"] == 0, f"provider-visible oversight package sentinel leaked: {row}"
     assert row["controlledSentinelCustomCount"] == 0, f"provider custom sentinel unexpectedly survived conversion: {row}"
+    assert row["roleKernelUserCount"] == 0, f"neutral role kernel leaked into provider user text: {row}"
+    assert row["roleKernelCustomCount"] == 0, f"neutral role kernel leaked into provider custom text: {row}"
     for field in (
         "retiredWorkControlSystemSentinelCount",
         "retiredWorkControlSystemStartCount",

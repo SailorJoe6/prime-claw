@@ -535,24 +535,38 @@ at `/Users/jlanders/.prime/agent/session-artifacts/01a0f51d-d51b-7649-a28a-84487
 must simplify from its preserved state or the smallest useful historical base; it
 must not finish the abandoned state machine.
 
-The next execute pass is limited to corrected Slice 1. It removes obsolete
-adversarial machinery/tests, retains the concrete unrelated-file deletion fix and
-practical installer behavior, runs proportional gates, commits/pushes one
-simplified candidate, reports, and stops. No Slice 2 or activation work is
-allowed.
+Corrected Slice 1 completed and was owner-accepted on 2026-10-06 at commit
+`57d26e582c583a81de370051b129f74f5b13ee45`, tree
+`d1739c3a2ffee4512d6741480b72792e3a8d4098`. It replaced the paused manager with a
+straightforward cooperative-lock/atomic-replacement implementation and a
+fixed-inventory known-state receipt. Transaction journals, descriptor chains,
+inode-generation authority, exchange restoration, exhaustive fault hooks, and
+the F1–F9 race matrices are absent. The sole bounded review found one in-model
+cooperative-lock ordering defect; its narrow repair and exact waiter regression
+were owner-verified and every full gate reran green. Incident `prime-claw-gv7.1`
+is closed. Systemic epic `prime-claw-gv7` and advisory H1 remain open for
+dogfood. Slice 1 is immutable accepted history.
 
-**Reduced implementation checkpoint (2026-10-06):** the episode replaced the
-paused manager with a straightforward cooperative-lock/atomic-replacement
-implementation and a fixed-inventory known-state receipt. Transaction journals,
-descriptor chains, inode-generation authority, exchange restoration, exhaustive
-fault hooks, and the F1–F9 race matrices are absent. The practical 10-scenario
-Linux matrix, complete Tier 0/Docker gates, and pinned 0.9.8 probe passed. The sole
-bounded review returned one in-model BLOCK: mutable destination preflight ran
-before the cooperative lock. The manager now validates mutable destination state
-under that lock, the shell wrapper no longer performs a separate unlocked
-preflight, and the focused matrix includes the exact intermediate-state waiter
-regression. Final proportional reruns, exact evidence, commit, and push remain;
-Slice 2 and activation remain untouched.
+## 5.2 Active Slice-2 vertical checkpoint
+
+The current execute pass delivers only the first small Slice 2 capability:
+managed active-owner and bounded-EPISODE provider calls bind to the generated
+neutral role-kernel bytes, malformed or missing managed context aborts before
+provider dispatch, explicit no-context ordinary sessions remain usable, and
+private bounded identity is no longer copied into provider-visible messages.
+Existing lifecycle state and historical-package filtering are reused.
+
+This candidate does not add the managed Conversation skill, activation tool,
+receipts, lifecycle readiness gates, or project-skill shim. Those remain the next
+Slice 2 capability after owner review. Do not begin Slice 3, land, mutate
+user-global state, restart, run UAT, finalize, or clean up.
+
+**Candidate evidence (2026-10-06):** focused native/provider migration 11 passed;
+Tier 0 291 passed; Docker Tier 1 60 passed; pinned Prime Agent 0.9.8 installed
+runtime probe PASS. Evidence and reproducible commands are in
+`docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-managed-role-integrity.md`.
+The candidate awaits commit, push, and owner review; later Slice 2 activation
+work remains untouched.
 
 ## 6. Slice 1 — Simplify and complete the neutral-kernel installer
 
@@ -1199,17 +1213,16 @@ operator when automatic recovery is not clearly safe.
 ## 18. Existing-episode continuation gate
 
 The episode already exists and remains bound to this specification. Do not create
-or replace it. Before canonical continuation, the owner must:
+or replace it. Corrected Slice 1 is immutable owner-accepted history at
+`57d26e582c583a81de370051b129f74f5b13ee45` / tree
+`d1739c3a2ffee4512d6741480b72792e3a8d4098`; incident `prime-claw-gv7.1` is
+closed. The systemic epic and advisory H1 remain open without expanding this
+implementation contract.
 
-1. preserve the paused F1–F9 draft and hashes outside the worktree;
-2. commit and push this corrected specification/plan on primary `main` without
-   including unrelated concurrent changes;
-3. update the active episode specification and plan to the same reduced contract;
-4. record the operator decision, incident, epic, and artifact hashes on
-   `prime-claw-h6w.30`; and
-5. use exactly one canonical handoff to resume Slice 1.
-
-The next execute pass removes obsolete adversarial machinery, runs proportional
-gates, publishes one simplified candidate, and stops. It must not begin Slice 2,
-land, mutate user-global state, restart Prime Agent, or seek perfection through
-another red-team loop.
+Each canonical owner handoff may authorize one smallest end-to-end Slice 2
+candidate. The execute pass audits current deterministic surfaces, implements one
+bounded capability, updates tests/docs/Beads, runs proportional gates, commits
+and pushes once, reports, and stops. The current candidate is limited to generated
+neutral-kernel enforcement and private managed-role context as recorded in
+Section 5.2. It must not begin activation receipts or Slice 3, land, mutate
+user-global state, restart Prime Agent, run UAT, finalize, or clean up.

@@ -1,17 +1,20 @@
 # Goal and heartbeat work control
 
-Prime Claw's one managed lean session block in
-`src/prime-agent-plugin/APPEND_SYSTEM.md` owns the model-facing goal and heartbeat
-rules. Ralph `/execute` applies those generic rules while implementing plans; it
-does not install a second policy.
+During the bridge generation, Prime Claw's retained
+`src/prime-agent-plugin/APPEND_SYSTEM.md` block continues to provide the
+model-facing goal and heartbeat rules. The separately installed neutral role
+kernel carries no detailed work-control procedure. Ralph `/execute` applies the
+existing generic rules while implementing plans; it does not install a second
+policy.
 
 ## Supported runtime boundary
 
-The APPEND_SYSTEM block is installed with the managed Prime Claw plugin and is
-validated byte-for-byte by the conversation lifecycle extension whenever trusted
-active state requires it. There is no separate `before_agent_start` overlay,
-capability gate, `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block, tool, message,
-or autonomous slash-command transport.
+The APPEND bridge remains installed and byte-checked by the role-protocol
+manager. Managed owner and EPISODE provider calls are independently guarded by
+the exact generated neutral role kernel in the selected global context. There is
+no separate `before_agent_start` overlay, capability gate,
+`PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block, tool, message, or autonomous
+slash-command transport.
 
 The block states the bounded control contract directly:
 

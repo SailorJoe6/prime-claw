@@ -23,7 +23,8 @@ from provider_context_assertions import (
 )
 
 REPO = Path(__file__).resolve().parents[1]
-KERNEL = REPO / "src/prime-agent-plugin/APPEND_SYSTEM.md"
+LEGACY_APPEND = REPO / "src/prime-agent-plugin/APPEND_SYSTEM.md"
+ROLE_KERNEL = REPO / "src/prime-agent-plugin/ROLE_KERNEL.md"
 EXTENSION = REPO / "src/prime-agent-plugin/extensions/reviewed-plan.ts"
 SUPPORT = REPO / "src/prime-agent-plugin/extension-support/conversation-oversight.ts"
 SKILL = REPO / ".ralph/skills/oversee-episode/SKILL.md"
@@ -33,12 +34,12 @@ DOGFOOD = REPO / "reports/reviews/conversation-driven-episode-oversight-dogfood.
 # Container paths (repo bind-mounted read-only at /workspace).
 WS_EXTENSION = "/workspace/src/prime-agent-plugin/extensions/reviewed-plan.ts"
 WS_SUPPORT = "/workspace/src/prime-agent-plugin/extension-support/conversation-oversight.ts"
-WS_KERNEL = "src/prime-agent-plugin/APPEND_SYSTEM.md"
+WS_KERNEL = "src/prime-agent-plugin/ROLE_KERNEL.md"
 WS_NODE_SUITE = "/workspace/tests/project_conversation_extension.test.mjs"
 
 
 def test_managed_session_contract_is_lean_and_covers_the_poc_protocol():
-    text = " ".join(KERNEL.read_text().split())
+    text = " ".join(LEGACY_APPEND.read_text().split())
     for phrase in [
         "PRIME_CLAW_CONVERSATION_IDENTITY_V1",
         "CONVERSATION",
@@ -84,7 +85,7 @@ def test_extension_uses_context_and_exact_state_without_rejected_flag_profile():
     assert "registerFlag" not in extension + support
     assert "before_agent_start" not in support
     assert "project-conversation.md" not in extension + support
-    for phrase in ["IDENTITY_KERNEL", "OVERSIGHT_MARKER_TYPE", "LEGACY_OVERSIGHT_PACKAGE_TYPE", "getBranch()", "spec-episodes", "ctx.abort()", "oversight marker disagrees", "filter"]:
+    for phrase in ["PRIME_CLAW_ROLE_KERNEL_TEXT", "OVERSIGHT_MARKER_TYPE", "LEGACY_OVERSIGHT_PACKAGE_TYPE", "getBranch()", "spec-episodes", "ctx.abort()", "oversight marker disagrees", "filter"]:
         assert phrase in support
     assert "OVERSIGHT_PACKAGE_PATH" not in support
     assert "packageBody" not in support
@@ -110,7 +111,7 @@ def _provider_extension(path: Path, records: Path):
 import {createAssistantMessageEventStream} from "@earendil-works/pi-ai";
 const records=RECORDS;
 export default function p(pi){pi.registerProvider("poc",{baseUrl:"x",apiKey:"x",api:"poc",
-streamSimple(model,context){const messages=context.messages??[],capture=PROVIDER_CAPTURE;appendFileSync(records,JSON.stringify({kernel:context.systemPrompt.split("PRIME_CLAW_CONVERSATION_IDENTITY_V1").length-1,...capture})+"\n");const s=createAssistantMessageEventStream();queueMicrotask(()=>{const m={role:"assistant",content:[{type:"text",text:"ok"}],api:model.api,provider:model.provider,model:model.id,usage:{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}},stopReason:"stop",timestamp:Date.now()};s.push({type:"start",partial:m});s.push({type:"done",reason:"stop",message:m});s.end()});return s},models:[{id:"m",name:"M",reasoning:false,input:["text"],cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:10000,maxTokens:1000}]})}'''
+streamSimple(model,context){const messages=context.messages??[],capture=PROVIDER_CAPTURE;appendFileSync(records,JSON.stringify({kernel:context.systemPrompt.split("PRIME_CLAW_ROLE_KERNEL_V1").length-1,...capture})+"\n");const s=createAssistantMessageEventStream();queueMicrotask(()=>{const m={role:"assistant",content:[{type:"text",text:"ok"}],api:model.api,provider:model.provider,model:model.id,usage:{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}},stopReason:"stop",timestamp:Date.now()};s.push({type:"start",partial:m});s.push({type:"done",reason:"stop",message:m});s.end()});return s},models:[{id:"m",name:"M",reasoning:false,input:["text"],cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:10000,maxTokens:1000}]})}'''
     path.write_text(
         source.replace("RECORDS", json.dumps(str(records))).replace(
             "PROVIDER_CAPTURE", provider_capture_expression()
@@ -310,13 +311,13 @@ def test_native_active_promotion_and_recovery_need_no_oversight_skill(tier1_cont
 
 
 def test_current_documentation_describes_lean_default_and_transition_compatibility():
-    text = DOC.read_text()
+    text = " ".join(DOC.read_text().split())
     for phrase in [
         "Managed lean session protocol",
-        "sole model-facing protocol",
+        "PRIME_CLAW_ROLE_KERNEL_V1",
         "one reviewable vertical slice at a time",
         "historical `prime-claw-oversee-episode-package` messages",
-        "never reads, parses, validates, or injects the old project-local skill",
+        "do not read, parse, validate, or inject `.ralph/skills/oversee-episode/SKILL.md`",
         "Loaded-generation compatibility reference (temporary)",
         "one coordinated full restart",
         "designated ordinary-conversation UAT",

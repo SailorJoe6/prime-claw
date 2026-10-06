@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Operator-approved scope correction on 2026-10-06. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode and must simplify paused Slice 1 under the reduced contract below.
+> **Status:** Corrected Slice 1 accepted on 2026-10-06 at `57d26e582c583a81de370051b129f74f5b13ee45` / tree `d1739c3a2ffee4512d6741480b72792e3a8d4098`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode and is advancing through bounded Slice 2 candidates.
 >
 > **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
 > **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** the existing episode may complete only the corrected Slice 1 after canonical owner handoff. Slice 2+, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical cleanup remain separately authorized.
+> **Implementation authority:** the existing episode may complete one smallest end-to-end Slice 2 candidate per canonical owner handoff, commit/push it, report, and stop. Slice 3, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical cleanup remain separately authorized.
 
 ## Summary
 

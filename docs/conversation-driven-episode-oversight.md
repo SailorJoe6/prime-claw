@@ -7,24 +7,21 @@ Prime Agent behavior.
 
 ## Managed lean session protocol
 
-The inert builder resource `src/prime-agent-plugin/APPEND_SYSTEM.md` contains the
-short managed block identified by `PRIME_CLAW_CONVERSATION_IDENTITY_V1`.
-`scripts/apply-prime-agent-plugin.sh --user-global` deliberately merges that
-block from the primary `main` checkout into the user-global
-`~/.prime/agent/APPEND_SYSTEM.md` while preserving unrelated user append content.
-Bare apply/check fail closed, linked worktrees cannot select user-global mode,
-and pre-merge execution stays inside Docker tier 1. The check script verifies
-exactly one byte-current block. The normalized block stays at or below 250 words
-and is the sole model-facing protocol for both conversation/episode oversight
-and goal/heartbeat work control.
+The canonical neutral floor is `src/prime-agent-plugin/ROLE_KERNEL.md`, with
+byte-identical generated TypeScript in
+`extension-support/role-kernel.generated.ts`. The role-protocol manager installs
+that exact `PRIME_CLAW_ROLE_KERNEL_V1` block into the one selected user-global
+AGENTS/CLAUDE context. During the bridge generation it also retains the legacy
+`APPEND_SYSTEM.md` block without treating it as role authority.
 
-Prime Agent chooses a project `.prime/agent/APPEND_SYSTEM.md` before the global
-file, and `--append-system-prompt` overrides file discovery. A truly inactive
-ordinary conversation remains available under such a shadow. `/implement-spec`
-readiness, explicit EPISODE state, active ownership, and recovery require exactly
-one intact canonical block. A native depth-positive delegated/RLM child instead
-follows its trusted bounded task prompt under an intentional shadow; it receives
-zero CONVERSATION ownership. No prose heuristic grants ownership.
+Bare apply/check fail closed, linked worktrees cannot select user-global mode,
+and pre-merge execution stays inside Docker tier 1. A truly inactive ordinary
+session remains usable when context files are explicitly disabled. Root
+promotion, active owner supervision, and bounded EPISODE execution instead
+require exactly one exact generated neutral block. Any missing, duplicate,
+stale, reversed, nested, or otherwise marker-shaped role-kernel content blocks
+the managed action. Working directory, branch, depth, session name, and copied
+prose cannot grant ownership or a managed role.
 
 The managed block establishes these rules:
 
@@ -50,9 +47,11 @@ and resume rebuild the block from current managed resources.
 
 Native `/implement-spec` remains the only promotion authority boundary. Before
 queuing its canonical readiness workflow, the extension verifies exactly one
-effective managed block, active restoration mechanics, a writable durable
+exact generated neutral block, active restoration mechanics, a writable durable
 spec-episode state directory, and canonical agreement among CWD, state, and the
-expected worktree. The current runtime and installer do not read, parse,
+expected worktree. This first Slice 2 capability does not yet install or activate
+the managed Conversation guide; that on-demand capability remains the next
+Slice 2 vertical change. The current runtime and installer do not read, parse,
 validate, or inject `.ralph/skills/oversee-episode/SKILL.md`.
 
 After `create_spec_episode` durably establishes and delivers a strictly parsed
@@ -72,18 +71,21 @@ or disagreeing current-owner state fails closed.
 
 On every real provider context, the restoration extension:
 
-1. validates one byte-current managed block whenever trusted active state requires it;
-2. reconciles the latest exact-session marker with
+1. validates the exact generated neutral block whenever trusted managed state
+   requires it;
+2. reconciles the latest exact-session owner marker with
    `.prime/agent/state/spec-episodes/<slug>.json`;
-3. removes historical `prime-claw-oversee-episode-package` messages;
-4. never reads, parses, validates, or injects the old project-local skill; and
-5. preserves the exact bounded-identity message for an explicit EPISODE.
+3. recognizes bounded EPISODE identity only from the exact private session entry;
+4. removes historical `prime-claw-oversee-episode-package` messages and private
+   bounded-identity records from provider messages; and
+5. never injects a role or identity package into provider-visible user or custom
+   content.
 
 This path covers normal input, extension triggers, queues, native follow-ups,
 heartbeats, agent messages, tool continuation, reload, resume, and the first real
-post-compaction call. Missing or duplicate managed blocks and corrupt or
-disagreeing trusted state call `ctx.abort()` before provider dispatch. Missing
-old compatibility skill files do not affect the current generation.
+post-compaction call. Missing or malformed managed kernels and corrupt or
+disagreeing trusted state call `ctx.abort()` before provider dispatch. Ordinary
+no-context sessions continue without managed authority.
 
 Provider-boundary acceptance keeps the two retired channels distinct. It checks
 converted provider-visible user messages for historical oversight packages and
@@ -96,12 +98,12 @@ leaks.
 
 ## Lean model-facing protocol
 
-The managed APPEND_SYSTEM block is the current policy. It tells an owner to
-review evidence rather than implement its episode, use optional independent
-EXPERT judgment when useful, and advance only through canonical handoff. Reports
-are evidence, never approval or native-command dispatch. Deterministic plugin
-code owns identity, lifecycle, admission, handoff, and idempotent bookkeeping
-mechanics; the model exercises bounded review judgment.
+The selected global role kernel is the current neutral invariant floor. The
+legacy APPEND block remains a temporary bridge until managed Conversation guide
+activation is delivered and Gate A is separately authorized. Reports are
+evidence, never approval or native-command dispatch. Deterministic plugin code
+owns identity, lifecycle, admission, handoff, and idempotent bookkeeping; the
+model exercises bounded judgment only through the currently available guidance.
 
 ## Loaded-generation compatibility reference (temporary)
 
@@ -325,8 +327,9 @@ removes every registered resource.
 ## Installation boundaries
 
 Builder sources remain inert under `src/prime-agent-plugin/`. The transition
-apply/check workflow manages eight TypeScript files plus one APPEND_SYSTEM block.
-There is no separate `goal-heartbeat-work-control.ts` entry point and no
+apply/check workflow manages nine allowlisted TypeScript files, one selected
+AGENTS/CLAUDE neutral-kernel region, and the retained legacy APPEND bridge. There
+is no separate `goal-heartbeat-work-control.ts` entry point and no
 `before_agent_start` work-control overlay. Apply treats a stale installed copy as
 a retired managed file: all managed and retired destinations are type-checked
 before the first mutation, then a regular stale copy is removed. Check rejects

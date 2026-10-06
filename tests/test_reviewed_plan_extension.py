@@ -239,7 +239,7 @@ export default function probe(pi) {
     result = tier1_container.run(
         "prime-agent",
         "--mode", "json", "--offline", "--no-session",
-        "--no-extensions", "--no-prompt-templates", "--no-context-files",
+        "--no-extensions", "--no-prompt-templates",
         "--cwd", str(project),
         "-e", CONTAINER_INSTALLED_EXTENSION,
         "-e", str(provider),
@@ -441,7 +441,7 @@ export default function probe(pi) {{
     result = tier1_container.run(
         "prime-agent",
         "--mode", "json", "--offline", "--no-session",
-        "--no-extensions", "--no-prompt-templates", "--no-context-files",
+        "--no-extensions", "--no-prompt-templates",
         "--cwd", str(project), "-e", str(provider),
         "--provider", "implement-prep-probe",
         "--model", "implement-prep-probe-model",

@@ -520,13 +520,13 @@ test("implement-spec admits implement-prep first and canonical readiness as the 
   assert.deepEqual(f.notices, []);
 });
 
-test("implement-spec refuses a shadowed identity kernel before model injection", async (t) => {
+test("implement-spec refuses a shadowed role kernel before model injection", async (t) => {
   const f = fixture(t);
   writeSkill(f.cwd, "implementation policy", "implement-spec");
   const shadowed = createHarness(f.cwd, reviewedPlan, 0, "project append shadow");
   await assert.rejects(
     shadowed.commands.get("implement-spec").handler(LOCATION, shadowed.ctx),
-    /expected exactly one intact managed identity kernel/,
+    /expected exactly one exact managed role kernel/,
   );
   assert.deepEqual(shadowed.messages, []);
 });

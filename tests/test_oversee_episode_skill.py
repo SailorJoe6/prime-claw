@@ -195,8 +195,9 @@ def test_current_docs_separate_lean_policy_from_loaded_generation_compatibility(
     expert = text.index("### Explicit EXPERT reviewer policy")
     assert current < compatibility < expert
     for phrase in (
-        "sole model-facing protocol",
+        "selected global role kernel is the current neutral invariant floor",
         "do not read, parse, validate, or inject `.ralph/skills/oversee-episode/SKILL.md`",
+        "does not yet install or activate the managed Conversation guide",
         "They are not current runtime or installer prerequisites",
         "retained as migration evidence, not as current activation requirements",
     ):

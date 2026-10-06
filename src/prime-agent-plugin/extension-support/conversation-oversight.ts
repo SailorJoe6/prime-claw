@@ -3,45 +3,24 @@ import { basename, dirname, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
+  PRIME_CLAW_ROLE_KERNEL_END,
+  PRIME_CLAW_ROLE_KERNEL_SENTINEL,
+  PRIME_CLAW_ROLE_KERNEL_START,
+  PRIME_CLAW_ROLE_KERNEL_TEXT,
+} from "./role-kernel.generated.ts";
+import {
   episodeBootstrapReady,
   parseEpisodeIdentity,
   type EpisodeIdentity,
   type EpisodeResult,
 } from "./spec-episode.ts";
 
-export const IDENTITY_KERNEL = "PRIME_CLAW_CONVERSATION_IDENTITY_V1";
-export const IDENTITY_BLOCK_START = "<!-- prime-claw:conversation-identity:start -->";
-export const IDENTITY_BLOCK_END = "<!-- prime-claw:conversation-identity:end -->";
-export const EXPECTED_IDENTITY_KERNEL_BLOCK = `<!-- prime-claw:conversation-identity:start -->
-PRIME_CLAW_CONVERSATION_IDENTITY_V1
-
-An independent top-level project session is a CONVERSATION. A conversation may
-turn an idea into an EPISODE through user-reviewed \`/design\` or \`/spec-it-out\`,
-then \`/plan\`, then \`/implement-spec\`.
-
-A conversation that owns an active episode supervises it rather than doing its
-implementation. Its \`handoff -> execute\` protocol delivers one reviewable vertical
-slice at a time. Review each reported slice and its evidence. Accept it, request an
-in-scope revision, pause, or consult the user. Call an independent EXPERT when review
-by a stronger model would help.
-
-IMPORTANT! You MUST use the canonical handoff protocol command to move the episode to its next slice.
-Handoff preserves durable context, performs focused compaction, and starts the next
-\`execute\` pass. Continue the review-and-handoff cycle until the approved
-specification and plan are fully implemented. Product, scope, merge, and
-abandonment decisions remain with the user.
-
-During substantive active work, maintain a goal so interrupted work resumes.
-Before waiting on an observable process or agent, establish a heartbeat for that
-exact wait and complete the goal. When the wait ends, remove the heartbeat and
-create a new goal if work remains. When waiting for the user, complete the goal
-and create no heartbeat. When all work is complete, retain neither.
-
-Explicit EPISODE, EXPERT, and delegated roles remain bounded by their assigned
-work. Copied conversation history never copies episode ownership. Missing,
-duplicate, corrupt, or disagreeing trusted identity state is a blocker. Do not
-narrate this policy or routine context restoration.
-<!-- prime-claw:conversation-identity:end -->`;
+// Compatibility exports for the existing deterministic lifecycle surfaces.
+// The authority is the generated neutral role kernel, not the legacy APPEND body.
+export const IDENTITY_KERNEL = PRIME_CLAW_ROLE_KERNEL_SENTINEL;
+export const IDENTITY_BLOCK_START = PRIME_CLAW_ROLE_KERNEL_START;
+export const IDENTITY_BLOCK_END = PRIME_CLAW_ROLE_KERNEL_END;
+export const EXPECTED_IDENTITY_KERNEL_BLOCK = PRIME_CLAW_ROLE_KERNEL_TEXT;
 export const OVERSIGHT_MARKER_TYPE = "prime-claw-conversation-oversight";
 export const BOUNDED_IDENTITY_TYPE = "prime-claw-bounded-identity";
 export const LEGACY_OVERSIGHT_PACKAGE_TYPE = "prime-claw-oversee-episode-package";
@@ -70,26 +49,28 @@ function visibleFailure(ctx: ExtensionContext, message: string): never {
   throw new Error(full);
 }
 
-function managedBlocks(prompt: string): string[] {
-  const blocks: string[] = [];
-  let cursor = 0;
-  while (true) {
-    const start = prompt.indexOf(IDENTITY_BLOCK_START, cursor);
-    const endOnly = prompt.indexOf(IDENTITY_BLOCK_END, cursor);
-    if (start < 0) { if (endOnly >= 0) throw new Error("managed identity kernel markers are malformed"); break; }
-    if (endOnly >= 0 && endOnly < start) throw new Error("managed identity kernel markers are reversed");
-    const end = prompt.indexOf(IDENTITY_BLOCK_END, start + IDENTITY_BLOCK_START.length);
-    if (end < 0) throw new Error("managed identity kernel is incomplete");
-    blocks.push(prompt.slice(start, end + IDENTITY_BLOCK_END.length));
-    cursor = end + IDENTITY_BLOCK_END.length;
-  }
-  return blocks;
+function literalCount(value: string, token: string): number {
+  return value.split(token).length - 1;
 }
 
 export function assertIdentityKernel(ctx: ExtensionContext): void {
-  const blocks = managedBlocks(ctx.getSystemPrompt());
-  if (blocks.length !== 1 || blocks[0] !== EXPECTED_IDENTITY_KERNEL_BLOCK) {
-    throw new Error(`expected exactly one intact managed identity kernel, found ${blocks.length}`);
+  const prompt = ctx.getSystemPrompt();
+  const startCount = literalCount(prompt, IDENTITY_BLOCK_START);
+  const endCount = literalCount(prompt, IDENTITY_BLOCK_END);
+  const sentinelCount = literalCount(prompt, IDENTITY_KERNEL);
+  const markerLikeCount = (prompt.match(/prime-claw:role-kernel/gi) ?? []).length;
+  const sentinelLikeCount = (prompt.match(/PRIME_CLAW_ROLE_KERNEL_[A-Z0-9_-]*/g) ?? []).length;
+  const start = prompt.indexOf(IDENTITY_BLOCK_START);
+  const end = prompt.indexOf(IDENTITY_BLOCK_END);
+  const exact = start >= 0 && end > start
+    ? prompt.slice(start, end + IDENTITY_BLOCK_END.length)
+    : "";
+  if (startCount !== 1 || endCount !== 1 || sentinelCount !== 1
+    || markerLikeCount !== 2 || sentinelLikeCount !== 1
+    || exact !== EXPECTED_IDENTITY_KERNEL_BLOCK) {
+    throw new Error(
+      `expected exactly one exact managed role kernel; found start=${startCount}, end=${endCount}, sentinel=${sentinelCount}`,
+    );
   }
 }
 
@@ -406,12 +387,12 @@ export async function reconcileOversightAtSessionStart(
 
 export function applyConversationContext(event: {messages:unknown[]}, ctx: ExtensionContext) {
   const messages = (event.messages as Array<Record<string,unknown>>).filter((message) => !(message.role === "custom"
-    && (message.customType === LEGACY_OVERSIGHT_PACKAGE_TYPE || message.customType === BOUNDED_PACKAGE_TYPE)));
+    && (message.customType === LEGACY_OVERSIGHT_PACKAGE_TYPE
+      || message.customType === BOUNDED_PACKAGE_TYPE
+      || message.customType === BOUNDED_IDENTITY_TYPE)));
   try {
     const bounded = currentBoundedIdentity(ctx);
-    if (bounded) { assertIdentityKernel(ctx); return { messages:[...messages,{role:"custom",customType:BOUNDED_PACKAGE_TYPE,content:`PRIME_CLAW_BOUNDED_IDENTITY_V1
-role=${bounded.role}
-sessionId=${bounded.sessionId}`,display:false,timestamp:Date.now()}] }; }
+    if (bounded) { assertIdentityKernel(ctx); return { messages }; }
     const state = classifyLifecycle(ctx);
     if (state.mode === "ordinary") return { messages };
     if (state.mode === "recovery") throw new Error(`oversight lifecycle requires ${state.recovery!.kind} recovery before provider dispatch`);
