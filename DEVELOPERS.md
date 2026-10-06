@@ -66,10 +66,15 @@ only. Do not apply, check, or probe a candidate against the host user-global
 ### Test tiers
 
 - **Tier 0 — host-safe unit/static.** No Docker, OpenShell, Prime Agent
-  execution, plugin install, PostgreSQL, or gbrain. Recording fakes and pure
-  local-tool checks belong here. This is the default gate.
-- **Tier 1 — slim container.** Anything executing Prime Agent, the plugin, or
-  the plugin's Node suites runs inside one run-owned plain-Docker container.
+  execution, plugin install, PostgreSQL, or gbrain. Pure checks and ordinary
+  recording fakes belong here. This is the default gate.
+- **Tier 1 — slim container.** Anything executing Prime Agent, the plugin,
+  environment-sensitive POSIX/Node/Git/socket/probe-wrapper behavior, or the
+  launcher/fixture recording-fake safety suites runs inside one run-owned
+  plain-Docker container. The non-default `tests/unit_env_*_body.py` files are
+  reachable only through the five guarded bridges in
+  `tests/test_unit_env_bridges.py`; plain pytest cannot collect their 56
+  environment-sensitive test functions.
   A sanitized run-owned snapshot of tracked and nonignored inputs is mounted
   read-only at `/workspace`; ignored local state is never mounted. A fresh
   scratch share is the only writable host mount; the durable evidence root,

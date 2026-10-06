@@ -6,9 +6,11 @@ sequencer parses, no tier-1 test code resolves host node/prime-agent
 binaries, and every committed node suite has a pytest bridge.
 """
 
+import ast
 import py_compile
 from pathlib import Path
 import subprocess
+import sys
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -76,3 +78,64 @@ def test_every_node_suite_has_a_pytest_bridge():
             if needle in test_file.read_text()
         ]
         assert bridges, f"{suite.name} has no pytest bridge"
+
+
+UNIT_ENV_BODIES = {
+    "watchdog": ("unit_env_watchdog_body.py", 8),
+    "npm_onload": ("unit_env_npm_onload_body.py", 1),
+    "launcher_driver": ("unit_env_tier1_driver_body.py", 34),
+    "launcher_launch_error": ("unit_env_tier1_launch_error_body.py", 1),
+    "launcher_fixture": ("unit_env_tier1_fixture_body.py", 3),
+    "launcher_image": ("unit_env_tier1_image_body.py", 6),
+    "cleanup": ("unit_env_cleanup_body.py", 1),
+    "probe_wrapper": ("unit_env_probe_wrapper_body.py", 2),
+}
+
+
+def test_environment_dependent_unit_bodies_are_noncollectable_and_bridged():
+    """Named Slice-5 bodies cannot be discovered by host pytest."""
+    bridge = (REPO / "tests" / "test_unit_env_bridges.py").read_text()
+    for filename, expected_tests in UNIT_ENV_BODIES.values():
+        body = REPO / "tests" / filename
+        assert body.is_file()
+        assert not filename.startswith("test_")
+        assert filename in bridge
+        assert "from unit_env_entry import require_unit_env" in body.read_text()
+        assert "require_unit_env()" in body.read_text()
+        tree = ast.parse(body.read_text(), filename=str(body))
+        test_defs = [node for node in ast.walk(tree)
+                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                     and node.name.startswith("test_")]
+        assert len(test_defs) == expected_tests, filename
+
+
+def test_slice5_removed_host_collected_environment_modules():
+    for filename in ("test_prime_agent_probe_isolation.py",):
+        assert not (REPO / "tests" / filename).exists(), filename
+
+
+def test_slice5_bridges_use_only_the_tier1_container_execution_boundary():
+    bridge = (REPO / "tests" / "test_unit_env_bridges.py").read_text()
+    assert bridge.count("def test_") == 5
+    assert "tier1_container.run(" in bridge
+    assert "subprocess" not in bridge
+    assert "docker" not in bridge.lower()
+    assert '"PRIME_CLAW_UNIT_ENV_BODY": "1"' in bridge
+    assert '"HOME": "/tmp/prime-claw-unit-env-home"' in bridge
+    assert "workdir=tier1_container.ws" in bridge
+    assert 'docker run -d --init --name "$NAME"' in (
+        REPO / "scripts" / "test-tier1.sh").read_text()
+    assert '["docker", "run", "-d", "--init"' in (
+        REPO / "tests" / "conftest.py").read_text()
+
+
+def test_unit_env_body_direct_host_entry_fails_closed():
+    env = {key: value for key, value in __import__("os").environ.items()
+           if key != "PRIME_CLAW_UNIT_ENV_BODY"}
+    for filename, _expected_tests in UNIT_ENV_BODIES.values():
+        body = REPO / "tests" / filename
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", "-q", str(body)],
+            cwd=REPO, text=True, capture_output=True, check=False, env=env)
+        assert result.returncode != 0, filename
+        assert "unit-env body refused" in result.stdout + result.stderr, filename

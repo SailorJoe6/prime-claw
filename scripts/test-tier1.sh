@@ -286,7 +286,7 @@ if [ "$PROBE" -eq 1 ]; then echo "tier-1 driver: offline RPC probe enabled"; fi
 if [ "$DRY_RUN" -eq 1 ]; then
     echo "dry-run: allocate .test-results/<run-id>/tier1"
     echo "dry-run: docker build --iidfile <run>/tier1/image.iid -f <run>/tier1/build-context/Dockerfile -t $IMAGE_TAG <run>/tier1/build-context"
-    echo "dry-run: docker run -d --cidfile <run>/tier1/container.cid <captured-image-id> sleep infinity"
+    echo "dry-run: docker run -d --init --cidfile <run>/tier1/container.cid <captured-image-id> sleep infinity"
     if [ -n "$SOURCE" ]; then
         echo "dry-run: disposable source builder mounts <selected-source>:ro and exports a validated release"
         echo "dry-run: online local-tarball install; runtime network absence precedes product actions"
@@ -759,7 +759,7 @@ if [ "$MODE" = source ]; then
     MOUNTS+=(-v "$SHARE/source-release/artifacts:/stage/releases/v$PA_VERSION:ro")
 fi
 RUN_ATTEMPTED=1
-bounded "$DOCKER_TIMEOUT" docker run -d --name "$NAME" --cidfile "$CIDFILE" \
+bounded "$DOCKER_TIMEOUT" docker run -d --init --name "$NAME" --cidfile "$CIDFILE" \
     ${MOUNTS[@]+"${MOUNTS[@]}"} "$IMAGE_ID" sleep infinity \
     >/dev/null 2>&1
 [ -s "$CIDFILE" ] || die "docker run did not publish the run-owned cidfile"

@@ -1,5 +1,8 @@
-"""Public standalone regression for post-preflight Docker launch failure."""
+"""Unit-env body: post-preflight launcher exec failure and replay."""
 from __future__ import annotations
+
+from unit_env_entry import require_unit_env
+require_unit_env()
 
 import json
 import tempfile
@@ -7,7 +10,7 @@ import unittest
 from pathlib import Path
 
 from scripts.testing import provenance
-from test_tier1_driver import DriverHarness, IMAGE_ID
+from unit_env_tier1_driver_body import DriverHarness, IMAGE_ID
 
 
 class TestPublicStandaloneLaunchError(unittest.TestCase):

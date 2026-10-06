@@ -21,8 +21,8 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH="/root/.local/bin:${PATH}"
 
-# --- Base tooling: curl for the NodeSource setup, Python 3 + pytest for the
-# --- bridge/test layer, ca-certificates for TLS. Nothing else. ---
+# --- Base tooling: curl for NodeSource, Python 3 + pytest for bridges,
+# --- procps for bounded POSIX process/reaping assertions, and TLS roots. ---
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bash \
@@ -31,6 +31,7 @@ RUN apt-get update \
         git \
         python3 \
         python3-pytest \
+        procps \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Node.js 22.x (prime-agent prerequisite: >= 22.8) via NodeSource. ---

@@ -1,10 +1,10 @@
 """Tests for bin/prime-claw Slice 3a: runtime stages + create.
 
-Host-safe tier-0 unit tests. Offline: openshell + docker + sandbox_exec are monkeypatched. Covers stage
+host-safe tier-0 unit tests. Offline and recording-fake only: openshell + docker + sandbox_exec are monkeypatched. Covers stage
 idempotency, create ordering, dry-run, and credential isolation (key never
 written to disk or echoed).
 """
-import json, os, subprocess, sys, base64
+import json, os, sys, base64
 from importlib.machinery import SourceFileLoader
 import pytest
 
@@ -166,29 +166,6 @@ def test_prime_agent_mirrors_settings_and_projects_placeholder_only_auth(tmp_pat
     token = pc._codex_synthetic_access_token()
     assert token.count(".") == 2 and "HOST-" not in token
 
-
-def test_npm_onload_rewrites_synthetic_codex_headers_to_placeholders_offline():
-    preload = os.path.join(REPO, "scripts", "lib", "npm-onload.js")
-    js = r"""
-globalThis.fetch = async (_input, init) => {
-  const h = new Headers(init.headers);
-  console.log(h.get('authorization'));
-  console.log(h.get('chatgpt-account-id'));
-  return {ok:true};
-};
-require(process.argv[1]);
-fetch('https://chatgpt.com/backend-api/codex/responses', {
-  headers: {authorization:'Bearer SYNTHETIC.JWT.VALUE', 'chatgpt-account-id':'synthetic'}
-});
-"""
-    env = dict(os.environ, access_token="openshell:resolve:env:v1_access_token",
-               account_id="openshell:resolve:env:v1_account_id")
-    result = subprocess.run(["node", "-e", js, preload], capture_output=True, text=True, env=env)
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines() == [
-        "Bearer openshell:resolve:env:v1_access_token",
-        "openshell:resolve:env:v1_account_id",
-    ]
 
 
 # --- stage: prime-agent / brain / spawn idempotency --------------------------------

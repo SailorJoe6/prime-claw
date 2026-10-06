@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "prime-claw",
-  "phase": "1 \u2014 de-risk gate",
+  "phase": "1 — de-risk gate",
   "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
   "requirements": [
     {
@@ -837,7 +837,7 @@
       "priority": "NICE",
       "phase": 2,
       "slice": 6,
-      "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
+      "summary": "Host exposure of sandboxed Postgres on localhost:5433 — documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
       "status": "documented (Slice 6; no host forward by design)",
       "proven_by": {
         "check": [
@@ -1135,7 +1135,7 @@
       "id": "R-T1-1",
       "priority": "P1",
       "summary": "Tier-1 slim test container image + standalone driver: docker/test.Dockerfile (Ubuntu 24.04 + Node 22 + python3/pytest), scripts/test-tier1.sh builds the image and runs one ephemeral container; --smoke, --dry-run (never contacts Docker), --rebuild; informational paths are Docker-free.",
-      "status": "met (slice 1, EXPERT PASS on 2666843 \u2261 b2f6b86)",
+      "status": "met (slice 1, EXPERT PASS on 2666843 ≡ b2f6b86)",
       "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
       "proven_by": {
         "apply": [
@@ -1148,7 +1148,9 @@
           "docker/test.Dockerfile"
         ],
         "tests": [
-          "tests/test_tier1_image.py"
+          "tests/unit_env_tier1_image_body.py",
+          "tests/test_tier1_image.py",
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-09-29-tier1-slice1-image-driver.md"
@@ -1174,8 +1176,10 @@
           "scripts/testing/provenance.py"
         ],
         "tests": [
+          "tests/unit_env_tier1_driver_body.py",
+          "tests/test_source_builder.py",
           "tests/test_tier1_driver.py",
-          "tests/test_source_builder.py"
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-03-testing-strategy-slice2-source-builder.md"
@@ -1184,7 +1188,7 @@
       "id": "R-T1-3",
       "priority": "P1",
       "summary": "Truthful marker and collection policy: unmarked recording-fake/static tests are tier 0; real tier-1 fixture users are auto-marked container and admitted only by exact `-m container`; arbitrary expressions cannot bypass environment guards; integration/lifecycle markers are never host-admitted.",
-      "status": "implemented in project-wide testing Slice 4; final gates pending",
+      "status": "owner-accepted at project-wide testing Slice-4 commit 854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a",
       "plan": ".ralph/plans/SPECIFICATION.md (Slice 4)",
       "proven_by": {
         "apply": [],
@@ -1197,7 +1201,8 @@
         ],
         "tests": [
           "tests/test_container_helpers_static.py",
-          "tests/test_tier1_fixture.py"
+          "tests/test_tier1_fixture.py",
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-06-testing-strategy-slice4-truthful-tiers.md"
@@ -1229,7 +1234,9 @@
           "tests/test_reviewed_plan_native_discovery.py",
           "tests/test_prime_agent_plugin_install.py",
           "tests/test_container_helpers_static.py",
-          "tests/test_tier1_fixture.py"
+          "tests/unit_env_tier1_fixture_body.py",
+          "tests/test_tier1_fixture.py",
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-09-30-tier1-slice3-migration-sequencer.md"
@@ -1238,7 +1245,7 @@
       "id": "R-T1-5",
       "priority": "P1",
       "summary": "Dumb whole-suite sequencer: scripts/test-all.sh runs tier 0 -> tier 1 -> tier 2 sequentially, fail-fast, prints a tier summary, and logs under .test-results; lifecycle flags are non-mutating usage errors.",
-      "status": "implemented in project-wide testing Slice 4; final gates pending",
+      "status": "owner-accepted at project-wide testing Slice-4 commit 854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 4)",
       "proven_by": {
         "apply": [],
@@ -1276,8 +1283,11 @@
         ],
         "tests": [
           "tests/test_prime_agent_plugin_install.py",
+          "tests/unit_env_tier1_driver_body.py",
+          "tests/unit_env_tier1_fixture_body.py",
           "tests/test_tier1_driver.py",
-          "tests/test_tier1_fixture.py"
+          "tests/test_tier1_fixture.py",
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-02-plugin-install-test-guardrail.md"
@@ -1300,8 +1310,11 @@
           "docs/testing-strategy.md"
         ],
         "tests": [
+          "tests/unit_env_tier1_driver_body.py",
+          "tests/unit_env_tier1_fixture_body.py",
           "tests/test_tier1_driver.py",
-          "tests/test_tier1_fixture.py"
+          "tests/test_tier1_fixture.py",
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-02-testing-strategy-slice1-pinned-provenance.md"
@@ -1310,7 +1323,7 @@
       "id": "R-TEST-2",
       "priority": "GATE",
       "summary": "Tests use the lowest sufficient tier: host-safe mocked/static tests are tier 0, real Prime Agent/plugin execution is Docker tier 1, and the guarded real-stack body is Docker tier 2; lifecycle execution remains disabled.",
-      "status": "Slice-4 truthful taxonomy implemented; final gates pending",
+      "status": "owner-accepted at project-wide testing Slice-4 commit 854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a",
       "plan": ".ralph/plans/SPECIFICATION.md (Slice 4)",
       "proven_by": {
         "apply": [
@@ -1327,10 +1340,12 @@
           "docs/testing-strategy.md"
         ],
         "tests": [
-          "tests/test_tier1_fixture.py",
+          "tests/unit_env_tier1_fixture_body.py",
           "tests/test_container_helpers_static.py",
           "tests/test_integration_tier.py",
-          "tests/test_test_all.py"
+          "tests/test_test_all.py",
+          "tests/test_tier1_fixture.py",
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-06-testing-strategy-slice4-truthful-tiers.md"
@@ -1404,9 +1419,12 @@
           "docs/testing-strategy.md"
         ],
         "tests": [
+          "tests/unit_env_tier1_driver_body.py",
+          "tests/unit_env_tier1_fixture_body.py",
+          "tests/test_integration_tier.py",
           "tests/test_tier1_driver.py",
           "tests/test_tier1_fixture.py",
-          "tests/test_integration_tier.py"
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
@@ -1433,9 +1451,12 @@
         ],
         "tests": [
           "tests/test_testing_provenance.py",
+          "tests/unit_env_tier1_driver_body.py",
+          "tests/unit_env_tier1_fixture_body.py",
+          "tests/test_integration_tier.py",
           "tests/test_tier1_driver.py",
           "tests/test_tier1_fixture.py",
-          "tests/test_integration_tier.py"
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
@@ -1462,9 +1483,12 @@
           "docs/testing-strategy.md"
         ],
         "tests": [
+          "tests/unit_env_tier1_driver_body.py",
+          "tests/unit_env_tier1_fixture_body.py",
+          "tests/test_integration_tier.py",
           "tests/test_tier1_driver.py",
           "tests/test_tier1_fixture.py",
-          "tests/test_integration_tier.py"
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
@@ -1495,9 +1519,12 @@
           "tests/test_source_builder.py",
           "tests/test_source_builder_real_install.py",
           "tests/container/test_source_generation_probe.py",
+          "tests/unit_env_tier1_driver_body.py",
+          "tests/unit_env_tier1_fixture_body.py",
+          "tests/test_testing_provenance.py",
           "tests/test_tier1_driver.py",
           "tests/test_tier1_fixture.py",
-          "tests/test_testing_provenance.py"
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-03-testing-strategy-slice2-source-builder.md"
@@ -1506,7 +1533,7 @@
       "id": "R-TEST-9",
       "priority": "GATE",
       "summary": "Lifecycle execution stays disabled: mocked runtime orchestration is tier 0, plugin development stays Docker-only, and legacy/current lifecycle-enable flags fail before mutation.",
-      "status": "implemented in project-wide testing Slice 4; final gates pending",
+      "status": "owner-accepted at project-wide testing Slice-4 commit 854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a",
       "plan": ".ralph/plans/SPECIFICATION.md (Slice 4)",
       "proven_by": {
         "apply": [
@@ -1550,14 +1577,48 @@
         ],
         "tests": [
           "tests/test_testing_provenance.py",
-          "tests/test_tier1_driver.py",
-          "tests/test_tier1_launch_error.py",
+          "tests/unit_env_tier1_driver_body.py",
+          "tests/unit_env_tier1_launch_error_body.py",
           "tests/test_tier1_network_policy.py",
+          "tests/unit_env_tier1_fixture_body.py",
+          "tests/test_integration_tier.py",
+          "tests/test_tier1_driver.py",
           "tests/test_tier1_fixture.py",
-          "tests/test_integration_tier.py"
+          "tests/test_unit_env_bridges.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
+    },
+    {
+      "id": "R-TEST-11",
+      "priority": "GATE",
+      "summary": "The remaining environment-dependent unit behaviors (POSIX watchdog, npm-onload, tier-1 launcher meta, Git/worktree/Unix-socket cleanup, and probe wrapper) are non-default body files executed only through five exact-marker tier-1 bridges in the disposable offline unit-env container.",
+      "status": "source candidate validated in project-wide testing Slice 5; exact-commit sequential gate and final review pending",
+      "plan": ".ralph/plans/SPECIFICATION.md (Slice 5)",
+      "proven_by": {
+        "apply": [
+          "tests/test_unit_env_bridges.py"
+        ],
+        "check": [
+          "tests/test_container_helpers_static.py",
+          "docs/testing-strategy.md"
+        ],
+        "validate": [
+          "tests/unit_env_watchdog_body.py",
+          "tests/unit_env_npm_onload_body.py",
+          "tests/unit_env_tier1_driver_body.py",
+          "tests/unit_env_tier1_launch_error_body.py",
+          "tests/unit_env_tier1_fixture_body.py",
+          "tests/unit_env_tier1_image_body.py",
+          "tests/unit_env_cleanup_body.py",
+          "tests/unit_env_probe_wrapper_body.py"
+        ],
+        "tests": [
+          "tests/test_unit_env_bridges.py",
+          "tests/test_container_helpers_static.py"
+        ]
+      },
+      "evidence": "docs/evidence/2026-10-06-testing-strategy-slice5-unit-env-bodies.md"
     }
   ],
   "phase2": {}

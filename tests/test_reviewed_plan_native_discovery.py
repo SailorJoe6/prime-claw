@@ -1,9 +1,7 @@
 """Native reviewed-plan discovery/lifecycle tests.
 
-Tier policy: test_registered_cleanup_survives_intentional_post_creation_assertion
-is a host-side self-test of the cleanup helper (no node/prime-agent/plugin
-install) and stays tier 0. The installed-* tests drive a real prime-agent
-INSIDE the session's tier-1 container via the `tier1_container` fixture
+Tier policy: installed-* tests drive a real prime-agent INSIDE the session's
+tier-1 container via the `tier1_container` fixture
 (auto-marked `container`; see tests/conftest.py): scratch lives on the
 same-path session share (ctmp), and the fake daemon runs in-container
 (tests/container/fake_daemon.py) because a host-bound Unix socket is
@@ -13,10 +11,6 @@ explicitly passed env vars cross into the container.
 
 import json
 import os
-import shutil
-import socket
-import subprocess
-import threading
 import time
 from pathlib import Path
 
@@ -29,128 +23,12 @@ WS_APPLY = "/workspace/scripts/apply-prime-agent-plugin.sh"
 WS_SKILL = ".ralph/skills/oversee-episode/SKILL.md"  # repo-relative, for read_repo
 
 
-def git(cwd, *args):
-    return subprocess.run(
-        ["git", "-C", str(cwd), *args], check=True, text=True, capture_output=True,
-    ).stdout.strip()
-
-
 def cgit(tier1_container, cwd, *args):
     """git INSIDE the tier-1 container — for repositories on container-local
     storage (croot), which the host cannot see."""
     result = tier1_container.run("git", "-C", str(cwd), *args, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
     return result.stdout.strip()
-
-
-class FakeDaemon:
-    def __init__(self, path):
-        self.path = path
-        self.envelopes = []
-        self.responses = {}
-        self.stop = False
-        self.closed = False
-        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock.bind(str(path))
-        self.sock.listen()
-        self.thread = threading.Thread(target=self.run, daemon=True)
-        self.thread.start()
-
-    @property
-    def commands(self):
-        return [envelope["command"] for envelope in self.envelopes]
-
-    def run(self):
-        while not self.stop:
-            try:
-                self.sock.settimeout(0.2)
-                conn, _ = self.sock.accept()
-            except (TimeoutError, socket.timeout, OSError):
-                continue
-            with conn:
-                conn.sendall((json.dumps({
-                    "type": "daemon_hello",
-                    "protocol": {"name": "prime-agent.daemon", "version": 7},
-                    "schema": {"revision": 28},
-                }) + "\n").encode())
-                buffer = b""
-                while not self.stop:
-                    try:
-                        data = conn.recv(65536)
-                    except OSError:
-                        break
-                    if not data:
-                        break
-                    buffer += data
-                    while b"\n" in buffer:
-                        line, buffer = buffer.split(b"\n", 1)
-                        if not line:
-                            continue
-                        envelope = json.loads(line)
-                        command = envelope.get("command", {})
-                        self.envelopes.append(envelope)
-                        command_type = command.get("type")
-                        if command_type == "ack_result":
-                            continue
-                        if command_type == "list":
-                            payload = {"sessions": []}
-                        elif command_type == "create":
-                            header = json.loads(
-                                Path(command["sessionPath"]).read_text().splitlines()[0]
-                            )
-                            payload = {
-                                "activeSessionId": FAKE_ROUTE,
-                                "sessionId": header["id"],
-                                "sessionFile": command["sessionPath"],
-                                "sessionName": command["name"],
-                                "cwd": command["config"]["cwd"],
-                                "isSessionActive": True,
-                            }
-                        elif command_type in {"prompt", "kill"}:
-                            payload = {"ok": True}
-                        else:
-                            payload = {}
-                        self.responses[envelope["id"]] = payload
-                        conn.sendall((json.dumps({
-                            "type": "response", "id": envelope["id"],
-                            "success": True, "data": payload,
-                        }) + "\n").encode())
-
-    def close(self):
-        if self.closed:
-            return
-        self.closed = True
-        self.stop = True
-        try:
-            self.sock.close()
-        except OSError:
-            pass
-        self.thread.join(2)
-        self.path.unlink(missing_ok=True)
-
-
-def cleanup_episode(project, worktree, branch, daemon, socket_path, *fixture_paths):
-    try:
-        if project.exists() and worktree is not None and worktree.exists():
-            subprocess.run(
-                ["git", "-C", str(project), "worktree", "remove", "--force", str(worktree)],
-                text=True, capture_output=True, check=False,
-            )
-        if project.exists() and branch:
-            subprocess.run(
-                ["git", "-C", str(project), "branch", "-D", branch],
-                text=True, capture_output=True, check=False,
-            )
-    finally:
-        try:
-            daemon.close()
-        finally:
-            socket_path.unlink(missing_ok=True)
-            for path in fixture_paths:
-                if path.is_dir() and not path.is_symlink():
-                    shutil.rmtree(path, ignore_errors=True)
-                else:
-                    path.unlink(missing_ok=True)
 
 
 def provider(path,records,location,socket_path=None):
@@ -233,44 +111,6 @@ def run(tier1_container, args, env):
   if fake_socket is not None:env["PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET"]=fake_socket
   if fake_registry is not None:env["PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_REGISTRY_DIR"]=fake_registry
  return tier1_container.run(*args,env=env,timeout=60)
-def test_registered_cleanup_survives_intentional_post_creation_assertion(tmp_path):
-    project = tmp_path / "cleanup-project"
-    project.mkdir()
-    git(project, "init", "-q")
-    git(project, "config", "user.email", "poc@example.invalid")
-    git(project, "config", "user.name", "POC")
-    (project / "README.md").write_text("fixture")
-    git(project, "add", ".")
-    git(project, "commit", "-qm", "fixture")
-    worktree = tmp_path / "cleanup-worktree"
-    branch = "episode/cleanup-proof"
-    lifecycle_state = tmp_path / "cleanup-lifecycle-state"
-    session_state = tmp_path / "cleanup-sessions"
-    socket_path = Path(f"/tmp/pc-cleanup-{os.getpid()}-{time.time_ns()}.sock")
-    daemon = FakeDaemon(socket_path)
-    failed = False
-    try:
-        git(project, "worktree", "add", "-q", "-b", branch, str(worktree), "HEAD")
-        lifecycle_state.mkdir()
-        (lifecycle_state / "identity.json").write_text("created")
-        session_state.mkdir()
-        (session_state / "episode.jsonl").write_text("created")
-        assert False, "intentional post-creation failure"
-    except AssertionError as error:
-        failed = "intentional post-creation failure" in str(error)
-    finally:
-        cleanup_episode(
-            project, worktree, branch, daemon, socket_path,
-            lifecycle_state, session_state,
-        )
-    assert failed is True
-    assert not worktree.exists()
-    assert git(project, "branch", "--list", branch) == ""
-    assert not socket_path.exists()
-    assert not lifecycle_state.exists()
-    assert not session_state.exists()
-
-
 def test_installed_lifecycle_classifier_blocks_corruption_before_provider_or_recovery(tier1_container, ctmp, request):
     agent=ctmp/"agent";env={"PRIME_AGENT_PLUGIN_ROOT":str(agent)};ap=run(tier1_container,[WS_APPLY],env);assert ap.returncode==0,ap.stdout+ap.stderr
     sock=f"/tmp/pc-lifecycle-{os.getpid()}-{time.time_ns()}.sock";daemon=tier1_container.start_daemon(sock,FAKE_ROUTE,ctmp/"daemon-log");request.addfinalizer(daemon.close)
@@ -283,8 +123,8 @@ export default function setup(pi){pi.on("session_start",(_event,ctx)=>{const cwd
     transport=ctmp/"lifecycle-transport.jsonl"
     blocked={"empty-expectation","empty-marker","current-mismatch","legacy-mismatch","orphan-active-beta"}
     for kind in [*sorted(blocked),"inactive-old-beta"]:
-        case=ctmp/kind;project=case/"project";project.mkdir(parents=True);git(project,"init","-q");git(project,"config","user.email","poc@example.invalid");git(project,"config","user.name","POC")
-        skill=project/".ralph/skills/oversee-episode/SKILL.md";skill.parent.mkdir(parents=True);skill.write_text(tier1_container.read_repo(WS_SKILL));git(project,"add",".");git(project,"commit","-qm","fixture")
+        case=ctmp/kind;project=case/"project";project.mkdir(parents=True);cgit(tier1_container,project,"init","-q");cgit(tier1_container,project,"config","user.email","poc@example.invalid");cgit(tier1_container,project,"config","user.name","POC")
+        skill=project/".ralph/skills/oversee-episode/SKILL.md";skill.parent.mkdir(parents=True);skill.write_text(tier1_container.read_repo(WS_SKILL));cgit(tier1_container,project,"add",".");cgit(tier1_container,project,"commit","-qm","fixture")
         sessions=case/"sessions";sessions.mkdir();records=case/"records.jsonl";snapshot=case/"snapshot.json"
         env2={"PRIME_AGENT_CODING_AGENT_DIR":str(agent),"PRIME_CLAW_TEST_DAEMON_REGISTRY":str(case/"supervisor"),"LIFECYCLE_CASE":kind,"LIFECYCLE_SOCKET":str(sock),"LIFECYCLE_TRANSPORT":str(transport),"LIFECYCLE_RECORDS":str(records),"LIFECYCLE_SNAPSHOT":str(snapshot)}
         guard_before=0 if not transport.exists() else len(transport.read_text().splitlines())

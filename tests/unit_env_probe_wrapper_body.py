@@ -1,4 +1,8 @@
-"""Regression coverage for native Prime Agent probe config isolation."""
+"""Unit-env body: Prime Agent probe-wrapper config/session isolation."""
+
+from unit_env_entry import require_unit_env
+require_unit_env()
+
 
 import json
 import os

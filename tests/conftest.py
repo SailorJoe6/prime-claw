@@ -782,7 +782,7 @@ def tier1_container(request):
                               f"/stage/releases/v{install_version}:ro")]
         container_attempted = True
         started = _host_command(
-            ["docker", "run", "-d", "--name", name,
+            ["docker", "run", "-d", "--init", "--name", name,
              "--cidfile", str(cidfile), *mounts,
              image["id"], "sleep", "infinity"],
             capture_output=True, text=True, timeout=60,

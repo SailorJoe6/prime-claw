@@ -1,8 +1,9 @@
 # Testing strategy
 
-prime-claw uses the lowest sufficient isolation tier. Pure and recording-fake
-unit tests stay on the host. Tests that execute Prime Agent or the plugin run in
-the slim disposable Docker tier. Tests that execute gbrain and PostgreSQL run in
+prime-claw uses the lowest sufficient isolation tier. Pure and ordinary
+recording-fake unit tests stay on the host. Environment-sensitive process,
+launcher, wrapper, Git/worktree/socket, Node, Prime Agent, and plugin behavior
+runs in the slim disposable Docker tier. Tests that execute gbrain and PostgreSQL run in
 a separate credential-free Docker image. Real OpenShell lifecycle execution is
 disabled; no marker or test-all option enables it.
 
@@ -22,6 +23,29 @@ an explicit container-entry guard and runs only through
 `scripts/test-integration.sh`. `scripts/test-all.sh` runs tiers 0, 1, and 2 in
 that order and stops on the first failure. The legacy `--with-sandbox` and the
 replacement `--with-lifecycle` both return a non-mutating usage error.
+
+## Tier-1 unit-env bodies
+
+Five environment-dependent behavior families are explicit tier-1 bodies:
+
+- Linux POSIX watchdog process groups, signals, status, and reaping;
+- the real Node `npm-onload.js` preload and header rewrite;
+- tier-1 launcher, fixture, and image behavior against recording fakes;
+- real Git worktree, Unix-socket, and state cleanup; and
+- `scripts/run-prime-agent-probe.sh` config/session isolation and exit status.
+
+Their files use the non-default `tests/unit_env_*_body.py` pattern. Plain host
+pytest cannot discover them. `tests/test_unit_env_bridges.py` is the only
+collected entry: its five tests request `tier1_container`, so collection
+applies the `container` marker and exact-selector guard before any body can run.
+Each bridge invokes an explicit body path with container Python after the
+fixture has disconnected all networks. Tier-1 containers use Docker `--init`
+so the Linux target reaps orphaned watchdog/launcher descendants. Body temporary state, processes, Git
+repositories, sockets, HOME, Node, and shell tools are container-local. The
+read-only `/workspace` snapshot is the only test-subject source. The image has
+no Docker CLI/socket or OpenShell control path, and the bridge passes only its
+fixed container-local HOME. Static tier 0 retains contract/string checks but no
+second execution of these named behaviors.
 
 ## Tier-2 disposable brain stack
 
@@ -279,7 +303,6 @@ and package repositories are external inputs.
     tests/test_source_builder.py \
     tests/test_testing_provenance.py \
     tests/test_tier1_driver.py \
-    tests/test_tier1_launch_error.py \
     tests/test_tier1_network_policy.py \
     tests/test_tier1_fixture.py \
     tests/test_tier1_image.py \
