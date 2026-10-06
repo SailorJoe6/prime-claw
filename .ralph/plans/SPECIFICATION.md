@@ -556,3 +556,28 @@ normal one-time disclosure, later omission, pairing, and abort-before-dispatch.
 This is an operator-approved exception to the automatic review stop-loss, not a
 threat-model or scope expansion. This pass performs no third independent review
 and accepts no additional finding.
+
+### Accepted active-owner guide candidate and prospective-create continuation
+
+The owner accepted Slice 2 candidate
+`d31ab61e89247a024948d66e2613d434c89688fd` / tree
+`f7ecd504d3f890455b858d53c6099c936fb0bf85`. The next candidate is limited to
+prospective future-location guide activation and the pre-mutation
+`create_spec_episode` readiness gate. It reuses the existing `/implement-spec`
+preparation/admission state as trusted prospective intent and minimally extends
+the existing activation subject and in-memory receipt to bind the exact owner
+session, selected future location, current role-kernel/guide generation, and
+current preparation lifecycle. Consumed readiness is required before any episode
+identity, worktree, branch, session, or marker mutation.
+
+The candidate preserves accepted active-owner handoff/finalization behavior and
+already-inactive finalize idempotence. Proof covers ordinary no-context failure,
+wrong/missing/stale location or preparation, EPISODE/generic-child/active-owner
+misuse, valid one-time prospective disclosure/consumption/create, no
+provider-visible receipt or replay, and abort before mutation. It uses the
+existing activation tool when practical, keeps the guide byte-identical, and
+leaves `execute` unchanged. A generalized token framework, durable receipt
+store, transaction journal, adversarial race matrix, duplicate policy, cutover
+coordination, Slice 3, landing, user-global mutation, restart, UAT, finalization,
+and cleanup remain outside this candidate. Remaining provider-route coverage may
+remain for one final bounded Slice 2 pass if it is not required here.

@@ -132,10 +132,13 @@ parent directory, and refuses a changed preimage.
 The first Slice 2 provider guard imports the generated role-kernel bytes rather
 than trusting the retained legacy APPEND body. Ordinary explicit no-context
 sessions remain ordinary; promotion, active-owner, and bounded-EPISODE paths
-require the exact neutral block. The accepted first Slice 2 candidate stopped at that provider guard. The next
-bounded candidate adds one active-owner Conversation-guide disclosure and gates
-handoff plus first finalization; prospective promotion activation remains later
-Slice 2 work.
+require the exact neutral block. The accepted first Slice 2 candidate stopped at
+that provider guard. The accepted next candidate added one active-owner
+Conversation-guide disclosure and gated handoff plus first finalization. The
+current bounded candidate reuses the existing `/implement-spec` preparation
+state to admit the same disclosure for one exact prospective future folder and
+requires its consumed private readiness before `create_spec_episode` can invoke
+any episode mutation.
 
 This is intentionally not a hostile-filesystem transaction engine. The manager
 does not maintain a multi-phase journal, continuous descriptor/inode authority,
@@ -217,7 +220,9 @@ the resumed sessions for cutover UAT; do not substitute a linked-worktree or
 host candidate probe. The accepted installed generation should expose:
 
 - native `/handoff`, `/plan`, and `/implement-spec` commands;
-- structured `ralph_handoff`, `ralph_plan`, `create_spec_episode`,
+- structured `ralph_handoff`, `ralph_plan`,
+  `prime_claw_activate_conversation_guide`,
+  `prime_claw_conversation_guide_status`, `create_spec_episode`,
   `handoff_spec_episode`, and `finalize_spec_episode` tools;
 - exactly one managed `PRIME_CLAW_ROLE_KERNEL_V1` block from the selected global
   AGENTS/CLAUDE context, byte-identical to the generated neutral kernel;

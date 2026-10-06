@@ -49,10 +49,9 @@ Native `/implement-spec` remains the only promotion authority boundary. Before
 queuing its canonical readiness workflow, the extension verifies exactly one
 exact generated neutral block, active restoration mechanics, a writable durable
 spec-episode state directory, and canonical agreement among CWD, state, and the
-expected worktree. Prospective promotion activation remains deferred: this
-candidate does not gate `create_spec_episode` until a later Slice 2 pass can bind
-a receipt to the exact operator-selected future location without inventing a
-second authority path.
+expected worktree. A successful preparation admission records one private
+in-memory lifecycle UUID for the exact owner session and selected future folder.
+It is ephemeral readiness state, not a second approval path or durable token.
 
 The installer now owns one plugin-managed global `prime-claw-oversee-episode`
 guide at `skills/prime-claw-oversee-episode/SKILL.md`. Its checked-in Markdown is
@@ -61,13 +60,16 @@ name, version, sentinel, and SHA-256 digest. Apply/check reject a missing, stale
 symlinked, non-regular, or mixed-directory installed copy. The Slice 1
 role-protocol manager and its fixed three-file receipt remain unchanged.
 
-For an exact active owner, `prime_claw_activate_conversation_guide` reads the
-direct managed path, rejects a project skill with the managed name, verifies the
-exact hash, and returns the guide only as one intended tool-result continuation.
-A private in-memory receipt moves from issued to consumed immediately before that
-first provider context. It binds the trusted session and active lifecycle
-generation, role-kernel generation, guide path, version/hash, tool-call ID, and
-exact result. A provider failure does not make the disclosure replayable.
+For an exact active owner or one current top-level prospective `/implement-spec`
+preparation, `prime_claw_activate_conversation_guide` reads the direct managed
+path, rejects a project skill with the managed name, verifies the exact hash, and
+returns the guide only as one intended tool-result continuation. A private
+in-memory receipt moves from issued to consumed immediately before that first
+provider context. It binds the trusted owner session; the active lifecycle or
+exact prospective location and preparation UUID; the role-kernel generation;
+the guide path, version/hash, tool-call ID; and the exact result. The prospective
+UUID and location never enter tool details or provider-visible receipt metadata.
+A provider failure does not make the disclosure replayable.
 `prime_claw_conversation_guide_status` provides a read-only readiness check
 without lifecycle mutation.
 
@@ -78,13 +80,17 @@ custom channels. Session start/shutdown, owner or episode generation change,
 path/hash change, role change, or project collision invalidates readiness. A
 fresh activation is then required.
 
-The active-owner handoff and first finalization gates now require a current
-consumed receipt before `handoff_spec_episode` or the first close can mutate any
-route, identity, transport, or bookkeeping state.
-Identical replay of an already inactive close remains idempotent without reviving
-an obsolete receipt. Promotion remains deliberately ungated until prospective
-activation is implemented. EXPERT admission also remains a later Slice 2
-capability.
+The active-owner handoff and first finalization gates require a current consumed
+active receipt before `handoff_spec_episode` or the first close can mutate any
+route, identity, transport, or bookkeeping state. After semantic readiness,
+`create_spec_episode` requires a current consumed prospective receipt matching
+the same owner, exact selected location, and exact preparation UUID before it
+calls the episode creator. Missing, early, wrong-location, stale-generation,
+EPISODE, generic-child, and active-owner subjects fail before episode identity,
+worktree, branch, session, or marker mutation. The approval and receipt become
+non-replayable when creation begins. Identical replay of an already inactive
+close remains idempotent without reviving an obsolete receipt. EXPERT admission
+remains a later Slice 2 capability.
 
 After `create_spec_episode` durably establishes and delivers a strictly parsed
 spec-episode identity, the same tool turn appends and verifies one full active

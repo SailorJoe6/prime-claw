@@ -166,7 +166,7 @@ def test_current_docs_describe_managed_on_demand_guide_and_loaded_generation_bou
         "one intended tool-result continuation",
         "active-owner handoff and first finalization",
         "project `oversee-episode` entry is a compatibility shim",
-        "Prospective promotion activation remains deferred",
+        "current consumed prospective receipt",
         "Loaded-generation compatibility reference (temporary)",
         "one coordinated full restart",
     ]:

@@ -1278,3 +1278,49 @@ Exact commands, log hashes, and the accepted-finding disposition are recorded in
 `docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-conversation-guide-activation.md`.
 This commit is the single reviewable candidate for the authorized pass. No third
 independent review or later-slice work was performed.
+
+## 20. Prospective future-location activation and create readiness gate
+
+The owner accepted `d31ab61e89247a024948d66e2613d434c89688fd` / tree
+`f7ecd504d3f890455b858d53c6099c936fb0bf85`. Implement one next Slice 2
+candidate only:
+
+1. Audit the existing `/implement-spec` preparation/admission lifecycle and the
+   exact pre-mutation boundary in `create_spec_episode`.
+2. Extend the existing guide activation subject/receipt minimally so prospective
+   readiness binds owner session, exact selected future location, current role
+   kernel and guide generation, and current preparation lifecycle.
+3. Require the matching consumed readiness before episode identity, worktree,
+   branch, session, or oversight-marker mutation.
+4. Preserve accepted active-owner handoff/finalization behavior, inactive
+   finalize replay, the byte-identical managed guide, and unchanged `execute`.
+5. Add focused proof for ordinary no-context failure; wrong, missing, or stale
+   location/preparation; EPISODE, generic child, and active-owner misuse; valid
+   one-time prospective disclosure/consumption/create; private non-replayable
+   receipt state; and abort before any mutation.
+6. Update plan/evidence/Bead, run proportional focused checks plus complete Tier
+   0, Docker Tier 1, and pinned-runtime probe, then commit/push one candidate,
+   report, and stop.
+
+Do not introduce a generalized token framework, durable receipt database,
+transaction journal, adversarial race matrix, duplicate policy authority, or
+cutover coordinator. If broader provider-route coverage is not required for this
+coherent capability, defer it to one final bounded Slice 2 pass. Do not begin
+Slice 3, land, mutate user-global state, restart, run UAT, finalize, or clean up.
+
+### 20.1 Implementation result
+
+The prospective subject reuses the existing `/implement-spec` approval map and
+adds one private UUID per successful admission. The existing activation receipt
+now distinguishes active and prospective subjects; prospective readiness binds
+the exact owner session, future location, preparation UUID, role-kernel SHA, and
+managed guide generation. `create_spec_episode` verifies the consumed exact
+prospective subject before deleting approval state, invoking creation, or
+appending oversight. Focused Docker passed 17 tests, installed-runtime creation
+fixtures passed 2 tests, complete Tier 0 passed 287 tests with 172 skipped,
+Docker Tier 1 passed 65 tests with 394 deselected, and the pinned Prime Agent
+0.9.8 probe passed. Exact commands and hashes are in
+`docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-prospective-create-readiness.md`.
+The managed guide and canonical `execute` skill are byte-identical to the
+accepted parent. Remaining provider-route coverage stays deferred to one final
+bounded Slice 2 pass.

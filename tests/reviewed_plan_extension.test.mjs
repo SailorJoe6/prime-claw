@@ -669,6 +669,17 @@ test("implement approval survives one prep agent_end, stays exact, and is consum
   assert.match(wrong.content[0].text, /no matching active \/implement-spec approval/);
   assert.equal(createCalls, 0);
 
+  const missingGuide = await f.tools.get("create_spec_episode").execute(
+    "missing-guide", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+  assert.equal(missingGuide.isError, true);
+  assert.match(missingGuide.content[0].text, /guide has not been activated and consumed/);
+  assert.equal(createCalls, 0);
+
+  const prospective = await activateConversationGuide(f, "prospective-guide");
+  assert.deepEqual(Object.keys(prospective.issued.details).sort(), ["sha256", "version"]);
+  assert.doesNotMatch(JSON.stringify(prospective.issued), /alpha-plan|preparation|lifecycle/i);
+
   const authorized = await f.tools.get("create_spec_episode").execute(
     "authorized", { location: LOCATION }, undefined, undefined, f.ctx,
   );
@@ -678,6 +689,111 @@ test("implement approval survives one prep agent_end, stays exact, and is consum
 
   const replay = await f.tools.get("create_spec_episode").execute(
     "consumed-replay", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+  assert.equal(replay.isError, true);
+  assert.match(replay.content[0].text, /no matching active \/implement-spec approval/);
+  assert.equal(createCalls, 1);
+});
+
+test("prospective guide activation rejects ordinary no-context, early, child, and EPISODE callers", async (t) => {
+  let createCalls = 0;
+  const extension = createReviewedPlanExtension({
+    async createEpisode() { createCalls += 1; throw new Error("must stay unauthorized"); },
+  });
+  const f = fixture(t, { extension });
+  writeSkill(f.cwd, "implementation readiness", "implement-spec");
+  const activation = f.tools.get(CONVERSATION_GUIDE_ACTIVATION_TOOL);
+
+  await assert.rejects(
+    () => activation.execute("ordinary-no-context", {}, undefined, undefined, f.ctx),
+    /active owner episode or current \/implement-spec preparation/,
+  );
+
+  await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+  await assert.rejects(
+    () => activation.execute("prep-too-early", {}, undefined, undefined, f.ctx),
+    /active owner episode or current \/implement-spec preparation/,
+  );
+  await f.events.get("agent_end")({}, f.ctx);
+
+  const topLevelHeader = f.ctx.sessionManager.getHeader;
+  f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 1 });
+  await assert.rejects(
+    () => activation.execute("generic-child", {}, undefined, undefined, f.ctx),
+    /top-level project conversation/,
+  );
+  f.ctx.sessionManager.getHeader = topLevelHeader;
+
+  f.entries.push({
+    type: "custom", customType: "prime-claw-bounded-identity",
+    data: { version: 1, role: "EPISODE", sessionId: "owner-session" },
+  });
+  await assert.rejects(
+    () => activation.execute("episode-role", {}, undefined, undefined, f.ctx),
+    /EPISODE cannot activate Conversation guidance/,
+  );
+  f.entries.pop();
+
+  const denied = await f.tools.get("create_spec_episode").execute(
+    "never-ready", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+  assert.equal(denied.isError, true);
+  assert.match(denied.content[0].text, /guide (?:has not been activated and consumed|receipt is stale or mismatched)/);
+  assert.equal(createCalls, 0);
+  assert.equal(f.entries.filter((entry) => entry.customType === "prime-claw-conversation-oversight").length, 0);
+});
+
+test("prospective receipt is exact to location and preparation lifecycle and aborts stale disclosure", async (t) => {
+  let createCalls = 0;
+  const extension = createReviewedPlanExtension({
+    async createEpisode(location) {
+      createCalls += 1;
+      throw new Error(`prospective create reached for ${location}`);
+    },
+  });
+  const f = fixture(t, { extension });
+  writeSkill(f.cwd, "implementation readiness", "implement-spec");
+  const betaLocation = ".ralph/plans/future/beta-plan";
+  mkdirSync(join(f.cwd, betaLocation), { recursive: true });
+
+  await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+  await f.events.get("agent_end")({}, f.ctx);
+  const issued = await f.tools.get(CONVERSATION_GUIDE_ACTIVATION_TOOL).execute(
+    "stale-alpha-guide", {}, undefined, undefined, f.ctx,
+  );
+  const staleMessages = [
+    { role: "assistant", content: [{ type: "toolCall", id: "stale-alpha-guide", name: CONVERSATION_GUIDE_ACTIVATION_TOOL, arguments: {} }] },
+    { role: "toolResult", toolCallId: "stale-alpha-guide", toolName: CONVERSATION_GUIDE_ACTIVATION_TOOL, content: issued.content, details: issued.details, isError: false, timestamp: Date.now() },
+  ];
+
+  await f.commands.get("implement-spec").handler(betaLocation, f.ctx);
+  await f.events.get("agent_end")({}, f.ctx);
+  assert.throws(
+    () => f.events.get("context")({ messages: staleMessages }, f.ctx),
+    /issued Conversation guide receipt is stale or mismatched/,
+  );
+  assert.match(f.notices.at(-1).message, /conversation blocked: issued Conversation guide receipt is stale or mismatched/);
+  const staleStatus = await f.tools.get(CONVERSATION_GUIDE_STATUS_TOOL).execute(
+    "stale-status", {}, undefined, undefined, f.ctx,
+  );
+  assert.equal(staleStatus.details.ready, false);
+
+  await activateConversationGuide(f, "beta-guide");
+  const wrong = await f.tools.get("create_spec_episode").execute(
+    "wrong-prepared-location", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+  assert.equal(wrong.isError, true);
+  assert.match(wrong.content[0].text, /no matching active \/implement-spec approval/);
+  assert.equal(createCalls, 0);
+
+  const exact = await f.tools.get("create_spec_episode").execute(
+    "exact-prepared-location", { location: betaLocation }, undefined, undefined, f.ctx,
+  );
+  assert.equal(exact.isError, true);
+  assert.match(exact.content[0].text, /prospective create reached for \.ralph\/plans\/future\/beta-plan/);
+  assert.equal(createCalls, 1);
+  const replay = await f.tools.get("create_spec_episode").execute(
+    "prospective-replay", { location: betaLocation }, undefined, undefined, f.ctx,
   );
   assert.equal(replay.isError, true);
   assert.match(replay.content[0].text, /no matching active \/implement-spec approval/);
@@ -774,6 +890,8 @@ test("successful create activates exact owner oversight without an oversight ski
   const f = createHarness(cwd, extension);
   await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
   await f.events.get("agent_end")({}, f.ctx);
+  const prospective = await activateConversationGuide(f, "prospective-create-guide");
+  assert.doesNotMatch(JSON.stringify(prospective.issued.details), /alpha-plan|preparation|lifecycle/i);
   const before = f.messages.length;
   const result = await f.tools.get("create_spec_episode").execute(
     "activate-call", { location: LOCATION }, undefined, undefined, f.ctx,
@@ -801,6 +919,16 @@ test("successful create activates exact owner oversight without an oversight ski
   const copiedBody = readFileSync(join(REPO_ROOT, "src", "prime-agent-plugin", "skills", "prime-claw-oversee-episode", "SKILL.md"), "utf8");
   const copied = await f.events.get("context")({ messages: [{ role: "user", content: copiedBody }] }, f.ctx);
   assert.equal(copied.messages[0].content, "[managed Conversation guide disclosure omitted]");
+
+  await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
+  await f.events.get("agent_end")({}, f.ctx);
+  const activeOwnerMisuse = await f.tools.get("create_spec_episode").execute(
+    "active-owner-create", { location: LOCATION }, undefined, undefined, f.ctx,
+  );
+  assert.equal(activeOwnerMisuse.isError, true);
+  assert.match(activeOwnerMisuse.content[0].text, /not bound to the current prospective preparation/);
+  assert.equal(createCalls, 1);
+
   await f.events.get("session_start")({}, f.ctx);
   const reset = await f.tools.get(CONVERSATION_GUIDE_STATUS_TOOL).execute("status-after-start", {}, undefined, undefined, f.ctx);
   assert.equal(reset.details.ready, false);
@@ -1030,6 +1158,7 @@ test("fresh native implement-spec runs can sequentially arm different reviewed f
 
   await f.commands.get("implement-spec").handler(LOCATION, f.ctx);
   await f.events.get("agent_end")({}, f.ctx);
+  await activateConversationGuide(f, "call-2-guide");
   const authorized = await tool.execute("call-2", { location: LOCATION }, undefined, undefined, f.ctx);
   assert.equal(authorized.isError, true);
   assert.match(authorized.content[0].text, /authorized tool reached host capability/);
@@ -1041,6 +1170,7 @@ test("fresh native implement-spec runs can sequentially arm different reviewed f
   mkdirSync(join(cwd, betaLocation), { recursive: true });
   await f.commands.get("implement-spec").handler(betaLocation, f.ctx);
   await f.events.get("agent_end")({}, f.ctx);
+  await activateConversationGuide(f, "call-4-guide");
   const laterAuthorized = await tool.execute("call-4", { location: betaLocation }, undefined, undefined, f.ctx);
   assert.equal(laterAuthorized.isError, true);
   assert.match(laterAuthorized.content[0].text, /authorized tool reached host capability/);

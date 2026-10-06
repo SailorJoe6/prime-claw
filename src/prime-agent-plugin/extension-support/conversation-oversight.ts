@@ -54,10 +54,25 @@ export type OversightMarker = {
 export const CONVERSATION_GUIDE_ACTIVATION_TOOL = "prime_claw_activate_conversation_guide";
 export const CONVERSATION_GUIDE_STATUS_TOOL = "prime_claw_conversation_guide_status";
 
+export type ProspectiveConversationPreparation = {
+  location: string;
+  lifecycle: string;
+};
+
+export type ConversationOversightRegistration = {
+  guideRoot?: string;
+  currentProspectivePreparation?: (
+    ctx: ExtensionContext,
+  ) => ProspectiveConversationPreparation | null;
+};
+
 type GuideReceipt = {
   status: "issued" | "consumed";
   toolCallId: string;
   sessionId: string;
+  subjectKind: "active" | "prospective";
+  sourceLocation?: string;
+  preparationLifecycle?: string;
   lifecycleFingerprint: string;
   guidePath: string;
   version: number;
@@ -382,10 +397,6 @@ function classifyLifecycle(ctx: ExtensionContext): LifecycleClassification {
   return { mode: "ordinary", expectation: null, marker: null, recovery: null };
 }
 
-export type ConversationOversightRegistration = {
-  guideRoot?: string;
-};
-
 function pluginRoot(options: ConversationOversightRegistration): string {
   return resolve(options.guideRoot ?? resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 }
@@ -429,20 +440,67 @@ function readExactConversationGuide(
   return { path, text };
 }
 
-function activeConversationFingerprint(ctx: ExtensionContext): string {
+type ConversationGuideSubject = {
+  kind: "active" | "prospective";
+  fingerprint: string;
+  sourceLocation?: string;
+  preparationLifecycle?: string;
+};
+
+function currentConversationGuideSubject(
+  ctx: ExtensionContext,
+  options: ConversationOversightRegistration,
+): ConversationGuideSubject {
   if (currentBoundedIdentity(ctx)) throw new Error("EPISODE cannot activate Conversation guidance");
   const state = classifyLifecycle(ctx);
-  if (state.mode !== "active" || !state.marker || state.marker.status !== "active") {
-    throw new Error("managed Conversation guidance requires one exact active owner episode");
+  if (state.mode === "active") {
+    if (!state.marker || state.marker.status !== "active") {
+      throw new Error("managed Conversation guidance requires one exact active owner episode");
+    }
+    assertIdentityKernel(ctx);
+    const marker = state.marker;
+    return {
+      kind: "active",
+      fingerprint: sha256(JSON.stringify([
+        "active", ctx.sessionManager.getSessionId(), marker.ownerSessionId,
+        marker.slug, marker.sourceLocation, marker.episodeId,
+        marker.episodeSessionFile, marker.branch, marker.worktree,
+        marker.sessionName, marker.identityVersion, marker.admission,
+        PRIME_CLAW_ROLE_KERNEL_SHA256,
+      ])),
+    };
+  }
+  if (state.mode !== "ordinary") {
+    throw new Error(`oversight lifecycle requires ${state.mode} reconciliation before guide activation`);
+  }
+  if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
+    throw new Error("prospective Conversation guidance is available only from a top-level project conversation");
+  }
+  const preparation = options.currentProspectivePreparation?.(ctx) ?? null;
+  if (!preparation) {
+    throw new Error("managed Conversation guidance requires one exact active owner episode or current /implement-spec preparation");
+  }
+  if (!/^\.ralph\/plans\/future\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(preparation.location)
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(preparation.lifecycle)) {
+    throw new Error("current /implement-spec preparation is corrupt");
   }
   assertIdentityKernel(ctx);
-  const marker = state.marker;
-  return sha256(JSON.stringify([
-    ctx.sessionManager.getSessionId(), marker.ownerSessionId, marker.slug,
-    marker.sourceLocation, marker.episodeId, marker.episodeSessionFile,
-    marker.branch, marker.worktree, marker.sessionName, marker.identityVersion,
-    marker.admission, PRIME_CLAW_ROLE_KERNEL_SHA256,
-  ]));
+  return {
+    kind: "prospective",
+    sourceLocation: preparation.location,
+    preparationLifecycle: preparation.lifecycle,
+    fingerprint: sha256(JSON.stringify([
+      "prospective", ctx.sessionManager.getSessionId(), preparation.location,
+      preparation.lifecycle, PRIME_CLAW_ROLE_KERNEL_SHA256,
+    ])),
+  };
+}
+
+function receiptMatchesSubject(receipt: GuideReceipt, subject: ConversationGuideSubject): boolean {
+  return receipt.subjectKind === subject.kind
+    && receipt.lifecycleFingerprint === subject.fingerprint
+    && receipt.sourceLocation === subject.sourceLocation
+    && receipt.preparationLifecycle === subject.preparationLifecycle;
 }
 
 function expectedGuideResult(text: string): string {
@@ -457,8 +515,10 @@ function currentGuideReceipt(
   const receipt = guideReceipts.get(sessionId);
   if (!receipt || receipt.status !== "consumed") throw new Error("managed Conversation guide has not been activated and consumed");
   const guide = readExactConversationGuide(ctx, options);
-  const fingerprint = activeConversationFingerprint(ctx);
-  if (receipt.sessionId !== sessionId || receipt.lifecycleFingerprint !== fingerprint
+  let subject: ConversationGuideSubject;
+  try { subject = currentConversationGuideSubject(ctx, options); }
+  catch (error) { guideReceipts.delete(sessionId); throw error; }
+  if (receipt.sessionId !== sessionId || !receiptMatchesSubject(receipt, subject)
     || receipt.guidePath !== guide.path || receipt.version !== PRIME_CLAW_CONVERSATION_GUIDE_VERSION
     || receipt.sha256 !== PRIME_CLAW_CONVERSATION_GUIDE_SHA256
     || receipt.resultText !== expectedGuideResult(guide.text)) {
@@ -481,6 +541,24 @@ export function assertConversationGuideReady(
 ): void {
   try { currentGuideReceipt(ctx, options); }
   catch (error) {
+    throw new ConversationGuideReadinessError(error instanceof Error ? error.message : String(error));
+  }
+}
+
+export function assertProspectiveConversationGuideReady(
+  ctx: ExtensionContext,
+  sourceLocation: string,
+  preparationLifecycle: string,
+  options: ConversationOversightRegistration = {},
+): void {
+  try {
+    const receipt = currentGuideReceipt(ctx, options);
+    if (receipt.subjectKind !== "prospective"
+      || receipt.sourceLocation !== sourceLocation
+      || receipt.preparationLifecycle !== preparationLifecycle) {
+      throw new Error("managed Conversation guide receipt is not bound to the current prospective preparation");
+    }
+  } catch (error) {
     throw new ConversationGuideReadinessError(error instanceof Error ? error.message : String(error));
   }
 }
@@ -548,8 +626,8 @@ function applyGuideDisclosure(
     return filterGuideMessages(messages, null, exactGuideText);
   }
   const guide = readExactConversationGuide(ctx, options);
-  const fingerprint = activeConversationFingerprint(ctx);
-  if (receipt.sessionId !== sessionId || receipt.lifecycleFingerprint !== fingerprint
+  const subject = currentConversationGuideSubject(ctx, options);
+  if (receipt.sessionId !== sessionId || !receiptMatchesSubject(receipt, subject)
     || receipt.guidePath !== guide.path || receipt.version !== PRIME_CLAW_CONVERSATION_GUIDE_VERSION
     || receipt.sha256 !== PRIME_CLAW_CONVERSATION_GUIDE_SHA256) {
     guideReceipts.delete(sessionId);
@@ -647,10 +725,11 @@ export function registerConversationOversight(pi: ExtensionAPI, options: Convers
   pi.registerTool({
     name: CONVERSATION_GUIDE_ACTIVATION_TOOL,
     label: "Activate managed Conversation guide",
-    description: "Disclose the exact managed Prime Claw Conversation guide once for the current trusted active owner episode.",
-    promptSnippet: "Activate the managed Conversation oversight guide before an owner lifecycle decision",
+    description: "Disclose the exact managed Prime Claw Conversation guide once for the current trusted active owner episode or current prospective /implement-spec preparation.",
+    promptSnippet: "Activate the managed Conversation guide before episode creation or an owner lifecycle decision",
     promptGuidelines: [
-      "Call prime_claw_activate_conversation_guide only as the exact trusted owner of one active episode, before the first oversight decision after session start or guide invalidation.",
+      "Call prime_claw_activate_conversation_guide only as the exact trusted owner of one active episode or after the current /implement-spec readiness review accepts its exact selected future folder.",
+      "For prospective creation, call it once before create_spec_episode; the returned guide applies after successful creation and the native gate privately binds it to the current preparation.",
       "Treat the returned guide as judgment guidance only; it grants no product, scope, merge, abandonment, cleanup, or transport authority.",
       "After the guide continuation, use prime_claw_conversation_guide_status when a read-only readiness proof is needed; never copy or replay the guide text.",
     ],
@@ -662,10 +741,14 @@ export function registerConversationOversight(pi: ExtensionAPI, options: Convers
         const previous = guideReceipts.get(sessionId);
         if (previous?.status === "issued") throw new Error("a Conversation guide disclosure is already awaiting its first continuation");
         const guide = readExactConversationGuide(ctx, options);
-        const lifecycleFingerprint = activeConversationFingerprint(ctx);
+        const subject = currentConversationGuideSubject(ctx, options);
         const resultText = expectedGuideResult(guide.text);
         guideReceipts.set(sessionId, {
-          status: "issued", toolCallId, sessionId, lifecycleFingerprint,
+          status: "issued", toolCallId, sessionId,
+          subjectKind: subject.kind,
+          sourceLocation: subject.sourceLocation,
+          preparationLifecycle: subject.preparationLifecycle,
+          lifecycleFingerprint: subject.fingerprint,
           guidePath: guide.path, version: PRIME_CLAW_CONVERSATION_GUIDE_VERSION,
           sha256: PRIME_CLAW_CONVERSATION_GUIDE_SHA256, resultText,
         });
@@ -682,7 +765,7 @@ export function registerConversationOversight(pi: ExtensionAPI, options: Convers
   pi.registerTool({
     name: CONVERSATION_GUIDE_STATUS_TOOL,
     label: "Inspect Conversation guide readiness",
-    description: "Read-only readiness check for the exact managed Conversation guide and current trusted active owner episode.",
+    description: "Read-only readiness check for the exact managed Conversation guide and current trusted active-owner or prospective preparation subject.",
     promptSnippet: "Inspect managed Conversation guide readiness without lifecycle mutation",
     promptGuidelines: [
       "Use prime_claw_conversation_guide_status for read-only readiness evidence before handoff or final bookkeeping UAT.",

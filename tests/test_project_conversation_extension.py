@@ -81,7 +81,9 @@ def test_canonical_managed_guide_replaces_project_policy_without_breaking_discov
 
 def test_extension_uses_context_and_exact_state_without_rejected_flag_profile():
     extension = EXTENSION.read_text(); support = SUPPORT.read_text()
-    assert "registerConversationOversight(pi, { guideRoot: dependencies?.guideRoot });" in extension
+    assert "registerConversationOversight(pi, oversightOptions);" in extension
+    assert "currentProspectivePreparation" in extension
+    assert "assertProspectiveConversationGuideReady" in extension
     assert "recoverCompleting:" not in extension
     assert "episode-finalization" not in extension + support
     assert "authorization receipt" not in extension + support

@@ -379,6 +379,16 @@ function streamProbe(model) {{
       stream.push({{ type: "done", reason: "stop", message: output }});
     }} else if (modelCalls === 3) {{
       const call = {{
+        type: "toolCall", id: "implement-guide-call", name: "prime_claw_activate_conversation_guide",
+        arguments: {{}},
+      }};
+      output = message(model, [call], "toolUse");
+      stream.push({{ type: "start", partial: output }});
+      stream.push({{ type: "toolcall_start", contentIndex: 0, partial: output }});
+      stream.push({{ type: "toolcall_end", contentIndex: 0, toolCall: call, partial: output }});
+      stream.push({{ type: "done", reason: "toolUse", message: output }});
+    }} else if (modelCalls === 4) {{
+      const call = {{
         type: "toolCall", id: "implement-create-call", name: "create_spec_episode",
         arguments: {{ location: ".ralph/plans/future/probe" }},
       }};
@@ -388,7 +398,7 @@ function streamProbe(model) {{
       stream.push({{ type: "toolcall_end", contentIndex: 0, toolCall: call, partial: output }});
       stream.push({{ type: "done", reason: "toolUse", message: output }});
     }} else {{
-      const text = modelCalls === 4
+      const text = modelCalls === 5
         ? "IMPLEMENT_PROBE_COMPLETED"
         : `UNEXPECTED_MODEL_CALL_${{modelCalls}}`;
       output = message(model, [{{ type: "text", text }}], "stop");
@@ -462,12 +472,15 @@ export default function probe(pi) {{
     user_skills = []
     compact_calls = 0
     compact_results = []
+    guide_results = []
     create_results = []
     completion_markers = 0
     for event in events:
         if event.get("type") == "tool_execution_end":
             if event.get("toolCallId") == "implement-compact-call":
                 compact_results.append(event)
+            elif event.get("toolCallId") == "implement-guide-call":
+                guide_results.append(event)
             elif event.get("toolCallId") == "implement-create-call":
                 create_results.append(event)
         if event.get("type") != "message_start":
@@ -499,6 +512,10 @@ export default function probe(pi) {{
     assert len(compact_results) == 1
     assert compact_results[0].get("isError") is False, json.dumps(
         compact_results, indent=2,
+    )
+    assert len(guide_results) == 1
+    assert guide_results[0].get("isError") is False, json.dumps(
+        guide_results, indent=2,
     )
     assert len(create_results) == 1
     assert create_results[0].get("isError") is False, json.dumps(
@@ -957,8 +974,11 @@ def test_implement_spec_policy_rejects_inadequate_bundles_without_tool_call() ->
         "missing, contradictory, or inadequate",
         "Do not call `create_spec_episode`",
         "Do not create or mutate a",
+        "`prime_claw_activate_conversation_guide` exactly once",
+        "current preparation lifecycle",
         "call `create_spec_episode` exactly once",
         "sole `location` argument",
+        "before any episode identity",
         "stop without implementing",
     ):
         assert fragment in skill

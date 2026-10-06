@@ -35,10 +35,19 @@ branch, worktree, session, or active plan. Stop after the explanation.
 
 ## Create the episode
 
-Only when the complete bundle is ready, call `create_spec_episode` exactly once
-with the exact selected future-folder path as its sole `location` argument. Do
-not supply or invent a branch, worktree, session name, prompt, command, or other
-host parameter. The trusted host capability derives and validates those values.
+Only when the complete bundle is ready, call
+`prime_claw_activate_conversation_guide` exactly once with no arguments. On its
+continuation, do not copy or replay the guide. The native host privately binds
+that one consumed disclosure to this owner session, exact selected future
+folder, current managed generation, and current preparation lifecycle. If
+activation or readiness fails, stop without creating anything.
+
+Then call `create_spec_episode` exactly once with the exact selected
+future-folder path as its sole `location` argument. Do not supply or invent a
+branch, worktree, session name, prompt, command, or other host parameter. The
+trusted host capability derives and validates those values. Missing, stale, or
+mismatched prospective readiness must fail before any episode identity,
+worktree, branch, session, or oversight marker mutation.
 
 Report the returned stable episode identity, active routing identity, branch,
 worktree, session name, and execute-admission state to the operator. State

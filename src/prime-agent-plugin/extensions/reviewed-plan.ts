@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
@@ -15,6 +16,7 @@ import {
   ConversationGuideReadinessError,
   assertConversationGuideReady,
   assertConversationPromotionReady,
+  assertProspectiveConversationGuideReady,
   currentOversightMarkerForClose,
   OVERSIGHT_MARKER_TYPE,
   registerConversationOversight,
@@ -52,6 +54,7 @@ const IMPLEMENT_PREP_WORKFLOW: PrepChainWorkflow = {
 
 type ImplementationApproval = {
   location: string;
+  preparationLifecycle: string;
   skipNextAgentEnd: boolean;
 };
 
@@ -90,8 +93,16 @@ type ReviewedPlanDependencies = EpisodeDependencies & {
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
-    registerConversationOversight(pi, { guideRoot: dependencies?.guideRoot });
     const implementationApprovalBySession = new Map<string, ImplementationApproval>();
+    const oversightOptions = {
+      guideRoot: dependencies?.guideRoot,
+      currentProspectivePreparation(ctx: ExtensionContext) {
+        const approval = implementationApprovalBySession.get(ctx.sessionManager.getSessionId());
+        if (!approval || approval.skipNextAgentEnd) return null;
+        return { location: approval.location, lifecycle: approval.preparationLifecycle };
+      },
+    };
+    registerConversationOversight(pi, oversightOptions);
     registerPrepChainCommand(pi, {
       command: "plan",
       description: "Plan a reviewed specification from an explicit .ralph/plans/future/<slug> folder",
@@ -105,6 +116,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       onValidated: (ctx, location) => {
         implementationApprovalBySession.set(ctx.sessionManager.getSessionId(), {
           location,
+          preparationLifecycle: randomUUID(),
           skipNextAgentEnd: true,
         });
       },
@@ -181,11 +193,12 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "create_spec_episode",
       label: "Create specification episode",
-      description: "Create or return the one worktree-isolated episode for an implementation-ready future-plan folder.",
-      promptSnippet: "Promote one reviewed future-plan folder into its isolated implementation episode",
+      description: "Create or return the one worktree-isolated episode for an implementation-ready future-plan folder after prospective Conversation-guide readiness is consumed.",
+      promptSnippet: "Promote one reviewed future-plan folder after its prospective guide gate is ready",
       promptGuidelines: [
-        "Call create_spec_episode only after the implement-spec readiness workflow finds the selected bundle complete and implementation-ready.",
+        "Call create_spec_episode only after the implement-spec readiness workflow finds the selected bundle complete and implementation-ready and the prospective Conversation guide activation continuation has occurred.",
         "Pass create_spec_episode only the exact operator-selected future-folder location.",
+        "A missing, stale, or mismatched guide readiness result is terminal for this preparation; never bypass or replay it.",
       ],
       executionMode: "sequential",
       parameters: {
@@ -209,8 +222,14 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             isError: true,
           };
         }
-        implementationApprovalBySession.delete(sessionId);
         try {
+          assertProspectiveConversationGuideReady(
+            ctx,
+            params.location,
+            approval.preparationLifecycle,
+            oversightOptions,
+          );
+          implementationApprovalBySession.delete(sessionId);
           assertConversationPromotionReady(ctx, params.location);
           const createEpisode = dependencies?.createEpisode ?? createSpecEpisode;
           const result = await createEpisode(params.location, toolCallId, ctx, dependencies);
