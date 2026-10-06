@@ -402,17 +402,18 @@ class TestSourceBuilderShareOwnership(unittest.TestCase):
             self.assertFalse((tier / "share").exists())
 
 class _FakeItem:
-    def __init__(self, fixturenames): self.fixturenames=fixturenames; self.markers=[]
+    def __init__(self, fixturenames): self.fixturenames=fixturenames; self.markers=[]; self.name="fake_item"
     def add_marker(self, marker): self.markers.append(marker)
     def get_closest_marker(self, name):
         return next((m for m in reversed(self.markers) if getattr(m,"name",None)==name),None)
 
 class TestCollectionPolicy(unittest.TestCase):
-    def _names(self, fixtures, expression="", markers=()):
+    def _names(self, fixtures, expression="", markers=(), run_lifecycle=False):
         item = _FakeItem(fixtures)
         for marker in markers:
             item.add_marker(getattr(conftest.pytest.mark, marker))
-        cfg = SimpleNamespace(option=SimpleNamespace(markexpr=expression))
+        cfg = SimpleNamespace(option=SimpleNamespace(
+            markexpr=expression, run_lifecycle=run_lifecycle))
         conftest.pytest_collection_modifyitems(cfg, [item])
         return [marker.name for marker in item.markers]
 
@@ -436,8 +437,8 @@ class TestCollectionPolicy(unittest.TestCase):
                 self.assertIn("skip", self._names(
                     ["tier1_container"], expression))
 
-    def test_integration_and_lifecycle_markers_are_never_host_admitted(self):
-        for marker in ("integration", "sandbox", "lifecycle"):
+    def test_integration_and_deprecated_sandbox_markers_are_never_host_admitted(self):
+        for marker in ("integration", "sandbox"):
             with self.subTest(marker=marker):
                 self.assertIn("skip", self._names([], marker, (marker,)))
 

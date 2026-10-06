@@ -28,6 +28,7 @@ def test_pytest_registers_only_supported_and_reserved_environment_markers():
     assert "container:" in ini
     assert "integration:" in ini
     assert "lifecycle:" in ini
+    assert "macos_host:" in ini
 
 
 def test_mocked_runtime_tests_are_host_safe_tier0():
@@ -116,7 +117,7 @@ def test_slice5_removed_host_collected_environment_modules():
 
 def test_slice5_bridges_use_only_the_tier1_container_execution_boundary():
     bridge = (REPO / "tests" / "test_unit_env_bridges.py").read_text()
-    assert bridge.count("def test_") == 5
+    assert bridge.count("def test_") == 6
     assert "tier1_container.run(" in bridge
     assert "subprocess" not in bridge
     assert "docker" not in bridge.lower()

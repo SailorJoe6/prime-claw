@@ -4,8 +4,9 @@ prime-claw uses the lowest sufficient isolation tier. Pure and ordinary
 recording-fake unit tests stay on the host. Environment-sensitive process,
 launcher, wrapper, Git/worktree/socket, Node, Prime Agent, and plugin behavior
 runs in the slim disposable Docker tier. Tests that execute gbrain and PostgreSQL run in
-a separate credential-free Docker image. Real OpenShell lifecycle execution is
-disabled; no marker or test-all option enables it.
+a separate credential-free Docker image. Slice 6 provides only an inert
+lifecycle control contract: no live OpenShell adapter or observer body exists,
+and no test-all option enables lifecycle execution.
 
 ## Current tiers
 
@@ -14,7 +15,7 @@ disabled; no marker or test-all option enables it.
 | 0 | `python3 -m pytest tests/ -q` | Host-safe static, pure unit, and recording-fake orchestration tests; no Docker. |
 | 1 | `python3 -m pytest tests/ -q -m container` or `scripts/test-tier1.sh` | Real Prime Agent/plugin execution in one disposable Docker container; no credentials or host home. |
 | 2 | `scripts/test-integration.sh` | Real PostgreSQL 16 + pgvector + exact gbrain in plain Docker; offline assertions; fixture-owned state. |
-| lifecycle | disabled | No real OpenShell lifecycle test entry. Mocked lifecycle behavior is tier 0. |
+| lifecycle | no live command | Contract only: `lifecycle` marker + `lifecycle_scope` + `--run-lifecycle`; Slice 6 has no live adapter/body. |
 
 Plain pytest is Docker-free. Only the exact marker expression `-m container`
 authorizes tier 1; arbitrary or compound expressions keep protected tests
@@ -22,21 +23,26 @@ skipped. Tier 2 is not a pytest body: its non-collectable assertion program has
 an explicit container-entry guard and runs only through
 `scripts/test-integration.sh`. `scripts/test-all.sh` runs tiers 0, 1, and 2 in
 that order and stops on the first failure. The legacy `--with-sandbox` and the
-replacement `--with-lifecycle` both return a non-mutating usage error.
+replacement `--with-lifecycle` both return an exit-64 non-mutating usage
+error. `--run-lifecycle` is a pytest collection opt-in only: a marker/fixture
+mismatch is an error, a valid pair without it skips before fixture setup, and
+Slice 6 contains no live pair. `macos_host` is a registered but empty observer
+registry and always skips in this slice.
 
 ## Tier-1 unit-env bodies
 
-Five environment-dependent behavior families are explicit tier-1 bodies:
+Six environment-dependent behavior families are explicit tier-1 bodies:
 
 - Linux POSIX watchdog process groups, signals, status, and reaping;
 - the real Node `npm-onload.js` preload and header rewrite;
 - tier-1 launcher, fixture, and image behavior against recording fakes;
 - real Git worktree, Unix-socket, and state cleanup; and
-- `scripts/run-prime-agent-probe.sh` config/session isolation and exit status.
+- `scripts/run-prime-agent-probe.sh` config/session isolation and exit status; and
+- the Slice-6 lifecycle control matrix against a recording fake only.
 
 Their files use the non-default `tests/unit_env_*_body.py` pattern. Plain host
 pytest cannot discover them. `tests/test_unit_env_bridges.py` is the only
-collected entry: its five tests request `tier1_container`, so collection
+collected entry: its six tests request `tier1_container`, so collection
 applies the `container` marker and exact-selector guard before any body can run.
 Each bridge invokes an explicit body path with container Python after the
 fixture has disconnected all networks. Tier-1 containers use Docker `--init`
@@ -46,6 +52,31 @@ read-only `/workspace` snapshot is the only test-subject source. The image has
 no Docker CLI/socket or OpenShell control path, and the bridge passes only its
 fixed container-local HOME. Static tier 0 retains contract/string checks but no
 second execution of these named behaviors.
+
+## Inert lifecycle boundary
+
+`tests/lifecycle/support.py` owns identity generation, exact inspection,
+ownership capture, normalized evidence, and bounded teardown. A run uses a full
+32-hex ID, `pct-<12hex>` workspace, unique target/sentinel/image identities,
+and exact `pc-test=true` plus `pc-run=<full-id>` labels. Gateway and workspace
+are explicit on every adapter call. The tracked minimal policy identity denies
+network and declares no provider or credential input; generated config refuses
+local overlays and automatic providers.
+
+Preflight reads capabilities and each exact identity using
+present/absent/unknown semantics. Default, forbidden, colliding, malformed,
+incompatible, unreachable, ambiguous, unowned, or label/policy-mismatched state
+cannot authorize mutation. Teardown visits target, sentinel, workspace, then
+image. It deletes only a captured identity after an exact ownership reread and
+one post-delete absence check. There are no retries, broad selectors, `--all`,
+or prune operations. Unknown or refusal is terminal and the mode-0600 evidence
+file remains.
+
+The command/control matrix is `tests/lifecycle/control_body.py`. Its filename
+is not default-collectable, its entry guard refuses host execution, and its only
+bridge runs inside the offline tier-1 container. Tier-0 guards validate the
+architecture and collection contract. This proves the boundary without a live
+OpenShell, Docker, provider, service, policy, remote, or sandbox call.
 
 ## Tier-2 disposable brain stack
 

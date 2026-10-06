@@ -1,64 +1,80 @@
-# Project-wide testing strategy — Slice 5 unit-env body migration
+# Project-wide testing strategy — Slice 6 lifecycle control boundary
 
 ## Status
 
-Slices 1–4 are owner-accepted. Slice 5 source candidate is validated and active on `prime-claw-5v7.8` from
-accepted commit `854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a`.
+Slices 1–5 are owner-accepted. Slice 6 / `prime-claw-5v7.7` starts from exact
+accepted commit `d7980cf051be8e459434ebc2a5d74753b0832e3b` (tree
+`79bcb1bc83a4dff83eebe4664f8e7751a0bda1d0`).
 
 ## Threat model
 
 The local host, checkout, Docker daemon, launcher, and same-UID operator are
-trusted. This slice prevents environment-dependent test bodies from using host
-tools or mutable host state. It does not defend against hostile local mutation
-and does not create security-attestation machinery.
+trusted. The material lifecycle risk is accidental mutation of shared
+control-plane state through default, ambiguous, colliding, missing, or unowned
+identities. Hostile same-UID mutation and security attestation are non-goals.
 
-## Required migration
+## Required control boundary
 
-The following behavior families execute only inside the disposable unit-env
-container through explicit tier-1 bodies/bridges:
+Slice 6 creates an inert, recording-fake-tested lifecycle support boundary:
 
-1. POSIX watchdog process, signal, process-group, and cleanup behavior.
-2. npm-onload Node preload and request/header rewrite behavior.
-3. launcher-meta behavior that depends on real launcher/tool semantics.
-4. The reviewed-plan post-creation Git/worktree/socket cleanup body formerly
-   collected from `test_reviewed_plan_native_discovery.py`.
-5. Prime Agent probe-wrapper behavior formerly collected from
-   `test_prime_agent_probe_isolation.py`.
+1. Every run generates a full run identity, a non-default workspace identity,
+   test-prefixed resource identities, and exact ownership labels. Gateway and
+   workspace scope are explicit; the default workspace is never a target.
+2. Lifecycle collection requires the `lifecycle` marker, the scoped fixture,
+   and explicit `--run-lifecycle` opt-in. Structural mismatch fails collection;
+   absent opt-in skips with zero mutation.
+3. Preflight and inspection use exact selectors and a present/absent/unknown
+   result. Collision, ambiguity, daemon/CLI failure, malformed output,
+   forbidden identity, missing ownership proof, and label mismatch fail before
+   any recorded mutating call.
+4. Ownership is captured only after an exact label/scope reread. Teardown uses
+   bounded deadlines and only exact captured, revalidated owned identities.
+   Unowned targets are never deleted; unknown/refusal is failure and retains
+   sanitized evidence.
+5. The host-observer registry records the exceptional seam, marker, fixture,
+   inadequate fake/container alternative, ownership rules, and current
+   disabled status. No live observer body is enabled in this slice.
+6. Evidence records sanitized identity, scope, command class, result,
+   timestamps/deadlines, and teardown/absence state. It contains no credentials,
+   private endpoints, production config, or raw private content.
 
-A moved body may use only the accepted read-only repository snapshot,
-container-local installed tools, and run-owned container-local/scratch state.
-It must not resolve or execute a host Node/Prime Agent/Git test subject, touch a
-host socket/worktree/runtime, or inherit host credentials/private state.
+## Required fake proofs
 
-## Collection and coverage contract
-
-- Every moved test uses the accepted tier-1 fixture/bridge and is auto-marked
-  `container`.
-- Only exact `-m container` admits it. Plain pytest and arbitrary marker
-  expressions skip it before fixtures or bodies run.
-- Tier 0 retains only static or pure recording-fake coverage for these areas.
-- Coverage reconciliation maps each named behavior to one authoritative tier-1
-  execution and removes misleading duplicate host proof.
-- Tier 2 remains the noncollectable Slice-3 gbrain/PostgreSQL body and is not
-  widened by this migration.
+Recording-fake and static tests prove collision handling, default-name/workspace
+rejection, missing/ambiguous state, ownership-label mismatch, incompatible CLI
+or malformed results, daemon failure, teardown refusal/failure, unknown inspect,
+evidence retention, and attempted unowned cleanup. Every pre-ownership failure
+has zero mutating calls. Post-ownership cleanup may reference only the exact
+owned identities recorded by the scope.
 
 ## Preserved boundaries
 
-Plain pytest remains Docker-free. Plugin development remains Docker-only.
-Lifecycle execution remains disabled; `--with-sandbox` and `--with-lifecycle`
-remain non-mutating errors. The simple zero-runtime-host-mount integration
-architecture and all accepted Slice 1–4 isolation/evidence behavior remain.
+Plain pytest remains Docker-free. Tier-1 admission remains exact `-m container`.
+Tier 2 and the accepted Slice-3 isolation topology do not change. Plugin work
+remains Docker-only. `scripts/test-all.sh --with-lifecycle` and
+`--with-sandbox` remain deterministic non-mutating errors until the approved
+later live-occupant slice. No live OpenShell/provider call, sandbox/service/
+remote/policy mutation, credentials, or user-global refresh is allowed.
 
 ## Acceptance
 
-Tests prove migration and guard behavior for all five named families. Docs,
-requirements inventory, evidence, and Bead receipt agree. Run appropriate
-sequential gates and one normal bounded final review against this practical
-contract, then publish one clean commit/push and stop for owner review.
+Marker/CLI/static and recording-fake gates prove fail-closed collection,
+identity, ownership, inspection, evidence, and bounded cleanup semantics. Docs,
+host-observer registry, inventory, evidence, and Bead receipt agree. Run the
+appropriate source and exact-commit sequential gates plus one normal bounded
+final review, publish one clean commit/push, and stop for owner review.
+
+## Source-candidate status — 2026-10-06
+
+The inert support layer, collection contract, Docker-only recording-fake
+matrix, tier-0 architecture guards, docs, host-observer registry, inventory,
+and evidence page are implemented. Focused host and recording-fake gates pass.
+Exact-commit sequential validation, the single bounded review, publication,
+and owner acceptance remain pending.
 
 ## Guardrails and boundary
 
-Bias for DONE over perfect. Excluded same-UID attacks and security attestation
-are not blockers. Do not launch recursive review. If two review cycles still
-find material in-scope defects, stop for operator scope consultation. Do not
-start Slice 6+.
+Bias for DONE over perfect. Do not add same-UID hardening, security attestation,
+or recursive review. If two repair/review cycles still find material in-scope
+defects, stop for operator consultation. Do not run a live lifecycle occupant
+or implement Slice 7+.

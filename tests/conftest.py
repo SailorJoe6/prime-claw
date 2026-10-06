@@ -6,14 +6,18 @@ the exact supported selector `-m container`. A random, negated, grouped, or
 compound marker expression never authorizes an environment tier.
 
 Tier 2 is not a host pytest suite. `scripts/test-integration.sh` invokes a
-non-collectable assertion body inside the purpose-built Slice-3 image. Lifecycle
-execution remains disabled; `integration`, `lifecycle`, and deprecated `sandbox`
-markers are always skipped by host pytest.
+non-collectable assertion body inside the purpose-built Slice-3 image.
+Lifecycle execution remains inert in Slice 6. A lifecycle item must pair the
+`lifecycle` marker with `lifecycle_scope`; mismatches are collection errors and
+the valid pair skips unless pytest receives dedicated `--run-lifecycle` opt-in.
+The deprecated `sandbox` marker always skips.
 
 The session fixture mirrors scripts/test-tier1.sh and preserves the accepted
 Slice-1/Slice-2 build, isolation, evidence, and cleanup contract.
 """
 
+import hashlib
+import importlib.util
 import json
 from dataclasses import dataclass
 import os
@@ -77,25 +81,62 @@ _SKIP_INTEGRATION = (
     "scripts/test-integration.sh"
 )
 _SKIP_LIFECYCLE = (
-    "lifecycle execution is disabled; mocked runtime tests belong in tier 0"
+    "lifecycle: explicit host observer requires --run-lifecycle"
+)
+_SKIP_MACOS_HOST = (
+    "macos_host registry is empty; no observer is enabled"
 )
 
 
+def pytest_addoption(parser):
+    group = parser.getgroup("prime-claw lifecycle")
+    group.addoption(
+        "--run-lifecycle", action="store_true", default=False,
+        help="admit reviewed lifecycle marker+fixture pairs (never used by test-all)",
+    )
+
+
+def _lifecycle_opt_in(config) -> bool:
+    getter = getattr(config, "getoption", None)
+    if getter is None:
+        return bool(getattr(getattr(config, "option", object()),
+                            "run_lifecycle", False))
+    return bool(getter("--run-lifecycle", default=False))
+
+
 def pytest_collection_modifyitems(config, items):
-    """Admit tier 1 only through exact `-m container`; fail closed otherwise."""
+    """Apply exact tier admission and lifecycle marker/fixture pairing."""
     for item in items:
         if any(name in item.fixturenames for name in ("tier1_container", "ctmp", "croot")):
             item.add_marker(pytest.mark.container)
+        marked = item.get_closest_marker("lifecycle") is not None
+        scoped = "lifecycle_scope" in item.fixturenames
+        macos_host = item.get_closest_marker("macos_host") is not None
+        if macos_host and not (marked and scoped):
+            raise pytest.UsageError(
+                f"macos_host collection contract mismatch for {item.name}: "
+                "requires lifecycle marker and lifecycle_scope fixture"
+            )
+        if marked != scoped:
+            missing = "lifecycle_scope fixture" if marked else "lifecycle marker"
+            raise pytest.UsageError(
+                f"lifecycle collection contract mismatch for {item.name}: missing {missing}"
+            )
     markexpr = (getattr(config.option, "markexpr", "") or "").strip()
     tier1_selected = markexpr == "container"
+    lifecycle_selected = _lifecycle_opt_in(config)
     for item in items:
         if (item.get_closest_marker("container") is not None
                 and not tier1_selected):
             item.add_marker(pytest.mark.skip(reason=_SKIP_CONTAINER))
         if item.get_closest_marker("integration") is not None:
             item.add_marker(pytest.mark.skip(reason=_SKIP_INTEGRATION))
+        if item.get_closest_marker("sandbox") is not None:
+            item.add_marker(pytest.mark.skip(reason=_SKIP_LIFECYCLE))
+        if item.get_closest_marker("macos_host") is not None:
+            item.add_marker(pytest.mark.skip(reason=_SKIP_MACOS_HOST))
         if (item.get_closest_marker("lifecycle") is not None
-                or item.get_closest_marker("sandbox") is not None):
+                and not lifecycle_selected):
             item.add_marker(pytest.mark.skip(reason=_SKIP_LIFECYCLE))
 
 
@@ -1239,3 +1280,37 @@ def croot(tier1_container) -> str:
     path = result.stdout.strip()
     yield path
     tier1_container.run("rm", "-rf", path, wrap=False, timeout=30, workdir=None)
+
+_LIFECYCLE_SUPPORT = None
+
+
+def _load_lifecycle_support():
+    global _LIFECYCLE_SUPPORT
+    if _LIFECYCLE_SUPPORT is None:
+        path = REPO / "tests" / "lifecycle" / "support.py"
+        spec = importlib.util.spec_from_file_location("prime_claw_lifecycle_support", path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError("unable to load inert lifecycle support")
+        module = importlib.util.module_from_spec(spec)
+        # dataclasses resolves postponed annotations through sys.modules.
+        import sys
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        _LIFECYCLE_SUPPORT = module
+    return _LIFECYCLE_SUPPORT
+
+
+@pytest.fixture
+def lifecycle_scope(tmp_path):
+    """Generate one inert, workspace-scoped lifecycle identity.
+
+    Collection requires the lifecycle marker and explicit --run-lifecycle.
+    Fixture setup performs no external call and exposes no live adapter.
+    """
+    support = _load_lifecycle_support()
+    policy = REPO / "tests" / "lifecycle" / "minimal-policy.json"
+    return support.LifecycleScope.generate(
+        evidence_dir=tmp_path / "lifecycle-evidence",
+        gateway_id="test-gateway",
+        policy_sha256=hashlib.sha256(policy.read_bytes()).hexdigest(),
+    )

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "prime-claw",
-  "phase": "1 — de-risk gate",
+  "phase": "1 \u2014 de-risk gate",
   "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
   "requirements": [
     {
@@ -837,7 +837,7 @@
       "priority": "NICE",
       "phase": 2,
       "slice": 6,
-      "summary": "Host exposure of sandboxed Postgres on localhost:5433 — documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
+      "summary": "Host exposure of sandboxed Postgres on localhost:5433 \u2014 documented constraint (no host forward; PG is in-sandbox-only, deny-by-default egress).",
       "status": "documented (Slice 6; no host forward by design)",
       "proven_by": {
         "check": [
@@ -1135,7 +1135,7 @@
       "id": "R-T1-1",
       "priority": "P1",
       "summary": "Tier-1 slim test container image + standalone driver: docker/test.Dockerfile (Ubuntu 24.04 + Node 22 + python3/pytest), scripts/test-tier1.sh builds the image and runs one ephemeral container; --smoke, --dry-run (never contacts Docker), --rebuild; informational paths are Docker-free.",
-      "status": "met (slice 1, EXPERT PASS on 2666843 ≡ b2f6b86)",
+      "status": "met (slice 1, EXPERT PASS on 2666843 \u2261 b2f6b86)",
       "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
       "proven_by": {
         "apply": [
@@ -1532,39 +1532,46 @@
     {
       "id": "R-TEST-9",
       "priority": "GATE",
-      "summary": "Lifecycle execution stays disabled: mocked runtime orchestration is tier 0, plugin development stays Docker-only, and legacy/current lifecycle-enable flags fail before mutation.",
-      "status": "owner-accepted at project-wide testing Slice-4 commit 854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a",
-      "plan": ".ralph/plans/SPECIFICATION.md (Slice 4)",
+      "summary": "Lifecycle execution is inert and fail closed: generated non-default workspace/resource identities, exact ownership capture, present/absent/unknown inspection, sanitized evidence, and bounded exact cleanup are proven with a recording fake in tier 1; marker+fixture mismatch fails collection, absent --run-lifecycle skips, the empty macos_host registry always skips, and test-all lifecycle flags remain exit-64 non-mutating errors.",
+      "status": "Slice-6 source candidate validated; exact-commit sequential gate and owner review pending",
+      "plan": ".ralph/plans/SPECIFICATION.md (Slice 6)",
       "proven_by": {
         "apply": [
-          "scripts/test-all.sh"
-        ],
-        "check": [
-          "AGENTS.md",
-          "DEVELOPERS.md",
-          "docs/testing-strategy.md"
-        ],
-        "validate": [
-          "pytest.ini",
+          "tests/lifecycle/support.py",
+          "tests/lifecycle/minimal-policy.json",
           "tests/conftest.py"
         ],
+        "check": [
+          "DEVELOPERS.md",
+          "docs/testing-strategy.md",
+          "pytest.ini",
+          "scripts/test-all.sh"
+        ],
+        "validate": [
+          "tests/lifecycle/control_body.py",
+          "tests/test_unit_env_bridges.py"
+        ],
         "tests": [
+          "tests/test_lifecycle_guards.py",
+          "tests/test_tier1_fixture.py",
+          "tests/test_container_helpers_static.py",
           "tests/test_test_all.py",
-          "tests/test_container_helpers_static.py"
+          "tests/test_runtime_converge.py"
         ]
       },
-      "evidence": "docs/evidence/2026-10-06-testing-strategy-slice4-truthful-tiers.md"
+      "evidence": "docs/evidence/2026-10-06-testing-strategy-slice6-lifecycle-guardrails.md"
     },
     {
       "id": "R-TEST-10",
       "priority": "GATE",
-      "summary": "Safety coverage preserves accepted Slice-1/Slice-2 cases. Reduced Slice-3 coverage targets ordinary build/create/body/copy failure, timeout and SIGINT/SIGTERM nonzero behavior, label mismatch, partial-resource recovery, cleanup refusal, malformed/missing result, and real mount-free stack execution; hostile same-UID races and publication micro-transactions are excluded optional hardening.",
-      "status": "proven for owner-accepted Slice 1/2; reduced ordinary-failure Slice-3 coverage owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
+      "summary": "Safety coverage preserves accepted Slice-1/Slice-2 cases. Reduced Slice-3 coverage targets ordinary build/create/body/copy failure, timeout and SIGINT/SIGTERM nonzero behavior, label mismatch, partial-resource recovery, cleanup refusal, malformed/missing result, and real mount-free stack execution; hostile same-UID races and publication micro-transactions are excluded optional hardening; Slice 6 adds default/forbidden/collision/unknown/malformed/daemon/CLI/ownership/teardown-refusal lifecycle guards with zero pre-ownership mutation and exact-owned cleanup. Slice 6 also closes tier-0 brain-query/GitHub-provider stage-stub gaps so orchestration-order tests cannot fall through to live OpenShell.",
+      "status": "Slices 1-3 owner-accepted; Slice-6 lifecycle safety source candidate validated with exact-commit gate pending",
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
           "scripts/testing/provenance.py",
-          "scripts/test-integration.sh"
+          "scripts/test-integration.sh",
+          "tests/lifecycle/support.py"
         ],
         "check": [
           "docs/testing-strategy.md",
@@ -1573,7 +1580,8 @@
         "validate": [
           "scripts/test-tier1.sh",
           "tests/conftest.py",
-          "docs/testing-strategy.md"
+          "docs/testing-strategy.md",
+          "tests/lifecycle/control_body.py"
         ],
         "tests": [
           "tests/test_testing_provenance.py",
@@ -1584,7 +1592,9 @@
           "tests/test_integration_tier.py",
           "tests/test_tier1_driver.py",
           "tests/test_tier1_fixture.py",
-          "tests/test_unit_env_bridges.py"
+          "tests/test_unit_env_bridges.py",
+          "tests/test_lifecycle_guards.py",
+          "tests/test_runtime_converge.py"
         ]
       },
       "evidence": "docs/evidence/2026-10-04-testing-strategy-slice3-integration-environment.md"
@@ -1592,15 +1602,18 @@
     {
       "id": "R-TEST-11",
       "priority": "GATE",
-      "summary": "The remaining environment-dependent unit behaviors (POSIX watchdog, npm-onload, tier-1 launcher meta, Git/worktree/Unix-socket cleanup, and probe wrapper) are non-default body files executed only through five exact-marker tier-1 bridges in the disposable offline unit-env container.",
-      "status": "source candidate validated in project-wide testing Slice 5; exact-commit sequential gate and final review pending",
-      "plan": ".ralph/plans/SPECIFICATION.md (Slice 5)",
+      "summary": "Environment-dependent unit behaviors remain non-default bodies behind six exact-marker tier-1 bridges, including the Slice-6 lifecycle recording fake. The host-observer exception registry has no enabled body; any future host observer requires an individually reviewed lifecycle marker+fixture entry because a controller container cannot prove the real host seam.",
+      "status": "Slice 5 owner-accepted at d7980cf; Slice-6 empty host-observer registry and recording-fake bridge validated with exact-commit gate pending",
+      "plan": ".ralph/plans/SPECIFICATION.md (Slices 5-6)",
       "proven_by": {
         "apply": [
-          "tests/test_unit_env_bridges.py"
+          "tests/test_unit_env_bridges.py",
+          "tests/conftest.py"
         ],
         "check": [
           "tests/test_container_helpers_static.py",
+          "tests/test_lifecycle_guards.py",
+          "DEVELOPERS.md",
           "docs/testing-strategy.md"
         ],
         "validate": [
@@ -1611,14 +1624,16 @@
           "tests/unit_env_tier1_fixture_body.py",
           "tests/unit_env_tier1_image_body.py",
           "tests/unit_env_cleanup_body.py",
-          "tests/unit_env_probe_wrapper_body.py"
+          "tests/unit_env_probe_wrapper_body.py",
+          "tests/lifecycle/control_body.py"
         ],
         "tests": [
           "tests/test_unit_env_bridges.py",
-          "tests/test_container_helpers_static.py"
+          "tests/test_container_helpers_static.py",
+          "tests/test_lifecycle_guards.py"
         ]
       },
-      "evidence": "docs/evidence/2026-10-06-testing-strategy-slice5-unit-env-bodies.md"
+      "evidence": "docs/evidence/2026-10-06-testing-strategy-slice6-lifecycle-guardrails.md"
     }
   ],
   "phase2": {}

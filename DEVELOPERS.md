@@ -145,10 +145,37 @@ only. Do not apply, check, or probe a candidate against the host user-global
   tier's acceptance boundary. The explicit body filename is not pytest-
   collectable, and direct host invocation fails before side effects.
 
-- **Lifecycle execution — disabled.** The former `sandbox` tests are recording-
-  fake host unit tests and now belong to tier 0. No pytest marker or
-  `scripts/test-all.sh` option runs real OpenShell lifecycle work. Both
-  `--with-sandbox` and `--with-lifecycle` are non-mutating usage errors.
+- **Lifecycle control boundary — inert.** `tests/lifecycle/support.py` generates
+  one non-default `pct-<12hex>` workspace plus run-scoped target, sentinel,
+  image, labels, deadline, and sanitized JSONL evidence. It exposes a protocol,
+  not a live adapter. The destructive path accepts only exact captured
+  identities after ownership-label and policy revalidation; unknown state or
+  refusal stops cleanup and retains evidence.
+- **Lifecycle collection — explicit and fail closed.** A lifecycle item must
+  have both `@pytest.mark.lifecycle` and the `lifecycle_scope` fixture.
+  Mismatch is a collection error. A valid pair skips without fixture setup
+  unless pytest receives `--run-lifecycle`. That option does not make a live
+  observer exist in Slice 6. `scripts/test-all.sh --with-sandbox` and
+  `--with-lifecycle` remain exit-64 non-mutating usage errors.
+
+### Host-observer exception registry
+
+Host observers are exceptional because their subject is the real hosting
+stack. Every enabled body must be individually listed here before use. The
+Linux controller container is inadequate for OpenShell workspace ownership,
+Docker Desktop/virtiofs, or macOS process behavior; recording fakes prove the
+control contract but cannot prove those host properties.
+
+| Observer body | Seam | Marker / fixture | Ownership rule | Status |
+|---|---|---|---|---|
+| _none_ | OpenShell host control plane / Docker Desktop | `lifecycle` / `lifecycle_scope` | Generated workspace and exact `pc-test=true`, `pc-run=<full-id>` labels; exact captured cleanup only | Disabled: Slice 6 has no live adapter or body |
+| _none_ | macOS-only hosting behavior | `macos_host` plus lifecycle contract | Same, with separate review | Registry empty |
+
+The first future observer must be approved in a later slice and added to this
+table. It must not read operator config, a default workspace, credentials, brain
+content, private endpoints, or production resource identities. A controller
+container is not a substitute because it would test the container's control
+client and mounts rather than the actual host seam.
 
 ### Whole-suite sequencer
 

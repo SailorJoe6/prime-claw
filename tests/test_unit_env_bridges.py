@@ -19,6 +19,7 @@ BODY_GROUPS = {
     ),
     "cleanup": ("tests/unit_env_cleanup_body.py",),
     "probe_wrapper": ("tests/unit_env_probe_wrapper_body.py",),
+    "lifecycle_fake": ("tests/lifecycle/control_body.py",),
 }
 
 
@@ -50,3 +51,7 @@ def test_git_worktree_socket_cleanup_unit_env(tier1_container):
 
 def test_probe_wrapper_unit_env(tier1_container):
     _run_body(tier1_container, *BODY_GROUPS["probe_wrapper"])
+
+
+def test_lifecycle_recording_fake_unit_env(tier1_container):
+    _run_body(tier1_container, *BODY_GROUPS["lifecycle_fake"])

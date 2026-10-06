@@ -236,11 +236,13 @@ def test_create_runs_stages_in_order(tmp_path, monkeypatch):
     monkeypatch.setattr(pc, "stage_brain_clone", rec("brain-clone"))
     monkeypatch.setattr(pc, "stage_brain", rec("brain"))
     monkeypatch.setattr(pc, "stage_brain_index", rec("brain-index"))
+    monkeypatch.setattr(pc, "stage_brain_query", rec("brain-query"))
     monkeypatch.setattr(pc, "stage_spawn", rec("spawn"))
     monkeypatch.setattr(pc, "stage_policy", rec("policy"))
     rc = pc.cmd_create(cfg(tmp_path), Args())
     assert rc == 0
-    assert order == ["build", "provider", "github-provider", "sandbox", "prime-agent", "brain-clone", "brain", "brain-index", "spawn", "policy"]
+    assert order == ["build", "provider", "github-provider", "sandbox", "prime-agent",
+                     "brain-clone", "brain", "brain-index", "brain-query", "spawn", "policy"]
 
 
 def test_create_stops_on_first_stage_failure(tmp_path, monkeypatch, capsys):
@@ -257,6 +259,7 @@ def test_create_dry_run_no_side_effects(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(pc, "stage_sandbox", lambda c, a, force_fresh=False: 0)
     monkeypatch.setattr(pc, "stage_prime_agent", lambda c, a: 0)
     monkeypatch.setattr(pc, "stage_brain", lambda c, a: 0)
+    monkeypatch.setattr(pc, "stage_brain_query", lambda c, a: 0)
     monkeypatch.setattr(pc, "stage_spawn", lambda c, a: 0)
     monkeypatch.setattr(pc, "stage_policy", lambda c, a: 0)
     rc = pc.cmd_create(cfg(tmp_path), Args(dry_run=True))
@@ -284,6 +287,7 @@ def _stub_stages(monkeypatch, order):
     monkeypatch.setattr(pc, "stage_brain_clone", rec("brain-clone"))
     monkeypatch.setattr(pc, "stage_brain", rec("brain"))
     monkeypatch.setattr(pc, "stage_brain_index", rec("brain-index"))
+    monkeypatch.setattr(pc, "stage_brain_query", rec("brain-query"))
     monkeypatch.setattr(pc, "stage_spawn", rec("spawn"))
     monkeypatch.setattr(pc, "stage_policy", rec("policy"))
 
@@ -294,7 +298,8 @@ def test_converge_runs_all_stages_no_recreate(tmp_path, monkeypatch):
     _stub_stages(monkeypatch, order)
     rc = pc.cmd_converge(cfg(tmp_path), Args())
     assert rc == 0
-    assert order == ["build", "provider", "github-provider", "sandbox", "prime-agent", "brain-clone", "brain", "brain-index", "spawn", "policy"]
+    assert order == ["build", "provider", "github-provider", "sandbox", "prime-agent",
+                     "brain-clone", "brain", "brain-index", "brain-query", "spawn", "policy"]
 
 
 def test_converge_errors_when_sandbox_absent(tmp_path, monkeypatch, capsys):
@@ -318,6 +323,7 @@ def test_converge_stops_on_stage_failure(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(pc, "probe_sandbox", lambda c: (True, "Ready", {"phase": "Ready"}))
     monkeypatch.setattr(pc, "cmd_build", lambda c, a: 0)
     monkeypatch.setattr(pc, "stage_provider", lambda c, a: 0)
+    monkeypatch.setattr(pc, "stage_github_provider", lambda c, a: 0)
     monkeypatch.setattr(pc, "stage_sandbox", lambda c, a, force_fresh=False: 9)  # fail
     rc = pc.cmd_converge(cfg(tmp_path), Args())
     assert rc == 9
