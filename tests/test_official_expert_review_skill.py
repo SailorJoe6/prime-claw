@@ -39,7 +39,7 @@ def test_official_expert_skill_has_one_exact_managed_package_inventory() -> None
 def test_managed_reviewer_definition_is_exact_standalone_migration_evidence() -> None:
     assert (PACKAGE / "reviewer.md").read_bytes() == PROFILE.read_bytes()
     digest = hashlib.sha256(PROFILE.read_bytes()).hexdigest()
-    assert digest == "d9f8b14954da36df3d9051b4e25f8a76b6d16a0a2c27f9b29cfab262b5efe6f6"
+    assert digest == "49e2f48421902721b25751380a2173cd8a44ad1c6c4655e7a9a4a8e583983ce6"
     assert f'REVIEWER_DEFINITION_SHA256 = "{digest}"' in (PACKAGE / "__init__.py").read_text()
 
 
@@ -80,6 +80,62 @@ def replace_marker_worktree(monkeypatch, worktree: str) -> None:
     entries = [json.loads(line) for line in session_file.read_text().splitlines()]
     entries[1]["data"]["worktree"] = worktree
     session_file.write_text("".join(json.dumps(entry) + "\n" for entry in entries))
+
+
+
+def claimed_fixture(tmp_path: Path, monkeypatch):
+    module = load_package()
+    state, packet = owner_fixture(tmp_path, monkeypatch, module)
+
+    async def find_models(query, limit):
+        return [SimpleNamespace(selector=module.MODEL_SELECTOR)]
+
+    async def spawn(prompt, **kwargs):
+        pending = next(state.glob("*.pending.json"))
+        pending_record = json.loads(pending.read_text())
+        child_directory = tmp_path / "sub-report"
+        child_directory.mkdir()
+        return SimpleNamespace(
+            rlm_child_id=child_directory.name,
+            name=pending_record["childName"],
+            session_dir=child_directory,
+            model=module.MODEL_SELECTOR,
+        )
+
+    monkeypatch.setitem(sys.modules, "rlm", SimpleNamespace(find_models=find_models, spawn=spawn))
+    asyncio.run(module.launch(packet))
+    finalized = next(state.glob("*.finalized.json"))
+    record = json.loads(finalized.read_text())
+    child_id = "33333333-3333-7333-8333-333333333333"
+    child_file = Path(record["sessionDir"]) / f"{child_id}.jsonl"
+    child_header = {
+        "type": "session", "version": 3, "id": child_id,
+        "timestamp": "2026-10-07T00:00:00Z", "cwd": record["projectPath"],
+        "parentSession": record["ownerSessionFile"], "rlmDepth": 1,
+    }
+    child_file.write_text(json.dumps(child_header) + "\n")
+    claimed_record = {
+        **record, "phase": "CLAIMED", "claimedAt": int(__import__("time").time() * 1000),
+        "childSessionId": child_id, "childSessionFile": str(child_file),
+        "childSessionName": record["childName"],
+    }
+    claimed = state / f"{record['childName']}.claimed.json"
+    claimed.write_text(json.dumps(claimed_record, sort_keys=True, separators=(",", ":")) + "\n")
+    os.chmod(claimed, 0o600)
+    finalized.unlink()
+    monkeypatch.setenv("RLM_DEPTH", "1")
+    monkeypatch.setenv("RLM_SESSION_DIR", record["sessionDir"])
+    owner_artifact = Path(os.environ["PRIME_AGENT_CODING_AGENT_DIR"]) / "session-artifacts" / record["ownerSessionId"]
+    return module, state, packet, claimed_record, owner_artifact
+
+
+def pass_report():
+    return {"schemaVersion": 1, "verdict": "PASS", "summary": "The exact candidate passes.", "findings": []}
+
+
+def owner_runtime(monkeypatch, owner_artifact: Path) -> None:
+    monkeypatch.setenv("RLM_DEPTH", "0")
+    monkeypatch.setenv("RLM_SESSION_DIR", str(owner_artifact))
 
 
 @pytest.mark.parametrize("spelling", ["dot-segment", "symlink", "nested"])
@@ -146,3 +202,215 @@ def test_launch_fails_before_spawn_on_ambiguous_discovery_and_revokes_definite_f
     monkeypatch.setitem(sys.modules, "rlm", SimpleNamespace(find_models=exact, spawn=spawn))
     with pytest.raises(RuntimeError, match="definite spawn failure"): asyncio.run(module.launch(packet))
     assert spawn_calls == [1] and not list(state.glob("*.pending.json")) and not list(state.glob("*.finalized.json"))
+
+
+def test_launch_rejects_dirty_candidate_before_model_discovery_and_state(tmp_path, monkeypatch) -> None:
+    module = load_package()
+    state, packet = owner_fixture(tmp_path, monkeypatch, module)
+    (Path(packet["repositoryPath"]) / "untracked").write_text("mutation\n")
+    calls = []
+
+    async def find_models(*args, **kwargs):
+        calls.append("find")
+        return []
+
+    monkeypatch.setitem(sys.modules, "rlm", SimpleNamespace(find_models=find_models))
+    with pytest.raises(RuntimeError, match="clean candidate worktree"):
+        asyncio.run(module.launch(packet))
+    assert calls == []
+    assert not state.exists()
+
+
+def test_child_report_and_owner_settlement_are_digest_exact_and_idempotent(tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    submitted = module.submit(pass_report())
+    assert submitted["report"]["verdict"] == "PASS"
+    assert submitted["receipt"]["phase"] == "REPORTED"
+    assert submitted["receipt"]["repositoryUnchanged"] is True
+    reported = state / f"{record['childName']}.reported.json"
+    assert reported.exists() and not list(state.glob("*.claimed.json"))
+    assert module.submit(pass_report()) == submitted
+
+    owner_runtime(monkeypatch, owner_artifact)
+    settled = module.settle()
+    assert settled["report"] == submitted["report"]
+    assert settled["reportReceipt"] == submitted["receipt"]
+    assert settled["settlementReceipt"]["phase"] == "SETTLED"
+    assert not reported.exists()
+    assert module.settle() == settled
+
+    monkeypatch.setenv("RLM_DEPTH", "1")
+    monkeypatch.setenv("RLM_SESSION_DIR", record["sessionDir"])
+    with pytest.raises(RuntimeError, match="cannot be replayed"):
+        module.submit(pass_report())
+
+
+def test_report_validation_requires_bounded_shape_and_actionable_block(tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, _owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    block = {
+        "schemaVersion": 1, "verdict": "BLOCK", "summary": "A material issue remains.",
+        "findings": [{
+            "severity": "BLOCK", "summary": "Broken invariant", "evidence": "tests/x.py:1",
+            "remediation": "",
+        }],
+    }
+    with pytest.raises(ValueError, match="actionable BLOCK remediation"):
+        module.submit(block)
+    with pytest.raises(ValueError, match="malformed or oversized"):
+        module.submit({"schemaVersion": 1, "verdict": "PASS", "summary": "x" * 4001, "findings": []})
+    with pytest.raises(ValueError, match="verdict and findings disagree"):
+        module.submit({
+            "schemaVersion": 1, "verdict": "PASS", "summary": "not pass",
+            "findings": [{"severity": "ADVISORY", "summary": "note", "evidence": "e", "remediation": ""}],
+        })
+    oversized = {
+        "schemaVersion": 1, "verdict": "BLOCK", "summary": "bounded",
+        "findings": [{
+            "severity": "BLOCK", "summary": "s" * 1000,
+            "evidence": "e" * 4000, "remediation": "r" * 4000,
+        } for _ in range(2)],
+    }
+    with pytest.raises(ValueError, match="report is too large"):
+        module.submit(oversized)
+    assert (state / f"{record['childName']}.claimed.json").exists()
+
+    block["findings"][0]["remediation"] = "Validate the exact binding before publication and add a negative replay test."
+    result = module.submit(block)
+    assert result["report"]["verdict"] == "BLOCK"
+    conflict = {"schemaVersion": 1, "verdict": "PASS", "summary": "conflict", "findings": []}
+    with pytest.raises(RuntimeError, match="conflicting"):
+        module.submit(conflict)
+
+
+def test_report_fails_closed_for_wrong_runtime_or_unclaimed_launch(tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, _owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    other = tmp_path / "sub-other"
+    other.mkdir()
+    monkeypatch.setenv("RLM_SESSION_DIR", str(other))
+    with pytest.raises(RuntimeError, match="exactly one private review state"):
+        module.submit(pass_report())
+    assert (state / f"{record['childName']}.claimed.json").exists()
+    monkeypatch.setenv("RLM_SESSION_DIR", record["sessionDir"])
+    claimed = state / f"{record['childName']}.claimed.json"
+    claimed.unlink()
+    with pytest.raises(RuntimeError, match="exactly one private review state"):
+        module.submit(pass_report())
+
+
+
+
+@pytest.mark.parametrize("mutation,pattern", [
+    ("model", "model lineage"),
+    ("generation", "generation changed"),
+    ("child", "child session header"),
+    ("candidate", "snapshot is invalid"),
+    ("packet", "packet digest"),
+])
+def test_report_revalidates_claimed_host_lineage(mutation, pattern, tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, _owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    claimed = state / f"{record['childName']}.claimed.json"
+    value = json.loads(claimed.read_text())
+    if mutation == "model":
+        value["returnedModel"] = "openai-codex/wrong"
+    elif mutation == "generation":
+        value["ownerGeneration"] = "0" * 64
+    elif mutation == "child":
+        value["childSessionId"] = "44444444-4444-7444-8444-444444444444"
+    elif mutation == "candidate":
+        value["candidateCommitOid"] = "d" * 40
+    else:
+        value["packet"]["focus"] = "tampered packet"
+    claimed.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
+    os.chmod(claimed, 0o600)
+    with pytest.raises(RuntimeError, match=pattern):
+        module.submit(pass_report())
+    assert claimed.exists()
+    assert not list(state.glob("*.reported.json"))
+
+
+@pytest.mark.parametrize("mutation,pattern", [
+    ("digest", "digest, receipt, or repository evidence"),
+    ("receipt", "digest, receipt, or repository evidence"),
+    ("model", "model lineage"),
+])
+def test_settlement_revalidates_immutable_report_and_spawn_lineage(mutation, pattern, tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    module.submit(pass_report())
+    reported = state / f"{record['childName']}.reported.json"
+    value = json.loads(reported.read_text())
+    if mutation == "digest":
+        value["reportDigest"] = "0" * 64
+    elif mutation == "receipt":
+        value["reportReceipt"]["reportedAt"] += 1
+    else:
+        value["returnedModel"] = "openai-codex/wrong"
+    reported.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
+    os.chmod(reported, 0o600)
+    owner_runtime(monkeypatch, owner_artifact)
+    with pytest.raises(RuntimeError, match=pattern):
+        module.settle()
+    assert reported.exists()
+    assert not list(state.glob("*.settled.json"))
+
+
+
+
+def test_settlement_requires_exact_current_owner_session_file(tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    module.submit(pass_report())
+    reported = state / f"{record['childName']}.reported.json"
+    value = json.loads(reported.read_text())
+    copied_owner = tmp_path / "copied-owner.jsonl"
+    copied_owner.write_bytes(Path(value["ownerSessionFile"]).read_bytes())
+    value["ownerSessionFile"] = str(copied_owner)
+    reported.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
+    os.chmod(reported, 0o600)
+    owner_runtime(monkeypatch, owner_artifact)
+    with pytest.raises(RuntimeError, match="exactly one matching reported or settled review"):
+        module.settle()
+    assert reported.exists()
+
+
+def test_idempotent_settled_read_revalidates_immutable_result(tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    module.submit(pass_report())
+    owner_runtime(monkeypatch, owner_artifact)
+    module.settle()
+    settled = state / f"{record['childName']}.settled.json"
+    value = json.loads(settled.read_text())
+    value["settlementResult"]["settlementReceipt"]["settledAt"] += 1
+    settled.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
+    os.chmod(settled, 0o600)
+    with pytest.raises(RuntimeError, match="settled official EXPERT report or receipt"):
+        module.settle()
+
+
+def test_report_records_and_rejects_post_review_repository_mutation(tmp_path, monkeypatch) -> None:
+    module, state, packet, record, owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    (Path(packet["repositoryPath"]) / "candidate").write_text("reviewer mutation\n")
+    with pytest.raises(RuntimeError, match="recorded a mutated candidate"):
+        module.submit(pass_report())
+    reported_path = state / f"{record['childName']}.reported.json"
+    reported = json.loads(reported_path.read_text())
+    assert reported["reportAccepted"] is False
+    assert reported["postReviewRepository"]["clean"] is False
+    assert reported["postReviewRepository"]["statusBytes"] > 0
+    owner_runtime(monkeypatch, owner_artifact)
+    with pytest.raises(RuntimeError, match="rejected a mutated candidate"):
+        module.settle()
+
+
+def test_settlement_preserves_mutation_evidence_and_cannot_retry(tmp_path, monkeypatch) -> None:
+    module, state, packet, record, owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    module.submit(pass_report())
+    (Path(packet["repositoryPath"]) / "candidate").write_text("post-report mutation\n")
+    owner_runtime(monkeypatch, owner_artifact)
+    with pytest.raises(RuntimeError, match="settlement recorded a mutated candidate"):
+        module.settle()
+    rejection = state / f"{record['childName']}.settlement-rejected.json"
+    evidence = json.loads(rejection.read_text())
+    assert evidence["phase"] == "SETTLEMENT_REJECTED"
+    assert evidence["settlementRepository"]["clean"] is False
+    assert (state / f"{record['childName']}.reported.json").exists()
+    with pytest.raises(RuntimeError, match="already rejected"):
+        module.settle()

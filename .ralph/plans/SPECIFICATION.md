@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved Section 26 private launch/first-call correction. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. The one owner-review BLOCK on pushed candidate `f15457d82c3c9e3760272e71600eefbaf4809b17` is repaired within the exact approved canonical-path scope and all required gates pass; the narrow repair awaits commit, push, and owner report.
+> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Section 27 structured report submission and exact owner settlement are implemented and fully validated pending one commit/push and direct owning-Conversation review.
 >
 > **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
 > **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** the existing episode may commit and push the fully validated owner-approved Section 26 canonical-worktree repair, report it, and stop. Review settlement, owner PASS/BLOCK disposition, child deletion/cleanup, Slice 4, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical cleanup remain separately authorized.
+> **Implementation authority:** the existing episode may commit/push the fully validated Section 27 candidate, report it for one direct owning-Conversation review, and stop. Owner PASS/BLOCK product disposition persistence beyond the settlement receipt, child deletion/state cleanup, Slice 4, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical cleanup remain separately authorized.
 
 ## Summary
 
@@ -819,3 +819,42 @@ framework. Every mismatch, timeout, stale/replay, copied input, or duplicate
 claim aborts before a provider call. Current model is rechecked on every admitted
 call. Prime Agent stays unmodified and its internal agent-message details are
 never read.
+
+## Accepted next vertical: structured EXPERT report and exact owner settlement
+
+Section 27 extends only the accepted private launch protocol. Inbound messages,
+headers, sender/target labels, and internal `agent_message` details retain zero
+authority.
+
+- The managed Python package exposes the smallest strict report API callable by
+  the already-admitted depth-1 child. It derives the current runtime/session
+  directory and claimed launch from host-authored state, revalidates exact
+  child/parent/candidate/packet lineage, and accepts one bounded canonical report
+  with verdict `PASS`, `BLOCK`, `ADVISORY`, or `SPEC_QUESTION`. Every `BLOCK`
+  includes actionable remediation.
+- The API digests the canonical report and atomically transitions one claimed
+  launch to `REPORTED`. An exact duplicate digest may return an idempotent
+  receipt. Conflict, malformed/oversized input, wrong identity/lineage,
+  unclaimed launch, or replay fails closed.
+- Launch records bind the exact pre-review candidate HEAD and clean repository
+  status. Report and settlement record and compare post-review HEAD/status.
+  Mutated-subject evidence is retained but rejected, preserving the semantic
+  read-only limit.
+- A depth-0 exact owner-only settlement/read API derives current owner and
+  generation itself, finds only the matching reported launch, validates report
+  digest plus actual spawn/child/session/model/candidate/package/kernel lineage
+  and unchanged repository state, atomically transitions once to `SETTLED`, and
+  returns the immutable report and receipt. Model-supplied handle fields carry
+  no authority.
+- `FINALIZED`, `CLAIMED`, `REPORTED`, and `SETTLED` continue to designate the
+  same child as a neutral EXPERT. Any provider call after report or settlement
+  explicitly aborts. The canonical reviewer must submit exactly once before its
+  final answer.
+- Reuse the purpose-built private files and atomic transitions. Do not add
+  message-metadata trust, a database, generalized journal, hostile-local-code
+  defense, or delivery retry framework.
+
+Run focused Python/Node/native-provider tests, including mutation and replay,
+then full Tier 0, Docker Tier 1, and the pinned Prime Agent 0.9.8 probe. Use one
+direct owner review only and no new independent review cycle. Commit/push one
+candidate, report, and stop.

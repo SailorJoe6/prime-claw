@@ -1690,3 +1690,65 @@ repair, report, and stop.
 Continue to defer report return/settlement, owner PASS/BLOCK disposition, child
 deletion, cleanup workflow, Slice 4, landing, global apply/restart/UAT, and
 finalization. Never patch Prime Agent or read internal agent-message details.
+
+## 27. Slice 3 — structured review report and exact owner settlement
+
+Accepted base: Section 26 commit
+`3efd0cc79717378f9be5f448afe32f6a7c33ed39`, tree
+`06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Advance only this coherent
+vertical. Inbound messages/details remain non-authoritative.
+
+1. Extend the managed Python package with a strict depth-1 report API. Derive
+   the current runtime/session directory and the unique claimed launch from
+   host-authored state; revalidate child, canonical parent, candidate, packet,
+   model, package, and kernel lineage. Accept one bounded canonical report with
+   verdict `PASS`, `BLOCK`, `ADVISORY`, or `SPEC_QUESTION`; every `BLOCK` must
+   contain actionable remediation.
+2. Canonicalize and digest the report, then atomically transition the matching
+   `CLAIMED` file to `REPORTED`. Return an idempotent receipt only for an exact
+   duplicate digest. Conflict, malformed/oversized report, wrong child/session/
+   parent/candidate, unclaimed launch, or replay fails closed.
+3. Capture exact pre-review candidate HEAD and clean status in the launch
+   record. At report and settlement, record and compare post-review HEAD/status.
+   Preserve evidence of mutation but reject the report/settlement when the
+   reviewed subject changed.
+4. Add a strict depth-0 owner-only settlement/read API. Derive current owner and
+   active generation rather than accepting identity or model-supplied handle
+   fields. Locate exactly one matching `REPORTED` launch, validate its digest,
+   actual spawn/child/session/model/candidate/package/kernel lineage, and
+   unchanged repository state; atomically transition once to `SETTLED` and
+   return the immutable structured report and receipt.
+5. Keep `FINALIZED`, `CLAIMED`, `REPORTED`, and `SETTLED` child sessions under
+   the neutral EXPERT kernel. After report submission or settlement, every
+   provider call explicitly aborts instead of falling back to an ordinary role.
+   Update the canonical reviewer to submit exactly once before its final answer.
+6. Reuse the narrow private file protocol and atomic transitions. Do not trust
+   inbound agent-message metadata, add a database/general journal, defend
+   against hostile local code, or build delivery retries. Defer owner product
+   disposition persistence beyond the receipt if it expands the vertical, plus
+   child deletion, state cleanup, Slice 4, landing, global apply/restart/UAT,
+   and finalization.
+7. Test focused Python/Node/native provider paths, mutation, duplicate digest,
+   conflict, replay, wrong lineage, malformed/oversized report, settlement
+   exactness, and post-report/post-settlement abort. Run full Tier 0, Docker
+   Tier 1, and pinned Prime Agent 0.9.8 probe. Use one direct owner review only;
+   no new independent review cycle. Record evidence, commit/push one candidate,
+   report, and stop.
+
+Implementation and validation are complete. `launch()` now records exact clean
+pre-review repository state; depth-1 `submit()` validates host-derived lineage,
+canonicalizes and digests one bounded structured report, records/rejects subject
+mutation, and creates `REPORTED`; depth-0 no-argument `settle()` revalidates the
+immutable report, actual spawn/session/model/package/kernel lineage, and clean
+repository before creating `SETTLED` and returning immutable receipts. Exact
+duplicate submission/settled reads are idempotent; conflicts and replays fail
+closed. `REPORTED` and `SETTLED` retain the neutral kernel and explicitly abort
+provider use.
+
+Final evidence: 43 focused Python passed/8 skipped; 55 Node passed; native
+provider coverage passed and reran inside the strict-final full Docker gate;
+full Tier 0 311 passed/184 skipped; Docker Tier 1 77 passed/418 deselected;
+pinned Prime Agent 0.9.8 probe OK. No independent review
+was launched. Evidence is in
+`docs/evidence/official-lean-role-protocol/2026-10-07-section-27-report-settlement.md`.
+Commit/push one candidate, report for one direct owner review, and stop.

@@ -61,7 +61,7 @@ type ProbeResult =
 
 type LaunchRecord = Record<string, unknown> & {
   schema: string;
-  phase: "FINALIZED" | "CLAIMED";
+  phase: "FINALIZED" | "CLAIMED" | "REPORTED" | "SETTLED";
   nonce: string;
   createdAt: number;
   expiresAt: number;
@@ -157,7 +157,7 @@ function runProbe(interpreter: string, expected: string, source?: string): Probe
 function validDescription(value: Record<string, unknown>, expected: string): boolean {
   const reviewer = value.reviewer;
   return value.schemaVersion === 1
-    && value.capability === "private-launch-and-first-call-admission"
+    && value.capability === "private-launch-report-and-settlement"
     && value.authority === false && value.module === EXPERT_IMPORT_NAME
     && value.packageSha256 === expected
     && reviewer !== null && typeof reviewer === "object" && !Array.isArray(reviewer)
@@ -205,6 +205,8 @@ function statePaths(root: string, name: string) {
     pending: join(root, `${name}.pending.json`),
     finalized: join(root, `${name}.finalized.json`),
     claimed: join(root, `${name}.claimed.json`),
+    reported: join(root, `${name}.reported.json`),
+    settled: join(root, `${name}.settled.json`),
   };
 }
 function assertPrivateRoot(root: string): void {
@@ -278,10 +280,10 @@ function providerMessages(record: LaunchRecord, messages: Array<Record<string, u
   const user = { role: "user", content: [{ type: "text", text }], timestamp: Date.now() };
   return [user, ...messages.filter((message) => message.role === "assistant" || message.role === "toolResult")];
 }
-function validateRecord(record: LaunchRecord, ctx: ExtensionContext, options: ExpertReviewReservationRegistration): void {
-  if (record.schema !== EXPERT_REVIEW_STATE_SCHEMA || !["FINALIZED", "CLAIMED"].includes(record.phase)) throw new Error("private launch schema or phase is invalid");
+function validateRecord(record: LaunchRecord, ctx: ExtensionContext, options: ExpertReviewReservationRegistration, allowExpired = false): void {
+  if (record.schema !== EXPERT_REVIEW_STATE_SCHEMA || !["FINALIZED", "CLAIMED", "REPORTED", "SETTLED"].includes(record.phase)) throw new Error("private launch schema or phase is invalid");
   const now = (options.now ?? Date.now)(); const createdAt = requireInteger(record, "createdAt"); const expiresAt = requireInteger(record, "expiresAt");
-  if (createdAt < 0 || expiresAt !== createdAt + EXPERT_REVIEW_RESERVATION_TTL_MS || now >= expiresAt) throw new Error("private launch is stale or expired");
+  if (createdAt < 0 || expiresAt !== createdAt + EXPERT_REVIEW_RESERVATION_TTL_MS || (!allowExpired && now >= expiresAt)) throw new Error("private launch is stale or expired");
   const sessionDir = realpathSync(ctx.sessionManager.getSessionDir()); const sessionFileValue = ctx.sessionManager.getSessionFile();
   if (!sessionFileValue) throw new Error("child session file is unavailable");
   const sessionFile = realpathSync(sessionFileValue); const childHeader = ctx.sessionManager.getHeader();
@@ -305,8 +307,12 @@ function validateRecord(record: LaunchRecord, ctx: ExtensionContext, options: Ex
   if (!record.packet || typeof record.packet !== "object" || Array.isArray(record.packet)
     || canonicalJson(record.packet) !== record.packetJson || digest(record.packetJson) !== record.packetDigest) throw new Error("immutable review packet digest is invalid");
   const repositoryPath = realpathSync(requireString(record, "repositoryPath")); const identity = (options.repositoryIdentity ?? defaultRepositoryIdentity)(repositoryPath);
-  if (realpathSync(identity.repositoryPath) !== repositoryPath || identity.commitOid !== requireString(record, "candidateCommitOid")
+  const candidate = requireString(record, "candidateCommitOid");
+  if (realpathSync(identity.repositoryPath) !== repositoryPath || identity.commitOid !== candidate
     || record.packet.repositoryPath !== repositoryPath || record.packet.commitOid !== identity.commitOid) throw new Error("candidate repository or commit binding changed");
+  const snapshot = record.preReviewRepository as Record<string, unknown> | undefined;
+  if (!snapshot || snapshot.head !== candidate || snapshot.clean !== true || snapshot.statusBytes !== 0
+    || snapshot.statusSha256 !== digest(Buffer.alloc(0))) throw new Error("clean pre-review repository snapshot is invalid");
 }
 function writeClaim(path: string, record: LaunchRecord, ctx: ExtensionContext): void {
   const claimed = { ...record, phase: "CLAIMED", claimedAt: Date.now(), childSessionId: ctx.sessionManager.getSessionId(), childSessionFile: ctx.sessionManager.getSessionFile(), childSessionName: ctx.sessionManager.getSessionName() };
@@ -326,7 +332,8 @@ export function registerOfficialExpertReviewReservation(pi: ExtensionAPI, option
     let paths: ReturnType<typeof statePaths>;
     try { assertPrivateRoot(root); paths = statePaths(root, name); }
     catch { return; }
-    if (existsSync(paths.pending) || existsSync(paths.finalized) || existsSync(paths.claimed)) return { systemPrompt: PRIME_CLAW_ROLE_KERNEL_TEXT };
+    if (existsSync(paths.pending) || existsSync(paths.finalized) || existsSync(paths.claimed)
+      || existsSync(paths.reported) || existsSync(paths.settled)) return { systemPrompt: PRIME_CLAW_ROLE_KERNEL_TEXT };
   });
   pi.on("context", async (event, ctx) => {
     const name = ctx.sessionManager.getSessionName?.();
@@ -334,11 +341,21 @@ export function registerOfficialExpertReviewReservation(pi: ExtensionAPI, option
     let paths: ReturnType<typeof statePaths>;
     try { assertPrivateRoot(root); paths = statePaths(root, name); }
     catch (error) { return failClosed(ctx, error instanceof Error ? error.message : String(error)); }
-    if (!existsSync(paths.pending) && !existsSync(paths.finalized) && !existsSync(paths.claimed)) return { messages: event.messages };
+    if (!existsSync(paths.pending) && !existsSync(paths.finalized) && !existsSync(paths.claimed)
+      && !existsSync(paths.reported) && !existsSync(paths.settled)) return { messages: event.messages };
     try {
       const deadline = Date.now() + waitLimit;
-      while (!existsSync(paths.finalized) && !existsSync(paths.claimed) && Date.now() < deadline) await wait(Math.min(20, Math.max(1, deadline - Date.now())));
-      if (!existsSync(paths.finalized) && !existsSync(paths.claimed)) return failClosed(ctx, "timed out waiting for finalized private launch state");
+      while (!existsSync(paths.finalized) && !existsSync(paths.claimed) && !existsSync(paths.reported)
+        && !existsSync(paths.settled) && Date.now() < deadline) await wait(Math.min(20, Math.max(1, deadline - Date.now())));
+      if (!existsSync(paths.finalized) && !existsSync(paths.claimed) && !existsSync(paths.reported) && !existsSync(paths.settled)) {
+        return failClosed(ctx, "timed out waiting for finalized private launch state");
+      }
+      const terminalPath = existsSync(paths.settled) ? paths.settled : existsSync(paths.reported) ? paths.reported : undefined;
+      if (terminalPath) {
+        const terminal = readPrivateRecord(terminalPath);
+        validateRecord(terminal, ctx, options, true);
+        return failClosed(ctx, terminal.phase === "SETTLED" ? "settled review child cannot make another provider call" : "reported review child cannot make another provider call");
+      }
       const alreadyClaimed = existsSync(paths.claimed);
       const record = readPrivateRecord(alreadyClaimed ? paths.claimed : paths.finalized);
       validateRecord(record, ctx, options);

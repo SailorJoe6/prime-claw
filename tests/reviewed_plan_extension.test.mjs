@@ -12,6 +12,7 @@ import {
   renameSync,
   rmSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1388,8 +1389,9 @@ function admissionFixture(t, mutate = () => {}) {
     schema: EXPERT_REVIEW_STATE_SCHEMA, phase: "FINALIZED", nonce: "n".repeat(43),
     createdAt: 1_000, expiresAt: 1_000 + EXPERT_REVIEW_RESERVATION_TTL_MS,
     ownerSessionId, ownerSessionFile, ownerHeaderId: ownerSessionId, ownerGeneration,
-    projectPath, repositoryPath, candidateCommitOid: commitOid, packet, packetJson,
-    packetDigest: sha256(packetJson), packageSha256, kernelSha256: PRIME_CLAW_ROLE_KERNEL_SHA256,
+    projectPath, repositoryPath, candidateCommitOid: commitOid,
+    preReviewRepository: { head: commitOid, clean: true, statusBytes: 0, statusSha256: sha256(Buffer.alloc(0)) },
+    packet, packetJson, packetDigest: sha256(packetJson), packageSha256, kernelSha256: PRIME_CLAW_ROLE_KERNEL_SHA256,
     selector: OFFICIAL_EXPERT_SELECTOR, thinking: OFFICIAL_EXPERT_THINKING,
     childName, bootstrapDigest: sha256("harmless bootstrap"), finalizedAt: 1_100,
     rlmChildId, sessionDir, returnedModel: OFFICIAL_EXPERT_SELECTOR,
@@ -1421,7 +1423,11 @@ function admissionFixture(t, mutate = () => {}) {
     abort() { control.aborts += 1; },
     ui: { notify(message, level) { control.notices.push({ message, level }); } },
   };
-  return { root, stateRoot, finalized, claimed: join(stateRoot, `${childName}.claimed.json`), record, control, hooks, ctx, childName };
+  return {
+    root, stateRoot, finalized, claimed: join(stateRoot, `${childName}.claimed.json`),
+    reported: join(stateRoot, `${childName}.reported.json`), settled: join(stateRoot, `${childName}.settled.json`),
+    record, control, hooks, ctx, childName,
+  };
 }
 
 const initialMessages = [
@@ -1459,6 +1465,27 @@ test("official EXPERT final state binds public child identity and claims before 
   f.ctx.model = { provider: "openai-codex", id: "wrong" };
   await assert.rejects(() => f.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [] }] }, f.ctx), /current child model/);
   assert.equal(f.control.aborts, 1);
+});
+
+test("reported and settled official EXPERT children retain the neutral kernel and abort provider calls", async (t) => {
+  for (const phase of ["REPORTED", "SETTLED"]) {
+    await t.test(phase.toLowerCase(), async (tt) => {
+      const f = admissionFixture(tt);
+      await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
+      const claimed = JSON.parse(readFileSync(f.claimed, "utf8"));
+      const terminalPath = phase === "REPORTED" ? f.reported : f.settled;
+      writeFileSync(terminalPath, `${canonicalJson({ ...claimed, phase })}
+`, { mode: 0o600 });
+      unlinkSync(f.claimed);
+      const before = await f.hooks.before[0]({ prompt: "post-report replay" }, f.ctx);
+      assert.equal(before.systemPrompt, PRIME_CLAW_ROLE_KERNEL_TEXT);
+      await assert.rejects(
+        () => f.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [] }] }, f.ctx),
+        phase === "REPORTED" ? /reported review child/ : /settled review child/,
+      );
+      assert.equal(f.control.aborts, 1);
+    });
+  }
 });
 
 test("official EXPERT admission aborts before provider use for every finalized binding mismatch", async (t) => {

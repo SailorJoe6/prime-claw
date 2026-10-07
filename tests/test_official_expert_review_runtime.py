@@ -41,7 +41,7 @@ def test_official_expert_native_first_call_and_refusals(tier1_container, ctmp) -
     package_sha = "a" * 64
     commit_oid = "c" * 40
     cases = []
-    for index, kind in enumerate(("valid", "mismatch", "timeout"), start=1):
+    for index, kind in enumerate(("valid", "mismatch", "timeout", "reported", "settled"), start=1):
         case = root / kind
         state_root = case / "private-state"
         session_dir = case / f"sub-native-{kind}"
@@ -105,7 +105,12 @@ def test_official_expert_native_first_call_and_refusals(tier1_container, ctmp) -
             "ownerSessionId": owner_id, "ownerSessionFile": str(owner_file),
             "ownerHeaderId": owner_id, "ownerGeneration": owner_generation,
             "projectPath": str(project), "repositoryPath": str(repository),
-            "candidateCommitOid": commit_oid, "packet": packet, "packetJson": packet_json,
+            "candidateCommitOid": commit_oid,
+            "preReviewRepository": {
+                "head": commit_oid, "clean": True, "statusBytes": 0,
+                "statusSha256": hashlib.sha256(b"").hexdigest(),
+            },
+            "packet": packet, "packetJson": packet_json,
             "packetDigest": hashlib.sha256(packet_json.encode()).hexdigest(),
             "packageSha256": package_sha,
             "kernelSha256": "fd370726c28097b4201f538958e32ddc0af8abdb7c72d675412df0c698bb328e",
@@ -117,7 +122,13 @@ def test_official_expert_native_first_call_and_refusals(tier1_container, ctmp) -
         }
         if kind == "mismatch":
             record["returnedModel"] = "openai-codex/wrong"
-        phase = "pending" if kind == "timeout" else "finalized"
+        if kind in ("reported", "settled"):
+            record.update({
+                "phase": kind.upper(), "claimedAt": 1200,
+                "childSessionId": child_id, "childSessionFile": str(child_file),
+                "childSessionName": child_name,
+            })
+        phase = "pending" if kind == "timeout" else kind if kind in ("reported", "settled") else "finalized"
         state_file = state_root / f"{child_name}.{phase}.json"
         state_file.write_text(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
         os.chmod(state_file, 0o600)
@@ -175,6 +186,8 @@ export default function setup(pi){{pi.on("context",(event,ctx)=>{{const prior=ct
     assert "harmless bootstrap" not in provider_text
     assert "PRIME_CLAW_ROLE_KERNEL_V1" in provider_row["systemPrompt"]
     assert any(name.endswith(".claimed.json") for name in valid["files"])
-    for kind in ("mismatch", "timeout"):
+    for kind in ("mismatch", "timeout", "reported", "settled"):
         assert outcomes[kind]["provider"] == []
         assert outcomes[kind]["notices"], outcomes[kind]
+    assert "reported review child" in outcomes["reported"]["notices"][-1]["message"]
+    assert "settled review child" in outcomes["settled"]["notices"][-1]["message"]

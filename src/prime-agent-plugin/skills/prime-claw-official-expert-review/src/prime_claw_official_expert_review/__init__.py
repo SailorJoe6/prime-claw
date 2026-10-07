@@ -20,11 +20,15 @@ SCHEMA_VERSION = 1
 REVIEWER_NAME = "expert-reviewer"
 MODEL_SELECTOR = "openai-codex/gpt-6-astra"
 THINKING_LEVEL = "max"
-REVIEWER_DEFINITION_SHA256 = "d9f8b14954da36df3d9051b4e25f8a76b6d16a0a2c27f9b29cfab262b5efe6f6"
+REVIEWER_DEFINITION_SHA256 = "49e2f48421902721b25751380a2173cd8a44ad1c6c4655e7a9a4a8e583983ce6"
 ROLE_KERNEL_SHA256 = "fd370726c28097b4201f538958e32ddc0af8abdb7c72d675412df0c698bb328e"
 LAUNCH_TTL_MS = 15 * 60 * 1000
 STATE_SCHEMA = "prime-claw-official-expert-launch-v1"
+REPORT_SCHEMA = "prime-claw-official-expert-report-v1"
+RECEIPT_SCHEMA = "prime-claw-official-expert-receipt-v1"
 PACKET_KIND = "prime-claw-official-expert-review-packet"
+REPORT_VERDICTS = frozenset({"PASS", "BLOCK", "ADVISORY", "SPEC_QUESTION"})
+REPORT_LIMIT_BYTES = 12 * 1024
 _PACKAGE_FILES = ("__init__.py", "reviewer.md")
 _MARKER_TYPE = "prime-claw-conversation-oversight"
 
@@ -90,7 +94,7 @@ def describe() -> dict[str, Any]:
     fields, rubric = _parse_reviewer_definition(definition)
     return {
         "schemaVersion": SCHEMA_VERSION,
-        "capability": "private-launch-and-first-call-admission",
+        "capability": "private-launch-report-and-settlement",
         "authority": False,
         "module": "prime_claw_official_expert_review",
         "packageSha256": package_sha256(),
@@ -220,6 +224,21 @@ def _git_identity(worktree: str) -> tuple[Path, str]:
     return root, oid
 
 
+def _repository_snapshot(worktree: str) -> dict[str, Any]:
+    repository, head = _git_identity(worktree)
+    result = subprocess.run(
+        ["git", "-C", str(repository), "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        check=True, stdin=subprocess.DEVNULL, capture_output=True, timeout=10,
+    )
+    status_bytes = result.stdout
+    return {
+        "head": head,
+        "clean": not status_bytes,
+        "statusBytes": len(status_bytes),
+        "statusSha256": _digest(status_bytes),
+    }
+
+
 def _packet(value: Any, repository: Path, commit_oid: str) -> tuple[dict[str, Any], str, str]:
     if not isinstance(value, dict) or set(value) != {
         "schemaVersion", "kind", "repositoryPath", "commitOid", "specificationPath",
@@ -246,15 +265,429 @@ def _packet(value: Any, repository: Path, commit_oid: str) -> tuple[dict[str, An
 
 
 def _exclusive_json(path: Path, value: dict[str, Any]) -> None:
+    encoded = (_canonical(value) + "\n").encode()
+    if len(encoded) > 64 * 1024:
+        raise ValueError("official EXPERT private state exceeds its bounded file size")
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            stream.write(_canonical(value) + "\n")
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(encoded)
             stream.flush()
             os.fsync(stream.fileno())
     except BaseException:
         path.unlink(missing_ok=True)
         raise
+
+
+
+
+def _private_record(path: Path) -> dict[str, Any]:
+    metadata = path.lstat()
+    if (
+        path.is_symlink() or not path.is_file() or path.resolve(strict=True) != path
+        or stat.S_IMODE(metadata.st_mode) != 0o600 or metadata.st_size > 64 * 1024
+    ):
+        raise RuntimeError("official EXPERT private state file is not canonical and mode-private")
+    raw = path.read_bytes()
+    if not raw.endswith(b"\n") or raw.count(b"\n") != 1:
+        raise RuntimeError("official EXPERT private state file is malformed")
+    value = json.loads(raw)
+    if not isinstance(value, dict):
+        raise RuntimeError("official EXPERT private state is malformed")
+    return value
+
+
+def _required_string(record: dict[str, Any], key: str) -> str:
+    value = record.get(key)
+    if not isinstance(value, str) or not value:
+        raise RuntimeError(f"official EXPERT state {key} is malformed")
+    return value
+
+
+def _required_integer(record: dict[str, Any], key: str) -> int:
+    value = record.get(key)
+    if type(value) is not int:
+        raise RuntimeError(f"official EXPERT state {key} is malformed")
+    return value
+
+
+def _canonical_path(value: str, label: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        raise RuntimeError(f"{label} is not canonical")
+    canonical = path.resolve(strict=True)
+    if value != str(canonical):
+        raise RuntimeError(f"{label} is not canonical")
+    return canonical
+
+
+def _session_entries(path: Path) -> list[dict[str, Any]]:
+    if path.is_symlink() or not path.is_file() or path.resolve(strict=True) != path:
+        raise RuntimeError("session file is not a canonical regular file")
+    entries: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as stream:
+        for line in stream:
+            value = json.loads(line)
+            if not isinstance(value, dict):
+                raise RuntimeError("session entry is malformed")
+            entries.append(value)
+    if not entries:
+        raise RuntimeError("session file is empty")
+    return entries
+
+
+def _runtime_directory(depth: int) -> Path:
+    value = os.environ.get("RLM_SESSION_DIR")
+    if os.environ.get("RLM_DEPTH") != str(depth) or not value:
+        raise RuntimeError(f"official EXPERT operation requires a persisted depth-{depth} kernel")
+    return _canonical_path(value, "current RLM session directory")
+
+
+def _state_paths(root: Path, child_name: str) -> dict[str, Path]:
+    if (
+        not child_name.startswith("expert-review-") or not 30 <= len(child_name) <= 80
+        or any(character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for character in child_name)
+    ):
+        raise RuntimeError("official EXPERT child name is malformed")
+    return {
+        phase: root / f"{child_name}.{phase}.json"
+        for phase in ("pending", "finalized", "claimed", "reported", "settled", "settlement-rejected")
+    }
+
+
+def _phase_records(root: Path, phase: str) -> list[tuple[Path, dict[str, Any]]]:
+    records: list[tuple[Path, dict[str, Any]]] = []
+    for path in sorted(root.glob(f"*.{phase.lower()}.json")):
+        record = _private_record(path)
+        if record.get("phase") != phase:
+            raise RuntimeError("official EXPERT private state phase and filename disagree")
+        paths = _state_paths(root, _required_string(record, "childName"))
+        if path != paths[phase.lower()]:
+            raise RuntimeError("official EXPERT private state filename is invalid")
+        records.append((path, record))
+    return records
+
+
+def _validate_snapshot(value: Any, candidate: str, *, clean: bool) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {"head", "clean", "statusBytes", "statusSha256"}:
+        raise RuntimeError("official EXPERT repository snapshot is malformed")
+    if (
+        value.get("head") != candidate or value.get("clean") is not clean
+        or type(value.get("statusBytes")) is not int or value["statusBytes"] < 0
+        or not isinstance(value.get("statusSha256"), str) or len(value["statusSha256"]) != 64
+    ):
+        raise RuntimeError("official EXPERT repository snapshot is invalid")
+    if clean and (value["statusBytes"] != 0 or value["statusSha256"] != _digest(b"")):
+        raise RuntimeError("official EXPERT clean repository snapshot is invalid")
+    return value
+
+
+def _validate_lineage(
+    record: dict[str, Any], phases: set[str], *, runtime_directory: Path | None = None,
+    require_live: bool = False,
+) -> None:
+    phase = record.get("phase")
+    if record.get("schema") != STATE_SCHEMA or phase not in phases:
+        raise RuntimeError("private launch schema or phase is invalid")
+    created = _required_integer(record, "createdAt")
+    expires = _required_integer(record, "expiresAt")
+    if created < 0 or expires != created + LAUNCH_TTL_MS or (require_live and int(time.time() * 1000) >= expires):
+        raise RuntimeError("private launch is stale or expired")
+    if _required_string(record, "packageSha256") != package_sha256():
+        raise RuntimeError("exact official EXPERT package is unavailable or changed")
+    if record.get("kernelSha256") != ROLE_KERNEL_SHA256:
+        raise RuntimeError("exact neutral role kernel is unavailable or changed")
+    if (
+        record.get("selector") != MODEL_SELECTOR or record.get("returnedModel") != MODEL_SELECTOR
+        or record.get("thinking") != THINKING_LEVEL
+    ):
+        raise RuntimeError("official EXPERT model lineage is invalid")
+
+    child_name = _required_string(record, "childName")
+    child_directory = _canonical_path(_required_string(record, "sessionDir"), "child session directory")
+    if child_directory.name != _required_string(record, "rlmChildId"):
+        raise RuntimeError("child session directory and RLM id disagree")
+    if runtime_directory is not None and runtime_directory != child_directory:
+        raise RuntimeError("current child runtime does not match the claimed launch")
+    child_file = _canonical_path(_required_string(record, "childSessionFile"), "child session file")
+    if child_file.parent != child_directory:
+        raise RuntimeError("child session file is outside its exact session directory")
+    child_entries = _session_entries(child_file)
+    child_header = child_entries[0]
+    if (
+        child_header.get("type") != "session"
+        or child_header.get("id") != _required_string(record, "childSessionId")
+        or child_header.get("rlmDepth") != 1
+    ):
+        raise RuntimeError("child session header identity is invalid")
+    if record.get("childSessionName") != child_name:
+        raise RuntimeError("child session name binding is invalid")
+
+    owner_file = _canonical_path(_required_string(record, "ownerSessionFile"), "owner session file")
+    owner_entries = _session_entries(owner_file)
+    owner_id = _required_string(record, "ownerSessionId")
+    owner_header = owner_entries[0]
+    project = _canonical_path(_required_string(record, "projectPath"), "owner project path")
+    if (
+        owner_header.get("type") != "session" or owner_header.get("id") != owner_id
+        or owner_header.get("id") != _required_string(record, "ownerHeaderId")
+        or owner_header.get("cwd") != str(project) or owner_header.get("parentSession") is not None
+        or child_header.get("parentSession") != str(owner_file) or child_header.get("cwd") != str(project)
+    ):
+        raise RuntimeError("canonical parent/child session lineage is invalid")
+    marker = _active_marker(owner_entries[1:], owner_id)
+    if _owner_generation(marker) != _required_string(record, "ownerGeneration"):
+        raise RuntimeError("owner episode generation changed or mismatched")
+
+    repository_value = _required_string(record, "repositoryPath")
+    repository = _canonical_path(repository_value, "candidate repository path")
+    if marker.get("worktree") != repository_value:
+        raise RuntimeError("candidate repository no longer matches the owner generation")
+    candidate = _required_string(record, "candidateCommitOid")
+    if len(candidate) not in (40, 64) or any(character not in "0123456789abcdef" for character in candidate):
+        raise RuntimeError("candidate commit binding is invalid")
+    _validate_snapshot(record.get("preReviewRepository"), candidate, clean=True)
+    packet = record.get("packet")
+    packet_json = record.get("packetJson")
+    if (
+        not isinstance(packet, dict) or not isinstance(packet_json, str)
+        or _canonical(packet) != packet_json or _digest(packet_json.encode()) != record.get("packetDigest")
+        or packet.get("repositoryPath") != str(repository) or packet.get("commitOid") != candidate
+    ):
+        raise RuntimeError("immutable review packet digest is invalid")
+
+
+def _canonical_report(value: Any) -> tuple[dict[str, Any], str, str]:
+    if not isinstance(value, dict) or set(value) != {"schemaVersion", "verdict", "summary", "findings"}:
+        raise ValueError("official EXPERT report has unexpected fields")
+    verdict = value.get("verdict")
+    summary = value.get("summary")
+    findings = value.get("findings")
+    if (
+        value.get("schemaVersion") != 1 or verdict not in REPORT_VERDICTS
+        or not isinstance(summary, str) or not summary.strip() or len(summary) > 4000 or "\x00" in summary
+        or not isinstance(findings, list) or len(findings) > 16
+    ):
+        raise ValueError("official EXPERT report is malformed or oversized")
+    counts = {kind: 0 for kind in ("BLOCK", "ADVISORY", "SPEC_QUESTION")}
+    normalized: list[dict[str, str]] = []
+    for finding in findings:
+        if not isinstance(finding, dict) or set(finding) != {"severity", "summary", "evidence", "remediation"}:
+            raise ValueError("official EXPERT report finding has unexpected fields")
+        severity = finding.get("severity")
+        if severity not in counts:
+            raise ValueError("official EXPERT report finding severity is invalid")
+        strings = {key: finding.get(key) for key in ("summary", "evidence", "remediation")}
+        if (
+            not isinstance(strings["summary"], str) or not strings["summary"].strip() or len(strings["summary"]) > 1000
+            or not isinstance(strings["evidence"], str) or not strings["evidence"].strip() or len(strings["evidence"]) > 4000
+            or not isinstance(strings["remediation"], str) or len(strings["remediation"]) > 4000
+            or any("\x00" in item for item in strings.values())
+            or (severity == "BLOCK" and not strings["remediation"].strip())
+        ):
+            raise ValueError("official EXPERT report finding is malformed or lacks actionable BLOCK remediation")
+        counts[severity] += 1
+        normalized.append({"severity": severity, **strings})
+    if (
+        (verdict == "PASS" and findings)
+        or (verdict == "BLOCK" and counts["BLOCK"] == 0)
+        or (verdict == "SPEC_QUESTION" and (counts["SPEC_QUESTION"] == 0 or counts["BLOCK"] > 0))
+        or (verdict == "ADVISORY" and (counts["ADVISORY"] == 0 or counts["BLOCK"] > 0 or counts["SPEC_QUESTION"] > 0))
+    ):
+        raise ValueError("official EXPERT report verdict and findings disagree")
+    normalized_report = {"schemaVersion": 1, "verdict": verdict, "summary": summary, "findings": normalized}
+    canonical = _canonical(normalized_report)
+    if len(canonical.encode()) > REPORT_LIMIT_BYTES:
+        raise ValueError("official EXPERT report is too large")
+    return normalized_report, canonical, _digest(canonical.encode())
+
+
+def _transition(source: Path, destination: Path, value: dict[str, Any]) -> None:
+    temporary = destination.parent / f".{destination.name}.{secrets.token_hex(8)}.tmp"
+    _exclusive_json(temporary, value)
+    try:
+        os.link(temporary, destination)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    temporary.unlink()
+    try:
+        source.unlink()
+    except BaseException:
+        raise RuntimeError("official EXPERT state transition published conflicting phase files")
+
+
+def _report_result(record: dict[str, Any]) -> dict[str, Any]:
+    report = record.get("report")
+    receipt = record.get("reportReceipt")
+    reported_at = _required_integer(record, "reportedAt")
+    accepted = record.get("reportAccepted")
+    if not isinstance(report, dict) or not isinstance(receipt, dict) or type(accepted) is not bool:
+        raise RuntimeError("reported official EXPERT state is malformed")
+    report_digest = _digest(_canonical(report).encode())
+    expected_receipt = {
+        "schema": RECEIPT_SCHEMA, "phase": "REPORTED", "childName": record["childName"],
+        "candidateCommitOid": record["candidateCommitOid"], "packetDigest": record["packetDigest"],
+        "reportDigest": report_digest, "repositoryUnchanged": accepted, "reportedAt": reported_at,
+    }
+    snapshot = record.get("postReviewRepository")
+    if (
+        report_digest != record.get("reportDigest") or receipt != expected_receipt
+        or not isinstance(snapshot, dict)
+        or set(snapshot) != {"head", "clean", "statusBytes", "statusSha256"}
+        or not isinstance(snapshot.get("head"), str) or type(snapshot.get("clean")) is not bool
+        or type(snapshot.get("statusBytes")) is not int or snapshot["statusBytes"] < 0
+        or not isinstance(snapshot.get("statusSha256"), str) or len(snapshot["statusSha256"]) != 64
+        or (accepted and snapshot != record.get("preReviewRepository"))
+    ):
+        raise RuntimeError("reported official EXPERT digest, receipt, or repository evidence is invalid")
+    return {"report": report, "receipt": receipt}
+
+
+def _settled_result(record: dict[str, Any]) -> dict[str, Any]:
+    reported = _report_result(record)
+    settled_at = _required_integer(record, "settledAt")
+    settlement_receipt = record.get("settlementReceipt")
+    expected_receipt = {
+        "schema": RECEIPT_SCHEMA, "phase": "SETTLED", "childName": record["childName"],
+        "candidateCommitOid": record["candidateCommitOid"], "reportDigest": record["reportDigest"],
+        "repositoryUnchanged": True, "settledAt": settled_at,
+    }
+    expected_result = {
+        "report": reported["report"], "reportReceipt": reported["receipt"],
+        "settlementReceipt": expected_receipt,
+    }
+    if (
+        record.get("reportAccepted") is not True
+        or record.get("settlementRepository") != record.get("preReviewRepository")
+        or settlement_receipt != expected_receipt or record.get("settlementResult") != expected_result
+    ):
+        raise RuntimeError("settled official EXPERT report or receipt is invalid")
+    return expected_result
+
+
+def submit(report: dict[str, Any]) -> dict[str, Any]:
+    """Submit exactly one structured report from the admitted depth-1 child."""
+    runtime = _runtime_directory(1)
+    root = _ensure_private_root()
+    report_value, report_json, report_digest = _canonical_report(report)
+    matches: list[tuple[Path, dict[str, Any]]] = []
+    for phase in ("CLAIMED", "REPORTED", "SETTLED"):
+        for path, record in _phase_records(root, phase):
+            if record.get("sessionDir") == str(runtime) and record.get("rlmChildId") == runtime.name:
+                matches.append((path, record))
+    if len(matches) != 1:
+        raise RuntimeError("current child does not have exactly one private review state")
+    path, record = matches[0]
+    phase = record["phase"]
+    _validate_lineage(record, {phase}, runtime_directory=runtime, require_live=phase == "CLAIMED")
+    if phase == "SETTLED":
+        raise RuntimeError("settled official EXPERT report cannot be replayed")
+    if phase == "REPORTED":
+        if record.get("reportDigest") != report_digest or _canonical(record.get("report")) != report_json:
+            raise RuntimeError("conflicting official EXPERT report was already submitted")
+        if record.get("reportAccepted") is not True:
+            raise RuntimeError("official EXPERT report recorded a mutated candidate and was rejected")
+        return _report_result(record)
+
+    snapshot = _repository_snapshot(_required_string(record, "repositoryPath"))
+    unchanged = snapshot["head"] == record["candidateCommitOid"] and snapshot["clean"] is True
+    reported_at = int(time.time() * 1000)
+    receipt = {
+        "schema": RECEIPT_SCHEMA, "phase": "REPORTED", "childName": record["childName"],
+        "candidateCommitOid": record["candidateCommitOid"], "packetDigest": record["packetDigest"],
+        "reportDigest": report_digest, "repositoryUnchanged": unchanged, "reportedAt": reported_at,
+    }
+    reported = {
+        **record, "phase": "REPORTED", "reportedAt": reported_at, "report": report_value,
+        "reportDigest": report_digest, "postReviewRepository": snapshot,
+        "reportAccepted": unchanged, "reportReceipt": receipt,
+    }
+    paths = _state_paths(root, record["childName"])
+    _transition(path, paths["reported"], reported)
+    if not unchanged:
+        raise RuntimeError("official EXPERT report recorded a mutated candidate and was rejected")
+    return {"report": report_value, "receipt": receipt}
+
+
+def _owner_state_matches(
+    record: dict[str, Any], owner_id: str, owner_file: Path, generation: str, repository: Path,
+) -> bool:
+    return (
+        record.get("ownerSessionId") == owner_id and record.get("ownerHeaderId") == owner_id
+        and record.get("ownerSessionFile") == str(owner_file)
+        and record.get("ownerGeneration") == generation and record.get("repositoryPath") == str(repository)
+    )
+
+
+def settle() -> dict[str, Any]:
+    """Settle and read the unique reported review owned by this depth-0 Conversation."""
+    _runtime_directory(0)
+    owner_id, owner_file, owner_header, entries = _owner_session()
+    marker = _active_marker(entries, owner_id)
+    generation = _owner_generation(marker)
+    project = _canonical_path(str(owner_header.get("cwd", "")), "owner project path")
+    if project != Path.cwd().resolve(strict=True):
+        raise RuntimeError("owner kernel cwd does not match its canonical session project")
+    repository, _current_head = _git_identity(marker["worktree"])
+    root = _ensure_private_root()
+    reported = [
+        (path, value) for path, value in _phase_records(root, "REPORTED")
+        if _owner_state_matches(value, owner_id, owner_file, generation, repository)
+    ]
+    if not reported:
+        settled = [
+            (path, value) for path, value in _phase_records(root, "SETTLED")
+            if _owner_state_matches(value, owner_id, owner_file, generation, repository)
+        ]
+        current = [item for item in settled if item[1].get("candidateCommitOid") == _current_head]
+        if len(current) != 1:
+            raise RuntimeError("owner does not have exactly one matching reported or settled review")
+        _path, record = current[0]
+        _validate_lineage(record, {"SETTLED"})
+        return _settled_result(record)
+    if len(reported) != 1:
+        raise RuntimeError("owner does not have exactly one matching reported review")
+    path, record = reported[0]
+    _validate_lineage(record, {"REPORTED"})
+    reported_result = _report_result(record)
+    if record.get("reportAccepted") is not True:
+        raise RuntimeError("reported official EXPERT review rejected a mutated candidate")
+    paths = _state_paths(root, record["childName"])
+    if paths["settlement-rejected"].exists():
+        raise RuntimeError("official EXPERT settlement was already rejected for repository mutation")
+    snapshot = _repository_snapshot(str(repository))
+    report_snapshot = record.get("postReviewRepository")
+    unchanged = (
+        snapshot["head"] == record["candidateCommitOid"] and snapshot["clean"] is True
+        and isinstance(report_snapshot, dict) and report_snapshot == record.get("preReviewRepository")
+    )
+    if not unchanged:
+        rejection = {
+            "schema": STATE_SCHEMA, "phase": "SETTLEMENT_REJECTED", "childName": record["childName"],
+            "ownerSessionId": owner_id, "ownerGeneration": generation,
+            "candidateCommitOid": record["candidateCommitOid"], "reportDigest": record["reportDigest"],
+            "settlementRepository": snapshot, "rejectedAt": int(time.time() * 1000),
+        }
+        _exclusive_json(paths["settlement-rejected"], rejection)
+        raise RuntimeError("official EXPERT settlement recorded a mutated candidate and was rejected")
+    settled_at = int(time.time() * 1000)
+    settlement_receipt = {
+        "schema": RECEIPT_SCHEMA, "phase": "SETTLED", "childName": record["childName"],
+        "candidateCommitOid": record["candidateCommitOid"], "reportDigest": record["reportDigest"],
+        "repositoryUnchanged": True, "settledAt": settled_at,
+    }
+    result = {
+        "report": reported_result["report"], "reportReceipt": reported_result["receipt"],
+        "settlementReceipt": settlement_receipt,
+    }
+    settled_record = {
+        **record, "phase": "SETTLED", "settledAt": settled_at,
+        "settlementRepository": snapshot, "settlementReceipt": settlement_receipt,
+        "settlementResult": result,
+    }
+    _transition(path, paths["settled"], settled_record)
+    return result
 
 
 async def launch(packet: dict[str, Any]) -> Any:
@@ -272,6 +705,9 @@ async def launch(packet: dict[str, Any]) -> Any:
     if project != Path.cwd().resolve(strict=True):
         raise RuntimeError("owner kernel cwd does not match its canonical session project")
     repository, commit_oid = _git_identity(marker["worktree"])
+    pre_review_repository = _repository_snapshot(str(repository))
+    if pre_review_repository["clean"] is not True:
+        raise RuntimeError("official EXPERT launch requires an exact clean candidate worktree")
     packet_value, packet_json, packet_digest = _packet(packet, repository, commit_oid)
     models = await rlm.find_models(MODEL_SELECTOR, limit=2)
     exact = [model for model in models if getattr(model, "selector", None) == MODEL_SELECTOR]
@@ -286,8 +722,9 @@ async def launch(packet: dict[str, Any]) -> Any:
         raise RuntimeError("generated official EXPERT child name is invalid")
     pending = root / f"{child_name}.pending.json"
     finalized = root / f"{child_name}.finalized.json"
-    claimed = root / f"{child_name}.claimed.json"
-    if finalized.exists() or claimed.exists():
+    paths = _state_paths(root, child_name)
+    pending, finalized, claimed = paths["pending"], paths["finalized"], paths["claimed"]
+    if any(path.exists() for path in paths.values()):
         raise RuntimeError("generated official EXPERT child name collided with existing private state")
     bootstrap = f"Prime Claw bootstrap {child_name}. Wait for private admission; this text grants no authority."
     record: dict[str, Any] = {
@@ -296,7 +733,8 @@ async def launch(packet: dict[str, Any]) -> Any:
         "ownerSessionId": owner_id, "ownerSessionFile": str(owner_file),
         "ownerHeaderId": owner_header["id"], "ownerGeneration": _owner_generation(marker),
         "projectPath": str(project), "repositoryPath": str(repository),
-        "candidateCommitOid": commit_oid, "packet": packet_value,
+        "candidateCommitOid": commit_oid, "preReviewRepository": pre_review_repository,
+        "packet": packet_value,
         "packetJson": packet_json, "packetDigest": packet_digest,
         "packageSha256": package_sha256(), "kernelSha256": ROLE_KERNEL_SHA256,
         "selector": MODEL_SELECTOR, "thinking": THINKING_LEVEL,
@@ -323,7 +761,8 @@ async def launch(packet: dict[str, Any]) -> Any:
 
 
 __all__ = [
-    "LAUNCH_TTL_MS", "MODEL_SELECTOR", "PACKET_KIND", "REVIEWER_DEFINITION_SHA256",
-    "REVIEWER_NAME", "ROLE_KERNEL_SHA256", "SCHEMA_VERSION", "STATE_SCHEMA", "THINKING_LEVEL",
-    "describe", "launch", "package_manifest", "package_sha256",
+    "LAUNCH_TTL_MS", "MODEL_SELECTOR", "PACKET_KIND", "RECEIPT_SCHEMA", "REPORT_LIMIT_BYTES",
+    "REPORT_SCHEMA", "REPORT_VERDICTS", "REVIEWER_DEFINITION_SHA256", "REVIEWER_NAME",
+    "ROLE_KERNEL_SHA256", "SCHEMA_VERSION", "STATE_SCHEMA", "THINKING_LEVEL",
+    "describe", "launch", "package_manifest", "package_sha256", "settle", "submit",
 ]

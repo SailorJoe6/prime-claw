@@ -43,7 +43,31 @@ rechecks the model and all bindings on later calls in the same run. Timeout,
 stale state, replay, duplicate claim, or any mismatch explicitly aborts before a
 provider call. Generic children remain ordinary.
 
+The admitted depth-1 reviewer calls `submit(report)` exactly once before its
+final answer. The API derives its own runtime and unique `CLAIMED` launch,
+validates host-authored child/parent/candidate/packet/model/package/kernel
+lineage, validates one bounded canonical `PASS`/`BLOCK`/`ADVISORY`/
+`SPEC_QUESTION` report, and atomically creates `REPORTED`. Every `BLOCK` needs
+actionable remediation. Only an identical digest is idempotent; malformed,
+oversized, conflicting, wrong-lineage, unclaimed, or replayed submissions fail
+closed. Pre/post HEAD and clean-status digests reject and retain evidence of a
+mutated review subject.
+
+The exact depth-0 owner calls:
+
+```python
+result = prime_claw_official_expert_review.settle()
+```
+
+`settle()` derives the owner and active generation, finds one matching
+`REPORTED` launch, revalidates the immutable report and actual spawn/session/
+model/candidate/package/kernel lineage plus unchanged repository state, then
+atomically creates `SETTLED` and returns the immutable report and receipts. It
+accepts no caller-supplied handle identity. An exact settled read is idempotent.
+After `REPORTED` or `SETTLED`, the designated child remains under the neutral
+EXPERT kernel and any provider call explicitly aborts.
+
 `describe()` remains a read-only package validation API and returns
-`authority: false`. Availability preflight remains read-only. Report return and
-settlement, owner PASS/BLOCK disposition, child deletion, and cleanup are not
-part of this skill generation.
+`authority: false`. Availability preflight remains read-only. Owner product
+disposition persistence beyond the settlement receipt, child deletion, state
+cleanup, and broader lifecycle cleanup are not part of this skill generation.
