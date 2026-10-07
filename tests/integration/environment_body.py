@@ -23,6 +23,8 @@ RESULTS = Path("/home/tester/results")
 FIXTURE = ASSETS / "fixtures/brain-source"
 BUILD_META = Path("/opt/prime-claw-test/integration-build.json")
 LOCK_COPY = Path("/opt/prime-claw-test/artifact-lock.json")
+DRY_BODY = ASSETS / "gbrain_dry_run_body.py"
+SOURCE_BODY = ASSETS / "gbrain_source_coverage_body.py"
 _ALLOWED_ENV = {
     "HOME", "HOSTNAME", "LANG", "PATH", "PWD", "SHLVL", "_",
     "PRIME_CLAW_INTEGRATION_ATTESTATION", "PRIME_CLAW_INTEGRATION_RUN_ID",
@@ -42,10 +44,15 @@ def _canonical(value: object) -> bytes:
 
 def _run(argv: list[str], *, env: dict[str, str], timeout: int = 120,
          cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    result = subprocess.run(
         argv, cwd=cwd, env=env, text=True, capture_output=True,
-        timeout=timeout, check=True,
+        timeout=timeout, check=False,
     )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip().replace("\n", " ")[:1000]
+        raise RuntimeError(f"command failed ({result.returncode}): {argv[0]}"
+                           + (f": {detail}" if detail else ""))
+    return result
 
 
 def _verify_entry_boundary(attestation: str, run_id: str) -> list[str]:
@@ -251,6 +258,37 @@ def _postgres_and_gbrain(root: Path, run_id: str, work: Path,
                  env=env, timeout=60)
 
 
+def _run_properties(attestation: str, run_id: str) -> dict[str, list[dict]]:
+    env = {
+        "HOME": "/home/tester", "LANG": "C.UTF-8",
+        "PATH": "/usr/lib/postgresql/16/bin:/usr/local/bin:/usr/bin:/bin",
+        "PRIME_CLAW_INTEGRATION_CONTAINER": "1",
+        "PRIME_CLAW_INTEGRATION_ATTESTATION": attestation,
+        "PRIME_CLAW_INTEGRATION_RUN_ID": run_id,
+    }
+    groups = {
+        "dry_run": (DRY_BODY, ("dry-run-a", "dry-run-b")),
+        "source_coverage": (SOURCE_BODY, ("source-coverage-a", "source-coverage-b")),
+    }
+    output: dict[str, list[dict]] = {}
+    for key, (script, identities) in groups.items():
+        rows = []
+        for property_id in identities:
+            _run(["python3", str(script), "--attestation", attestation,
+                  "--run-id", run_id, "--property-id", property_id],
+                 env=env, timeout=600)
+            receipt_path = RESULTS / f"{property_id}.json"
+            rows.append(json.loads(receipt_path.read_text()))
+        if rows[0].get("normalized_result_sha256") != rows[1].get("normalized_result_sha256"):
+            raise RuntimeError(f"{key} repetitions produced different logical results")
+        output[key] = rows
+    identities = [row["stack"]["database_id"] for rows in output.values() for row in rows]
+    runs = [row["property_run_id"] for rows in output.values() for row in rows]
+    if len(identities) != 4 or len(set(identities)) != 4 or len(set(runs)) != 4:
+        raise RuntimeError("property repetitions did not use disjoint identities")
+    return output
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--attestation", required=True)
@@ -271,6 +309,12 @@ def main(argv: list[str] | None = None) -> int:
     binary_sha = _sha(Path("/usr/local/bin/gbrain").read_bytes())
     if binary_sha != build.get("gbrain", {}).get("executable_sha256"):
         raise RuntimeError("gbrain executable hash mismatched")
+    asset_hashes = {
+        path.relative_to(ASSETS).as_posix(): _sha(path.read_bytes())
+        for path in sorted(value for value in ASSETS.rglob("*") if value.is_file())
+    }
+    if asset_hashes != build.get("assets"):
+        raise RuntimeError("baked integration asset inventory mismatched")
     root = Path("/home/tester/integration") / args.run_id
     root.mkdir(parents=True, mode=0o700)
     base_env = {
@@ -279,10 +323,15 @@ def main(argv: list[str] | None = None) -> int:
     }
     commit, refs_sha, roundtrip_sha = _git_fixture(
         root, args.run_id, base_env, manifest)
-    stack = _postgres_and_gbrain(root, args.run_id, root / "brain", base_env)
+    legacy_stack = _postgres_and_gbrain(root, args.run_id, root / "brain", base_env)
+    properties = _run_properties(args.attestation, args.run_id)
+    dry0 = properties["dry_run"][0]
+    first_stack = dry0["stack"]
+    first_snapshot = dry0["snapshot_before"]
+    property_rows = [row for rows in properties.values() for row in rows]
     receipt = {
         "schema_version": 1,
-        "contract": "integration-body-v2",
+        "contract": "integration-body-v3",
         "run_id": args.run_id,
         "started_at": started,
         "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -302,18 +351,23 @@ def main(argv: list[str] | None = None) -> int:
             "executable_sha256": binary_sha,
         },
         "bun": build["bun"],
+        "asset_sha256s": asset_hashes,
         "fixtures": {
             "corpus_manifest_sha256": manifest_sha,
             "whole_source_inventory_sha256": inventory_sha,
-            "database_id": stack.pop("database_id"),
-            "pgdata_id": stack.pop("pgdata_id"),
-            "gbrain_home_id": stack.pop("gbrain_home_id"),
+            "property_manifest_sha256": dry0["fixture_manifest_sha256"],
+            "database_id": legacy_stack.pop("database_id"),
+            "pgdata_id": legacy_stack.pop("pgdata_id"),
+            "gbrain_home_id": legacy_stack.pop("gbrain_home_id"),
+            "property_database_ids": [row["stack"]["database_id"] for row in property_rows],
+            "property_run_ids": [row["property_run_id"] for row in property_rows],
             "bare_remote_id": _sha((args.run_id + ":bare-remote").encode()),
             "worktree_commit": commit,
             "bare_refs_sha256": refs_sha,
             "roundtrip_inventory_sha256": roundtrip_sha,
         },
-        "postgresql": stack,
+        "postgresql": legacy_stack,
+        "properties": properties,
     }
     payload = _canonical(receipt)
     target = RESULTS / "body.json"

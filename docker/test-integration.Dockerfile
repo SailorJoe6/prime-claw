@@ -42,7 +42,7 @@ RUN useradd --uid 10001 --home-dir /home/tester --shell /bin/bash tester \
 ENV PATH="/usr/lib/postgresql/16/bin:/usr/local/bin:/usr/bin:/bin" \
     HOME=/home/tester \
     LANG=C.UTF-8
-LABEL org.prime-claw.test.contract="integration-v2"
+LABEL org.prime-claw.test.contract="integration-v3"
 ARG TEST_RUN_ID
 LABEL org.prime-claw.test.run="$TEST_RUN_ID"
 USER tester

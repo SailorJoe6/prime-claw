@@ -1,0 +1,96 @@
+{
+  "accounting": [
+    {
+      "path": "people/ada-example.md",
+      "reason": "renamed",
+      "slug": "people/ada-example",
+      "state": "superseded"
+    },
+    {
+      "path": "people/ada-renamed.md",
+      "slug": "people/ada-renamed",
+      "state": "live"
+    },
+    {
+      "path": "projects/meridian.md",
+      "slug": "projects/meridian",
+      "state": "live"
+    },
+    {
+      "path": "concepts/quartz.md",
+      "slug": "concepts/quartz",
+      "state": "live"
+    },
+    {
+      "path": "archive/retired.md",
+      "slug": "archive/retired",
+      "state": "deleted"
+    },
+    {
+      "path": "broken/frontmatter.md",
+      "reason": "invalid-yaml-frontmatter",
+      "slug": "broken/frontmatter",
+      "state": "excluded"
+    }
+  ],
+  "delta": [
+    {
+      "asset": "delta/people/ada-renamed.md",
+      "from_path": "people/ada-example.md",
+      "from_slug": "people/ada-example",
+      "operation": "rename",
+      "path": "people/ada-renamed.md",
+      "sha256": "4b50fb1b5cc0a4a8146f36eb698dbc40dd56af3444b08e2f87384771c73c0ba5",
+      "slug": "people/ada-renamed"
+    },
+    {
+      "asset": "delta/projects/meridian.md",
+      "operation": "modify",
+      "path": "projects/meridian.md",
+      "sha256": "3d5609cfb31eee8d8f8cb72fda9b68dc727a12a7d761c2dc19d6c33c3c6abc90",
+      "slug": "projects/meridian"
+    },
+    {
+      "asset": "delta/concepts/quartz.md",
+      "operation": "add",
+      "path": "concepts/quartz.md",
+      "sha256": "3800c4934af9de9785f806a1e30d94772bcd9ec90e3068e793731459173c6c29",
+      "slug": "concepts/quartz"
+    },
+    {
+      "operation": "delete",
+      "path": "archive/retired.md",
+      "slug": "archive/retired"
+    },
+    {
+      "asset": "malformed/broken/frontmatter.md",
+      "operation": "malformed",
+      "path": "broken/frontmatter.md",
+      "reason": "invalid-yaml-frontmatter",
+      "sha256": "cc71a233b51fd81e514a1f0622fcd75449b2088b88f925cf470e2afc4eb81939",
+      "slug": "broken/frontmatter"
+    }
+  ],
+  "fixture": "prime-claw-gbrain-properties-v1",
+  "initial": [
+    {
+      "asset": "initial/people/ada-example.md",
+      "path": "people/ada-example.md",
+      "sha256": "d78fc2e1fa6a3d89584806ea701fa8abe387b04880da0faedfba8af384b561e1",
+      "slug": "people/ada-example"
+    },
+    {
+      "asset": "initial/projects/meridian.md",
+      "path": "projects/meridian.md",
+      "sha256": "7f841b77454fbc43922105966e86ef0288b9fb4cef221d32004af101554444fc",
+      "slug": "projects/meridian"
+    },
+    {
+      "asset": "initial/archive/retired.md",
+      "path": "archive/retired.md",
+      "sha256": "33d69340f3ad76db266af7e9babf563cd55d3114badc511faa033831763d3a18",
+      "slug": "archive/retired"
+    }
+  ],
+  "schema_version": 1
+}

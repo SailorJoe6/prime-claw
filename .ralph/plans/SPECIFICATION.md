@@ -1,109 +1,97 @@
-# Project-wide testing strategy — Slice 7 guarded real lifecycle observer
+# Project-wide testing strategy — Slice 8 gbrain properties
 
 ## Status
 
-**SLICE 7 CANDIDATE COMPLETE; publication pending.** The exact structured
-identity audit fix and regressions passed all invalidated non-live gates. The
-sole final observer ran once with fresh run `2f8d0cd3754147028f71a6a34a740441` and
-passed. Retained evidence proves target absence, sentinel preservation until
-finalizer, empty provider lists, exact-owned teardown, all generated resources
-absent, and identical configured-production before/after hash
-`fd7e356ab7c2050174c4a817d790e9a83e4cced9e77ec74a728443ced685f945`.
-
-No cleanup or observer was retried. No P0, credential, configured-production,
-third-cycle, extra-live-run, or Slice-8 work occurred. The one bounded review
-completed; its offline admission and publication-consistency findings were
-corrected and host-tested. One clean commit/push remains before owner review.
-
-Slices 1–6 remain owner-accepted. Slice 7 / `prime-claw-5v7.6` starts from exact
-accepted commit `fda41dcadbac15b2c957c866d9e22eafb5f6afca` (tree
-`a5e1245c29022092b5684be99c7220d0b6fc7d9a`).
+**OWNER-ACCEPTED HANDOFF.** Begin only Slice 8 / `prime-claw-5v7.3` from
+accepted Slice-7 commit `e4cbc59e19fe823d598456dbf2185facf0621dee`
+(tree `f0cb0910d9111f6c9a2067102c1c2a81e8cd59d7`). Slices 1–7 are immutable
+foundations. Never rerun the consumed lifecycle observer and do not inspect P0
+`prime-claw-5v7.10`.
 
 ## Authorized outcome
 
-One explicitly invoked host observer proves the product destroy path against a
-generated target and sentinel inside a generated non-default workspace. Live
-mutation is authorized only for the captured and revalidated test identities
-created by that run. A sanitized read-only configured-production snapshot is
-captured before and after and must be unchanged.
+The existing disposable tier-2 fixture produces reproducible offline evidence
+for exact logical gbrain dry-run non-mutation and complete synthetic source
+path/slug accounting. It also produces a bounded Phase 3a consumer-admission
+proposal without running, activating, handing off, or mutating Phase 3a.
 
-## Required safety contract
+## Required contracts
 
-1. **Explicit admission.** The registered body requires the `lifecycle` marker,
-   `lifecycle_scope`, pytest `--run-lifecycle`, and sequencer
-   `--with-lifecycle`. Plain pytest, plain `test-all`, arbitrary expressions,
-   and deprecated `--with-sandbox` cannot run it.
-2. **Generated scope.** The run generates full run/workspace/target/sentinel/
-   image identities and exact ownership labels. Gateway and workspace are
-   explicit on every OpenShell call. Default, forbidden, colliding, ambiguous,
-   malformed, missing, or unowned state fails closed.
-3. **Credential-free fixture.** The pinned fixture image uses a tracked minimal
-   no-egress policy. Target and sentinel use `--no-auto-providers --no-tty`, no
-   remote or brain, and empty provider lists. No Keychain/browser credential,
-   token, provider value, private endpoint, or raw production config enters
-   disk, argv evidence, logs, or fixtures.
-4. **Product-path proof.** A generated config with no local overlay names only
-   the generated target/image and explicit gateway/workspace. A run-owned
-   proxy accepts only exact target get/delete argv and records safe classes.
-   The observer runs `bin/prime-claw --config <generated> destroy --yes`
-   without `--image`, then
-   proves target absent and sentinel present with unchanged exact
-   workspace/policy/labels.
-5. **Production noninterference.** A reviewed read-only seam uses bounded
-   `sandbox list --names` pages in the explicit tracked production workspace
-   before mutation and after cleanup. It retains only hashes of configured
-   identity/workspace and presence. Equality is mandatory. It never requests
-   policy, annotations, providers, endpoints, secrets, brain content, or local
-   overlay. Production resource/workspace/image identities cannot occur in a
-   mutating transcript event; the shared selected gateway is not a resource.
-6. **Bounded finalization.** Ownership is captured only after exact reread.
-   Every post-ownership exit enters the Slice-6 finalizer. It revalidates and
-   removes only captured target/sentinel/workspace/image identities, then
-   positively verifies absence. Unknown/refusal fails, retains evidence, and is
-   not automatically retried.
-7. **Sanitized evidence.** Each event records run/gateway/workspace/resource,
-   deadline, version, command class, result, and evidence destination without
-   raw command output, secrets, or private endpoints. Evidence includes
-   before/after snapshot hashes, target/sentinel proof, transcript audit, and
-   teardown/absence state.
+### Isolation
 
-## Required fake and static proofs
+All assertion state is fixture-owned: PostgreSQL database, installed pinned
+gbrain, local Git worktree and bare remote, configuration, corpus, result paths,
+and run identities. Assertions run after network removal. No production brain,
+operator data/HOME, credential, configured runtime, provider, private endpoint,
+or external remote is read, mounted, contacted, logged, or persisted.
 
-Before the live run, recording fakes and static guards prove wrong-target,
-sentinel-delete, target-preserved, snapshot-drift, forbidden/default identity,
-ownership/policy/label mismatch, incompatible or malformed CLI response, daemon
-failure, unknown state, teardown refusal, evidence retention, and attempted
-unowned cleanup. Deliberate faults never run against the live control plane.
-Raw Docker/OpenShell calls are confined to the reviewed lifecycle support seam.
+### Dry-run non-mutation
 
-## P0 incident separation
+On a fully migrated seeded database, commit the synthetic delta before the
+baseline. Run exactly:
 
-`prime-claw-5v7.10` remains open and deferred by operator decision. Slice 7 does
-not inspect or recover suspected historical effects, remediate providers,
-investigate credentials, retrieve tokens, clean historical resources, or make
-an operational-impact determination. The authorized production snapshot is
-only a bounded before/after noninterference proof for this Slice-7 run.
+`gbrain sync --source fixture --dry-run --no-pull --no-embed --yes`
 
-## Preserved boundaries
+The before/after logical snapshot must be identical across schema/migrations,
+ordered relevant rows and failure ledger, bookmark, persistent locks,
+post-exit fixture sessions, configuration hashes, worktree HEAD/status/tree,
+and bare refs. Raw PostgreSQL files and WAL are excluded. Each named drift has
+a deterministic red proof.
 
-Preserve accepted Slices 1–6: Docker-free plain pytest, exact `-m container`
-tier-1 admission, zero-runtime-host-mount tier 2, Docker-only plugin work,
-Slice-6 ownership/evidence rules, and Prime Agent as an upstream dependency.
-Do not refresh the user-global plugin or implement Slice 8.
+### Whole-source accounting
 
-## Acceptance
+Run exactly:
 
-The single explicit real run passes once within its deadline. Target is absent,
-sentinel remains until finalizer, provider lists stay empty, all captured test
-resources end absent, transcript mutation is test-scope-only, and canonical
-configured-production snapshots match. Focused fake/static/CLI gates and the
-appropriate exact-commit sequence pass. Docs/registry/inventory/evidence/Bead
-agree. One normal bounded final review passes, one clean commit is pushed once,
-and execution stops for owner review.
+`gbrain sync --source fixture --no-pull --no-embed --no-extract --yes`
 
-## Practical guardrails
+A tracked synthetic manifest maps every source path to its expected slug,
+operation, and any allowed named exclusion. Normalized database accounting must
+show each path and slug exactly once as a row or explicit exclusion, with no
+silent omission, duplicate, stale manifest entry, or unlisted row. Add, rename,
+and delete converge. Malformed frontmatter either fails without bookmark
+advance or is a named accounted exclusion.
 
-The host, checkout, Docker daemon, launcher, OpenShell installation, and
-same-UID operator are trusted. Bias for DONE over perfect. No hostile same-UID
-hardening, attestation, recursive review, credential archaeology, or custom
-policy framework. Goals are unbudgeted; the approved slice/spec is the bound.
+### Repeatability and provenance
+
+Both properties pass twice using disjoint databases and run identities and
+produce identical normalized outcomes. Evidence validates the pinned installed
+gbrain artifact, images/build inputs, body and corpus hashes, exact commands,
+logical snapshots, accounting, network isolation, ownership, and cleanup.
+Non-default in-container bodies cannot be collected or executed by plain host
+pytest.
+
+### Phase 3a boundary
+
+The deliverable is documentation/proposal only. Fixture evidence may be offered
+to the Phase 3a owner under R-TEST-3/R-TEST-6/R-TEST-13. It never replaces or
+authorizes live exact-model probes, production dry-run, resumed build, Git/L7
+proof, policy application, cutover, routed write, continuation, or handoff.
+
+## Non-goals
+
+- No production or operator gbrain/runtime access.
+- No Phase 3a execution, activation, mutation, or handoff.
+- No credentials, network providers, private data, or external remotes.
+- No lifecycle observer rerun and no P0 `prime-claw-5v7.10` work.
+- No upstream gbrain or Prime Agent patch/fork.
+- No new orchestration framework, Docker-in-Docker, or host Docker socket.
+- No semantic embedding-quality test or interrupted-sync fault seam not
+  supported by the pinned upstream.
+- No Slice-1–7 behavior changes except narrow compatibility needed to admit the
+  new offline tests; any material change requires owner review.
+
+## Completion
+
+The focused properties, two disjoint repetitions, tier 0, supported tier 1,
+tier 2, default `test-all`, inventory, provenance, isolation, and cleanup gates
+all pass. Documentation and `R-TEST-*` inventory agree. One practical bounded
+review, one clean commit/push, and terminal `prime-claw-5v7.3` receipt complete
+the slice, then work stops for owner review.
+
+## Slice 8 completion evidence
+
+- Offline integration-v3 property fixture passed twice per property with disjoint identities and identical normalized outcomes.
+- Exact dry-run logical non-mutation, whole-source accounting, malformed-frontmatter exclusion, and named negative proofs passed.
+- Full non-live matrix passed: 513 host tests, 46 exact tier-1 tests, and final default tiers 0–2.
+- Phase 3a language is proposal-only and no lifecycle, production, P0, credential, or configured-runtime action occurred.
+- Durable receipt: `docs/evidence/2026-10-07-testing-strategy-slice8-gbrain-properties.md`.

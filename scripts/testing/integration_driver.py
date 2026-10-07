@@ -24,7 +24,14 @@ REPO = Path(__file__).resolve().parents[2]
 DOCKERFILE = REPO / "docker/test-integration.Dockerfile"
 LOCK_PATH = REPO / "config/test-artifacts.lock.json"
 BODY_PATH = REPO / "tests/integration/environment_body.py"
+PROPERTY_BODY_PATHS = [
+    REPO / "tests/integration/gbrain_property_support.py",
+    REPO / "tests/integration/gbrain_dry_run_body.py",
+    REPO / "tests/integration/gbrain_source_coverage_body.py",
+    REPO / "scripts/testing/gbrain_property_contract.py",
+]
 FIXTURE_PATH = REPO / "tests/fixtures/brain-source"
+PROPERTY_FIXTURE_PATH = REPO / "tests/fixtures/brain-properties"
 IMAGE_REPO = "prime-claw-test-integration"
 DEFAULT_RESULTS = REPO / ".test-results"
 
@@ -45,8 +52,13 @@ def _command(argv: list[str], *, timeout: float = 60,
              text: bool = True) -> bounded.BoundedResult:
     result = _run(argv, timeout=timeout, text=text)
     if result.outcome != "exited" or result.returncode != 0:
+        raw_detail = result.stderr or result.stdout or ""
+        if isinstance(raw_detail, bytes):
+            raw_detail = raw_detail.decode("utf-8", errors="replace")
+        detail = raw_detail.strip().replace("\n", " ")[:1000]
         raise IntegrationError(
-            f"command did not exit cleanly: {argv[0]} ({result.outcome})",
+            f"command did not exit cleanly: {argv[0]} ({result.outcome})"
+            + (f": {detail}" if detail else ""),
             code=result.outcome if result.outcome != "exited" else "command-failed")
     return result
 
@@ -77,12 +89,13 @@ def _run_id() -> str:
 
 def _selected_repository_files() -> list[Path]:
     fixed = [
-        DOCKERFILE, LOCK_PATH, BODY_PATH,
+        DOCKERFILE, LOCK_PATH, BODY_PATH, *PROPERTY_BODY_PATHS,
         REPO / "scripts/test-integration.sh",
         REPO / "scripts/testing/integration_driver.py",
         REPO / "scripts/testing/integration_provenance.py",
     ]
-    fixtures = sorted(path for path in FIXTURE_PATH.rglob("*") if path.is_file())
+    fixtures = sorted(path for root in (FIXTURE_PATH, PROPERTY_FIXTURE_PATH)
+                      for path in root.rglob("*") if path.is_file())
     return fixed + fixtures
 
 
@@ -194,7 +207,14 @@ def prepare_build_context(context: Path, scratch: Path, *,
     assets = context / "assets"
     assets.mkdir()
     shutil.copy2(BODY_PATH, assets / "environment_body.py")
+    for body in PROPERTY_BODY_PATHS:
+        shutil.copy2(body, assets / body.name)
     shutil.copytree(FIXTURE_PATH, assets / "fixtures" / "brain-source")
+    shutil.copytree(PROPERTY_FIXTURE_PATH, assets / "fixtures" / "brain-properties")
+    asset_hashes = {
+        path.relative_to(assets).as_posix(): _sha(path.read_bytes())
+        for path in sorted(value for value in assets.rglob("*") if value.is_file())
+    }
     build = {
         "schema_version": 1,
         "run_id": run_id,
@@ -206,6 +226,7 @@ def prepare_build_context(context: Path, scratch: Path, *,
             "artifact_sha256": lock["bun"]["platforms"][platform]["sha256"],
         },
         "gbrain": dict(lock["gbrain"]),
+        "assets": asset_hashes,
     }
     (context / "integration-build.json").write_bytes(_canonical(build))
     rows = []
@@ -282,7 +303,7 @@ def _run_body(container_id: str, *, run_id: str, attestation: str) -> None:
         "docker", "exec", container_id, "python3",
         "/opt/prime-claw-test/assets/environment_body.py",
         "--attestation", attestation, "--run-id", run_id,
-    ], timeout=300)
+    ], timeout=1200)
 
 
 def _stop_and_copy(container_id: str, destination: Path) -> dict[str, Any]:

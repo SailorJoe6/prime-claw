@@ -72,8 +72,8 @@ only. Do not apply, check, or probe a candidate against the host user-global
   environment-sensitive POSIX/Node/Git/socket/probe-wrapper behavior, or the
   launcher/fixture recording-fake safety suites runs inside one run-owned
   plain-Docker container. The non-default `tests/unit_env_*_body.py` files are
-  reachable only through the five guarded bridges in
-  `tests/test_unit_env_bridges.py`; plain pytest cannot collect their 56
+  reachable only through the six guarded bridges in
+  `tests/test_unit_env_bridges.py`; plain pytest cannot collect their
   environment-sensitive test functions.
   A sanitized run-owned snapshot of tracked and nonignored inputs is mounted
   read-only at `/workspace`; ignored local state is never mounted. A fresh
@@ -129,22 +129,29 @@ only. Do not apply, check, or probe a candidate against the host user-global
   INTEGRATION_GBRAIN_MIRROR=/absolute/path/to/gbrain scripts/test-integration.sh
   ```
 
-  The assertion body and synthetic fixture are baked into the image. Runtime uses
+  The coordinator, two explicit non-default property bodies, shared support,
+  and both synthetic corpora are baked into the image. Runtime uses
   `--network none`, no host mounts or published ports, and no host home, socket,
   credentials, provider environment, private data, or production service. HOME,
   PostgreSQL state, results, and synthetic Git repositories are container-local.
-  After the body exits, the launcher stops the container and copies its JSON
-  result with `docker cp`.
+  The accepted Slice-3 sync/get/search and local bare-remote round trip remain.
 
-  The launcher records the tested HEAD/content identity, platform, locked
-  versions, immutable image/container IDs, functional result, and cleanup
-  outcomes in one `manifest.json`. It removes only exact IDs whose run/contract
-  labels match. Cleanup, command, timeout, interrupt, copied-result, or ownership
-  failures stay nonzero. The local host and same-UID operator are trusted; hostile
-  local races and inode/publication hardening are intentionally outside this
-  tier's acceptance boundary. The explicit body filename is not pytest-
-  collectable, and direct host invocation fails before side effects.
+  Integration-v3 then runs the exact dry-run and whole-source commands twice
+  each with four disjoint database/run identities. Dry-run compares exact
+  before/after logical schema, migration, sequence, all-table rows, source
+  bookmark, failure ledger, locks, sessions, config, worktree, and refs.
+  Whole-source accounting maps every synthetic path and slug exactly once to a
+  live row, tombstone, superseded identity, or named malformed-frontmatter
+  exclusion. A/B normalized outcomes must match.
 
+  The launcher records exact baked-asset hashes, tested HEAD/content identity,
+  platform, locked versions, immutable image/container IDs, sanitized command
+  output, property receipts, and cleanup in one `manifest.json`. It removes only
+  exact IDs whose run/contract labels match. Cleanup, command, timeout,
+  interrupt, copied-result, property, or ownership failures stay nonzero. The
+  local host and same-UID operator are trusted; hostile local races and
+  inode/publication hardening remain outside this tier's acceptance boundary.
+  Property filenames are not pytest-collectable and refuse direct host entry.
 - **Lifecycle control boundary — inert by default.**
   `tests/lifecycle/support.py` generates one non-default `pct-<12hex>`
   workspace plus `pct-<12hex>-t` target and `pct-<12hex>-s` sentinel names.

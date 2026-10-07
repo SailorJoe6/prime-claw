@@ -1639,7 +1639,7 @@
       "id": "R-TEST-12",
       "priority": "GATE",
       "summary": "One explicit guarded host lifecycle acceptance uses the owner-accepted Slice-6 boundary to prove product destroy removes only a generated target, preserves a generated sentinel, leaves a names-only configured-production snapshot unchanged, and finalizes only exact captured/revalidated test resources.",
-      "status": "IMPLEMENTED: final fresh observer passed with exact structured identity audit, unchanged production snapshot, and positive absence for all generated resources; publication pending",
+      "status": "owner-accepted at Slice-7 commit e4cbc59e19fe823d598456dbf2185facf0621dee; consumed observer must not rerun",
       "plan": ".ralph/plans/SPECIFICATION.md (Slice 7)",
       "proven_by": {
         "apply": [
@@ -1671,6 +1671,37 @@
         ]
       },
       "evidence": "docs/evidence/2026-10-06-testing-strategy-slice7-lifecycle-destroy.md"
+    },
+    {
+      "id": "R-TEST-13",
+      "priority": "GATE",
+      "summary": "The offline integration-v3 fixture proves exact installed-gbrain dry-run logical non-mutation and complete synthetic whole-source path/slug accounting twice with disjoint database/run identities, including add/modify/rename/delete, malformed-frontmatter exclusion, named negative drift proofs, and deterministic normalized equality.",
+      "status": "implemented and validated: final default tiers 0-2, repaired-contract tier-2 receipt, and deterministic negative proofs passed; owner review pending",
+      "slice": 8,
+      "proven_by": {
+        "launcher": [
+          "scripts/test-integration.sh",
+          "scripts/testing/integration_driver.py",
+          "scripts/testing/integration_provenance.py",
+          "docker/test-integration.Dockerfile"
+        ],
+        "validate": [
+          "tests/integration/environment_body.py",
+          "tests/integration/gbrain_property_support.py",
+          "tests/integration/gbrain_dry_run_body.py",
+          "tests/integration/gbrain_source_coverage_body.py"
+        ],
+        "fixtures": [
+          "tests/fixtures/brain-properties/manifest.json"
+        ],
+        "tests": [
+          "tests/test_integration_tier.py",
+          "tests/test_inventory_integrity.py"
+        ]
+      },
+      "evidence": "docs/evidence/2026-10-07-testing-strategy-slice8-gbrain-properties.md",
+      "verdict_doc": "docs/testing-strategy.md",
+      "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 8)"
     }
   ],
   "phase2": {}

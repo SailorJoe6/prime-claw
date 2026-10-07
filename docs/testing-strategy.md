@@ -143,64 +143,95 @@ it is not a defense against hostile local pathname or process races.
 
 ### Build and inputs
 
-The launcher verifies `config/test-artifacts.lock.json`, selects only the native
-`linux/arm64` or `linux/amd64` identities, and stages a private temporary build
-context containing only:
-
-- the exact locked gbrain Git archive;
-- the exact locked Bun archive;
-- `docker/test-integration.Dockerfile` and the artifact lock;
-- `tests/integration/environment_body.py`; and
-- the synthetic `tests/fixtures/brain-source/` corpus.
-
-The assertion body and fixtures are baked into the image. The tested repository
-HEAD, dirty state, and a deterministic selected-input content hash are recorded.
-The build may use the network to install public locked dependencies. There is no
-cross-platform emulation fallback.
+The launcher verifies `config/test-artifacts.lock.json`, selects only native
+`linux/arm64` or `linux/amd64`, and stages a private temporary build context
+containing the exact locked gbrain and Bun artifacts, Dockerfile/lock/build
+metadata, the coordinator, both explicit property bodies, shared support, and
+the two public synthetic fixture trees. Every baked asset has an exact SHA-256
+in the integration-v3 receipt. No ignored operator state enters the context.
+The public dependency build may use network; assertion execution cannot.
 
 ### Runtime isolation
 
-The image runs as fixed nonroot user `tester`. Its HOME, PostgreSQL data/socket,
-results, temporary files, and synthetic Git repositories are all container-local.
-The launcher creates the container with:
+The fixed nonroot `tester` container has `--network none`, no host mounts,
+ports, privileged/host namespaces, Docker/OpenShell socket, host home,
+credentials, providers, private data, external remote, or production service.
+HOME, five PostgreSQL clusters (the retained Slice-3 stack plus four Slice-8
+property stacks), results, temporary files, worktrees, and bare remotes are
+container-local. The coordinator preserves the original sync/get/search and
+Git round-trip proof before running the new properties.
 
-- `--network none`;
-- no bind mounts or volumes from the host;
-- no published ports;
-- no privileged, host PID, or host IPC mode;
-- no Docker/OpenShell socket, host home, credentials, provider environment, or
-  production data/service connection; and
-- exact run and contract labels.
+### Dry-run logical non-mutation
 
-The body proves real gbrain `0.50.0.0` initialization/migration against PostgreSQL
-16 + pgvector, fixture sync/get/search, and a fixture-owned bare Git push/clone
-round trip. It also proves nonroot execution, baked inputs are non-writable, local
-result storage is writable, and external TCP fails under `--network none`.
+For `dry-run-a` and `dry-run-b`, each fresh fully migrated database registers
+and seeds its own source, commits a synthetic delta, snapshots logical state,
+and runs exactly:
 
-### Result and cleanup
+```text
+gbrain sync --source fixture --dry-run --no-pull --no-embed --yes
+```
 
-After the body finishes, the launcher stops the container and uses `docker cp` to
-copy `/home/tester/results/body.json` into the run directory. It validates the
-receipt and writes one readable `manifest.json` with tested commit/content,
-platform and locked versions, immutable image/container IDs, result details, and
-cleanup outcomes.
+The post-exit snapshot must equal the baseline byte-for-byte as canonical JSON.
+Named dimensions are schema objects, migration version, sequence state, every
+public table's ordered rows, exact fixture source/bookmark, sync-failure ledger
+and lock, cycle/advisory locks, remaining database sessions, parsed and raw
+effective config, worktree HEAD/status/tree, and bare refs. PGDATA and WAL bytes
+are deliberately excluded. Host negative tests make each dimension red.
+Sanitized stdout/stderr and exact exited/return-code semantics are retained.
 
-Cleanup is best-effort but ownership-safe: the launcher inspects the exact captured
-ID (or the unique run name/tag after a partial create/build), requires matching
-run/contract labels, and only then removes that object. It never prunes or deletes
-an unverified resource. Command failure, timeout, SIGINT/SIGTERM interruption,
-missing/malformed copied output, label mismatch, or cleanup failure is nonzero and
-cannot publish a passed manifest.
+### Whole-source path/slug accounting
 
-Validate a retained manifest with:
+For `source-coverage-a` and `source-coverage-b`, fresh disjoint databases run a
+baseline sync, commit add/modify/rename/delete changes, and run exactly:
+
+```text
+gbrain sync --source fixture --no-pull --no-embed --no-extract --yes
+```
+
+The valid bookmark must reach the committed delta. Every synthetic path and
+slug appears exactly once in the manifest and is represented by an exact live
+row, delete tombstone, renamed tombstone/absence, or named exclusion. Duplicate,
+missing, stale, live rename residue, or unexpected paths/slugs fail. Invalid
+YAML frontmatter is then committed separately and run with the same command;
+the pinned CLI reports `blocked_by_failures` with exit 0, while its source
+bookmark and page rows remain unchanged and its fixture-owned failure ledger
+names the excluded path. A/B normalized outcomes must match while all four raw
+database and property identities remain distinct.
+
+### Result, validation, and cleanup
+
+After the coordinator finishes, the launcher stops the container before copying
+`/home/tester/results/body.json`. The integration-v3 validator checks locked
+artifacts, every asset hash, exact commands, four disjoint identities, named
+snapshots, row/accounting parity, malformed-frontmatter behavior, A/B equality,
+legacy Slice-3 proof, immutable Docker identities, and cleanup. Cleanup remains
+exact-ID and label-gated; unknown ownership, command failure, timeout,
+interruption, missing/malformed output, property mismatch, or cleanup failure is
+nonzero.
+
+Validate retained evidence with:
 
 ```bash
 python3 -m scripts.testing.integration_provenance   .test-results/<run-id>/integration/manifest.json
 ```
 
-One successful native run is acceptance evidence. State the observed platform
-truthfully. A second-run comparison can be used during review, but it is not
-permanent launcher machinery or a completion requirement.
+One outer integration-v3 run contains the two mandatory disjoint repetitions of
+each property. Lifecycle evidence remains the accepted consumed Slice-7 run and
+is never rerun for Slice 8.
+
+### Phase 3a consumer boundary
+
+The following is a proposal for later owner review only. It was not applied,
+handed off, activated, or used to mutate Phase 3a:
+
+> When the project-wide tier-2 integration fixture is admitted under
+> R-TEST-3/R-TEST-6/R-TEST-13, Phase 3a may cite fixture evidence for exact
+> installed-binary provenance, fully migrated
+> `gbrain sync --dry-run --no-pull --no-embed --yes` logical non-mutation, and
+> synthetic whole-source path/slug accounting. This supports and never replaces
+> authorized host/in-sandbox exact-model probes, operator clearance, the single
+> bounded resumed build, production Git/L7 proof, or cutover. No production
+> dry-run or Phase 3a handoff is authorized.
 
 ## Tier-1 pinned run
 

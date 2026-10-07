@@ -9,8 +9,11 @@ from pathlib import Path
 import re
 from typing import Any
 
-CONTRACT = "integration-v2"
-BODY_CONTRACT = "integration-body-v2"
+from scripts.testing.gbrain_property_contract import (
+    digest as normalized_digest, dry_payload, source_payload)
+
+CONTRACT = "integration-v3"
+BODY_CONTRACT = "integration-body-v3"
 SUPPORTED_PLATFORMS = {"linux/arm64", "linux/amd64"}
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _IMAGE = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -158,6 +161,226 @@ def validate_container(raw: Any, *, container_id: str, image_id: str,
             "labels_verified": True}
 
 
+DRY_COMMAND = ["gbrain", "sync", "--source", "fixture", "--dry-run",
+               "--no-pull", "--no-embed", "--yes"]
+SOURCE_COMMAND = ["gbrain", "sync", "--source", "fixture", "--no-pull",
+                  "--no-embed", "--no-extract", "--yes"]
+
+
+def _expected_asset_hashes() -> dict[str, str]:
+    repo = Path(__file__).resolve().parents[2]
+    roots = [
+        (repo / "tests/integration/environment_body.py", "environment_body.py"),
+        (repo / "tests/integration/gbrain_property_support.py", "gbrain_property_support.py"),
+        (repo / "tests/integration/gbrain_dry_run_body.py", "gbrain_dry_run_body.py"),
+        (repo / "tests/integration/gbrain_source_coverage_body.py", "gbrain_source_coverage_body.py"),
+        (repo / "scripts/testing/gbrain_property_contract.py", "gbrain_property_contract.py"),
+    ]
+    rows = {relative: sha256_bytes(path.read_bytes()) for path, relative in roots}
+    for source_name in ("brain-source", "brain-properties"):
+        root = repo / "tests/fixtures" / source_name
+        for path in sorted(value for value in root.rglob("*") if value.is_file()):
+            rows[f"fixtures/{source_name}/{path.relative_to(root).as_posix()}"] = sha256_bytes(path.read_bytes())
+    return rows
+
+
+def _validate_snapshot(value: Any, label: str) -> dict[str, Any]:
+    row = _mapping(value, label)
+    required = {
+        "schema_sha256", "schema_object_count", "migration_version",
+        "source_bookmark", "sequence_sha256", "sequence_count",
+        "table_hashes", "table_row_counts", "rows_sha256",
+        "failure_ledger_sha256", "failure_ledger_lock", "persistent_locks",
+        "post_exit_fixture_sessions", "config_sha256", "config_raw_sha256", "config_semantics_sha256", "worktree",
+        "bare_refs_sha256",
+    }
+    if set(row) != required:
+        raise IntegrationEvidenceError(f"{label} dimensions mismatched")
+    for key in ("schema_sha256", "sequence_sha256", "rows_sha256", "failure_ledger_sha256",
+                "config_sha256", "config_raw_sha256", "config_semantics_sha256", "bare_refs_sha256"):
+        _sha(row.get(key), f"{label} {key}")
+    if row.get("migration_version") != "149":
+        raise IntegrationEvidenceError(f"{label} migration version mismatched")
+    bookmark = _mapping(row.get("source_bookmark"), f"{label} source bookmark")
+    if bookmark.get("id") != "fixture" or not re.fullmatch(r"[0-9a-f]{40}", str(bookmark.get("last_commit", ""))):
+        raise IntegrationEvidenceError(f"{label} source bookmark invalid")
+    if not isinstance(row.get("sequence_count"), int) or row["sequence_count"] < 1:
+        raise IntegrationEvidenceError(f"{label} sequence inventory invalid")
+    table_hashes = _mapping(row.get("table_hashes"), f"{label} table hashes")
+    table_counts = _mapping(row.get("table_row_counts"), f"{label} table counts")
+    if set(table_hashes) != set(table_counts) or not {"pages", "sources", "config", "gbrain_cycle_locks"}.issubset(table_hashes):
+        raise IntegrationEvidenceError(f"{label} table inventory mismatched")
+    for table, digest in table_hashes.items():
+        _string(table, f"{label} table")
+        _sha(digest, f"{label} table {table}")
+        if not isinstance(table_counts[table], int) or table_counts[table] < 0:
+            raise IntegrationEvidenceError(f"{label} table count invalid")
+    locks = _mapping(row.get("persistent_locks"), f"{label} locks")
+    _sha(locks.get("cycle_rows_sha256"), f"{label} cycle locks")
+    if locks.get("advisory_lock_count") != 0 or row.get("post_exit_fixture_sessions") != 0:
+        raise IntegrationEvidenceError(f"{label} retained lock or session")
+    ledger_lock = _mapping(row.get("failure_ledger_lock"), f"{label} failure ledger lock")
+    if not isinstance(ledger_lock.get("exists"), bool):
+        raise IntegrationEvidenceError(f"{label} failure ledger lock state invalid")
+    _sha(ledger_lock.get("sha256"), f"{label} failure ledger lock")
+    worktree = _mapping(row.get("worktree"), f"{label} worktree")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(worktree.get("head", ""))):
+        raise IntegrationEvidenceError(f"{label} worktree head invalid")
+    _sha(worktree.get("status_sha256"), f"{label} worktree status")
+    _sha(worktree.get("tree_sha256"), f"{label} worktree tree")
+    return row
+
+
+def _validate_stack(value: Any, label: str) -> dict[str, Any]:
+    stack = _mapping(value, label)
+    for key in ("database_id", "pgdata_id", "gbrain_home_id", "database_name_sha256"):
+        _sha(stack.get(key), f"{label} {key}")
+    if stack.get("gbrain_version") != "gbrain 0.50.0.0":
+        raise IntegrationEvidenceError(f"{label} gbrain version mismatched")
+    if not str(stack.get("postgres_version_num", "")).startswith("16"):
+        raise IntegrationEvidenceError(f"{label} PostgreSQL version mismatched")
+    _string(stack.get("pgvector_version"), f"{label} pgvector version")
+    return stack
+
+
+def validate_dry_property(value: Any, *, run_id: str, expected_id: str) -> dict[str, Any]:
+    row = _mapping(value, "dry-run property")
+    if (row.get("schema_version") != 1 or row.get("contract") != "gbrain-dry-run-v1"
+            or row.get("run_id") != run_id or row.get("property_run_id") != expected_id):
+        raise IntegrationEvidenceError("dry-run property identity mismatched")
+    if (row.get("command") != DRY_COMMAND or row.get("outcome") != "exited"
+            or row.get("exit_code") != 0 or not isinstance(row.get("stdout"), str)
+            or not isinstance(row.get("stderr"), str)):
+        raise IntegrationEvidenceError("dry-run command or exit mismatched")
+    before = _validate_snapshot(row.get("snapshot_before"), "dry-run before")
+    after = _validate_snapshot(row.get("snapshot_after"), "dry-run after")
+    if before != after or row.get("logical_mutation") is not False:
+        raise IntegrationEvidenceError("dry-run logical state mutated")
+    for key in ("fixture_manifest_sha256", "stdout_sha256", "stderr_sha256",
+                "normalized_result_sha256"):
+        _sha(row.get(key), f"dry-run {key}")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(row.get("delta_commit", ""))):
+        raise IntegrationEvidenceError("dry-run delta commit invalid")
+    if row.get("postgres_stopped") is not True:
+        raise IntegrationEvidenceError("dry-run PostgreSQL cleanup missing")
+    _validate_stack(row.get("stack"), "dry-run stack")
+    expected_normalized = normalized_digest(dry_payload(
+        command=row["command"], exit_code=row["exit_code"],
+        logical_mutation=row["logical_mutation"], snapshot=before))
+    if row.get("normalized_result_sha256") != expected_normalized:
+        raise IntegrationEvidenceError("dry-run normalized result mismatched")
+    return row
+
+
+def _load_property_manifest() -> dict[str, Any]:
+    path = Path(__file__).resolve().parents[2] / "tests/fixtures/brain-properties/manifest.json"
+    try:
+        return _mapping(json.loads(path.read_text()), "property fixture manifest")
+    except (OSError, json.JSONDecodeError) as exc:
+        raise IntegrationEvidenceError("property fixture manifest unavailable") from exc
+
+
+def validate_source_property(value: Any, *, run_id: str, expected_id: str) -> dict[str, Any]:
+    row = _mapping(value, "source property")
+    if (row.get("schema_version") != 1 or row.get("contract") != "gbrain-source-coverage-v1"
+            or row.get("run_id") != run_id or row.get("property_run_id") != expected_id):
+        raise IntegrationEvidenceError("source property identity mismatched")
+    if (row.get("command") != SOURCE_COMMAND or row.get("outcome") != "exited"
+            or row.get("exit_code") != 0 or not isinstance(row.get("stdout"), str)
+            or not isinstance(row.get("stderr"), str)):
+        raise IntegrationEvidenceError("source property command or exit mismatched")
+    for key in ("fixture_manifest_sha256", "stdout_sha256", "stderr_sha256",
+                "normalized_result_sha256"):
+        _sha(row.get(key), f"source property {key}")
+    _validate_snapshot(row.get("logical_snapshot"), "source logical snapshot")
+    accounting = _mapping(row.get("accounting"), "source accounting")
+    records = accounting.get("records")
+    database_rows = accounting.get("database_rows")
+    if not isinstance(records, list) or not isinstance(database_rows, list):
+        raise IntegrationEvidenceError("source accounting rows invalid")
+    if accounting.get("path_count") != len(records) or accounting.get("row_count") != len(database_rows):
+        raise IntegrationEvidenceError("source accounting counts mismatched")
+    pairs = [(r.get("path"), r.get("slug")) for r in records if isinstance(r, dict)]
+    record_paths = [pair[0] for pair in pairs]
+    record_slugs = [pair[1] for pair in pairs]
+    if (len(pairs) != len(records) or len(set(pairs)) != len(pairs)
+            or len(set(record_paths)) != len(record_paths)
+            or len(set(record_slugs)) != len(record_slugs)):
+        raise IntegrationEvidenceError("source accounting path/slug duplication")
+    states = {r.get("state") for r in records}
+    if not {"live", "deleted", "superseded", "excluded"}.issubset(states):
+        raise IntegrationEvidenceError("source accounting states incomplete")
+    for record in records:
+        expected_representation = {"live": "row", "deleted": "tombstone",
+                                   "excluded": "absent"}.get(record.get("state"))
+        if expected_representation and record.get("representation") != expected_representation:
+            raise IntegrationEvidenceError("source accounting representation mismatched")
+        if (record.get("state") == "superseded"
+                and record.get("representation") not in {"absent", "tombstone"}):
+            raise IntegrationEvidenceError("superseded accounting representation mismatched")
+    row_slugs = [r.get("slug") for r in database_rows if isinstance(r, dict)]
+    expected_row_slugs = [r.get("slug") for r in records
+                          if r.get("representation") in {"row", "tombstone"}]
+    if sorted(row_slugs) != sorted(expected_row_slugs) or len(row_slugs) != len(set(row_slugs)):
+        raise IntegrationEvidenceError("source accounting database parity mismatched")
+    delta_commit = row.get("delta_commit")
+    if (not re.fullmatch(r"[0-9a-f]{40}", str(delta_commit or ""))
+            or row["logical_snapshot"]["source_bookmark"].get("last_commit") != delta_commit):
+        raise IntegrationEvidenceError("source coverage bookmark mismatched delta commit")
+    malformed = _mapping(row.get("malformed_frontmatter"), "malformed frontmatter")
+    if (malformed.get("reason") != "invalid-yaml-frontmatter"
+            or malformed.get("command") != SOURCE_COMMAND
+            or malformed.get("outcome") != "exited"
+            or not isinstance(malformed.get("exit_code"), int)
+            or not isinstance(malformed.get("stdout"), str)
+            or not isinstance(malformed.get("stderr"), str)
+            or malformed.get("bookmark_before") != malformed.get("bookmark_after")
+            or malformed.get("bookmark_before") != delta_commit
+            or malformed.get("rows_before_sha256") != malformed.get("rows_after_sha256")):
+        raise IntegrationEvidenceError("malformed frontmatter exclusion mismatched")
+    for key in ("rows_before_sha256", "rows_after_sha256", "failure_ledger_sha256",
+                "stdout_sha256", "stderr_sha256"):
+        _sha(malformed.get(key), f"malformed frontmatter {key}")
+    expected_manifest = _load_property_manifest()
+    expected_records = [{key: item[key] for key in ("path", "slug", "state", "reason") if key in item}
+                        for item in expected_manifest["accounting"]]
+    actual_records = [{key: item[key] for key in ("path", "slug", "state", "reason") if key in item}
+                      for item in records]
+    if actual_records != expected_records:
+        raise IntegrationEvidenceError("source accounting fixture manifest mismatched")
+    if row.get("postgres_stopped") is not True:
+        raise IntegrationEvidenceError("source property PostgreSQL cleanup missing")
+    _validate_stack(row.get("stack"), "source property stack")
+    expected_normalized = normalized_digest(source_payload(
+        command=row["command"], accounting=accounting, malformed=malformed))
+    if row.get("normalized_result_sha256") != expected_normalized:
+        raise IntegrationEvidenceError("source normalized result mismatched")
+    return row
+
+
+def validate_properties(value: Any, *, run_id: str) -> dict[str, list[dict[str, Any]]]:
+    props = _mapping(value, "body properties")
+    if set(props) != {"dry_run", "source_coverage"}:
+        raise IntegrationEvidenceError("body property groups mismatched")
+    dry_raw, source_raw = props["dry_run"], props["source_coverage"]
+    if not isinstance(dry_raw, list) or len(dry_raw) != 2 or not isinstance(source_raw, list) or len(source_raw) != 2:
+        raise IntegrationEvidenceError("body property repetitions mismatched")
+    dry = [validate_dry_property(row, run_id=run_id, expected_id=f"dry-run-{suffix}")
+           for row, suffix in zip(dry_raw, ("a", "b"), strict=True)]
+    source = [validate_source_property(row, run_id=run_id, expected_id=f"source-coverage-{suffix}")
+              for row, suffix in zip(source_raw, ("a", "b"), strict=True)]
+    if dry[0]["normalized_result_sha256"] != dry[1]["normalized_result_sha256"]:
+        raise IntegrationEvidenceError("dry-run repetitions differ")
+    if source[0]["normalized_result_sha256"] != source[1]["normalized_result_sha256"]:
+        raise IntegrationEvidenceError("source repetitions differ")
+    rows = dry + source
+    db_ids = [row["stack"]["database_id"] for row in rows]
+    property_ids = [row["property_run_id"] for row in rows]
+    if len(set(db_ids)) != 4 or len(set(property_ids)) != 4:
+        raise IntegrationEvidenceError("property database/run identities are not disjoint")
+    return {"dry_run": dry, "source_coverage": source}
+
+
 def validate_body(value: Any, lock: dict[str, Any], *, run_id: str,
                   platform: str, repository: dict[str, Any]) -> dict[str, Any]:
     body = _mapping(value, "body receipt")
@@ -190,6 +413,10 @@ def validate_body(value: Any, lock: dict[str, Any], *, run_id: str,
     if (bun.get("version") != lock["bun"]["version"]
             or bun.get("artifact_sha256") != expected_bun["sha256"]):
         raise IntegrationEvidenceError("body Bun identity mismatched")
+    assets = _mapping(body.get("asset_sha256s"), "body asset hashes")
+    if assets != _expected_asset_hashes():
+        raise IntegrationEvidenceError("body asset inventory mismatched")
+    properties = validate_properties(body.get("properties"), run_id=run_id)
     postgres = _mapping(body.get("postgresql"), "body PostgreSQL")
     if not str(postgres.get("postgres_version_num", "")).startswith("16"):
         raise IntegrationEvidenceError("PostgreSQL major version mismatched")
@@ -198,11 +425,21 @@ def validate_body(value: Any, lock: dict[str, Any], *, run_id: str,
         raise IntegrationEvidenceError("gbrain migration version mismatched")
     fixtures = _mapping(body.get("fixtures"), "body fixtures")
     for key in ("corpus_manifest_sha256", "whole_source_inventory_sha256",
-                "database_id", "pgdata_id", "gbrain_home_id", "bare_remote_id",
+                "property_manifest_sha256", "database_id", "pgdata_id", "gbrain_home_id", "bare_remote_id",
                 "bare_refs_sha256", "roundtrip_inventory_sha256"):
         _sha(fixtures.get(key), f"fixture {key}")
     if not re.fullmatch(r"[0-9a-f]{40}", str(fixtures.get("worktree_commit", ""))):
         raise IntegrationEvidenceError("fixture worktree commit is invalid")
+    expected_property_manifest = _expected_asset_hashes()["fixtures/brain-properties/manifest.json"]
+    if fixtures.get("property_manifest_sha256") != expected_property_manifest:
+        raise IntegrationEvidenceError("property fixture manifest mismatched")
+    property_rows = properties["dry_run"] + properties["source_coverage"]
+    expected_db_ids = [row["stack"]["database_id"] for row in property_rows]
+    expected_run_ids = [row["property_run_id"] for row in property_rows]
+    if (fixtures.get("property_database_ids") != expected_db_ids
+            or fixtures.get("property_run_ids") != expected_run_ids
+            or fixtures.get("database_id") in expected_db_ids):
+        raise IntegrationEvidenceError("body property identity summary mismatched")
     return body
 
 
@@ -235,6 +472,13 @@ def validate_manifest(value: Any) -> dict[str, Any]:
             raise IntegrationEvidenceError("passed manifest has incomplete cleanup")
         if run.get("failure_codes") != []:
             raise IntegrationEvidenceError("passed manifest has failure codes")
+        lock_path = Path(__file__).resolve().parents[2] / "config/test-artifacts.lock.json"
+        lock = load_lock(lock_path)
+        expected_lock_sha = sha256_bytes((canonical_json(lock) + "\n").encode())
+        if manifest.get("artifact_lock_sha256") != expected_lock_sha:
+            raise IntegrationEvidenceError("manifest artifact lock mismatched")
+        validate_body(manifest["body"], lock, run_id=run["id"],
+                      platform=platform, repository=repository)
     return manifest
 
 
