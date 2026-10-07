@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved Section 26 private launch/first-call correction. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode, and the Section 26 candidate is implemented and fully validated pending commit/push/report.
+> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved Section 26 private launch/first-call correction. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. The one owner-review BLOCK on pushed candidate `f15457d82c3c9e3760272e71600eefbaf4809b17` is repaired within the exact approved canonical-path scope and all required gates pass; the narrow repair awaits commit, push, and owner report.
 >
 > **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
 > **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** the existing episode may complete the owner-approved Section 26 private launch/first-call admission candidate, commit/push it, report, and stop. Review settlement, owner PASS/BLOCK disposition, child deletion/cleanup, Slice 4, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical cleanup remain separately authorized.
+> **Implementation authority:** the existing episode may commit and push the fully validated owner-approved Section 26 canonical-worktree repair, report it, and stop. Review settlement, owner PASS/BLOCK disposition, child deletion/cleanup, Slice 4, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical cleanup remain separately authorized.
 
 ## Summary
 

@@ -13,8 +13,11 @@ authority and never reads the internal details shape.
 - Retired the native caller-supplied reserve/bind/status/cancel tools.
 - Extended `prime_claw_official_expert_review.launch(packet)` to derive the
   depth-0 owner and active episode generation from host-authored public session
-  state, prove the exact marker worktree/HEAD, require one exact model discovery
-  result, create mode-private untracked `PENDING`, and call public `rlm.spawn`
+  state, require the raw marker worktree to be absolute and byte-equal to its
+  strict real path, require raw Git toplevel output to equal that same canonical
+  string before normalization, prove the exact lowercase 40/64-hex HEAD, require
+  one exact model discovery result, create mode-private untracked `PENDING`, and
+  call public `rlm.spawn`
   with explicit selector/thinking and an unpredictable harmless bootstrap.
 - Finalization uses only the actual returned child id/name/session directory/model;
   definite failures revoke pending state. Returned reasoning is not claimed.
@@ -81,8 +84,42 @@ Post-repair evidence:
 - Full Docker Tier 1: **77 passed, 399 deselected**.
 - Pinned `scripts/test-tier1.sh --probe`: **OK** on Prime Agent **0.9.8**; the image built, the exact release installed, plugin apply/check completed, command publication was unique, the RPC probe passed, and the container was destroyed.
 
-The review child made no edits. This is the sole review cycle and sole bounded
-repair allowed by Section 26.
+The review child made no edits. This remains the sole independent review cycle;
+no second independent review was launched.
+
+## Owner-review canonical-worktree repair
+
+Owner review BLOCKED pushed candidate
+`f15457d82c3c9e3760272e71600eefbaf4809b17` because the new Python launch path
+resolved the marker worktree and Git toplevel before comparing them. That lost
+the accepted Section 24 repository-subject contract at
+`5674219bc914682a7e28c96146a68ab1b3e80f5f`: a dot-segment or symlink spelling
+could alias the canonical worktree and pass.
+
+The bounded repair validates the raw marker string before any launch mutation:
+it must be absolute and exactly equal to its strict real path. Git's raw
+toplevel line must then equal that same canonical string before any path
+normalization. Existing lowercase 40/64-hex HEAD validation remains unchanged.
+Focused regressions cover dot-segment, symlink, and nested/non-root marker paths;
+each proves failure before model discovery, private-state creation, or spawn.
+The private launch/admission architecture and accepted `[custom, user]` history
+filtering are otherwise unchanged.
+
+Final owner-revision evidence:
+
+- Focused Node and Python command: **52 Node passed**; **19 Python passed, 10
+  deselected**.
+- Full Tier 0: **295 passed, 184 skipped** in 52.27 seconds. Log SHA256:
+  `04e0042f23dda75db9ef52a7f5a555dfc6b86cb999e39d2d666cba4fa8eebc5a`.
+- Full Docker Tier 1: **77 passed, 402 deselected** in 165.58 seconds. Log
+  SHA256: `3e87db61ca4ef65dfd653d42c0b81e28a73a70468832e37d73067d3b90eb3687`.
+- Pinned `scripts/test-tier1.sh --probe`: **OK** on Prime Agent **0.9.8**.
+  It built the image, installed the exact release, applied and checked the
+  plugin, passed unique RPC command publication, and destroyed the container.
+  Log SHA256:
+  `c82f10e16e19f5cec155f7403e0f7aae05317c23c57de9db6aefde7d5dad36d2`.
+
+No additional independent review or broader repair was performed.
 
 ## Deferred boundaries
 

@@ -1664,6 +1664,29 @@ native provider seam proving one exact call on success and zero calls on timeout
 or mismatch. Final evidence is in
 `docs/evidence/official-lean-role-protocol/2026-10-07-section-26-private-launch-admission.md`.
 
+Owner review BLOCKS exact pushed candidate
+`f15457d82c3c9e3760272e71600eefbaf4809b17` on one regression only. The Python
+launch path normalizes `marker["worktree"]` and Git toplevel before comparison,
+so dot-segment or symlink marker paths can pass and lose the accepted Section 24
+contract at `5674219bc914682a7e28c96146a68ab1b3e80f5f`. Repair only this: require
+the raw marker worktree string to be absolute and exactly equal to its strict
+real path; require raw `git rev-parse --show-toplevel` output to equal that same
+canonical string before normalization; retain exact lowercase 40/64-hex HEAD.
+Add focused Python launch regressions for dot-segment and symlink/noncanonical
+marker worktrees, retain nested/non-root rejection, and prove failure before
+private state creation and spawn. Do not add another independent review cycle,
+broaden transaction machinery, reopen sender metadata, or begin settlement,
+cleanup, or Slice 4.
+
+The exact repair is implemented. Raw marker spelling must now be absolute and
+equal to its strict real path; raw Git toplevel must equal that canonical string
+before normalization; lowercase 40/64-hex HEAD validation is retained. The
+focused regressions reject dot-segment, symlink, and nested/non-root paths before
+model discovery, state creation, or spawn. Final gates pass: 52 Node; 19 focused
+Python with 10 deselected; full Tier 0 295 passed/184 skipped; Docker Tier 1 77
+passed/402 deselected; pinned Prime Agent 0.9.8 probe OK. Commit/push the narrow
+repair, report, and stop.
+
 Continue to defer report return/settlement, owner PASS/BLOCK disposition, child
 deletion, cleanup workflow, Slice 4, landing, global apply/restart/UAT, and
 finalization. Never patch Prime Agent or read internal agent-message details.

@@ -74,6 +74,49 @@ def owner_fixture(tmp_path: Path, monkeypatch, module):
     return state, packet
 
 
+def replace_marker_worktree(monkeypatch, worktree: str) -> None:
+    sessions = Path(os.environ["PRIME_AGENT_CODING_AGENT_DIR"]) / "sessions"
+    session_file = next(sessions.glob("*.jsonl"))
+    entries = [json.loads(line) for line in session_file.read_text().splitlines()]
+    entries[1]["data"]["worktree"] = worktree
+    session_file.write_text("".join(json.dumps(entry) + "\n" for entry in entries))
+
+
+@pytest.mark.parametrize("spelling", ["dot-segment", "symlink", "nested"])
+def test_launch_rejects_noncanonical_or_nonroot_marker_before_state_and_spawn(
+    spelling, tmp_path, monkeypatch
+) -> None:
+    module = load_package()
+    state, packet = owner_fixture(tmp_path, monkeypatch, module)
+    repository = Path(packet["repositoryPath"])
+    if spelling == "dot-segment":
+        worktree = f"{repository.parent}/./{repository.name}"
+    elif spelling == "symlink":
+        link = tmp_path / "episode-link"
+        link.symlink_to(repository, target_is_directory=True)
+        worktree = str(link)
+    else:
+        nested = repository / "nested"
+        nested.mkdir()
+        worktree = str(nested)
+    replace_marker_worktree(monkeypatch, worktree)
+    calls = []
+
+    async def find_models(*args, **kwargs):
+        calls.append("find")
+        return [SimpleNamespace(selector=module.MODEL_SELECTOR)]
+
+    async def spawn(*args, **kwargs):
+        calls.append("spawn")
+        raise AssertionError("spawn must not run")
+
+    monkeypatch.setitem(sys.modules, "rlm", SimpleNamespace(find_models=find_models, spawn=spawn))
+    with pytest.raises(RuntimeError, match="exact active episode worktree root"):
+        asyncio.run(module.launch(packet))
+    assert calls == []
+    assert not state.exists()
+
+
 def test_launch_discovers_exact_model_creates_pending_and_finalizes_actual_handle(tmp_path, monkeypatch) -> None:
     module = load_package(); state, packet = owner_fixture(tmp_path, monkeypatch, module); calls = []
     async def find_models(query, limit): calls.append(("find", query, limit)); return [SimpleNamespace(selector=module.MODEL_SELECTOR)]

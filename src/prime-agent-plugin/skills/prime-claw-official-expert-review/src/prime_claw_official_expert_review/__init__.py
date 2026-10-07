@@ -197,15 +197,22 @@ def _owner_generation(marker: dict[str, Any]) -> str:
     return _digest(_canonical(values).encode())
 
 
-def _git_identity(path: Path) -> tuple[Path, str]:
-    root = Path(subprocess.run(
-        ["git", "-C", str(path), "rev-parse", "--show-toplevel"], check=True,
+def _git_identity(worktree: str) -> tuple[Path, str]:
+    marker_path = Path(worktree)
+    if not marker_path.is_absolute():
+        raise RuntimeError("candidate repository is not the exact active episode worktree root")
+    root = marker_path.resolve(strict=True)
+    if worktree != str(root):
+        raise RuntimeError("candidate repository is not the exact active episode worktree root")
+    toplevel_output = subprocess.run(
+        ["git", "-C", worktree, "rev-parse", "--show-toplevel"], check=True,
         stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10,
-    ).stdout.strip()).resolve(strict=True)
-    if root != path.resolve(strict=True):
+    ).stdout
+    toplevel = toplevel_output[:-1] if toplevel_output.endswith("\n") else toplevel_output
+    if toplevel != worktree:
         raise RuntimeError("candidate repository is not the exact active episode worktree root")
     oid = subprocess.run(
-        ["git", "-C", str(root), "rev-parse", "HEAD"], check=True,
+        ["git", "-C", worktree, "rev-parse", "HEAD"], check=True,
         stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10,
     ).stdout.strip()
     if len(oid) not in (40, 64) or any(char not in "0123456789abcdef" for char in oid):
@@ -264,7 +271,7 @@ async def launch(packet: dict[str, Any]) -> Any:
     project = Path(str(owner_header.get("cwd", ""))).resolve(strict=True)
     if project != Path.cwd().resolve(strict=True):
         raise RuntimeError("owner kernel cwd does not match its canonical session project")
-    repository, commit_oid = _git_identity(Path(marker["worktree"]))
+    repository, commit_oid = _git_identity(marker["worktree"])
     packet_value, packet_json, packet_digest = _packet(packet, repository, commit_oid)
     models = await rlm.find_models(MODEL_SELECTOR, limit=2)
     exact = [model for model in models if getattr(model, "selector", None) == MODEL_SELECTOR]
