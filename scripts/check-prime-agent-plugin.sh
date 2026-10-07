@@ -26,6 +26,9 @@ managed_directories=(
   "$destination_root/extension-support"
   "$destination_root/skills"
   "$destination_root/skills/prime-claw-oversee-episode"
+  "$destination_root/skills/prime-claw-official-expert-review"
+  "$destination_root/skills/prime-claw-official-expert-review/src"
+  "$destination_root/skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review"
   "$destination_root/.prime-claw"
 )
 for directory in "${managed_directories[@]}"; do
@@ -127,6 +130,69 @@ if [[ -e "$managed_skill_installed" || -L "$managed_skill_installed" ]]; then
 else
   printf 'missing installed managed Conversation skill: %s
 ' "$managed_skill_installed" >&2
+  status=1
+fi
+
+expert_skill_root_relative="skills/prime-claw-official-expert-review"
+expert_skill_source="$source_root/$expert_skill_root_relative"
+expert_skill_dir="$destination_root/$expert_skill_root_relative"
+expert_src_dir="$expert_skill_dir/src"
+expert_package_dir="$expert_src_dir/prime_claw_official_expert_review"
+expert_skill_files=(
+  "$expert_skill_root_relative/SKILL.md"
+  "$expert_skill_root_relative/pyproject.toml"
+  "$expert_skill_root_relative/src/prime_claw_official_expert_review/__init__.py"
+  "$expert_skill_root_relative/src/prime_claw_official_expert_review/reviewer.md"
+)
+if [[ -d "$expert_skill_dir" ]]; then
+  unexpected_entry="$(find "$expert_skill_dir" -mindepth 1 -maxdepth 1 ! -name SKILL.md ! -name pyproject.toml ! -name src -print -quit)"
+  if [[ -n "$unexpected_entry" ]]; then
+    printf 'unexpected entry in managed EXPERT skill directory: %s
+' "$unexpected_entry" >&2
+    status=1
+  fi
+fi
+if [[ -d "$expert_src_dir" ]]; then
+  unexpected_entry="$(find "$expert_src_dir" -mindepth 1 -maxdepth 1 ! -name prime_claw_official_expert_review -print -quit)"
+  if [[ -n "$unexpected_entry" ]]; then
+    printf 'unexpected entry in managed EXPERT source directory: %s
+' "$unexpected_entry" >&2
+    status=1
+  fi
+fi
+if [[ -d "$expert_package_dir" ]]; then
+  unexpected_entry="$(find "$expert_package_dir" -mindepth 1 -maxdepth 1 ! -name __init__.py ! -name reviewer.md -print -quit)"
+  if [[ -n "$unexpected_entry" ]]; then
+    printf 'unexpected entry in managed EXPERT package directory: %s
+' "$unexpected_entry" >&2
+    status=1
+  fi
+fi
+for relative in "${expert_skill_files[@]}"; do
+  source_file="$source_root/$relative"
+  installed_file="$destination_root/$relative"
+  if [[ ! -f "$source_file" || -L "$source_file" ]]; then
+    printf 'missing or unsafe managed EXPERT skill source: %s
+' "$source_file" >&2
+    status=1
+  elif [[ -e "$installed_file" || -L "$installed_file" ]]; then
+    if [[ ! -f "$installed_file" || -L "$installed_file" ]]; then
+      printf 'unsafe managed EXPERT skill destination: %s
+' "$installed_file" >&2
+      status=1
+    elif ! cmp -s "$source_file" "$installed_file"; then
+      printf 'stale installed managed EXPERT skill file: %s
+' "$installed_file" >&2
+      status=1
+    fi
+  else
+    printf 'missing installed managed EXPERT skill file: %s
+' "$installed_file" >&2
+    status=1
+  fi
+done
+if ! python3 "$repo_root/scripts/check-prime-agent-expert-runtime.py" \
+  "$expert_skill_source"; then
   status=1
 fi
 

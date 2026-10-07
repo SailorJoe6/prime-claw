@@ -77,7 +77,7 @@ of two target modes:
    refused; the conspicuous flag is required. Tier 1 may use that same path
    inside Docker because the container filesystem is the isolation boundary.
 
-Apply copies only the nine allowlisted TypeScript files. Before the first copy,
+Apply copies only the ten allowlisted TypeScript files. Before the first copy,
 `scripts/manage-prime-agent-role-protocol.py` selects exactly one global context
 candidate in Prime Agent priority order: `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`,
 then `CLAUDE.MD`. It creates `AGENTS.md` only when none exists. The manager owns
@@ -109,16 +109,26 @@ retired entry and verifies each current installed file byte-for-byte. Apply
 forwards its explicit target mode to that required full check, so an interrupted
 or mixed sequential generation cannot report success.
 
-The installer owns the uniquely named global
-`skills/prime-claw-oversee-episode/SKILL.md` beside the TypeScript plugin files.
-It validates real managed `skills/` directories, refuses extra entries in that
-exact managed directory, installs mode 0644 bytes, and requires an exact check.
+The installer owns two uniquely named global skills beside the TypeScript
+plugin files: `skills/prime-claw-oversee-episode/SKILL.md` and the complete
+`skills/prime-claw-official-expert-review/` Python-backed package. It validates
+real managed `skills/`, skill, `src/`, and package directories; refuses extra
+entries in either exact managed inventory; installs mode 0644 bytes; and
+requires an exact final check. Before any destination mutation,
+`check-prime-agent-expert-runtime.py` selects the same managed-kernel interpreter
+Prime Agent will use. It accepts an exact normal installed package import or
+validates the source package with that interpreter and reports `SYNC_PENDING`
+without changing the environment. If `PRIME_AGENT_KERNEL_PYTHON` is set, only an
+already-installed exact package/hash is `AVAILABLE`; missing, stale, mismatched,
+or unusable state is deterministically `UNAVAILABLE` before plugin mutation.
+
 This ordinary plugin-file ownership does not widen the role-protocol manager's
 fixed context/legacy-APPEND/manifest receipt. The project
 `.ralph/skills/oversee-episode/SKILL.md` is only a policy-free compatibility shim;
 its `.agents` discovery symlink remains for transition diagnostics. The
-standalone reviewer profile remains migration evidence until the later official
-EXPERT slice.
+standalone reviewer profile remains byte-identical migration evidence. The new
+EXPERT package is definition-only and inert: spawn, reservation, admission,
+delivery, settlement, cleanup, and provider identity remain deferred.
 
 The predecessor APPEND-only manager remains in source for bridge rollback. New
 apply/check use the role-protocol manager for both selected context and retained

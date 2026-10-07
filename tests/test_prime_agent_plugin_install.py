@@ -34,6 +34,7 @@ WS_CONCURRENT_PROBE = "/workspace/tests/container/concurrent_apply_probe.py"
 # The image's default PATH (Ubuntu base); tests that shadow a tool prepend
 # their fake bin dir to this.
 CONTAINER_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+CONTAINER_EXPERT_VENV = "/tmp/prime-claw-expert-preflight-venv"
 RETIRED = "extensions/goal-heartbeat-work-control.ts"
 FILES = (
     "extensions/handoff-chain.ts",
@@ -47,7 +48,16 @@ FILES = (
     "extension-support/role-kernel.generated.ts",
     "extension-support/spec-episode.ts",
 )
-SKILL_FILES = ("skills/prime-claw-oversee-episode/SKILL.md",)
+SKILL_FILES = (
+    "skills/prime-claw-oversee-episode/SKILL.md",
+    "skills/prime-claw-official-expert-review/SKILL.md",
+)
+EXPERT_FILES = (
+    "skills/prime-claw-official-expert-review/pyproject.toml",
+    "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/__init__.py",
+    "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/reviewer.md",
+)
+MANAGED_SKILL_FILES = (*SKILL_FILES, *EXPERT_FILES)
 
 
 def test_source_is_outside_project_extension_discovery() -> None:
@@ -79,7 +89,10 @@ def _run_script(tier1_container, script: str, destination: Path, *, env=None):
         timeout=60,
     )
     assert staged.returncode == 0, staged.stdout + staged.stderr
-    script_env = {"PRIME_AGENT_PLUGIN_ROOT": native}
+    script_env = {
+        "PRIME_AGENT_PLUGIN_ROOT": native,
+        "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV,
+    }
     if env is not None:
         script_env.update(env)
     result = tier1_container.run(
@@ -178,13 +191,17 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
     home = f"{base}/home"
     apply = f"{base}/primary/scripts/apply-prime-agent-plugin.sh"
     check = f"{base}/primary/scripts/check-prime-agent-plugin.sh"
+    runtime_env = {
+        "HOME": home,
+        "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV,
+    }
     applied = tier1_container.run(
-        apply, "--user-global", env={"HOME": home}, workdir=None, timeout=60,
+        apply, "--user-global", env=runtime_env, workdir=None, timeout=60,
     )
     assert applied.returncode == 0, applied.stdout + applied.stderr
     assert "target mode: user-global" in applied.stdout
     checked = tier1_container.run(
-        check, "--user-global", env={"HOME": home}, workdir=None, timeout=60,
+        check, "--user-global", env=runtime_env, workdir=None, timeout=60,
     )
     assert checked.returncode == 0, checked.stdout + checked.stderr
 
@@ -241,14 +258,20 @@ def test_linked_worktree_cannot_activate_shared_generation_and_isolated_works(
     isolated = f"{base}/isolated-agent"
     applied = tier1_container.run(
         f"{base}/candidate/scripts/apply-prime-agent-plugin.sh",
-        env={"PRIME_AGENT_PLUGIN_ROOT": isolated},
+        env={
+            "PRIME_AGENT_PLUGIN_ROOT": isolated,
+            "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV,
+        },
         workdir=None,
         timeout=60,
     )
     assert applied.returncode == 0, applied.stdout + applied.stderr
     checked = tier1_container.run(
         f"{base}/candidate/scripts/check-prime-agent-plugin.sh",
-        env={"PRIME_AGENT_PLUGIN_ROOT": isolated},
+        env={
+            "PRIME_AGENT_PLUGIN_ROOT": isolated,
+            "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV,
+        },
         workdir=None,
         timeout=60,
     )
@@ -271,7 +294,7 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     applied = _run_script(tier1_container, WS_APPLY, destination)
     assert applied.returncode == 0, applied.stdout + applied.stderr
     assert "selected copy is current" in applied.stdout
-    for relative in (*FILES, *SKILL_FILES):
+    for relative in (*FILES, *MANAGED_SKILL_FILES):
         expected = tier1_container.read_repo(f"src/prime-agent-plugin/{relative}")
         assert (destination / relative).read_text() == expected, relative
     append = (destination / "APPEND_SYSTEM.md").read_text()
@@ -298,7 +321,7 @@ def test_apply_is_convergent_and_preserves_unrelated_files(tier1_container, ctmp
         relative: (destination / relative).read_bytes()
         for relative in (
             *FILES,
-            *SKILL_FILES,
+            *MANAGED_SKILL_FILES,
             "AGENTS.md",
             "APPEND_SYSTEM.md",
             ".prime-claw/role-protocol-state.json",
@@ -325,6 +348,7 @@ def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container,
         "apply-prime-agent-plugin.sh",
         "check-prime-agent-plugin.sh",
         "generate-prime-agent-role-kernel.py",
+        "check-prime-agent-expert-runtime.py",
         "manage-prime-agent-append-system.py",
         "manage-prime-agent-role-protocol.py",
         "prime-agent-plugin-target.sh",
@@ -406,7 +430,13 @@ def test_apply_rejects_unsafe_retired_destination_before_mutation(
 
 
 
-@pytest.mark.parametrize("managed_directory", ["root", "extensions", "extension-support", "skills", "skills/prime-claw-oversee-episode"])
+@pytest.mark.parametrize("managed_directory", [
+    "root", "extensions", "extension-support", "skills",
+    "skills/prime-claw-oversee-episode",
+    "skills/prime-claw-official-expert-review",
+    "skills/prime-claw-official-expert-review/src",
+    "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review",
+])
 def test_apply_and_check_reject_symlinked_managed_directories_before_mutation(
     tier1_container, ctmp, managed_directory,
 ) -> None:
@@ -674,3 +704,59 @@ def test_concurrent_apply_serializes_before_read_and_preserves_sentinel(
     assert result.returncode == 0, result.stdout + result.stderr
     verdict = json.loads(result.stdout.strip().splitlines()[-1])
     assert verdict == {"ok": True, "contenders": 4}
+
+def test_check_rejects_stale_managed_expert_package_file(tier1_container, ctmp) -> None:
+    destination = ctmp / "agent"
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    package = destination / EXPERT_FILES[1]
+    package.write_text(package.read_text() + "\n# stale installed package\n")
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    assert checked.returncode != 0
+    assert "stale installed managed EXPERT skill file" in checked.stderr
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "skills/prime-claw-official-expert-review/foreign.md",
+        "skills/prime-claw-official-expert-review/src/foreign-package",
+        "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/foreign.py",
+    ],
+)
+def test_apply_and_check_reject_unexpected_managed_expert_entries(
+    tier1_container, ctmp, relative,
+) -> None:
+    destination = ctmp / "agent"
+    extra = destination / relative
+    extra.parent.mkdir(parents=True)
+    extra.write_text("foreign content must not be adopted\n")
+    before = _tree_snapshot(destination)
+    applied = _run_script(tier1_container, WS_APPLY, destination)
+    checked = _run_script(tier1_container, WS_CHECK, destination)
+    assert applied.returncode != 0
+    assert checked.returncode != 0
+    assert "unexpected entry in managed EXPERT" in applied.stderr
+    assert "unexpected entry in managed EXPERT" in checked.stderr
+    assert _tree_snapshot(destination) == before
+
+
+def test_configured_interpreter_unavailable_blocks_apply_before_mutation(
+    tier1_container, ctmp,
+) -> None:
+    destination = ctmp / "agent"
+    sentinel = destination / "extensions/reviewed-plan.ts"
+    sentinel.parent.mkdir(parents=True)
+    sentinel.write_bytes(b"existing generation remains untouched\n")
+    append = destination / "APPEND_SYSTEM.md"
+    append.write_bytes(b"unrelated append remains untouched\n")
+    before = _tree_snapshot(destination)
+    applied = _run_script(
+        tier1_container,
+        WS_APPLY,
+        destination,
+        env={"PRIME_AGENT_KERNEL_PYTHON": str(ctmp / "missing-python")},
+    )
+    assert applied.returncode != 0
+    assert '"status": "UNAVAILABLE"' in applied.stdout
+    assert _tree_snapshot(destination) == before

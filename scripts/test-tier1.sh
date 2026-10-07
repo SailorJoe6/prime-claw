@@ -293,7 +293,7 @@ if [ "$SMOKE" -eq 1 ]; then
     exit 0
 fi
 
-CONTAINER_CMD="set -euo pipefail; $INSTALL && prime-agent --version && PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT /workspace/scripts/apply-prime-agent-plugin.sh && PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT /workspace/scripts/check-prime-agent-plugin.sh"
+CONTAINER_CMD="set -euo pipefail; $INSTALL && prime-agent --version && python3 -m venv --without-pip /tmp/prime-claw-expert-preflight-venv && PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT PRIME_AGENT_KERNEL_VENV=/tmp/prime-claw-expert-preflight-venv /workspace/scripts/apply-prime-agent-plugin.sh && PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT PRIME_AGENT_KERNEL_VENV=/tmp/prime-claw-expert-preflight-venv /workspace/scripts/check-prime-agent-plugin.sh"
 if [ "$PROBE" -eq 1 ]; then
     # Container-side RPC probe: load the container's real installed
     # extensions (no --no-extensions) and ask for the native command list.

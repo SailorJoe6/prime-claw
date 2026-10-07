@@ -648,10 +648,14 @@ def tier1_container(request):
             "bash", "-lc",
             "set -euo pipefail; " + install
             + " && prime-agent --version"
+            + " && python3 -m venv --without-pip /tmp/prime-claw-expert-preflight-venv"
             + " && /workspace/scripts/apply-prime-agent-plugin.sh"
             + " && /workspace/scripts/check-prime-agent-plugin.sh",
             timeout=600, workdir=None,
-            env={"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT},
+            env={
+                "PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT,
+                "PRIME_AGENT_KERNEL_VENV": "/tmp/prime-claw-expert-preflight-venv",
+            },
         )
         log_lines.append(result.stdout)
         if result.returncode != 0:

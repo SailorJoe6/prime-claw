@@ -1372,3 +1372,46 @@ Production code, the managed guide, and `execute` are unchanged. Under the
 owner-approved test/docs-only rule, no independent patch review was required.
 Slice 2 is complete at this candidate. Slice 3, landing, activation/restart, UAT,
 finalization, and cleanup remain separately gated.
+
+## 22. Slice 3 first candidate — official EXPERT package and exact preflight only
+
+Accepted base: `e8b047c1493e6718c2f3062f19c77bc0b23ce8e9` / tree
+`881b455a121b4cd53dd01005c5f84e31c7c9d555`.
+
+1. Add the managed official EXPERT Python-backed skill/package with strict,
+   deterministic reviewer configuration and rubric parity to the unchanged
+   standalone expert profile. Preserve that profile as migration evidence.
+2. Add read-only availability/preflight for the exact interpreter that would
+   execute the package. In default managed-kernel mode, validate source
+   importability with that exact runtime interpreter without environment
+   mutation and report sync pending where applicable. Under
+   `PRIME_AGENT_KERNEL_PYTHON`, accept only a normal already-installed exact
+   package/hash import; return deterministic UNAVAILABLE for missing, stale,
+   mismatched, or unusable interpreter/package before any other activity.
+3. Use only public Prime Agent/Python interfaces. Do not add host runtime modules
+   to `pyproject.toml`, source-path injection, host requests, or provisioning.
+4. Extend the practical installer/check inventory to own both managed skill
+   directories. Preserve preflight-before-copy, exact copy/final check, and
+   known-state refusal. Do not introduce a transaction journal, rollback engine,
+   or adversarial Slice 1 machinery.
+5. Keep the package inert. Do not add spawn, reservation, nonce/expiry, handle
+   binding, child admission, delivery, settlement, cleanup tools, provider
+   identity, or generic-child EXPERT authority.
+6. Run focused package/interpreter/installer coverage, complete Tier 0, Docker
+   Tier 1, and pinned-runtime probe. Update evidence/checkpoint, commit/push one
+   candidate, report, and stop.
+
+Do not begin later EXPERT admission/reservation mechanics, Slice 4, landing,
+user-global mutation, restart, UAT, finalization, or cleanup.
+
+### 22.1 Prerequisite candidate checkpoint
+
+The managed definition-only package, strict standalone-profile byte parity,
+exact-interpreter read-only preflight, and complete two-skill installer/check
+inventory are implemented. Focused static coverage passed 5 tests and focused
+Docker coverage passed 41 with 1 deselected. Evidence and reproducible commands
+are in `docs/evidence/official-lean-role-protocol/2026-10-06-slice-3-expert-prerequisite.md`. Complete Tier 0 passed 291 tests with 183 skipped; Docker Tier 1 passed 76
+with 398 deselected; and the downloaded/checksum-verified Prime Agent 0.9.8
+probe passed with managed `SYNC_PENDING`. This bounded prerequisite is complete
+at the candidate and may be committed/reported. Admission, reservation,
+transport, role authority, Slice 4, and operational cutover remain excluded.

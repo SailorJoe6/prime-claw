@@ -622,3 +622,52 @@ and documentation only; production code, managed guide bytes, and canonical
 `execute` bytes remain unchanged. Slice 2 is complete. Official EXPERT admission
 begins only in a later owner-authorized Slice 3 pass; no operational cutover or
 terminal lifecycle action is authorized by this result.
+
+### Accepted Slice 2 and bounded Slice 3 prerequisite
+
+The owner accepted Slice 2 complete at
+`e8b047c1493e6718c2f3062f19c77bc0b23ce8e9` / tree
+`881b455a121b4cd53dd01005c5f84e31c7c9d555`. Begin Slice 3 with only the
+smallest prerequisite capability: the managed official EXPERT Python-backed
+skill/package, strict reviewer configuration and rubric parity, installer/check
+ownership, and deterministic read-only availability/preflight for the exact
+interpreter that will execute it.
+
+This pass adds no spawn, reservation, nonce/expiry state, handle binding, child
+role admission, message delivery, report settlement, cleanup tools, or provider
+identity. The standalone expert profile remains byte-identical migration
+evidence and must have exact configuration/rubric parity with the managed
+package. In default managed-kernel mode, source importability is validated with
+the exact runtime interpreter without modifying its environment; report sync
+pending when the currently loaded runtime does not yet contain the candidate.
+When `PRIME_AGENT_KERNEL_PYTHON` is set, require a normal already-installed
+exact package/hash import and deterministically return UNAVAILABLE for a
+missing, stale, mismatched, or unusable interpreter/package before any
+reservation, RLM, message, or lifecycle activity.
+
+Use only supported Prime Agent and public Python interfaces. Do not add host
+runtime modules to `pyproject.toml`, invent host requests or source-path
+injection, or provision dependencies. Extend the existing practical apply/check
+inventory for both managed skill directories with preflight, copy, final check,
+and known-state refusal. Do not add a journal/rollback engine or revive rejected
+Slice 1 overengineering. The package remains inert and generic children gain no
+EXPERT authority.
+
+Run proportional focused package/interpreter/installer tests plus complete Tier
+0, Docker Tier 1, and the pinned-runtime probe. Update evidence and plan,
+commit/push one candidate, report, and stop. Reservation/admission, Slice 4,
+landing, user-global mutation, restart, UAT, finalization, and cleanup remain
+excluded.
+
+### Slice 3 prerequisite candidate checkpoint
+
+The first bounded Slice 3 candidate now owns the inert
+`prime-claw-official-expert-review` Python-backed skill/package, an exact
+byte-identical reviewer definition, deterministic managed/configured interpreter
+preflight, and the second managed skill installer inventory. Focused static/Docker, complete Tier 0/Docker Tier 1, and the pinned Prime Agent
+0.9.8 probe are green. The bounded prerequisite is complete at this candidate.
+Successful description, source validation, `SYNC_PENDING`, or `AVAILABLE` never
+grants EXPERT authority.
+All admission/reservation/delivery/settlement behavior and operational cutover
+remain deferred as specified in plan Section 22. Evidence:
+`docs/evidence/official-lean-role-protocol/2026-10-06-slice-3-expert-prerequisite.md`.

@@ -230,6 +230,26 @@ lifetime-locks that owner.
 
 ### Explicit EXPERT reviewer policy
 
+The managed bridge now contains the Python-backed
+`prime-claw-official-expert-review` skill. Its bundled `reviewer.md` is
+byte-identical to the unchanged standalone profile at SHA256
+`d9f8b14954da36df3d9051b4e25f8a76b6d16a0a2c27f9b29cfab262b5efe6f6`.
+The package strictly validates the exact `expert-reviewer`,
+`openai-codex/gpt-6-astra`, `max` configuration and the full rubric before
+returning a definition-only description, package manifest/hash, and
+`authority: false`. It imports only the Python standard library and performs no
+host request.
+
+This is a prerequisite, not EXPERT admission. Installer preflight is read-only:
+the default managed interpreter either imports the exact installed package or
+imports the source normally from its `src` working directory and reports
+`SYNC_PENDING`; configured `PRIME_AGENT_KERNEL_PYTHON` accepts only an exact
+already-installed package/hash. Hash mismatch is detected before importing
+stale configured code. No environment is provisioned or modified. Spawn,
+reservation, nonce/expiry, handle binding, child admission, packet delivery,
+report settlement, cleanup tools, and provider identity remain absent; generic
+children receive no EXPERT authority.
+
 The first project policy lives at
 `.prime/agent/profiles/expert-reviewer.md`. Its closed frontmatter names
 `expert-reviewer` and selects `openai-codex/gpt-6-astra` with reasoning level
@@ -376,7 +396,7 @@ rationale, and hashes are recorded in
 ## Installation boundaries
 
 Builder sources remain inert under `src/prime-agent-plugin/`. The transition
-apply/check workflow manages nine allowlisted TypeScript files, one selected
+apply/check workflow manages ten allowlisted TypeScript files, one selected
 AGENTS/CLAUDE neutral-kernel region, and the retained legacy APPEND bridge. There
 is no separate `goal-heartbeat-work-control.ts` entry point and no
 `before_agent_start` work-control overlay. Apply treats a stale installed copy as
