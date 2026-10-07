@@ -1919,3 +1919,116 @@ known-good -> exact restore proof are present. Focused host 76/54 skipped, Node
 76, and Docker-native 3 pass. No live process, primary `main`, or user-global
 mutation occurred. Run complete gates, freeze/commit/push one immutable
 candidate, report it to the owner, and stop without independent review or Gate A.
+
+## 31. Owner-review repair — Generation A coordinator and bundle seams
+
+**Blocked historical candidate:**
+`f2f3fcd25dbe3d96f05193261020d26bf79f1213`, tree
+`8b4fef1936766c7383a577317ac6d2436f4e72e5`.
+
+**Accepted report:** exact configured Astra/max `BLOCK`, SHA256
+`4ed03385fc1d54cdecdbbacf5ea720d00b70a9af10b99b1466f7592df50d95e1`.
+Preserve that candidate, freeze, report, and prior evidence as history.
+
+### 31.1 Coordinator B1 — exact pre-shutdown observation
+
+- Reconcile every observed declared process against its declared role and
+  supported entrypoint form, including compiled launcher and interpreter/Node
+  entrypoints.
+- Require client, TUI, launcher, and wrapper absence before shutdown. Allow only
+  the explicitly approved old daemon/worker set until shutdown.
+- Bind actual status/build/socket/executable observations, including exact build
+  identity rather than version-only equivalence.
+- Failed commands, malformed or unknown status/process data, undeclared live
+  roles, and any mapping mismatch stop before the first mutation.
+- Bound observation to declared/relevant entrypoints; do not substring-scan or
+  inspect unrelated programs.
+
+Required cases include a declared live TUI refusal, a supported Node entrypoint
+success, and wrong same-version build refusal before shutdown.
+
+### 31.2 Coordinator B2 — one start plus bounded readiness
+
+After exactly one recorded start, use only a short bounded read-only status/
+child observation loop. Never invoke start again. Admit readiness only for one
+exact expected runtime identity. Stop truthfully for wrong identity, duplicate
+runtime, child exit, malformed status, or deadline. Cover delayed readiness that
+succeeds after multiple observations with exactly one start, plus every failure
+case above.
+
+### 31.3 Coordinator B3 — concrete rollback topology
+
+Replace the syntactic `git revert` prefix check and placeholder recipe with one
+fully concrete history-preserving recipe. Validate its exact commit arguments,
+integration merge, parent order/mainline, prelanding HEAD, candidate ancestry,
+and resulting accepted baseline using a scratch-only inverse application or an
+equivalently bounded Git topology proof. Reject placeholders, missing/wrong
+commits, wrong mainline, non-resolving results, reset, rebase, force, and
+automatic live compensation. No live rollback runs in this pass.
+
+### 31.4 Bundle B4 — original-path no-follow validation
+
+Before any `resolve()`, use `lstat` to reject visible or dangling symlinks and
+non-regular selected-context/destination/bundle-root/fixed managed parent or leaf
+components at the originally supplied paths. Preserve supported real isolated
+roots, fixed managed inventory, and case-insensitive macOS naming behavior. Do
+not add descriptor-chain, inode-generation, ABA, or hostile-race machinery.
+Cover visible and dangling links for every affected input/output class.
+
+### 31.5 Bundle B5 — metadata-complete restoration
+
+Treat ordinary mode/uid/gid as part of preimage equality. When bytes already
+match but metadata differs, restore metadata or fail; never report
+`alreadyRestored`. Classify the complete fixed set before mutation, preserve
+unknown-content all-or-refuse, and make replay return `alreadyRestored: true`
+only when bytes and all required metadata already match. Cover unchanged-byte
+mode drift, metadata application failure with truthful state, normal restore,
+and replay.
+
+### 31.6 Evidence, gates, and stop boundary
+
+- Add only the exact focused positive/negative/failure/replay tests above.
+- Regenerate only affected private bundle manifest, isolated proof, and
+  sanitized non-self-referential readiness evidence. Do not rewrite the old
+  candidate/report/freeze evidence.
+- Run focused coordinator/bundle tests, affected Docker-native checks, complete
+  Tier 0, complete selected Docker Tier 1, pinned Prime Agent 0.9.8 probe,
+  `git diff --check`, remote equality, and teardown.
+- Freeze and push one new immutable candidate commit/tree with no tracked
+  mutation afterward. Report exact hashes/evidence to the owning Conversation
+  and stop.
+- Do not launch the renewed independent review. The owner will re-admit one fresh
+  exact configured reviewer because bytes changed.
+
+No Gate A, landing, primary-main or user-global mutation, live runtime shutdown/
+restart, UAT, compatibility removal, finalization, bookkeeping close, or cleanup
+is authorized.
+
+### Section 31 implementation checkpoint
+
+The five accepted findings are repaired through only the two existing seams.
+Coordinator preflight now binds compiled or Node CLI artifacts, exact status
+identity, declared roles, and targeted Prime Agent PIDs; all observation defects
+stop before operational mutation or scratch proof. One start is followed by a
+short attempt/deadline-bounded read-only status/child loop. Rollback input is an
+explicit complete linear chain plus the integration merge/mainline and accepted
+baseline, proven by generated inverses in a temporary no-local clone.
+
+The bundle helper now checks original supplied paths and every fixed managed
+component with `lstat` before resolution, rejects visible/dangling links and
+nonregular leaves, and treats bytes plus mode/uid/gid as restored equality.
+Metadata-only repair, failure, fixed-set all-or-refuse, and replay are explicit.
+No descriptor-chain or race framework was added.
+
+Focused results: 77 coordinator/bundle tests pass; the broader focused host set
+passes 137/54 skipped; full Node passes 165; affected Docker-native passes 3.
+The replacement private bundle manifest is
+`527f88a8897f5f2abe92a5ad9745a17db869c5e3440c351f841908d01aebcce2`
+and its isolated bundle-proof SHA256 is
+`5eb527a2f2b77edca7033c856794b6f9c53466a9dc0b0545bcbf85c7b3f69983`.
+The previous candidate/freeze/report remain untouched. Preliminary complete
+Tier 0 passes 404/185 skipped and Docker Tier 1 passes 78/511 deselected. Re-run
+all gates on the exact staged evidence bytes, complete prospective rollback
+proof plus pinned probe/diff/remote/teardown, then freeze/push/report one
+replacement candidate. Do not run renewed review or any Gate A/live/global
+action.

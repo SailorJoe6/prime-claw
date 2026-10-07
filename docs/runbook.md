@@ -197,10 +197,20 @@ UAT.
 
 A future explicitly authorized Gate A starts from a separate non-Orca terminal
 with a reviewed coordinator input, private bundle manifest digest, and private
-checkpoint directory. The external coordinator must prove complete resident
-client/launcher inventory and zero stale recoverers before shutdown. Its only
-mutating sequence is shutdown, exact fast-forward landing/push, apply with a
-fresh external role receipt, check, one-runtime start/status, then printing the
-owner -> episode -> ordinary resume checklist. Stop at the first uncertain
-boundary and follow the phase-specific recovery table in the plugin guide. Never
-blindly retry a push, apply, or runtime start.
+checkpoint directory. The external coordinator first binds the exact compiled or
+Node CLI prefix, both interpreter/entrypoint artifact digests, the declared old
+daemon's status/build/socket/PID, the approved worker set, and confirmed absence
+of clients, TUIs, launchers, and wrappers. Observation uses only exact Prime
+Agent process-title discovery plus targeted declared/discovered PIDs.
+
+The input also contains the explicit newest-to-oldest linear revert commits, the
+integration merge and ordered parents, mainline 2, and accepted prelanding
+commit/tree. The coordinator proves that recipe only in a temporary no-local
+clone. Its sole mutating sequence remains shutdown, exact fast-forward
+landing/push, apply with a fresh external role receipt, check, and one runtime
+start. After that single start it performs only bounded read-only readiness
+observations; wrong identity, duplicate runtime, child exit, malformed status,
+or deadline stops without retry. Only exact readiness prints the owner -> episode
+-> ordinary checklist. Stop at the first uncertain boundary and follow the
+phase-specific recovery table. Never blindly retry a push, apply, or runtime
+start, and never use reset/rebase/force or automatic live compensation.

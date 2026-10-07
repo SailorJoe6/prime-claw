@@ -72,6 +72,70 @@ def regular(path: Path, *, limit: int | None = None) -> tuple[bytes, os.stat_res
     return data, info
 
 
+def original_directory(path: Path, label: str) -> Path:
+    try:
+        info = path.lstat()
+    except FileNotFoundError as exc:
+        raise ValueError(f"{label} must be an existing real directory: {path}") from exc
+    if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+        raise ValueError(f"{label} must be a real directory: {path}")
+    return path.resolve(strict=True)
+
+
+def new_bundle_root(path: Path) -> Path:
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        if stat.S_ISLNK(info.st_mode):
+            raise ValueError(f"bundle path must not be a symlink: {path}")
+        raise ValueError(f"bundle path must not exist: {path}")
+    parent = original_directory(path.parent, "bundle parent")
+    return parent / path.name
+
+
+def validate_fixed_components(root: Path, relative: str, *, leaf_may_be_absent: bool) -> Path:
+    current = root
+    parts = Path(relative).parts
+    for index, part in enumerate(parts):
+        current = current / part
+        try:
+            info = current.lstat()
+        except FileNotFoundError:
+            if index == len(parts) - 1 and not leaf_may_be_absent:
+                raise ValueError(f"required fixed managed leaf is missing: {current}")
+            break
+        if stat.S_ISLNK(info.st_mode):
+            raise ValueError(f"fixed managed path component must not be a symlink: {current}")
+        if index < len(parts) - 1 and not stat.S_ISDIR(info.st_mode):
+            raise ValueError(f"fixed managed parent must be a directory: {current}")
+        if index == len(parts) - 1 and not stat.S_ISREG(info.st_mode):
+            raise ValueError(f"fixed managed leaf must be regular or absent: {current}")
+    return root / relative
+
+
+def metadata_matches(info: os.stat_result, entry: dict[str, Any]) -> bool:
+    return (
+        stat.S_IMODE(info.st_mode) == int(entry["mode"])
+        and info.st_uid == int(entry["uid"])
+        and info.st_gid == int(entry["gid"])
+    )
+
+
+def apply_metadata(path: Path, entry: dict[str, Any]) -> None:
+    try:
+        os.chown(path, int(entry["uid"]), int(entry["gid"]), follow_symlinks=False)
+    except PermissionError:
+        info = path.lstat()
+        if info.st_uid != int(entry["uid"]) or info.st_gid != int(entry["gid"]):
+            raise
+    os.chmod(path, int(entry["mode"]), follow_symlinks=False)
+    info = path.lstat()
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or not metadata_matches(info, entry):
+        raise ValueError(f"failed to restore required metadata: {path}")
+
+
 def newline_style(data: bytes) -> str:
     if b"\r\n" in data:
         return "crlf" if data.replace(b"\r\n", b"").find(b"\n") < 0 else "mixed"
@@ -100,14 +164,10 @@ def screen_required_blob(data: bytes, label: str) -> None:
 
 
 def installed_inventory(root: Path, source_root: Path, candidate_post_root: Path) -> list[dict[str, Any]]:
-    if not root.is_dir() or root.is_symlink():
-        raise ValueError(f"installed root must be a real directory: {root}")
-    if not source_root.is_dir() or source_root.is_symlink():
-        raise ValueError(f"source root must be a real directory: {source_root}")
     result: list[dict[str, Any]] = []
     for rel in MANAGED_FILES:
-        installed_path = root / rel
-        source_path = source_root / rel
+        installed_path = validate_fixed_components(root, rel, leaf_may_be_absent=True)
+        source_path = validate_fixed_components(source_root, rel, leaf_may_be_absent=False)
         source_data, _ = regular(source_path, limit=MAX_PREIMAGE_BYTES)
         source_sha = digest(source_data)
         if installed_path.exists() or installed_path.is_symlink():
@@ -118,20 +178,20 @@ def installed_inventory(root: Path, source_root: Path, candidate_post_root: Path
                 "mode": stat.S_IMODE(installed_info.st_mode), "uid": installed_info.st_uid,
                 "gid": installed_info.st_gid, "size": len(installed_data),
                 "installedSha256": installed_sha, "candidateSourceSha256": source_sha,
-                "candidateEqual": installed_sha == source_sha,
+                "candidateSourceSize": len(source_data), "candidateEqual": installed_sha == source_sha,
             })
         else:
-            result.append({"path": rel, "kind": "absent", "observed": "absent", "candidateSourceSha256": source_sha, "candidateEqual": False})
+            result.append({"path": rel, "kind": "absent", "observed": "absent", "candidateSourceSha256": source_sha, "candidateSourceSize": len(source_data), "candidateEqual": False})
     for rel in EXPECTED_ABSENT:
-        path = root / rel
+        path = validate_fixed_components(root, rel, leaf_may_be_absent=True)
         if path.exists() or path.is_symlink():
             data, info = regular(path, limit=MAX_PREIMAGE_BYTES)
             result.append({"path": rel, "kind": "file", "observed": "present", "mode": stat.S_IMODE(info.st_mode), "uid": info.st_uid, "gid": info.st_gid, "size": len(data), "installedSha256": digest(data), "candidateExpected": "absent"})
         else:
             result.append({"path": rel, "kind": "absent", "observed": "absent", "candidateExpected": "absent"})
     for rel in PROTOCOL_SURFACES:
-        path = root / rel
-        candidate = candidate_post_root / rel
+        path = validate_fixed_components(root, rel, leaf_may_be_absent=True)
+        candidate = validate_fixed_components(candidate_post_root, rel, leaf_may_be_absent=False)
         candidate_data, _ = regular(candidate, limit=MAX_PREIMAGE_BYTES)
         if path.exists() or path.is_symlink():
             data, info = regular(path, limit=MAX_PREIMAGE_BYTES)
@@ -159,28 +219,41 @@ def atomic_write(path: Path, data: bytes, mode: int) -> None:
 
 
 def create(args: argparse.Namespace) -> dict[str, Any]:
-    bundle = args.bundle.resolve()
-    if bundle.exists() or bundle.is_symlink():
-        raise ValueError(f"bundle path must not exist: {bundle}")
-    bundle.mkdir(parents=True, mode=0o700)
+    bundle = new_bundle_root(args.bundle)
+    global_data, global_info = regular(args.global_context, limit=MAX_PREIMAGE_BYTES)
+    append_data, append_info = regular(args.append, limit=MAX_PREIMAGE_BYTES)
+    global_post, _ = regular(args.global_postimage, limit=MAX_PREIMAGE_BYTES)
+    append_post, _ = regular(args.append_postimage, limit=MAX_PREIMAGE_BYTES)
+    topology_data, _ = regular(args.source_topology, limit=MAX_PREIMAGE_BYTES)
+    screen_required_blob(global_data, "selected global context")
+    screen_required_blob(append_data, "APPEND_SYSTEM")
+    topology = json.loads(topology_data)
+    if not isinstance(topology, dict):
+        raise ValueError("source topology must be a JSON object")
+    known_good = args.known_good_generation.strip()
+    if not known_good or len(known_good) > 256:
+        raise ValueError("known-good generation must be a short non-empty identifier")
+    selected = args.selected_file.strip()
+    if selected not in {"AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"}:
+        raise ValueError("selected file decision is unsupported")
+
+    installed_root = original_directory(args.installed_root, "installed root")
+    source_root = original_directory(args.source_root, "source root")
+    candidate_post_root = original_directory(args.candidate_postimage_root, "candidate postimage root")
+    inventory = installed_inventory(installed_root, source_root, candidate_post_root)
+    prepared_tools: list[tuple[str, bytes]] = []
+    seen_names: set[str] = set()
+    for raw_tool in args.restore_tool:
+        tool_data, _ = regular(raw_tool, limit=MAX_PREIMAGE_BYTES)
+        name = raw_tool.name
+        if name in seen_names:
+            raise ValueError(f"duplicate restore tool basename: {name}")
+        seen_names.add(name)
+        prepared_tools.append((name, tool_data))
+
+    bundle.mkdir(mode=0o700)
     os.chmod(bundle, 0o700)
     try:
-        global_data, global_info = regular(args.global_context.resolve(), limit=MAX_PREIMAGE_BYTES)
-        append_data, append_info = regular(args.append.resolve(), limit=MAX_PREIMAGE_BYTES)
-        screen_required_blob(global_data, "selected global context")
-        screen_required_blob(append_data, "APPEND_SYSTEM")
-        global_post, _ = regular(args.global_postimage.resolve(), limit=MAX_PREIMAGE_BYTES)
-        append_post, _ = regular(args.append_postimage.resolve(), limit=MAX_PREIMAGE_BYTES)
-        topology_data, _ = regular(args.source_topology.resolve(), limit=MAX_PREIMAGE_BYTES)
-        topology = json.loads(topology_data)
-        if not isinstance(topology, dict):
-            raise ValueError("source topology must be a JSON object")
-        known_good = args.known_good_generation.strip()
-        if not known_good or len(known_good) > 256:
-            raise ValueError("known-good generation must be a short non-empty identifier")
-        selected = args.selected_file.strip()
-        if not selected or Path(selected).name != selected:
-            raise ValueError("selected file decision must be a basename")
         preimages = bundle / "preimages"
         postimages = bundle / "postimages"
         tools = bundle / "tools"
@@ -193,28 +266,21 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
         atomic_write(postimages / "global-context.bin", global_post, 0o600)
         atomic_write(postimages / "append-system.bin", append_post, 0o600)
         toolset: list[dict[str, Any]] = []
-        seen_names: set[str] = set()
-        for tool_path in args.restore_tool:
-            tool_path = tool_path.resolve()
-            tool_data, _ = regular(tool_path, limit=MAX_PREIMAGE_BYTES)
-            name = tool_path.name
-            if name in seen_names:
-                raise ValueError(f"duplicate restore tool basename: {name}")
-            seen_names.add(name)
+        for name, tool_data in prepared_tools:
             copy = f"tools/{name}"
             atomic_write(bundle / copy, tool_data, 0o600)
             toolset.append({"name": name, "copy": copy, "sha256": digest(tool_data), "size": len(tool_data)})
-        inventory = installed_inventory(args.installed_root.resolve(), args.source_root.resolve(), args.candidate_postimage_root.resolve())
         for entry in inventory:
             relative = entry["path"]
             if entry["observed"] == "present":
-                source = args.installed_root.resolve() / relative
+                source = validate_fixed_components(installed_root, relative, leaf_may_be_absent=False)
                 data, _ = regular(source, limit=MAX_PREIMAGE_BYTES)
                 copy = f"installed-preimages/{relative}"
                 atomic_write(bundle / copy, data, 0o600)
                 entry["preimageCopy"] = copy
             if relative in PROTOCOL_SURFACES:
-                post_data, _ = regular(args.candidate_postimage_root.resolve() / relative, limit=MAX_PREIMAGE_BYTES)
+                post_path = validate_fixed_components(candidate_post_root, relative, leaf_may_be_absent=False)
+                post_data, _ = regular(post_path, limit=MAX_PREIMAGE_BYTES)
                 post_copy = f"installed-postimages/{relative}"
                 atomic_write(bundle / post_copy, post_data, 0o600)
                 entry["postimageCopy"] = post_copy
@@ -246,18 +312,20 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def bundled_file(bundle: Path, relative: str) -> Path:
-    candidate = (bundle / relative).resolve()
+    rel = Path(relative)
+    if rel.is_absolute() or ".." in rel.parts or not rel.parts:
+        raise ValueError(f"bundle relative path escapes root: {relative}")
+    candidate = validate_fixed_components(bundle, relative, leaf_may_be_absent=False)
+    resolved = candidate.resolve(strict=True)
     try:
-        candidate.relative_to(bundle)
+        resolved.relative_to(bundle)
     except ValueError as exc:
         raise ValueError(f"bundle relative path escapes root: {relative}") from exc
-    return candidate
+    return resolved
 
 
 def load_verified(bundle: Path) -> tuple[dict[str, Any], str]:
-    bundle = bundle.resolve()
-    if not bundle.is_dir() or bundle.is_symlink():
-        raise ValueError(f"bundle must be a real directory: {bundle}")
+    bundle = original_directory(bundle, "bundle")
     manifest_data, _ = regular(bundle / "manifest.json", limit=MAX_PREIMAGE_BYTES)
     recorded_data, _ = regular(bundle / "manifest.sha256", limit=256)
     recorded = recorded_data.decode().strip()
@@ -321,84 +389,96 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def restore(args: argparse.Namespace) -> dict[str, Any]:
-    bundle = args.bundle.resolve()
-    manifest, actual = load_verified(bundle)
-    destinations = {
-        "globalContext": args.global_context_destination.resolve(),
-        "appendSystem": args.append_destination.resolve(),
+    manifest, actual = load_verified(args.bundle)
+    raw_destinations = {
+        "globalContext": args.global_context_destination,
+        "appendSystem": args.append_destination,
     }
     prepared: list[tuple[Path, bytes, dict[str, Any], str]] = []
-    for key, destination in destinations.items():
-        current, _ = regular(destination, limit=MAX_PREIMAGE_BYTES)
+    for key, raw_destination in raw_destinations.items():
+        current, info = regular(raw_destination, limit=MAX_PREIMAGE_BYTES)
+        destination = raw_destination.resolve(strict=True)
         entry = manifest["preimages"][key]
         current_sha = digest(current)
         if current_sha == entry["sha256"] and len(current) == entry["size"]:
-            state = "preimage"
+            state = "complete" if metadata_matches(info, entry) else "metadata"
         elif current_sha == entry["postimageSha256"] and len(current) == entry["postimageSize"]:
-            state = "postimage"
+            state = "content"
         else:
             raise ValueError(f"current destination is neither exact preimage nor known postimage: {key}")
-        preimage, _ = regular(bundled_file(bundle, entry["copy"]), limit=MAX_PREIMAGE_BYTES)
+        preimage, _ = regular(bundled_file(Path(args.bundle).resolve(strict=True), entry["copy"]), limit=MAX_PREIMAGE_BYTES)
         prepared.append((destination, preimage, entry, state))
     restored: list[str] = []
     for destination, preimage, entry, state in prepared:
-        if state == "preimage":
+        if state == "complete":
             continue
-        atomic_write(destination, preimage, int(entry["mode"]))
-        try:
-            os.chown(destination, int(entry["uid"]), int(entry["gid"]))
-        except PermissionError:
-            info = destination.stat()
-            if info.st_uid != int(entry["uid"]) or info.st_gid != int(entry["gid"]):
-                raise
+        if state == "content":
+            atomic_write(destination, preimage, int(entry["mode"]))
+        apply_metadata(destination, entry)
+        current, info = regular(destination, limit=MAX_PREIMAGE_BYTES)
+        if len(current) != entry["size"] or digest(current) != entry["sha256"] or not metadata_matches(info, entry):
+            raise ValueError(f"restored destination does not match bytes and metadata: {destination}")
         restored.append(str(destination))
     return {"schemaVersion": SCHEMA_VERSION, "status": "RESTORED", "alreadyRestored": not restored, "manifestSha256": actual, "restored": restored}
 
 
 def restore_installed(args: argparse.Namespace) -> dict[str, Any]:
-    bundle = args.bundle.resolve()
-    root = args.installed_root.resolve()
-    if not root.is_dir() or root.is_symlink():
-        raise ValueError(f"installed root must be a real directory: {root}")
-    manifest, actual = load_verified(bundle)
+    root = original_directory(args.installed_root, "installed root")
+    manifest, actual = load_verified(args.bundle)
+    fixed_paths = [
+        validate_fixed_components(root, entry["path"], leaf_may_be_absent=True)
+        for entry in manifest["installedInventory"]
+    ]
     classified: list[tuple[Path, dict[str, Any], str]] = []
-    for entry in manifest["installedInventory"]:
-        path = root / entry["path"]
-        exists = path.exists() or path.is_symlink()
+    for path, entry in zip(fixed_paths, manifest["installedInventory"], strict=True):
+        try:
+            current, info = regular(path, limit=MAX_PREIMAGE_BYTES)
+        except FileNotFoundError:
+            exists = False
+            current = b""
+            info = None
+        else:
+            exists = True
         pre_exists = entry["observed"] == "present"
         candidate_digest = entry.get("candidateSourceSha256", entry.get("candidatePostimageSha256"))
+        candidate_size = entry.get("candidateSourceSize", entry.get("candidatePostimageSize"))
         candidate_exists = candidate_digest is not None
         if exists:
-            current, _ = regular(path, limit=MAX_PREIMAGE_BYTES)
             current_sha = digest(current)
             if pre_exists and current_sha == entry["installedSha256"] and len(current) == entry["size"]:
-                state = "preimage"
-            elif candidate_exists and current_sha == candidate_digest:
-                state = "postimage"
+                state = "complete" if metadata_matches(info, entry) else "metadata"
+            elif candidate_exists and current_sha == candidate_digest and len(current) == candidate_size:
+                state = "content"
             else:
                 raise ValueError(f"unknown installed state: {entry['path']}")
         elif not pre_exists:
-            state = "preimage"
+            state = "complete"
         elif not candidate_exists:
-            state = "postimage"
+            state = "content"
         else:
             raise ValueError(f"missing installed state is not known: {entry['path']}")
         classified.append((path, entry, state))
     restored: list[str] = []
+    bundle_root = Path(args.bundle).resolve(strict=True)
     for path, entry, state in classified:
-        if state == "preimage":
+        if state == "complete":
             continue
         if entry["observed"] == "present":
-            preimage, _ = regular(bundled_file(bundle, entry["preimageCopy"]), limit=MAX_PREIMAGE_BYTES)
-            atomic_write(path, preimage, int(entry["mode"]))
-            try:
-                os.chown(path, int(entry["uid"]), int(entry["gid"]))
-            except PermissionError:
-                info = path.stat()
-                if info.st_uid != int(entry["uid"]) or info.st_gid != int(entry["gid"]):
-                    raise
+            if state == "content":
+                preimage, _ = regular(bundled_file(bundle_root, entry["preimageCopy"]), limit=MAX_PREIMAGE_BYTES)
+                atomic_write(path, preimage, int(entry["mode"]))
+            apply_metadata(path, entry)
+            current, info = regular(path, limit=MAX_PREIMAGE_BYTES)
+            if len(current) != entry["size"] or digest(current) != entry["installedSha256"] or not metadata_matches(info, entry):
+                raise ValueError(f"restored installed path does not match bytes and metadata: {entry['path']}")
         else:
             path.unlink()
+            try:
+                path.lstat()
+            except FileNotFoundError:
+                pass
+            else:
+                raise ValueError(f"failed to restore absence: {entry['path']}")
         restored.append(entry["path"])
     return {"schemaVersion": SCHEMA_VERSION, "status": "INSTALLED_RESTORED", "alreadyRestored": not restored, "manifestSha256": actual, "restored": restored}
 

@@ -1282,7 +1282,7 @@
  "officialLeanRoleProtocol": {
   "spec": ".ralph/plans/SPECIFICATION.md",
   "plan": ".ralph/plans/EXECUTION_PLAN.md",
-  "activeSlice": "S4 Generation A integration and immutable freeze",
+  "activeSlice": "S4 Generation A owner-review repair and replacement freeze",
   "requirements": [
    {
     "id": "ORP-001",
@@ -1353,10 +1353,11 @@
    {
     "id": "ORP-007",
     "summary": "guidance activation",
-    "status": "active-s4",
+    "status": "active-s4-review-repair",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
-     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md"
     ]
    },
    {
@@ -1406,10 +1407,11 @@
    {
     "id": "ORP-012",
     "summary": "historical filtering",
-    "status": "active-s4",
+    "status": "active-s4-review-repair",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
-     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md"
     ]
    },
    {
@@ -1426,19 +1428,21 @@
    {
     "id": "ORP-014",
     "summary": "one fresh complete episode",
-    "status": "active-s4",
+    "status": "active-s4-review-repair",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
-     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md"
     ]
    },
    {
     "id": "ORP-015",
     "summary": "bridge generation",
-    "status": "active-s4",
+    "status": "active-s4-review-repair",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
-     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md"
     ]
    },
    {
@@ -1465,28 +1469,31 @@
    {
     "id": "ORP-019",
     "summary": "isolated gates",
-    "status": "active-s4",
+    "status": "active-s4-review-repair",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
-     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md"
     ]
    },
    {
     "id": "ORP-020",
     "summary": "correlatable evidence",
-    "status": "active-s4",
+    "status": "active-s4-review-repair",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
-     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md"
     ]
    },
    {
     "id": "ORP-021",
     "summary": "two rollback points",
-    "status": "active-s4",
+    "status": "active-s4-review-repair",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
-     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md"
     ]
    },
    {
@@ -1497,7 +1504,8 @@
     "evidence": [
      "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
      "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
-     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md"
     ]
    },
    {
@@ -1508,7 +1516,8 @@
     "evidence": [
      "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
      "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
-     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md"
     ]
    }
   ]

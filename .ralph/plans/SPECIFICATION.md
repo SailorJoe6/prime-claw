@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Owner accepts repaired lifecycle closure through `6bceeea133f767d72739a8d88df2639ab75bba96` / tree `6421f9acc11a4c5e755e37dfa3060c2821bf5326`; Slice 3 is complete. The existing episode has integrated the bounded Slice 4 Generation A bridge, inert coordinator, private rollback preparation, documentation/provider reconciliation, and focused proof. Complete gates and one immutable commit/push remain; landing, activation, and in-episode independent review remain excluded.
+> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Owner accepts repaired lifecycle closure through `6bceeea133f767d72739a8d88df2639ab75bba96` / tree `6421f9acc11a4c5e755e37dfa3060c2821bf5326`; Slice 3 is complete. Generation A candidate `f2f3fcd25dbe3d96f05193261020d26bf79f1213` / tree `8b4fef1936766c7383a577317ac6d2436f4e72e5` is preserved immutable history. Its exact configured Astra/max review returned `BLOCK`, report SHA256 `4ed03385fc1d54cdecdbbacf5ea720d00b70a9af10b99b1466f7592df50d95e1`. The owner accepts all five findings as in-scope ordinary-operation defects. The bounded Section 31 coordinator and bundle repairs, exact focused regressions, private manifest/proof regeneration, documentation, and traceability are implemented; complete gates and one replacement immutable candidate remain. Landing, activation, and in-episode renewed review remain excluded.
 >
 > **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
 > **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** the existing episode may implement only Slice 4 Generation A bridge integration and immutable freeze preparation from plan Section 9/Section 30. It may fetch and normally merge an advanced exact `origin/main` tip while preserving accepted history, implement and fake-test the inert external cutover coordinator, reconcile bridge documentation/inventories/recovery/provider assertions, build and isolated-copy-test the private preactivation/rollback bundle, run all required gates, then freeze and push one immutable candidate. It must not land, activate, mutate main or user-global state, stop/restart live processes, run UAT, remove compatibility resources, launch the independent review, start Gate A, finalize, or clean up.
+> **Implementation authority:** repair only the five accepted Generation A review findings through the two existing coordinator and bundle seams described in plan Section 31. Preserve the blocked candidate/freeze/report as history. Add the exact accepted positive, negative, failure, and replay cases; regenerate only affected private manifest/proof/readiness evidence; run complete gates; freeze and push one new immutable candidate; report it and stop. Do not broaden into a descriptor-chain/ABA/race framework, scan unrelated programs or private files, launch the renewed independent review, start Gate A, land, mutate main or user-global state, stop/restart live processes, run UAT, remove compatibility, finalize, or clean up.
 
 ## Summary
 
@@ -961,3 +961,47 @@ plan-required primary-main exact configured independent review after checking
 legacy skill/profile hashes and pre/post subject state. Gate A, landing,
 activation, live runtime shutdown/restart, UAT, compatibility removal,
 finalization, and cleanup remain unauthorized.
+
+## Owner-blocked Generation A revision authority
+
+Candidate `f2f3fcd25dbe3d96f05193261020d26bf79f1213` / tree
+`8b4fef1936766c7383a577317ac6d2436f4e72e5`, its private freeze receipts, and
+its tracked readiness evidence remain immutable historical evidence. The exact
+configured Astra/max report SHA256 is
+`4ed03385fc1d54cdecdbbacf5ea720d00b70a9af10b99b1466f7592df50d95e1`.
+The owner accepts its five blocking findings as ordinary-operation defects.
+
+Repair only these two existing seams:
+
+1. **Coordinator (B1-B3).** Preflight must reconcile actual observations against
+   declared roles and supported compiled/interpreter entrypoints. It must require
+   client/launcher absence before shutdown while allowing only the approved old
+   daemon/worker set, and bind actual status/build/socket/executable facts.
+   Failed, malformed, unknown, or mismatched observations stop before mutation;
+   do not scan unrelated programs. After exactly one start, perform a short
+   bounded read-only readiness observation loop. It never starts or retries
+   again and fails truthfully for wrong identity, duplicates, child exit,
+   malformed status, or deadline. Replace syntactic `git revert`/placeholder
+   acceptance with one concrete resolvable history-preserving recipe validated
+   against prelanding HEAD, candidate, integration-merge parents/mainline, and
+   the resulting accepted baseline by a scratch-only inverse or equivalent
+   bounded topology proof. Reset, rebase, force, and automatic live
+   compensation remain forbidden.
+2. **Bundle (B4-B5).** Before resolving paths, `lstat` the originally supplied
+   selected-context, destination, bundle-root, and every fixed managed parent/
+   leaf component; reject visible or dangling symlinks and non-regular inputs
+   while preserving real isolated roots, fixed inventory, and supported macOS
+   naming. Do not build a descriptor-chain, ABA, or race framework. Restored
+   state includes ordinary mode/uid/gid. Restore required metadata even when
+   bytes already match, or fail. `alreadyRestored` is true only when bytes and
+   required metadata already match. Unknown content remains all-or-refuse.
+
+Tests must include the report's exact cases: declared live TUI, supported Node
+entrypoint, wrong same-version build, delayed readiness with one start,
+malformed status, wrong/placeholder rollback and wrong mainline, visible and
+dangling links, unchanged-byte mode drift, metadata failure, and replay.
+Regenerate only the affected private manifest/proof/readiness evidence, rerun
+complete focused/Tier 0/Docker Tier 1/pinned gates, freeze and push one new
+immutable commit/tree with no tracked post-freeze change, report it to the
+owning Conversation, and stop. The owner will admit one fresh exact configured
+reviewer because candidate bytes changed.

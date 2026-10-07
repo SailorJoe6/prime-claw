@@ -265,21 +265,42 @@ Slice 4 adds two inert, operator-launched helpers:
   entries. Exact opaque preimages remain private and are never committed.
 
 The coordinator input must record the exact accepted commit/tree, synchronized
-primary `main`, expected remote ref, explicit history-preserving revert recipe,
-bundle manifest digest, launcher realpath/version/build/socket, complete
-resident client/launcher/process inventory, and ordered owner/episode/ordinary
-session checkpoints. Preflight stops on a linked worktree, dirty or diverged
-main, non-fast-forward candidate, bundle mismatch, unacknowledged resident
-launcher, executable/build mismatch, or ambiguous rollback.
+primary `main`, expected remote ref, bundle manifest digest, ordered
+owner/episode/ordinary checkpoints, and one canonical CLI entrypoint. A compiled
+entrypoint is `[launcher]`; a Node entrypoint is `[interpreter, entrypoint]`.
+Both realpaths and artifact digests are bound, every CLI command uses the whole
+prefix, and `status --json` must report the entrypoint path, exact build, socket,
+and declared old-daemon PID.
+
+Process observation is bounded to exact `pgrep -x prime-agent` results and the
+explicitly declared PIDs, followed by targeted `ps -p`. It never parses an
+unrelated process listing. Exactly one declared old daemon and only approved old
+workers may be present. Declared client, TUI, launcher, and wrapper roles must be
+absent. The daemon status row is authoritative; a worker is recorded honestly by
+its approved parent/entrypoint relationship because the public status API does
+not publish per-worker build rows. Failed, malformed, duplicate, unknown, or
+mismatched observations stop before shutdown, landing, apply, start, or the
+scratch rollback proof.
+
+Rollback input is topology, not arbitrary shell text: an ordered explicit list
+of every linear commit from candidate back to the integration merge, the exact
+merge and ordered parents, mainline 2, accepted prelanding commit/tree, and a
+fixed commit message. Preflight resolves every commit, proves the complete
+first-parent chain, and applies the generated no-commit inverses in a temporary
+`git clone --no-local`. The resulting tree must equal the accepted prelanding
+tree. Placeholder ranges, omitted/wrong commits, wrong mainline, reset, rebase,
+force-push, and automatic live compensation are not representable or accepted.
 
 The separately authorized execute path records an intent checkpoint before each
 uncertain boundary: shutdown, landing/push, user-global apply, and runtime start.
 It uses exact `prime-agent shutdown --force --json`, proves zero stale process and
 socket state, fast-forwards and verifies local/remote equality, calls apply then
-check with a fresh live role receipt, proves zero stale launchers again, starts
-one recorded daemon, validates the real Prime Agent 0.9.8 `status --json` array,
-and emits only the ordered resume checklist. It never retries an uncertain push,
-apply, or start.
+check with a fresh live role receipt, and proves zero stale processes again. It
+then starts exactly once. A deadline- and attempt-bounded loop performs only
+read-only status/child observations. Empty or exact expected-socket unreachable
+state may wait; wrong identity, duplicates, child exit, malformed/failed status,
+or deadline stop truthfully without another start. Only one exact current row
+emits the ordered resume checklist.
 
 Recovery follows the last recorded intent/confirmation:
 
@@ -295,9 +316,15 @@ Recovery follows the last recorded intent/confirmation:
 - after one proven runtime, recover owner, episode, then ordinary conversation.
 
 Bundle apply/restore proof is always performed against an explicit isolated
-agent root. `restore-installed` and `restore` classify the whole fixed inventory
-before any write, accept replayed preimages, reject third states with zero
-partial mutation, and preserve unrelated sentinels. Real Gate A still requires
+agent root. Before resolving paths, the helper uses `lstat` on the originally
+supplied context, destination, bundle root, real inventory roots, and every fixed
+managed parent/leaf component. Visible or dangling links and nonregular leaves
+fail closed; it does not add descriptor-chain, ABA, or hostile-race machinery.
+`restore-installed` and `restore` classify the whole fixed inventory before any
+write, reject third states with zero partial mutation, and preserve unrelated
+sentinels. Restored equality includes bytes plus ordinary mode/uid/gid. Equal
+bytes with metadata drift trigger metadata repair or failure; only complete
+bytes-and-metadata replay reports `alreadyRestored`. Real Gate A still requires
 fresh operator authority and a fresh live destination-bound receipt.
 
 ## Verify runtime discovery
