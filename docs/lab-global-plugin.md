@@ -8,7 +8,7 @@
 
 The builder source is deliberately inert. The bridge generation has one authored
 neutral kernel, one machine-readable generation selector, the retained legacy
-APPEND block, and nine managed TypeScript files:
+APPEND block, eleven managed TypeScript files and two exact managed global skill inventories:
 
 ```text
 src/prime-agent-plugin/
@@ -19,20 +19,25 @@ src/prime-agent-plugin/
     handoff-chain.ts
     reviewed-plan.ts
   extension-support/
+    conversation-guide-metadata.ts
     conversation-oversight.ts
     episode-close.ts
+    expert-review-reservation.ts
     handoff-prompts.ts
     prep-chain.ts
     reviewed-plan-support.ts
     role-kernel.generated.ts      # generated exact bytes + SHA256
     spec-episode.ts
+  skills/
+    prime-claw-oversee-episode/SKILL.md
+    prime-claw-official-expert-review/  # SKILL, pyproject, package, reviewer
 ```
 
 `ROLE_KERNEL.md` is the only authored neutral-kernel policy. Apply, check, Tier
 0, and Tier 1 run `scripts/generate-prime-agent-role-kernel.py check`; a stale
 checked-in generated file fails before installation. The installed copy keeps
 the TypeScript layout under `~/.prime/agent/`. Prime Agent auto-discovers the
-two extension entry points; their relative imports resolve through the seven
+two extension entry points; their relative imports resolve through the nine
 installed `extension-support/` files.
 
 Do not keep plugin source or a second copy under this repository's or a managed
@@ -77,7 +82,7 @@ of two target modes:
    refused; the conspicuous flag is required. Tier 1 may use that same path
    inside Docker because the container filesystem is the isolation boundary.
 
-Apply copies only the ten allowlisted TypeScript files. Before the first copy,
+Apply copies only the eleven allowlisted TypeScript files and the two exact managed skill inventories. Before the first copy,
 `scripts/manage-prime-agent-role-protocol.py` selects exactly one global context
 candidate in Prime Agent priority order: `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`,
 then `CLAUDE.MD`. It creates `AGENTS.md` only when none exists. The manager owns
@@ -171,8 +176,10 @@ does not maintain a multi-phase journal, continuous descriptor/inode authority,
 atomic-exchange rollback, or syscall-by-syscall crash protocol. An in-process
 ordinary write failure attempts rollback only from exact known pre/post states.
 An abrupt interruption can require guarded manual recovery; unknown state is left
-untouched. The supported wrapper does not itself retain an external receipt, so
-Gate A must keep the separately captured coordinator preimages before mutation. A
+untouched. The supported wrapper accepts `--role-receipt /absolute/private/path` so the
+separately authorized coordinator can require a fresh destination-bound live
+receipt. A receipt produced by an isolated proof is never valid authority for the
+real user-global root. A
 non-cooperating same-UID process can race individual checks; that is outside the
 approved local-product threat model.
 
@@ -237,6 +244,61 @@ For cutover:
 Saved sessions are resumed, never deleted. On failure, retain or restore every
 compatibility resource, reapply/check the known-good generation, and repeat the
 same quiesce/full-restart discipline.
+
+
+## Generation A coordinator and preactivation bundle
+
+Slice 4 adds two inert, operator-launched helpers:
+
+- `scripts/coordinate-prime-agent-role-cutover.py` performs read-only preflight
+  by default. A real mutation requires both `--execute` and the full accepted
+  candidate commit as `--authorization`, plus the exact operation input. It
+  records a mode-0600 checkpoint under an operator-selected mode-0700 private
+  directory. It never reviews, accepts, retries an uncertain mutation, resumes a
+  session, or starts Gate A on its own.
+- `scripts/manage-prime-agent-cutover-bundle.py` creates and verifies the private
+  preactivation bundle. It captures only the selected global-context and APPEND
+  preimages, their known candidate postimages, the fixed managed plugin/skill
+  and ownership-manifest surface, selected-file decision, known-good generation,
+  source topology, and exact recovery tool hashes. It does not traverse
+  settings, sessions, provider/OAuth state, `.env` files, or unrelated agent
+  entries. Exact opaque preimages remain private and are never committed.
+
+The coordinator input must record the exact accepted commit/tree, synchronized
+primary `main`, expected remote ref, explicit history-preserving revert recipe,
+bundle manifest digest, launcher realpath/version/build/socket, complete
+resident client/launcher/process inventory, and ordered owner/episode/ordinary
+session checkpoints. Preflight stops on a linked worktree, dirty or diverged
+main, non-fast-forward candidate, bundle mismatch, unacknowledged resident
+launcher, executable/build mismatch, or ambiguous rollback.
+
+The separately authorized execute path records an intent checkpoint before each
+uncertain boundary: shutdown, landing/push, user-global apply, and runtime start.
+It uses exact `prime-agent shutdown --force --json`, proves zero stale process and
+socket state, fast-forwards and verifies local/remote equality, calls apply then
+check with a fresh live role receipt, proves zero stale launchers again, starts
+one recorded daemon, validates the real Prime Agent 0.9.8 `status --json` array,
+and emits only the ordered resume checklist. It never retries an uncertain push,
+apply, or start.
+
+Recovery follows the last recorded intent/confirmation:
+
+- before shutdown request, leave the accepted generation running;
+- after shutdown request, inspect status/process/socket evidence before deciding
+  whether the old runtime is running;
+- after confirmed shutdown, only the unchanged accepted runtime is eligible to
+  restart;
+- after landing request, inspect local and remote refs without retrying;
+- after apply request, restore only fixed surfaces whose current state is an
+  exact recorded preimage/postimage, otherwise stop for manual recovery;
+- after start request, inspect status and never start a second runtime; and
+- after one proven runtime, recover owner, episode, then ordinary conversation.
+
+Bundle apply/restore proof is always performed against an explicit isolated
+agent root. `restore-installed` and `restore` classify the whole fixed inventory
+before any write, accept replayed preimages, reject third states with zero
+partial mutation, and preserve unrelated sentinels. Real Gate A still requires
+fresh operator authority and a fresh live destination-bound receipt.
 
 ## Verify runtime discovery
 

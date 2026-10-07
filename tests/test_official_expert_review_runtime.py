@@ -4,6 +4,8 @@ import json
 import time
 from pathlib import Path
 
+from provider_context_assertions import assert_provider_context_clean, provider_capture_expression
+
 
 def test_official_expert_exact_interpreter_preflight_matrix(tier1_container) -> None:
     work = f"/tmp/official-expert-preflight-{time.time_ns()}"
@@ -154,7 +156,7 @@ def test_official_expert_native_first_call_and_refusals(tier1_container, ctmp) -
 import {{appendFileSync}} from "node:fs";
 import {{createAssistantMessageEventStream}} from "@earendil-works/pi-ai";
 const output={json.dumps(str(provider_path))};
-export default function provider(pi){{pi.registerProvider("openai-codex",{{baseUrl:"x",apiKey:"x",api:"native-expert",streamSimple(model,context){{appendFileSync(output,JSON.stringify({{roles:(context.messages??[]).map(m=>m.role),messages:context.messages,systemPrompt:context.systemPrompt}})+"\n");const stream=createAssistantMessageEventStream();queueMicrotask(()=>{{const message={{role:"assistant",content:[{{type:"text",text:"ok"}}],api:model.api,provider:model.provider,model:model.id,usage:{{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,cost:{{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}}}},stopReason:"stop",timestamp:Date.now()}};stream.push({{type:"start",partial:message}});stream.push({{type:"done",reason:"stop",message}});stream.end()}});return stream}},models:[{{id:"gpt-6-astra",name:"Astra",reasoning:true,input:["text"],cost:{{input:0,output:0,cacheRead:0,cacheWrite:0}},contextWindow:100000,maxTokens:1000}}]}})}}
+export default function provider(pi){{pi.registerProvider("openai-codex",{{baseUrl:"x",apiKey:"x",api:"native-expert",streamSimple(model,context){{appendFileSync(output,JSON.stringify({{roles:(context.messages??[]).map(m=>m.role),messages:context.messages,systemPrompt:context.systemPrompt,metrics:{provider_capture_expression("context")}}})+"\n");const stream=createAssistantMessageEventStream();queueMicrotask(()=>{{const message={{role:"assistant",content:[{{type:"text",text:"ok"}}],api:model.api,provider:model.provider,model:model.id,usage:{{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,cost:{{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}}}},stopReason:"stop",timestamp:Date.now()}};stream.push({{type:"start",partial:message}});stream.push({{type:"done",reason:"stop",message}});stream.end()}});return stream}},models:[{{id:"gpt-6-astra",name:"Astra",reasoning:true,input:["text"],cost:{{input:0,output:0,cacheRead:0,cacheWrite:0}},contextWindow:100000,maxTokens:1000}}]}})}}
 ''')
         setup_extension = case / "setup.ts"
         wait_action = (
@@ -199,6 +201,17 @@ export default function setup(pi){{pi.on("context",(event,ctx)=>{{const prior=ct
     assert valid["raw"][0].count("user") == 1
     provider_row = valid["provider"][0]
     assert provider_row["roles"] == ["user"]
+    metrics = provider_row["metrics"]
+    assert_provider_context_clean(metrics, role_kernel_system_count=1)
+    assert metrics["expertRubricSystemCount"] == 0
+    assert metrics["expertRubricUserCount"] == 1
+    assert metrics["expertRubricCustomCount"] == 0
+    assert metrics["expertPacketSystemCount"] == 0
+    assert metrics["expertPacketUserCount"] == 1
+    assert metrics["expertPacketCustomCount"] == 0
+    assert metrics["expertPrivateStateSystemCount"] == 0
+    assert metrics["expertPrivateStateUserCount"] == 0
+    assert metrics["expertPrivateStateCustomCount"] == 0
     provider_text = provider_row["messages"][0]["content"][0]["text"]
     assert "## Immutable review packet" in provider_text
     assert "harmless bootstrap" not in provider_text
@@ -208,6 +221,10 @@ export default function setup(pi){{pi.on("context",(event,ctx)=>{{const prior=ct
     resolved = outcomes["overlap-resolves"]
     assert resolved["returncode"] == 0, resolved["stdout"] + resolved["stderr"]
     assert len(resolved["provider"]) == 1, resolved["notices"]
+    assert_provider_context_clean(resolved["provider"][0]["metrics"], role_kernel_system_count=1)
+    assert resolved["provider"][0]["metrics"]["expertRubricUserCount"] == 1
+    assert resolved["provider"][0]["metrics"]["expertPacketUserCount"] == 1
+    assert resolved["provider"][0]["metrics"]["expertPrivateStateUserCount"] == 0
     assert any(name.endswith(".claimed.json") for name in resolved["files"])
     assert not any(name.endswith(".pending.json") for name in resolved["files"])
     assert not any(name.endswith(".finalized.json") for name in resolved["files"])

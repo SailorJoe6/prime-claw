@@ -1278,4 +1278,239 @@
   }
  ],
  "phase2": {}
+,
+ "officialLeanRoleProtocol": {
+  "spec": ".ralph/plans/SPECIFICATION.md",
+  "plan": ".ralph/plans/EXECUTION_PLAN.md",
+  "activeSlice": "S4 Generation A integration and immutable freeze",
+  "requirements": [
+   {
+    "id": "ORP-001",
+    "summary": "canonical neutral kernel",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-002",
+    "summary": "guarded selected context",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-003",
+    "summary": "system channel only",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-004",
+    "summary": "per-provider integrity",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-005",
+    "summary": "explicit context opt-out",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-006",
+    "summary": "lean Conversation skill",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-007",
+    "summary": "guidance activation",
+    "status": "active-s4",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+    ]
+   },
+   {
+    "id": "ORP-008",
+    "summary": "bounded execute role",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-009",
+    "summary": "official EXPERT",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-010",
+    "summary": "semantic read-only",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-011",
+    "summary": "role scoping",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-012",
+    "summary": "historical filtering",
+    "status": "active-s4",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+    ]
+   },
+   {
+    "id": "ORP-013",
+    "summary": "retired overlay absent",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-014",
+    "summary": "one fresh complete episode",
+    "status": "active-s4",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+    ]
+   },
+   {
+    "id": "ORP-015",
+    "summary": "bridge generation",
+    "status": "active-s4",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+    ]
+   },
+   {
+    "id": "ORP-016",
+    "summary": "interim UAT",
+    "status": "pending-later-gate",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": []
+   },
+   {
+    "id": "ORP-017",
+    "summary": "compatibility removal",
+    "status": "pending-later-gate",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": []
+   },
+   {
+    "id": "ORP-018",
+    "summary": "final UAT/completion",
+    "status": "pending-later-gate",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": []
+   },
+   {
+    "id": "ORP-019",
+    "summary": "isolated gates",
+    "status": "active-s4",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+    ]
+   },
+   {
+    "id": "ORP-020",
+    "summary": "correlatable evidence",
+    "status": "active-s4",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+    ]
+   },
+   {
+    "id": "ORP-021",
+    "summary": "two rollback points",
+    "status": "active-s4",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md"
+    ]
+   },
+   {
+    "id": "ORP-022",
+    "summary": "current documentation",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   },
+   {
+    "id": "ORP-023",
+    "summary": "immutable history",
+    "status": "accepted-through-s3",
+    "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+    ]
+   }
+  ]
+ }
 }

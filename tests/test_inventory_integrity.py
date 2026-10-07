@@ -28,3 +28,18 @@ def test_inventory_covers_phase2_requirements():
     # the Phase 2 lifecycle gates must all be tracked
     for rid in ("R2-A-1", "R2-A-2", "R2-C-2", "R2-C-3", "R2-C-5", "R2-X-1"):
         assert rid in ids, f"inventory missing {rid}"
+
+def test_inventory_covers_exact_official_lean_role_protocol_requirements():
+    inv = json.loads(open(INVENTORY).read())
+    section = inv["officialLeanRoleProtocol"]
+    rows = section["requirements"]
+    assert [row["id"] for row in rows] == [f"ORP-{number:03d}" for number in range(1, 24)]
+    assert section["spec"] == ".ralph/plans/SPECIFICATION.md"
+    assert section["plan"] == ".ralph/plans/EXECUTION_PLAN.md"
+    missing = []
+    for row in rows:
+        assert row["status"] in {"accepted-through-s3", "active-s4", "pending-later-gate"}
+        for path in row["evidence"]:
+            if not os.path.isfile(os.path.join(REPO_ROOT, path)):
+                missing.append(f"{row['id']} -> {path}")
+    assert not missing, "official lean evidence paths missing:\n" + "\n".join(missing)

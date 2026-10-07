@@ -4,7 +4,38 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=prime-agent-plugin-target.sh
 source "$repo_root/scripts/prime-agent-plugin-target.sh"
-select_prime_agent_plugin_target "$@"
+role_receipt=""
+target_args=()
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --user-global)
+      target_args+=("$1")
+      shift
+      ;;
+    --role-receipt)
+      if [[ "$#" -lt 2 || -z "$2" ]]; then
+        printf 'error: --role-receipt requires an absolute private receipt path\n' >&2
+        exit 64
+      fi
+      role_receipt="$2"
+      shift 2
+      ;;
+    *)
+      prime_agent_plugin_target_usage
+      printf 'error: unknown argument: %s\n' "$1" >&2
+      exit 64
+      ;;
+  esac
+done
+if [[ -n "$role_receipt" && "$role_receipt" != /* ]]; then
+  printf 'error: --role-receipt requires an absolute private receipt path\n' >&2
+  exit 64
+fi
+if [[ "${#target_args[@]}" -gt 0 ]]; then
+  select_prime_agent_plugin_target "${target_args[@]}"
+else
+  select_prime_agent_plugin_target
+fi
 source_root="$repo_root/src/prime-agent-plugin"
 files=(
   extensions/handoff-chain.ts
@@ -142,8 +173,13 @@ if [[ -d "$expert_package_dir" ]]; then
 fi
 
 mkdir -p "$destination_root/extensions" "$destination_root/extension-support" "$managed_skill_dir" "$expert_package_dir"
-python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" apply \
-  "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"
+role_apply_args=(
+  apply "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"
+)
+if [[ -n "$role_receipt" ]]; then
+  role_apply_args+=(--receipt "$role_receipt")
+fi
+python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" "${role_apply_args[@]}"
 rm -f "$destination_root/extensions/project-conversation.ts"
 for relative in "${obsolete_files[@]}"; do
   rm -f "$destination_root/$relative"

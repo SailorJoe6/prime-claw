@@ -185,3 +185,22 @@ an outage or quota error must be visible.
 configured another embedding profile may use its documented non-destructive parallel rebuild,
 but prime-claw must never auto-select personal hardware as fallback. Joe's home-Qwen override
 is ready to resume after the exact-model preflight; no build has restarted. See [home-embedding-runtime.md](home-embedding-runtime.md).
+
+## Prime Agent Generation A role cutover preparation
+
+Generation A is prepared but not activated by normal development. Use
+`docs/lab-global-plugin.md#Generation-A-coordinator-and-preactivation-bundle`
+for the exact coordinator, private-bundle, checkpoint, and recovery contracts.
+During Slice 4, run only recording fakes and isolated-copy apply/restore proof.
+Do not run `--execute`, `--user-global`, `shutdown`, a daemon start, landing, or
+UAT.
+
+A future explicitly authorized Gate A starts from a separate non-Orca terminal
+with a reviewed coordinator input, private bundle manifest digest, and private
+checkpoint directory. The external coordinator must prove complete resident
+client/launcher inventory and zero stale recoverers before shutdown. Its only
+mutating sequence is shutdown, exact fast-forward landing/push, apply with a
+fresh external role receipt, check, one-runtime start/status, then printing the
+owner -> episode -> ordinary resume checklist. Stop at the first uncertain
+boundary and follow the phase-specific recovery table in the plugin guide. Never
+blindly retry a push, apply, or runtime start.

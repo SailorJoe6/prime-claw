@@ -311,6 +311,30 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     assert checked.returncode == 0, checked.stdout + checked.stderr
 
 
+
+def test_apply_can_write_an_external_role_receipt_for_cutover_recovery(tier1_container) -> None:
+    base = f"/tmp/prime-claw-role-receipt-{time.time_ns()}"
+    root = f"{base}/agent"
+    receipt = f"{base}/private/live-role-receipt.json"
+    prepared = tier1_container.run("bash", "-lc", 'mkdir -p -- "$1"; chmod 700 "$1"', "prepare", f"{base}/private", workdir=None)
+    assert prepared.returncode == 0, prepared.stdout + prepared.stderr
+    applied = tier1_container.run(
+        WS_APPLY, "--role-receipt", receipt,
+        env={"PRIME_AGENT_PLUGIN_ROOT": root, "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV},
+        workdir=None, timeout=120,
+    )
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    verified = tier1_container.run(
+        "python3", "-c",
+        "import json,os,stat,sys; p,r=sys.argv[1:]; v=json.load(open(p)); assert v['transaction']=='applied'; assert v['destinationRealpath']==os.path.realpath(r); assert stat.S_IMODE(os.stat(p).st_mode)==0o600; print(json.dumps({'ok':True,'transaction':v['transaction']},sort_keys=True))",
+        receipt, root, workdir=None,
+    )
+    cleaned = tier1_container.run("rm", "-rf", "--", base, workdir=None)
+    assert cleaned.returncode == 0, cleaned.stdout + cleaned.stderr
+    assert verified.returncode == 0, verified.stdout + verified.stderr
+    assert json.loads(verified.stdout.strip()) == {"ok": True, "transaction": "applied"}
+
+
 def test_apply_is_convergent_and_preserves_unrelated_files(tier1_container, ctmp) -> None:
     destination = ctmp / "agent"
     unrelated = destination / "extensions" / "unrelated.ts"

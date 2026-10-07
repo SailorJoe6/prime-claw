@@ -292,14 +292,16 @@ Provider assertions are role- and channel-specific:
   context-disabled ordinary negative control may contain zero and has no managed
   authority;
 - an admitted EXPERT contains exactly one neutral system kernel and exactly one
-  bounded rubric+packet in the intended parent `agent_message` turn, which Prime
-  Agent converts to provider user-role content; that bounded task appears
-  nowhere else and is never treated as an always-on oversight injection; and
+  bounded rubric+packet in the one user-role task published from the package's
+  canonical private `FINALIZED` launch state after child/session/header lineage
+  validation and atomic claim. Inbound `agent_message` content and metadata have
+  zero authority; the bounded task appears nowhere else and is never treated as
+  an always-on oversight injection; and
 - every role contains zero retired work-control overlay and zero legacy
   oversight package.
 
-Tests capture system prompt, provider roles, tool-call/result IDs, host
-sender/target identity, and call sequence so a broad zero-content assertion
+Tests capture system prompt, provider roles, tool-call/result IDs, canonical
+private launch/child/session/header lineage, and call sequence so a broad zero-content assertion
 cannot contradict the two required on-demand disclosures.
 
 ### 3.5 Official EXPERT package and trusted two-phase admission
@@ -1860,3 +1862,60 @@ Final gates pass: full Tier 0 326 passed/184 skipped; Docker Tier 1 77 passed/
 433 deselected; pinned Prime Agent 0.9.8 probe OK with expected package SHA256.
 Evidence is in `docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md`.
 Commit/push one repair candidate, report for direct owner review, and stop.
+
+## 30. Current pass — Generation A bridge integration and immutable freeze
+
+**Accepted dependency:** repaired Slice 3 commit
+`6bceeea133f767d72739a8d88df2639ab75bba96`, tree
+`6421f9acc11a4c5e755e37dfa3060c2821bf5326`.
+
+Execute Section 9 only, with these pass boundaries:
+
+1. Fetch `origin/main`. If its tip advanced, merge that exact tip normally into
+   the published episode branch, record first/second parent order, and never
+   rebase accepted history.
+2. Implement the smallest inert, operator-launched external cutover coordinator
+   from Section 3.6. Use recording fakes to cover resident client/launcher
+   inventory, executable/build mapping, `shutdown --force --json` order,
+   zero-stale-process checks, exact landing/apply/check, single-runtime
+   start/status, practical checkpoint recovery, and ordered resume. Do not touch
+   real processes, `main`, or user-global state.
+3. Reconcile S1-S3 documentation, requirement traceability, managed inventories,
+   recovery runbook, provider assertions, and coordinator instructions. Audit
+   the complete Generation A bridge inventory while retaining every
+   compatibility resource.
+4. Create the private preactivation/rollback bundle specified by Section 9:
+   exact selected global-context and APPEND preimages with mode/uid/gid/newline
+   metadata; installed plugin/skill inventory; selected-file decision; current
+   known-good generation; source topology; restore tool/hash; and manifest
+   digest. Exclude credentials and unrelated private data. Prove apply and
+   restore only against isolated copies.
+5. Before freeze, commit the sanitized non-self-referential readiness/rollback
+   evidence under `docs/evidence/official-lean-role-protocol/`. It may record
+   pre-freeze inputs and hashes but no future candidate identity or review
+   result.
+6. Run complete Tier 0, selected Docker Tier 1, pinned probe, focused native and
+   coordinator-fake tests, diff check, and teardown. Commit all tracked
+   reconciliation before freeze. Freeze and push one immutable candidate
+   commit/tree. Make no tracked change afterward.
+7. Report the exact candidate/tree, parent order, gate/evidence digests, bridge
+   inventory, rollback-bundle manifest digest, and review packet to the owning
+   Conversation, then stop. Do not launch the independent review here. The owner
+   will perform it from the accepted primary-main checkout after verifying
+   legacy skill/profile hashes and pre/post subject state.
+
+Do not start Gate A, land, apply user-global state, stop/restart the live runtime,
+run UAT, remove compatibility, finalize, or clean up.
+### Section 30 pre-freeze checkpoint
+
+Generation A integration is complete before final gates. `origin/main`
+`c24ba6c1e76585193d4f34f0b0b0233846780442` was merged normally at
+`46147ff887569101b7e64a8466cde5887c15cc31`, with accepted episode history as
+first parent and exact main as second parent. The inert coordinator, fixed-surface
+private bundle/restore helper, fresh live-receipt wrapper option, recording fakes,
+provider assertions, central ORP traceability, current docs/runbook, bridge
+inventory regression, sanitized readiness evidence, and isolated candidate ->
+known-good -> exact restore proof are present. Focused host 76/54 skipped, Node
+76, and Docker-native 3 pass. No live process, primary `main`, or user-global
+mutation occurred. Run complete gates, freeze/commit/push one immutable
+candidate, report it to the owner, and stop without independent review or Gate A.

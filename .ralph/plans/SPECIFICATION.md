@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Section 28 candidate `1fed99101f3dee95bf6863a3c9298d8c05d96718` / tree `7c28ffe42d9b7018899cd252460287c91c30604d` was owner-review BLOCKED on one exact `PENDING`+`FINALIZED` crash window and one public-export omission. Section 29 implements that narrow repair and passes focused and full Tier 0, Docker Tier 1, and pinned 0.9.8 validation; one commit/push and direct owner review remain.
+> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Owner accepts repaired lifecycle closure through `6bceeea133f767d72739a8d88df2639ab75bba96` / tree `6421f9acc11a4c5e755e37dfa3060c2821bf5326`; Slice 3 is complete. The existing episode has integrated the bounded Slice 4 Generation A bridge, inert coordinator, private rollback preparation, documentation/provider reconciliation, and focused proof. Complete gates and one immutable commit/push remain; landing, activation, and in-episode independent review remain excluded.
 >
 > **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
 > **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** the existing episode may repair only the owner-blocked Section 28 candidate: close the `PENDING`+`FINALIZED` admission crash window and export/assert the approved Section 28 public surface, run the specified affected gates, commit/push one repair candidate, report, and stop. Lifecycle architecture, deletion semantics, Slice 4, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical project cleanup remain out of scope.
+> **Implementation authority:** the existing episode may implement only Slice 4 Generation A bridge integration and immutable freeze preparation from plan Section 9/Section 30. It may fetch and normally merge an advanced exact `origin/main` tip while preserving accepted history, implement and fake-test the inert external cutover coordinator, reconcile bridge documentation/inventories/recovery/provider assertions, build and isolated-copy-test the private preactivation/rollback bundle, run all required gates, then freeze and push one immutable candidate. It must not land, activate, mutate main or user-global state, stop/restart live processes, run UAT, remove compatibility resources, launch the independent review, start Gate A, finalize, or clean up.
 
 ## Summary
 
@@ -922,3 +922,42 @@ Do not broaden architecture, redesign deletion, launch a new independent review,
 or start Slice 4. Run focused and affected full Tier 0, Docker Tier 1, and the
 pinned Prime Agent 0.9.8 probe. Commit/push one narrow repair, report for direct
 owner review, and stop.
+
+## Owner-accepted Slice 3 and bounded Slice 4 authority
+
+The owner accepts the repaired lifecycle closure through
+`6bceeea133f767d72739a8d88df2639ab75bba96` / tree
+`6421f9acc11a4c5e755e37dfa3060c2821bf5326`. Slice 3 is complete.
+
+Slice 4 must produce one immutable Generation A bridge candidate without
+activating it:
+
+- Fetch `origin/main` before integration. If it advanced, merge that exact tip
+  normally into the published episode branch and record parent order; never
+  rebase accepted history.
+- Implement the smallest external cutover coordinator required by the approved
+  plan and recording-fake-test resident client/launcher inventory,
+  executable/build mapping, `shutdown --force --json` sequencing,
+  zero-stale-process gates, exact landing/apply/check, one-runtime start/status,
+  practical checkpoint recovery, and the ordered resume checklist. It remains
+  inert unless an operator explicitly invokes it. This pass may not stop or
+  restart real processes or mutate `main` or user-global state.
+- Reconcile S1-S3 docs, traceability, managed inventories, recovery runbook,
+  provider assertions, and operator instructions. Audit the full Generation A
+  bridge inventory without deleting any compatibility resource.
+- Build the private preactivation/rollback bundle with exact selected
+  global-context and APPEND preimages and metadata, installed inventory,
+  selected-file decision, current known-good generation, source topology,
+  restore tool/hash, and manifest digest. Keep credentials and unrelated private
+  data out. Prove apply/restore only against isolated copies.
+- Commit a sanitized, non-self-referential readiness/rollback evidence document
+  before freeze. Run complete Tier 0, selected Docker Tier 1, pinned probe,
+  focused native/coordinator fakes, diff check, and teardown. Then freeze and
+  push one immutable commit/tree with no tracked mutation afterward.
+
+The episode reports the exact frozen packet and evidence to the owning
+Conversation and stops. The owning Conversation, not the episode, performs the
+plan-required primary-main exact configured independent review after checking
+legacy skill/profile hashes and pre/post subject state. Gate A, landing,
+activation, live runtime shutdown/restart, UAT, compatibility removal,
+finalization, and cleanup remain unauthorized.

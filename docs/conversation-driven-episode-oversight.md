@@ -89,8 +89,8 @@ calls the episode creator. Missing, early, wrong-location, stale-generation,
 EPISODE, generic-child, and active-owner subjects fail before episode identity,
 worktree, branch, session, or marker mutation. The approval and receipt become
 non-replayable when creation begins. Identical replay of an already inactive
-close remains idempotent without reviving an obsolete receipt. EXPERT admission
-remains a later Slice 2 capability.
+close remains idempotent without reviving an obsolete receipt. EXPERT admission, reporting, settlement, disposition, close, expiry cancellation,
+and exact purge are complete Slice 3 capabilities.
 
 After `create_spec_episode` durably establishes and delivers a strictly parsed
 spec-episode identity, the same tool turn appends and verifies one full active
@@ -232,7 +232,7 @@ lifetime-locks that owner.
 
 The managed `prime-claw-official-expert-review` Python skill retains the
 byte-identical canonical `reviewer.md` at SHA256
-`d9f8b14954da36df3d9051b4e25f8a76b6d16a0a2c27f9b29cfab262b5efe6f6` and
+`49e2f48421902721b25751380a2173cd8a44ad1c6c4655e7a9a4a8e583983ce6` and
 validates the exact `expert-reviewer`, `openai-codex/gpt-6-astra`, `max`
 configuration. `describe()` remains read-only and returns `authority: false`.
 Installer preflight remains read-only: a configured interpreter accepts only an
@@ -367,14 +367,15 @@ rationale, and hashes are recorded in
 ## Installation boundaries
 
 Builder sources remain inert under `src/prime-agent-plugin/`. The transition
-apply/check workflow manages ten allowlisted TypeScript files, one selected
+apply/check workflow manages eleven allowlisted TypeScript files, one selected
 AGENTS/CLAUDE neutral-kernel region, and the retained legacy APPEND bridge. There
 is no separate `goal-heartbeat-work-control.ts` entry point and no
 `before_agent_start` work-control overlay. Apply treats a stale installed copy as
 a retired managed file: all managed and retired destinations are type-checked
 before the first mutation, then a regular stale copy is removed. Check rejects
-any surviving copy. The current installer does not preflight or copy the old
-`oversee-episode` skill.
+any surviving copy. The installer preflights and copies the managed global Conversation guide. The
+project-local `.ralph/skills/oversee-episode/SKILL.md` remains only a policy-free
+compatibility shim with its discovery link.
 
 Oversight registration remains co-located with the normally discovered
 `reviewed-plan.ts` entry point; there is no redundant production
