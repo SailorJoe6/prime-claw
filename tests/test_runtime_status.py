@@ -119,9 +119,14 @@ def test_probe_gateway_cli_failure(monkeypatch):
 
 def test_probe_sandbox_ready(monkeypatch):
     data = {"phase": "Ready", "current_policy_version": 3, "name": "prime-claw"}
-    monkeypatch.setattr(pc, "openshell_json", lambda a, timeout=30: (data, ""))
-    ok, det, raw = pc.probe_sandbox(cfg())
+    seen = []
+    monkeypatch.setattr(
+        pc, "openshell_json",
+        lambda a, timeout=30: seen.append(a) or (data, ""))
+    ok, det, raw = pc.probe_sandbox(cfg(workspace="default"))
     assert ok is True and "Ready" in det and raw["phase"] == "Ready"
+    assert seen == [["-g", "openshell", "--workspace", "default",
+                     "sandbox", "get", "prime-claw"]]
 
 
 def test_probe_sandbox_absent(monkeypatch):

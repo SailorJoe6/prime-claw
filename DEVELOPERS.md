@@ -145,48 +145,63 @@ only. Do not apply, check, or probe a candidate against the host user-global
   tier's acceptance boundary. The explicit body filename is not pytest-
   collectable, and direct host invocation fails before side effects.
 
-- **Lifecycle control boundary — inert.** `tests/lifecycle/support.py` generates
-  one non-default `pct-<12hex>` workspace plus run-scoped target, sentinel,
-  image, labels, deadline, and sanitized JSONL evidence. It exposes a protocol,
-  not a live adapter. The destructive path accepts only exact captured
-  identities after ownership-label and policy revalidation; unknown state or
-  refusal stops cleanup and retains evidence.
-- **Lifecycle collection — explicit and fail closed.** A lifecycle item must
-  have both `@pytest.mark.lifecycle` and the `lifecycle_scope` fixture.
-  Mismatch is a collection error. A valid pair skips without fixture setup
-  unless pytest receives `--run-lifecycle`. That option does not make a live
-  observer exist in Slice 6. `scripts/test-all.sh --with-sandbox` and
-  `--with-lifecycle` remain exit-64 non-mutating usage errors.
+- **Lifecycle control boundary — inert by default.**
+  `tests/lifecycle/support.py` generates one non-default `pct-<12hex>`
+  workspace plus `pct-<12hex>-t` target and `pct-<12hex>-s` sentinel names.
+  Both sandbox names are guarded locally against OpenShell v0.0.116's
+  19-character maximum before any adapter call. The run also owns its image,
+  labels, deadline, and recursively sanitized mode-0600 JSONL evidence. Failure
+  evidence retains the configured-production before/after snapshot hashes when
+  the snapshots are available. The destructive boundary
+  accepts only exact captured identities after ownership-label and policy
+  revalidation; unknown state or refusal stops cleanup and retains evidence.
+- **Lifecycle collection — four explicit gates.** The sole live item has the
+  exact registered node ID
+  `tests/test_lifecycle_destroy.py::test_destroy_only_generated_target`, both
+  `lifecycle` and `macos_host` markers, the `lifecycle_scope` fixture, pytest
+  `--run-lifecycle`, and the sequencer admission environment set only by
+  `scripts/test-all.sh --with-lifecycle`. Mismatch is a collection error.
+  Plain pytest, direct `--run-lifecycle`, arbitrary marker expressions, plain
+  `test-all`, and deprecated `--with-sandbox` cannot run the observer.
 
 ### Host-observer exception registry
 
 Host observers are exceptional because their subject is the real hosting
-stack. Every enabled body must be individually listed here before use. The
-Linux controller container is inadequate for OpenShell workspace ownership,
-Docker Desktop/virtiofs, or macOS process behavior; recording fakes prove the
-control contract but cannot prove those host properties.
+stack. Every enabled body is individually listed. Recording fakes prove the
+control contract but cannot prove OpenShell workspace ownership or the product
+host destroy path.
 
 | Observer body | Seam | Marker / fixture | Ownership rule | Status |
 |---|---|---|---|---|
-| _none_ | OpenShell host control plane / Docker Desktop | `lifecycle` / `lifecycle_scope` | Generated workspace and exact `pc-test=true`, `pc-run=<full-id>` labels; exact captured cleanup only | Disabled: Slice 6 has no live adapter or body |
-| _none_ | macOS-only hosting behavior | `macos_host` plus lifecycle contract | Same, with separate review | Registry empty |
+| `tests/test_lifecycle_destroy.py::test_destroy_only_generated_target` | `tests/lifecycle/live.py`: OpenShell host control plane + Docker fixture + guarded product proxy | `lifecycle` + `macos_host` / `lifecycle_scope`; exact sequencer + pytest opt-in | Generated non-default workspace and exact `pc-test=true`, `pc-run=<full-id>` labels; captured immutable image ID; exact revalidated finalizer only | Enabled only by `scripts/test-all.sh --with-lifecycle` |
+| _none_ | other macOS-only hosting behavior | separate reviewed entry required | Generated exact-owned scope only | Registry empty |
 
-The first future observer must be approved in a later slice and added to this
-table. It must not read operator config, a default workspace, credentials, brain
-content, private endpoints, or production resource identities. A controller
-container is not a substitute because it would test the container's control
-client and mounts rather than the actual host seam.
+The enabled observer uses a pinned test-only base and tracked no-egress policy,
+creates no providers/remotes/credentials, and runs product `destroy --yes`
+against only the generated target. A generated OpenShell proxy accepts and
+records only the product target get/delete calls with explicit gateway and
+workspace. A names-only, read-only configured-production snapshot is hashed
+before and after; no policy, annotations, provider data, endpoint, credential,
+brain content, or operator-local overlay is retrieved or persisted. Target,
+sentinel, workspace, and image cleanup remains exact and non-retrying.
 
 ### Whole-suite sequencer
 
 ```bash
-scripts/test-all.sh          # tier 0 -> tier 1 -> tier 2, sequential/fail-fast
-scripts/test-integration.sh  # tier 2 alone
+scripts/test-all.sh                   # tier 0 -> tier 1 -> tier 2
+scripts/test-all.sh --with-lifecycle  # tiers 0 -> 1 -> 2 -> one exact host observer
+scripts/test-integration.sh           # tier 2 alone
 ```
 
 The sequencer is deliberately dumb. It runs plain host pytest, exact
-`-m container`, then the real integration launcher. It stops at the first
-failure, prints a tier summary, and leaves logs in the gitignored
+`-m container`, then the real integration launcher. Exact `--with-lifecycle`
+adds only the registered observer after all three pass. It clears inherited
+`PYTEST_ADDOPTS` and `PRIME_CLAW_LIFECYCLE_SEQUENCER` from interpreter checks
+and tiers 0–2, then sets sequencer admission only for the exact final child. It
+is never retried. `--with-sandbox`, unknown, or ambiguous arguments fail with
+exit 64 before any
+command or result directory. The sequencer stops at the first failure, prints a
+tier summary, and leaves logs and sanitized lifecycle evidence in the gitignored
 `.test-results/` directory. Plugin development remains Docker-only: never apply,
 check, or probe a candidate against the host/user-global Prime Agent install.
 

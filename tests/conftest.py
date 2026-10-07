@@ -7,7 +7,7 @@ compound marker expression never authorizes an environment tier.
 
 Tier 2 is not a host pytest suite. `scripts/test-integration.sh` invokes a
 non-collectable assertion body inside the purpose-built Slice-3 image.
-Lifecycle execution remains inert in Slice 6. A lifecycle item must pair the
+Lifecycle support is inert by default. A lifecycle item must pair the
 `lifecycle` marker with `lifecycle_scope`; mismatches are collection errors and
 the valid pair skips unless pytest receives dedicated `--run-lifecycle` opt-in.
 The deprecated `sandbox` marker always skips.
@@ -83,8 +83,13 @@ _SKIP_INTEGRATION = (
 _SKIP_LIFECYCLE = (
     "lifecycle: explicit host observer requires --run-lifecycle"
 )
+_LIFECYCLE_NODEID = (
+    "tests/test_lifecycle_destroy.py::test_destroy_only_generated_target"
+)
+_LIFECYCLE_SEQUENCER_ENV = "PRIME_CLAW_LIFECYCLE_SEQUENCER"
 _SKIP_MACOS_HOST = (
-    "macos_host registry is empty; no observer is enabled"
+    "macos_host: only the exact registered observer is admitted by "
+    "scripts/test-all.sh --with-lifecycle"
 )
 
 
@@ -92,7 +97,7 @@ def pytest_addoption(parser):
     group = parser.getgroup("prime-claw lifecycle")
     group.addoption(
         "--run-lifecycle", action="store_true", default=False,
-        help="admit reviewed lifecycle marker+fixture pairs (never used by test-all)",
+        help="admit reviewed lifecycle marker+fixture pairs; live host body also requires the sequencer gate",
     )
 
 
@@ -134,7 +139,13 @@ def pytest_collection_modifyitems(config, items):
         if item.get_closest_marker("sandbox") is not None:
             item.add_marker(pytest.mark.skip(reason=_SKIP_LIFECYCLE))
         if item.get_closest_marker("macos_host") is not None:
-            item.add_marker(pytest.mark.skip(reason=_SKIP_MACOS_HOST))
+            admitted_host = (
+                item.nodeid == _LIFECYCLE_NODEID
+                and lifecycle_selected
+                and os.environ.get(_LIFECYCLE_SEQUENCER_ENV) == "1"
+            )
+            if not admitted_host:
+                item.add_marker(pytest.mark.skip(reason=_SKIP_MACOS_HOST))
         if (item.get_closest_marker("lifecycle") is not None
                 and not lifecycle_selected):
             item.add_marker(pytest.mark.skip(reason=_SKIP_LIFECYCLE))
@@ -1287,27 +1298,57 @@ _LIFECYCLE_SUPPORT = None
 def _load_lifecycle_support():
     global _LIFECYCLE_SUPPORT
     if _LIFECYCLE_SUPPORT is None:
-        path = REPO / "tests" / "lifecycle" / "support.py"
-        spec = importlib.util.spec_from_file_location("prime_claw_lifecycle_support", path)
-        if spec is None or spec.loader is None:
-            raise RuntimeError("unable to load inert lifecycle support")
-        module = importlib.util.module_from_spec(spec)
-        # dataclasses resolves postponed annotations through sys.modules.
         import sys
-        sys.modules[spec.name] = module
-        spec.loader.exec_module(module)
-        _LIFECYCLE_SUPPORT = module
+        tests_root = str(REPO / "tests")
+        if tests_root not in sys.path:
+            sys.path.insert(0, tests_root)
+        _LIFECYCLE_SUPPORT = importlib.import_module("lifecycle.support")
     return _LIFECYCLE_SUPPORT
 
 
 @pytest.fixture
-def lifecycle_scope(tmp_path):
-    """Generate one inert, workspace-scoped lifecycle identity.
+def lifecycle_scope(tmp_path, request):
+    """Generate one scope after exact collection admission.
 
-    Collection requires the lifecycle marker and explicit --run-lifecycle.
-    Fixture setup performs no external call and exposes no live adapter.
+    Ordinary/fake callers receive the inert Slice-6 identity. The one exact
+    registered host observer additionally requires the sequencer admission
+    environment and receives durable evidence plus the tracked gateway/policy.
+    Fixture setup itself performs no external command.
     """
     support = _load_lifecycle_support()
+    if request.node.nodeid == _LIFECYCLE_NODEID:
+        if (not _lifecycle_opt_in(request.config)
+                or os.environ.get(_LIFECYCLE_SEQUENCER_ENV) != "1"):
+            pytest.skip(_SKIP_MACOS_HOST)
+        import yaml
+        runtime = json.loads((REPO / "config" / "runtime.json").read_text())
+        gateway = runtime.get("gateway")
+        production_name = runtime.get("sandbox_name")
+        production_image = runtime.get("image")
+        policy = REPO / "policies" / "test-lifecycle.yaml"
+        policy_value = yaml.safe_load(policy.read_text())
+        if (not isinstance(gateway, dict)
+                or not isinstance(gateway.get("name"), str)
+                or not isinstance(production_name, str)
+                or not isinstance(production_image, str)
+                or not isinstance(policy_value, dict)):
+            raise RuntimeError("lifecycle fixture: tracked host identities are malformed")
+        evidence_value = os.environ.get("LIFECYCLE_RESULTS_ROOT")
+        if not evidence_value:
+            raise RuntimeError("lifecycle fixture: durable evidence root is required")
+        evidence_root = Path(evidence_value)
+        if not evidence_root.is_absolute():
+            evidence_root = (REPO / evidence_root).resolve()
+        evidence_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        policy_hash = hashlib.sha256(json.dumps(
+            policy_value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        return support.LifecycleScope.generate(
+            evidence_dir=evidence_root,
+            gateway_id=gateway["name"],
+            policy_sha256=policy_hash,
+            forbidden_identities={"default", production_name, production_image},
+            deadline_seconds=900,
+        )
     policy = REPO / "tests" / "lifecycle" / "minimal-policy.json"
     return support.LifecycleScope.generate(
         evidence_dir=tmp_path / "lifecycle-evidence",

@@ -1,5 +1,6 @@
 {
   "sandbox_name": "prime-claw",
+  "workspace": "default",
   "image": "prime-claw-brain:0.1.0",
   "gateway": {
     "name": "openshell",

@@ -35,6 +35,8 @@ class RecordingControl:
         self.malformed_slots = set()
         self.refuse_delete = set()
         self.unknown_after_delete = set()
+        self.providers = {}
+        self.raise_providers = set()
 
     def capabilities(self, *, gateway_id, workspace):
         self.calls.append(("read", "capabilities", gateway_id, workspace))
@@ -73,6 +75,13 @@ class RecordingControl:
         state = "unknown" if ref.slot in self.unknown_after_delete else "absent"
         self.states[ref.slot] = Inspection(ref, state)
 
+    def provider_names(self, ref, *, gateway_id, workspace):
+        self.calls.append(("read", f"providers-{ref.slot}", gateway_id,
+                           workspace, ref.identity))
+        if ref.slot in self.raise_providers:
+            raise OSError("provider list failed")
+        return self.providers.get(ref.slot, ())
+
 
 def scope(tmp_path, **kwargs):
     return LifecycleScope.generate(
@@ -96,8 +105,8 @@ def test_generated_scope_is_unique_nondefault_and_overlay_free(tmp_path):
     first = scope(tmp_path / "first")
     second = scope(tmp_path / "second", run_id="f" * 32)
     assert first.identity.workspace == "pct-0123456789ab"
-    assert first.identity.target.endswith("-target")
-    assert first.identity.sentinel.endswith("-sentinel")
+    assert first.identity.target == "pct-0123456789ab-t"
+    assert first.identity.sentinel == "pct-0123456789ab-s"
     assert first.identity.image == "prime-claw-lifecycle:0123456789ab"
     assert first.identity.labels() == {"pc-test": "true", "pc-run": RUN_ID}
     assert first.identity.workspace != second.identity.workspace
@@ -110,12 +119,22 @@ def test_generated_scope_is_unique_nondefault_and_overlay_free(tmp_path):
 
 def test_local_default_forbidden_and_malformed_identities_fail_before_calls(tmp_path):
     control = RecordingControl()
+    generated = LifecycleIdentity.generate(RUN_ID)
+    overlength = LifecycleIdentity(
+        RUN_ID, generated.workspace, "x" * 20,
+        generated.sentinel, generated.image,
+    )
+    with pytest.raises(LifecycleRefusal, match="19-character limit"):
+        LifecycleScope(
+            identity=overlength, gateway_id="test-gateway",
+            policy_sha256=POLICY, evidence_path=tmp_path / "overlength.jsonl",
+        )
+    assert control.calls == []
     bad = LifecycleIdentity(RUN_ID, "default", "pct-x-target",
                             "pct-x-sentinel", "prime-claw-lifecycle:x")
     with pytest.raises(LifecycleRefusal, match="derived from the run identity"):
         LifecycleScope(identity=bad, gateway_id="test-gateway",
                        policy_sha256=POLICY, evidence_path=tmp_path / "bad.jsonl")
-    generated = LifecycleIdentity.generate(RUN_ID)
     bad_target = LifecycleIdentity(RUN_ID, generated.workspace, "default",
                                    generated.sentinel, generated.image)
     with pytest.raises(LifecycleRefusal, match="derived from the run identity"):
@@ -284,3 +303,60 @@ def test_evidence_schema_has_required_normalized_fields(tmp_path):
     assert "authorization" not in serialized
     assert "bearer " not in serialized
     assert "https://" not in serialized
+
+
+def test_provider_proof_requires_owned_sandbox_and_empty_list(tmp_path):
+    candidate = scope(tmp_path)
+    control = RecordingControl()
+    with pytest.raises(LifecycleRefusal, match="owned sandbox"):
+        candidate.assert_empty_providers(control, "target")
+    candidate.capture_owned(present(candidate, "target"))
+    candidate.assert_empty_providers(control, "target")
+    control.providers["target"] = ("provider-name-is-not-recorded",)
+    with pytest.raises(LifecycleRefusal, match="unexpectedly has providers"):
+        candidate.assert_empty_providers(control, "target")
+    assert control.mutations == []
+
+
+def test_product_destroy_requires_target_absent_and_sentinel_exact(tmp_path):
+    candidate = scope(tmp_path)
+    control = RecordingControl()
+    target = present(candidate, "target")
+    sentinel = present(candidate, "sentinel")
+    candidate.capture_owned(target)
+    candidate.capture_owned(sentinel)
+    control.states.update(target=Inspection(candidate.ref("target"), "absent"),
+                          sentinel=sentinel)
+    candidate.verify_product_destroy(control)
+    control.states["target"] = target
+    with pytest.raises(LifecycleRefusal, match="target absent"):
+        candidate.verify_product_destroy(control)
+    control.states["target"] = Inspection(candidate.ref("target"), "absent")
+    control.states["sentinel"] = Inspection(candidate.ref("sentinel"), "absent")
+    with pytest.raises(LifecycleRefusal, match="preserve"):
+        candidate.verify_product_destroy(control)
+
+
+def test_generated_product_config_is_target_only_and_overlay_free(tmp_path):
+    candidate = scope(tmp_path)
+    config = candidate.generated_product_config()
+    assert config == {
+        "sandbox_name": candidate.identity.target,
+        "image": candidate.identity.image,
+        "workspace": candidate.identity.workspace,
+        "gateway": {"name": "test-gateway"},
+    }
+    assert candidate.identity.sentinel not in json.dumps(config)
+    assert "local_config" not in json.dumps(config)
+
+
+def test_nested_sensitive_evidence_is_rejected(tmp_path):
+    candidate = scope(tmp_path)
+    for event in (
+        {"nested": {"value": "token=do-not-write"}},
+        {"nested": ["https://private.example"]},
+        {"nested": {"address": "10.0.0.8"}},
+    ):
+        with pytest.raises(LifecycleRefusal, match="credential or endpoint"):
+            candidate.evidence.append(event)
+    assert candidate.evidence.path.read_text() == ""

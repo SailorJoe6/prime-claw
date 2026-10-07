@@ -1,80 +1,109 @@
-# Project-wide testing strategy — Slice 6 lifecycle control boundary
+# Project-wide testing strategy — Slice 7 guarded real lifecycle observer
 
 ## Status
 
-Slices 1–5 are owner-accepted. Slice 6 / `prime-claw-5v7.7` starts from exact
-accepted commit `d7980cf051be8e459434ebc2a5d74753b0832e3b` (tree
-`79bcb1bc83a4dff83eebe4664f8e7751a0bda1d0`).
+**SLICE 7 CANDIDATE COMPLETE; publication pending.** The exact structured
+identity audit fix and regressions passed all invalidated non-live gates. The
+sole final observer ran once with fresh run `2f8d0cd3754147028f71a6a34a740441` and
+passed. Retained evidence proves target absence, sentinel preservation until
+finalizer, empty provider lists, exact-owned teardown, all generated resources
+absent, and identical configured-production before/after hash
+`fd7e356ab7c2050174c4a817d790e9a83e4cced9e77ec74a728443ced685f945`.
 
-## Threat model
+No cleanup or observer was retried. No P0, credential, configured-production,
+third-cycle, extra-live-run, or Slice-8 work occurred. The one bounded review
+completed; its offline admission and publication-consistency findings were
+corrected and host-tested. One clean commit/push remains before owner review.
 
-The local host, checkout, Docker daemon, launcher, and same-UID operator are
-trusted. The material lifecycle risk is accidental mutation of shared
-control-plane state through default, ambiguous, colliding, missing, or unowned
-identities. Hostile same-UID mutation and security attestation are non-goals.
+Slices 1–6 remain owner-accepted. Slice 7 / `prime-claw-5v7.6` starts from exact
+accepted commit `fda41dcadbac15b2c957c866d9e22eafb5f6afca` (tree
+`a5e1245c29022092b5684be99c7220d0b6fc7d9a`).
 
-## Required control boundary
+## Authorized outcome
 
-Slice 6 creates an inert, recording-fake-tested lifecycle support boundary:
+One explicitly invoked host observer proves the product destroy path against a
+generated target and sentinel inside a generated non-default workspace. Live
+mutation is authorized only for the captured and revalidated test identities
+created by that run. A sanitized read-only configured-production snapshot is
+captured before and after and must be unchanged.
 
-1. Every run generates a full run identity, a non-default workspace identity,
-   test-prefixed resource identities, and exact ownership labels. Gateway and
-   workspace scope are explicit; the default workspace is never a target.
-2. Lifecycle collection requires the `lifecycle` marker, the scoped fixture,
-   and explicit `--run-lifecycle` opt-in. Structural mismatch fails collection;
-   absent opt-in skips with zero mutation.
-3. Preflight and inspection use exact selectors and a present/absent/unknown
-   result. Collision, ambiguity, daemon/CLI failure, malformed output,
-   forbidden identity, missing ownership proof, and label mismatch fail before
-   any recorded mutating call.
-4. Ownership is captured only after an exact label/scope reread. Teardown uses
-   bounded deadlines and only exact captured, revalidated owned identities.
-   Unowned targets are never deleted; unknown/refusal is failure and retains
-   sanitized evidence.
-5. The host-observer registry records the exceptional seam, marker, fixture,
-   inadequate fake/container alternative, ownership rules, and current
-   disabled status. No live observer body is enabled in this slice.
-6. Evidence records sanitized identity, scope, command class, result,
-   timestamps/deadlines, and teardown/absence state. It contains no credentials,
-   private endpoints, production config, or raw private content.
+## Required safety contract
 
-## Required fake proofs
+1. **Explicit admission.** The registered body requires the `lifecycle` marker,
+   `lifecycle_scope`, pytest `--run-lifecycle`, and sequencer
+   `--with-lifecycle`. Plain pytest, plain `test-all`, arbitrary expressions,
+   and deprecated `--with-sandbox` cannot run it.
+2. **Generated scope.** The run generates full run/workspace/target/sentinel/
+   image identities and exact ownership labels. Gateway and workspace are
+   explicit on every OpenShell call. Default, forbidden, colliding, ambiguous,
+   malformed, missing, or unowned state fails closed.
+3. **Credential-free fixture.** The pinned fixture image uses a tracked minimal
+   no-egress policy. Target and sentinel use `--no-auto-providers --no-tty`, no
+   remote or brain, and empty provider lists. No Keychain/browser credential,
+   token, provider value, private endpoint, or raw production config enters
+   disk, argv evidence, logs, or fixtures.
+4. **Product-path proof.** A generated config with no local overlay names only
+   the generated target/image and explicit gateway/workspace. A run-owned
+   proxy accepts only exact target get/delete argv and records safe classes.
+   The observer runs `bin/prime-claw --config <generated> destroy --yes`
+   without `--image`, then
+   proves target absent and sentinel present with unchanged exact
+   workspace/policy/labels.
+5. **Production noninterference.** A reviewed read-only seam uses bounded
+   `sandbox list --names` pages in the explicit tracked production workspace
+   before mutation and after cleanup. It retains only hashes of configured
+   identity/workspace and presence. Equality is mandatory. It never requests
+   policy, annotations, providers, endpoints, secrets, brain content, or local
+   overlay. Production resource/workspace/image identities cannot occur in a
+   mutating transcript event; the shared selected gateway is not a resource.
+6. **Bounded finalization.** Ownership is captured only after exact reread.
+   Every post-ownership exit enters the Slice-6 finalizer. It revalidates and
+   removes only captured target/sentinel/workspace/image identities, then
+   positively verifies absence. Unknown/refusal fails, retains evidence, and is
+   not automatically retried.
+7. **Sanitized evidence.** Each event records run/gateway/workspace/resource,
+   deadline, version, command class, result, and evidence destination without
+   raw command output, secrets, or private endpoints. Evidence includes
+   before/after snapshot hashes, target/sentinel proof, transcript audit, and
+   teardown/absence state.
 
-Recording-fake and static tests prove collision handling, default-name/workspace
-rejection, missing/ambiguous state, ownership-label mismatch, incompatible CLI
-or malformed results, daemon failure, teardown refusal/failure, unknown inspect,
-evidence retention, and attempted unowned cleanup. Every pre-ownership failure
-has zero mutating calls. Post-ownership cleanup may reference only the exact
-owned identities recorded by the scope.
+## Required fake and static proofs
+
+Before the live run, recording fakes and static guards prove wrong-target,
+sentinel-delete, target-preserved, snapshot-drift, forbidden/default identity,
+ownership/policy/label mismatch, incompatible or malformed CLI response, daemon
+failure, unknown state, teardown refusal, evidence retention, and attempted
+unowned cleanup. Deliberate faults never run against the live control plane.
+Raw Docker/OpenShell calls are confined to the reviewed lifecycle support seam.
+
+## P0 incident separation
+
+`prime-claw-5v7.10` remains open and deferred by operator decision. Slice 7 does
+not inspect or recover suspected historical effects, remediate providers,
+investigate credentials, retrieve tokens, clean historical resources, or make
+an operational-impact determination. The authorized production snapshot is
+only a bounded before/after noninterference proof for this Slice-7 run.
 
 ## Preserved boundaries
 
-Plain pytest remains Docker-free. Tier-1 admission remains exact `-m container`.
-Tier 2 and the accepted Slice-3 isolation topology do not change. Plugin work
-remains Docker-only. `scripts/test-all.sh --with-lifecycle` and
-`--with-sandbox` remain deterministic non-mutating errors until the approved
-later live-occupant slice. No live OpenShell/provider call, sandbox/service/
-remote/policy mutation, credentials, or user-global refresh is allowed.
+Preserve accepted Slices 1–6: Docker-free plain pytest, exact `-m container`
+tier-1 admission, zero-runtime-host-mount tier 2, Docker-only plugin work,
+Slice-6 ownership/evidence rules, and Prime Agent as an upstream dependency.
+Do not refresh the user-global plugin or implement Slice 8.
 
 ## Acceptance
 
-Marker/CLI/static and recording-fake gates prove fail-closed collection,
-identity, ownership, inspection, evidence, and bounded cleanup semantics. Docs,
-host-observer registry, inventory, evidence, and Bead receipt agree. Run the
-appropriate source and exact-commit sequential gates plus one normal bounded
-final review, publish one clean commit/push, and stop for owner review.
+The single explicit real run passes once within its deadline. Target is absent,
+sentinel remains until finalizer, provider lists stay empty, all captured test
+resources end absent, transcript mutation is test-scope-only, and canonical
+configured-production snapshots match. Focused fake/static/CLI gates and the
+appropriate exact-commit sequence pass. Docs/registry/inventory/evidence/Bead
+agree. One normal bounded final review passes, one clean commit is pushed once,
+and execution stops for owner review.
 
-## Source-candidate status — 2026-10-06
+## Practical guardrails
 
-The inert support layer, collection contract, Docker-only recording-fake
-matrix, tier-0 architecture guards, docs, host-observer registry, inventory,
-and evidence page are implemented. Focused host and recording-fake gates pass.
-Exact-commit sequential validation, the single bounded review, publication,
-and owner acceptance remain pending.
-
-## Guardrails and boundary
-
-Bias for DONE over perfect. Do not add same-UID hardening, security attestation,
-or recursive review. If two repair/review cycles still find material in-scope
-defects, stop for operator consultation. Do not run a live lifecycle occupant
-or implement Slice 7+.
+The host, checkout, Docker daemon, launcher, OpenShell installation, and
+same-UID operator are trusted. Bias for DONE over perfect. No hostile same-UID
+hardening, attestation, recursive review, credential archaeology, or custom
+policy framework. Goals are unbudgeted; the approved slice/spec is the bound.

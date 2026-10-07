@@ -4,9 +4,9 @@ prime-claw uses the lowest sufficient isolation tier. Pure and ordinary
 recording-fake unit tests stay on the host. Environment-sensitive process,
 launcher, wrapper, Git/worktree/socket, Node, Prime Agent, and plugin behavior
 runs in the slim disposable Docker tier. Tests that execute gbrain and PostgreSQL run in
-a separate credential-free Docker image. Slice 6 provides only an inert
-lifecycle control contract: no live OpenShell adapter or observer body exists,
-and no test-all option enables lifecycle execution.
+a separate credential-free Docker image. The lifecycle boundary is inert by
+default; one exact host observer exists behind the explicit
+`scripts/test-all.sh --with-lifecycle` sequence.
 
 ## Current tiers
 
@@ -15,19 +15,25 @@ and no test-all option enables lifecycle execution.
 | 0 | `python3 -m pytest tests/ -q` | Host-safe static, pure unit, and recording-fake orchestration tests; no Docker. |
 | 1 | `python3 -m pytest tests/ -q -m container` or `scripts/test-tier1.sh` | Real Prime Agent/plugin execution in one disposable Docker container; no credentials or host home. |
 | 2 | `scripts/test-integration.sh` | Real PostgreSQL 16 + pgvector + exact gbrain in plain Docker; offline assertions; fixture-owned state. |
-| lifecycle | no live command | Contract only: `lifecycle` marker + `lifecycle_scope` + `--run-lifecycle`; Slice 6 has no live adapter/body. |
+| lifecycle | `scripts/test-all.sh --with-lifecycle` | After tiers 0–2, runs one exact registered host body with marker + fixture + pytest + sequencer admission. |
 
 Plain pytest is Docker-free. Only the exact marker expression `-m container`
 authorizes tier 1; arbitrary or compound expressions keep protected tests
 skipped. Tier 2 is not a pytest body: its non-collectable assertion program has
 an explicit container-entry guard and runs only through
-`scripts/test-integration.sh`. `scripts/test-all.sh` runs tiers 0, 1, and 2 in
-that order and stops on the first failure. The legacy `--with-sandbox` and the
-replacement `--with-lifecycle` both return an exit-64 non-mutating usage
-error. `--run-lifecycle` is a pytest collection opt-in only: a marker/fixture
-mismatch is an error, a valid pair without it skips before fixture setup, and
-Slice 6 contains no live pair. `macos_host` is a registered but empty observer
-registry and always skips in this slice.
+`scripts/test-integration.sh`. Plain `scripts/test-all.sh` runs tiers 0, 1,
+and 2 in that order and stops on the first failure. Exact
+`--with-lifecycle` adds only
+`tests/test_lifecycle_destroy.py::test_destroy_only_generated_target` after all
+three tiers pass. The body also requires `lifecycle` + `macos_host`, the
+`lifecycle_scope` fixture, pytest `--run-lifecycle`, and the sequencer admission
+environment. The sequencer removes inherited `PYTEST_ADDOPTS` and
+`PRIME_CLAW_LIFECYCLE_SEQUENCER` from its interpreter check and prerequisite
+tiers, and introduces sequencer admission only for the exact lifecycle child.
+Missing any gate skips before fixture setup; marker/fixture mismatch is an
+error. It is never automatically retried. Legacy
+`--with-sandbox`, unknown, and multi-argument forms return exit 64 before any
+command or result directory.
 
 ## Tier-1 unit-env bodies
 
@@ -53,13 +59,16 @@ no Docker CLI/socket or OpenShell control path, and the bridge passes only its
 fixed container-local HOME. Static tier 0 retains contract/string checks but no
 second execution of these named behaviors.
 
-## Inert lifecycle boundary
+## Fail-closed lifecycle control boundary
 
 `tests/lifecycle/support.py` owns identity generation, exact inspection,
 ownership capture, normalized evidence, and bounded teardown. A run uses a full
-32-hex ID, `pct-<12hex>` workspace, unique target/sentinel/image identities,
-and exact `pc-test=true` plus `pc-run=<full-id>` labels. Gateway and workspace
-are explicit on every adapter call. The tracked minimal policy identity denies
+32-hex ID, `pct-<12hex>` workspace, `pct-<12hex>-t` target,
+`pct-<12hex>-s` sentinel, and a unique image identity. The target and sentinel
+fit OpenShell v0.0.116's 19-character maximum; both the pure scope and live
+adapter reject overlength sandbox names before an OpenShell command. Exact
+`pc-test=true` plus `pc-run=<full-id>` labels bind ownership. Gateway and
+workspace are explicit on every adapter call. The tracked minimal policy denies
 network and declares no provider or credential input; generated config refuses
 local overlays and automatic providers.
 
@@ -77,6 +86,44 @@ is not default-collectable, its entry guard refuses host execution, and its only
 bridge runs inside the offline tier-1 container. Tier-0 guards validate the
 architecture and collection contract. This proves the boundary without a live
 OpenShell, Docker, provider, service, policy, remote, or sandbox call.
+
+## Guarded host lifecycle observer
+
+Slice 7 adds one reviewed body and one process seam. The body contains no
+process code. `tests/lifecycle/live.py` is the only host adapter. It uses bounded
+commands, an overall deadline, explicit gateway/workspace flags, a pinned
+`docker/test-lifecycle.Dockerfile`, and tracked
+`policies/test-lifecycle.yaml` with no network policies, providers,
+credentials, or endpoints.
+
+The observer first takes a conservative names-only snapshot of the exact
+configured production sandbox in the explicit tracked production workspace.
+It hashes only the configured identity/workspace and present/absent state; it
+does not request `sandbox get`, policy, annotations, provider state, endpoints,
+operator-local config, or brain content. The after snapshot must match. On any
+primary or cleanup failure, a mode-0600 `failure.json` retains the canonical
+before/after snapshot hashes (or `null` only when the after snapshot itself
+could not be obtained), equality result, and failure-class booleans without raw
+production names.
+
+It then preflights generated identities, builds/captures the fixture image by
+immutable iid, and creates target and sentinel with `--no-auto-providers`,
+`--no-tty`, exact labels, and the no-egress policy. Both provider lists must be
+empty. A mode-0600 generated runtime config names only the target/image plus
+explicit gateway/workspace. Product `destroy --yes` runs without `--image`
+through a generated guard proxy that accepts exactly the target get and delete
+argv and records only safe command classes. The target must be absent while the
+sentinel remains exactly owned. Finally, the Slice-6 finalizer revalidates and
+removes only captured target, sentinel, workspace, and immutable image IDs and
+positively verifies absence. Unknown/refusal retains evidence and fails without
+retry.
+
+Sanitized evidence is under the sequencer run's `lifecycle-evidence/` directory
+and is summarized in
+`docs/evidence/2026-10-06-testing-strategy-slice7-lifecycle-destroy.md` plus the
+terminal `prime-claw-5v7.6` receipt. The deferred P0 incident
+`prime-claw-5v7.10` is outside this observer: the snapshot proves only this
+run's noninterference and authorizes no incident inspection or recovery.
 
 ## Tier-2 disposable brain stack
 

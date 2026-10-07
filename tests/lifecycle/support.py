@@ -1,8 +1,8 @@
-"""Inert lifecycle control boundary for explicit host-observer tests.
+"""Pure lifecycle control boundary shared by fake and explicit host observers.
 
-This module contains no subprocess, Docker, or OpenShell implementation.  A
-future live observer must provide a reviewed adapter; Slice 6 exercises the
-contract only with a recording fake inside the disposable tier-1 container.
+This module contains no subprocess, Docker, or OpenShell implementation. Slice
+6 proves it with the offline recording fake; Slice 7 supplies one separately
+reviewed adapter in ``tests/lifecycle/live.py`` behind exact admission.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from uuid import uuid4
 
 LABEL_TEST = "pc-test"
 LABEL_RUN = "pc-run"
+MAX_SANDBOX_NAME_LEN = 19  # OpenShell v0.0.116 MAX_ROUTABLE_NAME_LEN
 _ALLOWED_SLOTS = ("workspace", "image", "target", "sentinel")
 _TEARDOWN_SLOTS = ("target", "sentinel", "workspace", "image")
 _HEX_32 = re.compile(r"^[0-9a-f]{32}$")
@@ -51,8 +52,8 @@ class LifecycleIdentity:
         return cls(
             run_id=full,
             workspace=f"pct-{short}",
-            target=f"pct-{short}-target",
-            sentinel=f"pct-{short}-sentinel",
+            target=f"pct-{short}-t",
+            sentinel=f"pct-{short}-s",
             image=f"prime-claw-lifecycle:{short}",
         )
 
@@ -96,6 +97,9 @@ class ControlPlane(Protocol):
     def delete(self, ref: ResourceRef, *, gateway_id: str,
                workspace: str) -> None: ...
 
+    def provider_names(self, ref: ResourceRef, *, gateway_id: str,
+                       workspace: str) -> tuple[str, ...]: ...
+
 
 class EvidenceRecorder:
     """Append normalized events without command output or endpoint material."""
@@ -115,10 +119,20 @@ class EvidenceRecorder:
             )
         return value
 
+    @classmethod
+    def _validate_value(cls, value: object, field_name: str) -> None:
+        if isinstance(value, str):
+            cls._safe(value, field_name)
+        elif isinstance(value, Mapping):
+            for key, nested in value.items():
+                cls._validate_value(str(key), field_name)
+                cls._validate_value(nested, f"{field_name}.{key}")
+        elif isinstance(value, (list, tuple, set, frozenset)):
+            for index, nested in enumerate(value):
+                cls._validate_value(nested, f"{field_name}[{index}]")
+
     def append(self, event: Mapping[str, object]) -> None:
-        for key, value in event.items():
-            if isinstance(value, str):
-                self._safe(value, key)
+        self._validate_value(event, "event")
         with self.path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(dict(event), sort_keys=True, separators=(",", ":")))
             stream.write("\n")
@@ -180,6 +194,12 @@ class LifecycleScope:
             raise LifecycleRefusal("lifecycle deadline must be between 1 and 900 seconds")
         if not _HEX_32.fullmatch(self.identity.run_id):
             raise LifecycleRefusal("run identity is malformed")
+        for slot in ("target", "sentinel"):
+            if len(getattr(self.identity, slot)) > MAX_SANDBOX_NAME_LEN:
+                raise LifecycleRefusal(
+                    f"{slot} identity exceeds OpenShell's "
+                    f"{MAX_SANDBOX_NAME_LEN}-character limit"
+                )
         expected = LifecycleIdentity.generate(self.identity.run_id)
         if self.identity != expected:
             raise LifecycleRefusal(
@@ -229,8 +249,8 @@ class LifecycleScope:
         self._event(argv_class=argv_class, result=inspection.state, resource=ref)
         return inspection
 
-    def preflight(self, control: ControlPlane) -> None:
-        """Perform read-only compatibility and collision checks."""
+    def require_compatible(self, control: ControlPlane) -> None:
+        """Require the reviewed client/server capability contract without mutation."""
         self._validate_local_contract()
         try:
             capabilities = control.capabilities(
@@ -252,6 +272,15 @@ class LifecycleScope:
             self._event(argv_class="capabilities", result="incompatible")
             raise LifecycleRefusal("lifecycle CLI/server capabilities are incompatible")
         self._event(argv_class="capabilities", result="compatible")
+
+    def inspect_exact(self, control: ControlPlane, slot: str,
+                      argv_class: str) -> Inspection:
+        """Read and record one exact generated resource identity."""
+        return self._inspect(control, self.ref(slot), argv_class)
+
+    def preflight(self, control: ControlPlane) -> None:
+        """Perform read-only compatibility and collision checks."""
+        self.require_compatible(control)
         for slot in _ALLOWED_SLOTS:
             inspection = self._inspect(control, self.ref(slot), f"inspect-{slot}")
             if inspection.state == "unknown":
@@ -262,7 +291,7 @@ class LifecycleScope:
         self._event(argv_class="preflight", result="ready")
 
     def generated_config(self) -> dict[str, object]:
-        """Return an isolated generated config; never merge operator config."""
+        """Return isolated lifecycle metadata; never merge operator config."""
         return {
             "schema": 1,
             "run_id": self.identity.run_id,
@@ -276,6 +305,45 @@ class LifecycleScope:
             "provider": None,
             "local_overlay": False,
         }
+
+    def generated_product_config(self) -> dict[str, object]:
+        """Return the minimum product runtime config for target-only destroy."""
+        return {
+            "sandbox_name": self.identity.target,
+            "image": self.identity.image,
+            "workspace": self.identity.workspace,
+            "gateway": {"name": self.gateway_id},
+        }
+
+    def assert_empty_providers(self, control: ControlPlane, slot: str) -> None:
+        """Require an exact owned sandbox to have no attached providers."""
+        if slot not in ("target", "sentinel") or slot not in self._owned:
+            raise LifecycleRefusal("provider proof requires an owned sandbox")
+        ref = self.ref(slot)
+        try:
+            names = control.provider_names(
+                ref, gateway_id=self.gateway_id,
+                workspace=self.identity.workspace)
+        except Exception as exc:
+            self._event(argv_class=f"providers-{slot}", result="failed", resource=ref)
+            raise LifecycleRefusal(f"exact {slot} provider inspection failed") from exc
+        if not isinstance(names, tuple) or any(not isinstance(name, str) for name in names):
+            self._event(argv_class=f"providers-{slot}", result="malformed", resource=ref)
+            raise LifecycleRefusal(f"exact {slot} provider inspection was malformed")
+        if names:
+            self._event(argv_class=f"providers-{slot}", result="nonempty", resource=ref)
+            raise LifecycleRefusal(f"exact {slot} unexpectedly has providers")
+        self._event(argv_class=f"providers-{slot}", result="empty", resource=ref)
+
+    def verify_product_destroy(self, control: ControlPlane) -> None:
+        """Prove target absent and sentinel still exactly owned after product destroy."""
+        target = self._inspect(control, self.ref("target"), "verify-target-destroyed")
+        if target.state != "absent":
+            raise LifecycleRefusal("product destroy did not make the exact target absent")
+        sentinel = self._inspect(control, self.ref("sentinel"), "verify-sentinel-preserved")
+        if sentinel.state != "present":
+            raise LifecycleRefusal("product destroy did not preserve the exact sentinel")
+        self.capture_owned(sentinel)
 
     def capture_owned(self, inspection: Inspection) -> None:
         """Capture only an exact, re-read resource carrying this run's ownership."""

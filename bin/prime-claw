@@ -88,6 +88,18 @@ def openshell_json(args: list[str], timeout: int = 30):
         return None, f"json parse error: {e}: {out[:200]}"
 
 
+def openshell_scope(cfg) -> list[str]:
+    """Return explicit non-endpoint gateway/workspace flags for resource calls."""
+    gateway = cfg.get("gateway")
+    gateway_name = gateway.get("name") if isinstance(gateway, dict) else None
+    workspace = cfg.get("workspace", "default")
+    safe = re.compile(r"^[a-z0-9][a-z0-9._-]{0,95}$")
+    if (not isinstance(gateway_name, str) or not safe.fullmatch(gateway_name)
+            or not isinstance(workspace, str) or not safe.fullmatch(workspace)):
+        raise ValueError("runtime gateway/workspace scope is invalid")
+    return ["-g", gateway_name, "--workspace", workspace]
+
+
 # --------------------------------------------------------------------------
 # Component probes (read-only). Each returns (ok: bool|None, detail: str).
 # ok=None means "unknown / not applicable" (e.g. sandbox absent).
@@ -111,7 +123,8 @@ def probe_gateway(cfg) -> tuple[bool, str]:
 
 
 def probe_sandbox(cfg) -> tuple[bool | None, str, dict | None]:
-    data, err = openshell_json(["sandbox", "get", cfg["sandbox_name"]])
+    data, err = openshell_json([
+        *openshell_scope(cfg), "sandbox", "get", cfg["sandbox_name"]])
     if data is None:
         return None, f"sandbox {cfg['sandbox_name']!r} not found", None
     phase = data.get("phase", "?")
@@ -2805,7 +2818,9 @@ def cmd_destroy(cfg, args) -> int:
             print(f"destroy: {kind} {target} already absent; skipping")
             continue
         if kind == "sandbox":
-            c, out = run([OPENSHELL, "sandbox", "delete", target], timeout=180)
+            c, out = run([
+                OPENSHELL, *openshell_scope(cfg), "sandbox", "delete", target],
+                timeout=180)
         else:  # image
             c, out = run(["docker", "rmi", target], timeout=120)
         if c != 0:

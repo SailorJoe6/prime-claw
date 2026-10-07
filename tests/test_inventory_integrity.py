@@ -27,5 +27,5 @@ def test_inventory_covers_phase2_requirements():
     ids = {r["id"] for r in inv["requirements"]}
     # the Phase 2 lifecycle gates must all be tracked
     for rid in ("R2-A-1", "R2-A-2", "R2-C-2", "R2-C-3", "R2-C-5", "R2-X-1",
-                "R-TEST-1", "R-TEST-5", "R-TEST-6", "R-TEST-7", "R-TEST-8", "R-TEST-10"):
+                "R-TEST-1", "R-TEST-5", "R-TEST-6", "R-TEST-7", "R-TEST-8", "R-TEST-10", "R-TEST-12"):
         assert rid in ids, f"inventory missing {rid}"

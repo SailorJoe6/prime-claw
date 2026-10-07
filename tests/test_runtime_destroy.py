@@ -27,6 +27,7 @@ def cfg(tmp_path, **over):
     c = {
         "sandbox_name": "prime-claw",
         "image": "prime-claw-brain:0.1.0",
+        "workspace": "default",
         "gateway": {"name": "openshell", "endpoint": "https://localhost:17670",
                     "forbidden": ["nemoclaw"]},
         "policy_file": "policies/runtime.yaml",
@@ -70,7 +71,8 @@ def test_confirmed_destroy_deletes_sandbox(tmp_path, monkeypatch, capsys):
     rc = pc.cmd_destroy(cfg(tmp_path), Args(yes=True))
     out = capsys.readouterr().out
     assert rc == 0 and "deleted sandbox prime-claw" in out
-    assert any(c[:3] == [pc.OPENSHELL, "sandbox", "delete"] for c in calls)
+    assert any(c == [pc.OPENSHELL, "-g", "openshell", "--workspace", "default",
+                     "sandbox", "delete", "prime-claw"] for c in calls)
 
 
 def test_destroy_is_idempotent_when_sandbox_absent(tmp_path, monkeypatch, capsys):
