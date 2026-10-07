@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
@@ -43,7 +43,7 @@ export type ExpertReviewRepositoryIdentity = {
 export type ExpertReviewReservationRegistration = {
   guideRoot?: string;
   packageStatus?: (ctx: ExtensionContext) => OfficialExpertPackageStatus;
-  repositoryIdentity?: (ctx: ExtensionContext) => ExpertReviewRepositoryIdentity;
+  repositoryIdentity?: (worktree: string) => ExpertReviewRepositoryIdentity;
   now?: () => number;
   nonce?: () => string;
 };
@@ -213,22 +213,34 @@ export function officialExpertPackageStatus(
   };
 }
 
-function defaultRepositoryIdentity(ctx: ExtensionContext): ExpertReviewRepositoryIdentity {
-  const repositoryPath = realpathSync(ctx.cwd);
+function defaultRepositoryIdentity(worktree: string): ExpertReviewRepositoryIdentity {
+  if (!isAbsolute(worktree)) {
+    throw new Error("active episode worktree is not an absolute canonical path");
+  }
+  const repositoryPath = realpathSync(worktree);
+  if (worktree !== repositoryPath) {
+    throw new Error("active episode worktree is not a canonical real path");
+  }
   const root = execFileSync("git", ["-C", repositoryPath, "rev-parse", "--show-toplevel"], {
     encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 10_000,
   }).trim();
-  if (realpathSync(root) !== repositoryPath) throw new Error("current working directory is not the exact repository root");
+  if (root !== repositoryPath) {
+    throw new Error("active episode worktree is not its exact Git repository root");
+  }
   const commitOid = execFileSync("git", ["-C", repositoryPath, "rev-parse", "HEAD"], {
     encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 10_000,
   }).trim();
   if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(commitOid)) {
-    throw new Error("current repository commit is not an exact 40- or 64-hex OID");
+    throw new Error("active episode worktree HEAD is not an exact 40- or 64-hex OID");
   }
   return { repositoryPath, commitOid };
 }
 
-function exactOwner(ctx: ExtensionContext): { ownerSessionId: string; ownerGeneration: string } {
+function exactOwner(ctx: ExtensionContext): {
+  ownerSessionId: string;
+  ownerGeneration: string;
+  markerWorktree: string;
+} {
   const marker = assertExactActiveConversationOwner(ctx);
   return {
     ownerSessionId: ctx.sessionManager.getSessionId(),
@@ -237,6 +249,7 @@ function exactOwner(ctx: ExtensionContext): { ownerSessionId: string; ownerGener
       marker.episodeId, resolve(marker.episodeSessionFile), marker.branch,
       resolve(marker.worktree), marker.sessionName, marker.identityVersion, marker.admission,
     ])),
+    markerWorktree: marker.worktree,
   };
 }
 
@@ -322,7 +335,7 @@ export function registerOfficialExpertReviewReservation(
     parameters: {
       type: "object",
       properties: {
-        commitOid: { type: "string", description: "Exact lowercase current repository commit OID" },
+        commitOid: { type: "string", description: "Exact lowercase active episode worktree HEAD OID" },
         packetDigest: { type: "string", description: "Exact lowercase SHA256 digest of the immutable review packet" },
         selector: { type: "string", description: "Requested full official model selector" },
         thinking: { type: "string", description: "Requested official thinking level" },
@@ -332,17 +345,28 @@ export function registerOfficialExpertReviewReservation(
     } as any,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       try {
-        const { ownerSessionId, ownerGeneration } = exactOwner(ctx);
+        const { ownerSessionId, ownerGeneration, markerWorktree } = exactOwner(ctx);
         assertConversationGuideReady(ctx, { guideRoot: options.guideRoot });
         const status = packagePreflight(ctx);
         if (status.status !== "AVAILABLE" || !status.packageSha256) {
           throw new Error(`official EXPERT package is ${status.status}${status.reason ? `: ${status.reason}` : ""}`);
         }
-        const identity = repositoryIdentity(ctx);
         const commitOid = assertCommitOid(params.commitOid);
         const packetDigest = assertHex(params.packetDigest, 64, "packetDigest");
-        if (realpathSync(identity.repositoryPath) !== realpathSync(ctx.cwd)) throw new Error("repository identity path does not match the exact current project root");
-        if (identity.commitOid !== commitOid) throw new Error("requested commit does not match the exact current repository HEAD");
+        if (!isAbsolute(markerWorktree)) {
+          throw new Error("active episode marker worktree is not an absolute canonical path");
+        }
+        const canonicalWorktree = realpathSync(markerWorktree);
+        if (markerWorktree !== canonicalWorktree) {
+          throw new Error("active episode marker worktree is not a canonical real path");
+        }
+        const identity = repositoryIdentity(canonicalWorktree);
+        if (realpathSync(identity.repositoryPath) !== canonicalWorktree) {
+          throw new Error("repository identity path does not match the exact active episode worktree");
+        }
+        if (identity.commitOid !== commitOid) {
+          throw new Error("requested commit does not match the exact active episode worktree HEAD");
+        }
         if (params.selector !== OFFICIAL_EXPERT_SELECTOR || params.thinking !== OFFICIAL_EXPERT_THINKING) {
           throw new Error("requested selector or thinking does not match the official EXPERT package");
         }

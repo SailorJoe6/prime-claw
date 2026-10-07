@@ -1466,3 +1466,63 @@ probe passed. Evidence is in
 `docs/evidence/official-lean-role-protocol/2026-10-07-slice-3-expert-reservation-foundation.md`.
 All live spawn/admission/delivery/execution/settlement/cleanup and later phases
 remain excluded.
+
+## 24. Section 23 repair — bind review subject to the active episode worktree
+
+Candidate `038d1cbaeb5f00614c4b4f40784cdb9119e72862` / tree
+`affdc7c242d6f7ec511a960181d250ba6a1bdea0` is **not accepted**. Repair only the
+repository-subject seam:
+
+1. Derive the review target exclusively from the exact active-owner oversight
+   marker's `worktree`, never from owning Conversation `ctx.cwd`, caller input,
+   branch, session name, or copied prompt.
+2. Require the marker worktree real path to exist and equal
+   `git -C <worktree> rev-parse --show-toplevel` after canonicalization.
+3. Require that worktree's current HEAD to equal the requested exact lowercase
+   40- or 64-hex candidate commit OID; store that canonical episode worktree
+   path and exact OID.
+4. Refuse owner-CWD HEAD, wrong worktree HEAD, missing/noncanonical worktree, or
+   any disagreement before reservation mutation.
+5. Preserve exact owner-generation, consumed-guide, fresh package `AVAILABLE`,
+   nonce/TTL, one `bound-pending` caller-supplied-unverified/`authority:false`
+   transition, read-only status, idempotent cancel/expiry/session boundaries,
+   and same-session episode A-to-B isolation.
+6. Add a topology regression where owner CWD differs from marker worktree and
+   prove only marker-worktree HEAD can reserve, including all specified negative
+   cases.
+7. Re-run invalidated focused tests, complete Tier 0, Docker Tier 1, and pinned
+   Prime Agent probe. Freeze and independently exact-review only the repaired
+   candidate, commit/push one repair, report, and stop.
+
+Do not accept or investigate another finding in this pass. Add no live spawn,
+delivery, child admission, review/report workflow, Slice 4, host activation,
+finalization, or cleanup.
+
+**Section 24 implementation checkpoint.** Reserve now receives the exact active
+owner marker worktree from `assertExactActiveConversationOwner`, canonicalizes
+and requires that path, proves its Git top-level equals the same real path, and
+compares that worktree HEAD to the requested exact OID before mutation. The
+record stores the canonical marker-worktree path. Owner `ctx.cwd` is no longer a
+subject input. A native topology regression uses distinct owner and episode Git
+repositories and covers owner-HEAD mismatch, stale worktree HEAD, missing
+worktree, symlink/noncanonical worktree, nested/non-root worktree, successful
+exact worktree reserve, and no mutation on refusal. Focused/full gates and exact
+review remain pending.
+
+**Section 24 validation checkpoint.** The bounded repair is implemented and the
+required topology negatives prove refusal before mutation. Focused host passed
+46 Node and 17 Python tests; focused Docker passed 43; complete Tier 0 passed
+292; complete Docker Tier 1 passed 76; and the pinned Prime Agent 0.9.8 probe
+passed. Evidence is
+`docs/evidence/official-lean-role-protocol/2026-10-07-section-24-repository-subject-repair.md`.
+Freeze this exact tracked patch and require bounded independent `PASS`; after
+PASS, commit and push it unchanged and record the exact review/patch/commit
+receipts on `prime-claw-h6w.30`. No other finding may be accepted in this pass.
+
+**Section 24 review-repair checkpoint.** The first exact review identified one
+in-scope lexical canonicalization gap: `resolve()` erased raw dot/relative or
+trailing syntax before comparison. The repair now requires the raw marker path
+to be absolute and byte-equal to `realpath`, requires raw trimmed Git top-level
+output to equal that canonical string, and adds a dot-segment refusal/no-state
+regression. All focused, complete, Docker, and pinned gates were rerun green.
+Refreeze and re-review this exact repair before unchanged commit/push.

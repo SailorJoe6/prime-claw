@@ -132,8 +132,11 @@ support file adds owner-scoped, exact-oversight-generation in-memory
 reserve/bind/read-only-status/cancel state only. Reserve/bind require exact
 active-owner guide readiness and a fresh
 `AVAILABLE` package probe; `SYNC_PENDING` and `UNAVAILABLE` fail before
-mutation. Bind stores only the public spawn return tuple as unverified pending
-evidence. Live spawn, child admission, delivery, review execution, settlement,
+mutation. Reserve takes no repository path from the caller: it canonicalizes the
+trusted active marker worktree, proves that path is its own Git top-level, and
+requires its HEAD to equal the requested exact candidate OID. Owner CWD and
+other inferred metadata cannot select the subject. Bind stores only the public
+spawn return tuple as unverified pending evidence. Live spawn, child admission, delivery, review execution, settlement,
 cleanup, persistence, and provider identity remain deferred.
 
 The predecessor APPEND-only manager remains in source for bridge rollback. New

@@ -263,9 +263,14 @@ The TypeScript probe and installer Python preflight share a Docker parity matrix
 Each owner has at most one session-lifecycle record, bound to a digest of every
 stable field in the exact active oversight generation. A later episode owned by
 the same Conversation cannot read, bind, or cancel the older generation and may
-replace it only through a newly gated reserve. Reserve derives the canonical
-repository root, verifies the exact current commit OID, validates an immutable
-packet SHA256 plus the official selector/thinking pair, generates one 32-byte
+replace it only through a newly gated reserve. Reserve derives the subject only
+from the trusted active oversight marker's `worktree`. It requires that path to
+exist canonically, requires its real path to equal that worktree's own Git
+`--show-toplevel`, and requires its HEAD to equal the requested exact lowercase
+40- or 64-hex commit OID before mutation. Owner CWD, branch, session name,
+prompt text, and caller paths cannot select or substitute the subject. Reserve
+then validates an immutable packet SHA256 plus the official selector/thinking
+pair, generates one 32-byte
 cryptographically random opaque nonce, and sets a fixed 15-minute expiry. Status
 only derives a generation-matched view; it never renews, deletes, or otherwise
 mutates the record. Expiry is derived idempotently. Cancel and session

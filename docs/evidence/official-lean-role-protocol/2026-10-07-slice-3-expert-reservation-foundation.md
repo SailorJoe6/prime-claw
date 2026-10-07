@@ -1,5 +1,11 @@
 # Slice 3 official EXPERT reservation foundation — 2026-10-07
 
+> **Acceptance correction (2026-10-07):** Candidate
+> `038d1cbaeb5f00614c4b4f40784cdb9119e72862` was pushed but not accepted. Its
+> repository subject used owner `ctx.cwd` instead of the exact active episode
+> marker worktree. Section 24 repairs only that seam; see
+> `2026-10-07-section-24-repository-subject-repair.md`.
+
 ## Scope
 
 This candidate follows accepted prerequisite commit

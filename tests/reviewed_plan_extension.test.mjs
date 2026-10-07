@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -1211,12 +1212,16 @@ const EXPERT_PACKAGE = "c".repeat(64);
 
 function reservationFixture(t) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-expert-reservation-")));
-  t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, LOCATION), { recursive: true });
   const state = join(cwd, ".prime", "agent", "state", "spec-episodes");
   mkdirSync(state, { recursive: true });
   const slug = "alpha-plan";
   const worktree = resolve(dirname(cwd), `${basename(cwd)}-${slug}-episode`);
+  mkdirSync(worktree, { recursive: true });
+  t.after(() => {
+    rmSync(worktree, { recursive: true, force: true });
+    rmSync(cwd, { recursive: true, force: true });
+  });
   const identity = {
     version: 2, slug, sourceLocation: LOCATION, ownerSessionId: "owner-session",
     episodeId: "33333333-3333-4333-8333-333333333333",
@@ -1229,6 +1234,7 @@ function reservationFixture(t) {
     nonceCount: 0,
     packageCalls: 0,
     repositoryCalls: 0,
+    repositoryTarget: undefined,
     packageStatus: {
       schemaVersion: 1, status: "AVAILABLE", mode: "managed",
       expectedPackageSha256: EXPERT_PACKAGE, packageSha256: EXPERT_PACKAGE,
@@ -1238,9 +1244,10 @@ function reservationFixture(t) {
     now: () => control.now,
     nonce: () => `${String(++control.nonceCount).padStart(2, "0")}${"n".repeat(41)}`,
     packageStatus() { control.packageCalls += 1; return control.packageStatus; },
-    repositoryIdentity() {
+    repositoryIdentity(worktreePath) {
       control.repositoryCalls += 1;
-      return { repositoryPath: cwd, commitOid: EXPERT_COMMIT };
+      control.repositoryTarget = worktreePath;
+      return { repositoryPath: worktreePath, commitOid: EXPERT_COMMIT };
     },
   });
   const f = createHarness(cwd, extension);
@@ -1276,6 +1283,139 @@ function bindArguments(f, nonce, overrides = {}) {
     ...overrides,
   };
 }
+
+function gitCommit(repository, name, contents) {
+  writeFileSync(join(repository, name), contents);
+  execFileSync("git", ["-C", repository, "add", name]);
+  execFileSync("git", ["-C", repository, "-c", "user.name=Prime Claw Test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", contents]);
+  return execFileSync("git", ["-C", repository, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+}
+
+function reservationTopologyFixture(t) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-expert-topology-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cwd = join(root, "conversation-owner");
+  const worktree = resolve(dirname(cwd), `${basename(cwd)}-alpha-plan-episode`);
+  mkdirSync(join(cwd, LOCATION), { recursive: true });
+  mkdirSync(worktree, { recursive: true });
+  execFileSync("git", ["-C", cwd, "init", "-q"]);
+  execFileSync("git", ["-C", worktree, "init", "-q"]);
+  const ownerHead = gitCommit(cwd, "owner.txt", "owner-head");
+  const episodePrevious = gitCommit(worktree, "episode.txt", "episode-previous");
+  const episodeHead = gitCommit(worktree, "episode.txt", "episode-head");
+  assert.notEqual(ownerHead, episodeHead);
+
+  const state = join(cwd, ".prime", "agent", "state", "spec-episodes");
+  mkdirSync(state, { recursive: true });
+  const identityPath = join(state, "alpha-plan.json");
+  const identity = {
+    version: 2, slug: "alpha-plan", sourceLocation: LOCATION, ownerSessionId: "owner-session",
+    episodeId: "77777777-7777-4777-8777-777777777777",
+    episodeActiveSessionId: "active-route", episodeSessionFile: join(worktree, "episode.jsonl"),
+    branch: "episode/alpha-plan", worktree, sessionName: "alpha-plan-episode", bootstrapAdmission: "delivered",
+  };
+  writeFileSync(identityPath, JSON.stringify(identity));
+  const control = { now: 1_000_000, nonceCount: 0 };
+  const extension = createReviewedPlanExtension({
+    now: () => control.now,
+    nonce: () => `${String(++control.nonceCount).padStart(2, "0")}${"t".repeat(41)}`,
+    packageStatus: () => ({
+      schemaVersion: 1, status: "AVAILABLE", mode: "managed",
+      expectedPackageSha256: EXPERT_PACKAGE, packageSha256: EXPERT_PACKAGE,
+    }),
+  });
+  const f = createHarness(cwd, extension);
+  const marker = {
+    markerVersion: 2, status: "active", ownerSessionId: identity.ownerSessionId,
+    slug: identity.slug, sourceLocation: identity.sourceLocation, episodeId: identity.episodeId,
+    episodeSessionFile: identity.episodeSessionFile, branch: identity.branch,
+    worktree: identity.worktree, sessionName: identity.sessionName,
+    identityVersion: 2, admission: "delivered",
+  };
+  f.entries.push({ type: "custom", customType: "prime-claw-conversation-oversight", data: marker });
+  function setWorktree(nextWorktree) {
+    identity.worktree = nextWorktree;
+    identity.episodeSessionFile = join(nextWorktree, "episode.jsonl");
+    marker.worktree = nextWorktree;
+    marker.episodeSessionFile = identity.episodeSessionFile;
+    writeFileSync(identityPath, JSON.stringify(identity));
+  }
+  return { root, cwd, worktree, ownerHead, episodePrevious, episodeHead, control, identity, marker, setWorktree, ...f };
+}
+
+test("official EXPERT reserve derives its subject only from the canonical active episode worktree", async (t) => {
+  const f = reservationTopologyFixture(t);
+  await f.events.get("session_start")({}, f.ctx);
+  await activateConversationGuide(f, "topology-guide");
+  const reserve = f.tools.get(EXPERT_REVIEW_RESERVE_TOOL);
+  const cancel = f.tools.get(EXPERT_REVIEW_CANCEL_TOOL);
+  const status = f.tools.get(EXPERT_REVIEW_STATUS_TOOL);
+
+  const ownerHead = await reserve.execute(
+    "owner-head", reserveArguments({ commitOid: f.ownerHead }), undefined, undefined, f.ctx,
+  );
+  assert.equal(ownerHead.isError, true);
+  assert.match(ownerHead.content[0].text, /active episode worktree HEAD/);
+  assert.equal(f.control.nonceCount, 0);
+
+  const staleWorktreeHead = await reserve.execute(
+    "stale-worktree-head", reserveArguments({ commitOid: f.episodePrevious }), undefined, undefined, f.ctx,
+  );
+  assert.equal(staleWorktreeHead.isError, true);
+  assert.match(staleWorktreeHead.content[0].text, /active episode worktree HEAD/);
+  assert.equal(f.control.nonceCount, 0);
+
+  const reserved = await reserve.execute(
+    "episode-head", reserveArguments({ commitOid: f.episodeHead }), undefined, undefined, f.ctx,
+  );
+  assert.equal(reserved.isError, undefined, JSON.stringify(reserved));
+  assert.equal(reserved.details.repositoryPath, realpathSync(f.worktree));
+  assert.equal(reserved.details.commitOid, f.episodeHead);
+  assert.notEqual(reserved.details.repositoryPath, realpathSync(f.cwd));
+  assert.equal(f.control.nonceCount, 1);
+  assert.equal((await cancel.execute("cancel", {}, undefined, undefined, f.ctx)).details.cancelled, true);
+
+  f.setWorktree(`${f.worktree}/.`);
+  await activateConversationGuide(f, "dot-segment-guide");
+  const dotSegmentResult = await reserve.execute(
+    "dot-segment", reserveArguments({ commitOid: f.episodeHead }), undefined, undefined, f.ctx,
+  );
+  assert.equal(dotSegmentResult.isError, true);
+  assert.match(dotSegmentResult.content[0].text, /not a canonical real path/);
+  assert.equal(f.control.nonceCount, 1);
+  assert.equal((await status.execute("dot-segment-status", {}, undefined, undefined, f.ctx)).details.phase, "none");
+  f.setWorktree(f.worktree);
+  await activateConversationGuide(f, "restored-canonical-guide");
+
+  rmSync(f.worktree, { recursive: true, force: true });
+  const missingResult = await reserve.execute(
+    "missing", reserveArguments({ commitOid: f.episodeHead }), undefined, undefined, f.ctx,
+  );
+  assert.equal(missingResult.isError, true);
+  assert.equal(f.control.nonceCount, 1);
+  assert.equal((await status.execute("missing-status", {}, undefined, undefined, f.ctx)).details.phase, "none");
+
+  const aliasTarget = join(f.root, "episode-worktree-alias-target");
+  mkdirSync(aliasTarget);
+  symlinkSync(aliasTarget, f.worktree, "dir");
+  const aliasResult = await reserve.execute(
+    "alias", reserveArguments({ commitOid: f.episodeHead }), undefined, undefined, f.ctx,
+  );
+  assert.equal(aliasResult.isError, true);
+  assert.match(aliasResult.content[0].text, /not a canonical real path/);
+  assert.equal(f.control.nonceCount, 1);
+
+  rmSync(f.worktree);
+  mkdirSync(f.worktree);
+  execFileSync("git", ["-C", f.root, "init", "-q"]);
+  const nestedResult = await reserve.execute(
+    "nested", reserveArguments({ commitOid: f.episodeHead }), undefined, undefined, f.ctx,
+  );
+  assert.equal(nestedResult.isError, true);
+  assert.match(nestedResult.content[0].text, /not its exact Git repository root/);
+  assert.equal(f.control.nonceCount, 1);
+  assert.equal((await status.execute("nested-status", {}, undefined, undefined, f.ctx)).details.phase, "none");
+});
 
 test("official EXPERT reserve fails closed before mutation on owner guide package and subject gates", async (t) => {
   const f = reservationFixture(t);
@@ -1328,7 +1468,9 @@ test("official EXPERT reserve fails closed before mutation on owner guide packag
   assert.equal(reserved.isError, undefined, JSON.stringify(reserved));
   assert.equal(reserved.details.phase, "reserved");
   assert.equal(reserved.details.ownerSessionId, "owner-session");
-  assert.equal(reserved.details.repositoryPath, f.cwd);
+  assert.equal(reserved.details.repositoryPath, realpathSync(f.identity.worktree));
+  assert.equal(f.control.repositoryTarget, realpathSync(f.identity.worktree));
+  assert.notEqual(reserved.details.repositoryPath, f.cwd);
   assert.equal(reserved.details.commitOid, EXPERT_COMMIT);
   assert.equal(reserved.details.packetDigest, EXPERT_PACKET);
   assert.equal(reserved.details.selector, OFFICIAL_EXPERT_SELECTOR);
@@ -1461,6 +1603,8 @@ test("official EXPERT reservation is exact to one owner episode generation in th
   const betaSlug = "beta-plan";
   const betaLocation = ".ralph/plans/future/beta-plan";
   const betaWorktree = resolve(dirname(f.cwd), `${basename(f.cwd)}-${betaSlug}-episode`);
+  mkdirSync(betaWorktree, { recursive: true });
+  t.after(() => rmSync(betaWorktree, { recursive: true, force: true }));
   const generationB = {
     ...f.identity,
     slug: betaSlug,

@@ -710,3 +710,29 @@ spawn return tuple recorded as unverified pending evidence with no authority.
 Focused and complete Tier 0/Docker Tier 1/pinned-0.9.8 gates are green. Live
 spawn, child-side admission/verification, delivery, review, settlement, cleanup,
 and operational cutover remain future work.
+
+### Required repository-subject repair
+
+The owner did not accept candidate
+`038d1cbaeb5f00614c4b4f40784cdb9119e72862`. Its reservation subject incorrectly
+derives repository path and HEAD from owning Conversation `ctx.cwd`. The exact
+review subject is the active oversight marker's episode worktree and candidate
+commit.
+
+The repaired reserve gate must canonicalize the trusted marker `worktree`, prove
+it exists and equals that worktree's own `git rev-parse --show-toplevel`, and
+prove its current HEAD equals the requested exact 40- or 64-hex OID before any
+reservation mutation. No caller path is accepted. Owner CWD, branch, session
+name, and prompt text cannot substitute. Tests must use distinct owner/worktree
+topology and cover wrong owner HEAD, wrong worktree HEAD, and noncanonical or
+missing marker paths. Every other accepted reservation invariant remains
+unchanged. This pass addresses only this blocker and retains all live admission,
+delivery, review, settlement, cleanup, and operational exclusions.
+
+**Repository-subject repair result.** The reserve path now comes exclusively
+from the exact active marker worktree, which must be canonical, exist, equal its
+own Git top-level, and have HEAD equal to the requested exact OID. Distinct
+owner-CWD/episode-worktree regression coverage and all required refusal cases
+are green across focused, complete, Docker, and pinned-runtime gates. Exact
+review and unchanged commit/push receipts are recorded on `prime-claw-h6w.30`;
+all other Section 23 behavior and exclusions remain intact.
