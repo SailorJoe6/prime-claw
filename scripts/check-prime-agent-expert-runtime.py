@@ -111,6 +111,25 @@ except Exception:
     return value
 
 
+
+
+def valid_description(value: Any, expected: str) -> bool:
+    reviewer = value.get("reviewer") if isinstance(value, dict) else None
+    return (
+        isinstance(value, dict)
+        and value.get("schemaVersion") == 1
+        and value.get("capability") == "private-launch-and-first-call-admission"
+        and value.get("authority") is False
+        and value.get("module") == IMPORT_NAME
+        and value.get("packageSha256") == expected
+        and isinstance(reviewer, dict)
+        and reviewer == {
+            "name": "expert-reviewer",
+            "model": "openai-codex/gpt-6-astra",
+            "thinking": "max",
+        }
+    )
+
 def unavailable(mode: str, python: Path, expected: str, reason: str) -> dict[str, Any]:
     return {
         "schemaVersion": 1,
@@ -132,7 +151,7 @@ def preflight(skill_root: Path) -> dict[str, Any]:
     installed = run_probe(python, source=None, expected=expected)
     if installed.get("probe") == "OK":
         value = installed.get("value")
-        if isinstance(value, dict) and value.get("packageSha256") == expected:
+        if valid_description(value, expected):
             return {
                 "schemaVersion": 1,
                 "status": "AVAILABLE",
@@ -154,8 +173,7 @@ def preflight(skill_root: Path) -> dict[str, Any]:
     value = source.get("value")
     expected_origin = (package_dir / "__init__.py").resolve()
     if (
-        not isinstance(value, dict)
-        or value.get("packageSha256") != expected
+        not valid_description(value, expected)
         or Path(str(value.get("origin", ""))).resolve() != expected_origin
     ):
         return unavailable(mode, python, expected, "source_hash_mismatch")

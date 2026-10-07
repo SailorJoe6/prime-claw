@@ -126,18 +126,17 @@ This ordinary plugin-file ownership does not widen the role-protocol manager's
 fixed context/legacy-APPEND/manifest receipt. The project
 `.ralph/skills/oversee-episode/SKILL.md` is only a policy-free compatibility shim;
 its `.agents` discovery symlink remains for transition diagnostics. The
-standalone reviewer profile remains byte-identical migration evidence. The
-EXPERT package itself stays definition-only and inert. A separately owned native
-support file adds owner-scoped, exact-oversight-generation in-memory
-reserve/bind/read-only-status/cancel state only. Reserve/bind require exact
-active-owner guide readiness and a fresh
-`AVAILABLE` package probe; `SYNC_PENDING` and `UNAVAILABLE` fail before
-mutation. Reserve takes no repository path from the caller: it canonicalizes the
-trusted active marker worktree, proves that path is its own Git top-level, and
-requires its HEAD to equal the requested exact candidate OID. Owner CWD and
-other inferred metadata cannot select the subject. Bind stores only the public
-spawn return tuple as unverified pending evidence. Live spawn, child admission, delivery, review execution, settlement,
-cleanup, persistence, and provider identity remain deferred.
+standalone reviewer profile remains byte-identical migration evidence. The EXPERT package now owns the supported launch sequence. The retired native
+reserve/bind/status/cancel tools grant no compatibility path. `launch(packet)`
+derives the exact active owner and marker worktree from host-authored session
+state, requires one exact model result, creates mode-private untracked `PENDING`
+state, calls public `rlm.spawn` with an unpredictable harmless bootstrap name,
+and atomically publishes `FINALIZED` only from the actual return. The child
+binds that state to public canonical session/model/parent-header facts and
+atomically claims before exposing one rubric-plus-packet provider turn. Inbound
+message content and metadata are ignored. Mismatch, timeout, replay, or duplicate
+claim explicitly aborts before provider use. Report settlement and cleanup
+remain deferred.
 
 The predecessor APPEND-only manager remains in source for bridge rollback. New
 apply/check use the role-protocol manager for both selected context and retained

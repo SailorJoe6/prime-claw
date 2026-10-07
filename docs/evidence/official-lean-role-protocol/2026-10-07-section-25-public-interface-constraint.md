@@ -87,3 +87,13 @@ unforgeable receiver sender/target identity plus sufficient current child/sessio
 identity at or before the provider seam, or an equivalent supported admission
 callback. Re-audit that release. Prime Agent remains an upstream dependency and
 must not be patched or forked as the prime-claw solution.
+
+## Product correction
+
+The owner accepts this audit's narrow conclusion: inbound message metadata is
+not a supported authority source. The terminal-block disposition is superseded,
+not erased. A supported redesign avoids inbound messages entirely by binding an
+owner-created private launch record to the actual public spawn return and the
+child's public canonical session/model/parent lineage at its initial context
+hook. Blocker commit `3586dcc0cb02f314e7c50f661d956f794637f17c` remains audit
+history. Active authority is the restored spec and Execution Plan Section 26.

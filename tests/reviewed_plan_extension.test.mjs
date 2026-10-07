@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -26,12 +28,19 @@ import {
 import {
   EXPERT_REVIEW_BIND_TOOL,
   EXPERT_REVIEW_CANCEL_TOOL,
+  EXPERT_REVIEW_PACKET_KIND,
   EXPERT_REVIEW_RESERVATION_TTL_MS,
   EXPERT_REVIEW_RESERVE_TOOL,
+  EXPERT_REVIEW_STATE_SCHEMA,
   EXPERT_REVIEW_STATUS_TOOL,
   OFFICIAL_EXPERT_SELECTOR,
   OFFICIAL_EXPERT_THINKING,
+  registerOfficialExpertReviewReservation,
 } from "../src/prime-agent-plugin/extension-support/expert-review-reservation.ts";
+import {
+  PRIME_CLAW_ROLE_KERNEL_SHA256,
+  PRIME_CLAW_ROLE_KERNEL_TEXT,
+} from "../src/prime-agent-plugin/extension-support/role-kernel.generated.ts";
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -74,7 +83,11 @@ function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPro
     },
     on(name, handler) {
       const earlier = events.get(name);
-      events.set(name, earlier ? async (...args) => { await earlier(...args); return handler(...args); } : handler);
+      events.set(name, earlier ? async (...args) => {
+        const previous = await earlier(...args);
+        if (name === "context" && previous?.messages) args[0] = { ...args[0], messages: previous.messages };
+        return (await handler(...args)) ?? previous;
+      } : handler);
     },
     appendEntry(customType, data) { entries.push({ type: "custom", customType, data }); },
     sendUserMessage(message, options) {
@@ -219,12 +232,13 @@ test("registers native reviewed commands, planning tool, and native-only impleme
   assert.deepEqual([...f.tools.keys()], [
     CONVERSATION_GUIDE_ACTIVATION_TOOL,
     CONVERSATION_GUIDE_STATUS_TOOL,
-    EXPERT_REVIEW_RESERVE_TOOL, EXPERT_REVIEW_BIND_TOOL,
-    EXPERT_REVIEW_STATUS_TOOL, EXPERT_REVIEW_CANCEL_TOOL,
     "ralph_plan", "create_spec_episode", "finalize_spec_episode", "handoff_spec_episode",
   ]);
   assert.equal(f.tools.has("ralph_implement_spec"), false);
-  assert.deepEqual([...f.events.keys()], ["session_start", "session_shutdown", "context", "agent_end"]);
+  for (const retired of [EXPERT_REVIEW_RESERVE_TOOL, EXPERT_REVIEW_BIND_TOOL, EXPERT_REVIEW_STATUS_TOOL, EXPERT_REVIEW_CANCEL_TOOL]) {
+    assert.equal(f.tools.has(retired), false, `${retired} must remain retired`);
+  }
+  assert.deepEqual([...f.events.keys()], ["session_start", "session_shutdown", "context", "before_agent_start", "agent_end"]);
   assert.match(f.commands.get("plan").description, /explicit .*future/);
   const planTool = f.tools.get("ralph_plan");
   assert.equal(planTool.executionMode, "sequential");
@@ -234,21 +248,6 @@ test("registers native reviewed commands, planning tool, and native-only impleme
   assert.ok(planTool.promptGuidelines.every((guideline) => guideline.includes("ralph_plan")));
   assert.deepEqual(f.tools.get("create_spec_episode").parameters.required, ["location"]);
   assert.equal(f.tools.get("create_spec_episode").parameters.additionalProperties, false);
-  const reserveTool = f.tools.get(EXPERT_REVIEW_RESERVE_TOOL);
-  assert.deepEqual(Object.keys(reserveTool.parameters.properties), ["commitOid", "packetDigest", "selector", "thinking"]);
-  assert.deepEqual(reserveTool.parameters.required, ["commitOid", "packetDigest", "selector", "thinking"]);
-  assert.equal(reserveTool.parameters.additionalProperties, false);
-  const bindTool = f.tools.get(EXPERT_REVIEW_BIND_TOOL);
-  assert.deepEqual(Object.keys(bindTool.parameters.properties), ["nonce", "rlmChildId", "childName", "sessionDir", "returnedModel"]);
-  assert.deepEqual(bindTool.parameters.required, ["nonce", "rlmChildId", "childName", "sessionDir", "returnedModel"]);
-  assert.equal(bindTool.parameters.additionalProperties, false);
-  assert.deepEqual(f.tools.get(EXPERT_REVIEW_STATUS_TOOL).parameters.required, undefined);
-  assert.equal(f.tools.get(EXPERT_REVIEW_STATUS_TOOL).parameters.additionalProperties, false);
-  assert.equal(f.tools.get(EXPERT_REVIEW_CANCEL_TOOL).parameters.additionalProperties, false);
-  const expertText = [reserveTool, bindTool, f.tools.get(EXPERT_REVIEW_STATUS_TOOL), f.tools.get(EXPERT_REVIEW_CANCEL_TOOL)]
-    .flatMap((tool) => [tool.description, ...(tool.promptGuidelines ?? [])]).join(" ");
-  assert.match(expertText, /does not admit|never proves|no .*authority/i);
-  assert.doesNotMatch(expertText, /send.*agent|spawn.*for you|verified expert/i);
   const finalizeTool = f.tools.get("finalize_spec_episode");
   assert.deepEqual(Object.keys(finalizeTool.parameters.properties), ["location"]);
   assert.deepEqual(finalizeTool.parameters.required, ["location"]);
@@ -795,7 +794,7 @@ test("prospective receipt is exact to location and preparation lifecycle and abo
 
   await f.commands.get("implement-spec").handler(betaLocation, f.ctx);
   await f.events.get("agent_end")({}, f.ctx);
-  assert.throws(
+  await assert.rejects(
     () => f.events.get("context")({ messages: staleMessages }, f.ctx),
     /issued Conversation guide receipt is stale or mismatched/,
   );
@@ -964,7 +963,7 @@ test("successful create activates exact owner oversight without an oversight ski
     { role: "assistant", content: [{ type: "toolCall", id: "malformed-guide", name: CONVERSATION_GUIDE_ACTIVATION_TOOL, arguments: {} }] },
     { role: "toolResult", toolCallId: "malformed-guide", toolName: CONVERSATION_GUIDE_ACTIVATION_TOOL, content: malformedIssued.content, details: { ...malformedIssued.details, sha256: "wrong" }, isError: false, timestamp: Date.now() },
   ];
-  assert.throws(() => f.events.get("context")({ messages: malformedMessages }, f.ctx), /tool call\/result pair is missing or malformed/);
+  await assert.rejects(() => f.events.get("context")({ messages: malformedMessages }, f.ctx), /tool call\/result pair is missing or malformed/);
   const afterMalformed = await f.tools.get(CONVERSATION_GUIDE_STATUS_TOOL).execute("status-after-malformed", {}, undefined, undefined, f.ctx);
   assert.equal(afterMalformed.details.ready, false);
   for (const alias of ["result", "call"]) {
@@ -979,7 +978,7 @@ test("successful create activates exact owner oversight without an oversight ski
     } else {
       messages[0].content.push({ type: "toolCall", id: toolCallId, name: CONVERSATION_GUIDE_STATUS_TOOL, arguments: {} });
     }
-    assert.throws(() => f.events.get("context")({ messages }, f.ctx), /tool call\/result pair is missing or malformed/);
+    await assert.rejects(() => f.events.get("context")({ messages }, f.ctx), /tool call\/result pair is missing or malformed/);
     assert.match(f.notices.at(-1).message, /conversation blocked: issued Conversation guide tool call\/result pair is missing or malformed/);
     const status = await f.tools.get(CONVERSATION_GUIDE_STATUS_TOOL).execute(`status-after-${alias}-alias`, {}, undefined, undefined, f.ctx);
     assert.equal(status.details.ready, false);
@@ -1343,360 +1342,170 @@ function reservationTopologyFixture(t) {
   return { root, cwd, worktree, ownerHead, episodePrevious, episodeHead, control, identity, marker, setWorktree, ...f };
 }
 
-test("official EXPERT reserve derives its subject only from the canonical active episode worktree", async (t) => {
-  const f = reservationTopologyFixture(t);
-  await f.events.get("session_start")({}, f.ctx);
-  await activateConversationGuide(f, "topology-guide");
-  const reserve = f.tools.get(EXPERT_REVIEW_RESERVE_TOOL);
-  const cancel = f.tools.get(EXPERT_REVIEW_CANCEL_TOOL);
-  const status = f.tools.get(EXPERT_REVIEW_STATUS_TOOL);
+function canonicalJson(value) {
+  if (value === null || typeof value === "string" || typeof value === "boolean" || typeof value === "number") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+}
 
-  const ownerHead = await reserve.execute(
-    "owner-head", reserveArguments({ commitOid: f.ownerHead }), undefined, undefined, f.ctx,
-  );
-  assert.equal(ownerHead.isError, true);
-  assert.match(ownerHead.content[0].text, /active episode worktree HEAD/);
-  assert.equal(f.control.nonceCount, 0);
+function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 
-  const staleWorktreeHead = await reserve.execute(
-    "stale-worktree-head", reserveArguments({ commitOid: f.episodePrevious }), undefined, undefined, f.ctx,
-  );
-  assert.equal(staleWorktreeHead.isError, true);
-  assert.match(staleWorktreeHead.content[0].text, /active episode worktree HEAD/);
-  assert.equal(f.control.nonceCount, 0);
-
-  const reserved = await reserve.execute(
-    "episode-head", reserveArguments({ commitOid: f.episodeHead }), undefined, undefined, f.ctx,
-  );
-  assert.equal(reserved.isError, undefined, JSON.stringify(reserved));
-  assert.equal(reserved.details.repositoryPath, realpathSync(f.worktree));
-  assert.equal(reserved.details.commitOid, f.episodeHead);
-  assert.notEqual(reserved.details.repositoryPath, realpathSync(f.cwd));
-  assert.equal(f.control.nonceCount, 1);
-  assert.equal((await cancel.execute("cancel", {}, undefined, undefined, f.ctx)).details.cancelled, true);
-
-  f.setWorktree(`${f.worktree}/.`);
-  await activateConversationGuide(f, "dot-segment-guide");
-  const dotSegmentResult = await reserve.execute(
-    "dot-segment", reserveArguments({ commitOid: f.episodeHead }), undefined, undefined, f.ctx,
-  );
-  assert.equal(dotSegmentResult.isError, true);
-  assert.match(dotSegmentResult.content[0].text, /not a canonical real path/);
-  assert.equal(f.control.nonceCount, 1);
-  assert.equal((await status.execute("dot-segment-status", {}, undefined, undefined, f.ctx)).details.phase, "none");
-  f.setWorktree(f.worktree);
-  await activateConversationGuide(f, "restored-canonical-guide");
-
-  rmSync(f.worktree, { recursive: true, force: true });
-  const missingResult = await reserve.execute(
-    "missing", reserveArguments({ commitOid: f.episodeHead }), undefined, undefined, f.ctx,
-  );
-  assert.equal(missingResult.isError, true);
-  assert.equal(f.control.nonceCount, 1);
-  assert.equal((await status.execute("missing-status", {}, undefined, undefined, f.ctx)).details.phase, "none");
-
-  const aliasTarget = join(f.root, "episode-worktree-alias-target");
-  mkdirSync(aliasTarget);
-  symlinkSync(aliasTarget, f.worktree, "dir");
-  const aliasResult = await reserve.execute(
-    "alias", reserveArguments({ commitOid: f.episodeHead }), undefined, undefined, f.ctx,
-  );
-  assert.equal(aliasResult.isError, true);
-  assert.match(aliasResult.content[0].text, /not a canonical real path/);
-  assert.equal(f.control.nonceCount, 1);
-
-  rmSync(f.worktree);
-  mkdirSync(f.worktree);
-  execFileSync("git", ["-C", f.root, "init", "-q"]);
-  const nestedResult = await reserve.execute(
-    "nested", reserveArguments({ commitOid: f.episodeHead }), undefined, undefined, f.ctx,
-  );
-  assert.equal(nestedResult.isError, true);
-  assert.match(nestedResult.content[0].text, /not its exact Git repository root/);
-  assert.equal(f.control.nonceCount, 1);
-  assert.equal((await status.execute("nested-status", {}, undefined, undefined, f.ctx)).details.phase, "none");
-});
-
-test("official EXPERT reserve fails closed before mutation on owner guide package and subject gates", async (t) => {
-  const f = reservationFixture(t);
-  await f.events.get("session_start")({}, f.ctx);
-  const reserve = f.tools.get(EXPERT_REVIEW_RESERVE_TOOL);
-  const status = f.tools.get(EXPERT_REVIEW_STATUS_TOOL);
-
-  const missingGuide = await reserve.execute("reserve-no-guide", reserveArguments(), undefined, undefined, f.ctx);
-  assert.equal(missingGuide.isError, true);
-  assert.match(missingGuide.content[0].text, /guide has not been activated and consumed/);
-  assert.equal(f.control.packageCalls, 0);
-  assert.equal(f.control.repositoryCalls, 0);
-  assert.equal(f.control.nonceCount, 0);
-
-  await activateConversationGuide(f, "reservation-guide");
-  f.control.packageStatus = {
-    schemaVersion: 1, status: "SYNC_PENDING", mode: "managed",
-    expectedPackageSha256: EXPERT_PACKAGE, installedReason: "package_import_failed",
+function admissionFixture(t, mutate = () => {}) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-expert-admission-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const stateRoot = join(root, "private-state"); mkdirSync(stateRoot, { mode: 0o700 }); chmodSync(stateRoot, 0o700);
+  const projectPath = join(root, "project"); const repositoryPath = join(root, "episode");
+  mkdirSync(projectPath); mkdirSync(repositoryPath);
+  const ownerSessionId = "11111111-1111-7111-8111-111111111111";
+  const ownerSessionFile = join(root, "owner.jsonl");
+  const episodeId = "22222222-2222-7222-8222-222222222222";
+  const marker = {
+    markerVersion: 2, status: "active", ownerSessionId, slug: "alpha-plan",
+    sourceLocation: ".ralph/plans/future/alpha-plan", episodeId,
+    episodeSessionFile: join(repositoryPath, "episode.jsonl"), branch: "episode/alpha-plan",
+    worktree: repositoryPath, sessionName: "alpha-plan-episode", identityVersion: 2, admission: "delivered",
   };
-  const pending = await reserve.execute("reserve-pending", reserveArguments(), undefined, undefined, f.ctx);
-  assert.equal(pending.isError, true);
-  assert.match(pending.content[0].text, /package is SYNC_PENDING/);
-  assert.equal(f.control.repositoryCalls, 0);
-  assert.equal(f.control.nonceCount, 0);
-  assert.equal((await status.execute("status-after-pending", {}, undefined, undefined, f.ctx)).details.phase, "none");
-
-  f.control.packageStatus = {
-    schemaVersion: 1, status: "UNAVAILABLE", mode: "configured",
-    expectedPackageSha256: EXPERT_PACKAGE, reason: "package_hash_mismatch",
+  const ownerHeader = { type: "session", version: 3, id: ownerSessionId, timestamp: "2026-10-07T00:00:00Z", cwd: projectPath, rlmDepth: 0 };
+  writeFileSync(ownerSessionFile, `${JSON.stringify(ownerHeader)}\n${JSON.stringify({ type: "custom", id: "marker", parentId: null, timestamp: ownerHeader.timestamp, customType: "prime-claw-conversation-oversight", data: marker })}\n`, { mode: 0o600 });
+  const ownerGeneration = sha256(JSON.stringify([
+    2, ownerSessionId, marker.slug, marker.sourceLocation, episodeId, resolve(marker.episodeSessionFile),
+    marker.branch, resolve(repositoryPath), marker.sessionName, 2, marker.admission,
+  ]));
+  const childName = "expert-review-abcdefghijklmnopqrstuvwx";
+  const rlmChildId = "sub-deadbeef"; const sessionDir = join(root, rlmChildId); mkdirSync(sessionDir);
+  const childSessionId = "33333333-3333-7333-8333-333333333333";
+  const sessionFile = join(sessionDir, `${childSessionId}.jsonl`);
+  const childHeader = { type: "session", version: 3, id: childSessionId, timestamp: ownerHeader.timestamp, cwd: projectPath, parentSession: ownerSessionFile, rlmDepth: 1 };
+  writeFileSync(sessionFile, `${JSON.stringify(childHeader)}\n`, { mode: 0o600 });
+  const commitOid = "c".repeat(40); const packageSha256 = "a".repeat(64);
+  const packet = {
+    schemaVersion: 1, kind: EXPERT_REVIEW_PACKET_KIND, repositoryPath, commitOid,
+    specificationPath: ".ralph/plans/SPECIFICATION.md", executionPlanPath: ".ralph/plans/EXECUTION_PLAN.md",
+    evidencePaths: ["docs/evidence/official-lean-role-protocol/candidate.md"], focus: "Review the exact candidate only.",
   };
-  const unavailable = await reserve.execute("reserve-unavailable", reserveArguments(), undefined, undefined, f.ctx);
-  assert.equal(unavailable.isError, true);
-  assert.match(unavailable.content[0].text, /UNAVAILABLE: package_hash_mismatch/);
-  assert.equal(f.control.repositoryCalls, 0);
-  assert.equal(f.control.nonceCount, 0);
-
-  f.control.packageStatus = {
-    schemaVersion: 1, status: "AVAILABLE", mode: "managed",
-    expectedPackageSha256: EXPERT_PACKAGE, packageSha256: EXPERT_PACKAGE,
+  const packetJson = canonicalJson(packet);
+  const record = {
+    schema: EXPERT_REVIEW_STATE_SCHEMA, phase: "FINALIZED", nonce: "n".repeat(43),
+    createdAt: 1_000, expiresAt: 1_000 + EXPERT_REVIEW_RESERVATION_TTL_MS,
+    ownerSessionId, ownerSessionFile, ownerHeaderId: ownerSessionId, ownerGeneration,
+    projectPath, repositoryPath, candidateCommitOid: commitOid, packet, packetJson,
+    packetDigest: sha256(packetJson), packageSha256, kernelSha256: PRIME_CLAW_ROLE_KERNEL_SHA256,
+    selector: OFFICIAL_EXPERT_SELECTOR, thinking: OFFICIAL_EXPERT_THINKING,
+    childName, bootstrapDigest: sha256("harmless bootstrap"), finalizedAt: 1_100,
+    rlmChildId, sessionDir, returnedModel: OFFICIAL_EXPERT_SELECTOR,
   };
-  const wrongCommit = await reserve.execute(
-    "reserve-wrong-commit", reserveArguments({ commitOid: "d".repeat(40) }), undefined, undefined, f.ctx,
-  );
-  assert.equal(wrongCommit.isError, true);
-  assert.match(wrongCommit.content[0].text, /does not match.*HEAD/);
-  assert.equal(f.control.nonceCount, 0);
-  assert.equal((await status.execute("status-after-wrong", {}, undefined, undefined, f.ctx)).details.phase, "none");
-
-  const reserved = await reserve.execute("reserve-ok", reserveArguments(), undefined, undefined, f.ctx);
-  assert.equal(reserved.isError, undefined, JSON.stringify(reserved));
-  assert.equal(reserved.details.phase, "reserved");
-  assert.equal(reserved.details.ownerSessionId, "owner-session");
-  assert.equal(reserved.details.repositoryPath, realpathSync(f.identity.worktree));
-  assert.equal(f.control.repositoryTarget, realpathSync(f.identity.worktree));
-  assert.notEqual(reserved.details.repositoryPath, f.cwd);
-  assert.equal(reserved.details.commitOid, EXPERT_COMMIT);
-  assert.equal(reserved.details.packetDigest, EXPERT_PACKET);
-  assert.equal(reserved.details.selector, OFFICIAL_EXPERT_SELECTOR);
-  assert.equal(reserved.details.thinking, OFFICIAL_EXPERT_THINKING);
-  assert.equal(reserved.details.packageSha256, EXPERT_PACKAGE);
-  assert.equal(reserved.details.authority, false);
-  assert.match(reserved.details.nonce, /^[A-Za-z0-9_-]{32,128}$/);
-  assert.equal(reserved.details.expiresAt - reserved.details.createdAt, EXPERT_REVIEW_RESERVATION_TTL_MS);
-
-  const duplicate = await reserve.execute("reserve-duplicate", reserveArguments(), undefined, undefined, f.ctx);
-  assert.equal(duplicate.isError, true);
-  assert.match(duplicate.content[0].text, /already active/);
-  assert.equal(f.control.nonceCount, 1);
-});
-
-test("official EXPERT bind records one exact tuple only as pending caller evidence", async (t) => {
-  const f = reservationFixture(t);
-  await f.events.get("session_start")({}, f.ctx);
-  await activateConversationGuide(f, "binding-guide");
-  const reserve = f.tools.get(EXPERT_REVIEW_RESERVE_TOOL);
-  const bind = f.tools.get(EXPERT_REVIEW_BIND_TOOL);
-  const status = f.tools.get(EXPERT_REVIEW_STATUS_TOOL);
-  const reserved = await reserve.execute("reserve", reserveArguments(), undefined, undefined, f.ctx);
-  const before = structuredClone((await status.execute("before", {}, undefined, undefined, f.ctx)).details);
-
-  f.control.packageStatus = {
-    schemaVersion: 1, status: "SYNC_PENDING", mode: "managed",
-    expectedPackageSha256: EXPERT_PACKAGE, installedReason: "package_import_failed",
-  };
-  const pending = await bind.execute("bind-pending", bindArguments(f, reserved.details.nonce), undefined, undefined, f.ctx);
-  assert.equal(pending.isError, true);
-  assert.match(pending.content[0].text, /package is SYNC_PENDING/);
-  assert.deepEqual((await status.execute("after-package-failure", {}, undefined, undefined, f.ctx)).details, before);
-
-  f.control.packageStatus = {
-    schemaVersion: 1, status: "AVAILABLE", mode: "managed",
-    expectedPackageSha256: "d".repeat(64), packageSha256: "d".repeat(64),
-  };
-  const changedPackage = await bind.execute(
-    "bind-changed-package", bindArguments(f, reserved.details.nonce), undefined, undefined, f.ctx,
-  );
-  assert.equal(changedPackage.isError, true);
-  assert.match(changedPackage.content[0].text, /package generation changed/);
-  assert.deepEqual((await status.execute("after-package-change", {}, undefined, undefined, f.ctx)).details, before);
-
-  f.control.packageStatus = {
-    schemaVersion: 1, status: "AVAILABLE", mode: "managed",
-    expectedPackageSha256: EXPERT_PACKAGE, packageSha256: EXPERT_PACKAGE,
-  };
-  const wrongNonce = await bind.execute("bind-wrong-nonce", bindArguments(f, "wrong_nonce_value_that_is_not_the_reservation"), undefined, undefined, f.ctx);
-  assert.equal(wrongNonce.isError, true);
-  assert.match(wrongNonce.content[0].text, /nonce mismatch/);
-  assert.deepEqual((await status.execute("after-wrong-nonce", {}, undefined, undefined, f.ctx)).details, before);
-
-  const wrongModel = await bind.execute("bind-wrong-model", bindArguments(f, reserved.details.nonce, { returnedModel: "openai-codex/wrong-model" }), undefined, undefined, f.ctx);
-  assert.equal(wrongModel.isError, true);
-  assert.match(wrongModel.content[0].text, /does not match the reserved selector/);
-
-  const bound = await bind.execute("bind-ok", bindArguments(f, reserved.details.nonce), undefined, undefined, f.ctx);
-  assert.equal(bound.isError, undefined, JSON.stringify(bound));
-  assert.equal(bound.details.phase, "bound-pending");
-  assert.equal(bound.details.rlmChildId, "sub-deadbeef");
-  assert.equal(bound.details.childName, "official-expert-reviewer");
-  assert.equal(bound.details.sessionDir, join(f.cwd, "child-session"));
-  assert.equal(bound.details.returnedModel, OFFICIAL_EXPERT_SELECTOR);
-  assert.equal(bound.details.evidence, "caller-supplied-unverified");
-  assert.equal(bound.details.authority, false);
-  assert.match(bound.content[0].text, /not admitted or verified as EXPERT/);
-
-  const replay = await bind.execute("bind-replay", bindArguments(f, reserved.details.nonce, { rlmChildId: "sub-feedface" }), undefined, undefined, f.ctx);
-  assert.equal(replay.isError, true);
-  assert.match(replay.content[0].text, /already bound/);
-  assert.equal((await status.execute("after-replay", {}, undefined, undefined, f.ctx)).details.rlmChildId, "sub-deadbeef");
-});
-
-test("official EXPERT status is read-only and expiry cancellation and session boundaries are idempotent", async (t) => {
-  const f = reservationFixture(t);
-  await f.events.get("session_start")({}, f.ctx);
-  await activateConversationGuide(f, "lifecycle-guide");
-  const reserve = f.tools.get(EXPERT_REVIEW_RESERVE_TOOL);
-  const bind = f.tools.get(EXPERT_REVIEW_BIND_TOOL);
-  const status = f.tools.get(EXPERT_REVIEW_STATUS_TOOL);
-  const cancel = f.tools.get(EXPERT_REVIEW_CANCEL_TOOL);
-  const first = await reserve.execute("reserve-first", reserveArguments(), undefined, undefined, f.ctx);
-
-  const statusOne = await status.execute("status-one", {}, undefined, undefined, f.ctx);
-  const statusTwo = await status.execute("status-two", {}, undefined, undefined, f.ctx);
-  assert.deepEqual(statusTwo.details, statusOne.details);
-  f.control.now = first.details.expiresAt;
-  const expiredOne = await status.execute("expired-one", {}, undefined, undefined, f.ctx);
-  const expiredTwo = await status.execute("expired-two", {}, undefined, undefined, f.ctx);
-  assert.equal(expiredOne.details.phase, "expired");
-  assert.equal(expiredOne.details.previousPhase, "reserved");
-  assert.deepEqual(expiredTwo.details, expiredOne.details);
-
-  const expiredBind = await bind.execute("expired-bind", bindArguments(f, first.details.nonce), undefined, undefined, f.ctx);
-  assert.equal(expiredBind.isError, true);
-  assert.match(expiredBind.content[0].text, /has expired/);
-  assert.deepEqual((await status.execute("expired-after-bind", {}, undefined, undefined, f.ctx)).details, expiredOne.details);
-
-  const replacement = await reserve.execute("reserve-replacement", reserveArguments(), undefined, undefined, f.ctx);
-  assert.equal(replacement.isError, undefined);
-  assert.notEqual(replacement.details.nonce, first.details.nonce);
-  const cancelled = await cancel.execute("cancel", {}, undefined, undefined, f.ctx);
-  const cancelledAgain = await cancel.execute("cancel-again", {}, undefined, undefined, f.ctx);
-  assert.equal(cancelled.details.cancelled, true);
-  assert.equal(cancelledAgain.details.cancelled, false);
-  assert.equal((await status.execute("after-cancel", {}, undefined, undefined, f.ctx)).details.phase, "none");
-
-  await reserve.execute("reserve-before-shutdown", reserveArguments(), undefined, undefined, f.ctx);
-  await f.events.get("session_shutdown")({}, f.ctx);
-  assert.equal((await status.execute("after-shutdown", {}, undefined, undefined, f.ctx)).details.phase, "none");
-  await f.events.get("session_shutdown")({}, f.ctx);
-  await reserve.execute("reserve-before-start", reserveArguments(), undefined, undefined, f.ctx);
-  await f.events.get("session_start")({}, f.ctx);
-  assert.equal((await status.execute("after-start", {}, undefined, undefined, f.ctx)).details.phase, "none");
-});
-
-test("official EXPERT reservation is exact to one owner episode generation in the same session", async (t) => {
-  const f = reservationFixture(t);
-  await f.events.get("session_start")({}, f.ctx);
-  await activateConversationGuide(f, "generation-a-guide");
-  const reserve = f.tools.get(EXPERT_REVIEW_RESERVE_TOOL);
-  const bind = f.tools.get(EXPERT_REVIEW_BIND_TOOL);
-  const status = f.tools.get(EXPERT_REVIEW_STATUS_TOOL);
-  const cancel = f.tools.get(EXPERT_REVIEW_CANCEL_TOOL);
-  const generationA = await reserve.execute("reserve-a", reserveArguments(), undefined, undefined, f.ctx);
-  assert.equal(generationA.isError, undefined);
-
-  const betaSlug = "beta-plan";
-  const betaLocation = ".ralph/plans/future/beta-plan";
-  const betaWorktree = resolve(dirname(f.cwd), `${basename(f.cwd)}-${betaSlug}-episode`);
-  mkdirSync(betaWorktree, { recursive: true });
-  t.after(() => rmSync(betaWorktree, { recursive: true, force: true }));
-  const generationB = {
-    ...f.identity,
-    slug: betaSlug,
-    sourceLocation: betaLocation,
-    episodeId: "55555555-5555-4555-8555-555555555555",
-    episodeActiveSessionId: "beta-route",
-    episodeSessionFile: join(betaWorktree, "episode.jsonl"),
-    branch: `episode/${betaSlug}`,
-    worktree: betaWorktree,
-    sessionName: `${betaSlug}-episode`,
-  };
-  const state = join(f.cwd, ".prime", "agent", "state", "spec-episodes");
-  rmSync(join(state, "alpha-plan.json"));
-  writeFileSync(join(state, "beta-plan.json"), JSON.stringify(generationB));
-  const alphaMarker = f.entries.at(-1).data;
-  f.entries.push({
-    type: "custom", customType: "prime-claw-conversation-oversight",
-    data: { ...alphaMarker, status: "inactive" },
+  const control = { now: 2_000, packageSha256, commitOid, systemPrompt: PRIME_CLAW_ROLE_KERNEL_TEXT, aborts: 0, notices: [] };
+  mutate({ record, control, childHeader, ownerHeader, marker, packet });
+  writeFileSync(sessionFile, `${JSON.stringify(childHeader)}\n`, { mode: 0o600 });
+  writeFileSync(ownerSessionFile, `${JSON.stringify(ownerHeader)}\n${JSON.stringify({ type: "custom", id: "marker", parentId: null, timestamp: ownerHeader.timestamp, customType: "prime-claw-conversation-oversight", data: marker })}\n`, { mode: 0o600 });
+  const finalized = join(stateRoot, `${childName}.finalized.json`);
+  writeFileSync(finalized, `${canonicalJson(record)}\n`, { mode: 0o600 }); chmodSync(finalized, 0o600);
+  const hooks = { before: [], context: [] };
+  registerOfficialExpertReviewReservation({
+    on(name, handler) { if (name === "before_agent_start") hooks.before.push(handler); if (name === "context") hooks.context.push(handler); },
+  }, {
+    guideRoot: join(REPO_ROOT, "src", "prime-agent-plugin"), stateRoot, now: () => control.now,
+    admissionWaitMs: 2, wait: async () => {},
+    packageStatus: () => ({ schemaVersion: 1, status: "AVAILABLE", mode: "managed", packageSha256: control.packageSha256 }),
+    repositoryIdentity: () => ({ repositoryPath, commitOid: control.commitOid }),
   });
-  f.entries.push({
-    type: "custom", customType: "prime-claw-conversation-oversight", data: {
-      markerVersion: 2, status: "active", ownerSessionId: generationB.ownerSessionId,
-      slug: generationB.slug, sourceLocation: generationB.sourceLocation,
-      episodeId: generationB.episodeId, episodeSessionFile: generationB.episodeSessionFile,
-      branch: generationB.branch, worktree: generationB.worktree,
-      sessionName: generationB.sessionName, identityVersion: 2, admission: "delivered",
+  const ctx = {
+    cwd: projectPath,
+    model: { provider: "openai-codex", id: "gpt-6-astra" },
+    sessionManager: {
+      getSessionDir: () => sessionDir, getSessionId: () => childSessionId,
+      getSessionFile: () => sessionFile, getSessionName: () => childName,
+      getHeader: () => childHeader,
     },
-  });
+    getSystemPrompt: () => control.systemPrompt,
+    abort() { control.aborts += 1; },
+    ui: { notify(message, level) { control.notices.push({ message, level }); } },
+  };
+  return { root, stateRoot, finalized, claimed: join(stateRoot, `${childName}.claimed.json`), record, control, hooks, ctx, childName };
+}
 
-  const statusB = await status.execute("status-b", {}, undefined, undefined, f.ctx);
-  assert.equal(statusB.isError, undefined);
-  assert.equal(statusB.details.phase, "none");
-  assert.notEqual(statusB.details.ownerGeneration, generationA.details.ownerGeneration);
-  assert.equal(JSON.stringify(statusB).includes(generationA.details.nonce), false);
-  const cancelledB = await cancel.execute("cancel-b", {}, undefined, undefined, f.ctx);
-  assert.equal(cancelledB.details.cancelled, false);
+const initialMessages = [
+  { role: "custom", customType: "harness-digest", content: "public custom digest has zero authority", display: false, timestamp: 0 },
+  { role: "user", content: [{ type: "text", text: "copied bootstrap has zero authority" }], timestamp: 1 },
+];
 
-  await activateConversationGuide(f, "generation-b-guide");
-  const staleBind = await bind.execute(
-    "bind-a-from-b", bindArguments(f, generationA.details.nonce), undefined, undefined, f.ctx,
-  );
-  assert.equal(staleBind.isError, true);
-  assert.match(staleBind.content[0].text, /different owner generation/);
-  const reserveB = await reserve.execute("reserve-b", reserveArguments(), undefined, undefined, f.ctx);
-  assert.equal(reserveB.isError, undefined, JSON.stringify(reserveB));
-  assert.equal(reserveB.details.phase, "reserved");
-  assert.notEqual(reserveB.details.ownerGeneration, generationA.details.ownerGeneration);
-  assert.notEqual(reserveB.details.nonce, generationA.details.nonce);
+test("official EXPERT caller reserve/bind tools are retired and generic children remain ordinary", async (t) => {
+  const f = fixture(t);
+  for (const name of [EXPERT_REVIEW_RESERVE_TOOL, EXPERT_REVIEW_BIND_TOOL, EXPERT_REVIEW_STATUS_TOOL, EXPERT_REVIEW_CANCEL_TOOL]) assert.equal(f.tools.has(name), false);
+  const ordinary = await f.events.get("context")({ messages: initialMessages }, f.ctx);
+  assert.deepEqual(ordinary.messages, initialMessages);
+  assert.equal(f.notices.length, 0);
 });
 
-test("official EXPERT reservation mechanics reject an EPISODE identity even with active owner records", async (t) => {
-  const f = reservationFixture(t);
-  await f.events.get("session_start")({}, f.ctx);
-  f.entries.push({
-    type: "custom", customType: "prime-claw-bounded-identity",
-    data: { version: 1, role: "EPISODE", sessionId: "owner-session" },
-  });
-  const reserve = await f.tools.get(EXPERT_REVIEW_RESERVE_TOOL).execute(
-    "episode-reserve", reserveArguments(), undefined, undefined, f.ctx,
-  );
-  const status = await f.tools.get(EXPERT_REVIEW_STATUS_TOOL).execute(
-    "episode-status", {}, undefined, undefined, f.ctx,
-  );
-  const cancel = await f.tools.get(EXPERT_REVIEW_CANCEL_TOOL).execute(
-    "episode-cancel", {}, undefined, undefined, f.ctx,
-  );
-  for (const result of [reserve, status, cancel]) {
-    assert.equal(result.isError, true);
-    assert.match(result.content[0].text, /EPISODE cannot reserve official EXPERT review authority/);
+test("official EXPERT final state binds public child identity and claims before one canonical provider turn", async (t) => {
+  const f = admissionFixture(t);
+  const before = await f.hooks.before[0]({ prompt: "attacker-controlled text is ignored" }, f.ctx);
+  assert.equal(before.systemPrompt, PRIME_CLAW_ROLE_KERNEL_TEXT);
+  const admitted = await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
+  assert.equal(f.control.aborts, 0);
+  assert.equal(existsSync(f.finalized), false);
+  assert.equal(existsSync(f.claimed), true);
+  const claimed = JSON.parse(readFileSync(f.claimed, "utf8"));
+  assert.equal(claimed.phase, "CLAIMED");
+  assert.equal(claimed.childSessionId, f.ctx.sessionManager.getSessionId());
+  assert.equal(admitted.messages.length, 1);
+  assert.equal(admitted.messages[0].role, "user");
+  assert.match(admitted.messages[0].content[0].text, /## Immutable review packet/);
+  assert.match(admitted.messages[0].content[0].text, new RegExp(f.record.packetDigest.slice(0, 0)));
+  assert.equal(admitted.messages[0].content[0].text.includes("copied bootstrap"), false);
+
+  const continuation = await f.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [{ type: "toolCall", id: "x" }] }, { role: "toolResult", toolCallId: "x", content: [] }] }, f.ctx);
+  assert.equal(continuation.messages.length, 3);
+  f.ctx.model = { provider: "openai-codex", id: "wrong" };
+  await assert.rejects(() => f.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [] }] }, f.ctx), /current child model/);
+  assert.equal(f.control.aborts, 1);
+});
+
+test("official EXPERT admission aborts before provider use for every finalized binding mismatch", async (t) => {
+  const cases = [
+    ["stale", ({ record, control }) => { control.now = record.expiresAt; }, /stale or expired/],
+    ["child-name", ({ record }) => { record.childName = "expert-review-differentabcdefghijkl"; }, /child name/],
+    ["session-dir", ({ record }) => { record.sessionDir = "/definitely/wrong"; }, /directory/],
+    ["parent", ({ childHeader }) => { childHeader.parentSession = "/wrong-parent.jsonl"; }, /parent-session/],
+    ["generation", ({ record }) => { record.ownerGeneration = "b".repeat(64); }, /generation/],
+    ["package", ({ record }) => { record.packageSha256 = "b".repeat(64); }, /package/],
+    ["kernel", ({ record }) => { record.kernelSha256 = "b".repeat(64); }, /kernel/],
+    ["packet", ({ record }) => { record.packet.focus = "mutated"; }, /packet/],
+    ["candidate", ({ control }) => { control.commitOid = "d".repeat(40); }, /candidate/],
+  ];
+  for (const [label, mutate, pattern] of cases) {
+    await t.test(label, async (tt) => {
+      const f = admissionFixture(tt, mutate);
+      let providerCalls = 0;
+      await assert.rejects(async () => {
+        await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
+        providerCalls += 1;
+      }, pattern);
+      assert.equal(providerCalls, 0, "provider must not be called after an admission refusal");
+      assert.equal(f.control.aborts, 1);
+      assert.equal(existsSync(f.claimed), false);
+    });
   }
-  assert.equal(f.control.packageCalls, 0);
-  assert.equal(f.control.repositoryCalls, 0);
-  assert.equal(f.control.nonceCount, 0);
 });
 
-test("official EXPERT reservation mechanics reject ordinary and generic child sessions without mutation", async (t) => {
-  const f = fixture(t, {
-    extension: createReviewedPlanExtension({
-      packageStatus() { throw new Error("package preflight must not run"); },
-      repositoryIdentity() { throw new Error("repository identity must not run"); },
-      nonce() { throw new Error("nonce must not be generated"); },
-    }),
-  });
-  const reserve = await f.tools.get(EXPERT_REVIEW_RESERVE_TOOL).execute(
-    "ordinary-reserve", reserveArguments(), undefined, undefined, f.ctx,
-  );
-  assert.equal(reserve.isError, true);
-  assert.match(reserve.content[0].text, /exact active episode owner/);
-  f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 1 });
-  const status = await f.tools.get(EXPERT_REVIEW_STATUS_TOOL).execute("child-status", {}, undefined, undefined, f.ctx);
-  const cancel = await f.tools.get(EXPERT_REVIEW_CANCEL_TOOL).execute("child-cancel", {}, undefined, undefined, f.ctx);
-  assert.equal(status.isError, true);
-  assert.equal(cancel.isError, true);
-  assert.match(status.content[0].text, /exact active episode owner/);
+test("official EXPERT pending timeout, duplicate claim, and replay all abort", async (t) => {
+  const unsafeRoot = admissionFixture(t);
+  chmodSync(unsafeRoot.stateRoot, 0o755);
+  await assert.rejects(() => unsafeRoot.hooks.context[0]({ messages: initialMessages }, unsafeRoot.ctx), /mode-private/);
+  assert.equal(unsafeRoot.control.aborts, 1);
+
+  const timeout = admissionFixture(t);
+  renameSync(timeout.finalized, join(timeout.stateRoot, `${timeout.childName}.pending.json`));
+  await assert.rejects(() => timeout.hooks.context[0]({ messages: initialMessages }, timeout.ctx), /timed out/);
+  assert.equal(timeout.control.aborts, 1);
+
+  const duplicate = admissionFixture(t);
+  await duplicate.hooks.context[0]({ messages: initialMessages }, duplicate.ctx);
+  await assert.rejects(() => duplicate.hooks.context[0]({ messages: initialMessages }, duplicate.ctx), /duplicated/);
+  assert.equal(duplicate.control.aborts, 1);
+
+  const replay = admissionFixture(t);
+  await replay.hooks.context[0]({ messages: initialMessages }, replay.ctx);
+  await assert.rejects(() => replay.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [] }, { role: "user", content: "replay" }] }, replay.ctx), /replayed|duplicate trigger/);
+  assert.equal(replay.control.aborts, 1);
 });

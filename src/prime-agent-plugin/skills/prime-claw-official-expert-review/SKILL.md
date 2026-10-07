@@ -1,45 +1,49 @@
 ---
 name: prime-claw-official-expert-review
-description: Validate the exact official Prime Claw EXPERT reviewer definition and report package availability. Admission and review execution are intentionally unavailable in this prerequisite generation.
+description: Launch one exact official Prime Claw EXPERT child through private one-use state and public Prime Agent RLM/session interfaces.
 ---
 
 # Prime Claw official EXPERT review
 
-This Python-backed skill currently owns only the official reviewer definition
-and deterministic availability contract. It is inert. It does not spawn a
-reviewer, reserve or admit a role, send a message, mutate lifecycle state, or
-grant EXPERT authority to this session or any child.
-
-The bundled `src/prime_claw_official_expert_review/reviewer.md` is the canonical
-managed definition. During the bridge generation it must remain byte-identical
-to `.prime/agent/profiles/expert-reviewer.md`, which is retained unchanged as
-migration evidence.
-
-## Available API
-
-Read and validate the definition from the persistent Python kernel:
+Use this skill only as the exact active Conversation owner after one pushed
+candidate and its immutable review packet are ready. The Python package owns the
+race-sensitive launch sequence. Do not call `rlm.spawn` separately and do not
+send the packet through `agent_message`.
 
 ```python
-info = prime_claw_official_expert_review.describe()
+packet = {
+    "schemaVersion": 1,
+    "kind": "prime-claw-official-expert-review-packet",
+    "repositoryPath": "/canonical/episode/worktree",
+    "commitOid": "<exact pushed candidate OID>",
+    "specificationPath": ".ralph/plans/SPECIFICATION.md",
+    "executionPlanPath": ".ralph/plans/EXECUTION_PLAN.md",
+    "evidencePaths": ["docs/evidence/<candidate>.md"],
+    "focus": "Review the exact approved scope and candidate.",
+}
+handle = await prime_claw_official_expert_review.launch(packet)
 ```
 
-`describe()` returns the exact model selector, requested reasoning level,
-reviewer-definition hash, rubric hash, package manifest/hash, and
-`authority: false`. It performs no host request and has no admission side
-effect. Any validation error is fail-closed.
+`launch()` validates the canonical reviewer package, derives the depth-0 owner
+and active episode generation from public host-authored session state, verifies
+the marker worktree and exact `HEAD`, and requires exactly one exact configured
+model result. It creates one mode-private `PENDING` record, calls public
+`rlm.spawn` itself with the exact selector/thinking and a harmless unpredictable
+bootstrap name, then finalizes only from the actual returned name, session
+directory, child id, and model. A definite failure revokes `PENDING`. There is
+no model fallback and the returned handle does not prove requested reasoning.
 
-Installer/runtime preflight is performed by
-`scripts/check-prime-agent-expert-runtime.py`. In managed-kernel mode it checks
-the exact kernel interpreter, accepts an exact installed package or validates
-the source package with that interpreter and reports `SYNC_PENDING`. When
-`PRIME_AGENT_KERNEL_PYTHON` is set, it accepts only a normal already-installed
-exact package import and otherwise reports `UNAVAILABLE`; it never installs or
-injects the source path.
+The extension ignores all inbound message text and metadata. At the child's
+initial context it binds the private `FINALIZED` record to public canonical
+child session directory/id/name/file, `header.parentSession`, parent header ID,
+current model, exact owner generation, candidate, packet, package, kernel, and
+TTL. It atomically claims before provider dispatch, removes bootstrap/private
+content, and exposes exactly one canonical rubric-plus-packet user turn. It
+rechecks the model and all bindings on later calls in the same run. Timeout,
+stale state, replay, duplicate claim, or any mismatch explicitly aborts before a
+provider call. Generic children remain ordinary.
 
-## Deferred behavior
-
-Reviewer discovery, spawn, reservation, nonce/expiry state, handle binding,
-child admission, packet delivery, report settlement, cleanup, provider
-identity, and all role authority are deferred. Generic RLM children remain
-generic. Do not interpret successful `describe()` or preflight as an admitted
-or completed EXPERT review.
+`describe()` remains a read-only package validation API and returns
+`authority: false`. Availability preflight remains read-only. Report return and
+settlement, owner PASS/BLOCK disposition, child deletion, and cleanup are not
+part of this skill generation.

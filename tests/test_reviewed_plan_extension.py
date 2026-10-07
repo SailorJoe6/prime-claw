@@ -116,10 +116,10 @@ export default function probe(pi) {
       && toolNames.includes("ralph_plan")
       && toolNames.includes("create_spec_episode")
       && toolNames.includes("handoff_spec_episode")
-      && toolNames.includes("prime_claw_reserve_expert_review")
-      && toolNames.includes("prime_claw_bind_expert_review")
-      && toolNames.includes("prime_claw_expert_review_status")
-      && toolNames.includes("prime_claw_cancel_expert_review")
+      && !toolNames.includes("prime_claw_reserve_expert_review")
+      && !toolNames.includes("prime_claw_bind_expert_review")
+      && !toolNames.includes("prime_claw_expert_review_status")
+      && !toolNames.includes("prime_claw_cancel_expert_review")
       && !toolNames.includes("ralph_implement_spec")) {
       pi.registerCommand("probe-reviewed-plan-tools", {
         description: "RPC proof that reviewed-plan tools are registered",

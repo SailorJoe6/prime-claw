@@ -228,147 +228,65 @@ returns to ordinary CONVERSATION incubation. A later reviewed
 folder requires a fresh native `/implement-spec` run. The first episode never
 lifetime-locks that owner.
 
-### Explicit EXPERT reviewer policy
+### Explicit EXPERT reviewer launch and admission policy
 
-The managed bridge now contains the Python-backed
-`prime-claw-official-expert-review` skill. Its bundled `reviewer.md` is
-byte-identical to the unchanged standalone profile at SHA256
-`d9f8b14954da36df3d9051b4e25f8a76b6d16a0a2c27f9b29cfab262b5efe6f6`.
-The package strictly validates the exact `expert-reviewer`,
-`openai-codex/gpt-6-astra`, `max` configuration and the full rubric before
-returning a definition-only description, package manifest/hash, and
-`authority: false`. It imports only the Python standard library and performs no
-host request.
+The managed `prime-claw-official-expert-review` Python skill retains the
+byte-identical canonical `reviewer.md` at SHA256
+`d9f8b14954da36df3d9051b4e25f8a76b6d16a0a2c27f9b29cfab262b5efe6f6` and
+validates the exact `expert-reviewer`, `openai-codex/gpt-6-astra`, `max`
+configuration. `describe()` remains read-only and returns `authority: false`.
+Installer preflight remains read-only: a configured interpreter accepts only an
+exact installed package, while the managed interpreter may report
+`SYNC_PENDING` after exact source validation.
 
-This is a prerequisite, not EXPERT admission. Installer preflight is read-only:
-the default managed interpreter either imports the exact installed package or
-imports the source normally from its `src` working directory and reports
-`SYNC_PENDING`; configured `PRIME_AGENT_KERNEL_PYTHON` accepts only an exact
-already-installed package/hash. Hash mismatch is detected before importing
-stale configured code. No environment is provisioned or modified. The Python package remains inert and
-its API is unchanged: it does not spawn, reserve, bind, admit, deliver, settle,
-or clean up. Generic children receive no EXPERT authority.
+The old native `prime_claw_reserve_expert_review` and
+`prime_claw_bind_expert_review` caller-authoritative tools are retired, together
+with their in-memory status/cancel state. The accepted reservation foundation
+remains historical evidence, not the active admission mechanism.
 
-### Owner-scoped EXPERT reservation foundation
+The exact active Conversation owner calls the Python package's `launch(packet)`.
+The package derives its depth-0 owner ID and canonical session file from
+host-provided kernel state, reads the plugin-owned active oversight marker,
+proves the marker worktree is its own Git top-level at the packet's exact HEAD,
+and requires exactly one exact model-discovery result. It creates one
+mode-private `PENDING` record in the untracked Prime Claw state namespace, then
+calls public `rlm.spawn` itself with the explicit selector/thinking and a
+harmless unpredictable child name. It finalizes only from the actual returned
+child id, name, session directory, and model. Definite failure revokes pending
+state. No model fallback or returned-reasoning claim is made.
 
-The native bridge now exposes four owner-only mechanics:
-`prime_claw_reserve_expert_review`, `prime_claw_bind_expert_review`,
-`prime_claw_expert_review_status`, and `prime_claw_cancel_expert_review`.
-Reserve and bind fail before in-memory mutation unless the caller is the exact
-active Conversation owner, the managed Conversation guide has been consumed,
-and a fresh exact-interpreter probe reports the official package `AVAILABLE`.
-Managed source-only `SYNC_PENDING` and every `UNAVAILABLE` result fail closed.
-The TypeScript probe and installer Python preflight share a Docker parity matrix.
+Private records bind a random nonce, fixed 15-minute TTL, exact owner/project/
+session/episode generation, candidate, canonical packet and digest, package,
+neutral kernel, selector/thinking request, and actual spawn return. The narrow
+state machine uses exclusive file creation and same-directory atomic rename for
+`PENDING -> FINALIZED -> CLAIMED/consumed`. It does not rely on cross-session
+module state and is not a general database, journal, capability-token service,
+power-loss protocol, or hostile-extension defense.
 
-Each owner has at most one session-lifecycle record, bound to a digest of every
-stable field in the exact active oversight generation. A later episode owned by
-the same Conversation cannot read, bind, or cancel the older generation and may
-replace it only through a newly gated reserve. Reserve derives the subject only
-from the trusted active oversight marker's `worktree`. It requires that path to
-exist canonically, requires its real path to equal that worktree's own Git
-`--show-toplevel`, and requires its HEAD to equal the requested exact lowercase
-40- or 64-hex commit OID before mutation. Owner CWD, branch, session name,
-prompt text, and caller paths cannot select or substitute the subject. Reserve
-then validates an immutable packet SHA256 plus the official selector/thinking
-pair, generates one 32-byte
-cryptographically random opaque nonce, and sets a fixed 15-minute expiry. Status
-only derives a generation-matched view; it never renews, deletes, or otherwise
-mutates the record. Expiry is derived idempotently. Cancel and session
-start/shutdown clearing are idempotent.
+The child extension selects the neutral kernel only when its actual unpredictable
+session name has matching private state. Its initial `context` waits boundedly
+for `FINALIZED`, then validates its public canonical session directory, ID,
+name, file and header, exact `header.parentSession`, canonical parent header ID,
+current provider/model, owner generation, candidate, packet, package, kernel,
+and expiry. It claims before provider dispatch. Provider context contains
+exactly one canonical rubric-plus-packet user turn; bootstrap, inbound messages,
+and private fields are excluded. Every admitted continuation revalidates the
+current model and bindings. Timeout, stale state, replay, duplicate claim, or any
+wrong identity/path/model/package/kernel explicitly calls `ctx.abort()` before a
+provider request.
 
-Bind is intentionally narrow. It records the exact public `rlm.spawn` return
-metadata (`rlm_child_id`, `name`, `session_dir`, and `model`) once, after the
-same owner/guide/package gates, exact nonce match, unexpired reservation, model
-text agreement, and unchanged package hash. The result is always
-`bound-pending`, `caller-supplied-unverified`, and `authority: false`. It does
-not prove the returned model, reasoning level, handle, session directory, or
-child identity and does not admit an EXPERT. No live spawn, agent-message
-delivery, child provider role, review execution, report settlement, cleanup,
-persistence, retry protocol, or provider-visible authority is implemented.
+Inbound message text, displayed headers, sender, target, and internal
+`agent_message` details have zero authority and are never read. Copied text
+cannot grant EXPERT role; a wrong trigger can at most deny service. Generic
+children without matching private state remain ordinary. Report return and
+settlement, owner PASS/BLOCK disposition, child deletion, and cleanup remain
+later verticals.
 
-The first project policy lives at
-`.prime/agent/profiles/expert-reviewer.md`. Its closed frontmatter names
-`expert-reviewer` and selects `openai-codex/gpt-6-astra` with reasoning level
-`max`; the Markdown body defines the independent, read-only exact-commit role,
-prohibits editing or steering the subject, requires returning findings to the
-owner, and defines the actionable `BLOCK` contract. This is project/operator
-configuration, not a portable claim that one model is always best.
-
-For required review, the owner validates the raw closed profile before mapping
-it, resolves one exact selector match, and uses the repository safe-spawn
-sequence: admit a fresh RLM with only a harmless bootstrap and the explicit
-selector/reasoning arguments, verify that the returned handle names the requested
-model, then send the profile body plus real read-only packet together exactly
-once. Successful spawn admission proves acceptance of the explicit reasoning
-request; the handle is not claimed to echo it. Evidence records the reviewer
-identity, exact reviewed commit, returned model, admitted reasoning, report
-artifact, and disposition. The owner preserves and adjudicates a complete report
-before stopping and deleting that exact reviewer.
-
-One bounded recovery applies when an exact reviewer is confirmed terminal after
-a purely technical failure and produced no usable `PASS` or `BLOCK`. The owner
-preserves the incomplete attempt and records its exact packet identity in the
-owner ledger so context refresh cannot replenish the one-replacement allowance,
-retires that exact reviewer, and may admit exactly one fresh replacement under
-PROJECT_CONVERSATION authority with the same validated profile and exact review
-packet, model, and reasoning. No new operator transport decision is required.
-The exception is unavailable for a still-active reviewer, ambiguous delivery or
-state, unavailable policy or access, or a substantive `BLOCK`. The failed task is
-never resent, a `BLOCK` is never retried to seek a different disposition, and
-replacement failure or uncertainty pauses for the operator with no further
-replacement.
-
-All other invalid configuration, unavailable or ambiguous resolution, rejected
-reasoning, failed or mismatched spawn, uncertain delivery, or incomplete-report
-cases pause for the operator. Uncertain delivery is never resent and a reviewer
-with outstanding delivery/report work is never deleted. The owner never falls
-back to its current/default model or a weaker policy.
-
-When an EPISODE claims completion, the owner first reconciles the exact
-promoted plan-artifact bundle with the project-customizable terminal policy.
-This is a final-readiness gate, not an ordinary in-progress `advance` gate.
-For the default `/execute` policy, the episode must archive its required active
-specification and plan, update the archive index, and preserve resolvable links.
-The owner identifies required paths from that project's execute skill and
-approved bundle; the example filenames in `/execute` are not a universal
-schema. It traces the promoted paths to their archived counterparts with the
-candidate's Git diff/history, then checks the files, archive index entry, and
-relative links at the exact pushed candidate. An unrelated archive directory
-is not proof. A documented project policy may instead define another
-terminal state with equally reviewable artifact/link evidence. Missing or
-uncertain evidence blocks a completion/merge-readiness claim and calls for
-in-scope repair or pause before final review.
-
-Historical state comparison (manual evidence, **not an executable owner-behavior
-test**): at reviewed merge commit `248f944f70acdbe19d3a93c6781ebcdb2eea22d2`,
-`git ls-tree -r --name-only` shows both promoted
-`.ralph/plans/SPECIFICATION.md` and `.ralph/plans/EXECUTION_PLAN.md` still
-active, no `archive/conversation-driven-episode-oversight/` counterparts, and
-no matching entry in the archive README. Under the readiness rule above, that
-completed episode must not be presented as merge-ready. At the separate
-one-time cleanup commit `26cefa16b83016a53737cceeda92822fe0098ebf`, both
-active paths are absent, their exact counterparts are in
-`.ralph/plans/archive/conversation-driven-episode-oversight/`, and the archive
-README has its `## conversation-driven-episode-oversight/` entry. Representative
-relative links from the archived specification to
-`../worktree-isolated-specification-episodes/SPECIFICATION.md` and
-`../../../../docs/future-specification-bundles.md` resolve in that commit
-(`git cat-file -e <commit>:<target>`). This later tree is suitable artifact
-evidence for owner review; it does not retroactively validate the earlier
-merge, prove all links, or authorize any merge. Policy-contract tests guard
-that the rule stays in the owner skill, but cannot prove an agent follows it
-in a live episode. The before-and-after trees provide bounded manual
-artifact-state coverage, not a live EPISODE behavior test.
-
-After this reconciliation, the owner obtains a fresh final EXPERT review of
-the complete exact candidate, adjudicates every finding, and requires
-`PASS` for that exact commit. An intermediate PASS cannot satisfy this gate; nor
-can another commit's report, an incomplete review, or an unresolved `BLOCK`.
-Any material repair invalidates the prior review and requires a renewed review
-of the repaired exact commit. Pause or abandonment remains available without
-claiming merge readiness. EXPERT PASS is evidence, not merge authority;
-favorable EXPERT review never authorizes merge. Only the operator authorizes
-merge or another terminal disposition.
+The first project policy lives at `.prime/agent/profiles/expert-reviewer.md` as
+byte-identical migration evidence. The Markdown body defines the independent,
+read-only exact-commit role and actionable `BLOCK` contract. This is
+project/operator configuration, not a portable claim that one model is always
+best.
 
 ## Exact bookkeeping close
 

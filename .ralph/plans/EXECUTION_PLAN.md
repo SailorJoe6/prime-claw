@@ -1,8 +1,11 @@
 # Execution Plan — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Operator-approved scope correction on 2026-10-06. Existing episode
-> `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode.
-> Paused Slice 1 must be simplified before any later slice can begin.
+> **Status:** Sections 1-24 are accepted history. Section 25 remains audit history
+> at `3586dcc0cb02f314e7c50f661d956f794637f17c`; the owner-approved Section 26
+> correction supersedes only its terminal disposition. Existing episode
+> `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode,
+> and the Section 26 candidate is implemented and fully validated pending
+> commit/push/report.
 >
 > **Superseded review:** the 2026-10-03 plan PASS and both later Slice-1 BLOCK
 > reports remain historical evidence, but their hostile same-UID and exhaustive
@@ -1611,3 +1614,56 @@ The accepted non-authoritative reservation foundation remains unchanged at
 no review packet was delivered, no child was admitted, and no review provider
 call was made. Experimental local implementation edits were discarded.
 Evidence: `docs/evidence/official-lean-role-protocol/2026-10-07-section-25-public-interface-constraint.md`.
+
+## 26. Product correction — private launch record and spawn-context admission
+
+The owner accepts Section 25's narrow finding that inbound agent-message
+text/header/sender/target is not a supported authority surface, but rejects
+terminal blockage. An independent Prime Agent Expert confirmed a supported
+redesign that does not use inbound message metadata. Preserve blocker commit
+`3586dcc0cb02f314e7c50f661d956f794637f17c` as audit history and implement only
+this launch/first-call admission vertical.
+
+1. Ignore inbound message text, headers, sender, and target completely. Retire
+   caller-supplied bind authority.
+2. Extend the owner-side Python skill to perform exact one-result public model
+   discovery, create one private `PENDING` launch record, call public
+   `rlm.spawn` with the explicit selector/thinking and a harmless bootstrap
+   containing an unpredictable name, then verify/finalize only from the actual
+   returned `session_dir`, `name`, and `model`. Revoke on definite failure. Use
+   no selector fallback and make no returned-reasoning claim.
+3. Store launch state in a purpose-built plugin-owned, untracked private
+   namespace with mode-private directories/files, random nonce, fixed TTL, and
+   exact owner/project/session/generation/candidate/packet/package/kernel
+   binding. Use ordinary exclusive creation plus atomic rename for
+   `PENDING -> FINALIZED -> CLAIMED/consumed`. Do not rely on cross-session
+   module state (`moduleCache: false`). Do not create a general database,
+   journal, power-loss engine, or hostile-extension defense.
+4. At the child's initial spawn `context` hook, wait only a short bounded time
+   for `FINALIZED`. Validate the public canonical `sessionDir`, `sessionId`,
+   `sessionName`, `sessionFile`, current provider/model, canonical
+   `header.parentSession` plus parent header ID, nonce/digest/expiry/package/
+   kernel, then atomically claim before provider dispatch.
+5. Filter the harmless bootstrap and all private fields. Expose exactly one
+   canonical rubric-plus-packet user turn and recheck the current model on every
+   admitted provider call. Inbound message content has zero authority.
+6. Timeout, stale/replay, copied text, duplicate claim, or any wrong
+   child/parent/model/session/name/path/package/kernel must call `ctx.abort()`
+   explicitly and prove zero provider calls. A wrong trigger may deny service
+   but cannot grant role or alter the packet.
+7. Run focused package/state/Node/native-provider tests, complete Tier 0,
+   Docker Tier 1, and the pinned Prime Agent 0.9.8 probe. Use at most one exact
+   independent review cycle and one bounded in-scope repair under stop-loss.
+   Record evidence, commit and push one candidate, report, and stop.
+
+Implementation and validation are complete for this vertical. The one exact
+review returned BLOCK on the real 0.9.8 `[custom harness digest, user bootstrap]`
+first-turn shape. The sole bounded repair changed trigger cardinality to public
+user turns, added that real-shaped success/replay coverage, and added an isolated
+native provider seam proving one exact call on success and zero calls on timeout
+or mismatch. Final evidence is in
+`docs/evidence/official-lean-role-protocol/2026-10-07-section-26-private-launch-admission.md`.
+
+Continue to defer report return/settlement, owner PASS/BLOCK disposition, child
+deletion, cleanup workflow, Slice 4, landing, global apply/restart/UAT, and
+finalization. Never patch Prime Agent or read internal agent-message details.

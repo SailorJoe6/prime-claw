@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Corrected Slice 1 accepted on 2026-10-06 at `57d26e582c583a81de370051b129f74f5b13ee45` / tree `d1739c3a2ffee4512d6741480b72792e3a8d4098`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode and is advancing through bounded Slice 2 candidates.
+> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved Section 26 private launch/first-call correction. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode, and the Section 26 candidate is implemented and fully validated pending commit/push/report.
 >
 > **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
 > **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** the existing episode may complete one smallest end-to-end Slice 2 candidate per canonical owner handoff, commit/push it, report, and stop. Slice 3, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical cleanup remain separately authorized.
+> **Implementation authority:** the existing episode may complete the owner-approved Section 26 private launch/first-call admission candidate, commit/push it, report, and stop. Review settlement, owner PASS/BLOCK disposition, child deletion/cleanup, Slice 4, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical cleanup remain separately authorized.
 
 ## Summary
 
@@ -800,3 +800,22 @@ The accepted non-authoritative reservation foundation remains unchanged at
 no review packet was delivered, no child was admitted, and no review provider
 call was made. Experimental local implementation edits were discarded.
 Evidence: `docs/evidence/official-lean-role-protocol/2026-10-07-section-25-public-interface-constraint.md`.
+
+### Product correction: authority comes from private launch state, not inbound messages
+
+Section 25's inbound-sender API audit remains valid history, but it is not a
+terminal blocker. The supported design assigns zero authority to inbound message
+text or metadata. The owner-side skill privately records the exact launch before
+public spawn and finalizes it only from the real returned tuple. The child's
+initial spawn context independently binds its public session/model and canonical
+parent-session lineage to that finalized private record, atomically claims it
+before provider dispatch, and exposes only the neutral kernel plus one canonical
+rubric/packet turn.
+
+The private namespace is plugin-owned and untracked, mode-private, nonce-bound,
+TTL-limited, and uses only exclusive create plus atomic rename across
+`PENDING`, `FINALIZED`, and `CLAIMED/consumed`. It is not a general persistence
+framework. Every mismatch, timeout, stale/replay, copied input, or duplicate
+claim aborts before a provider call. Current model is rechecked on every admitted
+call. Prime Agent stays unmodified and its internal agent-message details are
+never read.
