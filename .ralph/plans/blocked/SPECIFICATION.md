@@ -736,3 +736,67 @@ owner-CWD/episode-worktree regression coverage and all required refusal cases
 are green across focused, complete, Docker, and pinned-runtime gates. Exact
 review and unchanged commit/push receipts are recorded on `prime-claw-h6w.30`;
 all other Section 23 behavior and exclusions remain intact.
+
+### Accepted reservation base and next EXPERT vertical
+
+The owner accepts the non-authoritative reservation foundation through commit
+`5674219bc914682a7e28c96146a68ab1b3e80f5f` and tree
+`930a7956545c6d3c9b8006e6cf59f5fa141f77d6`. The next bounded Slice 3 vertical
+may discover and spawn exactly one configured reviewer, bind its public return
+tuple, deliver one immutable packet, and admit only the child's first
+packet-triggered review call.
+
+This vertical must first prove supported Prime Agent 0.9.8 public trust seams for
+sender/target, actual child session/model, and pre-provider admission. Missing
+public proof is a product constraint and stop condition, not permission to patch
+Prime Agent or infer authority from copied context. Admission requires every
+trusted binding—owner generation, nonce, digest, expiry/use, sender/target,
+child/session/model, package, and kernel—to agree. It consumes before dispatch,
+strips private receipts, and exposes only a neutral system kernel plus one
+bounded rubric/packet user turn. Bootstrap, mismatch, replay, stale state, and
+copied identity abort without a review provider call. Generic children remain
+ordinary.
+
+Use no fallback selector, retry after uncertain delivery, durable store,
+generalized token system, or broader race framework. Report settlement, owner
+disposition, child deletion, and all cleanup remain later verticals.
+
+## BLOCKED — Prime Agent 0.9.8 receiver trust metadata is not public
+
+Section 25 stopped at its required public-interface audit. Prime Agent 0.9.8
+(commit `a1faacd53ac4473a75de1d434afaf50945c2f647`) has the authoritative
+facts internally, but no supported receiver-side interface exposes the complete
+set needed for admission before provider dispatch:
+
+- public `rlm.spawn` returns `rlm_child_id`, `name`, `session_dir`, and the
+  actual selected `model` to the parent;
+- public `agent_message.send` returns trusted sender/target endpoints only to
+  the sender;
+- a receiving extension can read its own `ctx.model` and read-only session
+  manager identity; but
+- the only receiver-side link to trusted inbound sender/target is the internal
+  built-in `agent_message` custom-message `details` shape. That schema is not
+  exported as a supported extension or Python contract. The public message text
+  contains only a sanitized relationship/name header and body.
+
+Therefore prime-claw cannot prove trusted sender/target and bind them to the
+actual child session/model at the pre-provider `context` seam without relying on
+an unsupported internal request/message shape. Serializing parent claims into
+the packet would remain attestation text, not independent host proof. A custom
+Python `host_request` is also unsupported because extensions cannot register a
+public host handler and unknown request types fail.
+
+**Unblock condition:** a supported Prime Agent public receiver interface must
+provide unforgeable inbound sender and target identity together with enough
+current child/session identity to bind public spawn metadata and `ctx.model` at
+or before the provider-admission seam (or an equivalent supported admission
+callback). Re-audit a released public interface before resuming. Do not patch or
+fork Prime Agent for this project and do not consume the current internal
+custom-message `details` schema.
+
+The accepted non-authoritative reservation foundation remains unchanged at
+`5674219bc914682a7e28c96146a68ab1b3e80f5f` / tree
+`930a7956545c6d3c9b8006e6cf59f5fa141f77d6`. No feature reviewer was spawned,
+no review packet was delivered, no child was admitted, and no review provider
+call was made. Experimental local implementation edits were discarded.
+Evidence: `docs/evidence/official-lean-role-protocol/2026-10-07-section-25-public-interface-constraint.md`.

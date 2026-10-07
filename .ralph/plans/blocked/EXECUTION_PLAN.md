@@ -1526,3 +1526,88 @@ to be absolute and byte-equal to `realpath`, requires raw trimmed Git top-level
 output to equal that canonical string, and adds a dot-segment refusal/no-state
 regression. All focused, complete, Docker, and pinned gates were rerun green.
 Refreeze and re-review this exact repair before unchanged commit/push.
+
+## 25. Slice 3 next vertical — discover, spawn, deliver, and first-call admit one EXPERT
+
+The owner accepts the complete non-authoritative reservation foundation through
+`5674219bc914682a7e28c96146a68ab1b3e80f5f` / tree
+`930a7956545c6d3c9b8006e6cf59f5fa141f77d6`. Build only the next coherent
+vertical: exact reviewer discovery/spawn, one guarded immutable-packet delivery,
+and child-side admission for the first packet-triggered review provider call.
+
+1. Audit only supported public Prime Agent 0.9.8 metadata and interfaces first.
+   Prove whether trusted sender/target, actual child session/model, and a
+   pre-provider admission seam are available. If any required fact cannot be
+   proven without patching Prime Agent or using an unsupported host request,
+   record the product constraint and stop; never simulate authority.
+2. Reuse the accepted owner-generation-bound reservation and inert official
+   package. Resolve exactly one full configured selector, with no fallback.
+3. Spawn with explicit model/thinking and a harmless generic bootstrap under the
+   startup-race protocol. Verify returned public model metadata without claiming
+   returned reasoning. Bind the exact returned `rlm_child_id`, `name`,
+   `session_dir`, and `model` tuple as pending evidence.
+4. Only after bind, deliver exactly one canonical immutable packet and digest
+   through lazy host-provided `agent_message`. A definite `delivered` or
+   `queued` result counts as the one send. An uncertain result is not retried.
+5. On the child's first packet-triggered call, admit EXPERT only when trusted
+   host sender/target metadata, actual child session/model, bound owner
+   generation/nonce/packet digest, unexpired one-use reservation, and exact
+   package/kernel all agree. Consume once before provider dispatch.
+6. Remove private nonce/receipt fields before provider visibility. Supply one
+   neutral system kernel and one bounded rubric plus packet in the intended
+   user-role turn. Copied name/prompt/depth/CWD, wrong sender/target/child/model/
+   session, stale or duplicate nonce/packet, generic bootstrap, and replay must
+   abort with zero review provider calls. Generic children remain ordinary.
+7. Use a simple loaded-process shared registry only if native tests prove module
+   and session sharing. Extend the Python skill with only the smallest typed
+   async orchestration helpers and lazy host imports; keep `pyproject.toml` free
+   of host-runtime dependencies.
+8. Run focused package, Node, native installed-runtime, and provider tests, then
+   complete Tier 0, Docker Tier 1, and the pinned Prime Agent 0.9.8 probe.
+   Record exact evidence, independently review the bounded candidate, commit and
+   push one candidate, report, and stop.
+
+Explicitly defer report return and settlement, owner PASS/BLOCK disposition,
+child deletion, cleanup workflow, durable databases/journals, generalized
+capability tokens, delivery retries, adversarial race matrices, Slice 4,
+landing, user-global mutation/restart, UAT, finalization, and cleanup.
+
+## BLOCKED — Prime Agent 0.9.8 receiver trust metadata is not public
+
+Section 25 stopped at its required public-interface audit. Prime Agent 0.9.8
+(commit `a1faacd53ac4473a75de1d434afaf50945c2f647`) has the authoritative
+facts internally, but no supported receiver-side interface exposes the complete
+set needed for admission before provider dispatch:
+
+- public `rlm.spawn` returns `rlm_child_id`, `name`, `session_dir`, and the
+  actual selected `model` to the parent;
+- public `agent_message.send` returns trusted sender/target endpoints only to
+  the sender;
+- a receiving extension can read its own `ctx.model` and read-only session
+  manager identity; but
+- the only receiver-side link to trusted inbound sender/target is the internal
+  built-in `agent_message` custom-message `details` shape. That schema is not
+  exported as a supported extension or Python contract. The public message text
+  contains only a sanitized relationship/name header and body.
+
+Therefore prime-claw cannot prove trusted sender/target and bind them to the
+actual child session/model at the pre-provider `context` seam without relying on
+an unsupported internal request/message shape. Serializing parent claims into
+the packet would remain attestation text, not independent host proof. A custom
+Python `host_request` is also unsupported because extensions cannot register a
+public host handler and unknown request types fail.
+
+**Unblock condition:** a supported Prime Agent public receiver interface must
+provide unforgeable inbound sender and target identity together with enough
+current child/session identity to bind public spawn metadata and `ctx.model` at
+or before the provider-admission seam (or an equivalent supported admission
+callback). Re-audit a released public interface before resuming. Do not patch or
+fork Prime Agent for this project and do not consume the current internal
+custom-message `details` schema.
+
+The accepted non-authoritative reservation foundation remains unchanged at
+`5674219bc914682a7e28c96146a68ab1b3e80f5f` / tree
+`930a7956545c6d3c9b8006e6cf59f5fa141f77d6`. No feature reviewer was spawned,
+no review packet was delivered, no child was admitted, and no review provider
+call was made. Experimental local implementation edits were discarded.
+Evidence: `docs/evidence/official-lean-role-protocol/2026-10-07-section-25-public-interface-constraint.md`.
