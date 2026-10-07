@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Owner accepts repaired lifecycle closure through `6bceeea133f767d72739a8d88df2639ab75bba96` / tree `6421f9acc11a4c5e755e37dfa3060c2821bf5326`; Slice 3 is complete. Generation A candidate `f2f3fcd25dbe3d96f05193261020d26bf79f1213` / tree `8b4fef1936766c7383a577317ac6d2436f4e72e5` is preserved immutable history. Its exact configured Astra/max review returned `BLOCK`, report SHA256 `4ed03385fc1d54cdecdbbacf5ea720d00b70a9af10b99b1466f7592df50d95e1`. The owner accepts all five findings as in-scope ordinary-operation defects. The bounded Section 31 coordinator and bundle repairs, exact focused regressions, private manifest/proof regeneration, documentation, and traceability are implemented; complete gates and one replacement immutable candidate remain. Landing, activation, and in-episode renewed review remain excluded.
+> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Owner accepts repaired lifecycle closure through `6bceeea133f767d72739a8d88df2639ab75bba96` / tree `6421f9acc11a4c5e755e37dfa3060c2821bf5326`; Slice 3 is complete. Generation A candidate `f2f3fcd25dbe3d96f05193261020d26bf79f1213` / tree `8b4fef1936766c7383a577317ac6d2436f4e72e5` is preserved immutable history. Its exact configured Astra/max review returned `BLOCK`, report SHA256 `4ed03385fc1d54cdecdbbacf5ea720d00b70a9af10b99b1466f7592df50d95e1`. The owner accepted the Section 31 replacement `ed42db9f20ce7a58689707b188e35028e31abf55` / tree `7fb098436e13296191ab64ef593c49550c70c162` after an exact configured `PASS` and explicitly authorized Gate A. Before any live mutation, owner read-only preflight found the supported Prime Agent 0.9.8 wrapper writes exact version `0.9.8` to stderr while coordinator verification reads stdout only. Gate A did not begin. Preserve ed42 and its PASS as history; only the bounded Section 32 executable-version stream repair, successor gates/freeze, and fresh review are authorized.
 >
 > **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
 > **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** repair only the five accepted Generation A review findings through the two existing coordinator and bundle seams described in plan Section 31. Preserve the blocked candidate/freeze/report as history. Add the exact accepted positive, negative, failure, and replay cases; regenerate only affected private manifest/proof/readiness evidence; run complete gates; freeze and push one new immutable candidate; report it and stop. Do not broaden into a descriptor-chain/ABA/race framework, scan unrelated programs or private files, launch the renewed independent review, start Gate A, land, mutate main or user-global state, stop/restart live processes, run UAT, remove compatibility, finalize, or clean up.
+> **Implementation authority:** repair only the coordinator executable-version verification seam described in plan Section 32. Preserve ed42, its exact configured PASS, and the owner diagnostic as history. Accept one exact single-line expected version from exactly one successful command stream only; add the exact stream matrix plus one real supported 0.9.8 wrapper probe; update affected docs/traceability and private bundle/readiness/config evidence; prove the complete successor rollback chain; run all gates; freeze/push one clean successor; report it and stop for a fresh exact owner review. Do not patch Prime Agent, generalize output normalization, touch primary main or the owner's private local-edit backup, execute invalidated ed42 config/state, perform live shutdown/landing/apply/restart/UAT, start S5, remove compatibility, finalize, or clean up.
 
 ## Summary
 
@@ -1005,3 +1005,45 @@ complete focused/Tier 0/Docker Tier 1/pinned gates, freeze and push one new
 immutable commit/tree with no tracked post-freeze change, report it to the
 owning Conversation, and stop. The owner will admit one fresh exact configured
 reviewer because candidate bytes changed.
+
+## Gate A preflight version-stream repair authority
+
+Gate A was explicitly authorized for accepted Generation A replacement
+`ed42db9f20ce7a58689707b188e35028e31abf55` / tree
+`7fb098436e13296191ab64ef593c49550c70c162` after an exact configured `PASS`.
+Before shutdown or any other live mutation, owner read-only preflight proved that
+supported Prime Agent 0.9.8 command
+`/Users/jlanders/code/prime-agent/.worktrees/cwd-fix-v0.9.8-r1-source/prime-agent.sh --version`
+returns 0 with exact `0.9.8` on stderr and empty stdout. Coordinator
+`verify_executable` compares stdout only and therefore stops with
+`runtime entrypoint version mismatch`.
+
+Preserve the exact private diagnostic at
+`/Users/jlanders/.prime/agent/session-artifacts/01a0f51d-d51b-7649-a28a-844879e42aec/gate-a-ed42db9/preflight-version-stream-block.json`,
+SHA256 `c0388aa8ede3912106afc3500370494bd37bdbc56880cc9114c91e8ed161be73`,
+and preserve ed42/PASS as history.
+
+Repair only executable version verification. For a return-code-zero version
+command, accept the exact expected single-line version from stdout or stderr
+only when exactly one stream is populated and the other is empty. Reject a
+nonzero result, both streams populated, both empty, multiline or extra content,
+and any mismatch. Do not add a general output-normalization layer.
+
+Focused coverage must include stdout and stderr success plus ambiguity, empty,
+extra-content, multiline, mismatch, and nonzero failures. A real read-only probe
+must run the supported Prime Agent 0.9.8 wrapper and prove its actual stderr
+contract. Update only affected documentation, traceability, and private bundle/
+readiness/config evidence.
+
+The successor rollback topology must contain the complete newest-to-oldest
+linear chain `[successor, ed42db9f20ce7a58689707b188e35028e31abf55,
+f2f3fcd25dbe3d96f05193261020d26bf79f1213]`, followed by integration merge
+`46147ff887569101b7e64a8466cde5887c15cc31` with mainline 2. It must produce
+accepted baseline `c24ba6c1e76585193d4f34f0b0b0233846780442` / tree
+`a9955483816af04a4c68468a8e2ce3d0d0d00a5d` in isolated proof.
+
+Run required exact-byte gates, freeze and push one clean immutable successor,
+report it, and stop for one fresh exact owner review. Gate A authority is not
+transported through the changed candidate bytes: do not execute the invalidated
+ed42 config/state or perform shutdown, landing, apply, restart, or UAT in this
+repair pass.

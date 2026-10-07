@@ -2032,3 +2032,92 @@ all gates on the exact staged evidence bytes, complete prospective rollback
 proof plus pinned probe/diff/remote/teardown, then freeze/push/report one
 replacement candidate. Do not run renewed review or any Gate A/live/global
 action.
+
+## 32. Gate A preflight repair — exact version stream admission
+
+**Accepted historical candidate:**
+`ed42db9f20ce7a58689707b188e35028e31abf55`, tree
+`7fb098436e13296191ab64ef593c49550c70c162`, exact configured `PASS`.
+
+**Pre-mutation blocker:** supported Prime Agent 0.9.8 wrapper
+`/Users/jlanders/code/prime-agent/.worktrees/cwd-fix-v0.9.8-r1-source/prime-agent.sh --version`
+returns 0, empty stdout, and exact `0.9.8` on stderr. Current coordinator reads
+stdout only and refuses it. Private diagnostic SHA256:
+`c0388aa8ede3912106afc3500370494bd37bdbc56880cc9114c91e8ed161be73`.
+No shutdown, landing, apply, restart, or other Gate A mutation occurred.
+
+### 32.1 Narrow implementation
+
+1. Change only coordinator executable version verification.
+2. Require return code zero.
+3. Treat stdout and stderr as raw candidate streams. Exactly one must be
+   populated and the other empty.
+4. The populated stream must equal the configured version as exactly one line.
+   Reject both populated, both empty, extra text, blank-leading/trailing lines,
+   multiline content, and mismatch.
+5. Keep every other artifact digest, entrypoint, role, status, topology,
+   readiness, and mutation gate unchanged. Do not create a reusable/general
+   output-normalization layer and do not patch Prime Agent.
+
+### 32.2 Exact tests and real interface proof
+
+Add focused recording cases for:
+
+- exact stdout success with empty stderr;
+- exact stderr success with empty stdout;
+- both streams populated;
+- both streams empty;
+- stdout or stderr extra content;
+- multiline and blank-line variants;
+- version mismatch; and
+- nonzero return code even when one stream contains the expected version.
+
+Add one bounded read-only real probe of the supported Prime Agent 0.9.8 wrapper
+that asserts return code 0, empty stdout, exact single-line stderr `0.9.8`, and
+successful coordinator version admission without invoking status, shutdown,
+landing, apply, start, or user-global mutation.
+
+### 32.3 Evidence, topology, gates, and stop
+
+- Preserve ed42, its PASS, and the owner diagnostic unchanged.
+- Update only affected documentation/traceability and regenerate affected
+  private bundle, readiness, and coordinator-config/proof evidence.
+- Prove successor rollback as the exact linear chain
+  `[successor, ed42db9f20ce7a58689707b188e35028e31abf55,
+  f2f3fcd25dbe3d96f05193261020d26bf79f1213]`, then merge
+  `46147ff887569101b7e64a8466cde5887c15cc31` with mainline 2, yielding baseline
+  `c24ba6c1e76585193d4f34f0b0b0233846780442` / tree
+  `a9955483816af04a4c68468a8e2ce3d0d0d00a5d` in a no-local isolated clone.
+- Run focused host/real-wrapper/Docker-native checks, full Node, complete Tier 0,
+  selected Docker Tier 1, pinned Prime Agent 0.9.8 probe, diff/remote equality,
+  and teardown.
+- Freeze/push one clean immutable successor, report it to the owner, and stop.
+  The owner must admit one fresh exact configured review because bytes changed.
+
+Do not touch primary `main`, the owner's private local-edit backup, invalidated
+ed42 config/state, live processes, user-global state, UAT, S5, compatibility
+removal, finalization, bookkeeping close, or physical cleanup.
+
+### Section 32 implementation checkpoint
+
+The exact version seam now captures nonzero status, uses a ten-second bound, and
+admits only the configured version followed by one LF on exactly one raw stream.
+It rejects both/empty streams, no-LF and CRLF forms, whitespace, extra/blank/
+multiple lines, mismatch, and nonzero output before status or operational work.
+The real supported 0.9.8 wrapper test calls only `--version` and proves empty
+stdout plus exact stderr `0.9.8\n`.
+
+Focused seam coverage passes 100. Preliminary broader focused host passes
+160/54 skipped, Node passes 165, and Docker-focused passes 3. Two independent
+read-only audits confirmed the bounded code/test surface and private evidence
+plan; their tightening findings are incorporated. The new private bundle
+manifest is `ff9a321274b8953f0a1b97bddee9e2f4b7f156990f1370c762c93982ca35ad68` and isolated bundle proof is
+`4725e44be01966e0127b0c2c298343e6a7feec3cff80f0a26c1a8ecd80d1ba5f`; Section 31 and Gate A diagnostic artifacts remain
+unchanged.
+
+Next, stage the exact successor bytes, prove the complete prospective rollback
+chain through ed42 then f2f3 and integration merge mainline 2, run complete exact
+Tier 0/Docker/pinned/diff/remote/teardown gates, freeze/push one candidate,
+create exact successor-bound proof-only config/rollback/freeze receipts, report
+the owner, and stop for fresh exact review. Do not run Gate A or any live/global
+mutation.

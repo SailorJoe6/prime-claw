@@ -133,7 +133,7 @@ def test_private_bundle_restore_is_all_or_nothing_on_unknown_current_content(tmp
 
 
 class RecordingRunner:
-    def __init__(self, config, *, stale_after_shutdown=False, fail_label=None, process_rows=None, readiness=None, child_exit=None, initial_status=None, discovery_failure=False):
+    def __init__(self, config, *, stale_after_shutdown=False, fail_label=None, process_rows=None, readiness=None, child_exit=None, initial_status=None, discovery_failure=False, version_result=None):
         self.config = config
         self.calls = []
         self.labels = []
@@ -151,6 +151,7 @@ class RecordingRunner:
         self.child_exit = child_exit
         self.initial_status = initial_status
         self.discovery_failure = discovery_failure
+        self.version_result = version_result
 
     def _label(self, argv):
         text = " ".join(argv)
@@ -176,6 +177,8 @@ class RecordingRunner:
             return coord.Result(argv, 0, json.dumps(output), "")
         cli = tuple(c["runtime"]["cliArgvPrefix"])
         if argv == (*cli, "--version"):
+            if self.version_result is not None:
+                return coord.Result(argv, *self.version_result)
             return coord.Result(argv, 0, c["runtime"]["version"] + "\n", "")
         if argv == ("pgrep", "-x", "prime-agent"):
             self.ps_count += 1
@@ -499,6 +502,112 @@ def test_preflight_supports_exact_node_interpreter_entrypoint(tmp_path: Path) ->
     assert (*prefix, "status", "--json") in runner.calls
     assert (*prefix, "shutdown", "--force", "--json") in runner.calls
     assert runner.started == [tuple(config["runtime"]["startArgs"])]
+
+
+@pytest.mark.parametrize(
+    "version_result",
+    [(0, "0.9.8\n", ""), (0, "", "0.9.8\n")],
+)
+def test_verify_executable_accepts_exact_lf_terminated_version_from_exactly_one_stream(
+    tmp_path: Path,
+    version_result: tuple[int, str, str],
+) -> None:
+    config = cutover_config(tmp_path)
+    runner = RecordingRunner(config, version_result=version_result)
+    coordinator = coord.Coordinator(config, tmp_path / "state", runner)
+
+    coordinator.validate_static()
+    coordinator.verify_executable()
+
+    assert runner.calls == [(*config["runtime"]["cliArgvPrefix"], "--version")]
+    assert coordinator.observations["runtime"]["version"] == "0.9.8"
+
+
+@pytest.mark.parametrize(
+    ("version_result", "message"),
+    [
+        ((7, "0.9.8\n", ""), "version command failed"),
+        ((7, "", "0.9.8\n"), "version command failed"),
+        ((0, "0.9.8\n", "0.9.8\n"), "exactly one stream"),
+        ((0, "", ""), "exactly one stream"),
+        ((0, "prime-agent 0.9.8\n", ""), "version mismatch"),
+        ((0, "", "prime-agent 0.9.8\n"), "version mismatch"),
+        ((0, "0.9.8\nextra\n", ""), "version mismatch"),
+        ((0, "", "extra\n0.9.8\n"), "version mismatch"),
+        ((0, "\n0.9.8\n", ""), "version mismatch"),
+        ((0, "0.9.8\n\n", ""), "version mismatch"),
+        ((0, "", "\n0.9.8\n"), "version mismatch"),
+        ((0, "", "0.9.8\n\n"), "version mismatch"),
+        ((0, "0.9.7\n", ""), "version mismatch"),
+        ((0, "", "0.9.7\n"), "version mismatch"),
+        ((0, "0.9.8", ""), "version mismatch"),
+        ((0, "", "0.9.8"), "version mismatch"),
+        ((0, "0.9.8\r\n", ""), "version mismatch"),
+        ((0, "", "0.9.8\r\n"), "version mismatch"),
+        ((0, " 0.9.8\n", ""), "version mismatch"),
+        ((0, "", "0.9.8 \n"), "version mismatch"),
+    ],
+)
+def test_verify_executable_rejects_ambiguous_empty_extra_multiline_mismatch_or_nonzero_version_output(
+    tmp_path: Path,
+    version_result: tuple[int, str, str],
+    message: str,
+) -> None:
+    config = cutover_config(tmp_path)
+    runner = RecordingRunner(config, version_result=version_result)
+    coordinator = coord.Coordinator(config, tmp_path / "state", runner)
+
+    coordinator.validate_static()
+    with pytest.raises(coord.CutoverError, match=message):
+        coordinator.verify_executable()
+
+    assert runner.calls == [(*config["runtime"]["cliArgvPrefix"], "--version")]
+    assert runner.started == []
+
+
+def test_supported_prime_agent_098_wrapper_uses_exact_stderr_version_interface(tmp_path: Path) -> None:
+    wrapper = Path("/Users/jlanders/code/prime-agent/.worktrees/cwd-fix-v0.9.8-r1-source/prime-agent.sh")
+    if not wrapper.is_file():
+        pytest.skip(f"supported Prime Agent 0.9.8 wrapper is unavailable: {wrapper}")
+    wrapper = wrapper.resolve()
+
+    class CapturingLocalRunner(coord.LocalRunner):
+        def __init__(self) -> None:
+            super().__init__()
+            self.results: list[coord.Result] = []
+            self.calls: list[tuple[tuple[str, ...], dict[str, object]]] = []
+
+        def run(self, argv, **kwargs):
+            self.calls.append((tuple(argv), dict(kwargs)))
+            result = super().run(argv, **kwargs)
+            self.results.append(result)
+            return result
+
+    config = cutover_config(tmp_path)
+    wrapper_sha = bundle.digest(wrapper.read_bytes())
+    config["runtime"].update({
+        "entrypointKind": "compiled",
+        "cliArgvPrefix": [str(wrapper)],
+        "executableRealpath": str(wrapper),
+        "executableSha256": wrapper_sha,
+        "entrypointRealpath": str(wrapper),
+        "entrypointSha256": wrapper_sha,
+        "version": "0.9.8",
+        "startArgs": [str(wrapper), "--mode", "daemon", "--daemon-socket", config["runtime"]["daemonSocket"]],
+    })
+    runner = CapturingLocalRunner()
+    coordinator = coord.Coordinator(config, tmp_path / "state", runner)
+
+    coordinator.validate_static()
+    coordinator.verify_executable()
+
+    assert runner.calls == [((str(wrapper), "--version"), {"cwd": None, "allow_failure": True, "timeout": 10})]
+    assert len(runner.results) == 1
+    assert runner.results[0].argv == (str(wrapper), "--version")
+    assert runner.results[0].returncode == 0
+    assert runner.results[0].stdout == ""
+    assert runner.results[0].stderr == "0.9.8\n"
+    assert coordinator.observations["runtime"]["version"] == "0.9.8"
 
 
 def test_preflight_rejects_same_version_wrong_build_before_status_or_git(tmp_path: Path) -> None:

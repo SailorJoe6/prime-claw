@@ -270,7 +270,10 @@ owner/episode/ordinary checkpoints, and one canonical CLI entrypoint. A compiled
 entrypoint is `[launcher]`; a Node entrypoint is `[interpreter, entrypoint]`.
 Both realpaths and artifact digests are bound, every CLI command uses the whole
 prefix, and `status --json` must report the entrypoint path, exact build, socket,
-and declared old-daemon PID.
+and declared old-daemon PID. The version command must return zero and emit the
+exact configured single-line version on exactly one of stdout or stderr, with the
+other empty. Both/empty streams, blank or extra lines, mismatch, and nonzero exit
+fail closed before status, shutdown, landing, apply, or start.
 
 Process observation is bounded to exact `pgrep -x prime-agent` results and the
 explicitly declared PIDs, followed by targeted `ps -p`. It never parses an

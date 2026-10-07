@@ -445,9 +445,14 @@ class Coordinator:
         entrypoint_sha = sha256_file(self.entrypoint)
         if executable_sha != self.runtime["executableSha256"] or entrypoint_sha != self.runtime["entrypointSha256"]:
             raise CutoverError("runtime executable or entrypoint build digest mismatch")
-        result = self.command(self.cli_argv("--version"))
+        result = self.command(self.cli_argv("--version"), allow_failure=True, timeout=10)
         expected = require_string(self.runtime.get("version"), "runtime.version")
-        if result.stdout.strip() != expected:
+        if result.returncode:
+            raise CutoverError(f"runtime entrypoint version command failed ({result.returncode})")
+        if bool(result.stdout) == bool(result.stderr):
+            raise CutoverError("runtime entrypoint version output must use exactly one stream")
+        version_output = result.stdout or result.stderr
+        if version_output != expected + "\n":
             raise CutoverError("runtime entrypoint version mismatch")
         expected_build = require_string(self.runtime.get("buildId"), "runtime.buildId")
         self.observations["runtime"] = {

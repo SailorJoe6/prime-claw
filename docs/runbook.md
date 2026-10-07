@@ -201,7 +201,10 @@ checkpoint directory. The external coordinator first binds the exact compiled or
 Node CLI prefix, both interpreter/entrypoint artifact digests, the declared old
 daemon's status/build/socket/PID, the approved worker set, and confirmed absence
 of clients, TUIs, launchers, and wrappers. Observation uses only exact Prime
-Agent process-title discovery plus targeted declared/discovered PIDs.
+Agent process-title discovery plus targeted declared/discovered PIDs. Version
+admission requires return code zero and the exact configured single-line version
+on exactly one of stdout or stderr while the other stream is empty. Ambiguous,
+empty, multiline, extra-content, and mismatched output fail before live mutation.
 
 The input also contains the explicit newest-to-oldest linear revert commits, the
 integration merge and ordered parents, mainline 2, and accepted prelanding
