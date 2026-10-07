@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Section 28 final Slice-3 lifecycle closure is implemented and fully validated pending one commit/push and direct owner review.
+> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Section 28 candidate `1fed99101f3dee95bf6863a3c9298d8c05d96718` / tree `7c28ffe42d9b7018899cd252460287c91c30604d` was owner-review BLOCKED on one exact `PENDING`+`FINALIZED` crash window and one public-export omission. Section 29 implements that narrow repair and passes focused and full Tier 0, Docker Tier 1, and pinned 0.9.8 validation; one commit/push and direct owner review remain.
 >
 > **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
 > **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** the existing episode may implement one final Slice-3 lifecycle-closure vertical: exact owner disposition persistence, definite settled-child deletion, bounded stale/crash reconciliation, CLOSED/CANCELLED receipts, and exact post-recording purge; run the specified gates, commit/push one candidate, report, and stop. Slice 4, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical project cleanup remain separately authorized.
+> **Implementation authority:** the existing episode may repair only the owner-blocked Section 28 candidate: close the `PENDING`+`FINALIZED` admission crash window and export/assert the approved Section 28 public surface, run the specified affected gates, commit/push one repair candidate, report, and stop. Lifecycle architecture, deletion semantics, Slice 4, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical project cleanup remain out of scope.
 
 ## Summary
 
@@ -898,3 +898,27 @@ Tier 1, and the pinned Prime Agent 0.9.8 probe. Use direct owner review only and
 no independent review cycle. Commit/push one candidate, report, and stop. Do not
 start Slice 4, landing, activation/restart/UAT, finalization, bookkeeping, or
 physical project cleanup.
+
+## Owner-blocked Section 28 narrow repair
+
+The rest of lifecycle closure is directionally accepted. Repair only these two
+findings against candidate `1fed99101f3dee95bf6863a3c9298d8c05d96718`:
+
+- Python finalization publishes `FINALIZED` before unlinking `PENDING`. The
+  extension may treat `PENDING` plus exactly one `FINALIZED` as a normal transient
+  overlap only while waiting within the existing admission deadline. It must not
+  admit until `PENDING` disappears and exactly one authority phase remains.
+  Persistent `PENDING`+`FINALIZED` at the deadline, or any other multiple
+  authority phases, must call `ctx.abort()` before provider use. Preserve the
+  existing conflicting-phase refusals. Prove both a transient overlap that
+  resolves and a persistent overlap that produces zero provider calls in Node
+  and native coverage.
+- Export the approved Section 28 public API from Python `__all__`: the lifecycle
+  functions `record_disposition`, `close`, `cancel_stale`, and `purge`, plus the
+  disposition decisions and disposition size limit. Add an exact public-surface
+  assertion.
+
+Do not broaden architecture, redesign deletion, launch a new independent review,
+or start Slice 4. Run focused and affected full Tier 0, Docker Tier 1, and the
+pinned Prime Agent 0.9.8 probe. Commit/push one narrow repair, report for direct
+owner review, and stop.

@@ -1192,8 +1192,9 @@ async def launch(packet: dict[str, Any]) -> Any:
 
 
 __all__ = [
-    "LAUNCH_TTL_MS", "MODEL_SELECTOR", "PACKET_KIND", "RECEIPT_SCHEMA", "REPORT_LIMIT_BYTES",
-    "REPORT_SCHEMA", "REPORT_VERDICTS", "REVIEWER_DEFINITION_SHA256", "REVIEWER_NAME",
-    "ROLE_KERNEL_SHA256", "SCHEMA_VERSION", "STATE_SCHEMA", "THINKING_LEVEL",
-    "describe", "launch", "package_manifest", "package_sha256", "settle", "submit",
+    "DISPOSITION_DECISIONS", "DISPOSITION_LIMIT_BYTES", "LAUNCH_TTL_MS", "MODEL_SELECTOR",
+    "PACKET_KIND", "RECEIPT_SCHEMA", "REPORT_LIMIT_BYTES", "REPORT_SCHEMA", "REPORT_VERDICTS",
+    "REVIEWER_DEFINITION_SHA256", "REVIEWER_NAME", "ROLE_KERNEL_SHA256", "SCHEMA_VERSION",
+    "STATE_SCHEMA", "THINKING_LEVEL", "cancel_stale", "close", "describe", "launch",
+    "package_manifest", "package_sha256", "purge", "record_disposition", "settle", "submit",
 ]

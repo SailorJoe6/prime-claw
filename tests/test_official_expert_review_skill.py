@@ -54,6 +54,21 @@ def test_official_expert_package_uses_only_stdlib_plus_public_rlm_import() -> No
     assert "await rlm.find_models" in source and "await rlm.spawn" in source
 
 
+def test_official_expert_package_exports_the_exact_public_surface() -> None:
+    module = load_package()
+    assert module.__all__ == [
+        "DISPOSITION_DECISIONS", "DISPOSITION_LIMIT_BYTES", "LAUNCH_TTL_MS", "MODEL_SELECTOR",
+        "PACKET_KIND", "RECEIPT_SCHEMA", "REPORT_LIMIT_BYTES", "REPORT_SCHEMA", "REPORT_VERDICTS",
+        "REVIEWER_DEFINITION_SHA256", "REVIEWER_NAME", "ROLE_KERNEL_SHA256", "SCHEMA_VERSION",
+        "STATE_SCHEMA", "THINKING_LEVEL", "cancel_stale", "close", "describe", "launch",
+        "package_manifest", "package_sha256", "purge", "record_disposition", "settle", "submit",
+    ]
+    assert set(module.__all__) == {
+        name for name in vars(module) if not name.startswith("_")
+        and name not in {"Any", "Path", "annotations", "hashlib", "json", "os", "secrets", "stat", "subprocess", "time"}
+    }
+
+
 def owner_fixture(tmp_path: Path, monkeypatch, module):
     agent = tmp_path / "agent"; sessions = agent / "sessions"; artifacts = agent / "session-artifacts"
     sessions.mkdir(parents=True); artifacts.mkdir()

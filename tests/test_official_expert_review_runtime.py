@@ -42,7 +42,8 @@ def test_official_expert_native_first_call_and_refusals(tier1_container, ctmp) -
     commit_oid = "c" * 40
     cases = []
     for index, kind in enumerate((
-        "valid", "mismatch", "timeout", "reported", "settled", "dispositioned", "closed", "cancelled",
+        "valid", "overlap-resolves", "overlap-persists", "mismatch", "timeout",
+        "reported", "settled", "dispositioned", "closed", "cancelled",
     ), start=1):
         case = root / kind
         state_root = case / "private-state"
@@ -136,6 +137,15 @@ def test_official_expert_native_first_call_and_refusals(tier1_container, ctmp) -
         state_file = state_root / f"{child_name}.{phase}.json"
         state_file.write_text(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
         os.chmod(state_file, 0o600)
+        pending_file = state_root / f"{child_name}.pending.json"
+        if kind in ("overlap-resolves", "overlap-persists"):
+            pending_record = {
+                key: value for key, value in record.items()
+                if key not in {"finalizedAt", "rlmChildId", "sessionDir", "returnedModel"}
+            }
+            pending_record["phase"] = "PENDING"
+            pending_file.write_text(json.dumps(pending_record, sort_keys=True, separators=(",", ":")) + "\n")
+            os.chmod(pending_file, 0o600)
         raw_path = case / "raw.jsonl"
         notices_path = case / "notices.jsonl"
         provider_path = case / "provider.jsonl"
@@ -147,11 +157,15 @@ const output={json.dumps(str(provider_path))};
 export default function provider(pi){{pi.registerProvider("openai-codex",{{baseUrl:"x",apiKey:"x",api:"native-expert",streamSimple(model,context){{appendFileSync(output,JSON.stringify({{roles:(context.messages??[]).map(m=>m.role),messages:context.messages,systemPrompt:context.systemPrompt}})+"\n");const stream=createAssistantMessageEventStream();queueMicrotask(()=>{{const message={{role:"assistant",content:[{{type:"text",text:"ok"}}],api:model.api,provider:model.provider,model:model.id,usage:{{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,cost:{{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}}}},stopReason:"stop",timestamp:Date.now()}};stream.push({{type:"start",partial:message}});stream.push({{type:"done",reason:"stop",message}});stream.end()}});return stream}},models:[{{id:"gpt-6-astra",name:"Astra",reasoning:true,input:["text"],cost:{{input:0,output:0,cacheRead:0,cacheWrite:0}},contextWindow:100000,maxTokens:1000}}]}})}}
 ''')
         setup_extension = case / "setup.ts"
+        wait_action = (
+            f'if(existsSync({json.dumps(str(pending_file))}))unlinkSync({json.dumps(str(pending_file))});'
+            if kind == "overlap-resolves" else ""
+        )
         setup_extension.write_text(rf'''
-import {{appendFileSync}} from "node:fs";
+import {{appendFileSync,existsSync,unlinkSync}} from "node:fs";
 import {{registerOfficialExpertReviewReservation}} from {json.dumps(module_uri)};
 const raw={json.dumps(str(raw_path))},notices={json.dumps(str(notices_path))};
-export default function setup(pi){{pi.on("context",(event,ctx)=>{{const prior=ctx.ui.notify.bind(ctx.ui);ctx.ui.notify=(message,level)=>{{appendFileSync(notices,JSON.stringify({{message,level}})+"\n");prior(message,level)}};appendFileSync(raw,JSON.stringify((event.messages??[]).map(message=>message.role))+"\n");return{{messages:event.messages}}}});registerOfficialExpertReviewReservation(pi,{{guideRoot:{json.dumps(guide_root)},stateRoot:{json.dumps(str(state_root))},now:()=>2000,admissionWaitMs:2,wait:async()=>{{}},packageStatus:()=>({{schemaVersion:1,status:"AVAILABLE",mode:"managed",packageSha256:{json.dumps(package_sha)}}}),repositoryIdentity:()=>({{repositoryPath:{json.dumps(str(repository))},commitOid:{json.dumps(commit_oid)}}})}})}}
+export default function setup(pi){{pi.on("context",(event,ctx)=>{{const prior=ctx.ui.notify.bind(ctx.ui);ctx.ui.notify=(message,level)=>{{appendFileSync(notices,JSON.stringify({{message,level}})+"\n");prior(message,level)}};appendFileSync(raw,JSON.stringify((event.messages??[]).map(message=>message.role))+"\n");return{{messages:event.messages}}}});registerOfficialExpertReviewReservation(pi,{{guideRoot:{json.dumps(guide_root)},stateRoot:{json.dumps(str(state_root))},now:()=>2000,admissionWaitMs:2,wait:async()=>{{{wait_action}}},packageStatus:()=>({{schemaVersion:1,status:"AVAILABLE",mode:"managed",packageSha256:{json.dumps(package_sha)}}}),repositoryIdentity:()=>({{repositoryPath:{json.dumps(str(repository))},commitOid:{json.dumps(commit_oid)}}})}})}}
 ''')
         cases.append({"kind": kind, "childFile": str(child_file), "sessionDir": str(session_dir), "provider": str(provider_extension), "setup": str(setup_extension), "raw": str(raw_path), "notices": str(notices_path), "providerOutput": str(provider_path), "stateRoot": str(state_root)})
 
@@ -190,8 +204,20 @@ export default function setup(pi){{pi.on("context",(event,ctx)=>{{const prior=ct
     assert "harmless bootstrap" not in provider_text
     assert "PRIME_CLAW_ROLE_KERNEL_V1" in provider_row["systemPrompt"]
     assert any(name.endswith(".claimed.json") for name in valid["files"])
-    for kind in ("mismatch", "timeout", "reported", "settled", "dispositioned", "closed", "cancelled"):
+
+    resolved = outcomes["overlap-resolves"]
+    assert resolved["returncode"] == 0, resolved["stdout"] + resolved["stderr"]
+    assert len(resolved["provider"]) == 1, resolved["notices"]
+    assert any(name.endswith(".claimed.json") for name in resolved["files"])
+    assert not any(name.endswith(".pending.json") for name in resolved["files"])
+    assert not any(name.endswith(".finalized.json") for name in resolved["files"])
+
+    for kind in ("overlap-persists", "mismatch", "timeout", "reported", "settled", "dispositioned", "closed", "cancelled"):
         assert outcomes[kind]["provider"] == []
         assert outcomes[kind]["notices"], outcomes[kind]
+    persistent = outcomes["overlap-persists"]
+    assert "conflicting official EXPERT private phase files" in persistent["notices"][-1]["message"]
+    assert any(name.endswith(".pending.json") for name in persistent["files"])
+    assert any(name.endswith(".finalized.json") for name in persistent["files"])
     for kind in ("reported", "settled", "dispositioned", "closed", "cancelled"):
         assert f"{kind} review child" in outcomes[kind]["notices"][-1]["message"]

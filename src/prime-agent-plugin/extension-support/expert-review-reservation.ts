@@ -348,12 +348,22 @@ export function registerOfficialExpertReviewReservation(pi: ExtensionAPI, option
       const deadline = Date.now() + waitLimit;
       const readyPaths = [paths.finalized, paths.claimed, paths.reported, paths.settled,
         paths.dispositioned, paths.closed, paths.cancelled];
-      while (!readyPaths.some((path) => existsSync(path)) && Date.now() < deadline) {
+      let present: string[] = [];
+      while (true) {
+        const pendingPresent = existsSync(paths.pending);
+        present = readyPaths.filter((path) => existsSync(path));
+        if (!pendingPresent && present.length === 1) break;
+        const publicationPending = present.length === 0
+          || (pendingPresent && present.length === 1 && present[0] === paths.finalized);
+        if (!publicationPending) return failClosed(ctx, "conflicting official EXPERT private phase files exist");
+        if (Date.now() >= deadline) {
+          if (pendingPresent && present.length === 1 && present[0] === paths.finalized) {
+            return failClosed(ctx, "conflicting official EXPERT private phase files exist");
+          }
+          return failClosed(ctx, "timed out waiting for finalized private launch state");
+        }
         await wait(Math.min(20, Math.max(1, deadline - Date.now())));
       }
-      const present = readyPaths.filter((path) => existsSync(path));
-      if (present.length === 0) return failClosed(ctx, "timed out waiting for finalized private launch state");
-      if (present.length !== 1) return failClosed(ctx, "conflicting official EXPERT private phase files exist");
       const currentPath = present[0];
       if ([paths.reported, paths.settled, paths.dispositioned, paths.closed, paths.cancelled].includes(currentPath)) {
         const terminal = readPrivateRecord(currentPath);

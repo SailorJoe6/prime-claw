@@ -1396,7 +1396,7 @@ function admissionFixture(t, mutate = () => {}) {
     childName, bootstrapDigest: sha256("harmless bootstrap"), finalizedAt: 1_100,
     rlmChildId, sessionDir, returnedModel: OFFICIAL_EXPERT_SELECTOR,
   };
-  const control = { now: 2_000, packageSha256, commitOid, systemPrompt: PRIME_CLAW_ROLE_KERNEL_TEXT, aborts: 0, notices: [] };
+  const control = { now: 2_000, packageSha256, commitOid, systemPrompt: PRIME_CLAW_ROLE_KERNEL_TEXT, aborts: 0, notices: [], wait: async () => {} };
   mutate({ record, control, childHeader, ownerHeader, marker, packet });
   writeFileSync(sessionFile, `${JSON.stringify(childHeader)}\n`, { mode: 0o600 });
   writeFileSync(ownerSessionFile, `${JSON.stringify(ownerHeader)}\n${JSON.stringify({ type: "custom", id: "marker", parentId: null, timestamp: ownerHeader.timestamp, customType: "prime-claw-conversation-oversight", data: marker })}\n`, { mode: 0o600 });
@@ -1407,7 +1407,7 @@ function admissionFixture(t, mutate = () => {}) {
     on(name, handler) { if (name === "before_agent_start") hooks.before.push(handler); if (name === "context") hooks.context.push(handler); },
   }, {
     guideRoot: join(REPO_ROOT, "src", "prime-agent-plugin"), stateRoot, now: () => control.now,
-    admissionWaitMs: 2, wait: async () => {},
+    admissionWaitMs: 2, wait: async (milliseconds) => control.wait(milliseconds),
     packageStatus: () => ({ schemaVersion: 1, status: "AVAILABLE", mode: "managed", packageSha256: control.packageSha256 }),
     repositoryIdentity: () => ({ repositoryPath, commitOid: control.commitOid }),
   });
@@ -1424,7 +1424,8 @@ function admissionFixture(t, mutate = () => {}) {
     ui: { notify(message, level) { control.notices.push({ message, level }); } },
   };
   return {
-    root, stateRoot, finalized, claimed: join(stateRoot, `${childName}.claimed.json`),
+    root, stateRoot, pending: join(stateRoot, `${childName}.pending.json`), finalized,
+    claimed: join(stateRoot, `${childName}.claimed.json`),
     reported: join(stateRoot, `${childName}.reported.json`), settled: join(stateRoot, `${childName}.settled.json`),
     dispositioned: join(stateRoot, `${childName}.dispositioned.json`),
     closed: join(stateRoot, `${childName}.closed.json`), cancelled: join(stateRoot, `${childName}.cancelled.json`),
@@ -1467,6 +1468,43 @@ test("official EXPERT final state binds public child identity and claims before 
   f.ctx.model = { provider: "openai-codex", id: "wrong" };
   await assert.rejects(() => f.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [] }] }, f.ctx), /current child model/);
   assert.equal(f.control.aborts, 1);
+});
+
+test("official EXPERT admission waits through a transient pending plus finalized publication overlap", async (t) => {
+  const f = admissionFixture(t);
+  writeFileSync(f.pending, `${canonicalJson({ ...f.record, phase: "PENDING" })}
+`, { mode: 0o600 });
+  let waits = 0;
+  f.control.wait = async () => {
+    waits += 1;
+    unlinkSync(f.pending);
+  };
+  let providerCalls = 0;
+  const admitted = await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
+  providerCalls += 1;
+  assert.equal(waits, 1);
+  assert.equal(providerCalls, 1);
+  assert.equal(f.control.aborts, 0);
+  assert.equal(existsSync(f.pending), false);
+  assert.equal(existsSync(f.finalized), false);
+  assert.equal(existsSync(f.claimed), true);
+  assert.equal(admitted.messages.length, 1);
+});
+
+test("official EXPERT admission refuses a persistent pending plus finalized overlap", async (t) => {
+  const f = admissionFixture(t);
+  writeFileSync(f.pending, `${canonicalJson({ ...f.record, phase: "PENDING" })}
+`, { mode: 0o600 });
+  let providerCalls = 0;
+  await assert.rejects(async () => {
+    await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
+    providerCalls += 1;
+  }, /conflicting official EXPERT private phase files/);
+  assert.equal(providerCalls, 0);
+  assert.equal(f.control.aborts, 1);
+  assert.equal(existsSync(f.pending), true);
+  assert.equal(existsSync(f.finalized), true);
+  assert.equal(existsSync(f.claimed), false);
 });
 
 test("all terminal official EXPERT children retain the neutral kernel and abort provider calls", async (t) => {

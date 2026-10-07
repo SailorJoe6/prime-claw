@@ -1821,3 +1821,42 @@ passed. Final gates pass: full Tier 0 325 passed/184 skipped; Docker Tier 1 77 p
 `ef3f353d8120ea85393c650d6fa0b5076df1773fee3eecb137a80bd89c0622d0`.
 Evidence is in `docs/evidence/official-lean-role-protocol/2026-10-07-section-28-lifecycle-closure.md`.
 Commit/push one candidate, report for direct owner review, and stop.
+
+## 29. Owner-review repair — pending/finalized crash overlap and public exports
+
+Base candidate: `1fed99101f3dee95bf6863a3c9298d8c05d96718`, tree
+`7c28ffe42d9b7018899cd252460287c91c30604d`. The lifecycle design is otherwise
+directionally accepted. Make only this narrow repair:
+
+1. Change the extension admission wait so `PENDING` plus exactly one
+   `FINALIZED` is tolerated only as a transient publication overlap within the
+   existing deadline. Wait for `PENDING` to disappear before admitting.
+2. At or before the deadline, require exactly one authority phase and no
+   `PENDING`. Persistent `PENDING`+`FINALIZED`, or any other multiple authority
+   phases, must call `ctx.abort()` and dispatch zero provider calls. Preserve all
+   current terminal-phase and conflicting-phase refusals.
+3. Add Node tests for transient overlap resolution and persistent overlap
+   refusal. Extend the Docker-authoritative native provider matrix to prove the
+   same success/refusal boundary and zero provider call on persistent overlap.
+4. Add Python `__all__` entries for `record_disposition`, `close`,
+   `cancel_stale`, `purge`, `DISPOSITION_DECISIONS`, and
+   `DISPOSITION_LIMIT_BYTES`, while retaining the existing intended launch,
+   submit, settle, description, package, and protocol constants. Assert the
+   exact public surface.
+5. Update evidence/status minimally. Run focused Python/Node/native tests, full
+   Tier 0, Docker Tier 1, and pinned Prime Agent 0.9.8 probe. Do not launch an
+   independent review cycle. Commit/push one repair candidate, report for direct
+   owner review, and stop.
+
+Do not broaden lifecycle architecture, redesign deletion, start Slice 4, land,
+activate/restart/UAT, finalize, perform bookkeeping, or physically clean up
+project/session resources.
+Section 29 implementation is complete on the blocked Section 28 candidate.
+Focused evidence passes: 61 Node, 51 Python/50 skipped, and 2 Docker-native.
+The native matrix proves one provider call only after transient overlap resolution
+and zero calls for persistent overlap. Package SHA256 is
+`92b7c40a36aaf3044f426a78126b5118bc578ef01ff195d1a437d2deae5f81ff`.
+Final gates pass: full Tier 0 326 passed/184 skipped; Docker Tier 1 77 passed/
+433 deselected; pinned Prime Agent 0.9.8 probe OK with expected package SHA256.
+Evidence is in `docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md`.
+Commit/push one repair candidate, report for direct owner review, and stop.

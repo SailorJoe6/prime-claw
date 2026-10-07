@@ -267,10 +267,13 @@ defense.
 
 The child extension selects the neutral kernel only when its actual unpredictable
 session name has matching private state. Its initial `context` waits boundedly
-for `FINALIZED`, then validates its public canonical session directory, ID,
-name, file and header, exact `header.parentSession`, canonical parent header ID,
-current provider/model, owner generation, candidate, packet, package, kernel,
-and expiry. It claims before provider dispatch. Provider context contains
+for publication to leave exactly one authority phase. `PENDING` plus exactly one
+`FINALIZED` is tolerated only as a transient overlap inside that existing wait;
+admission begins only after `PENDING` disappears. A persistent overlap at the
+deadline or any other multiple phases aborts before provider use. It then
+validates its public canonical session directory, ID, name, file and header,
+exact `header.parentSession`, canonical parent header ID, current provider/model,
+owner generation, candidate, packet, package, kernel, and expiry. It claims before provider dispatch. Provider context contains
 exactly one canonical rubric-plus-packet user turn; bootstrap, inbound messages,
 and private fields are excluded. Every admitted continuation revalidates the
 current model and bindings. Timeout, stale state, replay, duplicate claim, or any

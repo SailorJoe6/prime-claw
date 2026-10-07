@@ -34,11 +34,14 @@ directory, child id, and model. A definite failure revokes `PENDING`. There is
 no model fallback and the returned handle does not prove requested reasoning.
 
 The extension ignores all inbound message text and metadata. At the child's
-initial context it binds the private `FINALIZED` record to public canonical
-child session directory/id/name/file, `header.parentSession`, parent header ID,
-current model, exact owner generation, candidate, packet, package, kernel, and
-TTL. It atomically claims before provider dispatch, removes bootstrap/private
-content, and exposes exactly one canonical rubric-plus-packet user turn. It
+initial context it waits for publication to leave exactly one authority phase.
+`PENDING` plus one `FINALIZED` is transiently tolerated only within the existing
+bounded wait; admission requires `PENDING` to disappear, while a persistent or
+broader phase conflict aborts before provider use. It then binds `FINALIZED` to
+public canonical child session directory/id/name/file, `header.parentSession`,
+parent header ID, current model, exact owner generation, candidate, packet,
+package, kernel, and TTL. It atomically claims before provider dispatch, removes
+bootstrap/private content, and exposes exactly one canonical rubric-plus-packet user turn. It
 rechecks the model and all bindings on later calls in the same run. Timeout,
 stale state, replay, duplicate claim, or any mismatch explicitly aborts before a
 provider call. Generic children remain ordinary.

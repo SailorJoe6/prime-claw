@@ -132,10 +132,13 @@ derives the exact active owner and marker worktree from host-authored session
 state, requires one exact model result, creates mode-private untracked `PENDING`
 state, calls public `rlm.spawn` with an unpredictable harmless bootstrap name,
 and atomically publishes `FINALIZED` only from the actual return. The child
-binds that state to public canonical session/model/parent-header facts and
-atomically claims before exposing one rubric-plus-packet provider turn. Inbound
-message content and metadata are ignored. Mismatch, timeout, replay, or duplicate
-claim explicitly aborts before provider use. The child submits one bounded
+waits for transient `PENDING`+`FINALIZED` publication overlap to resolve, admits
+only after exactly one authority phase remains, and aborts a persistent or
+broader phase conflict before provider use. It then binds that state to public
+canonical session/model/parent-header facts and atomically claims before exposing
+one rubric-plus-packet provider turn. Inbound message content and metadata are
+ignored. Mismatch, timeout, replay, or duplicate claim explicitly aborts before
+provider use. The child submits one bounded
 structured report; the owner settles it and records one explicit conversational
 disposition. Public roster/delete/re-list operations must prove the stored
 actual child is no longer addressable before `CLOSED` or stale `CANCELLED`.
