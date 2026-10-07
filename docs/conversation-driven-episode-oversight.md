@@ -258,10 +258,12 @@ state. No model fallback or returned-reasoning claim is made.
 Private records bind a random nonce, fixed 15-minute TTL, exact owner/project/
 session/episode generation, candidate, canonical packet and digest, package,
 neutral kernel, selector/thinking request, and actual spawn return. The narrow
-state machine uses exclusive file creation and same-directory atomic rename for
-`PENDING -> FINALIZED -> CLAIMED/consumed`. It does not rely on cross-session
-module state and is not a general database, journal, capability-token service,
-power-loss protocol, or hostile-extension defense.
+state machine uses mode-private, same-directory publication for `PENDING ->
+FINALIZED -> CLAIMED -> REPORTED -> SETTLED -> DISPOSITIONED -> CLOSED`, plus
+expired pre-report transition to `CANCELLED` and explicit post-recording purge.
+It does not rely on cross-session module state and is not a general database,
+journal, capability-token service, power-loss protocol, or hostile-extension
+defense.
 
 The child extension selects the neutral kernel only when its actual unpredictable
 session name has matching private state. Its initial `context` waits boundedly
@@ -278,9 +280,21 @@ provider request.
 Inbound message text, displayed headers, sender, target, and internal
 `agent_message` details have zero authority and are never read. Copied text
 cannot grant EXPERT role; a wrong trigger can at most deny service. Generic
-children without matching private state remain ordinary. Report return and
-settlement, owner PASS/BLOCK disposition, child deletion, and cleanup remain
-later verticals.
+children without matching private state remain ordinary.
+
+The reviewer submits one bounded structured report before its final answer.
+The depth-0 owner settles that immutable report, then explicitly records one
+conversational `ACCEPT`, `REVISE`, `PAUSE`, or `CONSULT` disposition with a
+required rationale. The package does not make that decision. Async closure uses
+only public `rlm.list_subagents` and `rlm.delete_subagent`, matches the stored
+actual child ID plus session lineage, and re-lists before recording `CLOSED`.
+This proves public addressability ended; it does not erase Prime Agent session
+artifacts. Failure or uncertainty retains recoverable state and cannot claim
+cleanup. Expired pre-report launches have the same bounded public-absence rule
+before `CANCELLED`. Explicit purge accepts only the exact durably recorded
+`CLOSED` result, re-proves public absence, and removes only its private closure
+record. Conflicting phases or roster identity fail closed. Every terminal phase
+keeps a still-running designated child neutral and aborts provider use.
 
 The first project policy lives at `.prime/agent/profiles/expert-reviewer.md` as
 byte-identical migration evidence. The Markdown body defines the independent,

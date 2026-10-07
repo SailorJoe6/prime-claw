@@ -135,8 +135,13 @@ and atomically publishes `FINALIZED` only from the actual return. The child
 binds that state to public canonical session/model/parent-header facts and
 atomically claims before exposing one rubric-plus-packet provider turn. Inbound
 message content and metadata are ignored. Mismatch, timeout, replay, or duplicate
-claim explicitly aborts before provider use. Report settlement and cleanup
-remain deferred.
+claim explicitly aborts before provider use. The child submits one bounded
+structured report; the owner settles it and records one explicit conversational
+disposition. Public roster/delete/re-list operations must prove the stored
+actual child is no longer addressable before `CLOSED` or stale `CANCELLED`.
+Failed or uncertain deletion retains recoverable private state. Exact explicit
+purge removes only a durably recorded `CLOSED` private record and never session
+artifacts. All terminal phases preserve neutral-kernel/provider-abort behavior.
 
 The predecessor APPEND-only manager remains in source for bridge rollback. New
 apply/check use the role-protocol manager for both selected context and retained

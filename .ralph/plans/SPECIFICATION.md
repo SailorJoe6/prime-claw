@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Section 27 structured report submission and exact owner settlement are implemented and fully validated pending one commit/push and direct owning-Conversation review.
+> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Section 28 final Slice-3 lifecycle closure is implemented and fully validated pending one commit/push and direct owner review.
 >
 > **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
 > **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** the existing episode may commit/push the fully validated Section 27 candidate, report it for one direct owning-Conversation review, and stop. Owner PASS/BLOCK product disposition persistence beyond the settlement receipt, child deletion/state cleanup, Slice 4, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical cleanup remain separately authorized.
+> **Implementation authority:** the existing episode may implement one final Slice-3 lifecycle-closure vertical: exact owner disposition persistence, definite settled-child deletion, bounded stale/crash reconciliation, CLOSED/CANCELLED receipts, and exact post-recording purge; run the specified gates, commit/push one candidate, report, and stop. Slice 4, landing, user-global mutation, restart, UAT acceptance, finalization, bookkeeping, and physical project cleanup remain separately authorized.
 
 ## Summary
 
@@ -858,3 +858,43 @@ Run focused Python/Node/native-provider tests, including mutation and replay,
 then full Tier 0, Docker Tier 1, and the pinned Prime Agent 0.9.8 probe. Use one
 direct owner review only and no new independent review cycle. Commit/push one
 candidate, report, and stop.
+
+## Accepted final Slice 3 vertical: lifecycle closure and bounded reconciliation
+
+Section 28 extends only the accepted private EXPERT file protocol. Product and
+scope decisions remain conversational; APIs record exact owner decisions and
+never invent them. Inbound messages/details remain non-authoritative.
+
+- A depth-0 owner-only disposition operation derives the current owner session,
+  active generation, and unique `SETTLED` report. It records one bounded explicit
+  disposition plus required rationale and digest without rewriting the EXPERT
+  report. Idempotence requires exact equality; conflicting decisions fail closed.
+- An async close operation validates `DISPOSITIONED`, uses only public
+  `rlm.list_subagents` and `rlm.delete_subagent` against the stored actual child
+  ID, proves definite deletion or absence, then creates `CLOSED` while preserving
+  report, settlement, disposition, and deletion evidence. Uncertain or failed
+  deletion retains recoverable state and never claims cleanup.
+- Explicit purge is allowed only for one exact `CLOSED` receipt/digest after the
+  caller confirms durable recording. Authority state is never removed before
+  definite child absence.
+- Add the smallest exact-owner stale cancellation for expired `PENDING`,
+  `FINALIZED`, and `CLAIMED`. A no-child pending launch may close directly;
+  published-child states must prove deletion/absence before `CANCELLED`.
+  Conflicting phase files or ambiguous/mismatched roster state fail closed.
+- `REPORTED`, `SETTLED`, `DISPOSITIONED`, `CLOSED`, and `CANCELLED` keep any
+  still-addressable child under the neutral EXPERT kernel and abort provider
+  calls. Purge is safe only after child absence.
+- Keep purpose-built files and public RLM APIs. Do not manually remove Prime
+  Agent session artifacts, trust inbound metadata, retry uncertain provider or
+  message work, or add a database, general journal, or hostile-local-code
+  defense.
+
+Prove success, exact duplicates, conflicting disposition, wrong owner/generation,
+ambiguous or mismatched roster, definite delete failure, conflicting phases,
+stale pending, stale child deletion, purge-before-close refusal, and no role
+fallback. Update status/preflight/docs for complete Slice-3 readiness, expiry,
+and cleanup state. Run focused Python/Node/native tests plus full Tier 0, Docker
+Tier 1, and the pinned Prime Agent 0.9.8 probe. Use direct owner review only and
+no independent review cycle. Commit/push one candidate, report, and stop. Do not
+start Slice 4, landing, activation/restart/UAT, finalization, bookkeeping, or
+physical project cleanup.

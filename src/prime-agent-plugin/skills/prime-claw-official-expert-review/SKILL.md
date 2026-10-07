@@ -67,7 +67,41 @@ accepts no caller-supplied handle identity. An exact settled read is idempotent.
 After `REPORTED` or `SETTLED`, the designated child remains under the neutral
 EXPERT kernel and any provider call explicitly aborts.
 
+The exact depth-0 owner records the conversational decision, then closes the
+child through public RLM lifecycle APIs:
+
+```python
+dispositioned = prime_claw_official_expert_review.record_disposition({
+    "schemaVersion": 1,
+    "decision": "ACCEPT",  # ACCEPT, REVISE, PAUSE, or CONSULT
+    "rationale": "Bounded rationale for the exact settled report.",
+})
+closed = await prime_claw_official_expert_review.close()
+# Durably record `closed` before the explicit final purge.
+purged = await prime_claw_official_expert_review.purge(closed)
+```
+
+`record_disposition()` derives the exact current owner/session/generation and
+unique `SETTLED` report. It records but never invents conversational product or
+scope authority. Only exact canonical equality is idempotent; conflicts fail
+closed. `close()` revalidates lineage, lists the public parent-owned roster,
+matches only the stored actual child identity, deletes that public row when
+present, and re-lists to prove the child is no longer publicly addressable. It
+then creates `CLOSED` with immutable report, settlement, disposition, and
+bounded deletion evidence. Failure or uncertainty retains `DISPOSITIONED` with
+one bounded failure record and cannot claim cleanup. Public deletion does not
+remove Prime Agent transcripts or artifacts.
+
+`purge()` requires the exact returned `CLOSED` result after the caller has
+recorded it durably, re-proves public roster absence, and removes only the exact
+private `.closed.json` authority record. It never removes session artifacts.
+For an expired pre-report launch, `await cancel_stale()` derives the exact owner
+and accepts only one `PENDING`, `FINALIZED`, or `CLAIMED` state. A pending launch
+must have no public child with its name; a published child uses the same exact
+public delete-and-re-list proof before `CANCELLED`. Ambiguous/mismatched roster,
+non-expired state, conflicting phase files, or uncertain deletion fails closed.
+
+`REPORTED`, `SETTLED`, `DISPOSITIONED`, `CLOSED`, and `CANCELLED` all retain the
+neutral kernel and abort provider calls while a child could still execute.
 `describe()` remains a read-only package validation API and returns
-`authority: false`. Availability preflight remains read-only. Owner product
-disposition persistence beyond the settlement receipt, child deletion, state
-cleanup, and broader lifecycle cleanup are not part of this skill generation.
+`authority: false`. Availability preflight remains read-only.

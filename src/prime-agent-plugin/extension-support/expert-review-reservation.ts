@@ -61,7 +61,7 @@ type ProbeResult =
 
 type LaunchRecord = Record<string, unknown> & {
   schema: string;
-  phase: "FINALIZED" | "CLAIMED" | "REPORTED" | "SETTLED";
+  phase: "FINALIZED" | "CLAIMED" | "REPORTED" | "SETTLED" | "DISPOSITIONED" | "CLOSED" | "CANCELLED";
   nonce: string;
   createdAt: number;
   expiresAt: number;
@@ -157,7 +157,7 @@ function runProbe(interpreter: string, expected: string, source?: string): Probe
 function validDescription(value: Record<string, unknown>, expected: string): boolean {
   const reviewer = value.reviewer;
   return value.schemaVersion === 1
-    && value.capability === "private-launch-report-and-settlement"
+    && value.capability === "private-review-lifecycle-closure"
     && value.authority === false && value.module === EXPERT_IMPORT_NAME
     && value.packageSha256 === expected
     && reviewer !== null && typeof reviewer === "object" && !Array.isArray(reviewer)
@@ -207,6 +207,9 @@ function statePaths(root: string, name: string) {
     claimed: join(root, `${name}.claimed.json`),
     reported: join(root, `${name}.reported.json`),
     settled: join(root, `${name}.settled.json`),
+    dispositioned: join(root, `${name}.dispositioned.json`),
+    closed: join(root, `${name}.closed.json`),
+    cancelled: join(root, `${name}.cancelled.json`),
   };
 }
 function assertPrivateRoot(root: string): void {
@@ -281,7 +284,7 @@ function providerMessages(record: LaunchRecord, messages: Array<Record<string, u
   return [user, ...messages.filter((message) => message.role === "assistant" || message.role === "toolResult")];
 }
 function validateRecord(record: LaunchRecord, ctx: ExtensionContext, options: ExpertReviewReservationRegistration, allowExpired = false): void {
-  if (record.schema !== EXPERT_REVIEW_STATE_SCHEMA || !["FINALIZED", "CLAIMED", "REPORTED", "SETTLED"].includes(record.phase)) throw new Error("private launch schema or phase is invalid");
+  if (record.schema !== EXPERT_REVIEW_STATE_SCHEMA || !["FINALIZED", "CLAIMED", "REPORTED", "SETTLED", "DISPOSITIONED", "CLOSED"].includes(record.phase)) throw new Error("private launch schema or phase is invalid");
   const now = (options.now ?? Date.now)(); const createdAt = requireInteger(record, "createdAt"); const expiresAt = requireInteger(record, "expiresAt");
   if (createdAt < 0 || expiresAt !== createdAt + EXPERT_REVIEW_RESERVATION_TTL_MS || (!allowExpired && now >= expiresAt)) throw new Error("private launch is stale or expired");
   const sessionDir = realpathSync(ctx.sessionManager.getSessionDir()); const sessionFileValue = ctx.sessionManager.getSessionFile();
@@ -332,8 +335,7 @@ export function registerOfficialExpertReviewReservation(pi: ExtensionAPI, option
     let paths: ReturnType<typeof statePaths>;
     try { assertPrivateRoot(root); paths = statePaths(root, name); }
     catch { return; }
-    if (existsSync(paths.pending) || existsSync(paths.finalized) || existsSync(paths.claimed)
-      || existsSync(paths.reported) || existsSync(paths.settled)) return { systemPrompt: PRIME_CLAW_ROLE_KERNEL_TEXT };
+    if (Object.values(paths).some((path) => existsSync(path))) return { systemPrompt: PRIME_CLAW_ROLE_KERNEL_TEXT };
   });
   pi.on("context", async (event, ctx) => {
     const name = ctx.sessionManager.getSessionName?.();
@@ -341,23 +343,27 @@ export function registerOfficialExpertReviewReservation(pi: ExtensionAPI, option
     let paths: ReturnType<typeof statePaths>;
     try { assertPrivateRoot(root); paths = statePaths(root, name); }
     catch (error) { return failClosed(ctx, error instanceof Error ? error.message : String(error)); }
-    if (!existsSync(paths.pending) && !existsSync(paths.finalized) && !existsSync(paths.claimed)
-      && !existsSync(paths.reported) && !existsSync(paths.settled)) return { messages: event.messages };
+    if (!Object.values(paths).some((path) => existsSync(path))) return { messages: event.messages };
     try {
       const deadline = Date.now() + waitLimit;
-      while (!existsSync(paths.finalized) && !existsSync(paths.claimed) && !existsSync(paths.reported)
-        && !existsSync(paths.settled) && Date.now() < deadline) await wait(Math.min(20, Math.max(1, deadline - Date.now())));
-      if (!existsSync(paths.finalized) && !existsSync(paths.claimed) && !existsSync(paths.reported) && !existsSync(paths.settled)) {
-        return failClosed(ctx, "timed out waiting for finalized private launch state");
+      const readyPaths = [paths.finalized, paths.claimed, paths.reported, paths.settled,
+        paths.dispositioned, paths.closed, paths.cancelled];
+      while (!readyPaths.some((path) => existsSync(path)) && Date.now() < deadline) {
+        await wait(Math.min(20, Math.max(1, deadline - Date.now())));
       }
-      const terminalPath = existsSync(paths.settled) ? paths.settled : existsSync(paths.reported) ? paths.reported : undefined;
-      if (terminalPath) {
-        const terminal = readPrivateRecord(terminalPath);
-        validateRecord(terminal, ctx, options, true);
-        return failClosed(ctx, terminal.phase === "SETTLED" ? "settled review child cannot make another provider call" : "reported review child cannot make another provider call");
+      const present = readyPaths.filter((path) => existsSync(path));
+      if (present.length === 0) return failClosed(ctx, "timed out waiting for finalized private launch state");
+      if (present.length !== 1) return failClosed(ctx, "conflicting official EXPERT private phase files exist");
+      const currentPath = present[0];
+      if ([paths.reported, paths.settled, paths.dispositioned, paths.closed, paths.cancelled].includes(currentPath)) {
+        const terminal = readPrivateRecord(currentPath);
+        if (currentPath !== paths.cancelled) validateRecord(terminal, ctx, options, true);
+        else if (terminal.schema !== EXPERT_REVIEW_STATE_SCHEMA || terminal.phase !== "CANCELLED"
+          || terminal.childName !== name) throw new Error("cancelled official EXPERT state is invalid");
+        return failClosed(ctx, `${String(terminal.phase).toLowerCase()} review child cannot make another provider call`);
       }
-      const alreadyClaimed = existsSync(paths.claimed);
-      const record = readPrivateRecord(alreadyClaimed ? paths.claimed : paths.finalized);
+      const alreadyClaimed = currentPath === paths.claimed;
+      const record = readPrivateRecord(currentPath);
       validateRecord(record, ctx, options);
       const messages = event.messages as Array<Record<string, unknown>>;
       if (startCount(messages) !== 1) return failClosed(ctx, alreadyClaimed ? "claimed launch was replayed or received a duplicate trigger" : "initial spawn context is missing or has duplicate run triggers");

@@ -118,7 +118,7 @@ def valid_description(value: Any, expected: str) -> bool:
     return (
         isinstance(value, dict)
         and value.get("schemaVersion") == 1
-        and value.get("capability") == "private-launch-report-and-settlement"
+        and value.get("capability") == "private-review-lifecycle-closure"
         and value.get("authority") is False
         and value.get("module") == IMPORT_NAME
         and value.get("packageSha256") == expected

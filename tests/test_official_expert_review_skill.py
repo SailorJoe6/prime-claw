@@ -414,3 +414,217 @@ def test_settlement_preserves_mutation_evidence_and_cannot_retry(tmp_path, monke
     assert (state / f"{record['childName']}.reported.json").exists()
     with pytest.raises(RuntimeError, match="already rejected"):
         module.settle()
+
+
+def settled_fixture(tmp_path: Path, monkeypatch):
+    module, state, packet, record, owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    module.submit(pass_report())
+    owner_runtime(monkeypatch, owner_artifact)
+    settled = module.settle()
+    return module, state, packet, record, owner_artifact, settled
+
+
+def owner_disposition():
+    return {"schemaVersion": 1, "decision": "ACCEPT", "rationale": "The owner accepts the exact settled candidate."}
+
+
+def roster_row(record, **overrides):
+    values = {
+        "rlm_child_id": record["rlmChildId"], "active_session_id": "active-child",
+        "session_id": record.get("childSessionId"), "session_name": record["childName"],
+        "session_dir": Path(record["sessionDir"]), "status": "completed",
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def install_roster(monkeypatch, rows, *, delete_error=None, delete_result=None):
+    current = list(rows); calls = []
+    async def list_subagents():
+        calls.append("list")
+        return list(current)
+    async def delete_subagent(row):
+        calls.append(("delete", row))
+        if delete_error is not None:
+            raise delete_error
+        current.clear()
+        return delete_result if delete_result is not None else row
+    monkeypatch.setitem(sys.modules, "rlm", SimpleNamespace(
+        list_subagents=list_subagents, delete_subagent=delete_subagent,
+    ))
+    return current, calls
+
+
+def test_owner_disposition_close_and_exact_purge_complete_lifecycle(tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, _owner_artifact, settled = settled_fixture(tmp_path, monkeypatch)
+    disposition = owner_disposition()
+    decided = module.record_disposition(disposition)
+    assert decided["report"] == settled["report"]
+    assert decided["disposition"] == disposition
+    assert decided["dispositionReceipt"]["phase"] == "DISPOSITIONED"
+    assert module.record_disposition(dict(disposition)) == decided
+    with pytest.raises(RuntimeError, match="conflicting official EXPERT owner disposition"):
+        module.record_disposition({**disposition, "decision": "REVISE"})
+
+    row = roster_row(record)
+    current, calls = install_roster(monkeypatch, [row])
+    closed = asyncio.run(module.close())
+    assert closed["closedReceipt"]["phase"] == "CLOSED"
+    assert closed["closedReceipt"]["childAbsent"] is True
+    assert current == [] and [item for item in calls if isinstance(item, tuple)] == [("delete", row)]
+    assert asyncio.run(module.close()) == closed
+    assert module.record_disposition(dict(disposition))["dispositionReceipt"] == decided["dispositionReceipt"]
+
+    with pytest.raises(RuntimeError, match="exact durably recorded CLOSED result"):
+        asyncio.run(module.purge({**closed, "closedReceiptDigest": "0" * 64}))
+    child_file = Path(record["childSessionFile"])
+    result = asyncio.run(module.purge(closed))
+    assert result["phase"] == "PURGED"
+    assert child_file.exists()
+    assert not list(state.glob(f"{record['childName']}.*.json"))
+
+
+def test_disposition_rejects_wrong_owner_generation_and_conflicting_phase(tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, _owner_artifact, _settled = settled_fixture(tmp_path, monkeypatch)
+    settled_path = state / f"{record['childName']}.settled.json"
+    value = json.loads(settled_path.read_text())
+    value["ownerGeneration"] = "0" * 64
+    settled_path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
+    os.chmod(settled_path, 0o600)
+    with pytest.raises(RuntimeError, match="exactly one matching settled or dispositioned"):
+        module.record_disposition(owner_disposition())
+
+
+def test_close_preserves_recoverable_state_on_delete_failure(tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, _owner_artifact, _settled = settled_fixture(tmp_path, monkeypatch)
+    module.record_disposition(owner_disposition())
+    row = roster_row(record)
+    install_roster(monkeypatch, [row], delete_error=RuntimeError("definite delete failure"))
+    with pytest.raises(RuntimeError, match="definite delete failure"):
+        asyncio.run(module.close())
+    dispositioned = state / f"{record['childName']}.dispositioned.json"
+    value = json.loads(dispositioned.read_text())
+    assert value["phase"] == "DISPOSITIONED"
+    assert value["lastDeletionFailure"]["operation"] == "close"
+    assert not list(state.glob("*.closed.json"))
+
+
+@pytest.mark.parametrize("rows,pattern", [
+    ("duplicate", "ambiguous"),
+    ("mismatch", "mismatches stored launch lineage"),
+])
+def test_close_fails_closed_for_ambiguous_or_mismatched_roster(rows, pattern, tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, _owner_artifact, _settled = settled_fixture(tmp_path, monkeypatch)
+    module.record_disposition(owner_disposition())
+    exact = roster_row(record)
+    roster = [exact, roster_row(record)] if rows == "duplicate" else [roster_row(record, rlm_child_id="sub-other")]
+    install_roster(monkeypatch, roster)
+    with pytest.raises(RuntimeError, match=pattern):
+        asyncio.run(module.close())
+    assert (state / f"{record['childName']}.dispositioned.json").exists()
+    assert not list(state.glob("*.closed.json"))
+
+
+def test_close_rejects_conflicting_phase_files(tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, _owner_artifact, _settled = settled_fixture(tmp_path, monkeypatch)
+    module.record_disposition(owner_disposition())
+    dispositioned = state / f"{record['childName']}.dispositioned.json"
+    conflict = json.loads(dispositioned.read_text()); conflict["phase"] = "SETTLED"
+    settled = state / f"{record['childName']}.settled.json"
+    settled.write_text(json.dumps(conflict, sort_keys=True, separators=(",", ":")) + "\n"); os.chmod(settled, 0o600)
+    install_roster(monkeypatch, [])
+    with pytest.raises(RuntimeError, match="conflicting official EXPERT private phase"):
+        asyncio.run(module.close())
+
+
+def stale_phase_fixture(tmp_path, monkeypatch, phase):
+    module, state, _packet, record, owner_artifact = claimed_fixture(tmp_path, monkeypatch)
+    claimed = state / f"{record['childName']}.claimed.json"
+    value = json.loads(claimed.read_text())
+    value["createdAt"] = 1
+    value["expiresAt"] = 1 + module.LAUNCH_TTL_MS
+    claimed.unlink()
+    if phase == "PENDING":
+        for key in ("finalizedAt", "rlmChildId", "sessionDir", "returnedModel", "claimedAt", "childSessionId", "childSessionFile", "childSessionName"):
+            value.pop(key, None)
+    elif phase == "FINALIZED":
+        for key in ("claimedAt", "childSessionId", "childSessionFile", "childSessionName"):
+            value.pop(key, None)
+    value["phase"] = phase
+    path = state / f"{record['childName']}.{phase.lower()}.json"
+    path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n"); os.chmod(path, 0o600)
+    owner_runtime(monkeypatch, owner_artifact)
+    return module, state, record, path
+
+
+@pytest.mark.parametrize("phase", ["PENDING", "FINALIZED", "CLAIMED"])
+def test_stale_cancellation_proves_absence_or_deletes_published_child(phase, tmp_path, monkeypatch) -> None:
+    module, state, record, source = stale_phase_fixture(tmp_path, monkeypatch, phase)
+    row = roster_row(record)
+    rows = [] if phase == "PENDING" else [row]
+    current, calls = install_roster(monkeypatch, rows)
+    result = asyncio.run(module.cancel_stale())
+    assert result["cancellationReceipt"]["sourcePhase"] == phase
+    assert current == [] and not source.exists()
+    assert (state / f"{record['childName']}.cancelled.json").exists()
+    assert asyncio.run(module.cancel_stale()) == result
+    delete_calls = [item for item in calls if isinstance(item, tuple)]
+    assert len(delete_calls) == (0 if phase == "PENDING" else 1)
+
+
+def test_pending_cancellation_refuses_addressable_name_and_nonexpired_state(tmp_path, monkeypatch) -> None:
+    module, state, record, pending = stale_phase_fixture(tmp_path, monkeypatch, "PENDING")
+    install_roster(monkeypatch, [roster_row(record)])
+    with pytest.raises(RuntimeError, match="addressable child without stored actual identity"):
+        asyncio.run(module.cancel_stale())
+    assert pending.exists()
+    value = json.loads(pending.read_text())
+    value.pop("lastDeletionFailure", None)
+    now = int(__import__("time").time() * 1000)
+    value["createdAt"] = now; value["expiresAt"] = now + module.LAUNCH_TTL_MS
+    pending.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n"); os.chmod(pending, 0o600)
+    install_roster(monkeypatch, [])
+    with pytest.raises(RuntimeError, match="not exactly expired"):
+        asyncio.run(module.cancel_stale())
+
+
+def test_purge_refuses_before_definite_close(tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, _owner_artifact, _settled = settled_fixture(tmp_path, monkeypatch)
+    dispositioned = module.record_disposition(owner_disposition())
+    install_roster(monkeypatch, [])
+    with pytest.raises(RuntimeError, match="exactly one matching closed review"):
+        asyncio.run(module.purge(dispositioned))
+    assert (state / f"{record['childName']}.dispositioned.json").exists()
+
+
+@pytest.mark.parametrize("mode,pattern", [
+    ("wrong-receipt", "mismatches stored launch lineage"),
+    ("reappears", "did not prove child absence"),
+    ("relist-error", "uncertain re-list"),
+])
+def test_close_retains_recoverable_state_for_uncertain_delete_outcome(mode, pattern, tmp_path, monkeypatch) -> None:
+    module, state, _packet, record, _owner_artifact, _settled = settled_fixture(tmp_path, monkeypatch)
+    module.record_disposition(owner_disposition())
+    row = roster_row(record)
+    calls = 0
+    async def list_subagents():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return [row]
+        if mode == "relist-error":
+            raise RuntimeError("uncertain re-list")
+        return [row] if mode == "reappears" else []
+    async def delete_subagent(_row):
+        if mode == "wrong-receipt":
+            return roster_row(record, rlm_child_id="sub-wrong")
+        return row
+    monkeypatch.setitem(sys.modules, "rlm", SimpleNamespace(
+        list_subagents=list_subagents, delete_subagent=delete_subagent,
+    ))
+    with pytest.raises(RuntimeError, match=pattern):
+        asyncio.run(module.close())
+    dispositioned = state / f"{record['childName']}.dispositioned.json"
+    value = json.loads(dispositioned.read_text())
+    assert value["lastDeletionFailure"]["operation"] == "close"
+    assert not list(state.glob("*.closed.json"))

@@ -1752,3 +1752,72 @@ pinned Prime Agent 0.9.8 probe OK. No independent review
 was launched. Evidence is in
 `docs/evidence/official-lean-role-protocol/2026-10-07-section-27-report-settlement.md`.
 Commit/push one candidate, report for one direct owner review, and stop.
+
+## 28. Slice 3 — final lifecycle closure and bounded stale reconciliation
+
+Accepted base: Section 27 commit
+`ee655a8907882a21f693169fbd0369d2d8c2e122`, tree
+`60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Advance only this final Slice-3
+vertical. Keep the purpose-built private-file protocol and public RLM APIs.
+
+1. Add an exact depth-0 owner-only disposition operation. Derive the current
+   owner session/file, active episode generation, canonical repository, and one
+   unique `SETTLED` report. Accept one bounded explicit disposition plus required
+   rationale, canonicalize/digest it, preserve the EXPERT report unchanged, and
+   transition to `DISPOSITIONED`. Return an idempotent receipt only for exact
+   equality; conflicting disposition or wrong owner/generation fails closed.
+   Product/scope authority remains in the Conversation; this API only records
+   the supplied decision.
+2. Add async close. Revalidate `DISPOSITIONED`, actual spawn/child/session/model/
+   candidate/package/kernel/report/settlement/disposition lineage, then call
+   public `rlm.list_subagents`. Match only the stored actual child ID. Ambiguous,
+   mismatched, or uncertain roster state fails closed. If present, call public
+   `rlm.delete_subagent` with the public handle and require a definite deletion
+   outcome; re-list when needed to prove absence. Preserve failed/uncertain
+   evidence without claiming cleanup. Only definite child absence may transition
+   to `CLOSED`, whose immutable receipt retains report, settlement, disposition,
+   and deletion evidence.
+3. Add explicit purge that accepts only an exact `CLOSED` receipt/digest after
+   the caller has durably recorded it. Refuse purge before close, on digest or
+   owner/generation mismatch, or without definite child absence. Remove only the
+   exact owned private closure files; never delete Prime Agent session artifacts.
+4. Add the smallest exact-owner stale cancellation for expired `PENDING`,
+   `FINALIZED`, and `CLAIMED`. A pending launch with no published child may
+   transition directly to `CANCELLED`. A finalized/claimed published child must
+   use the same public roster/delete/definite-absence proof before cancellation.
+   Conflicting phase files, non-expired state, wrong owner/generation, ambiguous
+   roster, mismatched child, or uncertain deletion fails closed. Do not add a
+   generalized recovery transaction engine.
+5. Extend the extension state paths and admission gates so `REPORTED`, `SETTLED`,
+   `DISPOSITIONED`, `CLOSED`, and `CANCELLED` preserve the neutral EXPERT kernel
+   and explicitly abort provider calls whenever a child remains addressable.
+   Purged state is allowed only after proven child absence, so it cannot create
+   an ordinary-role fallback for a live designated child.
+6. Update package capability/status, preflight, reviewer/skill docs, evidence,
+   and Slice-3 readiness/expiry/cleanup documentation. Preserve inbound-message
+   zero authority and avoid manual artifact deletion, provider/message retries,
+   database/general journal machinery, or hostile-local-code defense.
+7. Test success, exact duplicate calls, conflicting disposition, wrong owner or
+   generation, ambiguous/mismatched roster, definite delete failure, uncertain
+   deletion, conflicting/crash phase files, stale no-child pending, stale
+   published-child deletion, purge-before-close refusal, exact purge, and no
+   role fallback. Run focused Python/Node/native tests, full Tier 0, Docker Tier
+   1, and pinned Prime Agent 0.9.8 probe. Use direct owner review only; no new
+   independent review cycle. Commit/push one candidate, report, and stop.
+
+Defer Slice 4, landing, user-global apply/restart/UAT, finalization, bookkeeping,
+and physical project cleanup.
+Implementation is complete on the accepted Section 27 base. The package now
+records exact owner `ACCEPT`/`REVISE`/`PAUSE`/`CONSULT` dispositions, closes the
+stored actual child only through public roster/delete/re-list proof, retains
+bounded failure evidence without claiming cleanup, cancels only exact expired
+pre-report states after absence proof, and purges only an exact durably recorded
+`CLOSED` result after re-proving public absence. Public deletion is documented as
+registry/addressability removal, not physical artifact deletion. The extension
+keeps all five terminal phases neutral and aborts every provider call. Focused
+evidence: 58 Python passed/50 skipped, 59 Node passed, and 2 native container
+passed. Final gates pass: full Tier 0 325 passed/184 skipped; Docker Tier 1 77 passed/
+432 deselected; pinned Prime Agent 0.9.8 probe OK with expected package SHA256
+`ef3f353d8120ea85393c650d6fa0b5076df1773fee3eecb137a80bd89c0622d0`.
+Evidence is in `docs/evidence/official-lean-role-protocol/2026-10-07-section-28-lifecycle-closure.md`.
+Commit/push one candidate, report for direct owner review, and stop.

@@ -1426,6 +1426,8 @@ function admissionFixture(t, mutate = () => {}) {
   return {
     root, stateRoot, finalized, claimed: join(stateRoot, `${childName}.claimed.json`),
     reported: join(stateRoot, `${childName}.reported.json`), settled: join(stateRoot, `${childName}.settled.json`),
+    dispositioned: join(stateRoot, `${childName}.dispositioned.json`),
+    closed: join(stateRoot, `${childName}.closed.json`), cancelled: join(stateRoot, `${childName}.cancelled.json`),
     record, control, hooks, ctx, childName,
   };
 }
@@ -1467,25 +1469,42 @@ test("official EXPERT final state binds public child identity and claims before 
   assert.equal(f.control.aborts, 1);
 });
 
-test("reported and settled official EXPERT children retain the neutral kernel and abort provider calls", async (t) => {
-  for (const phase of ["REPORTED", "SETTLED"]) {
+test("all terminal official EXPERT children retain the neutral kernel and abort provider calls", async (t) => {
+  for (const [phase, key] of [
+    ["REPORTED", "reported"], ["SETTLED", "settled"], ["DISPOSITIONED", "dispositioned"],
+    ["CLOSED", "closed"], ["CANCELLED", "cancelled"],
+  ]) {
     await t.test(phase.toLowerCase(), async (tt) => {
       const f = admissionFixture(tt);
       await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
       const claimed = JSON.parse(readFileSync(f.claimed, "utf8"));
-      const terminalPath = phase === "REPORTED" ? f.reported : f.settled;
-      writeFileSync(terminalPath, `${canonicalJson({ ...claimed, phase })}
+      writeFileSync(f[key], `${canonicalJson({ ...claimed, phase })}
 `, { mode: 0o600 });
       unlinkSync(f.claimed);
-      const before = await f.hooks.before[0]({ prompt: "post-report replay" }, f.ctx);
+      const before = await f.hooks.before[0]({ prompt: "terminal replay" }, f.ctx);
       assert.equal(before.systemPrompt, PRIME_CLAW_ROLE_KERNEL_TEXT);
       await assert.rejects(
         () => f.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [] }] }, f.ctx),
-        phase === "REPORTED" ? /reported review child/ : /settled review child/,
+        new RegExp(`${phase.toLowerCase()} review child`),
       );
       assert.equal(f.control.aborts, 1);
     });
   }
+});
+
+test("conflicting official EXPERT phase files fail closed before provider use", async (t) => {
+  const f = admissionFixture(t);
+  await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
+  const claimed = JSON.parse(readFileSync(f.claimed, "utf8"));
+  writeFileSync(f.reported, `${canonicalJson({ ...claimed, phase: "REPORTED" })}
+`, { mode: 0o600 });
+  const before = await f.hooks.before[0]({ prompt: "conflict" }, f.ctx);
+  assert.equal(before.systemPrompt, PRIME_CLAW_ROLE_KERNEL_TEXT);
+  await assert.rejects(
+    () => f.hooks.context[0]({ messages: initialMessages }, f.ctx),
+    /conflicting official EXPERT private phase files/,
+  );
+  assert.equal(f.control.aborts, 1);
 });
 
 test("official EXPERT admission aborts before provider use for every finalized binding mismatch", async (t) => {

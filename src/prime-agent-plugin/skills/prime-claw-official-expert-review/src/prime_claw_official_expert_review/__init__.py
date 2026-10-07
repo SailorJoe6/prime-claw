@@ -28,7 +28,10 @@ REPORT_SCHEMA = "prime-claw-official-expert-report-v1"
 RECEIPT_SCHEMA = "prime-claw-official-expert-receipt-v1"
 PACKET_KIND = "prime-claw-official-expert-review-packet"
 REPORT_VERDICTS = frozenset({"PASS", "BLOCK", "ADVISORY", "SPEC_QUESTION"})
+DISPOSITION_DECISIONS = frozenset({"ACCEPT", "REVISE", "PAUSE", "CONSULT"})
 REPORT_LIMIT_BYTES = 12 * 1024
+DISPOSITION_LIMIT_BYTES = 8 * 1024
+_LIVE_PHASES = ("PENDING", "FINALIZED", "CLAIMED", "REPORTED", "SETTLED", "DISPOSITIONED", "CLOSED", "CANCELLED")
 _PACKAGE_FILES = ("__init__.py", "reviewer.md")
 _MARKER_TYPE = "prime-claw-conversation-oversight"
 
@@ -94,7 +97,7 @@ def describe() -> dict[str, Any]:
     fields, rubric = _parse_reviewer_definition(definition)
     return {
         "schemaVersion": SCHEMA_VERSION,
-        "capability": "private-launch-report-and-settlement",
+        "capability": "private-review-lifecycle-closure",
         "authority": False,
         "module": "prime_claw_official_expert_review",
         "packageSha256": package_sha256(),
@@ -351,7 +354,10 @@ def _state_paths(root: Path, child_name: str) -> dict[str, Path]:
         raise RuntimeError("official EXPERT child name is malformed")
     return {
         phase: root / f"{child_name}.{phase}.json"
-        for phase in ("pending", "finalized", "claimed", "reported", "settled", "settlement-rejected")
+        for phase in (
+            "pending", "finalized", "claimed", "reported", "settled", "dispositioned",
+            "closed", "cancelled", "settlement-rejected",
+        )
     }
 
 
@@ -688,6 +694,431 @@ def settle() -> dict[str, Any]:
     }
     _transition(path, paths["settled"], settled_record)
     return result
+
+
+
+
+def _owner_context() -> tuple[str, Path, str, Path, Path, str]:
+    _runtime_directory(0)
+    owner_id, owner_file, owner_header, entries = _owner_session()
+    marker = _active_marker(entries, owner_id)
+    generation = _owner_generation(marker)
+    project = _canonical_path(str(owner_header.get("cwd", "")), "owner project path")
+    if project != Path.cwd().resolve(strict=True):
+        raise RuntimeError("owner kernel cwd does not match its canonical session project")
+    repository, current_head = _git_identity(marker["worktree"])
+    return owner_id, owner_file, generation, project, repository, current_head
+
+
+def _owned_phase_records(
+    root: Path, phases: tuple[str, ...], owner_id: str, owner_file: Path,
+    generation: str, repository: Path,
+) -> list[tuple[Path, dict[str, Any]]]:
+    records: list[tuple[Path, dict[str, Any]]] = []
+    for phase in phases:
+        records.extend(
+            (path, record) for path, record in _phase_records(root, phase)
+            if _owner_state_matches(record, owner_id, owner_file, generation, repository)
+        )
+    return records
+
+
+def _assert_unique_child_phase(root: Path, child_name: str, selected: Path) -> None:
+    paths = _state_paths(root, child_name)
+    existing = [paths[phase.lower()] for phase in _LIVE_PHASES if paths[phase.lower()].exists()]
+    if existing != [selected]:
+        raise RuntimeError("conflicting official EXPERT private phase files exist")
+
+
+def _canonical_disposition(value: Any) -> tuple[dict[str, Any], str, str]:
+    if not isinstance(value, dict) or set(value) != {"schemaVersion", "decision", "rationale"}:
+        raise ValueError("official EXPERT disposition has unexpected fields")
+    decision = value.get("decision")
+    rationale = value.get("rationale")
+    if (
+        value.get("schemaVersion") != 1 or decision not in DISPOSITION_DECISIONS
+        or not isinstance(rationale, str) or not rationale.strip() or len(rationale) > 4000
+        or "\x00" in rationale
+    ):
+        raise ValueError("official EXPERT disposition is malformed or oversized")
+    normalized = {"schemaVersion": 1, "decision": decision, "rationale": rationale}
+    canonical = _canonical(normalized)
+    if len(canonical.encode()) > DISPOSITION_LIMIT_BYTES:
+        raise ValueError("official EXPERT disposition is too large")
+    return normalized, canonical, _digest(canonical.encode())
+
+
+def _disposition_result(record: dict[str, Any]) -> dict[str, Any]:
+    settled = _settled_result(record)
+    value = record.get("disposition")
+    canonical = record.get("dispositionJson")
+    digest = record.get("dispositionDigest")
+    disposed_at = _required_integer(record, "disposedAt")
+    receipt = record.get("dispositionReceipt")
+    if not isinstance(value, dict) or not isinstance(canonical, str):
+        raise RuntimeError("dispositioned official EXPERT state is malformed")
+    expected_receipt = {
+        "schema": RECEIPT_SCHEMA, "phase": "DISPOSITIONED", "childName": record["childName"],
+        "candidateCommitOid": record["candidateCommitOid"], "reportDigest": record["reportDigest"],
+        "dispositionDigest": digest, "decision": value.get("decision"), "disposedAt": disposed_at,
+    }
+    if _canonical(value) != canonical or _digest(canonical.encode()) != digest or receipt != expected_receipt:
+        raise RuntimeError("official EXPERT disposition digest or receipt is invalid")
+    return {
+        **settled, "disposition": value, "dispositionReceipt": expected_receipt,
+    }
+
+
+def record_disposition(disposition: dict[str, Any]) -> dict[str, Any]:
+    """Record one exact conversational owner disposition for the settled report."""
+    value, canonical, digest = _canonical_disposition(disposition)
+    owner_id, owner_file, generation, _project, repository, current_head = _owner_context()
+    root = _ensure_private_root()
+    matches = _owned_phase_records(
+        root, ("SETTLED", "DISPOSITIONED", "CLOSED"), owner_id, owner_file, generation, repository,
+    )
+    current = [item for item in matches if item[1].get("candidateCommitOid") == current_head]
+    if len(current) != 1:
+        raise RuntimeError("owner does not have exactly one matching settled or dispositioned review")
+    path, record = current[0]
+    _assert_unique_child_phase(root, record["childName"], path)
+    phase = record["phase"]
+    _validate_lineage(record, {phase})
+    if phase in {"DISPOSITIONED", "CLOSED"}:
+        if record.get("dispositionDigest") != digest or record.get("dispositionJson") != canonical:
+            raise RuntimeError("conflicting official EXPERT owner disposition was already recorded")
+        return _disposition_result(record)
+    _settled_result(record)
+    snapshot = _repository_snapshot(str(repository))
+    if snapshot != record.get("preReviewRepository"):
+        raise RuntimeError("official EXPERT disposition requires the exact unchanged candidate repository")
+    disposed_at = int(time.time() * 1000)
+    receipt = {
+        "schema": RECEIPT_SCHEMA, "phase": "DISPOSITIONED", "childName": record["childName"],
+        "candidateCommitOid": record["candidateCommitOid"], "reportDigest": record["reportDigest"],
+        "dispositionDigest": digest, "decision": value["decision"], "disposedAt": disposed_at,
+    }
+    updated = {
+        **record, "phase": "DISPOSITIONED", "disposedAt": disposed_at,
+        "disposition": value, "dispositionJson": canonical, "dispositionDigest": digest,
+        "dispositionReceipt": receipt,
+    }
+    _transition(path, _state_paths(root, record["childName"])["dispositioned"], updated)
+    return _disposition_result(updated)
+
+
+def _replace_private_record(path: Path, value: dict[str, Any]) -> None:
+    temporary = path.parent / f".{path.name}.{secrets.token_hex(8)}.tmp"
+    _exclusive_json(temporary, value)
+    try:
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _record_deletion_failure(path: Path, record: dict[str, Any], operation: str, error: BaseException) -> None:
+    message = str(error).replace("\x00", "")[:1000]
+    failure = {
+        "method": "public-rlm", "operation": operation,
+        "errorType": type(error).__name__, "message": message,
+        "failedAt": int(time.time() * 1000),
+    }
+    _replace_private_record(path, {**record, "lastDeletionFailure": failure})
+
+
+def _roster_entry(entry: Any) -> dict[str, Any]:
+    values = {
+        "rlmChildId": getattr(entry, "rlm_child_id", None),
+        "sessionName": getattr(entry, "session_name", None),
+        "sessionDir": str(getattr(entry, "session_dir", "")),
+        "sessionId": getattr(entry, "session_id", None),
+        "activeSessionId": getattr(entry, "active_session_id", None),
+        "status": getattr(entry, "status", None),
+    }
+    if (
+        not isinstance(values["rlmChildId"], str) or not values["rlmChildId"]
+        or not isinstance(values["sessionName"], str) or not values["sessionName"]
+        or not isinstance(values["sessionDir"], str) or not values["sessionDir"]
+        or values["status"] not in {"running", "completed", "error"}
+        or (values["sessionId"] is not None and not isinstance(values["sessionId"], str))
+        or (values["activeSessionId"] is not None and not isinstance(values["activeSessionId"], str))
+    ):
+        raise RuntimeError("public RLM roster returned a malformed child entry")
+    return values
+
+
+def _related_roster_entries(record: dict[str, Any], roster: Any) -> list[tuple[Any, dict[str, Any]]]:
+    if not isinstance(roster, list):
+        raise RuntimeError("public RLM roster did not return an exact list")
+    child_id = _required_string(record, "rlmChildId")
+    child_name = _required_string(record, "childName")
+    session_dir = _required_string(record, "sessionDir")
+    related: list[tuple[Any, dict[str, Any]]] = []
+    for entry in roster:
+        fields = _roster_entry(entry)
+        if fields["rlmChildId"] == child_id or fields["sessionName"] == child_name or fields["sessionDir"] == session_dir:
+            related.append((entry, fields))
+    return related
+
+
+def _validate_exact_roster_entry(record: dict[str, Any], fields: dict[str, Any]) -> None:
+    if (
+        fields["rlmChildId"] != record.get("rlmChildId")
+        or fields["sessionName"] != record.get("childName")
+        or fields["sessionDir"] != record.get("sessionDir")
+        or (record.get("childSessionId") is not None and fields["sessionId"] != record.get("childSessionId"))
+    ):
+        raise RuntimeError("public RLM roster child identity mismatches stored launch lineage")
+
+
+def _deletion_snapshot(fields: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: fields[key]
+        for key in ("rlmChildId", "sessionName", "sessionDir", "sessionId", "activeSessionId", "status")
+    }
+
+
+async def _prove_roster_absent(record: dict[str, Any]) -> None:
+    import rlm
+
+    related = _related_roster_entries(record, await rlm.list_subagents())
+    if related:
+        if len(related) > 1:
+            raise RuntimeError("public RLM roster is ambiguous for the stored official EXPERT child")
+        _validate_exact_roster_entry(record, related[0][1])
+        raise RuntimeError("official EXPERT child remains addressable in the public RLM roster")
+
+
+async def _ensure_child_absent(record: dict[str, Any]) -> dict[str, Any]:
+    import rlm
+
+    initial = _related_roster_entries(record, await rlm.list_subagents())
+    if len(initial) > 1:
+        raise RuntimeError("public RLM roster is ambiguous for the stored official EXPERT child")
+    deleted: dict[str, Any] | None = None
+    initial_status = "ABSENT"
+    if initial:
+        entry, fields = initial[0]
+        _validate_exact_roster_entry(record, fields)
+        initial_status = "PRESENT"
+        result = await rlm.delete_subagent(entry)
+        deleted = _roster_entry(result)
+        _validate_exact_roster_entry(record, deleted)
+    remaining = _related_roster_entries(record, await rlm.list_subagents())
+    if remaining:
+        if len(remaining) > 1:
+            raise RuntimeError("public RLM roster remains ambiguous after deletion")
+        _validate_exact_roster_entry(record, remaining[0][1])
+        raise RuntimeError("public RLM deletion did not prove child absence")
+    confirmed_at = int(time.time() * 1000)
+    return {
+        "method": "public-rlm", "childId": record["rlmChildId"], "childName": record["childName"],
+        "sessionDir": record["sessionDir"], "initialRoster": initial_status,
+        "deleteReceipt": _deletion_snapshot(deleted) if deleted is not None else None,
+        "absenceConfirmed": True, "confirmedAt": confirmed_at,
+    }
+
+
+async def _prove_pending_unpublished(record: dict[str, Any]) -> dict[str, Any]:
+    import rlm
+
+    roster = await rlm.list_subagents()
+    if not isinstance(roster, list):
+        raise RuntimeError("public RLM roster did not return an exact list")
+    matches = []
+    for entry in roster:
+        fields = _roster_entry(entry)
+        if fields["sessionName"] == record["childName"]:
+            matches.append(fields)
+    if matches:
+        raise RuntimeError("pending official EXPERT launch has an addressable child without stored actual identity")
+    return {
+        "method": "not-published", "childId": None, "childName": record["childName"],
+        "sessionDir": None, "initialRoster": "NOT_PUBLISHED", "deleteReceipt": None,
+        "absenceConfirmed": True, "confirmedAt": int(time.time() * 1000),
+    }
+
+
+def _closed_result(record: dict[str, Any]) -> dict[str, Any]:
+    dispositioned = _disposition_result(record)
+    evidence = record.get("deletionEvidence")
+    evidence_digest = record.get("deletionEvidenceDigest")
+    closed_at = _required_integer(record, "closedAt")
+    receipt = record.get("closedReceipt")
+    if not isinstance(evidence, dict) or evidence.get("absenceConfirmed") is not True:
+        raise RuntimeError("closed official EXPERT deletion evidence is invalid")
+    expected_receipt = {
+        "schema": RECEIPT_SCHEMA, "phase": "CLOSED", "childName": record["childName"],
+        "candidateCommitOid": record["candidateCommitOid"], "reportDigest": record["reportDigest"],
+        "dispositionDigest": record["dispositionDigest"], "deletionEvidenceDigest": evidence_digest,
+        "childAbsent": True, "closedAt": closed_at,
+    }
+    if _digest(_canonical(evidence).encode()) != evidence_digest or receipt != expected_receipt:
+        raise RuntimeError("closed official EXPERT digest or receipt is invalid")
+    receipt_digest = _digest(_canonical(expected_receipt).encode())
+    if record.get("closedReceiptDigest") != receipt_digest:
+        raise RuntimeError("closed official EXPERT receipt digest is invalid")
+    return {**dispositioned, "closedReceipt": expected_receipt, "closedReceiptDigest": receipt_digest}
+
+
+async def close() -> dict[str, Any]:
+    """Delete or prove absence of the dispositioned child, then create CLOSED."""
+    owner_id, owner_file, generation, _project, repository, current_head = _owner_context()
+    root = _ensure_private_root()
+    matches = _owned_phase_records(
+        root, ("DISPOSITIONED", "CLOSED"), owner_id, owner_file, generation, repository,
+    )
+    current = [item for item in matches if item[1].get("candidateCommitOid") == current_head]
+    if len(current) != 1:
+        raise RuntimeError("owner does not have exactly one matching dispositioned or closed review")
+    path, record = current[0]
+    _assert_unique_child_phase(root, record["childName"], path)
+    phase = record["phase"]
+    _validate_lineage(record, {phase})
+    if phase == "CLOSED":
+        await _prove_roster_absent(record)
+        return _closed_result(record)
+    _disposition_result(record)
+    try:
+        evidence = await _ensure_child_absent(record)
+    except BaseException as error:
+        _record_deletion_failure(path, record, "close", error)
+        raise
+    closed_at = int(time.time() * 1000)
+    evidence_digest = _digest(_canonical(evidence).encode())
+    receipt = {
+        "schema": RECEIPT_SCHEMA, "phase": "CLOSED", "childName": record["childName"],
+        "candidateCommitOid": record["candidateCommitOid"], "reportDigest": record["reportDigest"],
+        "dispositionDigest": record["dispositionDigest"], "deletionEvidenceDigest": evidence_digest,
+        "childAbsent": True, "closedAt": closed_at,
+    }
+    receipt_digest = _digest(_canonical(receipt).encode())
+    updated = {
+        **record, "phase": "CLOSED", "closedAt": closed_at, "deletionEvidence": evidence,
+        "deletionEvidenceDigest": evidence_digest, "closedReceipt": receipt,
+        "closedReceiptDigest": receipt_digest,
+    }
+    _transition(path, _state_paths(root, record["childName"])["closed"], updated)
+    return _closed_result(updated)
+
+
+def _validate_stale_owner_record(
+    record: dict[str, Any], phase: str, owner_id: str, owner_file: Path,
+    generation: str, project: Path, repository: Path,
+) -> None:
+    if record.get("schema") != STATE_SCHEMA or record.get("phase") != phase:
+        raise RuntimeError("private launch schema or phase is invalid")
+    created = _required_integer(record, "createdAt")
+    expires = _required_integer(record, "expiresAt")
+    if created < 0 or expires != created + LAUNCH_TTL_MS or int(time.time() * 1000) < expires:
+        raise RuntimeError("private launch is not exactly expired")
+    if not _owner_state_matches(record, owner_id, owner_file, generation, repository):
+        raise RuntimeError("expired launch does not match the exact current owner")
+    if record.get("projectPath") != str(project):
+        raise RuntimeError("expired launch project does not match the exact current owner")
+    if record.get("packageSha256") != package_sha256() or record.get("kernelSha256") != ROLE_KERNEL_SHA256:
+        raise RuntimeError("expired launch package or kernel lineage is invalid")
+    if record.get("selector") != MODEL_SELECTOR or record.get("thinking") != THINKING_LEVEL:
+        raise RuntimeError("expired launch requested model lineage is invalid")
+    candidate = _required_string(record, "candidateCommitOid")
+    _validate_snapshot(record.get("preReviewRepository"), candidate, clean=True)
+    packet = record.get("packet")
+    packet_json = record.get("packetJson")
+    if (
+        not isinstance(packet, dict) or not isinstance(packet_json, str)
+        or _canonical(packet) != packet_json or _digest(packet_json.encode()) != record.get("packetDigest")
+        or packet.get("repositoryPath") != str(repository) or packet.get("commitOid") != candidate
+    ):
+        raise RuntimeError("expired launch packet digest is invalid")
+    child_name = _required_string(record, "childName")
+    _state_paths(_private_root(), child_name)
+    if phase == "PENDING":
+        if any(key in record for key in ("rlmChildId", "sessionDir", "returnedModel", "childSessionId")):
+            raise RuntimeError("pending launch unexpectedly contains published child identity")
+    else:
+        child_id = _required_string(record, "rlmChildId")
+        child_dir = _canonical_path(_required_string(record, "sessionDir"), "child session directory")
+        if child_dir.name != child_id or record.get("returnedModel") != MODEL_SELECTOR:
+            raise RuntimeError("expired published child identity is invalid")
+        if phase == "CLAIMED":
+            _validate_lineage(record, {"CLAIMED"})
+
+
+def _cancelled_result(record: dict[str, Any]) -> dict[str, Any]:
+    evidence = record.get("deletionEvidence")
+    evidence_digest = record.get("deletionEvidenceDigest")
+    cancelled_at = _required_integer(record, "cancelledAt")
+    receipt = record.get("cancellationReceipt")
+    if not isinstance(evidence, dict) or evidence.get("absenceConfirmed") is not True:
+        raise RuntimeError("cancelled official EXPERT deletion evidence is invalid")
+    expected = {
+        "schema": RECEIPT_SCHEMA, "phase": "CANCELLED", "childName": record["childName"],
+        "candidateCommitOid": record["candidateCommitOid"], "sourcePhase": record["cancelledFrom"],
+        "deletionEvidenceDigest": evidence_digest, "childAbsent": True, "cancelledAt": cancelled_at,
+    }
+    if _digest(_canonical(evidence).encode()) != evidence_digest or receipt != expected:
+        raise RuntimeError("cancelled official EXPERT digest or receipt is invalid")
+    return {"cancellationReceipt": expected, "cancellationReceiptDigest": _digest(_canonical(expected).encode())}
+
+
+async def cancel_stale() -> dict[str, Any]:
+    """Cancel one exact expired pre-report launch owned by this Conversation."""
+    owner_id, owner_file, generation, project, repository, _current_head = _owner_context()
+    root = _ensure_private_root()
+    matches = _owned_phase_records(
+        root, ("PENDING", "FINALIZED", "CLAIMED", "CANCELLED"),
+        owner_id, owner_file, generation, repository,
+    )
+    if len(matches) != 1:
+        raise RuntimeError("owner does not have exactly one matching stale or cancelled launch")
+    path, record = matches[0]
+    _assert_unique_child_phase(root, record["childName"], path)
+    phase = record["phase"]
+    if phase == "CANCELLED":
+        return _cancelled_result(record)
+    _validate_stale_owner_record(record, phase, owner_id, owner_file, generation, project, repository)
+    try:
+        evidence = await _prove_pending_unpublished(record) if phase == "PENDING" else await _ensure_child_absent(record)
+    except BaseException as error:
+        _record_deletion_failure(path, record, "cancel-stale", error)
+        raise
+    cancelled_at = int(time.time() * 1000)
+    evidence_digest = _digest(_canonical(evidence).encode())
+    receipt = {
+        "schema": RECEIPT_SCHEMA, "phase": "CANCELLED", "childName": record["childName"],
+        "candidateCommitOid": record["candidateCommitOid"], "sourcePhase": phase,
+        "deletionEvidenceDigest": evidence_digest, "childAbsent": True, "cancelledAt": cancelled_at,
+    }
+    updated = {
+        **record, "phase": "CANCELLED", "cancelledFrom": phase, "cancelledAt": cancelled_at,
+        "deletionEvidence": evidence, "deletionEvidenceDigest": evidence_digest,
+        "cancellationReceipt": receipt,
+    }
+    _transition(path, _state_paths(root, record["childName"])["cancelled"], updated)
+    return _cancelled_result(updated)
+
+
+async def purge(closed_result: dict[str, Any]) -> dict[str, Any]:
+    """Purge one exact CLOSED authority record after its receipt was durably recorded."""
+    owner_id, owner_file, generation, _project, repository, current_head = _owner_context()
+    root = _ensure_private_root()
+    matches = _owned_phase_records(root, ("CLOSED",), owner_id, owner_file, generation, repository)
+    current = [item for item in matches if item[1].get("candidateCommitOid") == current_head]
+    if len(current) != 1:
+        raise RuntimeError("owner does not have exactly one matching closed review")
+    path, record = current[0]
+    _assert_unique_child_phase(root, record["childName"], path)
+    expected = _closed_result(record)
+    if not isinstance(closed_result, dict) or closed_result != expected:
+        raise RuntimeError("purge requires the exact durably recorded CLOSED result")
+    await _prove_roster_absent(record)
+    purged_at = int(time.time() * 1000)
+    path.unlink()
+    return {
+        "schema": RECEIPT_SCHEMA, "phase": "PURGED", "childName": record["childName"],
+        "closedReceiptDigest": record["closedReceiptDigest"], "purgedAt": purged_at,
+    }
 
 
 async def launch(packet: dict[str, Any]) -> Any:
