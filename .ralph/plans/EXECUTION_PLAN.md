@@ -1415,3 +1415,54 @@ with 398 deselected; and the downloaded/checksum-verified Prime Agent 0.9.8
 probe passed with managed `SYNC_PENDING`. This bounded prerequisite is complete
 at the candidate and may be committed/reported. Admission, reservation,
 transport, role authority, Slice 4, and operational cutover remain excluded.
+
+## 23. Slice 3 second candidate — owner-scoped reservation foundation only
+
+Accepted base: `e319e39949e1eb1c6b6b680d996ffb15ea664264` / tree
+`03a88ac106d7fed83f48f0e157366e7d13258c7f`.
+
+1. Add one simple in-memory/session-lifecycle review-reservation record per
+   exact active owner. Gate reserve and bind to trusted active-owner state,
+   consumed Conversation-guide readiness, and deterministic EXPERT package
+   `AVAILABLE`; `SYNC_PENDING` or `UNAVAILABLE` stops before mutation.
+2. A reservation contains one cryptographically random opaque nonce, practical
+   bounded expiry, exact immutable repository path and commit OID, packet
+   digest, requested full selector, and requested thinking level.
+3. Add native owner-only reserve, bind, read-only status, and cancel mechanics.
+   Status never mutates. Cancel, expiry, and session shutdown are idempotent and
+   cannot grant authority.
+4. Permit at most one transition from reserved to a record of the exact returned
+   child handle/session/model metadata. Treat all caller-supplied spawn metadata
+   as pending evidence only. Do not call it verified admission, returned-model
+   proof, reasoning proof, or child role authority; those require the later
+   trusted child-side seam.
+5. If meaningful bind cannot be represented safely without child admission,
+   stop at reserve/status/cancel and document that boundary instead of faking
+   verification.
+6. Keep generic children ordinary. Preserve the inert EXPERT package API and
+   use only supported plugin/public interfaces.
+7. Run focused state/tool/package tests plus complete Tier 0, Docker Tier 1, and
+   pinned-runtime probe. Update evidence/checkpoint, commit/push one candidate,
+   report, and stop.
+
+Do not add live reviewer spawn, agent-message delivery, child provider-role
+admission, review execution, report settlement, cleanup workflow, durable
+database, journal, cross-process recovery, generalized token framework,
+hostile-concurrency model, spawn orchestration, message retry, report protocol,
+or provider-visible EXPERT authority. Do not begin Slice 4, landing, user-global
+mutation/restart, UAT, finalization, or cleanup.
+
+**Section 23 checkpoint — complete at candidate.** The four native mechanics are
+implemented with exact active-owner/consumed-guide/fresh-`AVAILABLE` gates, a
+15-minute cryptographic-nonce reservation bound to the complete stable oversight
+generation and immutable repository/commit/packet/selector/thinking/package
+subject, one public-spawn-tuple `bound-pending` transition, read-only status,
+and idempotent cancel/expiry/session boundaries. Bind data remains
+`caller-supplied-unverified` with `authority: false`. The independent review's
+same-session A-to-B lifecycle BLOCK was repaired and re-review passed. Focused
+host passed 45 Node plus 17 Python tests; focused Docker passed 43; complete
+Tier 0 passed 292, Docker Tier 1 passed 76, and the pinned Prime Agent 0.9.8
+probe passed. Evidence is in
+`docs/evidence/official-lean-role-protocol/2026-10-07-slice-3-expert-reservation-foundation.md`.
+All live spawn/admission/delivery/execution/settlement/cleanup and later phases
+remain excluded.

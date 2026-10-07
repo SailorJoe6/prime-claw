@@ -245,10 +245,41 @@ the default managed interpreter either imports the exact installed package or
 imports the source normally from its `src` working directory and reports
 `SYNC_PENDING`; configured `PRIME_AGENT_KERNEL_PYTHON` accepts only an exact
 already-installed package/hash. Hash mismatch is detected before importing
-stale configured code. No environment is provisioned or modified. Spawn,
-reservation, nonce/expiry, handle binding, child admission, packet delivery,
-report settlement, cleanup tools, and provider identity remain absent; generic
-children receive no EXPERT authority.
+stale configured code. No environment is provisioned or modified. The Python package remains inert and
+its API is unchanged: it does not spawn, reserve, bind, admit, deliver, settle,
+or clean up. Generic children receive no EXPERT authority.
+
+### Owner-scoped EXPERT reservation foundation
+
+The native bridge now exposes four owner-only mechanics:
+`prime_claw_reserve_expert_review`, `prime_claw_bind_expert_review`,
+`prime_claw_expert_review_status`, and `prime_claw_cancel_expert_review`.
+Reserve and bind fail before in-memory mutation unless the caller is the exact
+active Conversation owner, the managed Conversation guide has been consumed,
+and a fresh exact-interpreter probe reports the official package `AVAILABLE`.
+Managed source-only `SYNC_PENDING` and every `UNAVAILABLE` result fail closed.
+The TypeScript probe and installer Python preflight share a Docker parity matrix.
+
+Each owner has at most one session-lifecycle record, bound to a digest of every
+stable field in the exact active oversight generation. A later episode owned by
+the same Conversation cannot read, bind, or cancel the older generation and may
+replace it only through a newly gated reserve. Reserve derives the canonical
+repository root, verifies the exact current commit OID, validates an immutable
+packet SHA256 plus the official selector/thinking pair, generates one 32-byte
+cryptographically random opaque nonce, and sets a fixed 15-minute expiry. Status
+only derives a generation-matched view; it never renews, deletes, or otherwise
+mutates the record. Expiry is derived idempotently. Cancel and session
+start/shutdown clearing are idempotent.
+
+Bind is intentionally narrow. It records the exact public `rlm.spawn` return
+metadata (`rlm_child_id`, `name`, `session_dir`, and `model`) once, after the
+same owner/guide/package gates, exact nonce match, unexpired reservation, model
+text agreement, and unchanged package hash. The result is always
+`bound-pending`, `caller-supplied-unverified`, and `authority: false`. It does
+not prove the returned model, reasoning level, handle, session directory, or
+child identity and does not admit an EXPERT. No live spawn, agent-message
+delivery, child provider role, review execution, report settlement, cleanup,
+persistence, retry protocol, or provider-visible authority is implemented.
 
 The first project policy lives at
 `.prime/agent/profiles/expert-reviewer.md`. Its closed frontmatter names

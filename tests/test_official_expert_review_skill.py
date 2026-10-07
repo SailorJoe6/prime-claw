@@ -70,3 +70,35 @@ def test_official_expert_skill_explicitly_defers_authority_and_admission() -> No
         "Reviewer discovery, spawn, reservation, nonce/expiry state, handle binding",
     ):
         assert phrase in text
+
+
+
+def test_native_reservation_docs_preserve_inert_package_and_pending_evidence_boundary() -> None:
+    oversight = " ".join(
+        (REPO / "docs/conversation-driven-episode-oversight.md").read_text().split()
+    )
+    lab = " ".join((REPO / "docs/lab-global-plugin.md").read_text().split())
+    support = (
+        REPO / "src/prime-agent-plugin/extension-support/expert-review-reservation.ts"
+    ).read_text()
+    for phrase in (
+        "prime_claw_reserve_expert_review",
+        "prime_claw_bind_expert_review",
+        "bound-pending",
+        "caller-supplied-unverified",
+        "No live spawn",
+    ):
+        assert phrase in oversight
+    for phrase in (
+        "package itself stays definition-only and inert",
+        "SYNC_PENDING",
+        "unverified pending evidence",
+    ):
+        assert phrase in lab
+    for forbidden in (
+        'from "rlm"',
+        "agent_message",
+        "sendUserMessage(",
+        "appendEntry(",
+    ):
+        assert forbidden not in support

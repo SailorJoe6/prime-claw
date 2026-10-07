@@ -12,6 +12,7 @@ files=(
   extension-support/conversation-guide-metadata.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-close.ts
+  extension-support/expert-review-reservation.ts
   extension-support/handoff-prompts.ts
   extension-support/prep-chain.ts
   extension-support/reviewed-plan-support.ts

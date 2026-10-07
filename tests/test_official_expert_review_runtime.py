@@ -12,6 +12,7 @@ def test_official_expert_exact_interpreter_preflight_matrix(tier1_container) -> 
         "/workspace/scripts/check-prime-agent-expert-runtime.py",
         "/workspace/src/prime-agent-plugin/skills/prime-claw-official-expert-review",
         work,
+        "/workspace/src/prime-agent-plugin/extension-support/expert-review-reservation.ts",
         workdir=None,
         timeout=180,
     )

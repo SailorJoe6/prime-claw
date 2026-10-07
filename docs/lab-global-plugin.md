@@ -126,9 +126,15 @@ This ordinary plugin-file ownership does not widen the role-protocol manager's
 fixed context/legacy-APPEND/manifest receipt. The project
 `.ralph/skills/oversee-episode/SKILL.md` is only a policy-free compatibility shim;
 its `.agents` discovery symlink remains for transition diagnostics. The
-standalone reviewer profile remains byte-identical migration evidence. The new
-EXPERT package is definition-only and inert: spawn, reservation, admission,
-delivery, settlement, cleanup, and provider identity remain deferred.
+standalone reviewer profile remains byte-identical migration evidence. The
+EXPERT package itself stays definition-only and inert. A separately owned native
+support file adds owner-scoped, exact-oversight-generation in-memory
+reserve/bind/read-only-status/cancel state only. Reserve/bind require exact
+active-owner guide readiness and a fresh
+`AVAILABLE` package probe; `SYNC_PENDING` and `UNAVAILABLE` fail before
+mutation. Bind stores only the public spawn return tuple as unverified pending
+evidence. Live spawn, child admission, delivery, review execution, settlement,
+cleanup, persistence, and provider identity remain deferred.
 
 The predecessor APPEND-only manager remains in source for bridge rollback. New
 apply/check use the role-protocol manager for both selected context and retained

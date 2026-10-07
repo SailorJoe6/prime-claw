@@ -711,6 +711,15 @@ export function currentOversightMarker(ctx: ExtensionContext): OversightMarker |
   const state = classifyLifecycle(ctx);
   return state.mode === "active" ? state.marker : null;
 }
+export function assertExactActiveConversationOwner(ctx: ExtensionContext): OversightMarker {
+  if (currentBoundedIdentity(ctx)) throw new Error("EPISODE cannot reserve official EXPERT review authority");
+  const sessionId = ctx.sessionManager.getSessionId();
+  const marker = currentOversightMarker(ctx);
+  if (!marker || marker.status !== "active" || marker.ownerSessionId !== sessionId) {
+    throw new Error("official EXPERT review requires the exact active episode owner");
+  }
+  return marker;
+}
 export function currentOversightMarkerForClose(ctx: ExtensionContext, sourceLocation: string): OversightMarker | null {
   const locationMarker = markerForLocation(ctx, sourceLocation)?.marker ?? null;
   const state = classifyLifecycle(ctx);

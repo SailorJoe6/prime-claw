@@ -671,3 +671,42 @@ grants EXPERT authority.
 All admission/reservation/delivery/settlement behavior and operational cutover
 remain deferred as specified in plan Section 22. Evidence:
 `docs/evidence/official-lean-role-protocol/2026-10-06-slice-3-expert-prerequisite.md`.
+
+### Accepted EXPERT prerequisite and bounded reservation foundation
+
+The owner accepted the inert EXPERT package/preflight prerequisite at
+`e319e39949e1eb1c6b6b680d996ffb15ea664264` / tree
+`03a88ac106d7fed83f48f0e157366e7d13258c7f`. The next candidate adds only
+owner-scoped single-review reservation state and native reserve/bind/read-only
+status/cancel mechanics.
+
+Reserve and bind require the exact active owner, consumed Conversation-guide
+readiness, and deterministic EXPERT package `AVAILABLE`. `SYNC_PENDING` or
+`UNAVAILABLE` stops before reservation mutation. One simple in-memory record per
+owner holds a cryptographically random opaque nonce, practical bounded expiry,
+exact immutable repository path and commit OID, packet digest, requested full
+selector, and requested thinking. It may transition once from reserved to exact
+returned child handle/session/model metadata, but caller-supplied spawn metadata
+remains pending evidence. This pass does not claim returned-model, reasoning, or
+handle verification and does not admit the child as EXPERT. If safe meaningful
+binding needs the later child-side seam, implement reserve/status/cancel only
+and record the boundary.
+
+Status is read-only. Cancel, expiry, and session shutdown are idempotent and
+leave generic children ordinary. The inert package API remains unchanged. This
+pass adds no live spawn, agent-message delivery, child provider-role admission,
+review execution, report settlement, cleanup workflow, durable database,
+journal, cross-process recovery, generalized token framework, hostile
+concurrency model, spawn orchestration, message retry, report protocol, or
+provider-visible EXPERT authority. Focused and complete/pinned gates, evidence,
+one commit/push, report, and stop are required. Slice 4 and operational cutover
+remain excluded.
+
+**Reservation-foundation disposition.** The bounded owner-scoped foundation is
+implemented and independently reviewed. Each record is exact to the full stable
+active oversight generation, so one Conversation's later episode cannot reuse,
+read, bind, or cancel an earlier episode's state. The only bind is the public
+spawn return tuple recorded as unverified pending evidence with no authority.
+Focused and complete Tier 0/Docker Tier 1/pinned-0.9.8 gates are green. Live
+spawn, child-side admission/verification, delivery, review, settlement, cleanup,
+and operational cutover remain future work.
