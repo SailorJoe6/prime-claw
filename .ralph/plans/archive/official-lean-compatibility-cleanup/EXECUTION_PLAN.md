@@ -1151,13 +1151,43 @@ archive/finalize, merge, or physically clean resources.
 
 ## 13. Slice 7 — Freeze and review Generation B final candidate
 
-**Dependency:** accepted S6.
+**Dependency:** accepted revised S6 candidate
+`64bbee26c363c87ef85446da707900439c869620`, tree
+`d9e9ba451cfcc2426ad200d8e05ed7e086f9abe1`.
 
 **Capability delivered:** one immutable final candidate, operator cutover inputs,
 and bridge rollback bundle are ready for separately authorized removal activation.
 
+**Bounded execution authority:** reconcile only the two preserved pre-landing
+files below, complete the normal Ralph plan archive, then perform the already
+approved final-candidate preparation, freeze, exact gates, and official review.
+Do not merge, apply final mode to the host, run live Gate B, restart Prime Agent,
+finalize bookkeeping, or physically clean resources.
+
 ### Changes and pre-freeze evidence
 
+- Reconcile the preserved
+  `.agents/skills/goals-and-heartbeats/SKILL.md` from the exact private source
+  path recorded in the specification. Its source SHA256 is
+  `6c9daca98cf818a784334493190f2c4ea17218ffb61e52b52919105178a6aaa1`;
+  preserve only the operator's no-goal-budget/unbounded token-authority intent
+  in the current canonical skill, exactly where compatible, with no duplicate
+  skill authority or unrelated policy restoration.
+- Reconcile `.beads/interactions.jsonl` append-only and losslessly. At handoff,
+  current 29,530-byte/99-record SHA256
+  `05f185840bda2ae7a8901796da4b19aa5b055183fdcb9b9ba5ee905d5283f8fd`
+  is an exact prefix of preserved 30,963-byte/105-record SHA256
+  `d3e5956f184694018426be8993452300401be361bd9ef6762018e39d8ab84a70`.
+  Append the exact six-record/1,433-byte suffix at SHA256
+  `3f1935e989dfb08f7635a1ebc53afd2fd42ac5ec368646881350f5e64720a5ac`;
+  never overwrite, reorder, normalize, or drop a current record, and if the
+  destination advances append only exact missing preserved records after
+  identity proof.
+- Move the finished active `SPECIFICATION.md` and `EXECUTION_PLAN.md` together
+  into `.ralph/plans/archive/official-lean-compatibility-cleanup/` and update
+  `.ralph/plans/archive/README.md` before freeze. The final candidate must not
+  strand active plan files at `.ralph/plans/`. Keep `prime-claw-h6w.30` open;
+  plan archival is not episode bookkeeping finalization.
 - Fetch and normally integrate exact latest `main` first if necessary; preserve
   reviewed history and record topology.
 - Re-audit every ORP requirement, final installed inventory, current docs,
@@ -1171,6 +1201,29 @@ and bridge rollback bundle are ready for separately authorized removal activatio
 - Commit a sanitized non-self-referential final readiness/rollback summary after
   integration and before freeze. It may not claim a future commit/tree or review
   result. Rerun all gates and commit every tracked reconciliation before freeze.
+
+### Pre-freeze reconciliation result
+
+- Integrated exact `origin/main` `7bbaebf959391bc8488fad4751c245f33f4e7f6c`
+  without rewriting accepted history in merge commit
+  `41b94b5bad3a4cc6a205ecac7e0527cce78cad3d`; parents are `64bbee26c363c87ef85446da707900439c869620` then
+  `7bbaebf959391bc8488fad4751c245f33f4e7f6c`.
+- Preserved main's proportional review guardrails and the accepted concise
+  repair-intent guidance in the sole managed reviewer at SHA256
+  `dcd02e81e7e0656a3d7eb89ccfa78bd8b24a8492de012122f82b17b7aec50a05`. The retired standalone profile remains absent.
+  Focused Docker reconciliation checks passed 63 tests with 31 skipped; log
+  SHA256 `67399ea2201871807b699225f6b8c3e5dea02d658569f8cc5831f4b652e73c60`.
+- Reconciled `.agents/skills/goals-and-heartbeats/SKILL.md` exactly to approved
+  source SHA256 `6c9daca98cf818a784334493190f2c4ea17218ffb61e52b52919105178a6aaa1`; the only baseline delta is the authorized
+  no-goal-budget/unbounded-token sentence.
+- Preserved the complete 29,896-byte/100-record post-main interactions file and
+  appended the exact six-record/1,433-byte suffix SHA256
+  `3f1935e989dfb08f7635a1ebc53afd2fd42ac5ec368646881350f5e64720a5ac`.
+  The resulting 31,329-byte/106-record file SHA256 is
+  `86f65e44d6a12fc0e06c0c7fc3fabb17d0cf01e3bbbf88df7db6ea6d2e219fe7`; no prior byte was changed.
+- The finished active specification and plan are archived together before the
+  immutable candidate freeze. This records plan lifecycle completion without
+  closing `prime-claw-h6w.30` or authorizing later bookkeeping/finalization.
 
 ### Exact freeze and official review
 
@@ -1285,10 +1338,11 @@ Only after explicit final UAT acceptance:
    receipts, rollback point, and operator decision in private evidence and
    `prime-claw-h6w.30`;
 2. prepare (but do not apply) one deterministic main-only bookkeeping diff that
-   archives the completed active specification/plan under
-   `.ralph/plans/archive/official-lean-compatibility-cleanup/`, adds the final
-   sanitized post-freeze evidence summaries, and updates current indexes/Bead
-   references without changing installed plugin source or user-global bytes;
+   adds the final sanitized post-freeze evidence summaries and updates current
+   indexes/Bead references without changing installed plugin source or user-global
+   bytes. The final candidate already archived the completed specification/plan
+   under `.ralph/plans/archive/official-lean-compatibility-cleanup/`; do not
+   recreate active root plan files or archive them a second time;
 3. present the exact diff, proposed commit, focused checks, and history-preserving
    revert to the operator and obtain distinct explicit authority for that named
    bookkeeping mutation. Final UAT acceptance alone does not authorize it;

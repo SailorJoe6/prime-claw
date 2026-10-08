@@ -34,9 +34,9 @@ def test_inventory_covers_exact_official_lean_role_protocol_requirements():
     section = inv["officialLeanRoleProtocol"]
     rows = section["requirements"]
     assert [row["id"] for row in rows] == [f"ORP-{number:03d}" for number in range(1, 24)]
-    assert section["spec"] == ".ralph/plans/SPECIFICATION.md"
-    assert section["plan"] == ".ralph/plans/EXECUTION_PLAN.md"
-    assert section["activeSlice"] == "S6 final-source compatibility removal and reconciliation"
+    assert section["spec"] == ".ralph/plans/archive/official-lean-compatibility-cleanup/SPECIFICATION.md"
+    assert section["plan"] == ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md"
+    assert section["activeSlice"] == "S7 immutable final candidate freeze and review"
     missing = []
     for row in rows:
         assert row["status"] in {

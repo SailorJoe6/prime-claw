@@ -24,6 +24,12 @@ packet = {
 handle = await prime_claw_official_expert_review.launch(packet)
 ```
 
+Use the active pair while the plan is active. When normal Ralph lifecycle has
+archived a completed plan before immutable review, both paths may instead name
+the paired `SPECIFICATION.md` and `EXECUTION_PLAN.md` in one direct
+`.ralph/plans/archive/<slug>/` folder. Active/archive mixing, different archive
+folders, traversal, future-plan paths, and arbitrary files fail closed.
+
 `launch()` validates the canonical reviewer package, derives the depth-0 owner
 and active episode generation from public host-authored session state, verifies
 the marker worktree and exact `HEAD`, and requires exactly one exact configured

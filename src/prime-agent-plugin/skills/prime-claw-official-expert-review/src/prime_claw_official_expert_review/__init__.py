@@ -242,6 +242,27 @@ def _repository_snapshot(worktree: str) -> dict[str, Any]:
     }
 
 
+def _review_artifact_paths(specification: Any, execution_plan: Any) -> bool:
+    if not isinstance(specification, str) or not isinstance(execution_plan, str):
+        return False
+    active = (".ralph/plans/SPECIFICATION.md", ".ralph/plans/EXECUTION_PLAN.md")
+    if (specification, execution_plan) == active:
+        return True
+    specification_parts = Path(specification).parts
+    execution_parts = Path(execution_plan).parts
+    return (
+        len(specification_parts) == 5
+        and specification_parts[:3] == (".ralph", "plans", "archive")
+        and specification_parts[3] not in {"", ".", ".."}
+        and specification_parts[4] == "SPECIFICATION.md"
+        and execution_parts == (*specification_parts[:4], "EXECUTION_PLAN.md")
+        and len(specification) <= 512
+        and len(execution_plan) <= 512
+        and "\x00" not in specification
+        and "\x00" not in execution_plan
+    )
+
+
 def _packet(value: Any, repository: Path, commit_oid: str) -> tuple[dict[str, Any], str, str]:
     if not isinstance(value, dict) or set(value) != {
         "schemaVersion", "kind", "repositoryPath", "commitOid", "specificationPath",
@@ -254,8 +275,9 @@ def _packet(value: Any, repository: Path, commit_oid: str) -> tuple[dict[str, An
         value.get("schemaVersion") != 1 or value.get("kind") != PACKET_KIND
         or Path(str(value.get("repositoryPath", ""))).resolve(strict=True) != repository
         or value.get("commitOid") != commit_oid
-        or value.get("specificationPath") != ".ralph/plans/SPECIFICATION.md"
-        or value.get("executionPlanPath") != ".ralph/plans/EXECUTION_PLAN.md"
+        or not _review_artifact_paths(
+            value.get("specificationPath"), value.get("executionPlanPath")
+        )
         or not isinstance(evidence, list) or len(evidence) > 16
         or any(not isinstance(item, str) or len(item) > 512 or not item.startswith("docs/evidence/") or ".." in Path(item).parts for item in evidence)
         or not isinstance(focus, str) or not focus.strip() or len(focus) > 4000 or "\x00" in focus

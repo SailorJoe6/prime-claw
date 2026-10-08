@@ -61,6 +61,24 @@ def test_managed_reviewer_definition_is_the_only_current_reviewer_authority() ->
     assert not (REPO / ".prime/agent/profiles/expert-reviewer.md").exists()
 
 
+def test_review_packet_accepts_only_active_or_paired_archive_plan_paths() -> None:
+    module = load_package()
+    assert module._review_artifact_paths(
+        ".ralph/plans/SPECIFICATION.md", ".ralph/plans/EXECUTION_PLAN.md"
+    )
+    assert module._review_artifact_paths(
+        ".ralph/plans/archive/official-lean-compatibility-cleanup/SPECIFICATION.md",
+        ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md",
+    )
+    for specification, execution_plan in [
+        (".ralph/plans/archive/alpha/SPECIFICATION.md", ".ralph/plans/archive/beta/EXECUTION_PLAN.md"),
+        (".ralph/plans/archive/../SPECIFICATION.md", ".ralph/plans/archive/../EXECUTION_PLAN.md"),
+        (".ralph/plans/future/alpha/SPECIFICATION.md", ".ralph/plans/future/alpha/EXECUTION_PLAN.md"),
+        ("/tmp/SPECIFICATION.md", "/tmp/EXECUTION_PLAN.md"),
+    ]:
+        assert not module._review_artifact_paths(specification, execution_plan)
+
+
 def test_official_expert_package_uses_only_stdlib_plus_public_rlm_import() -> None:
     project = tomllib.loads((SKILL / "pyproject.toml").read_text())["project"]
     assert project["dependencies"] == []

@@ -1159,3 +1159,51 @@ successor for owner review.
 
 Do not broaden Slice 6, begin Slice 7, apply final mode to the host, run Gate B,
 archive or finalize the episode, merge, or physically clean resources.
+
+
+## Revised Slice 6 acceptance and bounded final-candidate authority
+
+The owner accepted revised Slice 6 candidate
+`64bbee26c363c87ef85446da707900439c869620`, tree
+`d9e9ba451cfcc2426ad200d8e05ed7e086f9abe1`, after verifying the single
+reviewer-guidance repair, managed hashes, focused Docker and pinned-probe
+evidence, exact independent PASS, clean synchronized push, and retained scope
+boundary. That immutable commit/tree is the final-candidate preparation
+baseline.
+
+Before freezing the final candidate, reconcile exactly two preserved pre-landing
+local files from
+`/Users/jlanders/.prime/agent/session-artifacts/01a0f51d-d51b-7649-a28a-844879e42aec/gate-a-f2e98e2/prelanding-local-edits`:
+
+- `.agents/skills/goals-and-heartbeats/SKILL.md`: source SHA256
+  `6c9daca98cf818a784334493190f2c4ea17218ffb61e52b52919105178a6aaa1`.
+  The accepted baseline SHA256 is
+  `1aa4f6391ceb96800208a0dd24aa20890fc06ef67b6a08f1afdb8b05977a7783`;
+  the preserved file differs only by the operator's no-goal-budget/unbounded
+  token-authority sentence in the opening operational paragraph. Reconcile that
+  intent semantically and exactly where the current canonical wording permits;
+  do not restore unrelated policy or create another skill authority.
+- `.beads/interactions.jsonl`: preserved source is 30,963 bytes / 105
+  newline-terminated records at SHA256
+  `d3e5956f184694018426be8993452300401be361bd9ef6762018e39d8ab84a70`.
+  At handoff, the tracked file is its exact 29,530-byte / 99-record prefix at
+  SHA256 `05f185840bda2ae7a8901796da4b19aa5b055183fdcb9b9ba5ee905d5283f8fd`.
+  Append the exact six-record, 1,433-byte suffix (SHA256
+  `3f1935e989dfb08f7635a1ebc53afd2fd42ac5ec368646881350f5e64720a5ac`)
+  losslessly and in order. Never overwrite, reorder, normalize, or drop any
+  current interaction; if the destination advanced, preserve it and append only
+  the exact missing preserved records after proving their identity.
+
+Complete the normal Ralph plan lifecycle before freeze: move the finished active
+`.ralph/plans/SPECIFICATION.md` and `.ralph/plans/EXECUTION_PLAN.md` into
+`.ralph/plans/archive/official-lean-compatibility-cleanup/` and update
+`.ralph/plans/archive/README.md`. The active root plan files must be absent from
+the final candidate. This archival does not close the bead or finalize episode
+bookkeeping; those remain reserved for the operator's later terminal decision.
+
+After those bounded reconciliations, perform only the already-approved final
+candidate preparation, immutable freeze, exact gates, and exact official review.
+Keep the implementation lean and add no new mechanism. Do not merge, apply final
+mode to the host, run the live cutover, restart Prime Agent, finalize bookkeeping,
+or physically clean resources. Report one immutable final candidate with
+evidence and stop.

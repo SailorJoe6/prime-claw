@@ -7,6 +7,32 @@ Older sets contain specification, requirements, decisions, and execution-plan
 files; newer project-customized sets may contain a different reviewed artifact
 collection.
 
+## official-lean-compatibility-cleanup/ — Official lean role protocol final candidate ✅ IMPLEMENTATION COMPLETE (2026-10-08)
+
+Delivered the official lean compatibility cleanup through owner-reviewed slices,
+ending at accepted revised Slice 6 commit `64bbee26c363c87ef85446da707900439c869620`. Final-candidate
+preparation then integrated `origin/main`
+`7bbaebf959391bc8488fad4751c245f33f4e7f6c` without rewriting accepted history
+in merge commit `41b94b5bad3a4cc6a205ecac7e0527cce78cad3d`, reconciled the two preserved pre-landing
+files, and archived this completed plan set before immutable freeze.
+
+- [Archived specification](official-lean-compatibility-cleanup/SPECIFICATION.md) —
+  SHA256 `305f8b69fc881fa25fdcabdeace4688e13787651270f843799f6f8471d30c012`.
+- [Archived execution plan](official-lean-compatibility-cleanup/EXECUTION_PLAN.md) —
+  SHA256 `33437aa648a0fc6b788db053edc216c543e3cdfa9d16944e978e5dbf21e6a325`.
+- Managed reviewer SHA256 after main reconciliation: `dcd02e81e7e0656a3d7eb89ccfa78bd8b24a8492de012122f82b17b7aec50a05`.
+- Goals-and-heartbeats reconciliation SHA256: `6c9daca98cf818a784334493190f2c4ea17218ffb61e52b52919105178a6aaa1`.
+- Interactions reconciliation: all existing 100 records preserved, exact six
+  missing records appended in order; resulting 106-record SHA256
+  `86f65e44d6a12fc0e06c0c7fc3fabb17d0cf01e3bbbf88df7db6ea6d2e219fe7`.
+
+The exact frozen candidate, post-freeze gates, official review, and operator
+disposition are recorded in private receipts and `prime-claw-h6w.30`; they do
+not mutate this candidate tree. This archive does not authorize merge, host
+final-mode apply, live Gate B, restart, episode finalization, or physical
+resource cleanup. The bead remains open pending the operator's later terminal
+decision.
+
 ## official-lean-session-protocol/ — Accepted predecessor lean protocol ✅ HISTORICAL (2026-10-04)
 
 These two files are the exact active plan/spec blobs replaced by promotion commit

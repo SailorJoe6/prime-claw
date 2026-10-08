@@ -238,7 +238,11 @@ with their in-memory status/cancel state. The accepted reservation foundation
 remains historical evidence, not the active admission mechanism.
 
 The exact active Conversation owner calls the Python package's `launch(packet)`.
-The package derives its depth-0 owner ID and canonical session file from
+The packet names either the active specification/plan pair or, after normal
+Ralph lifecycle archival, the paired files in one direct
+`.ralph/plans/archive/<slug>/` folder. Mixing active and archived paths,
+cross-folder pairs, traversal, future-plan paths, and arbitrary files fail
+closed. The package derives its depth-0 owner ID and canonical session file from
 host-provided kernel state, reads the plugin-owned active oversight marker,
 proves the marker worktree is its own Git top-level at the packet's exact HEAD,
 and requires exactly one exact model-discovery result. It creates one
