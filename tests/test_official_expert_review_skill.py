@@ -39,7 +39,7 @@ def test_official_expert_skill_has_one_exact_managed_package_inventory() -> None
 def test_managed_reviewer_definition_is_exact_standalone_migration_evidence() -> None:
     assert (PACKAGE / "reviewer.md").read_bytes() == PROFILE.read_bytes()
     digest = hashlib.sha256(PROFILE.read_bytes()).hexdigest()
-    assert digest == "49e2f48421902721b25751380a2173cd8a44ad1c6c4655e7a9a4a8e583983ce6"
+    assert digest == "c02fde846db68634a152854ce11dee66273bc556dbfc187f75612cff4fa8bab6"
     assert f'REVIEWER_DEFINITION_SHA256 = "{digest}"' in (PACKAGE / "__init__.py").read_text()
 
 

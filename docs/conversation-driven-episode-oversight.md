@@ -232,7 +232,7 @@ lifetime-locks that owner.
 
 The managed `prime-claw-official-expert-review` Python skill retains the
 byte-identical canonical `reviewer.md` at SHA256
-`49e2f48421902721b25751380a2173cd8a44ad1c6c4655e7a9a4a8e583983ce6` and
+`c02fde846db68634a152854ce11dee66273bc556dbfc187f75612cff4fa8bab6` and
 validates the exact `expert-reviewer`, `openai-codex/gpt-6-astra`, `max`
 configuration. `describe()` remains read-only and returns `authority: false`.
 Installer preflight remains read-only: a configured interpreter accepts only an
@@ -301,9 +301,13 @@ keeps a still-running designated child neutral and aborts provider use.
 
 The first project policy lives at `.prime/agent/profiles/expert-reviewer.md` as
 byte-identical migration evidence. The Markdown body defines the independent,
-read-only exact-commit role and actionable `BLOCK` contract. This is
-project/operator configuration, not a portable claim that one model is always
-best.
+read-only exact-commit role and a proportionate `BLOCK` contract. It bounds
+review to the approved threat model and non-goals, permits PASS when no
+in-contract blocker or specification decision remains, and routes plausible
+out-of-model hardening to non-blocking advice with evidence-based promotion
+triggers. An EXPERT cannot expand scope; adversarial red-team review requires
+explicit operator authorization. This is project/operator configuration, not a
+portable claim that one model is always best.
 
 ## Exact bookkeeping close
 

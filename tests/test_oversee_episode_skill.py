@@ -81,25 +81,35 @@ def test_expert_profile_contract_rejects_ambiguous_or_open_configuration():
 
 
 def test_expert_profile_is_read_only_and_makes_blocks_actionable():
-    _, body = _profile()
+    _, raw_body = _profile()
+    body = " ".join(raw_body.split())
     for phrase in [
         "one exact pushed commit",
         "independently and read-only",
         "Do not edit or steer the subject",
         "Return the result to the owning conversation",
         "Return `PASS`",
-        "return `BLOCK`",
-        "violated invariant",
+        "Return `BLOCK`",
+        "violated approved invariant",
         "root cause or failing lifecycle seam",
-        "recommended repair direction",
+        "proportionate repair direction",
         "approaches to avoid",
         "positive, negative, failure, and replay tests",
         "regression risks",
         "repaired together",
         "bounded alternatives",
+        "approved product contract",
+        "An EXPERT cannot expand product scope",
+        "realistic product impact",
+        "proportionate remediation cost",
+        "PASS does not mean that no imaginable finding exists",
+        "evidence-based promotion trigger",
+        "explicit operator authorization",
     ]:
         assert phrase in body
 
+    assert "PASS only when no finding remains" not in body
+    assert "BLOCK for any material defect" not in body
 
 
 def test_managed_conversation_guide_is_lean_judgment_only():
@@ -117,8 +127,15 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Pause",
         "Consult the operator",
         "canonical handoff",
-        "Expert PASS or BLOCK as bounded evidence",
-        "Every blocking finding",
+        "Treat every verdict as bounded evidence",
+        "Classify each finding",
+        "in-contract blocker",
+        "hardening candidate",
+        "Only the operator may promote",
+        "same slice acceptance attempt across successor candidate commits",
+        "After two cycles",
+        "simplification",
+        "manual recovery",
         "bounded goal",
         "one exact heartbeat",
         "operator alone decides scope",
