@@ -26,6 +26,7 @@ WS_PROBE = "/workspace/tests/container/role_protocol_probe.py"
         "concurrent",
         "legacy-adoption",
         "ordinary-failure",
+        "final-removal",
     ],
 )
 def test_role_protocol_manager_matrix(tier1_container, croot, scenario) -> None:

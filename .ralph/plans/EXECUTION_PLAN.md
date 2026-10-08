@@ -971,15 +971,25 @@ are explicitly unnecessary.
 
 ## 11. Slice 5 — Practical final legacy removal and restore
 
-**Dependency:** explicit accepted Gate A UAT.
+**Dependency:** satisfied. The owner explicitly accepted Gate A bridge UAT after
+owner guide/identity success, clean exact-episode resume without injected legacy
+packages, and a mutation-free ordinary-session `VISION.md` read-only task.
 
 **Capability delivered:** final mode can remove only Prime Claw's exact managed
 legacy APPEND region and restore a known accepted bridge preimage in isolated
 tests, without deleting repository compatibility resources yet.
 
+**Bounded execution authority:** deliver only this smallest practical cleanup
+slice and report it as one reviewable vertical slice. Do not begin Slice 6.
+
 ### Changes
 
 - Extend the practical manager with exact-marker legacy removal and the same fixed-inventory known-state receipt rules used by Slice 1.
+- Remove the operator-rejected managed-directory unexpected-entry purity gates
+  from apply/check and remove their direct tests. Do not add cache exceptions,
+  replacement integrity machinery, or generalized defenses. Preserve expected-
+  file comparisons, managed package hash/import validation, role generation and
+  lock checks, and ordinary safety checks.
 - Cover unrelated prefix/suffix, LF/CRLF, final-newline form, malformed/duplicate markers, absent/already-removed replay, and unknown-state refusal.
 - Preserve ordinary metadata where supported and reject obvious unsafe target types at validation.
 - Keep `role-protocol.json` in bridge mode and do not run final mode against the host.
@@ -999,6 +1009,32 @@ exhaustive restore-state matrix.
 
 Revert Slice 5 normally. The active host remains the accepted bridge generation,
 so no user-global or restart rollback is required.
+
+### Slice 5 implementation checkpoint
+
+The practical manager now supports an isolated exact final transition from an
+owned bridge manifest. It removes only the recorded legacy APPEND block and
+Prime Claw-owned separators, preserves unrelated bytes and ordinary metadata,
+keeps already-final absence stable, and restores the exact bridge fixed
+inventory only from known states. Final removal refuses unowned state, source
+or separator drift, malformed/duplicate markers, tampered receipts, and unknown
+restore state. The tracked `role-protocol.json` remains `bridge`, and final mode
+was not applied to the host.
+
+The operator-rejected managed-directory unexpected-entry scans and only their
+direct tests are removed. Expected-file comparisons, EXPERT package hash/import
+validation, role generation/lock checks, explicit obsolete-file checks, and
+ordinary directory/leaf safety remain. No cache exception or replacement
+integrity mechanism was added.
+
+Evidence is recorded in
+`docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md`.
+Focused final-mode Docker coverage passes 11; complete Tier 0 passes 447 with
+182 skipped; complete Docker Tier 1 passes 75 with 554 deselected; the pinned
+0.9.8 apply/check/command-registration probe passes; and independent exact-diff
+review returns PASS. This is the sole Slice 5 vertical slice. Stop here for
+owner review; Slice 6, host final-mode apply, Gate B, finalization, and physical
+cleanup remain unauthorized.
 
 ## 12. Slice 6 — Remove compatibility and reconcile the final source tree
 

@@ -136,41 +136,9 @@ for relative in "${managed_destinations[@]}"; do
 done
 
 managed_skill_dir="$destination_root/skills/prime-claw-oversee-episode"
-if [[ -d "$managed_skill_dir" ]]; then
-  unexpected_entry="$(find "$managed_skill_dir" -mindepth 1 -maxdepth 1 ! -name SKILL.md -print -quit)"
-  if [[ -n "$unexpected_entry" ]]; then
-    printf 'unexpected entry in managed Conversation skill directory: %s
-' "$unexpected_entry" >&2
-    exit 1
-  fi
-fi
 expert_skill_dir="$destination_root/$expert_skill_root_relative"
 expert_src_dir="$expert_skill_dir/src"
 expert_package_dir="$expert_src_dir/prime_claw_official_expert_review"
-if [[ -d "$expert_skill_dir" ]]; then
-  unexpected_entry="$(find "$expert_skill_dir" -mindepth 1 -maxdepth 1 ! -name SKILL.md ! -name pyproject.toml ! -name src -print -quit)"
-  if [[ -n "$unexpected_entry" ]]; then
-    printf 'unexpected entry in managed EXPERT skill directory: %s
-' "$unexpected_entry" >&2
-    exit 1
-  fi
-fi
-if [[ -d "$expert_src_dir" ]]; then
-  unexpected_entry="$(find "$expert_src_dir" -mindepth 1 -maxdepth 1 ! -name prime_claw_official_expert_review -print -quit)"
-  if [[ -n "$unexpected_entry" ]]; then
-    printf 'unexpected entry in managed EXPERT source directory: %s
-' "$unexpected_entry" >&2
-    exit 1
-  fi
-fi
-if [[ -d "$expert_package_dir" ]]; then
-  unexpected_entry="$(find "$expert_package_dir" -mindepth 1 -maxdepth 1 ! -name __init__.py ! -name reviewer.md -print -quit)"
-  if [[ -n "$unexpected_entry" ]]; then
-    printf 'unexpected entry in managed EXPERT package directory: %s
-' "$unexpected_entry" >&2
-    exit 1
-  fi
-fi
 
 mkdir -p "$destination_root/extensions" "$destination_root/extension-support" "$managed_skill_dir" "$expert_package_dir"
 role_apply_args=(

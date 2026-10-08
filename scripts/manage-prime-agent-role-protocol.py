@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install and restore Prime Claw's bridge role protocol.
+"""Install and restore Prime Claw's bridge or final role protocol.
 
 The manager is deliberately small and stdlib-only. It assumes a trusted local
 operator, serializes cooperating writers with one lock, validates ordinary file
@@ -100,9 +100,13 @@ def load_block(path: Path, start: bytes, end: bytes, description: str) -> bytes:
 
 def validate_config(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
-    if value != {"schemaVersion": 1, "generation": "bridge"}:
+    generation = value.get("generation") if isinstance(value, dict) else None
+    if generation not in {"bridge", "final"} or value != {
+        "schemaVersion": 1,
+        "generation": generation,
+    }:
         raise ValueError(
-            "role-protocol.json must declare exactly schemaVersion 1 and generation bridge"
+            "role-protocol.json must declare exactly schemaVersion 1 and generation bridge or final"
         )
     return value
 
@@ -367,6 +371,16 @@ def separators_match(
         raise ValueError(f"{description} owned suffix separator drifted")
 
 
+def remove_owned_block(
+    data: bytes, selected: tuple[int, int], entry: dict[str, Any], description: str
+) -> bytes:
+    separators_match(data, selected, entry, description)
+    start, end = selected
+    prefix = decode(entry["prefixSeparatorBase64"])
+    suffix = decode(entry["suffixSeparatorBase64"])
+    return data[: start - len(prefix)] + data[end + len(suffix) :]
+
+
 def validate_manifest(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != {
         "schemaVersion",
@@ -375,7 +389,10 @@ def validate_manifest(value: Any) -> dict[str, Any]:
         "legacyAppend",
     }:
         raise ValueError("role protocol ownership manifest is malformed")
-    if value.get("schemaVersion") != 1 or value.get("generation") != "bridge":
+    if value.get("schemaVersion") != 1 or value.get("generation") not in {
+        "bridge",
+        "final",
+    }:
         raise ValueError("role protocol ownership manifest is unsupported")
     context = value.get("selectedContext")
     legacy = value.get("legacyAppend")
@@ -455,6 +472,7 @@ def aliases_selected(
 
 
 def manifest_value(
+    generation: str,
     selected: str,
     installer_created: bool,
     kernel: bytes,
@@ -466,7 +484,7 @@ def manifest_value(
 ) -> dict[str, Any]:
     return {
         "schemaVersion": 1,
-        "generation": "bridge",
+        "generation": generation,
         "selectedContext": {
             "path": selected,
             "installerCreated": installer_created,
@@ -483,7 +501,9 @@ def manifest_value(
     }
 
 
-def prepare_apply(root: Path, kernel: bytes, legacy: bytes) -> dict[str, Any]:
+def prepare_apply(
+    root: Path, kernel: bytes, legacy: bytes, generation: str
+) -> dict[str, Any]:
     selected_name, candidates = inspect_candidates(root)
     selected_path = root / selected_name
     selected_loaded = candidates[selected_name]
@@ -516,6 +536,14 @@ def prepare_apply(root: Path, kernel: bytes, legacy: bytes) -> dict[str, Any]:
 
     manifest_path = root / STATE_DIR / STATE_NAME
     manifest, manifest_snapshot = load_manifest(manifest_path)
+    if generation == "final" and manifest is None:
+        raise ValueError("final role protocol requires an owned bridge manifest")
+    if (
+        generation == "bridge"
+        and manifest is not None
+        and manifest["generation"] != "bridge"
+    ):
+        raise ValueError("final role protocol must be restored before bridge apply")
     installer_created = selected_loaded is None
     if manifest is not None:
         recorded = manifest["selectedContext"]
@@ -533,6 +561,8 @@ def prepare_apply(root: Path, kernel: bytes, legacy: bytes) -> dict[str, Any]:
             raise ValueError(
                 "selected global context role kernel disagrees with ownership manifest"
             )
+        if generation == "final" and digest(kernel) != recorded["blockSha256"]:
+            raise ValueError("final removal cannot change the managed role kernel")
         separators_match(
             selected_data, selected_range, recorded, "selected global context"
         )
@@ -558,18 +588,30 @@ def prepare_apply(root: Path, kernel: bytes, legacy: bytes) -> dict[str, Any]:
     )
     if manifest is not None:
         recorded_legacy = manifest["legacyAppend"]
-        if append_range is None:
-            raise ValueError("managed legacy APPEND block disappeared")
-        start, end = append_range
-        existing_block = append_data[start:end]
-        if digest(existing_block) != recorded_legacy["blockSha256"]:
-            raise ValueError("legacy APPEND block disagrees with ownership manifest")
-        separators_match(
-            append_data, append_range, recorded_legacy, "legacy APPEND"
-        )
-        append_updated = append_data[:start] + legacy + append_data[end:]
+        if generation == "final" and digest(legacy) != recorded_legacy["blockSha256"]:
+            raise ValueError("final removal cannot change the managed legacy block source")
         append_prefix = decode(recorded_legacy["prefixSeparatorBase64"])
         append_suffix = decode(recorded_legacy["suffixSeparatorBase64"])
+        if manifest["generation"] == "final":
+            if append_range is not None:
+                raise ValueError("managed legacy APPEND block reappeared after final removal")
+            append_updated = append_data
+        else:
+            if append_range is None:
+                raise ValueError("managed legacy APPEND block disappeared")
+            start, end = append_range
+            existing_block = append_data[start:end]
+            if digest(existing_block) != recorded_legacy["blockSha256"]:
+                raise ValueError("legacy APPEND block disagrees with ownership manifest")
+            if generation == "final":
+                append_updated = remove_owned_block(
+                    append_data, append_range, recorded_legacy, "legacy APPEND"
+                )
+            else:
+                separators_match(
+                    append_data, append_range, recorded_legacy, "legacy APPEND"
+                )
+                append_updated = append_data[:start] + legacy + append_data[end:]
     elif append_range is None:
         append_updated, append_prefix, append_suffix = install_new_block(
             append_data, legacy
@@ -586,6 +628,7 @@ def prepare_apply(root: Path, kernel: bytes, legacy: bytes) -> dict[str, Any]:
         append_suffix = b""
 
     value = manifest_value(
+        generation,
         selected_name,
         installer_created,
         kernel,
@@ -595,7 +638,18 @@ def prepare_apply(root: Path, kernel: bytes, legacy: bytes) -> dict[str, Any]:
         append_prefix,
         append_suffix,
     )
+
     manifest_data = canonical_json(value)
+    append_postimage = (
+        missing_snapshot()
+        if generation == "final"
+        and manifest is not None
+        and manifest["generation"] == "final"
+        and append_loaded is None
+        else predicted_snapshot(
+            append_updated, metadata(append_info, new_mode=0o644)
+        )
+    )
     entries = [
         {
             "label": "context",
@@ -611,9 +665,7 @@ def prepare_apply(root: Path, kernel: bytes, legacy: bytes) -> dict[str, Any]:
             "relativePath": "APPEND_SYSTEM.md",
             "path": append_path,
             "preimage": snapshot(append_path, "legacy APPEND"),
-            "postimage": predicted_snapshot(
-                append_updated, metadata(append_info, new_mode=0o644)
-            ),
+            "postimage": append_postimage,
         },
         {
             "label": "manifest",
@@ -648,6 +700,7 @@ def expected_inventory(selected: str) -> list[tuple[str, str]]:
 
 def receipt_value(
     root: Path,
+    generation: str,
     selected: str,
     entries: list[dict[str, Any]],
     transaction: str,
@@ -656,7 +709,7 @@ def receipt_value(
         "schemaVersion": 1,
         "manager": RECEIPT_MANAGER,
         "transaction": transaction,
-        "generation": "bridge",
+        "generation": generation,
         "destinationRealpath": os.path.realpath(root),
         "selectedContext": selected,
         "files": [
@@ -703,7 +756,7 @@ def validate_receipt(
     if (
         value.get("schemaVersion") != 1
         or value.get("manager") != RECEIPT_MANAGER
-        or value.get("generation") != "bridge"
+        or value.get("generation") not in {"bridge", "final"}
     ):
         raise ValueError("role protocol receipt is unsupported")
     transaction = value.get("transaction")
@@ -734,13 +787,17 @@ def validate_receipt(
             raise ValueError("role protocol receipt fixed inventory does not match")
         validate_snapshot(entry.get("preimage"), f"receipt {label} preimage")
         validate_snapshot(entry.get("postimage"), f"receipt {label} postimage")
-        if not entry["postimage"]["exists"]:
+        if not entry["postimage"]["exists"] and not (
+            value["generation"] == "final" and label == "legacyAppend"
+        ):
             raise ValueError(f"role protocol receipt {label} postimage is absent")
         validated[label] = entry
 
     manifest_post = validate_manifest(
         parse_snapshot_json(validated["manifest"]["postimage"], "manifest postimage")
     )
+    if manifest_post["generation"] != value["generation"]:
+        raise ValueError("receipt generation disagrees with manifest postimage")
     if manifest_post["selectedContext"]["path"] != selected:
         raise ValueError("receipt selection disagrees with manifest postimage")
 
@@ -753,14 +810,22 @@ def validate_receipt(
     ) != manifest_post["selectedContext"]["blockSha256"]:
         raise ValueError("receipt context postimage disagrees with manifest")
 
-    append_post = snapshot_bytes(validated["legacyAppend"]["postimage"])
+    append_post_snapshot = validated["legacyAppend"]["postimage"]
+    append_post = (
+        snapshot_bytes(append_post_snapshot)
+        if append_post_snapshot["exists"]
+        else b""
+    )
     append_range = managed_range(
         append_post, LEGACY_START, LEGACY_END, "receipt APPEND postimage"
     )
-    if append_range is None or digest(
-        append_post[append_range[0] : append_range[1]]
-    ) != manifest_post["legacyAppend"]["blockSha256"]:
-        raise ValueError("receipt APPEND postimage disagrees with manifest")
+    if manifest_post["generation"] == "bridge":
+        if append_range is None or digest(
+            append_post[append_range[0] : append_range[1]]
+        ) != manifest_post["legacyAppend"]["blockSha256"]:
+            raise ValueError("receipt APPEND postimage disagrees with manifest")
+    elif append_range is not None:
+        raise ValueError("final receipt APPEND postimage retains the managed block")
 
     manifest_preimage = validated["manifest"]["preimage"]
     context_preimage = validated["context"]["preimage"]
@@ -779,6 +844,33 @@ def validate_receipt(
         not context_preimage["exists"]
     ):
         raise ValueError("receipt context creation ownership is contradictory")
+
+    if value["generation"] == "final":
+        if context_preimage != validated["context"]["postimage"]:
+            raise ValueError("final receipt unexpectedly changes selected context")
+        if not manifest_preimage["exists"] or manifest_pre["generation"] != "bridge":
+            raise ValueError("final receipt does not restore an owned bridge manifest")
+        expected_final_manifest = dict(manifest_pre)
+        expected_final_manifest["generation"] = "final"
+        if manifest_post != expected_final_manifest:
+            raise ValueError("final receipt manifest transition is contradictory")
+        append_preimage = validated["legacyAppend"]["preimage"]
+        if not append_preimage["exists"]:
+            raise ValueError("final receipt bridge APPEND preimage is absent")
+        append_pre = snapshot_bytes(append_preimage)
+        append_pre_range = managed_range(
+            append_pre, LEGACY_START, LEGACY_END, "receipt APPEND preimage"
+        )
+        if append_pre_range is None or digest(
+            append_pre[append_pre_range[0] : append_pre_range[1]]
+        ) != manifest_pre["legacyAppend"]["blockSha256"]:
+            raise ValueError("final receipt bridge APPEND preimage disagrees with manifest")
+        separators_match(
+            append_pre,
+            append_pre_range,
+            manifest_pre["legacyAppend"],
+            "receipt bridge APPEND",
+        )
     return value
 
 
@@ -850,7 +942,7 @@ def acquire_lock(root: Path, *, create: bool) -> int:
 def preflight(
     root: Path, config_path: Path, kernel_path: Path, legacy_path: Path
 ) -> dict[str, Any]:
-    validate_config(config_path)
+    generation = validate_config(config_path)["generation"]
     kernel = load_block(kernel_path, KERNEL_START, KERNEL_END, "ROLE_KERNEL source")
     legacy = load_block(
         legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source"
@@ -864,6 +956,14 @@ def preflight(
         selected, candidates = inspect_candidates(root)
         selected_loaded = candidates[selected]
         manifest, _ = load_manifest(state_dir / STATE_NAME)
+        if generation == "final" and manifest is None:
+            raise ValueError("final role protocol requires an owned bridge manifest")
+        if (
+            generation == "bridge"
+            and manifest is not None
+            and manifest["generation"] != "bridge"
+        ):
+            raise ValueError("final role protocol must be restored before bridge apply")
         if manifest is not None and manifest["selectedContext"]["path"] != selected:
             raise ValueError(
                 f"selected global context drift: manifest={manifest['selectedContext']['path']} current={selected}"
@@ -905,7 +1005,7 @@ def preflight(
                         "legacy APPEND block does not match the accepted predecessor"
                     )
     return {
-        "generation": "bridge",
+        "generation": generation,
         "selectedContext": selected,
         "kernelSha256": digest(kernel),
         "legacyAppendSha256": digest(legacy),
@@ -969,7 +1069,7 @@ def apply_protocol(
             )
     # Static source validation is safe before destination serialization. Every
     # read of mutable destination state happens only after the cooperative lock.
-    validate_config(config_path)
+    generation = validate_config(config_path)["generation"]
     load_block(kernel_path, KERNEL_START, KERNEL_END, "ROLE_KERNEL source")
     load_block(legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source")
     require_directory(root, "agentDir")
@@ -1011,12 +1111,12 @@ def apply_protocol(
         if not state_dir.exists():
             state_dir.mkdir(mode=0o700)
             fsync_directory(root)
-        prepared = prepare_apply(root, kernel, legacy)
+        prepared = prepare_apply(root, kernel, legacy, generation)
         entries = prepared["entries"]
 
         if receipt_path is not None:
             receipt = receipt_value(
-                root, prepared["selected_name"], entries, "prepared"
+                root, generation, prepared["selected_name"], entries, "prepared"
             )
             prepared_receipt_snapshot = write_receipt(
                 receipt_path, receipt, root, receipt_expected
@@ -1046,7 +1146,7 @@ def apply_protocol(
             if receipt_path is not None:
                 assert prepared_receipt_snapshot is not None
                 applied = receipt_value(
-                    root, prepared["selected_name"], entries, "applied"
+                    root, generation, prepared["selected_name"], entries, "applied"
                 )
                 write_receipt(
                     receipt_path,
@@ -1060,6 +1160,7 @@ def apply_protocol(
                 if receipt_path is not None and prepared_receipt_snapshot is not None:
                     rolled_back = receipt_value(
                         root,
+                        generation,
                         prepared["selected_name"],
                         entries,
                         "rolled_back",
@@ -1078,7 +1179,7 @@ def apply_protocol(
             raise RuntimeError(f"apply failed ({error}); changes rolled back") from error
 
         return {
-            "generation": "bridge",
+            "generation": generation,
             "selectedContext": prepared["selected_name"],
             "manifest": str(root / STATE_DIR / STATE_NAME),
         }
@@ -1094,7 +1195,7 @@ def check_protocol(
     *,
     already_locked: bool = False,
 ) -> dict[str, Any]:
-    validate_config(config_path)
+    generation = validate_config(config_path)["generation"]
     kernel = load_block(kernel_path, KERNEL_START, KERNEL_END, "ROLE_KERNEL source")
     legacy = load_block(
         legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source"
@@ -1109,6 +1210,11 @@ def check_protocol(
         manifest, _ = load_manifest(root / STATE_DIR / STATE_NAME)
         if manifest is None:
             raise ValueError("missing role protocol ownership manifest")
+        if manifest["generation"] != generation:
+            raise ValueError(
+                "role protocol generation mismatch: "
+                f"manifest={manifest['generation']} config={generation}"
+            )
         recorded = manifest["selectedContext"]
         if recorded["path"] != selected_name:
             raise ValueError(
@@ -1152,36 +1258,41 @@ def check_protocol(
         append_loaded = read_regular(
             root / "APPEND_SYSTEM.md",
             "legacy APPEND destination",
-            allow_absent=False,
+            allow_absent=generation == "final",
         )
-        assert append_loaded is not None
-        append_data = append_loaded[0]
+        append_data = b"" if append_loaded is None else append_loaded[0]
         append_range = managed_range(
             append_data,
             LEGACY_START,
             LEGACY_END,
             "legacy APPEND destination",
         )
-        if (
-            append_range is None
-            or append_data[append_range[0] : append_range[1]] != legacy
-        ):
-            raise ValueError(
-                f"missing or stale managed legacy APPEND block: {root / 'APPEND_SYSTEM.md'}"
+        if generation == "bridge":
+            if (
+                append_range is None
+                or append_data[append_range[0] : append_range[1]] != legacy
+            ):
+                raise ValueError(
+                    f"missing or stale managed legacy APPEND block: {root / 'APPEND_SYSTEM.md'}"
+                )
+            separators_match(
+                append_data,
+                append_range,
+                manifest["legacyAppend"],
+                "legacy APPEND",
             )
-        separators_match(
-            append_data,
-            append_range,
-            manifest["legacyAppend"],
-            "legacy APPEND",
-        )
+        elif append_range is not None:
+            raise ValueError(
+                "managed legacy APPEND block remains after final removal: "
+                f"{root / 'APPEND_SYSTEM.md'}"
+            )
         if (
             recorded["blockSha256"] != digest(kernel)
             or manifest["legacyAppend"]["blockSha256"] != digest(legacy)
         ):
             raise ValueError("role protocol ownership manifest source digest is stale")
         return {
-            "generation": "bridge",
+            "generation": generation,
             "selectedContext": selected_name,
             "kernelSha256": digest(kernel),
             "legacyAppendSha256": digest(legacy),
@@ -1234,7 +1345,7 @@ def restore_protocol(root: Path, receipt_path: Path) -> dict[str, Any]:
         return {
             "restored": True,
             "alreadyRestored": already,
-            "generation": "bridge",
+            "generation": value["generation"],
             "receipt": str(receipt_path),
         }
     finally:

@@ -3,6 +3,7 @@
 
 import base64
 import fcntl
+import hashlib
 import importlib.util
 import json
 import os
@@ -24,7 +25,7 @@ LEGACY_START = b"<!-- prime-claw:conversation-identity:start -->"
 LEGACY_END = b"<!-- prime-claw:conversation-identity:end -->"
 
 
-def run(mode, root, *extra, ok=True):
+def run(mode, root, *extra, ok=True, config=CONFIG):
     if mode == "restore":
         argv = [sys.executable, MANAGER, "restore", str(extra[0]), str(root)]
     else:
@@ -32,7 +33,7 @@ def run(mode, root, *extra, ok=True):
             sys.executable,
             MANAGER,
             mode,
-            CONFIG,
+            config,
             KERNEL,
             LEGACY,
             str(root),
@@ -437,7 +438,7 @@ def scenario_concurrent():
     target = root / "AGENTS.md"
     target.write_bytes(b"ordinary original\n")
     (root / ".prime-claw").mkdir()
-    prepared = module.prepare_apply(root, KERNEL_BYTES, LEGACY_BYTES)
+    prepared = module.prepare_apply(root, KERNEL_BYTES, LEGACY_BYTES, "bridge")
     context = prepared["entries"][0]
     target.chmod(0o600)
     try:
@@ -540,6 +541,166 @@ def scenario_ordinary_failure():
     assert (root / "unrelated.txt").read_bytes() == b"unrelated exact\n"
 
 
+def scenario_final_removal():
+    WORK.mkdir(parents=True, exist_ok=True)
+    final_config = WORK / "role-protocol-final.json"
+    final_config.write_text(json.dumps({"schemaVersion": 1, "generation": "final"}))
+
+    originals = [
+        b"",
+        b"operator LF\n",
+        b"operator no-final",
+        b"operator CRLF\r\n",
+        b"operator CRLF no-final\r\nnext",
+    ]
+    for index, original in enumerate(originals):
+        root = clean(f"final-owned-{index}")
+        context = root / "AGENTS.md"
+        context.write_bytes(b"operator context\n")
+        append = root / "APPEND_SYSTEM.md"
+        append.write_bytes(original)
+        append.chmod(0o660)
+        unrelated = root / "unrelated.bin"
+        unrelated.write_bytes(b"unrelated exact\x00\xff")
+        run("apply", root)
+        bridge_tree = snap(root)
+        bridge_append_info = append.stat()
+        bridge_context = context.read_bytes()
+        bridge_append = append.read_bytes()
+        receipt = WORK / f"final-owned-{index}-receipt.json"
+        receipt.unlink(missing_ok=True)
+
+        run("apply", root, "--receipt", receipt, config=final_config)
+        assert append.read_bytes() == original
+        assert LEGACY_START not in append.read_bytes()
+        assert context.read_bytes() == bridge_context
+        append_info = append.stat()
+        assert (
+            stat.S_IMODE(append_info.st_mode), append_info.st_uid, append_info.st_gid
+        ) == (
+            stat.S_IMODE(bridge_append_info.st_mode),
+            bridge_append_info.st_uid,
+            bridge_append_info.st_gid,
+        )
+        assert unrelated.read_bytes() == b"unrelated exact\x00\xff"
+        manifest = json.loads((root / ".prime-claw/role-protocol-state.json").read_text())
+        assert manifest["generation"] == "final"
+        assert json.loads(receipt.read_text())["generation"] == "final"
+        run("check", root, config=final_config)
+        if index == 0:
+            tampered = json.loads(receipt.read_text())
+            manifest_preimage = tampered["files"][2]["preimage"]
+            manifest_pre = json.loads(
+                base64.b64decode(manifest_preimage["bytesBase64"])
+            )
+            manifest_pre["generation"] = "final"
+            manifest_pre_bytes = (
+                json.dumps(manifest_pre, indent=2, sort_keys=True) + "\n"
+            ).encode()
+            manifest_preimage["bytesBase64"] = base64.b64encode(
+                manifest_pre_bytes
+            ).decode()
+            manifest_preimage["sha256"] = hashlib.sha256(
+                manifest_pre_bytes
+            ).hexdigest()
+            tampered_receipt = WORK / "final-tampered-receipt.json"
+            tampered_receipt.write_text(json.dumps(tampered))
+            tampered_receipt.chmod(0o600)
+            before_tampered_restore = snap(root)
+            result = run("restore", root, tampered_receipt, ok=False)
+            assert "owned bridge manifest" in result.stderr
+            assert snap(root) == before_tampered_restore
+
+        final_tree = snap(root)
+        append_inode = append.stat().st_ino
+        run("apply", root, config=final_config)
+        assert snap(root) == final_tree
+        assert append.stat().st_ino == append_inode
+
+        run("restore", root, receipt)
+        assert snap(root) == bridge_tree
+        assert append.read_bytes() == bridge_append
+        run("check", root)
+        mismatch = run("check", root, ok=False, config=final_config)
+        assert "generation mismatch" in mismatch.stderr
+        replay = run("restore", root, receipt)
+        assert json.loads(replay.stdout)["alreadyRestored"] is True
+        if index == 0:
+            run("apply", root, config=final_config)
+            append.unlink()
+            run("check", root, config=final_config)
+            run("apply", root, config=final_config)
+            assert not append.exists()
+            run("check", root, config=final_config)
+
+    adopted = clean("final-adopted")
+    adopted_append = adopted / "APPEND_SYSTEM.md"
+    prefix = b"operator prefix\r\n"
+    suffix = b"\r\noperator suffix-no-final"
+    adopted_original = prefix + LEGACY_BYTES + suffix
+    adopted_append.write_bytes(adopted_original)
+    run("apply", adopted)
+    adopted_bridge = snap(adopted)
+    adopted_receipt = WORK / "final-adopted-receipt.json"
+    adopted_receipt.unlink(missing_ok=True)
+    run("apply", adopted, "--receipt", adopted_receipt, config=final_config)
+    assert adopted_append.read_bytes() == prefix + suffix
+    run("check", adopted, config=final_config)
+    run("restore", adopted, adopted_receipt)
+    assert snap(adopted) == adopted_bridge
+
+    malformed = clean("final-malformed")
+    (malformed / "APPEND_SYSTEM.md").write_bytes(b"operator append\n")
+    run("apply", malformed)
+    malformed_append = malformed / "APPEND_SYSTEM.md"
+    malformed_append.write_bytes(malformed_append.read_bytes() + b"\n" + LEGACY_BYTES)
+    malformed_before = snap(malformed)
+    result = run("apply", malformed, ok=False, config=final_config)
+    assert "duplicate managed markers" in result.stderr
+    assert snap(malformed) == malformed_before
+
+    unknown = clean("final-unknown-restore")
+    (unknown / "APPEND_SYSTEM.md").write_bytes(b"operator append\n")
+    run("apply", unknown)
+    unknown_receipt = WORK / "final-unknown-receipt.json"
+    unknown_receipt.unlink(missing_ok=True)
+    run("apply", unknown, "--receipt", unknown_receipt, config=final_config)
+    (unknown / "APPEND_SYSTEM.md").write_bytes(
+        (unknown / "APPEND_SYSTEM.md").read_bytes() + b"operator drift\n"
+    )
+    unknown_before = snap(unknown)
+    result = run("restore", unknown, unknown_receipt, ok=False)
+    assert "manual recovery" in result.stderr
+    assert snap(unknown) == unknown_before
+
+    source_drift = clean("final-source-drift")
+    (source_drift / "APPEND_SYSTEM.md").write_bytes(b"operator append\n")
+    run("apply", source_drift)
+    source_drift_before = snap(source_drift)
+    module = load_manager()
+    changed_kernel = KERNEL_BYTES.replace(b"Prime Claw", b"Prime claw", 1)
+    changed_legacy = LEGACY_BYTES.replace(b"CONVERSATION", b"Conversation", 1)
+    assert changed_kernel != KERNEL_BYTES and changed_legacy != LEGACY_BYTES
+    for kernel, legacy, diagnostic in (
+        (changed_kernel, LEGACY_BYTES, "role kernel"),
+        (KERNEL_BYTES, changed_legacy, "legacy block source"),
+    ):
+        try:
+            module.prepare_apply(source_drift, kernel, legacy, "final")
+        except ValueError as error:
+            assert diagnostic in str(error)
+        else:
+            raise AssertionError("final removal unexpectedly accepted source drift")
+        assert snap(source_drift) == source_drift_before
+
+    unowned = clean("final-unowned")
+    (unowned / "APPEND_SYSTEM.md").write_bytes(b"operator append\n")
+    unowned_before = snap_without_lock(unowned)
+    result = run("apply", unowned, ok=False, config=final_config)
+    assert "owned bridge manifest" in result.stderr
+    assert snap_without_lock(unowned) == unowned_before
+
+
 SCENARIOS = {
     "priority": scenario_priority,
     "preserve": scenario_preserve,
@@ -551,6 +712,7 @@ SCENARIOS = {
     "concurrent": scenario_concurrent,
     "legacy-adoption": scenario_legacy_adoption,
     "ordinary-failure": scenario_ordinary_failure,
+    "final-removal": scenario_final_removal,
 }
 SCENARIOS[SCENARIO]()
 print(json.dumps({"ok": True, "scenario": SCENARIO}, sort_keys=True))

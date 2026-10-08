@@ -506,21 +506,6 @@ def test_check_rejects_stale_managed_conversation_skill(tier1_container, ctmp) -
     assert "stale installed managed Conversation skill" in checked.stderr
 
 
-def test_apply_and_check_reject_unexpected_managed_skill_entry(tier1_container, ctmp) -> None:
-    destination = ctmp / "agent"
-    extra = destination / "skills/prime-claw-oversee-episode/foreign.md"
-    extra.parent.mkdir(parents=True)
-    extra.write_text("foreign content must not be adopted\n")
-    before = extra.read_bytes()
-    applied = _run_script(tier1_container, WS_APPLY, destination)
-    checked = _run_script(tier1_container, WS_CHECK, destination)
-    assert applied.returncode != 0
-    assert checked.returncode != 0
-    assert "unexpected entry in managed Conversation skill directory" in applied.stderr
-    assert "unexpected entry in managed Conversation skill directory" in checked.stderr
-    assert extra.read_bytes() == before
-
-
 def test_check_rejects_a_stale_global_file(tier1_container, ctmp) -> None:
     destination = ctmp / "agent"
     applied = _run_script(tier1_container, WS_APPLY, destination)
@@ -739,31 +724,6 @@ def test_check_rejects_stale_managed_expert_package_file(tier1_container, ctmp) 
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode != 0
     assert "stale installed managed EXPERT skill file" in checked.stderr
-
-
-@pytest.mark.parametrize(
-    "relative",
-    [
-        "skills/prime-claw-official-expert-review/foreign.md",
-        "skills/prime-claw-official-expert-review/src/foreign-package",
-        "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/foreign.py",
-    ],
-)
-def test_apply_and_check_reject_unexpected_managed_expert_entries(
-    tier1_container, ctmp, relative,
-) -> None:
-    destination = ctmp / "agent"
-    extra = destination / relative
-    extra.parent.mkdir(parents=True)
-    extra.write_text("foreign content must not be adopted\n")
-    before = _tree_snapshot(destination)
-    applied = _run_script(tier1_container, WS_APPLY, destination)
-    checked = _run_script(tier1_container, WS_CHECK, destination)
-    assert applied.returncode != 0
-    assert checked.returncode != 0
-    assert "unexpected entry in managed EXPERT" in applied.stderr
-    assert "unexpected entry in managed EXPERT" in checked.stderr
-    assert _tree_snapshot(destination) == before
 
 
 def test_configured_interpreter_unavailable_blocks_apply_before_mutation(

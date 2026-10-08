@@ -97,8 +97,16 @@ fails closed before plugin copy. Apply and check do not migrate a selected file
 implicitly. First bridge adoption accepts only the byte-exact predecessor
 legacy APPEND block from `src/prime-agent-plugin/APPEND_SYSTEM.md`; marker-shaped
 stale or disagreeing policy is not provenance and is rejected before the lock
-or any shared-file/plugin-copy mutation. Removing the accepted block is not
-part of this generation.
+or any shared-file/plugin-copy mutation. The checked-in `role-protocol.json`
+remains in bridge mode, so normal apply/check still retain that block.
+
+For isolated cleanup proofs, the practical manager also accepts an explicit
+schema-1 `final` config. Final mode requires the owned bridge manifest, removes
+only the exact recorded legacy block plus separators that Prime Claw introduced,
+and records a fixed-inventory receipt whose known bridge preimages can be
+restored. It preserves unrelated APPEND bytes and metadata and refuses malformed,
+duplicate, unowned, or unknown state. Slice 5 does not run final mode against the
+host or delete the compatibility source.
 
 The installer treats these former managed paths as retired:
 
@@ -117,9 +125,11 @@ or mixed sequential generation cannot report success.
 The installer owns two uniquely named global skills beside the TypeScript
 plugin files: `skills/prime-claw-oversee-episode/SKILL.md` and the complete
 `skills/prime-claw-official-expert-review/` Python-backed package. It validates
-real managed `skills/`, skill, `src/`, and package directories; refuses extra
-entries in either exact managed inventory; installs mode 0644 bytes; and
-requires an exact final check. Before any destination mutation,
+real managed `skills/`, skill, `src/`, and package directories, but leaves
+unrelated extra entries in those directories untouched. It installs each
+expected file at mode 0644, checks its bytes exactly, and requires a final full
+check. Before
+any destination mutation,
 `check-prime-agent-expert-runtime.py` selects the same managed-kernel interpreter
 Prime Agent will use. It accepts an exact normal installed package import or
 validates the source package with that interpreter and reports `SYNC_PENDING`
@@ -199,6 +209,16 @@ python3 scripts/manage-prime-agent-role-protocol.py restore \
   /external/private/bridge-preimage.json \
   /explicit/isolated/agent-dir
 ```
+
+To prove cleanup without changing the checked-in bridge default, copy
+`role-protocol.json` to an isolated file, change only `generation` to `final`,
+and invoke the same `apply` command against an already applied isolated bridge
+root with a fresh external receipt. `check` with that final config proves the
+managed APPEND region is absent; replay also preserves an already-absent APPEND
+file instead of recreating it. `restore` with the receipt recreates the exact
+accepted bridge context, APPEND, manifest bytes, and ordinary metadata. If any
+fixed-inventory path matches neither recorded preimage nor postimage, stop and
+preserve the root and receipt for manual recovery.
 
 The simple schema-1 receipt has a fixed inventory of exactly the selected context,
 `APPEND_SYSTEM.md`, and `.prime-claw/role-protocol-state.json`. Before any restore

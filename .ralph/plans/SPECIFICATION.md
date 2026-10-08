@@ -1100,3 +1100,21 @@ The owner Conversation restored Docker Desktop. Independent health returned
 server version `29.6.2`, and the exact Docker-focused gate passed 3 tests with an
 isolated pinned-0.9.8 selector. No credential, tracked configuration, Gate A, or
 live Prime Agent state changed.
+
+## Gate A bridge UAT acceptance and bounded Slice 5 authority
+
+The owner accepted Gate A bridge UAT after post-restart evidence proved the
+managed owner guide and identity worked, the exact episode resumed cleanly with
+no injected legacy or retired work-control package, and a saved ordinary session
+completed only the harmless read-only `VISION.md` task without mutation.
+Compatibility cleanup may therefore advance only through the smallest practical
+Slice 5 vertical slice.
+
+Slice 5 remains bounded to the plan's isolated legacy-compatibility removal and
+known-state restore path. It also removes the operator-rejected managed-directory
+unexpected-entry purity gates from apply/check and their direct tests. Do not
+replace those gates with cache exceptions, new integrity machinery, or generalized
+defenses. Retain expected-file comparisons, managed package hash/import
+validation, role generation and lock checks, and ordinary safety checks. Do not
+start Slice 6, apply final mode to the host, run Gate B, finalize, or physically
+clean up resources in this slice.

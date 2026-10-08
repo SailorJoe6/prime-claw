@@ -103,20 +103,11 @@ done
 
 managed_skill_relative="skills/prime-claw-oversee-episode/SKILL.md"
 managed_skill_source="$source_root/$managed_skill_relative"
-managed_skill_dir="$destination_root/skills/prime-claw-oversee-episode"
 managed_skill_installed="$destination_root/$managed_skill_relative"
 if [[ ! -s "$managed_skill_source" ]]; then
   printf 'missing or empty managed Conversation skill source: %s
 ' "$managed_skill_source" >&2
   status=1
-fi
-if [[ -d "$managed_skill_dir" ]]; then
-  unexpected_entry="$(find "$managed_skill_dir" -mindepth 1 -maxdepth 1 ! -name SKILL.md -print -quit)"
-  if [[ -n "$unexpected_entry" ]]; then
-    printf 'unexpected entry in managed Conversation skill directory: %s
-' "$unexpected_entry" >&2
-    status=1
-  fi
 fi
 if [[ -e "$managed_skill_installed" || -L "$managed_skill_installed" ]]; then
   if [[ ! -f "$managed_skill_installed" || -L "$managed_skill_installed" ]]; then
@@ -136,39 +127,12 @@ fi
 
 expert_skill_root_relative="skills/prime-claw-official-expert-review"
 expert_skill_source="$source_root/$expert_skill_root_relative"
-expert_skill_dir="$destination_root/$expert_skill_root_relative"
-expert_src_dir="$expert_skill_dir/src"
-expert_package_dir="$expert_src_dir/prime_claw_official_expert_review"
 expert_skill_files=(
   "$expert_skill_root_relative/SKILL.md"
   "$expert_skill_root_relative/pyproject.toml"
   "$expert_skill_root_relative/src/prime_claw_official_expert_review/__init__.py"
   "$expert_skill_root_relative/src/prime_claw_official_expert_review/reviewer.md"
 )
-if [[ -d "$expert_skill_dir" ]]; then
-  unexpected_entry="$(find "$expert_skill_dir" -mindepth 1 -maxdepth 1 ! -name SKILL.md ! -name pyproject.toml ! -name src -print -quit)"
-  if [[ -n "$unexpected_entry" ]]; then
-    printf 'unexpected entry in managed EXPERT skill directory: %s
-' "$unexpected_entry" >&2
-    status=1
-  fi
-fi
-if [[ -d "$expert_src_dir" ]]; then
-  unexpected_entry="$(find "$expert_src_dir" -mindepth 1 -maxdepth 1 ! -name prime_claw_official_expert_review -print -quit)"
-  if [[ -n "$unexpected_entry" ]]; then
-    printf 'unexpected entry in managed EXPERT source directory: %s
-' "$unexpected_entry" >&2
-    status=1
-  fi
-fi
-if [[ -d "$expert_package_dir" ]]; then
-  unexpected_entry="$(find "$expert_package_dir" -mindepth 1 -maxdepth 1 ! -name __init__.py ! -name reviewer.md -print -quit)"
-  if [[ -n "$unexpected_entry" ]]; then
-    printf 'unexpected entry in managed EXPERT package directory: %s
-' "$unexpected_entry" >&2
-    status=1
-  fi
-fi
 for relative in "${expert_skill_files[@]}"; do
   source_file="$source_root/$relative"
   installed_file="$destination_root/$relative"
