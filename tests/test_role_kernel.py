@@ -67,4 +67,6 @@ def test_predecessor_archive_matches_recorded_hashes() -> None:
     assert {path.name for path in archive.iterdir()} == set(expected)
     for name, sha256 in expected.items():
         assert hashlib.sha256((archive / name).read_bytes()).hexdigest() == sha256
-        assert (archive / name).read_bytes() != (REPO / ".ralph/plans" / name).read_bytes()
+        assert (archive / name).read_bytes() != (
+            REPO / ".ralph/plans/archive/official-lean-compatibility-cleanup" / name
+        ).read_bytes()
