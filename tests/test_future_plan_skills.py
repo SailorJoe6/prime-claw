@@ -232,7 +232,9 @@ def test_implement_prep_skill_owns_compaction_prompt_and_bounded_continuation() 
         assert fragment in skill
 
     assert skill.count("await compact.run(focus_hint)") == 1
-    assert "Do not run `prepare`" in skill
+    assert "Do not run `prepare`" not in skill
+    assert "queued implementation-readiness turn" not in skill
+    assert "own preparation and semantic readiness review" not in skill
     assert "Do not wait for a compaction event" in skill
 
     extension = (
