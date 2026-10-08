@@ -402,7 +402,7 @@ def test_resume_order_and_runtime_inventory_are_fail_closed(tmp_path: Path) -> N
     with pytest.raises(coord.CutoverError, match="must be a non-empty string"):
         coord.Coordinator(config, tmp_path / "state-2", RecordingRunner(config)).preflight()
 
-def test_generation_a_bridge_inventory_is_complete_and_retains_compatibility_resources() -> None:
+def test_final_source_inventory_removes_only_legacy_compatibility_resources() -> None:
     apply_text = (ROOT / "scripts/apply-prime-agent-plugin.sh").read_text()
     check_text = (ROOT / "scripts/check-prime-agent-plugin.sh").read_text()
     guide = (ROOT / "docs/lab-global-plugin.md").read_text()
@@ -420,15 +420,17 @@ def test_generation_a_bridge_inventory_is_complete_and_retains_compatibility_res
     for relative in bundle.EXPECTED_ABSENT:
         assert relative in apply_text and relative in check_text
         assert not (ROOT / "src/prime-agent-plugin" / relative).exists()
-    shim = ROOT / ".ralph/skills/oversee-episode/SKILL.md"
-    discovery = ROOT / ".agents/skills/oversee-episode"
-    profile = ROOT / ".prime/agent/profiles/expert-reviewer.md"
+    assert not (ROOT / ".ralph/skills/oversee-episode").exists()
+    assert not (ROOT / ".agents/skills/oversee-episode").exists()
+    assert not (ROOT / ".agents/skills/oversee-episode").is_symlink()
+    assert not (ROOT / ".prime/agent/profiles/expert-reviewer.md").exists()
+    assert not (ROOT / "src/prime-agent-plugin/APPEND_SYSTEM.md").exists()
+    assert not (ROOT / "scripts/manage-prime-agent-append-system.py").exists()
     reviewer = ROOT / "src/prime-agent-plugin/skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/reviewer.md"
-    assert shim.is_file() and "compatibility shim" in shim.read_text()
-    assert discovery.is_symlink() and discovery.resolve() == shim.parent.resolve()
-    assert profile.read_bytes() == reviewer.read_bytes()
-    assert (ROOT / "src/prime-agent-plugin/APPEND_SYSTEM.md").is_file()
-    assert (ROOT / "scripts/manage-prime-agent-append-system.py").is_file()
+    assert reviewer.is_file()
+    assert json.loads((ROOT / "src/prime-agent-plugin/role-protocol.json").read_text()) == {
+        "schemaVersion": 1, "generation": "final",
+    }
 
 def test_bundle_verify_rejects_unexpected_files_and_required_secret_patterns(tmp_path: Path) -> None:
     source = tmp_path / "source"; source.mkdir()

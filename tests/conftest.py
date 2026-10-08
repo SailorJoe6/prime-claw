@@ -649,6 +649,8 @@ def tier1_container(request):
             "set -euo pipefail; " + install
             + " && prime-agent --version"
             + " && python3 -m venv --without-pip /tmp/prime-claw-expert-preflight-venv"
+            + " && printf '%s\\n' '{\"schemaVersion\":1,\"generation\":\"bridge\"}' > /tmp/prime-claw-bridge.json"
+            + " && python3 /workspace/scripts/manage-prime-agent-role-protocol.py apply /tmp/prime-claw-bridge.json /workspace/src/prime-agent-plugin/ROLE_KERNEL.md /workspace/tests/fixtures/role-protocol-legacy-append.md $PRIME_AGENT_PLUGIN_ROOT"
             + " && /workspace/scripts/apply-prime-agent-plugin.sh"
             + " && /workspace/scripts/check-prime-agent-plugin.sh",
             timeout=600, workdir=None,

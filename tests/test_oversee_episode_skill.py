@@ -3,103 +3,11 @@ import re
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-SHIM = REPO / ".ralph/skills/oversee-episode/SKILL.md"
 GUIDE = REPO / "src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md"
 METADATA = REPO / "src/prime-agent-plugin/extension-support/conversation-guide-metadata.ts"
-PROFILE = REPO / ".prime/agent/profiles/expert-reviewer.md"
 DOC = REPO / "docs/conversation-driven-episode-oversight.md"
 FUTURE_DOC = REPO / "docs/future-specification-bundles.md"
 HANDOFF_DOC = REPO / "docs/handoff-chain.md"
-
-
-def _parse_profile(text: str):
-    lines = text.splitlines()
-    assert lines and lines[0] == "---"
-    assert "---" in lines[1:]
-    closing = lines.index("---", 1)
-    assert closing > 1
-    pairs = []
-    for line in lines[1:closing]:
-        assert line and not line.startswith((" ", "\t", "#"))
-        assert line.count(":") == 1
-        key, value = line.split(":", 1)
-        assert key in {"name", "model", "thinking"}
-        assert value.startswith(" ")
-        scalar = value.strip()
-        assert re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", scalar)
-        pairs.append((key, scalar))
-    assert len(pairs) == 3
-    assert len({key for key, _ in pairs}) == 3
-    fields = dict(pairs)
-    assert fields["name"] == "expert-reviewer"
-    body = "\n".join(lines[closing + 1 :]).strip()
-    assert body
-    return fields, body
-
-
-def _profile():
-    return _parse_profile(PROFILE.read_text())
-
-
-def test_expert_profile_selects_one_exact_model_and_reasoning_level():
-    fields, body = _profile()
-    assert fields == {
-        "name": "expert-reviewer",
-        "model": "openai-codex/gpt-6-astra",
-        "thinking": "max",
-    }
-    assert body
-
-
-def test_expert_profile_contract_rejects_ambiguous_or_open_configuration():
-    valid = PROFILE.read_text()
-    invalid = [
-        valid.replace("name: expert-reviewer", "name: other"),
-        valid.replace("model: openai-codex/gpt-6-astra", "model: unauthorized\nmodel: openai-codex/gpt-6-astra"),
-        valid.replace("name: expert-reviewer", "name: other\nname: expert-reviewer"),
-        valid.replace("thinking: max", "thinking: low\nthinking: max"),
-        valid.replace("thinking: max", "fallback: default\nthinking: max"),
-        valid.replace("name: expert-reviewer\n", ""),
-        valid.replace("model: openai-codex/gpt-6-astra\n", ""),
-        valid.replace("thinking: max", "thinking:"),
-        valid.replace("thinking: max", "thinking:\n  level: max"),
-        valid.replace("thinking: max", "thinking: [max]"),
-        valid.replace("thinking: max", "thinking: {level: max}"),
-        valid.replace("thinking: max", "thinking: |"),
-        valid.replace("thinking: max", "thinking: >"),
-        valid.replace("thinking: max", "thinking: &level max"),
-        valid.replace("---\n", " ---\n", 1),
-        valid.replace("---\n# EXPERT", "--- extra\n# EXPERT", 1),
-        "---\nname: expert-reviewer\nmodel: openai-codex/gpt-6-astra\nthinking: max\n---\n",
-    ]
-    for text in invalid:
-        try:
-            _parse_profile(text)
-        except AssertionError:
-            continue
-        raise AssertionError("invalid EXPERT profile was accepted")
-
-
-def test_expert_profile_is_read_only_and_makes_blocks_actionable():
-    _, body = _profile()
-    for phrase in [
-        "one exact pushed commit",
-        "independently and read-only",
-        "Do not edit or steer the subject",
-        "Return the result to the owning conversation",
-        "Return `PASS`",
-        "return `BLOCK`",
-        "violated invariant",
-        "root cause or failing lifecycle seam",
-        "recommended repair direction",
-        "approaches to avoid",
-        "positive, negative, failure, and replay tests",
-        "regression risks",
-        "repaired together",
-        "bounded alternatives",
-    ]:
-        assert phrase in body
-
 
 
 def test_managed_conversation_guide_is_lean_judgment_only():
@@ -141,23 +49,6 @@ def test_managed_conversation_guide_metadata_matches_exact_source_without_copyin
     assert "Choose exactly one disposition" not in metadata
 
 
-def test_project_oversee_entry_is_a_policy_free_compatibility_shim():
-    raw = SHIM.read_text()
-    text = " ".join(raw.split())
-    assert "compatibility shim" in text
-    assert "plugin-managed global `prime-claw-oversee-episode` skill" in text
-    assert "native activation and readiness tools" in text
-    for retired in [
-        "one owner-coordination message", "15-minute", "rlm.spawn",
-        "expert-reviewer.md", "handoff_spec_episode", "finalize_spec_episode",
-        "merge readiness", "technical failure",
-    ]:
-        assert retired not in raw
-    link = REPO / ".agents/skills/oversee-episode"
-    assert link.is_symlink()
-    assert link.resolve() == SHIM.parent.resolve()
-
-
 def test_current_docs_describe_managed_on_demand_guide_and_loaded_generation_boundary():
     text = " ".join(DOC.read_text().split())
     for phrase in [
@@ -165,10 +56,10 @@ def test_current_docs_describe_managed_on_demand_guide_and_loaded_generation_bou
         "plugin-managed global `prime-claw-oversee-episode` guide",
         "one intended tool-result continuation",
         "active-owner handoff and first finalization",
-        "project `oversee-episode` entry is a compatibility shim",
+        "There is no project forwarding skill, discovery link, or standalone reviewer profile",
         "current consumed prospective receipt",
-        "Loaded-generation compatibility reference (temporary)",
-        "one coordinated full restart",
+        "Historical loaded-generation evidence",
+        "managed global Conversation and EXPERT skills",
     ]:
         assert phrase in text
 

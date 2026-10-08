@@ -318,7 +318,7 @@ def test_container_installed_native_implement_runs_prep_then_one_authorized_foll
 ) -> None:
     """Exercise installed prep ordering and the one-agent_end approval bridge."""
     project = ctmp / "implement-prep-project"
-    for skill_name in ("implement-prep", "implement-spec", "oversee-episode"):
+    for skill_name in ("implement-prep", "implement-spec"):
         skill = project / ".ralph" / "skills" / skill_name / "SKILL.md"
         skill.parent.mkdir(parents=True, exist_ok=True)
         skill.write_text(tier1_container.read_repo(

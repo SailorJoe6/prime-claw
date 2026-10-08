@@ -33,6 +33,10 @@ FAKE_ROUTE = "active-episode"
 # container PATH; the repo is bind-mounted read-only at /workspace.
 PRIME = "prime-agent"
 WS_APPLY = "/workspace/scripts/apply-prime-agent-plugin.sh"
+WS_ROLE_MANAGER = "/workspace/scripts/manage-prime-agent-role-protocol.py"
+WS_BRIDGE_CONFIG = "/workspace/tests/fixtures/role-protocol-bridge.json"
+WS_ROLE_KERNEL = "/workspace/src/prime-agent-plugin/ROLE_KERNEL.md"
+WS_LEGACY_FIXTURE = "/workspace/tests/fixtures/role-protocol-legacy-append.md"
 
 
 def git(cwd, *args):
@@ -239,6 +243,17 @@ def run(tier1_container, args, env):
   if fake_socket is not None:env["PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET"]=fake_socket
   if fake_registry is not None:env["PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_REGISTRY_DIR"]=fake_registry
  return tier1_container.run(*args,env=env,timeout=60)
+
+
+def seed_bridge(tier1_container, agent):
+ """Create the isolated predecessor state required by final-mode apply."""
+ seeded = run(tier1_container, [
+  "python3", WS_ROLE_MANAGER, "apply", WS_BRIDGE_CONFIG,
+  WS_ROLE_KERNEL, WS_LEGACY_FIXTURE, str(agent),
+ ], {})
+ assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+
+
 def test_registered_cleanup_survives_intentional_post_creation_assertion(tmp_path):
     project = tmp_path / "cleanup-project"
     project.mkdir()
@@ -278,7 +293,7 @@ def test_registered_cleanup_survives_intentional_post_creation_assertion(tmp_pat
 
 
 def test_installed_lifecycle_classifier_blocks_corruption_before_provider_or_recovery(tier1_container, ctmp, request):
-    agent=ctmp/"agent";env={"PRIME_AGENT_PLUGIN_ROOT":str(agent)};ap=run(tier1_container,[WS_APPLY],env);assert ap.returncode==0,ap.stdout+ap.stderr
+    agent=ctmp/"agent";seed_bridge(tier1_container,agent);env={"PRIME_AGENT_PLUGIN_ROOT":str(agent)};ap=run(tier1_container,[WS_APPLY],env);assert ap.returncode==0,ap.stdout+ap.stderr
     sock=f"/tmp/pc-lifecycle-{os.getpid()}-{time.time_ns()}.sock";daemon=tier1_container.start_daemon(sock,FAKE_ROUTE,ctmp/"daemon-log");request.addfinalizer(daemon.close)
     setup=agent/"extensions/aaa-lifecycle-setup.ts"
     setup.write_text(r'''import{mkdirSync,writeFileSync,readdirSync,readFileSync}from"node:fs";import{join,dirname,basename,resolve}from"node:path";
@@ -318,7 +333,7 @@ def test_installed_discovery_real_implement_spec_activation_resume_and_absence(t
  # --session-dir stay on the same-path share (ctmp) for host-side reads.
  location=f".ralph/plans/future/native-{os.getpid()}-{time.time_ns()}"
  slug=location.rsplit("/",1)[1]
- agent=ctmp/"agent";env={"PRIME_AGENT_PLUGIN_ROOT":str(agent)};ap=run(tier1_container,[WS_APPLY],env);assert ap.returncode==0,ap.stdout+ap.stderr
+ agent=ctmp/"agent";seed_bridge(tier1_container,agent);env={"PRIME_AGENT_PLUGIN_ROOT":str(agent)};ap=run(tier1_container,[WS_APPLY],env);assert ap.returncode==0,ap.stdout+ap.stderr
  sock=f"/tmp/pc-daemon-{os.getpid()}-{time.time_ns()}.sock";daemon=tier1_container.start_daemon(sock,FAKE_ROUTE,ctmp/"daemon-log");request.addfinalizer(daemon.close)
  records=ctmp/"records.jsonl";probe=agent/"extensions/probe-provider.ts";provider(probe,records,location,sock)
  project=f"{croot}/project";tier1_container.mkdir_p(project);cgit(tier1_container,project,"init","-q");cgit(tier1_container,project,"config","user.email","poc@example.invalid");cgit(tier1_container,project,"config","user.name","POC")
@@ -412,7 +427,7 @@ def test_installed_inactive_generation_allows_later_cycle_and_is_inert(tier1_con
     # fixture). Records/transport/daemon logs and --session-dir stay on the
     # same-path share (ctmp) for host-side reads.
     location=f".ralph/plans/future/later-{os.getpid()}-{time.time_ns()}";slug=location.rsplit("/",1)[1]
-    agent=ctmp/"agent";env={"PRIME_AGENT_PLUGIN_ROOT":str(agent)};assert run(tier1_container,[WS_APPLY],env).returncode==0
+    agent=ctmp/"agent";seed_bridge(tier1_container,agent);env={"PRIME_AGENT_PLUGIN_ROOT":str(agent)};assert run(tier1_container,[WS_APPLY],env).returncode==0
     sock=f"/tmp/pc-daemon-{os.getpid()}-{time.time_ns()}.sock";daemon=tier1_container.start_daemon(sock,FAKE_ROUTE,ctmp/"daemon-log");records=ctmp/"records.jsonl"
     request.addfinalizer(daemon.close)
     # Provider creates beta, probes alpha's inert inactive bookkeeping during beta, then finishes.

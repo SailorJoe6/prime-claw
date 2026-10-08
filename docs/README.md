@@ -44,15 +44,15 @@ prime-claw builds on four prior projects. Read these before designing:
   walkthrough for reviewed future-folder authoring, native `/plan`, explicit
   `/implement-spec` promotion, unresolved admission handling, validation scope,
   and archived design provenance.
-- [lab-global-plugin.md](lab-global-plugin.md) — the bridge plugin layout,
-  selected-global-context ownership, receipt-driven recovery, staged deployment,
-  full-restart cutover, and rollback.
+- [lab-global-plugin.md](lab-global-plugin.md) — the final plugin layout,
+  selected-global-context ownership, exact legacy-region removal,
+  receipt-driven recovery, staged deployment, and rollback.
 - [conversation-driven-episode-oversight.md](conversation-driven-episode-oversight.md)
   — the lean managed session protocol, deterministic lifecycle mechanics,
-  historical-package filtering, and temporary loaded-generation compatibility.
+  historical-package filtering, and managed global role guides.
 - [goal-heartbeat-work-control.md](goal-heartbeat-work-control.md) — the
-  APPEND_SYSTEM-owned goal/heartbeat policy, retired-extension migration, and
-  coordinated activation boundary.
+  neutral-kernel/managed-guide work-control split, retired-extension migration,
+  and coordinated Gate B activation boundary.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)

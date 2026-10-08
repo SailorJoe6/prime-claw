@@ -9,7 +9,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 MANAGED_SOURCE = REPO / "src/prime-agent-plugin"
-KERNEL = MANAGED_SOURCE / "APPEND_SYSTEM.md"
+KERNEL = MANAGED_SOURCE / "ROLE_KERNEL.md"
+GUIDE = MANAGED_SOURCE / "skills/prime-claw-oversee-episode/SKILL.md"
 RETIRED = MANAGED_SOURCE / "extensions/goal-heartbeat-work-control.ts"
 OBSOLETE = MANAGED_SOURCE / "extensions/goal-blocker-control.ts"
 WS_NODE_SUITE = "/workspace/tests/managed_session_protocol.test.mjs"
@@ -36,22 +37,25 @@ def test_managed_session_protocol_node_suite(tier1_container) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_lean_append_system_owns_session_and_work_control_semantics() -> None:
-    source = " ".join(KERNEL.read_text().split())
-    required = (
-        "An independent top-level project session is a CONVERSATION",
-        "supervises it rather than doing its implementation",
-        "one reviewable vertical slice at a time",
-        "MUST use the canonical handoff protocol command",
-        "maintain a goal so interrupted work resumes",
-        "establish a heartbeat for that exact wait and complete the goal",
-        "When waiting for the user, complete the goal and create no heartbeat",
-        "When all work is complete, retain neither",
-    )
-    for phrase in required:
-        assert phrase in source
-    assert len(source.split()) <= 250
-
+def test_final_protocol_separates_neutral_kernel_from_managed_guidance() -> None:
+    kernel = " ".join(KERNEL.read_text().split())
+    guide = " ".join(GUIDE.read_text().split())
+    for phrase in (
+        "CONVERSATION supervises",
+        "EPISODE implements",
+        "EXPERT reviews",
+        "Product, scope, merge, abandonment, and destructive cleanup remain operator decisions",
+    ):
+        assert phrase in kernel
+    for phrase in (
+        "one reported vertical slice at a time",
+        "canonical handoff",
+        "bounded goal",
+        "one exact heartbeat",
+        "operator alone decides scope",
+    ):
+        assert phrase in guide
+    assert not (MANAGED_SOURCE / "APPEND_SYSTEM.md").exists()
 
 def test_managed_plugin_has_eleven_typescript_files_and_no_retired_work_control_transport() -> None:
     actual = {

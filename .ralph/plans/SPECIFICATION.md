@@ -1118,3 +1118,19 @@ defenses. Retain expected-file comparisons, managed package hash/import
 validation, role generation and lock checks, and ordinary safety checks. Do not
 start Slice 6, apply final mode to the host, run Gate B, finalize, or physically
 clean up resources in this slice.
+
+## Slice 5 acceptance and bounded Slice 6 authority
+
+The owner accepted exact Slice 5 candidate
+`98ed8d14e028622d07a120fbd4af730bd4171e38`, tree
+`2b83d87a5adfab4c3f6e274b3149df54c588631e`, after verifying its exact diff,
+clean synchronized push state, retained log hashes, complete Docker/Tier 0/probe
+evidence, and independent PASS. That candidate and its evidence are the accepted
+Slice 6 baseline.
+
+Advance only Slice 6 as already specified: perform the fresh foreign-consumer
+audit, remove the remaining legacy compatibility resources, and reconcile the
+final source tree as one minimal reviewable vertical slice. Do not add replacement
+frameworks, generalized integrity machinery, or new defensive scope. Do not
+apply final mode to the host, run Gate B, begin Slice 7 freeze/review work,
+archive or finalize the episode, merge, or physically clean up resources.

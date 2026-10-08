@@ -100,6 +100,8 @@ export function assertIdentityKernel(ctx: ExtensionContext): void {
   const sentinelCount = literalCount(prompt, IDENTITY_KERNEL);
   const markerLikeCount = (prompt.match(/prime-claw:role-kernel/gi) ?? []).length;
   const sentinelLikeCount = (prompt.match(/PRIME_CLAW_ROLE_KERNEL_[A-Z0-9_-]*/g) ?? []).length;
+  const legacyMarkerLikeCount = (prompt.match(/prime-claw:conversation-identity/gi) ?? []).length;
+  const legacySentinelLikeCount = (prompt.match(/PRIME_CLAW_CONVERSATION_IDENTITY_[A-Z0-9_-]*/g) ?? []).length;
   const start = prompt.indexOf(IDENTITY_BLOCK_START);
   const end = prompt.indexOf(IDENTITY_BLOCK_END);
   const exact = start >= 0 && end > start
@@ -107,6 +109,7 @@ export function assertIdentityKernel(ctx: ExtensionContext): void {
     : "";
   if (startCount !== 1 || endCount !== 1 || sentinelCount !== 1
     || markerLikeCount !== 2 || sentinelLikeCount !== 1
+    || legacyMarkerLikeCount !== 0 || legacySentinelLikeCount !== 0
     || exact !== EXPECTED_IDENTITY_KERNEL_BLOCK) {
     throw new Error(
       `expected exactly one exact managed role kernel; found start=${startCount}, end=${endCount}, sentinel=${sentinelCount}`,

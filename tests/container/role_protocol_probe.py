@@ -15,8 +15,12 @@ import sys
 import threading
 import time
 
-MANAGER, CONFIG, KERNEL, LEGACY, WORK, SCENARIO = sys.argv[1:]
+MANAGER, SOURCE_CONFIG, KERNEL, LEGACY, WORK, SCENARIO = sys.argv[1:]
 WORK = Path(WORK)
+WORK.mkdir(parents=True, exist_ok=True)
+BRIDGE_CONFIG = WORK / "role-protocol-bridge.json"
+BRIDGE_CONFIG.write_text(json.dumps({"schemaVersion": 1, "generation": "bridge"}))
+CONFIG = str(BRIDGE_CONFIG)
 KERNEL_BYTES = Path(KERNEL).read_bytes().rstrip(b"\n")
 LEGACY_BYTES = Path(LEGACY).read_bytes().rstrip(b"\n")
 START = b"<!-- prime-claw:role-kernel:start -->"
@@ -25,7 +29,7 @@ LEGACY_START = b"<!-- prime-claw:conversation-identity:start -->"
 LEGACY_END = b"<!-- prime-claw:conversation-identity:end -->"
 
 
-def run(mode, root, *extra, ok=True, config=CONFIG):
+def run(mode, root, *extra, ok=True, config=CONFIG, legacy=LEGACY):
     if mode == "restore":
         argv = [sys.executable, MANAGER, "restore", str(extra[0]), str(root)]
     else:
@@ -35,7 +39,7 @@ def run(mode, root, *extra, ok=True, config=CONFIG):
             mode,
             config,
             KERNEL,
-            LEGACY,
+            legacy,
             str(root),
             *map(str, extra),
         ]
@@ -570,7 +574,9 @@ def scenario_final_removal():
         receipt = WORK / f"final-owned-{index}-receipt.json"
         receipt.unlink(missing_ok=True)
 
-        run("apply", root, "--receipt", receipt, config=final_config)
+        final_legacy = WORK / "removed-legacy-source.md"
+        final_legacy.unlink(missing_ok=True)
+        run("apply", root, "--receipt", receipt, config=final_config, legacy=final_legacy)
         assert append.read_bytes() == original
         assert LEGACY_START not in append.read_bytes()
         assert context.read_bytes() == bridge_context
@@ -586,7 +592,7 @@ def scenario_final_removal():
         manifest = json.loads((root / ".prime-claw/role-protocol-state.json").read_text())
         assert manifest["generation"] == "final"
         assert json.loads(receipt.read_text())["generation"] == "final"
-        run("check", root, config=final_config)
+        run("check", root, config=final_config, legacy=final_legacy)
         if index == 0:
             tampered = json.loads(receipt.read_text())
             manifest_preimage = tampered["files"][2]["preimage"]
@@ -679,19 +685,15 @@ def scenario_final_removal():
     source_drift_before = snap(source_drift)
     module = load_manager()
     changed_kernel = KERNEL_BYTES.replace(b"Prime Claw", b"Prime claw", 1)
-    changed_legacy = LEGACY_BYTES.replace(b"CONVERSATION", b"Conversation", 1)
-    assert changed_kernel != KERNEL_BYTES and changed_legacy != LEGACY_BYTES
-    for kernel, legacy, diagnostic in (
-        (changed_kernel, LEGACY_BYTES, "role kernel"),
-        (KERNEL_BYTES, changed_legacy, "legacy block source"),
-    ):
-        try:
-            module.prepare_apply(source_drift, kernel, legacy, "final")
-        except ValueError as error:
-            assert diagnostic in str(error)
-        else:
-            raise AssertionError("final removal unexpectedly accepted source drift")
-        assert snap(source_drift) == source_drift_before
+    assert changed_kernel != KERNEL_BYTES
+    try:
+        module.prepare_apply(source_drift, changed_kernel, None, "final")
+    except ValueError as error:
+        assert "role kernel" in str(error)
+    else:
+        raise AssertionError("final removal unexpectedly accepted source drift")
+    module.prepare_apply(source_drift, KERNEL_BYTES, None, "final")
+    assert snap(source_drift) == source_drift_before
 
     unowned = clean("final-unowned")
     (unowned / "APPEND_SYSTEM.md").write_bytes(b"operator append\n")

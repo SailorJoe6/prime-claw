@@ -17,17 +17,14 @@ const expected = [
   "extension-support/spec-episode.ts",
 ];
 
-test("managed APPEND_SYSTEM owns the lean session and work-control protocol", () => {
-  const source = readFileSync(join(managed, "APPEND_SYSTEM.md"), "utf8").trim().split(/\s+/).join(" ");
-  for (const phrase of [
-    "one reviewable vertical slice at a time",
-    "MUST use the canonical handoff protocol command",
-    "maintain a goal so interrupted work resumes",
-    "establish a heartbeat for that exact wait and complete the goal",
-    "When waiting for the user, complete the goal and create no heartbeat",
-    "When all work is complete, retain neither",
-  ]) assert.match(source, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.ok(source.split(" ").length <= 250);
+test("final protocol separates the neutral kernel from managed guidance", () => {
+  const kernel = readFileSync(join(managed, "ROLE_KERNEL.md"), "utf8").trim().split(/\s+/).join(" ");
+  const guide = readFileSync(join(managed, "skills/prime-claw-oversee-episode/SKILL.md"), "utf8").trim().split(/\s+/).join(" ");
+  for (const phrase of ["CONVERSATION supervises", "EPISODE implements", "EXPERT reviews"])
+    assert.match(kernel, new RegExp(phrase));
+  for (const phrase of ["one reported vertical slice at a time", "canonical handoff", "bounded goal", "one exact heartbeat"])
+    assert.match(guide, new RegExp(phrase));
+  assert.equal(existsSync(join(managed, "APPEND_SYSTEM.md")), false);
 });
 
 test("managed plugin is the eight-file generation without retired transports", () => {

@@ -170,8 +170,10 @@ as the sole `followUp`, with the same validated location envelope.
 and one best-effort focused compaction request. It cannot cancel or reconstruct
 the independently queued phase workflow. Canonical `implement-spec` runs
 `prepare`, performs the authoritative semantic readiness review, and either
-explains every deficiency without a tool call or calls `create_spec_episode`
-exactly once.
+explains every deficiency without a tool call or activates and consumes the
+managed prospective Conversation guide for that exact folder before calling
+`create_spec_episode` exactly once. A read-only guide status check may prove
+readiness; it cannot arm or replay readiness.
 
 Approval is recorded only after both messages are admitted, bound to the exact
 session and location, and carries one non-accumulating `agent_end` skip. The prep

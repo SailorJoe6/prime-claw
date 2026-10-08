@@ -27,10 +27,10 @@ SOURCE = REPO / "src" / "prime-agent-plugin"
 # Container paths (repo bind-mounted read-only at /workspace).
 WS_APPLY = "/workspace/scripts/apply-prime-agent-plugin.sh"
 WS_CHECK = "/workspace/scripts/check-prime-agent-plugin.sh"
-WS_MANAGER = "/workspace/scripts/manage-prime-agent-append-system.py"
-WS_APPEND_SOURCE = "/workspace/src/prime-agent-plugin/APPEND_SYSTEM.md"
-WS_SIGTERM_PROBE = "/workspace/tests/container/sigterm_orphan_probe.py"
-WS_CONCURRENT_PROBE = "/workspace/tests/container/concurrent_apply_probe.py"
+WS_ROLE_MANAGER = "/workspace/scripts/manage-prime-agent-role-protocol.py"
+WS_BRIDGE_CONFIG = "/workspace/tests/fixtures/role-protocol-bridge.json"
+WS_ROLE_KERNEL = "/workspace/src/prime-agent-plugin/ROLE_KERNEL.md"
+WS_LEGACY_FIXTURE = "/workspace/tests/fixtures/role-protocol-legacy-append.md"
 # The image's default PATH (Ubuntu base); tests that shadow a tool prepend
 # their fake bin dir to this.
 CONTAINER_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -71,7 +71,9 @@ def test_source_is_outside_project_extension_discovery() -> None:
     assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("SKILL.md")} == set(SKILL_FILES)
 
 
-def _run_script(tier1_container, script: str, destination: Path, *, env=None):
+def _run_script(
+    tier1_container, script: str, destination: Path, *, env=None, seed_bridge=False
+):
     """Run an install script on native Linux storage, mirroring test state.
 
     Docker Desktop bind mounts can asynchronously remap inode and uid metadata
@@ -90,6 +92,13 @@ def _run_script(tier1_container, script: str, destination: Path, *, env=None):
         timeout=60,
     )
     assert staged.returncode == 0, staged.stdout + staged.stderr
+    if seed_bridge:
+        seeded = tier1_container.run(
+            "python3", WS_ROLE_MANAGER, "apply", WS_BRIDGE_CONFIG,
+            WS_ROLE_KERNEL, WS_LEGACY_FIXTURE, native,
+            workdir=None, timeout=60,
+        )
+        assert seeded.returncode == 0, seeded.stdout + seeded.stderr
     script_env = {
         "PRIME_AGENT_PLUGIN_ROOT": native,
         "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV,
@@ -113,14 +122,6 @@ def _run_script(tier1_container, script: str, destination: Path, *, env=None):
     )
     assert mirrored.returncode == 0, mirrored.stdout + mirrored.stderr
     return result
-
-
-def _run_manager(tier1_container, mode: str, destination: Path):
-    return tier1_container.run(
-        "python3", WS_MANAGER, mode, WS_APPEND_SOURCE, str(destination),
-        workdir=None,
-        timeout=60,
-    )
 
 
 def _tree_snapshot(root: Path) -> dict[str, bytes]:
@@ -167,11 +168,9 @@ def _create_primary_fixture(tier1_container, base: str):
     return tier1_container.run(
         "bash", "-lc",
         "set -euo pipefail; "
-        'mkdir -p "$1/primary/.ralph/skills"; '
+        'mkdir -p "$1/primary"; '
         'cp -a /workspace/scripts "$1/primary/"; '
         'cp -a /workspace/src "$1/primary/"; '
-        'cp -a /workspace/.ralph/skills/oversee-episode '
-        '"$1/primary/.ralph/skills/"; '
         'git -C "$1/primary" init -q -b main; '
         'git -C "$1/primary" config user.name "Tier One"; '
         'git -C "$1/primary" config user.email tier1@example.invalid; '
@@ -196,6 +195,12 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
         "HOME": home,
         "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV,
     }
+    seeded = tier1_container.run(
+        "python3", WS_ROLE_MANAGER, "apply", WS_BRIDGE_CONFIG,
+        WS_ROLE_KERNEL, WS_LEGACY_FIXTURE, f"{home}/.prime/agent",
+        workdir=None, timeout=60,
+    )
+    assert seeded.returncode == 0, seeded.stdout + seeded.stderr
     applied = tier1_container.run(
         apply, "--user-global", env=runtime_env, workdir=None, timeout=60,
     )
@@ -257,6 +262,12 @@ def test_linked_worktree_cannot_activate_shared_generation_and_isolated_works(
     assert after.stdout == before.stdout
 
     isolated = f"{base}/isolated-agent"
+    seeded = tier1_container.run(
+        "python3", WS_ROLE_MANAGER, "apply", WS_BRIDGE_CONFIG,
+        WS_ROLE_KERNEL, WS_LEGACY_FIXTURE, isolated,
+        workdir=None, timeout=60,
+    )
+    assert seeded.returncode == 0, seeded.stdout + seeded.stderr
     applied = tier1_container.run(
         f"{base}/candidate/scripts/apply-prime-agent-plugin.sh",
         env={
@@ -292,20 +303,20 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     destination = ctmp / "agent"
     destination.mkdir(parents=True)
     (destination / "APPEND_SYSTEM.md").write_text("unrelated user append\n")
-    applied = _run_script(tier1_container, WS_APPLY, destination)
+    applied = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
     assert applied.returncode == 0, applied.stdout + applied.stderr
     assert "selected copy is current" in applied.stdout
     for relative in (*FILES, *MANAGED_SKILL_FILES):
         expected = tier1_container.read_repo(f"src/prime-agent-plugin/{relative}")
         assert (destination / relative).read_text() == expected, relative
     append = (destination / "APPEND_SYSTEM.md").read_text()
-    assert "unrelated user append" in append
-    assert append.count("PRIME_CLAW_CONVERSATION_IDENTITY_V1") == 1
+    assert append == "unrelated user append\n"
+    assert "PRIME_CLAW_CONVERSATION_IDENTITY_V1" not in append
     context = (destination / "AGENTS.md").read_bytes()
     kernel = (SOURCE / "ROLE_KERNEL.md").read_bytes()
     assert context == kernel
     manifest = json.loads((destination / ".prime-claw/role-protocol-state.json").read_text())
-    assert manifest["generation"] == "bridge"
+    assert manifest["generation"] == "final"
     assert manifest["selectedContext"]["path"] == "AGENTS.md"
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode == 0, checked.stdout + checked.stderr
@@ -318,6 +329,11 @@ def test_apply_can_write_an_external_role_receipt_for_cutover_recovery(tier1_con
     receipt = f"{base}/private/live-role-receipt.json"
     prepared = tier1_container.run("bash", "-lc", 'mkdir -p -- "$1"; chmod 700 "$1"', "prepare", f"{base}/private", workdir=None)
     assert prepared.returncode == 0, prepared.stdout + prepared.stderr
+    seeded = tier1_container.run(
+        "python3", WS_ROLE_MANAGER, "apply", WS_BRIDGE_CONFIG,
+        WS_ROLE_KERNEL, WS_LEGACY_FIXTURE, root, workdir=None, timeout=60,
+    )
+    assert seeded.returncode == 0, seeded.stdout + seeded.stderr
     applied = tier1_container.run(
         WS_APPLY, "--role-receipt", receipt,
         env={"PRIME_AGENT_PLUGIN_ROOT": root, "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV},
@@ -340,7 +356,7 @@ def test_apply_is_convergent_and_preserves_unrelated_files(tier1_container, ctmp
     unrelated = destination / "extensions" / "unrelated.ts"
     unrelated.parent.mkdir(parents=True)
     unrelated.write_bytes(b"preserve me exactly\n")
-    first = _run_script(tier1_container, WS_APPLY, destination)
+    first = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
     assert first.returncode == 0, first.stdout + first.stderr
     snapshot = {
         relative: (destination / relative).read_bytes()
@@ -374,14 +390,16 @@ def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container,
         "check-prime-agent-plugin.sh",
         "generate-prime-agent-role-kernel.py",
         "check-prime-agent-expert-runtime.py",
-        "manage-prime-agent-append-system.py",
         "manage-prime-agent-role-protocol.py",
         "prime-agent-plugin-target.sh",
     ):
         shutil.copy2(REPO / "scripts" / name, scripts / name)
     assert not (fixture / ".ralph/skills/oversee-episode/SKILL.md").exists()
     destination = ctmp / "agent-without-skill"
-    applied = _run_script(tier1_container, str(scripts / "apply-prime-agent-plugin.sh"), destination)
+    applied = _run_script(
+        tier1_container, str(scripts / "apply-prime-agent-plugin.sh"), destination,
+        seed_bridge=True,
+    )
     checked = _run_script(tier1_container, str(scripts / "check-prime-agent-plugin.sh"), destination)
     assert applied.returncode == 0, applied.stdout + applied.stderr
     assert checked.returncode == 0, checked.stdout + checked.stderr
@@ -412,7 +430,7 @@ def test_apply_removes_and_check_rejects_obsolete_managed_files(
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode != 0
     assert diagnostic in checked.stderr
-    applied = _run_script(tier1_container, WS_APPLY, destination)
+    applied = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
     assert applied.returncode == 0, applied.stdout + applied.stderr
     assert not obsolete.exists()
     assert unrelated.read_text() == "preserve me\n"
@@ -497,7 +515,7 @@ def test_apply_and_check_reject_symlinked_managed_directories_before_mutation(
 
 def test_check_rejects_stale_managed_conversation_skill(tier1_container, ctmp) -> None:
     destination = ctmp / "agent"
-    applied = _run_script(tier1_container, WS_APPLY, destination)
+    applied = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
     assert applied.returncode == 0, applied.stdout + applied.stderr
     skill = destination / SKILL_FILES[0]
     skill.write_text("stale guide\n")
@@ -508,7 +526,7 @@ def test_check_rejects_stale_managed_conversation_skill(tier1_container, ctmp) -
 
 def test_check_rejects_a_stale_global_file(tier1_container, ctmp) -> None:
     destination = ctmp / "agent"
-    applied = _run_script(tier1_container, WS_APPLY, destination)
+    applied = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
     assert applied.returncode == 0, applied.stdout + applied.stderr
     stale = destination / FILES[0]
     stale.write_text("stale generation\n")
@@ -517,28 +535,33 @@ def test_check_rejects_a_stale_global_file(tier1_container, ctmp) -> None:
     assert "stale installed plugin file" in checked.stderr
 
 
-def test_check_rejects_missing_or_stale_identity_block(tier1_container, ctmp) -> None:
+def test_check_rejects_reappeared_legacy_identity_block(tier1_container, ctmp) -> None:
     destination = ctmp / "agent"
-    applied = _run_script(tier1_container, WS_APPLY, destination)
+    applied = _run_script(
+        tier1_container, WS_APPLY, destination, seed_bridge=True
+    )
     assert applied.returncode == 0, applied.stdout + applied.stderr
     append = destination / "APPEND_SYSTEM.md"
-    append.write_text("unrelated only\n")
+    append.write_text(tier1_container.read_repo(
+        "tests/fixtures/role-protocol-legacy-append.md"
+    ))
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode != 0
-    assert "missing or stale managed legacy APPEND block" in checked.stderr
+    assert "managed legacy APPEND block remains" in checked.stderr
 
 
-def test_apply_rejects_duplicate_managed_blocks_before_copying(
+
+def test_final_apply_rejects_an_unowned_destination_before_copying(
     tier1_container, ctmp,
 ) -> None:
     destination = ctmp / "agent"
     destination.mkdir(parents=True)
-    block = tier1_container.read_repo("src/prime-agent-plugin/APPEND_SYSTEM.md")
-    (destination / "APPEND_SYSTEM.md").write_text(block + "\n" + block)
+    (destination / "APPEND_SYSTEM.md").write_text("unrelated operator append\n")
     applied = _run_script(tier1_container, WS_APPLY, destination)
     assert applied.returncode != 0
-    assert "duplicate managed markers" in applied.stderr
+    assert "owned bridge manifest" in applied.stderr
     assert not (destination / FILES[0]).exists()
+
 
 
 @pytest.mark.parametrize("unsafe_kind", ["directory", "symlink"])
@@ -598,6 +621,7 @@ def test_interrupted_sequential_install_is_not_atomic_and_check_detects_generati
         tier1_container,
         WS_APPLY,
         destination,
+        seed_bridge=True,
         env={
             "INSTALL_COUNTER": str(counter),
             "PATH": str(tools) + ":" + CONTAINER_PATH,
@@ -613,111 +637,9 @@ def test_interrupted_sequential_install_is_not_atomic_and_check_detects_generati
     assert "missing installed plugin file" in checked.stderr
 
 
-def test_managed_append_is_byte_stable_and_preserves_unmanaged_bytes_and_mode(
-    tier1_container, ctmp,
-) -> None:
-    destination = ctmp / "APPEND_SYSTEM.md"
-    sentinel = b"prefix\x00\xff  \n"
-    destination.write_bytes(sentinel)
-    destination.chmod(0o640)
-    first = _run_manager(tier1_container, "apply", destination)
-    assert first.returncode == 0, first.stderr
-    installed = destination.read_bytes()
-    assert installed.startswith(sentinel)
-    assert destination.stat().st_mode & 0o777 == 0o640
-    second = _run_manager(tier1_container, "apply", destination)
-    assert second.returncode == 0, second.stderr
-    assert destination.read_bytes() == installed
-    checked = _run_manager(tier1_container, "check", destination)
-    assert checked.returncode == 0, checked.stderr
-    assert list(destination.parent.glob(".*.tmp")) == []
-
-
-def test_manager_rejects_every_malformed_marker_shape_without_mutation(
-    tier1_container, ctmp,
-) -> None:
-    source_block = tier1_container.read_repo(
-        "src/prime-agent-plugin/APPEND_SYSTEM.md"
-    ).encode().strip()
-    start = b"<!-- prime-claw:conversation-identity:start -->"
-    end = b"<!-- prime-claw:conversation-identity:end -->"
-    malformed = {
-        "start-only": b"sentinel\n" + start,
-        "end-only": b"sentinel\n" + end,
-        "reversed": b"sentinel\n" + end + b"\n" + start,
-        "duplicate": source_block + b"\n" + source_block,
-        "overlap": start + b"\n" + start + b"\n" + end + b"\n" + end,
-    }
-    for label, original in malformed.items():
-        case = ctmp / label
-        case.mkdir()
-        destination = case / "APPEND_SYSTEM.md"
-        destination.write_bytes(original)
-        applied = _run_manager(tier1_container, "apply", destination)
-        assert applied.returncode != 0, label
-        assert destination.read_bytes() == original, label
-
-
-def test_manager_rejects_destination_symlink_without_mutating_target(
-    tier1_container, ctmp,
-) -> None:
-    target = ctmp / "target.md"
-    sentinel = b"do not modify\n"
-    target.write_bytes(sentinel)
-    destination = ctmp / "APPEND_SYSTEM.md"
-    destination.symlink_to(target)
-    applied = _run_manager(tier1_container, "apply", destination)
-    assert applied.returncode != 0
-    assert "destination symlink" in applied.stderr
-    assert destination.is_symlink()
-    assert target.read_bytes() == sentinel
-
-
-def test_manager_rejects_symlink_parent_without_creating_destination(
-    tier1_container, ctmp,
-) -> None:
-    real_parent = ctmp / "real-agent"
-    real_parent.mkdir()
-    linked_parent = ctmp / "linked-agent"
-    linked_parent.symlink_to(real_parent, target_is_directory=True)
-    destination = linked_parent / "APPEND_SYSTEM.md"
-    applied = _run_manager(tier1_container, "apply", destination)
-    assert applied.returncode != 0
-    assert "parent symlink" in applied.stderr
-    assert not (real_parent / "APPEND_SYSTEM.md").exists()
-
-
-def test_sigterm_orphan_is_reconciled_on_retry_without_deleting_live_writer_temp(
-    tier1_container,
-) -> None:
-    """Runs as a self-verifying in-container runner (see module docstring)."""
-    workdir = f"/tmp/pc-sigterm-{time.time_ns()}"
-    result = tier1_container.run(
-        "python3", WS_SIGTERM_PROBE, WS_MANAGER, WS_APPEND_SOURCE, workdir,
-        workdir=None, timeout=120,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    verdict = json.loads(result.stdout.strip().splitlines()[-1])
-    assert verdict == {"ok": True, "orphan_reconciled": True,
-                       "decoys_preserved": True}
-
-
-def test_concurrent_apply_serializes_before_read_and_preserves_sentinel(
-    tier1_container,
-) -> None:
-    """Runs as a self-verifying in-container runner (see module docstring)."""
-    workdir = f"/tmp/pc-concurrent-{time.time_ns()}"
-    result = tier1_container.run(
-        "python3", WS_CONCURRENT_PROBE, WS_MANAGER, WS_APPEND_SOURCE, workdir,
-        workdir=None, timeout=120,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    verdict = json.loads(result.stdout.strip().splitlines()[-1])
-    assert verdict == {"ok": True, "contenders": 4}
-
 def test_check_rejects_stale_managed_expert_package_file(tier1_container, ctmp) -> None:
     destination = ctmp / "agent"
-    applied = _run_script(tier1_container, WS_APPLY, destination)
+    applied = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
     assert applied.returncode == 0, applied.stdout + applied.stderr
     package = destination / EXPERT_FILES[1]
     package.write_text(package.read_text() + "\n# stale installed package\n")

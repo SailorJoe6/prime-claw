@@ -1,18 +1,17 @@
 # Goal and heartbeat work control
 
-During the bridge generation, Prime Claw's retained
-`src/prime-agent-plugin/APPEND_SYSTEM.md` block continues to provide the
-model-facing goal and heartbeat rules. The separately installed neutral role
-kernel carries no detailed work-control procedure. Ralph `/execute` applies the
-existing generic rules while implementing plans; it does not install a second
-policy.
+Prime Claw's selected global role kernel provides only neutral role and authority
+invariants. The managed global Conversation guide provides the detailed
+model-facing goal and heartbeat judgment on demand. No project APPEND source or
+second work-control policy remains. Ralph `/execute` applies the same generic
+rules while implementing plans.
 
 ## Supported runtime boundary
 
-The APPEND bridge remains installed and byte-checked by the role-protocol
-manager. Managed owner and EPISODE provider calls are independently guarded by
-the exact generated neutral role kernel in the selected global context. There is
-no separate `before_agent_start` overlay, capability gate,
+The final role-protocol manager requires the recorded legacy APPEND region to be
+absent. Managed owner and EPISODE provider calls are guarded by the exact
+generated neutral role kernel in the selected global context. There is no
+separate `before_agent_start` overlay, capability gate,
 `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block, tool, message, or autonomous
 slash-command transport.
 
@@ -59,38 +58,38 @@ retired managed destinations:
 - check rejects any surviving stale or unsafe copy; and
 - unrelated installed extensions and unmanaged APPEND_SYSTEM bytes are preserved.
 
-The installer no longer reads or validates the project-local `oversee-episode`
-skill. That skill, its discovery link, and its reviewer profile remain temporary
-loaded-generation compatibility resources until accepted cutover evidence.
+The project-local `oversee-episode` skill, its discovery link, the standalone
+reviewer profile, the legacy APPEND source, and the append-only manager are
+absent. The managed global Conversation and EXPERT skills are the only current
+judgment and reviewer authorities.
 
-Apply/check are safe to test under an explicitly isolated
-`PRIME_AGENT_PLUGIN_ROOT`; all Prime Agent/plugin execution remains Docker tier
-1. Bare commands fail closed. Only an accepted deployment checkpoint may be
-installed user-globally, from the primary `main` checkout with explicit
-`--user-global`:
-
-```sh
-scripts/apply-prime-agent-plugin.sh --user-global
-scripts/check-prime-agent-plugin.sh --user-global
-```
-
-`--user-global` is refused from linked worktrees.
+Final apply/check intentionally require exact owned bridge state; they are not a
+fresh-root diagnostic. Docker Tier 1 seeds that historical predecessor state in
+an isolated container before testing the transition. Bare commands fail closed.
+Do not invoke user-global apply/check directly.
 
 Installation is not activation. `/reload`, elapsed time, copy success, a fresh
 process, or container evidence alone cannot prove the loaded generation changed.
-Quiesce active work, perform one coordinated full Prime Agent daemon/harness
-restart, and resume the exact owner, exact episode, and preidentified ordinary
-project conversation. The operator accepts that UAT before compatibility
-cleanup. On failure, retain or restore compatibility resources, reapply the
-known-good plugin generation, and repeat the same full-restart discipline. Saved
+After the exact final candidate is accepted and Gate B is separately authorized,
+launch the bounded cutover coordinator once from a separate terminal with the
+verified private accepted-bridge bundle, exact operation input, private state
+directory, and full accepted-commit authorization. It proves quiescence,
+fast-forwards primary `main`, runs guarded user-global apply/check, retains the
+installation receipt, performs one full restart, and emits the exact
+owner/episode/ordinary resume checklist.
+
+On failure, follow the coordinator's last proven checkpoint. Restore exact bridge
+preimages from the verified private bundle or installation receipt and repeat the
+full quiesce/restart discipline only under renewed operator authority. Never retry
+an uncertain coordinator result or improvise direct host apply/check. Saved
 sessions are resumed, never deleted.
 
 ## Automated evidence
 
 Coverage proves:
 
-- the managed block contains the required goal/heartbeat rules and stays within
-  its 250-word bound;
+- the neutral kernel and managed Conversation guide contain their separated
+  invariant and goal/heartbeat contracts;
 - the managed plugin has exactly eleven TypeScript files and no retired source,
   overlay sentinel, pause/resume tool, or autonomous slash-command transport;
 - installer migration removes a stale regular retired entry, rejects unsafe

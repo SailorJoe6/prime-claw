@@ -11,8 +11,8 @@ The canonical neutral floor is `src/prime-agent-plugin/ROLE_KERNEL.md`, with
 byte-identical generated TypeScript in
 `extension-support/role-kernel.generated.ts`. The role-protocol manager installs
 that exact `PRIME_CLAW_ROLE_KERNEL_V1` block into the one selected user-global
-AGENTS/CLAUDE context. During the bridge generation it also retains the legacy
-`APPEND_SYSTEM.md` block without treating it as role authority.
+AGENTS/CLAUDE context. The final generation requires the previously owned legacy
+APPEND region to be absent and never treats it as role authority.
 
 Bare apply/check fail closed, linked worktrees cannot select user-global mode,
 and pre-merge execution stays inside Docker tier 1. A truly inactive ordinary
@@ -128,30 +128,20 @@ Ordinary no-context sessions continue without managed authority.
 ## Lean model-facing protocol
 
 The selected global role kernel is the current neutral invariant floor. Detailed
-Conversation judgment is progressively disclosed from the exact managed guide,
-not copied into the kernel or extension. The project `oversee-episode` entry is
-a compatibility shim with no supervision or EXPERT policy; its existing discovery
-symlink remains valid. Reports are evidence, never approval or native-command
-dispatch. Deterministic plugin code owns identity, receipt validation, lifecycle,
-admission, handoff, and idempotent bookkeeping. The model chooses only among the
-bounded oversight dispositions described by the activated guide.
+Conversation judgment is progressively disclosed from the exact managed global
+guide, not copied into the kernel or extension. There is no project forwarding
+skill, discovery link, or standalone reviewer profile. Reports are evidence,
+never approval or native-command dispatch. Deterministic plugin code owns
+identity, receipt validation, lifecycle, admission, handoff, and idempotent
+bookkeeping. The model chooses only among the bounded oversight dispositions
+described by the activated guide.
 
-## Loaded-generation compatibility reference (temporary)
+## Historical loaded-generation evidence
 
-The accepted predecessor generation may remain loaded until Gate A. Its detailed
-project skill and standalone EXPERT profile are migration evidence, not authority
-for the new generation. The source-tree project skill is now only the forwarding
-shim, while the discovery symlink is retained. The external cutover coordinator
-must quiesce every old client before this candidate reaches `main`, install the
-managed global guide, and start one new runtime; no loaded old process may reread
-the shim during that gap.
-
-Keep the standalone profile and historical records until one coordinated full
-restart plus resumed owner, episode, and designated ordinary-conversation UAT is
-accepted. A failed cutover restores the known-good installed generation and all
-required compatibility resources. The following chronology documents the old
-loaded generation and is retained as migration evidence, not current activation
-policy.
+The following chronology records the retired loaded generation and migration
+work. It is historical evidence, not current activation policy. Current source
+and installation use only the neutral global context plus the managed global
+Conversation and EXPERT skills.
 
 ### Completed dogfood evidence
 
@@ -299,11 +289,10 @@ before `CANCELLED`. Explicit purge accepts only the exact durably recorded
 record. Conflicting phases or roster identity fail closed. Every terminal phase
 keeps a still-running designated child neutral and aborts provider use.
 
-The first project policy lives at `.prime/agent/profiles/expert-reviewer.md` as
-byte-identical migration evidence. The Markdown body defines the independent,
-read-only exact-commit role and actionable `BLOCK` contract. This is
-project/operator configuration, not a portable claim that one model is always
-best.
+The managed global EXPERT package's `reviewer.md` is the sole current reviewer
+rubric. Its Markdown body defines the independent, read-only exact-commit role
+and actionable `BLOCK` contract. The package binds and verifies those bytes; no
+standalone project profile remains.
 
 ## Exact bookkeeping close
 
@@ -366,30 +355,37 @@ rationale, and hashes are recorded in
 
 ## Installation boundaries
 
-Builder sources remain inert under `src/prime-agent-plugin/`. The transition
-apply/check workflow manages eleven allowlisted TypeScript files, one selected
-AGENTS/CLAUDE neutral-kernel region, and the retained legacy APPEND bridge. There
-is no separate `goal-heartbeat-work-control.ts` entry point and no
+Builder sources remain inert under `src/prime-agent-plugin/`. Final apply/check
+manages eleven allowlisted TypeScript files, one selected AGENTS/CLAUDE neutral
+kernel region, the managed global Conversation guide, and the managed global
+EXPERT package. It requires an exact owned bridge manifest before removing the
+recorded legacy APPEND region, preserves unrelated APPEND bytes and metadata,
+and then requires that managed region to remain absent. The removed legacy
+APPEND source, project forwarding skill/link, standalone reviewer profile, and
+append-only manager are not current installation inputs.
+
+There is no separate `goal-heartbeat-work-control.ts` entry point and no
 `before_agent_start` work-control overlay. Apply treats a stale installed copy as
 a retired managed file: all managed and retired destinations are type-checked
 before the first mutation, then a regular stale copy is removed. Check rejects
-any surviving copy. The installer preflights and copies the managed global Conversation guide. The
-project-local `.ralph/skills/oversee-episode/SKILL.md` remains only a policy-free
-compatibility shim with its discovery link.
+any surviving copy. Expected-file byte comparison, managed EXPERT package
+hash/import validation, neutral-kernel generation checks, role-protocol locking,
+and ordinary path safety remain.
 
 Oversight registration remains co-located with the normally discovered
 `reviewed-plan.ts` entry point; there is no redundant production
-`project-conversation.ts` entry. Historical package messages are filtered by
-`conversation-oversight.ts`, but no new package is produced.
+`project-conversation.ts` entry. Historical
+`prime-claw-oversee-episode-package` and bounded identity/package messages are
+still filtered from provider context for saved-session replay, but no new legacy
+package is produced.
 
-Installation is not runtime cutover. Apply the accepted candidate, verify it,
-then perform one coordinated full Prime Agent daemon/harness restart. Resume the
-exact owner, exact episode, and a preidentified ordinary project conversation
-before accepting cutover. `/reload`, file-copy success, elapsed time, and
-container evidence alone are insufficient. Saved sessions are resumed, never
-deleted. Keep the temporary compatibility skill, link, and profile until this
-resumed-session evidence is accepted; on failure restore the known-good plugin
-generation and resources before another attempt.
+Installation is not runtime cutover. Final source is proved only in isolated
+Docker roots until the separately authorized Gate B. Applying it to the live
+user-global root, restarting Prime Agent, resuming the designated sessions, and
+accepting UAT remain later operator-bounded steps. `/reload`, file-copy success,
+elapsed time, and container evidence alone are insufficient. Saved sessions are
+resumed, never deleted. A failed cutover restores the known bridge generation
+from the retained private rollback inputs.
 
 The extension registers no CONVERSATION launch flag and emits no startup turn.
 It does not replace `/prepare`, `/design`, `/spec-it-out`, `/plan`,

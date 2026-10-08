@@ -15,7 +15,6 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 SKILL = REPO / "src/prime-agent-plugin/skills/prime-claw-official-expert-review"
 PACKAGE = SKILL / "src/prime_claw_official_expert_review"
-PROFILE = REPO / ".prime/agent/profiles/expert-reviewer.md"
 EXPECTED_FILES = {"SKILL.md", "pyproject.toml", "src/prime_claw_official_expert_review/__init__.py", "src/prime_claw_official_expert_review/reviewer.md"}
 
 
@@ -36,11 +35,12 @@ def test_official_expert_skill_has_one_exact_managed_package_inventory() -> None
     assert {str(path.relative_to(SKILL)) for path in SKILL.rglob("*") if path.is_file()} == EXPECTED_FILES
 
 
-def test_managed_reviewer_definition_is_exact_standalone_migration_evidence() -> None:
-    assert (PACKAGE / "reviewer.md").read_bytes() == PROFILE.read_bytes()
-    digest = hashlib.sha256(PROFILE.read_bytes()).hexdigest()
+def test_managed_reviewer_definition_is_the_only_current_reviewer_authority() -> None:
+    reviewer = PACKAGE / "reviewer.md"
+    digest = hashlib.sha256(reviewer.read_bytes()).hexdigest()
     assert digest == "49e2f48421902721b25751380a2173cd8a44ad1c6c4655e7a9a4a8e583983ce6"
     assert f'REVIEWER_DEFINITION_SHA256 = "{digest}"' in (PACKAGE / "__init__.py").read_text()
+    assert not (REPO / ".prime/agent/profiles/expert-reviewer.md").exists()
 
 
 def test_official_expert_package_uses_only_stdlib_plus_public_rlm_import() -> None:

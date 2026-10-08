@@ -293,7 +293,11 @@ if [ "$SMOKE" -eq 1 ]; then
     exit 0
 fi
 
-CONTAINER_CMD="set -euo pipefail; $INSTALL && prime-agent --version && python3 -m venv --without-pip /tmp/prime-claw-expert-preflight-venv && PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT PRIME_AGENT_KERNEL_VENV=/tmp/prime-claw-expert-preflight-venv /workspace/scripts/apply-prime-agent-plugin.sh && PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT PRIME_AGENT_KERNEL_VENV=/tmp/prime-claw-expert-preflight-venv /workspace/scripts/check-prime-agent-plugin.sh"
+# Final-source validation starts from the accepted owned bridge state. The final
+# manager intentionally refuses a fresh or unowned destination rather than
+# guessing whether a legacy block is safe to remove.
+BRIDGE_SEED="printf '%s\n' '{\"schemaVersion\":1,\"generation\":\"bridge\"}' > /tmp/prime-claw-bridge.json && python3 /workspace/scripts/manage-prime-agent-role-protocol.py apply /tmp/prime-claw-bridge.json /workspace/src/prime-agent-plugin/ROLE_KERNEL.md /workspace/tests/fixtures/role-protocol-legacy-append.md $CONTAINER_PLUGIN_ROOT"
+CONTAINER_CMD="set -euo pipefail; $INSTALL && prime-agent --version && python3 -m venv --without-pip /tmp/prime-claw-expert-preflight-venv && $BRIDGE_SEED && PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT PRIME_AGENT_KERNEL_VENV=/tmp/prime-claw-expert-preflight-venv /workspace/scripts/apply-prime-agent-plugin.sh && PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT PRIME_AGENT_KERNEL_VENV=/tmp/prime-claw-expert-preflight-venv /workspace/scripts/check-prime-agent-plugin.sh"
 if [ "$PROBE" -eq 1 ]; then
     # Container-side RPC probe: load the container's real installed
     # extensions (no --no-extensions) and ask for the native command list.

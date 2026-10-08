@@ -23,11 +23,9 @@ from provider_context_assertions import (
 )
 
 REPO = Path(__file__).resolve().parents[1]
-LEGACY_APPEND = REPO / "src/prime-agent-plugin/APPEND_SYSTEM.md"
 ROLE_KERNEL = REPO / "src/prime-agent-plugin/ROLE_KERNEL.md"
 EXTENSION = REPO / "src/prime-agent-plugin/extensions/reviewed-plan.ts"
 SUPPORT = REPO / "src/prime-agent-plugin/extension-support/conversation-oversight.ts"
-SKILL = REPO / ".ralph/skills/oversee-episode/SKILL.md"
 MANAGED_GUIDE = REPO / "src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md"
 DOC = REPO / "docs/conversation-driven-episode-oversight.md"
 DOGFOOD = REPO / "reports/reviews/conversation-driven-episode-oversight-dogfood.md"
@@ -39,44 +37,26 @@ WS_KERNEL = "src/prime-agent-plugin/ROLE_KERNEL.md"
 WS_NODE_SUITE = "/workspace/tests/project_conversation_extension.test.mjs"
 
 
-def test_managed_session_contract_is_lean_and_covers_the_poc_protocol():
-    text = " ".join(LEGACY_APPEND.read_text().split())
-    for phrase in [
-        "PRIME_CLAW_CONVERSATION_IDENTITY_V1",
-        "CONVERSATION",
-        "EPISODE",
-        "EXPERT",
-        "delegated",
-        "vertical slice",
-        "canonical handoff protocol",
-        "focused compaction",
-        "maintain a goal",
-        "establish a heartbeat",
-        "waiting for the user",
-        "Do not narrate",
-    ]:
-        assert phrase in text
-    assert "daemon protocol" not in text
-    assert len(text.split()) <= 250
+def test_final_source_uses_only_the_neutral_kernel_and_managed_global_guides():
+    kernel = " ".join(ROLE_KERNEL.read_text().split())
+    assert "PRIME_CLAW_ROLE_KERNEL_V1" in kernel
+    assert "CONVERSATION supervises" in kernel
+    assert "EPISODE implements" in kernel
+    assert "EXPERT reviews" in kernel
+    assert not (REPO / "src/prime-agent-plugin/APPEND_SYSTEM.md").exists()
+    assert not (REPO / ".ralph/skills/oversee-episode").exists()
+    assert not (REPO / ".agents/skills/oversee-episode").exists()
+    assert not (REPO / ".agents/skills/oversee-episode").is_symlink()
+    assert not (REPO / ".prime/agent/profiles/expert-reviewer.md").exists()
 
 
-def test_oversee_episode_is_exposed_through_normal_project_skill_discovery():
-    link = REPO / ".agents/skills/oversee-episode"
-    assert link.is_symlink()
-    assert link.resolve() == (REPO / ".ralph/skills/oversee-episode").resolve()
-    assert (link / "SKILL.md").read_bytes() == SKILL.read_bytes()
-
-
-def test_canonical_managed_guide_replaces_project_policy_without_breaking_discovery():
-    shim = " ".join(SKILL.read_text().split())
+def test_canonical_managed_guide_is_the_only_current_conversation_guide():
     guide = " ".join(MANAGED_GUIDE.read_text().split())
-    assert "compatibility shim" in shim
-    assert "plugin-managed global `prime-claw-oversee-episode` skill" in shim
     assert "one reported vertical slice at a time" in guide
     assert "Accept and advance" in guide
     assert "Consult the operator" in guide
-    assert "one owner-coordination message" not in shim
-    assert "rlm.spawn" not in shim
+    assert "one owner-coordination message" not in guide
+    assert "rlm.spawn" not in guide
 
 
 def test_extension_uses_context_and_exact_state_without_rejected_flag_profile():
@@ -155,10 +135,10 @@ export default function workControl(pi){
 
 def _run_provider_control(tier1_container, case: Path, order: str):
     project = case / "project"
-    (project / ".prime/agent").mkdir(parents=True)
-    (project / ".prime/agent/APPEND_SYSTEM.md").write_text(
-        tier1_container.read_repo(WS_KERNEL)
-    )
+    project.mkdir()
+    agent = case / "agent"
+    agent.mkdir()
+    (agent / "AGENTS.md").write_text(tier1_container.read_repo(WS_KERNEL))
     records = case / "records.jsonl"
     provider = case / "provider.ts"
     oversight_control = case / "oversight-control.ts"
@@ -174,7 +154,7 @@ def _run_provider_control(tier1_container, case: Path, order: str):
     }[order]
     command = [
         "prime-agent", "--mode", "text", "--offline", "--no-session",
-        "--no-skills", "--no-prompt-templates", "--no-context-files",
+        "--no-skills", "--no-prompt-templates",
         "--no-extensions", "--cwd", str(project),
     ]
     for extension in extensions:
@@ -246,17 +226,16 @@ def test_provider_visible_detector_controls_and_real_hook_removal(tier1_containe
 
 def _run_native(tier1_container, ctmp, with_kernel: bool):
     project = ctmp / "project"; project.mkdir()
+    agent = ctmp / "agent"; agent.mkdir()
     if with_kernel:
-        (project / ".prime/agent").mkdir(parents=True)
-        (project / ".prime/agent/APPEND_SYSTEM.md").write_text(tier1_container.read_repo(WS_KERNEL))
+        (agent / "AGENTS.md").write_text(tier1_container.read_repo(WS_KERNEL))
     records = ctmp / "records.jsonl"; provider = ctmp / "provider.ts"; _provider_extension(provider, records)
     env = {
-        "PRIME_AGENT_CODING_AGENT_DIR": str(ctmp / "agent"),
+        "PRIME_AGENT_CODING_AGENT_DIR": str(agent),
         "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1",
     }
-    completed = tier1_container.run("prime-agent", "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-extensions", "--cwd", str(project), "-e", str(provider), "-e", WS_EXTENSION, "--provider", "poc", "--model", "m", "-p", "probe", env=env, timeout=40)
+    completed = tier1_container.run("prime-agent", "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-extensions", "--cwd", str(project), "-e", str(provider), "-e", WS_EXTENSION, "--provider", "poc", "--model", "m", "-p", "probe", env=env, timeout=40)
     return completed, records
-
 
 def test_native_inactive_shadowed_kernel_keeps_ordinary_conversation(tier1_container, ctmp):
     completed, records = _run_native(tier1_container, ctmp, False)
@@ -272,6 +251,10 @@ def test_native_inactive_conversation_gets_one_kernel_and_no_package(tier1_conta
     row = json.loads(records.read_text())
     assert row["kernel"] == 1
     assert_provider_context_clean(row)
+
+
+def _legacy_role_prompt(path: Path):
+    path.write_text(r'''export default function legacy(pi){pi.on("before_agent_start",event=>({systemPrompt:`${event.systemPrompt}\n<!-- prime-claw:conversation-identity:start -->\nPRIME_CLAW_CONVERSATION_IDENTITY_V1\n<!-- prime-claw:conversation-identity:end -->`}))}''')
 
 
 def _active_setup(path: Path):
@@ -294,18 +277,26 @@ import {{appendActiveOversight}} from {support};
 export default function setup(pi){{pi.on("session_start",(_event,ctx)=>{{const slug="alpha",ownerSessionId=ctx.sessionManager.getSessionId(),worktree=resolve(dirname(ctx.cwd),`${{basename(ctx.cwd)}}-${{slug}}-episode`);const identity={{version:2,slug,sourceLocation:`.ralph/plans/future/${{slug}}`,ownerSessionId,episodeId:"11111111-1111-4111-8111-111111111111",episodeActiveSessionId:"active",episodeSessionFile:resolve(worktree,"episode.jsonl"),branch:`episode/${{slug}}`,worktree,sessionName:`${{slug}}-episode`,bootstrapAdmission:"delivered"}};const encoded=JSON.stringify(identity),root=resolve(ctx.cwd,".prime/agent/state/spec-episodes");mkdirSync(root,{{recursive:true}});writeFileSync(resolve(root,`${{slug}}.json`),encoded);writeFileSync(resolve(ctx.cwd,"expected-identity.json"),encoded);appendActiveOversight(pi,ctx,{{...identity,reused:false}})}})}}''')
 
 
-def _run_native_active(tier1_container, case: Path, mode: str):
-    project = case / "project"; (project / ".prime/agent").mkdir(parents=True)
-    (project / ".prime/agent/APPEND_SYSTEM.md").write_text(tier1_container.read_repo(WS_KERNEL))
+def _run_native_active(tier1_container, case: Path, mode: str, *, legacy_prompt=False):
+    project = case / "project"; project.mkdir()
+    agent = case / "agent"; agent.mkdir()
+    (agent / "AGENTS.md").write_text(tier1_container.read_repo(WS_KERNEL))
     assert not (project / ".ralph/skills/oversee-episode/SKILL.md").exists()
     records = case / "records.jsonl"; provider = case / "provider.ts"; _provider_extension(provider, records)
     setup = case / "setup.ts"
     {"active": _active_setup, "promotion": _promotion_setup, "recovery": _recovery_setup}[mode](setup)
-    env = {"PRIME_AGENT_CODING_AGENT_DIR": str(case / "agent"), "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1"}
-    completed = tier1_container.run("prime-agent", "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-extensions", "--cwd", str(project), "-e", str(provider), "-e", str(setup), "-e", WS_EXTENSION, "--provider", "poc", "--model", "m", "-p", "probe", env=env, timeout=40)
+    extensions = [provider, setup]
+    if legacy_prompt:
+        legacy = case / "legacy-role.ts"; _legacy_role_prompt(legacy); extensions.append(legacy)
+    extensions.append(Path(WS_EXTENSION))
+    command = ["prime-agent", "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-extensions", "--cwd", str(project)]
+    for extension in extensions:
+        command.extend(["-e", str(extension)])
+    command.extend(["--provider", "poc", "--model", "m", "-p", "probe"])
+    env = {"PRIME_AGENT_CODING_AGENT_DIR": str(agent), "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1"}
+    completed = tier1_container.run(*command, env=env, timeout=40)
     identity = project / ".prime/agent/state/spec-episodes/alpha.json"
     return completed, records, identity, project
-
 
 def test_native_active_promotion_and_recovery_need_no_oversight_skill(tier1_container, ctmp):
     for mode in ("active", "promotion", "recovery"):
@@ -319,6 +310,15 @@ def test_native_active_promotion_and_recovery_need_no_oversight_skill(tier1_cont
         assert not (project / ".ralph/skills/oversee-episode/SKILL.md").exists()
 
 
+def test_native_active_owner_rejects_legacy_role_prompt_before_provider(tier1_container, ctmp):
+    completed, records, _, _ = _run_native_active(
+        tier1_container, ctmp, "active", legacy_prompt=True
+    )
+    assert completed.returncode != 0
+    assert "expected exactly one exact managed role kernel" in completed.stderr
+    assert not records.exists()
+
+
 def test_current_documentation_describes_lean_default_and_transition_compatibility():
     text = " ".join(DOC.read_text().split())
     for phrase in [
@@ -327,10 +327,10 @@ def test_current_documentation_describes_lean_default_and_transition_compatibili
         "one reviewable vertical slice at a time",
         "historical `prime-claw-oversee-episode-package` messages",
         "plugin-managed global `prime-claw-oversee-episode` guide",
-        "project `oversee-episode` entry is a compatibility shim",
-        "Loaded-generation compatibility reference (temporary)",
-        "one coordinated full restart",
-        "designated ordinary-conversation UAT",
+        "There is no project forwarding skill, discovery link, or standalone reviewer profile",
+        "Historical loaded-generation evidence",
+        "managed global Conversation and EXPERT skills",
+        "Final source is proved only in isolated Docker roots until the separately authorized Gate B",
         "Exact bookkeeping close",
         "location-only, no-UI bookkeeping close",
     ]:
@@ -365,11 +365,15 @@ def test_dogfood_report_preserves_frozen_old_finalizer_chronology():
 
 def test_native_unclassifiable_marker_owners_block_before_provider(tier1_container, ctmp):
     for index, owner in enumerate([None, 7, ""]):
-        case=ctmp/str(index);case.mkdir();project=case/"project";(project/".prime/agent").mkdir(parents=True);(project/".prime/agent/APPEND_SYSTEM.md").write_text(tier1_container.read_repo(WS_KERNEL))
-        records=case/"records.jsonl";provider=case/"provider.ts";_provider_extension(provider,records)
-        setup=case/"setup.ts";setup.write_text(f'''export default function s(pi){{pi.on("session_start",()=>pi.appendEntry("prime-claw-conversation-oversight",{{markerVersion:2,status:"active",ownerSessionId:{json.dumps(owner)},slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeSessionFile:"/session",branch:"episode/alpha",worktree:"/worktree",sessionName:"alpha-episode",identityVersion:2,admission:"delivered"}}))}}''')
-        env={"PRIME_AGENT_CODING_AGENT_DIR":str(case/"agent"),"PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND":"1"}
-        completed=tier1_container.run("prime-agent","--mode","text","--offline","--no-session","--no-skills","--no-prompt-templates","--no-context-files","--no-extensions","--cwd",str(project),"-e",str(provider),"-e",str(setup),"-e",WS_EXTENSION,"--provider","poc","--model","m","-p","probe",env=env,timeout=40)
-        assert completed.returncode!=0
+        case = ctmp / str(index); case.mkdir()
+        project = case / "project"; project.mkdir()
+        agent = case / "agent"; agent.mkdir()
+        (agent / "AGENTS.md").write_text(tier1_container.read_repo(WS_KERNEL))
+        records = case / "records.jsonl"; provider = case / "provider.ts"; _provider_extension(provider, records)
+        setup = case / "setup.ts"
+        setup.write_text(f'''export default function s(pi){{pi.on("session_start",()=>pi.appendEntry("prime-claw-conversation-oversight",{{markerVersion:2,status:"active",ownerSessionId:{json.dumps(owner)},slug:"alpha",sourceLocation:".ralph/plans/future/alpha",episodeId:"11111111-1111-4111-8111-111111111111",episodeSessionFile:"/session",branch:"episode/alpha",worktree:"/worktree",sessionName:"alpha-episode",identityVersion:2,admission:"delivered"}}))}}''')
+        env = {"PRIME_AGENT_CODING_AGENT_DIR": str(agent), "PRIME_AGENT_INTERNAL_LEGACY_OWNED_WORKER_FRONTEND": "1"}
+        completed = tier1_container.run("prime-agent", "--mode", "text", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-extensions", "--cwd", str(project), "-e", str(provider), "-e", str(setup), "-e", WS_EXTENSION, "--provider", "poc", "--model", "m", "-p", "probe", env=env, timeout=40)
+        assert completed.returncode != 0
         assert "owner is unclassifiable" in completed.stderr
         assert not records.exists()

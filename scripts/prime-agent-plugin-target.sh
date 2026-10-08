@@ -4,8 +4,8 @@
 
 prime_agent_plugin_target_usage() {
   printf 'usage: %s [--user-global]\n' "${0##*/}" >&2
-  printf '  development/test: PRIME_AGENT_PLUGIN_ROOT=/explicit/isolated/root %s\n' "${0##*/}" >&2
-  printf '  accepted primary main only: %s --user-global\n' "${0##*/}" >&2
+  printf '  development/test (owned bridge fixture required; prefer Tier 1): PRIME_AGENT_PLUGIN_ROOT=/explicit/isolated/root %s\n' "${0##*/}" >&2
+  printf '  authorized Gate B coordinator on accepted primary main only: %s --user-global\n' "${0##*/}" >&2
 }
 
 _prime_claw_canonical_path() {
@@ -47,12 +47,12 @@ select_prime_agent_plugin_target() {
     git_dir="$(_prime_claw_canonical_path "$git_dir")"
     git_common="$(_prime_claw_canonical_path "$git_common")"
     if [[ "$git_dir" != "$git_common" ]]; then
-      printf 'error: --user-global is refused from a linked Git worktree; use Docker tier 1 or an explicit isolated PRIME_AGENT_PLUGIN_ROOT\n' >&2
+      printf 'error: --user-global is refused from a linked Git worktree; use Docker Tier 1 or an isolated PRIME_AGENT_PLUGIN_ROOT with owned bridge state\n' >&2
       return 1
     fi
     if ! branch="$(git -C "$repo_root" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
       || [[ "$branch" != "main" ]]; then
-      printf 'error: --user-global requires the primary checkout on branch main; use Docker tier 1 or an explicit isolated PRIME_AGENT_PLUGIN_ROOT\n' >&2
+      printf 'error: --user-global requires the primary checkout on branch main; use Docker Tier 1 or an isolated PRIME_AGENT_PLUGIN_ROOT with owned bridge state\n' >&2
       return 1
     fi
     destination_root="$user_root"
@@ -75,7 +75,7 @@ select_prime_agent_plugin_target() {
   canonical_destination="$(_prime_claw_canonical_path "$destination_root")"
   canonical_user="$(_prime_claw_canonical_path "$user_root")"
   if [[ "$canonical_destination" == "$canonical_user" && ! -f /.dockerenv ]]; then
-    printf 'error: PRIME_AGENT_PLUGIN_ROOT resolves to the user-global destination; use --user-global from the primary main checkout, or Docker tier 1 for testing\n' >&2
+    printf 'error: PRIME_AGENT_PLUGIN_ROOT resolves to the user-global destination; use the authorized Gate B coordinator from primary main, or Docker Tier 1 for testing\n' >&2
     return 1
   fi
 }

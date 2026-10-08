@@ -70,7 +70,10 @@ or the following execute pass completed.
 ### Owner-driven episode tool
 
 The project-conversation extension also exposes `handoff_spec_episode` for the
-one remote transition proved necessary by manual oversight. Its input is only:
+one remote transition proved necessary by manual oversight. The active owner
+must first have consumed its managed Conversation guide receipt; a read-only
+status check may prove that readiness before handoff or final bookkeeping UAT,
+but cannot grant or replay it. Its input is only:
 
 ```json
 {"location":".ralph/plans/future/<slug>","guidance":"optional bounded compaction focus"}

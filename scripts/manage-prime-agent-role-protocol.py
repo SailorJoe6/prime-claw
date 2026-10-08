@@ -476,7 +476,7 @@ def manifest_value(
     selected: str,
     installer_created: bool,
     kernel: bytes,
-    legacy: bytes,
+    legacy_sha256: str,
     context_prefix: bytes,
     context_suffix: bytes,
     append_prefix: bytes,
@@ -494,7 +494,7 @@ def manifest_value(
         },
         "legacyAppend": {
             "path": "APPEND_SYSTEM.md",
-            "blockSha256": digest(legacy),
+            "blockSha256": legacy_sha256,
             "prefixSeparatorBase64": encode(append_prefix),
             "suffixSeparatorBase64": encode(append_suffix),
         },
@@ -502,7 +502,7 @@ def manifest_value(
 
 
 def prepare_apply(
-    root: Path, kernel: bytes, legacy: bytes, generation: str
+    root: Path, kernel: bytes, legacy: bytes | None, generation: str
 ) -> dict[str, Any]:
     selected_name, candidates = inspect_candidates(root)
     selected_path = root / selected_name
@@ -538,6 +538,8 @@ def prepare_apply(
     manifest, manifest_snapshot = load_manifest(manifest_path)
     if generation == "final" and manifest is None:
         raise ValueError("final role protocol requires an owned bridge manifest")
+    if generation == "bridge" and legacy is None:
+        raise ValueError("bridge role protocol requires the legacy APPEND source")
     if (
         generation == "bridge"
         and manifest is not None
@@ -588,8 +590,6 @@ def prepare_apply(
     )
     if manifest is not None:
         recorded_legacy = manifest["legacyAppend"]
-        if generation == "final" and digest(legacy) != recorded_legacy["blockSha256"]:
-            raise ValueError("final removal cannot change the managed legacy block source")
         append_prefix = decode(recorded_legacy["prefixSeparatorBase64"])
         append_suffix = decode(recorded_legacy["suffixSeparatorBase64"])
         if manifest["generation"] == "final":
@@ -632,7 +632,7 @@ def prepare_apply(
         selected_name,
         installer_created,
         kernel,
-        legacy,
+        manifest["legacyAppend"]["blockSha256"] if manifest is not None else digest(legacy),
         context_prefix,
         context_suffix,
         append_prefix,
@@ -944,12 +944,17 @@ def preflight(
 ) -> dict[str, Any]:
     generation = validate_config(config_path)["generation"]
     kernel = load_block(kernel_path, KERNEL_START, KERNEL_END, "ROLE_KERNEL source")
-    legacy = load_block(
-        legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source"
+    legacy = (
+        load_block(legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source")
+        if generation == "bridge"
+        else None
     )
     require_directory(root, "agentDir")
     if not root.exists():
+        if generation == "final":
+            raise ValueError("final role protocol requires an owned bridge manifest")
         selected = "AGENTS.md"
+        legacy_sha256 = digest(legacy)
     else:
         state_dir = root / STATE_DIR
         require_directory(state_dir, "role protocol state directory")
@@ -1004,11 +1009,16 @@ def preflight(
                     raise ValueError(
                         "legacy APPEND block does not match the accepted predecessor"
                     )
+        legacy_sha256 = (
+            manifest["legacyAppend"]["blockSha256"]
+            if manifest is not None
+            else digest(legacy)
+        )
     return {
         "generation": generation,
         "selectedContext": selected,
         "kernelSha256": digest(kernel),
-        "legacyAppendSha256": digest(legacy),
+        "legacyAppendSha256": legacy_sha256,
     }
 
 
@@ -1071,7 +1081,8 @@ def apply_protocol(
     # read of mutable destination state happens only after the cooperative lock.
     generation = validate_config(config_path)["generation"]
     load_block(kernel_path, KERNEL_START, KERNEL_END, "ROLE_KERNEL source")
-    load_block(legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source")
+    if generation == "bridge":
+        load_block(legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source")
     require_directory(root, "agentDir")
     root.mkdir(parents=True, mode=0o700, exist_ok=True)
     require_directory(root, "agentDir", allow_absent=False)
@@ -1103,8 +1114,10 @@ def apply_protocol(
         kernel = load_block(
             kernel_path, KERNEL_START, KERNEL_END, "ROLE_KERNEL source"
         )
-        legacy = load_block(
-            legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source"
+        legacy = (
+            load_block(legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source")
+            if generation == "bridge"
+            else None
         )
         state_dir = root / STATE_DIR
         require_directory(state_dir, "role protocol state directory")
@@ -1197,8 +1210,10 @@ def check_protocol(
 ) -> dict[str, Any]:
     generation = validate_config(config_path)["generation"]
     kernel = load_block(kernel_path, KERNEL_START, KERNEL_END, "ROLE_KERNEL source")
-    legacy = load_block(
-        legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source"
+    legacy = (
+        load_block(legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source")
+        if generation == "bridge"
+        else None
     )
     require_directory(root, "agentDir", allow_absent=False)
     lock_fd = None if already_locked else acquire_lock(root, create=False)
@@ -1286,16 +1301,16 @@ def check_protocol(
                 "managed legacy APPEND block remains after final removal: "
                 f"{root / 'APPEND_SYSTEM.md'}"
             )
-        if (
-            recorded["blockSha256"] != digest(kernel)
-            or manifest["legacyAppend"]["blockSha256"] != digest(legacy)
-        ):
+        if recorded["blockSha256"] != digest(kernel):
+            raise ValueError("role protocol ownership manifest source digest is stale")
+        legacy_sha256 = manifest["legacyAppend"]["blockSha256"]
+        if generation == "bridge" and legacy_sha256 != digest(legacy):
             raise ValueError("role protocol ownership manifest source digest is stale")
         return {
             "generation": generation,
             "selectedContext": selected_name,
             "kernelSha256": digest(kernel),
-            "legacyAppendSha256": digest(legacy),
+            "legacyAppendSha256": legacy_sha256,
         }
     finally:
         if lock_fd is not None:

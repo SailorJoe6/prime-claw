@@ -1038,11 +1038,20 @@ cleanup remain unauthorized.
 
 ## 12. Slice 6 — Remove compatibility and reconcile the final source tree
 
-**Dependency:** accepted S5 and a fresh foreign-worktree/session audit proving no
-active stale consumer.
+**Dependency:** Slice 5 candidate
+`98ed8d14e028622d07a120fbd4af730bd4171e38`, tree
+`2b83d87a5adfab4c3f6e274b3149df54c588631e`, is accepted. Before removing
+compatibility resources, perform the required fresh foreign-worktree/session
+audit and stop if an active stale consumer remains.
 
 **Capability delivered:** the episode branch reaches the complete clean target
 state while the installed host remains on the accepted bridge until Gate B.
+
+**Bounded execution authority:** implement only this minimal final-source slice
+and report it as one reviewable vertical slice. Do not add replacement frameworks,
+generalized integrity machinery, or new defensive scope. Do not begin Slice 7,
+apply final mode to the host, run Gate B, archive/finalize, merge, or physically
+clean up resources.
 
 ### Changes
 
@@ -1084,6 +1093,29 @@ state while the installed host remains on the accepted bridge until Gate B.
 Revert S6 and return to bridge source with all compatibility files intact. The
 host is still bridge, so no activation rollback occurs. If the foreign-consumer
 audit becomes stale, stop rather than force another branch to converge.
+
+### Slice 6 implementation checkpoint
+
+The fresh foreign-consumer audit passed with both retained foreign worktrees
+clean and all matching saved sessions quiescent. The source tree is now final:
+the tracked selector is `final`; the legacy APPEND source and append-only
+manager, project forwarding skill/link, standalone reviewer profile, and
+append-only container probes are absent; the final manager requires exact owned
+bridge state and preserves fixed-inventory restore; retired prompt shapes fail
+managed owner/EPISODE admission while historical replay filters remain.
+
+Focused final-source Docker passes 55. Complete Tier 0 passes 442 with 177
+skipped; complete Docker Tier 1 passes 70 with 549 deselected; and the pinned
+Prime Agent 0.9.8 apply/check/registration probe passes. The first independent
+review found only stale current operator guidance plus unfinished evidence
+placeholders. Both are repaired: current guidance now routes Gate B through the
+authorized coordinator and private accepted-bridge recovery material, and the
+Slice 6 evidence contains concrete gate results and hashes.
+
+Next obtain a clean independent exact-diff review, commit and push this one
+reviewable Slice 6 candidate, report it to the owner, and stop. Do not begin
+Slice 7, apply final mode to the host, run Gate B, archive/finalize, merge, or
+physically clean resources.
 
 ## 13. Slice 7 — Freeze and review Generation B final candidate
 

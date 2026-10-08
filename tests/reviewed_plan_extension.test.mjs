@@ -581,15 +581,42 @@ test("implement-spec admits implement-prep first and canonical readiness as the 
   assert.deepEqual(f.notices, []);
 });
 
-test("implement-spec refuses a shadowed role kernel before model injection", async (t) => {
+test("implement-spec refuses shadowed or legacy role prompt shapes before model injection", async (t) => {
   const f = fixture(t);
   writeSkill(f.cwd, "implementation policy", "implement-spec");
-  const shadowed = createHarness(f.cwd, reviewedPlan, 0, "project append shadow");
+  const prompts = [
+    "project append shadow",
+    `${PRIME_CLAW_ROLE_KERNEL_TEXT}
+<!-- prime-claw:conversation-identity:start -->
+PRIME_CLAW_CONVERSATION_IDENTITY_V1
+<!-- prime-claw:conversation-identity:end -->`,
+  ];
+  for (const prompt of prompts) {
+    const shadowed = createHarness(f.cwd, reviewedPlan, 0, prompt);
+    await assert.rejects(
+      shadowed.commands.get("implement-spec").handler(LOCATION, shadowed.ctx),
+      /expected exactly one exact managed role kernel/,
+    );
+    assert.deepEqual(shadowed.messages, []);
+  }
+});
+
+test("bounded EPISODE rejects a legacy role prompt before provider context", async (t) => {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-episode-legacy-prompt-")));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const prompt = `${PRIME_CLAW_ROLE_KERNEL_TEXT}
+<!-- prime-claw:conversation-identity:start -->
+PRIME_CLAW_CONVERSATION_IDENTITY_V1
+<!-- prime-claw:conversation-identity:end -->`;
+  const f = createHarness(cwd, reviewedPlan, 0, prompt);
+  f.entries.push({
+    type: "custom", customType: "prime-claw-bounded-identity",
+    data: { version: 1, role: "EPISODE", sessionId: "owner-session" },
+  });
   await assert.rejects(
-    shadowed.commands.get("implement-spec").handler(LOCATION, shadowed.ctx),
+    () => f.events.get("context")({ messages: [] }, f.ctx),
     /expected exactly one exact managed role kernel/,
   );
-  assert.deepEqual(shadowed.messages, []);
 });
 
 test("invalid implement-spec input shows usage without model injection", async (t) => {

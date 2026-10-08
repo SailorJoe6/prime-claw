@@ -9,7 +9,7 @@ import pytest
 WS_MANAGER = "/workspace/scripts/manage-prime-agent-role-protocol.py"
 WS_CONFIG = "/workspace/src/prime-agent-plugin/role-protocol.json"
 WS_KERNEL = "/workspace/src/prime-agent-plugin/ROLE_KERNEL.md"
-WS_LEGACY = "/workspace/src/prime-agent-plugin/APPEND_SYSTEM.md"
+WS_LEGACY = "/workspace/tests/fixtures/role-protocol-legacy-append.md"
 WS_PROBE = "/workspace/tests/container/role_protocol_probe.py"
 
 

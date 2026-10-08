@@ -1200,7 +1200,7 @@
   {
    "id": "R-T1-4",
    "priority": "P1",
-   "summary": "Session-scoped tier-1 container fixture + migrated plugin suites: one container per pytest run with driver-equivalent setup (install prime-agent per .env, apply+check plugin once), exec/popen helpers with in-container hard timeouts, same-path session share for scratch, in-container fake daemon + self-verifying choreography runners (tests/container/); every node suite has a pytest bridge (episode_close and project_conversation bridges added); no tier-1 test code resolves host binaries.",
+   "summary": "Session-scoped tier-1 container fixture + migrated plugin suites: one container per pytest run with driver-equivalent setup (install prime-agent per .env, apply+check plugin once), exec/popen helpers with in-container hard timeouts, same-path session share for scratch, in-container fake daemon + self-verifying role-protocol matrix (tests/container/); every node suite has a pytest bridge (episode_close and project_conversation bridges added); no tier-1 test code resolves host binaries.",
    "status": "met (slice 3)",
    "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
    "proven_by": {
@@ -1211,9 +1211,7 @@
      "tests/conftest.py"
     ],
     "validate": [
-     "tests/container/fake_daemon.py",
-     "tests/container/sigterm_orphan_probe.py",
-     "tests/container/concurrent_apply_probe.py"
+     "tests/container/fake_daemon.py"
     ],
     "tests": [
      "tests/test_handoff_chain_extension.py",
@@ -1277,12 +1275,11 @@
    "evidence": "docs/evidence/2026-10-02-plugin-install-test-guardrail.md"
   }
  ],
- "phase2": {}
-,
+ "phase2": {},
  "officialLeanRoleProtocol": {
   "spec": ".ralph/plans/SPECIFICATION.md",
   "plan": ".ralph/plans/EXECUTION_PLAN.md",
-  "activeSlice": "S4 final stop-loss lossless version-capture repair and successor freeze",
+  "activeSlice": "S6 final-source compatibility removal and reconciliation",
   "requirements": [
    {
     "id": "ORP-001",
@@ -1353,7 +1350,7 @@
    {
     "id": "ORP-007",
     "summary": "guidance activation",
-    "status": "active-s4-review-repair",
+    "status": "accepted-gate-a",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
      "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
@@ -1409,13 +1406,14 @@
    {
     "id": "ORP-012",
     "summary": "historical filtering",
-    "status": "active-s4-review-repair",
+    "status": "active-s6-final-replay-audit",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
      "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
-     "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
     ]
    },
    {
@@ -1432,7 +1430,7 @@
    {
     "id": "ORP-014",
     "summary": "one fresh complete episode",
-    "status": "active-s4-review-repair",
+    "status": "accepted-gate-a",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
      "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
@@ -1444,7 +1442,7 @@
    {
     "id": "ORP-015",
     "summary": "bridge generation",
-    "status": "active-s4-review-repair",
+    "status": "accepted-gate-a",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
      "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
@@ -1456,64 +1454,72 @@
    {
     "id": "ORP-016",
     "summary": "interim UAT",
-    "status": "pending-later-gate",
+    "status": "accepted-gate-a",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": []
    },
    {
     "id": "ORP-017",
     "summary": "compatibility removal",
-    "status": "pending-later-gate",
+    "status": "active-s6-final-source",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
-    "evidence": []
+    "evidence": [
+     "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
+    ]
    },
    {
     "id": "ORP-018",
     "summary": "final UAT/completion",
-    "status": "pending-later-gate",
+    "status": "pending-gate-b",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": []
    },
    {
     "id": "ORP-019",
     "summary": "isolated gates",
-    "status": "active-s4-review-repair",
+    "status": "active-s6-final-gates",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
      "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
-     "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
     ]
    },
    {
     "id": "ORP-020",
     "summary": "correlatable evidence",
-    "status": "active-s4-review-repair",
+    "status": "active-s6-final-evidence",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
      "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
-     "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
     ]
    },
    {
     "id": "ORP-021",
     "summary": "two rollback points",
-    "status": "active-s4-review-repair",
+    "status": "accepted-through-s5",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
      "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
-     "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md"
     ]
    },
    {
     "id": "ORP-022",
     "summary": "current documentation",
-    "status": "accepted-through-s3",
+    "status": "active-s6-final-docs",
     "authority": ".ralph/plans/EXECUTION_PLAN.md#5-requirement-traceability",
     "evidence": [
      "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
@@ -1521,7 +1527,9 @@
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md",
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
      "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
-     "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md"
+     "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md",
+     "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
     ]
    },
    {

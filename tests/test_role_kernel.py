@@ -53,9 +53,9 @@ def test_role_kernel_generated_bytes_and_digest_are_exact(tmp_path: Path) -> Non
     assert "stale generated role kernel" in rejected.stderr
 
 
-def test_bridge_manifest_declares_one_generation() -> None:
+def test_final_protocol_config_declares_one_generation() -> None:
     manifest = json.loads((REPO / "src/prime-agent-plugin/role-protocol.json").read_text())
-    assert manifest == {"schemaVersion": 1, "generation": "bridge"}
+    assert manifest == {"schemaVersion": 1, "generation": "final"}
 
 
 def test_predecessor_archive_matches_recorded_hashes() -> None:

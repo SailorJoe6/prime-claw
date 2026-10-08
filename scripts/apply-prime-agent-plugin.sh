@@ -87,7 +87,7 @@ legacy_append_source="$source_root/APPEND_SYSTEM.md"
 role_kernel_source="$source_root/ROLE_KERNEL.md"
 role_protocol_source="$source_root/role-protocol.json"
 role_kernel_generated="$source_root/extension-support/role-kernel.generated.ts"
-for source_file in "$legacy_append_source" "$role_kernel_source" "$role_protocol_source" "$role_kernel_generated"; do
+for source_file in "$role_kernel_source" "$role_protocol_source" "$role_kernel_generated"; do
   if [[ ! -s "$source_file" ]]; then
     printf 'missing or empty role-protocol source: %s\n' "$source_file" >&2
     exit 1

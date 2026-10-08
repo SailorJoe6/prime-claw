@@ -36,10 +36,16 @@ def test_inventory_covers_exact_official_lean_role_protocol_requirements():
     assert [row["id"] for row in rows] == [f"ORP-{number:03d}" for number in range(1, 24)]
     assert section["spec"] == ".ralph/plans/SPECIFICATION.md"
     assert section["plan"] == ".ralph/plans/EXECUTION_PLAN.md"
-    assert section["activeSlice"] == "S4 final stop-loss lossless version-capture repair and successor freeze"
+    assert section["activeSlice"] == "S6 final-source compatibility removal and reconciliation"
     missing = []
     for row in rows:
-        assert row["status"] in {"accepted-through-s3", "active-s4", "active-s4-review-repair", "pending-later-gate"}
+        assert row["status"] in {
+            "accepted-through-s3", "accepted-gate-a", "accepted-through-s5",
+            "active-s4", "active-s4-review-repair", "active-s6-final-replay-audit",
+            "active-s6-final-source", "active-s6-final-gates",
+            "active-s6-final-evidence", "active-s6-final-docs",
+            "pending-later-gate", "pending-gate-b",
+        }
         for path in row["evidence"]:
             if not os.path.isfile(os.path.join(REPO_ROOT, path)):
                 missing.append(f"{row['id']} -> {path}")
