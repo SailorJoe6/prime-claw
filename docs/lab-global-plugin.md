@@ -270,10 +270,13 @@ owner/episode/ordinary checkpoints, and one canonical CLI entrypoint. A compiled
 entrypoint is `[launcher]`; a Node entrypoint is `[interpreter, entrypoint]`.
 Both realpaths and artifact digests are bound, every CLI command uses the whole
 prefix, and `status --json` must report the entrypoint path, exact build, socket,
-and declared old-daemon PID. The version command must return zero and emit the
-exact configured single-line version on exactly one of stdout or stderr, with the
-other empty. Both/empty streams, blank or extra lines, mismatch, and nonzero exit
-fail closed before status, shutdown, landing, apply, or start.
+and declared old-daemon PID. The version command uses a version-only lossless capture and must return zero,
+with exactly one raw stream equal to the configured version encoded as UTF-8 plus
+one LF byte and the other raw stream equal to `b""`. CRLF, bare CR, no LF,
+non-UTF-8 bytes, both/empty streams, whitespace, blank or extra lines, mismatch,
+nonzero exit, and timeout fail closed before status, shutdown, landing, apply, or
+start. General text-mode Git, status, process, and bundle commands remain
+unchanged.
 
 Process observation is bounded to exact `pgrep -x prime-agent` results and the
 explicitly declared PIDs, followed by targeted `ps -p`. It never parses an

@@ -36,7 +36,7 @@ def test_inventory_covers_exact_official_lean_role_protocol_requirements():
     assert [row["id"] for row in rows] == [f"ORP-{number:03d}" for number in range(1, 24)]
     assert section["spec"] == ".ralph/plans/SPECIFICATION.md"
     assert section["plan"] == ".ralph/plans/EXECUTION_PLAN.md"
-    assert section["activeSlice"] == "S4 Gate A preflight version-stream repair and successor freeze"
+    assert section["activeSlice"] == "S4 final stop-loss lossless version-capture repair and successor freeze"
     missing = []
     for row in rows:
         assert row["status"] in {"accepted-through-s3", "active-s4", "active-s4-review-repair", "pending-later-gate"}

@@ -54,6 +54,14 @@ class Result:
     stderr: str = ""
 
 
+@dataclass(frozen=True)
+class RawResult:
+    argv: tuple[str, ...]
+    returncode: int
+    stdout: bytes = b""
+    stderr: bytes = b""
+
+
 class LocalRunner:
     def __init__(self) -> None:
         self.children: dict[int, subprocess.Popen[bytes]] = {}
@@ -67,6 +75,13 @@ class LocalRunner:
         if result.returncode and not allow_failure:
             raise CutoverError(f"command failed ({result.returncode}): {' '.join(argv)}")
         return result
+
+    def run_version(self, argv: Sequence[str], *, cwd: Path | None = None, timeout: float = 10) -> RawResult:
+        try:
+            completed = subprocess.run(list(argv), cwd=cwd, capture_output=True, check=False, timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            raise CutoverError(f"command timed out: {' '.join(argv)}") from exc
+        return RawResult(tuple(argv), completed.returncode, completed.stdout, completed.stderr)
 
     def start(self, argv: Sequence[str], *, cwd: Path | None = None) -> Result:
         process = subprocess.Popen(
@@ -212,6 +227,10 @@ class Coordinator:
 
     def command(self, argv: Sequence[str], *, cwd: Path | None = None, allow_failure: bool = False, timeout: float | None = None) -> Result:
         return self.runner.run(tuple(str(item) for item in argv), cwd=cwd, allow_failure=allow_failure, timeout=timeout)
+
+    def version_command(self) -> RawResult:
+        argv = self.cli_argv("--version")
+        return self.runner.run_version(argv, cwd=None, timeout=10)
 
     def cli_argv(self, *args: str) -> tuple[str, ...]:
         return (*tuple(self.runtime["cliArgvPrefix"]), *args)
@@ -445,14 +464,18 @@ class Coordinator:
         entrypoint_sha = sha256_file(self.entrypoint)
         if executable_sha != self.runtime["executableSha256"] or entrypoint_sha != self.runtime["entrypointSha256"]:
             raise CutoverError("runtime executable or entrypoint build digest mismatch")
-        result = self.command(self.cli_argv("--version"), allow_failure=True, timeout=10)
+        result = self.version_command()
         expected = require_string(self.runtime.get("version"), "runtime.version")
+        try:
+            expected_bytes = expected.encode("utf-8") + b"\n"
+        except UnicodeEncodeError as exc:
+            raise CutoverError("runtime.version must be valid UTF-8") from exc
         if result.returncode:
             raise CutoverError(f"runtime entrypoint version command failed ({result.returncode})")
         if bool(result.stdout) == bool(result.stderr):
             raise CutoverError("runtime entrypoint version output must use exactly one stream")
         version_output = result.stdout or result.stderr
-        if version_output != expected + "\n":
+        if version_output != expected_bytes:
             raise CutoverError("runtime entrypoint version mismatch")
         expected_build = require_string(self.runtime.get("buildId"), "runtime.buildId")
         self.observations["runtime"] = {

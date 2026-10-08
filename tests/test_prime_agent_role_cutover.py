@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 
 import pytest
 
@@ -166,6 +167,14 @@ class RecordingRunner:
         c = self.config
         return {"socketPath": c["runtime"]["daemonSocket"], "pid": pid, "version": c["runtime"]["version"], "buildId": c["runtime"]["buildId"], "executablePath": c["runtime"]["entrypointRealpath"], "status": status, "isDefault": True}
 
+    def run_version(self, argv, *, cwd=None, timeout=10):
+        argv = tuple(argv); self.calls.append(argv)
+        self.labels.append(self._label(argv))
+        c = self.config
+        if self.version_result is not None:
+            return coord.RawResult(argv, *self.version_result)
+        return coord.RawResult(argv, 0, c["runtime"]["version"].encode("utf-8") + b"\n", b"")
+
     def run(self, argv, *, cwd=None, allow_failure=False, timeout=None):
         argv = tuple(argv); self.calls.append(argv)
         label = self._label(argv); self.labels.append(label)
@@ -176,10 +185,6 @@ class RecordingRunner:
             output = {"status": "VERIFIED", "manifestSha256": c["bundle"]["manifestSha256"]}
             return coord.Result(argv, 0, json.dumps(output), "")
         cli = tuple(c["runtime"]["cliArgvPrefix"])
-        if argv == (*cli, "--version"):
-            if self.version_result is not None:
-                return coord.Result(argv, *self.version_result)
-            return coord.Result(argv, 0, c["runtime"]["version"] + "\n", "")
         if argv == ("pgrep", "-x", "prime-agent"):
             self.ps_count += 1
             if self.discovery_failure:
@@ -506,11 +511,11 @@ def test_preflight_supports_exact_node_interpreter_entrypoint(tmp_path: Path) ->
 
 @pytest.mark.parametrize(
     "version_result",
-    [(0, "0.9.8\n", ""), (0, "", "0.9.8\n")],
+    [(0, b"0.9.8\n", b""), (0, b"", b"0.9.8\n")],
 )
 def test_verify_executable_accepts_exact_lf_terminated_version_from_exactly_one_stream(
     tmp_path: Path,
-    version_result: tuple[int, str, str],
+    version_result: tuple[int, bytes, bytes],
 ) -> None:
     config = cutover_config(tmp_path)
     runner = RecordingRunner(config, version_result=version_result)
@@ -526,31 +531,31 @@ def test_verify_executable_accepts_exact_lf_terminated_version_from_exactly_one_
 @pytest.mark.parametrize(
     ("version_result", "message"),
     [
-        ((7, "0.9.8\n", ""), "version command failed"),
-        ((7, "", "0.9.8\n"), "version command failed"),
-        ((0, "0.9.8\n", "0.9.8\n"), "exactly one stream"),
-        ((0, "", ""), "exactly one stream"),
-        ((0, "prime-agent 0.9.8\n", ""), "version mismatch"),
-        ((0, "", "prime-agent 0.9.8\n"), "version mismatch"),
-        ((0, "0.9.8\nextra\n", ""), "version mismatch"),
-        ((0, "", "extra\n0.9.8\n"), "version mismatch"),
-        ((0, "\n0.9.8\n", ""), "version mismatch"),
-        ((0, "0.9.8\n\n", ""), "version mismatch"),
-        ((0, "", "\n0.9.8\n"), "version mismatch"),
-        ((0, "", "0.9.8\n\n"), "version mismatch"),
-        ((0, "0.9.7\n", ""), "version mismatch"),
-        ((0, "", "0.9.7\n"), "version mismatch"),
-        ((0, "0.9.8", ""), "version mismatch"),
-        ((0, "", "0.9.8"), "version mismatch"),
-        ((0, "0.9.8\r\n", ""), "version mismatch"),
-        ((0, "", "0.9.8\r\n"), "version mismatch"),
-        ((0, " 0.9.8\n", ""), "version mismatch"),
-        ((0, "", "0.9.8 \n"), "version mismatch"),
+        ((7, b"0.9.8\n", b""), "version command failed"),
+        ((7, b"", b"0.9.8\n"), "version command failed"),
+        ((0, b"0.9.8\n", b"0.9.8\n"), "exactly one stream"),
+        ((0, b"", b""), "exactly one stream"),
+        ((0, b"prime-agent 0.9.8\n", b""), "version mismatch"),
+        ((0, b"", b"prime-agent 0.9.8\n"), "version mismatch"),
+        ((0, b"0.9.8\nextra\n", b""), "version mismatch"),
+        ((0, b"", b"extra\n0.9.8\n"), "version mismatch"),
+        ((0, b"\n0.9.8\n", b""), "version mismatch"),
+        ((0, b"0.9.8\n\n", b""), "version mismatch"),
+        ((0, b"", b"\n0.9.8\n"), "version mismatch"),
+        ((0, b"", b"0.9.8\n\n"), "version mismatch"),
+        ((0, b"0.9.7\n", b""), "version mismatch"),
+        ((0, b"", b"0.9.7\n"), "version mismatch"),
+        ((0, b"0.9.8", b""), "version mismatch"),
+        ((0, b"", b"0.9.8"), "version mismatch"),
+        ((0, b"0.9.8\r\n", b""), "version mismatch"),
+        ((0, b"", b"0.9.8\r\n"), "version mismatch"),
+        ((0, b" 0.9.8\n", b""), "version mismatch"),
+        ((0, b"", b"0.9.8 \n"), "version mismatch"),
     ],
 )
 def test_verify_executable_rejects_ambiguous_empty_extra_multiline_mismatch_or_nonzero_version_output(
     tmp_path: Path,
-    version_result: tuple[int, str, str],
+    version_result: tuple[int, bytes, bytes],
     message: str,
 ) -> None:
     config = cutover_config(tmp_path)
@@ -565,6 +570,151 @@ def test_verify_executable_rejects_ambiguous_empty_extra_multiline_mismatch_or_n
     assert runner.started == []
 
 
+
+def configure_node_version_emitter(config: dict, tmp_path: Path, *, stdout: bytes, stderr: bytes, returncode: int = 0, sleep_seconds: float = 0) -> Path:
+    emitter = (tmp_path / "version-emitter.py").resolve()
+    emitter.write_text(
+        "import os, sys, time\n"
+        "if sys.argv[1:] != ['--version']:\n"
+        "    raise SystemExit(91)\n"
+        f"time.sleep({sleep_seconds!r})\n"
+        f"os.write(1, {stdout!r})\n"
+        f"os.write(2, {stderr!r})\n"
+        f"raise SystemExit({returncode})\n"
+    )
+    executable = Path(sys.executable).resolve()
+    config["runtime"].update({
+        "entrypointKind": "node",
+        "cliArgvPrefix": [str(executable), str(emitter)],
+        "executableRealpath": str(executable),
+        "executableSha256": bundle.digest(executable.read_bytes()),
+        "entrypointRealpath": str(emitter),
+        "entrypointSha256": bundle.digest(emitter.read_bytes()),
+        "startArgs": [str(executable), str(emitter), "--mode", "daemon", "--daemon-socket", config["runtime"]["daemonSocket"]],
+    })
+    config["processInventory"][0]["entrypointKind"] = "node"
+    return emitter
+
+
+class ObservingLocalRunner(coord.LocalRunner):
+    def __init__(self) -> None:
+        super().__init__()
+        self.version_calls: list[tuple[tuple[str, ...], dict[str, object]]] = []
+        self.version_results: list[coord.RawResult] = []
+        self.text_calls: list[tuple[str, ...]] = []
+
+    def run_version(self, argv, **kwargs):
+        self.version_calls.append((tuple(argv), dict(kwargs)))
+        result = super().run_version(argv, **kwargs)
+        self.version_results.append(result)
+        return result
+
+    def run(self, argv, **kwargs):
+        argv = tuple(argv)
+        self.text_calls.append(argv)
+        if argv and argv[0].endswith("manage-prime-agent-cutover-bundle.py"):
+            return coord.Result(argv, 0, json.dumps({"status": "VERIFIED", "manifestSha256": "b" * 64}), "")
+        return super().run(argv, **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("stdout", "stderr", "returncode", "accepted", "message"),
+    [
+        (b"0.9.8\n", b"", 0, True, None),
+        (b"", b"0.9.8\n", 0, True, None),
+        (b"0.9.8\r\n", b"", 0, False, "version mismatch"),
+        (b"", b"0.9.8\r\n", 0, False, "version mismatch"),
+        (b"0.9.8\r", b"", 0, False, "version mismatch"),
+        (b"", b"0.9.8\r", 0, False, "version mismatch"),
+        (b"0.9.8", b"", 0, False, "version mismatch"),
+        (b"", b"0.9.8", 0, False, "version mismatch"),
+        (b"0.9.8\n", b"0.9.8\n", 0, False, "exactly one stream"),
+        (b"", b"", 0, False, "exactly one stream"),
+        (b" 0.9.8\n", b"", 0, False, "version mismatch"),
+        (b"", b"0.9.8 \n", 0, False, "version mismatch"),
+        (b"0.9.8\nextra\n", b"", 0, False, "version mismatch"),
+        (b"", b"\n0.9.8\n", 0, False, "version mismatch"),
+        (b"0.9.8\n\n", b"", 0, False, "version mismatch"),
+        (b"", b"0.9.7\n", 0, False, "version mismatch"),
+        (b"\xff\n", b"", 0, False, "version mismatch"),
+        (b"", b"0.9.8\n", 7, False, "version command failed"),
+    ],
+)
+def test_production_version_adapter_preserves_exact_raw_stream_bytes(
+    tmp_path: Path,
+    stdout: bytes,
+    stderr: bytes,
+    returncode: int,
+    accepted: bool,
+    message: str | None,
+) -> None:
+    config = cutover_config(tmp_path)
+    configure_node_version_emitter(config, tmp_path, stdout=stdout, stderr=stderr, returncode=returncode)
+    runner = ObservingLocalRunner()
+    coordinator = coord.Coordinator(config, tmp_path / "state", runner)
+    coordinator.validate_static()
+
+    if accepted:
+        coordinator.verify_executable()
+        coordinator.verify_executable()
+        assert coordinator.observations["runtime"]["version"] == "0.9.8"
+        assert len(runner.version_results) == 2
+        assert all(result.stdout == stdout and result.stderr == stderr for result in runner.version_results)
+    else:
+        for _ in range(2):
+            with pytest.raises(coord.CutoverError, match=message):
+                coordinator.verify_executable()
+        assert len(runner.version_results) == 2
+        assert all(result.stdout == stdout and result.stderr == stderr for result in runner.version_results)
+
+    expected_argv = tuple(config["runtime"]["cliArgvPrefix"] + ["--version"])
+    assert runner.version_calls == [
+        (expected_argv, {"cwd": None, "timeout": 10})
+    ] * 2
+    assert runner.text_calls == []
+    assert runner.children == {}
+
+
+def test_production_version_adapter_failure_stops_preflight_before_downstream_commands(tmp_path: Path) -> None:
+    config = cutover_config(tmp_path)
+    configure_node_version_emitter(config, tmp_path, stdout=b"0.9.8\r\n", stderr=b"")
+    runner = ObservingLocalRunner()
+
+    with pytest.raises(coord.CutoverError, match="version mismatch"):
+        coord.Coordinator(config, tmp_path / "state", runner).preflight()
+
+    assert len(runner.version_calls) == 1
+    assert runner.version_results[0].stdout == b"0.9.8\r\n"
+    assert len(runner.text_calls) == 1
+    assert runner.text_calls[0][0].endswith("manage-prime-agent-cutover-bundle.py")
+    assert not any(call[-2:] == ("status", "--json") for call in runner.text_calls)
+    assert not any(call[:3] == ("git", "clone", "--no-local") for call in runner.text_calls)
+    assert runner.children == {}
+
+
+def test_production_version_adapter_timeout_is_bounded_and_reaps_child(tmp_path: Path) -> None:
+    pid_file = tmp_path / "version-emitter.pid"
+    emitter = (tmp_path / "slow-version-emitter.py").resolve()
+    emitter.write_text(
+        "import os, pathlib, time\n"
+        f"pathlib.Path({str(pid_file)!r}).write_text(str(os.getpid()))\n"
+        "time.sleep(60)\n"
+        "os.write(1, b'0.9.8\\n')\n"
+    )
+    runner = ObservingLocalRunner()
+    started = time.monotonic()
+
+    with pytest.raises(coord.CutoverError, match="command timed out"):
+        runner.run_version((sys.executable, str(emitter), "--version"), timeout=0.2)
+
+    elapsed = time.monotonic() - started
+    assert elapsed < 3
+    assert len(runner.version_calls) == 1
+    pid = int(pid_file.read_text())
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
+    assert runner.children == {}
+
 def test_supported_prime_agent_098_wrapper_uses_exact_stderr_version_interface(tmp_path: Path) -> None:
     wrapper = Path("/Users/jlanders/code/prime-agent/.worktrees/cwd-fix-v0.9.8-r1-source/prime-agent.sh")
     if not wrapper.is_file():
@@ -574,12 +724,12 @@ def test_supported_prime_agent_098_wrapper_uses_exact_stderr_version_interface(t
     class CapturingLocalRunner(coord.LocalRunner):
         def __init__(self) -> None:
             super().__init__()
-            self.results: list[coord.Result] = []
+            self.results: list[coord.RawResult] = []
             self.calls: list[tuple[tuple[str, ...], dict[str, object]]] = []
 
-        def run(self, argv, **kwargs):
+        def run_version(self, argv, **kwargs):
             self.calls.append((tuple(argv), dict(kwargs)))
-            result = super().run(argv, **kwargs)
+            result = super().run_version(argv, **kwargs)
             self.results.append(result)
             return result
 
@@ -601,12 +751,12 @@ def test_supported_prime_agent_098_wrapper_uses_exact_stderr_version_interface(t
     coordinator.validate_static()
     coordinator.verify_executable()
 
-    assert runner.calls == [((str(wrapper), "--version"), {"cwd": None, "allow_failure": True, "timeout": 10})]
+    assert runner.calls == [((str(wrapper), "--version"), {"cwd": None, "timeout": 10})]
     assert len(runner.results) == 1
     assert runner.results[0].argv == (str(wrapper), "--version")
     assert runner.results[0].returncode == 0
-    assert runner.results[0].stdout == ""
-    assert runner.results[0].stderr == "0.9.8\n"
+    assert runner.results[0].stdout == b""
+    assert runner.results[0].stderr == b"0.9.8\n"
     assert coordinator.observations["runtime"]["version"] == "0.9.8"
 
 

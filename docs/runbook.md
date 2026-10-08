@@ -191,9 +191,10 @@ is ready to resume after the exact-model preflight; no build has restarted. See 
 Generation A is prepared but not activated by normal development. Use
 `docs/lab-global-plugin.md#Generation-A-coordinator-and-preactivation-bundle`
 for the exact coordinator, private-bundle, checkpoint, and recovery contracts.
-During Slice 4, run only recording fakes and isolated-copy apply/restore proof.
-Do not run `--execute`, `--user-global`, `shutdown`, a daemon start, landing, or
-UAT.
+During Slice 4, use recording fakes, bounded temporary subprocess emitters, the
+supported wrapper's read-only `--version` interface, and isolated-copy
+apply/restore proofs. Do not run `--execute`, `--user-global`, `shutdown`, a
+daemon start, landing, or UAT.
 
 A future explicitly authorized Gate A starts from a separate non-Orca terminal
 with a reviewed coordinator input, private bundle manifest digest, and private
@@ -202,9 +203,13 @@ Node CLI prefix, both interpreter/entrypoint artifact digests, the declared old
 daemon's status/build/socket/PID, the approved worker set, and confirmed absence
 of clients, TUIs, launchers, and wrappers. Observation uses only exact Prime
 Agent process-title discovery plus targeted declared/discovered PIDs. Version
-admission requires return code zero and the exact configured single-line version
-on exactly one of stdout or stderr while the other stream is empty. Ambiguous,
-empty, multiline, extra-content, and mismatched output fail before live mutation.
+admission uses a version-only lossless subprocess capture and requires return
+code zero, exactly one raw stream equal to the configured version encoded as
+UTF-8 plus one LF byte, and the other raw stream equal to `b""`. CRLF, bare CR,
+no LF, non-UTF-8 bytes, ambiguity, whitespace, extra or multiple lines,
+mismatch, nonzero status, and timeout fail before status or any live work. The
+general text-mode runner for Git, status, process, and bundle commands remains
+unchanged.
 
 The input also contains the explicit newest-to-oldest linear revert commits, the
 integration merge and ordered parents, mainline 2, and accepted prelanding

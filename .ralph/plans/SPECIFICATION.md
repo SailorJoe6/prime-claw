@@ -1,12 +1,12 @@
 # Specification — Official lean role protocol completion and compatibility cleanup
 
-> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Owner accepts repaired lifecycle closure through `6bceeea133f767d72739a8d88df2639ab75bba96` / tree `6421f9acc11a4c5e755e37dfa3060c2821bf5326`; Slice 3 is complete. Generation A candidate `f2f3fcd25dbe3d96f05193261020d26bf79f1213` / tree `8b4fef1936766c7383a577317ac6d2436f4e72e5` is preserved immutable history. Its exact configured Astra/max review returned `BLOCK`, report SHA256 `4ed03385fc1d54cdecdbbacf5ea720d00b70a9af10b99b1466f7592df50d95e1`. The owner accepted the Section 31 replacement `ed42db9f20ce7a58689707b188e35028e31abf55` / tree `7fb098436e13296191ab64ef593c49550c70c162` after an exact configured `PASS` and explicitly authorized Gate A. Before any live mutation, owner read-only preflight found the supported Prime Agent 0.9.8 wrapper writes exact version `0.9.8` to stderr while coordinator verification reads stdout only. Gate A did not begin. Preserve ed42 and its PASS as history; only the bounded Section 32 executable-version stream repair, successor gates/freeze, and fresh review are authorized.
+> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Owner accepts repaired lifecycle closure through `6bceeea133f767d72739a8d88df2639ab75bba96` / tree `6421f9acc11a4c5e755e37dfa3060c2821bf5326`; Slice 3 is complete. Generation A candidate `f2f3fcd25dbe3d96f05193261020d26bf79f1213` / tree `8b4fef1936766c7383a577317ac6d2436f4e72e5` is preserved immutable history. Its exact configured Astra/max review returned `BLOCK`, report SHA256 `4ed03385fc1d54cdecdbbacf5ea720d00b70a9af10b99b1466f7592df50d95e1`. The owner accepted the Section 31 replacement `ed42db9f20ce7a58689707b188e35028e31abf55` / tree `7fb098436e13296191ab64ef593c49550c70c162` after an exact configured `PASS` and explicitly authorized Gate A. Before any live mutation, owner read-only preflight found the supported Prime Agent 0.9.8 wrapper writes exact version `0.9.8` to stderr while coordinator verification reads stdout only. Gate A did not begin. Section 32 successor `47d2d49280bd4ef8cd66e4bcc7eddcf7ad7980b4` / tree `a4667c0047a9ea6f3379790d024c3df44754f00c` is frozen history; its fresh exact Astra/max review returned `BLOCK` because `LocalRunner.run(..., text=True)` normalizes raw CRLF and bare CR to LF before the verifier. Preserve owner report SHA256 `039a66d0ad404d5592913d9476dfef77c6e309dbc16b5dd9a23e3593f6008262` and reviewer production-adapter matrix SHA256 `bf8d9d182c028b77608745237aa286cf416aaf704a35bbd26ea94a0a77a337de`. Owner stop-loss reassessment authorizes exactly one final narrow Section 33 lossless version-capture repair and one final fresh exact review.
 >
 > **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
 >
 > **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
 >
-> **Implementation authority:** repair only the coordinator executable-version verification seam described in plan Section 32. Preserve ed42, its exact configured PASS, and the owner diagnostic as history. Accept one exact single-line expected version from exactly one successful command stream only; add the exact stream matrix plus one real supported 0.9.8 wrapper probe; update affected docs/traceability and private bundle/readiness/config evidence; prove the complete successor rollback chain; run all gates; freeze/push one clean successor; report it and stop for a fresh exact owner review. Do not patch Prime Agent, generalize output normalization, touch primary main or the owner's private local-edit backup, execute invalidated ed42 config/state, perform live shutdown/landing/apply/restart/UAT, start S5, remove compatibility, finalize, or clean up.
+> **Implementation authority:** execute only the final bounded production-adapter repair in plan Section 33. Add a version-specific lossless subprocess capture seam without changing general `LocalRunner.run` text behavior. Admit only rc0 plus exact UTF-8 configured-version bytes followed by one LF on exactly one raw stream, with the other raw stream empty; fail all specified byte, ambiguity, timeout, and decode cases. Exercise the actual adapter, preserve the real supported 0.9.8 stderr proof, update only affected documentation/traceability/private evidence, prove the full successor rollback chain, run all gates, freeze/push one clean successor, report it, and stop for the one allowed final fresh exact owner review. Preserve 47d2d49, ed42, f2f3, all reports/diagnostics, primary main, the owner's private overlay, old configs, live/global state, UAT, S5, compatibility, finalization, and cleanup.
 
 ## Summary
 
@@ -1047,3 +1047,56 @@ report it, and stop for one fresh exact owner review. Gate A authority is not
 transported through the changed candidate bytes: do not execute the invalidated
 ed42 config/state or perform shutdown, landing, apply, restart, or UAT in this
 repair pass.
+
+## Final stop-loss repair authority — lossless version observation
+
+Fresh exact Astra/max review returned `BLOCK` for immutable Section 32 successor
+`47d2d49280bd4ef8cd66e4bcc7eddcf7ad7980b4` / tree
+`a4667c0047a9ea6f3379790d024c3df44754f00c`. Preserve owner report SHA256
+`039a66d0ad404d5592913d9476dfef77c6e309dbc16b5dd9a23e3593f6008262`
+and reviewer real-`LocalRunner` matrix SHA256
+`bf8d9d182c028b77608745237aa286cf416aaf704a35bbd26ea94a0a77a337de`.
+The accepted finding is that Python text-mode universal-newline conversion turns
+raw CRLF and bare CR into LF before `verify_executable`, so the recording-fake
+contract was stricter than the production adapter.
+
+Owner stop-loss reassessment authorizes exactly one final narrow repair. Introduce
+a version-specific subprocess observation seam that preserves stdout and stderr
+bytes losslessly, or an exact equivalent. Keep the existing ten-second timeout.
+Do not alter general `LocalRunner.run(..., text=True)` behavior used by Git,
+status, process, and bundle operations.
+
+Version admission requires return code zero, exactly one populated raw stream,
+and exact equality with the configured version encoded as UTF-8 followed by one
+LF byte. The other raw stream must be empty. Reject nonzero, both streams, neither
+stream, no LF, CRLF, bare CR, whitespace, extra/blank/multiple lines, mismatch,
+timeout, undecodable bytes, and every non-exact byte sequence. Do not strip,
+split lines, remove carriage returns, concatenate streams, regex/substring parse,
+or add a shared/general normalizer.
+
+Tests must traverse the real production capture adapter for LF stdout and LF
+stderr positives and CRLF and bare-CR negatives on both streams. Preserve the
+supported Prime Agent 0.9.8 raw-stderr proof. Prove downstream command absence on
+failure plus first-call, replay, and timeout behavior. Update only affected docs,
+traceability, private bundle/proofs/config, and gate evidence.
+
+The final successor rollback chain is exactly `[successor,
+47d2d49280bd4ef8cd66e4bcc7eddcf7ad7980b4,
+ed42db9f20ce7a58689707b188e35028e31abf55,
+f2f3fcd25dbe3d96f05193261020d26bf79f1213]`, followed by integration merge
+`46147ff887569101b7e64a8466cde5887c15cc31` with mainline 2. Isolated proof must
+produce baseline `c24ba6c1e76585193d4f34f0b0b0233846780442` / tree
+`a9955483816af04a4c68468a8e2ce3d0d0d00a5d`.
+
+Run all required exact gates, freeze/push one clean immutable successor, report
+it, and stop for the one allowed final fresh exact owner review. Do not touch
+primary `main`, the owner's private overlay, prior configs, Prime Agent source,
+live/global state, Gate A, UAT, S5, compatibility removal, finalization,
+bookkeeping close, or physical cleanup.
+
+## Docker validation recovery
+
+The owner Conversation restored Docker Desktop. Independent health returned
+server version `29.6.2`, and the exact Docker-focused gate passed 3 tests with an
+isolated pinned-0.9.8 selector. No credential, tracked configuration, Gate A, or
+live Prime Agent state changed.

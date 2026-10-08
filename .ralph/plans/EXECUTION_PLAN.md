@@ -2121,3 +2121,111 @@ Tier 0/Docker/pinned/diff/remote/teardown gates, freeze/push one candidate,
 create exact successor-bound proof-only config/rollback/freeze receipts, report
 the owner, and stop for fresh exact review. Do not run Gate A or any live/global
 mutation.
+
+## 33. Final stop-loss repair — lossless version capture adapter
+
+**Blocked immutable successor:**
+`47d2d49280bd4ef8cd66e4bcc7eddcf7ad7980b4` / tree
+`a4667c0047a9ea6f3379790d024c3df44754f00c`.
+
+**Preserved exact review evidence:** owner report SHA256
+`039a66d0ad404d5592913d9476dfef77c6e309dbc16b5dd9a23e3593f6008262`;
+reviewer production-`LocalRunner` matrix SHA256
+`bf8d9d182c028b77608745237aa286cf416aaf704a35bbd26ea94a0a77a337de`.
+
+**Accepted root cause:** general `LocalRunner.run` invokes `subprocess.run` with
+`text=True`; universal-newline conversion changes raw CRLF and bare CR to LF
+before the Section 32 verifier. Recording fakes returned already-decoded strings
+and therefore bypassed the production adapter defect.
+
+### 33.1 One version-specific production seam
+
+1. Add a version-only runner operation that invokes the supplied version argv,
+   captures stdout/stderr losslessly as bytes (or exact equivalent), and retains
+   the existing ten-second bound.
+2. Do not change the signature or text semantics of general `LocalRunner.run`.
+   Git, status, process, bundle, and all non-version commands remain unchanged.
+3. Keep the version decision local to `verify_executable`; do not add a general
+   normalizer or parser.
+4. Require rc0, exactly one nonempty raw stream, and exact equality to
+   `runtime.version.encode("utf-8") + b"\n"`; require the other stream to equal
+   `b""`.
+5. Reject nonzero, both/empty streams, no-LF, CRLF, bare CR, surrounding or
+   internal whitespace, extra/blank/multiple lines, mismatch, timeout,
+   undecodable bytes, and all other non-exact byte sequences.
+6. Do not strip, `splitlines`, remove CR, concatenate streams, regex/substring
+   match, patch Prime Agent, or broaden transaction/process/crash behavior.
+
+### 33.2 Production-adapter coverage
+
+Use the actual `LocalRunner` version-capture adapter with bounded temporary
+emitters, not recording fakes alone, to prove:
+
+- exact LF stdout and exact LF stderr are accepted;
+- CRLF stdout/stderr and bare-CR stdout/stderr are rejected without conversion;
+- both/empty streams, no-LF, whitespace, extra/blank/multiple lines, mismatch,
+  nonzero expected output, undecodable/non-UTF-8 bytes, and timeout fail closed;
+- no status, Git clone, shutdown, landing, apply, start, or other downstream
+  command occurs after a version failure;
+- first-call behavior, deterministic replay, and timeout cleanup are bounded; and
+- the exact supported 0.9.8 wrapper still produces rc0, empty raw stdout, and
+  raw stderr `b"0.9.8\n"`, and is admitted through the production adapter.
+
+### 33.3 Evidence, rollback, gates, and terminal boundary
+
+- Preserve 47d2d49, ed42, f2f3, their review history, the Gate A diagnostic, and
+  both accepted review hashes unchanged.
+- Update only affected documentation/traceability and regenerate affected
+  private successor bundle, real-adapter proof, proof-only coordinator config,
+  prospective/exact topology proof, gate receipt, freeze receipt, and owner
+  packet. Never reuse an operational old config.
+- Prove rollback chain `[successor,
+  47d2d49280bd4ef8cd66e4bcc7eddcf7ad7980b4,
+  ed42db9f20ce7a58689707b188e35028e31abf55,
+  f2f3fcd25dbe3d96f05193261020d26bf79f1213]`, then merge
+  `46147ff887569101b7e64a8466cde5887c15cc31` mainline 2, yielding
+  `c24ba6c1e76585193d4f34f0b0b0233846780442` / tree
+  `a9955483816af04a4c68468a8e2ce3d0d0d00a5d` in a no-local clone.
+- Run exact focused production-adapter/real-wrapper/Docker/Node/Tier 0/Tier 1/
+  pinned/diff/remote/teardown gates.
+- Freeze and push one clean successor, report it, and stop for the one allowed
+  final fresh exact owner review.
+
+Do not touch primary `main`, the owner's private overlay, old configs, Prime
+Agent source, live processes, user-global state, Gate A, UAT, S5, compatibility
+removal, finalization, bookkeeping close, or physical cleanup.
+
+### Section 33 implementation checkpoint — lossless adapter and evidence
+
+The version-only `RawResult` / `LocalRunner.run_version` seam now captures raw
+stdout and stderr bytes with the existing ten-second bound; general
+`LocalRunner.run(..., text=True)` remains unchanged. `verify_executable` compares
+one raw stream directly to `runtime.version.encode("utf-8") + b"\n"` and
+requires the other to be empty. The actual production adapter covers LF, CRLF,
+bare CR, no LF, ambiguity, whitespace, extra/blank/multiple lines, mismatch,
+non-UTF-8, nonzero, downstream absence, first/replay behavior, bounded timeout,
+child reaping, and the supported 0.9.8 wrapper's raw stderr contract.
+
+The post-audit focused suite passes 120. Byte-contract audit is `PASS`; evidence
+audit's malformed replay and timeout-bound tightenings are incorporated. Current
+private evidence is reconstructed only from Section 32 preserved inputs:
+source topology `35a2307c7edad520c6c9fb0b47d37eaaf4bd78e0cfe34b9f8bae92fd8bf1c487`,
+bundle manifest `f48241bbc2e9019bfc8606d63d526e2fdf72b17cd538d93bede6d54ee4556f93`,
+bundle proof `afd6eb29f86093a7efb8e50d7872a3f6639a8affd8ca4ce3229f34e7c51f7232`,
+and raw adapter proof
+`37fd6704ac622c7b7dfa1e8b516ac6380709023a42695934fe16430a2e18c3c2`.
+No user-global state was read and no prohibited action occurred.
+
+Next run preliminary broader exact gates, stage the intended successor, prove the
+prospective full rollback chain, run complete exact gates, freeze/push one clean
+successor, regenerate successor-bound private receipts, report the owner, and
+stop for the one allowed final fresh exact review.
+
+## Docker validation recovery
+
+The owner Conversation explicitly hard-restarted Docker Desktop. Independent
+`docker info` returned server version `29.6.2`. The first retry then exposed only
+the recovered worktree's absent `.env`; an isolated mode-0600 selector containing
+`PRIME_AGENT_PINNED=0.9.8` supplied the already approved test input without
+credentials or tracked configuration. The exact Docker-focused gate then passed
+3 tests. The external blocker is resolved; continue the bounded freeze workflow.
