@@ -21,6 +21,26 @@ def test_execute_skill_enforces_one_small_complete_slice() -> None:
         assert fragment in text
 
 
+def test_execute_skill_keeps_implementation_inside_the_bounded_contract() -> None:
+    text = " ".join(EXECUTE_SKILL.read_text().split())
+
+    for fragment in (
+        "approved threat model",
+        "trusted assumptions",
+        "non-goals",
+        "qualitative complexity budget",
+        "Reviewer novelty",
+        "not acceptance scope unless the operator has promoted it",
+        "lightweight hardening backlog",
+        "grow materially faster than delivered value",
+        "simplification checkpoint",
+        "topology simplification",
+        "evidence-preserving manual recovery",
+        "bespoke transaction or recovery subsystem",
+    ):
+        assert fragment in text
+
+
 def test_execute_skill_defers_goal_and_heartbeat_control_to_plugin_context() -> None:
     text = EXECUTE_SKILL.read_text()
 

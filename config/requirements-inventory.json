@@ -1221,15 +1221,13 @@
           "tests/conftest.py"
         ],
         "validate": [
-          "tests/container/fake_daemon.py",
-          "tests/container/sigterm_orphan_probe.py",
-          "tests/container/concurrent_apply_probe.py"
+          "tests/container/fake_daemon.py"
         ],
         "tests": [
           "tests/test_handoff_chain_extension.py",
           "tests/test_reviewed_plan_extension.py",
           "tests/test_project_conversation_extension.py",
-          "tests/test_goal_heartbeat_work_control_extension.py",
+          "tests/test_managed_session_protocol.py",
           "tests/test_conversation_oversight_native.py",
           "tests/test_reviewed_plan_native_discovery.py",
           "tests/test_prime_agent_plugin_install.py",
@@ -1704,5 +1702,277 @@
       "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 8)"
     }
   ],
-  "phase2": {}
+  "phase2": {},
+  "officialLeanRoleProtocol": {
+    "spec": ".ralph/plans/archive/official-lean-compatibility-cleanup/SPECIFICATION.md",
+    "plan": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md",
+    "activeSlice": "S7 immutable final candidate freeze and review",
+    "requirements": [
+      {
+        "id": "ORP-001",
+        "summary": "canonical neutral kernel",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-002",
+        "summary": "guarded selected context",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-003",
+        "summary": "system channel only",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-004",
+        "summary": "per-provider integrity",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-005",
+        "summary": "explicit context opt-out",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-006",
+        "summary": "lean Conversation skill",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-007",
+        "summary": "guidance activation",
+        "status": "accepted-gate-a",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md"
+        ]
+      },
+      {
+        "id": "ORP-008",
+        "summary": "bounded execute role",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-009",
+        "summary": "official EXPERT",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-010",
+        "summary": "semantic read-only",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-011",
+        "summary": "role scoping",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-012",
+        "summary": "historical filtering",
+        "status": "active-s6-final-replay-audit",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
+        ]
+      },
+      {
+        "id": "ORP-013",
+        "summary": "retired overlay absent",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md"
+        ]
+      },
+      {
+        "id": "ORP-014",
+        "summary": "one fresh complete episode",
+        "status": "accepted-gate-a",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md"
+        ]
+      },
+      {
+        "id": "ORP-015",
+        "summary": "bridge generation",
+        "status": "accepted-gate-a",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md"
+        ]
+      },
+      {
+        "id": "ORP-016",
+        "summary": "interim UAT",
+        "status": "accepted-gate-a",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": []
+      },
+      {
+        "id": "ORP-017",
+        "summary": "compatibility removal",
+        "status": "active-s6-final-source",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
+        ]
+      },
+      {
+        "id": "ORP-018",
+        "summary": "final UAT/completion",
+        "status": "pending-gate-b",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": []
+      },
+      {
+        "id": "ORP-019",
+        "summary": "isolated gates",
+        "status": "active-s6-final-gates",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
+        ]
+      },
+      {
+        "id": "ORP-020",
+        "summary": "correlatable evidence",
+        "status": "active-s6-final-evidence",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
+        ]
+      },
+      {
+        "id": "ORP-021",
+        "summary": "two rollback points",
+        "status": "accepted-through-s5",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md"
+        ]
+      },
+      {
+        "id": "ORP-022",
+        "summary": "current documentation",
+        "status": "active-s6-final-docs",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
+        ]
+      },
+      {
+        "id": "ORP-023",
+        "summary": "immutable history",
+        "status": "accepted-through-s3",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "evidence": [
+          "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-29-publication-overlap-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-32-version-stream-repair.md",
+          "docs/evidence/official-lean-role-protocol/2026-10-07-section-33-lossless-version-capture.md"
+        ]
+      }
+    ]
+  }
 }

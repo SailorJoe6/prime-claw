@@ -19,6 +19,16 @@ If the plan is truly finished, all changes are documented and there is nothing l
 
 Assuming there is still work left, choose one small elephant-carpaccio slice: the smallest end-to-end change that produces observable value or decisive evidence. It must fit within the current context window, including implementation, tests, documentation, bead and plan updates, and one clean single-purpose commit pushed for review. Size the slice to finish without relying on auto-compaction. If it cannot reasonably finish within that boundary, split it before starting. After pushing the slice, stop and report; do not begin another slice.  You may use as many subagents as useful within that one slice.
 
+Stay inside the approved threat model, trusted assumptions, non-goals, and
+qualitative complexity budget while implementing the slice. Reviewer novelty,
+an advisory, or a new invariant is not acceptance scope unless the operator has
+promoted it. Record plausible non-blocking risks in the plan's lightweight
+hardening backlog instead of implementing them automatically. If support
+machinery or recovery states begin to grow materially faster than delivered
+value, stop and report a simplification checkpoint to the owner. Prefer deletion,
+topology simplification, ordinary failure handling, and evidence-preserving
+manual recovery over a bespoke transaction or recovery subsystem.
+
 General execution standards (apply to any work you do):
 - Evidence-backed decisions: any claim of correctness, completion, causality, etc. must cite an artifact (test output, log, benchmark, user research, code diff, design doc).
 - Hypothesis hygiene: check the plan for previously rejected approaches to avoid re-attempting.

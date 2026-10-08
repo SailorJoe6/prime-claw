@@ -200,8 +200,9 @@ execute workflow; specification and planning do not repeat inside it.
 The episode remains available through bounded execute/handoff iterations,
 implementation, PR review, updates, and rebasing. Archiving its completed active
 plans is the episode's claim that it is ready for owner review; the owning
-conversation verifies the work, decides whether to merge or abandon, and reaps
-the session and worktree only after that terminal disposition.
+conversation verifies the work and presents evidence, the operator decides
+whether to merge or abandon, and the owner performs verified terminal work and
+bookkeeping before reaping the session or worktree.
 
 The hard problem at this boundary remains *what context crosses*: too little
 and the episode is past-design-blind; too much and the context-rot problem is

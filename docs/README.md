@@ -39,19 +39,23 @@ prime-claw builds on four prior projects. Read these before designing:
 - [handoff-chain.md](handoff-chain.md) — the Phase 4a native `/handoff` →
   focused compaction → next-skill transition, its legacy Ralph-loop lineage,
   marker lifecycle, regression tests, evidence, and short-session recovery.
+- [prep-chain.md](prep-chain.md) — the compaction-first planning and
+  implementation-promotion boundaries: project-owned prep policy, fail-closed
+  two-skill preflight, deterministic admission ordering, one-deep approval
+  survival, and best-effort compaction semantics.
 - [future-specification-bundles.md](future-specification-bundles.md) — operator
   walkthrough for reviewed future-folder authoring, native `/plan`, explicit
   `/implement-spec` promotion, unresolved admission handling, validation scope,
   and archived design provenance.
-- [lab-global-plugin.md](lab-global-plugin.md) — manual POC installation,
-  refresh, and verification of the shared prime-claw plugin on the personal lab
-  machine.
+- [lab-global-plugin.md](lab-global-plugin.md) — the final plugin layout,
+  selected-global-context ownership, exact legacy-region removal,
+  receipt-driven recovery, staged deployment, and rollback.
 - [conversation-driven-episode-oversight.md](conversation-driven-episode-oversight.md)
-  — every independent project session defaults to CONVERSATION, with temporary
-  exact-session episode oversight and authority boundaries.
+  — the lean managed session protocol, deterministic lifecycle mechanics,
+  historical-package filtering, and managed global role guides.
 - [goal-heartbeat-work-control.md](goal-heartbeat-work-control.md) — the
-  plugin-global event-driven goal/heartbeat ownership policy, capability gating,
-  safe migration, activation boundary, and manual acceptance checklist.
+  neutral-kernel/managed-guide work-control split, retired-extension migration,
+  and coordinated Gate B activation boundary.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)

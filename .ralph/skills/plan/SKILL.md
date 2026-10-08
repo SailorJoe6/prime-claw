@@ -19,8 +19,12 @@ audit the repository's current state against it.
 
 If the selected folder lacks required specification material, its documents are
 internally inconsistent, or the work is not adequate to plan safely, explain the
-specific gap and stop. Do not create a partial execution plan and do not start
-implementation.
+specific gap and stop. In particular, require a concise threat model, trusted
+assumptions, ordinary failure model, explicit non-goals, an evidence-preserving
+manual-recovery boundary, and a qualitative complexity budget. Confirm that the
+specification separates acceptance requirements from optional hardening and does
+not promote reviewer-discovered scope without operator approval. Do not create a
+partial execution plan and do not start implementation.
 
 ## Create the reviewed execution plan
 
@@ -35,6 +39,21 @@ commit pushed for review. Size each slice for one bounded implementation
 iteration. Record dependencies, acceptance evidence, and explicit non-goals so
 an implementation episode can execute the plan without relying on conversation
 history.
+
+Plan for ordinary failure handling and manual recovery before bespoke
+transaction or recovery machinery. Add a simplification checkpoint when support
+machinery or recovery states could grow materially faster than delivered value;
+the checkpoint considers deletion or topology simplification before more
+hardening. Limit one slice acceptance attempt, across successor candidate commits, to two
+repair/review cycles. A third cycle stops
+for owner reassessment and operator consultation when continuing would change
+scope, product behavior, architecture, or the complexity budget.
+
+Record plausible non-blocking risks only in a lightweight hardening backlog.
+Each entry needs the scenario, likely impact, current assumption, and a concrete
+promotion trigger such as an observed failure, near miss, credible user report,
+changed deployment boundary, or newly approved requirement. It is not acceptance
+scope until the operator promotes it.
 
 ## Stop for operator plan review
 

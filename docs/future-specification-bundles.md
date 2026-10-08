@@ -68,6 +68,39 @@ into it when they emerge, before conversation history or compaction can lose
 them. Update the relevant text and remove stale claims rather than using the
 specification as an append-only activity log.
 
+## Bounded contracts and proportionate review
+
+Prime Claw biases toward **DONE over perfect**. A future specification must bound
+its practical product contract before planning: desired outcome, required safety,
+concise threat model, trusted assumptions, ordinary failure model, explicit
+non-goals, manual-recovery boundary, and qualitative complexity budget. Required
+acceptance behavior stays separate from optional hardening and implementation
+suggestions. Diagnostic evidence is not a security attestation unless the
+operator explicitly makes that the product.
+
+Plans deliver the smallest safe vertical slice and prefer ordinary failure
+handling, deletion, or topology simplification over bespoke transaction and
+recovery systems. Plausible non-blocking risks can enter a lightweight hardening
+backlog with four fields: scenario, likely impact, current assumption, and a
+concrete promotion trigger. Observed failure, a near miss, a credible user
+report, a changed deployment boundary, or a newly approved requirement can
+trigger reconsideration. Review novelty alone cannot promote scope.
+
+An EXPERT may block only on a concrete violation inside the approved contract
+with realistic impact and proportionate remediation. Out-of-model findings are
+advisory. A specification defect or new product invariant returns to the
+operator; the reviewer cannot expand scope. PASS means no in-contract blocker or
+required specification decision remains, not that no imaginable edge case
+exists. Optional adversarial red-team review requires explicit operator
+authorization and cannot redefine the baseline contract.
+
+After two repair/review cycles for the same slice acceptance attempt across
+successor candidate commits, automatic repair stops. The
+owner reassesses threat model, architecture, and complexity. It consults the
+operator if continuing changes scope, product behavior, architecture, or the
+approved complexity budget. A separate simplification checkpoint fires when
+support machinery or recovery states grow materially faster than user value.
+
 ## Reviewed planning entry paths
 
 Planning is a separate reviewed gate with two explicit entry paths.
@@ -90,17 +123,23 @@ unsafe slugs, and folders that do not exist. Invalid input displays:
 Usage: /plan .ralph/plans/future/<slug>
 ```
 
-A valid command loads the current project policy from
-`.ralph/skills/plan/SKILL.md`, adds the validated path in an
-`<operator-plan-location>` block, and sends that combined prompt exactly once.
-The native code does not choose artifact names or define how planning works.
-Those customizable decisions remain in the canonical skill Markdown.
+A valid command preflights both current project policies:
+`.ralph/skills/plan-prep/SKILL.md` and `.ralph/skills/plan/SKILL.md`. It wraps
+each with the same validated `<operator-plan-location>` block, admits
+`plan-prep` as an ordinary message, and queues canonical `plan` exactly once as
+the sole `followUp`. The native code does not define the readiness sniff,
+compaction hint, or planning behavior. Those customizable decisions remain in
+the canonical skill Markdown.
 
-The default policy reads the specification bundle and writes
+`plan-prep` performs a light specification-presence sniff and requests focused
+compaction once with the project-owned standard hint. Compaction is best effort,
+not the continuation trigger; `plan` was queued independently at admission. The
+canonical plan policy then reads the specification bundle and writes
 `EXECUTION_PLAN.md` back into the same future folder. If specification material
 is missing or inadequate, it explains the gap and stops. Otherwise, it links
 all planning output and stops for operator plan review. `/plan` never moves the
-bundle, creates an implementation worktree, or authorizes implementation.
+bundle, creates an implementation worktree, or authorizes implementation. See
+[phase prep chain](prep-chain.md) for ordering and failure semantics.
 
 ### Conversational `ralph_plan`
 
@@ -110,17 +149,19 @@ It accepts only one required `location` field containing the exact
 command, approval, implementation, or routing fields.
 
 When the operator clearly requests planning for an exact folder, the tool calls
-the same deterministic validation and canonical skill-loading helper as native
-`/plan`. Because the tool runs during an agent turn, it queues the wrapped
-planning workflow exactly once with `deliverAs: "followUp"`. Its result reports
-admission only: planning has not completed, and implementation remains
-unauthorized.
+the same deterministic validation and two-skill preflight as native `/plan`.
+Because the tool runs during an agent turn, it steers wrapped `plan-prep` first
+and queues wrapped `plan` exactly once as the sole `followUp`. Its result reports
+admission only: neither compaction nor planning is reported complete, and
+implementation remains unauthorized.
 
 If the folder is missing or materially ambiguous, the model asks the operator
 instead of searching, selecting, or inventing a slug. Invalid paths, missing
-folders, symlink escapes, missing canonical Markdown, and queue failures are
-visible and admit no partial workflow. Inline prose is not parsed by extension
-substring matching.
+folders, symlink escapes, or missing canonical Markdown are visible and send
+nothing. A first-message failure reports that prep was not admitted; a
+second-message failure reports that prep was admitted but planning was not
+queued and the transition is incomplete. Inline prose is not parsed by
+extension substring matching.
 
 These are two explicit admission surfaces for the same planning operation:
 native `/plan` and conversational `ralph_plan`. The former
@@ -133,16 +174,14 @@ Implementation promotion remains native-only. A fresh project conversation does
 not register `ralph_implement_spec`; the operator must use the explicit native
 command below. This is a deliberate fail-closed result, not a missing adapter.
 
-The installed Prime Agent 0.9.5 RPC characterization confirmed host approval,
-`steer`, and matching `input` with `event.source === "extension"`. It also
-showed `agent_end` after that matching input and before the readiness agent turn.
-The approved conversational design clears pending and active authority on
-`agent_end`, so its one-use arm cannot safely reach `create_spec_episode` without
-adding forbidden cross-run lifecycle state. Rejection, cancellation, absent UI,
-and non-UI modes consequently have no conversational implementation path or
-episode side effect. Confirmation UX can be reconsidered only with a simpler
-public runtime ordering; it must not be emulated with durable approvals, leases,
-nonces, timers, or private runtime patches.
+The installed Prime Agent RPC characterization confirmed that a model-called
+confirmation tool would cross `agent_end` before a steered readiness turn. That
+surface remains intentionally absent: rejection, cancellation, absent UI, and
+non-UI modes have no conversational implementation path or episode side effect.
+The explicit native command is the operator authority boundary and uses only a
+bounded in-memory one-deep lifecycle flag for its own admitted prep chain. It
+does not add durable approvals, leases, nonces, timers, or private runtime
+patches. Conversational confirmation UX remains a separate deferred design.
 
 Implementation remains unauthorized until the operator selects an approved,
 planned bundle with:
@@ -153,15 +192,35 @@ planned bundle with:
 
 The native handler applies the same relative-path, safe-slug, directory,
 containment, and realpath checks as `/plan`. Invalid input displays concise
-usage and never invokes the model. Valid input loads the current customizable
-readiness policy from `.ralph/skills/implement-spec/SKILL.md` and supplies only
-the validated location. The policy either explains every readiness deficiency
-and stops without calling a tool, or calls `create_spec_episode` exactly once.
+usage and never invokes the model. A valid command preflights both current
+project policies, `.ralph/skills/implement-prep/SKILL.md` and
+`.ralph/skills/implement-spec/SKILL.md`, plus the existing conversation identity
+boundary before sending either message. It admits wrapped `implement-prep` as
+an ordinary message and queues wrapped canonical `implement-spec` exactly once
+as the sole `followUp`, with the same validated location envelope.
 
-`create_spec_episode` accepts only that location. The native command arms that
-exact location for one model turn; an unarmed, different, late, or repeated tool
-call is rejected. The capability also runs only from a persisted, daemon-backed,
-top-level project conversation. Trusted host code derives all other values:
+`implement-prep` performs only the project-owned light bundle-presence sniff
+and one best-effort focused compaction request. It cannot cancel or reconstruct
+the independently queued phase workflow. Canonical `implement-spec` runs
+`prepare`, performs the authoritative semantic readiness review, and either
+explains every deficiency without a tool call or activates and consumes the
+managed prospective Conversation guide for that exact folder before calling
+`create_spec_episode` exactly once. A read-only guide status check may prove
+readiness; it cannot arm or replay readiness.
+
+Approval is recorded only after both messages are admitted, bound to the exact
+session and location, and carries one non-accumulating `agent_end` skip. The prep
+turn consumes that skip; the approval is unusable before that boundary, and
+the queued implementation turn can then use it. `create_spec_episode` consumes it before any later readiness check or
+host mutation, even on failure. A second `agent_end`, `session_start`, or
+`session_shutdown` clears an unused approval. A cancelled chain therefore dies
+at the next `agent_end` after its one prep-turn skip. Missing skills, failed
+preflight, or either transport failure never arm approval.
+
+`create_spec_episode` accepts only that exact location. An unarmed, different,
+late, or repeated tool call is rejected. The capability also runs only from a
+persisted, daemon-backed, top-level project conversation. Trusted host code
+derives all other values:
 
 | Identity | Derived value |
 |---|---|
@@ -317,16 +376,20 @@ the inherited planning context.
 
 ## Automated and integration validation
 
-Run the command loader and host-mechanics coverage with:
+Run the command loader and episode-mechanics coverage only through Docker
+tier 1:
 
 ```sh
-node --experimental-strip-types --test tests/reviewed_plan_extension.test.mjs
-node --experimental-strip-types --test tests/spec_episode_extension.test.mjs
-pytest -q tests/test_reviewed_plan_extension.py
+python3 -m pytest tests/test_reviewed_plan_extension.py -q -m container
+scripts/test-tier1.sh --probe
+scripts/test-all.sh
 ```
 
-The Node suites cover native and conversational planning registration,
-validation, canonical Markdown loading, controlled publisher acknowledgements and
+The Node suites, executed by the container-marked Python bridge, cover native
+and conversational planning registration, native implementation prep ordering,
+fail-closed dual-skill loading, exactly-one-`agent_end` approval survival,
+cancellation, lifecycle clearing, consume-on-use, validation, canonical Markdown
+loading, controlled publisher acknowledgements and
 rejections, failure isolation, opaque temporary-Git promotion,
 lifecycle-directory preservation, promotion commits, inherited context,
 protocol-7 daemon envelopes, durable handoff-first bootstrap admission,
@@ -338,8 +401,9 @@ delivery, and visible partial or uncertain failures. These maintained plugin tes
 exercise production request and control-flow code. Their controlled client
 responses are not native-runtime admission proof.
 
-The Python bridge reruns both suites and uses isolated installed Prime Agent RPC
-plus startup probes to check one native `plan`, one native `implement-spec`,
+The Python bridge reruns both suites inside tier 1 and uses the
+container-installed Prime Agent RPC plus startup probes to check one native
+`plan`, one native `implement-spec`,
 explicit `ralph_plan`, `create_spec_episode`, and `handoff_spec_episode` tools, no
 `ralph_implement_spec` tool, a valid inherited Prime Agent context, and bounded
 daemon create/state/messages/kill behavior at the episode worktree CWD. Previously

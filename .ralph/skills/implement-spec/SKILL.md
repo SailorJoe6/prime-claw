@@ -24,8 +24,16 @@ Check that the bundle defines at least:
 - a coherent desired outcome and bounded scope;
 - decisions and requirements sufficient to implement without conversation-only
   assumptions;
+- a concise threat model, trusted assumptions, and ordinary failure model;
+- explicit non-goals and an evidence-preserving manual-recovery boundary;
+- a qualitative complexity budget and a simplification checkpoint;
 - an executable vertical-slice plan with acceptance evidence and dependencies;
-- explicit approval boundaries and material non-goals; and
+- separate required acceptance behavior and optional hardening, with any
+  hardening candidate carrying a concrete evidence-based promotion trigger;
+- a two-repair/review-cycle stop-loss before further scope or architecture
+  growth;
+- explicit approval boundaries, including that only the operator may promote a
+  reviewer-discovered invariant into product scope; and
 - no unresolved contradiction or blocker that makes implementation unsafe.
 
 If anything required is missing, contradictory, or inadequate, explain every
@@ -35,10 +43,19 @@ branch, worktree, session, or active plan. Stop after the explanation.
 
 ## Create the episode
 
-Only when the complete bundle is ready, call `create_spec_episode` exactly once
-with the exact selected future-folder path as its sole `location` argument. Do
-not supply or invent a branch, worktree, session name, prompt, command, or other
-host parameter. The trusted host capability derives and validates those values.
+Only when the complete bundle is ready, call
+`prime_claw_activate_conversation_guide` exactly once with no arguments. On its
+continuation, do not copy or replay the guide. The native host privately binds
+that one consumed disclosure to this owner session, exact selected future
+folder, current managed generation, and current preparation lifecycle. If
+activation or readiness fails, stop without creating anything.
+
+Then call `create_spec_episode` exactly once with the exact selected
+future-folder path as its sole `location` argument. Do not supply or invent a
+branch, worktree, session name, prompt, command, or other host parameter. The
+trusted host capability derives and validates those values. Missing, stale, or
+mismatched prospective readiness must fail before any episode identity,
+worktree, branch, session, or oversight marker mutation.
 
 Report the returned stable episode identity, active routing identity, branch,
 worktree, session name, and execute-admission state to the operator. State
@@ -50,5 +67,5 @@ replay returns that identity without redelivering. Do not begin implementation
 in the owner conversation.
 
 Once the tool reports success, the owner conversation begins its separately
-configured oversight workflow. Stop without implementing or invoking
-`/handoff`.
+configured oversight workflow. Set up a heartbeat to monitor your sibling. Then
+stop without implementing or invoking `/handoff`.

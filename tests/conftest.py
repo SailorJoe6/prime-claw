@@ -38,6 +38,7 @@ from scripts.testing import bounded as bounded_command
 REPO = Path(__file__).resolve().parents[1]
 WORKSPACE = "/workspace"
 CONTAINER_PLUGIN_ROOT = "/root/.prime/agent"
+CONTAINER_PREP_KERNEL_VENV = "/tmp/prime-claw-prep-kernel-venv"
 IMAGE_REPO = "prime-claw-test-tier1"
 DOCKERFILE = "docker/test.Dockerfile"
 RESULTS = Path(os.environ.get("TIER1_RESULTS_ROOT") or REPO / ".test-results").resolve()
@@ -729,6 +730,7 @@ def _finalize_session(container_id, share: Path, in_flight=None,
     return result
 
 
+
 @pytest.fixture(scope="session")
 def tier1_container(request):
     """One offline, exact-image tier-1 container per selected pytest run."""
@@ -857,7 +859,9 @@ def tier1_container(request):
                 timeout=600, workdir=None,
                 env={"PRIME_AGENT_VERSION": value,
                      "PRIME_AGENT_INSTALLER_PLAIN": "1",
-                     "PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL": "0"},
+                     "PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL": "1",
+                     "PRIME_AGENT_INSTALL_UV": "1",
+                     "PRIME_AGENT_KERNEL_VENV": CONTAINER_PREP_KERNEL_VENV},
             )
             install_label = "pinned"
         else:
@@ -873,6 +877,11 @@ def tier1_container(request):
                  "sha256sum -c SHA256SUMS >/dev/null; "
                  f"npm install -g ./prime-agent-{install_version}.tgz"),
                 timeout=600, workdir=None,
+                env={
+                    "PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL": "1",
+                    "PRIME_AGENT_INSTALL_UV": "1",
+                    "PRIME_AGENT_KERNEL_VENV": CONTAINER_PREP_KERNEL_VENV,
+                },
             )
             install_label = "source"
         if result.returncode != 0:
@@ -880,6 +889,28 @@ def tier1_container(request):
                 f"tier-1 fixture: {install_label} Prime Agent install failed")
         setup_lines.append(f"phase=prime-agent-{install_label}-installed")
 
+        prep_skill = container.run(
+            "bash", "-lc",
+            "set -euo pipefail; "
+            "npm_root=$(npm root -g); "
+            "mapfile -t matches < <(find /root/.local/share/prime-agent "
+            "\"$npm_root\" -path '*/skills/compact/pyproject.toml' "
+            "! -path '*/dist/skills/*' -type f -print); "
+            "[ ${#matches[@]} -eq 1 ]; "
+            'compact_dir=$(dirname "${matches[0]}"); '
+            "/root/.local/bin/uv pip install "
+            f"--python {CONTAINER_PREP_KERNEL_VENV}/bin/python "
+            '--editable "$compact_dir"',
+            timeout=300, workdir=None,
+        )
+        if prep_skill.returncode != 0:
+            setup_lines.append(
+                "prep_kernel_install_failure="
+                f"outcome={prep_skill.outcome} rc={prep_skill.returncode} "
+                f"stdout={prep_skill.stdout[-1000:]!r} stderr={prep_skill.stderr[-1000:]!r}")
+            raise RuntimeError(
+                "tier-1 fixture: isolated prep kernel skill install failed")
+        setup_lines.append("phase=prep-kernel-installed")
         network_time = _disconnect_container_networks(container_id)
         setup_lines.append("phase=network-absent")
         provenance.write_sanitized_json(
@@ -892,10 +923,31 @@ def tier1_container(request):
         provenance.write_sanitized_json(
             tier_cap, "installed-artifact.json", artifact)
 
+        bridge = container.run(
+            "bash", "-lc",
+            "set -euo pipefail; "
+            "python3 -m venv --without-pip /tmp/prime-claw-expert-preflight-venv; "
+            "printf '%s\n' '{\"schemaVersion\":1,\"generation\":\"bridge\"}' "
+            "> /tmp/prime-claw-bridge.json; "
+            "python3 /workspace/scripts/manage-prime-agent-role-protocol.py apply "
+            "/tmp/prime-claw-bridge.json "
+            "/workspace/src/prime-agent-plugin/ROLE_KERNEL.md "
+            "/workspace/tests/fixtures/role-protocol-legacy-append.md "
+            "$PRIME_AGENT_PLUGIN_ROOT",
+            timeout=120, workdir=None,
+            env={"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT},
+        )
+        if bridge.returncode != 0:
+            raise RuntimeError("tier-1 fixture: bridge role-protocol seed failed")
+        setup_lines.append("phase=role-protocol-bridge-seeded")
+
         for script in ("apply-prime-agent-plugin.sh", "check-prime-agent-plugin.sh"):
             result = container.run(
                 f"{WORKSPACE}/scripts/{script}", timeout=120, workdir=None,
-                env={"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT},
+                env={
+                    "PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT,
+                    "PRIME_AGENT_KERNEL_VENV": "/tmp/prime-claw-expert-preflight-venv",
+                },
             )
             if result.returncode != 0:
                 raise RuntimeError(

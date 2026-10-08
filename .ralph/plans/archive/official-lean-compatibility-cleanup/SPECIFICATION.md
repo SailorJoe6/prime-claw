@@ -1,0 +1,1209 @@
+# Specification — Official lean role protocol completion and compatibility cleanup
+
+> **Status:** Sections 1-24 are accepted history. Section 25 remains preserved audit history at `3586dcc0cb02f314e7c50f661d956f794637f17c`; its terminal disposition is superseded by the owner-approved private launch design. Section 26 is accepted through `3efd0cc79717378f9be5f448afe32f6a7c33ed39` / tree `06e08cbcf7a226409749f29c7e6dd815ee66ff4b`. Section 27 is accepted through `ee655a8907882a21f693169fbd0369d2d8c2e122` / tree `60bc9c9985845f54b3ddb1b790f8e10fdda4ad06`. Existing episode `01a10774-0155-7316-a329-50ee5f7d17be` remains the sole implementation episode. Owner accepts repaired lifecycle closure through `6bceeea133f767d72739a8d88df2639ab75bba96` / tree `6421f9acc11a4c5e755e37dfa3060c2821bf5326`; Slice 3 is complete. Generation A candidate `f2f3fcd25dbe3d96f05193261020d26bf79f1213` / tree `8b4fef1936766c7383a577317ac6d2436f4e72e5` is preserved immutable history. Its exact configured Astra/max review returned `BLOCK`, report SHA256 `4ed03385fc1d54cdecdbbacf5ea720d00b70a9af10b99b1466f7592df50d95e1`. The owner accepted the Section 31 replacement `ed42db9f20ce7a58689707b188e35028e31abf55` / tree `7fb098436e13296191ab64ef593c49550c70c162` after an exact configured `PASS` and explicitly authorized Gate A. Before any live mutation, owner read-only preflight found the supported Prime Agent 0.9.8 wrapper writes exact version `0.9.8` to stderr while coordinator verification reads stdout only. Gate A did not begin. Section 32 successor `47d2d49280bd4ef8cd66e4bcc7eddcf7ad7980b4` / tree `a4667c0047a9ea6f3379790d024c3df44754f00c` is frozen history; its fresh exact Astra/max review returned `BLOCK` because `LocalRunner.run(..., text=True)` normalizes raw CRLF and bare CR to LF before the verifier. Preserve owner report SHA256 `039a66d0ad404d5592913d9476dfef77c6e309dbc16b5dd9a23e3593f6008262` and reviewer production-adapter matrix SHA256 `bf8d9d182c028b77608745237aa286cf416aaf704a35bbd26ea94a0a77a337de`. Owner stop-loss reassessment authorizes exactly one final narrow Section 33 lossless version-capture repair and one final fresh exact review.
+>
+> **Tracking:** implementation `prime-claw-h6w.30`; incident `prime-claw-gv7.1`; systemic correction epic `prime-claw-gv7`.
+>
+> **Predecessor:** accepted official lean session-protocol cutover (`d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`), terminal main checkpoint `62ee095cc9cfc7e88a884edec03024edf87953f0`.
+>
+> **Implementation authority:** execute only the final bounded production-adapter repair in plan Section 33. Add a version-specific lossless subprocess capture seam without changing general `LocalRunner.run` text behavior. Admit only rc0 plus exact UTF-8 configured-version bytes followed by one LF on exactly one raw stream, with the other raw stream empty; fail all specified byte, ambiguity, timeout, and decode cases. Exercise the actual adapter, preserve the real supported 0.9.8 stderr proof, update only affected documentation/traceability/private evidence, prove the full successor rollback chain, run all gates, freeze/push one clean successor, report it, and stop for the one allowed final fresh exact owner review. Preserve 47d2d49, ed42, f2f3, all reports/diagnostics, primary main, the owner's private overlay, old configs, live/global state, UAT, S5, compatibility, finalization, and cleanup.
+
+## Summary
+
+The accepted official lean cutover removed the repeated provider-visible oversight package and replaced it with a 246-word managed identity block installed through user-global `APPEND_SYSTEM.md`. Deterministic plugin code retained exact identity, lifecycle, handoff, finalization, recovery, and historical-message filtering. Restart and three-context UAT passed, the operator accepted the cutover, and the transition episode was finalized and physically cleaned.
+
+Review of the proposed compatibility cleanup found that simple deletion would overcorrect in three ways:
+
+1. deleting the project `oversee-episode` skill and discovery link would remove progressive Conversation guidance rather than only stopping automatic injection;
+2. deleting `.prime/agent/profiles/expert-reviewer.md` would remove the only concrete definition of the official EXPERT without replacing its non-native admission mechanism; and
+3. user-global `APPEND_SYSTEM.md` is only a fallback in Prime Agent v0.9.8, so an exact-CWD project `APPEND_SYSTEM.md` can structurally replace the lean kernel.
+
+This specification completes the role protocol and removes compatibility in **the one existing episode**. The episode first installs and proves the replacement architecture while retaining legacy resources, then removes those resources after an explicit interim UAT gate, and ends only when the clean target state passes final UAT. Intermediate deployments and restarts are vertical slices within the same episode; they are not separate episodes.
+
+The target architecture is:
+
+- one small role-neutral kernel in Prime Agent's selected user-global context file;
+- one plugin-managed global `prime-claw-oversee-episode` skill for Conversation judgment;
+- the existing `execute` skill for EPISODE implementation;
+- one plugin-managed global Python-backed `prime-claw-official-expert-review` skill for exact EXPERT admission and review;
+- deterministic plugin code for trusted identity, lifecycle, role boundaries, activation/admission, handoff, finalization, and historical filtering; and
+- no Prime Claw-managed block in user-global `APPEND_SYSTEM.md` in the final state.
+
+## Accepted baseline
+
+The following baseline is already accepted and must remain true throughout migration:
+
+- Prime Agent is an upstream dependency and is never patched, forked, or used as a Prime Claw implementation surface.
+- The old approximately 11.5 KB oversight package is not freshly injected into provider-visible messages.
+- Historical `prime-claw-oversee-episode-package` records are filtered before provider dispatch.
+- The retired detailed goal/heartbeat overlay is absent.
+- Trusted ownership and lifecycle state are enforced by plugin code, not model imitation.
+- Product, scope, merge, abandonment, destructive cleanup, and terminal episode disposition remain operator decisions.
+- Plugin development and pre-merge validation are Docker-only.
+- User-global apply/check runs only from clean synchronized primary `main` with explicit `--user-global`.
+- A loaded generation remains active until a coordinated full restart proves otherwise.
+
+Accepted transition evidence, rollback material, review reports, Beads chronology, and terminal cleanup receipts remain immutable historical records.
+
+## Problem statement
+
+### Global APPEND is shadowable
+
+Prime Agent v0.9.8 chooses an exact-CWD project `APPEND_SYSTEM.md` before the user-global file. A project file can therefore remove the global Prime Claw kernel from the assembled base prompt without modifying the installed plugin.
+
+A `before_agent_start` system-prompt hook is the correct system-role composition seam for normal direct, queued, and injected turns, but it is not universal. Direct idle `agent_message` and idle custom-trigger turns can skip that hook. The neutral kernel therefore needs a base-prompt location that survives both project APPEND selection and those skipped paths.
+
+### Global context is merged, not replaced
+
+Prime Agent loads one context file from the active user `agentDir`, then loads context files from filesystem ancestors through the current working directory. The user-global context file remains present when a project provides its own `SYSTEM.md`, `APPEND_SYSTEM.md`, `AGENTS.md`, or `CLAUDE.md`.
+
+Within each directory Prime Agent selects the first readable candidate in this exact order:
+
+1. `AGENTS.md`
+2. `AGENTS.MD`
+3. `CLAUDE.md`
+4. `CLAUDE.MD`
+
+Files in the same directory are not merged. The installer must modify the already-selected global file and must not create a higher-priority filename that shadows existing instructions.
+
+### Role guidance needs progressive disclosure
+
+The existing project-local `oversee-episode` skill contains useful supervision guidance but is 1,547 words and combines judgment, identity details, expert admission, retry mechanics, lifecycle implementation, cleanup procedure, and project-specific ledger rules. Its `.agents/skills/oversee-episode` entry is a symlink to the same `.ralph/skills/oversee-episode` directory; they are not independent policy copies.
+
+The plugin no longer reads or injects this file. Its automatic-injection defect is already gone. The remaining work is to migrate its useful Conversation judgment into a small globally available skill and retire the old project path only after the new route is proven.
+
+### The expert profile is not native
+
+`.prime/agent/profiles/expert-reviewer.md` is a Prime Claw convention. Prime Agent does not discover or instantiate `.prime/agent/profiles/*.md`. The old oversight skill manually validated that file, resolved its exact model, spawned a child, delivered the packet, and preserved evidence.
+
+The reviewer definition and its admission mechanics must migrate into a supported Prime Agent skill before the standalone profile can be removed.
+
+## Goals
+
+1. Make the neutral Prime Claw role kernel present in managed turns even when a project supplies its own APPEND or SYSTEM prompt.
+2. Keep all managed policy in the provider system-prompt channel or explicit on-demand skill/tool results; never reintroduce fresh user-shaped oversight messages.
+3. Give each role concise progressive guidance without duplicating deterministic plugin mechanics.
+4. Make the official EXPERT concrete, exact-model, fail-closed, independently reviewable, and globally available.
+5. Preserve safe direct idle messages, resume, compaction, linked worktrees, nested directories, and unrelated repositories.
+6. Install and prove the replacement before removing any compatibility resource.
+7. Complete replacement, compatibility removal, final UAT, and finalization inside one episode.
+8. Preserve user-owned global configuration and all historical evidence.
+
+## Non-goals
+
+- Modifying Prime Agent source or requesting an unsolicited upstream pull request.
+- Treating prompt order as a security boundary against an untrusted repository or installed extension.
+- Providing capability-enforced read-only RLM children; current public `rlm.spawn` inherits parent tools.
+- Replacing `execute` or redesigning EPISODE implementation.
+- Reintroducing a monolithic oversight package, mandatory always-visible procedure, fixed heartbeat interval, or autonomous orchestrator.
+- Removing historical provider-message filtering merely because current files are gone.
+- Solving probable hung-tool detection (`prime-claw-h6w.29`).
+- Changing the scope of Project-Wide Testing or any foreign episode.
+- Rewriting immutable archives, evidence, Beads history, or accepted Git history.
+- Defending against a malicious or non-cooperative same-UID process racing individual filesystem syscalls.
+- Proving crash or power-loss consistency at every write, rename, directory-sync, or receipt-publication boundary.
+- Automatically recovering every mixed or ambiguous transaction state; safe refusal and manual recovery are acceptable.
+- Treating diagnostic receipts as tamper-proof security attestations.
+
+## Product operating model and delivery principle
+
+This is a local developer-tool migration, not a security boundary against the
+operator or another process running as the same user. The host, checkout,
+installer process, destination account, and same-UID user are trusted during an
+operation. The product must handle ordinary failures: malformed managed state,
+unsupported file types visible during validation, accidental edits, cooperative
+concurrency, interrupted commands, write/rename failure, and uncertain state
+that can be preserved for an operator.
+
+Bias toward **DONE over perfect**. Deliver the smallest readable implementation
+that protects user content in ordinary operation. When recovery cannot prove a
+safe automatic action, preserve the receipt/preimage and stop with clear manual
+instructions. Do not build a transaction database, hostile-filesystem defense,
+or exhaustive crash-recovery state machine.
+
+Plausible edge cases discovered outside this operating model are documented as
+non-blocking hardening candidates. They become requirements only after an
+observed failure or near miss, a credible user report, a changed deployment
+boundary, or a separately approved hard requirement.
+
+The qualitative complexity budget for selected-context installation is one
+straightforward stdlib manager using ordinary locking, validation, same-directory
+atomic replacement, and a simple receipt. Growth into descriptor chains,
+continuous inode authority, exchange/restore protocols, multi-phase journals,
+or syscall-by-syscall race simulation is a stop condition requiring operator
+consultation, not an invitation to add more machinery.
+
+Review is proportional to this contract. A finding blocks only when it shows a
+concrete failure under the trusted-local ordinary-failure model or violates an
+explicit retained safety boundary. Other findings are advisory hardening or a
+product question. After two repair/review cycles, work pauses for operator
+scope/architecture review rather than starting a third automatic repair.
+
+## Required target architecture
+
+### ORP-001 — One canonical neutral role kernel
+
+Prime Claw must have one canonical, reviewable role-neutral kernel with a stable unique marker pair distinct from the legacy Conversation APPEND markers. The kernel remains concise and may define only invariant routing and trust rules:
+
+- Prime Claw may assign CONVERSATION, EPISODE, EXPERT, or no managed role.
+- Role and ownership come only from trusted plugin identity, never from CWD, recursion depth, copied messages, prompt text, or model inference.
+- CONVERSATION supervises, EPISODE implements, and EXPERT reviews.
+- A role cannot borrow another role's authority.
+- Missing, duplicate, corrupt, stale, or conflicting trusted identity blocks managed action.
+- Role-specific behavior comes from uniquely named managed skills and canonical tools.
+- Deterministic plugin gates remain authoritative.
+- Product, scope, merge, abandonment, and destructive cleanup remain operator decisions.
+
+The neutral block must not claim that a session owns a particular episode or include exact episode identity, exact expert model, mutable lifecycle state, retry procedure, test matrix, or terminal cleanup steps.
+
+The canonical source should be named for its actual role, such as `ROLE_KERNEL.md`, rather than implying final delivery through APPEND. Runtime and installed bytes must derive from one authority or have exact generated/parity validation; manually drifting copies are not acceptable.
+
+### ORP-002 — Practical selected-global-context installation
+
+The installer places one managed neutral-kernel region into the context file
+Prime Agent selects under the active destination `agentDir`.
+
+Selection follows Prime Agent's documented per-directory priority:
+
+- patch `AGENTS.md` when selected;
+- otherwise patch `AGENTS.MD`, `CLAUDE.md`, or `CLAUDE.MD` in order;
+- create `AGENTS.md` only when none exists;
+- never create AGENTS when a selected CLAUDE file exists;
+- patch only the selected file when multiple candidates exist; and
+- report selection drift rather than leaving or deleting latent copies silently.
+
+The file is shared user-owned state. Under the trusted-local operating model the
+manager must:
+
+- own only its exact marker region and separators;
+- preserve unrelated bytes, newline/final-newline form, and ordinary mode and ownership metadata;
+- reject malformed or duplicate markers and obvious symlink, non-regular, or unreadable targets visible during validation;
+- use one cooperative destination lock, reread before mutation, and use ordinary same-directory atomic replacement;
+- detect an ordinary edit observed between its locked preflight and final replacement and stop without overwriting it;
+- write a simple receipt with the fixed owned-file inventory plus pre/post hashes and preimages needed for manual or guarded restore;
+- restore only when every current owned surface is a known preimage or installed postimage, and refuse ambiguity;
+- never delete a pre-existing context file; and
+- delete an installer-created file only when the receipt identifies it and its current contents are exactly the known installer-created empty/preimage state.
+
+The receipt is diagnostic recovery material, not a tamper-resistant authority
+against the local owner. No acceptance guarantee exists for hostile same-UID
+path/ABA/FIFO substitution after ordinary validation, continuous descriptor or
+inode authority, malicious receipt replacement, or power loss between individual
+filesystem durability operations. These may be recorded as hardening candidates
+but cannot block this specification without a new operator-approved requirement.
+
+### ORP-003 — System channel only
+
+The neutral kernel must reach providers only through `Context.systemPrompt`. It must never be added to session messages as `custom`, `user`, assistant, tool-result imitation, or continuation text.
+
+Provider-boundary evidence must show:
+
+- exactly one exact neutral block in the effective system prompt;
+- zero neutral-kernel or role-skill bodies in provider-visible user text;
+- no kernel-bearing custom message in session JSONL; and
+- stable bytes across identical turns.
+
+A provider payload rewrite may be used for observation in tests but not as the production repair mechanism.
+
+### ORP-004 — Per-provider integrity guard
+
+The existing provider-context seam must parse the assembled system prompt before every managed provider call and require exactly one exact current neutral block.
+
+- No marker is a managed-role failure.
+- Exactly one correctly ordered exact block passes.
+- Unmatched, reversed, nested, duplicate, stale-version, or disagreeing marker content fails closed.
+- Any marker-looking occurrence counts, including occurrences in project context.
+- Rejection must call `ctx.abort()` and prove zero provider calls; throwing alone is insufficient because Prime Agent extension handler exceptions are fail-open.
+
+The guard protects integrity inside the trusted extension set. It does not claim to detect semantic contradiction in unmarked project prose or a later trusted `before_provider_request` rewrite.
+
+Ordinary unmanaged sessions may continue when the kernel is intentionally unavailable, but no managed role action may do so.
+
+### ORP-005 — Explicit context opt-out
+
+Prime Agent's `--no-context-files` option and SDK context overrides can remove global context. Prime Claw must not silently defeat that explicit choice.
+
+A session without the exact neutral block may perform ordinary unmanaged work. Promotion, active owner supervision, EPISODE execution, EXPERT admission, handoff, finalization, or other managed role action must fail visibly and without provider or lifecycle mutation until the kernel is available.
+
+### ORP-006 — Lean global Conversation skill
+
+Install one uniquely named plugin-managed global Markdown skill:
+
+`prime-claw-oversee-episode`
+
+Its canonical source belongs under `src/prime-agent-plugin/skills/` and its installed authority belongs under the selected destination `agentDir/skills/`. The guarded installer/check owns and verifies the exact managed directory.
+
+The skill should remain approximately 300–600 words and contain only Conversation judgment:
+
+- require exact trusted owner and active episode preconditions;
+- inspect the exact reported slice, candidate commit, diff, tests, approved scope, and evidence;
+- choose accept, in-scope revise, pause, or consult;
+- never implement or directly steer implementation;
+- supervise one reviewable vertical slice at a time;
+- use only canonical handoff for accepted advance or recorded in-scope revision;
+- invoke the official EXPERT skill when project policy or material risk requires it;
+- preserve and adjudicate EXPERT PASS/BLOCK evidence without treating it as product or merge authority;
+- maintain a bounded goal and an exact wait heartbeat only while observable work is active; and
+- preserve operator authority and record accepted findings before revision.
+
+It must exclude identity storage fields, lifecycle state-machine implementation, handoff/finalization internals, historical filtering, exact expert model/thinking, packet delivery/retry mechanics, terminal Git cleanup, fixed timing rules, project-specific ledger IDs, and duplicated kernel prose.
+
+### ORP-007 — Conversation guidance activation
+
+Prime Agent exposes skill metadata progressively but does not guarantee that a model opens a matching Markdown skill. Before a managed Conversation performs a lifecycle-changing action, the runtime must have observable evidence that the exact managed Conversation guidance was activated for the current trusted owner/episode generation.
+
+The plan may realize this through a small plugin activation tool or equivalent supported interface. The contract must:
+
+- derive role and episode from trusted plugin state;
+- identify the exact managed skill location, version, and content hash;
+- expose guidance only on demand, never in every provider request;
+- bind the receipt to the exact session, episode, and generation;
+- invalidate it on role, identity, skill, episode, or lifecycle change;
+- block handoff/finalization when missing, stale, shadowed, or mismatched; and
+- avoid a second policy copy.
+
+Representative model UAT must show the exact managed guidance is read or returned before the first oversight decision. A project skill with the same name or import must not silently shadow the managed authority.
+
+Implementation is intentionally staged inside Slice 2. Accepted candidate 1
+established exact neutral-kernel and private-role integrity. The next bounded
+candidate installs the sole guide, implements the active-owner issued-to-consumed
+disclosure path plus read-only status, and gates active-owner handoff and first
+finalization. Prospective future-location activation and the promotion gate remain
+required later Slice 2 work; `create_spec_episode` must remain usable until that
+matching receipt subject exists. A resumed process without a current private
+receipt must activate again rather than reconstructing authority from transcript
+content.
+
+### ORP-008 — Existing EPISODE execution role remains
+
+The existing `execute` skill remains the EPISODE implementation procedure. This work may update routing names and documentation but does not broaden or rewrite its implementation policy unless a separately reviewed requirement proves necessary.
+
+Trusted identity and lifecycle code must prevent an EPISODE, EXPERT, generic RLM child, or copied transcript from acquiring Conversation acceptance, handoff, merge, or cleanup authority.
+
+### ORP-009 — Official EXPERT skill
+
+Install one uniquely named plugin-managed global Python-backed skill:
+
+`prime-claw-official-expert-review`
+
+with import name `prime_claw_official_expert_review`. Its managed directory
+contains `SKILL.md`, `pyproject.toml`, the Python package, and one canonical
+reviewer definition. The skill owns the official reviewer configuration formerly
+held by `.prime/agent/profiles/expert-reviewer.md` and uses only supported Prime
+Agent interfaces.
+
+The skill must validate a full configured model selector and reasoning level,
+resolve one exact model, spawn one fresh reviewer with the startup-race-safe
+bootstrap, validate the returned model, and deliver one self-contained immutable
+commit packet exactly once. It records reviewer/session identity, selected model,
+requested reasoning, commit, packet digest, delivery result, report, and owner
+disposition. Unavailable or uncertain admission/delivery blocks the required
+review; it never silently chooses a fallback model or claims review occurred.
+
+The review packet includes the approved product outcomes, threat model, trusted
+assumptions, non-goals, and complexity budget. The reviewer returns:
+
+- `PASS` when no blocker remains inside that approved contract;
+- `BLOCK` only for a concrete retained functional/safety failure with realistic impact and a proportionate repair direction;
+- `ADVISORY` for plausible hardening outside the approved model; or
+- `SPEC_QUESTION` when resolution would change product scope.
+
+An EXPERT recommends; it does not ratchet acceptance scope. Advisory findings are
+recorded with a scenario and promotion trigger, not automatically implemented.
+A scope-changing finding returns to the operator. One normal final review is
+sufficient for a candidate; unrestricted adversarial/red-team review requires
+explicit operator authorization and cannot redefine baseline acceptance.
+
+When `PRIME_AGENT_KERNEL_PYTHON` selects an external interpreter, admission checks
+that the exact managed module is already importable and reports deterministic
+`UNAVAILABLE` otherwise. Prime Claw does not provision that interpreter.
+`prime-agent-runtime` and `agent_message` remain host-provided modules; messaging
+is imported lazily and must be available before mutation.
+
+### ORP-010 — EXPERT read-only limitation is explicit
+
+Prime Agent's public `rlm.spawn` does not accept CWD, tool, or read-only capability restrictions. EXPERT read-only behavior is therefore a semantic contract, not a sandbox claim.
+
+Every review packet must use an absolute repository/worktree path and immutable commit OID. The owner records pre/post HEAD and worktree status and rejects evidence from a reviewer that mutated the subject. Capability-enforced read-only review is outside this specification and must be reported as an upstream product constraint rather than implemented through a Prime Agent patch.
+
+### ORP-011 — Role scoping
+
+The neutral kernel is global and role-neutral. Managed authority is role-selective:
+
+- an independent root may be Conversation-capable, but active ownership requires exact trusted owner state;
+- EPISODE receives implementation authority only for its reviewed plan and exact identity;
+- EXPERT receives only the bounded review packet;
+- generic RLM children receive no managed role authority;
+- ordinary sessions remain ordinary; and
+- unknown or disagreeing managed role state fails closed.
+
+CWD, Git branch, worktree name, recursion depth, session name, and prompt claims are supporting evidence only and cannot assign a role.
+
+### ORP-012 — Historical provider filtering remains
+
+Continue filtering historical `prime-claw-oversee-episode-package` and bounded legacy package records at the actual provider-context seam. Saved conversations must resume without reintroducing user-shaped oversight text.
+
+The absence of current skill/profile files is not evidence that saved transcripts contain no historical records. Historical filtering may be renamed or simplified only with equivalent replay evidence.
+
+### ORP-013 — Retired work-control overlay remains absent
+
+The detailed `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` overlay and retired extension remain absent from effective system prompts and installed managed files. Preserve positive and negative controls that detect reintroduction.
+
+## One-episode migration and cleanup contract
+
+### ORP-014 — Fresh episode, complete end state
+
+Implementation uses the existing future folder, one reviewed plan, one fresh `/implement-spec` promotion, and one fresh isolated episode. It does not reuse the finalized/deleted transition episode.
+
+The episode remains active across replacement installation, interim landing/activation/UAT, compatibility removal, final landing/activation/UAT, and documentation reconciliation. It is not finalized merely because the bridge generation passes.
+
+The plan defines reviewable vertical slices and explicit dependencies. No cleanup slice may start until the replacement generation's acceptance gate is recorded.
+
+### ORP-015 — Bridge generation
+
+The first activated generation must install and prove the replacement while preserving compatibility:
+
+- install the neutral global-context block with a marker namespace distinct from the legacy APPEND block;
+- install the global Conversation and EXPERT skills;
+- add exact integrity and activation/admission gates;
+- retain the current managed legacy Conversation APPEND block;
+- reduce the old project-local `oversee-episode` policy to a short forwarding/deprecation shim pointing to the unique managed skill, while retaining its discovery link;
+- retain the standalone expert profile as migration evidence, not a second authority; and
+- accept exactly the explicitly known neutral-plus-legacy transition shape.
+
+There must never be two independent current policy copies. The shim contains no supervision policy or expert mechanics.
+
+Bridge activation requires its own exact candidate, independent review, landing decision, rollback input, guarded user-global apply/check, coordinated full restart, and interim UAT. `/reload` may be used only in isolated tests and does not replace production restart proof.
+
+### ORP-016 — Interim UAT gate
+
+Before compatibility removal begins, interim UAT must prove at least:
+
+1. the owning Conversation uses the exact managed Conversation guidance;
+2. the unchanged episode remains correctly bounded and can continue through canonical handoff;
+3. the official EXPERT can be admitted exactly or fails closed as specified;
+4. an ordinary saved conversation remains ordinary;
+5. nested CWD, linked worktree, and unrelated-repository sessions receive the neutral global floor;
+6. a project `APPEND_SYSTEM.md` and project `SYSTEM.md` do not remove the neutral floor;
+7. direct idle and queued agent messages retain the neutral floor;
+8. provider requests contain zero fresh user/custom oversight packages; and
+9. rollback to the accepted pre-bridge generation is verified.
+
+The operator must explicitly accept this gate. Passing tests or review does not authorize compatibility removal by itself.
+
+### ORP-017 — Compatibility removal generation
+
+Only after accepted interim UAT may the same episode remove transition compatibility:
+
+- remove only Prime Claw's exact managed legacy block from user-global `APPEND_SYSTEM.md`, preserving all unrelated content byte-for-byte;
+- stop installing the legacy APPEND block;
+- remove or retire the source `APPEND_SYSTEM.md` name so it cannot be mistaken for the final delivery path;
+- remove `.ralph/skills/oversee-episode/SKILL.md` only after it is only the forwarding shim;
+- remove `.agents/skills/oversee-episode` without leaving a broken symlink;
+- remove `.prime/agent/profiles/expert-reviewer.md` only after exact reviewer parity exists in the official EXPERT skill;
+- remove tests and current docs whose sole subject is a deleted compatibility resource;
+- retain historical provider filtering and non-vacuous regression coverage; and
+- remove legacy prompt-shape tolerance only when coordinated drain/restart evidence proves no loaded process requires it.
+
+A live foreign episode worktree that can still exercise a full legacy skill/profile or stale policy is a cleanup blocker unless it reaches an operator-approved safe state. Cleanup does not modify foreign branches to force convergence.
+
+### ORP-018 — Final UAT and episode completion
+
+The removal generation requires its own exact candidate, independent review, landing decision, rollback input, guarded user-global apply/check, coordinated full restart, and final UAT.
+
+Final UAT covers:
+
+1. the owning Conversation;
+2. the unchanged cleanup episode fixture;
+3. one operator-approved ordinary saved conversation;
+4. Conversation guidance activation and canonical handoff;
+5. exact EXPERT admission/unavailable behavior;
+6. no legacy APPEND block, old project skill/link, or standalone profile;
+7. exactly one neutral global-context block;
+8. no missing-skill/profile/startup/lifecycle error;
+9. zero user-shaped oversight or retired work-control injection; and
+10. clean synchronized primary `main` plus verified rollback capability.
+
+The operator explicitly accepts or rejects the completed target state. Only accepted final UAT permits episode finalization. Physical session/worktree/local-branch/remote-branch cleanup remains a separate explicit operator-authorized terminal action.
+
+## Test and evidence requirements
+
+### ORP-019 — Complete proportional isolated gates
+
+Each exact generation candidate passes complete Tier 0, the selected complete
+Tier 1 path in Docker, the pinned Prime Agent probe, `git diff --check`, focused
+behavioral tests, and one independent read-only exact-candidate review. Bare
+host-global candidate probing remains prohibited.
+
+Focused Slice-1 coverage is intentionally practical:
+
+- selected AGENTS/CLAUDE priority and creation behavior;
+- ordinary symlink/non-regular/unreadable rejection at validation;
+- LF/CRLF, final-newline, unrelated-byte, and ordinary mode preservation;
+- malformed/duplicate markers, idempotence, cooperative locking, and an ordinary detected concurrent edit;
+- exact fixed receipt inventory, known-state restore, refusal on unknown current content, and safe installer-created-file cleanup;
+- a regression proving a malformed/tampered inventory cannot delete an unrelated file;
+- bridge retention of the legacy APPEND region; and
+- honest documentation and isolated apply/check behavior.
+
+Delete or stop enforcing tests whose sole purpose is hostile same-UID
+syscall-by-syscall races, continuous inode authority, exhaustive crash points,
+or autonomous recovery of every journal state. Passing those cases is optional
+hardening, not acceptance evidence.
+
+Later slices retain focused coverage for system-only provider delivery, role
+isolation, context opt-out, managed skill discovery, exact model admission,
+custom-kernel availability, historical filtering, and absence of full policy
+bodies in ordinary prompts. Extension exceptions remain fail-open controls while
+production managed rejection proves zero provider calls.
+
+### ORP-020 — Useful, correlatable evidence
+
+Evidence is diagnostic, not a security attestation protocol. Record enough to
+reproduce and review the result: exact commit/tree, relevant dependency version,
+selected context path, owned-file pre/post hashes, commands, concise raw-log
+locations, test counts, reviewer identity/report, and teardown result.
+
+Do not add cryptographic cross-binding, per-step sidecars, permanent comparator
+machinery, or repeated rereads unless a later observed failure or approved
+security requirement justifies them. The reviewer record states the actual
+returned model and requested reasoning without claiming `RlmSpawnHandle` returned
+reasoning when it did not.
+
+### ORP-021 — Two rollback points
+
+Before bridge landing, record the exact accepted baseline and user-global context/APPEND preimages. Bridge rollback restores the accepted lean generation, selected global context bytes, legacy APPEND bytes, project skill/link/profile, and installed plugin generation, followed by coordinated restart and resumed-session verification.
+
+Before removal landing, record the exact accepted bridge generation. Removal rollback restores that bridge generation and both global-file preimages, followed by the same guarded apply/check, restart, and UAT discipline.
+
+Never reconstruct user-global files from chat text. Never reset or rewrite accepted Git history. Use the normal history-preserving revert appropriate to each landed topology.
+
+## Documentation and historical preservation
+
+### ORP-022 — Current documentation
+
+Update current normative docs and indexes to describe:
+
+- the selected global-context neutral floor;
+- role-skill progressive disclosure;
+- deterministic role and activation gates;
+- official EXPERT admission and read-only limitation;
+- context opt-out behavior;
+- global file ownership/recovery;
+- staged activation and rollback; and
+- the final absence of Prime Claw's global APPEND block and legacy project resources.
+
+At minimum audit `docs/conversation-driven-episode-oversight.md`, `docs/goal-heartbeat-work-control.md`, `docs/lab-global-plugin.md`, `docs/README.md`, installer documentation, and operator recovery guidance.
+
+### ORP-023 — Immutable history
+
+Do not rewrite archived specifications/plans, `docs/evidence`, historical dogfood reports, review reports, Beads chronology, accepted commits, preactivation rollback bundles, or prior UAT receipts to remove old names. Historical references remain valid when their location and purpose are clearly historical.
+
+When planning replaces the predecessor active plan/spec, preserve those predecessor documents intact in the project archive and update current indexes only.
+
+## Acceptance criteria
+
+The one existing episode is complete only when all of the following are true:
+
+1. `prime-claw-h6w.30`, incident `prime-claw-gv7.1`, and epic `prime-claw-gv7` link the corrected contract, candidates, evidence, activation gates, and final disposition.
+2. The selected global context contains one managed neutral block while unrelated user content and ordinary file metadata are preserved.
+3. Slice 1 uses a readable practical installer and simple receipt; obsolete F1–F9 adversarial transaction machinery and tests are removed or no longer enforced.
+4. Local project AGENTS/CLAUDE, SYSTEM, and APPEND files do not structurally remove the neutral floor.
+5. Managed work fails closed when context files are explicitly disabled or trusted role state disagrees.
+6. Provider evidence shows the neutral kernel only in system instructions and no fresh user/custom oversight package.
+7. `prime-claw-oversee-episode` remains the on-demand Conversation policy and `execute` remains the bounded EPISODE procedure.
+8. `prime-claw-official-expert-review` provides exact-model admission plus contract-bounded `PASS`/`BLOCK` and non-blocking `ADVISORY`/`SPEC_QUESTION` outcomes.
+9. Slice 1 passes focused practical tests, complete Tier 0, Docker Tier 1/probe, and one normal review under the trusted-local model.
+10. The bridge generation passes complete tests/review, separately authorized landing/apply/restart, and accepted interim UAT.
+11. Compatibility removal does not begin before criterion 10 is recorded.
+12. The final generation has no Prime Claw-managed global APPEND block, old project oversight skill/link, standalone expert profile, duplicate policy copy, or broken symlink.
+13. Historical provider filtering, deterministic lifecycle behavior, and retired-overlay regression controls remain.
+14. The removal generation passes complete tests/review, separately authorized landing/apply/restart, and accepted final three-context UAT.
+15. Both rollback points preserve accepted history and provide practical preimages plus manual stop/recovery when state is ambiguous; exhaustive adversarial crash recovery is not required.
+16. No active foreign worktree/session can exercise stale compatibility behavior at final acceptance.
+17. Primary `main` is clean and synchronized after every landing and at completion.
+18. Plausible excluded hazards are documented with promotion triggers rather than silently ignored or automatically implemented.
+19. The episode remains active through the clean target state, is finalized only after explicit final acceptance, and is physically cleaned only after separate operator authority.
+
+## Dependencies and sequencing
+
+- The accepted official lean cutover and its terminal cleanup are complete.
+- This future folder and Bead remain the single specification/tracking authority for the full migration and cleanup.
+- Project-Wide Testing remains independent. It may continue, but its live worktree/session must satisfy each applicable activation or cleanup safety gate.
+- `prime-claw-h6w.29` remains independent and receives no implementation authority from this specification.
+- Prime Agent public interfaces are constraints. Unsupported behavior is reported as a product limitation, not converted into an upstream patch plan.
+
+## Open decisions for implementation
+
+The operator resolved the Slice-1 threat model and delivery tradeoff on 2026-10-06:
+trusted local host, ordinary failures, DONE over perfect, and advisory backlog for
+unobserved adversarial edge cases. The existing episode chooses the smallest
+readable implementation consistent with this corrected contract. Any proposal to
+restore hostile same-UID guarantees, exhaustive crash recovery, or a third
+repair/review cycle is a new product decision and must return to the operator.
+
+### Operator-authorized duplicate-ID repair exception (2026-10-06)
+
+After the required two-cycle stop, the owner independently confirmed the cycle-2
+finding and authorized one exact in-contract repair. The repair is limited to the
+active-owner Conversation-guide disclosure seam: before consumption, the issued
+tool-call ID must occur exactly once across all assistant tool-call items and
+exactly once across all tool-result messages regardless of name; the unique call
+and result must use the activation tool name and match the bound text/details;
+and only that exact validated result record is authorized. Focused regressions
+cover same-ID/different-name assistant-call and result aliases while preserving
+normal one-time disclosure, later omission, pairing, and abort-before-dispatch.
+This is an operator-approved exception to the automatic review stop-loss, not a
+threat-model or scope expansion. This pass performs no third independent review
+and accepts no additional finding.
+
+### Accepted active-owner guide candidate and prospective-create continuation
+
+The owner accepted Slice 2 candidate
+`d31ab61e89247a024948d66e2613d434c89688fd` / tree
+`f7ecd504d3f890455b858d53c6099c936fb0bf85`. The next candidate is limited to
+prospective future-location guide activation and the pre-mutation
+`create_spec_episode` readiness gate. It reuses the existing `/implement-spec`
+preparation/admission state as trusted prospective intent and minimally extends
+the existing activation subject and in-memory receipt to bind the exact owner
+session, selected future location, current role-kernel/guide generation, and
+current preparation lifecycle. Consumed readiness is required before any episode
+identity, worktree, branch, session, or marker mutation.
+
+The candidate preserves accepted active-owner handoff/finalization behavior and
+already-inactive finalize idempotence. Proof covers ordinary no-context failure,
+wrong/missing/stale location or preparation, EPISODE/generic-child/active-owner
+misuse, valid one-time prospective disclosure/consumption/create, no
+provider-visible receipt or replay, and abort before mutation. It uses the
+existing activation tool when practical, keeps the guide byte-identical, and
+leaves `execute` unchanged. A generalized token framework, durable receipt
+store, transaction journal, adversarial race matrix, duplicate policy, cutover
+coordination, Slice 3, landing, user-global mutation, restart, UAT, finalization,
+and cleanup remain outside this candidate. Remaining provider-route coverage may
+remain for one final bounded Slice 2 pass if it is not required here.
+
+### Accepted prospective-create candidate and final Slice 2 coverage reconciliation
+
+The owner accepted prospective create-readiness candidate
+`29b8932e3e576d0068194e44a5494af98474d8bf` / tree
+`a5a16cacce0fad56f546a565475cefe519761b0a`. The next and final bounded Slice 2
+candidate is coverage reconciliation only. Map existing static, Node, native
+installed-runtime, and provider-capture proof to the Section 7 route and
+acceptance list. Treat routes that converge on the same proven `context` seam as
+equivalence classes; do not build a combinatorial matrix.
+
+Add only the smallest representative tests for material uncovered paths, with
+priority on queued/injected/direct-idle agent-message continuation, tool loop and
+retry, compaction/resume/reload/recovered queue, project SYSTEM/APPEND and
+global/project AGENTS/CLAUDE shadows, CLI `--no-context-files`, and SDK override.
+Reuse existing assertions for exactly one system kernel, no guide or private
+identity in user/custom channels, exactly one intended guide tool result, later
+omission, and abort before provider dispatch on managed defects.
+
+Production code remains unchanged unless a representative test exposes a
+concrete in-contract defect. Any such defect is recorded and repaired only at
+its root seam under owner-delegated triage without broadening architecture. Mark
+Slice 2 complete only when the approved acceptance contract is actually covered.
+Run proportional focused checks plus complete Tier 0, Docker Tier 1, and the
+pinned runtime probe. Freeze one commit. Use at most one independent exact-patch
+review only if production code changes; otherwise owner/test evidence is
+sufficient. Commit/push, report, and stop. EXPERT admission, Slice 3, landing,
+user-global mutation, restart, UAT, finalization, and cleanup remain excluded.
+
+### Slice 2 completion result
+
+Final route reconciliation is recorded in
+`docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md`. Static, Node, installed-runtime, and provider-capture
+proof now cover the Section 7 route and acceptance list through explicit
+`context`-seam equivalence classes and the smallest distinct restoration,
+loader-override, retry, and receipt representatives. Complete Tier 0, Docker
+Tier 1, and pinned Prime Agent 0.9.8 gates passed. The candidate changes tests
+and documentation only; production code, managed guide bytes, and canonical
+`execute` bytes remain unchanged. Slice 2 is complete. Official EXPERT admission
+begins only in a later owner-authorized Slice 3 pass; no operational cutover or
+terminal lifecycle action is authorized by this result.
+
+### Accepted Slice 2 and bounded Slice 3 prerequisite
+
+The owner accepted Slice 2 complete at
+`e8b047c1493e6718c2f3062f19c77bc0b23ce8e9` / tree
+`881b455a121b4cd53dd01005c5f84e31c7c9d555`. Begin Slice 3 with only the
+smallest prerequisite capability: the managed official EXPERT Python-backed
+skill/package, strict reviewer configuration and rubric parity, installer/check
+ownership, and deterministic read-only availability/preflight for the exact
+interpreter that will execute it.
+
+This pass adds no spawn, reservation, nonce/expiry state, handle binding, child
+role admission, message delivery, report settlement, cleanup tools, or provider
+identity. The standalone expert profile remains byte-identical migration
+evidence and must have exact configuration/rubric parity with the managed
+package. In default managed-kernel mode, source importability is validated with
+the exact runtime interpreter without modifying its environment; report sync
+pending when the currently loaded runtime does not yet contain the candidate.
+When `PRIME_AGENT_KERNEL_PYTHON` is set, require a normal already-installed
+exact package/hash import and deterministically return UNAVAILABLE for a
+missing, stale, mismatched, or unusable interpreter/package before any
+reservation, RLM, message, or lifecycle activity.
+
+Use only supported Prime Agent and public Python interfaces. Do not add host
+runtime modules to `pyproject.toml`, invent host requests or source-path
+injection, or provision dependencies. Extend the existing practical apply/check
+inventory for both managed skill directories with preflight, copy, final check,
+and known-state refusal. Do not add a journal/rollback engine or revive rejected
+Slice 1 overengineering. The package remains inert and generic children gain no
+EXPERT authority.
+
+Run proportional focused package/interpreter/installer tests plus complete Tier
+0, Docker Tier 1, and the pinned-runtime probe. Update evidence and plan,
+commit/push one candidate, report, and stop. Reservation/admission, Slice 4,
+landing, user-global mutation, restart, UAT, finalization, and cleanup remain
+excluded.
+
+### Slice 3 prerequisite candidate checkpoint
+
+The first bounded Slice 3 candidate now owns the inert
+`prime-claw-official-expert-review` Python-backed skill/package, an exact
+byte-identical reviewer definition, deterministic managed/configured interpreter
+preflight, and the second managed skill installer inventory. Focused static/Docker, complete Tier 0/Docker Tier 1, and the pinned Prime Agent
+0.9.8 probe are green. The bounded prerequisite is complete at this candidate.
+Successful description, source validation, `SYNC_PENDING`, or `AVAILABLE` never
+grants EXPERT authority.
+All admission/reservation/delivery/settlement behavior and operational cutover
+remain deferred as specified in plan Section 22. Evidence:
+`docs/evidence/official-lean-role-protocol/2026-10-06-slice-3-expert-prerequisite.md`.
+
+### Accepted EXPERT prerequisite and bounded reservation foundation
+
+The owner accepted the inert EXPERT package/preflight prerequisite at
+`e319e39949e1eb1c6b6b680d996ffb15ea664264` / tree
+`03a88ac106d7fed83f48f0e157366e7d13258c7f`. The next candidate adds only
+owner-scoped single-review reservation state and native reserve/bind/read-only
+status/cancel mechanics.
+
+Reserve and bind require the exact active owner, consumed Conversation-guide
+readiness, and deterministic EXPERT package `AVAILABLE`. `SYNC_PENDING` or
+`UNAVAILABLE` stops before reservation mutation. One simple in-memory record per
+owner holds a cryptographically random opaque nonce, practical bounded expiry,
+exact immutable repository path and commit OID, packet digest, requested full
+selector, and requested thinking. It may transition once from reserved to exact
+returned child handle/session/model metadata, but caller-supplied spawn metadata
+remains pending evidence. This pass does not claim returned-model, reasoning, or
+handle verification and does not admit the child as EXPERT. If safe meaningful
+binding needs the later child-side seam, implement reserve/status/cancel only
+and record the boundary.
+
+Status is read-only. Cancel, expiry, and session shutdown are idempotent and
+leave generic children ordinary. The inert package API remains unchanged. This
+pass adds no live spawn, agent-message delivery, child provider-role admission,
+review execution, report settlement, cleanup workflow, durable database,
+journal, cross-process recovery, generalized token framework, hostile
+concurrency model, spawn orchestration, message retry, report protocol, or
+provider-visible EXPERT authority. Focused and complete/pinned gates, evidence,
+one commit/push, report, and stop are required. Slice 4 and operational cutover
+remain excluded.
+
+**Reservation-foundation disposition.** The bounded owner-scoped foundation is
+implemented and independently reviewed. Each record is exact to the full stable
+active oversight generation, so one Conversation's later episode cannot reuse,
+read, bind, or cancel an earlier episode's state. The only bind is the public
+spawn return tuple recorded as unverified pending evidence with no authority.
+Focused and complete Tier 0/Docker Tier 1/pinned-0.9.8 gates are green. Live
+spawn, child-side admission/verification, delivery, review, settlement, cleanup,
+and operational cutover remain future work.
+
+### Required repository-subject repair
+
+The owner did not accept candidate
+`038d1cbaeb5f00614c4b4f40784cdb9119e72862`. Its reservation subject incorrectly
+derives repository path and HEAD from owning Conversation `ctx.cwd`. The exact
+review subject is the active oversight marker's episode worktree and candidate
+commit.
+
+The repaired reserve gate must canonicalize the trusted marker `worktree`, prove
+it exists and equals that worktree's own `git rev-parse --show-toplevel`, and
+prove its current HEAD equals the requested exact 40- or 64-hex OID before any
+reservation mutation. No caller path is accepted. Owner CWD, branch, session
+name, and prompt text cannot substitute. Tests must use distinct owner/worktree
+topology and cover wrong owner HEAD, wrong worktree HEAD, and noncanonical or
+missing marker paths. Every other accepted reservation invariant remains
+unchanged. This pass addresses only this blocker and retains all live admission,
+delivery, review, settlement, cleanup, and operational exclusions.
+
+**Repository-subject repair result.** The reserve path now comes exclusively
+from the exact active marker worktree, which must be canonical, exist, equal its
+own Git top-level, and have HEAD equal to the requested exact OID. Distinct
+owner-CWD/episode-worktree regression coverage and all required refusal cases
+are green across focused, complete, Docker, and pinned-runtime gates. Exact
+review and unchanged commit/push receipts are recorded on `prime-claw-h6w.30`;
+all other Section 23 behavior and exclusions remain intact.
+
+### Accepted reservation base and next EXPERT vertical
+
+The owner accepts the non-authoritative reservation foundation through commit
+`5674219bc914682a7e28c96146a68ab1b3e80f5f` and tree
+`930a7956545c6d3c9b8006e6cf59f5fa141f77d6`. The next bounded Slice 3 vertical
+may discover and spawn exactly one configured reviewer, bind its public return
+tuple, deliver one immutable packet, and admit only the child's first
+packet-triggered review call.
+
+This vertical must first prove supported Prime Agent 0.9.8 public trust seams for
+sender/target, actual child session/model, and pre-provider admission. Missing
+public proof is a product constraint and stop condition, not permission to patch
+Prime Agent or infer authority from copied context. Admission requires every
+trusted binding—owner generation, nonce, digest, expiry/use, sender/target,
+child/session/model, package, and kernel—to agree. It consumes before dispatch,
+strips private receipts, and exposes only a neutral system kernel plus one
+bounded rubric/packet user turn. Bootstrap, mismatch, replay, stale state, and
+copied identity abort without a review provider call. Generic children remain
+ordinary.
+
+Use no fallback selector, retry after uncertain delivery, durable store,
+generalized token system, or broader race framework. Report settlement, owner
+disposition, child deletion, and all cleanup remain later verticals.
+
+## BLOCKED — Prime Agent 0.9.8 receiver trust metadata is not public
+
+Section 25 stopped at its required public-interface audit. Prime Agent 0.9.8
+(commit `a1faacd53ac4473a75de1d434afaf50945c2f647`) has the authoritative
+facts internally, but no supported receiver-side interface exposes the complete
+set needed for admission before provider dispatch:
+
+- public `rlm.spawn` returns `rlm_child_id`, `name`, `session_dir`, and the
+  actual selected `model` to the parent;
+- public `agent_message.send` returns trusted sender/target endpoints only to
+  the sender;
+- a receiving extension can read its own `ctx.model` and read-only session
+  manager identity; but
+- the only receiver-side link to trusted inbound sender/target is the internal
+  built-in `agent_message` custom-message `details` shape. That schema is not
+  exported as a supported extension or Python contract. The public message text
+  contains only a sanitized relationship/name header and body.
+
+Therefore prime-claw cannot prove trusted sender/target and bind them to the
+actual child session/model at the pre-provider `context` seam without relying on
+an unsupported internal request/message shape. Serializing parent claims into
+the packet would remain attestation text, not independent host proof. A custom
+Python `host_request` is also unsupported because extensions cannot register a
+public host handler and unknown request types fail.
+
+**Unblock condition:** a supported Prime Agent public receiver interface must
+provide unforgeable inbound sender and target identity together with enough
+current child/session identity to bind public spawn metadata and `ctx.model` at
+or before the provider-admission seam (or an equivalent supported admission
+callback). Re-audit a released public interface before resuming. Do not patch or
+fork Prime Agent for this project and do not consume the current internal
+custom-message `details` schema.
+
+The accepted non-authoritative reservation foundation remains unchanged at
+`5674219bc914682a7e28c96146a68ab1b3e80f5f` / tree
+`930a7956545c6d3c9b8006e6cf59f5fa141f77d6`. No feature reviewer was spawned,
+no review packet was delivered, no child was admitted, and no review provider
+call was made. Experimental local implementation edits were discarded.
+Evidence: `docs/evidence/official-lean-role-protocol/2026-10-07-section-25-public-interface-constraint.md`.
+
+### Product correction: authority comes from private launch state, not inbound messages
+
+Section 25's inbound-sender API audit remains valid history, but it is not a
+terminal blocker. The supported design assigns zero authority to inbound message
+text or metadata. The owner-side skill privately records the exact launch before
+public spawn and finalizes it only from the real returned tuple. The child's
+initial spawn context independently binds its public session/model and canonical
+parent-session lineage to that finalized private record, atomically claims it
+before provider dispatch, and exposes only the neutral kernel plus one canonical
+rubric/packet turn.
+
+The private namespace is plugin-owned and untracked, mode-private, nonce-bound,
+TTL-limited, and uses only exclusive create plus atomic rename across
+`PENDING`, `FINALIZED`, and `CLAIMED/consumed`. It is not a general persistence
+framework. Every mismatch, timeout, stale/replay, copied input, or duplicate
+claim aborts before a provider call. Current model is rechecked on every admitted
+call. Prime Agent stays unmodified and its internal agent-message details are
+never read.
+
+## Accepted next vertical: structured EXPERT report and exact owner settlement
+
+Section 27 extends only the accepted private launch protocol. Inbound messages,
+headers, sender/target labels, and internal `agent_message` details retain zero
+authority.
+
+- The managed Python package exposes the smallest strict report API callable by
+  the already-admitted depth-1 child. It derives the current runtime/session
+  directory and claimed launch from host-authored state, revalidates exact
+  child/parent/candidate/packet lineage, and accepts one bounded canonical report
+  with verdict `PASS`, `BLOCK`, `ADVISORY`, or `SPEC_QUESTION`. Every `BLOCK`
+  includes actionable remediation.
+- The API digests the canonical report and atomically transitions one claimed
+  launch to `REPORTED`. An exact duplicate digest may return an idempotent
+  receipt. Conflict, malformed/oversized input, wrong identity/lineage,
+  unclaimed launch, or replay fails closed.
+- Launch records bind the exact pre-review candidate HEAD and clean repository
+  status. Report and settlement record and compare post-review HEAD/status.
+  Mutated-subject evidence is retained but rejected, preserving the semantic
+  read-only limit.
+- A depth-0 exact owner-only settlement/read API derives current owner and
+  generation itself, finds only the matching reported launch, validates report
+  digest plus actual spawn/child/session/model/candidate/package/kernel lineage
+  and unchanged repository state, atomically transitions once to `SETTLED`, and
+  returns the immutable report and receipt. Model-supplied handle fields carry
+  no authority.
+- `FINALIZED`, `CLAIMED`, `REPORTED`, and `SETTLED` continue to designate the
+  same child as a neutral EXPERT. Any provider call after report or settlement
+  explicitly aborts. The canonical reviewer must submit exactly once before its
+  final answer.
+- Reuse the purpose-built private files and atomic transitions. Do not add
+  message-metadata trust, a database, generalized journal, hostile-local-code
+  defense, or delivery retry framework.
+
+Run focused Python/Node/native-provider tests, including mutation and replay,
+then full Tier 0, Docker Tier 1, and the pinned Prime Agent 0.9.8 probe. Use one
+direct owner review only and no new independent review cycle. Commit/push one
+candidate, report, and stop.
+
+## Accepted final Slice 3 vertical: lifecycle closure and bounded reconciliation
+
+Section 28 extends only the accepted private EXPERT file protocol. Product and
+scope decisions remain conversational; APIs record exact owner decisions and
+never invent them. Inbound messages/details remain non-authoritative.
+
+- A depth-0 owner-only disposition operation derives the current owner session,
+  active generation, and unique `SETTLED` report. It records one bounded explicit
+  disposition plus required rationale and digest without rewriting the EXPERT
+  report. Idempotence requires exact equality; conflicting decisions fail closed.
+- An async close operation validates `DISPOSITIONED`, uses only public
+  `rlm.list_subagents` and `rlm.delete_subagent` against the stored actual child
+  ID, proves definite deletion or absence, then creates `CLOSED` while preserving
+  report, settlement, disposition, and deletion evidence. Uncertain or failed
+  deletion retains recoverable state and never claims cleanup.
+- Explicit purge is allowed only for one exact `CLOSED` receipt/digest after the
+  caller confirms durable recording. Authority state is never removed before
+  definite child absence.
+- Add the smallest exact-owner stale cancellation for expired `PENDING`,
+  `FINALIZED`, and `CLAIMED`. A no-child pending launch may close directly;
+  published-child states must prove deletion/absence before `CANCELLED`.
+  Conflicting phase files or ambiguous/mismatched roster state fail closed.
+- `REPORTED`, `SETTLED`, `DISPOSITIONED`, `CLOSED`, and `CANCELLED` keep any
+  still-addressable child under the neutral EXPERT kernel and abort provider
+  calls. Purge is safe only after child absence.
+- Keep purpose-built files and public RLM APIs. Do not manually remove Prime
+  Agent session artifacts, trust inbound metadata, retry uncertain provider or
+  message work, or add a database, general journal, or hostile-local-code
+  defense.
+
+Prove success, exact duplicates, conflicting disposition, wrong owner/generation,
+ambiguous or mismatched roster, definite delete failure, conflicting phases,
+stale pending, stale child deletion, purge-before-close refusal, and no role
+fallback. Update status/preflight/docs for complete Slice-3 readiness, expiry,
+and cleanup state. Run focused Python/Node/native tests plus full Tier 0, Docker
+Tier 1, and the pinned Prime Agent 0.9.8 probe. Use direct owner review only and
+no independent review cycle. Commit/push one candidate, report, and stop. Do not
+start Slice 4, landing, activation/restart/UAT, finalization, bookkeeping, or
+physical project cleanup.
+
+## Owner-blocked Section 28 narrow repair
+
+The rest of lifecycle closure is directionally accepted. Repair only these two
+findings against candidate `1fed99101f3dee95bf6863a3c9298d8c05d96718`:
+
+- Python finalization publishes `FINALIZED` before unlinking `PENDING`. The
+  extension may treat `PENDING` plus exactly one `FINALIZED` as a normal transient
+  overlap only while waiting within the existing admission deadline. It must not
+  admit until `PENDING` disappears and exactly one authority phase remains.
+  Persistent `PENDING`+`FINALIZED` at the deadline, or any other multiple
+  authority phases, must call `ctx.abort()` before provider use. Preserve the
+  existing conflicting-phase refusals. Prove both a transient overlap that
+  resolves and a persistent overlap that produces zero provider calls in Node
+  and native coverage.
+- Export the approved Section 28 public API from Python `__all__`: the lifecycle
+  functions `record_disposition`, `close`, `cancel_stale`, and `purge`, plus the
+  disposition decisions and disposition size limit. Add an exact public-surface
+  assertion.
+
+Do not broaden architecture, redesign deletion, launch a new independent review,
+or start Slice 4. Run focused and affected full Tier 0, Docker Tier 1, and the
+pinned Prime Agent 0.9.8 probe. Commit/push one narrow repair, report for direct
+owner review, and stop.
+
+## Owner-accepted Slice 3 and bounded Slice 4 authority
+
+The owner accepts the repaired lifecycle closure through
+`6bceeea133f767d72739a8d88df2639ab75bba96` / tree
+`6421f9acc11a4c5e755e37dfa3060c2821bf5326`. Slice 3 is complete.
+
+Slice 4 must produce one immutable Generation A bridge candidate without
+activating it:
+
+- Fetch `origin/main` before integration. If it advanced, merge that exact tip
+  normally into the published episode branch and record parent order; never
+  rebase accepted history.
+- Implement the smallest external cutover coordinator required by the approved
+  plan and recording-fake-test resident client/launcher inventory,
+  executable/build mapping, `shutdown --force --json` sequencing,
+  zero-stale-process gates, exact landing/apply/check, one-runtime start/status,
+  practical checkpoint recovery, and the ordered resume checklist. It remains
+  inert unless an operator explicitly invokes it. This pass may not stop or
+  restart real processes or mutate `main` or user-global state.
+- Reconcile S1-S3 docs, traceability, managed inventories, recovery runbook,
+  provider assertions, and operator instructions. Audit the full Generation A
+  bridge inventory without deleting any compatibility resource.
+- Build the private preactivation/rollback bundle with exact selected
+  global-context and APPEND preimages and metadata, installed inventory,
+  selected-file decision, current known-good generation, source topology,
+  restore tool/hash, and manifest digest. Keep credentials and unrelated private
+  data out. Prove apply/restore only against isolated copies.
+- Commit a sanitized, non-self-referential readiness/rollback evidence document
+  before freeze. Run complete Tier 0, selected Docker Tier 1, pinned probe,
+  focused native/coordinator fakes, diff check, and teardown. Then freeze and
+  push one immutable commit/tree with no tracked mutation afterward.
+
+The episode reports the exact frozen packet and evidence to the owning
+Conversation and stops. The owning Conversation, not the episode, performs the
+plan-required primary-main exact configured independent review after checking
+legacy skill/profile hashes and pre/post subject state. Gate A, landing,
+activation, live runtime shutdown/restart, UAT, compatibility removal,
+finalization, and cleanup remain unauthorized.
+
+## Owner-blocked Generation A revision authority
+
+Candidate `f2f3fcd25dbe3d96f05193261020d26bf79f1213` / tree
+`8b4fef1936766c7383a577317ac6d2436f4e72e5`, its private freeze receipts, and
+its tracked readiness evidence remain immutable historical evidence. The exact
+configured Astra/max report SHA256 is
+`4ed03385fc1d54cdecdbbacf5ea720d00b70a9af10b99b1466f7592df50d95e1`.
+The owner accepts its five blocking findings as ordinary-operation defects.
+
+Repair only these two existing seams:
+
+1. **Coordinator (B1-B3).** Preflight must reconcile actual observations against
+   declared roles and supported compiled/interpreter entrypoints. It must require
+   client/launcher absence before shutdown while allowing only the approved old
+   daemon/worker set, and bind actual status/build/socket/executable facts.
+   Failed, malformed, unknown, or mismatched observations stop before mutation;
+   do not scan unrelated programs. After exactly one start, perform a short
+   bounded read-only readiness observation loop. It never starts or retries
+   again and fails truthfully for wrong identity, duplicates, child exit,
+   malformed status, or deadline. Replace syntactic `git revert`/placeholder
+   acceptance with one concrete resolvable history-preserving recipe validated
+   against prelanding HEAD, candidate, integration-merge parents/mainline, and
+   the resulting accepted baseline by a scratch-only inverse or equivalent
+   bounded topology proof. Reset, rebase, force, and automatic live
+   compensation remain forbidden.
+2. **Bundle (B4-B5).** Before resolving paths, `lstat` the originally supplied
+   selected-context, destination, bundle-root, and every fixed managed parent/
+   leaf component; reject visible or dangling symlinks and non-regular inputs
+   while preserving real isolated roots, fixed inventory, and supported macOS
+   naming. Do not build a descriptor-chain, ABA, or race framework. Restored
+   state includes ordinary mode/uid/gid. Restore required metadata even when
+   bytes already match, or fail. `alreadyRestored` is true only when bytes and
+   required metadata already match. Unknown content remains all-or-refuse.
+
+Tests must include the report's exact cases: declared live TUI, supported Node
+entrypoint, wrong same-version build, delayed readiness with one start,
+malformed status, wrong/placeholder rollback and wrong mainline, visible and
+dangling links, unchanged-byte mode drift, metadata failure, and replay.
+Regenerate only the affected private manifest/proof/readiness evidence, rerun
+complete focused/Tier 0/Docker Tier 1/pinned gates, freeze and push one new
+immutable commit/tree with no tracked post-freeze change, report it to the
+owning Conversation, and stop. The owner will admit one fresh exact configured
+reviewer because candidate bytes changed.
+
+## Gate A preflight version-stream repair authority
+
+Gate A was explicitly authorized for accepted Generation A replacement
+`ed42db9f20ce7a58689707b188e35028e31abf55` / tree
+`7fb098436e13296191ab64ef593c49550c70c162` after an exact configured `PASS`.
+Before shutdown or any other live mutation, owner read-only preflight proved that
+supported Prime Agent 0.9.8 command
+`/Users/jlanders/code/prime-agent/.worktrees/cwd-fix-v0.9.8-r1-source/prime-agent.sh --version`
+returns 0 with exact `0.9.8` on stderr and empty stdout. Coordinator
+`verify_executable` compares stdout only and therefore stops with
+`runtime entrypoint version mismatch`.
+
+Preserve the exact private diagnostic at
+`/Users/jlanders/.prime/agent/session-artifacts/01a0f51d-d51b-7649-a28a-844879e42aec/gate-a-ed42db9/preflight-version-stream-block.json`,
+SHA256 `c0388aa8ede3912106afc3500370494bd37bdbc56880cc9114c91e8ed161be73`,
+and preserve ed42/PASS as history.
+
+Repair only executable version verification. For a return-code-zero version
+command, accept the exact expected single-line version from stdout or stderr
+only when exactly one stream is populated and the other is empty. Reject a
+nonzero result, both streams populated, both empty, multiline or extra content,
+and any mismatch. Do not add a general output-normalization layer.
+
+Focused coverage must include stdout and stderr success plus ambiguity, empty,
+extra-content, multiline, mismatch, and nonzero failures. A real read-only probe
+must run the supported Prime Agent 0.9.8 wrapper and prove its actual stderr
+contract. Update only affected documentation, traceability, and private bundle/
+readiness/config evidence.
+
+The successor rollback topology must contain the complete newest-to-oldest
+linear chain `[successor, ed42db9f20ce7a58689707b188e35028e31abf55,
+f2f3fcd25dbe3d96f05193261020d26bf79f1213]`, followed by integration merge
+`46147ff887569101b7e64a8466cde5887c15cc31` with mainline 2. It must produce
+accepted baseline `c24ba6c1e76585193d4f34f0b0b0233846780442` / tree
+`a9955483816af04a4c68468a8e2ce3d0d0d00a5d` in isolated proof.
+
+Run required exact-byte gates, freeze and push one clean immutable successor,
+report it, and stop for one fresh exact owner review. Gate A authority is not
+transported through the changed candidate bytes: do not execute the invalidated
+ed42 config/state or perform shutdown, landing, apply, restart, or UAT in this
+repair pass.
+
+## Final stop-loss repair authority — lossless version observation
+
+Fresh exact Astra/max review returned `BLOCK` for immutable Section 32 successor
+`47d2d49280bd4ef8cd66e4bcc7eddcf7ad7980b4` / tree
+`a4667c0047a9ea6f3379790d024c3df44754f00c`. Preserve owner report SHA256
+`039a66d0ad404d5592913d9476dfef77c6e309dbc16b5dd9a23e3593f6008262`
+and reviewer real-`LocalRunner` matrix SHA256
+`bf8d9d182c028b77608745237aa286cf416aaf704a35bbd26ea94a0a77a337de`.
+The accepted finding is that Python text-mode universal-newline conversion turns
+raw CRLF and bare CR into LF before `verify_executable`, so the recording-fake
+contract was stricter than the production adapter.
+
+Owner stop-loss reassessment authorizes exactly one final narrow repair. Introduce
+a version-specific subprocess observation seam that preserves stdout and stderr
+bytes losslessly, or an exact equivalent. Keep the existing ten-second timeout.
+Do not alter general `LocalRunner.run(..., text=True)` behavior used by Git,
+status, process, and bundle operations.
+
+Version admission requires return code zero, exactly one populated raw stream,
+and exact equality with the configured version encoded as UTF-8 followed by one
+LF byte. The other raw stream must be empty. Reject nonzero, both streams, neither
+stream, no LF, CRLF, bare CR, whitespace, extra/blank/multiple lines, mismatch,
+timeout, undecodable bytes, and every non-exact byte sequence. Do not strip,
+split lines, remove carriage returns, concatenate streams, regex/substring parse,
+or add a shared/general normalizer.
+
+Tests must traverse the real production capture adapter for LF stdout and LF
+stderr positives and CRLF and bare-CR negatives on both streams. Preserve the
+supported Prime Agent 0.9.8 raw-stderr proof. Prove downstream command absence on
+failure plus first-call, replay, and timeout behavior. Update only affected docs,
+traceability, private bundle/proofs/config, and gate evidence.
+
+The final successor rollback chain is exactly `[successor,
+47d2d49280bd4ef8cd66e4bcc7eddcf7ad7980b4,
+ed42db9f20ce7a58689707b188e35028e31abf55,
+f2f3fcd25dbe3d96f05193261020d26bf79f1213]`, followed by integration merge
+`46147ff887569101b7e64a8466cde5887c15cc31` with mainline 2. Isolated proof must
+produce baseline `c24ba6c1e76585193d4f34f0b0b0233846780442` / tree
+`a9955483816af04a4c68468a8e2ce3d0d0d00a5d`.
+
+Run all required exact gates, freeze/push one clean immutable successor, report
+it, and stop for the one allowed final fresh exact owner review. Do not touch
+primary `main`, the owner's private overlay, prior configs, Prime Agent source,
+live/global state, Gate A, UAT, S5, compatibility removal, finalization,
+bookkeeping close, or physical cleanup.
+
+## Docker validation recovery
+
+The owner Conversation restored Docker Desktop. Independent health returned
+server version `29.6.2`, and the exact Docker-focused gate passed 3 tests with an
+isolated pinned-0.9.8 selector. No credential, tracked configuration, Gate A, or
+live Prime Agent state changed.
+
+## Gate A bridge UAT acceptance and bounded Slice 5 authority
+
+The owner accepted Gate A bridge UAT after post-restart evidence proved the
+managed owner guide and identity worked, the exact episode resumed cleanly with
+no injected legacy or retired work-control package, and a saved ordinary session
+completed only the harmless read-only `VISION.md` task without mutation.
+Compatibility cleanup may therefore advance only through the smallest practical
+Slice 5 vertical slice.
+
+Slice 5 remains bounded to the plan's isolated legacy-compatibility removal and
+known-state restore path. It also removes the operator-rejected managed-directory
+unexpected-entry purity gates from apply/check and their direct tests. Do not
+replace those gates with cache exceptions, new integrity machinery, or generalized
+defenses. Retain expected-file comparisons, managed package hash/import
+validation, role generation and lock checks, and ordinary safety checks. Do not
+start Slice 6, apply final mode to the host, run Gate B, finalize, or physically
+clean up resources in this slice.
+
+## Slice 5 acceptance and bounded Slice 6 authority
+
+The owner accepted exact Slice 5 candidate
+`98ed8d14e028622d07a120fbd4af730bd4171e38`, tree
+`2b83d87a5adfab4c3f6e274b3149df54c588631e`, after verifying its exact diff,
+clean synchronized push state, retained log hashes, complete Docker/Tier 0/probe
+evidence, and independent PASS. That candidate and its evidence are the accepted
+Slice 6 baseline.
+
+Advance only Slice 6 as already specified: perform the fresh foreign-consumer
+audit, remove the remaining legacy compatibility resources, and reconcile the
+final source tree as one minimal reviewable vertical slice. Do not add replacement
+frameworks, generalized integrity machinery, or new defensive scope. Do not
+apply final mode to the host, run Gate B, begin Slice 7 freeze/review work,
+archive or finalize the episode, merge, or physically clean up resources.
+
+
+## Slice 6 owner-requested omission repair
+
+The owner reviewed Slice 6 candidate
+`0e96838d430049980fa9ab2f6f8fc2762f2c127c`, tree
+`c8474abac9ba25da740c0beae858223aee4c8b17`, and requested one bounded
+successor rather than accepting the candidate. The preserved pre-landing
+operator edit to the now-deleted
+`.prime/agent/profiles/expert-reviewer.md` required semantic reconciliation
+before deletion, but that intent was not made explicit in the managed reviewer
+source.
+
+Repair only this omission. Migrate the operator edit's intent into the managed
+official reviewer guidance. Give implementers repair intent and useful general
+direction without prescribing exact code changes or wasting report tokens.
+Retain the current structured PASS/BLOCK report contract and require each
+blocking finding to remain actionable enough for a strong one-pass repair.
+Do not restore the standalone profile or create another reviewer authority.
+Update only directly affected tests, hash expectations, traceability, and Slice
+6 evidence; run proportionate focused checks; commit and push one clean Slice 6
+successor for owner review.
+
+Do not broaden Slice 6, begin Slice 7, apply final mode to the host, run Gate B,
+archive or finalize the episode, merge, or physically clean resources.
+
+
+## Revised Slice 6 acceptance and bounded final-candidate authority
+
+The owner accepted revised Slice 6 candidate
+`64bbee26c363c87ef85446da707900439c869620`, tree
+`d9e9ba451cfcc2426ad200d8e05ed7e086f9abe1`, after verifying the single
+reviewer-guidance repair, managed hashes, focused Docker and pinned-probe
+evidence, exact independent PASS, clean synchronized push, and retained scope
+boundary. That immutable commit/tree is the final-candidate preparation
+baseline.
+
+Before freezing the final candidate, reconcile exactly two preserved pre-landing
+local files from
+`/Users/jlanders/.prime/agent/session-artifacts/01a0f51d-d51b-7649-a28a-844879e42aec/gate-a-f2e98e2/prelanding-local-edits`:
+
+- `.agents/skills/goals-and-heartbeats/SKILL.md`: source SHA256
+  `6c9daca98cf818a784334493190f2c4ea17218ffb61e52b52919105178a6aaa1`.
+  The accepted baseline SHA256 is
+  `1aa4f6391ceb96800208a0dd24aa20890fc06ef67b6a08f1afdb8b05977a7783`;
+  the preserved file differs only by the operator's no-goal-budget/unbounded
+  token-authority sentence in the opening operational paragraph. Reconcile that
+  intent semantically and exactly where the current canonical wording permits;
+  do not restore unrelated policy or create another skill authority.
+- `.beads/interactions.jsonl`: preserved source is 30,963 bytes / 105
+  newline-terminated records at SHA256
+  `d3e5956f184694018426be8993452300401be361bd9ef6762018e39d8ab84a70`.
+  At handoff, the tracked file is its exact 29,530-byte / 99-record prefix at
+  SHA256 `05f185840bda2ae7a8901796da4b19aa5b055183fdcb9b9ba5ee905d5283f8fd`.
+  Append the exact six-record, 1,433-byte suffix (SHA256
+  `3f1935e989dfb08f7635a1ebc53afd2fd42ac5ec368646881350f5e64720a5ac`)
+  losslessly and in order. Never overwrite, reorder, normalize, or drop any
+  current interaction; if the destination advanced, preserve it and append only
+  the exact missing preserved records after proving their identity.
+
+Complete the normal Ralph plan lifecycle before freeze: move the finished active
+`.ralph/plans/SPECIFICATION.md` and `.ralph/plans/EXECUTION_PLAN.md` into
+`.ralph/plans/archive/official-lean-compatibility-cleanup/` and update
+`.ralph/plans/archive/README.md`. The active root plan files must be absent from
+the final candidate. This archival does not close the bead or finalize episode
+bookkeeping; those remain reserved for the operator's later terminal decision.
+
+After those bounded reconciliations, perform only the already-approved final
+candidate preparation, immutable freeze, exact gates, and exact official review.
+Keep the implementation lean and add no new mechanism. Do not merge, apply final
+mode to the host, run the live cutover, restart Prime Agent, finalize bookkeeping,
+or physically clean resources. Report one immutable final candidate with
+evidence and stop.

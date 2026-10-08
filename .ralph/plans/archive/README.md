@@ -7,6 +7,81 @@ Older sets contain specification, requirements, decisions, and execution-plan
 files; newer project-customized sets may contain a different reviewed artifact
 collection.
 
+## official-lean-compatibility-cleanup/ — Official lean role protocol final candidate ✅ IMPLEMENTATION COMPLETE (2026-10-08)
+
+Delivered the official lean compatibility cleanup through owner-reviewed slices,
+ending at accepted revised Slice 6 commit `64bbee26c363c87ef85446da707900439c869620`. Final-candidate
+preparation then integrated `origin/main`
+`7bbaebf959391bc8488fad4751c245f33f4e7f6c` without rewriting accepted history
+in merge commit `41b94b5bad3a4cc6a205ecac7e0527cce78cad3d`, reconciled the two preserved pre-landing
+files, and archived this completed plan set before immutable freeze.
+
+- [Archived specification](official-lean-compatibility-cleanup/SPECIFICATION.md) —
+  SHA256 `305f8b69fc881fa25fdcabdeace4688e13787651270f843799f6f8471d30c012`.
+- [Archived execution plan](official-lean-compatibility-cleanup/EXECUTION_PLAN.md) —
+  SHA256 `33437aa648a0fc6b788db053edc216c543e3cdfa9d16944e978e5dbf21e6a325`.
+- Managed reviewer SHA256 after main reconciliation: `dcd02e81e7e0656a3d7eb89ccfa78bd8b24a8492de012122f82b17b7aec50a05`.
+- Goals-and-heartbeats reconciliation SHA256: `6c9daca98cf818a784334493190f2c4ea17218ffb61e52b52919105178a6aaa1`.
+- Interactions reconciliation: all existing 100 records preserved, exact six
+  missing records appended in order; resulting 106-record SHA256
+  `86f65e44d6a12fc0e06c0c7fc3fabb17d0cf01e3bbbf88df7db6ea6d2e219fe7`.
+
+The exact frozen candidate, post-freeze gates, official review, and operator
+disposition are recorded in private receipts and `prime-claw-h6w.30`; they do
+not mutate this candidate tree. This archive does not authorize merge, host
+final-mode apply, live Gate B, restart, episode finalization, or physical
+resource cleanup. The bead remains open pending the operator's later terminal
+decision.
+
+## official-lean-session-protocol/ — Accepted predecessor lean protocol ✅ HISTORICAL (2026-10-04)
+
+These two files are the exact active plan/spec blobs replaced by promotion commit
+`6fcc4bf03b2beb09802ea9fed66a3c956be1d687`. They were recovered only from its
+sole parent `001cd228f6fca8ddd708bfde06823b0641bcfdf0`; their historical status text
+and references are intentionally unchanged.
+
+- [Archived specification](official-lean-session-protocol/SPECIFICATION.md) —
+  SHA256 `09cce8ae0898da292fb34f843b3e99b3a5144898934c7e13408a29e76ae2802a`.
+- [Archived execution plan](official-lean-session-protocol/EXECUTION_PLAN.md) —
+  SHA256 `cf9a75e45d4ccabb42e3c36feed05ef9678227bc58d9e8514aea99145cabe888`.
+- Accepted cutover commit:
+  `d2ee807ee2f0f066dac1a6b0f1d1c661f2fe1fd4`.
+- Terminal main/bookkeeping checkpoint:
+  `62ee095cc9cfc7e88a884edec03024edf87953f0`.
+
+This archive preserves predecessor lineage only. The active official lean
+compatibility-cleanup specification and plan govern the replacement protocol.
+Nothing here authorizes landing, activation, rollback, or cleanup.
+
+## compaction-first-phase-transitions/ — Compaction-first phase transitions ✅ COMPLETE (2026-10-02)
+
+Delivered project-local compaction-first transitions for reviewed `/plan` and
+`/implement-spec` flows. Each command now admits a minimal prep turn, requests
+best-effort compaction, and queues exactly one canonical phase turn while
+preserving existing location, readiness, approval, and replay boundaries.
+
+- Slice 1 accepted at `200be5744003ac47cecd2d79a337df3e4c4aeebc`
+  (`prime-claw-h6w.26`).
+- Slice 2 accepted at documentation replacement
+  `c4de0a89c84aa02f1035f0f3f6ed4bc838223949`, with runtime predecessor
+  `94e4488ade82e1a2a8ce74cf956993870759d1f3` (`prime-claw-h6w.27`).
+- [Archived specification](compaction-first-phase-transitions/SPECIFICATION.md)
+- [Archived execution plan](compaction-first-phase-transitions/EXECUTION_PLAN.md)
+- [Prep-chain operator contract](../../../docs/prep-chain.md)
+
+Joe explicitly deferred the planned human-operated `/plan` + `/implement-spec`
+dogfood to P1/BLOCKED Bead `prime-claw-h6w.28`, pending separate merge
+authorization and deliberate activation from primary `main`. That disposition
+matches the `prime-claw-h6w.15` precedent and is not completed dogfood evidence.
+This archive does not claim merge readiness, host-global activation, merge,
+episode cleanup, or any product-scope change.
+
+Post-acceptance integration rebased the six reviewed commits onto `origin/main`
+`eca48f8b284c990a8e030062ef70192313781b7f`. The original review hashes remain
+acceptance provenance; their patch-equivalent rebased hashes are recorded in the
+archived execution plan. The rebased archive commit is
+`445ca79b38ccccc79ca857eaaa8d3bf1d575bb34`.
+
 ## plugin-test-container/ — Test tier architecture + tier-1 plugin test container ✅ COMPLETE (2026-09-30)
 
 Delivered the three-tier test architecture and the tier-1 plugin test container

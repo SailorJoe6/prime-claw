@@ -29,6 +29,25 @@ Document the current system, the required change, and the intended end state in
 important boundaries without inventing implementation architecture. This phase
 specifies the work; it does not create an execution plan.
 
+## Bound the product contract
+
+Keep rigor proportional to the product outcome. The specification must state:
+
+- the practical outcome and required safety properties;
+- a concise threat model, trusted assumptions, and ordinary failure model;
+- explicit non-goals, including technically possible cases that are not product
+  requirements;
+- the boundary where ambiguous states stop for evidence-preserving manual
+  recovery instead of more autonomous machinery; and
+- a qualitative complexity budget describing what support machinery would be
+  disproportionate to the value delivered.
+
+Separate required acceptance behavior from optional hardening and implementation
+suggestions. Evidence is diagnostic unless the operator explicitly requests a
+security-grade attestation product. Prefer the smallest safe end-to-end slice,
+then harden risks observed in dogfood or real use. A reviewer-discovered
+invariant does not enter acceptance scope without operator approval.
+
 ## Keep the specification alive
 
 A specification under `.ralph/plans/future/` is a living source of truth, not a

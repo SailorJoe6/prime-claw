@@ -185,3 +185,40 @@ an outage or quota error must be visible.
 configured another embedding profile may use its documented non-destructive parallel rebuild,
 but prime-claw must never auto-select personal hardware as fallback. Joe's home-Qwen override
 is ready to resume after the exact-model preflight; no build has restarted. See [home-embedding-runtime.md](home-embedding-runtime.md).
+
+## Prime Agent Generation A role cutover preparation
+
+Generation A is prepared but not activated by normal development. Use
+`docs/lab-global-plugin.md#Generation-A-coordinator-and-preactivation-bundle`
+for the exact coordinator, private-bundle, checkpoint, and recovery contracts.
+During Slice 4, use recording fakes, bounded temporary subprocess emitters, the
+supported wrapper's read-only `--version` interface, and isolated-copy
+apply/restore proofs. Do not run `--execute`, `--user-global`, `shutdown`, a
+daemon start, landing, or UAT.
+
+A future explicitly authorized Gate A starts from a separate non-Orca terminal
+with a reviewed coordinator input, private bundle manifest digest, and private
+checkpoint directory. The external coordinator first binds the exact compiled or
+Node CLI prefix, both interpreter/entrypoint artifact digests, the declared old
+daemon's status/build/socket/PID, the approved worker set, and confirmed absence
+of clients, TUIs, launchers, and wrappers. Observation uses only exact Prime
+Agent process-title discovery plus targeted declared/discovered PIDs. Version
+admission uses a version-only lossless subprocess capture and requires return
+code zero, exactly one raw stream equal to the configured version encoded as
+UTF-8 plus one LF byte, and the other raw stream equal to `b""`. CRLF, bare CR,
+no LF, non-UTF-8 bytes, ambiguity, whitespace, extra or multiple lines,
+mismatch, nonzero status, and timeout fail before status or any live work. The
+general text-mode runner for Git, status, process, and bundle commands remains
+unchanged.
+
+The input also contains the explicit newest-to-oldest linear revert commits, the
+integration merge and ordered parents, mainline 2, and accepted prelanding
+commit/tree. The coordinator proves that recipe only in a temporary no-local
+clone. Its sole mutating sequence remains shutdown, exact fast-forward
+landing/push, apply with a fresh external role receipt, check, and one runtime
+start. After that single start it performs only bounded read-only readiness
+observations; wrong identity, duplicate runtime, child exit, malformed status,
+or deadline stops without retry. Only exact readiness prints the owner -> episode
+-> ordinary checklist. Stop at the first uncertain boundary and follow the
+phase-specific recovery table. Never blindly retry a push, apply, or runtime
+start, and never use reset/rebase/force or automatic live compensation.

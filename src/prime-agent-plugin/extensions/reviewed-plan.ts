@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
@@ -7,17 +8,24 @@ import {
   type EpisodeDependencies,
 } from "../extension-support/spec-episode.ts";
 import {
-  validateFutureLocation,
-  wrapCanonicalSkill,
-} from "../extension-support/reviewed-plan-support.ts";
+  admitPrepChain,
+  type PrepChainWorkflow,
+} from "../extension-support/prep-chain.ts";
 import {
   appendActiveOversight,
+  ConversationGuideReadinessError,
+  assertConversationGuideReady,
   assertConversationPromotionReady,
+  assertProspectiveConversationGuideReady,
   currentOversightMarkerForClose,
   OVERSIGHT_MARKER_TYPE,
   registerConversationOversight,
 } from "../extension-support/conversation-oversight.ts";
 import { closeEpisodeOversight } from "../extension-support/episode-close.ts";
+import {
+  registerOfficialExpertReviewReservation,
+  type ExpertReviewReservationRegistration,
+} from "../extension-support/expert-review-reservation.ts";
 
 /**
  * Native reviewed planning and implementation-promotion boundaries.
@@ -35,82 +43,31 @@ const PLAN_WORKFLOW = {
   skillName: "plan",
   locationTag: "operator-plan-location",
 };
-const IMPLEMENT_WORKFLOW = {
+const PLAN_PREP_WORKFLOW: PrepChainWorkflow = {
+  usage: PLAN_USAGE,
+  prepSkillName: "plan-prep",
+  phaseSkillName: PLAN_WORKFLOW.skillName,
+  locationTag: PLAN_WORKFLOW.locationTag,
+};
+const IMPLEMENT_PREP_WORKFLOW: PrepChainWorkflow = {
   usage: IMPLEMENT_USAGE,
-  skillName: "implement-spec",
+  prepSkillName: "implement-prep",
+  phaseSkillName: "implement-spec",
   locationTag: "operator-implementation-location",
 };
 
-function warn(ctx: ExtensionContext, message: string): void {
-  ctx.ui.notify(message, "warning");
-}
-
-type SkillWorkflow = {
-  usage: string;
-  skillName: string;
-  locationTag: string;
+type ImplementationApproval = {
+  location: string;
+  preparationLifecycle: string;
+  skipNextAgentEnd: boolean;
 };
 
-type SkillAdmissionResult =
-  | { ok: true; location: string }
-  | { ok: false; message: string };
-
-function admitCanonicalSkill(
-  pi: ExtensionAPI,
-  ctx: ExtensionContext,
-  rawLocation: string,
-  workflow: SkillWorkflow,
-  delivery: "native" | "followUp",
-  onValidated?: (ctx: ExtensionContext, location: string) => void,
-  preflight?: (ctx: ExtensionContext, location: string) => void,
-): SkillAdmissionResult {
-  let selected;
-  try {
-    selected = validateFutureLocation(ctx.cwd, rawLocation);
-  } catch {
-    selected = null;
-  }
-  if (!selected) return { ok: false, message: workflow.usage };
-
-  preflight?.(ctx, selected.location);
-
-  const prompt = wrapCanonicalSkill(
-    selected.projectRoot,
-    workflow.skillName,
-    workflow.locationTag,
-    selected.location,
-  );
-  if (!prompt) {
-    return {
-      ok: false,
-      message: `reviewed-plan: .ralph/skills/${workflow.skillName}/SKILL.md not found`,
-    };
-  }
-
-  try {
-    if (delivery === "followUp") {
-      pi.sendUserMessage(prompt, { deliverAs: "followUp" });
-    } else {
-      pi.sendUserMessage(prompt);
-    }
-  } catch (error) {
-    if (delivery === "native") throw error;
-    return {
-      ok: false,
-      message: `reviewed-plan: canonical ${workflow.skillName} could not be queued`,
-    };
-  }
-
-  onValidated?.(ctx, selected.location);
-  return { ok: true, location: selected.location };
-}
-
-function registerSkillCommand(
+function registerPrepChainCommand(
   pi: ExtensionAPI,
   options: {
     command: string;
     description: string;
-    workflow: SkillWorkflow;
+    workflow: PrepChainWorkflow;
     onValidated?: (ctx: ExtensionContext, location: string) => void;
     preflight?: (ctx: ExtensionContext, location: string) => void;
   },
@@ -118,7 +75,7 @@ function registerSkillCommand(
   pi.registerCommand(options.command, {
     description: options.description,
     handler: async (args, ctx) => {
-      const result = admitCanonicalSkill(
+      const result = admitPrepChain(
         pi,
         ctx,
         args,
@@ -127,32 +84,51 @@ function registerSkillCommand(
         options.onValidated,
         options.preflight,
       );
-      if (!result.ok) warn(ctx, result.message);
+      if (!result.ok) ctx.ui.notify(result.message, result.level);
     },
   });
 }
 
-type ReviewedPlanDependencies = EpisodeDependencies & {
+type ReviewedPlanDependencies = EpisodeDependencies & ExpertReviewReservationRegistration & {
   createEpisode?: typeof createSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
 };
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
-    registerConversationOversight(pi);
-    const approvedLocationBySession = new Map<string, string>();
-    registerSkillCommand(pi, {
+    const implementationApprovalBySession = new Map<string, ImplementationApproval>();
+    const oversightOptions = {
+      guideRoot: dependencies?.guideRoot,
+      currentProspectivePreparation(ctx: ExtensionContext) {
+        const approval = implementationApprovalBySession.get(ctx.sessionManager.getSessionId());
+        if (!approval || approval.skipNextAgentEnd) return null;
+        return { location: approval.location, lifecycle: approval.preparationLifecycle };
+      },
+    };
+    registerConversationOversight(pi, oversightOptions);
+    registerOfficialExpertReviewReservation(pi, {
+      guideRoot: dependencies?.guideRoot,
+      packageStatus: dependencies?.packageStatus,
+      repositoryIdentity: dependencies?.repositoryIdentity,
+      now: dependencies?.now,
+      nonce: dependencies?.nonce,
+    });
+    registerPrepChainCommand(pi, {
       command: "plan",
       description: "Plan a reviewed specification from an explicit .ralph/plans/future/<slug> folder",
-      workflow: PLAN_WORKFLOW,
+      workflow: PLAN_PREP_WORKFLOW,
     });
-    registerSkillCommand(pi, {
+    registerPrepChainCommand(pi, {
       command: "implement-spec",
       description: "Review and promote an approved future bundle into an isolated implementation episode",
-      workflow: IMPLEMENT_WORKFLOW,
+      workflow: IMPLEMENT_PREP_WORKFLOW,
       preflight: (ctx, location) => assertConversationPromotionReady(ctx, location),
       onValidated: (ctx, location) => {
-        approvedLocationBySession.set(ctx.sessionManager.getSessionId(), location);
+        implementationApprovalBySession.set(ctx.sessionManager.getSessionId(), {
+          location,
+          preparationLifecycle: randomUUID(),
+          skipNextAgentEnd: true,
+        });
       },
     });
 
@@ -180,12 +156,12 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         additionalProperties: false,
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-        const result = admitCanonicalSkill(
+        const result = admitPrepChain(
           pi,
           ctx,
           params.location,
-          PLAN_WORKFLOW,
-          "followUp",
+          PLAN_PREP_WORKFLOW,
+          "tool",
         );
         if (!result.ok) {
           return {
@@ -197,7 +173,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         return {
           content: [{
             type: "text",
-            text: `Planning admitted for ${result.location}: the canonical workflow was queued as a follow-up. Planning has not completed, and implementation is not authorized.`,
+            text: `Planning admitted for ${result.location}: canonical plan-prep was steered and canonical plan was queued as the sole follow-up. Planning has not completed, and implementation is not authorized.`,
           }],
           details: { admitted: true, location: result.location },
         };
@@ -205,23 +181,34 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     });
 
     pi.on("session_start", (_event, ctx) => {
-      approvedLocationBySession.delete(ctx.sessionManager.getSessionId());
+      implementationApprovalBySession.delete(ctx.sessionManager.getSessionId());
     });
     pi.on("agent_end", (_event, ctx) => {
-      approvedLocationBySession.delete(ctx.sessionManager.getSessionId());
+      const sessionId = ctx.sessionManager.getSessionId();
+      const approval = implementationApprovalBySession.get(sessionId);
+      if (!approval) return;
+      if (approval.skipNextAgentEnd) {
+        implementationApprovalBySession.set(sessionId, {
+          ...approval,
+          skipNextAgentEnd: false,
+        });
+        return;
+      }
+      implementationApprovalBySession.delete(sessionId);
     });
     pi.on("session_shutdown", (_event, ctx) => {
-      approvedLocationBySession.delete(ctx.sessionManager.getSessionId());
+      implementationApprovalBySession.delete(ctx.sessionManager.getSessionId());
     });
 
     pi.registerTool({
       name: "create_spec_episode",
       label: "Create specification episode",
-      description: "Create or return the one worktree-isolated episode for an implementation-ready future-plan folder.",
-      promptSnippet: "Promote one reviewed future-plan folder into its isolated implementation episode",
+      description: "Create or return the one worktree-isolated episode for an implementation-ready future-plan folder after prospective Conversation-guide readiness is consumed.",
+      promptSnippet: "Promote one reviewed future-plan folder after its prospective guide gate is ready",
       promptGuidelines: [
-        "Call create_spec_episode only after the implement-spec readiness workflow finds the selected bundle complete and implementation-ready.",
+        "Call create_spec_episode only after the implement-spec readiness workflow finds the selected bundle complete and implementation-ready and the prospective Conversation guide activation continuation has occurred.",
         "Pass create_spec_episode only the exact operator-selected future-folder location.",
+        "A missing, stale, or mismatched guide readiness result is terminal for this preparation; never bypass or replay it.",
       ],
       executionMode: "sequential",
       parameters: {
@@ -237,15 +224,22 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       } as any,
       async execute(toolCallId, params, _signal, _onUpdate, ctx) {
         const sessionId = ctx.sessionManager.getSessionId();
-        if (approvedLocationBySession.get(sessionId) !== params.location) {
+        const approval = implementationApprovalBySession.get(sessionId);
+        if (approval?.location !== params.location || approval.skipNextAgentEnd) {
           return {
             content: [{ type: "text", text: "Episode creation failed: no matching active /implement-spec approval" }],
             details: { error: "no matching active /implement-spec approval" },
             isError: true,
           };
         }
-        approvedLocationBySession.delete(sessionId);
         try {
+          assertProspectiveConversationGuideReady(
+            ctx,
+            params.location,
+            approval.preparationLifecycle,
+            oversightOptions,
+          );
+          implementationApprovalBySession.delete(sessionId);
           assertConversationPromotionReady(ctx, params.location);
           const createEpisode = dependencies?.createEpisode ?? createSpecEpisode;
           const result = await createEpisode(params.location, toolCallId, ctx, dependencies);
@@ -288,6 +282,9 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         try {
           const marker = currentOversightMarkerForClose(ctx, params.location);
           if (!marker) throw new Error("No exact oversight marker exists for this conversation");
+          if (marker.status === "active") {
+            assertConversationGuideReady(ctx, { guideRoot: dependencies?.guideRoot });
+          }
           const result = closeEpisodeOversight(
             params.location,
             ctx,
@@ -307,6 +304,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             details: { location: params.location, reused: result.reused, episodeId: result.marker.episodeId, status: "inactive" },
           };
         } catch (error) {
+          if (error instanceof ConversationGuideReadinessError) throw error;
           const message = error instanceof Error ? error.message : String(error);
           return { content: [{ type: "text", text: `Episode bookkeeping close failed: ${message}` }], details: { error: message }, isError: true };
         }
@@ -343,6 +341,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         try {
+          assertConversationGuideReady(ctx, { guideRoot: dependencies?.guideRoot });
           const handoffEpisode = dependencies?.handoffEpisode ?? handoffSpecEpisode;
           const result = await handoffEpisode(
             params.location,
@@ -358,6 +357,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             details: result,
           };
         } catch (error) {
+          if (error instanceof ConversationGuideReadinessError) throw error;
           return {
             content: [{ type: "text", text: `Episode handoff failed: ${error instanceof Error ? error.message : String(error)}` }],
             details: { error: error instanceof Error ? error.message : String(error) },

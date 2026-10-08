@@ -62,10 +62,13 @@ scripts/apply-prime-agent-plugin.sh --user-global
 scripts/check-prime-agent-plugin.sh --user-global
 ```
 
-`--user-global` is refused from linked worktrees. A loaded process can retain
-the old generation. After an approved global refresh, let affected work
-quiesce, restart Prime Agent, and use a fresh primary-main process before
-claiming the new generation is active.
+`--user-global` is refused from linked worktrees. A loaded process can retain old
+extension code while rereading project files. After an approved global refresh,
+let affected work quiesce and perform one coordinated full Prime Agent restart.
+Keep every resource that the loaded generation may read until resumed owner,
+episode, and designated ordinary-session UAT prove the new generation is active.
+`/reload`, elapsed time, copy success, and a fresh probe alone are not cutover
+proof.
 
 ## Non-Interactive Shell Commands
 
