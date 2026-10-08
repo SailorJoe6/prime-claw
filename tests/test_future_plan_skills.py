@@ -61,6 +61,67 @@ def test_authoring_skill_has_no_active_root_artifact_destination(
     assert ".ralph/plans/SPECIFICATION.md" not in text
 
 
+@pytest.mark.parametrize("skill_name", SKILLS)
+def test_authoring_skill_requires_a_bounded_product_contract(skill_name: str) -> None:
+    text = " ".join(
+        (ROOT / ".ralph" / "skills" / skill_name / "SKILL.md").read_text().split()
+    )
+
+    for fragment in (
+        "concise threat model",
+        "trusted assumptions",
+        "ordinary failure model",
+        "explicit non-goals",
+        "manual recovery",
+        "qualitative complexity budget",
+        "Separate required acceptance behavior from optional hardening",
+        "Evidence is diagnostic",
+        "reviewer-discovered invariant",
+        "operator approval",
+    ):
+        assert fragment in text
+
+
+def test_plan_and_implementation_readiness_enforce_proportionate_delivery() -> None:
+    plan = " ".join(
+        (ROOT / ".ralph" / "skills" / "plan" / "SKILL.md").read_text().split()
+    )
+    readiness = " ".join(
+        (ROOT / ".ralph" / "skills" / "implement-spec" / "SKILL.md")
+        .read_text()
+        .split()
+    )
+
+    for fragment in (
+        "threat model",
+        "trusted assumptions",
+        "ordinary failure model",
+        "explicit non-goals",
+        "manual-recovery boundary",
+        "qualitative complexity budget",
+        "simplification checkpoint",
+        "two repair/review cycles",
+        "hardening backlog",
+        "scenario, likely impact, current assumption",
+        "operator promotes it",
+    ):
+        assert fragment in plan
+
+    for fragment in (
+        "threat model",
+        "trusted assumptions",
+        "ordinary failure model",
+        "manual-recovery boundary",
+        "qualitative complexity budget",
+        "simplification checkpoint",
+        "optional hardening",
+        "evidence-based promotion trigger",
+        "two-repair/review-cycle stop-loss",
+        "only the operator may promote",
+    ):
+        assert fragment in readiness
+
+
 def test_design_and_spec_it_out_keep_distinct_discovery_modes() -> None:
     design = (ROOT / ".ralph" / "skills" / "design" / "SKILL.md").read_text()
     spec_it_out = (
@@ -171,7 +232,9 @@ def test_implement_prep_skill_owns_compaction_prompt_and_bounded_continuation() 
         assert fragment in skill
 
     assert skill.count("await compact.run(focus_hint)") == 1
-    assert "Do not run `prepare`" in skill
+    assert "Do not run `prepare`" not in skill
+    assert "queued implementation-readiness turn" not in skill
+    assert "own preparation and semantic readiness review" not in skill
     assert "Do not wait for a compaction event" in skill
 
     extension = (

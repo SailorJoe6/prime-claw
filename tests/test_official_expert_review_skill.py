@@ -38,11 +38,25 @@ def test_official_expert_skill_has_one_exact_managed_package_inventory() -> None
 def test_managed_reviewer_definition_is_the_only_current_reviewer_authority() -> None:
     reviewer = PACKAGE / "reviewer.md"
     definition = reviewer.read_text()
+    body = " ".join(definition.split())
     digest = hashlib.sha256(definition.encode()).hexdigest()
-    assert digest == "f737bb48bc5179fa2613e1fbb87c24bce0010ec3f69f31907d5bfa02d2b718f3"
-    assert "state the repair intent and" in definition
-    assert "useful general guidance without spending review tokens prescribing exact code" in definition
-    assert "every\n`BLOCK` remediation must be actionable" in definition
+    assert digest == "dcd02e81e7e0656a3d7eb89ccfa78bd8b24a8492de012122f82b17b7aec50a05"
+    for phrase in [
+        "approved product contract",
+        "An EXPERT cannot expand product scope",
+        "realistic product impact",
+        "proportionate remediation cost",
+        "PASS does not mean that no imaginable finding exists",
+        "evidence-based promotion trigger",
+        "state the repair intent and useful general guidance",
+        "without spending review tokens prescribing exact code changes",
+        "including disproportionate machinery",
+        "explicit operator authorization",
+        "every `BLOCK` remediation must be actionable",
+    ]:
+        assert phrase in body
+    assert "PASS only when no finding remains" not in body
+    assert "BLOCK for any material defect" not in body
     assert f'REVIEWER_DEFINITION_SHA256 = "{digest}"' in (PACKAGE / "__init__.py").read_text()
     assert not (REPO / ".prime/agent/profiles/expert-reviewer.md").exists()
 

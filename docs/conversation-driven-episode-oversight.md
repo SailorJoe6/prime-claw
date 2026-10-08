@@ -222,7 +222,7 @@ lifetime-locks that owner.
 
 The managed `prime-claw-official-expert-review` Python skill retains the
 byte-identical canonical `reviewer.md` at SHA256
-`f737bb48bc5179fa2613e1fbb87c24bce0010ec3f69f31907d5bfa02d2b718f3` and
+`dcd02e81e7e0656a3d7eb89ccfa78bd8b24a8492de012122f82b17b7aec50a05` and
 validates the exact `expert-reviewer`, `openai-codex/gpt-6-astra`, `max`
 configuration. The rubric keeps the structured verdict/remediation contract
 and actionable `BLOCK` requirement while asking for concise repair intent and
@@ -294,7 +294,13 @@ keeps a still-running designated child neutral and aborts provider use.
 
 The managed global EXPERT package's `reviewer.md` is the sole current reviewer
 rubric. Its Markdown body defines the independent, read-only exact-commit role
-and actionable `BLOCK` contract. The package binds and verifies those bytes; no
+and a proportionate actionable `BLOCK` contract. It bounds review to the
+approved threat model and non-goals, permits PASS when no in-contract blocker or
+specification decision remains, and routes plausible out-of-model hardening to
+non-blocking advice with evidence-based promotion triggers. Remediation states
+repair intent and useful general direction without prescribing exact code
+changes. An EXPERT cannot expand scope; adversarial red-team review requires
+explicit operator authorization. The package binds and verifies those bytes; no
 standalone project profile remains.
 
 ## Exact bookkeeping close

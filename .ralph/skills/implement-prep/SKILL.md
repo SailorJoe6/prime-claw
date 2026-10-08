@@ -10,8 +10,7 @@ folder.
 
 The canonical `implement-spec` workflow is already queued independently as the
 sole follow-up. This prep turn cannot cancel, replace, reconstruct, retry, or
-invoke that workflow. Do not run `prepare`; the queued implementation-readiness
-turn does that after the context boundary.
+invoke that workflow.
 
 ## Light readiness sniff
 
@@ -39,8 +38,7 @@ only the exact selected folder where indicated:
 > then retain the owner-supervision role that
 > reviews each delivered slice and supervises the episode to completion.
 > Preserve the conversation-to-episode authority and oversight boundaries
-> needed for that role. The queued `implement-spec` workflow must perform its
-> own preparation and semantic readiness review on the compacted context.
+> needed for that role.
 
 Then call exactly once:
 

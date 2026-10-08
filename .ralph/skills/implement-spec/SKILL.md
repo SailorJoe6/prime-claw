@@ -24,8 +24,16 @@ Check that the bundle defines at least:
 - a coherent desired outcome and bounded scope;
 - decisions and requirements sufficient to implement without conversation-only
   assumptions;
+- a concise threat model, trusted assumptions, and ordinary failure model;
+- explicit non-goals and an evidence-preserving manual-recovery boundary;
+- a qualitative complexity budget and a simplification checkpoint;
 - an executable vertical-slice plan with acceptance evidence and dependencies;
-- explicit approval boundaries and material non-goals; and
+- separate required acceptance behavior and optional hardening, with any
+  hardening candidate carrying a concrete evidence-based promotion trigger;
+- a two-repair/review-cycle stop-loss before further scope or architecture
+  growth;
+- explicit approval boundaries, including that only the operator may promote a
+  reviewer-discovered invariant into product scope; and
 - no unresolved contradiction or blocker that makes implementation unsafe.
 
 If anything required is missing, contradictory, or inadequate, explain every

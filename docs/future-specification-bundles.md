@@ -68,6 +68,39 @@ into it when they emerge, before conversation history or compaction can lose
 them. Update the relevant text and remove stale claims rather than using the
 specification as an append-only activity log.
 
+## Bounded contracts and proportionate review
+
+Prime Claw biases toward **DONE over perfect**. A future specification must bound
+its practical product contract before planning: desired outcome, required safety,
+concise threat model, trusted assumptions, ordinary failure model, explicit
+non-goals, manual-recovery boundary, and qualitative complexity budget. Required
+acceptance behavior stays separate from optional hardening and implementation
+suggestions. Diagnostic evidence is not a security attestation unless the
+operator explicitly makes that the product.
+
+Plans deliver the smallest safe vertical slice and prefer ordinary failure
+handling, deletion, or topology simplification over bespoke transaction and
+recovery systems. Plausible non-blocking risks can enter a lightweight hardening
+backlog with four fields: scenario, likely impact, current assumption, and a
+concrete promotion trigger. Observed failure, a near miss, a credible user
+report, a changed deployment boundary, or a newly approved requirement can
+trigger reconsideration. Review novelty alone cannot promote scope.
+
+An EXPERT may block only on a concrete violation inside the approved contract
+with realistic impact and proportionate remediation. Out-of-model findings are
+advisory. A specification defect or new product invariant returns to the
+operator; the reviewer cannot expand scope. PASS means no in-contract blocker or
+required specification decision remains, not that no imaginable edge case
+exists. Optional adversarial red-team review requires explicit operator
+authorization and cannot redefine the baseline contract.
+
+After two repair/review cycles for the same slice acceptance attempt across
+successor candidate commits, automatic repair stops. The
+owner reassesses threat model, architecture, and complexity. It consults the
+operator if continuing changes scope, product behavior, architecture, or the
+approved complexity budget. A separate simplification checkpoint fires when
+support machinery or recovery states grow materially faster than user value.
+
 ## Reviewed planning entry paths
 
 Planning is a separate reviewed gate with two explicit entry paths.
