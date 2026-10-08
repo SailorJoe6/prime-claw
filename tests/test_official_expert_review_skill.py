@@ -37,8 +37,12 @@ def test_official_expert_skill_has_one_exact_managed_package_inventory() -> None
 
 def test_managed_reviewer_definition_is_the_only_current_reviewer_authority() -> None:
     reviewer = PACKAGE / "reviewer.md"
-    digest = hashlib.sha256(reviewer.read_bytes()).hexdigest()
-    assert digest == "49e2f48421902721b25751380a2173cd8a44ad1c6c4655e7a9a4a8e583983ce6"
+    definition = reviewer.read_text()
+    digest = hashlib.sha256(definition.encode()).hexdigest()
+    assert digest == "f737bb48bc5179fa2613e1fbb87c24bce0010ec3f69f31907d5bfa02d2b718f3"
+    assert "state the repair intent and" in definition
+    assert "useful general guidance without spending review tokens prescribing exact code" in definition
+    assert "every\n`BLOCK` remediation must be actionable" in definition
     assert f'REVIEWER_DEFINITION_SHA256 = "{digest}"' in (PACKAGE / "__init__.py").read_text()
     assert not (REPO / ".prime/agent/profiles/expert-reviewer.md").exists()
 

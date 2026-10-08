@@ -222,12 +222,15 @@ lifetime-locks that owner.
 
 The managed `prime-claw-official-expert-review` Python skill retains the
 byte-identical canonical `reviewer.md` at SHA256
-`49e2f48421902721b25751380a2173cd8a44ad1c6c4655e7a9a4a8e583983ce6` and
+`f737bb48bc5179fa2613e1fbb87c24bce0010ec3f69f31907d5bfa02d2b718f3` and
 validates the exact `expert-reviewer`, `openai-codex/gpt-6-astra`, `max`
-configuration. `describe()` remains read-only and returns `authority: false`.
-Installer preflight remains read-only: a configured interpreter accepts only an
-exact installed package, while the managed interpreter may report
-`SYNC_PENDING` after exact source validation.
+configuration. The rubric keeps the structured verdict/remediation contract
+and actionable `BLOCK` requirement while asking for concise repair intent and
+useful general direction instead of exact code instructions. `describe()`
+remains read-only and returns `authority: false`. Installer preflight remains
+read-only: a configured interpreter accepts only an exact installed package,
+while the managed interpreter may report `SYNC_PENDING` after exact source
+validation.
 
 The old native `prime_claw_reserve_expert_review` and
 `prime_claw_bind_expert_review` caller-authoritative tools are retired, together

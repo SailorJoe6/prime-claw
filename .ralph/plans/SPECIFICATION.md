@@ -1134,3 +1134,28 @@ final source tree as one minimal reviewable vertical slice. Do not add replaceme
 frameworks, generalized integrity machinery, or new defensive scope. Do not
 apply final mode to the host, run Gate B, begin Slice 7 freeze/review work,
 archive or finalize the episode, merge, or physically clean up resources.
+
+
+## Slice 6 owner-requested omission repair
+
+The owner reviewed Slice 6 candidate
+`0e96838d430049980fa9ab2f6f8fc2762f2c127c`, tree
+`c8474abac9ba25da740c0beae858223aee4c8b17`, and requested one bounded
+successor rather than accepting the candidate. The preserved pre-landing
+operator edit to the now-deleted
+`.prime/agent/profiles/expert-reviewer.md` required semantic reconciliation
+before deletion, but that intent was not made explicit in the managed reviewer
+source.
+
+Repair only this omission. Migrate the operator edit's intent into the managed
+official reviewer guidance. Give implementers repair intent and useful general
+direction without prescribing exact code changes or wasting report tokens.
+Retain the current structured PASS/BLOCK report contract and require each
+blocking finding to remain actionable enough for a strong one-pass repair.
+Do not restore the standalone profile or create another reviewer authority.
+Update only directly affected tests, hash expectations, traceability, and Slice
+6 evidence; run proportionate focused checks; commit and push one clean Slice 6
+successor for owner review.
+
+Do not broaden Slice 6, begin Slice 7, apply final mode to the host, run Gate B,
+archive or finalize the episode, merge, or physically clean resources.

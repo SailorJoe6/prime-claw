@@ -86,3 +86,39 @@ final-absence assertions, historical replay/provider filters, minimal historical
 test fixtures, destination/receipt labels required for rollback, or retained
 historical evidence. No current project shim, profile, legacy policy source, or
 append-only manager remains.
+
+
+## Owner-requested reviewer-guidance revision
+
+The owner reviewed candidate `0e96838d430049980fa9ab2f6f8fc2762f2c127c`,
+tree `c8474abac9ba25da740c0beae858223aee4c8b17`, and requested one bounded
+successor for a preserved pre-landing operator edit that required semantic
+reconciliation before the standalone reviewer profile was deleted.
+
+The managed official `reviewer.md` remains the only current reviewer authority.
+Its remediation guidance now explicitly asks for one actionable repair direction
+that states repair intent and useful general guidance without spending review
+tokens prescribing exact code changes. The structured verdict/report contract
+and the requirement that every `BLOCK` remediation be actionable are unchanged.
+The standalone `.prime/agent/profiles/expert-reviewer.md` remains absent.
+
+The managed reviewer SHA256 is `f737bb48bc5179fa2613e1fbb87c24bce0010ec3f69f31907d5bfa02d2b718f3`. The resulting managed
+EXPERT package SHA256 is `13f1871531a51ef480be518148856320fcada33667216bf6e49a07e62fe5873b`. Only the managed reviewer,
+its pinned package constant, its direct contract test, the current hash-bearing
+oversight guide, active plan/spec traceability, and this Slice 6 evidence record
+change from the first candidate.
+
+Proportionate isolated validation passed:
+
+- focused Docker contract tests:
+  `python3 -m pytest -q -p no:cacheprovider tests/test_official_expert_review_skill.py tests/test_prime_agent_plugin_install.py`
+  inside `prime-claw-test-tier1:latest`: 40 passed, 31 skipped; log SHA256
+  `ff1b711b48935f19ac42134888ecbf3eb57f4edc417399556f1697d56feb655b`;
+- pinned Prime Agent 0.9.8 Docker Tier 1 apply/check/registration probe:
+  PASS, container destroyed; log SHA256 `7259b6f8d19bddb32e1ff940bd0458b14e98aa08496d097f7f7b85d69d887730`; and
+- `git diff --check`, exact managed-source hash assertions, current-authority
+  absence checks, and stale-current-hash classification are performed on the
+  final staged patch before commit.
+
+No host/global apply, Gate B, Slice 7 work, archival/finalization, merge, or
+physical cleanup is part of this revision.

@@ -1112,10 +1112,42 @@ placeholders. Both are repaired: current guidance now routes Gate B through the
 authorized coordinator and private accepted-bridge recovery material, and the
 Slice 6 evidence contains concrete gate results and hashes.
 
-Next obtain a clean independent exact-diff review, commit and push this one
-reviewable Slice 6 candidate, report it to the owner, and stop. Do not begin
-Slice 7, apply final mode to the host, run Gate B, archive/finalize, merge, or
-physically clean resources.
+The first candidate was independently reviewed, committed, and pushed as
+`0e96838d430049980fa9ab2f6f8fc2762f2c127c`, tree
+`c8474abac9ba25da740c0beae858223aee4c8b17`. The owner requested one bounded
+revision for a single accepted omission; that candidate remains the immutable
+revision baseline.
+
+### Slice 6 owner-requested omission repair
+
+The preserved pre-landing operator edit to the now-deleted
+`.prime/agent/profiles/expert-reviewer.md` required semantic reconciliation
+before the profile was removed. Repair only that omission:
+
+- migrate the preserved operator intent explicitly into the managed official
+  reviewer guidance;
+- tell the reviewer to provide repair intent and useful general direction rather
+  than spending tokens prescribing exact code changes;
+- retain the current structured PASS/BLOCK report contract and the requirement
+  that every blocking finding be actionable enough for a strong one-pass repair;
+- keep the managed reviewer as the sole reviewer authority; do not restore the
+  standalone profile or add another policy copy;
+- update only directly affected tests, hash expectations, traceability, and the
+  existing Slice 6 evidence; and
+- run proportionate focused checks, commit and push one clean successor, report
+  it to the owner, and stop.
+
+Implementation result: the managed reviewer now asks for actionable repair intent
+and useful general direction without exact code instructions, while the structured
+report contract and actionable `BLOCK` requirement remain. The reviewer SHA256 is
+`f737bb48bc5179fa2613e1fbb87c24bce0010ec3f69f31907d5bfa02d2b718f3` and the managed package SHA256 is
+`13f1871531a51ef480be518148856320fcada33667216bf6e49a07e62fe5873b`. Focused Docker contract tests pass 40 with 31 skipped,
+and the pinned Prime Agent 0.9.8 Tier 1 apply/check/registration probe passes with
+its container destroyed. The final staged patch receives an independent read-only
+review before commit and push.
+
+Do not broaden Slice 6, begin Slice 7, apply final mode to the host, run Gate B,
+archive/finalize, merge, or physically clean resources.
 
 ## 13. Slice 7 — Freeze and review Generation B final candidate
 

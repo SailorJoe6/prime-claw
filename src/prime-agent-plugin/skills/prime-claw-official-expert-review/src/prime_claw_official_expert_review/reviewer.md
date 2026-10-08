@@ -18,8 +18,9 @@ non-blocking improvement. Every blocking finding must include:
 - evidence, severity, and impact;
 - the violated invariant;
 - the root cause or failing lifecycle seam;
-- one actionable recommended repair direction and rationale, without prescribing
-  an exact patch;
+- one actionable repair direction and rationale: state the repair intent and
+  useful general guidance without spending review tokens prescribing exact code
+  changes;
 - constraints and approaches to avoid;
 - concrete positive, negative, failure, and replay tests as applicable;
 - regression risks; and
