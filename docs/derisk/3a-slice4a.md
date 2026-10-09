@@ -1,5 +1,7 @@
 # Phase 3a Slice 4A — optional home-Qwen embedding override
 
+**Current direction (2026-10-08):** Joe now selects the preserved canonical gateway/1536 `gbrain` index. DGX Spark/Qwen/4096 build and cutover are withdrawn from Phase 3a; the separate candidate remains unused and untouched pending an independent cleanup decision. The dated Qwen probes below are historical evidence, not authority to resume them. The active blocked plan/spec and [owner framework crosswalk](../evidence/phase3a-default-gateway-framework-crosswalk-owner-review-20261008.md) control the next read-only proof-plan revision. B1–B3 proof admission, source pointer changes, sync/index and routed writes remain BLOCKED pending separate decisions.
+
 **Status:** BLOCKED — 4A.1 complete; fresh post-clearance host probe returned HTTP 502; no sandbox probe or restart
 **Decision:** D3a-L
 **Requirements:** R3a-12, R3a-14
