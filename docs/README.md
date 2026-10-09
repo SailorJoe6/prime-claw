@@ -65,6 +65,8 @@ following the openclaw-setup pattern.)
   placeholder-isolated ChatGPT-5.6 Sol / openai-codex OAuth as an explicit operator override.
 - [derisk/3a-slice4r.md](derisk/3a-slice4r.md) — Slice 4R: mandatory explicit
   per-operator brain repository setup, provenance hardening, and pre-mutation gates.
+- [derisk/3a-storage-step1.md](derisk/3a-storage-step1.md) — disposable
+  OpenShell 0.0.116 one-volume subpath and root-link smoke; stop at owner review.
 
 ## Runtime (Phase 2)
 
