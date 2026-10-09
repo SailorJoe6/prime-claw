@@ -1,19 +1,33 @@
 # Goal and heartbeat work control
 
 Prime Claw's selected global role kernel provides only neutral role and authority
-invariants. The managed global Conversation guide provides the detailed
-model-facing goal and heartbeat judgment on demand. No project APPEND source or
-second work-control policy remains. Ralph `/execute` applies the same generic
-rules while implementing plans.
+invariants. The managed global Conversation guide provides detailed judgment for
+managed Conversation work. Ordinary project work uses the project-customizable
+`.agents/skills/goals-and-heartbeats/SKILL.md`; Ralph `/execute` applies the same
+generic ownership rules while implementing plans. No project APPEND source or
+second plugin-authored work-control policy remains.
 
 ## Supported runtime boundary
 
 The final role-protocol manager requires the recorded legacy APPEND region to be
 absent. Managed owner and EPISODE provider calls are guarded by the exact
 generated neutral role kernel in the selected global context. There is no
-separate `before_agent_start` overlay, capability gate,
-`PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block, tool, message, or autonomous
+separate `before_agent_start` policy overlay, capability gate,
+`PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block, tool, or autonomous
 slash-command transport.
+
+The narrow `goal-continuation-nudge.ts` extension is reinforcement, not a second
+policy. It observes structured `goal_context` continuation messages, deduplicates
+by goal identity and continuation count, and measures a per-session rapid-repeat
+streak. Only when the project Markdown threshold is reached does it append the
+exact body of
+`.agents/skills/goals-and-heartbeats/CONTINUATION.md` to the provider context.
+The same Markdown frontmatter owns the minimum streak and elapsed-time window.
+TypeScript contains no model-facing goal or heartbeat advice, does not inspect
+assistant prose, delay continuation delivery, create a timer, or mutate the
+stored transcript. Session start, tree navigation, and shutdown clear transient
+streak state. Missing, invalid, symlinked, nonregular, or oversized project
+configuration is a safe no-op.
 
 The block states the bounded control contract directly:
 
@@ -49,7 +63,7 @@ authoritative.
 ## Retired extension migration
 
 `src/prime-agent-plugin/extensions/goal-heartbeat-work-control.ts` is retired and
-absent from the eleven-file managed TypeScript source set. The older
+absent from the twelve-file managed TypeScript source set. The older
 `extensions/goal-blocker-control.ts` is also absent. Apply/check treat both as
 retired managed destinations:
 
@@ -60,8 +74,10 @@ retired managed destinations:
 
 The project-local `oversee-episode` skill, its discovery link, the standalone
 reviewer profile, the legacy APPEND source, and the append-only manager are
-absent. The managed global Conversation and EXPERT skills are the only current
-judgment and reviewer authorities.
+absent. The managed global Conversation and EXPERT skills retain their exact
+role-specific authority. The generic project-local goals-and-heartbeats skill
+and continuation reminder remain editable project guidance; the lifecycle
+extension only routes that guidance at a repeated continuation signal.
 
 Final apply/check intentionally require exact owned bridge state; they are not a
 fresh-root diagnostic. Docker Tier 1 seeds that historical predecessor state in
@@ -90,8 +106,11 @@ Coverage proves:
 
 - the neutral kernel and managed Conversation guide contain their separated
   invariant and goal/heartbeat contracts;
-- the managed plugin has exactly eleven TypeScript files and no retired source,
+- the managed plugin has exactly twelve TypeScript files and no retired source,
   overlay sentinel, pause/resume tool, or autonomous slash-command transport;
+- the rapid-repeat nudge uses structured goal identity, deduplicates repeated
+  provider calls, resets across goal/user/session boundaries, and loads its
+  threshold and exact reminder from project Markdown;
 - installer migration removes a stale regular retired entry, rejects unsafe
   destination types before mutation, preserves unrelated files, and converges;
 - provider contexts contain one managed lean block and no separate detailed

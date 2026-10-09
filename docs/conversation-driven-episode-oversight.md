@@ -369,7 +369,7 @@ rationale, and hashes are recorded in
 ## Installation boundaries
 
 Builder sources remain inert under `src/prime-agent-plugin/`. Final apply/check
-manages eleven allowlisted TypeScript files, one selected AGENTS/CLAUDE neutral
+manages twelve allowlisted TypeScript files, one selected AGENTS/CLAUDE neutral
 kernel region, the managed global Conversation guide, and the managed global
 EXPERT package. It requires an exact owned bridge manifest before removing the
 recorded legacy APPEND region, preserves unrelated APPEND bytes and metadata,
@@ -377,9 +377,12 @@ and then requires that managed region to remain absent. The removed legacy
 APPEND source, project forwarding skill/link, standalone reviewer profile, and
 append-only manager are not current installation inputs.
 
-There is no separate `goal-heartbeat-work-control.ts` entry point and no
-`before_agent_start` work-control overlay. Apply treats a stale installed copy as
-a retired managed file: all managed and retired destinations are type-checked
+There is no retired `goal-heartbeat-work-control.ts` entry point and no
+`before_agent_start` work-control overlay. The separate
+`goal-continuation-nudge.ts` hook contains no policy prose: it only detects a
+structured rapid-repeat signal and loads the current project's customizable
+Markdown reminder. Apply treats a stale installed work-control copy as a retired
+managed file: all managed and retired destinations are type-checked
 before the first mutation, then a regular stale copy is removed. Check rejects
 any surviving copy. Expected-file byte comparison, managed EXPERT package
 hash/import validation, neutral-kernel generation checks, role-protocol locking,

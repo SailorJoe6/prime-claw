@@ -7,6 +7,7 @@ import test from "node:test";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const managed = join(root, "src", "prime-agent-plugin");
 const expected = [
+  "extensions/goal-continuation-nudge.ts",
   "extensions/handoff-chain.ts",
   "extensions/reviewed-plan.ts",
   "extension-support/conversation-oversight.ts",
@@ -27,7 +28,7 @@ test("final protocol separates the neutral kernel from managed guidance", () => 
   assert.equal(existsSync(join(managed, "APPEND_SYSTEM.md")), false);
 });
 
-test("managed plugin is the eight-file generation without retired transports", () => {
+test("managed plugin is the nine-file protocol surface without retired transports", () => {
   for (const relative of expected) assert.equal(existsSync(join(managed, relative)), true, relative);
   assert.equal(existsSync(join(managed, "extensions/goal-heartbeat-work-control.ts")), false);
   assert.equal(existsSync(join(managed, "extensions/goal-blocker-control.ts")), false);

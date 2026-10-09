@@ -7,7 +7,7 @@
 ## Source and installed layouts
 
 The builder source is deliberately inert. The final generation has one authored
-neutral kernel, one machine-readable final selector, eleven managed TypeScript
+neutral kernel, one machine-readable final selector, twelve managed TypeScript
 files, and two exact managed global skill inventories:
 
 ```text
@@ -15,6 +15,7 @@ src/prime-agent-plugin/
   ROLE_KERNEL.md
   role-protocol.json              # schema 1, generation=final
   extensions/
+    goal-continuation-nudge.ts
     handoff-chain.ts
     reviewed-plan.ts
   extension-support/
@@ -35,12 +36,14 @@ src/prime-agent-plugin/
 `ROLE_KERNEL.md` is the only authored neutral-kernel policy. Apply, check, Tier
 0, and Tier 1 run `scripts/generate-prime-agent-role-kernel.py check`; a stale
 checked-in generated file fails before installation. The managed global
-Conversation guide and EXPERT reviewer are the only current detailed judgment
-sources. The legacy APPEND source, project forwarding skill/link, standalone
-reviewer profile, and append-only manager are absent.
+Conversation guide and EXPERT reviewer are the only plugin-managed role-specific
+judgment sources. Generic goal/heartbeat guidance remains project-customizable
+under `.agents/skills/goals-and-heartbeats/`, and the continuation hook loads its
+reminder from there. The legacy APPEND source, project forwarding skill/link,
+standalone reviewer profile, and append-only manager are absent.
 
 The installed copy keeps the TypeScript layout under `~/.prime/agent/`. Prime
-Agent auto-discovers the two extension entry points; their relative imports
+Agent auto-discovers the three extension entry points; their relative imports
 resolve through the nine installed `extension-support/` files. Do not keep
 plugin source or a second copy under this repository's or a managed project's
 `.prime/agent/extensions/` path. Cross-scope duplicate discovery can prevent
@@ -85,7 +88,7 @@ of two target modes:
    `--user-global` scripts remain guarded implementation details: they refuse
    linked worktrees, non-`main` branches, and explicit host-root overrides.
 
-Apply copies only the eleven allowlisted TypeScript files and the two exact managed skill inventories. Before the first copy,
+Apply copies only the twelve allowlisted TypeScript files and the two exact managed skill inventories. Before the first copy,
 `scripts/manage-prime-agent-role-protocol.py` selects exactly one global context
 candidate in Prime Agent priority order: `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`,
 then `CLAUDE.MD`. It creates `AGENTS.md` only when none exists. The manager owns
@@ -386,8 +389,11 @@ installed generation should expose:
   AGENTS/CLAUDE context, byte-identical to the generated neutral kernel;
 - no neutral-kernel copy in provider-visible user or custom messages, and no
   provider-visible bounded EPISODE identity package;
-- no separate `goal-heartbeat-work-control.ts` entry or
-  `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` overlay; and
+- no retired `goal-heartbeat-work-control.ts` entry or
+  `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` overlay;
+- the narrow `goal-continuation-nudge.ts` context hook, which reads the current
+  project's `.agents/skills/goals-and-heartbeats/CONTINUATION.md` and contains
+  no model-facing work-control prose of its own; and
 - lifecycle hooks from `reviewed-plan.ts` that filter historical oversight and
   private identity records, require the exact neutral kernel for managed owner or
   EPISODE calls, and explicitly abort malformed managed context before provider

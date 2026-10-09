@@ -406,10 +406,10 @@ def test_final_source_inventory_removes_only_legacy_compatibility_resources() ->
     apply_text = (ROOT / "scripts/apply-prime-agent-plugin.sh").read_text()
     check_text = (ROOT / "scripts/check-prime-agent-plugin.sh").read_text()
     guide = (ROOT / "docs/lab-global-plugin.md").read_text()
-    assert len(bundle.MANAGED_FILES) == 16
+    assert len(bundle.MANAGED_FILES) == 17
     for relative in bundle.MANAGED_FILES:
         assert Path(ROOT / "src/prime-agent-plugin" / relative).is_file(), relative
-    for relative in bundle.MANAGED_FILES[:11]:
+    for relative in bundle.MANAGED_FILES[:12]:
         assert relative in apply_text and relative in check_text, relative
     assert 'managed_skill_relative="skills/prime-claw-oversee-episode/SKILL.md"' in apply_text
     assert 'expert_skill_root_relative="skills/prime-claw-official-expert-review"' in apply_text

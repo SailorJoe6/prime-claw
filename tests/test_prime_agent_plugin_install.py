@@ -37,6 +37,7 @@ CONTAINER_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 CONTAINER_EXPERT_VENV = "/tmp/prime-claw-expert-preflight-venv"
 RETIRED = "extensions/goal-heartbeat-work-control.ts"
 FILES = (
+    "extensions/goal-continuation-nudge.ts",
     "extensions/handoff-chain.ts",
     "extensions/reviewed-plan.ts",
     "extension-support/conversation-guide-metadata.ts",

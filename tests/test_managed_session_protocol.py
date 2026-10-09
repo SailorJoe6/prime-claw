@@ -15,6 +15,7 @@ RETIRED = MANAGED_SOURCE / "extensions/goal-heartbeat-work-control.ts"
 OBSOLETE = MANAGED_SOURCE / "extensions/goal-blocker-control.ts"
 WS_NODE_SUITE = "/workspace/tests/managed_session_protocol.test.mjs"
 EXPECTED_TYPESCRIPT = {
+    "extensions/goal-continuation-nudge.ts",
     "extensions/handoff-chain.ts",
     "extensions/reviewed-plan.ts",
     "extension-support/conversation-guide-metadata.ts",
@@ -57,7 +58,7 @@ def test_final_protocol_separates_neutral_kernel_from_managed_guidance() -> None
         assert phrase in guide
     assert not (MANAGED_SOURCE / "APPEND_SYSTEM.md").exists()
 
-def test_managed_plugin_has_eleven_typescript_files_and_no_retired_work_control_transport() -> None:
+def test_managed_plugin_has_twelve_typescript_files_and_no_retired_work_control_transport() -> None:
     actual = {
         str(path.relative_to(MANAGED_SOURCE))
         for path in MANAGED_SOURCE.rglob("*.ts")

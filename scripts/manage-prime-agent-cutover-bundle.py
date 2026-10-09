@@ -21,6 +21,7 @@ from typing import Any
 SCHEMA_VERSION = 1
 MAX_PREIMAGE_BYTES = 8 * 1024 * 1024
 MANAGED_FILES = (
+    "extensions/goal-continuation-nudge.ts",
     "extensions/handoff-chain.ts",
     "extensions/reviewed-plan.ts",
     "extension-support/conversation-guide-metadata.ts",

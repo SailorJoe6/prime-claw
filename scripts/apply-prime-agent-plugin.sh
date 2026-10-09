@@ -38,6 +38,7 @@ else
 fi
 source_root="$repo_root/src/prime-agent-plugin"
 files=(
+  extensions/goal-continuation-nudge.ts
   extensions/handoff-chain.ts
   extensions/reviewed-plan.ts
   extension-support/conversation-guide-metadata.ts
