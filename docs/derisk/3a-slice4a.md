@@ -989,3 +989,43 @@ Unblock condition: owner evaluates this result and explicitly chooses a
 supported, bounded way to transition the **same** container from `Error` to an
 allowed start state (or decides to stop); that path is not authorized here.
 Keep incident OPEN; source `.5`, parent and routed-write `.4` remain BLOCKED.
+
+## 2026-10-09 one-stop incident recovery attempt — OpenShell refuses Error phase
+
+The owner-accepted revision in OPEN incident `prime-claw-5v7.10` comment
+`01a11ebf-dd2a-735b-bca5-14bc531c40bd` allowed **one** supported stop
+before one conditional start of the same container. The CLI help for
+`openshell sandbox stop --help` says “Stop a sandbox while preserving its
+workspace.” Fresh read-only preflight before the attempt:
+
+- `openshell sandbox get -g openshell prime-claw -o json`: workspace `default`,
+  sandbox `prime-claw`, exact ID `c9066cee-a64f-4fae-95cd-2a9245b2dc66`,
+  phase `Error`.
+- `docker ps -a --no-trunc --filter name=prime-claw --format '{{json .}}'`:
+  exactly one container named
+  `openshell-default--prime-claw-c9066cee-a64f-4fae-95cd-2a9245b2dc66`,
+  full ID `5aab359a43b0cafc94a7552e419736238578a786c9ddb6ee790fbadfa44a1316`.
+- Targeted `docker inspect --format` of only name, state, start/finish times
+  and mount type/name/destination reported `exited`, running `false`, exit
+  143, OOM `false`, last finished `2026-10-06T14:06:17.633423503Z`.
+  No environment, credential values, file contents or source host paths were
+  inspected.
+
+The **only** `openshell sandbox stop -g openshell prime-claw` returned exit
+**1**:
+
+```text
+code: 'The system is not in a state required for the operation's execution'
+message: "sandbox must be Ready to stop (current phase: Error)"
+```
+
+The supported stop did **not** return a Stopped state. No subsequent sandbox
+or Docker operation was attempted: no verification-after-stop, start, retry,
+recreate, converge, two-file read or repair. Workspace preservation and effects
+remain unverified, not assumed. The first start requires `Stopped`; the now
+attempted stop requires `Ready`, so neither approved CLI transition accepts
+current `Error`. This is a documented deadlock, not authority for an
+alternate recovery command. Unblock only after owner review chooses a
+supported, bounded Error-state recovery path for this same sandbox/container
+or chooses to stop. Incident remains OPEN; source `.5`, parent and routed-write
+`.4` stay BLOCKED for their separate live gates.
