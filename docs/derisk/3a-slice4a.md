@@ -901,3 +901,57 @@ reuse that broader host selection until its external calls are isolated.
 The preserved Qwen candidate, brain source, registration and databases were
 not intentionally changed by this offline increment. Source `.5`, parent,
 routed-write `.4`, and the active plan/spec remain BLOCKED for live steps.
+
+## 2026-10-09 owner-approved test-isolation revision (candidate)
+
+The exact owner review in OPEN `prime-claw-5v7.10`, comment
+`01a11ea4-27d6-700b-9a0e-ec9e6d18d9d9`, accepted only a test repair; it did
+**not** accept `3ddf68b` as a slice. Comparing the two affected episode tests
+against the known `main` repair (`fe7023fe85ec098730268ee47ad7b305640ec2a7`)
+showed exactly the missing `stage_brain_query` stubs and order assertions.
+Only those lines in `tests/test_runtime_converge.py` changed. No product code,
+provider, sandbox, brain source, index, database or configuration was edited.
+
+A host-side runner prepended inert `openshell`, `docker`, and `gh` shims to
+`PATH`, blocked `subprocess.Popen`, `os.system`, and `os.popen`, first confirmed
+all three named commands are denied, then cleared its self-test attempts and
+ran only the two repaired order tests plus the isolated portable-profile file.
+Exact command (shell-quoted multiline `-c` argument):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -c 'import os, pathlib, subprocess, tempfile, pytest
+from unittest.mock import patch
+with tempfile.TemporaryDirectory(prefix="phase3a-external-block-") as td:
+    for command in ("openshell", "docker", "gh"):
+        path = pathlib.Path(td) / command
+        path.write_text("#!/bin/sh\necho BLOCKED-EXTERNAL >&2\nexit 97\n")
+        path.chmod(0o755)
+    os.environ["PATH"] = td + os.pathsep + os.environ["PATH"]
+    attempted = []
+    def deny(*args, **kwargs):
+        attempted.append(repr(args[0] if args else kwargs))
+        raise AssertionError("subprocess forbidden by test isolation sentinel")
+    with patch.object(subprocess, "Popen", side_effect=deny), patch.object(os, "system", side_effect=deny), patch.object(os, "popen", side_effect=deny):
+        for command in ("openshell", "docker", "gh"):
+            try:
+                subprocess.Popen([command, "--version"])
+            except AssertionError:
+                pass
+        assert len(attempted) == 3
+        attempted.clear()
+        result = pytest.main(["-q", "-p", "no:cacheprovider", "tests/test_runtime_converge.py::test_create_runs_stages_in_order", "tests/test_runtime_converge.py::test_converge_runs_all_stages_no_recreate", "tests/test_portable_provider_defaults.py"])
+    print("external subprocess attempts:", len(attempted))
+    if attempted:
+        print("blocked calls:", attempted)
+    raise SystemExit(result if not attempted else 97)
+'
+```
+
+Result: **33 passed, 2 importlib warnings in 0.20s; zero external subprocess
+attempts during pytest**. A separate two-test run with the same block passed
+**2 tests, 1 warning; zero attempts**. AST parsing of the edited test file
+and `git diff --check` passed. No unsafe broader suite was replayed, and a
+guarded pass cannot establish any earlier live effects or source/index health.
+The incident remains OPEN pending operator impact disposition; source `.5`,
+parent and routed-write `.4` remain BLOCKED for live steps. This is one
+review candidate, not owner acceptance or permission for a broader gate.
