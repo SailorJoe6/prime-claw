@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -52,10 +52,6 @@ function skillPath(cwd, name) {
   return join(cwd, ".ralph", "skills", name, "SKILL.md");
 }
 
-function legacyMarkerPath(cwd) {
-  return join(cwd, ".prime", "agent", "state", "chain-next");
-}
-
 function writeSkill(cwd, name, body) {
   const path = skillPath(cwd, name);
   mkdirSync(dirname(path), { recursive: true });
@@ -84,7 +80,7 @@ function writeCanonicalSkills(f, handoffBody = "handoff body", executeBody = "ex
   };
 }
 
-test("registers native handoff, one narrow tool, and only cleanup lifecycle listeners", (t) => {
+test("registers native handoff and one narrow tool without lifecycle listeners", (t) => {
   const f = fixture(t);
   assert.deepEqual([...f.commands.keys()], ["handoff"]);
   assert.deepEqual([...f.tools.keys()], ["ralph_handoff"]);
@@ -95,10 +91,7 @@ test("registers native handoff, one narrow tool, and only cleanup lifecycle list
   assert.equal(tool.parameters.required, undefined);
   assert.equal(tool.parameters.additionalProperties, false);
   assert.ok(tool.promptGuidelines.every((guideline) => guideline.includes("ralph_handoff")));
-  assert.equal(typeof f.events.get("session_start"), "function");
-  assert.equal(typeof f.events.get("session_shutdown"), "function");
-  assert.equal(f.events.has("session_compact"), false);
-  assert.equal(f.events.has("input"), false);
+  assert.deepEqual([...f.events.keys()], []);
 });
 
 test("preflights then admits handoff followed by one execute follow-up", async (t) => {
@@ -268,20 +261,4 @@ test("late or repeated compaction signals have no execute-admission path", async
   assert.equal(f.events.get("session_compact"), undefined);
   assert.deepEqual(f.messages, admitted);
   assert.equal(f.messages.filter(({ options }) => options?.deliverAs === "followUp").length, 1);
-});
-
-test("session lifecycle only removes legacy state and never reconstructs execute", async (t) => {
-  const f = fixture(t);
-  const legacy = legacyMarkerPath(f.cwd);
-  mkdirSync(dirname(legacy), { recursive: true });
-  writeFileSync(legacy, "execute");
-
-  f.events.get("session_start")({}, f.ctx);
-  assert.equal(existsSync(legacy), false);
-  assert.deepEqual(f.messages, []);
-
-  writeFileSync(legacy, "execute");
-  f.events.get("session_shutdown")({}, f.ctx);
-  assert.equal(existsSync(legacy), false);
-  assert.deepEqual(f.messages, []);
 });

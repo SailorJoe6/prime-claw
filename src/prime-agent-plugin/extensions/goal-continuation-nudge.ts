@@ -1,9 +1,10 @@
 import { existsSync, lstatSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const GOAL_CONTEXT_TYPE = "goal_context";
-const CONFIG_PATH = join(".agents", "skills", "goals-and-heartbeats", "CONTINUATION.md");
+const CONFIG_PATH = join(dirname(fileURLToPath(import.meta.url)), "..", "skills", "goals-and-heartbeats", "CONTINUATION.md");
 const MAX_WINDOW_SECONDS = 3600;
 const MAX_RAPID_CONTINUATIONS = 100;
 const MAX_CONFIG_BYTES = 16 * 1024;
@@ -31,6 +32,7 @@ type NudgeConfig = {
 
 type Dependencies = {
   now?: () => number;
+  configPath?: string;
 };
 
 function parsePositiveInteger(value: string): number | null {
@@ -39,8 +41,7 @@ function parsePositiveInteger(value: string): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
-export function loadGoalContinuationNudge(cwd: string): NudgeConfig | null {
-  const path = join(cwd, CONFIG_PATH);
+export function loadGoalContinuationNudge(path = CONFIG_PATH): NudgeConfig | null {
   if (!existsSync(path)) return null;
 
   let source: string;
@@ -124,6 +125,7 @@ function appendReminder(message: any, reminder: string): any | null {
 
 export function createGoalContinuationNudgeExtension(dependencies: Dependencies = {}) {
   const now = dependencies.now ?? Date.now;
+  const configPath = dependencies.configPath ?? CONFIG_PATH;
 
   return function goalContinuationNudge(pi: ExtensionAPI): void {
     const observations = new Map<string, Observation>();
@@ -161,7 +163,7 @@ export function createGoalContinuationNudgeExtension(dependencies: Dependencies 
       }
 
       const observedAt = now();
-      const config = loadGoalContinuationNudge(ctx.cwd);
+      const config = loadGoalContinuationNudge(configPath);
       const isRapidSuccessor = Boolean(
         previous
         && config

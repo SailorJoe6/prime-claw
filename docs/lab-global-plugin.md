@@ -7,8 +7,8 @@
 ## Source and installed layouts
 
 The builder source is deliberately inert. The final generation has one authored
-neutral kernel, one machine-readable final selector, twelve managed TypeScript
-files, and two exact managed global skill inventories:
+role kernel, one machine-readable final selector, ten managed TypeScript files,
+and three exact managed global skill capabilities:
 
 ```text
 src/prime-agent-plugin/
@@ -22,29 +22,28 @@ src/prime-agent-plugin/
     conversation-guide-metadata.ts
     conversation-oversight.ts
     episode-close.ts
-    expert-review-reservation.ts
     handoff-prompts.ts
     prep-chain.ts
     reviewed-plan-support.ts
-    role-kernel.generated.ts      # generated exact bytes + SHA256
     spec-episode.ts
   skills/
+    goals-and-heartbeats/          # managed SKILL + continuation policy
     prime-claw-oversee-episode/SKILL.md
-    prime-claw-official-expert-review/  # SKILL, pyproject, package, reviewer
+    prime-claw-expert-review/SKILL.md
 ```
 
-`ROLE_KERNEL.md` is the only authored neutral-kernel policy. Apply, check, Tier
-0, and Tier 1 run `scripts/generate-prime-agent-role-kernel.py check`; a stale
-checked-in generated file fails before installation. The managed global
-Conversation guide and EXPERT reviewer are the only plugin-managed role-specific
-judgment sources. Generic goal/heartbeat guidance remains project-customizable
-under `.agents/skills/goals-and-heartbeats/`, and the continuation hook loads its
-reminder from there. The legacy APPEND source, project forwarding skill/link,
+`ROLE_KERNEL.md` is the only role-kernel policy source. The role-protocol
+installer reads it directly when managing the selected global context block;
+there is no generated TypeScript copy or runtime prompt-byte authentication. The
+managed global Conversation and EXPERT skills are the plugin-managed
+role-specific judgment sources. The goals-and-heartbeats `SKILL.md` and
+`CONTINUATION.md` form one managed user-global capability bundle; the
+continuation hook loads its reminder from that bundle. The legacy APPEND source, project forwarding skill/link,
 standalone reviewer profile, and append-only manager are absent.
 
 The installed copy keeps the TypeScript layout under `~/.prime/agent/`. Prime
 Agent auto-discovers the three extension entry points; their relative imports
-resolve through the nine installed `extension-support/` files. Do not keep
+resolve through the seven installed `extension-support/` files. Do not keep
 plugin source or a second copy under this repository's or a managed project's
 `.prime/agent/extensions/` path. Cross-scope duplicate discovery can prevent
 startup. The durable source belongs under `src/prime-agent-plugin/`.
@@ -88,7 +87,7 @@ of two target modes:
    `--user-global` scripts remain guarded implementation details: they refuse
    linked worktrees, non-`main` branches, and explicit host-root overrides.
 
-Apply copies only the twelve allowlisted TypeScript files and the two exact managed skill inventories. Before the first copy,
+Apply copies only the allowlisted plugin support files and exact managed skill inventories. Before the first copy,
 `scripts/manage-prime-agent-role-protocol.py` selects exactly one global context
 candidate in Prime Agent priority order: `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`,
 then `CLAUDE.MD`. It creates `AGENTS.md` only when none exists. The manager owns
@@ -98,8 +97,7 @@ mode, uid, and gid. It records the selected path and ownership in mode-0600
 `$agentDir/.prime-claw/role-protocol-state.json`.
 
 Selection drift, a latent block in an unselected candidate, malformed or
-unowned markers, unsafe files/directories, or source/generated disagreement
-fails closed before plugin copy. Apply and check do not migrate a selected file
+unowned markers, unsafe files/directories, fails closed before plugin copy. Apply and check do not migrate a selected file
 implicitly. The checked-in `role-protocol.json` is final. Final apply requires
 an exact owned bridge manifest, derives the retired block digest and separators
 from that manifest, removes only that recorded region plus Prime Claw-owned
@@ -126,44 +124,25 @@ retired entry and verifies each current installed file byte-for-byte. Apply
 forwards its explicit target mode to that required full check, so an interrupted
 or mixed sequential generation cannot report success.
 
-The installer owns two uniquely named global skills beside the TypeScript
-plugin files: `skills/prime-claw-oversee-episode/SKILL.md` and the complete
-`skills/prime-claw-official-expert-review/` Python-backed package. It validates
-real managed `skills/`, skill, `src/`, and package directories, but leaves
-unrelated extra entries in those directories untouched. It installs each
-expected file at mode 0644, checks its bytes exactly, and requires a final full
-check. Before
-any destination mutation,
-`check-prime-agent-expert-runtime.py` selects the same managed-kernel interpreter
-Prime Agent will use. It accepts an exact normal installed package import or
-validates the source package with that interpreter and reports `SYNC_PENDING`
-without changing the environment. If `PRIME_AGENT_KERNEL_PYTHON` is set, only an
-already-installed exact package/hash is `AVAILABLE`; missing, stale, mismatched,
-or unusable state is deterministically `UNAVAILABLE` before plugin mutation.
+The installer owns two uniquely named role skills beside the TypeScript plugin
+files: `skills/prime-claw-oversee-episode/SKILL.md` and
+`skills/prime-claw-expert-review/SKILL.md`. It validates real managed `skills/`
+and skill directories, leaves unrelated skill entries untouched, installs each
+file at mode 0644, checks bytes exactly, and requires a final full check.
 
-This ordinary plugin-file ownership does not widen the role-protocol manager's
-fixed context/legacy-APPEND/manifest receipt. The project forwarding skill and
-its discovery link are absent, and the standalone reviewer profile is absent.
-The managed global Conversation guide and EXPERT package own the supported
-judgment and launch sequences. The retired native
-reserve/bind/status/cancel tools grant no compatibility path. `launch(packet)`
-derives the exact active owner and marker worktree from host-authored session
-state, requires one exact model result, creates mode-private untracked `PENDING`
-state, calls public `rlm.spawn` with an unpredictable harmless bootstrap name,
-and atomically publishes `FINALIZED` only from the actual return. The child
-waits for transient `PENDING`+`FINALIZED` publication overlap to resolve, admits
-only after exactly one authority phase remains, and aborts a persistent or
-broader phase conflict before provider use. It then binds that state to public
-canonical session/model/parent-header facts and atomically claims before exposing
-one rubric-plus-packet provider turn. Inbound message content and metadata are
-ignored. Mismatch, timeout, replay, or duplicate claim explicitly aborts before
-provider use. The child submits one bounded
-structured report; the owner settles it and records one explicit conversational
-disposition. Public roster/delete/re-list operations must prove the stored
-actual child is no longer addressable before `CLOSED` or stale `CANCELLED`.
-Failed or uncertain deletion retains recoverable private state. Exact explicit
-purge removes only a durably recorded `CLOSED` private record and never session
-artifacts. All terminal phases preserve neutral-kernel/provider-abort behavior.
+During an explicitly selected user-global cutover, apply validates and removes
+the exact retired `skills/prime-claw-official-expert-review` four-file layout
+and the exact `$PRIME_AGENT_CODING_AGENT_DIR/prime-claw-private/expert-review-launches`
+state directory. Symlinked, escaped, wrong-type, or unexpected old skill layouts
+fail before cleanup. This is narrow cleanup for the unshipped lab installation,
+not a migration framework.
+
+The EXPERT workflow is Markdown plus native Prime Agent APIs. It uses model
+discovery, a harmless RLM bootstrap followed by one ordinary parent-to-child
+review task, parent/child clarification messages, and normal child deletion. The
+child keeps Prime Agent's normal system prompt. There is no Python package,
+private reservation/admission state, packet schema, prompt replacement,
+structured submission, settlement, disposition, close, or purge protocol.
 
 The predecessor APPEND-only manager is retired. Final apply/check use the
 role-protocol manager for the selected context, exact owned legacy removal, and
@@ -174,16 +153,11 @@ ordinary byte-and-metadata preimage immediately before same-directory
 `os.replace`, preserves mode/uid/gid where supported, fsyncs the new file and its
 parent directory, and refuses a changed preimage.
 
-The first Slice 2 provider guard imports the generated role-kernel bytes rather
-than trusting the retained legacy APPEND body. Ordinary explicit no-context
-sessions remain ordinary; promotion, active-owner, and bounded-EPISODE paths
-require the exact neutral block. The accepted first Slice 2 candidate stopped at
-that provider guard. The accepted next candidate added one active-owner
-Conversation-guide disclosure and gated handoff plus first finalization. The
-current bounded candidate reuses the existing `/implement-spec` preparation
-state to admit the same disclosure for one exact prospective future folder and
-requires its consumed private readiness before `create_spec_episode` can invoke
-any episode mutation.
+The role kernel is shared orientation installed from `ROLE_KERNEL.md`, not a
+runtime identity credential. Provider guards no longer scan, hash, or compare
+its bytes. The current bounded implementation still uses its existing
+Conversation-guide readiness and Episode lifecycle mechanics; those roles will
+be simplified separately rather than extended during the EXPERT cleanup.
 
 This is intentionally not a hostile-filesystem transaction engine. The manager
 does not maintain a multi-phase journal, continuous descriptor/inode authority,
@@ -386,18 +360,17 @@ installed generation should expose:
   `prime_claw_conversation_guide_status`, `create_spec_episode`,
   `handoff_spec_episode`, and `finalize_spec_episode` tools;
 - exactly one managed `PRIME_CLAW_ROLE_KERNEL_V1` block from the selected global
-  AGENTS/CLAUDE context, byte-identical to the generated neutral kernel;
+  AGENTS/CLAUDE context, sourced directly from `ROLE_KERNEL.md`;
 - no neutral-kernel copy in provider-visible user or custom messages, and no
   provider-visible bounded EPISODE identity package;
 - no retired `goal-heartbeat-work-control.ts` entry or
   `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` overlay;
-- the narrow `goal-continuation-nudge.ts` context hook, which reads the current
-  project's `.agents/skills/goals-and-heartbeats/CONTINUATION.md` and contains
-  no model-facing work-control prose of its own; and
+- the narrow `goal-continuation-nudge.ts` context hook, which reads the managed
+  `skills/goals-and-heartbeats/CONTINUATION.md` plugin asset and contains no
+  model-facing work-control prose of its own; and
 - lifecycle hooks from `reviewed-plan.ts` that filter historical oversight and
-  private identity records, require the exact neutral kernel for managed owner or
-  EPISODE calls, and explicitly abort malformed managed context before provider
-  dispatch.
+  private identity records and explicitly abort malformed lifecycle context
+  before provider dispatch; they do not authenticate role-kernel prompt bytes.
 
 `finalize_spec_episode` remains a location-only, no-UI bookkeeping close after
 verified terminal work. It grants no Git, merge, abandonment, session, worktree,

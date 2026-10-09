@@ -1799,7 +1799,7 @@
       },
       {
         "id": "ORP-009",
-        "summary": "official EXPERT",
+        "summary": "retired official EXPERT protocol (superseded by skill-based review)",
         "status": "accepted-through-s3",
         "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
         "evidence": [

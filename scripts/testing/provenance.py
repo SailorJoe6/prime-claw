@@ -1623,12 +1623,17 @@ def _repository_entries(root: Path, root_fd: int) -> list[tuple[str, str, int]]:
         except OSError as exc:
             raise ProvenanceError(
                 f"repository input path is unsafe or unavailable: {rel}") from exc
-        mode = stat.S_IMODE(st.st_mode)
         if stat.S_ISLNK(st.st_mode):
             _safe_link_target(root, rel, root_fd=root_fd)
             kind = "symlink"
+            # Symlink permission bits are not portable: Darwin applies umask
+            # when creating them, while Linux normally reports 0777. Type and
+            # target carry the security meaning, so manifests use one stable
+            # canonical value and never authenticate observed link modes.
+            mode = 0o777
         elif stat.S_ISREG(st.st_mode):
             kind = "file"
+            mode = stat.S_IMODE(st.st_mode)
         else:
             raise ProvenanceError(
                 "repository input is not a regular file or symlink")
@@ -2276,9 +2281,6 @@ def verify_repository_snapshot(
                                follow_symlinks=False)
         finally:
             os.close(parent_fd)
-        if stat.S_IMODE(observed.st_mode) != record.get("mode"):
-            raise ProvenanceError(
-                f"captured repository mode changed: {relative}")
         if record["kind"] == "symlink":
             if not stat.S_ISLNK(observed.st_mode):
                 raise ProvenanceError(
@@ -2292,6 +2294,9 @@ def verify_repository_snapshot(
             if not stat.S_ISREG(observed.st_mode):
                 raise ProvenanceError(
                     f"captured repository kind changed: {relative}")
+            if stat.S_IMODE(observed.st_mode) != record.get("mode"):
+                raise ProvenanceError(
+                    f"captured repository mode changed: {relative}")
             digest, mode, current_binding = _regular_digest(
                 root.path, relative, root_fd=root.fd)
             if (digest != record.get("content_sha256")

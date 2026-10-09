@@ -926,7 +926,6 @@ def tier1_container(request):
         bridge = container.run(
             "bash", "-lc",
             "set -euo pipefail; "
-            "python3 -m venv --without-pip /tmp/prime-claw-expert-preflight-venv; "
             "printf '%s\n' '{\"schemaVersion\":1,\"generation\":\"bridge\"}' "
             "> /tmp/prime-claw-bridge.json; "
             "python3 /workspace/scripts/manage-prime-agent-role-protocol.py apply "
@@ -944,10 +943,7 @@ def tier1_container(request):
         for script in ("apply-prime-agent-plugin.sh", "check-prime-agent-plugin.sh"):
             result = container.run(
                 f"{WORKSPACE}/scripts/{script}", timeout=120, workdir=None,
-                env={
-                    "PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT,
-                    "PRIME_AGENT_KERNEL_VENV": "/tmp/prime-claw-expert-preflight-venv",
-                },
+                env={"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT},
             )
             if result.returncode != 0:
                 raise RuntimeError(

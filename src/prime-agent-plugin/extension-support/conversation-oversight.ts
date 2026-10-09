@@ -5,13 +5,6 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
-  PRIME_CLAW_ROLE_KERNEL_END,
-  PRIME_CLAW_ROLE_KERNEL_SENTINEL,
-  PRIME_CLAW_ROLE_KERNEL_SHA256,
-  PRIME_CLAW_ROLE_KERNEL_START,
-  PRIME_CLAW_ROLE_KERNEL_TEXT,
-} from "./role-kernel.generated.ts";
-import {
   PRIME_CLAW_CONVERSATION_GUIDE_NAME,
   PRIME_CLAW_CONVERSATION_GUIDE_SENTINEL,
   PRIME_CLAW_CONVERSATION_GUIDE_SHA256,
@@ -24,12 +17,6 @@ import {
   type EpisodeResult,
 } from "./spec-episode.ts";
 
-// Compatibility exports for the existing deterministic lifecycle surfaces.
-// The authority is the generated neutral role kernel, not the legacy APPEND body.
-export const IDENTITY_KERNEL = PRIME_CLAW_ROLE_KERNEL_SENTINEL;
-export const IDENTITY_BLOCK_START = PRIME_CLAW_ROLE_KERNEL_START;
-export const IDENTITY_BLOCK_END = PRIME_CLAW_ROLE_KERNEL_END;
-export const EXPECTED_IDENTITY_KERNEL_BLOCK = PRIME_CLAW_ROLE_KERNEL_TEXT;
 export const OVERSIGHT_MARKER_TYPE = "prime-claw-conversation-oversight";
 export const BOUNDED_IDENTITY_TYPE = "prime-claw-bounded-identity";
 export const LEGACY_OVERSIGHT_PACKAGE_TYPE = "prime-claw-oversee-episode-package";
@@ -89,33 +76,6 @@ function visibleFailure(ctx: ExtensionContext, message: string): never {
   throw new Error(full);
 }
 
-function literalCount(value: string, token: string): number {
-  return value.split(token).length - 1;
-}
-
-export function assertIdentityKernel(ctx: ExtensionContext): void {
-  const prompt = ctx.getSystemPrompt();
-  const startCount = literalCount(prompt, IDENTITY_BLOCK_START);
-  const endCount = literalCount(prompt, IDENTITY_BLOCK_END);
-  const sentinelCount = literalCount(prompt, IDENTITY_KERNEL);
-  const markerLikeCount = (prompt.match(/prime-claw:role-kernel/gi) ?? []).length;
-  const sentinelLikeCount = (prompt.match(/PRIME_CLAW_ROLE_KERNEL_[A-Z0-9_-]*/g) ?? []).length;
-  const legacyMarkerLikeCount = (prompt.match(/prime-claw:conversation-identity/gi) ?? []).length;
-  const legacySentinelLikeCount = (prompt.match(/PRIME_CLAW_CONVERSATION_IDENTITY_[A-Z0-9_-]*/g) ?? []).length;
-  const start = prompt.indexOf(IDENTITY_BLOCK_START);
-  const end = prompt.indexOf(IDENTITY_BLOCK_END);
-  const exact = start >= 0 && end > start
-    ? prompt.slice(start, end + IDENTITY_BLOCK_END.length)
-    : "";
-  if (startCount !== 1 || endCount !== 1 || sentinelCount !== 1
-    || markerLikeCount !== 2 || sentinelLikeCount !== 1
-    || legacyMarkerLikeCount !== 0 || legacySentinelLikeCount !== 0
-    || exact !== EXPECTED_IDENTITY_KERNEL_BLOCK) {
-    throw new Error(
-      `expected exactly one exact managed role kernel; found start=${startCount}, end=${endCount}, sentinel=${sentinelCount}`,
-    );
-  }
-}
 
 function canonicalProjectRoot(cwd: string): string {
   try { return realpathSync(cwd); }
@@ -289,7 +249,6 @@ function assertLegacyAgreement(marker: LegacyMarker, identity: EpisodeIdentity):
 }
 
 export function assertConversationPromotionReady(ctx: ExtensionContext, requestedLocation?: string): void {
-  assertIdentityKernel(ctx);
   const root = stateRoot(ctx.cwd); mkdirSync(root, { recursive: true }); accessSync(root, constants.R_OK | constants.W_OK);
   const state = classifyLifecycle(ctx);
   if (state.mode === "ordinary") {
@@ -317,7 +276,6 @@ function currentBoundedIdentity(ctx: ExtensionContext): { role: "EPISODE"; sessi
 }
 
 export function appendActiveOversight(pi: ExtensionAPI, ctx: ExtensionContext, episode: EpisodeResult): OversightMarker {
-  assertIdentityKernel(ctx);
   const root = stateRoot(ctx.cwd); mkdirSync(root, { recursive: true }); accessSync(root, constants.R_OK | constants.W_OK);
   const identity = validateProjectBinding(parseEpisodeIdentity(episode, "created episode result"), ctx.cwd);
   if (!episodeBootstrapReady(identity)) throw new Error("created episode expectation is not bootstrap-ready");
@@ -460,7 +418,6 @@ function currentConversationGuideSubject(
     if (!state.marker || state.marker.status !== "active") {
       throw new Error("managed Conversation guidance requires one exact active owner episode");
     }
-    assertIdentityKernel(ctx);
     const marker = state.marker;
     return {
       kind: "active",
@@ -469,7 +426,6 @@ function currentConversationGuideSubject(
         marker.slug, marker.sourceLocation, marker.episodeId,
         marker.episodeSessionFile, marker.branch, marker.worktree,
         marker.sessionName, marker.identityVersion, marker.admission,
-        PRIME_CLAW_ROLE_KERNEL_SHA256,
       ])),
     };
   }
@@ -487,14 +443,13 @@ function currentConversationGuideSubject(
     || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(preparation.lifecycle)) {
     throw new Error("current /implement-spec preparation is corrupt");
   }
-  assertIdentityKernel(ctx);
   return {
     kind: "prospective",
     sourceLocation: preparation.location,
     preparationLifecycle: preparation.lifecycle,
     fingerprint: sha256(JSON.stringify([
       "prospective", ctx.sessionManager.getSessionId(), preparation.location,
-      preparation.lifecycle, PRIME_CLAW_ROLE_KERNEL_SHA256,
+      preparation.lifecycle,
     ])),
   };
 }
@@ -671,9 +626,6 @@ export async function reconcileOversightAtSessionStart(
 ): Promise<void> {
   try {
     let state = classifyLifecycle(ctx);
-    if (state.mode !== "ordinary" || currentBoundedIdentity(ctx)) {
-      assertIdentityKernel(ctx);
-    }
     if (state.mode === "recovery") {
       const recovery = state.recovery!;
       pi.appendEntry(OVERSIGHT_MARKER_TYPE, markerFromIdentity(recovery.identity, "active"));
@@ -702,26 +654,16 @@ export function applyConversationContext(
   try {
     const messages = applyGuideDisclosure(historical, ctx, options);
     const bounded = currentBoundedIdentity(ctx);
-    if (bounded) { assertIdentityKernel(ctx); return { messages }; }
+    if (bounded) { return { messages }; }
     const state = classifyLifecycle(ctx);
     if (state.mode === "ordinary") return { messages };
     if (state.mode === "recovery") throw new Error(`oversight lifecycle requires ${state.recovery!.kind} recovery before provider dispatch`);
-    assertIdentityKernel(ctx);
     return { messages };
   } catch (error) { visibleFailure(ctx, error instanceof Error ? error.message : String(error)); }
 }
 export function currentOversightMarker(ctx: ExtensionContext): OversightMarker | null {
   const state = classifyLifecycle(ctx);
   return state.mode === "active" ? state.marker : null;
-}
-export function assertExactActiveConversationOwner(ctx: ExtensionContext): OversightMarker {
-  if (currentBoundedIdentity(ctx)) throw new Error("EPISODE cannot reserve official EXPERT review authority");
-  const sessionId = ctx.sessionManager.getSessionId();
-  const marker = currentOversightMarker(ctx);
-  if (!marker || marker.status !== "active" || marker.ownerSessionId !== sessionId) {
-    throw new Error("official EXPERT review requires the exact active episode owner");
-  }
-  return marker;
 }
 export function currentOversightMarkerForClose(ctx: ExtensionContext, sourceLocation: string): OversightMarker | null {
   const locationMarker = markerForLocation(ctx, sourceLocation)?.marker ?? null;

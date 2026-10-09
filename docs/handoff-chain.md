@@ -222,17 +222,10 @@ runtime path or a reason to patch private queue state.
 
 Canonical workflow prose remains customizable Markdown. The extension loads it
 rather than duplicating it. The LLM does not choose the next phase or create
-transition state.
+transition state. The extension owns no filesystem transition marker.
 
 There is intentionally no `.agents/skills/handoff` symlink. Keeping one would
 expose both `/handoff` and `/skill:handoff` for the same workflow.
-
-### Legacy cleanup
-
-The older `.prime/agent/state/chain-next` marker had no trustworthy session
-owner. The extension deletes that file without consuming it on command,
-`session_start`, and `session_shutdown`. It is never allowed to inject a skill.
-No new project-local transition marker replaces it.
 
 ### Shared-runtime limitation
 

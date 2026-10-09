@@ -16,14 +16,15 @@ function createHarness(cwd) {
     registerTool(definition) { tools.push(definition.name); },
   };
   let currentTime = 0;
-  const extension = createGoalContinuationNudgeExtension({ now: () => currentTime });
+  const configPath = join(cwd, "plugin", "skills", "goals-and-heartbeats", "CONTINUATION.md");
+  const extension = createGoalContinuationNudgeExtension({ now: () => currentTime, configPath });
   extension(pi);
   const ctx = {
     cwd,
     sessionManager: { getSessionId() { return "session-1"; } },
   };
   return {
-    events, commands, tools, ctx,
+    events, commands, tools, ctx, configPath,
     setTime(value) { currentTime = value; },
   };
 }
@@ -34,12 +35,11 @@ function fixture(t) {
   return { cwd, ...createHarness(cwd) };
 }
 
-function writeConfig(cwd, {
+function writeConfig(path, {
   minimum = 2,
   window = 30,
   reminder = "custom project reminder",
 } = {}) {
-  const path = join(cwd, ".agents", "skills", "goals-and-heartbeats", "CONTINUATION.md");
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `---
 minimum_rapid_continuations: ${minimum}
@@ -75,44 +75,52 @@ test("registers only context and session cleanup listeners", (t) => {
   assert.deepEqual(f.tools, []);
 });
 
-test("loads validated project Markdown frontmatter and exact reminder body", (t) => {
+test("ships a valid default managed plugin policy", () => {
+  assert.deepEqual(loadGoalContinuationNudge(), {
+    minimumRapidContinuations: 2,
+    windowMs: 30_000,
+    reminder: "If there is no more work to do, or you are waiting on the user or a long-running process, remember to follow `/skill:goals-and-heartbeats`.",
+  });
+});
+
+test("loads validated managed plugin Markdown frontmatter and exact reminder body", (t) => {
   const f = fixture(t);
-  writeConfig(f.cwd, { minimum: 3, window: 45, reminder: "line one\nline two" });
-  assert.deepEqual(loadGoalContinuationNudge(f.cwd), {
+  writeConfig(f.configPath, { minimum: 3, window: 45, reminder: "line one\nline two" });
+  assert.deepEqual(loadGoalContinuationNudge(f.configPath), {
     minimumRapidContinuations: 3,
     windowMs: 45_000,
     reminder: "line one\nline two",
   });
 });
 
-test("missing or malformed project Markdown is a safe no-op", (t) => {
+test("missing or malformed managed plugin Markdown is a safe no-op", (t) => {
   const f = fixture(t);
-  assert.equal(loadGoalContinuationNudge(f.cwd), null);
-  const path = writeConfig(f.cwd);
+  assert.equal(loadGoalContinuationNudge(f.configPath), null);
+  const path = writeConfig(f.configPath);
   writeFileSync(path, "---\nminimum_rapid_continuations: 1\nwindow_seconds: 30\n---\nnope\n");
-  assert.equal(loadGoalContinuationNudge(f.cwd), null);
+  assert.equal(loadGoalContinuationNudge(f.configPath), null);
   writeFileSync(path, "---\nminimum_rapid_continuations: 2\nwindow_seconds: 0\n---\nnope\n");
-  assert.equal(loadGoalContinuationNudge(f.cwd), null);
+  assert.equal(loadGoalContinuationNudge(f.configPath), null);
   writeFileSync(path, "---\nminimum_rapid_continuations: 2\nwindow_seconds: 30\nextra: 1\n---\nnope\n");
-  assert.equal(loadGoalContinuationNudge(f.cwd), null);
+  assert.equal(loadGoalContinuationNudge(f.configPath), null);
 });
 
 test("oversize and symlinked reminder files are safe no-ops", (t) => {
   const f = fixture(t);
-  const path = writeConfig(f.cwd);
+  const path = writeConfig(f.configPath);
   writeFileSync(path, `---\nminimum_rapid_continuations: 2\nwindow_seconds: 30\n---\n\n${"x".repeat(17_000)}`);
-  assert.equal(loadGoalContinuationNudge(f.cwd), null);
+  assert.equal(loadGoalContinuationNudge(f.configPath), null);
 
   const target = join(f.cwd, "outside-reminder.md");
   writeFileSync(target, "---\nminimum_rapid_continuations: 2\nwindow_seconds: 30\n---\n\noutside\n");
   unlinkSync(path);
   symlinkSync(target, path);
-  assert.equal(loadGoalContinuationNudge(f.cwd), null);
+  assert.equal(loadGoalContinuationNudge(f.configPath), null);
 });
 
 test("nudges the second distinct rapid continuation and preserves source messages", async (t) => {
   const f = fixture(t);
-  writeConfig(f.cwd, { reminder: "follow the project skill" });
+  writeConfig(f.configPath, { reminder: "follow the managed policy" });
   const first = goalContinuation("goal-a", 1);
   f.setTime(1_000);
   assert.equal(await f.events.get("context")({ messages: [first] }, f.ctx), undefined);
@@ -122,14 +130,14 @@ test("nudges the second distinct rapid continuation and preserves source message
   f.setTime(2_000);
   const result = await f.events.get("context")({ messages }, f.ctx);
 
-  assert.equal(outputText(result, messages), "native goal continuation\n\nfollow the project skill");
+  assert.equal(outputText(result, messages), "native goal continuation\n\nfollow the managed policy");
   assert.equal(second.content, "native goal continuation");
   assert.notEqual(result.messages, messages);
 });
 
 test("repeated provider calls do not increment the streak or duplicate the reminder", async (t) => {
   const f = fixture(t);
-  writeConfig(f.cwd, { minimum: 3, reminder: "one nudge" });
+  writeConfig(f.configPath, { minimum: 3, reminder: "one nudge" });
   f.setTime(1_000);
   await f.events.get("context")({ messages: [goalContinuation("goal-a", 1)] }, f.ctx);
   f.setTime(2_000);
@@ -151,7 +159,7 @@ test("repeated provider calls do not increment the streak or duplicate the remin
 
 test("an expired window, changed goal, or user turn resets the rapid streak", async (t) => {
   const f = fixture(t);
-  writeConfig(f.cwd, { window: 10 });
+  writeConfig(f.configPath, { window: 10 });
   f.setTime(0);
   await f.events.get("context")({ messages: [goalContinuation("goal-a", 1)] }, f.ctx);
   f.setTime(11_000);
@@ -169,7 +177,7 @@ test("an expired window, changed goal, or user turn resets the rapid streak", as
 
 test("session lifecycle clears observations", async (t) => {
   const f = fixture(t);
-  writeConfig(f.cwd);
+  writeConfig(f.configPath);
   f.setTime(1_000);
   await f.events.get("context")({ messages: [goalContinuation("goal-a", 1)] }, f.ctx);
   f.events.get("session_tree")({}, f.ctx);
@@ -183,7 +191,7 @@ test("session lifecycle clears observations", async (t) => {
 
 test("appends to text content without dropping image blocks", async (t) => {
   const f = fixture(t);
-  writeConfig(f.cwd, { reminder: "image-safe reminder" });
+  writeConfig(f.configPath, { reminder: "image-safe reminder" });
   f.setTime(1_000);
   await f.events.get("context")({ messages: [goalContinuation("goal-a", 1)] }, f.ctx);
   const content = [

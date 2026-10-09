@@ -43,6 +43,9 @@ def test_final_source_uses_only_the_neutral_kernel_and_managed_global_guides():
     assert "CONVERSATION supervises" in kernel
     assert "EPISODE implements" in kernel
     assert "EXPERT reviews" in kernel
+    assert "Roles are skill-based responsibilities" in kernel
+    assert "trusted plugin state" not in kernel
+    assert not (REPO / "src/prime-agent-plugin/extension-support/role-kernel.generated.ts").exists()
     assert not (REPO / "src/prime-agent-plugin/APPEND_SYSTEM.md").exists()
     assert not (REPO / ".ralph/skills/oversee-episode").exists()
     assert not (REPO / ".agents/skills/oversee-episode").exists()
@@ -74,8 +77,10 @@ def test_extension_uses_context_and_exact_state_without_rejected_flag_profile():
     assert "registerFlag" not in extension + support
     assert "before_agent_start" not in support
     assert "project-conversation.md" not in extension + support
-    for phrase in ["PRIME_CLAW_ROLE_KERNEL_TEXT", "OVERSIGHT_MARKER_TYPE", "LEGACY_OVERSIGHT_PACKAGE_TYPE", "getBranch()", "spec-episodes", "ctx.abort()", "oversight marker disagrees", "filter"]:
+    for phrase in ["OVERSIGHT_MARKER_TYPE", "LEGACY_OVERSIGHT_PACKAGE_TYPE", "getBranch()", "spec-episodes", "ctx.abort()", "oversight marker disagrees", "filter"]:
         assert phrase in support
+    assert "PRIME_CLAW_ROLE_KERNEL" not in support
+    assert "assertIdentityKernel" not in support
     assert "OVERSIGHT_PACKAGE_PATH" not in support
     assert "packageBody" not in support
     assert "parseSkillFrontmatter" not in support
@@ -310,13 +315,14 @@ def test_native_active_promotion_and_recovery_need_no_oversight_skill(tier1_cont
         assert not (project / ".ralph/skills/oversee-episode/SKILL.md").exists()
 
 
-def test_native_active_owner_rejects_legacy_role_prompt_before_provider(tier1_container, ctmp):
+def test_native_active_owner_does_not_authenticate_legacy_prompt_bytes(tier1_container, ctmp):
     completed, records, _, _ = _run_native_active(
-        tier1_container, ctmp, "active", legacy_prompt=True
+        tier1_container, ctmp, "active", legacy_prompt=True,
     )
-    assert completed.returncode != 0
-    assert "expected exactly one exact managed role kernel" in completed.stderr
-    assert not records.exists()
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    row = json.loads(records.read_text())
+    assert row["kernel"] == 1
+    assert_provider_context_clean(row)
 
 
 def test_current_documentation_describes_lean_default_and_transition_compatibility():
@@ -329,7 +335,7 @@ def test_current_documentation_describes_lean_default_and_transition_compatibili
         "plugin-managed global `prime-claw-oversee-episode` guide",
         "There is no project forwarding skill, discovery link, or standalone reviewer profile",
         "Historical loaded-generation evidence",
-        "managed global Conversation and EXPERT skills",
+        "managed Conversation and EXPERT skills",
         "Final source is proved only in isolated Docker roots until the separately authorized Gate B",
         "Exact bookkeeping close",
         "location-only, no-UI bookkeeping close",

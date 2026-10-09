@@ -22,10 +22,6 @@ import {
   registerConversationOversight,
 } from "../extension-support/conversation-oversight.ts";
 import { closeEpisodeOversight } from "../extension-support/episode-close.ts";
-import {
-  registerOfficialExpertReviewReservation,
-  type ExpertReviewReservationRegistration,
-} from "../extension-support/expert-review-reservation.ts";
 
 /**
  * Native reviewed planning and implementation-promotion boundaries.
@@ -89,7 +85,7 @@ function registerPrepChainCommand(
   });
 }
 
-type ReviewedPlanDependencies = EpisodeDependencies & ExpertReviewReservationRegistration & {
+type ReviewedPlanDependencies = EpisodeDependencies & {
   createEpisode?: typeof createSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
 };
@@ -106,13 +102,6 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       },
     };
     registerConversationOversight(pi, oversightOptions);
-    registerOfficialExpertReviewReservation(pi, {
-      guideRoot: dependencies?.guideRoot,
-      packageStatus: dependencies?.packageStatus,
-      repositoryIdentity: dependencies?.repositoryIdentity,
-      now: dependencies?.now,
-      nonce: dependencies?.nonce,
-    });
     registerPrepChainCommand(pi, {
       command: "plan",
       description: "Plan a reviewed specification from an explicit .ralph/plans/future/<slug> folder",

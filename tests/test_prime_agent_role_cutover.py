@@ -402,32 +402,33 @@ def test_resume_order_and_runtime_inventory_are_fail_closed(tmp_path: Path) -> N
     with pytest.raises(coord.CutoverError, match="must be a non-empty string"):
         coord.Coordinator(config, tmp_path / "state-2", RecordingRunner(config)).preflight()
 
-def test_final_source_inventory_removes_only_legacy_compatibility_resources() -> None:
+def test_final_source_inventory_reflects_markdown_only_expert_workflow() -> None:
     apply_text = (ROOT / "scripts/apply-prime-agent-plugin.sh").read_text()
     check_text = (ROOT / "scripts/check-prime-agent-plugin.sh").read_text()
+    cleanup_text = (ROOT / "scripts/cleanup-retired-prime-agent-expert-review.py").read_text()
     guide = (ROOT / "docs/lab-global-plugin.md").read_text()
-    assert len(bundle.MANAGED_FILES) == 17
+    assert len(bundle.MANAGED_FILES) == 14
     for relative in bundle.MANAGED_FILES:
         assert Path(ROOT / "src/prime-agent-plugin" / relative).is_file(), relative
-    for relative in bundle.MANAGED_FILES[:12]:
         assert relative in apply_text and relative in check_text, relative
     assert 'managed_skill_relative="skills/prime-claw-oversee-episode/SKILL.md"' in apply_text
-    assert 'expert_skill_root_relative="skills/prime-claw-official-expert-review"' in apply_text
-    for suffix in ("SKILL.md", "pyproject.toml", "src/prime_claw_official_expert_review/__init__.py", "src/prime_claw_official_expert_review/reviewer.md"):
-        assert f'$expert_skill_root_relative/{suffix}' in apply_text
-    assert "conversation-guide-metadata.ts" in guide and "expert-review-reservation.ts" in guide
-    assert "prime-claw-oversee-episode/SKILL.md" in guide and "prime-claw-official-expert-review" in guide
+    assert 'expert_skill_relative="skills/prime-claw-expert-review/SKILL.md"' in apply_text
+    assert "prime-claw-expert-review/SKILL.md" in guide
+    assert "Python-backed package" not in guide
     for relative in bundle.EXPECTED_ABSENT:
-        assert relative in apply_text and relative in check_text
         assert not (ROOT / "src/prime-agent-plugin" / relative).exists()
+    for relative in bundle.EXPECTED_ABSENT[:6]:
+        assert relative in apply_text and relative in check_text
+    assert "prime-claw-official-expert-review" in cleanup_text
+    assert "expert-review-launches" in cleanup_text
     assert not (ROOT / ".ralph/skills/oversee-episode").exists()
     assert not (ROOT / ".agents/skills/oversee-episode").exists()
     assert not (ROOT / ".agents/skills/oversee-episode").is_symlink()
     assert not (ROOT / ".prime/agent/profiles/expert-reviewer.md").exists()
     assert not (ROOT / "src/prime-agent-plugin/APPEND_SYSTEM.md").exists()
     assert not (ROOT / "scripts/manage-prime-agent-append-system.py").exists()
-    reviewer = ROOT / "src/prime-agent-plugin/skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/reviewer.md"
-    assert reviewer.is_file()
+    assert not (ROOT / "scripts/generate-prime-agent-role-kernel.py").exists()
+    assert not (ROOT / "scripts/check-prime-agent-expert-runtime.py").exists()
     assert json.loads((ROOT / "src/prime-agent-plugin/role-protocol.json").read_text()) == {
         "schemaVersion": 1, "generation": "final",
     }

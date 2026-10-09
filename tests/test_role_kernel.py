@@ -3,55 +3,30 @@
 import hashlib
 import json
 from pathlib import Path
-import re
-import subprocess
-import sys
 
 
 REPO = Path(__file__).resolve().parents[1]
 SOURCE = REPO / "src" / "prime-agent-plugin" / "ROLE_KERNEL.md"
-GENERATED = REPO / "src" / "prime-agent-plugin" / "extension-support" / "role-kernel.generated.ts"
-GENERATOR = REPO / "scripts" / "generate-prime-agent-role-kernel.py"
 START = b"<!-- prime-claw:role-kernel:start -->"
 END = b"<!-- prime-claw:role-kernel:end -->"
 
 
-def _generated_string(name: str) -> str:
-    match = re.search(
-        rf"^export const {re.escape(name)} = (.+);$",
-        GENERATED.read_text(),
-        re.MULTILINE,
-    )
-    assert match, name
-    return json.loads(match.group(1))
-
-
-def test_role_kernel_generated_bytes_and_digest_are_exact(tmp_path: Path) -> None:
+def test_role_kernel_is_the_single_advisory_policy_source() -> None:
     source = SOURCE.read_bytes()
     assert source.count(START) == source.count(END) == 1
     assert source.startswith(START) and source.endswith(END)
     assert not source.endswith((b"\n", b"\r"))
-    assert _generated_string("PRIME_CLAW_ROLE_KERNEL_TEXT").encode() == source
-    assert _generated_string("PRIME_CLAW_ROLE_KERNEL_SHA256") == hashlib.sha256(source).hexdigest()
-    assert _generated_string("PRIME_CLAW_ROLE_KERNEL_START").encode() == START
-    assert _generated_string("PRIME_CLAW_ROLE_KERNEL_END").encode() == END
-
-    checked = subprocess.run(
-        [sys.executable, GENERATOR, "check", SOURCE, GENERATED],
-        text=True,
-        capture_output=True,
-    )
-    assert checked.returncode == 0, checked.stderr
-    stale = tmp_path / "role-kernel.generated.ts"
-    stale.write_bytes(GENERATED.read_bytes() + b"// stale\n")
-    rejected = subprocess.run(
-        [sys.executable, GENERATOR, "check", SOURCE, stale],
-        text=True,
-        capture_output=True,
-    )
-    assert rejected.returncode != 0
-    assert "stale generated role kernel" in rejected.stderr
-
+    text = source.decode()
+    for phrase in (
+        "Roles are skill-based responsibilities, not authenticated identities.",
+        "CONVERSATION supervises. EPISODE implements. EXPERT reviews.",
+        "The plugin helps invoke those skills at the appropriate lifecycle boundaries.",
+    ):
+        assert phrase in text
+    for retired in ("trusted plugin state", "trusted identity", "Deterministic plugin gates"):
+        assert retired not in text
+    assert not (REPO / "src/prime-agent-plugin/extension-support/role-kernel.generated.ts").exists()
+    assert not (REPO / "scripts/generate-prime-agent-role-kernel.py").exists()
 
 def test_final_protocol_config_declares_one_generation() -> None:
     manifest = json.loads((REPO / "src/prime-agent-plugin/role-protocol.json").read_text())

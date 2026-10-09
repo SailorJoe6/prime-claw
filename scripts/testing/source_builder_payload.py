@@ -107,8 +107,9 @@ def _validate_manifest(value: Any) -> dict[str, Any]:
             raise BuildError("invalid source file digest")
         if kind == "symlink":
             target = record.get("target")
-            if not isinstance(target, str) or not target or os.path.isabs(target):
-                raise BuildError("invalid source link target")
+            if (mode != 0o777 or not isinstance(target, str)
+                    or not target or os.path.isabs(target)):
+                raise BuildError("invalid source link metadata")
         if kind == "missing" and record.get("content_sha256") is not None:
             raise BuildError("invalid missing source record")
     if _framed_hash(records, "repository-v2") != identity["content_sha256"]:
@@ -132,8 +133,6 @@ def _copy_source(source: Path, destination: Path,
         dst.parent.mkdir(parents=True, exist_ok=True)
         observed = src.lstat()
         mode = stat.S_IMODE(observed.st_mode)
-        if mode != record["mode"]:
-            raise BuildError("source mode changed during builder copy")
         if kind == "symlink":
             if not stat.S_ISLNK(observed.st_mode):
                 raise BuildError("source link changed type")
@@ -144,6 +143,8 @@ def _copy_source(source: Path, destination: Path,
             continue
         if not stat.S_ISREG(observed.st_mode):
             raise BuildError("source file changed type")
+        if mode != record["mode"]:
+            raise BuildError("source mode changed during builder copy")
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
         fd = os.open(src, flags)
         try:

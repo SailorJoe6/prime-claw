@@ -825,18 +825,16 @@ else
         (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance capture-artifact \
             "$TIER_DIR" "$TIER_BINDING" installed-artifact.json "$INSTALLED_VERSION")
     [ "$INSTALLED_VERSION" = "$PA_VERSION" ] || die "installed Prime Agent version does not match validated requested version"
-    BRIDGE_SEED="python3 -m venv --without-pip /tmp/prime-claw-expert-preflight-venv && printf '%s\n' '{\"schemaVersion\":1,\"generation\":\"bridge\"}' > /tmp/prime-claw-bridge.json && python3 /workspace/scripts/manage-prime-agent-role-protocol.py apply /tmp/prime-claw-bridge.json /workspace/src/prime-agent-plugin/ROLE_KERNEL.md /workspace/tests/fixtures/role-protocol-legacy-append.md $CONTAINER_PLUGIN_ROOT"
+    BRIDGE_SEED="printf '%s\n' '{\"schemaVersion\":1,\"generation\":\"bridge\"}' > /tmp/prime-claw-bridge.json && python3 /workspace/scripts/manage-prime-agent-role-protocol.py apply /tmp/prime-claw-bridge.json /workspace/src/prime-agent-plugin/ROLE_KERNEL.md /workspace/tests/fixtures/role-protocol-legacy-append.md $CONTAINER_PLUGIN_ROOT"
     bounded "$CHECK_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc \
       "set -euo pipefail; $BRIDGE_SEED" >/dev/null 2>&1
     phase role-protocol-bridge-seeded
     bounded "$CHECK_TIMEOUT" docker exec \
       -e "PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT" \
-      -e "PRIME_AGENT_KERNEL_VENV=/tmp/prime-claw-expert-preflight-venv" \
       "$CONTAINER_ID" /workspace/scripts/apply-prime-agent-plugin.sh >/dev/null 2>&1
     phase plugin-applied
     bounded "$CHECK_TIMEOUT" docker exec \
       -e "PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT" \
-      -e "PRIME_AGENT_KERNEL_VENV=/tmp/prime-claw-expert-preflight-venv" \
       "$CONTAINER_ID" /workspace/scripts/check-prime-agent-plugin.sh >/dev/null 2>&1
     phase plugin-checked
     if [ "$PROBE" -eq 1 ]; then

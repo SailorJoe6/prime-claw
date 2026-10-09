@@ -21,11 +21,9 @@ EXPECTED_TYPESCRIPT = {
     "extension-support/conversation-guide-metadata.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
-    "extension-support/expert-review-reservation.ts",
     "extension-support/handoff-prompts.ts",
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
-    "extension-support/role-kernel.generated.ts",
     "extension-support/spec-episode.ts",
 }
 
@@ -56,9 +54,12 @@ def test_final_protocol_separates_neutral_kernel_from_managed_guidance() -> None
         "operator alone decides scope",
     ):
         assert phrase in guide
+    assert "Roles are skill-based responsibilities" in kernel
     assert not (MANAGED_SOURCE / "APPEND_SYSTEM.md").exists()
+    assert (MANAGED_SOURCE / "skills/prime-claw-expert-review/SKILL.md").is_file()
+    assert not (MANAGED_SOURCE / "skills/prime-claw-official-expert-review").exists()
 
-def test_managed_plugin_has_twelve_typescript_files_and_no_retired_work_control_transport() -> None:
+def test_managed_plugin_has_ten_typescript_files_and_no_retired_work_control_transport() -> None:
     actual = {
         str(path.relative_to(MANAGED_SOURCE))
         for path in MANAGED_SOURCE.rglob("*.ts")

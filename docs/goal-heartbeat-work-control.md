@@ -2,10 +2,10 @@
 
 Prime Claw's selected global role kernel provides only neutral role and authority
 invariants. The managed global Conversation guide provides detailed judgment for
-managed Conversation work. Ordinary project work uses the project-customizable
-`.agents/skills/goals-and-heartbeats/SKILL.md`; Ralph `/execute` applies the same
-generic ownership rules while implementing plans. No project APPEND source or
-second plugin-authored work-control policy remains.
+managed Conversation work. Ordinary project work uses the plugin-managed user-level
+`goals-and-heartbeats` skill; Ralph `/execute` applies the same generic ownership
+rules while implementing plans. No project APPEND source or second plugin-authored
+work-control policy remains.
 
 ## Supported runtime boundary
 
@@ -19,15 +19,14 @@ slash-command transport.
 The narrow `goal-continuation-nudge.ts` extension is reinforcement, not a second
 policy. It observes structured `goal_context` continuation messages, deduplicates
 by goal identity and continuation count, and measures a per-session rapid-repeat
-streak. Only when the project Markdown threshold is reached does it append the
-exact body of
-`.agents/skills/goals-and-heartbeats/CONTINUATION.md` to the provider context.
-The same Markdown frontmatter owns the minimum streak and elapsed-time window.
-TypeScript contains no model-facing goal or heartbeat advice, does not inspect
-assistant prose, delay continuation delivery, create a timer, or mutate the
-stored transcript. Session start, tree navigation, and shutdown clear transient
-streak state. Missing, invalid, symlinked, nonregular, or oversized project
-configuration is a safe no-op.
+streak. Only when the managed plugin Markdown threshold is reached does it append
+the exact body of `skills/goals-and-heartbeats/CONTINUATION.md` to the provider
+context. The same managed Markdown frontmatter owns the minimum streak and
+elapsed-time window. TypeScript contains no model-facing goal or heartbeat advice,
+does not inspect assistant prose, delay continuation delivery, create a timer, or
+mutate the stored transcript. Session start, tree navigation, and shutdown clear
+transient streak state. Missing, invalid, symlinked, nonregular, or oversized
+managed policy is a safe no-op.
 
 The block states the bounded control contract directly:
 
@@ -75,9 +74,9 @@ retired managed destinations:
 The project-local `oversee-episode` skill, its discovery link, the standalone
 reviewer profile, the legacy APPEND source, and the append-only manager are
 absent. The managed global Conversation and EXPERT skills retain their exact
-role-specific authority. The generic project-local goals-and-heartbeats skill
-and continuation reminder remain editable project guidance; the lifecycle
-extension only routes that guidance at a repeated continuation signal.
+role-specific authority. The goals-and-heartbeats `SKILL.md` and `CONTINUATION.md` are one plugin-owned,
+user-level capability bundle. The lifecycle hook only routes that managed reminder
+at a repeated continuation signal.
 
 Final apply/check intentionally require exact owned bridge state; they are not a
 fresh-root diagnostic. Docker Tier 1 seeds that historical predecessor state in
@@ -110,7 +109,7 @@ Coverage proves:
   overlay sentinel, pause/resume tool, or autonomous slash-command transport;
 - the rapid-repeat nudge uses structured goal identity, deduplicates repeated
   provider calls, resets across goal/user/session boundaries, and loads its
-  threshold and exact reminder from project Markdown;
+  threshold and exact reminder from managed plugin Markdown;
 - installer migration removes a stale regular retired entry, rejects unsafe
   destination types before mutation, preserves unrelated files, and converges;
 - provider contexts contain one managed lean block and no separate detailed

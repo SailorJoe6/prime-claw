@@ -34,7 +34,6 @@ WS_LEGACY_FIXTURE = "/workspace/tests/fixtures/role-protocol-legacy-append.md"
 # The image's default PATH (Ubuntu base); tests that shadow a tool prepend
 # their fake bin dir to this.
 CONTAINER_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-CONTAINER_EXPERT_VENV = "/tmp/prime-claw-expert-preflight-venv"
 RETIRED = "extensions/goal-heartbeat-work-control.ts"
 FILES = (
     "extensions/goal-continuation-nudge.ts",
@@ -43,23 +42,25 @@ FILES = (
     "extension-support/conversation-guide-metadata.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
-    "extension-support/expert-review-reservation.ts",
+    "skills/goals-and-heartbeats/SKILL.md",
+    "skills/goals-and-heartbeats/CONTINUATION.md",
     "extension-support/handoff-prompts.ts",
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
-    "extension-support/role-kernel.generated.ts",
     "extension-support/spec-episode.ts",
 )
 SKILL_FILES = (
+    "skills/goals-and-heartbeats/SKILL.md",
     "skills/prime-claw-oversee-episode/SKILL.md",
-    "skills/prime-claw-official-expert-review/SKILL.md",
+    "skills/prime-claw-expert-review/SKILL.md",
 )
-EXPERT_FILES = (
-    "skills/prime-claw-official-expert-review/pyproject.toml",
-    "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/__init__.py",
-    "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/reviewer.md",
+MANAGED_SKILL_FILES = SKILL_FILES
+RETIRED_EXPERT_FILES = (
+    "SKILL.md",
+    "pyproject.toml",
+    "src/prime_claw_official_expert_review/__init__.py",
+    "src/prime_claw_official_expert_review/reviewer.md",
 )
-MANAGED_SKILL_FILES = (*SKILL_FILES, *EXPERT_FILES)
 
 
 def test_source_is_outside_project_extension_discovery() -> None:
@@ -68,7 +69,7 @@ def test_source_is_outside_project_extension_discovery() -> None:
     assert not (REPO / ".prime" / "agent" / "extensions-bak").exists()
     assert not (REPO / ".prime" / "agent" / "extension-support").exists()
     assert not (SOURCE / RETIRED).exists()
-    assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*.ts")} == set(FILES)
+    assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*.ts")} == {item for item in FILES if item.endswith(".ts")}
     assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("SKILL.md")} == set(SKILL_FILES)
 
 
@@ -102,7 +103,6 @@ def _run_script(
         assert seeded.returncode == 0, seeded.stdout + seeded.stderr
     script_env = {
         "PRIME_AGENT_PLUGIN_ROOT": native,
-        "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV,
     }
     if env is not None:
         script_env.update(env)
@@ -194,7 +194,6 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
     check = f"{base}/primary/scripts/check-prime-agent-plugin.sh"
     runtime_env = {
         "HOME": home,
-        "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV,
     }
     seeded = tier1_container.run(
         "python3", WS_ROLE_MANAGER, "apply", WS_BRIDGE_CONFIG,
@@ -202,11 +201,21 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
         workdir=None, timeout=60,
     )
     assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+    old_skill = Path(home) / ".prime/agent/skills/prime-claw-official-expert-review"
+    for relative in RETIRED_EXPERT_FILES:
+        old_file = old_skill / relative
+        old_file.parent.mkdir(parents=True, exist_ok=True)
+        old_file.write_text(relative)
+    old_state = Path(home) / ".prime/agent/prime-claw-private/expert-review-launches"
+    old_state.mkdir(parents=True)
+    (old_state / "old.closed.json").write_text("{}")
     applied = tier1_container.run(
         apply, "--user-global", env=runtime_env, workdir=None, timeout=60,
     )
     assert applied.returncode == 0, applied.stdout + applied.stderr
     assert "target mode: user-global" in applied.stdout
+    assert not old_skill.exists()
+    assert not old_state.exists()
     checked = tier1_container.run(
         check, "--user-global", env=runtime_env, workdir=None, timeout=60,
     )
@@ -273,8 +282,7 @@ def test_linked_worktree_cannot_activate_shared_generation_and_isolated_works(
         f"{base}/candidate/scripts/apply-prime-agent-plugin.sh",
         env={
             "PRIME_AGENT_PLUGIN_ROOT": isolated,
-            "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV,
-        },
+            },
         workdir=None,
         timeout=60,
     )
@@ -283,8 +291,7 @@ def test_linked_worktree_cannot_activate_shared_generation_and_isolated_works(
         f"{base}/candidate/scripts/check-prime-agent-plugin.sh",
         env={
             "PRIME_AGENT_PLUGIN_ROOT": isolated,
-            "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV,
-        },
+            },
         workdir=None,
         timeout=60,
     )
@@ -337,7 +344,7 @@ def test_apply_can_write_an_external_role_receipt_for_cutover_recovery(tier1_con
     assert seeded.returncode == 0, seeded.stdout + seeded.stderr
     applied = tier1_container.run(
         WS_APPLY, "--role-receipt", receipt,
-        env={"PRIME_AGENT_PLUGIN_ROOT": root, "PRIME_AGENT_KERNEL_VENV": CONTAINER_EXPERT_VENV},
+        env={"PRIME_AGENT_PLUGIN_ROOT": root},
         workdir=None, timeout=120,
     )
     assert applied.returncode == 0, applied.stdout + applied.stderr
@@ -389,8 +396,7 @@ def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container,
     for name in (
         "apply-prime-agent-plugin.sh",
         "check-prime-agent-plugin.sh",
-        "generate-prime-agent-role-kernel.py",
-        "check-prime-agent-expert-runtime.py",
+        "cleanup-retired-prime-agent-expert-review.py",
         "manage-prime-agent-role-protocol.py",
         "prime-agent-plugin-target.sh",
     ):
@@ -476,10 +482,9 @@ def test_apply_rejects_unsafe_retired_destination_before_mutation(
 
 @pytest.mark.parametrize("managed_directory", [
     "root", "extensions", "extension-support", "skills",
+    "skills/goals-and-heartbeats",
     "skills/prime-claw-oversee-episode",
-    "skills/prime-claw-official-expert-review",
-    "skills/prime-claw-official-expert-review/src",
-    "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review",
+    "skills/prime-claw-expert-review",
 ])
 def test_apply_and_check_reject_symlinked_managed_directories_before_mutation(
     tier1_container, ctmp, managed_directory,
@@ -638,33 +643,12 @@ def test_interrupted_sequential_install_is_not_atomic_and_check_detects_generati
     assert "missing installed plugin file" in checked.stderr
 
 
-def test_check_rejects_stale_managed_expert_package_file(tier1_container, ctmp) -> None:
+def test_check_rejects_stale_managed_expert_skill(tier1_container, ctmp) -> None:
     destination = ctmp / "agent"
     applied = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
     assert applied.returncode == 0, applied.stdout + applied.stderr
-    package = destination / EXPERT_FILES[1]
-    package.write_text(package.read_text() + "\n# stale installed package\n")
+    skill = destination / "skills/prime-claw-expert-review/SKILL.md"
+    skill.write_text(skill.read_text() + "\n# stale installed skill\n")
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode != 0
-    assert "stale installed managed EXPERT skill file" in checked.stderr
-
-
-def test_configured_interpreter_unavailable_blocks_apply_before_mutation(
-    tier1_container, ctmp,
-) -> None:
-    destination = ctmp / "agent"
-    sentinel = destination / "extensions/reviewed-plan.ts"
-    sentinel.parent.mkdir(parents=True)
-    sentinel.write_bytes(b"existing generation remains untouched\n")
-    append = destination / "APPEND_SYSTEM.md"
-    append.write_bytes(b"unrelated append remains untouched\n")
-    before = _tree_snapshot(destination)
-    applied = _run_script(
-        tier1_container,
-        WS_APPLY,
-        destination,
-        env={"PRIME_AGENT_KERNEL_PYTHON": str(ctmp / "missing-python")},
-    )
-    assert applied.returncode != 0
-    assert '"status": "UNAVAILABLE"' in applied.stdout
-    assert _tree_snapshot(destination) == before
+    assert "stale installed managed EXPERT skill" in checked.stderr

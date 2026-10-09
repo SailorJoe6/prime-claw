@@ -25,7 +25,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Pause",
         "Consult the operator",
         "canonical handoff",
-        "Treat every verdict as bounded evidence",
+        "Treat every review conclusion as bounded evidence",
         "Classify each finding",
         "in-contract blocker",
         "hardening candidate",
@@ -59,14 +59,14 @@ def test_managed_conversation_guide_metadata_matches_exact_source_without_copyin
 def test_current_docs_describe_managed_on_demand_guide_and_loaded_generation_boundary():
     text = " ".join(DOC.read_text().split())
     for phrase in [
-        "selected global role kernel is the current neutral invariant floor",
+        "selected global role kernel is shared cross-role orientation",
         "plugin-managed global `prime-claw-oversee-episode` guide",
         "one intended tool-result continuation",
         "active-owner handoff and first finalization",
         "There is no project forwarding skill, discovery link, or standalone reviewer profile",
         "current consumed prospective receipt",
         "Historical loaded-generation evidence",
-        "managed global Conversation and EXPERT skills",
+        "managed Conversation and EXPERT skills",
     ]:
         assert phrase in text
 

@@ -97,7 +97,7 @@ export default function setup(pi){pi.on("session_start",(_event,ctx)=>{const slu
     assert_provider_context_clean(row)
 
 
-def test_native_sdk_system_prompt_override_preserves_or_blocks_managed_kernel(
+def test_native_sdk_system_prompt_override_does_not_authenticate_roles(
     tier1_container, ctmp,
 ):
     kernel = tier1_container.read_repo(WS_KERNEL)
@@ -129,7 +129,7 @@ export default function setup(pi){pi.on("session_start",(_event,ctx)=>{const slu
     driver.write_text(rf'''import {{existsSync,readFileSync,writeFileSync}} from "node:fs";
 import {{createAgentSessionRuntime,createAgentSessionServices,createAgentSessionFromServices,SessionManager}} from "@earendil-works/pi-coding-agent";
 const projects={json.dumps(projects)},agents={json.dumps(agents)},provider={json.dumps(str(provider))},setup={json.dumps(str(setup))},extension={json.dumps(WS_EXT)},records={json.dumps(str(records))},result={json.dumps(str(result))};const providerCalls=()=>existsSync(records)?readFileSync(records,"utf8").trim().split("\n").filter(Boolean).length:0;
-export default function driver(pi){{pi.on("session_start",async()=>{{const outcome={{preserve:false,replaceBlocked:false,diagnostics:{{}}}};for(const name of ["preserve","replace"]){{let runtime;try{{const cwd=projects[name],agentDir=agents[name];const make=async target=>{{const services=await createAgentSessionServices({{cwd:target.cwd,agentDir,noBuiltinHerdrReporter:true,telemetryDisabled:true,resourceLoaderOptions:{{additionalExtensionPaths:[provider,setup,extension],noExtensions:true,noSkills:true,noPromptTemplates:true,noContextFiles:true,noThemes:true,systemPromptOverride:name==="preserve"?(base)=>`${{base??""}}\nSDK_PRESERVED`:()=>"SDK_REPLACED"}}}});const model=services.modelRegistry.find("sdk","m");const made=await createAgentSessionFromServices({{services,sessionManager:target.sessionManager,sessionStartEvent:target.sessionStartEvent,model,thinkingLevel:"off",noTools:true,prewarmIpythonKernel:false,telemetryDisabled:true}});return{{...made,services,diagnostics:services.diagnostics}}}};runtime=await createAgentSessionRuntime(make,{{cwd,agentDir,sessionManager:SessionManager.inMemory(cwd)}});await runtime.session.bindExtensions({{}});outcome.diagnostics[name]={{kernel:(runtime.session.systemPrompt.match(/PRIME_CLAW_ROLE_KERNEL_V1/g)||[]).length,marker:runtime.session.sessionManager.getBranch().filter(entry=>entry.type==="custom"&&entry.customType==="prime-claw-conversation-oversight").length}};try{{await runtime.session.prompt("SDK_OVERRIDE_PROBE");if(name==="preserve")outcome.preserve=true;else outcome.replaceBlocked=providerCalls()===1}}catch(error){{if(name==="replace"&&providerCalls()===1)outcome.replaceBlocked=true;else throw error}}}}finally{{await runtime?.dispose()}}}}writeFileSync(result,JSON.stringify(outcome))}})}}''')
+export default function driver(pi){{pi.on("session_start",async()=>{{const outcome={{preserve:false,replace:false,diagnostics:{{}}}};for(const name of ["preserve","replace"]){{let runtime;try{{const cwd=projects[name],agentDir=agents[name];const make=async target=>{{const services=await createAgentSessionServices({{cwd:target.cwd,agentDir,noBuiltinHerdrReporter:true,telemetryDisabled:true,resourceLoaderOptions:{{additionalExtensionPaths:[provider,setup,extension],noExtensions:true,noSkills:true,noPromptTemplates:true,noContextFiles:true,noThemes:true,systemPromptOverride:name==="preserve"?(base)=>`${{base??""}}\nSDK_PRESERVED`:()=>"SDK_REPLACED"}}}});const model=services.modelRegistry.find("sdk","m");const made=await createAgentSessionFromServices({{services,sessionManager:target.sessionManager,sessionStartEvent:target.sessionStartEvent,model,thinkingLevel:"off",noTools:true,prewarmIpythonKernel:false,telemetryDisabled:true}});return{{...made,services,diagnostics:services.diagnostics}}}};runtime=await createAgentSessionRuntime(make,{{cwd,agentDir,sessionManager:SessionManager.inMemory(cwd)}});await runtime.session.bindExtensions({{}});outcome.diagnostics[name]={{kernel:(runtime.session.systemPrompt.match(/PRIME_CLAW_ROLE_KERNEL_V1/g)||[]).length,marker:runtime.session.sessionManager.getBranch().filter(entry=>entry.type==="custom"&&entry.customType==="prime-claw-conversation-oversight").length}};await runtime.session.prompt("SDK_OVERRIDE_PROBE");if(name==="preserve")outcome.preserve=true;else outcome.replace=true}}finally{{await runtime?.dispose()}}}}writeFileSync(result,JSON.stringify(outcome))}})}}''')
     outer = ctmp / "sdk-outer.ts"
     _outer_provider(outer)
     completed = tier1_container.run(
@@ -142,13 +142,17 @@ export default function driver(pi){{pi.on("session_start",async()=>{{const outco
     assert completed.returncode == 0, completed.stdout + completed.stderr
     outcome = json.loads(result.read_text())
     assert outcome["preserve"] is True
-    assert outcome["replaceBlocked"] is True, outcome
+    assert outcome["replace"] is True, outcome
     rows = [json.loads(line) for line in records.read_text().splitlines()]
-    assert len(rows) == 1
+    assert len(rows) == 2
     assert rows[0]["kernel"] == 1
     assert rows[0]["preserved"] is True
     assert rows[0]["replaced"] is False
-    assert_provider_context_clean(rows[0])
+    assert rows[1]["kernel"] == 0
+    assert rows[1]["preserved"] is False
+    assert rows[1]["replaced"] is True
+    for row in rows:
+        assert_provider_context_clean(row)
 
 def test_native_auto_compaction_restores_first_real_active_call(tier1_container, ctmp):
     project=ctmp/"project"; (project/".prime/agent").mkdir(parents=True); (project/".prime/agent/APPEND_SYSTEM.md").write_text(tier1_container.read_repo(WS_KERNEL))

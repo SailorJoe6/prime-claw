@@ -31,9 +31,9 @@ accepted advance or recorded in-scope revision, use only the canonical handoff
 for the exact owned idle Episode. Admission is not completion; inspect the next
 reported state before making another decision. Do not retry uncertain transport.
 
-Use the managed official Expert workflow when project policy requires it or
-material risk warrants an independent review. Treat every verdict as bounded
-evidence, not product, merge, or owner authority. Classify each finding as an
+When project policy requires independent review or material risk warrants it,
+load and follow the managed `prime-claw-expert-review` skill. Treat every
+review conclusion as bounded evidence, not product, merge, or owner authority. Classify each finding as an
 in-contract blocker, hardening candidate, out of scope, specification defect, or
 operator decision. A blocker must map to an approved in-model scenario, realistic
 impact, and proportionate repair. Preserve the exact candidate and reviewer

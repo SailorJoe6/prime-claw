@@ -13,11 +13,11 @@ files=(
   extension-support/conversation-guide-metadata.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-close.ts
-  extension-support/expert-review-reservation.ts
+  skills/goals-and-heartbeats/SKILL.md
+  skills/goals-and-heartbeats/CONTINUATION.md
   extension-support/handoff-prompts.ts
   extension-support/prep-chain.ts
   extension-support/reviewed-plan-support.ts
-  extension-support/role-kernel.generated.ts
   extension-support/spec-episode.ts
 )
 
@@ -27,10 +27,9 @@ managed_directories=(
   "$destination_root/extensions"
   "$destination_root/extension-support"
   "$destination_root/skills"
+  "$destination_root/skills/goals-and-heartbeats"
   "$destination_root/skills/prime-claw-oversee-episode"
-  "$destination_root/skills/prime-claw-official-expert-review"
-  "$destination_root/skills/prime-claw-official-expert-review/src"
-  "$destination_root/skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review"
+  "$destination_root/skills/prime-claw-expert-review"
   "$destination_root/.prime-claw"
 )
 for directory in "${managed_directories[@]}"; do
@@ -46,6 +45,8 @@ obsolete_files=(
   "extensions/goal-heartbeat-work-control.ts:stale retired goal heartbeat work-control extension"
   "extensions/goal-blocker-control.ts:stale obsolete goal blocker control extension"
   "extension-support/episode-finalization.ts:stale obsolete episode finalization support file"
+  "extension-support/expert-review-reservation.ts:stale retired EXPERT reservation support file"
+  "extension-support/role-kernel.generated.ts:stale retired generated role-kernel file"
 )
 for entry in "${obsolete_files[@]}"; do
   relative="${entry%%:*}"
@@ -126,50 +127,39 @@ else
   status=1
 fi
 
-expert_skill_root_relative="skills/prime-claw-official-expert-review"
-expert_skill_source="$source_root/$expert_skill_root_relative"
-expert_skill_files=(
-  "$expert_skill_root_relative/SKILL.md"
-  "$expert_skill_root_relative/pyproject.toml"
-  "$expert_skill_root_relative/src/prime_claw_official_expert_review/__init__.py"
-  "$expert_skill_root_relative/src/prime_claw_official_expert_review/reviewer.md"
-)
-for relative in "${expert_skill_files[@]}"; do
-  source_file="$source_root/$relative"
-  installed_file="$destination_root/$relative"
-  if [[ ! -f "$source_file" || -L "$source_file" ]]; then
-    printf 'missing or unsafe managed EXPERT skill source: %s
-' "$source_file" >&2
+expert_skill_relative="skills/prime-claw-expert-review/SKILL.md"
+expert_skill_source="$source_root/$expert_skill_relative"
+expert_skill_installed="$destination_root/$expert_skill_relative"
+if [[ ! -f "$expert_skill_source" || -L "$expert_skill_source" ]]; then
+  printf 'missing or unsafe managed EXPERT skill source: %s
+' "$expert_skill_source" >&2
+  status=1
+elif [[ -e "$expert_skill_installed" || -L "$expert_skill_installed" ]]; then
+  if [[ ! -f "$expert_skill_installed" || -L "$expert_skill_installed" ]]; then
+    printf 'unsafe managed EXPERT skill destination: %s
+' "$expert_skill_installed" >&2
     status=1
-  elif [[ -e "$installed_file" || -L "$installed_file" ]]; then
-    if [[ ! -f "$installed_file" || -L "$installed_file" ]]; then
-      printf 'unsafe managed EXPERT skill destination: %s
-' "$installed_file" >&2
-      status=1
-    elif ! cmp -s "$source_file" "$installed_file"; then
-      printf 'stale installed managed EXPERT skill file: %s
-' "$installed_file" >&2
-      status=1
-    fi
-  else
-    printf 'missing installed managed EXPERT skill file: %s
-' "$installed_file" >&2
+  elif ! cmp -s "$expert_skill_source" "$expert_skill_installed"; then
+    printf 'stale installed managed EXPERT skill: %s
+' "$expert_skill_installed" >&2
     status=1
   fi
-done
-if ! python3 "$repo_root/scripts/check-prime-agent-expert-runtime.py" \
-  "$expert_skill_source"; then
+else
+  printf 'missing installed managed EXPERT skill: %s
+' "$expert_skill_installed" >&2
+  status=1
+fi
+cleanup_args=(check-absent --plugin-root "$destination_root")
+if [[ "$plugin_target_mode" == "user-global" ]]; then
+  cleanup_args+=(--coding-agent-root "${PRIME_AGENT_CODING_AGENT_DIR:-$HOME/.prime/agent}")
+fi
+if ! python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"; then
   status=1
 fi
 
 legacy_append_source="$source_root/APPEND_SYSTEM.md"
 role_kernel_source="$source_root/ROLE_KERNEL.md"
 role_protocol_source="$source_root/role-protocol.json"
-role_kernel_generated="$source_root/extension-support/role-kernel.generated.ts"
-if ! python3 "$repo_root/scripts/generate-prime-agent-role-kernel.py" check \
-  "$role_kernel_source" "$role_kernel_generated"; then
-  status=1
-fi
 if ! python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" check \
   "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"; then
   status=1

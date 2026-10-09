@@ -1,5 +1,3 @@
-import { rmSync } from "node:fs";
-import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { canonicalSkillPrompt } from "../extension-support/handoff-prompts.ts";
@@ -12,15 +10,9 @@ import { canonicalSkillPrompt } from "../extension-support/handoff-prompts.ts";
  * follow-up, so no compaction event can create a second execute pass.
  */
 
-const LEGACY_MARKER = join(".prime", "agent", "state", "chain-next");
-
 type AdmissionResult =
   | { ok: true }
   | { ok: false; message: string; level: "warning" | "error" };
-
-function removeLegacyMarker(cwd: string): void {
-  rmSync(join(cwd, LEGACY_MARKER), { force: true });
-}
 
 function admitHandoff(
   pi: ExtensionAPI,
@@ -28,8 +20,6 @@ function admitHandoff(
   guidance: string,
   source: "native" | "tool",
 ): AdmissionResult {
-  removeLegacyMarker(cwd);
-
   // Preflight both canonical workflows before beginning a partial transition.
   const handoff = canonicalSkillPrompt(cwd, "handoff", guidance.trim());
   if (!handoff) {
@@ -124,8 +114,4 @@ export default function handoffChain(pi: ExtensionAPI): void {
     },
   });
 
-  // The Phase 4a.1 marker has no trustworthy session owner. Delete it without
-  // consuming it. Native queues and session lifecycle now own cancellation.
-  pi.on("session_start", (_event, ctx) => removeLegacyMarker(ctx.cwd));
-  pi.on("session_shutdown", (_event, ctx) => removeLegacyMarker(ctx.cwd));
 }

@@ -12,23 +12,26 @@ const expected = [
   "extensions/reviewed-plan.ts",
   "extension-support/conversation-oversight.ts",
   "extension-support/episode-close.ts",
+  "skills/goals-and-heartbeats/SKILL.md",
+  "skills/goals-and-heartbeats/CONTINUATION.md",
   "extension-support/handoff-prompts.ts",
   "extension-support/prep-chain.ts",
   "extension-support/reviewed-plan-support.ts",
   "extension-support/spec-episode.ts",
+  "skills/prime-claw-expert-review/SKILL.md",
 ];
 
 test("final protocol separates the neutral kernel from managed guidance", () => {
   const kernel = readFileSync(join(managed, "ROLE_KERNEL.md"), "utf8").trim().split(/\s+/).join(" ");
   const guide = readFileSync(join(managed, "skills/prime-claw-oversee-episode/SKILL.md"), "utf8").trim().split(/\s+/).join(" ");
-  for (const phrase of ["CONVERSATION supervises", "EPISODE implements", "EXPERT reviews"])
+  for (const phrase of ["Roles are skill-based responsibilities", "CONVERSATION supervises", "EPISODE implements", "EXPERT reviews"])
     assert.match(kernel, new RegExp(phrase));
   for (const phrase of ["one reported vertical slice at a time", "canonical handoff", "bounded goal", "one exact heartbeat"])
     assert.match(guide, new RegExp(phrase));
   assert.equal(existsSync(join(managed, "APPEND_SYSTEM.md")), false);
 });
 
-test("managed plugin is the nine-file protocol surface without retired transports", () => {
+test("managed plugin protocol surface includes its continuation policy without retired transports", () => {
   for (const relative of expected) assert.equal(existsSync(join(managed, relative)), true, relative);
   assert.equal(existsSync(join(managed, "extensions/goal-heartbeat-work-control.ts")), false);
   assert.equal(existsSync(join(managed, "extensions/goal-blocker-control.ts")), false);

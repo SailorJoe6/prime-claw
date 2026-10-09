@@ -1,13 +1,14 @@
-"""Regression coverage for the project-configurable goal-continuation nudge."""
+"""Regression coverage for the plugin-owned goal-continuation nudge."""
 
 from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[1]
 WS_NODE_SUITE = "/workspace/tests/goal_continuation_nudge_extension.test.mjs"
-SKILL = REPO / ".agents" / "skills" / "goals-and-heartbeats" / "SKILL.md"
+PLUGIN = REPO / "src" / "prime-agent-plugin"
+SKILL = PLUGIN / "skills" / "goals-and-heartbeats" / "SKILL.md"
 CONTINUATION = SKILL.parent / "CONTINUATION.md"
-EXTENSION = REPO / "src" / "prime-agent-plugin" / "extensions" / "goal-continuation-nudge.ts"
+EXTENSION = PLUGIN / "extensions" / "goal-continuation-nudge.ts"
 
 
 def test_goal_continuation_nudge_node_suite(tier1_container) -> None:
@@ -18,15 +19,14 @@ def test_goal_continuation_nudge_node_suite(tier1_container) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_goal_policy_avoids_trivial_goals_and_keeps_wait_ownership_explicit() -> None:
+def test_goal_skill_and_continuation_policy_are_one_plugin_owned_bundle() -> None:
     skill = SKILL.read_text()
-    assert "Do not create a goal for a direct answer" in skill
-    assert "only a few tool calls" in skill
-    assert "you MUST complete the active-work goal" in skill
-    assert "create no heartbeat" in skill
+    assert "name: goals-and-heartbeats" in skill
+    assert "If you are waiting for the user" in skill
+    assert SKILL.parent == CONTINUATION.parent
 
 
-def test_reminder_and_timing_are_project_markdown_not_typescript_guidance() -> None:
+def test_reminder_and_timing_are_managed_plugin_markdown_not_typescript_guidance() -> None:
     reminder = CONTINUATION.read_text()
     extension = EXTENSION.read_text()
     assert "minimum_rapid_continuations: 2" in reminder
@@ -34,4 +34,5 @@ def test_reminder_and_timing_are_project_markdown_not_typescript_guidance() -> N
     assert "/skill:goals-and-heartbeats" in reminder
     assert "If there is no more work to do" not in extension
     assert "waiting on the user" not in extension
+    assert "goals-and-heartbeats" in extension
     assert "CONTINUATION.md" in extension

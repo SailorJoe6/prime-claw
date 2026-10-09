@@ -1,5 +1,15 @@
 # Specification — Delivery Manager episode supervision
 
+> **Status: requires redesign before planning or implementation.** The accepted
+> `prime-claw-h6w.32` direction supersedes this draft's generated role-kernel,
+> authenticated-role, and private official-EXPERT assumptions. Prime Claw roles
+> are skill-based; the plugin may help invoke the right skills at lifecycle
+> boundaries but does not authenticate roles. EXPERT review now uses the
+> Markdown-only `prime-claw-expert-review` workflow and native Prime Agent RLM
+> and messaging. This note prevents the stale draft from reintroducing retired
+> machinery; the Delivery Manager design itself remains future work.
+
+
 > **Status:** FUTURE — awaiting operator review. This document specifies a possible enhancement only. It does not authorize planning or implementation.
 
 ## Summary

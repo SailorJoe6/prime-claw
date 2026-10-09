@@ -44,11 +44,11 @@ files=(
   extension-support/conversation-guide-metadata.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-close.ts
-  extension-support/expert-review-reservation.ts
+  skills/goals-and-heartbeats/SKILL.md
+  skills/goals-and-heartbeats/CONTINUATION.md
   extension-support/handoff-prompts.ts
   extension-support/prep-chain.ts
   extension-support/reviewed-plan-support.ts
-  extension-support/role-kernel.generated.ts
   extension-support/spec-episode.ts
 )
 
@@ -68,46 +68,32 @@ if [[ ! -s "$managed_skill_source" ]]; then
   exit 1
 fi
 
-expert_skill_root_relative="skills/prime-claw-official-expert-review"
-expert_skill_source="$source_root/$expert_skill_root_relative"
-expert_skill_files=(
-  "$expert_skill_root_relative/SKILL.md"
-  "$expert_skill_root_relative/pyproject.toml"
-  "$expert_skill_root_relative/src/prime_claw_official_expert_review/__init__.py"
-  "$expert_skill_root_relative/src/prime_claw_official_expert_review/reviewer.md"
-)
-for relative in "${expert_skill_files[@]}"; do
-  if [[ ! -f "$source_root/$relative" || -L "$source_root/$relative" ]]; then
-    printf 'missing or unsafe managed EXPERT skill source: %s
-' "$source_root/$relative" >&2
-    exit 1
-  fi
-done
+expert_skill_relative="skills/prime-claw-expert-review/SKILL.md"
+expert_skill_source="$source_root/$expert_skill_relative"
+if [[ ! -f "$expert_skill_source" || -L "$expert_skill_source" ]]; then
+  printf 'missing or unsafe managed EXPERT skill source: %s
+' "$expert_skill_source" >&2
+  exit 1
+fi
 
 legacy_append_source="$source_root/APPEND_SYSTEM.md"
 role_kernel_source="$source_root/ROLE_KERNEL.md"
 role_protocol_source="$source_root/role-protocol.json"
-role_kernel_generated="$source_root/extension-support/role-kernel.generated.ts"
-for source_file in "$role_kernel_source" "$role_protocol_source" "$role_kernel_generated"; do
+for source_file in "$role_kernel_source" "$role_protocol_source"; do
   if [[ ! -s "$source_file" ]]; then
     printf 'missing or empty role-protocol source: %s\n' "$source_file" >&2
     exit 1
   fi
 done
-python3 "$repo_root/scripts/generate-prime-agent-role-kernel.py" check \
-  "$role_kernel_source" "$role_kernel_generated"
-python3 "$repo_root/scripts/check-prime-agent-expert-runtime.py" \
-  "$expert_skill_source"
 # Reject symlinked or non-directory managed roots before inspecting leaf paths.
 managed_directories=(
   "$destination_root"
   "$destination_root/extensions"
   "$destination_root/extension-support"
   "$destination_root/skills"
+  "$destination_root/skills/goals-and-heartbeats"
   "$destination_root/skills/prime-claw-oversee-episode"
-  "$destination_root/skills/prime-claw-official-expert-review"
-  "$destination_root/skills/prime-claw-official-expert-review/src"
-  "$destination_root/skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review"
+  "$destination_root/skills/prime-claw-expert-review"
   "$destination_root/.prime-claw"
 )
 for directory in "${managed_directories[@]}"; do
@@ -124,8 +110,10 @@ obsolete_files=(
   extensions/goal-heartbeat-work-control.ts
   extensions/goal-blocker-control.ts
   extension-support/episode-finalization.ts
+  extension-support/expert-review-reservation.ts
+  extension-support/role-kernel.generated.ts
 )
-managed_destinations=("${files[@]}" "$managed_skill_relative" "${expert_skill_files[@]}" extensions/project-conversation.ts "${obsolete_files[@]}")
+managed_destinations=("${files[@]}" "$managed_skill_relative" "$expert_skill_relative" extensions/project-conversation.ts "${obsolete_files[@]}")
 for relative in "${managed_destinations[@]}"; do
   destination="$destination_root/$relative"
   if [[ -e "$destination" || -L "$destination" ]]; then
@@ -137,11 +125,14 @@ for relative in "${managed_destinations[@]}"; do
 done
 
 managed_skill_dir="$destination_root/skills/prime-claw-oversee-episode"
-expert_skill_dir="$destination_root/$expert_skill_root_relative"
-expert_src_dir="$expert_skill_dir/src"
-expert_package_dir="$expert_src_dir/prime_claw_official_expert_review"
+expert_skill_dir="$destination_root/skills/prime-claw-expert-review"
+cleanup_args=(validate --plugin-root "$destination_root")
+if [[ "$plugin_target_mode" == "user-global" ]]; then
+  cleanup_args+=(--coding-agent-root "${PRIME_AGENT_CODING_AGENT_DIR:-$HOME/.prime/agent}")
+fi
+python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"
 
-mkdir -p "$destination_root/extensions" "$destination_root/extension-support" "$managed_skill_dir" "$expert_package_dir"
+mkdir -p "$destination_root/extensions" "$destination_root/extension-support" "$destination_root/skills/goals-and-heartbeats" "$managed_skill_dir" "$expert_skill_dir"
 role_apply_args=(
   apply "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"
 )
@@ -149,6 +140,8 @@ if [[ -n "$role_receipt" ]]; then
   role_apply_args+=(--receipt "$role_receipt")
 fi
 python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" "${role_apply_args[@]}"
+cleanup_args[0]=remove
+python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"
 rm -f "$destination_root/extensions/project-conversation.ts"
 for relative in "${obsolete_files[@]}"; do
   rm -f "$destination_root/$relative"
@@ -157,9 +150,7 @@ for relative in "${files[@]}"; do
   install -m 0644 "$source_root/$relative" "$destination_root/$relative"
 done
 install -m 0644 "$managed_skill_source" "$destination_root/$managed_skill_relative"
-for relative in "${expert_skill_files[@]}"; do
-  install -m 0644 "$source_root/$relative" "$destination_root/$relative"
-done
+install -m 0644 "$expert_skill_source" "$destination_root/$expert_skill_relative"
 # Installation is sequential, not an atomic generation swap. The required final
 # check detects any incomplete or mixed generation before apply reports success,
 # using the same explicit target semantics selected above.

@@ -723,18 +723,30 @@ class TestSecureCaptureRegressions(unittest.TestCase):
                 second,
                 provenance.hash_declared_inputs(root, ["a.txt", "b.txt"]))
 
-    def test_safe_relative_leaf_symlink_is_preserved(self):
+    def test_safe_relative_leaf_symlink_is_preserved_across_umask_modes(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td).resolve()
             repo = self._repo(root)
             (repo / "target.txt").write_text("safe\n")
-            (repo / "link.txt").symlink_to("target.txt")
+            prior = os.umask(0o022)
+            try:
+                (repo / "link.txt").symlink_to("target.txt")
+            finally:
+                os.umask(prior)
             subprocess.run(["git", "-C", str(repo), "add", "target.txt", "link.txt"],
                            check=True)
             subprocess.run(["git", "-C", str(repo), "commit", "-qm", "base"],
                            check=True)
+            manifest = provenance.repository_source_manifest(repo)
+            link_record = next(row for row in manifest["records"]
+                               if row["path"] == "link.txt")
+            self.assertEqual(link_record["mode"], 0o777)
             snapshot = root / "snapshot"
-            provenance.stage_repository_snapshot(repo, snapshot)
+            prior = os.umask(0o077)
+            try:
+                provenance.stage_repository_snapshot(repo, snapshot)
+            finally:
+                os.umask(prior)
             self.assertTrue((snapshot / "link.txt").is_symlink())
             self.assertEqual(os.readlink(snapshot / "link.txt"), "target.txt")
 

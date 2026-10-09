@@ -114,8 +114,6 @@ def run(tier1_container, args, env):
  supervisor vars; only explicitly passed env vars are set — the host
  environment (credentials included) never leaks into the container."""
  env=dict(env)
- if args and args[0]==WS_APPLY:
-  env.setdefault("PRIME_AGENT_KERNEL_VENV", "/tmp/prime-claw-expert-preflight-venv")
  if args and args[0]==PRIME:
   fake_socket=env.pop("PRIME_CLAW_TEST_DAEMON_SOCKET",None)
   fake_registry=env.pop("PRIME_CLAW_TEST_DAEMON_REGISTRY",None)

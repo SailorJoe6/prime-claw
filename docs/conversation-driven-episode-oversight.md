@@ -7,21 +7,19 @@ Prime Agent behavior.
 
 ## Managed lean session protocol
 
-The canonical neutral floor is `src/prime-agent-plugin/ROLE_KERNEL.md`, with
-byte-identical generated TypeScript in
-`extension-support/role-kernel.generated.ts`. The role-protocol manager installs
-that exact `PRIME_CLAW_ROLE_KERNEL_V1` block into the one selected user-global
-AGENTS/CLAUDE context. The final generation requires the previously owned legacy
-APPEND region to be absent and never treats it as role authority.
+The single role-kernel policy source is
+`src/prime-agent-plugin/ROLE_KERNEL.md`. The role-protocol manager installs that
+`PRIME_CLAW_ROLE_KERNEL_V1` block directly into the one selected user-global
+AGENTS/CLAUDE context. It is shared orientation for skill-based CONVERSATION,
+EPISODE, and EXPERT responsibilities, not role authentication. There is no
+generated TypeScript policy copy, runtime prompt scan, or kernel hash binding.
 
 Bare apply/check fail closed, linked worktrees cannot select user-global mode,
-and pre-merge execution stays inside Docker tier 1. A truly inactive ordinary
-session remains usable when context files are explicitly disabled. Root
-promotion, active owner supervision, and bounded EPISODE execution instead
-require exactly one exact generated neutral block. Any missing, duplicate,
-stale, reversed, nested, or otherwise marker-shaped role-kernel content blocks
-the managed action. Working directory, branch, depth, session name, and copied
-prose cannot grant ownership or a managed role.
+and pre-merge execution stays inside Docker tier 1. Ordinary sessions remain
+usable when context files are disabled or overridden. Current Conversation and
+Episode lifecycle mechanics still validate their own durable records, but role
+or ownership authority does not come from system-prompt bytes, working
+directory, branch, depth, session name, or copied prose.
 
 The managed block establishes these rules:
 
@@ -109,39 +107,37 @@ or disagreeing current-owner state fails closed.
 
 On every real provider context, the restoration extension:
 
-1. validates the exact generated neutral block whenever trusted managed state
-   requires it;
-2. reconciles the latest exact-session owner marker with
+1. reconciles the latest exact-session owner marker with
    `.prime/agent/state/spec-episodes/<slug>.json`;
-3. recognizes bounded EPISODE identity only from the exact private session entry;
-4. removes historical `prime-claw-oversee-episode-package` messages and private
+2. recognizes bounded EPISODE identity only from the exact private session entry;
+3. removes historical `prime-claw-oversee-episode-package` messages and private
    bounded-identity records;
-5. permits one exact issued guide tool result, consumes its receipt before
+4. permits one exact issued guide tool result, consumes its receipt before
    dispatch, and redacts that disclosure on all later contexts; and
-6. never injects a role, identity, or guide package into provider-visible system,
+5. never injects a role, identity, or guide package into provider-visible system,
    user, or custom content.
 
-Missing or malformed managed kernels, corrupt or disagreeing trusted state, and
-malformed issued disclosure pairs call `ctx.abort()` before provider dispatch.
-Ordinary no-context sessions continue without managed authority.
+Corrupt or disagreeing lifecycle state and malformed issued disclosure pairs
+call `ctx.abort()` before provider dispatch. The role kernel remains shared
+orientation loaded from global context; runtime code does not authenticate its
+bytes or use it as role authority. Ordinary no-context sessions continue
+normally.
 
 ## Lean model-facing protocol
 
-The selected global role kernel is the current neutral invariant floor. Detailed
+The selected global role kernel is shared cross-role orientation. Detailed
 Conversation judgment is progressively disclosed from the exact managed global
-guide, not copied into the kernel or extension. There is no project forwarding
-skill, discovery link, or standalone reviewer profile. Reports are evidence,
-never approval or native-command dispatch. Deterministic plugin code owns
-identity, receipt validation, lifecycle, admission, handoff, and idempotent
-bookkeeping. The model chooses only among the bounded oversight dispositions
-described by the activated guide.
+guide, not copied into the kernel or extension. There is no project forwarding skill, discovery link, or standalone reviewer profile. Reports
+are evidence, never approval or native-command dispatch. Role behavior lives in
+managed skills. Plugin code remains limited to current deterministic lifecycle
+transitions and mechanics while Conversation and Episode simplification proceeds
+separately.
 
 ## Historical loaded-generation evidence
 
 The following chronology records the retired loaded generation and migration
-work. It is historical evidence, not current activation policy. Current source
-and installation use only the neutral global context plus the managed global
-Conversation and EXPERT skills.
+work. It is historical evidence, not current activation policy. Current source and installation use the shared global role context plus the
+managed Conversation and EXPERT skills.
 
 ### Completed dogfood evidence
 
@@ -218,94 +214,46 @@ returns to ordinary CONVERSATION incubation. A later reviewed
 folder requires a fresh native `/implement-spec` run. The first episode never
 lifetime-locks that owner.
 
-### Explicit EXPERT reviewer launch and admission policy
+### Native EXPERT review workflow
 
-The managed `prime-claw-official-expert-review` Python skill retains the
-byte-identical canonical `reviewer.md` at SHA256
-`dcd02e81e7e0656a3d7eb89ccfa78bd8b24a8492de012122f82b17b7aec50a05` and
-validates the exact `expert-reviewer`, `openai-codex/gpt-6-astra`, `max`
-configuration. The rubric keeps the structured verdict/remediation contract
-and actionable `BLOCK` requirement while asking for concise repair intent and
-useful general direction instead of exact code instructions. `describe()`
-remains read-only and returns `authority: false`. Installer preflight remains
-read-only: a configured interpreter accepts only an exact installed package,
-while the managed interpreter may report `SYNC_PENDING` after exact source
-validation.
+The managed `prime-claw-expert-review` capability is one self-contained Markdown
+skill. EXPERT is a skill-based review responsibility, not a plugin-authenticated
+identity. The Conversation loads this skill when project policy requires an
+independent review or material risk warrants one. Direct expert-review requests
+route to the same workflow.
 
-The old native `prime_claw_reserve_expert_review` and
-`prime_claw_bind_expert_review` caller-authoritative tools are retired, together
-with their in-memory status/cancel state. The accepted reservation foundation
-remains historical evidence, not the active admission mechanism.
+The caller resolves the repository, exact commit, applicable specification,
+execution plan, evidence, focus, and any explicit model override from ordinary
+context. A managed EPISODE report is a common source, not an admission gate. The
+workflow does not require active ownership, a fixed packet schema, particular
+branch or push state, repository snapshot hashes, or private lifecycle state. If
+material context is unclear, the reviewer asks its parent through ordinary
+messaging instead of guessing.
 
-The exact active Conversation owner calls the Python package's `launch(packet)`.
-The packet names either the active specification/plan pair or, after normal
-Ralph lifecycle archival, the paired files in one direct
-`.ralph/plans/archive/<slug>/` folder. Mixing active and archived paths,
-cross-folder pairs, traversal, future-plan paths, and arbitrary files fail
-closed. The package derives its depth-0 owner ID and canonical session file from
-host-provided kernel state, reads the plugin-owned active oversight marker,
-proves the marker worktree is its own Git top-level at the packet's exact HEAD,
-and requires exactly one exact model-discovery result. It creates one
-mode-private `PENDING` record in the untracked Prime Claw state namespace, then
-calls public `rlm.spawn` itself with the explicit selector/thinking and a
-harmless unpredictable child name. It finalizes only from the actual returned
-child id, name, session directory, and model. Definite failure revokes pending
-state. No model fallback or returned-reasoning claim is made.
+Model discovery uses `rlm.find_models`. An operator-selected model wins;
+otherwise the default is `openai-codex/gpt-6-astra`. If that selector is
+unavailable, the caller chooses a reasonably strong available review model and
+reports the actual selection. The spawn requests `max` reasoning, or the
+fallback model's strongest supported level.
 
-Private records bind a random nonce, fixed 15-minute TTL, exact owner/project/
-session/episode generation, candidate, canonical packet and digest, package,
-neutral kernel, selector/thinking request, and actual spawn return. The narrow
-state machine uses mode-private, same-directory publication for `PENDING ->
-FINALIZED -> CLAIMED -> REPORTED -> SETTLED -> DISPOSITIONED -> CLOSED`, plus
-expired pre-report transition to `CANCELLED` and explicit post-recording purge.
-It does not rely on cross-session module state and is not a general database,
-journal, capability-token service, power-loss protocol, or hostile-extension
-defense.
+The caller uses Prime Agent's safe native spawn sequence: create a uniquely named
+child with a harmless bootstrap, then send the complete review task exactly once
+with `agent_message.send`. The child keeps Prime Agent's normal system prompt.
+The task supplies the review role, resolved candidate context, and rubric. It
+bounds review to the approved contract and asks for concrete, reproducible
+findings with realistic impact, proportionate general repair direction, and
+relevant regression considerations. It distinguishes defects, optional
+hardening, out-of-model cases, and product questions without fixed verdicts or a
+JSON report schema. Scope expansion remains outside the reviewer role, and
+adversarial red-team review still requires explicit operator authorization.
 
-The child extension selects the neutral kernel only when its actual unpredictable
-session name has matching private state. Its initial `context` waits boundedly
-for publication to leave exactly one authority phase. `PENDING` plus exactly one
-`FINALIZED` is tolerated only as a transient overlap inside that existing wait;
-admission begins only after `PENDING` disappears. A persistent overlap at the
-deadline or any other multiple phases aborts before provider use. It then
-validates its public canonical session directory, ID, name, file and header,
-exact `header.parentSession`, canonical parent header ID, current provider/model,
-owner generation, candidate, packet, package, kernel, and expiry. It claims before provider dispatch. Provider context contains
-exactly one canonical rubric-plus-packet user turn; bootstrap, inbound messages,
-and private fields are excluded. Every admitted continuation revalidates the
-current model and bindings. Timeout, stale state, replay, duplicate claim, or any
-wrong identity/path/model/package/kernel explicitly calls `ctx.abort()` before a
-provider request.
-
-Inbound message text, displayed headers, sender, target, and internal
-`agent_message` details have zero authority and are never read. Copied text
-cannot grant EXPERT role; a wrong trigger can at most deny service. Generic
-children without matching private state remain ordinary.
-
-The reviewer submits one bounded structured report before its final answer.
-The depth-0 owner settles that immutable report, then explicitly records one
-conversational `ACCEPT`, `REVISE`, `PAUSE`, or `CONSULT` disposition with a
-required rationale. The package does not make that decision. Async closure uses
-only public `rlm.list_subagents` and `rlm.delete_subagent`, matches the stored
-actual child ID plus session lineage, and re-lists before recording `CLOSED`.
-This proves public addressability ended; it does not erase Prime Agent session
-artifacts. Failure or uncertainty retains recoverable state and cannot claim
-cleanup. Expired pre-report launches have the same bounded public-absence rule
-before `CANCELLED`. Explicit purge accepts only the exact durably recorded
-`CLOSED` result, re-proves public absence, and removes only its private closure
-record. Conflicting phases or roster identity fail closed. Every terminal phase
-keeps a still-running designated child neutral and aborts provider use.
-
-The managed global EXPERT package's `reviewer.md` is the sole current reviewer
-rubric. Its Markdown body defines the independent, read-only exact-commit role
-and a proportionate actionable `BLOCK` contract. It bounds review to the
-approved threat model and non-goals, permits PASS when no in-contract blocker or
-specification decision remains, and routes plausible out-of-model hardening to
-non-blocking advice with evidence-based promotion triggers. Remediation states
-repair intent and useful general direction without prescribing exact code
-changes. An EXPERT cannot expand scope; adversarial red-team review requires
-explicit operator authorization. The package binds and verifies those bytes; no
-standalone project profile remains.
+The reviewer returns ordinary prose through parent messaging: a short conclusion
+followed by material findings. Clarification uses the same parent/child channel.
+The Conversation treats the result as evidence and retains product, scope, and
+oversight judgment. After review and clarification finish, the caller uses
+ordinary `rlm.delete_subagent` cleanup. There is no private reservation,
+admission hook, prompt replacement, report submission, settlement, disposition,
+close, purge, or retained phase-file lifecycle.
 
 ## Exact bookkeeping close
 
@@ -380,8 +328,8 @@ append-only manager are not current installation inputs.
 There is no retired `goal-heartbeat-work-control.ts` entry point and no
 `before_agent_start` work-control overlay. The separate
 `goal-continuation-nudge.ts` hook contains no policy prose: it only detects a
-structured rapid-repeat signal and loads the current project's customizable
-Markdown reminder. Apply treats a stale installed work-control copy as a retired
+structured rapid-repeat signal and loads the managed plugin Markdown reminder.
+Apply treats a stale installed work-control copy as a retired
 managed file: all managed and retired destinations are type-checked
 before the first mutation, then a regular stale copy is removed. Check rejects
 any surviving copy. Expected-file byte comparison, managed EXPERT package

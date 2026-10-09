@@ -115,6 +115,9 @@ class TestSourceIdentityAndInventory(unittest.TestCase):
             paths = {row["path"] for row in selected_a["records"]}
             self.assertIn("marker.txt", paths)
             self.assertIn("marker-link", paths)
+            link = next(row for row in selected_a["records"]
+                        if row["path"] == "marker-link")
+            self.assertEqual(link["mode"], 0o777)
             self.assertNotIn("packages/coding-agent/dist/stale.js", paths)
             (repo / "packages/coding-agent/dist/stale.js").write_text("changed")
             selected_b = provenance.repository_source_manifest(repo)

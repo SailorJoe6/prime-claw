@@ -1,18 +1,13 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
 import {
-  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   realpathSync,
-  renameSync,
   rmSync,
   symlinkSync,
-  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,25 +19,7 @@ import reviewedPlan, { createReviewedPlanExtension } from "../src/prime-agent-pl
 import {
   CONVERSATION_GUIDE_ACTIVATION_TOOL,
   CONVERSATION_GUIDE_STATUS_TOOL,
-  EXPECTED_IDENTITY_KERNEL_BLOCK,
 } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
-import {
-  EXPERT_REVIEW_BIND_TOOL,
-  EXPERT_REVIEW_CANCEL_TOOL,
-  EXPERT_REVIEW_PACKET_KIND,
-  EXPERT_REVIEW_RESERVATION_TTL_MS,
-  EXPERT_REVIEW_RESERVE_TOOL,
-  EXPERT_REVIEW_STATE_SCHEMA,
-  EXPERT_REVIEW_STATUS_TOOL,
-  OFFICIAL_EXPERT_SELECTOR,
-  OFFICIAL_EXPERT_THINKING,
-  registerOfficialExpertReviewReservation,
-} from "../src/prime-agent-plugin/extension-support/expert-review-reservation.ts";
-import {
-  PRIME_CLAW_ROLE_KERNEL_SHA256,
-  PRIME_CLAW_ROLE_KERNEL_TEXT,
-} from "../src/prime-agent-plugin/extension-support/role-kernel.generated.ts";
-
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const LOCATION = ".ralph/plans/future/alpha-plan";
@@ -65,7 +42,7 @@ test("every shipped extension entry point exports a factory", async () => {
   }
 });
 
-function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPrompt = EXPECTED_IDENTITY_KERNEL_BLOCK) {
+function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPrompt = "BASE") {
   const commands = new Map();
   const tools = new Map();
   const events = new Map();
@@ -236,10 +213,11 @@ test("registers native reviewed commands, planning tool, and native-only impleme
     "ralph_plan", "create_spec_episode", "finalize_spec_episode", "handoff_spec_episode",
   ]);
   assert.equal(f.tools.has("ralph_implement_spec"), false);
-  for (const retired of [EXPERT_REVIEW_RESERVE_TOOL, EXPERT_REVIEW_BIND_TOOL, EXPERT_REVIEW_STATUS_TOOL, EXPERT_REVIEW_CANCEL_TOOL]) {
-    assert.equal(f.tools.has(retired), false, `${retired} must remain retired`);
-  }
-  assert.deepEqual([...f.events.keys()], ["session_start", "session_shutdown", "context", "before_agent_start", "agent_end"]);
+  for (const retired of [
+    "prime_claw_reserve_expert_review", "prime_claw_bind_expert_review",
+    "prime_claw_expert_review_status", "prime_claw_cancel_expert_review",
+  ]) assert.equal(f.tools.has(retired), false, `${retired} must remain retired`);
+  assert.deepEqual([...f.events.keys()], ["session_start", "session_shutdown", "context", "agent_end"]);
   assert.match(f.commands.get("plan").description, /explicit .*future/);
   const planTool = f.tools.get("ralph_plan");
   assert.equal(planTool.executionMode, "sequential");
@@ -581,42 +559,28 @@ test("implement-spec admits implement-prep first and canonical readiness as the 
   assert.deepEqual(f.notices, []);
 });
 
-test("implement-spec refuses shadowed or legacy role prompt shapes before model injection", async (t) => {
+test("implement-spec does not authenticate role prompt bytes", async (t) => {
   const f = fixture(t);
   writeSkill(f.cwd, "implementation policy", "implement-spec");
-  const prompts = [
-    "project append shadow",
-    `${PRIME_CLAW_ROLE_KERNEL_TEXT}
-<!-- prime-claw:conversation-identity:start -->
-PRIME_CLAW_CONVERSATION_IDENTITY_V1
-<!-- prime-claw:conversation-identity:end -->`,
-  ];
-  for (const prompt of prompts) {
-    const shadowed = createHarness(f.cwd, reviewedPlan, 0, prompt);
-    await assert.rejects(
-      shadowed.commands.get("implement-spec").handler(LOCATION, shadowed.ctx),
-      /expected exactly one exact managed role kernel/,
+  for (const prompt of ["project append shadow", "legacy copied role text"]) {
+    const session = createHarness(f.cwd, reviewedPlan, 0, prompt);
+    await assert.doesNotReject(
+      session.commands.get("implement-spec").handler(LOCATION, session.ctx),
     );
-    assert.deepEqual(shadowed.messages, []);
+    assert.equal(session.messages.length, 2);
   }
 });
 
-test("bounded EPISODE rejects a legacy role prompt before provider context", async (t) => {
+test("bounded EPISODE context does not authenticate role prompt bytes", async (t) => {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-episode-legacy-prompt-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
-  const prompt = `${PRIME_CLAW_ROLE_KERNEL_TEXT}
-<!-- prime-claw:conversation-identity:start -->
-PRIME_CLAW_CONVERSATION_IDENTITY_V1
-<!-- prime-claw:conversation-identity:end -->`;
-  const f = createHarness(cwd, reviewedPlan, 0, prompt);
+  const f = createHarness(cwd, reviewedPlan, 0, "legacy copied role text");
   f.entries.push({
     type: "custom", customType: "prime-claw-bounded-identity",
     data: { version: 1, role: "EPISODE", sessionId: "owner-session" },
   });
-  await assert.rejects(
-    () => f.events.get("context")({ messages: [] }, f.ctx),
-    /expected exactly one exact managed role kernel/,
-  );
+  const result = await f.events.get("context")({ messages: [] }, f.ctx);
+  assert.deepEqual(result, { messages: [] });
 });
 
 test("invalid implement-spec input shows usage without model injection", async (t) => {
@@ -822,7 +786,7 @@ test("prospective receipt is exact to location and preparation lifecycle and abo
 
   await f.commands.get("implement-spec").handler(betaLocation, f.ctx);
   await f.events.get("agent_end")({}, f.ctx);
-  await assert.rejects(
+  assert.throws(
     () => f.events.get("context")({ messages: staleMessages }, f.ctx),
     /issued Conversation guide receipt is stale or mismatched/,
   );
@@ -991,7 +955,7 @@ test("successful create activates exact owner oversight without an oversight ski
     { role: "assistant", content: [{ type: "toolCall", id: "malformed-guide", name: CONVERSATION_GUIDE_ACTIVATION_TOOL, arguments: {} }] },
     { role: "toolResult", toolCallId: "malformed-guide", toolName: CONVERSATION_GUIDE_ACTIVATION_TOOL, content: malformedIssued.content, details: { ...malformedIssued.details, sha256: "wrong" }, isError: false, timestamp: Date.now() },
   ];
-  await assert.rejects(() => f.events.get("context")({ messages: malformedMessages }, f.ctx), /tool call\/result pair is missing or malformed/);
+  assert.throws(() => f.events.get("context")({ messages: malformedMessages }, f.ctx), /tool call\/result pair is missing or malformed/);
   const afterMalformed = await f.tools.get(CONVERSATION_GUIDE_STATUS_TOOL).execute("status-after-malformed", {}, undefined, undefined, f.ctx);
   assert.equal(afterMalformed.details.ready, false);
   for (const alias of ["result", "call"]) {
@@ -1006,7 +970,7 @@ test("successful create activates exact owner oversight without an oversight ski
     } else {
       messages[0].content.push({ type: "toolCall", id: toolCallId, name: CONVERSATION_GUIDE_STATUS_TOOL, arguments: {} });
     }
-    await assert.rejects(() => f.events.get("context")({ messages }, f.ctx), /tool call\/result pair is missing or malformed/);
+    assert.throws(() => f.events.get("context")({ messages }, f.ctx), /tool call\/result pair is missing or malformed/);
     assert.match(f.notices.at(-1).message, /conversation blocked: issued Conversation guide tool call\/result pair is missing or malformed/);
     const status = await f.tools.get(CONVERSATION_GUIDE_STATUS_TOOL).execute(`status-after-${alias}-alias`, {}, undefined, undefined, f.ctx);
     assert.equal(status.details.ready, false);
@@ -1230,393 +1194,4 @@ test("fresh native implement-spec runs can sequentially arm different reviewed f
   assert.match(laterAuthorized.content[0].text, /authorized tool reached host capability/);
   const laterConsumed = await tool.execute("call-5", { location: betaLocation }, undefined, undefined, f.ctx);
   assert.match(laterConsumed.content[0].text, /no matching active \/implement-spec approval/);
-});
-
-
-const EXPERT_COMMIT = "a".repeat(40);
-const EXPERT_PACKET = "b".repeat(64);
-const EXPERT_PACKAGE = "c".repeat(64);
-
-function reservationFixture(t) {
-  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-expert-reservation-")));
-  mkdirSync(join(cwd, LOCATION), { recursive: true });
-  const state = join(cwd, ".prime", "agent", "state", "spec-episodes");
-  mkdirSync(state, { recursive: true });
-  const slug = "alpha-plan";
-  const worktree = resolve(dirname(cwd), `${basename(cwd)}-${slug}-episode`);
-  mkdirSync(worktree, { recursive: true });
-  t.after(() => {
-    rmSync(worktree, { recursive: true, force: true });
-    rmSync(cwd, { recursive: true, force: true });
-  });
-  const identity = {
-    version: 2, slug, sourceLocation: LOCATION, ownerSessionId: "owner-session",
-    episodeId: "33333333-3333-4333-8333-333333333333",
-    episodeActiveSessionId: "active-route", episodeSessionFile: join(worktree, "episode.jsonl"),
-    branch: `episode/${slug}`, worktree, sessionName: `${slug}-episode`, bootstrapAdmission: "delivered",
-  };
-  writeFileSync(join(state, `${slug}.json`), JSON.stringify(identity));
-  const control = {
-    now: 1_000_000,
-    nonceCount: 0,
-    packageCalls: 0,
-    repositoryCalls: 0,
-    repositoryTarget: undefined,
-    packageStatus: {
-      schemaVersion: 1, status: "AVAILABLE", mode: "managed",
-      expectedPackageSha256: EXPERT_PACKAGE, packageSha256: EXPERT_PACKAGE,
-    },
-  };
-  const extension = createReviewedPlanExtension({
-    now: () => control.now,
-    nonce: () => `${String(++control.nonceCount).padStart(2, "0")}${"n".repeat(41)}`,
-    packageStatus() { control.packageCalls += 1; return control.packageStatus; },
-    repositoryIdentity(worktreePath) {
-      control.repositoryCalls += 1;
-      control.repositoryTarget = worktreePath;
-      return { repositoryPath: worktreePath, commitOid: EXPERT_COMMIT };
-    },
-  });
-  const f = createHarness(cwd, extension);
-  f.entries.push({
-    type: "custom", customType: "prime-claw-conversation-oversight", data: {
-      markerVersion: 2, status: "active", ownerSessionId: identity.ownerSessionId,
-      slug, sourceLocation: LOCATION, episodeId: identity.episodeId,
-      episodeSessionFile: identity.episodeSessionFile, branch: identity.branch,
-      worktree: identity.worktree, sessionName: identity.sessionName,
-      identityVersion: 2, admission: "delivered",
-    },
-  });
-  return { cwd, ...f, control, identity };
-}
-
-function reserveArguments(overrides = {}) {
-  return {
-    commitOid: EXPERT_COMMIT,
-    packetDigest: EXPERT_PACKET,
-    selector: OFFICIAL_EXPERT_SELECTOR,
-    thinking: OFFICIAL_EXPERT_THINKING,
-    ...overrides,
-  };
-}
-
-function bindArguments(f, nonce, overrides = {}) {
-  return {
-    nonce,
-    rlmChildId: "sub-deadbeef",
-    childName: "official-expert-reviewer",
-    sessionDir: join(f.cwd, "child-session"),
-    returnedModel: OFFICIAL_EXPERT_SELECTOR,
-    ...overrides,
-  };
-}
-
-function gitCommit(repository, name, contents) {
-  writeFileSync(join(repository, name), contents);
-  execFileSync("git", ["-C", repository, "add", name]);
-  execFileSync("git", ["-C", repository, "-c", "user.name=Prime Claw Test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", contents]);
-  return execFileSync("git", ["-C", repository, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-}
-
-function reservationTopologyFixture(t) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-expert-topology-")));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const cwd = join(root, "conversation-owner");
-  const worktree = resolve(dirname(cwd), `${basename(cwd)}-alpha-plan-episode`);
-  mkdirSync(join(cwd, LOCATION), { recursive: true });
-  mkdirSync(worktree, { recursive: true });
-  execFileSync("git", ["-C", cwd, "init", "-q"]);
-  execFileSync("git", ["-C", worktree, "init", "-q"]);
-  const ownerHead = gitCommit(cwd, "owner.txt", "owner-head");
-  const episodePrevious = gitCommit(worktree, "episode.txt", "episode-previous");
-  const episodeHead = gitCommit(worktree, "episode.txt", "episode-head");
-  assert.notEqual(ownerHead, episodeHead);
-
-  const state = join(cwd, ".prime", "agent", "state", "spec-episodes");
-  mkdirSync(state, { recursive: true });
-  const identityPath = join(state, "alpha-plan.json");
-  const identity = {
-    version: 2, slug: "alpha-plan", sourceLocation: LOCATION, ownerSessionId: "owner-session",
-    episodeId: "77777777-7777-4777-8777-777777777777",
-    episodeActiveSessionId: "active-route", episodeSessionFile: join(worktree, "episode.jsonl"),
-    branch: "episode/alpha-plan", worktree, sessionName: "alpha-plan-episode", bootstrapAdmission: "delivered",
-  };
-  writeFileSync(identityPath, JSON.stringify(identity));
-  const control = { now: 1_000_000, nonceCount: 0 };
-  const extension = createReviewedPlanExtension({
-    now: () => control.now,
-    nonce: () => `${String(++control.nonceCount).padStart(2, "0")}${"t".repeat(41)}`,
-    packageStatus: () => ({
-      schemaVersion: 1, status: "AVAILABLE", mode: "managed",
-      expectedPackageSha256: EXPERT_PACKAGE, packageSha256: EXPERT_PACKAGE,
-    }),
-  });
-  const f = createHarness(cwd, extension);
-  const marker = {
-    markerVersion: 2, status: "active", ownerSessionId: identity.ownerSessionId,
-    slug: identity.slug, sourceLocation: identity.sourceLocation, episodeId: identity.episodeId,
-    episodeSessionFile: identity.episodeSessionFile, branch: identity.branch,
-    worktree: identity.worktree, sessionName: identity.sessionName,
-    identityVersion: 2, admission: "delivered",
-  };
-  f.entries.push({ type: "custom", customType: "prime-claw-conversation-oversight", data: marker });
-  function setWorktree(nextWorktree) {
-    identity.worktree = nextWorktree;
-    identity.episodeSessionFile = join(nextWorktree, "episode.jsonl");
-    marker.worktree = nextWorktree;
-    marker.episodeSessionFile = identity.episodeSessionFile;
-    writeFileSync(identityPath, JSON.stringify(identity));
-  }
-  return { root, cwd, worktree, ownerHead, episodePrevious, episodeHead, control, identity, marker, setWorktree, ...f };
-}
-
-function canonicalJson(value) {
-  if (value === null || typeof value === "string" || typeof value === "boolean" || typeof value === "number") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
-}
-
-function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
-
-function admissionFixture(t, mutate = () => {}) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-expert-admission-")));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const stateRoot = join(root, "private-state"); mkdirSync(stateRoot, { mode: 0o700 }); chmodSync(stateRoot, 0o700);
-  const projectPath = join(root, "project"); const repositoryPath = join(root, "episode");
-  mkdirSync(projectPath); mkdirSync(repositoryPath);
-  const ownerSessionId = "11111111-1111-7111-8111-111111111111";
-  const ownerSessionFile = join(root, "owner.jsonl");
-  const episodeId = "22222222-2222-7222-8222-222222222222";
-  const marker = {
-    markerVersion: 2, status: "active", ownerSessionId, slug: "alpha-plan",
-    sourceLocation: ".ralph/plans/future/alpha-plan", episodeId,
-    episodeSessionFile: join(repositoryPath, "episode.jsonl"), branch: "episode/alpha-plan",
-    worktree: repositoryPath, sessionName: "alpha-plan-episode", identityVersion: 2, admission: "delivered",
-  };
-  const ownerHeader = { type: "session", version: 3, id: ownerSessionId, timestamp: "2026-10-07T00:00:00Z", cwd: projectPath, rlmDepth: 0 };
-  writeFileSync(ownerSessionFile, `${JSON.stringify(ownerHeader)}\n${JSON.stringify({ type: "custom", id: "marker", parentId: null, timestamp: ownerHeader.timestamp, customType: "prime-claw-conversation-oversight", data: marker })}\n`, { mode: 0o600 });
-  const ownerGeneration = sha256(JSON.stringify([
-    2, ownerSessionId, marker.slug, marker.sourceLocation, episodeId, resolve(marker.episodeSessionFile),
-    marker.branch, resolve(repositoryPath), marker.sessionName, 2, marker.admission,
-  ]));
-  const childName = "expert-review-abcdefghijklmnopqrstuvwx";
-  const rlmChildId = "sub-deadbeef"; const sessionDir = join(root, rlmChildId); mkdirSync(sessionDir);
-  const childSessionId = "33333333-3333-7333-8333-333333333333";
-  const sessionFile = join(sessionDir, `${childSessionId}.jsonl`);
-  const childHeader = { type: "session", version: 3, id: childSessionId, timestamp: ownerHeader.timestamp, cwd: projectPath, parentSession: ownerSessionFile, rlmDepth: 1 };
-  writeFileSync(sessionFile, `${JSON.stringify(childHeader)}\n`, { mode: 0o600 });
-  const commitOid = "c".repeat(40); const packageSha256 = "a".repeat(64);
-  const packet = {
-    schemaVersion: 1, kind: EXPERT_REVIEW_PACKET_KIND, repositoryPath, commitOid,
-    specificationPath: ".ralph/plans/SPECIFICATION.md", executionPlanPath: ".ralph/plans/EXECUTION_PLAN.md",
-    evidencePaths: ["docs/evidence/official-lean-role-protocol/candidate.md"], focus: "Review the exact candidate only.",
-  };
-  const packetJson = canonicalJson(packet);
-  const record = {
-    schema: EXPERT_REVIEW_STATE_SCHEMA, phase: "FINALIZED", nonce: "n".repeat(43),
-    createdAt: 1_000, expiresAt: 1_000 + EXPERT_REVIEW_RESERVATION_TTL_MS,
-    ownerSessionId, ownerSessionFile, ownerHeaderId: ownerSessionId, ownerGeneration,
-    projectPath, repositoryPath, candidateCommitOid: commitOid,
-    preReviewRepository: { head: commitOid, clean: true, statusBytes: 0, statusSha256: sha256(Buffer.alloc(0)) },
-    packet, packetJson, packetDigest: sha256(packetJson), packageSha256, kernelSha256: PRIME_CLAW_ROLE_KERNEL_SHA256,
-    selector: OFFICIAL_EXPERT_SELECTOR, thinking: OFFICIAL_EXPERT_THINKING,
-    childName, bootstrapDigest: sha256("harmless bootstrap"), finalizedAt: 1_100,
-    rlmChildId, sessionDir, returnedModel: OFFICIAL_EXPERT_SELECTOR,
-  };
-  const control = { now: 2_000, packageSha256, commitOid, systemPrompt: PRIME_CLAW_ROLE_KERNEL_TEXT, aborts: 0, notices: [], wait: async () => {} };
-  mutate({ record, control, childHeader, ownerHeader, marker, packet });
-  writeFileSync(sessionFile, `${JSON.stringify(childHeader)}\n`, { mode: 0o600 });
-  writeFileSync(ownerSessionFile, `${JSON.stringify(ownerHeader)}\n${JSON.stringify({ type: "custom", id: "marker", parentId: null, timestamp: ownerHeader.timestamp, customType: "prime-claw-conversation-oversight", data: marker })}\n`, { mode: 0o600 });
-  const finalized = join(stateRoot, `${childName}.finalized.json`);
-  writeFileSync(finalized, `${canonicalJson(record)}\n`, { mode: 0o600 }); chmodSync(finalized, 0o600);
-  const hooks = { before: [], context: [] };
-  registerOfficialExpertReviewReservation({
-    on(name, handler) { if (name === "before_agent_start") hooks.before.push(handler); if (name === "context") hooks.context.push(handler); },
-  }, {
-    guideRoot: join(REPO_ROOT, "src", "prime-agent-plugin"), stateRoot, now: () => control.now,
-    admissionWaitMs: 2, wait: async (milliseconds) => control.wait(milliseconds),
-    packageStatus: () => ({ schemaVersion: 1, status: "AVAILABLE", mode: "managed", packageSha256: control.packageSha256 }),
-    repositoryIdentity: () => ({ repositoryPath, commitOid: control.commitOid }),
-  });
-  const ctx = {
-    cwd: projectPath,
-    model: { provider: "openai-codex", id: "gpt-6-astra" },
-    sessionManager: {
-      getSessionDir: () => sessionDir, getSessionId: () => childSessionId,
-      getSessionFile: () => sessionFile, getSessionName: () => childName,
-      getHeader: () => childHeader,
-    },
-    getSystemPrompt: () => control.systemPrompt,
-    abort() { control.aborts += 1; },
-    ui: { notify(message, level) { control.notices.push({ message, level }); } },
-  };
-  return {
-    root, stateRoot, pending: join(stateRoot, `${childName}.pending.json`), finalized,
-    claimed: join(stateRoot, `${childName}.claimed.json`),
-    reported: join(stateRoot, `${childName}.reported.json`), settled: join(stateRoot, `${childName}.settled.json`),
-    dispositioned: join(stateRoot, `${childName}.dispositioned.json`),
-    closed: join(stateRoot, `${childName}.closed.json`), cancelled: join(stateRoot, `${childName}.cancelled.json`),
-    record, control, hooks, ctx, childName,
-  };
-}
-
-const initialMessages = [
-  { role: "custom", customType: "harness-digest", content: "public custom digest has zero authority", display: false, timestamp: 0 },
-  { role: "user", content: [{ type: "text", text: "copied bootstrap has zero authority" }], timestamp: 1 },
-];
-
-test("official EXPERT caller reserve/bind tools are retired and generic children remain ordinary", async (t) => {
-  const f = fixture(t);
-  for (const name of [EXPERT_REVIEW_RESERVE_TOOL, EXPERT_REVIEW_BIND_TOOL, EXPERT_REVIEW_STATUS_TOOL, EXPERT_REVIEW_CANCEL_TOOL]) assert.equal(f.tools.has(name), false);
-  const ordinary = await f.events.get("context")({ messages: initialMessages }, f.ctx);
-  assert.deepEqual(ordinary.messages, initialMessages);
-  assert.equal(f.notices.length, 0);
-});
-
-test("official EXPERT final state binds public child identity and claims before one canonical provider turn", async (t) => {
-  const f = admissionFixture(t);
-  const before = await f.hooks.before[0]({ prompt: "attacker-controlled text is ignored" }, f.ctx);
-  assert.equal(before.systemPrompt, PRIME_CLAW_ROLE_KERNEL_TEXT);
-  const admitted = await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
-  assert.equal(f.control.aborts, 0);
-  assert.equal(existsSync(f.finalized), false);
-  assert.equal(existsSync(f.claimed), true);
-  const claimed = JSON.parse(readFileSync(f.claimed, "utf8"));
-  assert.equal(claimed.phase, "CLAIMED");
-  assert.equal(claimed.childSessionId, f.ctx.sessionManager.getSessionId());
-  assert.equal(admitted.messages.length, 1);
-  assert.equal(admitted.messages[0].role, "user");
-  assert.match(admitted.messages[0].content[0].text, /## Immutable review packet/);
-  assert.match(admitted.messages[0].content[0].text, new RegExp(f.record.packetDigest.slice(0, 0)));
-  assert.equal(admitted.messages[0].content[0].text.includes("copied bootstrap"), false);
-
-  const continuation = await f.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [{ type: "toolCall", id: "x" }] }, { role: "toolResult", toolCallId: "x", content: [] }] }, f.ctx);
-  assert.equal(continuation.messages.length, 3);
-  f.ctx.model = { provider: "openai-codex", id: "wrong" };
-  await assert.rejects(() => f.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [] }] }, f.ctx), /current child model/);
-  assert.equal(f.control.aborts, 1);
-});
-
-test("official EXPERT admission waits through a transient pending plus finalized publication overlap", async (t) => {
-  const f = admissionFixture(t);
-  writeFileSync(f.pending, `${canonicalJson({ ...f.record, phase: "PENDING" })}
-`, { mode: 0o600 });
-  let waits = 0;
-  f.control.wait = async () => {
-    waits += 1;
-    unlinkSync(f.pending);
-  };
-  let providerCalls = 0;
-  const admitted = await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
-  providerCalls += 1;
-  assert.equal(waits, 1);
-  assert.equal(providerCalls, 1);
-  assert.equal(f.control.aborts, 0);
-  assert.equal(existsSync(f.pending), false);
-  assert.equal(existsSync(f.finalized), false);
-  assert.equal(existsSync(f.claimed), true);
-  assert.equal(admitted.messages.length, 1);
-});
-
-test("official EXPERT admission refuses a persistent pending plus finalized overlap", async (t) => {
-  const f = admissionFixture(t);
-  writeFileSync(f.pending, `${canonicalJson({ ...f.record, phase: "PENDING" })}
-`, { mode: 0o600 });
-  let providerCalls = 0;
-  await assert.rejects(async () => {
-    await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
-    providerCalls += 1;
-  }, /conflicting official EXPERT private phase files/);
-  assert.equal(providerCalls, 0);
-  assert.equal(f.control.aborts, 1);
-  assert.equal(existsSync(f.pending), true);
-  assert.equal(existsSync(f.finalized), true);
-  assert.equal(existsSync(f.claimed), false);
-});
-
-test("all terminal official EXPERT children retain the neutral kernel and abort provider calls", async (t) => {
-  for (const [phase, key] of [
-    ["REPORTED", "reported"], ["SETTLED", "settled"], ["DISPOSITIONED", "dispositioned"],
-    ["CLOSED", "closed"], ["CANCELLED", "cancelled"],
-  ]) {
-    await t.test(phase.toLowerCase(), async (tt) => {
-      const f = admissionFixture(tt);
-      await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
-      const claimed = JSON.parse(readFileSync(f.claimed, "utf8"));
-      writeFileSync(f[key], `${canonicalJson({ ...claimed, phase })}
-`, { mode: 0o600 });
-      unlinkSync(f.claimed);
-      const before = await f.hooks.before[0]({ prompt: "terminal replay" }, f.ctx);
-      assert.equal(before.systemPrompt, PRIME_CLAW_ROLE_KERNEL_TEXT);
-      await assert.rejects(
-        () => f.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [] }] }, f.ctx),
-        new RegExp(`${phase.toLowerCase()} review child`),
-      );
-      assert.equal(f.control.aborts, 1);
-    });
-  }
-});
-
-test("conflicting official EXPERT phase files fail closed before provider use", async (t) => {
-  const f = admissionFixture(t);
-  await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
-  const claimed = JSON.parse(readFileSync(f.claimed, "utf8"));
-  writeFileSync(f.reported, `${canonicalJson({ ...claimed, phase: "REPORTED" })}
-`, { mode: 0o600 });
-  const before = await f.hooks.before[0]({ prompt: "conflict" }, f.ctx);
-  assert.equal(before.systemPrompt, PRIME_CLAW_ROLE_KERNEL_TEXT);
-  await assert.rejects(
-    () => f.hooks.context[0]({ messages: initialMessages }, f.ctx),
-    /conflicting official EXPERT private phase files/,
-  );
-  assert.equal(f.control.aborts, 1);
-});
-
-test("official EXPERT admission aborts before provider use for every finalized binding mismatch", async (t) => {
-  const cases = [
-    ["stale", ({ record, control }) => { control.now = record.expiresAt; }, /stale or expired/],
-    ["child-name", ({ record }) => { record.childName = "expert-review-differentabcdefghijkl"; }, /child name/],
-    ["session-dir", ({ record }) => { record.sessionDir = "/definitely/wrong"; }, /directory/],
-    ["parent", ({ childHeader }) => { childHeader.parentSession = "/wrong-parent.jsonl"; }, /parent-session/],
-    ["generation", ({ record }) => { record.ownerGeneration = "b".repeat(64); }, /generation/],
-    ["package", ({ record }) => { record.packageSha256 = "b".repeat(64); }, /package/],
-    ["kernel", ({ record }) => { record.kernelSha256 = "b".repeat(64); }, /kernel/],
-    ["packet", ({ record }) => { record.packet.focus = "mutated"; }, /packet/],
-    ["candidate", ({ control }) => { control.commitOid = "d".repeat(40); }, /candidate/],
-  ];
-  for (const [label, mutate, pattern] of cases) {
-    await t.test(label, async (tt) => {
-      const f = admissionFixture(tt, mutate);
-      let providerCalls = 0;
-      await assert.rejects(async () => {
-        await f.hooks.context[0]({ messages: initialMessages }, f.ctx);
-        providerCalls += 1;
-      }, pattern);
-      assert.equal(providerCalls, 0, "provider must not be called after an admission refusal");
-      assert.equal(f.control.aborts, 1);
-      assert.equal(existsSync(f.claimed), false);
-    });
-  }
-});
-
-test("official EXPERT pending timeout, duplicate claim, and replay all abort", async (t) => {
-  const unsafeRoot = admissionFixture(t);
-  chmodSync(unsafeRoot.stateRoot, 0o755);
-  await assert.rejects(() => unsafeRoot.hooks.context[0]({ messages: initialMessages }, unsafeRoot.ctx), /mode-private/);
-  assert.equal(unsafeRoot.control.aborts, 1);
-
-  const timeout = admissionFixture(t);
-  renameSync(timeout.finalized, join(timeout.stateRoot, `${timeout.childName}.pending.json`));
-  await assert.rejects(() => timeout.hooks.context[0]({ messages: initialMessages }, timeout.ctx), /timed out/);
-  assert.equal(timeout.control.aborts, 1);
-
-  const duplicate = admissionFixture(t);
-  await duplicate.hooks.context[0]({ messages: initialMessages }, duplicate.ctx);
-  await assert.rejects(() => duplicate.hooks.context[0]({ messages: initialMessages }, duplicate.ctx), /duplicated/);
-  assert.equal(duplicate.control.aborts, 1);
-
-  const replay = admissionFixture(t);
-  await replay.hooks.context[0]({ messages: initialMessages }, replay.ctx);
-  await assert.rejects(() => replay.hooks.context[0]({ messages: [...initialMessages, { role: "assistant", content: [] }, { role: "user", content: "replay" }] }, replay.ctx), /replayed|duplicate trigger/);
-  assert.equal(replay.control.aborts, 1);
 });
