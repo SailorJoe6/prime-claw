@@ -955,3 +955,37 @@ guarded pass cannot establish any earlier live effects or source/index health.
 The incident remains OPEN pending operator impact disposition; source `.5`,
 parent and routed-write `.4` remain BLOCKED for live steps. This is one
 review candidate, not owner acceptance or permission for a broader gate.
+
+## 2026-10-09 one-start incident recovery attempt — blocked at OpenShell phase
+
+Under OPEN incident `prime-claw-5v7.10` comment
+`01a11eb7-ed9c-7dda-af31-c2e17fef4243`, the episode ran a fresh preflight
+without printing the sandbox policy or container environment:
+
+- `openshell sandbox get -g openshell prime-claw -o json`: sandbox name
+  `prime-claw`, workspace `default`, ID
+  `c9066cee-a64f-4fae-95cd-2a9245b2dc66`, phase `Error`.
+- `docker ps -a --no-trunc --filter name=prime-claw --format '{{json .}}'`:
+  one matching container; its name ends with the same sandbox ID.
+- `docker inspect --format '{{json .Name}} {{json .State.Status}} {{json .State.Running}} {{json .State.ExitCode}} {{json .State.OOMKilled}} {{json .State.StartedAt}} {{json .State.FinishedAt}}' 5aab359a43b0cafc94a7552e419736238578a786c9ddb6ee790fbadfa44a1316`:
+  `exited`, `false`, `143`, `false`, last started
+  `2026-10-06T00:55:31.428735084Z`, finished
+  `2026-10-06T14:06:17.633423503Z`. Only listed fields were inspected.
+
+The **single** approved `openshell sandbox start -g openshell prime-claw`
+returned exit **1**:
+
+```text
+code: 'The system is not in a state required for the operation's execution'
+message: "sandbox must be Stopped to start (current phase: Error)"
+```
+
+There was no retry, delete, recreate, converge, Docker start or alternate live
+operation. The gateway did not report Ready, so neither named incident path was
+read and no repair was attempted. This command rejection is not evidence of
+past script execution or absence of effects. Impact and root cause remain
+unknown. The approved action cannot pass the OpenShell phase prerequisite.
+Unblock condition: owner evaluates this result and explicitly chooses a
+supported, bounded way to transition the **same** container from `Error` to an
+allowed start state (or decides to stop); that path is not authorized here.
+Keep incident OPEN; source `.5`, parent and routed-write `.4` remain BLOCKED.
