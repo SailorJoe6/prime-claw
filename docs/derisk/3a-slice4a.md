@@ -845,3 +845,22 @@ routed-write `.4` remain BLOCKED.
 The owner independently reconciled the exact read-only readiness receipt SHA-256 `1912356b45543f1941e7817473367828373ece708d7fe62bc6a34f679fa581ae` at clean pushed project `6089e417921b03f7e97366efa67baac173c1cb68`: live brain `main` and tracking remain at published `83eee06e4322b3264bb812959a2a5482bce13151`, but the clean registered checkout and both source registrations still use older accepted `5c47c067e93eb633da8a8dcb28221e23eea7685b`. Effective base policy matched its prior canonical hash; no source build ran; owner read-only database queries matched the receipt for both stores. The canonical bookmark is not the published commit, Qwen bookmark is absent, and no published-tree dry-run or eligible-file/page/path parity proof exists. No ref, source registration, policy, index, database or provider was changed.
 
 The [separate owner PAUSE decision](../evidence/phase3a-slice2-source-current-owner-paused-83eee-20261001.md) SHA-256 `bd7692ca0a25164ed5a15d2486bd717e512b4fe0d0fd3a23323f97a463c43311` accepts **only this read-only finding**, not source-current/index/build eligibility. Future lossless registered-source reconciliation preserving the accepted checkout/refs and independent same-version hermetic dry-run no-write proof each require a separate owner decision and fresh exact remote/ref/clean checkout/no-active-build/policy/BOTH DB gates. No checkout/ref/registration change or unproven probe, Qwen retry/index/build/cutover, routed write, merge, plugin overwrite or cleanup is authorized. Source `.5`, parent, `.4` and blocked plan/spec remain BLOCKED; retain the exact EPISODE idle.
+
+## 2026-10-09 retained-default residual B2/B3 method packet
+
+Joe selected the preserved canonical `gbrain` default gateway
+`openai:text-embedding-3-large`/1536 and withdrew the DGX/Qwen re-embed and
+cutover path. The [owner fixture crosswalk](../evidence/phase3a-default-gateway-framework-crosswalk-owner-review-20261008.md)
+SHA-256 `28e203b779cd3a308b997413d5a1c032073d0d4824c77fa8ff4bb4005de9957b`
+credits generic disposable B1 isolation and synthetic path/slug examples; it
+authorizes only a read-only residual-proof-plan revision, not proof admission.
+The pinned landed Slice 8 fixture shows successful post-exit logical dry-run
+equality on isolated DBs, but does not bind the actual installed target,
+transient or non-success effects. Its synthetic classifier does not establish
+Joe's current private tree, canonical bookmark, vector freshness or semantic
+retrieval. The [sanitized residual decision packet](../evidence/phase3a-slice2-default-gateway-residual-b2-b3-decision-packet-20261009.md)
+SHA-256 `861797a7adc0d28617c27e9e952b314043d698bf38a52ef10c56b9399d80e690` asks Joe for separate bounded decisions on B2 target binding
+and only-if-needed disposable delta checks, and B3 private tree and canonical
+DB read-only diagnostics. No Phase 3a fixture/live proof or source/DB/index
+operation was performed. The unused Qwen candidate remains preserved; source
+`.5`, parent, routed-write `.4` and the blocked plan/spec remain BLOCKED.
