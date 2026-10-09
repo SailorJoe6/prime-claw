@@ -614,7 +614,7 @@ def scenario_final_removal():
             tampered_receipt.chmod(0o600)
             before_tampered_restore = snap(root)
             result = run("restore", root, tampered_receipt, ok=False)
-            assert "owned bridge manifest" in result.stderr
+            assert "unexpectedly changes APPEND" in result.stderr
             assert snap(root) == before_tampered_restore
 
         final_tree = snap(root)

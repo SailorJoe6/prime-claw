@@ -844,31 +844,73 @@ def validate_receipt(
         raise ValueError("receipt context creation ownership is contradictory")
 
     if value["generation"] == "final":
-        if context_preimage != validated["context"]["postimage"]:
-            raise ValueError("final receipt unexpectedly changes selected context")
-        if not manifest_preimage["exists"] or manifest_pre["generation"] != "bridge":
-            raise ValueError("final receipt does not restore an owned bridge manifest")
-        expected_final_manifest = dict(manifest_pre)
-        expected_final_manifest["generation"] = "final"
+        if not manifest_preimage["exists"]:
+            raise ValueError("final receipt does not restore an owned manifest")
+        context_pre = snapshot_bytes(context_preimage)
+        context_pre_range = managed_range(
+            context_pre, KERNEL_START, KERNEL_END, "receipt context preimage"
+        )
+        if context_pre_range is None or digest(
+            context_pre[context_pre_range[0] : context_pre_range[1]]
+        ) != manifest_pre["selectedContext"]["blockSha256"]:
+            raise ValueError("receipt context preimage disagrees with manifest")
+        separators_match(
+            context_pre,
+            context_pre_range,
+            manifest_pre["selectedContext"],
+            "receipt context preimage",
+        )
+        post_start, post_end = context_range
+        pre_start, pre_end = context_pre_range
+        expected_context_post = (
+            context_pre[:pre_start]
+            + context_post[post_start:post_end]
+            + context_pre[pre_end:]
+        )
+        context_postimage = validated["context"]["postimage"]
+        if (context_post != expected_context_post
+                or any(context_preimage[key] != context_postimage[key]
+                       for key in ("mode", "uid", "gid"))):
+            raise ValueError("final receipt changes bytes outside the owned context block")
+        expected_final_manifest = {
+            **manifest_pre,
+            "generation": "final",
+            "selectedContext": {
+                **manifest_pre["selectedContext"],
+                "blockSha256": manifest_post["selectedContext"]["blockSha256"],
+            },
+        }
         if manifest_post != expected_final_manifest:
             raise ValueError("final receipt manifest transition is contradictory")
         append_preimage = validated["legacyAppend"]["preimage"]
-        if not append_preimage["exists"]:
-            raise ValueError("final receipt bridge APPEND preimage is absent")
-        append_pre = snapshot_bytes(append_preimage)
-        append_pre_range = managed_range(
-            append_pre, LEGACY_START, LEGACY_END, "receipt APPEND preimage"
-        )
-        if append_pre_range is None or digest(
-            append_pre[append_pre_range[0] : append_pre_range[1]]
-        ) != manifest_pre["legacyAppend"]["blockSha256"]:
-            raise ValueError("final receipt bridge APPEND preimage disagrees with manifest")
-        separators_match(
-            append_pre,
-            append_pre_range,
-            manifest_pre["legacyAppend"],
-            "receipt bridge APPEND",
-        )
+        append_postimage = validated["legacyAppend"]["postimage"]
+        if manifest_pre["generation"] == "final":
+            if append_preimage != append_postimage:
+                raise ValueError("final refresh receipt unexpectedly changes APPEND")
+        else:
+            if not append_preimage["exists"]:
+                raise ValueError("final receipt bridge APPEND preimage is absent")
+            append_pre = snapshot_bytes(append_preimage)
+            append_pre_range = managed_range(
+                append_pre, LEGACY_START, LEGACY_END, "receipt APPEND preimage"
+            )
+            if append_pre_range is None or digest(
+                append_pre[append_pre_range[0] : append_pre_range[1]]
+            ) != manifest_pre["legacyAppend"]["blockSha256"]:
+                raise ValueError(
+                    "final receipt bridge APPEND preimage disagrees with manifest"
+                )
+            expected_append_post = remove_owned_block(
+                append_pre,
+                append_pre_range,
+                manifest_pre["legacyAppend"],
+                "receipt bridge APPEND",
+            )
+            if (not append_postimage["exists"]
+                    or snapshot_bytes(append_postimage) != expected_append_post
+                    or any(append_preimage[key] != append_postimage[key]
+                           for key in ("mode", "uid", "gid"))):
+                raise ValueError("final receipt bridge APPEND removal is contradictory")
     return value
 
 
