@@ -29,7 +29,7 @@ LEGACY_START = b"<!-- prime-claw:conversation-identity:start -->"
 LEGACY_END = b"<!-- prime-claw:conversation-identity:end -->"
 
 
-def run(mode, root, *extra, ok=True, config=CONFIG, legacy=LEGACY):
+def run(mode, root, *extra, ok=True, config=CONFIG, legacy=LEGACY, kernel=KERNEL):
     if mode == "restore":
         argv = [sys.executable, MANAGER, "restore", str(extra[0]), str(root)]
     else:
@@ -38,7 +38,7 @@ def run(mode, root, *extra, ok=True, config=CONFIG, legacy=LEGACY):
             MANAGER,
             mode,
             config,
-            KERNEL,
+            kernel,
             legacy,
             str(root),
             *map(str, extra),
@@ -679,21 +679,36 @@ def scenario_final_removal():
     assert "manual recovery" in result.stderr
     assert snap(unknown) == unknown_before
 
-    source_drift = clean("final-source-drift")
-    (source_drift / "APPEND_SYSTEM.md").write_bytes(b"operator append\n")
-    run("apply", source_drift)
-    source_drift_before = snap(source_drift)
-    module = load_manager()
+    source_refresh = clean("final-source-refresh")
+    (source_refresh / "APPEND_SYSTEM.md").write_bytes(b"operator append\n")
+    run("apply", source_refresh)
+    bridge_tree = snap(source_refresh)
     changed_kernel = KERNEL_BYTES.replace(b"Prime Claw", b"Prime claw", 1)
     assert changed_kernel != KERNEL_BYTES
-    try:
-        module.prepare_apply(source_drift, changed_kernel, None, "final")
-    except ValueError as error:
-        assert "role kernel" in str(error)
-    else:
-        raise AssertionError("final removal unexpectedly accepted source drift")
-    module.prepare_apply(source_drift, KERNEL_BYTES, None, "final")
-    assert snap(source_drift) == source_drift_before
+    changed_kernel_path = WORK / "changed-role-kernel.md"
+    changed_kernel_path.write_bytes(changed_kernel + b"\n")
+    bridge_receipt = WORK / "bridge-kernel-refresh-receipt.json"
+    run("apply", source_refresh, "--receipt", bridge_receipt,
+        config=final_config, kernel=changed_kernel_path)
+    run("check", source_refresh, config=final_config, kernel=changed_kernel_path)
+    changed_final_tree = snap(source_refresh)
+    assert changed_final_tree != bridge_tree
+    run("restore", source_refresh, bridge_receipt)
+    assert snap(source_refresh) == bridge_tree
+
+    run("apply", source_refresh, config=final_config, kernel=changed_kernel_path)
+    changed_final_tree = snap(source_refresh)
+    changed_again = changed_kernel.replace(b"skill-based", b"skill based", 1)
+    assert changed_again != changed_kernel
+    changed_again_path = WORK / "changed-again-role-kernel.md"
+    changed_again_path.write_bytes(changed_again + b"\n")
+    final_receipt = WORK / "final-kernel-refresh-receipt.json"
+    run("apply", source_refresh, "--receipt", final_receipt,
+        config=final_config, kernel=changed_again_path)
+    run("check", source_refresh, config=final_config, kernel=changed_again_path)
+    assert snap(source_refresh) != changed_final_tree
+    run("restore", source_refresh, final_receipt)
+    assert snap(source_refresh) == changed_final_tree
 
     unowned = clean("final-unowned")
     (unowned / "APPEND_SYSTEM.md").write_bytes(b"operator append\n")

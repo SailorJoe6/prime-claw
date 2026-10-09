@@ -563,8 +563,6 @@ def prepare_apply(
             raise ValueError(
                 "selected global context role kernel disagrees with ownership manifest"
             )
-        if generation == "final" and digest(kernel) != recorded["blockSha256"]:
-            raise ValueError("final removal cannot change the managed role kernel")
         separators_match(
             selected_data, selected_range, recorded, "selected global context"
         )

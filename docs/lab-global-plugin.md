@@ -99,10 +99,13 @@ mode, uid, and gid. It records the selected path and ownership in mode-0600
 Selection drift, a latent block in an unselected candidate, malformed or
 unowned markers, unsafe files/directories, fails closed before plugin copy. Apply and check do not migrate a selected file
 implicitly. The checked-in `role-protocol.json` is final. Final apply requires
-an exact owned bridge manifest, derives the retired block digest and separators
-from that manifest, removes only that recorded region plus Prime Claw-owned
-separators, and records a fixed-inventory receipt whose known bridge preimages
-can be restored. It never reads a legacy policy source.
+an exact owned bridge or final manifest, verifies the installed managed block
+against that ownership record, and replaces only that block with the checked-in
+`ROLE_KERNEL.md`. This permits an accepted Markdown policy refresh without
+adopting an unowned block. A bridge-to-final apply also removes only the recorded
+legacy APPEND region plus Prime Claw-owned separators. The transaction updates
+the ownership manifest and records a fixed-inventory receipt whose known
+preimages can be restored. It never reads a legacy policy source.
 
 Unrelated APPEND bytes and ordinary metadata are preserved. Malformed,
 duplicate, unowned, reappeared, or unknown state is refused. A fresh/unowned
