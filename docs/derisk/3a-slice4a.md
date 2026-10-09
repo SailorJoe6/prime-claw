@@ -864,3 +864,5 @@ and only-if-needed disposable delta checks, and B3 private tree and canonical
 DB read-only diagnostics. No Phase 3a fixture/live proof or source/DB/index
 operation was performed. The unused Qwen candidate remains preserved; source
 `.5`, parent, routed-write `.4` and the blocked plan/spec remain BLOCKED.
+
+The [owner consultation-only acceptance](../evidence/phase3a-slice2-default-gateway-residual-owner-plan-accepted-20261009.md) SHA-256 `46da34df6ecd46b9d3e16ecea3755e7af33f040db3a4f0a933738a236e1fc4ea` accepts this **planning packet only** after exact pushed-commit and citation review. Two optional read-only research reviewers returned no result; no independent review is claimed. Joe has not admitted A–D. The owner recommends deciding A (bounded read-only installed-runtime identity/config observation) first under an exact reviewed command/target/redaction contract; C follows separately, B only if A exposes a concrete disposable fixture gap, and D has its own later production-diagnostic gate. No live or fixture action follows from this owner decision.
