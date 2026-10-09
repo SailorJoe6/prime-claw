@@ -1,6 +1,6 @@
 # Execution Plan — Finish the Phase 3a brain-hosting tracer bullet
 
-> **Status:** Joe-approved embedding-scope amendment (2026-10-08) to the reviewed Phase 3a result. The existing episode remains BLOCKED_B1_B2_B3_SOURCE_CURRENT_PROOF_METHOD. This plan does not authorize a proof run, source pointer change, sync/index, routed write, or cleanup.
+> **Status:** Joe selects the preserved default gateway `openai:text-embedding-3-large`/1536 `gbrain` index; the Qwen build/cutover is withdrawn. **Do the next offline implementation and tests now.** B1–B3 source-current proof remains a gate only for the specific later fixture/live source/index/retrieval actions, not for choosing this model or doing offline code/test work. No source pointer change, production diagnostic, sync/index, routed write, or cleanup is authorized by this plan. The B2/B3 packet and failed optional reviews are not an execution prerequisite.
 > **Approved specification:** [SPECIFICATION.md](SPECIFICATION.md) in this exact future folder.
 > **Tracking:** `prime-claw-zwg`; default-profile source-current prerequisite `prime-claw-zwg.5`; routed write `prime-claw-zwg.4`.
 
@@ -14,13 +14,17 @@ The 20-page lossless source repair was separately published to brain `main` at `
 
 ## Shared iteration contract
 
-Each bounded EPISODE iteration must use the exact amended spec/plan in its worktree, update current docs and Beads, push one candidate, and stop for the owning Conversation's exact-branch review and required official EXPERT review. The maintained test gate is `scripts/test-all.sh`: host-safe tier 0 plus disposable Docker tier 1 (Prime Agent/plugin) and tier 2 (gbrain/Postgres). Use focused tests in their designated tier; do not treat plain host `python3 -m pytest tests/ -q` as the complete gate. Run applicable compilation/diff checks without host plugin probes or live brain access. A non-code operational slice records sanitized evidence and current-doc/Bead updates rather than inventing code.
+Each bounded EPISODE iteration must use the exact amended spec/plan in its worktree, update relevant docs and Beads, push one candidate, and stop for the owning Conversation's exact-branch review; request an official EXPERT review only when policy or material risk requires it, not two automatic reviews of a planning note. The maintained test gate is `scripts/test-all.sh`: host-safe tier 0 plus disposable Docker tier 1 (Prime Agent/plugin) and tier 2 (gbrain/Postgres). Use focused tests in their designated tier; do not treat plain host `python3 -m pytest tests/ -q` as the complete gate. Run applicable compilation/diff checks without host plugin probes or live brain access. A non-code operational slice records sanitized evidence and current-doc/Bead updates rather than inventing code.
 
 A failed external prerequisite stops safely with canonical and candidate databases, original source bytes, and Git evidence preserved. No automatic retry, `--skip-failed`, force-push, credential workaround, apparent partial-success receipt, full re-embedding, or cleanup. A long approved sync gets one bounded non-steering watch, removed on stop/completion. No second build while any sync/build is active. Ask Joe for an exact decision when a live gate or external repair is not already approved.
 
 ## Slice 1 — Accepted safe brain-source publication (historical)
 
 The original two-file repair and later lossless 20-page repair were separately accepted and published. Preserve their original Markdown bytes, both accepted Slice 1 blobs, and disjoint newer paths. Fresh read-only source/remote checks are needed for Slice 2; do not republish or reimplement Slice 1 on the strength of an old receipt.
+
+## Next safe execution — default profile offline
+
+Before any live source-current work, the Episode may verify and, only if needed, minimally correct default gateway/1536 selection, config precedence, and fail-closed behavior with focused offline tests in their designated tiers. Use the preserved canonical database identity as configuration, not as an unproved freshness claim. Do not run live `create`, `converge`, `validate`, gbrain, or production checks merely to exercise the selection. Deliver one bounded code/test checkpoint or a concise no-change finding. No new proof packet or independent review of that packet is a prerequisite to this offline work.
 
 ## Slice 2 — Prove source-current canonical gateway/1536 eligibility and catch up only as needed
 
@@ -35,7 +39,7 @@ The original two-file repair and later lossless 20-page repair were separately a
 
 **Working capability:** Joe's local runtime is verified to use the preserved gateway/1536 canonical index for queries and embeddings; `create`/`converge`/`validate` use that selected profile and portable defaults remain intact. There is no switch to or rollback from Qwen.
 
-- Gate acceptance on Slice 2's exact source, vectors, retrieval, and authorized-effect evidence. Prove selected configuration and policy without changing them merely to exercise a cutover. Test default/override precedence and fail-closed selected-state validation in the appropriate tiers. Keep the Qwen database/config inert and unmodified pending an independent cleanup decision.
+- Offline default/override precedence and fail-closed selected-state tests may be completed and reviewed before live Slice 2. Prove selected configuration and policy without changing them merely to exercise a cutover. Live index/retrieval acceptance still needs separately authorized source-current evidence; keep the Qwen database/config inert and unmodified pending an independent cleanup decision.
 - Record sanitized selected-state and nonmutation evidence, current docs, requirements and `prime-claw-zwg.5`; run shared gates, push exact candidate for owner review. Only owner acceptance of this default-profile checkpoint unlocks Joe's ordered Slice 4.
 
 ## Slice 4 — One routed brain write reaches the remote
@@ -54,4 +58,4 @@ The original two-file repair and later lossless 20-page repair were separately a
 
 ## Dependency and non-goal boundaries
 
-Accepted Slice 1 precedes the revised source-current Slice 2; accepted Slice 2 precedes default-profile confirmation in Slice 3; Joe's accepted Slice 3 precedes the routed write in Slice 4; Slice 5 requires its receipt. No new brain taxonomy, fallback repository, credentials on sandbox disk, private endpoint in tracked material, in-place database migration, Qwen re-embedding/cutover, automatic model retry, full canonical re-embed without separate justification, destructive candidate cleanup, unrelated provider-status fix (`prime-claw-zwg.3`), memory-skill port, browse/channel/schedule work, orchestrator, or new general lifecycle machinery. The scope amendment grants no proof or live-action authority on its own; the exact blocked episode and Joe's separate gates remain controlling.
+Accepted Slice 1 is historical. Offline default-profile implementation and tests may proceed now, independent of Slice 2 live source-current proof. Actual index/retrieval acceptance still requires the relevant source-current gates; Joe's accepted selected-profile and index checkpoint precedes any routed write in Slice 4, and Slice 5 requires its receipt. No new brain taxonomy, fallback repository, credentials on sandbox disk, private endpoint in tracked material, in-place database migration, Qwen re-embedding/cutover, automatic model retry, full canonical re-embed without separate justification, destructive candidate cleanup, unrelated provider-status fix (`prime-claw-zwg.3`), memory-skill port, browse/channel/schedule work, orchestrator, or new general lifecycle machinery. The scope amendment grants no proof or live-action authority on its own; the exact blocked episode and Joe's separate gates remain controlling.
