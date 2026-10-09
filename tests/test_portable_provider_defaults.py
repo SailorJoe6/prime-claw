@@ -76,6 +76,7 @@ def test_no_config_resolves_kimi_gateway_embedding_and_glm_catalog(tmp_path):
     assert profiles["embedding"]["profile"] == "gateway"
     assert profiles["embedding"]["model"] == "openai:text-embedding-3-large"
     assert profiles["embedding"]["dimensions"] == 1536
+    assert profiles["embedding"]["database"] == "gbrain"  # canonical, not Qwen candidate
     catalog = json.loads(profiles["inference"]["models_text"])
     ids = {m["id"] for m in catalog["providers"]["anthropic"]["models"]}
     assert ids == {"anthropic.kimi-k3", "anthropic.glm-5.2"}
@@ -100,6 +101,38 @@ def test_local_home_embedding_overrides_embedding_only(tmp_path):
     assert profiles["embedding"]["model_ref"] == "openai:Qwen3-Embedding-8B"
     assert profiles["embedding"]["dimensions"] == 4096
     assert profiles["provider_names"] == ["prime-claw-ai-gateway", "prime-claw-github"]
+
+
+@pytest.mark.parametrize("source", ["environment", "operator-local"])
+def test_explicit_gateway_profile_beats_stale_home_endpoint(tmp_path, monkeypatch, source):
+    cfg = home_override(hermetic_cfg(tmp_path))
+    if source == "environment":
+        monkeypatch.setenv("PRIME_CLAW_EMBEDDING_PROFILE", "gateway")
+        monkeypatch.setenv("PRIME_CLAW_EMBEDDING_BASE_URL", "http://unused.invalid:7997/v1")
+    else:
+        cfg["embedding_profile"] = "gateway"
+        cfg["_local_override_keys"].append("embedding_profile")
+    profiles = pc._resolve_runtime_profiles(cfg)
+    assert profiles["embedding"]["profile"] == "gateway"
+    assert profiles["embedding"]["model"] == "openai:text-embedding-3-large"
+    assert profiles["embedding"]["dimensions"] == 1536
+    assert profiles["embedding"]["database"] == "gbrain"
+
+
+@pytest.mark.parametrize("source", ["environment", "operator-local"])
+def test_explicit_empty_embedding_profile_fails_before_lifecycle_mutation(
+        tmp_path, monkeypatch, capsys, source):
+    cfg = hermetic_cfg(tmp_path)
+    if source == "environment":
+        monkeypatch.setenv("PRIME_CLAW_EMBEDDING_PROFILE", "")
+        monkeypatch.setenv("PRIME_CLAW_EMBEDDING_BASE_URL", "http://unused.invalid:7997/v1")
+    else:
+        cfg["embedding_profile"] = ""
+        cfg["_local_override_keys"].append("embedding_profile")
+    monkeypatch.setattr(pc, "cmd_build",
+                        lambda *a: (_ for _ in ()).throw(AssertionError("must fail before build")))
+    assert pc.cmd_create(cfg, Args()) == 1
+    assert "embedding_profile cannot be empty" in capsys.readouterr().err
 
 
 def test_codex_and_home_overrides_do_not_require_gateway(tmp_path):

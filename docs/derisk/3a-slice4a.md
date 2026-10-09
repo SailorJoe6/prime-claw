@@ -866,3 +866,38 @@ operation was performed. The unused Qwen candidate remains preserved; source
 `.5`, parent, routed-write `.4` and the blocked plan/spec remain BLOCKED.
 
 The [owner consultation-only acceptance](../evidence/phase3a-slice2-default-gateway-residual-owner-plan-accepted-20261009.md) SHA-256 `46da34df6ecd46b9d3e16ecea3755e7af33f040db3a4f0a933738a236e1fc4ea` accepts this **planning packet only** after exact pushed-commit and citation review. Two optional read-only research reviewers returned no result; no independent review is claimed. Joe has not admitted A–D. The owner recommends deciding A (bounded read-only installed-runtime identity/config observation) first under an exact reviewed command/target/redaction contract; C follows separately, B only if A exposes a concrete disposable fixture gap, and D has its own later production-diagnostic gate. No live or fixture action follows from this owner decision.
+
+## 2026-10-09 offline default-profile empty-selection guard (review candidate)
+
+Joe's scope correction permits one small offline default-gateway/1536 configuration
+and test increment before any current-index proof. The tracked default remains
+`gateway`, `openai:text-embedding-3-large`/1536 and canonical `gbrain`.
+The prior selector silently treated an explicitly empty
+`PRIME_CLAW_EMBEDDING_PROFILE` (or ignored-local `embedding_profile`) as if no
+selection had been supplied. A focused regression reproduced both cases:
+`cmd_create` reached the build stage instead of rejecting the ambiguous value.
+The candidate now rejects each explicit blank at the profile gate before a
+lifecycle stage; an explicit same-level `gateway` still beats a stale optional
+home endpoint. Existing valid default/env/local precedence is otherwise unchanged.
+
+Reproduction (host-only, all boundary calls in this file monkeypatched):
+`PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider
+tests/test_portable_provider_defaults.py` — **31 passed, 1 importlib warning**.
+The red pre-change selection had **2 failed, 2 passed, 26 deselected**.
+AST parsing of `bin/prime-claw` and the test file passed. No claim is made
+about live selection, source-current/index/retrieval acceptance or the full
+tiered suite. R3a-15 already traces this source/test pair in the requirement
+inventory; no requirement status was advanced.
+
+**Test isolation incident:** A broader attempted selection that included
+`tests/test_runtime_converge.py` and `tests/test_runtime_validate.py` returned
+**66 passed, 2 failed, 3 warnings**. Two preexisting runtime-converge tests
+left `stage_brain_query` unstubbed; it reached OpenShell and received
+`sandbox 'prime-claw' is not ready (phase: Error)` from brain-query. The test
+selection stopped. No further sandbox probe, operation or recovery was run;
+this output does not establish whether any external state changed. The owner
+was notified, and `prime-claw-5v7.10` records the exact boundary. Do not
+reuse that broader host selection until its external calls are isolated.
+The preserved Qwen candidate, brain source, registration and databases were
+not intentionally changed by this offline increment. Source `.5`, parent,
+routed-write `.4`, and the active plan/spec remain BLOCKED for live steps.

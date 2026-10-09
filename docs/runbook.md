@@ -50,7 +50,12 @@ concerns independently:
 3. Otherwise, the portable Kimi/GLM gateway catalog is generated.
 4. `PRIME_CLAW_EMBEDDING_PROFILE` or ignored local embedding config selects embeddings;
    `.prime-claw/runtime.local.json` containing only `embedding_base_url` selects `home-qwen`
-   for backward compatibility.
+   for backward compatibility. An explicit `gateway` profile beats a stale endpoint at the
+   same or lower precedence. An explicitly empty environment or operator-local profile
+   is rejected before `create`/`converge` stages; unset it to use the tracked gateway
+   default. An environment endpoint still beats an operator-local profile when no
+   environment profile is set, so use `PRIME_CLAW_EMBEDDING_PROFILE=gateway` to opt
+   back into the canonical default without deleting the unused Qwen config.
 
 The no-config provider set is AI gateway + GitHub. Codex OAuth and its policy routes are added
 only for explicit Codex inference. `home-qwen` stays isolated and cannot become an automatic

@@ -669,15 +669,21 @@ def _embedding_profile(cfg: dict) -> str:
     """Resolve embedding profile independently from inference selection."""
     local_keys = set(cfg.get("_local_override_keys", []))
     profile = os.environ.get("PRIME_CLAW_EMBEDDING_PROFILE")
-    if not profile and os.environ.get("PRIME_CLAW_EMBEDDING_BASE_URL"):
+    if profile is not None:
+        # An explicitly empty selection must not silently activate either profile.
+        if not profile:
+            raise ValueError("embedding_profile cannot be empty")
+    elif os.environ.get("PRIME_CLAW_EMBEDDING_BASE_URL"):
         profile = HOME_EMBEDDING_PROFILE
-    if not profile and "embedding_profile" in local_keys:
+    elif "embedding_profile" in local_keys:
         profile = str(cfg.get("embedding_profile"))
-    if not profile and "embedding_base_url" in local_keys:
+        if not profile:
+            raise ValueError("embedding_profile cannot be empty")
+    elif "embedding_base_url" in local_keys:
         # Backward-compatible operator-local Qwen selection: the existing ignored
         # file contains only the private endpoint.
         profile = HOME_EMBEDDING_PROFILE
-    if not profile:
+    else:
         profile = str(cfg.get("embedding_profile") or PORTABLE_EMBEDDING_PROFILE)
     if profile not in (PORTABLE_EMBEDDING_PROFILE, HOME_EMBEDDING_PROFILE):
         raise ValueError("embedding_profile must be gateway or home-qwen")
