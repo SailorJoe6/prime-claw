@@ -56,6 +56,9 @@ prime-claw builds on four prior projects. Read these before designing:
 - [goal-heartbeat-work-control.md](goal-heartbeat-work-control.md) — the
   neutral-kernel/managed-guide work-control split, retired-extension migration,
   and coordinated Gate B activation boundary.
+- [evidence/2026-10-09-orca-prime-agent-integration-probes.md](evidence/2026-10-09-orca-prime-agent-integration-probes.md)
+  — the in-progress evidence matrix that gates the final Orca/Prime Agent
+  responsibility boundary for `prime-claw-h6w.33`.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)
