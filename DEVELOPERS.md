@@ -88,20 +88,27 @@ only. Do not apply, check, or probe a candidate against the host user-global
   python3 -m pytest tests/ -q -m container   # tier 1 (requires Docker + .env)
   ```
 
-  Copy `.env.example` to the ignored `.env` and set exactly one selector:
+  Copy `.env.example` to the ignored `.env` and select the verified source
+  checkout:
 
-  - `PRIME_AGENT_PINNED=<version>` is executable. The vendor install is the
-    only online container phase. The fixture then disconnects every captured
-    network and verifies the set is empty before version/artifact identity,
-    plugin apply/check, probes, or tests run.
-  - `PRIME_AGENT_SOURCE=/absolute/path/to/prime-agent` builds in a separate
-    disposable container. The checkout is mounted read-only and copied to
-    container-local storage; complete before/after inventory equality is
-    mandatory. The runtime mounts its run-owned scratch share read/write and
-    exposes the validated release subtree separately as read-only `/stage`;
-    installation verifies and reads only `/stage`. No source checkout, host
-    home, socket, credentials, or live state is exposed. The source path is
-    never written to evidence or echoed.
+  - `PRIME_AGENT_SOURCE=/absolute/path/to/prime-agent` is the only supported
+    Prime Claw selection. It must identify the maintained fork tag
+    `cwd-fix-v0.9.8-r1` and pass the tag-object, commit, tree, lockfile, and build-ID
+    checks in [docs/prime-agent-installation.md](docs/prime-agent-installation.md).
+    Verify those identities independently before using the current tier-1
+    fixture: its source inventory and release checks do not yet enforce this
+    fork-specific identity policy. The source builds in a separate disposable
+    container. The checkout is mounted read-only and copied to container-local
+    storage; complete before/after
+    inventory equality is mandatory. The runtime mounts its run-owned scratch
+    share read/write and exposes the validated release subtree separately as
+    read-only `/stage`; installation verifies and reads only `/stage`. No source
+    checkout, host home, socket, credentials, or live state is exposed. The
+    source path is never written to evidence or echoed.
+  - `PRIME_AGENT_PINNED=<version>` and its vendor-installer path remain legacy
+    fixture surfaces only. They are not supported for candidate construction:
+    today's public installer can select a Rust/native artifact that shares the
+    `0.9.8` version string but cannot load Prime Claw's TypeScript plugin.
 
   `scripts/test-tier1.sh` is the standalone driver (`--smoke`, `--probe`,
   `--dry-run`, `--rebuild`). The fixture mirrors its boundary. Builder and

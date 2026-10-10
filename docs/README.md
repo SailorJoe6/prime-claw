@@ -33,6 +33,9 @@ prime-claw builds on four prior projects. Read these before designing:
   multi-store routing layer: which store owns a durable fact (brain vs. docs
   vs. harness vs. beads vs. reports), the two-level routing split, and the
   report guard. Orthogonal to the three-horizon context model.
+- [prime-agent-installation.md](prime-agent-installation.md) — the only
+  supported Prime Agent source, exact fork/tag/commit/tree/lockfile identity,
+  Docker-only build contract, unsupported installer paths, and v0.10 boundary.
 - [testing-strategy.md](testing-strategy.md) — isolation tiers, the current
   exact-image/offline tier-1 contract, provenance schema, source-mode safety
   boundary, teardown rules, and reproduction commands.

@@ -308,8 +308,21 @@ malformed identities never reach a destructive command.
 
 ## Tier-1 source run
 
-`PRIME_AGENT_SOURCE` now uses the same runtime boundary as pinned mode plus a
-separate disposable preparation container:
+`PRIME_AGENT_SOURCE` is the only supported *tier-1 candidate* selector. It
+must point to the exact maintained fork source identified in
+[prime-agent-installation.md](prime-agent-installation.md). The existing source
+fixture preserves an inventory and package-release provenance boundary but does
+not by itself enforce this new fork tag/commit/tree/lockfile/build-ID policy.
+Perform the exact identity checks independently before using it; a future
+fixture change must make these checks fail closed. `0.9.8` version text alone
+is not provenance. The pinned run above describes historical fixture coverage:
+`PRIME_AGENT_PINNED` remains implemented for legacy tests, not for constructing
+a new candidate through the mutable vendor installer. The runtime-image source
+candidate is a separate in-progress branch; do not claim it is active based on
+tier-1 results alone.
+
+Source mode uses the isolated runtime boundary plus a separate disposable
+preparation container:
 
 1. Before Docker contact, the host reads Git with `GIT_OPTIONAL_LOCKS=0` through
    a retained no-follow checkout descriptor. It records tracked plus nonignored
