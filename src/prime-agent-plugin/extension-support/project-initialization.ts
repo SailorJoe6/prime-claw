@@ -221,14 +221,26 @@ export function resolveNearestProjectRoot(start: string, home = process.env.HOME
   return { root, kind };
 }
 
-function ensureSafeDirectory(projectRoot: string, path: string): void {
+export function assertSafePathAncestors(projectRoot: string, path: string): void {
+  if (!containedBy(projectRoot, path)) throw new Error(`destination escapes project root: ${path}`);
+  const rel = relative(projectRoot, dirname(path));
+  let current = projectRoot;
+  for (const part of rel.split(sep).filter(Boolean)) {
+    current = join(current, part);
+    const stat = lstatIfPresent(current);
+    if (!stat) return;
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`unsafe managed directory collision: ${relative(projectRoot, current)}`);
+  }
+}
+
+export function ensureSafeDirectory(projectRoot: string, path: string): void {
   if (!containedBy(projectRoot, path)) throw new Error(`destination escapes project root: ${path}`);
   const rel = relative(projectRoot, path);
   let current = projectRoot;
   for (const part of rel.split(sep).filter(Boolean)) {
     current = join(current, part);
-    if (existsSync(current)) {
-      const stat = lstatSync(current);
+    const stat = lstatIfPresent(current);
+    if (stat) {
       if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`unsafe managed directory collision: ${relative(projectRoot, current)}`);
     } else {
       mkdirSync(current, { mode: 0o755 });
@@ -298,6 +310,7 @@ function recoverResetIntent(projectRoot: string, pluginRoot: string, inventory: 
   const destination = join(projectRoot, asset.destination);
   const upstream = digest(source);
   if (upstream !== intent.upstreamSha256) throw new Error(`${RESET_INTENT} upstream changed and requires explicit recovery`);
+  assertSafePathAncestors(projectRoot, destination);
   const destinationStat = lstatIfPresent(destination);
   if (!destinationStat) {
     if (intent.beforeSha256 !== null) throw new Error(`${RESET_INTENT} destination disappeared and requires explicit recovery`);
@@ -325,13 +338,24 @@ function legacyPath(projectRoot: string, asset: AssetDefinition): string | null 
   return null;
 }
 
+function safeLegacyStat(projectRoot: string, path: string) {
+  try { assertSafePathAncestors(projectRoot, path); }
+  catch (error) {
+    if (lstatIfPresent(path)) throw error;
+    return null;
+  }
+  return lstatIfPresent(path);
+}
+
 function migrateExpectedSkillSymlink(projectRoot: string, asset: AssetDefinition): Buffer | null {
   if (!asset.id.startsWith("project-skill-")) return null;
   const skillDir = join(projectRoot, dirname(asset.destination));
   const expectedLegacy = legacyPath(projectRoot, asset);
   if (!expectedLegacy) return null;
+  assertSafePathAncestors(projectRoot, skillDir);
   const backupLink = `${skillDir}.prime-claw-migration-link`;
   if (existsSync(backupLink)) {
+    assertSafePathAncestors(projectRoot, expectedLegacy);
     const backupStat = lstatSync(backupLink);
     if (!backupStat.isSymbolicLink() || realpathSync(backupLink) !== realpathSync(dirname(expectedLegacy))) {
       throw new Error(`unsafe interrupted project skill migration: ${relative(projectRoot, backupLink)}`);
@@ -346,6 +370,7 @@ function migrateExpectedSkillSymlink(projectRoot: string, asset: AssetDefinition
   if (!existsSync(skillDir)) return null;
   const stat = lstatSync(skillDir);
   if (!stat.isSymbolicLink()) return null;
+  assertSafePathAncestors(projectRoot, expectedLegacy);
   if (realpathSync(skillDir) !== realpathSync(dirname(expectedLegacy))) {
     throw new Error(`unsafe project skill symlink collision: ${relative(projectRoot, skillDir)}`);
   }
@@ -585,7 +610,7 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
         ensureSafeDirectory(project.root, dirname(destination));
         const legacy = legacyPath(project.root, asset);
         const destinationStat = lstatIfPresent(destination);
-        const legacyStat = legacy ? lstatIfPresent(legacy) : null;
+        const legacyStat = legacy ? safeLegacyStat(project.root, legacy) : null;
         if (migratedSymlinkBytes) {
           const current = digest(migratedSymlinkBytes);
           const state: TemplateState = current === upstream ? "managed" : "customized";
@@ -673,6 +698,7 @@ export function acceptProjectOverride(cwd: string, assetId: string, options: Omi
     if (options.isActiveEpisode?.(project.root) ?? (episodeWorktreeActivity(project.root, project.kind, runner) !== "inactive")) throw new Error("active or uncertain Episode worktree retains its starting template snapshot");
     if (lstatIfPresent(join(project.root, TEMPLATE_REVIEW_STATE))) throw new Error("template review requires completion or recovery before accepting an override");
     const destination = join(project.root, asset.destination);
+    assertSafePathAncestors(project.root, destination);
     const stat = lstatSync(destination);
     if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("override destination is not a regular file");
     const current = digest(readFileSync(destination));
@@ -699,6 +725,7 @@ export function resetProjectAsset(cwd: string, assetId: string, options: Omit<Re
     const sourceBytes = readFileSync(join(pluginRoot, asset.source));
     const upstream = digest(sourceBytes);
     const destination = join(project.root, asset.destination);
+    assertSafePathAncestors(project.root, destination);
     let beforeSha256: string | null = null;
     const destinationStat = lstatIfPresent(destination);
     if (destinationStat) {

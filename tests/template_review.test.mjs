@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, lstatSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -29,3 +29,6 @@ function startHeldInSeparateProcess(f){
 test("held review surviving owner-process exit can be restored after later edits",t=>{const f=fixture(t);startHeldInSeparateProcess(f);assert.equal(readFileSync(f.path,"utf8"),f.upstream);writeFileSync(f.path,"later resumed edit\n");const result=recoverTemplateReview(f.root,"restore",{home:dirname(f.root),runner:f.runner});assert.equal(result.clean,true);assert.equal(readFileSync(f.path,"utf8"),f.custom);assert.equal(git(f.root,"status","--porcelain","--",f.rel),"")});
 
 test("held review surviving owner-process exit can keep later edits",t=>{const f=fixture(t);startHeldInSeparateProcess(f);writeFileSync(f.path,"later kept edit\n");const result=recoverTemplateReview(f.root,"keep",{home:dirname(f.root),runner:f.runner});assert.equal(result.kept,true);assert.equal(readFileSync(f.path,"utf8"),"later kept edit\n");assert.match(git(f.root,"status","--porcelain","--",f.rel),/^ M /)});
+
+
+test("review start refuses a linked destination directory without touching shared bytes",t=>{const f=fixture(t),parent=dirname(f.path),outside=mkdtempSync(join(tmpdir(),"pc-shared-review-")),shared=join(outside,"SKILL.md");writeFileSync(shared,"shared review customization\n");rmSync(parent,{recursive:true,force:true});symlinkSync(outside,parent);assert.throws(()=>startTemplateReview(f.root,"project-skill-prepare",true,{pluginRoot:PLUGIN,home:dirname(f.root),runner:f.runner}),/unsafe managed directory collision/);assert.equal(readFileSync(shared,"utf8"),"shared review customization\n");assert.equal(lstatSync(parent).isSymbolicLink(),true)});

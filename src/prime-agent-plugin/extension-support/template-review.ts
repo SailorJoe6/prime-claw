@@ -17,6 +17,7 @@ import {
   ProcessCommandRunner,
   TEMPLATE_REVIEW_STATE,
   acquireProjectMutationLock,
+  assertSafePathAncestors,
   fsyncDirectory,
   episodeWorktreeActivity,
   loadAssetInventory,
@@ -69,6 +70,7 @@ function writeState(path: string, state: ReviewState): void {
 
 function readState(root: string): ReviewState {
   const path = statePath(root);
+  assertSafePathAncestors(root, path);
   const stat = lstatIfPresent(path);
   if (!stat) throw new Error("no Prime Claw template review is active");
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("template review state is not a regular file");
@@ -94,6 +96,7 @@ function assertCleanTrackedRegular(root: string, destination: string, runner: Co
 
 function restoreHeld(root: string, state: ReviewState, runner: CommandRunner): void {
   const destination = join(root, state.destination);
+  assertSafePathAncestors(root, destination);
   const current = digest(readFileSync(destination));
   if (current !== state.upstreamSha256) {
     writeState(statePath(root), { ...state, status: "interrupted" });
@@ -144,6 +147,8 @@ export function startTemplateReview(cwd: string, assetId: string, confirmedReady
   try {
     if (options.isActiveEpisode?.(project.root) ?? (episodeWorktreeActivity(project.root, project.kind, runner) !== "inactive")) throw new Error("active or uncertain Episode worktree retains its starting template snapshot");
     const path = statePath(project.root);
+    assertSafePathAncestors(project.root, path);
+    assertSafePathAncestors(project.root, destination);
     if (lstatIfPresent(path)) throw new Error("another template review requires completion or recovery");
     assertCleanTrackedRegular(project.root, destination, runner);
     const original = readFileSync(destination);
@@ -217,9 +222,10 @@ export function recoverTemplateReview(cwd: string, action: "restore" | "keep", o
       fsyncDirectory(dirname(statePath(project.root)));
       return { kept: true, assetId: state.assetId, destination: state.destination, message: "Current bytes were kept without staging or committing; reconcile will preserve them as customization." };
     }
+    const destination = join(project.root, state.destination);
+    assertSafePathAncestors(project.root, destination);
     const restored = run(runner, "git", ["-C", project.root, "restore", "--worktree", "--", state.destination], project.root, true);
     if (restored.status !== 0) throw new Error(`explicit template restore failed: ${restored.stderr.trim()}`);
-    const destination = join(project.root, state.destination);
     fsyncDirectory(dirname(destination));
     if (run(runner, "git", ["-C", project.root, "diff", "--quiet", "--", state.destination], project.root, true).status !== 0
       || run(runner, "git", ["-C", project.root, "diff", "--cached", "--quiet", "--", state.destination], project.root, true).status !== 0

@@ -63,7 +63,7 @@ continue when another destination is blocked.
 
 Reconciliation serializes through `.prime-claw/reconcile.lock`, reclaims only a
 well-formed lock whose recorded local PID is proven dead, rejects symlink (including dangling symlink) or
-special-file collisions in assets and state, writes replacements and manifests atomically, and
+special-file collisions at managed leaves and ancestor directories in assets and state, writes replacements and manifests atomically, and
 never commits. A completed managed upstream file rename is healed if interruption left the
 prior manifest. Explicit resets use a durable reset-intent record so the same
 recovery is safe from customized or accepted-override state. Current manifest
