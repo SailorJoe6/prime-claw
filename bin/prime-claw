@@ -453,6 +453,8 @@ def _prime_agent_source_gate_script() -> str:
         "set -euo pipefail\n"
         f"test -x {root}/prime-agent.sh\n"
         f"test -x {root}/node_modules/.bin/tsx\n"
+        'test "${PRIME_AGENT_KERNEL_VENV:-}" = /sandbox/kernel-venv\n'
+        'test -x /sandbox/kernel-venv/bin/python\n'
         f'test "$(git -C {root} remote get-url origin)" = https://github.com/SailorJoe6/prime-agent.git\n'
         f"test $(git -C {root} cat-file -t {tag_ref}) = tag\n"
         f"test $(git -C {root} rev-parse {tag_ref}) = {PRIME_AGENT_SOURCE_TAG_OBJECT}\n"
@@ -462,7 +464,7 @@ def _prime_agent_source_gate_script() -> str:
         f"printf '%s  %s\\n' {PRIME_AGENT_SOURCE_LOCK_SHA256} {root}/package-lock.json | sha256sum -c - >/dev/null\n"
         f'test -z "$(git -C {root} status --porcelain)"\n'
         f'test "$(git -C {root} describe --tags --always --dirty)" = {PRIME_AGENT_SOURCE_TAG}\n'
-        'observed_v="$(/usr/local/bin/prime-agent --version 2>&1)"\n'
+        'observed_v="$(/usr/local/bin/prime-agent --version 2>&1 | tail -n 1)"\n'
         f'test "$observed_v" = {PRIME_AGENT_REQUIRED_VERSION}\n'
         f"printf 'source_identity=%s commit=%s tree=%s version=%s\\n' "
         f"{PRIME_AGENT_SOURCE_TAG} {PRIME_AGENT_SOURCE_COMMIT} {PRIME_AGENT_SOURCE_TREE} {PRIME_AGENT_REQUIRED_VERSION}\n"
@@ -1780,8 +1782,7 @@ def stage_codex_provider(cfg, args) -> int:
         if code != 0:
             print("error: codex provider apply failed: " + out.strip()[:240], file=sys.stderr)
             return code
-        with open(state, "w") as sf:
-            sf.write(digest)
+        _write_private_file(state, digest + "\n")
         print(f"provider: {action} {name}")
         return 0
     finally:
@@ -1920,8 +1921,13 @@ def stage_sandbox(cfg, args, force_fresh: bool = False) -> int:
         print(f"dry_run: {verb} sandbox {name} --from {image} {provider_flags} "
               f"--policy {pf} (brain arrives via stage_brain_clone git clone, not --upload)")
         return 0
-    exists = probe_sandbox(cfg)[2] is not None
+    ready, detail, record = probe_sandbox(cfg)
+    exists = record is not None
     if exists and not force_fresh:
+        if ready is not True or not isinstance(record, dict) or record.get("phase") != "Ready":
+            print(f"error: sandbox {name} is not Ready ({detail}); refusing provider/policy changes",
+                  file=sys.stderr)
+            return 1
         # Providers can be attached to a running sandbox. This lets a config change
         # (e.g. switching the host default to openai-codex) converge without wiping
         # /sandbox and rebuilding the full brain index.
@@ -1942,7 +1948,9 @@ def stage_sandbox(cfg, args, force_fresh: bool = False) -> int:
         return stage_policy(cfg, args)
     if exists and force_fresh:
         run([OPENSHELL, "sandbox", "delete", name], timeout=120)  # supported path; not docker restart
-    cmd = [OPENSHELL, "sandbox", "create", "--name", name, "--from", image, "--no-tty", "--detach"]
+    cmd = [OPENSHELL, "sandbox", "create", "--name", name, "--from", image, "--no-tty", "--detach",
+           "--env", "PRIME_AGENT_KERNEL_VENV=/sandbox/kernel-venv",
+           "--env", "TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json"]
     # Attach only providers required by the selected inference/embedding profiles.
     # Every real credential remains host-side; the sandbox receives only placeholders.
     for prov in providers:
@@ -2074,7 +2082,7 @@ def stage_prime_agent(cfg, args) -> int:
     # import is not a release contract for this downstream v0.9.8-r1 tag.
     js64 = base64.b64encode(js.encode()).decode()
     kernel = ("export TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json\n"
-              "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n"
+              "export NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--require /sandbox/.prime-claw/npm-onload.js\"\n"
               "export PRIME_AGENT_INSTALL_UV=1\n"
               "echo " + js64 + " | base64 -d > /tmp/pc-kernel.mts\n"
               "/opt/prime-agent/node_modules/.bin/tsx /tmp/pc-kernel.mts\n")
@@ -2088,7 +2096,7 @@ def stage_prime_agent(cfg, args) -> int:
     ensure_daemon = (
         "set -euo pipefail\n"
         "export HOME=/sandbox PATH=/usr/local/bin:$PATH TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json\n"
-        "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n"
+        "export NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--require /sandbox/.prime-claw/npm-onload.js\"\n"
         # Do not kill an existing daemon, remove its socket, or attach to an
         # incompatible instance during converge. A changed provider environment
         # needs a separately supervised daemon restart, not an implicit signal.
@@ -2470,10 +2478,16 @@ def cmd_converge(cfg, args) -> int:
     if gate != 0:
         return gate
     name = cfg["sandbox_name"]
-    if not args.dry_run and probe_sandbox(cfg)[2] is None:
-        print(f"error: sandbox {name} absent; use 'prime-claw create' for fresh bring-up",
-              file=sys.stderr)
-        return 1
+    if not args.dry_run:
+        ready, detail, record = probe_sandbox(cfg)
+        if record is None:
+            print(f"error: sandbox {name} absent; use 'prime-claw create' for fresh bring-up",
+                  file=sys.stderr)
+            return 1
+        if ready is not True or not isinstance(record, dict) or record.get("phase") != "Ready":
+            print(f"error: sandbox {name} is not Ready ({detail}); refusing converge stages",
+                  file=sys.stderr)
+            return 1
     provider_stages = _provider_stage_entries(cfg)
     labels = ["build", *[label for label, _ in provider_stages],
               "sandbox(converge, no recreate)", "prime-agent", "brain-clone", "brain",
@@ -2614,7 +2628,7 @@ def _validate_checks(cfg, args):
           "console.log('REPL_VAL=' + (r.result ?? '').trim());\n"
           "await k.shutdown?.();\n")
     b64 = base64.b64encode(js.encode()).decode()
-    code, out = sandbox_exec(cfg, "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\" TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json; echo " + b64 + " | base64 -d > /tmp/pc-repl.mts; /opt/prime-agent/node_modules/.bin/tsx /tmp/pc-repl.mts 2>&1 | grep REPL_VAL", timeout=300)
+    code, out = sandbox_exec(cfg, "export NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--require /sandbox/.prime-claw/npm-onload.js\" TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json; echo " + b64 + " | base64 -d > /tmp/pc-repl.mts; /opt/prime-agent/node_modules/.bin/tsx /tmp/pc-repl.mts 2>&1 | grep REPL_VAL", timeout=300)
     m = re.search(r"REPL_VAL=(\S+)", out)
     checks.append(("persistent-repl", True, bool(m and m.group(1) == "42"),
                    "state=%s" % (m.group(1) if m else None)))

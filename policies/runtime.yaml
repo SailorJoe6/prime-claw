@@ -17,6 +17,9 @@ filesystem_policy:
     - /etc
     - /proc/self
     - /dev/urandom
+    # Image-owned, verified TypeScript v0.9.8-r1 source and node_modules.
+    # Execution needs read-only access; never permit writes to this checkout.
+    - /opt/prime-agent
   read_write:
     - /sandbox
     - /tmp

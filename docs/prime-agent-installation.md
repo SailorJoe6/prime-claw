@@ -80,8 +80,16 @@ release. The extension host lives under
 extensions through `jiti`. Prewarm the Python kernel inside the Docker image
 as the unprivileged sandbox user by importing `ensureKernelPython` from
 `packages/coding-agent/src/core/kernel/bootstrap.ts` through the checkout's
-`node_modules/.bin/tsx`. The image build may use network to acquire source and
-locked dependencies; disposable runtime validation must then run offline.
+`node_modules/.bin/tsx`. Set `PRIME_AGENT_KERNEL_VENV=/sandbox/kernel-venv`
+**before** prewarming. A restored v2 home must link `/sandbox/.prime` to its
+mounted historical state; the image must not create that path first. The
+versioned root-link bootstrap retains image-owned `.uv`, `.venv`, `.cache`,
+`.local`, and `kernel-venv` while linking the other historical home entries.
+OpenShell does not carry image environment variables into every sandbox exec:
+pass the non-secret kernel path and `TSX_TSCONFIG_PATH` through sandbox
+`--env`, and grant only read-only `/opt/prime-agent` in the runtime policy.
+The image build may use network to acquire source and locked dependencies;
+disposable runtime validation must then run offline.
 
 Install the Prime Claw candidate entry point in a container-only path and load
 it explicitly with `--extension /candidate/bootstrap.js`, or place it under an
@@ -123,10 +131,12 @@ does not take an untrusted host selector as its source.
 ## v0.10 and later
 
 The supported Prime Claw target is the TypeScript `cwd-fix-v0.9.8-r1` line.
-This installation policy and the offline candidate proof do **not** establish
-that the active v2 sandbox or Mac runtime was upgraded or recovered. The active
-v2 P0 Error remains a separate recovery and acceptance gate. Prime Agent's
-separate downstream maintainer may develop maintenance-only Rust v0.10+ branches,
+The offline candidate proof alone does **not** establish active recovery.
+The original v2 Error sandbox remains preserved. A separate Ready sandbox on
+a verified checkpoint copy has PostgreSQL and the pinned TypeScript daemon
+running; routing, restart behavior, and live model acceptance are recorded
+separately in [the v2 recovery evidence](evidence/prime-agent-v098-v2-recovery-20261010.md).
+Prime Agent's separate downstream maintainer may develop maintenance-only Rust v0.10+ branches,
 but Prime Claw must not install, activate, test-cut over to, or claim
 compatibility with them. Installation requires new explicit operator
 authorization after upstream Orca compatibility is independently validated.
