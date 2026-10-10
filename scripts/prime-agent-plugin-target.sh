@@ -56,6 +56,7 @@ select_prime_agent_plugin_target() {
       return 1
     fi
     destination_root="$user_root"
+    user_agents_root="${PRIME_CLAW_USER_AGENTS_ROOT:-$HOME/.agents}"
     plugin_target_mode="user-global"
     return 0
   fi
@@ -65,6 +66,10 @@ select_prime_agent_plugin_target() {
     return 64
   fi
   destination_root="$explicit_root"
+  # Explicit roots use a contained user-scope fixture by default so candidate
+  # validation cannot mutate the caller's real ~/.agents tree. Sandboxed callers
+  # may override this with an equally isolated PRIME_CLAW_USER_AGENTS_ROOT.
+  user_agents_root="${PRIME_CLAW_USER_AGENTS_ROOT:-$destination_root/.agents}"
   plugin_target_mode="explicit-root"
 
   # On a host, spelling the user-global destination as an explicit root must

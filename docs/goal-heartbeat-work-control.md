@@ -21,12 +21,14 @@ policy. It observes structured `goal_context` continuation messages, deduplicate
 by goal identity and continuation count, and measures a per-session rapid-repeat
 streak. Only when the managed plugin Markdown threshold is reached does it append
 the exact body of `skills/goals-and-heartbeats/CONTINUATION.md` to the provider
-context. The same managed Markdown frontmatter owns the minimum streak and
-elapsed-time window. TypeScript contains no model-facing goal or heartbeat advice,
-does not inspect assistant prose, delay continuation delivery, create a timer, or
-mutate the stored transcript. Session start, tree navigation, and shutdown clear
-transient streak state. Missing, invalid, symlinked, nonregular, or oversized
-managed policy is a safe no-op.
+context. After every successful compaction, the same hook immediately appends that
+managed reminder as a hidden, non-turn transcript message so the next work reads
+and applies the skill. The same managed Markdown frontmatter owns the minimum
+streak and elapsed-time window. TypeScript contains no model-facing goal or
+heartbeat advice, does not inspect assistant prose, delay continuation delivery,
+create a timer, or mutate stored source messages. Session start, tree navigation,
+and shutdown clear transient streak state. Missing, invalid, symlinked, nonregular,
+or oversized managed policy is a safe no-op.
 
 The block states the bounded control contract directly:
 
@@ -75,8 +77,11 @@ The project-local `oversee-episode` skill, its discovery link, the standalone
 reviewer profile, the legacy APPEND source, and the append-only manager are
 absent. The managed global Conversation and EXPERT skills retain their exact
 role-specific authority. The goals-and-heartbeats `SKILL.md` and `CONTINUATION.md` are one plugin-owned,
-user-level capability bundle. The lifecycle hook only routes that managed reminder
-at a repeated continuation signal.
+user-level capability bundle. Apply/check also require the discoverable skill at
+`~/.agents/skills/goals-and-heartbeats/SKILL.md`; isolated explicit-root validation
+uses an owned `.agents` subtree instead of the caller's real home. The lifecycle
+hook routes the managed reminder at repeated continuation signals and immediately
+after successful compaction.
 
 Final apply/check intentionally require exact owned bridge state; they are not a
 fresh-root diagnostic. Docker Tier 1 seeds that historical predecessor state in

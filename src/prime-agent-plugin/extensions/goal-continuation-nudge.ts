@@ -130,6 +130,16 @@ export function createGoalContinuationNudgeExtension(dependencies: Dependencies 
   return function goalContinuationNudge(pi: ExtensionAPI): void {
     const observations = new Map<string, Observation>();
 
+    pi.on("session_compact", async () => {
+      const config = loadGoalContinuationNudge(configPath);
+      if (!config) return;
+      await pi.sendMessage({
+        customType: "prime-claw-goals-and-heartbeats-post-compaction",
+        content: config.reminder,
+        display: false,
+      }, { triggerTurn: false });
+    });
+
     const clear = (_event: unknown, ctx: any) => {
       observations.delete(ctx.sessionManager.getSessionId());
     };

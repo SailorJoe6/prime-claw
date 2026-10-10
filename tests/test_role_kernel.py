@@ -21,6 +21,7 @@ def test_role_kernel_is_the_single_advisory_policy_source() -> None:
         "Roles are skill-based responsibilities, not authenticated identities.",
         "CONVERSATION supervises. EPISODE implements. EXPERT reviews.",
         "The plugin helps invoke those skills at the appropriate lifecycle boundaries.",
+        "The user-level `/skill:goals-and-heartbeats` operating contract is always in effect and is mandatory reading",
     ):
         assert phrase in text
     for retired in ("trusted plugin state", "trusted identity", "Deterministic plugin gates"):

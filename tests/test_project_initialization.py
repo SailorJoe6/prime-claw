@@ -18,6 +18,13 @@ def test_asset_inventory_covers_every_shipped_markdown_source_once():
     assert inventoried==shipped
     assert all((SOURCE/row["source"]).is_file() and not (SOURCE/row["source"]).is_symlink() for row in rows)
 
+def test_prepare_requires_the_user_level_goals_and_heartbeats_skill():
+    prepare=" ".join((SOURCE/"skills/project-templates/prepare.md").read_text().split())
+    assert "`/skill:goals-and-heartbeats`" in prepare
+    assert "unless that exact skill is already present in the current context" in prepare
+    assert "mandatory and always in effect" in prepare
+
+
 def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
     project_rows=[row for row in json.loads((SOURCE/"asset-inventory.json").read_text())["assets"] if row["scope"]=="project"]
     for row in project_rows:

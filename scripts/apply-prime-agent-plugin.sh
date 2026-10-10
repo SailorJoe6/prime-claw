@@ -47,6 +47,9 @@ else
   select_prime_agent_plugin_target
 fi
 source_root="$repo_root/src/prime-agent-plugin"
+user_skill_source="$source_root/skills/goals-and-heartbeats/SKILL.md"
+user_skill_dir="$user_agents_root/skills/goals-and-heartbeats"
+user_skill_destination="$user_skill_dir/SKILL.md"
 files=(
   extensions/goal-continuation-nudge.ts
   extensions/handoff-chain.ts
@@ -120,6 +123,9 @@ managed_directories=(
   "$destination_root/skills/prime-claw-oversee-episode"
   "$destination_root/skills/prime-claw-expert-review"
   "$destination_root/.prime-claw"
+  "$user_agents_root"
+  "$user_agents_root/skills"
+  "$user_skill_dir"
 )
 for directory in "${managed_directories[@]}"; do
   if [[ -e "$directory" || -L "$directory" ]]; then
@@ -129,6 +135,12 @@ for directory in "${managed_directories[@]}"; do
     fi
   fi
 done
+if [[ -e "$user_skill_destination" || -L "$user_skill_destination" ]]; then
+  if [[ ! -f "$user_skill_destination" || -L "$user_skill_destination" ]]; then
+    printf 'unsafe user-level skill destination (expected absent or regular file): %s\n' "$user_skill_destination" >&2
+    exit 1
+  fi
+fi
 
 # Project template sources are deliberately non-discoverable. Never tolerate a
 # global SKILL.md copy that could shadow project customization.
@@ -170,7 +182,7 @@ if [[ "$plugin_target_mode" == "user-global" ]]; then
 fi
 python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"
 
-mkdir -p "$destination_root/extensions" "$destination_root/extension-support"   "$destination_root/skills/goals-and-heartbeats" "$destination_root/skills/project-templates"   "$destination_root/workflows" "$managed_skill_dir" "$expert_skill_dir"
+mkdir -p "$destination_root/extensions" "$destination_root/extension-support"   "$destination_root/skills/goals-and-heartbeats" "$destination_root/skills/project-templates"   "$destination_root/workflows" "$managed_skill_dir" "$expert_skill_dir" "$user_skill_dir"
 role_apply_args=(
   apply "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"
 )
@@ -188,6 +200,7 @@ for relative in "${files[@]}"; do
   install -m 0644 "$source_root/$relative" "$destination_root/$relative"
 done
 python3 "$repo_root/scripts/manage-prime-agent-global-assets.py" apply   "$source_root" "$destination_root" --action "$global_drift_action"
+install -m 0644 "$user_skill_source" "$user_skill_destination"
 # Installation is sequential, not an atomic generation swap. The required final
 # check detects any incomplete or mixed generation before apply reports success,
 # using the same explicit target semantics selected above.

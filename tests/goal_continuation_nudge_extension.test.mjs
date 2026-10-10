@@ -10,10 +10,12 @@ function createHarness(cwd) {
   const events = new Map();
   const commands = [];
   const tools = [];
+  const sent = [];
   const pi = {
     on(name, handler) { events.set(name, handler); },
     registerCommand(name) { commands.push(name); },
     registerTool(definition) { tools.push(definition.name); },
+    async sendMessage(message, options) { sent.push({ message, options }); },
   };
   let currentTime = 0;
   const configPath = join(cwd, "plugin", "skills", "goals-and-heartbeats", "CONTINUATION.md");
@@ -24,7 +26,7 @@ function createHarness(cwd) {
     sessionManager: { getSessionId() { return "session-1"; } },
   };
   return {
-    events, commands, tools, ctx, configPath,
+    events, commands, tools, sent, ctx, configPath,
     setTime(value) { currentTime = value; },
   };
 }
@@ -68,9 +70,9 @@ function outputText(result, original) {
   return message.content.find((part) => part.type === "text")?.text;
 }
 
-test("registers only context and session cleanup listeners", (t) => {
+test("registers only compaction, context, and session cleanup listeners", (t) => {
   const f = fixture(t);
-  assert.deepEqual([...f.events.keys()], ["session_start", "session_tree", "session_shutdown", "context"]);
+  assert.deepEqual([...f.events.keys()], ["session_compact", "session_start", "session_tree", "session_shutdown", "context"]);
   assert.deepEqual(f.commands, []);
   assert.deepEqual(f.tools, []);
 });
@@ -79,7 +81,7 @@ test("ships a valid default managed plugin policy", () => {
   assert.deepEqual(loadGoalContinuationNudge(), {
     minimumRapidContinuations: 2,
     windowMs: 30_000,
-    reminder: "If there is no more work to do, or you are waiting on the user or a long-running process, remember to follow `/skill:goals-and-heartbeats`.",
+    reminder: "Read and apply `/skill:goals-and-heartbeats` now. It is mandatory and always in effect. If there is no more work to do, or you are waiting on the user or a long-running process, follow its goal-completion and heartbeat rules.",
   });
 });
 
@@ -116,6 +118,28 @@ test("oversize and symlinked reminder files are safe no-ops", (t) => {
   unlinkSync(path);
   symlinkSync(target, path);
   assert.equal(loadGoalContinuationNudge(f.configPath), null);
+});
+
+test("immediately injects the managed reminder after compaction without triggering a turn", async (t) => {
+  const f = fixture(t);
+  writeConfig(f.configPath, { reminder: "read and apply the mandatory skill" });
+
+  await f.events.get("session_compact")({}, f.ctx);
+
+  assert.deepEqual(f.sent, [{
+    message: {
+      customType: "prime-claw-goals-and-heartbeats-post-compaction",
+      content: "read and apply the mandatory skill",
+      display: false,
+    },
+    options: { triggerTurn: false },
+  }]);
+});
+
+test("missing post-compaction reminder is a safe no-op", async (t) => {
+  const f = fixture(t);
+  await f.events.get("session_compact")({}, f.ctx);
+  assert.deepEqual(f.sent, []);
 });
 
 test("nudges the second distinct rapid continuation and preserves source messages", async (t) => {

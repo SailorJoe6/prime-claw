@@ -400,9 +400,10 @@ installed generation should expose:
   provider-visible bounded EPISODE identity package;
 - no retired `goal-heartbeat-work-control.ts` entry or
   `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` overlay;
-- the narrow `goal-continuation-nudge.ts` context hook, which reads the managed
-  `skills/goals-and-heartbeats/CONTINUATION.md` plugin asset and contains no
-  model-facing work-control prose of its own; and
+- the narrow `goal-continuation-nudge.ts` context and post-compaction hook, which
+  reads the managed `skills/goals-and-heartbeats/CONTINUATION.md` plugin asset,
+  immediately reminds the next post-compaction turn, and contains no model-facing
+  work-control prose of its own; and
 - lifecycle hooks from `reviewed-plan.ts` that append one ordinary full oversight
   guide after each qualifying owner compaction and use one project ownership
   record; they do not authenticate role-kernel or guide prompt bytes.

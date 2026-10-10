@@ -230,6 +230,13 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
     )
     assert applied.returncode == 0, applied.stdout + applied.stderr
     assert "target mode: user-global" in applied.stdout
+    user_skill = tier1_container.run(
+        "cmp", "-s",
+        f"{home}/.agents/skills/goals-and-heartbeats/SKILL.md",
+        f"{base}/primary/src/prime-agent-plugin/skills/goals-and-heartbeats/SKILL.md",
+        workdir=None, timeout=10,
+    )
+    assert user_skill.returncode == 0, user_skill.stdout + user_skill.stderr
     absent = tier1_container.run("test", "!", "-e", old_skill, workdir=None, wrap=False)
     assert absent.returncode == 0, absent.stderr
     state_absent = tier1_container.run("test", "!", "-e", old_state, workdir=None, wrap=False)

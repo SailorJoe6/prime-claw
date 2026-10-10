@@ -11,7 +11,11 @@ fresh session.
 
 ## Orientation (do this)
 
-Read these files, in this order:
+First, read and apply **`/skill:goals-and-heartbeats`** unless that exact skill
+is already present in the current context. It is mandatory and always in effect
+while working toward any goal.
+
+Then read these files, in this order:
 
 1. **[AGENTS.md](AGENTS.md)** — operating instructions, beads usage, the RLM
    safe-spawn protocol, credential isolation, and the land-the-plane rule.

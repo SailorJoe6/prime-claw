@@ -6,6 +6,9 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/prime-agent-plugin-target.sh"
 select_prime_agent_plugin_target "$@"
 source_root="$repo_root/src/prime-agent-plugin"
+user_skill_source="$source_root/skills/goals-and-heartbeats/SKILL.md"
+user_skill_dir="$user_agents_root/skills/goals-and-heartbeats"
+user_skill_destination="$user_skill_dir/SKILL.md"
 files=(
   extensions/goal-continuation-nudge.ts
   extensions/handoff-chain.ts
@@ -46,6 +49,9 @@ managed_directories=(
   "$destination_root/skills/prime-claw-oversee-episode"
   "$destination_root/skills/prime-claw-expert-review"
   "$destination_root/.prime-claw"
+  "$user_agents_root"
+  "$user_agents_root/skills"
+  "$user_skill_dir"
 )
 for directory in "${managed_directories[@]}"; do
   if [[ -e "$directory" || -L "$directory" ]]; then
@@ -55,6 +61,16 @@ for directory in "${managed_directories[@]}"; do
     fi
   fi
 done
+if [[ ! -e "$user_skill_destination" && ! -L "$user_skill_destination" ]]; then
+  printf 'missing user-level goals-and-heartbeats skill: %s\n' "$user_skill_destination" >&2
+  status=1
+elif [[ ! -f "$user_skill_destination" || -L "$user_skill_destination" ]]; then
+  printf 'unsafe user-level skill destination (expected regular file): %s\n' "$user_skill_destination" >&2
+  status=1
+elif ! cmp -s "$user_skill_source" "$user_skill_destination"; then
+  printf 'stale user-level goals-and-heartbeats skill: %s\n' "$user_skill_destination" >&2
+  status=1
+fi
 
 for name in blocked design execute prepare spec-it-out; do
   collision="$destination_root/skills/$name"
