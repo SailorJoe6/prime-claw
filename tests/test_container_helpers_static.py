@@ -89,7 +89,7 @@ UNIT_ENV_BODIES = {
     "launcher_fixture": ("unit_env_tier1_fixture_body.py", 3),
     "launcher_image": ("unit_env_tier1_image_body.py", 6),
     "cleanup": ("unit_env_cleanup_body.py", 1),
-    "probe_wrapper": ("unit_env_probe_wrapper_body.py", 2),
+    "probe_wrapper": ("unit_env_probe_wrapper_body.py", 3),
 }
 
 

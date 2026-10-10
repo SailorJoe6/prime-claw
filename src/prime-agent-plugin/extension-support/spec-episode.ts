@@ -422,7 +422,7 @@ function daemonLaunchEnvironment(): Record<string, string> {
 
 
 export interface PrimeSessionManagerClass {
-  create(cwd: string): { getSessionFile(): string | undefined; getSessionId(): string };
+  create(cwd: string): { getSessionFile(): string | undefined; getSessionId(): string; flushNow(): void };
 }
 export function runtimeSessionManagerClass(sessionManager: object): PrimeSessionManagerClass {
   const candidate = Object.getPrototypeOf(sessionManager)?.constructor as Partial<PrimeSessionManagerClass> | undefined;
@@ -453,6 +453,8 @@ export class PrimeSessionPublisher implements SessionPublisher {
     const sessionFile = manager.getSessionFile();
     if (!sessionFile) throw new Error("Prime Agent created an in-memory Episode session");
     const sessionId = manager.getSessionId();
+    manager.flushNow();
+    if (!existsSync(sessionFile)) throw new Error("Prime Agent did not persist the allocated Episode session");
     try { await options.onAllocated?.({ sessionId, sessionFile }); }
     catch (error) { rmSync(sessionFile, { force: true }); throw error; }
     try { return await this.openResident({ ...options, sessionFile, sessionId }); }
@@ -787,10 +789,12 @@ async function reopenIfNeeded(
     const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
     const reopened = await publisher.reopen({ sessionFile: record.episodeSessionFile!, sessionId: record.episodeId!, worktree: record.worktree!, sessionName: `${record.slug}-episode`, model });
     activeSessionId = reopened.activeSessionId;
+  }
+  if (!activeSessionId) throw new EpisodeStateUncertainError("Episode has no usable active routing identity");
+  if (record.episodeActiveSessionId !== activeSessionId) {
     current = updated(record, { episodeActiveSessionId: activeSessionId });
     store.write(repo, current);
   }
-  if (!activeSessionId) throw new EpisodeStateUncertainError("Episode has no usable active routing identity");
   return { record: current, activeSessionId };
 }
 
@@ -884,6 +888,7 @@ export async function createSpecEpisode(
     try { setups = await orca.listReadySetups(repo); }
     catch (error) {
       if (!(error instanceof OrcaUnavailableError)) throw error;
+      if (options.host) throw new Error(`Explicit Episode host ${options.host} could not be resolved because Orca inventory is unavailable`);
       const branch = `episode/${selected.slug}-${operationId.slice(0, 8)}`;
       const worktree = resolve(dirname(repo), worktreeName);
       if (filesystem.exists(worktree) || git.worktrees(repo).some((entry) => samePath(entry.path, worktree))) throw new Error(`Episode worktree path already exists: ${worktree}`);

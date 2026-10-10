@@ -68,6 +68,29 @@ print(json.dumps({"config": str(config), "sessions": str(sessions)}))
         )
         self.assertEqual(result.returncode, 23, result.stdout + result.stderr)
 
+    def test_native_probe_gets_unique_socket_and_supervisor_registry(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="prime-claw-native-probe-") as tmp:
+            fake = Path(tmp) / "prime-agent-fixture"
+            fake.write_text("""#!/bin/sh
+python3 -c 'import json,os,sys;print(json.dumps({"args":sys.argv[1:],"config":os.environ.get("PRIME_AGENT_CODING_AGENT_DIR"),"sessions":os.environ.get("PRIME_AGENT_SESSION_DIR"),"registry":os.environ.get("PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_REGISTRY_DIR"),"tmpdir":os.environ.get("TMPDIR")}))' "$@"
+""")
+            fake.chmod(0o755)
+            result = subprocess.run(
+                [str(RUN_PROBE), str(fake), "--mode", "rpc"],
+                cwd=REPO,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            proof = json.loads(result.stdout)
+            config = Path(proof["config"])
+            self.assertNotIn("--daemon-socket", proof["args"])
+            self.assertEqual(Path(proof["tmpdir"]).parent, config.parent)
+            self.assertEqual(Path(proof["sessions"]).parent, config.parent)
+            self.assertEqual(Path(proof["registry"]).parent, config.parent)
+            self.assertFalse(config.parent.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

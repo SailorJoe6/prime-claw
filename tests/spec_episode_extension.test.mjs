@@ -158,6 +158,16 @@ test("definitive pre-mutation Orca unavailability uses fresh local fallback once
   assert.equal(f.calls.some((call) => call[0] === "handoff" || call[0] === "orca-create"), false);
 });
 
+test("explicit host never falls back locally when Orca inventory is unavailable", async () => {
+  const f = harness({ unavailable: true });
+  await assert.rejects(
+    createApproved(f, { host: "id:123e4567-e89b-12d3-a456-426614174000" }),
+    /Explicit Episode host .* could not be resolved/,
+  );
+  assert.equal(f.record, null);
+  assert.equal(f.calls.some((call) => ["local-create", "fresh", "execute", "orca-create"].includes(call[0])), false);
+});
+
 test("local worktree identity is durable before fallback mutation", async () => {
   const f = harness({ unavailable: true });
   f.git.createWorktree = () => { throw new Error("ambiguous local create"); };
@@ -187,6 +197,19 @@ test("active replay refreshes route without replaying assignment", async () => {
   const result = await createApproved(f);
   assert.equal(result.reused, true); assert.equal(f.calls.some((call) => ["auto-run", "execute", "handoff"].includes(call[0])), false);
   assert.equal(f.calls.some((call) => call[0] === "reopen"), true);
+});
+
+test("active replay persists an already-live replacement route without reopening", async () => {
+  const f0 = harness(); const active = await createApproved(f0);
+  const replacement = { ...active, episodeActiveSessionId: "old-route", reused: undefined };
+  const f = harness({ record: replacement, list: () => [{ activeSessionId: "replacement-route", sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree }] });
+  f.git.entries = [{ path: f.root, branch: "main" }, { path: active.worktree, branch: active.branch }];
+  f.filesystem.exists = () => true;
+  f.orca.showWorktree = async () => ({ ...f.wt, id: active.worktreeId, identity: active.worktreeIdentity, path: active.worktree, branch: active.branch, projectSetupId: active.projectSetupId, head: active.head });
+  const result = await createApproved(f);
+  assert.equal(result.reused, true); assert.equal(result.episodeActiveSessionId, "replacement-route");
+  assert.equal(f.record.episodeActiveSessionId, "replacement-route");
+  assert.equal(f.calls.some((call) => ["reopen", "execute", "handoff", "fresh"].includes(call[0])), false);
 });
 
 test("uncertain replay never replays assignment", async () => {

@@ -10,6 +10,7 @@ REPO = Path(__file__).resolve().parents[1]
 EXTENSION = REPO / "src/prime-agent-plugin/extensions/reviewed-plan.ts"
 EPISODE_EXTENSION = REPO / "src/prime-agent-plugin/extension-support/spec-episode.ts"
 WS_EXTENSION = "/workspace/src/prime-agent-plugin/extensions/reviewed-plan.ts"
+WS_EPISODE_EXTENSION = "/workspace/src/prime-agent-plugin/extension-support/spec-episode.ts"
 WS_REVIEWED_PLAN_NODE_SUITE = "/workspace/tests/reviewed_plan_extension.test.mjs"
 WS_SPEC_EPISODE_NODE_SUITE = "/workspace/tests/spec_episode_extension.test.mjs"
 WS_EPISODE_CLOSE_NODE_SUITE = "/workspace/tests/episode_close_extension.test.mjs"
@@ -28,6 +29,46 @@ def test_spec_episode_node_suite(tier1_container) -> None:
 def test_episode_close_node_suite(tier1_container) -> None:
     result = tier1_container.run("node", "--experimental-strip-types", "--test", WS_EPISODE_CLOSE_NODE_SUITE, timeout=120)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_real_v098_fresh_session_is_flushed_before_daemon_publication(tier1_container, ctmp) -> None:
+    cwd = ctmp / "fresh-session"
+    cwd.mkdir()
+    result_file = ctmp / "fresh-session-result.json"
+    driver = ctmp / "fresh-session-proof.ts"
+    driver.write_text(f"""import {{existsSync,writeFileSync}} from 'node:fs';
+import {{SessionManager}} from '@earendil-works/pi-coding-agent';
+import {{PrimeSessionPublisher,runtimeSessionManagerClass}} from '{WS_EPISODE_EXTENSION}';
+const cwd={json.dumps(str(cwd))},resultFile={json.dumps(str(result_file))};
+export default function proof(pi){{pi.on('session_start',async()=>{{
+  try{{
+    const Runtime=runtimeSessionManagerClass(SessionManager.inMemory(cwd));
+    let allocated;
+    const client={{async request(command){{
+      if(command.type!=='create')throw new Error('unexpected daemon request '+command.type);
+      if(!existsSync(command.sessionPath))throw new Error('allocated header was not durable');
+      const opened=await SessionManager.openAsync(command.sessionPath,undefined,command.config.cwd);
+      return {{success:true,data:{{activeSessionId:'route',sessionId:opened.getSessionId(),sessionFile:command.sessionPath,cwd:command.config.cwd,sessionName:command.name}}}};
+    }},close(){{}}}};
+    const publisher=new PrimeSessionPublisher(client,Runtime);
+    const published=await publisher.createFresh({{worktree:cwd,sessionName:'fresh-episode',onAllocated(identity){{allocated=identity;if(!existsSync(identity.sessionFile))throw new Error('allocation callback preceded flush');}}}});
+    publisher.close();
+    writeFileSync(resultFile,JSON.stringify({{allocated,published,sameId:allocated.sessionId===published.sessionId,sameFile:allocated.sessionFile===published.sessionFile}}));
+  }}catch(error){{writeFileSync(resultFile,JSON.stringify({{error:String(error),stack:error?.stack}}));}}
+}})}}
+""")
+    request = json.dumps({"id": "commands", "type": "get_commands"}) + "\n"
+    result = tier1_container.run(
+        "/workspace/scripts/run-prime-agent-probe.sh", tier1_container.prime_agent,
+        "--mode", "rpc", "--offline", "--no-session", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-extensions",
+        "--cwd", str(cwd), "-e", str(driver), input_text=request, timeout=60, workdir=None,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    proof = json.loads(result_file.read_text())
+    assert "error" not in proof, proof
+    assert proof["sameId"] is True
+    assert proof["sameFile"] is True
+    assert proof["published"]["activeSessionId"] == "route"
 
 
 def test_episode_creation_uses_fresh_host_session_without_runtime_package_import() -> None:
