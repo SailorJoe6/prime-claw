@@ -83,7 +83,7 @@ def test_handoff_skill_has_only_one_slash_command_surface():
 
 def test_handoff_skill_reports_compaction_without_owning_execute_admission():
     """The workflow must report immediate compaction state and not route execute."""
-    skill = (REPO / ".ralph" / "skills" / "handoff" / "SKILL.md").read_text()
+    skill = (REPO / ".prime-claw" / "workflows" / "handoff.md").read_text()
     assert "<operator-compaction-guidance>" in skill
     assert "compaction_result = await compact.run(focus_hint)" in skill
     assert "It is guidance only; it never selects the next phase." in skill

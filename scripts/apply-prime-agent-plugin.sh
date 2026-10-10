@@ -5,12 +5,22 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=prime-agent-plugin-target.sh
 source "$repo_root/scripts/prime-agent-plugin-target.sh"
 role_receipt=""
+global_drift_action="preserve"
 target_args=()
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --user-global)
       target_args+=("$1")
       shift
+      ;;
+    --global-drift-action)
+      if [[ "$#" -lt 2 || ! "$2" =~ ^(preserve|backup-reset|accept-override)$ ]]; then
+        printf 'error: --global-drift-action requires preserve, backup-reset, or accept-override
+' >&2
+        exit 64
+      fi
+      global_drift_action="$2"
+      shift 2
       ;;
     --role-receipt)
       if [[ "$#" -lt 2 || -z "$2" ]]; then
@@ -40,12 +50,25 @@ source_root="$repo_root/src/prime-agent-plugin"
 files=(
   extensions/goal-continuation-nudge.ts
   extensions/handoff-chain.ts
+  extensions/project-initialization.ts
   extensions/reviewed-plan.ts
+  asset-inventory.json
+  ROLE_KERNEL.md
+  extension-support/project-initialization.ts
+  extension-support/template-review.ts
   extension-support/conversation-guide-metadata.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-close.ts
-  skills/goals-and-heartbeats/SKILL.md
-  skills/goals-and-heartbeats/CONTINUATION.md
+  skills/project-templates/blocked.md
+  skills/project-templates/design.md
+  skills/project-templates/execute.md
+  skills/project-templates/prepare.md
+  skills/project-templates/spec-it-out.md
+  workflows/handoff.md
+  workflows/implement-prep.md
+  workflows/implement-spec.md
+  workflows/plan-prep.md
+  workflows/plan-spec.md
   extension-support/handoff-prompts.ts
   extension-support/prep-chain.ts
   extension-support/reviewed-plan-support.ts
@@ -92,6 +115,8 @@ managed_directories=(
   "$destination_root/extension-support"
   "$destination_root/skills"
   "$destination_root/skills/goals-and-heartbeats"
+  "$destination_root/skills/project-templates"
+  "$destination_root/workflows"
   "$destination_root/skills/prime-claw-oversee-episode"
   "$destination_root/skills/prime-claw-expert-review"
   "$destination_root/.prime-claw"
@@ -102,6 +127,16 @@ for directory in "${managed_directories[@]}"; do
       printf 'unsafe managed plugin directory (expected absent or real directory): %s\n' "$directory" >&2
       exit 1
     fi
+  fi
+done
+
+# Project template sources are deliberately non-discoverable. Never tolerate a
+# global SKILL.md copy that could shadow project customization.
+for name in blocked design execute prepare spec-it-out; do
+  collision="$destination_root/skills/$name"
+  if [[ -e "$collision" || -L "$collision" ]]; then
+    printf 'unexpected global project-template skill collision: %s\n' "$collision" >&2
+    exit 1
   fi
 done
 
@@ -124,6 +159,8 @@ for relative in "${managed_destinations[@]}"; do
   fi
 done
 
+python3 "$repo_root/scripts/manage-prime-agent-global-assets.py" preflight   "$source_root" "$destination_root" --action "$global_drift_action"
+
 managed_skill_dir="$destination_root/skills/prime-claw-oversee-episode"
 expert_skill_dir="$destination_root/skills/prime-claw-expert-review"
 cleanup_args=(validate --plugin-root "$destination_root")
@@ -132,7 +169,7 @@ if [[ "$plugin_target_mode" == "user-global" ]]; then
 fi
 python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"
 
-mkdir -p "$destination_root/extensions" "$destination_root/extension-support" "$destination_root/skills/goals-and-heartbeats" "$managed_skill_dir" "$expert_skill_dir"
+mkdir -p "$destination_root/extensions" "$destination_root/extension-support"   "$destination_root/skills/goals-and-heartbeats" "$destination_root/skills/project-templates"   "$destination_root/workflows" "$managed_skill_dir" "$expert_skill_dir"
 role_apply_args=(
   apply "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"
 )
@@ -149,8 +186,7 @@ done
 for relative in "${files[@]}"; do
   install -m 0644 "$source_root/$relative" "$destination_root/$relative"
 done
-install -m 0644 "$managed_skill_source" "$destination_root/$managed_skill_relative"
-install -m 0644 "$expert_skill_source" "$destination_root/$expert_skill_relative"
+python3 "$repo_root/scripts/manage-prime-agent-global-assets.py" apply   "$source_root" "$destination_root" --action "$global_drift_action"
 # Installation is sequential, not an atomic generation swap. The required final
 # check detects any incomplete or mixed generation before apply reports success,
 # using the same explicit target semantics selected above.

@@ -5,7 +5,7 @@ description: Use for Ralph's execution phase in beads-tracked projects to implem
 
 run the /prepare skill if it is not fresh in your context window.  Important: If you have had a recent context compaction, then nothing is fresh!
 
-Next, study [the plan](.ralph/plans/EXECUTION_PLAN.md), if one exists.  The plan describes the implementation steps for the current [spec doc](.ralph/plans/SPECIFICATION.md).  Study both of these files, if they exist.   This will get you up to speed on where we are, what we are working on and what's left to do.  If the files are not found in that location, then the user should have given you other instructions on what to work on. If you have not been given any instructions, then ask the user for instructions on what to work on.  In either case, these instructions are "the plan" for the purposes of this conversation. 
+Next, study [the plan](.ralph/plans/EXECUTION_PLAN.md), if one exists.  The plan describes the implementation steps for the current [spec doc](.ralph/plans/SPECIFICATION.md).  Study both of these files, if they exist.   This will get you up to speed on where we are, what we are working on and what's left to do.  If the files are not found in that location, then the user should have given you other instructions on what to work on. If you have not been given any instructions, then ask the user for instructions on what to work on.  In either case, these instructions are "the plan" for the purposes of this conversation.
 
 There may be some tickets in beads related to the plan, and you may need to create beads tickets as you implement the plan.  There may be some tickets that are not related to the plan.  Focus on the plan and plan related tickets.
 
@@ -51,4 +51,4 @@ Remember to maintain good documentation quality.  All new features and changes t
 
 Remember to maintain high test coverage.  All new features will need tests.  Bug fixes need tests as well.
 
-That is your workflow. Do all these things for the one task you choose.  Only complete these things for one task, then report back on the status and await further instructions.  
+That is your workflow. Do all these things for the one task you choose.  Only complete these things for one task, then report back on the status and await further instructions.

@@ -176,7 +176,7 @@ def test_installed_discovery_real_implement_spec_activation_resume_and_absence(t
  records=ctmp/"records.jsonl";probe=agent/"extensions/probe-provider.ts";provider(probe,records,location,sock)
  project=f"{croot}/project";tier1_container.mkdir_p(project);cgit(tier1_container,project,"init","-q");cgit(tier1_container,project,"config","user.email","poc@example.invalid");cgit(tier1_container,project,"config","user.name","POC")
  for name in ["implement-prep","implement-spec","handoff","execute"]:
-  tier1_container.write_text(f"{project}/.ralph/skills/{name}/SKILL.md",f"---\nname: {name}\ndescription: native {name} fixture\n---\n{name} policy")
+  tier1_container.write_text(f"{project}/.prime-claw/workflows/{'plan-spec' if name == 'plan' else name}.md",f"---\nname: {name}\ndescription: native {name} fixture\n---\n{name} policy")
  assert not tier1_container.exists(f"{project}/.ralph/skills/oversee-episode/SKILL.md")
  future=f"{project}/{location}";tier1_container.write_text(f"{future}/SPECIFICATION.md","spec");tier1_container.write_text(f"{future}/EXECUTION_PLAN.md","plan");cgit(tier1_container,project,"add",".");cgit(tier1_container,project,"commit","-qm","fixture")
  sessions=ctmp/"sessions";sessions.mkdir()
@@ -279,7 +279,7 @@ export default function x(pi){pi.on("session_start",async()=>{if(mode==="later")
     probe.write_text(provider_source.replace("__SOCKET__",json.dumps(str(sock))).replace("__TRANSPORT__",json.dumps(str(records.with_suffix(".transport.jsonl")))).replace("__RECORDS__",json.dumps(str(records))).replace("__LOCATION__",json.dumps(location)).replace("__PROVIDER_CAPTURE__",provider_capture_expression()).replace("__LEGACY_PACKAGE__",json.dumps(LEGACY_PACKAGE_SENTINEL)))
     project=f"{croot}/project";tier1_container.mkdir_p(project);cgit(tier1_container,project,"init","-q");cgit(tier1_container,project,"config","user.email","poc@example.invalid");cgit(tier1_container,project,"config","user.name","POC")
     for name in ["implement-prep","implement-spec","handoff","execute"]:
-        tier1_container.write_text(f"{project}/.ralph/skills/{name}/SKILL.md",f"---\nname: {name}\ndescription: native {name} fixture\n---\n{name}")
+        tier1_container.write_text(f"{project}/.prime-claw/workflows/{'plan-spec' if name == 'plan' else name}.md",f"---\nname: {name}\ndescription: native {name} fixture\n---\n{name}")
     assert not tier1_container.exists(f"{project}/.ralph/skills/oversee-episode/SKILL.md")
     future=f"{project}/{location}";tier1_container.write_text(f"{future}/SPECIFICATION.md","spec");tier1_container.write_text(f"{future}/EXECUTION_PLAN.md","plan")
     # Test-only setup records one exact old completed generation for the new owner UUID.

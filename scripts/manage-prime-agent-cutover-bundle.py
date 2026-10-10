@@ -23,12 +23,27 @@ MAX_PREIMAGE_BYTES = 8 * 1024 * 1024
 MANAGED_FILES = (
     "extensions/goal-continuation-nudge.ts",
     "extensions/handoff-chain.ts",
+    "extensions/project-initialization.ts",
     "extensions/reviewed-plan.ts",
+    "asset-inventory.json",
+    "ROLE_KERNEL.md",
+    "extension-support/project-initialization.ts",
+    "extension-support/template-review.ts",
     "extension-support/conversation-guide-metadata.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
     "skills/goals-and-heartbeats/SKILL.md",
     "skills/goals-and-heartbeats/CONTINUATION.md",
+    "skills/project-templates/blocked.md",
+    "skills/project-templates/design.md",
+    "skills/project-templates/execute.md",
+    "skills/project-templates/prepare.md",
+    "skills/project-templates/spec-it-out.md",
+    "workflows/handoff.md",
+    "workflows/implement-prep.md",
+    "workflows/implement-spec.md",
+    "workflows/plan-prep.md",
+    "workflows/plan-spec.md",
     "extension-support/handoff-prompts.ts",
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
@@ -50,6 +65,9 @@ EXPECTED_ABSENT = (
 )
 PROTOCOL_SURFACES = (
     ".prime-claw/role-protocol-state.json",
+)
+MUTABLE_SURFACES = (
+    ".prime-claw/global-templates.json",
 )
 SECRET_PATTERNS = (
     re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
@@ -202,6 +220,13 @@ def installed_inventory(root: Path, source_root: Path, candidate_post_root: Path
             result.append({"path": rel, "kind": "file", "observed": "present", "mode": stat.S_IMODE(info.st_mode), "uid": info.st_uid, "gid": info.st_gid, "size": len(data), "installedSha256": digest(data), "candidatePostimageSha256": digest(candidate_data), "candidatePostimageSize": len(candidate_data)})
         else:
             result.append({"path": rel, "kind": "absent", "observed": "absent", "candidatePostimageSha256": digest(candidate_data), "candidatePostimageSize": len(candidate_data)})
+    for rel in MUTABLE_SURFACES:
+        path = validate_fixed_components(root, rel, leaf_may_be_absent=True)
+        if path.exists() or path.is_symlink():
+            data, info = regular(path, limit=MAX_PREIMAGE_BYTES)
+            result.append({"path": rel, "kind": "mutable-state", "observed": "present", "mode": stat.S_IMODE(info.st_mode), "uid": info.st_uid, "gid": info.st_gid, "size": len(data), "installedSha256": digest(data)})
+        else:
+            result.append({"path": rel, "kind": "mutable-state", "observed": "absent"})
     return result
 
 
@@ -355,7 +380,7 @@ def load_verified(bundle: Path) -> tuple[dict[str, Any], str]:
         tool_data, _ = regular(bundled_file(bundle, tool["copy"]), limit=MAX_PREIMAGE_BYTES)
         if len(tool_data) != tool["size"] or digest(tool_data) != tool["sha256"]:
             raise ValueError(f"bundle restore tool mismatch: {tool['name']}")
-    expected_inventory_paths = list(MANAGED_FILES) + list(EXPECTED_ABSENT) + list(PROTOCOL_SURFACES)
+    expected_inventory_paths = list(MANAGED_FILES) + list(EXPECTED_ABSENT) + list(PROTOCOL_SURFACES) + list(MUTABLE_SURFACES)
     if [entry.get("path") for entry in manifest["installedInventory"]] != expected_inventory_paths:
         raise ValueError("installed inventory is not the fixed managed surface")
     expected_files = {"manifest.json", "manifest.sha256"}
@@ -452,6 +477,8 @@ def restore_installed(args: argparse.Namespace) -> dict[str, Any]:
             if pre_exists and current_sha == entry["installedSha256"] and len(current) == entry["size"]:
                 state = "complete" if metadata_matches(info, entry) else "metadata"
             elif candidate_exists and current_sha == candidate_digest and len(current) == candidate_size:
+                state = "content"
+            elif entry["path"] in MUTABLE_SURFACES:
                 state = "content"
             else:
                 raise ValueError(f"unknown installed state: {entry['path']}")

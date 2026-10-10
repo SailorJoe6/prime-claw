@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
+import { resolveNearestProjectRoot } from "./project-initialization.ts";
 
 export interface FutureLocation {
   location: string;
@@ -25,7 +26,7 @@ export function validateFutureLocation(cwd: string, rawArgs: string): FutureLoca
   const match = SAFE_LOCATION.exec(location);
   if (!match) return null;
 
-  const projectRoot = realpathSync(cwd);
+  const projectRoot = resolveNearestProjectRoot(cwd).root;
   const futureRoot = resolve(projectRoot, ".ralph", "plans", "future");
   const folder = resolve(projectRoot, location);
   if (!containedBy(futureRoot, folder)) return null;
@@ -45,8 +46,10 @@ export function wrapCanonicalSkill(
   locationTag: string,
   location: string,
 ): string | null {
-  const path = join(projectRoot, ".ralph", "skills", skillName, "SKILL.md");
-  if (!existsSync(path)) return null;
+  const path = skillName === "execute"
+    ? join(projectRoot, ".agents", "skills", "execute", "SKILL.md")
+    : join(projectRoot, ".prime-claw", "workflows", `${skillName}.md`);
+  if (!existsSync(path) || !statSync(path).isFile()) return null;
   const body = readFileSync(path, "utf8");
   return `<skill name="${skillName}" location="${path}">
 References are relative to ${dirname(path)}.

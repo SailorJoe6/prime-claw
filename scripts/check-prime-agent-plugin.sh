@@ -9,12 +9,25 @@ source_root="$repo_root/src/prime-agent-plugin"
 files=(
   extensions/goal-continuation-nudge.ts
   extensions/handoff-chain.ts
+  extensions/project-initialization.ts
   extensions/reviewed-plan.ts
+  asset-inventory.json
+  ROLE_KERNEL.md
+  extension-support/project-initialization.ts
+  extension-support/template-review.ts
   extension-support/conversation-guide-metadata.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-close.ts
-  skills/goals-and-heartbeats/SKILL.md
-  skills/goals-and-heartbeats/CONTINUATION.md
+  skills/project-templates/blocked.md
+  skills/project-templates/design.md
+  skills/project-templates/execute.md
+  skills/project-templates/prepare.md
+  skills/project-templates/spec-it-out.md
+  workflows/handoff.md
+  workflows/implement-prep.md
+  workflows/implement-spec.md
+  workflows/plan-prep.md
+  workflows/plan-spec.md
   extension-support/handoff-prompts.ts
   extension-support/prep-chain.ts
   extension-support/reviewed-plan-support.ts
@@ -28,6 +41,8 @@ managed_directories=(
   "$destination_root/extension-support"
   "$destination_root/skills"
   "$destination_root/skills/goals-and-heartbeats"
+  "$destination_root/skills/project-templates"
+  "$destination_root/workflows"
   "$destination_root/skills/prime-claw-oversee-episode"
   "$destination_root/skills/prime-claw-expert-review"
   "$destination_root/.prime-claw"
@@ -38,6 +53,14 @@ for directory in "${managed_directories[@]}"; do
       printf 'unsafe managed plugin directory (expected absent or real directory): %s\n' "$directory" >&2
       status=1
     fi
+  fi
+done
+
+for name in blocked design execute prepare spec-it-out; do
+  collision="$destination_root/skills/$name"
+  if [[ -e "$collision" || -L "$collision" ]]; then
+    printf 'unexpected global project-template skill collision: %s\n' "$collision" >&2
+    status=1
   fi
 done
 
@@ -103,57 +126,15 @@ for relative in "${files[@]}"; do
   fi
 done
 
-managed_skill_relative="skills/prime-claw-oversee-episode/SKILL.md"
-managed_skill_source="$source_root/$managed_skill_relative"
-managed_skill_installed="$destination_root/$managed_skill_relative"
-if [[ ! -s "$managed_skill_source" ]]; then
-  printf 'missing or empty managed Conversation skill source: %s
-' "$managed_skill_source" >&2
-  status=1
-fi
-if [[ -e "$managed_skill_installed" || -L "$managed_skill_installed" ]]; then
-  if [[ ! -f "$managed_skill_installed" || -L "$managed_skill_installed" ]]; then
-    printf 'unsafe managed Conversation skill destination: %s
-' "$managed_skill_installed" >&2
-    status=1
-  elif ! cmp -s "$managed_skill_source" "$managed_skill_installed"; then
-    printf 'stale installed managed Conversation skill: %s
-' "$managed_skill_installed" >&2
-    status=1
-  fi
-else
-  printf 'missing installed managed Conversation skill: %s
-' "$managed_skill_installed" >&2
-  status=1
-fi
-
-expert_skill_relative="skills/prime-claw-expert-review/SKILL.md"
-expert_skill_source="$source_root/$expert_skill_relative"
-expert_skill_installed="$destination_root/$expert_skill_relative"
-if [[ ! -f "$expert_skill_source" || -L "$expert_skill_source" ]]; then
-  printf 'missing or unsafe managed EXPERT skill source: %s
-' "$expert_skill_source" >&2
-  status=1
-elif [[ -e "$expert_skill_installed" || -L "$expert_skill_installed" ]]; then
-  if [[ ! -f "$expert_skill_installed" || -L "$expert_skill_installed" ]]; then
-    printf 'unsafe managed EXPERT skill destination: %s
-' "$expert_skill_installed" >&2
-    status=1
-  elif ! cmp -s "$expert_skill_source" "$expert_skill_installed"; then
-    printf 'stale installed managed EXPERT skill: %s
-' "$expert_skill_installed" >&2
-    status=1
-  fi
-else
-  printf 'missing installed managed EXPERT skill: %s
-' "$expert_skill_installed" >&2
-  status=1
-fi
 cleanup_args=(check-absent --plugin-root "$destination_root")
 if [[ "$plugin_target_mode" == "user-global" ]]; then
   cleanup_args+=(--coding-agent-root "${PRIME_AGENT_CODING_AGENT_DIR:-$HOME/.prime/agent}")
 fi
 if ! python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"; then
+  status=1
+fi
+
+if ! python3 "$repo_root/scripts/manage-prime-agent-global-assets.py" check   "$source_root" "$destination_root"; then
   status=1
 fi
 

@@ -235,9 +235,12 @@ which folders, how the brain links in — is a deferred secondary concern.)
   forks).
 - **gbrain source:** `prime-claw` is registered as an isolated source (searched
   only when explicitly named) — the correct project-source scoping.
-- **Skills exposure:** `.agents/skills/<phase>` symlinks to
-  `../../.ralph/skills/<phase>`; `.ralph/skills/` is the single source of
-  truth. All seven phases are symlinked (including `blocked`).
+- **Skills exposure (historical, superseded):** `.agents/skills/<phase>`
+  originally symlinked to `../../.ralph/skills/<phase>`. The evidence-backed
+  initializer now installs regular customizable skills under `.agents/skills/`
+  and lifecycle-only workflows under `.prime-claw/workflows/` from canonical
+  `src/prime-agent-plugin/` sources. `.ralph/skills/` is retired without moving
+  `.ralph/plans/`.
 - **Session CWD is a spawn-time binding.** `os.chdir` moves the kernel's
   working directory but does NOT re-point the harness's skill-resolution root;
   `/reload` re-reads from the original spawn root. A session rooted in one

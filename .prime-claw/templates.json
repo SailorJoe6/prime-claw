@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "project-skill-blocked": {
+      "source": "skills/project-templates/blocked.md",
+      "destination": ".agents/skills/blocked/SKILL.md",
+      "baselineSha256": "3d73166d4bc3b8fdcdfdcdb312fe6c227a75a43e6342d3154d8137a2fbe76257",
+      "installedSha256": "3d73166d4bc3b8fdcdfdcdb312fe6c227a75a43e6342d3154d8137a2fbe76257",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "3d73166d4bc3b8fdcdfdcdb312fe6c227a75a43e6342d3154d8137a2fbe76257",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "discoverable",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "project-reconcile"
+      }
+    },
+    "project-skill-design": {
+      "source": "skills/project-templates/design.md",
+      "destination": ".agents/skills/design/SKILL.md",
+      "baselineSha256": "089fd7bbc6adcf74d52f078fbb8297865cb977796c55acce0b927dbe9be7fe53",
+      "installedSha256": "089fd7bbc6adcf74d52f078fbb8297865cb977796c55acce0b927dbe9be7fe53",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "089fd7bbc6adcf74d52f078fbb8297865cb977796c55acce0b927dbe9be7fe53",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "discoverable",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "project-reconcile"
+      }
+    },
+    "project-skill-execute": {
+      "source": "skills/project-templates/execute.md",
+      "destination": ".agents/skills/execute/SKILL.md",
+      "baselineSha256": "c069e82b0e41c445c929a5c8018473c56d46303565b1c686bdb2c900ba9851b5",
+      "installedSha256": "c069e82b0e41c445c929a5c8018473c56d46303565b1c686bdb2c900ba9851b5",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "c069e82b0e41c445c929a5c8018473c56d46303565b1c686bdb2c900ba9851b5",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "discoverable",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "project-reconcile"
+      }
+    },
+    "project-skill-prepare": {
+      "source": "skills/project-templates/prepare.md",
+      "destination": ".agents/skills/prepare/SKILL.md",
+      "baselineSha256": "b88d5bbd6665a11f10d0b0cd3307c9364655056ddcb13f7b1c99d17beb43378c",
+      "installedSha256": "b88d5bbd6665a11f10d0b0cd3307c9364655056ddcb13f7b1c99d17beb43378c",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "b88d5bbd6665a11f10d0b0cd3307c9364655056ddcb13f7b1c99d17beb43378c",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "discoverable",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "project-reconcile"
+      }
+    },
+    "project-skill-spec-it-out": {
+      "source": "skills/project-templates/spec-it-out.md",
+      "destination": ".agents/skills/spec-it-out/SKILL.md",
+      "baselineSha256": "dc2e8b1cc341df97fb55d7742b390c4bedd694749e39abbe93c37868c9b8eab0",
+      "installedSha256": "dc2e8b1cc341df97fb55d7742b390c4bedd694749e39abbe93c37868c9b8eab0",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "dc2e8b1cc341df97fb55d7742b390c4bedd694749e39abbe93c37868c9b8eab0",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "discoverable",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "project-reconcile"
+      }
+    },
+    "project-workflow-handoff": {
+      "source": "workflows/handoff.md",
+      "destination": ".prime-claw/workflows/handoff.md",
+      "baselineSha256": "12bfa24110079f27c9a22537dbc1d5f9b86dd83ac954fdc6df9a3fec5704dd44",
+      "installedSha256": "12bfa24110079f27c9a22537dbc1d5f9b86dd83ac954fdc6df9a3fec5704dd44",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "12bfa24110079f27c9a22537dbc1d5f9b86dd83ac954fdc6df9a3fec5704dd44",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "internal",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "handoff"
+      }
+    },
+    "project-workflow-implement-prep": {
+      "source": "workflows/implement-prep.md",
+      "destination": ".prime-claw/workflows/implement-prep.md",
+      "baselineSha256": "f44ebc44b6d2f3bfc8c9111e83f5d0522257d04c3b8153b58fd7fc52d19db4d4",
+      "installedSha256": "f44ebc44b6d2f3bfc8c9111e83f5d0522257d04c3b8153b58fd7fc52d19db4d4",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "f44ebc44b6d2f3bfc8c9111e83f5d0522257d04c3b8153b58fd7fc52d19db4d4",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "internal",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "implement-spec"
+      }
+    },
+    "project-workflow-implement-spec": {
+      "source": "workflows/implement-spec.md",
+      "destination": ".prime-claw/workflows/implement-spec.md",
+      "baselineSha256": "c63a2e6403a8748ff097daa557f48c6e27f93669cc3bef1f1cfb41ae6e30a198",
+      "installedSha256": "c63a2e6403a8748ff097daa557f48c6e27f93669cc3bef1f1cfb41ae6e30a198",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "c63a2e6403a8748ff097daa557f48c6e27f93669cc3bef1f1cfb41ae6e30a198",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "internal",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "implement-spec"
+      }
+    },
+    "project-workflow-plan-prep": {
+      "source": "workflows/plan-prep.md",
+      "destination": ".prime-claw/workflows/plan-prep.md",
+      "baselineSha256": "140140447e920c0d135c11e17e9376270e69bf8bab84f8131ff0df1dd9a7bba3",
+      "installedSha256": "140140447e920c0d135c11e17e9376270e69bf8bab84f8131ff0df1dd9a7bba3",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "140140447e920c0d135c11e17e9376270e69bf8bab84f8131ff0df1dd9a7bba3",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "internal",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "plan-spec"
+      }
+    },
+    "project-workflow-plan-spec": {
+      "source": "workflows/plan-spec.md",
+      "destination": ".prime-claw/workflows/plan-spec.md",
+      "baselineSha256": "b8c21e023287e7f15f38788e710674b25e5f084cce1af80af2002c5b13de59dd",
+      "installedSha256": "b8c21e023287e7f15f38788e710674b25e5f084cce1af80af2002c5b13de59dd",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "b8c21e023287e7f15f38788e710674b25e5f084cce1af80af2002c5b13de59dd",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "internal",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "plan-spec"
+      }
+    }
+  }
+}

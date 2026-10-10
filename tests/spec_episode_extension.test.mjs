@@ -56,8 +56,8 @@ function repositoryFixture(t) {
   git(repo, "config", "user.email", "test@example.com");
   git(repo, "config", "user.name", "Spec Episode Test");
   write(join(repo, ".gitignore"), ".prime/agent/state/\n");
-  write(join(repo, ".ralph", "skills", "handoff", "SKILL.md"), "canonical handoff body\n\n```python\ncompaction_result = await compact.run(focus_hint)\n```\n");
-  write(join(repo, ".ralph", "skills", "execute", "SKILL.md"), "canonical execute body");
+  write(join(repo, ".prime-claw", "workflows", "handoff.md"), "canonical handoff body\n\n```python\ncompaction_result = await compact.run(focus_hint)\n```\n");
+  write(join(repo, ".agents", "skills", "execute", "SKILL.md"), "canonical execute body");
   write(join(repo, ".ralph", "plans", "CURRENT.md"), "old active plan");
   write(join(repo, LOCATION, "manifest.yaml"), "kind: arbitrary-bundle\n");
   write(join(repo, LOCATION, "nested", "notes.txt"), "opaque nested artifact\n");
@@ -605,7 +605,7 @@ test("owner handoff rejects non-root callers and unresolved initial admission", 
 test("owner handoff preflights both canonical workflows before reopening", async (t) => {
   const { repo } = repositoryFixture(t);
   const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  rmSync(join(created.worktree, ".ralph", "skills", "execute", "SKILL.md"));
+  rmSync(join(created.worktree, ".agents", "skills", "execute", "SKILL.md"));
   const publisher = new FakePublisher({
     sessions: [{
       sessionId: created.episodeId,
@@ -621,7 +621,7 @@ test("owner handoff preflights both canonical workflows before reopening", async
 
   await assert.rejects(
     handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
-    /missing \.ralph\/skills\/execute\/SKILL\.md/,
+    /missing \.agents\/skills\/execute\/SKILL\.md/,
   );
 
   assert.deepEqual(publisher.reopens, []);
@@ -631,13 +631,13 @@ test("owner handoff preflights both canonical workflows before reopening", async
 test("initial bootstrap preflights handoff and execute before publication", async (t) => {
   for (const missing of ["handoff", "execute"]) {
     const { repo, worktree } = repositoryFixture(t);
-    git(repo, "rm", `.ralph/skills/${missing}/SKILL.md`);
+    git(repo, "rm", missing === "handoff" ? `.prime-claw/workflows/handoff.md` : `.agents/skills/execute/SKILL.md`);
     git(repo, "commit", "-qm", `remove ${missing}`);
     const publisher = new FakePublisher();
 
     await assert.rejects(
       createSpecEpisode(LOCATION, `tool-call-missing-${missing}`, context(repo), dependencies(publisher)),
-      new RegExp(`missing \.ralph/skills/${missing}/SKILL\.md`),
+      new RegExp(missing === "handoff" ? "missing \.prime-claw/workflows/handoff\.md" : "missing \.agents/skills/execute/SKILL\.md"),
     );
 
     assert.deepEqual(publisher.forks, []);

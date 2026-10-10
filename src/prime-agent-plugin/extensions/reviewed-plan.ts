@@ -36,7 +36,7 @@ const IMPLEMENT_USAGE = "Usage: /implement-spec .ralph/plans/future/<slug>";
 
 const PLAN_WORKFLOW = {
   usage: PLAN_USAGE,
-  skillName: "plan",
+  skillName: "plan-spec",
   locationTag: "operator-plan-location",
 };
 const PLAN_PREP_WORKFLOW: PrepChainWorkflow = {

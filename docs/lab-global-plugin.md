@@ -6,9 +6,10 @@
 
 ## Source and installed layouts
 
-The builder source is deliberately inert. The final generation has one authored
-role kernel, one machine-readable final selector, ten managed TypeScript files,
-and three exact managed global skill capabilities:
+The builder source is deliberately inert. The current generation has one authored
+role kernel, one machine-readable final selector, thirteen managed TypeScript
+files, one 15-row Markdown inventory, and three exact managed global skill
+capabilities:
 
 ```text
 src/prime-agent-plugin/
@@ -17,8 +18,11 @@ src/prime-agent-plugin/
   extensions/
     goal-continuation-nudge.ts
     handoff-chain.ts
+    project-initialization.ts
     reviewed-plan.ts
   extension-support/
+    project-initialization.ts
+    template-review.ts
     conversation-guide-metadata.ts
     conversation-oversight.ts
     episode-close.ts
@@ -26,10 +30,13 @@ src/prime-agent-plugin/
     prep-chain.ts
     reviewed-plan-support.ts
     spec-episode.ts
+  asset-inventory.json
   skills/
-    goals-and-heartbeats/          # managed SKILL + continuation policy
+    goals-and-heartbeats/          # managed global SKILL + continuation policy
     prime-claw-oversee-episode/SKILL.md
     prime-claw-expert-review/SKILL.md
+    project-templates/*.md         # non-discoverable project skill sources
+  workflows/*.md                  # non-discoverable internal workflow sources
 ```
 
 `ROLE_KERNEL.md` is the only role-kernel policy source. The role-protocol
@@ -42,11 +49,22 @@ continuation hook loads its reminder from that bundle. The legacy APPEND source,
 standalone reviewer profile, and append-only manager are absent.
 
 The installed copy keeps the TypeScript layout under `~/.prime/agent/`. Prime
-Agent auto-discovers the three extension entry points; their relative imports
-resolve through the seven installed `extension-support/` files. Do not keep
+Agent auto-discovers the four extension entry points; their relative imports
+resolve through the nine installed `extension-support/` files. Project skill
+sources use `.md` names below `skills/project-templates/`, so they are not global
+`SKILL.md` discovery candidates; initialization copies them to project-local
+`.agents/skills/` destinations. Do not keep
 plugin source or a second copy under this repository's or a managed project's
 `.prime/agent/extensions/` path. Cross-scope duplicate discovery can prevent
 startup. The durable source belongs under `src/prime-agent-plugin/`.
+
+## Supported runtime
+
+Prime Claw is pinned to Prime Agent v0.9.8. Do not install, activate, test-cut
+over, or claim compatibility with v0.10 through this workflow. A future change
+requires released upstream Orca support for CWD plus lifecycle, identity, and
+finality integration and new acceptance evidence; Prime Claw does not patch or
+vendor Prime Agent to supply it.
 
 ## Apply or refresh
 
@@ -349,6 +367,20 @@ bytes with metadata drift trigger metadata repair or failure; only complete
 bytes-and-metadata replay reports `alreadyRestored`. Real Gate A still requires
 fresh operator authority and a fresh live destination-bound receipt.
 
+## Global Markdown drift gate
+
+The apply/check scripts reconcile inventoried global Markdown through
+`scripts/manage-prime-agent-global-assets.py`. Apply first runs a read-only
+preflight before changing plugin code, so unresolved drift cannot leave a mixed
+generation. Unknown or changed bytes are
+preserved by default and block readiness. `--global-drift-action
+accept-override` explicitly accepts current bytes against this upstream;
+`--global-drift-action backup-reset` writes and verifies a timestamped backup
+before replacement. These choices do not apply to project-customizable copies. The cutover bundle
+inventories `.prime-claw/global-templates.json` as mutable authority state and
+restores its exact preimage (or prior absence). Verified backup/reset artifacts
+are deliberately retained as recovery evidence; rollback never deletes them.
+
 ## Verify runtime discovery
 
 Candidate discovery is proved only by Tier 1 Docker. After the separately
@@ -357,8 +389,9 @@ performed the coordinated restart above, use the resumed sessions for cutover
 UAT; do not substitute a linked-worktree or host candidate probe. The accepted
 installed generation should expose:
 
-- native `/handoff`, `/plan`, and `/implement-spec` commands;
-- structured `ralph_handoff`, `ralph_plan`,
+- native `/handoff`, `/plan`, `/implement-spec`, and `/initialize-prime-claw`
+  commands;
+- structured `ralph_handoff`, `ralph_plan`, `initialize_prime_claw`,
   `prime_claw_activate_conversation_guide`,
   `prime_claw_conversation_guide_status`, `create_spec_episode`,
   `handoff_spec_episode`, and `finalize_spec_episode` tools;
@@ -377,8 +410,9 @@ installed generation should expose:
 
 `finalize_spec_episode` remains a location-only, no-UI bookkeeping close after
 verified terminal work. It grants no Git, merge, abandonment, session, worktree,
-branch, cleanup, scope, or product authority. Plugin verification also does not
-replace project `.ralph/` readiness.
+branch, cleanup, scope, or product authority. Plugin verification also does not replace project readiness. Project assets are
+reconciled separately through the tracked `.prime-claw/templates.json` manifest;
+`.ralph/plans/` remains project-owned planning state.
 
 ## Evidence history
 

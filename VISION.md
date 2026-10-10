@@ -172,8 +172,9 @@ routing.
 The boundary begins when the operator invokes `/design` or `/spec-it-out`
 inside a project conversation. `/design` is for work that still needs
 requirements discovery; `/spec-it-out` is for work whose design is already
-substantially present in the conversation. Their exact questions and artifacts
-remain project-customizable Markdown under `.ralph/skills/`.
+substantially present in the conversation. Their exact questions and artifacts remain project-customizable Markdown:
+discoverable skills under `.agents/skills/` and lifecycle-only workflows under
+`.prime-claw/workflows/`.
 
 Both workflows write their output into a new named folder under
 `.ralph/plans/future/`, link the resulting artifacts, and ask the operator to
@@ -247,9 +248,10 @@ sandbox each explicitly apply it to Prime Agent's global plugin location for
 that isolated environment. The builder and managed projects must not retain a
 project-local plugin copy while that global installation is active because
 cross-scope discovery can prevent Prime Agent startup. In both stages, each
-managed project keeps its own `.ralph/plans/` and customizable `.ralph/skills/`
-tree, which the universal agent initializes from templates and asks the operator
-to verify when required files are missing.
+managed project keeps its own `.ralph/plans/`, regular customizable skills
+under `.agents/skills/`, and lifecycle-only workflows under
+`.prime-claw/workflows/`. The awaited reconciler installs independently safe
+template updates and preserves customization.
 
 ## The builder repo
 

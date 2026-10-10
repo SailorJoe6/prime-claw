@@ -1,18 +1,16 @@
-# .ralph — prime-claw planning & skills layout
+# .ralph — prime-claw planning layout
 
-This directory holds the Ralph-style planning layout prime-claw uses, with
-prime-agent-native skills.
+This directory holds the Ralph-style planning artifacts used by Prime Claw.
+Project skills and lifecycle workflows now live outside `.ralph`.
 
-- `skills/<phase>/SKILL.md` — the seven phase skills, imported verbatim from
-  `~/gitlab_local/ralph-pva/.ralph/skills` (a hand-built prime-agent-native set)
-  as the Phase 1 starting point. They will diverge as prime-claw validates
-  them by manual driving.
+- `skills/` is retired. Project initialization migrates recognized legacy
+  files to regular customizable `.agents/skills/` files and lifecycle-only
+  `.prime-claw/workflows/` files without moving `plans/`.
 - `plans/` — created on demand by the design/plan skills. The design and
   spec-it-out skills produce one `SPECIFICATION.md`; the plan skill produces
   `EXECUTION_PLAN.md`; finished work archives to `plans/archive/`; blocked work
   moves to `plans/blocked/`.
 
-Provenance note: these skills are already prime-agent-native — handoff
-triggers targeted compaction, execute manages goals/heartbeats/subagents and
-the blocked→goal-complete→pause-heartbeat protocol. They are the reference
-implementation for the conversation→episode work in LONG_RANGE_PLAN.md.
+Provenance note: the migrated project assets remain Prime-Agent-native and are
+canonical under `src/prime-agent-plugin/`. Installed project copies can diverge
+safely under the tracked template manifest.

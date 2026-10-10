@@ -3,7 +3,7 @@ name: blocked
 description: Use when Ralph detects blocked planning docs and needs help explaining the blocker and getting the project unblocked.
 ---
 
-First, run through the "prepare" skill. 
+First, run through the "prepare" skill.
 
 Then, Run `bd prime` to understand our beads workflow.
 

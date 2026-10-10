@@ -25,7 +25,7 @@ function admitHandoff(
   if (!handoff) {
     return {
       ok: false,
-      message: "handoff-chain: .ralph/skills/handoff/SKILL.md not found",
+      message: "handoff-chain: .prime-claw/workflows/handoff.md not found",
       level: "warning",
     };
   }
@@ -33,7 +33,7 @@ function admitHandoff(
   if (!execute) {
     return {
       ok: false,
-      message: "handoff-chain: .ralph/skills/execute/SKILL.md not found",
+      message: "handoff-chain: .agents/skills/execute/SKILL.md not found",
       level: "warning",
     };
   }

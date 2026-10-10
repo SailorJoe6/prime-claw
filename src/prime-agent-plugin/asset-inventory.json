@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "id": "global-role-kernel",
+      "source": "ROLE_KERNEL.md",
+      "scope": "global",
+      "exposure": "internal",
+      "customization": "plugin-managed",
+      "destination": "AGENTS.md",
+      "lifecycleTrigger": "global-plugin-apply"
+    },
+    {
+      "id": "global-goals-and-heartbeats",
+      "source": "skills/goals-and-heartbeats/SKILL.md",
+      "scope": "global",
+      "exposure": "discoverable",
+      "customization": "plugin-managed",
+      "destination": "skills/goals-and-heartbeats/SKILL.md",
+      "lifecycleTrigger": "global-plugin-apply"
+    },
+    {
+      "id": "global-goal-continuation",
+      "source": "skills/goals-and-heartbeats/CONTINUATION.md",
+      "scope": "global",
+      "exposure": "internal",
+      "customization": "plugin-managed",
+      "destination": "skills/goals-and-heartbeats/CONTINUATION.md",
+      "lifecycleTrigger": "goal-continuation-hook"
+    },
+    {
+      "id": "global-expert-review",
+      "source": "skills/prime-claw-expert-review/SKILL.md",
+      "scope": "global",
+      "exposure": "discoverable",
+      "customization": "plugin-managed",
+      "destination": "skills/prime-claw-expert-review/SKILL.md",
+      "lifecycleTrigger": "global-plugin-apply"
+    },
+    {
+      "id": "global-oversee-episode",
+      "source": "skills/prime-claw-oversee-episode/SKILL.md",
+      "scope": "global",
+      "exposure": "discoverable",
+      "customization": "plugin-managed",
+      "destination": "skills/prime-claw-oversee-episode/SKILL.md",
+      "lifecycleTrigger": "implement-spec-and-session-compact"
+    },
+    {
+      "id": "project-skill-blocked",
+      "source": "skills/project-templates/blocked.md",
+      "scope": "project",
+      "exposure": "discoverable",
+      "customization": "project-customizable",
+      "destination": ".agents/skills/blocked/SKILL.md",
+      "lifecycleTrigger": "project-reconcile"
+    },
+    {
+      "id": "project-skill-design",
+      "source": "skills/project-templates/design.md",
+      "scope": "project",
+      "exposure": "discoverable",
+      "customization": "project-customizable",
+      "destination": ".agents/skills/design/SKILL.md",
+      "lifecycleTrigger": "project-reconcile"
+    },
+    {
+      "id": "project-skill-execute",
+      "source": "skills/project-templates/execute.md",
+      "scope": "project",
+      "exposure": "discoverable",
+      "customization": "project-customizable",
+      "destination": ".agents/skills/execute/SKILL.md",
+      "lifecycleTrigger": "project-reconcile"
+    },
+    {
+      "id": "project-skill-prepare",
+      "source": "skills/project-templates/prepare.md",
+      "scope": "project",
+      "exposure": "discoverable",
+      "customization": "project-customizable",
+      "destination": ".agents/skills/prepare/SKILL.md",
+      "lifecycleTrigger": "project-reconcile"
+    },
+    {
+      "id": "project-skill-spec-it-out",
+      "source": "skills/project-templates/spec-it-out.md",
+      "scope": "project",
+      "exposure": "discoverable",
+      "customization": "project-customizable",
+      "destination": ".agents/skills/spec-it-out/SKILL.md",
+      "lifecycleTrigger": "project-reconcile"
+    },
+    {
+      "id": "project-workflow-handoff",
+      "source": "workflows/handoff.md",
+      "scope": "project",
+      "exposure": "internal",
+      "customization": "project-customizable",
+      "destination": ".prime-claw/workflows/handoff.md",
+      "lifecycleTrigger": "handoff"
+    },
+    {
+      "id": "project-workflow-implement-prep",
+      "source": "workflows/implement-prep.md",
+      "scope": "project",
+      "exposure": "internal",
+      "customization": "project-customizable",
+      "destination": ".prime-claw/workflows/implement-prep.md",
+      "lifecycleTrigger": "implement-spec"
+    },
+    {
+      "id": "project-workflow-implement-spec",
+      "source": "workflows/implement-spec.md",
+      "scope": "project",
+      "exposure": "internal",
+      "customization": "project-customizable",
+      "destination": ".prime-claw/workflows/implement-spec.md",
+      "lifecycleTrigger": "implement-spec"
+    },
+    {
+      "id": "project-workflow-plan-prep",
+      "source": "workflows/plan-prep.md",
+      "scope": "project",
+      "exposure": "internal",
+      "customization": "project-customizable",
+      "destination": ".prime-claw/workflows/plan-prep.md",
+      "lifecycleTrigger": "plan-spec"
+    },
+    {
+      "id": "project-workflow-plan-spec",
+      "source": "workflows/plan-spec.md",
+      "scope": "project",
+      "exposure": "internal",
+      "customization": "project-customizable",
+      "destination": ".prime-claw/workflows/plan-spec.md",
+      "lifecycleTrigger": "plan-spec"
+    }
+  ]
+}

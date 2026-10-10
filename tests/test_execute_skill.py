@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXECUTE_SKILL = ROOT / ".ralph" / "skills" / "execute" / "SKILL.md"
+EXECUTE_SKILL = ROOT / "src" / "prime-agent-plugin" / "skills" / "project-templates" / "execute.md"
 AGENT_SKILL = ROOT / ".agents" / "skills" / "execute"
 
 
@@ -49,5 +49,5 @@ def test_execute_skill_defers_goal_and_heartbeat_control_to_plugin_context() -> 
 
 
 def test_agent_execute_skill_uses_canonical_definition() -> None:
-    assert AGENT_SKILL.is_symlink()
-    assert AGENT_SKILL.resolve() == EXECUTE_SKILL.parent.resolve()
+    assert AGENT_SKILL.is_dir() and not AGENT_SKILL.is_symlink()
+    assert (AGENT_SKILL / "SKILL.md").read_bytes() == EXECUTE_SKILL.read_bytes()

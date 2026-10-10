@@ -73,7 +73,7 @@ def test_private_bundle_captures_exact_preimages_metadata_inventory_and_restores
     ))
     assert result["manifestSha256"] == (target / "manifest.sha256").read_text().strip()
     verified = bundle.verify(ns(bundle=target))
-    assert verified == {"schemaVersion": 1, "status": "VERIFIED", "manifestSha256": result["manifestSha256"], "inventoryEntries": len(bundle.MANAGED_FILES) + len(bundle.EXPECTED_ABSENT) + len(bundle.PROTOCOL_SURFACES)}
+    assert verified == {"schemaVersion": 1, "status": "VERIFIED", "manifestSha256": result["manifestSha256"], "inventoryEntries": len(bundle.MANAGED_FILES) + len(bundle.EXPECTED_ABSENT) + len(bundle.PROTOCOL_SURFACES) + len(bundle.MUTABLE_SURFACES)}
     manifest = json.loads((target / "manifest.json").read_text())
     assert manifest["selectedFileDecision"] == "AGENTS.md"
     assert manifest["currentKnownGoodGeneration"] == "accepted-generation"
@@ -82,7 +82,7 @@ def test_private_bundle_captures_exact_preimages_metadata_inventory_and_restores
     assert manifest["installedInventory"][0]["path"] == bundle.MANAGED_FILES[0]
     assert manifest["installedInventory"][0]["candidateEqual"] is False
     assert manifest["installedInventory"][1]["observed"] == "absent"
-    assert [entry["path"] for entry in manifest["installedInventory"]] == list(bundle.MANAGED_FILES) + list(bundle.EXPECTED_ABSENT) + list(bundle.PROTOCOL_SURFACES)
+    assert [entry["path"] for entry in manifest["installedInventory"]] == list(bundle.MANAGED_FILES) + list(bundle.EXPECTED_ABSENT) + list(bundle.PROTOCOL_SURFACES) + list(bundle.MUTABLE_SURFACES)
     assert manifest["sourceTopology"]["branch"] == "episode/x"
     assert manifest["restoreToolset"][0]["sha256"] == bundle.digest(BUNDLE.read_bytes())
     assert b"DO-NOT-COPY" not in b"".join(path.read_bytes() for path in target.rglob("*") if path.is_file())
@@ -96,12 +96,16 @@ def test_private_bundle_captures_exact_preimages_metadata_inventory_and_restores
     for relative in bundle.PROTOCOL_SURFACES:
         destination = installed / relative; destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes((managed_source / relative).read_bytes())
+    for relative in bundle.MUTABLE_SURFACES:
+        destination = installed / relative; destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text("post-cutover mutable state\n")
     installed_restored = bundle.restore_installed(ns(bundle=target, installed_root=installed))
     assert installed_restored["status"] == "INSTALLED_RESTORED"
     assert (installed / bundle.MANAGED_FILES[0]).read_text() == "accepted baseline\n"
     assert not (installed / bundle.MANAGED_FILES[1]).exists()
     assert (installed / bundle.EXPECTED_ABSENT[0]).read_text() == "accepted obsolete\n"
     assert not (installed / bundle.PROTOCOL_SURFACES[0]).exists()
+    assert all(not (installed / relative).exists() for relative in bundle.MUTABLE_SURFACES)
 
     global_destination = tmp_path / "global-destination"; global_destination.write_bytes(global_post.read_bytes())
     append_destination = tmp_path / "append-destination"; append_destination.write_bytes(append_post.read_bytes())
@@ -407,10 +411,13 @@ def test_final_source_inventory_reflects_markdown_only_expert_workflow() -> None
     check_text = (ROOT / "scripts/check-prime-agent-plugin.sh").read_text()
     cleanup_text = (ROOT / "scripts/cleanup-retired-prime-agent-expert-review.py").read_text()
     guide = (ROOT / "docs/lab-global-plugin.md").read_text()
-    assert len(bundle.MANAGED_FILES) == 14
+    assert len(bundle.MANAGED_FILES) == 29
+    inventoried = {
+        row["source"] for row in json.loads((ROOT / "src/prime-agent-plugin/asset-inventory.json").read_text())["assets"]
+    }
     for relative in bundle.MANAGED_FILES:
         assert Path(ROOT / "src/prime-agent-plugin" / relative).is_file(), relative
-        assert relative in apply_text and relative in check_text, relative
+        assert (relative in apply_text and relative in check_text) or relative in inventoried, relative
     assert 'managed_skill_relative="skills/prime-claw-oversee-episode/SKILL.md"' in apply_text
     assert 'expert_skill_relative="skills/prime-claw-expert-review/SKILL.md"' in apply_text
     assert "prime-claw-expert-review/SKILL.md" in guide

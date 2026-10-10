@@ -935,9 +935,9 @@ export async function handoffSpecEpisode(
 
     // Preflight both workflows before publishing a missing route or messaging the episode.
     const handoffPrompt = canonicalSkillPrompt(identity.worktree, "handoff", guidance.trim());
-    if (!handoffPrompt) throw new Error("Episode worktree is missing .ralph/skills/handoff/SKILL.md");
+    if (!handoffPrompt) throw new Error("Episode worktree is missing .prime-claw/workflows/handoff.md");
     const executePrompt = canonicalSkillPrompt(identity.worktree, "execute");
-    if (!executePrompt) throw new Error("Episode worktree is missing .ralph/skills/execute/SKILL.md");
+    if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
 
     let activeSessionId = durableSession.activeSessionId;
     if (!activeSessionId) {
@@ -1070,9 +1070,9 @@ export async function createSpecEpisode(
     git.commitPromotion(worktree, selected.slug);
 
     const handoffPrompt = canonicalSkillPrompt(worktree, "handoff");
-    if (!handoffPrompt) throw new Error("Episode worktree is missing .ralph/skills/handoff/SKILL.md");
+    if (!handoffPrompt) throw new Error("Episode worktree is missing .prime-claw/workflows/handoff.md");
     const executePrompt = wrapCanonicalSkill(worktree, "execute", "operator-episode-source", selected.location);
-    if (!executePrompt) throw new Error("Episode worktree is missing .ralph/skills/execute/SKILL.md");
+    if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
 
     published = await publisher.forkAndPublish({
       sourceSessionFile,

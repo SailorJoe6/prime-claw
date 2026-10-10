@@ -162,13 +162,14 @@ builder nor a managed project keeps a project-local copy while that global
 installation is active. The final sandbox uses the same
 environment-global placement inside its isolated home. In both stages the
 universal agent ensures
-every managed project has a local `.ralph/plans/` tree and a complete
-project-customizable `.ralph/skills/` set, installing missing templates and
-asking the operator to verify them.
+every managed project has a local `.ralph/plans/` tree, regular customizable
+skills under `.agents/skills/`, and lifecycle-only customizable workflows under
+`.prime-claw/workflows/`, reconciled without overwriting project changes.
 
-- **4a — phase skills and proven transitions.** The canonical skills under
-  `.ralph/skills/` remain editable per operator and project. Native commands
-  load that Markdown rather than duplicating workflow policy. Dogfooding
+- **4a — phase skills and proven transitions.** Discoverable project skills
+  under `.agents/skills/` and internal workflows under `.prime-claw/workflows/`
+  remain editable per operator and project. Native commands load that Markdown
+  rather than duplicating workflow policy. Dogfooding
   established one stable transition, implemented and regression-tested as
   native `/handoff` → focused compaction → execute; see
   [docs/handoff-chain.md](docs/handoff-chain.md). Add native

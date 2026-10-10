@@ -26,10 +26,10 @@ hint, exactly-once `compact.run()` call, and result wording.
 
 - Mechanics: [`prep-chain.ts`](../src/prime-agent-plugin/extension-support/prep-chain.ts)
 - Entry surfaces: [`reviewed-plan.ts`](../src/prime-agent-plugin/extensions/reviewed-plan.ts)
-- Planning prep policy: [`plan-prep/SKILL.md`](../.ralph/skills/plan-prep/SKILL.md)
-- Planning phase policy: [`plan/SKILL.md`](../.ralph/skills/plan/SKILL.md)
-- Promotion prep policy: [`implement-prep/SKILL.md`](../.ralph/skills/implement-prep/SKILL.md)
-- Promotion phase policy: [`implement-spec/SKILL.md`](../.ralph/skills/implement-spec/SKILL.md)
+- Planning prep policy: [`plan-prep.md`](../.prime-claw/workflows/plan-prep.md)
+- Planning phase policy: [`plan-spec.md`](../.prime-claw/workflows/plan-spec.md)
+- Promotion prep policy: [`implement-prep.md`](../.prime-claw/workflows/implement-prep.md)
+- Promotion phase policy: [`implement-spec.md`](../.prime-claw/workflows/implement-spec.md)
 
 This is the phase-boundary counterpart to the proven
 [handoff chain](handoff-chain.md). It does not create a general transition

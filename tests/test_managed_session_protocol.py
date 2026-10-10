@@ -17,7 +17,10 @@ WS_NODE_SUITE = "/workspace/tests/managed_session_protocol.test.mjs"
 EXPECTED_TYPESCRIPT = {
     "extensions/goal-continuation-nudge.ts",
     "extensions/handoff-chain.ts",
+    "extensions/project-initialization.ts",
     "extensions/reviewed-plan.ts",
+    "extension-support/project-initialization.ts",
+    "extension-support/template-review.ts",
     "extension-support/conversation-guide-metadata.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",

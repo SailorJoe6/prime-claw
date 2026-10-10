@@ -166,11 +166,11 @@ def test_container_installed_native_plan_runs_prep_then_one_plan_followup(
 ) -> None:
     """Exercise the full plan-prep chain without touching the host generation."""
     project = ctmp / "plan-prep-project"
-    for skill_name in ("plan-prep", "plan"):
-        skill = project / ".ralph" / "skills" / skill_name / "SKILL.md"
+    for skill_name in ("plan-prep", "plan-spec"):
+        skill = project / ".prime-claw" / "workflows" / f"{skill_name}.md"
         skill.parent.mkdir(parents=True, exist_ok=True)
         skill.write_text(tier1_container.read_repo(
-            f".ralph/skills/{skill_name}/SKILL.md"
+            f"src/prime-agent-plugin/workflows/{skill_name}.md"
         ))
     bundle = project / ".ralph" / "plans" / "future" / "probe"
     bundle.mkdir(parents=True)
@@ -323,10 +323,10 @@ def test_container_installed_native_implement_runs_prep_then_one_authorized_foll
     """Exercise installed prep ordering and the one-agent_end approval bridge."""
     project = ctmp / "implement-prep-project"
     for skill_name in ("implement-prep", "implement-spec"):
-        skill = project / ".ralph" / "skills" / skill_name / "SKILL.md"
+        skill = project / ".prime-claw" / "workflows" / f"{skill_name}.md"
         skill.parent.mkdir(parents=True, exist_ok=True)
         skill.write_text(tier1_container.read_repo(
-            f".ralph/skills/{skill_name}/SKILL.md"
+            f"src/prime-agent-plugin/workflows/{skill_name}.md"
         ))
     bundle = project / ".ralph" / "plans" / "future" / "probe"
     bundle.mkdir(parents=True)
@@ -959,7 +959,7 @@ def test_reviewed_skills_have_only_native_slash_command_surfaces() -> None:
 
 def test_plan_skill_keeps_output_in_selected_folder_and_stops_for_review() -> None:
     """Project policy consumes native input without crossing approval gates."""
-    skill = (REPO / ".ralph" / "skills" / "plan" / "SKILL.md").read_text()
+    skill = (REPO / ".prime-claw" / "workflows" / "plan-spec.md").read_text()
     assert "<operator-plan-location>" not in skill
     required = (
         "operator plan location",
@@ -979,7 +979,7 @@ def test_plan_skill_keeps_output_in_selected_folder_and_stops_for_review() -> No
 
 def test_implement_spec_policy_rejects_inadequate_bundles_without_tool_call() -> None:
     """Semantic readiness remains an explicit customizable policy gate."""
-    skill = (REPO / ".ralph" / "skills" / "implement-spec" / "SKILL.md").read_text()
+    skill = (REPO / ".prime-claw" / "workflows" / "implement-spec.md").read_text()
     assert "<operator-implementation-location>" not in skill
     for fragment in (
         "missing, contradictory, or inadequate",

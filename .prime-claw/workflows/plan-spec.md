@@ -1,6 +1,6 @@
 ---
-name: plan
-description: Use for Ralph's planning phase to turn a reviewed future-folder specification into a reviewable execution plan in that same folder.
+name: plan-spec
+description: Use for Ralph's reviewed planning phase to turn a reviewed future-folder specification into a reviewable execution plan in that same folder.
 ---
 
 First, run the `prepare` skill.

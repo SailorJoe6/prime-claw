@@ -143,7 +143,7 @@ identities remain truthful legacy direct-execute records.
 1. Prime Agent discovers the extension and registers native `/handoff` plus the
    explicit `ralph_handoff` tool.
 2. The command preflights both canonical files:
-   `.ralph/skills/handoff/SKILL.md` and `.ralph/skills/execute/SKILL.md`. A
+   `.prime-claw/workflows/handoff.md` and `.agents/skills/execute/SKILL.md`. A
    missing file fails before the extension begins a partial transition.
 3. The shared admission helper injects canonical handoff first. Optional guidance
    is appended in the existing `<operator-compaction-guidance>` envelope. For
@@ -212,8 +212,8 @@ runtime path or a reason to patch private queue state.
 
 | Item | Owner | Lifetime |
 |---|---|---|
-| `.ralph/skills/handoff/SKILL.md` | Project/operator | Canonical tracked workflow |
-| `.ralph/skills/execute/SKILL.md` | Project/operator | Canonical tracked workflow |
+| `.prime-claw/workflows/handoff.md` | Project/operator | Canonical tracked workflow |
+| `.agents/skills/execute/SKILL.md` | Project/operator | Canonical tracked workflow |
 | `src/prime-agent-plugin/extensions/handoff-chain.ts` | prime-claw | Inert source for native and current-session conversational admission |
 | `src/prime-agent-plugin/extension-support/handoff-prompts.ts` | prime-claw | Inert source for shared canonical handoff/execute prompt construction |
 | Durable episode identity | Owning project conversation | Exact remote episode authorization and routing validation |

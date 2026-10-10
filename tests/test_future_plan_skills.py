@@ -8,10 +8,16 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ("design", "spec-it-out")
 
+def project_skill(name: str) -> Path:
+    return ROOT / "src" / "prime-agent-plugin" / "skills" / "project-templates" / f"{name}.md"
+
+def workflow(name: str) -> Path:
+    return ROOT / "src" / "prime-agent-plugin" / "workflows" / f"{name}.md"
+
 
 @pytest.mark.parametrize("skill_name", SKILLS)
 def test_authoring_skill_creates_one_new_future_specification(skill_name: str) -> None:
-    text = (ROOT / ".ralph" / "skills" / skill_name / "SKILL.md").read_text()
+    text = project_skill(skill_name).read_text()
 
     required_fragments = (
         ".ralph/plans/future/<slug>/",
@@ -37,7 +43,7 @@ def test_authoring_skill_creates_one_new_future_specification(skill_name: str) -
 def test_authoring_skill_stops_at_operator_specification_review(
     skill_name: str,
 ) -> None:
-    text = (ROOT / ".ralph" / "skills" / skill_name / "SKILL.md").read_text()
+    text = project_skill(skill_name).read_text()
 
     required_fragments = (
         "report the exact project-relative future-folder path",
@@ -56,7 +62,7 @@ def test_authoring_skill_stops_at_operator_specification_review(
 def test_authoring_skill_has_no_active_root_artifact_destination(
     skill_name: str,
 ) -> None:
-    text = (ROOT / ".ralph" / "skills" / skill_name / "SKILL.md").read_text()
+    text = project_skill(skill_name).read_text()
 
     assert ".ralph/plans/SPECIFICATION.md" not in text
 
@@ -64,7 +70,7 @@ def test_authoring_skill_has_no_active_root_artifact_destination(
 @pytest.mark.parametrize("skill_name", SKILLS)
 def test_authoring_skill_requires_a_bounded_product_contract(skill_name: str) -> None:
     text = " ".join(
-        (ROOT / ".ralph" / "skills" / skill_name / "SKILL.md").read_text().split()
+        project_skill(skill_name).read_text().split()
     )
 
     for fragment in (
@@ -84,10 +90,10 @@ def test_authoring_skill_requires_a_bounded_product_contract(skill_name: str) ->
 
 def test_plan_and_implementation_readiness_enforce_proportionate_delivery() -> None:
     plan = " ".join(
-        (ROOT / ".ralph" / "skills" / "plan" / "SKILL.md").read_text().split()
+        workflow("plan-spec").read_text().split()
     )
     readiness = " ".join(
-        (ROOT / ".ralph" / "skills" / "implement-spec" / "SKILL.md")
+        workflow("implement-spec")
         .read_text()
         .split()
     )
@@ -123,10 +129,8 @@ def test_plan_and_implementation_readiness_enforce_proportionate_delivery() -> N
 
 
 def test_design_and_spec_it_out_keep_distinct_discovery_modes() -> None:
-    design = (ROOT / ".ralph" / "skills" / "design" / "SKILL.md").read_text()
-    spec_it_out = (
-        ROOT / ".ralph" / "skills" / "spec-it-out" / "SKILL.md"
-    ).read_text()
+    design = project_skill("design").read_text()
+    spec_it_out = project_skill("spec-it-out").read_text()
 
     assert "First, run the `prepare` skill" in design
     assert "requirements" in design
@@ -140,13 +144,14 @@ def test_design_and_spec_it_out_keep_distinct_discovery_modes() -> None:
 def test_prime_skill_exposure_resolves_to_canonical_authoring_skills() -> None:
     for skill_name in SKILLS:
         exposed = ROOT / ".agents" / "skills" / skill_name / "SKILL.md"
-        canonical = ROOT / ".ralph" / "skills" / skill_name / "SKILL.md"
-        assert exposed.resolve() == canonical.resolve()
+        canonical = project_skill(skill_name)
+        assert exposed.is_file() and not exposed.is_symlink()
+        assert exposed.read_bytes() == canonical.read_bytes()
 
 
 def test_plan_prep_skill_owns_compaction_prompt_and_bounded_continuation() -> None:
     """Plan prep owns model policy while the extension owns admission mechanics."""
-    skill = (ROOT / ".ralph" / "skills" / "plan-prep" / "SKILL.md").read_text()
+    skill = workflow("plan-prep").read_text()
 
     assert "name: plan-prep" in skill
     for fragment in (
@@ -198,9 +203,7 @@ def test_plan_prep_skill_owns_compaction_prompt_and_bounded_continuation() -> No
 
 def test_implement_prep_skill_owns_compaction_prompt_and_bounded_continuation() -> None:
     """Implement prep owns model policy while approval mechanics stay in TS."""
-    skill = (
-        ROOT / ".ralph" / "skills" / "implement-prep" / "SKILL.md"
-    ).read_text()
+    skill = workflow("implement-prep").read_text()
 
     assert "name: implement-prep" in skill
     for fragment in (

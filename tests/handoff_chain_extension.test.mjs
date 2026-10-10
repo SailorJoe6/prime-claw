@@ -49,7 +49,9 @@ function fixture(t, throwOnSend = 0) {
 }
 
 function skillPath(cwd, name) {
-  return join(cwd, ".ralph", "skills", name, "SKILL.md");
+  return name === "execute"
+    ? join(cwd, ".agents", "skills", "execute", "SKILL.md")
+    : join(cwd, ".prime-claw", "workflows", `${name}.md`);
 }
 
 function writeSkill(cwd, name, body) {
@@ -204,7 +206,7 @@ test("missing handoff fails before a partial transition", async (t) => {
 
   assert.deepEqual(f.messages, []);
   assert.deepEqual(f.notices, [{
-    message: "handoff-chain: .ralph/skills/handoff/SKILL.md not found",
+    message: "handoff-chain: .prime-claw/workflows/handoff.md not found",
     level: "warning",
   }]);
 });
@@ -217,7 +219,7 @@ test("missing execute fails before handoff admission", async (t) => {
 
   assert.deepEqual(f.messages, []);
   assert.deepEqual(f.notices, [{
-    message: "handoff-chain: .ralph/skills/execute/SKILL.md not found",
+    message: "handoff-chain: .agents/skills/execute/SKILL.md not found",
     level: "warning",
   }]);
 });

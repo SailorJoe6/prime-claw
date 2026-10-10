@@ -52,7 +52,7 @@ export function admitPrepChain(
   if (!prepPrompt) {
     return {
       ok: false,
-      message: `reviewed-plan: .ralph/skills/${workflow.prepSkillName}/SKILL.md not found`,
+      message: `reviewed-plan: .prime-claw/workflows/${workflow.prepSkillName}.md not found`,
       level: "warning",
     };
   }
@@ -65,7 +65,7 @@ export function admitPrepChain(
   if (!phasePrompt) {
     return {
       ok: false,
-      message: `reviewed-plan: .ralph/skills/${workflow.phaseSkillName}/SKILL.md not found`,
+      message: `reviewed-plan: .prime-claw/workflows/${workflow.phaseSkillName}.md not found`,
       level: "warning",
     };
   }

@@ -124,7 +124,7 @@ Usage: /plan .ralph/plans/future/<slug>
 ```
 
 A valid command preflights both current project policies:
-`.ralph/skills/plan-prep/SKILL.md` and `.ralph/skills/plan/SKILL.md`. It wraps
+`.prime-claw/workflows/plan-prep.md` and `.prime-claw/workflows/plan-spec.md`. It wraps
 each with the same validated `<operator-plan-location>` block, admits
 `plan-prep` as an ordinary message, and queues canonical `plan` exactly once as
 the sole `followUp`. The native code does not define the readiness sniff,
@@ -193,8 +193,8 @@ planned bundle with:
 The native handler applies the same relative-path, safe-slug, directory,
 containment, and realpath checks as `/plan`. Invalid input displays concise
 usage and never invokes the model. A valid command preflights both current
-project policies, `.ralph/skills/implement-prep/SKILL.md` and
-`.ralph/skills/implement-spec/SKILL.md`, plus the existing conversation identity
+project policies, `.prime-claw/workflows/implement-prep.md` and
+`.prime-claw/workflows/implement-spec.md`, plus the existing conversation identity
 boundary before sending either message. It admits wrapped `implement-prep` as
 an ordinary message and queues wrapped canonical `implement-spec` exactly once
 as the sole `followUp`, with the same validated location envelope.

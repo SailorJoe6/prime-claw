@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -43,6 +44,7 @@ test("every shipped extension entry point exports a factory", async () => {
 });
 
 function createHarness(cwd, extension = reviewedPlan, throwOnSend = 0, systemPrompt = "BASE") {
+  if (!existsSync(join(cwd, ".git"))) execFileSync("git", ["-C", cwd, "init", "-q", "-b", "main"]);
   const commands = new Map();
   const tools = new Map();
   const events = new Map();
@@ -105,6 +107,7 @@ function fixture(t, {
   extension = reviewedPlan,
 } = {}) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-reviewed-plan-")));
+  execFileSync("git", ["-C", cwd, "init", "-q", "-b", "main"]);
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   mkdirSync(join(cwd, ".ralph", "plans", "future"), { recursive: true });
   if (folder) mkdirSync(join(cwd, LOCATION), { recursive: true });
@@ -115,16 +118,18 @@ function fixture(t, {
   return { cwd, ...createHarness(cwd, extension, throwOnSend) };
 }
 
-function writeSkill(cwd, body, name = "plan") {
-  const path = join(cwd, ".ralph", "skills", name, "SKILL.md");
+function writeSkill(cwd, body, name = "plan-spec") {
+  const path = name === "execute"
+    ? join(cwd, ".agents", "skills", "execute", "SKILL.md")
+    : join(cwd, ".prime-claw", "workflows", `${name}.md`);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, body);
   return path;
 }
 
 function expectedPrompt(cwd, body, location = LOCATION) {
-  const path = join(cwd, ".ralph", "skills", "plan", "SKILL.md");
-  return `<skill name="plan" location="${path}">
+  const path = join(cwd, ".prime-claw", "workflows", "plan-spec.md");
+  return `<skill name="plan-spec" location="${path}">
 References are relative to ${dirname(path)}.
 
 ${body}
@@ -136,7 +141,7 @@ ${location}
 }
 
 function expectedPrepPrompt(cwd, body, location = LOCATION) {
-  const path = join(cwd, ".ralph", "skills", "plan-prep", "SKILL.md");
+  const path = join(cwd, ".prime-claw", "workflows", "plan-prep.md");
   return `<skill name="plan-prep" location="${path}">
 References are relative to ${dirname(path)}.
 
@@ -149,7 +154,7 @@ ${location}
 }
 
 function expectedImplementPrompt(cwd, body, location = LOCATION) {
-  const path = join(cwd, ".ralph", "skills", "implement-spec", "SKILL.md");
+  const path = join(cwd, ".prime-claw", "workflows", "implement-spec.md");
   return `<skill name="implement-spec" location="${path}">
 References are relative to ${dirname(path)}.
 
@@ -162,7 +167,7 @@ ${location}
 }
 
 function expectedImplementPrepPrompt(cwd, body, location = LOCATION) {
-  const path = join(cwd, ".ralph", "skills", "implement-prep", "SKILL.md");
+  const path = join(cwd, ".prime-claw", "workflows", "implement-prep.md");
   return `<skill name="implement-prep" location="${path}">
 References are relative to ${dirname(path)}.
 
@@ -385,7 +390,7 @@ test("conversational planning reports missing plan-prep before any send", async 
   );
 
   assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /\.ralph\/skills\/plan-prep\/SKILL\.md not found/);
+  assert.match(result.content[0].text, /\.prime-claw\/workflows\/plan-prep\.md not found/);
   assert.deepEqual(f.messages, []);
   assert.deepEqual(f.deliveries, []);
 });
@@ -398,7 +403,7 @@ test("conversational planning reports missing canonical skill", async (t) => {
   );
 
   assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /\.ralph\/skills\/plan\/SKILL\.md not found/);
+  assert.match(result.content[0].text, /\.prime-claw\/workflows\/plan-spec\.md not found/);
   assert.deepEqual(f.messages, []);
   assert.deepEqual(f.deliveries, []);
 });
@@ -429,12 +434,12 @@ test("conversational planning reports plan follow-up failure without claiming ad
 
   const prep = expectedPrepPrompt(f.cwd, "canonical plan-prep body");
   assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /canonical plan follow-up could not be queued/);
+  assert.match(result.content[0].text, /canonical plan-spec follow-up could not be queued/);
   assert.match(result.content[0].text, /transition is incomplete/);
   assert.doesNotMatch(result.content[0].text, /Planning admitted/);
   assert.deepEqual(result.details, {
     admitted: false,
-    error: "reviewed-plan: canonical plan follow-up could not be queued; transition is incomplete",
+    error: "reviewed-plan: canonical plan-spec follow-up could not be queued; transition is incomplete",
   });
   assert.deepEqual(f.messages, [prep]);
   assert.deepEqual(f.deliveries, [{ message: prep, options: { deliverAs: "steer" } }]);
@@ -489,7 +494,7 @@ test("missing plan-prep warns before native planning sends anything", async (t) 
   assert.deepEqual(f.messages, []);
   assert.deepEqual(f.deliveries, []);
   assert.deepEqual(f.notices, [{
-    message: "reviewed-plan: .ralph/skills/plan-prep/SKILL.md not found",
+    message: "reviewed-plan: .prime-claw/workflows/plan-prep.md not found",
     level: "warning",
   }]);
 });
@@ -500,7 +505,7 @@ test("missing canonical skill warns without model injection", async (t) => {
   assert.deepEqual(f.messages, []);
   assert.deepEqual(f.deliveries, []);
   assert.deepEqual(f.notices, [{
-    message: "reviewed-plan: .ralph/skills/plan/SKILL.md not found",
+    message: "reviewed-plan: .prime-claw/workflows/plan-spec.md not found",
     level: "warning",
   }]);
 });
@@ -523,7 +528,7 @@ test("native planning reports plan follow-up failure after prep admission", asyn
   assert.deepEqual(f.messages, [prep]);
   assert.deepEqual(f.deliveries, [{ message: prep, options: undefined }]);
   assert.deepEqual(f.notices, [{
-    message: "reviewed-plan: canonical plan follow-up could not be queued; transition is incomplete",
+    message: "reviewed-plan: canonical plan-spec follow-up could not be queued; transition is incomplete",
     level: "error",
   }]);
 });
@@ -616,7 +621,7 @@ test("implement-spec fails closed on either missing skill without arming approva
     assert.deepEqual(f.messages, []);
     assert.deepEqual(f.deliveries, []);
     assert.deepEqual(f.notices, [{
-      message: `reviewed-plan: .ralph/skills/${missing}/SKILL.md not found`,
+      message: `reviewed-plan: .prime-claw/workflows/${missing}.md not found`,
       level: "warning",
     }]);
     const denied = await f.tools.get("create_spec_episode").execute(

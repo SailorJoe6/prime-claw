@@ -38,12 +38,27 @@ RETIRED = "extensions/goal-heartbeat-work-control.ts"
 FILES = (
     "extensions/goal-continuation-nudge.ts",
     "extensions/handoff-chain.ts",
+    "extensions/project-initialization.ts",
     "extensions/reviewed-plan.ts",
+    "asset-inventory.json",
+    "ROLE_KERNEL.md",
+    "extension-support/project-initialization.ts",
+    "extension-support/template-review.ts",
     "extension-support/conversation-guide-metadata.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
     "skills/goals-and-heartbeats/SKILL.md",
     "skills/goals-and-heartbeats/CONTINUATION.md",
+    "skills/project-templates/blocked.md",
+    "skills/project-templates/design.md",
+    "skills/project-templates/execute.md",
+    "skills/project-templates/prepare.md",
+    "skills/project-templates/spec-it-out.md",
+    "workflows/handoff.md",
+    "workflows/implement-prep.md",
+    "workflows/implement-spec.md",
+    "workflows/plan-prep.md",
+    "workflows/plan-spec.md",
     "extension-support/handoff-prompts.ts",
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
@@ -232,9 +247,9 @@ def test_linked_worktree_cannot_activate_shared_generation_and_isolated_works(
         "bash", "-lc",
         "set -euo pipefail; "
         'git -C "$1/primary" worktree add -q -b candidate "$1/candidate"; '
-        'mkdir -p "$1/candidate/.ralph/skills/plan-prep"; '
+        'mkdir -p "$1/candidate/.prime-claw/workflows"; '
         'printf "candidate-only skill\n" > '
-        '"$1/candidate/.ralph/skills/plan-prep/SKILL.md"; '
+        '"$1/candidate/.prime-claw/workflows/plan-prep.md"; '
         'mkdir -p "$1/shared-home/.prime/agent/extensions"; '
         'printf "sibling installed generation\n" > '
         '"$1/shared-home/.prime/agent/extensions/reviewed-plan.ts"',
@@ -245,7 +260,7 @@ def test_linked_worktree_cannot_activate_shared_generation_and_isolated_works(
     assert setup.returncode == 0, setup.stdout + setup.stderr
 
     primary_skill = tier1_container.run(
-        "test", "!", "-e", f"{base}/primary/.ralph/skills/plan-prep/SKILL.md",
+        "test", "!", "-e", f"{base}/primary/.prime-claw/workflows/plan-prep.md",
         workdir=None,
     )
     assert primary_skill.returncode == 0
@@ -317,6 +332,8 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     for relative in (*FILES, *MANAGED_SKILL_FILES):
         expected = tier1_container.read_repo(f"src/prime-agent-plugin/{relative}")
         assert (destination / relative).read_text() == expected, relative
+    runtime_inventory = json.loads((destination / "asset-inventory.json").read_text())
+    assert all((destination / row["source"]).is_file() for row in runtime_inventory["assets"])
     append = (destination / "APPEND_SYSTEM.md").read_text()
     assert append == "unrelated user append\n"
     assert "PRIME_CLAW_CONVERSATION_IDENTITY_V1" not in append
@@ -326,6 +343,9 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     manifest = json.loads((destination / ".prime-claw/role-protocol-state.json").read_text())
     assert manifest["generation"] == "final"
     assert manifest["selectedContext"]["path"] == "AGENTS.md"
+    discovered = {path.parent.name for path in (destination / "skills").glob("*/SKILL.md")}
+    assert discovered == {"goals-and-heartbeats", "prime-claw-oversee-episode", "prime-claw-expert-review"}
+    assert not list((destination / "skills/project-templates").rglob("SKILL.md"))
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode == 0, checked.stdout + checked.stderr
 
@@ -483,6 +503,8 @@ def test_apply_rejects_unsafe_retired_destination_before_mutation(
 @pytest.mark.parametrize("managed_directory", [
     "root", "extensions", "extension-support", "skills",
     "skills/goals-and-heartbeats",
+    "skills/blocked", "skills/design", "skills/execute", "skills/prepare", "skills/spec-it-out",
+    "workflows",
     "skills/prime-claw-oversee-episode",
     "skills/prime-claw-expert-review",
 ])
@@ -527,7 +549,7 @@ def test_check_rejects_stale_managed_conversation_skill(tier1_container, ctmp) -
     skill.write_text("stale guide\n")
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode != 0
-    assert "stale installed managed Conversation skill" in checked.stderr
+    assert "global managed asset drift requires explicit resolution" in checked.stderr
 
 
 def test_check_rejects_a_stale_global_file(tier1_container, ctmp) -> None:
@@ -651,4 +673,20 @@ def test_check_rejects_stale_managed_expert_skill(tier1_container, ctmp) -> None
     skill.write_text(skill.read_text() + "\n# stale installed skill\n")
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode != 0
-    assert "stale installed managed EXPERT skill" in checked.stderr
+    assert "global managed asset drift requires explicit resolution" in checked.stderr
+
+
+def test_apply_refuses_global_project_template_skill_collision_before_mutation(tier1_container, ctmp) -> None:
+    destination = ctmp / "agent"
+    applied = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    sentinel = destination / FILES[0]
+    before = sentinel.read_bytes()
+    collision = destination / "skills/prepare/SKILL.md"
+    collision.parent.mkdir(parents=True)
+    collision.write_text("operator global skill\n")
+    refused = _run_script(tier1_container, WS_APPLY, destination)
+    assert refused.returncode != 0
+    assert "unexpected global project-template skill collision" in refused.stderr
+    assert sentinel.read_bytes() == before
+    assert collision.read_text() == "operator global skill\n"
