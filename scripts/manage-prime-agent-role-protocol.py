@@ -34,6 +34,22 @@ TEMP_TAG = "prime-claw-role-protocol"
 RECEIPT_MANAGER = "prime-claw-role-protocol"
 
 
+def require_sandbox_fresh_root(root: Path) -> None:
+    """Authorize final ownership genesis only in the isolated mounted sandbox home."""
+    link = Path("/sandbox/.prime")
+    if (
+        os.environ.get("HOME") != "/sandbox"
+        or not Path("/.dockerenv").is_file()
+        or root != Path("/sandbox/.prime/agent")
+        or not link.is_symlink()
+        or os.readlink(link) != "home-root/.prime"
+        or root.resolve() != Path("/sandbox/home-root/.prime/agent")
+        or not root.is_dir()
+        or root.is_symlink()
+    ):
+        raise ValueError("fresh final role ownership requires the exact sandbox mounted home")
+
+
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -502,7 +518,8 @@ def manifest_value(
 
 
 def prepare_apply(
-    root: Path, kernel: bytes, legacy: bytes | None, generation: str
+    root: Path, kernel: bytes, legacy: bytes | None, generation: str,
+    *, allow_fresh_final: bool = False,
 ) -> dict[str, Any]:
     selected_name, candidates = inspect_candidates(root)
     selected_path = root / selected_name
@@ -537,7 +554,13 @@ def prepare_apply(
     manifest_path = root / STATE_DIR / STATE_NAME
     manifest, manifest_snapshot = load_manifest(manifest_path)
     if generation == "final" and manifest is None:
-        raise ValueError("final role protocol requires an owned bridge manifest")
+        if not allow_fresh_final:
+            raise ValueError("final role protocol requires an owned bridge manifest")
+        require_sandbox_fresh_root(root)
+        if any(loaded is not None for loaded in candidates.values()):
+            raise ValueError("fresh final role ownership requires no existing global context")
+        if (root / "APPEND_SYSTEM.md").exists() or (root / "APPEND_SYSTEM.md").is_symlink():
+            raise ValueError("fresh final role ownership requires no legacy APPEND destination")
     if generation == "bridge" and legacy is None:
         raise ValueError("bridge role protocol requires the legacy APPEND source")
     if (
@@ -610,6 +633,10 @@ def prepare_apply(
                     append_data, append_range, recorded_legacy, "legacy APPEND"
                 )
                 append_updated = append_data[:start] + legacy + append_data[end:]
+    elif generation == "final" and allow_fresh_final and manifest is None:
+        # A genuinely fresh final install owns no legacy APPEND block. Do not
+        # create a fake bridge or an empty APPEND_SYSTEM.md merely for migration.
+        append_updated, append_prefix, append_suffix = append_data, b"", b""
     elif append_range is None:
         append_updated, append_prefix, append_suffix = install_new_block(
             append_data, legacy
@@ -630,7 +657,7 @@ def prepare_apply(
         selected_name,
         installer_created,
         kernel,
-        manifest["legacyAppend"]["blockSha256"] if manifest is not None else digest(legacy),
+        manifest["legacyAppend"]["blockSha256"] if manifest is not None else digest(legacy or b""),
         context_prefix,
         context_suffix,
         append_prefix,
@@ -641,8 +668,7 @@ def prepare_apply(
     append_postimage = (
         missing_snapshot()
         if generation == "final"
-        and manifest is not None
-        and manifest["generation"] == "final"
+        and (manifest is None or manifest["generation"] == "final")
         and append_loaded is None
         else predicted_snapshot(
             append_updated, metadata(append_info, new_mode=0o644)
@@ -845,7 +871,22 @@ def validate_receipt(
 
     if value["generation"] == "final":
         if not manifest_preimage["exists"]:
-            raise ValueError("final receipt does not restore an owned manifest")
+            # A container-only fresh final install has no bridge preimage to
+            # restore. The fixed inventory must instead restore a wholly absent
+            # context, manifest, and APPEND file, not any unrelated user bytes.
+            require_sandbox_fresh_root(root)
+            append_preimage = validated["legacyAppend"]["preimage"]
+            if (context_preimage["exists"] or append_preimage["exists"]
+                    or append_post_snapshot["exists"]
+                    or not manifest_post["selectedContext"]["installerCreated"]
+                    or manifest_post["legacyAppend"]["blockSha256"] != digest(b"")
+                    or context_post[:context_range[0]].strip()
+                    or context_post[context_range[1]:].strip()):
+                raise ValueError("fresh final receipt does not restore an empty sandbox role preimage")
+            separators_match(context_post, context_range,
+                             manifest_post["selectedContext"],
+                             "fresh final receipt context postimage")
+            return value
         context_pre = snapshot_bytes(context_preimage)
         context_pre_range = managed_range(
             context_pre, KERNEL_START, KERNEL_END, "receipt context preimage"
@@ -980,9 +1021,14 @@ def acquire_lock(root: Path, *, create: bool) -> int:
 
 
 def preflight(
-    root: Path, config_path: Path, kernel_path: Path, legacy_path: Path
+    root: Path, config_path: Path, kernel_path: Path, legacy_path: Path,
+    *, allow_fresh_final: bool = False,
 ) -> dict[str, Any]:
     generation = validate_config(config_path)["generation"]
+    if allow_fresh_final:
+        if generation != "final":
+            raise ValueError("fresh final ownership requires the final role protocol")
+        require_sandbox_fresh_root(root)
     kernel = load_block(kernel_path, KERNEL_START, KERNEL_END, "ROLE_KERNEL source")
     legacy = (
         load_block(legacy_path, LEGACY_START, LEGACY_END, "legacy APPEND source")
@@ -1002,7 +1048,12 @@ def preflight(
         selected_loaded = candidates[selected]
         manifest, _ = load_manifest(state_dir / STATE_NAME)
         if generation == "final" and manifest is None:
-            raise ValueError("final role protocol requires an owned bridge manifest")
+            if not allow_fresh_final:
+                raise ValueError("final role protocol requires an owned bridge manifest")
+            if any(loaded is not None for loaded in candidates.values()):
+                raise ValueError("fresh final role ownership requires no existing global context")
+            if (root / "APPEND_SYSTEM.md").exists() or (root / "APPEND_SYSTEM.md").is_symlink():
+                raise ValueError("fresh final role ownership requires no legacy APPEND destination")
         if (
             generation == "bridge"
             and manifest is not None
@@ -1052,7 +1103,7 @@ def preflight(
         legacy_sha256 = (
             manifest["legacyAppend"]["blockSha256"]
             if manifest is not None
-            else digest(legacy)
+            else digest(legacy or b"")
         )
     return {
         "generation": generation,
@@ -1106,7 +1157,10 @@ def apply_protocol(
     kernel_path: Path,
     legacy_path: Path,
     receipt_path: Path | None,
+    *, allow_fresh_final: bool = False,
 ) -> dict[str, Any]:
+    if allow_fresh_final:
+        require_sandbox_fresh_root(root)
     receipt_expected = missing_snapshot()
     if receipt_path is not None:
         receipt_location_is_external(receipt_path, root)
@@ -1130,7 +1184,8 @@ def apply_protocol(
     prepared_receipt_snapshot: dict[str, Any] | None = None
     prepared: dict[str, Any] | None = None
     try:
-        preflight(root, config_path, kernel_path, legacy_path)
+        preflight(root, config_path, kernel_path, legacy_path,
+                  allow_fresh_final=allow_fresh_final)
         if receipt_path is not None:
             require_snapshot(
                 receipt_path, receipt_expected, "role protocol receipt"
@@ -1164,7 +1219,8 @@ def apply_protocol(
         if not state_dir.exists():
             state_dir.mkdir(mode=0o700)
             fsync_directory(root)
-        prepared = prepare_apply(root, kernel, legacy, generation)
+        prepared = prepare_apply(root, kernel, legacy, generation,
+                                 allow_fresh_final=allow_fresh_final)
         entries = prepared["entries"]
 
         if receipt_path is not None:
@@ -1418,6 +1474,7 @@ def main() -> int:
         command.add_argument("agent_dir", type=Path)
         if name == "apply":
             command.add_argument("--receipt", type=Path)
+            command.add_argument("--allow-fresh-final", action="store_true")
     restore = sub.add_parser("restore")
     restore.add_argument("receipt", type=Path)
     restore.add_argument("agent_dir", type=Path)
@@ -1434,6 +1491,7 @@ def main() -> int:
                 args.kernel,
                 args.legacy_append,
                 args.receipt,
+                allow_fresh_final=args.allow_fresh_final,
             )
         elif args.mode == "check":
             result = check_protocol(

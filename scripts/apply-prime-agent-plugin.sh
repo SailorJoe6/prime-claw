@@ -9,7 +9,7 @@ global_drift_action="preserve"
 target_args=()
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
-    --user-global)
+    --user-global|--sandbox-home)
       target_args+=("$1")
       shift
       ;;
@@ -177,7 +177,7 @@ python3 "$repo_root/scripts/manage-prime-agent-global-assets.py" preflight   "$s
 managed_skill_dir="$destination_root/skills/prime-claw-oversee-episode"
 expert_skill_dir="$destination_root/skills/prime-claw-expert-review"
 cleanup_args=(validate --plugin-root "$destination_root")
-if [[ "$plugin_target_mode" == "user-global" ]]; then
+if [[ "$plugin_target_mode" == "user-global" || "$plugin_target_mode" == "sandbox-home" ]]; then
   cleanup_args+=(--coding-agent-root "${PRIME_AGENT_CODING_AGENT_DIR:-$HOME/.prime/agent}")
 fi
 python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"
@@ -188,6 +188,9 @@ role_apply_args=(
 )
 if [[ -n "$role_receipt" ]]; then
   role_apply_args+=(--receipt "$role_receipt")
+fi
+if [[ "$plugin_target_mode" == "sandbox-home" ]]; then
+  role_apply_args+=(--allow-fresh-final)
 fi
 python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" "${role_apply_args[@]}"
 cleanup_args[0]=remove
@@ -204,8 +207,8 @@ install -m 0644 "$user_skill_source" "$user_skill_destination"
 # Installation is sequential, not an atomic generation swap. The required final
 # check detects any incomplete or mixed generation before apply reports success,
 # using the same explicit target semantics selected above.
-if [[ "$plugin_target_mode" == "user-global" ]]; then
-  "$repo_root/scripts/check-prime-agent-plugin.sh" --user-global
+if [[ "$plugin_target_mode" == "user-global" || "$plugin_target_mode" == "sandbox-home" ]]; then
+  "$repo_root/scripts/check-prime-agent-plugin.sh" "--${plugin_target_mode}"
 else
   PRIME_AGENT_PLUGIN_ROOT="$destination_root" \
     "$repo_root/scripts/check-prime-agent-plugin.sh"

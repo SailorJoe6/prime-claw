@@ -252,6 +252,50 @@ substitution, hard exits at every rename/fsync boundary, and power-loss
 durability. Promote one only after repeatable dogfood failure, a near miss or
 user report, a changed trust boundary, or a separately approved hard requirement.
 
+## Restored v2 sandbox home (container-only)
+
+For a **Ready, pinned TypeScript v0.9.8-r1** sandbox restored with separate
+`/sandbox/pgdata`, `/sandbox/brain`, and `/sandbox/home-root` mounts from the
+same accepted working volume, use the guarded container delivery step. It is
+not the host `--user-global` installer and does not run `recover`, `converge`,
+`validate`, brain writes, or a daemon restart. Run it from a committed, clean
+prime-claw checkout after Docker tier 1 and container tests pass:
+
+```bash
+python3 scripts/deploy-prime-agent-plugin-sandbox.py \
+  --sandbox <exact-ready-name> --sandbox-id <exact-openshell-id> \
+  --image-id sha256:<exact-pinned-image-id> --volume <exact-working-volume> \
+  --policy-sha256 <accepted-effective-policy-digest>
+python3 scripts/deploy-prime-agent-plugin-sandbox.py \
+  --sandbox <same-name> --sandbox-id <same-id> \
+  --image-id sha256:<same-image-id> --volume <same-volume> \
+  --policy-sha256 <same-accepted-policy-digest> --check-only
+```
+
+The script checks OpenShell readiness, immutable Docker image and tag,
+OpenShell-managed mounts, the operator-retained digest of the **whole accepted
+effective policy** (not one derived from a changed live policy), pinned source,
+mounted home topology, and duplicate project extension paths before upload.
+It packages only committed plugin assets and helper scripts into a
+content-hashed bundle, uploads it to the selected sandbox's private `/tmp`,
+and invokes the container-local installer/checker. The installer requires
+`HOME=/sandbox`, the exact `/sandbox/.prime -> home-root/.prime` link, and the
+real image-owned `/sandbox/.agents`. Its one-time fresh-final role ownership
+path refuses existing global contexts and does not invent a bridge manifest.
+The role receipt is saved under the persistent mounted home, outside the agent
+root; retain it if manual recovery is needed.
+
+`/sandbox/.prime/agent` persists on the accepted volume. `/sandbox/.agents`
+is **image-owned**, not mounted, so reapply this step to every replacement
+container before cutover. Never copy the host-global plugin into the sandbox.
+A successful copy/check is not activation: quiesce affected sessions,
+coordinate one full Prime Agent daemon restart, then prove the pinned build
+and uniquely discovered commands/tools in a **new daemon-backed session**.
+Check database counts, source identity, policy, and a bounded model call.
+Preserve the old container, checkpoint, working volume, and UAT resources.
+On mismatch, stop and retain the receipt and preimage evidence; do not
+blindly restore or rerun broad recovery against a live daemon.
+
 ## Cutover and rollback
 
 A successful apply/check proves installed bytes, not the loaded generation.

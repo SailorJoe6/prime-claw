@@ -3,7 +3,8 @@
 # Source this file, then call select_prime_agent_plugin_target "$@".
 
 prime_agent_plugin_target_usage() {
-  printf 'usage: %s [--user-global]\n' "${0##*/}" >&2
+  printf 'usage: %s [--user-global|--sandbox-home]\n' "${0##*/}" >&2
+  printf '  sandbox-only persistent home (fresh final ownership allowed): %s --sandbox-home\n' "${0##*/}" >&2
   printf '  development/test (owned bridge fixture required; prefer Tier 1): PRIME_AGENT_PLUGIN_ROOT=/explicit/isolated/root %s\n' "${0##*/}" >&2
   printf '  authorized Gate B coordinator on accepted primary main only: %s --user-global\n' "${0##*/}" >&2
 }
@@ -27,7 +28,7 @@ select_prime_agent_plugin_target() {
   local user_root
   user_root="${HOME:?HOME must be set}/.prime/agent"
 
-  if [[ -n "$requested" && "$requested" != "--user-global" ]]; then
+  if [[ -n "$requested" && "$requested" != "--user-global" && "$requested" != "--sandbox-home" ]]; then
     prime_agent_plugin_target_usage
     printf 'error: unknown argument: %s\n' "$requested" >&2
     return 64
@@ -58,6 +59,26 @@ select_prime_agent_plugin_target() {
     destination_root="$user_root"
     user_agents_root="$HOME/.agents"
     plugin_target_mode="user-global"
+    return 0
+  fi
+
+  if [[ "$requested" == "--sandbox-home" ]]; then
+    if [[ -n "$explicit_root" || "$HOME" != /sandbox || ! -f /.dockerenv ]]; then
+      printf 'error: --sandbox-home requires Docker HOME=/sandbox without PRIME_AGENT_PLUGIN_ROOT\n' >&2
+      return 1
+    fi
+    # The restored home is a mounted volume, never a second project-local copy.
+    # Refuse a direct /sandbox/.prime directory or an escaped/changed link.
+    if [[ ! -L /sandbox/.prime || "$(readlink /sandbox/.prime)" != home-root/.prime ||
+          ! -d /sandbox/home-root/.prime/agent ||
+          "$(_prime_claw_canonical_path /sandbox/.prime/agent)" != /sandbox/home-root/.prime/agent ||
+          ! -d /sandbox/.agents || -L /sandbox/.agents ]]; then
+      printf 'error: --sandbox-home requires the verified mounted .prime link and image-owned .agents directory\n' >&2
+      return 1
+    fi
+    destination_root=/sandbox/.prime/agent
+    user_agents_root=/sandbox/.agents
+    plugin_target_mode=sandbox-home
     return 0
   fi
 

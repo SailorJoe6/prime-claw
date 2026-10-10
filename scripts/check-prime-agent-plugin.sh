@@ -144,7 +144,7 @@ for relative in "${files[@]}"; do
 done
 
 cleanup_args=(check-absent --plugin-root "$destination_root")
-if [[ "$plugin_target_mode" == "user-global" ]]; then
+if [[ "$plugin_target_mode" == "user-global" || "$plugin_target_mode" == "sandbox-home" ]]; then
   cleanup_args+=(--coding-agent-root "${PRIME_AGENT_CODING_AGENT_DIR:-$HOME/.prime/agent}")
 fi
 if ! python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"; then

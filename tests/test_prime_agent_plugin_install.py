@@ -88,6 +88,17 @@ def test_source_is_outside_project_extension_discovery() -> None:
     assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("SKILL.md")} == set(SKILL_FILES)
 
 
+def test_sandbox_home_installs_fresh_final_plugin_in_exact_container_root(tier1_container) -> None:
+    result = tier1_container.run(
+        "python3", "/workspace/tests/container/sandbox_plugin_install_probe.py",
+        workdir=None, timeout=240,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout.strip().splitlines()[-1]) == {
+        "ok": True, "case": "sandbox-home-fresh-final",
+    }
+
+
 def _run_script(
     tier1_container, script: str, destination: Path, *, env=None, seed_bridge=False
 ):
