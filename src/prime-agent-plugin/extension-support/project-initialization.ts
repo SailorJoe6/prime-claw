@@ -241,6 +241,11 @@ export function fsyncDirectory(path: string): void {
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }
 
+function lstatIfPresent(path: string) {
+  try { return lstatSync(path); }
+  catch (error: any) { if (error?.code === "ENOENT") return null; throw error; }
+}
+
 function atomicWrite(path: string, bytes: Buffer | string, mode = 0o644): void {
   const tmp = join(dirname(path), `.${relative(dirname(path), path)}.tmp-${process.pid}-${randomUUID()}`);
   const fd = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), mode);
@@ -579,15 +584,16 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
         const migratedSymlinkBytes = migrateExpectedSkillSymlink(project.root, asset);
         ensureSafeDirectory(project.root, dirname(destination));
         const legacy = legacyPath(project.root, asset);
+        const destinationStat = lstatIfPresent(destination);
+        const legacyStat = legacy ? lstatIfPresent(legacy) : null;
         if (migratedSymlinkBytes) {
           const current = digest(migratedSymlinkBytes);
           const state: TemplateState = current === upstream ? "managed" : "customized";
           manifest.assets[asset.id] = { source: asset.source, destination: asset.destination, baselineSha256: current === upstream ? upstream : null, installedSha256: current, acceptedOverrideSha256: null, availableUpstreamSha256: upstream, state, provenance: provenance(asset) };
           action = "migrated";
           if (state === "customized") reason = "preserved customized legacy content";
-        } else if (!existsSync(destination) && legacy && existsSync(legacy)) {
-          const stat = lstatSync(legacy);
-          if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`legacy asset is not a regular file: ${relative(project.root, legacy)}`);
+        } else if (!destinationStat && legacy && legacyStat) {
+          if (!legacyStat.isFile() || legacyStat.isSymbolicLink()) throw new Error(`legacy asset is not a regular file: ${relative(project.root, legacy)}`);
           const bytes = readFileSync(legacy);
           atomicWrite(destination, bytes);
           unlinkSync(legacy);
@@ -596,13 +602,12 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
           manifest.assets[asset.id] = { source: asset.source, destination: asset.destination, baselineSha256: current === upstream ? upstream : null, installedSha256: current, acceptedOverrideSha256: null, availableUpstreamSha256: upstream, state, provenance: provenance(asset) };
           action = "migrated";
           if (state === "customized") reason = "preserved customized legacy content";
-        } else if (!existsSync(destination)) {
+        } else if (!destinationStat) {
           atomicWrite(destination, sourceBytes);
           manifest.assets[asset.id] = { source: asset.source, destination: asset.destination, baselineSha256: upstream, installedSha256: upstream, acceptedOverrideSha256: null, availableUpstreamSha256: upstream, state: "managed", provenance: provenance(asset) };
           action = "created";
         } else {
-          const stat = lstatSync(destination);
-          if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("destination is not a regular file");
+          if (!destinationStat.isFile() || destinationStat.isSymbolicLink()) throw new Error("destination is not a regular file");
           const currentBytes = readFileSync(destination);
           const current = digest(currentBytes);
           if (!prior) {

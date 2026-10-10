@@ -88,3 +88,24 @@ def test_preflight_detects_drift_without_mutating_files_or_state(tmp_path):
     assert result.returncode==3
     assert target.read_text()=="local edit\n"
     assert not (root/".prime-claw").exists()
+
+
+def test_exact_upstream_bytes_recover_stale_managed_and_customized_provenance(tmp_path):
+    source=tmp_path/"source";shutil.copytree(SOURCE,source)
+    root=tmp_path/"agent";root.mkdir()
+    def local(mode,*extra):
+        return subprocess.run([str(SCRIPT),mode,str(source),str(root),*extra],text=True,capture_output=True)
+    assert local("apply").returncode==0
+    target=root/"skills/goals-and-heartbeats/SKILL.md";upstream=source/"skills/goals-and-heartbeats/SKILL.md";upstream.write_text(upstream.read_text()+"\nupstream interrupted v2\n")
+    target.write_bytes(upstream.read_bytes())  # asset replacement completed, manifest save did not
+    assert local("preflight").returncode==0
+    repaired=local("apply");assert repaired.returncode==0,repaired.stderr
+    assert local("check").returncode==0
+    row=json.loads((root/".prime-claw/global-templates.json").read_text())["assets"]["global-goals-and-heartbeats"]
+    assert row["state"]=="managed" and row["installedSha256"]==row["baselineSha256"]
+    target.write_text("temporary local customization\n")
+    assert local("apply").returncode==3
+    target.write_bytes(upstream.read_bytes())  # operator manually restored the shipped bytes
+    assert local("preflight").returncode==0
+    assert local("apply").returncode==0
+    assert local("check").returncode==0

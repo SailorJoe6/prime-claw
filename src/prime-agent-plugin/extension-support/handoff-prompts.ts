@@ -8,10 +8,11 @@ export function canonicalSkillPrompt(
   name: "handoff" | "execute",
   guidance = "",
 ): string | null {
-  const path = name === "execute"
-    ? join(cwd, ".agents", "skills", "execute", "SKILL.md")
-    : join(cwd, ".prime-claw", "workflows", `${name}.md`);
-  if (!existsSync(path)) return null;
+  const candidates = name === "execute"
+    ? [join(cwd, ".agents", "skills", "execute", "SKILL.md"), join(cwd, ".ralph", "skills", "execute", "SKILL.md")]
+    : [join(cwd, ".prime-claw", "workflows", `${name}.md`), join(cwd, ".ralph", "skills", name, "SKILL.md")];
+  const path = candidates.find((candidate) => existsSync(candidate));
+  if (!path) return null;
   const body = readFileSync(path, "utf8");
   const wrapped = `<skill name="${name}" location="${path}">
 References are relative to ${dirname(path)}.

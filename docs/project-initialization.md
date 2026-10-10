@@ -80,12 +80,17 @@ recursive delete.
 
 The plugin's awaited `session_start` handler first verifies that the Git project
 is already registered with Orca. It then awaits the complete deterministic
-reconcile before Prime Agent accepts the initial prompt. It sends no user message
-and starts no model turn. Changes, conflicts, or degraded state produce one
+reconcile before Prime Agent accepts the initial prompt. Newly created, migrated, updated,
+or recovered discoverable skill paths are returned through Prime Agent v0.9.8's
+post-start `resources_discover` seam, so the same first session receives both their
+slash commands and model-visible skill entries. It sends no user message and starts
+no model turn. Changes, conflicts, or degraded state produce one
 concise UI notice; a current project is silent.
 
 An active Episode worktree is skipped. It retains the project workflow snapshot
-with which it started. The implementation has an injected activity seam for the
+with which it started. Runtime handoff readers prefer the new topology but retain
+read-only fallback to the corresponding legacy `.ralph/skills/{handoff,execute}`
+bytes, so an old-layout active Episode can finish without policy migration. The implementation has an injected activity seam for the
 minimal ownership record introduced by the lifecycle work and a bounded reader
 that scans the current Git worktree set for the current project-level legacy
 Episode identity during migration. Linked-worktree enumeration or identity
@@ -112,14 +117,17 @@ a separate explicit lifecycle driven through `initialize_prime_claw` actions:
    Current bytes are preserved until explicit `review-restore` or `review-keep`.
 
 A terminal tracked-file `git diff --no-ext-diff -- <path>` result is the fallback
-when Orca cannot open the comparison. Prime Claw does not invoke Orca Computer Use, macOS Accessibility,
+when Orca cannot open the comparison. The restored comparison is returned directly
+in both slash-command and model-callable tool output. Prime Claw does not invoke Orca Computer Use, macOS Accessibility,
 an OS permission prompt, or another GUI-control API for this workflow.
 
 ## Global drift
 
 `scripts/manage-prime-agent-global-assets.py` protects the global Markdown
 assets during plugin apply/check. Managed bytes update safely. Unknown or changed
-bytes are preserved by default and make readiness fail visibly. An operator may
+bytes are preserved by default and make readiness fail visibly. Exact current
+upstream bytes safely repair stale managed/customized provenance after an interrupted
+managed update or a manual restoration. An operator may
 choose `--global-drift-action accept-override` to accept the current bytes
 against this upstream or `--global-drift-action backup-reset` to create and
 verify a timestamped backup before reset. A later upstream change reopens an

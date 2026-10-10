@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   acceptProjectOverride,
@@ -42,7 +43,11 @@ function summarize(result: ReconcileResult, detailed = false): string {
 function actionSummary(value: unknown, detailed = true): string {
   if (value && typeof value === "object" && "items" in value) return summarize(value as ReconcileResult, detailed);
   if (value && typeof value === "object" && typeof (value as any).message === "string") return (value as any).message;
-  if (value && typeof value === "object" && (value as any).fallback) return `Prime Claw review restored cleanly; ${(value as any).fallback} fallback is available in the action result.`;
+  if (value && typeof value === "object" && (value as any).fallback) {
+    const diff = typeof (value as any).diff === "string" && (value as any).diff.trim() ? (value as any).diff.trimEnd() : "(no textual differences)";
+    return `Prime Claw review restored cleanly; ${(value as any).fallback} fallback:
+${diff}`;
+  }
   return "Prime Claw initialization action completed";
 }
 
@@ -98,6 +103,7 @@ function parseCommand(raw: string): { action: Action; assetId?: string; ready: b
 
 export function createProjectInitializationExtension(dependencies: ProjectInitializationDependencies = {}) {
   return function projectInitialization(pi: ExtensionAPI): void {
+    let pendingSkillPaths: string[] = [];
     pi.registerCommand("initialize-prime-claw", {
       description: "Initialize or safely reconcile Prime Claw project assets",
       handler: async (args, ctx) => {
@@ -148,10 +154,14 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
     });
 
     pi.on("session_start", async (_event, ctx) => {
+      pendingSkillPaths = [];
       try {
         const project = resolveNearestProjectRoot(ctx.cwd, dependencies.home, dependencies.runner);
         if (!isOrcaRegistered(project.root, dependencies.runner)) return;
         const result = reconcilePrimeClawProject({ ...dependencies, cwd: ctx.cwd, registerOrca: false });
+        pendingSkillPaths = result.items
+          .filter((item) => ["created", "migrated", "updated", "recovered"].includes(item.action) && item.destination.startsWith(".agents/skills/") && item.destination.endsWith("/SKILL.md"))
+          .map((item) => join(result.project.root, item.destination));
         if (result.skipReason === "uncertain-episode-activity") {
           ctx.ui.notify(summarize(result), "warning");
         } else if (result.changed || result.conflicts > 0 || result.registration.status === "unavailable") {
@@ -162,6 +172,12 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
         if (/No Git worktree|HOME boundary/.test(message)) return;
         ctx.ui.notify(`Prime Claw startup reconciliation degraded: ${message}`, "warning");
       }
+    });
+
+    pi.on("resources_discover", async () => {
+      const skillPaths = pendingSkillPaths;
+      pendingSkillPaths = [];
+      return skillPaths.length ? { skillPaths } : undefined;
     });
   };
 }

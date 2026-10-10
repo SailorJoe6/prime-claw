@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 
 import handoffChain from "../src/prime-agent-plugin/extensions/handoff-chain.ts";
+import { canonicalSkillPrompt } from "../src/prime-agent-plugin/extension-support/handoff-prompts.ts";
 
 function createHarness(cwd, throwOnSend = 0) {
   const commands = new Map();
@@ -263,4 +264,19 @@ test("late or repeated compaction signals have no execute-admission path", async
   assert.equal(f.events.get("session_compact"), undefined);
   assert.deepEqual(f.messages, admitted);
   assert.equal(f.messages.filter(({ options }) => options?.deliverAs === "followUp").length, 1);
+});
+
+
+test("active legacy Episode snapshot remains readable without template migration", (t) => {
+  const cwd=mkdtempSync(join(tmpdir(),"pc-legacy-episode-"));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
+  for(const name of ["handoff","execute"]){const path=join(cwd,".ralph","skills",name,"SKILL.md");mkdirSync(dirname(path),{recursive:true});writeFileSync(path,`legacy ${name} bytes\n`);}
+  const handoff=canonicalSkillPrompt(cwd,"handoff"),execute=canonicalSkillPrompt(cwd,"execute");
+  assert.match(handoff,/legacy handoff bytes/);assert.match(handoff,/\.ralph\/skills\/handoff\/SKILL\.md/);assert.match(execute,/legacy execute bytes/);
+});
+
+
+test("old-layout active Episode admits handoff and execute from its unchanged snapshot", async (t) => {
+  const f=fixture(t);for(const name of ["handoff","execute"]){const path=join(f.cwd,".ralph","skills",name,"SKILL.md");mkdirSync(dirname(path),{recursive:true});writeFileSync(path,`active snapshot ${name}\n`);}
+  const result=await f.tools.get("ralph_handoff").execute("legacy-active",{},undefined,undefined,f.ctx);
+  assert.equal(result.isError,undefined);assert.equal(f.messages.length,2);assert.match(f.messages[0].message,/active snapshot handoff/);assert.match(f.messages[1].message,/active snapshot execute/);assert.match(f.messages[0].message,/\.ralph\/skills\/handoff\/SKILL\.md/);
 });

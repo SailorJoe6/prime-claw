@@ -80,8 +80,8 @@ test("extension shares core across command, tool, and awaited startup without a 
   const root=repo(t); const runner=new Runner([{id:"exact",path:root,displayName:"preserve"}]); const commands=new Map(),tools=new Map(),events=new Map(),notifications=[];
   const pi={registerCommand(n,d){commands.set(n,d)},registerTool(d){tools.set(d.name,d)},on(n,h){events.set(n,h)}};
   createProjectInitializationExtension({pluginRoot:PLUGIN,home:dirname(root),runner})(pi);
-  assert.deepEqual([...commands.keys()],["initialize-prime-claw"]); assert.deepEqual([...tools.keys()],["initialize_prime_claw"]); assert.ok(events.has("session_start"));
-  const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}}; await events.get("session_start")({},ctx); assert.ok(existsSync(join(root,".prime-claw/templates.json"))); assert.equal(notifications.length,1); await events.get("session_start")({},ctx); assert.equal(notifications.length,1);
+  assert.deepEqual([...commands.keys()],["initialize-prime-claw"]); assert.deepEqual([...tools.keys()],["initialize_prime_claw"]); assert.ok(events.has("session_start")); assert.ok(events.has("resources_discover"));
+  const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}}; await events.get("session_start")({},ctx); assert.ok(existsSync(join(root,".prime-claw/templates.json"))); assert.equal(notifications.length,1); const discovered=await events.get("resources_discover")({},ctx); assert.equal(discovered.skillPaths.length,5); assert.ok(discovered.skillPaths.every(path=>path.endsWith("SKILL.md"))); assert.equal(await events.get("resources_discover")({},ctx),undefined); await events.get("session_start")({},ctx); assert.equal(notifications.length,1);
   const result=await tools.get("initialize_prime_claw").execute("id",{action:"reconcile"},null,null,ctx); assert.equal(result.isError,undefined); assert.equal(runner.adds,0);
   await commands.get("initialize-prime-claw").handler("--review project-skill-prepare",ctx);
   assert.match(notifications.at(-1).message,/temporarily overwrite/);
@@ -217,4 +217,21 @@ test("startup reports Orca lookup failure and does not initialize an unproven pr
   createProjectInitializationExtension({pluginRoot:PLUGIN,home:dirname(root),runner})({registerCommand(){},registerTool(){},on(name,handler){events.set(name,handler)}});
   await events.get("session_start")({}, {cwd:root,ui:{notify(message,level){notifications.push({message,level})}}});
   assert.equal(existsSync(join(root,".prime-claw/templates.json")),false);assert.equal(notifications.length,1);assert.match(notifications[0].message,/orca lookup unavailable/);assert.equal(notifications[0].level,"warning");
+});
+
+
+test("dangling project skill and workflow leaf symlinks are preserved as independent blocked assets", (t) => {
+  const root=repo(t);for(const relative of [".agents/skills/prepare/SKILL.md",".prime-claw/workflows/handoff.md"]){const path=join(root,relative);mkdirSync(dirname(path),{recursive:true});symlinkSync(join(root,"missing",relative.replaceAll("/","-")),path);}
+  const result=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()});
+  for(const id of ["project-skill-prepare","project-workflow-handoff"]){const item=result.items.find(row=>row.assetId===id);assert.equal(item.action,"blocked");assert.match(item.reason,/not a regular file/);}
+  assert.equal(lstatSync(join(root,".agents/skills/prepare/SKILL.md")).isSymbolicLink(),true);assert.equal(lstatSync(join(root,".prime-claw/workflows/handoff.md")).isSymbolicLink(),true);assert.ok(result.items.some(row=>row.action==="created"));
+});
+
+
+test("adapter exposes restored terminal fallback diff to both tool and slash-command callers", async (t) => {
+  const root=repo(t),runner=new Runner();reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});git(root,"add",".");git(root,"commit","-qm","initialize");
+  const target=join(root,".agents/skills/prepare/SKILL.md");writeFileSync(target,readFileSync(target,"utf8")+"\nadapter fallback customization\n");git(root,"add",target);git(root,"commit","-qm","customize");runner.orcaError="Orca diff unavailable";
+  const commands=new Map(),tools=new Map(),notifications=[];createProjectInitializationExtension({pluginRoot:PLUGIN,home:dirname(root),runner})({registerCommand(name,value){commands.set(name,value)},registerTool(value){tools.set(value.name,value)},on(){}});const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}};
+  const tool=await tools.get("initialize_prime_claw").execute("fallback",{action:"review-start",assetId:"project-skill-prepare",confirmedReady:true},null,null,ctx);assert.equal(tool.isError,undefined);assert.match(tool.content[0].text,/adapter fallback customization/);assert.match(tool.content[0].text,/git-diff fallback/);
+  await commands.get("initialize-prime-claw").handler("--review-ready project-skill-prepare",ctx);assert.match(notifications.at(-1).message,/adapter fallback customization/);assert.match(notifications.at(-1).message,/git-diff fallback/);
 });

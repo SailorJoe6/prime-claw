@@ -161,12 +161,12 @@ def apply(source_root: Path, root: Path, action: str) -> tuple[dict, int]:
         if current is None:
             destination.parent.mkdir(parents=True,exist_ok=True); atomic_copy(source,destination)
             state["assets"][asset["id"]]={"source":asset["source"],"destination":relative,"baselineSha256":upstream,"installedSha256":upstream,"availableUpstreamSha256":upstream,"state":"managed","backup":None}; rows.append({"id":asset["id"],"action":"created"}); continue
+        if current==upstream:
+            recovered=bool(prior and (prior.get("state")!="managed" or prior.get("installedSha256")!=upstream or prior.get("baselineSha256")!=upstream))
+            state["assets"][asset["id"]]={**(prior or {}),"source":asset["source"],"destination":relative,"baselineSha256":upstream,"installedSha256":upstream,"availableUpstreamSha256":upstream,"state":"managed","backup":prior.get("backup") if prior else None}; rows.append({"id":asset["id"],"action":"recovered" if recovered else "unchanged" if prior else "adopted"}); continue
         if prior and prior.get("state")=="managed" and current==prior.get("installedSha256"):
-            if current!=upstream: atomic_copy(source,destination); verb="updated"
-            else: verb="unchanged"
-            state["assets"][asset["id"]]={**prior,"source":asset["source"],"destination":relative,"baselineSha256":upstream,"installedSha256":upstream,"availableUpstreamSha256":upstream,"state":"managed"}; rows.append({"id":asset["id"],"action":verb}); continue
-        if current==upstream and not prior:
-            state["assets"][asset["id"]]={"source":asset["source"],"destination":relative,"baselineSha256":upstream,"installedSha256":upstream,"availableUpstreamSha256":upstream,"state":"managed","backup":None}; rows.append({"id":asset["id"],"action":"adopted"}); continue
+            atomic_copy(source,destination)
+            state["assets"][asset["id"]]={**prior,"source":asset["source"],"destination":relative,"baselineSha256":upstream,"installedSha256":upstream,"availableUpstreamSha256":upstream,"state":"managed"}; rows.append({"id":asset["id"],"action":"updated"}); continue
         if action=="backup-reset":
             saved=backup(root,relative,destination); atomic_copy(source,destination)
             state["assets"][asset["id"]]={"source":asset["source"],"destination":relative,"baselineSha256":upstream,"installedSha256":upstream,"availableUpstreamSha256":upstream,"state":"managed","backup":saved}; rows.append({"id":asset["id"],"action":"backup-reset","backup":saved}); continue
