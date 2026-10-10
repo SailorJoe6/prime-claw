@@ -88,6 +88,9 @@ def test_sandbox_create_attaches_provider_at_create(tmp_path, monkeypatch):
     cmd = seen["create"]
     assert "--from" in cmd and "prime-claw-brain:0.1.0" in cmd
     assert "--provider" in cmd and "prime-claw-ai-gateway" in cmd  # provider at CREATE
+    env_pairs = [cmd[i + 1] for i, arg in enumerate(cmd[:-1]) if arg == "--env"]
+    assert env_pairs == ["PRIME_AGENT_KERNEL_VENV=/sandbox/kernel-venv",
+                         "TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json"]
 
 
 def test_sandbox_existing_attaches_providers_without_recreate(tmp_path, monkeypatch, capsys):
@@ -109,6 +112,15 @@ def test_sandbox_existing_attaches_providers_without_recreate(tmp_path, monkeypa
     assert attached == ["prime-claw-ai-gateway", "prime-claw-github"]
     assert detached == ["prime-claw-codex"]
     assert "no recreate" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("phase", ["Error", "Stopped", "Pending"])
+def test_sandbox_existing_nonready_refuses_provider_and_policy(tmp_path, monkeypatch, capsys, phase):
+    monkeypatch.setattr(pc, "probe_sandbox", lambda c: (False, f"phase={phase}", {"phase": phase}))
+    monkeypatch.setattr(pc, "run", lambda c, timeout=30: (_ for _ in ()).throw(AssertionError("no provider mutation")))
+    monkeypatch.setattr(pc, "stage_policy", lambda c, a: (_ for _ in ()).throw(AssertionError("no policy mutation")))
+    assert pc.stage_sandbox(cfg(tmp_path), Args(), force_fresh=False) == 1
+    assert "not Ready" in capsys.readouterr().err
 
 
 def test_sandbox_force_fresh_deletes_first(tmp_path, monkeypatch):
@@ -144,6 +156,7 @@ def test_codex_provider_reads_host_oauth_but_only_openshell_holds_it(tmp_path, m
     assert "refresh_token=HOST-REFRESH" in create
     assert "account_id=HOST-ACCOUNT" in create
     assert state.exists() and "HOST-" not in state.read_text()  # hash only
+    assert state.stat().st_mode & 0o777 == 0o600
 
 
 def test_prime_agent_mirrors_settings_and_projects_placeholder_only_auth(tmp_path, monkeypatch):
@@ -221,7 +234,9 @@ def test_prime_agent_source_gate_requires_tag_commit_tree_lock_and_launcher(tmp_
     assert "sha256sum -c -" in gate
     assert "git -C /opt/prime-agent status --porcelain" in gate
     assert "git -C /opt/prime-agent describe --tags --always --dirty" in gate
-    assert "/usr/local/bin/prime-agent --version 2>&1" in gate
+    assert "/usr/local/bin/prime-agent --version 2>&1 | tail -n 1" in gate
+    assert 'PRIME_AGENT_KERNEL_VENV:-' in gate
+    assert '/sandbox/kernel-venv/bin/python' in gate
     assert "0.9.8" in gate
 
 
@@ -243,6 +258,7 @@ def test_prime_agent_daemon_starts_without_implicit_kill(tmp_path, monkeypatch):
     assert pc.stage_prime_agent(cfg(tmp_path), Args()) == 0
     daemon = next(c for c in calls if "pc-daemon-identity.mts" in c)
     assert "nohup prime-agent --mode daemon --offline" in daemon
+    assert "${NODE_OPTIONS:+$NODE_OPTIONS }--require /sandbox/.prime-claw/npm-onload.js" in daemon
     assert "prime-agent status" not in daemon
     probe = pc._prime_agent_daemon_identity_probe_script()
     assert "hello.runtime?.buildId" in probe
@@ -359,6 +375,16 @@ def test_converge_errors_when_sandbox_absent(tmp_path, monkeypatch, capsys):
     rc = pc.cmd_converge(cfg(tmp_path), Args())
     assert rc == 1
     assert "use 'prime-claw create'" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("phase", ["Error", "Stopped", "Pending"])
+def test_converge_nonready_refuses_before_all_mutating_stages(tmp_path, monkeypatch, capsys, phase):
+    monkeypatch.setattr(pc, "probe_sandbox", lambda c: (False, f"phase={phase}", {"phase": phase}))
+    order = []
+    _stub_stages(monkeypatch, order)
+    assert pc.cmd_converge(cfg(tmp_path), Args()) == 1
+    assert order == []
+    assert "not Ready" in capsys.readouterr().err
 
 
 def test_converge_dry_run_skips_presence_check(tmp_path, monkeypatch, capsys):

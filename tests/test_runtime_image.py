@@ -60,6 +60,12 @@ def test_runtime_dockerfile_exists_and_is_runtime():
     assert 'git rev-parse HEAD^{tree}' in body
     assert 'sha256sum -c -' in body and 'HUSKY=0 npm ci' in body
     assert 'TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json' in body
+    assert 'ENV PRIME_AGENT_KERNEL_VENV=/sandbox/kernel-venv' in body
+    assert 'test ! -e /sandbox/.prime' in body
+    policy = open(os.path.join(REPO, "policies", "runtime.yaml")).read()
+    read_only = policy.split("  read_only:\n", 1)[1].split("  read_write:\n", 1)[0]
+    assert "    - /opt/prime-agent\n" in read_only
+    assert "    - /opt/prime-agent\n" not in policy.split("  read_write:\n", 1)[1].split("landlock:", 1)[0]
     assert 'exec /opt/prime-agent/prime-agent.sh' in body
     for exact in (pc.PRIME_AGENT_SOURCE_TAG_OBJECT, pc.PRIME_AGENT_SOURCE_COMMIT,
                   pc.PRIME_AGENT_SOURCE_TREE, pc.PRIME_AGENT_SOURCE_LOCK_SHA256):

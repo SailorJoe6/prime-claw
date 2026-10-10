@@ -31,6 +31,46 @@ blindly on an Error sandbox. An unaccepted `home-qwen` selection also fails
 ordinary lifecycle commands closed; use the explicit canonical-profile
 recovery command in the Slice 4A section below.
 
+## Preserved v2 replacement (2026-10-10)
+
+The original `prime-claw-v2` OpenShell sandbox is `Error`; installed OpenShell
+0.0.116 cannot transition that instance to `Ready` with `sandbox start`. Its
+container and original volume remain retained. A verified checkpoint was
+copied to a separate working volume. The accepted replacement is
+`prime-claw-v2r1013` on the pinned TypeScript v0.9.8-r1 image, using a fresh
+provider binding and its own checkpoint-derived working volume. See the
+[initial trial](evidence/prime-agent-v098-v2-recovery-20261010.md) and
+[active acceptance](evidence/prime-agent-v098-v2-active-acceptance-20261010.md)
+for exact identities, volume manifests, data counts, and remaining gates.
+
+Do not call `recover`, `converge`, `validate`, `destroy`, `docker start`, or
+`docker restart` as an unexplained shortcut. `converge` includes provider
+reconciliation, brain clone/index/query, and spawn stages; `validate` applies
+a temporary policy and writes a validator page. Neither is a read-only
+health check. The first replacement's Codex response said the token expired,
+but Joe's host Codex still worked. The host auth fingerprint had changed since
+the last OpenShell provider provisioning. The supported Prime Claw provider
+refresh and a **new sandbox attachment** fixed the route; reprojection of the
+old sandbox's synthetic auth alone did not. No host OAuth value was copied to
+sandbox disk. Do not refresh a shared provider without accounting for old
+sandbox placeholder bindings. Do not route writes, switch vector spaces, or
+discard v1/original/checkpoint state merely because this runtime is healthy.
+
+A restored home links nine state entries from `/sandbox/home-root`. The image
+retains `.uv`, `.venv`, `.cache`, `.local`, and `kernel-venv` as active local
+environments while preserving their historical copies under `home-root`.
+`/opt/prime-agent` must be read-only in the effective OpenShell policy; the
+non-secret kernel and tsconfig paths must be present in the sandbox environment.
+A cold container retains the volume and links but not the manually started
+PostgreSQL and daemon processes. Re-check exact image, three mount sources,
+policy, provider binding, source identity, and absence of live database/daemon
+owners before explicitly starting just those two services on the working copy.
+After OpenShell restart the daemon socket file can exist without a listener:
+the pinned source daemon's own lease logic recovered it on an isolated trial
+and on the accepted replacement. Do not manually unlink the socket/lock or
+infer a running daemon from `test -S`; require a successful RPC build-ID hello.
+Never assume a `Ready` phase alone proves application health.
+
 ## Required one-time brain repository setup
 
 A fresh checkout has no brain repository by design. Add your GitHub `owner/repository` slug to

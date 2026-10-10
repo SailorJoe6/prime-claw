@@ -116,12 +116,15 @@ RUN mkdir -p /sandbox/pgdata /var/run/postgresql \
 USER sandbox
 WORKDIR /sandbox
 
-# Prepare the source release's Python kernel under the same sandbox HOME used
-# at runtime. The network is available during this image build, not required
-# for the first disposable offline session. Keep the checked-out source and
-# kernel runtime inside the image; do not use host packages or state.
+# A restored v2 volume links /sandbox/.prime into mounted home-root. Keep the
+# baked Python kernel outside that link so first boot does not collide with
+# preserved agent state. This is the upstream-supported kernel venv override.
+# Network is available at build time; runtime/offline checks use the baked venv.
+ENV PRIME_AGENT_KERNEL_VENV=/sandbox/kernel-venv
 RUN PRIME_AGENT_INSTALL_UV=1 /opt/prime-agent/node_modules/.bin/tsx -e \
-    "import { ensureKernelPython } from '/opt/prime-agent/packages/coding-agent/src/core/kernel/bootstrap.ts'; ensureKernelPython().then((python) => console.log('kernel_python=' + python)).catch((error) => { console.error(error); process.exitCode = 1; })"
+    "import { ensureKernelPython } from '/opt/prime-agent/packages/coding-agent/src/core/kernel/bootstrap.ts'; ensureKernelPython().then((python) => console.log('kernel_python=' + python)).catch((error) => { console.error(error); process.exitCode = 1; })" \
+    && test -x /sandbox/kernel-venv/bin/python \
+    && test ! -e /sandbox/.prime
 
 # Postgres connection defaults (override at apply time if needed).
 ENV POSTGRES_USER=gbrain \
