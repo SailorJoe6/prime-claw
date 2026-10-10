@@ -213,7 +213,7 @@ read -r -d '' PROBE_VALIDATOR <<'PYEOF' || true
 import json
 import sys
 
-REQUIRED = ("handoff", "plan", "implement-spec")
+REQUIRED = ("handoff", "plan-spec", "implement-spec")
 EXT_PREFIX = "/root/.prime/agent/extensions/"
 
 
@@ -267,7 +267,7 @@ for name in REQUIRED:
             and path.endswith(".ts")):
         die("command " + repr(name)
             + " not sourced from container extensions: " + repr(path))
-print("tier-1 probe validation OK: handoff, plan, implement-spec each "
+print("tier-1 probe validation OK: handoff, plan-spec, implement-spec each "
       "registered exactly once from " + EXT_PREFIX)
 PYEOF
 

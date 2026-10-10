@@ -255,37 +255,19 @@ def test_implement_prep_skill_owns_compaction_prompt_and_bounded_continuation() 
 def test_phase_prep_documentation_requires_docker_only_plugin_validation() -> None:
     docs = (ROOT / "docs" / "prep-chain.md").read_text()
     normalized = " ".join(docs.split())
-
     for fragment in (
-        "Plugin development and pre-merge validation are Docker tier 1 only",
-        "Never apply, check, or probe a candidate against the host user-global",
-        "python3 -m pytest tests/ -q -m container",
-        "scripts/test-tier1.sh --probe",
-        "scripts/test-all.sh",
-        "container-marked reviewed-plan coverage",
-        "behavioral native `/plan` and `/implement-spec` probes",
-        "one-deep `agent_end` skip",
-        "`create_spec_episode` still requires exact session and location equality",
+        "isolated Docker Tier 1", "Never apply", "host user-global plugin",
+        "python3 -m pytest tests/ -q -m container", "scripts/test-tier1.sh --probe",
+        "scripts/test-all.sh", "reviewed-plan Node behavior bridge",
+        "`create_spec_episode` remains the only mechanical promotion boundary",
     ):
         assert fragment in normalized
 
-    assert "scripts/apply-prime-agent-plugin.sh\n" not in docs
-    assert "scripts/check-prime-agent-plugin.sh\n" not in docs
-
 
 def test_phase_transition_docs_route_plugin_execution_to_docker_tier1() -> None:
-    cases = {
-        "docs/future-specification-bundles.md": (
-            "python3 -m pytest tests/test_reviewed_plan_extension.py -q -m container"
-        ),
-        "docs/handoff-chain.md": (
-            "python3 -m pytest tests/test_handoff_chain_extension.py -q -m container"
-        ),
-    }
-
-    for relative, focused_command in cases.items():
+    for relative in ("docs/future-specification-bundles.md", "docs/handoff-chain.md"):
         docs = (ROOT / relative).read_text()
-        assert focused_command in docs
+        assert "python3 -m pytest tests/ -q -m container" in docs
         assert "scripts/test-tier1.sh --probe" in docs
-        assert "scripts/test-all.sh" in docs
+        assert "host user-global plugin" in docs
         assert "node --experimental-strip-types --test" not in docs

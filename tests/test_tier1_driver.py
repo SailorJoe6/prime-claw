@@ -19,7 +19,7 @@ def _validator_source():
     if not match: raise AssertionError("probe validator heredoc not found")
     return match.group(1)
 def _cmd(name,path): return {"name":name,"sourceInfo":{"path":path}}
-GOOD_COMMANDS=[_cmd("handoff",EXT+"/handoff.ts"),_cmd("plan",EXT+"/plan.ts"),_cmd("implement-spec",EXT+"/plan.ts")]
+GOOD_COMMANDS=[_cmd("handoff",EXT+"/handoff.ts"),_cmd("plan-spec",EXT+"/reviewed-plan.ts"),_cmd("implement-spec",EXT+"/reviewed-plan.ts")]
 def _reply(commands=None,success=True):
     return json.dumps({"id":"loader","type":"response","command":"get_commands","success":success,"data":{"commands":GOOD_COMMANDS if commands is None else commands}})
 

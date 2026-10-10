@@ -1,1501 +1,286 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { once } from "node:events";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { createServer } from "node:net";
+import { mkdtempSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
-  CliGitAdapter,
-  createSpecEpisode,
-  DaemonJsonlClient,
-  handoffSpecEpisode,
-  DaemonMutationUncertainError,
-  EpisodeStateUncertainError,
-  HandoffFollowUpRejectedError,
-  episodeResultText,
-  forkPrimeSession,
-  NodeFilesystemAdapter,
-  PrimeSessionPublisher,
-  parseEpisodeIdentity,
-  runtimeSessionManagerClass,
+  CliOrcaAdapter, EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
+  bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
+import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
-const LOCATION = ".ralph/plans/future/alpha-plan";
-
-function git(cwd, ...args) {
-  return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }).trim();
+const LOCATION = ".ralph/plans/future/alpha";
+function diskFixture() {
+  const rawRoot = mkdtempSync(join(tmpdir(), "prime-claw-episode-"));
+  execFileSync("git", ["init", "-q", rawRoot]);
+  const root = realpathSync(rawRoot);
+  mkdirSync(join(root, ".ralph", "plans", "future", "alpha"), { recursive: true });
+  writeFileSync(join(root, ".ralph", "plans", "future", "alpha", "SPECIFICATION.md"), "spec");
+  writeFileSync(join(root, ".ralph", "plans", "future", "alpha", "EXECUTION_PLAN.md"), "plan");
+  mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true });
+  writeFileSync(join(root, ".agents", "skills", "execute", "SKILL.md"), `---
+name: execute
+---
+EXECUTE POLICY
+`);
+  mkdirSync(join(root, ".prime-claw", "workflows"), { recursive: true });
+  writeFileSync(join(root, ".prime-claw", "workflows", "handoff.md"), `---
+name: handoff
+---
+HANDOFF POLICY
+`);
+  const worktree = join(root, "episode-worktree");
+  mkdirSync(join(worktree, ".agents", "skills", "execute"), { recursive: true });
+  writeFileSync(join(worktree, ".agents", "skills", "execute", "SKILL.md"), `---
+name: execute
+---
+EXECUTE POLICY
+`);
+  mkdirSync(join(worktree, ".prime-claw", "workflows"), { recursive: true });
+  writeFileSync(join(worktree, ".prime-claw", "workflows", "handoff.md"), `---
+name: handoff
+---
+HANDOFF POLICY
+`);
+  return { root, worktree };
+}
+function setup(id = "setup-local", hostId = "local", route) {
+  return { id, projectId: "project", hostId, path: "/project", displayName: "prime-claw", environmentLabel: hostId, ...(route ? { routingEnvironmentId: route } : {}) };
+}
+function harness(options = {}) {
+  const disk = diskFixture(); const calls = []; let record = options.record ?? null;
+  const wt = { id: `repo::${disk.worktree}`, identity: "wt2:local:one", path: disk.worktree, branch: "JLanders/generated", head: "base", projectSetupId: "setup-local" };
+  const git = {
+    entries: [{ path: disk.root, branch: "main" }, { path: disk.worktree, branch: wt.branch }],
+    repositoryRoot: () => disk.root, head: (path) => path === disk.root ? "base" : "promoted",
+    branch: () => wt.branch, worktrees() { return this.entries; },
+    createWorktree(_repo, branch, path, base) { calls.push(["local-create", branch, path, base]); mkdirSync(path, { recursive: true }); this.entries.push({ path, branch }); mkdirSync(join(path, ".agents", "skills", "execute"), { recursive: true }); writeFileSync(join(path, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE POLICY"); mkdirSync(join(path, ".prime-claw", "workflows"), { recursive: true }); writeFileSync(join(path, ".prime-claw", "workflows", "handoff.md"), "HANDOFF POLICY"); },
+    assertCleanWorktree(path) { calls.push(["clean", path]); },
+    commitPromotion(path) { calls.push(["commit", path]); return "promoted"; }, removeCreatedWorktree() { calls.push(["remove-local"]); },
+  };
+  const filesystem = { exists: (path) => options.unavailable ? !String(path).includes("-alpha-episode-") : true, promoteBundle(path) { calls.push(["promote", path]); } };
+  const ownership = { read: () => record, write(_root, value) { record = structuredClone(value); calls.push(["ownership", value.status]); } };
+  const published = { activeSessionId: "route", sessionId: "episode", sessionFile: join(disk.root, "episode.jsonl") };
+  let listCount = 0;
+  const session = { ...published, cwd: disk.worktree, sessionName: "alpha-episode", isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 };
+  const publisher = {
+    async list() { listCount += 1; return options.list ? options.list(listCount, session) : (listCount === 1 ? [] : [session]); },
+    async getState() { return { ...session, isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null } }; },
+    async createFresh(args) { calls.push(["fresh", args]); await args.onAllocated?.({ sessionId: published.sessionId, sessionFile: published.sessionFile }); return published; },
+    async reopen(args) { calls.push(["reopen", args]); return published; },
+    async deliverExecute(_route, prompt) { calls.push(["execute", prompt]); },
+    async deliverHandoff(_route, handoff, execute) { calls.push(["handoff", handoff, execute]); },
+    async kill() { return true; }, close() { calls.push(["close"]); },
+  };
+  const localSetup = setup();
+  const orca = {
+    async listReadySetups() { calls.push(["setups"]); if (options.unavailable) throw new OrcaUnavailableError("missing"); return options.setups ?? [localSetup]; },
+    async createWorktree(args) { calls.push(["orca-create", args]); if (options.createError) throw options.createError; return wt; },
+    async showWorktree() { calls.push(["orca-show"]); return wt; },
+    async createLaunchAutomation(args) { calls.push(["auto-create", args]); if (options.autoCreateError) throw options.autoCreateError; return "automation"; },
+    async runAutomation(id) { calls.push(["auto-run", id]); if (options.runError) throw options.runError; return "run"; },
+    async removeAutomation(id) { calls.push(["auto-remove", id]); if (options.removeError) throw options.removeError; },
+    async listTerminals() { return options.terminals ?? [{ handle: "terminal", connected: true, writable: true, agentIdentity: "prime-agent", worktreeId: wt.id, worktreePath: wt.path, tabId: "tab", leafId: "leaf", visible: true }]; },
+    async readTerminalScreen() { return options.screen ?? { source: "screen", text: "← manage model" }; },
+  };
+  const ctx = {
+    cwd: disk.root, hasUI: options.hasUI ?? true,
+    ui: { async select(_title, labels) { calls.push(["picker", labels]); return options.pick?.(labels); } },
+    sessionManager: { getSessionId: () => "owner", getSessionFile: () => join(disk.root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }) },
+    model: { provider: "provider", id: "model" },
+  };
+  return { ...disk, wt, calls, git, filesystem, ownership, publisher, orca, ctx, deps: { git, filesystem, ownership, publisher, orca, wait: async () => {}, bindingAttempts: 1 }, get record() { return record; } };
+}
+function createApproved(f, options = {}) {
+  const approvedBundleDigest = bundleContentDigest(join(f.root, ".ralph", "plans", "future", "alpha"));
+  return createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, { ...options, approvedBundleDigest });
 }
 
-function write(path, body) {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, body);
-}
+test("Orca creation promotes before exactly one native execute assignment and removes launcher", async () => {
+  const f = harness(); const result = await createApproved(f);
+  assert.equal(result.engine, "orca"); assert.equal(result.status, "active"); assert.equal(result.reused, false);
+  const names = f.calls.map((call) => call[0]);
+  assert.ok(names.indexOf("promote") < names.indexOf("auto-create"));
+  assert.ok(names.indexOf("commit") < names.indexOf("auto-create"));
+  assert.deepEqual(names.filter((name) => name === "auto-run"), ["auto-run"]);
+  assert.equal(names.includes("fresh"), false); assert.equal(names.includes("execute"), false); assert.equal(names.includes("handoff"), false);
+  const automation = f.calls.find((call) => call[0] === "auto-create")[1];
+  assert.match(automation.prompt, /EXECUTE POLICY/); assert.equal(automation.worktreeId, f.wt.id);
+  assert.ok(names.indexOf("auto-remove") < names.lastIndexOf("ownership"));
+  assert.equal(f.record.launchAutomationId, undefined); assert.match(f.record.launchAutomationName, /^prime-claw-launch-/);
+  assert.equal(f.record.terminalHandle, "terminal");
+});
 
-function repositoryFixture(t) {
-  const repo = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-spec-episode-")));
-  const worktree = resolve(dirname(repo), `${basename(repo)}-alpha-plan-episode`);
-  t.after(() => {
-    try { execFileSync("git", ["-C", repo, "worktree", "remove", "--force", worktree], { stdio: "ignore" }); } catch {}
-    try { execFileSync("git", ["-C", repo, "branch", "-D", "episode/alpha-plan"], { stdio: "ignore" }); } catch {}
-    rmSync(worktree, { recursive: true, force: true });
-    rmSync(repo, { recursive: true, force: true });
+test("single ready setup bypasses picker", async () => {
+  const f = harness(); await createApproved(f);
+  assert.equal(f.calls.some((call) => call[0] === "picker"), false);
+});
+
+test("multiple setups use stable labeled picker and selected local id", async () => {
+  const second = setup("setup-second");
+  const f = harness({ setups: [setup(), second], pick: (labels) => labels[1] });
+  f.orca.createWorktree = async (args) => { f.calls.push(["orca-create", args]); return { ...f.wt, projectSetupId: second.id }; };
+  const result = await createApproved(f);
+  assert.equal(result.projectSetupId, second.id);
+  assert.match(f.calls.find((call) => call[0] === "picker")[1][1], /id:setup-second/);
+});
+
+test("stable host bypass selects exact setup without picker", async () => {
+  const second = setup("123e4567-e89b-12d3-a456-426614174000"); const f = harness({ setups: [setup(), second] });
+  f.orca.createWorktree = async (args) => ({ ...f.wt, projectSetupId: args.setup.id });
+  const result = await createApproved(f, { host: "id:123e4567-e89b-12d3-a456-426614174000" });
+  assert.equal(result.projectSetupId, "123e4567-e89b-12d3-a456-426614174000"); assert.equal(f.calls.some((call) => call[0] === "picker"), false);
+});
+
+for (const [name, options, pattern] of [
+  ["picker cancellation", { setups: [setup(), setup("two")], pick: () => undefined }, /cancelled/],
+  ["noninteractive ambiguity", { setups: [setup(), setup("two")], hasUI: false }, /noninteractive/],
+  ["zero ready setups", { setups: [] }, /No ready/],
+]) test(`${name} creates nothing`, async () => {
+  const f = harness(options); await assert.rejects(createApproved(f), pattern);
+  assert.equal(f.calls.some((call) => call[0] === "orca-create" || call[0] === "local-create"), false);
+  assert.equal(f.record, null);
+});
+
+test("remote selection is rejected before mutation and never falls back", async () => {
+  const remote = setup("remote", "runtime:env", "env"); const f = harness({ setups: [remote] });
+  await assert.rejects(createApproved(f), /Remote Episode placement is disabled/);
+  assert.equal(f.calls.some((call) => call[0] === "orca-create" || call[0] === "local-create"), false);
+});
+
+test("definitive pre-mutation Orca unavailability uses fresh local fallback once", async () => {
+  const f = harness({ unavailable: true }); const result = await createApproved(f);
+  assert.equal(result.engine, "local"); assert.equal(result.status, "active");
+  assert.equal(f.calls.filter((call) => call[0] === "fresh").length, 1);
+  assert.equal(f.calls.filter((call) => call[0] === "execute").length, 1);
+  assert.equal(f.calls.some((call) => call[0] === "handoff" || call[0] === "orca-create"), false);
+});
+
+test("local worktree identity is durable before fallback mutation", async () => {
+  const f = harness({ unavailable: true });
+  f.git.createWorktree = () => { throw new Error("ambiguous local create"); };
+  await assert.rejects(createApproved(f), /ambiguous local create/);
+  assert.equal(f.record.status, "uncertain");
+  assert.match(f.record.worktree, /-alpha-episode-/);
+  assert.match(f.record.branch, /^episode\/alpha-/);
+  assert.equal(f.record.head, "base");
+});
+
+for (const [name, option, value] of [
+  ["worktree create", "createError", new OrcaMutationUncertainError("create", "lost")],
+  ["automation run", "runError", new OrcaMutationUncertainError("run", "lost")],
+  ["automation removal", "removeError", new OrcaMutationUncertainError("remove", "lost")],
+]) test(`${name} uncertainty preserves one record and never falls back`, async () => {
+  const f = harness({ [option]: value }); await assert.rejects(createApproved(f));
+  assert.equal(f.record.status, "uncertain"); assert.equal(f.record.engine, "orca");
+  assert.equal(f.calls.some((call) => call[0] === "local-create"), false);
+  if (option === "removeError") { assert.equal(f.record.episodeId, "episode"); assert.equal(f.record.launchAutomationId, "automation"); }
+});
+
+test("active replay refreshes route without replaying assignment", async () => {
+  const f0 = harness(); const active = await createApproved(f0);
+  const f = harness({ record: { ...active, reused: undefined }, list: () => [{ sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree }] });
+  f.git.entries = [{ path: f.root, branch: "main" }, { path: active.worktree, branch: active.branch }];
+  f.filesystem.exists = () => true; f.orca.showWorktree = async () => ({ ...f.wt, id: active.worktreeId, identity: active.worktreeIdentity, path: active.worktree, branch: active.branch, projectSetupId: active.projectSetupId, head: active.head });
+  const result = await createApproved(f);
+  assert.equal(result.reused, true); assert.equal(f.calls.some((call) => ["auto-run", "execute", "handoff"].includes(call[0])), false);
+  assert.equal(f.calls.some((call) => call[0] === "reopen"), true);
+});
+
+test("uncertain replay never replays assignment", async () => {
+  const f = harness({ record: { version: 1, status: "uncertain", operationId: "op", engine: "local", ownerSessionId: "owner", sourceLocation: LOCATION, slug: "alpha", baseRef: "base", bundleDigest: "0".repeat(64), createdAt: "x", updatedAt: "x", uncertaintyReason: "lost" } });
+  await assert.rejects(createApproved(f), /No assignment was replayed/);
+  assert.equal(f.calls.some((call) => ["auto-run", "execute", "fresh"].includes(call[0])), false);
+});
+
+test("handoff uses exact active ownership and queues canonical execute only after quiescence", async () => {
+  const f0 = harness(); const active = await createApproved(f0);
+  const f = harness({ record: { ...active, reused: undefined }, list: () => [{ activeSessionId: "route", sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree, isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 }] });
+  f.git.entries = [{ path: f.root, branch: "main" }, { path: active.worktree, branch: active.branch }];
+  f.orca.showWorktree = async () => ({ ...f.wt, id: active.worktreeId, identity: active.worktreeIdentity, path: active.worktree, branch: active.branch, projectSetupId: active.projectSetupId, head: active.head });
+  f.publisher.getState = async () => ({ activeSessionId: "route", sessionId: "episode", sessionFile: active.episodeSessionFile, isSessionActive: false, isStreaming: false, isCompacting: false, isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null } });
+  const result = await handoffSpecEpisode(LOCATION, "fix accepted defect", f.ctx, f.deps);
+  assert.equal(result.handoffDelivery, "prompt"); assert.equal(result.executeDelivery, "followUp");
+  const call = f.calls.find((value) => value[0] === "handoff"); assert.match(call[1], /fix accepted defect/); assert.match(call[2], /EXECUTE POLICY/);
+});
+
+test("ownership parser requires active durable and Orca bindings", () => {
+  assert.throws(() => parseEpisodeOwnership({ version: 1, status: "active", engine: "orca" }), /unsupported shape/);
+});
+
+test("bundle bytes are bound before any ownership or external mutation", async () => {
+  const f = harness();
+  const folder = join(f.root, ".ralph", "plans", "future", "alpha");
+  const approvedBundleDigest = bundleContentDigest(folder);
+  writeFileSync(join(folder, "SPECIFICATION.md"), "changed after approval");
+  await assert.rejects(createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, { approvedBundleDigest }), /Approved bundle changed/);
+  assert.deepEqual(f.calls, [["close"]]); assert.equal(f.record, null);
+});
+
+test("uncertain local publication preserves allocated durable session identity", async () => {
+  const f = harness({ unavailable: true });
+  f.publisher.createFresh = async (args) => {
+    await args.onAllocated?.({ sessionId: "allocated", sessionFile: join(f.root, "allocated.jsonl") });
+    throw new EpisodeStateUncertainError("publication uncertain");
+  };
+  await assert.rejects(createApproved(f), /publication uncertain/);
+  assert.equal(f.record.status, "uncertain"); assert.equal(f.record.episodeId, "allocated");
+  assert.equal(f.record.episodeSessionFile, join(f.root, "allocated.jsonl"));
+  assert.equal(f.calls.some((call) => call[0] === "execute"), false);
+});
+
+test("Orca binding requires positive visible provider readiness", async () => {
+  const f = harness({ screen: { source: "screen-unavailable", text: "starting" } });
+  await assert.rejects(createApproved(f), /Timed out binding/);
+  assert.equal(f.record.status, "uncertain"); assert.equal(f.calls.some((call) => call[0] === "auto-remove"), false);
+});
+
+test("CLI Orca adapter encodes background provider launch without activate", async () => {
+  const commands = [];
+  const runner = (args) => {
+    commands.push(args);
+    const key = args.slice(0, 2).join(" ");
+    if (key === "project setups") return JSON.stringify({ ok: true, result: { setups: [{ id: "setup", projectId: "project", hostId: "local", path: "/repo", displayName: "repo", setupState: "ready" }] } });
+    if (key === "environment list") return JSON.stringify({ ok: true, result: { environments: [] } });
+    if (key === "worktree create") return JSON.stringify({ ok: true, result: { worktree: { id: "repo::/wt", identity: { key: "wt2:local:one" }, path: "/wt", branch: "refs/heads/generated", head: "base", projectHostSetupId: "setup" } } });
+    if (key === "automations create") return JSON.stringify({ ok: true, result: { automation: { id: "auto" } } });
+    if (key === "automations run") return JSON.stringify({ ok: true, result: { run: { id: "run" } } });
+    if (key === "automations remove") return JSON.stringify({ ok: true, result: {} });
+    if (key === "terminal list") return JSON.stringify({ ok: true, result: {
+      terminals: [{ handle: "term", worktreeId: "repo::/wt", worktreePath: "/wt", connected: true, writable: true, agentIdentity: "prime-agent", tabId: "tab", leafId: "leaf" }],
+      visualLayouts: [{ worktreeId: "repo::/wt", root: { tabs: [{ panes: { handle: "term" } }] } }],
+    } });
+    if (key === "terminal read") return JSON.stringify({ ok: true, result: { terminal: { source: "screen", tail: ["← manage model"] } } });
+    throw new Error(`unexpected ${args}`);
+  };
+  const adapter = new CliOrcaAdapter(runner); const setups = await adapter.listReadySetups("/repo");
+  const wt = await adapter.createWorktree({ setup: setups[0], name: "episode", baseRef: "base" });
+  const auto = await adapter.createLaunchAutomation({ worktreeId: wt.id, name: "launch", prompt: "execute" });
+  await adapter.runAutomation(auto); await adapter.removeAutomation(auto);
+  const terminals = await adapter.listTerminals(wt.id);
+  assert.equal(terminals[0].visible, true); assert.equal(terminals[0].worktreePath, "/wt");
+  assert.equal(terminals[0].tabId, "tab"); assert.equal(terminals[0].leafId, "leaf");
+  assert.deepEqual(await adapter.readTerminalScreen("term"), { source: "screen", text: "← manage model" });
+  const flattened = commands.flat(); assert.equal(flattened.includes("--activate"), false);
+  const create = commands.find((args) => args[0] === "worktree"); assert.ok(create.includes("--no-parent")); assert.ok(create.includes("--project-host-setup"));
+  const automation = commands.find((args) => args[0] === "automations" && args[1] === "create");
+  assert.ok(automation.includes("prime-agent")); assert.ok(automation.includes("--reuse-session")); assert.ok(automation.includes("--disabled"));
+});
+
+
+test("CLI setup inventory still enumerates remote-ready rows when local registration is not ready", async () => {
+  const commands = [];
+  const adapter = new CliOrcaAdapter((args) => {
+    commands.push(args);
+    if (args[0] === "project" && args[1] === "setups" && !args.includes("--host")) return JSON.stringify({ ok: true, result: { setups: [{ id: "local", projectId: "project", path: "/repo", setupState: "missing" }] } });
+    if (args[0] === "environment") return JSON.stringify({ ok: true, result: { environments: [{ id: "remote-id", name: "remote" }] } });
+    if (args[0] === "project" && args[1] === "setups" && args.includes("--host")) return JSON.stringify({ ok: true, result: { setups: [{ id: "remote-setup", projectId: "project", path: "/remote/repo", displayName: "repo", setupState: "ready", platform: "linux" }] } });
+    throw new Error(`unexpected ${args}`);
   });
-
-  git(repo, "init", "-q");
-  git(repo, "config", "user.email", "test@example.com");
-  git(repo, "config", "user.name", "Spec Episode Test");
-  write(join(repo, ".gitignore"), ".prime/agent/state/\n");
-  write(join(repo, ".prime-claw", "workflows", "handoff.md"), "canonical handoff body\n\n```python\ncompaction_result = await compact.run(focus_hint)\n```\n");
-  write(join(repo, ".agents", "skills", "execute", "SKILL.md"), "canonical execute body");
-  write(join(repo, ".ralph", "plans", "CURRENT.md"), "old active plan");
-  write(join(repo, LOCATION, "manifest.yaml"), "kind: arbitrary-bundle\n");
-  write(join(repo, LOCATION, "nested", "notes.txt"), "opaque nested artifact\n");
-  write(join(repo, ".ralph", "plans", "future", "other-bundle", "KEEP"), "future lifecycle");
-  write(join(repo, ".ralph", "plans", "archive", "KEEP"), "archive lifecycle");
-  write(join(repo, ".ralph", "plans", "blocked", "KEEP"), "blocked lifecycle");
-  git(repo, "add", "-A");
-  git(repo, "commit", "-qm", "initial");
-  return { repo, worktree };
-}
-
-class FakePublisher {
-  constructor({ sessions = [], state = null, failDelivery = false, failKill = false } = {}) {
-    this.sessions = sessions;
-    this.state = state;
-    this.failDelivery = failDelivery;
-    this.failKill = failKill;
-    this.listCalls = 0;
-    this.stateCalls = [];
-    this.forks = [];
-    this.reopens = [];
-    this.deliveries = [];
-    this.handoffs = [];
-    this.kills = [];
-    this.closed = 0;
-  }
-  async list() { this.listCalls += 1; return this.sessions; }
-  async getState(activeSessionId) {
-    this.stateCalls.push(activeSessionId);
-    if (!this.state) throw new Error("missing fake state");
-    return this.state;
-  }
-  async forkAndPublish(options) {
-    this.forks.push(options);
-    return {
-      activeSessionId: "active-episode-1",
-      sessionId: "stable-episode-1",
-      sessionFile: join(options.worktree, ".episode-session.jsonl"),
-    };
-  }
-  async reopen(options) {
-    this.reopens.push(options);
-    return {
-      activeSessionId: "active-episode-reopened",
-      sessionId: options.sessionId,
-      sessionFile: options.sessionFile,
-    };
-  }
-  async deliverExecute(activeSessionId, prompt) {
-    this.deliveries.push({ activeSessionId, prompt });
-    if (this.failDelivery) throw new Error("delivery rejected");
-  }
-  async deliverHandoff(activeSessionId, handoffPrompt, executePrompt, onHandoffAdmitted, queueHandoffIfBusy = false) {
-    this.handoffs.push({ activeSessionId, handoffPrompt, executePrompt, queueHandoffIfBusy });
-    if (this.failDelivery) throw new Error("delivery rejected");
-    await onHandoffAdmitted?.();
-  }
-  async kill(activeSessionId) {
-    this.kills.push(activeSessionId);
-    if (this.failKill) throw new Error("kill unconfirmed");
-    return true;
-  }
-  close() { this.closed += 1; }
-}
-
-function context(repo) {
-  return {
-    cwd: repo,
-    model: { provider: "test-provider", id: "test-model" },
-    sessionManager: {
-      getSessionFile() { return join(repo, "owner-session.jsonl"); },
-      getSessionId() { return "owner-session-id"; },
-      getHeader() { return { rlmDepth: 0 }; },
-    },
-  };
-}
-
-function dependencies(publisher) {
-  return {
-    git: new CliGitAdapter(),
-    filesystem: new NodeFilesystemAdapter(),
-    publisher,
-  };
-}
-
-function idleState(created, activeSessionId = created.episodeActiveSessionId) {
-  return {
-    activeSessionId,
-    sessionId: created.episodeId,
-    sessionFile: created.episodeSessionFile,
-    sessionName: created.sessionName,
-    cwd: created.worktree,
-    isSessionActive: false,
-    isStreaming: false,
-    isCompacting: false,
-    isBashRunning: false,
-    isRunningTools: false,
-    hasRunningRlmChildren: false,
-    unfinishedActionCount: 0,
-    sessionActions: { queuedCount: 0, steering: [], followUps: [] },
-  };
-}
-
-test("strict episode identity parser rejects malformed binding and admission fields", () => {
-  const valid = { version: 2, slug: "alpha-plan", sourceLocation: LOCATION,
-    ownerSessionId: "owner", episodeId: "episode", episodeActiveSessionId: "active",
-    episodeSessionFile: "/sessions/episode.jsonl", branch: "episode/alpha-plan",
-    worktree: "/worktree", sessionName: "alpha-plan-episode", bootstrapAdmission: "delivered" };
-  assert.deepEqual(parseEpisodeIdentity(valid), valid);
-  for (const changed of [
-    { version: 99 }, { slug: "../escape" }, { sourceLocation: ".ralph/plans/future/other" },
-    { branch: "episode/other" }, { sessionName: "other" }, { bootstrapAdmission: "bad" },
-    { episodeSessionFile: "" },
-  ]) assert.throws(() => parseEpisodeIdentity({ ...valid, ...changed }), /unsupported shape/);
-});
-
-test("promotes an opaque bundle, commits it, publishes context, and bootstraps handoff before execute", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  write(join(repo, LOCATION, "approved-after-head.md"), "uncommitted approved content\n");
-  const publisher = new FakePublisher();
-
-  const result = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher));
-
-  assert.equal(result.reused, false);
-  assert.equal(result.episodeId, "stable-episode-1");
-  assert.equal(result.episodeActiveSessionId, "active-episode-1");
-  assert.equal(result.branch, "episode/alpha-plan");
-  assert.equal(result.worktree, worktree);
-  assert.equal(result.sessionName, "alpha-plan-episode");
-  assert.match(episodeResultText(result), /"episodeActiveSessionId":"active-episode-1"/);
-
-  assert.equal(readFileSync(join(repo, LOCATION, "manifest.yaml"), "utf8"), "kind: arbitrary-bundle\n");
-  assert.equal(existsSync(join(worktree, LOCATION)), false);
-  assert.equal(existsSync(join(worktree, ".ralph", "plans", "CURRENT.md")), false);
-  assert.equal(readFileSync(join(worktree, ".ralph", "plans", "manifest.yaml"), "utf8"), "kind: arbitrary-bundle\n");
-  assert.equal(readFileSync(join(worktree, ".ralph", "plans", "nested", "notes.txt"), "utf8"), "opaque nested artifact\n");
-  assert.equal(readFileSync(join(worktree, ".ralph", "plans", "approved-after-head.md"), "utf8"), "uncommitted approved content\n");
-  for (const lifecycle of ["future/other-bundle/KEEP", "archive/KEEP", "blocked/KEEP"]) {
-    assert.equal(existsSync(join(worktree, ".ralph", "plans", lifecycle)), true);
-  }
-  assert.match(git(worktree, "log", "-1", "--pretty=%s"), /promote alpha-plan specification/);
-  assert.equal(git(worktree, "show", "HEAD:.ralph/plans/manifest.yaml"), "kind: arbitrary-bundle");
-  assert.equal(git(worktree, "show", "HEAD:.ralph/plans/approved-after-head.md"), "uncommitted approved content");
-  assert.throws(() => execFileSync(
-    "git",
-    ["-C", worktree, "cat-file", "-e", "HEAD:.ralph/plans/future/alpha-plan/manifest.yaml"],
-    { stdio: "ignore" },
-  ));
-  assert.equal(git(worktree, "status", "--porcelain"), "");
-
-  assert.equal(publisher.forks.length, 1);
-  assert.deepEqual(publisher.forks[0], {
-    sourceSessionFile: join(repo, "owner-session.jsonl"),
-    worktree,
-    sessionName: "alpha-plan-episode",
-    branch: "episode/alpha-plan",
-    toolCallId: "tool-call-1",
-    model: { provider: "test-provider", id: "test-model" },
-  });
-  assert.deepEqual(publisher.deliveries, []);
-  assert.equal(publisher.handoffs.length, 1);
-  assert.equal(publisher.handoffs[0].activeSessionId, "active-episode-1");
-  assert.equal(publisher.handoffs[0].queueHandoffIfBusy, true);
-  assert.equal(publisher.handoffs[0].handoffPrompt.split("canonical handoff body").length - 1, 1);
-  assert.match(publisher.handoffs[0].handoffPrompt, /compact\.run\(focus_hint\)/);
-  assert.equal(publisher.handoffs[0].executePrompt.split("canonical execute body").length - 1, 1);
-  assert.equal(publisher.handoffs[0].executePrompt.split(LOCATION).length - 1, 1);
-  assert.equal(publisher.closed, 1);
-
-  const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
-  const identity = JSON.parse(readFileSync(identityPath, "utf8"));
-  assert.deepEqual(Object.keys(identity).sort(), [
-    "bootstrapAdmission", "branch", "episodeActiveSessionId", "episodeId",
-    "episodeSessionFile", "ownerSessionId", "sessionName", "slug", "sourceLocation",
-    "version", "worktree",
-  ]);
-  assert.equal(identity.version, 2);
-  assert.equal(identity.bootstrapAdmission, "delivered");
-});
-
-
-test("no-diff promotion starts clean and creates an allow-empty marker commit", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  git(repo, "rm", "-qr", ".ralph/plans/CURRENT.md", LOCATION);
-  write(join(repo, ".ralph", "plans", "manifest.yaml"), "kind: arbitrary-bundle\n");
-  write(join(repo, ".ralph", "plans", "nested", "notes.txt"), "opaque nested artifact\n");
-  git(repo, "add", "-A");
-  git(repo, "commit", "-qm", "make active plan match future bundle");
-  write(join(repo, LOCATION, "manifest.yaml"), "kind: arbitrary-bundle\n");
-  write(join(repo, LOCATION, "nested", "notes.txt"), "opaque nested artifact\n");
-  const publisher = new FakePublisher();
-
-  const result = await createSpecEpisode(LOCATION, "tool-call-empty", context(repo), dependencies(publisher));
-
-  assert.equal(result.bootstrapAdmission, "delivered");
-  assert.equal(git(worktree, "diff", "--exit-code", "HEAD^", "HEAD"), "");
-  assert.match(git(worktree, "log", "-1", "--pretty=%s"), /promote alpha-plan specification/);
-  assert.equal(existsSync(join(repo, LOCATION, "manifest.yaml")), true);
-  assert.equal(git(worktree, "status", "--porcelain"), "");
-});
-
-
-test("bootstrap journal advances durably between the two admissions", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const baseFilesystem = new NodeFilesystemAdapter();
-  const stages = [];
-  const filesystem = {
-    exists: (path) => baseFilesystem.exists(path),
-    promoteBundle: (...args) => baseFilesystem.promoteBundle(...args),
-    readIdentity: (path) => baseFilesystem.readIdentity(path),
-    removeFile: (path) => baseFilesystem.removeFile(path),
-    writeIdentity(path, identity) {
-      stages.push(identity.bootstrapAdmission ?? `v${identity.version}`);
-      baseFilesystem.writeIdentity(path, identity);
-    },
-  };
-
-  const result = await createSpecEpisode(LOCATION, "tool-call-journal", context(repo), {
-    git: new CliGitAdapter(), filesystem, publisher: new FakePublisher(),
-  });
-
-  assert.equal(result.bootstrapAdmission, "delivered");
-  assert.deepEqual(stages, ["handoff-pending", "execute-pending", "delivered"]);
-});
-
-test("matching repeated request returns identity without another fork or execute delivery", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const first = new FakePublisher();
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(first));
-  const replay = new FakePublisher({ sessions: [{
-    activeSessionId: created.episodeActiveSessionId,
-    sessionId: created.episodeId,
-    sessionFile: created.episodeSessionFile,
-    sessionName: created.sessionName,
-    cwd: created.worktree,
-  }] });
-
-  const result = await createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay));
-
-  assert.equal(result.reused, true);
-  assert.equal(result.worktree, worktree);
-  assert.deepEqual(replay.forks, []);
-  assert.deepEqual(replay.deliveries, []);
-  assert.equal(replay.closed, 1);
-});
-
-
-
-test("matching inactive durable session is reopened without another execute delivery", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const first = new FakePublisher();
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(first));
-  const replay = new FakePublisher({ sessions: [{
-    sessionId: created.episodeId,
-    sessionFile: created.episodeSessionFile,
-    sessionName: created.sessionName,
-    cwd: created.worktree,
-  }] });
-
-  const result = await createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay));
-
-  assert.equal(result.reused, true);
-  assert.equal(result.episodeActiveSessionId, "active-episode-reopened");
-  assert.equal(replay.reopens.length, 1);
-  assert.deepEqual(replay.forks, []);
-  assert.deepEqual(replay.deliveries, []);
-  const identity = JSON.parse(readFileSync(
-    join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
-    "utf8",
-  ));
-  assert.equal(identity.episodeActiveSessionId, "active-episode-reopened");
-});
-
-
-test("version-1 identities remain truthful legacy direct-execute records", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
-  const legacy = {
-    version: 1,
-    slug: created.slug,
-    sourceLocation: created.sourceLocation,
-    ownerSessionId: created.ownerSessionId,
-    episodeId: created.episodeId,
-    episodeActiveSessionId: created.episodeActiveSessionId,
-    episodeSessionFile: created.episodeSessionFile,
-    branch: created.branch,
-    worktree: created.worktree,
-    sessionName: created.sessionName,
-    executeAdmission: "delivered",
-  };
-  writeFileSync(identityPath, `${JSON.stringify(legacy, null, 2)}\n`);
-  const session = {
-    activeSessionId: legacy.episodeActiveSessionId,
-    sessionId: legacy.episodeId,
-    sessionFile: legacy.episodeSessionFile,
-    sessionName: legacy.sessionName,
-    cwd: legacy.worktree,
-    isSessionActive: false,
-  };
-  const replay = new FakePublisher({ sessions: [session] });
-
-  const reused = await createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay));
-  assert.equal(reused.version, 1);
-  assert.equal(reused.executeAdmission, "delivered");
-  assert.deepEqual(replay.handoffs, []);
-
-  const handoffPublisher = new FakePublisher({
-    sessions: [session],
-    state: idleState(created),
-  });
-  const handoff = await handoffSpecEpisode(LOCATION, "", context(repo), dependencies(handoffPublisher));
-  assert.equal(handoff.admitted, true);
-  assert.equal(handoffPublisher.handoffs.length, 1);
-
-  writeFileSync(identityPath, `${JSON.stringify({ ...legacy, executeAdmission: "uncertain" }, null, 2)}\n`);
-  const unresolved = new FakePublisher({ sessions: [session], state: idleState(created) });
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-3", context(repo), dependencies(unresolved)),
-    /legacy execute admission uncertain/,
-  );
-  await assert.rejects(
-    handoffSpecEpisode(LOCATION, "", context(repo), dependencies(unresolved)),
-    /legacy execute admission uncertain is incomplete/,
-  );
-  assert.deepEqual(unresolved.handoffs, []);
-});
-
-test("owner retains an idle resident route and admits handoff prompt before one execute follow-up", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  const publisher = new FakePublisher({
-    sessions: [idleState(created)],
-    state: idleState(created),
-  });
-
-  const result = await handoffSpecEpisode(
-    LOCATION,
-    "preserve the accepted slice boundary",
-    context(repo),
-    dependencies(publisher),
-  );
-
-  assert.deepEqual(result, {
-    admitted: true,
-    sourceLocation: LOCATION,
-    episodeId: created.episodeId,
-    episodeActiveSessionId: created.episodeActiveSessionId,
-    handoffDelivery: "prompt",
-    executeDelivery: "followUp",
-  });
-  assert.deepEqual(publisher.reopens, []);
-  assert.deepEqual(publisher.stateCalls, [created.episodeActiveSessionId]);
-  assert.equal(publisher.handoffs.length, 1);
-  assert.equal(publisher.handoffs[0].activeSessionId, created.episodeActiveSessionId);
-  assert.match(publisher.handoffs[0].handoffPrompt, /canonical handoff body/);
-  assert.match(publisher.handoffs[0].handoffPrompt, /compact\.run\(focus_hint\)/);
-  assert.equal(publisher.handoffs[0].handoffPrompt.split("preserve the accepted slice boundary").length - 1, 1);
-  assert.match(publisher.handoffs[0].executePrompt, /canonical execute body/);
-  assert.equal(publisher.closed, 1);
-});
-
-test("owner handoff accepts a renamed durable agent with the same GUID and session file", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  const renamed = { ...idleState(created), sessionName: "operator-renamed-agent" };
-  const publisher = new FakePublisher({ sessions: [renamed], state: renamed });
-
-  const result = await handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher));
-
-  assert.equal(result.admitted, true);
-  assert.equal(result.episodeId, created.episodeId);
-  assert.equal(publisher.handoffs.length, 1);
-});
-
-test("owner handoff accepts differing list and state recorded cwd for the same GUID and file", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  const publisher = new FakePublisher({
-    sessions: [{ ...idleState(created), cwd: join(repo, "list-recorded-cwd") }],
-    state: { ...idleState(created), cwd: join(repo, "state-recorded-cwd") },
-  });
-
-  const result = await handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher));
-
-  assert.equal(result.admitted, true);
-  assert.equal(result.episodeId, created.episodeId);
-  assert.equal(publisher.handoffs.length, 1);
-});
-
-test("owner handoff rejects a different GUID from list or get_state with zero delivery", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  for (const source of ["list", "get_state"]) {
-    await t.test(source, async () => {
-      const publisher = new FakePublisher({
-        sessions: [source === "list" ? { ...idleState(created), sessionId: "different-guid" } : idleState(created)],
-        state: source === "get_state" ? { ...idleState(created), sessionId: "different-guid" } : idleState(created),
-      });
-      await assert.rejects(
-        handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
-        source === "list" ? /missing or different durable session/ : /does not match the durable owned identity/,
-      );
-      assert.deepEqual(publisher.handoffs, []);
-      assert.deepEqual(publisher.reopens, []);
-    });
-  }
-});
-
-test("owner publishes a missing route, re-reads idle state, and then delivers", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  const publisher = new FakePublisher({
-    sessions: [{
-      sessionId: created.episodeId,
-      sessionFile: created.episodeSessionFile,
-      sessionName: created.sessionName,
-      cwd: created.worktree,
-      isSessionActive: false,
-      isStreaming: false,
-      isCompacting: false,
-      queuedCount: 0,
-    }],
-    state: idleState(created, "active-episode-reopened"),
-  });
-
-  const result = await handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher));
-
-  assert.equal(result.episodeActiveSessionId, "active-episode-reopened");
-  assert.equal(publisher.reopens.length, 1);
-  assert.deepEqual(publisher.stateCalls, ["active-episode-reopened"]);
-  assert.equal(publisher.handoffs[0].activeSessionId, "active-episode-reopened");
-  const identity = JSON.parse(readFileSync(
-    join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
-    "utf8",
-  ));
-  assert.equal(identity.episodeActiveSessionId, "active-episode-reopened");
-});
-
-test("owner handoff rejects a different owner before state checks or delivery", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  const publisher = new FakePublisher({
-    sessions: [{ ...idleState(created), isSessionActive: true }],
-    state: idleState(created),
-  });
-  const otherOwner = context(repo);
-  otherOwner.sessionManager.getSessionId = () => "different-owner";
-
-  await assert.rejects(
-    handoffSpecEpisode(LOCATION, "", otherOwner, dependencies(publisher)),
-    /conflicts on ownerSessionId/,
-  );
-
-  assert.deepEqual(publisher.stateCalls, []);
-  assert.deepEqual(publisher.handoffs, []);
-});
-
-test("owner handoff rejects every busy list signal and sends nothing", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  const busySummaries = [
-    ["isSessionActive alone", { isSessionActive: true }],
-    ["streaming", { isStreaming: true }],
-    ["compacting", { isCompacting: true }],
-    ["queued", { queuedCount: 1 }],
-  ];
-
-  for (const [label, patch] of busySummaries) {
-    await t.test(label, async () => {
-      const publisher = new FakePublisher({
-        sessions: [{ ...idleState(created), ...patch }],
-        state: idleState(created),
-      });
-      await assert.rejects(
-        handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
-        /episode is busy/i,
-      );
-      assert.deepEqual(publisher.stateCalls, []);
-      assert.deepEqual(publisher.handoffs, []);
-      assert.deepEqual(publisher.reopens, []);
-    });
-  }
-});
-
-test("owner handoff rejects every detailed busy state signal with zero sends", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  const busyStates = [
-    ["isSessionActive alone", { isSessionActive: true }],
-    ["streaming", { isStreaming: true }],
-    ["compacting", { isCompacting: true }],
-    ["bash", { isBashRunning: true }],
-    ["tools", { isRunningTools: true }],
-    ["RLM children", { hasRunningRlmChildren: true }],
-    ["unfinished actions", { unfinishedActionCount: 1 }],
-    ["action queue", { sessionActions: { queuedCount: 1, steering: [], followUps: [] } }],
-    ["steering queue", { sessionActions: { queuedCount: 0, steering: ["handoff"], followUps: [] } }],
-    ["follow-up queue", { sessionActions: { queuedCount: 0, steering: [], followUps: ["execute"] } }],
-    ["active action", { sessionActions: { queuedCount: 0, steering: [], followUps: [], active: {} } }],
-  ];
-
-  for (const [label, patch] of busyStates) {
-    await t.test(label, async () => {
-      const publisher = new FakePublisher({
-        sessions: [idleState(created)],
-        state: { ...idleState(created), ...patch },
-      });
-      await assert.rejects(
-        handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
-        /not quiescent/,
-      );
-      assert.deepEqual(publisher.handoffs, []);
-      assert.deepEqual(publisher.reopens, []);
-    });
-  }
-});
-
-test("owner handoff rejects non-root callers and unresolved initial admission", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  const publisher = new FakePublisher({
-    sessions: [{ ...idleState(created), isSessionActive: true }],
-    state: idleState(created),
-  });
-  const child = context(repo);
-  child.sessionManager.getHeader = () => ({ rlmDepth: 1 });
-  await assert.rejects(
-    handoffSpecEpisode(LOCATION, "", child, dependencies(publisher)),
-    /top-level project conversation/,
-  );
-  assert.equal(publisher.listCalls, 0);
-
-  const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
-  const identity = JSON.parse(readFileSync(identityPath, "utf8"));
-  writeFileSync(identityPath, `${JSON.stringify({ ...identity, bootstrapAdmission: "execute-uncertain" }, null, 2)}\n`);
-  await assert.rejects(
-    handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
-    /bootstrap admission execute-uncertain is incomplete/,
-  );
-  assert.deepEqual(publisher.stateCalls, []);
-  assert.deepEqual(publisher.handoffs, []);
-});
-
-test("owner handoff preflights both canonical workflows before reopening", async (t) => {
-  const { repo } = repositoryFixture(t);
-  const created = await createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(new FakePublisher()));
-  rmSync(join(created.worktree, ".agents", "skills", "execute", "SKILL.md"));
-  const publisher = new FakePublisher({
-    sessions: [{
-      sessionId: created.episodeId,
-      sessionFile: created.episodeSessionFile,
-      sessionName: created.sessionName,
-      cwd: created.worktree,
-      isSessionActive: false,
-      isStreaming: false,
-      isCompacting: false,
-      queuedCount: 0,
-    }],
-  });
-
-  await assert.rejects(
-    handoffSpecEpisode(LOCATION, "", context(repo), dependencies(publisher)),
-    /missing \.agents\/skills\/execute\/SKILL\.md/,
-  );
-
-  assert.deepEqual(publisher.reopens, []);
-  assert.deepEqual(publisher.handoffs, []);
-});
-
-test("initial bootstrap preflights handoff and execute before publication", async (t) => {
-  for (const missing of ["handoff", "execute"]) {
-    const { repo, worktree } = repositoryFixture(t);
-    git(repo, "rm", missing === "handoff" ? `.prime-claw/workflows/handoff.md` : `.agents/skills/execute/SKILL.md`);
-    git(repo, "commit", "-qm", `remove ${missing}`);
-    const publisher = new FakePublisher();
-
-    await assert.rejects(
-      createSpecEpisode(LOCATION, `tool-call-missing-${missing}`, context(repo), dependencies(publisher)),
-      new RegExp(missing === "handoff" ? "missing \.prime-claw/workflows/handoff\.md" : "missing \.agents/skills/execute/SKILL\.md"),
-    );
-
-    assert.deepEqual(publisher.forks, []);
-    assert.deepEqual(publisher.handoffs, []);
-    assert.equal(existsSync(worktree), false);
-  }
-});
-
-test("non-root session is rejected before collision checks or Git mutation", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const publisher = new FakePublisher();
-  const childContext = context(repo);
-  childContext.sessionManager.getHeader = () => ({ rlmDepth: 1 });
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", childContext, dependencies(publisher)),
-    /top-level project conversation/,
-  );
-
-  assert.equal(publisher.listCalls, 0);
-  assert.equal(existsSync(worktree), false);
-  assert.equal(existsSync(join(repo, LOCATION, "manifest.yaml")), true);
-});
-
-
-test("ordinary branch collision fails clearly without deleting it", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  git(repo, "branch", "episode/alpha-plan");
-  const publisher = new FakePublisher();
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
-    /Episode branch already exists/,
-  );
-
-  assert.equal(git(repo, "show-ref", "--verify", "--quiet", "refs/heads/episode/alpha-plan"), "");
-  assert.equal(existsSync(worktree), false);
-  assert.equal(existsSync(join(repo, LOCATION, "manifest.yaml")), true);
-});
-
-
-test("worktree path collision fails without deleting the directory", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  write(join(worktree, "OWNER"), "pre-existing resource");
-  const publisher = new FakePublisher();
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
-    /Episode worktree path already exists/,
-  );
-
-  assert.equal(readFileSync(join(worktree, "OWNER"), "utf8"), "pre-existing resource");
-  assert.throws(() => git(repo, "show-ref", "--verify", "--quiet", "refs/heads/episode/alpha-plan"));
-});
-
-test("session-name collision fails before Git mutation", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const publisher = new FakePublisher({ sessions: [{
-    activeSessionId: "other-active",
-    sessionId: "other-stable",
-    sessionName: "alpha-plan-episode",
-    cwd: "/somewhere-else",
-  }] });
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
-    /Episode session name already exists/,
-  );
-
-  assert.equal(existsSync(worktree), false);
-  assert.throws(() => git(repo, "show-ref", "--verify", "--quiet", "refs/heads/episode/alpha-plan"));
-  assert.equal(existsSync(join(repo, LOCATION, "manifest.yaml")), true);
-});
-
-
-
-
-
-test("cleanup reports worktree-removal failure after still attempting branch deletion", () => {
-  const calls = [];
-  const adapter = new CliGitAdapter((_cwd, args) => {
-    calls.push(args);
-    if (args[0] === "worktree" && args[1] === "remove") throw new Error("cannot remove worktree");
-    return "";
-  });
-
-  assert.throws(
-    () => adapter.removeCreatedWorktree("/repo", "episode/alpha", "/worktree"),
-    /worktree removal failed: cannot remove worktree/,
-  );
-  assert.deepEqual(calls.map((args) => args.slice(0, 2)), [["worktree", "remove"], ["branch", "-D"]]);
-});
-
-test("cleanup reports branch-deletion failure after confirmed worktree removal", () => {
-  const calls = [];
-  const adapter = new CliGitAdapter((_cwd, args) => {
-    calls.push(args);
-    if (args[0] === "branch" && args[1] === "-D") throw new Error("cannot delete branch");
-    return "";
-  });
-
-  assert.throws(
-    () => adapter.removeCreatedWorktree("/repo", "episode/alpha", "/worktree"),
-    /branch deletion failed: cannot delete branch/,
-  );
-  assert.deepEqual(calls.map((args) => args.slice(0, 2)), [["worktree", "remove"], ["branch", "-D"]]);
-});
-
-test("partial Git cleanup becomes uncertain and preserves identity artifacts", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  class CleanupFailureGit extends CliGitAdapter {
-    removeCreatedWorktree() { throw new Error("worktree removal failed: simulated"); }
-  }
-  const publisher = new FakePublisher({ failDelivery: true });
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), {
-      git: new CleanupFailureGit(), filesystem: new NodeFilesystemAdapter(), publisher,
-    }),
-    /Git cleanup was incomplete/,
-  );
-
-  assert.deepEqual(publisher.kills, ["active-episode-1"]);
-  assert.equal(existsSync(worktree), true);
-  assert.equal(existsSync(join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json")), true);
-});
-
-
-test("uncertain initial handoff admission preserves identity and never replays", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const publisher = new FakePublisher();
-  publisher.deliverHandoff = async (activeSessionId, handoffPrompt, executePrompt) => {
-    publisher.handoffs.push({ activeSessionId, handoffPrompt, executePrompt });
-    const pending = JSON.parse(readFileSync(
-      join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
-      "utf8",
-    ));
-    assert.equal(pending.bootstrapAdmission, "handoff-pending");
-    throw new EpisodeStateUncertainError("handoff admission uncertain");
-  };
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
-    /handoff admission uncertain/,
-  );
-
-  assert.deepEqual(publisher.kills, []);
-  assert.equal(existsSync(worktree), true);
-  const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
-  const uncertain = JSON.parse(readFileSync(identityPath, "utf8"));
-  assert.equal(uncertain.bootstrapAdmission, "handoff-uncertain");
-
-  const replay = new FakePublisher({ sessions: [{
-    activeSessionId: uncertain.episodeActiveSessionId,
-    sessionId: uncertain.episodeId,
-    sessionFile: uncertain.episodeSessionFile,
-    sessionName: uncertain.sessionName,
-    cwd: uncertain.worktree,
-  }] });
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay)),
-    /incomplete bootstrap admission handoff-uncertain/,
-  );
-  assert.deepEqual(replay.handoffs, []);
-  assert.deepEqual(replay.kills, []);
-});
-
-test("checkpoint write failure after handoff sends no execute and preserves pending identity", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const baseFilesystem = new NodeFilesystemAdapter();
-  let identityWrites = 0;
-  const filesystem = {
-    exists: (path) => baseFilesystem.exists(path),
-    promoteBundle: (...args) => baseFilesystem.promoteBundle(...args),
-    readIdentity: (path) => baseFilesystem.readIdentity(path),
-    removeFile: (path) => baseFilesystem.removeFile(path),
-    writeIdentity(path, identity) {
-      identityWrites += 1;
-      if (identityWrites === 2) throw new Error("checkpoint disk failure");
-      baseFilesystem.writeIdentity(path, identity);
-    },
-  };
-  const publisher = new FakePublisher();
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), {
-      git: new CliGitAdapter(), filesystem, publisher,
-    }),
-    /execute checkpoint could not be persisted/,
-  );
-
-  assert.equal(publisher.handoffs.length, 1);
-  assert.deepEqual(publisher.kills, []);
-  assert.equal(existsSync(worktree), true);
-  const identity = JSON.parse(readFileSync(
-    join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
-    "utf8",
-  ));
-  assert.equal(identity.bootstrapAdmission, "handoff-pending");
-});
-
-test("definite execute follow-up rejection preserves the admitted handoff", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const publisher = new FakePublisher();
-  publisher.deliverHandoff = async (activeSessionId, handoffPrompt, executePrompt, onHandoffAdmitted) => {
-    publisher.handoffs.push({ activeSessionId, handoffPrompt, executePrompt });
-    await onHandoffAdmitted();
-    throw new HandoffFollowUpRejectedError("follow-up rejected");
-  };
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
-    /follow-up rejected/,
-  );
-
-  assert.deepEqual(publisher.kills, []);
-  assert.equal(existsSync(worktree), true);
-  const identity = JSON.parse(readFileSync(
-    join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
-    "utf8",
-  ));
-  assert.equal(identity.bootstrapAdmission, "execute-rejected");
-});
-
-test("uncertain execute follow-up preserves the episode and records its stage", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const publisher = new FakePublisher();
-  publisher.deliverHandoff = async (activeSessionId, handoffPrompt, executePrompt, onHandoffAdmitted) => {
-    publisher.handoffs.push({ activeSessionId, handoffPrompt, executePrompt });
-    await onHandoffAdmitted();
-    throw new EpisodeStateUncertainError("execute follow-up uncertain");
-  };
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
-    /execute follow-up uncertain/,
-  );
-
-  assert.deepEqual(publisher.kills, []);
-  assert.equal(existsSync(worktree), true);
-  const identity = JSON.parse(readFileSync(
-    join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json"),
-    "utf8",
-  ));
-  assert.equal(identity.bootstrapAdmission, "execute-uncertain");
-});
-
-test("delivered-mark failure preserves execute-pending and never replays", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const baseFilesystem = new NodeFilesystemAdapter();
-  let identityWrites = 0;
-  const filesystem = {
-    exists: (path) => baseFilesystem.exists(path),
-    promoteBundle: (...args) => baseFilesystem.promoteBundle(...args),
-    readIdentity: (path) => baseFilesystem.readIdentity(path),
-    removeFile: (path) => baseFilesystem.removeFile(path),
-    writeIdentity(path, identity) {
-      identityWrites += 1;
-      if (identityWrites === 3) throw new Error("delivered mark disk failure");
-      baseFilesystem.writeIdentity(path, identity);
-    },
-  };
-  const publisher = new FakePublisher();
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), {
-      git: new CliGitAdapter(), filesystem, publisher,
-    }),
-    /delivered bootstrap mark could not be persisted/,
-  );
-
-  assert.deepEqual(publisher.kills, []);
-  assert.equal(existsSync(worktree), true);
-  const identityPath = join(repo, ".prime", "agent", "state", "spec-episodes", "alpha-plan.json");
-  const identity = JSON.parse(readFileSync(identityPath, "utf8"));
-  assert.equal(identity.bootstrapAdmission, "execute-pending");
-  const replay = new FakePublisher({ sessions: [{
-    activeSessionId: identity.episodeActiveSessionId,
-    sessionId: identity.episodeId,
-    sessionFile: identity.episodeSessionFile,
-    sessionName: identity.sessionName,
-    cwd: identity.worktree,
-  }] });
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-2", context(repo), dependencies(replay)),
-    /incomplete bootstrap admission execute-pending/,
-  );
-  assert.deepEqual(replay.handoffs, []);
-});
-
-test("uncertain create preserves the promoted branch and worktree", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const publisher = new FakePublisher();
-  publisher.forkAndPublish = async () => {
-    throw new EpisodeStateUncertainError("publication may have succeeded");
-  };
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
-    /publication may have succeeded/,
-  );
-
-  assert.equal(existsSync(worktree), true);
-  assert.equal(git(repo, "show-ref", "--verify", "--quiet", "refs/heads/episode/alpha-plan"), "");
-  assert.equal(readFileSync(join(worktree, ".ralph", "plans", "manifest.yaml"), "utf8"), "kind: arbitrary-bundle\n");
-});
-
-test("failed kill after delivery error preserves live-resource candidates", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const publisher = new FakePublisher({ failDelivery: true, failKill: true });
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
-    /cleanup could not be confirmed/,
-  );
-
-  assert.deepEqual(publisher.kills, ["active-episode-1"]);
-  assert.equal(existsSync(worktree), true);
-  assert.equal(git(repo, "show-ref", "--verify", "--quiet", "refs/heads/episode/alpha-plan"), "");
-});
-
-
-test("delivery failure removes only resources created by that invocation", async (t) => {
-  const { repo, worktree } = repositoryFixture(t);
-  const publisher = new FakePublisher({ failDelivery: true });
-
-  await assert.rejects(
-    createSpecEpisode(LOCATION, "tool-call-1", context(repo), dependencies(publisher)),
-    /delivery rejected/,
-  );
-
-  assert.deepEqual(publisher.kills, ["active-episode-1"]);
-  assert.equal(existsSync(worktree), false);
-  assert.throws(() => git(repo, "show-ref", "--verify", "--quiet", "refs/heads/episode/alpha-plan"));
-  assert.equal(existsSync(join(repo, LOCATION, "manifest.yaml")), true);
-});
-
-test("public SessionManager forkFrom gets target cwd and a matching successful tool result", () => {
-  const calls = [];
-  const appended = [];
-  const SessionManager = {
-    forkFrom(source, cwd) {
-      calls.push({ source, cwd });
-      return {
-        getSessionFile: () => "/sessions/fork.jsonl",
-        getSessionId: () => "stable-fork-id",
-        appendMessage(message) { appended.push(message); return "entry-1"; },
-        appendCustomEntry(customType, data) { appended.push({ type: "custom", customType, data }); return "identity-1"; },
-      };
-    },
-  };
-  const options = {
-    sourceSessionFile: "/sessions/owner.jsonl",
-    worktree: "/repo-alpha-episode",
-    sessionName: "alpha-episode",
-    branch: "episode/alpha",
-    toolCallId: "tool-call-9",
-  };
-
-  const fork = forkPrimeSession(SessionManager, options);
-
-  assert.deepEqual(calls, [{ source: options.sourceSessionFile, cwd: options.worktree }]);
-  assert.deepEqual(fork, { sessionFile: "/sessions/fork.jsonl", sessionId: "stable-fork-id" });
-  assert.equal(appended.length, 2);
-  assert.deepEqual(appended[0], {
-    type: "custom",
-    customType: "prime-claw-bounded-identity",
-    data: { version: 1, role: "EPISODE", sessionId: "stable-fork-id" },
-  });
-  assert.equal(appended[1].role, "toolResult");
-  assert.equal(appended[1].toolCallId, "tool-call-9");
-  assert.equal(appended[1].toolName, "create_spec_episode");
-  assert.equal(appended[1].isError, false);
-  assert.equal(appended[1].content[0].text, episodeResultText({
-    episodeId: "stable-fork-id",
-    branch: options.branch,
-    worktree: options.worktree,
-    sessionName: options.sessionName,
-    bootstrapAdmission: "handoff-pending",
-    reused: false,
-  }));
-});
-
-
-
-test("runtime SessionManager resolution reuses the class already supplied by the extension context", () => {
-  class RuntimeSessionManager {
-    static forkFrom() { throw new Error("not called by resolver"); }
-  }
-
-  assert.equal(runtimeSessionManagerClass(new RuntimeSessionManager()), RuntimeSessionManager);
-  assert.throws(
-    () => runtimeSessionManagerClass({}),
-    /did not expose a runtime SessionManager with forkFrom/,
-  );
-});
-
-test("publisher forks with the supplied runtime SessionManager without importing the coding-agent package", async () => {
-  const calls = [];
-  class RuntimeSessionManager {
-    static forkFrom(source, cwd) {
-      calls.push({ source, cwd });
-      return {
-        getSessionFile: () => "/sessions/runtime-fork.jsonl",
-        getSessionId: () => "runtime-fork-id",
-        appendCustomEntry() { return "identity"; },
-        appendMessage() { return "tool-result"; },
-      };
-    }
-  }
-  const requests = [];
-  const client = {
-    async request(command) {
-      requests.push(command);
-      return { success: true, data: {
-        activeSessionId: "active-runtime-fork",
-        sessionId: "runtime-fork-id",
-        sessionFile: "/sessions/runtime-fork.jsonl",
-        sessionName: "alpha-episode",
-        cwd: "/repo-alpha-episode",
-      } };
-    },
-    close() {},
-  };
-  const publisher = new PrimeSessionPublisher(client, RuntimeSessionManager);
-
-  const result = await publisher.forkAndPublish({
-    sourceSessionFile: "/sessions/owner.jsonl",
-    worktree: "/repo-alpha-episode",
-    sessionName: "alpha-episode",
-    branch: "episode/alpha",
-    toolCallId: "tool-call-runtime",
-  });
-
-  assert.deepEqual(calls, [{ source: "/sessions/owner.jsonl", cwd: "/repo-alpha-episode" }]);
-  assert.deepEqual(result, {
-    activeSessionId: "active-runtime-fork",
-    sessionId: "runtime-fork-id",
-    sessionFile: "/sessions/runtime-fork.jsonl",
-  });
-  assert.deepEqual(requests.map((request) => request.type), ["create"]);
-});
-
-test("episode identity append failure removes the created fork file", () => {
-  const sessionFile = join(tmpdir(), `prime-claw-fork-failure-${process.pid}-${Date.now()}.jsonl`);
-  writeFileSync(sessionFile, "fork");
-  const SessionManager = { forkFrom() { return {
-    getSessionFile: () => sessionFile,
-    getSessionId: () => "failed-fork",
-    appendCustomEntry() { throw new Error("identity append failed"); },
-    appendMessage() { throw new Error("must not append tool result"); },
-  }; } };
-  assert.throws(() => forkPrimeSession(SessionManager, {
-    sourceSessionFile: "/owner.jsonl", worktree: "/worktree", sessionName: "episode",
-    branch: "episode/alpha", toolCallId: "call",
-  }), /identity append failed/);
-  assert.equal(existsSync(sessionFile), false);
-});
-
-test("publisher rejects and kills a daemon identity not bound to the requested fork", async () => {
-  const requests = [];
-  const client = {
-    async request(command) {
-      requests.push(command);
-      if (command.type === "create") {
-        return { success: true, data: {
-          activeSessionId: "wrong-active",
-          sessionId: "wrong-stable",
-          sessionFile: "/sessions/wrong.jsonl",
-          sessionName: "wrong-name",
-          cwd: "/wrong-cwd",
-        } };
-      }
-      return { success: true, data: {} };
-    },
-    close() {},
-  };
-  const publisher = new PrimeSessionPublisher(client);
-
-  await assert.rejects(
-    publisher.reopen({
-      sessionFile: "/sessions/fork.jsonl",
-      sessionId: "stable-fork",
-      worktree: "/repo-alpha-episode",
-      sessionName: "alpha-episode",
-    }),
-    /does not match the requested fork/,
-  );
-
-  assert.deepEqual(requests.map((request) => request.type), ["create", "kill"]);
-  assert.equal(requests[1].activeSessionId, "wrong-active");
-});
-
-
-test("publisher admits execute as one queued follow-up without template expansion", async () => {
-  const requests = [];
-  const client = {
-    async request(command) { requests.push(command); return { success: true, data: {} }; },
-    close() {},
-  };
-  const publisher = new PrimeSessionPublisher(client);
-
-  await publisher.deliverExecute("active-episode-1", "wrapped execute");
-
-  assert.deepEqual(requests, [{
-    type: "prompt",
-    activeSessionId: "active-episode-1",
-    message: "wrapped execute",
-    streamingBehavior: "followUp",
-    queueIfBusy: true,
-    expandPromptTemplates: false,
-    source: "extension",
-  }]);
-});
-
-
-test("publisher handles a mocked already-admitted handoff before the sole execute follow-up", async () => {
-  const requests = [];
-  const events = [];
-  const client = {
-    async request(command) {
-      requests.push(command);
-      events.push(command.message);
-      // This controlled acknowledgement represents an ordinary prompt that the
-      // runtime has already admitted, either immediately or queued until idle.
-      return { success: true, data: {} };
-    },
-    close() {},
-  };
-  const publisher = new PrimeSessionPublisher(client);
-
-  let checkpointCalls = 0;
-  await publisher.deliverHandoff(
-    "active-episode-1",
-    "wrapped handoff",
-    "wrapped execute",
-    () => {
-      checkpointCalls += 1;
-      events.push("checkpoint");
-      assert.equal(requests.length, 1);
-      assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
-    },
-  );
-
-  assert.equal(checkpointCalls, 1);
-  assert.deepEqual(events, ["wrapped handoff", "checkpoint", "wrapped execute"]);
-  assert.deepEqual(requests, [{
-    type: "prompt",
-    activeSessionId: "active-episode-1",
-    message: "wrapped handoff",
-    queueIfBusy: false,
-    expandPromptTemplates: false,
-    source: "extension",
-  }, {
-    type: "prompt",
-    activeSessionId: "active-episode-1",
-    message: "wrapped execute",
-    streamingBehavior: "followUp",
-    queueIfBusy: true,
-    expandPromptTemplates: false,
-    source: "extension",
-  }]);
-});
-
-test("publisher queues initial handoff behind automatic preparation before execute", async () => {
-  const requests = [];
-  const events = [];
-  const client = {
-    async request(command) {
-      requests.push(command);
-      events.push(command.message);
-      return { success: true, data: {} };
-    },
-    close() {},
-  };
-  const publisher = new PrimeSessionPublisher(client);
-
-  await publisher.deliverHandoff(
-    "active-episode-1",
-    "wrapped handoff",
-    "wrapped execute",
-    () => { events.push("checkpoint"); },
-    true,
-  );
-
-  assert.deepEqual(events, ["wrapped handoff", "checkpoint", "wrapped execute"]);
-  assert.deepEqual(requests, [{
-    type: "prompt",
-    activeSessionId: "active-episode-1",
-    message: "wrapped handoff",
-    streamingBehavior: "followUp",
-    queueIfBusy: true,
-    expandPromptTemplates: false,
-    source: "extension",
-  }, {
-    type: "prompt",
-    activeSessionId: "active-episode-1",
-    message: "wrapped execute",
-    streamingBehavior: "followUp",
-    queueIfBusy: true,
-    expandPromptTemplates: false,
-    source: "extension",
-  }]);
-});
-
-test("publisher stops after a controlled first ordinary-prompt rejection", async () => {
-  const requests = [];
-  const client = {
-    async request(command) {
-      requests.push(command);
-      return { success: false, error: "injected first prompt rejection" };
-    },
-    close() {},
-  };
-  const publisher = new PrimeSessionPublisher(client);
-  let checkpointCalls = 0;
-
-  await assert.rejects(
-    publisher.deliverHandoff(
-      "active-episode-1",
-      "wrapped handoff",
-      "wrapped execute",
-      () => { checkpointCalls += 1; },
-    ),
-    /injected first prompt rejection/,
-  );
-  assert.equal(checkpointCalls, 0);
-  assert.deepEqual(requests, [{
-    type: "prompt",
-    activeSessionId: "active-episode-1",
-    message: "wrapped handoff",
-    queueIfBusy: false,
-    expandPromptTemplates: false,
-    source: "extension",
-  }]);
-});
-
-test("publisher exposes first-send failure without queuing execute", async () => {
-  const requests = [];
-  const client = {
-    async request(command) {
-      requests.push(command);
-      return { success: false, error: "episode became busy" };
-    },
-    close() {},
-  };
-  const publisher = new PrimeSessionPublisher(client);
-
-  await assert.rejects(
-    publisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute"),
-    /handoff delivery failed: episode became busy/,
-  );
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].message, "wrapped handoff");
-});
-
-test("publisher exposes second-send failure as a partial transition", async () => {
-  const requests = [];
-  const client = {
-    async request(command) {
-      requests.push(command);
-      return requests.length === 1
-        ? { success: true, data: {} }
-        : { success: false, error: "follow-up rejected" };
-    },
-    close() {},
-  };
-  const publisher = new PrimeSessionPublisher(client);
-
-  await assert.rejects(
-    publisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute"),
-    /Handoff was admitted, but canonical execute follow-up could not be queued: execute follow-up delivery failed: follow-up rejected/,
-  );
-  assert.equal(requests.length, 2);
-  assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
-  assert.equal(requests[1].streamingBehavior, "followUp");
-});
-
-test("publisher distinguishes uncertain first and second handoff mutations", async () => {
-  const firstRequests = [];
-  const firstPublisher = new PrimeSessionPublisher({
-    async request(command) {
-      firstRequests.push(command);
-      throw new DaemonMutationUncertainError("prompt", "connection closed");
-    },
-    close() {},
-  });
-  await assert.rejects(
-    firstPublisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute"),
-    (error) => error instanceof EpisodeStateUncertainError && /Handoff task admission is uncertain/.test(error.message),
-  );
-  assert.equal(firstRequests.length, 1);
-
-  const secondRequests = [];
-  const secondPublisher = new PrimeSessionPublisher({
-    async request(command) {
-      secondRequests.push(command);
-      if (secondRequests.length === 1) return { success: true, data: {} };
-      throw new DaemonMutationUncertainError("prompt", "connection closed");
-    },
-    close() {},
-  });
-  await assert.rejects(
-    secondPublisher.deliverHandoff("active-episode-1", "wrapped handoff", "wrapped execute"),
-    (error) => error instanceof EpisodeStateUncertainError && /Execute follow-up admission is uncertain after handoff admission/.test(error.message),
-  );
-  assert.equal(secondRequests.length, 2);
-});
-
-test("publisher retrieves the exact active episode state before admission", async () => {
-  const requests = [];
-  const state = { activeSessionId: "active-episode-1", isStreaming: false };
-  const client = {
-    async request(command) { requests.push(command); return { success: true, data: state }; },
-    close() {},
-  };
-  const publisher = new PrimeSessionPublisher(client);
-
-  assert.equal(await publisher.getState("active-episode-1"), state);
-  assert.deepEqual(requests, [{ type: "get_state", activeSessionId: "active-episode-1" }]);
-});
-
-test("daemon client uses protocol-7 command envelope and acknowledges mutation", async (t) => {
-  const socketPath = join(tmpdir(), `spec-episode-${process.pid}-${Date.now()}.sock`);
-  rmSync(socketPath, { force: true });
-  const records = [];
-  let acknowledge;
-  const acknowledged = new Promise((resolveAck) => { acknowledge = resolveAck; });
-  const server = createServer((socket) => {
-    socket.setEncoding("utf8");
-    socket.write(`${JSON.stringify({
-      type: "daemon_hello",
-      protocol: { name: "prime-agent.daemon", version: 7 },
-      schema: { revision: 28 },
-    })}\n`);
-    let buffer = "";
-    socket.on("data", (chunk) => {
-      buffer += chunk;
-      while (buffer.includes("\n")) {
-        const index = buffer.indexOf("\n");
-        const line = buffer.slice(0, index);
-        buffer = buffer.slice(index + 1);
-        if (!line) continue;
-        const record = JSON.parse(line);
-        records.push(record);
-        if (record.command.type === "create") {
-          socket.write(`${JSON.stringify({ type: "response", id: record.id, success: true, data: { ok: true } })}\n`);
-        } else if (record.command.type === "ack_result") {
-          acknowledge();
-        }
-      }
-    });
-  });
-  server.listen(socketPath);
-  await once(server, "listening");
-  t.after(() => { server.close(); rmSync(socketPath, { force: true }); });
-  const client = new DaemonJsonlClient(socketPath);
-  t.after(() => client.close());
-
-  const response = await client.request({
-    type: "create",
-    lifecycle: "resident",
-    sessionPath: "/sessions/fork.jsonl",
-    name: "alpha-episode",
-    config: { cwd: "/repo-alpha-episode" },
-  });
-  await acknowledged;
-
-  assert.equal(response.success, true);
-  assert.equal(records[0].type, "command");
-  assert.equal(records[0].protocol.name, "prime-agent.daemon");
-  assert.equal(records[0].protocol.version, 7);
-  assert.equal(records[0].command.id, records[0].id);
-  assert.equal(records[0].command.lifecycle, "resident");
-  assert.equal(records[1].command.type, "ack_result");
-  assert.equal(records[1].command.commandId, records[0].id);
-});
-
-
-test("lost daemon mutation response is reported as uncertain", async (t) => {
-  const socketPath = join(tmpdir(), `spec-episode-lost-${process.pid}-${Date.now()}.sock`);
-  rmSync(socketPath, { force: true });
-  const server = createServer((socket) => {
-    socket.setEncoding("utf8");
-    socket.write(`${JSON.stringify({
-      type: "daemon_hello",
-      protocol: { name: "prime-agent.daemon", version: 7 },
-      schema: { revision: 28 },
-    })}\n`);
-    socket.once("data", () => socket.destroy());
-  });
-  server.listen(socketPath);
-  await once(server, "listening");
-  t.after(() => { server.close(); rmSync(socketPath, { force: true }); });
-  const client = new DaemonJsonlClient(socketPath);
-  t.after(() => client.close());
-
-  await assert.rejects(
-    client.request({ type: "create", sessionPath: "/sessions/fork.jsonl" }),
-    (error) => error instanceof DaemonMutationUncertainError && /create outcome is uncertain/.test(error.message),
-  );
-});
-
-
-test("daemon command_result_uncertain preserves the durable episode state", async (t) => {
-  const socketPath = join(tmpdir(), `spec-episode-reported-${process.pid}-${Date.now()}.sock`);
-  rmSync(socketPath, { force: true });
-  const commandTypes = [];
-  const server = createServer((socket) => {
-    socket.setEncoding("utf8");
-    socket.write(`${JSON.stringify({
-      type: "daemon_hello",
-      protocol: { name: "prime-agent.daemon", version: 7 },
-      schema: { revision: 28 },
-    })}\n`);
-    let buffer = "";
-    socket.on("data", (chunk) => {
-      buffer += chunk;
-      while (buffer.includes("\n")) {
-        const index = buffer.indexOf("\n");
-        const line = buffer.slice(0, index);
-        buffer = buffer.slice(index + 1);
-        if (!line) continue;
-        const record = JSON.parse(line);
-        commandTypes.push(record.command.type);
-        if (record.command.type === "create") {
-          socket.write(`${JSON.stringify({
-            type: "response",
-            id: record.id,
-            success: false,
-            error: "mutation outcome unknown after worker disconnect",
-            errorInfo: {
-              code: "command_result_uncertain",
-              clientId: record.clientId,
-              commandId: record.id,
-            },
-          })}\n`);
-        }
-      }
-    });
-  });
-  server.listen(socketPath);
-  await once(server, "listening");
-  t.after(() => { server.close(); rmSync(socketPath, { force: true }); });
-  const client = new DaemonJsonlClient(socketPath);
-  const publisher = new PrimeSessionPublisher(client);
-  t.after(() => publisher.close());
-
-  await assert.rejects(
-    publisher.reopen({
-      sessionFile: "/sessions/fork.jsonl",
-      sessionId: "stable-fork",
-      worktree: "/repo-alpha-episode",
-      sessionName: "alpha-episode",
-    }),
-    (error) => error instanceof EpisodeStateUncertainError && /may have succeeded/.test(error.message),
-  );
-
-  assert.equal(commandTypes[0], "create");
-  assert.equal(commandTypes.includes("kill"), false);
+  const rows = await adapter.listReadySetups("/repo");
+  assert.equal(rows.length, 1); assert.equal(rows[0].id, "remote-setup");
+  assert.equal(rows[0].routingEnvironmentId, "remote-id");
+  assert.equal(commands.some((args) => args.includes("runtime:remote-id")), true);
 });

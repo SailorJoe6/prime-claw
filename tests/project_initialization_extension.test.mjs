@@ -92,12 +92,12 @@ test("extension shares core across command, tool, and awaited startup without a 
 });
 
 
-test("real legacy Episode identity in the owner worktree protects the linked worktree snapshot", (t) => {
+test("one owner-worktree record protects the linked Episode snapshot", (t) => {
   const root=repo(t), worktree=join(dirname(root),"episode-worktree");
   git(root,"worktree","add","-q","-b","episode/test",worktree);
   t.after(()=>{try{git(root,"worktree","remove","--force",worktree)}catch{};rmSync(worktree,{recursive:true,force:true})});
-  const records=join(root,".prime/agent/state/spec-episodes");mkdirSync(records,{recursive:true});
-  writeFileSync(join(records,"test.json"),JSON.stringify({worktree,bootstrapAdmission:"delivered"}));
+  const ownership=join(root,".prime-claw/ownership.json");mkdirSync(dirname(ownership),{recursive:true});
+  writeFileSync(ownership,JSON.stringify({status:"active",worktree}));
   const result=reconcilePrimeClawProject({cwd:worktree,pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()});
   assert.equal(result.skippedActiveEpisode,true);
   assert.equal(existsSync(join(worktree,".prime-claw/templates.json")),false);
@@ -167,10 +167,10 @@ test("linked worktree activity uncertainty fails closed without mutation", (t) =
   const failing=new Runner();const baseRun=failing.run.bind(failing);failing.run=(command,args,options={})=>command==="git"&&args.includes("worktree")?{stdout:"",stderr:"git metadata unavailable",status:1}:baseRun(command,args,options);
   const skipped=reconcilePrimeClawProject({cwd:linked,pluginRoot:PLUGIN,home:dirname(root),runner:failing});
   assert.equal(skipped.skipReason,"uncertain-episode-activity");assert.equal(existsSync(join(linked,".prime-claw/templates.json")),false);
-  const identities=join(root,".prime/agent/state/spec-episodes");mkdirSync(identities,{recursive:true});writeFileSync(join(identities,"broken.json"),"{bad json");
+  const ownership=join(root,".prime-claw/ownership.json");mkdirSync(dirname(ownership),{recursive:true});writeFileSync(ownership,"{bad json");
   const malformed=reconcilePrimeClawProject({cwd:linked,pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()});
   assert.equal(malformed.skipReason,"uncertain-episode-activity");assert.equal(existsSync(join(linked,".agents/skills/prepare/SKILL.md")),false);
-  rmSync(join(identities,"broken.json"));const outside=join(dirname(root),"identity-outside.json");writeFileSync(outside,JSON.stringify({worktree:linked,bootstrapAdmission:"delivered"}));symlinkSync(outside,join(identities,"symlink.json"));
+  rmSync(ownership);const outside=join(dirname(root),"ownership-outside.json");writeFileSync(outside,JSON.stringify({status:"active",worktree:linked}));symlinkSync(outside,ownership);
   const unsafe=reconcilePrimeClawProject({cwd:linked,pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()});assert.equal(unsafe.skipReason,"uncertain-episode-activity");assert.equal(existsSync(join(linked,".prime-claw/templates.json")),false);
 });
 

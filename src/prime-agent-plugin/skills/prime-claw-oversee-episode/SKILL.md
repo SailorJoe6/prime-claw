@@ -5,8 +5,8 @@ description: Supervise one exact owned Prime Claw episode through evidence-based
 
 # Oversee one owned episode
 
-Use this guidance only when trusted Prime Claw state says this Conversation owns
-one active Episode and native readiness reports this exact guide as current.
+Use this guidance only when the one durable Prime Claw ownership record says
+this Conversation owns one active Episode.
 
 Keep the approved specification and execution plan as the scope boundary. Review
 one reported vertical slice at a time. Reconcile the Episode's report against the

@@ -29,6 +29,7 @@ export function admitPrepChain(
   source: "native" | "tool",
   onValidated?: (ctx: ExtensionContext, location: string) => void,
   preflight?: (ctx: ExtensionContext, location: string) => void,
+  phasePreamble?: string,
 ): PrepChainAdmissionResult {
   let selected;
   try {
@@ -56,13 +57,13 @@ export function admitPrepChain(
       level: "warning",
     };
   }
-  const phasePrompt = wrapCanonicalSkill(
+  const canonicalPhasePrompt = wrapCanonicalSkill(
     selected.projectRoot,
     workflow.phaseSkillName,
     workflow.locationTag,
     selected.location,
   );
-  if (!phasePrompt) {
+  if (!canonicalPhasePrompt) {
     return {
       ok: false,
       message: `reviewed-plan: .prime-claw/workflows/${workflow.phaseSkillName}.md not found`,
@@ -70,6 +71,7 @@ export function admitPrepChain(
     };
   }
 
+  const phasePrompt = phasePreamble ? `${phasePreamble}\n\n${canonicalPhasePrompt}` : canonicalPhasePrompt;
   preflight?.(ctx, selected.location);
 
   try {

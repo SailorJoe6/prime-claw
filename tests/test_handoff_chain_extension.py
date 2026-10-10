@@ -49,7 +49,7 @@ def test_prime_agent_rpc_loads_native_handoff_command_and_conversational_tool(
     probe = ctmp / "tool-probe.ts"
     probe.write_text(probe_source)
     result = tier1_container.run(
-        "prime-agent",
+        "/workspace/scripts/run-prime-agent-probe.sh", tier1_container.prime_agent,
         "--mode", "rpc",
         "--offline",
         "--no-session",

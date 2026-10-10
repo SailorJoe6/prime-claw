@@ -56,7 +56,7 @@ files=(
   ROLE_KERNEL.md
   extension-support/project-initialization.ts
   extension-support/template-review.ts
-  extension-support/conversation-guide-metadata.ts
+  extension-support/episode-ownership.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-close.ts
   skills/project-templates/blocked.md
@@ -144,6 +144,7 @@ done
 obsolete_files=(
   extensions/goal-heartbeat-work-control.ts
   extensions/goal-blocker-control.ts
+  extension-support/conversation-guide-metadata.ts
   extension-support/episode-finalization.ts
   extension-support/expert-review-reservation.ts
   extension-support/role-kernel.generated.ts

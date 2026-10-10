@@ -173,7 +173,7 @@ skills under `.agents/skills/`, and lifecycle-only customizable workflows under
   established one stable transition, implemented and regression-tested as
   native `/handoff` → focused compaction → execute; see
   [docs/handoff-chain.md](docs/handoff-chain.md). Add native
-  `/plan <future-folder>` with the same loader pattern, while keeping artifact
+  `/plan-spec <future-folder>` with the same loader pattern, while keeping artifact
   interpretation and planning behavior in the customizable plan skill.
 - **4b — episode mechanics.** Implement `/implement-spec <future-folder>` as
   the explicit promotion boundary: customizable Markdown decides whether the
@@ -187,7 +187,7 @@ skills under `.agents/skills/`, and lifecycle-only customizable workflows under
 - **4c — reviewed conversation → episode workflow.** `/design` and
   `/spec-it-out` retain different customizable starting assumptions, but both
   write to a named `.ralph/plans/future/<slug>/` folder and stop for operator
-  review. The operator explicitly invokes `/plan <future-folder>`; the plan is
+  review. The operator explicitly invokes `/plan-spec <future-folder>`; the plan is
   written to that same folder and receives a second operator review. Only
   `/implement-spec <future-folder>` authorizes implementation and creates the
   worktree-rooted episode. Manually prove that the owning conversation retains
@@ -201,7 +201,7 @@ skills under `.agents/skills/`, and lifecycle-only customizable workflows under
 
 Done when: a project conversation has created a future specification through
 `/design` or `/spec-it-out`, received operator specification approval, created a
-future-folder execution plan through `/plan`, received operator plan approval,
+future-folder execution plan through `/plan-spec`, received operator plan approval,
 and promoted it through `/implement-spec` into a worktree-rooted episode that
 shipped a real feature through bounded execute/handoff iterations, merge, and
 safe cleanup. The customizable-policy versus deterministic-mechanics boundary,

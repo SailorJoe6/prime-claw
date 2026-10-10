@@ -15,7 +15,7 @@ files=(
   ROLE_KERNEL.md
   extension-support/project-initialization.ts
   extension-support/template-review.ts
-  extension-support/conversation-guide-metadata.ts
+  extension-support/episode-ownership.ts
   extension-support/conversation-oversight.ts
   extension-support/episode-close.ts
   skills/project-templates/blocked.md
@@ -67,6 +67,7 @@ done
 obsolete_files=(
   "extensions/goal-heartbeat-work-control.ts:stale retired goal heartbeat work-control extension"
   "extensions/goal-blocker-control.ts:stale obsolete goal blocker control extension"
+  "extension-support/conversation-guide-metadata.ts:stale retired Conversation guide authentication metadata"
   "extension-support/episode-finalization.ts:stale obsolete episode finalization support file"
   "extension-support/expert-review-reservation.ts:stale retired EXPERT reservation support file"
   "extension-support/role-kernel.generated.ts:stale retired generated role-kernel file"

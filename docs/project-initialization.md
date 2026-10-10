@@ -90,10 +90,10 @@ concise UI notice; a current project is silent.
 An active Episode worktree is skipped. It retains the project workflow snapshot
 with which it started. Runtime handoff readers prefer the new topology but retain
 read-only fallback to the corresponding legacy `.ralph/skills/{handoff,execute}`
-bytes, so an old-layout active Episode can finish without policy migration. The implementation has an injected activity seam for the
-minimal ownership record introduced by the lifecycle work and a bounded reader
-that scans the current Git worktree set for the current project-level legacy
-Episode identity during migration. Linked-worktree enumeration or identity
+bytes, so an old-layout active Episode can finish without policy migration. The implementation has an injected activity seam for the one minimal ownership
+record and a bounded reader that scans the current Git worktree set to find that
+record in the canonical project checkout when startup occurs inside a linked
+Episode worktree. Linked-worktree enumeration or identity
 uncertainty fails closed and reports a degraded skip. Reset, override acceptance,
 and review-start mutations use the same protection.
 

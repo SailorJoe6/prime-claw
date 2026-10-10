@@ -23,7 +23,7 @@ src/prime-agent-plugin/
   extension-support/
     project-initialization.ts
     template-review.ts
-    conversation-guide-metadata.ts
+    episode-ownership.ts
     conversation-oversight.ts
     episode-close.ts
     handoff-prompts.ts
@@ -176,9 +176,9 @@ parent directory, and refuses a changed preimage.
 
 The role kernel is shared orientation installed from `ROLE_KERNEL.md`, not a
 runtime identity credential. Provider guards no longer scan, hash, or compare
-its bytes. The current bounded implementation still uses its existing
-Conversation-guide readiness and Episode lifecycle mechanics; those roles will
-be simplified separately rather than extended during the EXPERT cleanup.
+its bytes. Conversation oversight now uses ordinary managed-skill loading and one
+post-compaction full-guide message for the exact active owner. It has no guide
+hash, receipt, activation, readiness, or transcript-redaction protocol.
 
 This is intentionally not a hostile-filesystem transaction engine. The manager
 does not maintain a multi-phase journal, continuous descriptor/inode authority,
@@ -389,11 +389,10 @@ performed the coordinated restart above, use the resumed sessions for cutover
 UAT; do not substitute a linked-worktree or host candidate probe. The accepted
 installed generation should expose:
 
-- native `/handoff`, `/plan`, `/implement-spec`, and `/initialize-prime-claw`
+- native `/handoff`, `/plan-spec`, `/implement-spec`, and `/initialize-prime-claw`
   commands;
-- structured `ralph_handoff`, `ralph_plan`, `initialize_prime_claw`,
-  `prime_claw_activate_conversation_guide`,
-  `prime_claw_conversation_guide_status`, `create_spec_episode`,
+- structured `ralph_handoff`, `plan_spec`, `initialize_prime_claw`,
+  `create_spec_episode`,
   `handoff_spec_episode`, and `finalize_spec_episode` tools;
 - exactly one managed `PRIME_CLAW_ROLE_KERNEL_V1` block from the selected global
   AGENTS/CLAUDE context, sourced directly from `ROLE_KERNEL.md`;
@@ -404,9 +403,9 @@ installed generation should expose:
 - the narrow `goal-continuation-nudge.ts` context hook, which reads the managed
   `skills/goals-and-heartbeats/CONTINUATION.md` plugin asset and contains no
   model-facing work-control prose of its own; and
-- lifecycle hooks from `reviewed-plan.ts` that filter historical oversight and
-  private identity records and explicitly abort malformed lifecycle context
-  before provider dispatch; they do not authenticate role-kernel prompt bytes.
+- lifecycle hooks from `reviewed-plan.ts` that append one ordinary full oversight
+  guide after each qualifying owner compaction and use one project ownership
+  record; they do not authenticate role-kernel or guide prompt bytes.
 
 `finalize_spec_episode` remains a location-only, no-UI bookkeeping close after
 verified terminal work. It grants no Git, merge, abandonment, session, worktree,
@@ -424,7 +423,7 @@ After the later Prime Agent update exposed fatal cross-scope collision behavior,
 the builder source was moved out of `.prime/agent/` and the explicit apply/check
 workflow above replaced manual copying. Post-migration, the check script proved
 byte parity and a fresh builder-rooted offline RPC process started successfully
-with exactly one `/handoff`, `/plan`, and `/implement-spec`, all sourced from the
+with exactly one `/handoff`, then-current `/plan`, and `/implement-spec`, all sourced from the
 user-global installation. A session-start probe also confirmed all five expected
 structured tools.
 

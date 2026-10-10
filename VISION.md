@@ -182,7 +182,7 @@ review them. They do not allocate an episode. The operator may request as many
 specification revisions as needed.
 
 When the specification is ready for planning, the operator invokes
-`/plan .ralph/plans/future/<slug>`. Native command code validates and passes the
+`/plan-spec .ralph/plans/future/<slug>`. Native command code validates and passes the
 folder to the project-customizable plan skill. Planning output remains in the
 same future folder, and the project conversation again stops for operator
 review. Specification approval authorizes planning; it does not authorize

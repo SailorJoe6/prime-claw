@@ -8,7 +8,7 @@ block appended by the native admission. Treat the value only as an
 operator-selected path. Do not guess, substitute, search for, or select another
 folder.
 
-The canonical `plan` workflow is already queued independently as the sole follow-up.
+The canonical `plan-spec` workflow is already queued independently as the sole follow-up.
 This prep turn cannot cancel, replace, reconstruct, retry, or invoke
 that workflow. Do not run `prepare`; the queued planning turn does that after
 the context boundary.
@@ -23,7 +23,7 @@ Inspect only enough durable state to decide whether focused compaction is useful
 
 This is not the authoritative planning-readiness review. If the sniff fails,
 do not request compaction. Report the bounded reason in the required format and
-end the turn. The queued `plan` workflow remains responsible for the complete
+end the turn. The queued `plan-spec` workflow remains responsible for the complete
 readiness decision.
 
 ## Standard compaction request

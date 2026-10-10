@@ -514,41 +514,23 @@ function sameExistingPath(left: string, right: string): boolean {
 
 export type EpisodeWorktreeActivity = "active" | "inactive" | "uncertain";
 
-function legacyActivityAt(ownerRoot: string, worktreeRoot: string): EpisodeWorktreeActivity {
-  const legacyRoot = join(ownerRoot, ".prime", "agent", "state", "spec-episodes");
-  let legacyStat;
-  try { legacyStat = lstatSync(legacyRoot); }
+function ownershipActivityAt(ownerRoot: string, worktreeRoot: string): EpisodeWorktreeActivity {
+  const path = join(ownerRoot, ".prime-claw", "ownership.json");
+  let stat;
+  try { stat = lstatSync(path); }
   catch (error: any) { return error?.code === "ENOENT" ? "inactive" : "uncertain"; }
-  if (!legacyStat.isDirectory() || legacyStat.isSymbolicLink()) return "uncertain";
-  let uncertain = false;
-  for (const name of readdirSync(legacyRoot)) {
-    if (!name.endsWith(".json")) continue;
-    try {
-      const path = join(legacyRoot, name);
-      const stat = lstatSync(path);
-      if (!stat.isFile() || stat.isSymbolicLink()) { uncertain = true; continue; }
-      const record = jsonObject(parseJson(readFileSync(path, "utf8"), name), name);
-      if (typeof record.worktree === "string" && sameExistingPath(record.worktree, worktreeRoot) && record.bootstrapAdmission !== "closed") return "active";
-    } catch { uncertain = true; }
-  }
-  return uncertain ? "uncertain" : "inactive";
+  try {
+    if (!stat.isFile() || stat.isSymbolicLink()) return "uncertain";
+    const record = jsonObject(parseJson(readFileSync(path, "utf8"), relative(ownerRoot, path)), relative(ownerRoot, path));
+    if (record.status !== "inactive" && typeof record.worktree === "string" && sameExistingPath(record.worktree, worktreeRoot)) return "active";
+    return "inactive";
+  } catch { return "uncertain"; }
 }
 
 export function episodeWorktreeActivity(root: string, kind: ProjectRoot["kind"], runner: CommandRunner = new ProcessCommandRunner()): EpisodeWorktreeActivity {
-  const ownershipCandidates = [join(root, ".prime-claw", "episode.json"), join(root, ".prime-claw", "ownership.json")];
-  for (const path of ownershipCandidates) {
-    let stat;
-    try { stat = lstatSync(path); }
-    catch (error: any) { if (error?.code === "ENOENT") continue; return "uncertain"; }
-    try {
-      if (!stat.isFile() || stat.isSymbolicLink()) return "uncertain";
-      const record = jsonObject(parseJson(readFileSync(path, "utf8"), relative(root, path)), relative(root, path));
-      if (record.status === "active" && typeof record.worktree === "string" && sameExistingPath(record.worktree, root)) return "active";
-    } catch { return "uncertain"; }
-  }
-  const local = legacyActivityAt(root, root);
+  const local = ownershipActivityAt(root, root);
   if (local === "active") return "active";
-  if (kind !== "linked-worktree") return "inactive";
+  if (kind !== "linked-worktree") return local;
   const worktrees = runGit(runner, root, ["worktree", "list", "--porcelain"], true);
   if (worktrees.status !== 0) return "uncertain";
   let uncertain = local === "uncertain";
@@ -558,7 +540,7 @@ export function episodeWorktreeActivity(root: string, kind: ProjectRoot["kind"],
     sawWorktree = true;
     const ownerRoot = line.slice("worktree ".length).trim();
     if (!ownerRoot) { uncertain = true; continue; }
-    const activity = legacyActivityAt(ownerRoot, root);
+    const activity = ownershipActivityAt(ownerRoot, root);
     if (activity === "active") return "active";
     if (activity === "uncertain") uncertain = true;
   }

@@ -21,7 +21,7 @@ EXPECTED_TYPESCRIPT = {
     "extensions/reviewed-plan.ts",
     "extension-support/project-initialization.ts",
     "extension-support/template-review.ts",
-    "extension-support/conversation-guide-metadata.ts",
+    "extension-support/episode-ownership.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
     "extension-support/handoff-prompts.ts",

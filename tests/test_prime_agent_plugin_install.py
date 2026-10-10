@@ -44,7 +44,7 @@ FILES = (
     "ROLE_KERNEL.md",
     "extension-support/project-initialization.ts",
     "extension-support/template-review.ts",
-    "extension-support/conversation-guide-metadata.ts",
+    "extension-support/episode-ownership.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
     "skills/goals-and-heartbeats/SKILL.md",
@@ -216,21 +216,24 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
         workdir=None, timeout=60,
     )
     assert seeded.returncode == 0, seeded.stdout + seeded.stderr
-    old_skill = Path(home) / ".prime/agent/skills/prime-claw-official-expert-review"
-    for relative in RETIRED_EXPERT_FILES:
-        old_file = old_skill / relative
-        old_file.parent.mkdir(parents=True, exist_ok=True)
-        old_file.write_text(relative)
-    old_state = Path(home) / ".prime/agent/prime-claw-private/expert-review-launches"
-    old_state.mkdir(parents=True)
-    (old_state / "old.closed.json").write_text("{}")
+    old_skill = f"{home}/.prime/agent/skills/prime-claw-official-expert-review"
+    old_state = f"{home}/.prime/agent/prime-claw-private/expert-review-launches"
+    seed_code = (
+        "import pathlib; root=pathlib.Path(" + repr(old_skill) + "); files=" + repr(RETIRED_EXPERT_FILES) + "; "
+        "[(root/rel).parent.mkdir(parents=True,exist_ok=True) or (root/rel).write_text(rel) for rel in files]; "
+        "state=pathlib.Path(" + repr(old_state) + "); state.mkdir(parents=True); (state/'old.closed.json').write_text('{}')"
+    )
+    seed_retired = tier1_container.run("python3", "-c", seed_code, workdir=None)
+    assert seed_retired.returncode == 0, seed_retired.stderr
     applied = tier1_container.run(
         apply, "--user-global", env=runtime_env, workdir=None, timeout=60,
     )
     assert applied.returncode == 0, applied.stdout + applied.stderr
     assert "target mode: user-global" in applied.stdout
-    assert not old_skill.exists()
-    assert not old_state.exists()
+    absent = tier1_container.run("test", "!", "-e", old_skill, workdir=None, wrap=False)
+    assert absent.returncode == 0, absent.stderr
+    state_absent = tier1_container.run("test", "!", "-e", old_state, workdir=None, wrap=False)
+    assert state_absent.returncode == 0, state_absent.stderr
     checked = tier1_container.run(
         check, "--user-global", env=runtime_env, workdir=None, timeout=60,
     )
@@ -418,6 +421,7 @@ def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container,
         "check-prime-agent-plugin.sh",
         "cleanup-retired-prime-agent-expert-review.py",
         "manage-prime-agent-role-protocol.py",
+        "manage-prime-agent-global-assets.py",
         "prime-agent-plugin-target.sh",
     ):
         shutil.copy2(REPO / "scripts" / name, scripts / name)
@@ -503,7 +507,6 @@ def test_apply_rejects_unsafe_retired_destination_before_mutation(
 @pytest.mark.parametrize("managed_directory", [
     "root", "extensions", "extension-support", "skills",
     "skills/goals-and-heartbeats",
-    "skills/blocked", "skills/design", "skills/execute", "skills/prepare", "skills/spec-it-out",
     "workflows",
     "skills/prime-claw-oversee-episode",
     "skills/prime-claw-expert-review",

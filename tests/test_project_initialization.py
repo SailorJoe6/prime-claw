@@ -63,25 +63,20 @@ def test_first_native_v098_session_discovers_initialized_skills(tier1_container,
     orca_payload=json.dumps({"result":{"repos":[{"id":"fixture","path":str(project),"displayName":"fixture"}]}})
     orca.write_text("#!/bin/sh\nprintf '%s\\n' '"+orca_payload+"'\n")
     orca.chmod(0o755)
-    capture=ctmp/"system-prompt.txt";probe=ctmp/"resource-probe.ts"
-    probe.write_text("import { writeFileSync } from \"node:fs\";\nexport default function probe(pi) {\n  pi.registerCommand(\"probe-project-resources\", {\n    description: \"capture post-discovery resources\",\n    handler: async () => writeFileSync("+json.dumps(str(capture))+", pi.getSystemPrompt()),\n  });\n}\n")
-    requests="\n".join([
-        json.dumps({"id":"commands","type":"get_commands"}),
-        json.dumps({"id":"prompt","type":"prompt","message":"/probe-project-resources"}),
-    ])+"\n"
+    request=json.dumps({"id":"commands","type":"get_commands"})+"\n"
     path_result=tier1_container.run("sh","-c","printf %s \"$PATH\"",wrap=False,timeout=10)
     assert path_result.returncode==0,path_result.stderr
     result=tier1_container.run(
-        tier1_container.prime_agent,"--mode","rpc","--offline","--no-session",
+        "/workspace/scripts/run-prime-agent-probe.sh",tier1_container.prime_agent,"--mode","rpc","--offline","--no-session",
         "--no-prompt-templates","--no-context-files","--no-extensions",
-        "--cwd",str(project),"-e","/workspace/src/prime-agent-plugin/extensions/project-initialization.ts","-e",str(probe),
-        input_text=requests,env={"PATH":str(bindir)+":"+path_result.stdout,"HOME":str(ctmp),"PRIME_AGENT_CODING_AGENT_DIR":str(ctmp/"agent")},timeout=60,workdir=None,
+        "--cwd",str(project),"-e","/workspace/src/prime-agent-plugin/extensions/project-initialization.ts",
+        input_text=request,env={"PATH":str(bindir)+":"+path_result.stdout,"HOME":str(ctmp)},timeout=60,workdir=None,
     )
     assert result.returncode==0,result.stdout+result.stderr
     responses=[json.loads(line) for line in result.stdout.splitlines() if line.startswith("{")]
     command_response=next(row for row in responses if row.get("id")=="commands")
-    names=[row["name"] for row in command_response["data"]["commands"]]
-    assert "skill:prepare" in names
-    prompt=capture.read_text()
-    assert str(project/".agents/skills/prepare/SKILL.md") in prompt
-    assert "prepare" in prompt
+    commands=command_response["data"]["commands"]
+    by_name={row["name"]:row for row in commands}
+    for name in ("skill:prepare","skill:execute"):
+        assert name in by_name
+        assert by_name[name]["sourceInfo"]["path"]==str(project/".agents/skills"/name.split(":",1)[1]/"SKILL.md")

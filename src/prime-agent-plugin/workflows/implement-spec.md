@@ -43,29 +43,34 @@ branch, worktree, session, or active plan. Stop after the explanation.
 
 ## Create the episode
 
-Only when the complete bundle is ready, call
-`prime_claw_activate_conversation_guide` exactly once with no arguments. On its
-continuation, do not copy or replay the guide. The native host privately binds
-that one consumed disclosure to this owner session, exact selected future
-folder, current managed generation, and current preparation lifecycle. If
-activation or readiness fails, stop without creating anything.
+The full ordinary `prime-claw-oversee-episode` guidance is loaded above this
+workflow in the post-preparation turn. Follow it as judgment guidance. It grants
+no product, scope, merge, abandonment, cleanup, or transport authority. Do not
+call an activation, disclosure, receipt, or readiness tool; those surfaces do
+not exist.
 
-Then call `create_spec_episode` exactly once with the exact selected
-future-folder path as its sole `location` argument. Do not supply or invent a
-branch, worktree, session name, prompt, command, or other host parameter. The
-trusted host capability derives and validates those values. Missing, stale, or
-mismatched prospective readiness must fail before any episode identity,
-worktree, branch, session, or oversight marker mutation.
+Only when the complete bundle is ready, call `create_spec_episode` exactly once
+with the exact selected future-folder path as its sole `location` argument. Do
+not supply or invent a branch, worktree, session name, prompt, command, or host
+parameter. A native `--host id:<project-host-setup-id>` bypass, when the operator
+provided one, is already bound privately to this preparation. Otherwise the
+trusted host selects the sole ready local setup or presents the native picker.
 
-Report the returned stable episode identity, active routing identity, branch,
-worktree, session name, and execute-admission state to the operator. State
-whether the capability created the episode or returned an existing matching
-identity. `delivered` confirms task admission. `pending` or `uncertain` is an
-unresolved exactly-once state: explain it, do not call the tool again in this
-turn, and never send execute directly. A later explicit `/implement-spec`
-replay returns that identity without redelivering. Do not begin implementation
-in the owner conversation.
+The capability first persists one provisioning ownership record, creates the
+background worktree without an agent, prompt, or activation, promotes and
+commits the exact bundle, and then launches one fresh native `prime-agent`
+session with one fixed execute assignment. It does not inherit this
+Conversation transcript, send an initial handoff, or send a second daemon
+prompt. Remote placement remains disabled until exact bundle transport is
+separately proven.
 
-Once the tool reports success, the owner conversation begins its separately
-configured oversight workflow. Set up a heartbeat to monitor your sibling. Then
-stop without implementing or invoking `/handoff`.
+Report the returned durable Episode session identity, current routing identity,
+lifecycle engine, exact Orca setup/worktree identity when applicable, actual
+branch, worktree, and status. State whether the capability created the Episode
+or returned the existing exact active ownership. `uncertain` or `provisioning`
+state requires inspection and must never be retried as a new creation or
+assignment. Do not begin implementation in the owner Conversation.
+
+Once the tool reports success, set up one bounded heartbeat only while waiting
+for observable Episode work. Then stop without implementing or invoking
+`/handoff`.

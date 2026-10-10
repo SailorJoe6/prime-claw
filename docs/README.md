@@ -48,7 +48,7 @@ prime-claw builds on four prior projects. Read these before designing:
   two-skill preflight, deterministic admission ordering, one-deep approval
   survival, and best-effort compaction semantics.
 - [future-specification-bundles.md](future-specification-bundles.md) — operator
-  walkthrough for reviewed future-folder authoring, native `/plan`, explicit
+  walkthrough for reviewed future-folder authoring, native `/plan-spec`, explicit
   `/implement-spec` promotion, unresolved admission handling, validation scope,
   and archived design provenance.
 - [lab-global-plugin.md](lab-global-plugin.md) — the final plugin layout,

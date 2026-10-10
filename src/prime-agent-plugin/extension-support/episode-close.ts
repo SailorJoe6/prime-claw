@@ -1,66 +1,55 @@
-import { lstatSync, readFileSync, realpathSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { parseEpisodeIdentity, type EpisodeIdentity } from "./spec-episode.ts";
-import type { OversightMarker } from "./conversation-oversight.ts";
+import {
+  readEpisodeOwnership,
+  writeEpisodeOwnership,
+  type EpisodeOwnershipRecord,
+} from "./episode-ownership.ts";
 
 export type EpisodeCloseResult = {
   reused: boolean;
-  marker: OversightMarker;
+  record: EpisodeOwnershipRecord;
 };
 
 const SAFE_LOCATION = /^\.ralph\/plans\/future\/([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 
-function identityPath(cwd: string, slug: string): string {
-  return join(realpathSync(cwd), ".prime", "agent", "state", "spec-episodes", `${slug}.json`);
+function projectRoot(cwd: string): string {
+  return execFileSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
 }
 
-function samePath(left: string, right: string): boolean {
-  return resolve(left) === resolve(right);
-}
-
-function assertExactIdentity(identity: EpisodeIdentity, marker: OversightMarker): void {
-  const admission = identity.version === 1 ? identity.executeAdmission : identity.bootstrapAdmission;
-  if (identity.ownerSessionId !== marker.ownerSessionId
-    || identity.slug !== marker.slug
-    || identity.sourceLocation !== marker.sourceLocation
-    || identity.episodeId !== marker.episodeId
-    || !samePath(identity.episodeSessionFile, marker.episodeSessionFile)
-    || identity.branch !== marker.branch
-    || !samePath(identity.worktree, marker.worktree)
-    || identity.sessionName !== marker.sessionName
-    || identity.version !== marker.identityVersion
-    || admission !== marker.admission) {
-    throw new Error("Episode bookkeeping identity does not match exact oversight state");
-  }
-}
-
-export function closeEpisodeOversight(
+export function closeEpisodeOwnership(
   sourceLocation: string,
   ctx: ExtensionContext,
-  marker: OversightMarker,
-  appendInactive: (marker: OversightMarker) => void,
-  removeIdentity: (path: string) => void = (path) => rmSync(path),
+  write: (root: string, record: EpisodeOwnershipRecord) => void = writeEpisodeOwnership,
 ): EpisodeCloseResult {
   const match = SAFE_LOCATION.exec(sourceLocation);
-  if (!match || match[1] !== marker.slug || marker.sourceLocation !== sourceLocation) {
-    throw new Error("Episode bookkeeping location does not match exact oversight state");
+  if (!match) throw new Error("Episode bookkeeping location is invalid");
+  const root = projectRoot(ctx.cwd);
+  const record = readEpisodeOwnership(root);
+  if (!record) throw new Error("Exact episode ownership is missing before bookkeeping close");
+  if (record.slug !== match[1] || record.sourceLocation !== sourceLocation) {
+    throw new Error("Episode bookkeeping location does not match exact ownership state");
   }
-  if (marker.ownerSessionId !== ctx.sessionManager.getSessionId()) {
+  if (record.ownerSessionId !== ctx.sessionManager.getSessionId()) {
     throw new Error("Episode bookkeeping owner mismatch");
   }
-
-  const path = identityPath(ctx.cwd, marker.slug);
-  const stat = lstatSync(path, { throwIfNoEntry: false });
-  if (!stat) {
-    if (marker.status !== "inactive") throw new Error("Exact episode identity is missing before bookkeeping close");
-    return { reused: true, marker };
+  if (record.status === "inactive") return { reused: true, record };
+  if (record.status !== "active") {
+    throw new Error(`Episode bookkeeping cannot close ${record.status} ownership`);
   }
-  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("Episode identity path is not a regular file");
-  const identity = parseEpisodeIdentity(JSON.parse(readFileSync(path, "utf8")), path);
-  assertExactIdentity(identity, marker);
-  if (marker.status === "active") appendInactive(marker);
-  removeIdentity(path);
-  return { reused: false, marker: { ...marker, status: "inactive" } };
+  const closed: EpisodeOwnershipRecord = {
+    ...record,
+    status: "inactive",
+    updatedAt: new Date().toISOString(),
+  };
+  write(root, closed);
+  const persisted = readEpisodeOwnership(root);
+  if (!persisted || persisted.status !== "inactive" || persisted.operationId !== record.operationId) {
+    throw new Error("Inactive episode bookkeeping evidence did not persist");
+  }
+  return { reused: false, record: persisted };
 }

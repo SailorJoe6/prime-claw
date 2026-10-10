@@ -1,40 +1,96 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
+
 import {
-  appendActiveOversight, applyConversationContext, assertConversationPromotionReady,
-  CONVERSATION_GUIDE_ACTIVATION_TOOL, CONVERSATION_GUIDE_STATUS_TOOL,
-  LEGACY_OVERSIGHT_PACKAGE_TYPE, OVERSIGHT_MARKER_TYPE,
-  registerConversationOversight, currentOversightMarkerForClose,
+  CONVERSATION_GUIDE_MESSAGE_TYPE,
+  assertConversationPromotionReady,
+  registerConversationOversight,
 } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
+import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
-function fixture(t,{sessionId="owner",prompt="BASE",entries=[]}={}){
-  const cwd=realpathSync(mkdtempSync(join(tmpdir(),"pc-oversight-")));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
-  const branch=structuredClone(entries),events=new Map(),tools=new Map(),notifications=[];let aborts=0,currentPrompt=prompt;
-  const ctx={cwd,ui:{notify(message,level){notifications.push({message,level})}},abort(){aborts++},getSystemPrompt(){return currentPrompt},sessionManager:{getSessionId(){return sessionId},getBranch(){return branch}}};
-  const pi={registerTool(definition){tools.set(definition.name,definition)},on(name,handler){events.set(name,handler)},appendEntry(customType,data){branch.push({type:"custom",customType,data})},sendMessage(message){branch.push({type:"custom_message",...message})}};
-  registerConversationOversight(pi);return{cwd,branch,events,tools,notifications,get aborts(){return aborts},setPrompt(value){currentPrompt=value},ctx,pi};
+function fixture({ status = "active", owner = "owner" } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-oversight-"));
+  execFileSync("git", ["init", "-q", root]);
+  const guideRoot = join(root, "plugin");
+  mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true });
+  writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), `FULL OVERSIGHT GUIDE
+`);
+  if (status) writeEpisodeOwnership(root, {
+    version: 1, status, operationId: "op", engine: "local", ownerSessionId: owner,
+    sourceLocation: ".ralph/plans/future/alpha", slug: "alpha", baseRef: "base", bundleDigest: "0".repeat(64),
+    createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
+    worktree: join(root, "wt"), branch: "actual-branch", head: "head",
+    episodeId: "episode", episodeSessionFile: join(root, "episode.jsonl"), episodeActiveSessionId: "route",
+  });
+  const events = new Map(); const tools = new Map(); const sent = [];
+  const pi = {
+    on(name, handler) { events.set(name, handler); },
+    registerTool(tool) { tools.set(tool.name, tool); },
+    async sendMessage(message, options) { sent.push({ message, options }); },
+  };
+  const ctx = { cwd: root, sessionManager: { getSessionId: () => "owner" } };
+  registerConversationOversight(pi, { guideRoot });
+  return { root, events, tools, sent, ctx };
 }
-function identity(f,{episodeId="11111111-1111-4111-8111-111111111111",slug="alpha",owner=f.ctx.sessionManager.getSessionId(),admission="delivered"}={}){
-  const worktree=resolve(dirname(f.cwd),`${basename(f.cwd)}-${slug}-episode`),value={version:2,slug,sourceLocation:`.ralph/plans/future/${slug}`,ownerSessionId:owner,episodeId,episodeActiveSessionId:"active",episodeSessionFile:join(worktree,"episode.jsonl"),branch:`episode/${slug}`,worktree,sessionName:`${slug}-episode`,bootstrapAdmission:admission};
-  const path=join(f.cwd,".prime/agent/state/spec-episodes",`${slug}.json`);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,JSON.stringify(value));return{...value,reused:false};
-}
-function marker(value,status="active"){return{markerVersion:2,status,ownerSessionId:value.ownerSessionId,slug:value.slug,sourceLocation:value.sourceLocation,episodeId:value.episodeId,episodeSessionFile:value.episodeSessionFile,branch:value.branch,worktree:value.worktree,sessionName:value.sessionName,identityVersion:value.version,admission:value.bootstrapAdmission};}
-function context(f,messages=[]){return f.events.get("context")({messages},f.ctx);}
 
-test("registers activation/status tools plus recovery and context hooks",()=>{const events=new Map(),tools=new Map();registerConversationOversight({registerTool(d){tools.set(d.name,d)},on(n,h){events.set(n,h)},appendEntry(){}});assert.deepEqual([...tools.keys()],[CONVERSATION_GUIDE_ACTIVATION_TOOL,CONVERSATION_GUIDE_STATUS_TOOL]);assert.deepEqual([...events.keys()],["session_start","session_shutdown","context"])});
-test("role behavior does not depend on system-prompt kernel bytes",t=>{for(const prompt of ["BASE","CLI SHADOW"]){const f=fixture(t,{prompt});assert.deepEqual(context(f,[{role:"user",content:"hello"}]),{messages:[{role:"user",content:"hello"}]});assert.equal(f.aborts,0)}});
-test("active exact expectation validates state without injecting the oversight package",t=>{const f=fixture(t),episode=identity(f);appendActiveOversight(f.pi,f.ctx,episode);const legacy={role:"custom",customType:LEGACY_OVERSIGHT_PACKAGE_TYPE,content:"legacy",display:false,timestamp:1};const result=context(f,[{role:"user",content:"x"},legacy]);assert.deepEqual(result.messages,[{role:"user",content:"x"}]);assert.equal(currentOversightMarkerForClose(f.ctx,episode.sourceLocation).episodeId,episode.episodeId)});
-test("session start reconstructs a missing active marker from exact expectation",async t=>{const f=fixture(t),episode=identity(f);await f.events.get("session_start")({},f.ctx);assert.equal(f.branch.findLast(x=>x.customType===OVERSIGHT_MARKER_TYPE).data.status,"active");assert.equal(f.branch.findLast(x=>x.customType===OVERSIGHT_MARKER_TYPE).data.episodeId,episode.episodeId);assert.match(f.notifications.at(-1).message,/Recovered active oversight/)});
-test("inactive closed evidence is ordinary and allows a later episode",t=>{const f=fixture(t);const old={version:2,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",ownerSessionId:"owner",episodeId:"old",episodeActiveSessionId:"route",episodeSessionFile:"/old/session.jsonl",branch:"episode/alpha",worktree:"/old/worktree",sessionName:"alpha-episode",bootstrapAdmission:"delivered"};f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(old,"inactive")});assert.deepEqual(context(f),{messages:[]});assert.doesNotThrow(()=>assertConversationPromotionReady(f.ctx,".ralph/plans/future/beta"));const beta=identity(f,{slug:"beta",episodeId:"new"});appendActiveOversight(f.pi,f.ctx,beta);const branchBefore=structuredClone(f.branch),identityBefore=readFileSync(join(f.cwd,".prime/agent/state/spec-episodes/beta.json"),"utf8");assert.equal(currentOversightMarkerForClose(f.ctx,beta.sourceLocation).episodeId,"new");const historical=currentOversightMarkerForClose(f.ctx,old.sourceLocation);assert.equal(historical.episodeId,"old");assert.equal(historical.status,"inactive");assert.deepEqual(f.branch,branchBefore);assert.equal(readFileSync(join(f.cwd,".prime/agent/state/spec-episodes/beta.json"),"utf8"),identityBefore)});
-test("orphan active exact-owner evidence blocks instead of becoming ordinary",t=>{const f=fixture(t);const old={version:2,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",ownerSessionId:"owner",episodeId:"old",episodeActiveSessionId:"route",episodeSessionFile:"/old/session.jsonl",branch:"episode/alpha",worktree:"/old/worktree",sessionName:"alpha-episode",bootstrapAdmission:"delivered"};f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(old)});assert.throws(()=>context(f),/orphan active/);assert.equal(f.aborts,1)});
-test("foreign owner evidence is inert",t=>{const foreign={version:2,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",ownerSessionId:"other",episodeId:"foreign",episodeActiveSessionId:"route",episodeSessionFile:"/old/session.jsonl",branch:"episode/alpha",worktree:"/old/worktree",sessionName:"alpha-episode",bootstrapAdmission:"delivered"};const f=fixture(t,{entries:[{type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(foreign)}]});assert.deepEqual(context(f),{messages:[]})});
-test("unclassifiable owner and stable-binding mismatch fail closed",t=>{const f=fixture(t),episode=identity(f);f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:{...marker(episode),ownerSessionId:""}});assert.throws(()=>context(f),/owner is unclassifiable/);const g=fixture(t),other=identity(g);g.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:{...marker(other),branch:"episode/wrong"}});assert.throws(()=>context(g),/corrupt|disagrees/)});
-test("bounded EPISODE identity stays private without prompt-byte authentication",t=>{const f=fixture(t);f.branch.push({type:"custom",customType:"prime-claw-bounded-identity",data:{version:1,role:"EPISODE",sessionId:"owner"}});const result=context(f,[{role:"custom",customType:"prime-claw-bounded-identity",content:"private"},{role:"custom",customType:"prime-claw-bounded-identity-package",content:"legacy"},{role:"user",content:"work"}]);assert.deepEqual(result.messages,[{role:"user",content:"work"}]);assert.equal(f.aborts,0)});
+test("oversight registers no activation or readiness tools", () => {
+  const f = fixture();
+  assert.deepEqual([...f.tools], []);
+  assert.equal(f.events.has("context"), false);
+  assert.equal(f.events.has("session_start"), false);
+  assert.equal(f.events.has("session_compact"), true);
+});
 
-test("inactive marker with exact identity remains closeable without package injection",t=>{const f=fixture(t),episode=identity(f);f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(episode,"inactive")});const result=context(f);assert.equal(result.messages.filter(x=>x.customType===LEGACY_OVERSIGHT_PACKAGE_TYPE).length,0);assert.equal(currentOversightMarkerForClose(f.ctx,episode.sourceLocation).status,"inactive")});
+test("each qualifying compact appends one full non-turn guide message", async () => {
+  const f = fixture(); const handler = f.events.get("session_compact");
+  await handler({ type: "session_compact", compactionEntry: { id: "one" } }, f.ctx);
+  await handler({ type: "session_compact", compactionEntry: { id: "two" } }, f.ctx);
+  assert.equal(f.sent.length, 2);
+  for (const sent of f.sent) {
+    assert.equal(sent.message.customType, CONVERSATION_GUIDE_MESSAGE_TYPE);
+    assert.equal(sent.message.content, `FULL OVERSIGHT GUIDE
+`);
+    assert.equal(sent.message.display, false);
+    assert.deepEqual(sent.options, { triggerTurn: false });
+  }
+});
 
-test("closed future-folder locations cannot be reused for a later generation",t=>{const f=fixture(t);const old={version:2,slug:"alpha",sourceLocation:".ralph/plans/future/alpha",ownerSessionId:"owner",episodeId:"old",episodeActiveSessionId:"route",episodeSessionFile:"/old/session.jsonl",branch:"episode/alpha",worktree:"/old/worktree",sessionName:"alpha-episode",bootstrapAdmission:"delivered"};f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(old,"inactive")});assert.throws(()=>assertConversationPromotionReady(f.ctx,old.sourceLocation),/cannot be reused/);assert.doesNotThrow(()=>assertConversationPromotionReady(f.ctx,".ralph/plans/future/beta"))});
-test("duplicate generations at one location block close lookup",t=>{const f=fixture(t),current=identity(f);f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker(current)});f.branch.push({type:"custom",customType:OVERSIGHT_MARKER_TYPE,data:marker({...current,episodeId:"older"},"inactive")});assert.throws(()=>currentOversightMarkerForClose(f.ctx,current.sourceLocation),/multiple oversight generations/)});
+for (const [name, status, owner] of [
+  ["no owner", null, "owner"], ["inactive", "inactive", "owner"], ["foreign owner", "active", "other"],
+]) test(`compact injects nothing for ${name}`, async () => {
+  const f = fixture({ status, owner });
+  await f.events.get("session_compact")({ type: "session_compact", compactionEntry: { id: "one" } }, f.ctx);
+  assert.deepEqual(f.sent, []);
+});
+
+test("ordinary guide loading ignores project skill collisions", async () => {
+  const f = fixture();
+  mkdirSync(join(f.root, ".agents", "skills", "prime-claw-oversee-episode"), { recursive: true });
+  writeFileSync(join(f.root, ".agents", "skills", "prime-claw-oversee-episode", "SKILL.md"), "collision");
+  await f.events.get("session_compact")({ type: "session_compact", compactionEntry: { id: "one" } }, f.ctx);
+  assert.equal(f.sent[0].message.content, `FULL OVERSIGHT GUIDE
+`);
+});
+
+test("promotion preflight allows only terminal or exact-owner state", () => {
+  const f = fixture();
+  assert.doesNotThrow(() => assertConversationPromotionReady(f.ctx, ".ralph/plans/future/alpha"));
+  assert.throws(() => assertConversationPromotionReady(f.ctx, ".ralph/plans/future/beta"), /already has non-terminal/);
+});
+
+
+test("compaction is inert outside a Git project", async () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-ordinary-"));
+  const guideRoot = join(root, "plugin");
+  mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true });
+  writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), "guide");
+  const events = new Map(); const sent = [];
+  const pi = { on(name, handler) { events.set(name, handler); }, async sendMessage(message) { sent.push(message); } };
+  registerConversationOversight(pi, { guideRoot });
+  await events.get("session_compact")({}, { cwd: root, sessionManager: { getSessionId: () => "ordinary" } });
+  assert.deepEqual(sent, []);
+});
