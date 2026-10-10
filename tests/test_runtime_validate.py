@@ -54,13 +54,15 @@ def _healthy_exec(c, script, timeout=30):
     s = script
     # Version-recording probes (routed via /sandbox/.pc-ver.sh).
     if "/sandbox/.pc-ver.sh" in s:
-        if "prime-agent" in s: return (0, "0.9.3")
+        if "prime-agent" in s: return (0, "0.9.8")
         if "gbrain" in s: return (0, "1.2.3")
         if "pgvector" in s or "pg_extension" in s: return (0, "0.7.0")
         if "psql-version" in s: return (0, "PostgreSQL 16.4")
         return (0, "")
+    if "git -C /opt/prime-agent describe --tags --always --dirty" in s:
+        return (0, "cwd-fix-v0.9.8-r1\na1faacd53ac4473a75de1d434afaf50945c2f647\n5301c70d9c9d74e474ccaf258fdd3c8de982c52f")
     # Spawn/reap DaemonClient RPC shell.
-    if "node /tmp/pc-rpc.mjs" in s:
+    if "node_modules/.bin/tsx /tmp/pc-rpc.mts" in s:
         return (0, "CREATED=sid1\nCWD=/sandbox/episode-target\nKILL=true\nSTILL=false")
     # Persistent-REPL proof.
     if "REPL_VAL" in s: return (0, "REPL_VAL=42")

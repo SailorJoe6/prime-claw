@@ -2,6 +2,7 @@
   "sandbox_name": "prime-claw",
   "workspace": "default",
   "image": "prime-claw-brain:0.1.0",
+  "prime_agent_version": "0.9.8",
   "gateway": {
     "name": "openshell",
     "endpoint": "https://localhost:17670",

@@ -174,32 +174,84 @@ def _exec_recorder(monkeypatch):
     calls = []
     def fake_exec(c, script, timeout=30):
         calls.append(script)
-        # Slice 5 added a daemon-ensure step to stage_prime_agent; report it up.
-        if "daemon-catalog-entry" in script or "DAEMON_UP" in script:
+        if "source_identity=" in script:
+            return (0, "source_identity=cwd-fix-v0.9.8-r1 commit=" + pc.PRIME_AGENT_SOURCE_COMMIT)
+        if "pc-daemon-identity.mts" in script:
             return (0, "DAEMON_UP")
         return (0, "ok")
     return calls, fake_exec
 
 
-def test_prime_agent_stage_runs_install_and_kernel(tmp_path, monkeypatch):
+def test_prime_agent_stage_verifies_image_owned_source_before_writes(tmp_path, monkeypatch):
     calls, fx = _exec_recorder(monkeypatch)
     monkeypatch.setattr(pc, "sandbox_exec", fx)
-    rc = pc.stage_prime_agent(cfg(tmp_path), Args())
-    assert rc == 0
-    assert any("install.sh" in c for c in calls)          # install leg
-    assert any("pc-kernel.mjs" in c for c in calls)        # kernel bootstrap (JS base64-staged)
-    assert any("npm-onload.js" in c for c in calls)       # %2F workaround staged
+    assert pc.stage_prime_agent(cfg(tmp_path), Args()) == 0
+    assert "source_identity=%s" in calls[0] and "cwd-fix-v0.9.8-r1" in calls[0]
+    assert "8ca4d5c39b7c738f71b5c86422ea46394c3d0558" in calls[0]
+    assert "3e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74" in calls[0]
+    assert any("pc-kernel.mts" in c and "node_modules/.bin/tsx" in c for c in calls)
+    assert any("npm-onload.js" in c for c in calls)
+    assert all("app.primeintellect.ai/prime-agent/install.sh" not in c for c in calls)
 
 
-def test_prime_agent_daemon_restarts_to_inherit_current_placeholders(tmp_path, monkeypatch):
+def test_prime_agent_pin_rejects_old_or_v010_selectors_before_sandbox_access(tmp_path, monkeypatch, capsys):
     calls, fx = _exec_recorder(monkeypatch)
     monkeypatch.setattr(pc, "sandbox_exec", fx)
-    rc = pc.stage_prime_agent(cfg(tmp_path), Args())
-    assert rc == 0
-    daemon = next(c for c in calls if "daemon-catalog-entry" in c)
-    assert "kill $PIDS" in daemon and "nohup prime-agent --mode daemon" in daemon
-    assert 'ANTHROPIC_API_KEY="$api_key"' in daemon  # gateway fallback; value is placeholder
-    assert "/proc/" not in daemon  # blocked under OpenShell filesystem policy
+    assert pc._required_prime_agent_version(cfg(tmp_path)) == "0.9.8"
+    assert pc.stage_prime_agent(cfg(tmp_path, prime_agent_version="0.9.3"), Args()) == 1
+    monkeypatch.setenv("PRIME_AGENT_VERSION", "0.10.0")
+    assert pc.stage_prime_agent(cfg(tmp_path), Args()) == 1
+    assert calls == []
+    assert "requires Prime Agent 0.9.8" in capsys.readouterr().err
+
+
+def test_prime_agent_source_gate_requires_tag_commit_tree_lock_and_launcher(tmp_path, monkeypatch):
+    calls, fx = _exec_recorder(monkeypatch)
+    monkeypatch.setattr(pc, "sandbox_exec", fx)
+    assert pc.stage_prime_agent(cfg(tmp_path), Args()) == 0
+    gate = calls[0]
+    assert "set -euo pipefail" in gate
+    assert "refs/tags/cwd-fix-v0.9.8-r1" in gate
+    assert "git -C /opt/prime-agent remote get-url origin" in gate
+    assert "https://github.com/SailorJoe6/prime-agent.git" in gate
+    assert pc.PRIME_AGENT_SOURCE_TAG_OBJECT in gate
+    assert pc.PRIME_AGENT_SOURCE_COMMIT in gate
+    assert pc.PRIME_AGENT_SOURCE_TREE in gate
+    assert pc.PRIME_AGENT_SOURCE_LOCK_SHA256 in gate
+    assert "sha256sum -c -" in gate
+    assert "git -C /opt/prime-agent status --porcelain" in gate
+    assert "git -C /opt/prime-agent describe --tags --always --dirty" in gate
+    assert "/usr/local/bin/prime-agent --version 2>&1" in gate
+    assert "0.9.8" in gate
+
+
+def test_prime_agent_stage_stops_before_writes_on_source_mismatch(tmp_path, monkeypatch):
+    calls = []
+    def fake_exec(c, script, timeout=30):
+        calls.append(script)
+        return 1, "error: tag object mismatch"
+    monkeypatch.setattr(pc, "sandbox_exec", fake_exec)
+    assert pc.stage_prime_agent(cfg(tmp_path), Args()) == 1
+    assert len(calls) == 1
+    assert "refs/tags/cwd-fix-v0.9.8-r1" in calls[0]
+    assert "npm-onload.js" not in calls[0]  # not staged before identity passes
+
+
+def test_prime_agent_daemon_starts_without_implicit_kill(tmp_path, monkeypatch):
+    calls, fx = _exec_recorder(monkeypatch)
+    monkeypatch.setattr(pc, "sandbox_exec", fx)
+    assert pc.stage_prime_agent(cfg(tmp_path), Args()) == 0
+    daemon = next(c for c in calls if "pc-daemon-identity.mts" in c)
+    assert "nohup prime-agent --mode daemon --offline" in daemon
+    assert "prime-agent status" not in daemon
+    probe = pc._prime_agent_daemon_identity_probe_script()
+    assert "hello.runtime?.buildId" in probe
+    assert pc.PRIME_AGENT_SOURCE_TAG in probe
+    assert "hello.appVersion" in probe and "0.9.8" in probe
+    assert "DAEMON_UP" in probe
+    assert 'ANTHROPIC_API_KEY="$api_key"' in daemon  # placeholder-only gateway
+    assert "kill $PIDS" not in daemon and "rm -rf /tmp/prime-agent" not in daemon
+    assert "/proc/" not in daemon
     assert "zdai_" not in daemon
 
 

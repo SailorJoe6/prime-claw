@@ -341,6 +341,14 @@ def _build_inputs_fingerprint(cfg) -> str:
                 h.update(f.read())
     h.update(("templates:real" if os.path.isdir(os.path.join(z, "templates"))
               else f"templates:fallback:{TEMPLATES_FALLBACK_COMMIT}").encode())
+    # The image includes an image-owned source checkout and prewarmed kernel.
+    # Fingerprint code-side identity as well as Dockerfile bytes, so either
+    # contract change invalidates the build stamp before an idempotent skip.
+    h.update(f"prime-agent-required:{_required_prime_agent_version(cfg)}".encode())
+    for value in (PRIME_AGENT_SOURCE_TAG, PRIME_AGENT_SOURCE_TAG_OBJECT,
+                  PRIME_AGENT_SOURCE_COMMIT, PRIME_AGENT_SOURCE_TREE,
+                  PRIME_AGENT_SOURCE_LOCK_SHA256):
+        h.update(value.encode())
     return h.hexdigest()
 
 
@@ -354,6 +362,11 @@ def _docker_image_exists(tag: str) -> bool:
 
 
 def cmd_build(cfg, args) -> int:
+    try:
+        required_prime_agent = _required_prime_agent_version(cfg)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     tag = cfg["image"]
     df = os.path.join(REPO_ROOT, "docker", "runtime.Dockerfile")
     ctx = _ctx_dir()
@@ -364,7 +377,7 @@ def cmd_build(cfg, args) -> int:
     if args.dry_run:
         man = stage_gbrain_context(zsrc, ctx, dry_run=True)
         print(f"dry_run: would stage gbrain context from {zsrc} (source={gsource}, templates={man['templates']})")
-        print(f"dry_run: would run: {DOCKER} build -f {df} -t {tag} {os.path.join(REPO_ROOT,'docker')}")
+        print(f"dry_run: would run: {DOCKER} build --build-arg PRIME_AGENT_REQUIRED_VERSION={required_prime_agent} -f {df} -t {tag} {os.path.join(REPO_ROOT,'docker')}")
         print("host_credential_access: prohibited")
         return 0
 
@@ -390,12 +403,20 @@ def cmd_build(cfg, args) -> int:
     print(f"      templates: {man['templates']}")
 
     print(f"[2/2] building image {tag} ...")
-    code = subprocess.call([DOCKER, "build", "-f", df, "-t", tag,
-                            os.path.join(REPO_ROOT, "docker")])
+    code = subprocess.call([DOCKER, "build", "--build-arg",
+                            f"PRIME_AGENT_REQUIRED_VERSION={required_prime_agent}",
+                            "-f", df, "-t", tag, os.path.join(REPO_ROOT, "docker")])
     if code != 0:
         print(f"error: docker build failed (exit {code})", file=sys.stderr)
         return code
-    json.dump({"image": tag, "inputs_sha256": fp, "templates": man["templates"],
+    json.dump({"image": tag, "inputs_sha256": fp,
+               "prime_agent_required_version": required_prime_agent,
+               "prime_agent_source_tag": PRIME_AGENT_SOURCE_TAG,
+               "prime_agent_source_tag_object": PRIME_AGENT_SOURCE_TAG_OBJECT,
+               "prime_agent_source_commit": PRIME_AGENT_SOURCE_COMMIT,
+               "prime_agent_source_tree": PRIME_AGENT_SOURCE_TREE,
+               "prime_agent_source_lock_sha256": PRIME_AGENT_SOURCE_LOCK_SHA256,
+               "templates": man["templates"],
                "built_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()},
               open(_stamp_path(), "w"), indent=2)
     print(f"build: done (image={tag})")
@@ -413,6 +434,64 @@ def cmd_build(cfg, args) -> int:
 
 def _cfg_get(cfg, key, envvar, default):
     return os.environ.get(envvar) or cfg.get(key) or default
+
+
+PRIME_AGENT_REQUIRED_VERSION = "0.9.8"
+PRIME_AGENT_SOURCE_ROOT = "/opt/prime-agent"
+PRIME_AGENT_SOURCE_TAG = "cwd-fix-v0.9.8-r1"
+PRIME_AGENT_SOURCE_TAG_OBJECT = "8ca4d5c39b7c738f71b5c86422ea46394c3d0558"
+PRIME_AGENT_SOURCE_COMMIT = "a1faacd53ac4473a75de1d434afaf50945c2f647"
+PRIME_AGENT_SOURCE_TREE = "5301c70d9c9d74e474ccaf258fdd3c8de982c52f"
+PRIME_AGENT_SOURCE_LOCK_SHA256 = "3e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74"
+
+
+def _prime_agent_source_gate_script() -> str:
+    """Read-only, fail-closed identity gate for the image-owned TS checkout."""
+    root = shlex.quote(PRIME_AGENT_SOURCE_ROOT)
+    tag_ref = shlex.quote("refs/tags/" + PRIME_AGENT_SOURCE_TAG)
+    return (
+        "set -euo pipefail\n"
+        f"test -x {root}/prime-agent.sh\n"
+        f"test -x {root}/node_modules/.bin/tsx\n"
+        f'test "$(git -C {root} remote get-url origin)" = https://github.com/SailorJoe6/prime-agent.git\n'
+        f"test $(git -C {root} cat-file -t {tag_ref}) = tag\n"
+        f"test $(git -C {root} rev-parse {tag_ref}) = {PRIME_AGENT_SOURCE_TAG_OBJECT}\n"
+        f"test $(git -C {root} rev-parse {tag_ref}^{{commit}}) = {PRIME_AGENT_SOURCE_COMMIT}\n"
+        f"test $(git -C {root} rev-parse HEAD) = {PRIME_AGENT_SOURCE_COMMIT}\n"
+        f"test $(git -C {root} rev-parse HEAD^{{tree}}) = {PRIME_AGENT_SOURCE_TREE}\n"
+        f"printf '%s  %s\\n' {PRIME_AGENT_SOURCE_LOCK_SHA256} {root}/package-lock.json | sha256sum -c - >/dev/null\n"
+        f'test -z "$(git -C {root} status --porcelain)"\n'
+        f'test "$(git -C {root} describe --tags --always --dirty)" = {PRIME_AGENT_SOURCE_TAG}\n'
+        'observed_v="$(/usr/local/bin/prime-agent --version 2>&1)"\n'
+        f'test "$observed_v" = {PRIME_AGENT_REQUIRED_VERSION}\n'
+        f"printf 'source_identity=%s commit=%s tree=%s version=%s\\n' "
+        f"{PRIME_AGENT_SOURCE_TAG} {PRIME_AGENT_SOURCE_COMMIT} {PRIME_AGENT_SOURCE_TREE} {PRIME_AGENT_REQUIRED_VERSION}\n"
+    )
+
+
+def _prime_agent_daemon_identity_probe_script() -> str:
+    """Read the running daemon's RPC hello, not just its version or PID."""
+    return (
+        "import { DaemonClient } from "
+        "'/opt/prime-agent/packages/coding-agent/src/modes/daemon/daemon-client.ts';\n"
+        "const c = new DaemonClient('/tmp/prime-agent-' + process.getuid() + '/daemon.sock');\n"
+        "try { await c.connect(); const hello = await c.waitForHello();\n"
+        f"  if (hello.runtime?.buildId !== '{PRIME_AGENT_SOURCE_TAG}' "
+        f"|| hello.appVersion !== '{PRIME_AGENT_REQUIRED_VERSION}') "
+        "throw new Error('wrong daemon build identity');\n"
+        "  console.log('DAEMON_UP'); } finally { c.close(); }\n"
+    )
+
+
+def _required_prime_agent_version(cfg):
+    """Reject stale/local/env selectors instead of silently installing v0.10."""
+    selected = str(_cfg_get(cfg, "prime_agent_version", "PRIME_AGENT_VERSION",
+                            PRIME_AGENT_REQUIRED_VERSION))
+    if selected != PRIME_AGENT_REQUIRED_VERSION:
+        raise ValueError(
+            f"Prime Claw requires Prime Agent {PRIME_AGENT_REQUIRED_VERSION}; "
+            f"requested {selected!r} is not approved")
+    return selected
 
 
 BRAIN_REPO_ENV = "PRIME_CLAW_BRAIN_REPO"
@@ -1917,32 +1996,32 @@ def _prime_agent_codex_auth_projection_script() -> str:
 
 
 def stage_prime_agent(cfg, args) -> int:
-    name = cfg["sandbox_name"]
-    version = _cfg_get(cfg, "prime_agent_version", "PRIME_AGENT_VERSION", "0.9.3")
-    onload = os.path.join(REPO_ROOT, "scripts", "lib", "npm-onload.js")
+    try:
+        version = _required_prime_agent_version(cfg)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     if args.dry_run:
-        print(f"dry_run: install prime-agent@{version} (npm prefix /sandbox/.npm-global), "
-              f"npm-onload %2F workaround, bootstrap Python kernel"); return 0
+        print(f"dry_run: verify image-owned TypeScript Prime Agent {version} "
+              f"({PRIME_AGENT_SOURCE_TAG}, tag/commit/tree/lock/launcher); "
+              "stage npm-onload shim, bootstrap Python kernel")
+        return 0
+    # Fail before ANY sandbox file write: an old or Rust image cannot pass this
+    # source/lock/build-ID gate even if it prints the same --version.
+    code, out = sandbox_exec(cfg, _prime_agent_source_gate_script(), timeout=120)
+    if code != 0 or "source_identity=" + PRIME_AGENT_SOURCE_TAG not in out:
+        print("error: Prime Agent source identity: " + out.strip()[-300:], file=sys.stderr)
+        return code or 1
+    print("prime-agent: " + out.strip().splitlines()[-1])
+    onload = os.path.join(REPO_ROOT, "scripts", "lib", "npm-onload.js")
     if not os.path.exists(onload):
-        print(f"error: npm-onload.js not found: {onload}", file=sys.stderr); return 1
+        print(f"error: npm-onload.js not found: {onload}", file=sys.stderr)
+        return 1
     b64 = base64.b64encode(open(onload, "rb").read()).decode()
     code, out = sandbox_exec(cfg, "mkdir -p /sandbox/.prime-claw && echo " + b64 + " | base64 -d > /sandbox/.prime-claw/npm-onload.js", timeout=60)
-    if code != 0: print("error: onload stage: " + out.strip()[:160], file=sys.stderr); return code
-    install = (
-        "export PATH=/sandbox/.npm-global/bin:$PATH\n"
-        "installed_v=\"$(prime-agent --version 2>&1 | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+' | head -1)\"\n"
-        "if command -v prime-agent >/dev/null 2>&1 && [ \"$installed_v\" = \"" + version + "\" ]; then\n"
-        "  echo 'prime-agent " + version + " already installed; skipping'\n"
-        "else\n"
-        "  export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n"
-        "  export NPM_CONFIG_PREFIX=/sandbox/.npm-global PRIME_AGENT_VERSION=\"" + version + "\"\n"
-        "  export PRIME_AGENT_INSTALLER_PLAIN=1 PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL=0\n"
-        "  curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh\n"
-        "fi\n"
-        "prime-agent --version 2>&1 | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+' | head -1\n")
-    code, out = sandbox_exec(cfg, install, timeout=1800)
-    if code != 0: print("error: prime-agent install: " + out.strip()[-300:], file=sys.stderr); return code
-    print("prime-agent: " + (out.strip().splitlines()[-1] if out.strip() else version))
+    if code != 0:
+        print("error: onload stage: " + out.strip()[:160], file=sys.stderr)
+        return code
     # R3a-13 (updated 2026-09-16): mirror the operator's NON-SECRET models.json
     # and settings.json verbatim, including their current default provider/model. auth.json
     # is input to host-side provider provisioning only; for openai-codex the sandbox gets a
@@ -1982,44 +2061,44 @@ def stage_prime_agent(cfg, args) -> int:
             print("error: remove stale codex auth projection: " + out.strip()[-200:], file=sys.stderr)
             return code
     js = ("import { ensureKernelPython } from "
-          "'/sandbox/.npm-global/lib/node_modules/prime-agent/dist/core/kernel/bootstrap.js'; "
+          "'/opt/prime-agent/packages/coding-agent/src/core/kernel/bootstrap.ts'; "
           "console.log('kernel_python=' + (await ensureKernelPython()));")
-    # Write the JS to a file via base64 and run `node file` (robust quoting):
-    # a single-quoted `node -e '...'` gets its quotes mangled by the npm-onload
-    # NODE_OPTIONS arg rewriting, producing a SyntaxError.
+    # Use the pinned source checkout's tsx and tsconfig. A generated dist JS
+    # import is not a release contract for this downstream v0.9.8-r1 tag.
     js64 = base64.b64encode(js.encode()).decode()
-    kernel = ("export PATH=/sandbox/.npm-global/bin:$PATH\n"
+    kernel = ("export TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json\n"
               "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n"
               "export PRIME_AGENT_INSTALL_UV=1\n"
-              "echo " + js64 + " | base64 -d > /tmp/pc-kernel.mjs\n"
-              "node /tmp/pc-kernel.mjs\n")
+              "echo " + js64 + " | base64 -d > /tmp/pc-kernel.mts\n"
+              "/opt/prime-agent/node_modules/.bin/tsx /tmp/pc-kernel.mts\n")
     code, out = sandbox_exec(cfg, kernel, timeout=1200)
     if code != 0: print("error: kernel bootstrap: " + out.strip()[-300:], file=sys.stderr); return code
     print("prime-agent: kernel bootstrapped")
     # Ensure the episode daemon is running (cold-daemon recovery): start it
     # detached if absent and wait for the socket. The daemon auto-exits when
     # idle unless it is hosting a session, so this must be part of converge.
+    probe64 = base64.b64encode(_prime_agent_daemon_identity_probe_script().encode()).decode()
     ensure_daemon = (
-        "export HOME=/sandbox PATH=/sandbox/.npm-global/bin:$PATH\n"
+        "set -euo pipefail\n"
+        "export HOME=/sandbox PATH=/usr/local/bin:$PATH TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json\n"
         "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n"
-        # Converge is allowed to restart the daemon. This guarantees the daemon that owns
-        # future sessions inherits the CURRENT provider placeholder set (codex OAuth and,
-        # for fallback gateway models, ANTHROPIC_API_KEY). /proc environ inspection is not
-        # available under the sandbox policy, so conditional inspection is not reliable.
-        "PIDS=$(pgrep -f 'daemon-catalog-entry[.]js' 2>/dev/null || true)\n"
-        "[ -z \"$PIDS\" ] || kill $PIDS 2>/dev/null || true\n"
-        "for i in 1 2 3 4 5; do pgrep -f 'daemon-catalog-entry[.]js' >/dev/null 2>&1 || break; sleep 1; done\n"
-        "rm -rf /tmp/prime-agent-*/daemon.sock /tmp/prime-agent-*/daemon.sock.lock\n"
+        # Do not kill an existing daemon, remove its socket, or attach to an
+        # incompatible instance during converge. A changed provider environment
+        # needs a separately supervised daemon restart, not an implicit signal.
+        "SOCK=/tmp/prime-agent-$(id -u)/daemon.sock\n"
         + ("[ -z \"${api_key:-}\" ] || export ANTHROPIC_API_KEY=\"$api_key\"\n"
            if bool(inference.get("gateway")) else "")
-        + "nohup prime-agent --mode daemon --offline >/sandbox/.prime-claw/daemon.log 2>&1 &\n"
-        "for i in $(seq 1 20); do\n"
-        "  S=$(ls /tmp/prime-agent-*/daemon.sock 2>/dev/null | head -1); [ -n \"$S\" ] && break; sleep 1\n"
-        "done\n"
-        "[ -n \"${S:-}\" ] && pgrep -af 'daemon-catalog-entry[.]js' 2>/dev/null | grep -v 'bash -c' | grep -q node && echo DAEMON_UP || echo DAEMON_DOWN\n")
+        + "if [ ! -S \"$SOCK\" ]; then\n"
+        "  nohup prime-agent --mode daemon --offline >/sandbox/.prime-claw/daemon.log 2>&1 &\n"
+        "  for i in $(seq 1 20); do [ -S \"$SOCK\" ] && break; sleep 1; done\n"
+        "fi\n"
+        "test -S \"$SOCK\"\n"
+        "echo " + probe64 + " | base64 -d > /tmp/pc-daemon-identity.mts\n"
+        "/opt/prime-agent/node_modules/.bin/tsx /tmp/pc-daemon-identity.mts\n")
     code, out = sandbox_exec(cfg, ensure_daemon, timeout=60)
-    if "DAEMON_UP" not in out:
-        print("error: daemon did not start: " + out.strip()[-200:], file=sys.stderr); return 1
+    if code != 0 or "DAEMON_UP" not in out:
+        print("error: daemon did not start with required build identity: " + out.strip()[-200:], file=sys.stderr)
+        return code or 1
     print("prime-agent: daemon running")
     return 0
 
@@ -2454,8 +2533,13 @@ def _validate_versions(cfg):
     if os.path.exists(stamp):
         try: v["image_inputs_sha256"] = json.load(open(stamp)).get("inputs_sha256")
         except Exception: v["image_inputs_sha256"] = None
-    code, out = sandbox_exec(cfg, "echo prime-agent --version > /sandbox/.pc-ver.sh; export PATH=/sandbox/.npm-global/bin:$PATH; prime-agent --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1", timeout=60)
+    code, out = sandbox_exec(cfg, "echo prime-agent --version > /sandbox/.pc-ver.sh; export PATH=/usr/local/bin:$PATH; prime-agent --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1", timeout=60)
     v["prime_agent"] = out.strip() or None
+    code, out = sandbox_exec(cfg, "git -C /opt/prime-agent describe --tags --always --dirty && git -C /opt/prime-agent rev-parse HEAD HEAD^{tree}", timeout=30)
+    source = out.strip().splitlines() if code == 0 else []
+    v["prime_agent_source_tag"] = source[0] if len(source) == 3 else None
+    v["prime_agent_source_commit"] = source[1] if len(source) == 3 else None
+    v["prime_agent_source_tree"] = source[2] if len(source) == 3 else None
     code, out = sandbox_exec(cfg, "echo gbrain --version >> /sandbox/.pc-ver.sh; export HOME=/sandbox; gbrain --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1", timeout=60)
     v["gbrain"] = out.strip() or None
     code, out = sandbox_exec(cfg, "echo psql-version >> /sandbox/.pc-ver.sh; export PATH=/usr/lib/postgresql/16/bin:$PATH; psql -h localhost -p 5433 -U gbrain -d postgres -tc 'select version();' 2>&1 | grep -oE 'PostgreSQL [0-9.]+' | head -1", timeout=60)
@@ -2512,11 +2596,11 @@ def _validate_checks(cfg, args):
     code, out = sandbox_exec(cfg, "ls /tmp/prime-agent-*/daemon.sock 2>/dev/null | head -1", timeout=30)
     sock = out.strip().splitlines()[-1] if out.strip() else ""
     checks.append(("daemon-socket", True, bool(sock), sock or "missing"))
-    code, out = sandbox_exec(cfg, "export PATH=/sandbox/.npm-global/bin:$PATH; prime-agent status 2>/dev/null | grep -q daemon.sock && echo A=yes || echo A=no", timeout=30)
+    code, out = sandbox_exec(cfg, "export PATH=/usr/local/bin:$PATH; prime-agent status 2>/dev/null | grep -q daemon.sock && echo A=yes || echo A=no", timeout=30)
     checks.append(("daemon-persists", True, "A=yes" in out, ""))
 
     # 4. persistent REPL holds state (two-turn set/read).
-    js = ("import { ReplKernelManager } from '/sandbox/.npm-global/lib/node_modules/prime-agent/dist/core/kernel/repl-manager.js';\n"
+    js = ("import { ReplKernelManager } from '/opt/prime-agent/packages/coding-agent/src/core/kernel/repl-manager.ts';\n"
           "const k = new ReplKernelManager({ sessionId: 'pc-validate-repl', cwd: '/sandbox' });\n"
           "await k.start();\n"
           "await k.execute('pc_v = 40 + 1');\n"
@@ -2524,7 +2608,7 @@ def _validate_checks(cfg, args):
           "console.log('REPL_VAL=' + (r.result ?? '').trim());\n"
           "await k.shutdown?.();\n")
     b64 = base64.b64encode(js.encode()).decode()
-    code, out = sandbox_exec(cfg, "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"; echo " + b64 + " | base64 -d > /tmp/pc-repl.mjs; node /tmp/pc-repl.mjs 2>&1 | grep REPL_VAL", timeout=300)
+    code, out = sandbox_exec(cfg, "export NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\" TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json; echo " + b64 + " | base64 -d > /tmp/pc-repl.mts; /opt/prime-agent/node_modules/.bin/tsx /tmp/pc-repl.mts 2>&1 | grep REPL_VAL", timeout=300)
     m = re.search(r"REPL_VAL=(\S+)", out)
     checks.append(("persistent-repl", True, bool(m and m.group(1) == "42"),
                    "state=%s" % (m.group(1) if m else None)))
@@ -2536,7 +2620,7 @@ def _validate_checks(cfg, args):
     checks.append(("no-key-on-disk", True, out.strip() == "", ""))
     auth_env = ("export ANTHROPIC_API_KEY=\"$api_key\"\n"
                 if bool(inference.get("gateway")) else "")
-    bcall = ("export HOME=/sandbox PATH=/sandbox/.npm-global/bin:$PATH "
+    bcall = ("export HOME=/sandbox PATH=/usr/local/bin:$PATH "
              "NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"\n" + auth_env +
              "prime-agent -p --no-tools --no-session --model " + shlex.quote(model) + " \"Reply with exactly: AGENT_OK\" "
              "2>&1 | grep -viE \"undici|trace-warnings\"\n")
@@ -2599,7 +2683,7 @@ def _validate_checks(cfg, args):
     # 7. spawn/reap via DaemonClient RPC (cwd scoped; reaped cleanly).
     code, out = sandbox_exec(cfg, "git -C " + shlex.quote(spawn_dir) + " rev-parse --short HEAD 2>&1 | head -1", timeout=30)
     checks.append(("spawn-target", True, code == 0 and bool(out.strip()), out.strip()))
-    rpc = ("import { DaemonClient } from '/sandbox/.npm-global/lib/node_modules/prime-agent/dist/modes/daemon/daemon-client.js';\n"
+    rpc = ("import { DaemonClient } from '/opt/prime-agent/packages/coding-agent/src/modes/daemon/daemon-client.ts';\n"
            "const sock = process.argv[2], proj = process.argv[3], model = process.argv[4], name = process.argv[5];\n"
            "const c = new DaemonClient(sock); let sid;\n"
            "try { await c.connect();\n"
@@ -2617,11 +2701,11 @@ def _validate_checks(cfg, args):
     rb64 = base64.b64encode(rpc.encode()).decode()
     name = "pc-val-" + datetime.now(timezone.utc).strftime("%H%M%S")
     rpc_auth = " ANTHROPIC_API_KEY=\"$api_key\"" if inference.get("gateway") else ""
-    rshell = ("export HOME=/sandbox PATH=/sandbox/.npm-global/bin:$PATH NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"" + rpc_auth + "\n"
+    rshell = ("export HOME=/sandbox PATH=/usr/local/bin:$PATH TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json NODE_OPTIONS=\"--require /sandbox/.prime-claw/npm-onload.js\"" + rpc_auth + "\n"
               "prime-agent status >/dev/null 2>&1 || (nohup prime-agent --mode daemon --offline >/sandbox/.prime-claw/daemon.log 2>&1 & sleep 6)\n"
-              "echo " + rb64 + " | base64 -d > /tmp/pc-rpc.mjs\n"
+              "echo " + rb64 + " | base64 -d > /tmp/pc-rpc.mts\n"
               "for i in 1 2 3 4 5; do S=$(ls /tmp/prime-agent-*/daemon.sock 2>/dev/null | head -1); [ -n \"$S\" ] && break; sleep 2; done\n"
-              "node /tmp/pc-rpc.mjs \"$S\" " + shlex.quote(spawn_dir) + " " + shlex.quote(model) + " " + shlex.quote(name) + " 2>&1 | grep -E 'CREATED=|CWD=|KILL=|STILL=|RPC_ERR='\n")
+              "/opt/prime-agent/node_modules/.bin/tsx /tmp/pc-rpc.mts \"$S\" " + shlex.quote(spawn_dir) + " " + shlex.quote(model) + " " + shlex.quote(name) + " 2>&1 | grep -E 'CREATED=|CWD=|KILL=|STILL=|RPC_ERR='\n")
     sid = cwd = None; kill = False; still = True
     for _ in range(4):
         code, out = sandbox_exec(cfg, rshell, timeout=120)
