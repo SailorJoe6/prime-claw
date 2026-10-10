@@ -483,6 +483,13 @@ def _prime_agent_daemon_identity_probe_script() -> str:
     )
 
 
+def _prime_agent_daemon_identity_probe_shell() -> str:
+    """Use the pinned TypeScript client to verify an existing daemon without signaling it."""
+    probe64 = base64.b64encode(_prime_agent_daemon_identity_probe_script().encode()).decode()
+    return ("echo " + probe64 + " | base64 -d > /tmp/pc-daemon-identity.mts\n"
+            "/opt/prime-agent/node_modules/.bin/tsx /tmp/pc-daemon-identity.mts\n")
+
+
 def _required_prime_agent_version(cfg):
     """Reject stale/local/env selectors instead of silently installing v0.10."""
     selected = str(_cfg_get(cfg, "prime_agent_version", "PRIME_AGENT_VERSION",
@@ -2077,7 +2084,7 @@ def stage_prime_agent(cfg, args) -> int:
     # Ensure the episode daemon is running (cold-daemon recovery): start it
     # detached if absent and wait for the socket. The daemon auto-exits when
     # idle unless it is hosting a session, so this must be part of converge.
-    probe64 = base64.b64encode(_prime_agent_daemon_identity_probe_script().encode()).decode()
+    daemon_identity_probe = _prime_agent_daemon_identity_probe_shell()
     ensure_daemon = (
         "set -euo pipefail\n"
         "export HOME=/sandbox PATH=/usr/local/bin:$PATH TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json\n"
@@ -2093,8 +2100,7 @@ def stage_prime_agent(cfg, args) -> int:
         "  for i in $(seq 1 20); do [ -S \"$SOCK\" ] && break; sleep 1; done\n"
         "fi\n"
         "test -S \"$SOCK\"\n"
-        "echo " + probe64 + " | base64 -d > /tmp/pc-daemon-identity.mts\n"
-        "/opt/prime-agent/node_modules/.bin/tsx /tmp/pc-daemon-identity.mts\n")
+        + daemon_identity_probe)
     code, out = sandbox_exec(cfg, ensure_daemon, timeout=60)
     if code != 0 or "DAEMON_UP" not in out:
         print("error: daemon did not start with required build identity: " + out.strip()[-200:], file=sys.stderr)
@@ -2801,45 +2807,53 @@ def cmd_validate(cfg, args) -> int:
 
 
 # --------------------------------------------------------------------------
-# Slice 5 — recover (the operability slice). Codifies the Phase 1-discovered
-# recovery moves and proves a degrade-and-recover cycle (see docs/runbook.md).
-# Safe-by-default: only mutates when a degradation is actually detected, and
-# (except vpn-flap's gateway restart) the recovery is just `converge`.
+# Slice 5 — recover (the operability slice). Phase 1 history is in docs/runbook.md.
+# Current automated recovery is restricted to a confirmed Ready sandbox with
+# exact image-owned source and an absent daemon socket. Failed get, non-Ready,
+# stale/mismatched daemon, and unverified absence cannot trigger converge.
 # --------------------------------------------------------------------------
 RECOVERY_PLAN = {
-    "vpn-flap":     "restart the openshell gateway (brew services start openshell), then converge",
-    "gateway-flip": "create the sandbox on the ACTIVE gateway (config.gateway), then converge",
-    "recreate-wipe":"/sandbox was wiped by a recreate -> converge re-installs prime-agent + brain",
-    "cold-daemon":  "converge (stage_prime_agent auto-starts the daemon with a socket-wait)",
-    "none":         "no degradation detected; nothing to do",
+    # Absence is unverified by sandbox get failures. An image-owned source install
+    # cannot be repaired by converge after a /sandbox wipe or image mismatch.
+    "cold-daemon": "converge only on a verified Ready sandbox with exact source identity",
+    "none":        "no degradation detected; nothing to do",
 }
 
 
-def _gateway_sandbox_names(cfg):
-    code, out = run([OPENSHELL, "gateway", "list", "--output", "json"], timeout=30)
-    if code != 0:
-        return None
-    try:
-        gws = json.loads(out).get("items", [])
-    except json.JSONDecodeError:
-        return None
-    for g in gws:
-        if g.get("name") == cfg.get("gateway"):
-            return [s.get("name") for s in g.get("sandboxes", [])], g.get("cluster_ready")
-    return [], None
+def _recover_source_ready(cfg):
+    """An image-owned source mismatch is not an automatic converge repair."""
+    code, out = sandbox_exec(cfg, _prime_agent_source_gate_script(), timeout=60)
+    if code == 0 and f"source_identity={PRIME_AGENT_SOURCE_TAG}" in out:
+        return True
+    print("error: recover blocked: image-owned Prime Agent source identity is "
+          "missing, damaged, or unverified; converge cannot reinstall the image. "
+          "Inspect and get operator approval for an image repair.", file=sys.stderr)
+    return False
 
 
 def _daemon_socket_present(cfg):
-    # The socket FILE can outlive the daemon (a kill leaves it behind), so
-    # "present" must mean a live daemon process, not just the file.
-    # pgrep -f would match this probe's own bash command line (the pattern is
-    # in it), so match the daemon-catalog-entry.js file and exclude our shell.
-    code, out = sandbox_exec(
-        cfg,
-        "pgrep -af 'daemon-catalog-entry[.]js' 2>/dev/null | grep -v 'bash -c' | grep -q node "
-        "&& echo LIVE || echo DEAD",
-        timeout=30)
-    return "LIVE" in out
+    """Return true only for a socket whose daemon hello matches this source build.
+
+    A missing socket is a cold daemon. A failed socket check or stale/mismatched
+    hello is ambiguous and must not be classified as a repairable cold daemon.
+    """
+    code, out = sandbox_exec(cfg, "SOCK=/tmp/prime-agent-$(id -u)/daemon.sock; "
+                             "if [ -S \"$SOCK\" ]; then echo SOCKET_PRESENT; "
+                             "else echo SOCKET_MISSING; fi", timeout=30)
+    if code != 0:
+        raise ValueError("daemon socket state unverified; recovery blocked")
+    if "SOCKET_MISSING" in out:
+        return False
+    if "SOCKET_PRESENT" not in out:
+        raise ValueError("daemon socket state unverified; recovery blocked")
+    identity_shell = ("set -euo pipefail\n"
+                      "export HOME=/sandbox PATH=/usr/local/bin:$PATH "
+                      "TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json\n"
+                      + _prime_agent_daemon_identity_probe_shell())
+    code, out = sandbox_exec(cfg, identity_shell, timeout=30)
+    if code != 0 or "DAEMON_UP" not in out:
+        raise ValueError("daemon RPC build identity unverified; recovery blocked")
+    return True
 
 
 def _require_recover_ready(cfg, sandbox_probe):
@@ -2868,31 +2882,15 @@ def _require_recover_ready(cfg, sandbox_probe):
 
 
 def detect_degradations(cfg, args, sandbox_probe=None):
-    """Detect known degradations only after the existing sandbox is Ready."""
-    sigs = []
+    """Classify only a verified Ready image-owned source and daemon."""
     sandbox_probe = sandbox_probe if sandbox_probe is not None else probe_sandbox(cfg)
     if not _require_recover_ready(cfg, sandbox_probe):
         raise ValueError("recover requires an existing sandbox to be Ready")
-    phase, label, data = sandbox_probe
-    if data is not None:
-        # Sandbox exists under our pinned gateway and is Ready. Check for a recreate-wipe
-        # (prime-agent gone from /sandbox) and a cold daemon.
-        code, out = sandbox_exec(cfg, "test -x /sandbox/.npm-global/bin/prime-agent && echo ok", timeout=30)
-        if "ok" not in out:
-            sigs.append("recreate-wipe")
-        elif not _daemon_socket_present(cfg):
-            sigs.append("cold-daemon")
-        return sigs
-    # Sandbox absent from our gateway -> distinguish vpn-flap (gateway down,
-    # container survived) from gateway-flip (active_gateway moved).
-    listed = _gateway_sandbox_names(cfg)
-    if listed is None or (isinstance(listed, tuple) and listed[0] is None):
-        sigs.append("vpn-flap")            # gateway list itself failed -> gateway down
-    elif isinstance(listed, tuple) and cfg["sandbox_name"] in listed[0]:
-        sigs.append("vpn-flap")            # container survived on the gw, just not registered
-    else:
-        sigs.append("gateway-flip")        # container gone everywhere we can see
-    return sigs
+    if not _recover_source_ready(cfg):
+        raise ValueError("recover requires exact image-owned source identity")
+    if not _daemon_socket_present(cfg):
+        return ["cold-daemon"]
+    return []
 
 
 def cmd_destroy(cfg, args) -> int:
@@ -2968,35 +2966,29 @@ def cmd_recover(cfg, args) -> int:
         print("error: recover blocked: vpn-flap/gateway-flip require verified "
               "sandbox absence; --signature cannot certify absence.", file=sys.stderr)
         return 1
-    sigs = force or detect_degradations(cfg, args, sandbox_probe)
+    if force and force != ["cold-daemon"]:
+        print("error: recover blocked: unsupported forced signature; recreate-wipe "
+              "cannot reinstall image-owned source. Inspect and get operator "
+              "approval before any repair.", file=sys.stderr)
+        return 1
+    try:
+        sigs = detect_degradations(cfg, args, sandbox_probe)
+    except ValueError as exc:
+        print(f"error: recover blocked: {exc}", file=sys.stderr)
+        return 1
+    if force and sigs != force:
+        print("error: recover blocked: --signature cannot certify cold-daemon "
+              "when an exact daemon hello is live.", file=sys.stderr)
+        return 1
     if not sigs:
         print(f"recover: no degradation detected on sandbox '{name}'.")
         return 0
     print(f"recover: degradations detected: {', '.join(sigs)}")
     for s_ in sigs:
-        print(f"  - {s_}: {RECOVERY_PLAN.get(s_, 'converge')}")
+        print(f"  - {s_}: {RECOVERY_PLAN[s_]}")
 
-    # vpn-flap: the gateway daemon is down; restart it before converging.
-    if "vpn-flap" in sigs:
-        print("recover: restarting openshell gateway (brew services start openshell) ...")
-        run(["brew", "services", "start", "openshell"], timeout=60)
-        _sleep(5)
-        listed = _gateway_sandbox_names(cfg)
-        ready = isinstance(listed, tuple) and listed[1]
-        if not ready:
-            print("recover: gateway still not cluster_ready after restart.", file=sys.stderr)
-            print("recover: check VPN/network (GlobalProtect) and re-run.", file=sys.stderr)
-            return 1
-
-    # gateway-flip: the sandbox is absent under the active gateway -> recreate it.
-    if "gateway-flip" in sigs:
-        print(f"recover: sandbox absent under gateway '{cfg.get('gateway')}'; recreating "
-              f"(active_gateway flip).")
-        rc = stage_sandbox(cfg, args, force_fresh=True)
-        if rc != 0:
-            return rc
-
-    # recreate-wipe / cold-daemon (and the follow-through for the above): converge.
+    # A confirmed missing socket on a Ready sandbox can start the exact source
+    # daemon during converge. Existing/stale/mismatched daemons are not signaled.
     print("recover: converging ...")
     rc = cmd_converge(cfg, args)
     if rc != 0:
@@ -3004,6 +2996,7 @@ def cmd_recover(cfg, args) -> int:
         return rc
     print("recover: converge done. Run 'bin/prime-claw validate' to confirm green.")
     return 0
+
 
 def _not_implemented(verb):
     def _run(cfg, args):

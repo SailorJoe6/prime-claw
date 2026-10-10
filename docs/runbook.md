@@ -14,9 +14,11 @@ the verb.
 
 ## Golden rule
 
-`bin/prime-claw converge` is the idempotent repair for almost everything:
-it re-runs every stage in place and fixes drift (policy, provider env,
-prime-agent install, brain, spawn target) **without** recreating the sandbox.
+`bin/prime-claw converge` re-runs in-place stages for a verified `Ready`
+sandbox and can fix policy, provider, brain, and spawn-target drift **without**
+recreating it. The Prime Agent source is now image-owned: `converge` cannot
+reinstall a missing or mismatched `/opt/prime-agent` checkout. It fails the
+source identity gate before other Prime Agent stage writes.
 Use `recover` only after confirming the existing sandbox is `Ready`. An `Error`,
 other non-Ready, or unverified sandbox state is **not** a wipe or cold-daemon
 signature: `recover` now stops before sandbox exec, gateway restart, recreation,
@@ -74,13 +76,13 @@ bin/prime-claw --dry-run create
 | 0 | **brain-repository-not-configured** | `status` reports `brain-repository BAD`, or a repository-dependent command exits before any provider/sandbox action and names `PRIME_CLAW_BRAIN_REPO` plus `.prime-claw/runtime.local.json`. | Configure your own GitHub `owner/repository` slug using one of the two setup paths above. Do not add a tracked fallback or public/example brain. |
 | 1 | **vpn-flap** | GlobalProtect VPN drops -> the openshell gateway daemon (17670) dies and the sandbox container is killed. `status` may show the sandbox absent, but a failed get does not prove absence. | Diagnose gateway/network and sandbox state first; `recover` now blocks if sandbox get fails rather than automatically restarting and converging. Obtain approval for a specific repair. |
 | 2 | **gateway-flip** | `active_gateway` in `~/.openshell/config.yaml` was flipped off `openshell` (e.g. by a NemoClaw tool). Sandbox get may fail under the wrong gateway. | Diagnose and re-pin `active_gateway: openshell` only with operator approval. `recover` blocks an unverified absence; it will not automatically recreate. **Never** point prime-claw at the `nemoclaw` gateway. |
-| 3 | **recreate-wipe** | A sandbox recreate wipes `/sandbox` -> prime-agent and the brain are gone even though the sandbox shows Ready. | `bin/prime-claw converge` (re-installs both). `recover` detects the missing install and converges. |
-| 4 | **cold-daemon** | The prime-agent daemon isn't running (no `/tmp/prime-agent-*/daemon.sock`) -> spawn times out. | `bin/prime-claw converge` — `stage_prime_agent` auto-starts the daemon (`--mode daemon --offline`) with a socket-wait. |
+| 3 | **recreate-wipe** (historical) | A recreate can wipe writable `/sandbox` state even if the image-owned Prime Agent checkout still exists. | Automatic `recreate-wipe` recovery is disabled. Preserve and inspect brain/Postgres/home state, and seek a separate operator-approved recovery; `converge` cannot reinstall image-owned source or restore wiped data. |
+| 4 | **cold-daemon** | On a verified `Ready` sandbox with exact image-owned source, the daemon socket is absent. A stale socket or wrong daemon RPC build identity is **not** a verified cold daemon. | Only this verified signature can enter `recover` -> `converge`; `stage_prime_agent` starts the source daemon (`--mode daemon --offline`) and checks its RPC hello. Stale/mismatched socket or unverified source blocks before `converge`. |
 | 5 | **drift** | Sandbox/policy/provider drifted from expected; `status` shows a mismatch. | `bin/prime-claw converge`. |
 | 6 | **brain-clone-401** | `create`/`converge` fails at stage `brain-clone` with `remote: Invalid username or token` (exit 128). | First check the stage script class of bug: the clone URL must expand `${api_token}` in-sandbox (double-quoted — see `docs/derisk/3a-slice1.md` for the Slice-1 root cause). If the code is right, verify the provider token is current: `gh auth token` vs the provider (`openshell provider get prime-claw-github`); a rotated token re-syncs automatically on the next run via the conditional-refresh hash (`.prime-claw-github-token.sha256`). Worst case: `destroy` + `create` for a clean placeholder binding. |
 | 7 | **credentialed-endpoints-dead-after-converge** | After a `converge`, the sandbox's credentialed calls (inference and/or git push) suddenly 401/403 even though nothing "changed". | Cause: a `provider update` bumped the provider's resource version, re-keying the placeholder set, while the running sandbox still holds the OLD placeholders. Recovery: `bin/prime-claw destroy` + `create` (binds fresh placeholders). Prevention is built in: only selected credential-provider stages run, and each skips no-op updates (D3a-J). If you rotate a credential by hand, run `converge` then recreate. |
 | 8 | **vpn-down-rbac-403** | Sandbox credentialed calls (embed, inference, clone) fail with `403 RBAC: access denied` (body from istio-envoy, no rate-limit headers) while the SAME real key returns 200 from the host. | The host VPN (GlobalProtect) is down — corporate policy forces re-login ~daily. Check `zetup vpn status`; connect with `zetup vpn connect` (Okta push). No provider/sandbox changes needed; placeholders are unaffected. Diagnose this FIRST before touching providers ( bead prime-claw-z56 ports the ensure-vpn auto-check). |
-| 9 | **daemon-no-provider-auth** | Daemon RPC can create a session, but `prompt_and_wait` fails preflight with `No API key found for <provider>`. | The daemon was started before the current provider placeholders/config were staged. Run `bin/prime-claw converge`; `stage_prime_agent` now deliberately restarts the daemon so it inherits the current placeholder environment. Do not inspect `/proc/<pid>/environ` — OpenShell blocks it. |
+| 9 | **daemon-no-provider-auth** | Daemon RPC can create a session, but `prompt_and_wait` fails preflight with `No API key found for <provider>`. | The daemon may predate the current provider placeholders/config. Do **not** assume `converge` restarts an existing daemon: the source stage deliberately does not kill or signal it. Preserve state and seek a separately supervised restart plan. Do not inspect `/proc/<pid>/environ` — OpenShell blocks it. |
 | 10 | **codex-placeholder-adapter-failure** | An explicitly selected `openai-codex` model fails locally with `Failed to extract accountId from token`, or remote calls 401 despite valid host OAuth. | Run `converge` and verify: host `settings.json` selects the intended `openai-codex` model; sandbox `settings.json` hash matches host; sandbox auth access is synthetic and refresh/accountId begin `openshell:resolve:`; `prime-claw-codex` is attached; `npm-onload.js` is staged. Never copy the real host auth file to the sandbox. |
 
 ## Teardown
@@ -109,27 +111,32 @@ Rebuild from scratch afterwards with `bin/prime-claw create` (fresh bring-up).
   OpenShell network policy is deny-by-default egress, so there is no host-side
   port to expose. Host access, when needed, is via `bin/prime-claw` / `openshell
   sandbox exec`, not a forwarded port.
-- **cold-daemon nuance**: an unclean daemon kill leaves a stale
-  `/tmp/prime-agent-*/daemon.sock` **and** a `daemon.sock.lock` directory;
-  the supervisor refuses to start (`ELOCKED`) until both are removed. The
-  daemon also auto-exits when it holds no session, so a truly idle sandbox may
-  have no daemon — `converge` (stage_prime_agent) cleans the lock and restarts
-  it. `recover` handles this only when the sandbox is confirmed `Ready`.
+- **cold-daemon nuance**: an unclean daemon kill may leave a stale
+  `/tmp/prime-agent-*/daemon.sock` and a `daemon.sock.lock` directory. The
+  supervisor can refuse to start (`ELOCKED`). `recover` does not delete them
+  or signal a daemon: a present socket with a failed or wrong-build RPC hello
+  blocks automatic recovery. A truly absent socket on an exact-source `Ready`
+  sandbox is the only automatic cold-daemon path. Seek operator approval for
+  any stale-lock or running-daemon repair.
 - **Single-gateway discipline**: prime-claw runs ONLY on the `openshell`
   gateway (17670, homebrew v0.0.116). `active_gateway` stays pinned to
   `openshell`. The `nemoclaw` gateway registration is stale and FORBIDDEN.
 - **If a 403 istio-envoy RBAC recurs** against `ai-gateway.zende.sk`, FIRST
   check VPN/network health (GlobalProtect) before suspecting the policy.
-- **Recreate wipes `/sandbox`** — after any recreate, re-run `converge`. Never
-  `docker restart`; delete + recreate.
+- **Recreate can wipe writable `/sandbox` state** — preserve and inspect the
+  retained data before any approved lifecycle repair. Image-owned Prime Agent
+  source does not restore PostgreSQL, brain, or home state. Do not use
+  `docker restart`, delete/recreate, or broad `converge` as an unapproved fix.
 - **Credentials** enter only via OpenShell providers (L7). No real key is ever
   on sandbox disk. `validate` proves this on every run.
 
 ## Demonstrated degrade-and-recover
 
-Slice 5's acceptance evidence is a live degrade-and-recover cycle (see
-`docs/evidence/recover-<utc>.json`): a known degradation is induced,
-`bin/prime-claw recover` runs, and `bin/prime-claw validate` returns green.
+Slice 5's historical acceptance evidence is a live degrade-and-recover cycle
+(see `docs/evidence/recover-<utc>.json`): a known degradation was induced,
+`bin/prime-claw recover` ran, and `bin/prime-claw validate` returned green.
+That older test does not prove a later image-owned source install, a stale
+source-daemon repair, or recovery of the active v2 `Error` sandbox.
 
 
 ## Home embedding preflight fails (Slice 4A)

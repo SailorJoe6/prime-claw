@@ -1,9 +1,10 @@
 # TypeScript Prime Agent v0.9.8-r1 isolated image candidate
 
-Status: **isolated image proof PASS; runtime branch under review** for source
-provenance, offline kernel, extension loading, and no-model daemon/RPC smoke.
-Two legacy recovery-detection paths still require correction before a branch
-merge can be proposed. This is **not** an active-v2 recovery,
+Status: **isolated candidate PASS; not merged or active** for source provenance,
+offline kernel, extension loading, no-model daemon/RPC smoke, host-safe tests,
+and independent recovery-safety re-review. The two legacy recovery-detector
+issues found in independent review were corrected in the isolated branch.
+This is **not** an active-v2 recovery,
 Prime Claw runtime cutover, merge, user-global refresh, or credentialed model
 acceptance. `prime-claw-lph` stays open for the separately approved remaining
 work. The earlier version-only/Rust candidate is rejected and remains documented
@@ -63,9 +64,33 @@ no host mounts or credentials, and `--network none` after construction.
    A no-model RPC created a session in `/sandbox`, confirmed its cwd, killed
    it, and confirmed it was absent. The disposable container was stopped and
    auto-removed. No model/provider network call was made.
-4. Host-safe `python3 -m pytest tests/ -q`: **671 passed, 86 skipped,
-   75 subtests passed**, 11 existing `load_module()` deprecation warnings.
+4. Host-safe `python3 -m pytest tests/ -q`: **718 passed, 86 skipped,
+   75 subtests passed** after integration of the fail-closed guard and
+   fork-source docs, 11 existing `load_module()` deprecation warnings.
    `git diff --check` passed. No plugin source file was changed.
+
+## Integrated recovery safety review
+
+An independent read-only review found that the old `/sandbox/.npm-global`
+installer test and `daemon-catalog-entry.js` process grep would misclassify a
+healthy image-owned TypeScript runtime and trigger broad `converge`. The
+isolated branch integrated the separately pushed P0 fail-closed guard: Error,
+Stopped, unknown, and failed `sandbox get` block `recover` before sandbox
+exec, gateway restart, recreation, or converge; dry-run returns nonzero with
+no recovery-safety verdict. The remediation removed the old install/process
+probes. `recover` now checks the **exact image-owned source identity** first
+and recognizes only a missing socket on a verified Ready sandbox as automatic
+`cold-daemon`. A present socket must pass a TypeScript `DaemonClient` hello
+with the required build ID/version; stale or mismatched hello blocks.
+`--signature` cannot override absence, source identity, or a live daemon.
+The source itself cannot be reinstalled by `converge` after a wipe.
+
+A separate Docker-only, network-disabled disposable default-socket daemon
+probe ran the exact new helper against the final image and returned
+`DAEMON_UP`. It was stopped and auto-removed. An independent read-only
+follow-up review reported no remaining actionable in-scope BLOCK. The
+focused recover/converge/validate tests passed (99 passed). No active-v2
+repair was run.
 
 ## Remaining boundaries
 

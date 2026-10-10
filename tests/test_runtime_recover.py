@@ -44,10 +44,21 @@ def test_recover_dry_run_no_calls(monkeypatch, capsys, signature):
     assert "no recovery plan or safety verdict" in out
 
 
+def _source_and_daemon_exec(*, socket="present", hello="DAEMON_UP"):
+    def fake_exec(_cfg, script, timeout=30):
+        if "source_identity=" in script:
+            return 0, "source_identity=cwd-fix-v0.9.8-r1"
+        if "SOCKET_PRESENT" in script:
+            return 0, "SOCKET_PRESENT" if socket == "present" else "SOCKET_MISSING"
+        if "pc-daemon-identity.mts" in script:
+            return (0, hello) if hello == "DAEMON_UP" else (1, hello)
+        raise AssertionError("unexpected sandbox exec during recover")
+    return fake_exec
+
+
 def test_recover_healthy_is_noop(monkeypatch, capsys):
     monkeypatch.setattr(pc, "probe_sandbox", lambda c: ("Ready", "Ready", {"phase": "Ready"}))
-    monkeypatch.setattr(pc, "sandbox_exec", lambda c, s, timeout=30: (0, "ok"))  # install present
-    monkeypatch.setattr(pc, "_daemon_socket_present", lambda c: True)
+    monkeypatch.setattr(pc, "sandbox_exec", _source_and_daemon_exec())
     conv = {"n": 0}
     monkeypatch.setattr(pc, "cmd_converge", lambda c, a: conv.__setitem__("n", conv["n"] + 1) or 0)
     rc = pc.cmd_recover(cfg(), Args())
@@ -57,15 +68,18 @@ def test_recover_healthy_is_noop(monkeypatch, capsys):
 
 def test_detect_cold_daemon(monkeypatch):
     monkeypatch.setattr(pc, "probe_sandbox", lambda c: ("Ready", "Ready", {"phase": "Ready"}))
-    monkeypatch.setattr(pc, "sandbox_exec", lambda c, s, timeout=30: (0, "ok"))  # install present
-    monkeypatch.setattr(pc, "_daemon_socket_present", lambda c: False)  # but no socket
+    monkeypatch.setattr(pc, "sandbox_exec", _source_and_daemon_exec(socket="missing"))
     assert pc.detect_degradations(cfg(), Args()) == ["cold-daemon"]
 
 
-def test_detect_recreate_wipe(monkeypatch):
+def test_detect_source_identity_mismatch_fails_closed(monkeypatch, capsys):
     monkeypatch.setattr(pc, "probe_sandbox", lambda c: ("Ready", "Ready", {"phase": "Ready"}))
-    monkeypatch.setattr(pc, "sandbox_exec", lambda c, s, timeout=30: (1, ""))  # install gone
-    assert pc.detect_degradations(cfg(), Args()) == ["recreate-wipe"]
+    monkeypatch.setattr(pc, "sandbox_exec", lambda c, s, timeout=30: (1, ""))
+    monkeypatch.setattr(pc, "_daemon_socket_present", lambda c: (_ for _ in ()).throw(
+        AssertionError("no daemon inference after source mismatch")))
+    with pytest.raises(ValueError, match="image-owned source identity"):
+        pc.detect_degradations(cfg(), Args())
+    assert "converge cannot reinstall the image" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("signature", ["", "gateway-flip", "vpn-flap", "recreate-wipe", "cold-daemon"])
@@ -76,7 +90,7 @@ def test_recover_failed_get_is_not_verified_absence(monkeypatch, capsys, signatu
     def forbidden(*_args, **_kwargs):
         raise AssertionError("unverified absence must not trigger recovery")
 
-    for name in ("sandbox_exec", "_gateway_sandbox_names", "run", "_sleep",
+    for name in ("sandbox_exec", "_recover_source_ready", "run", "_sleep",
                  "stage_sandbox", "cmd_converge"):
         monkeypatch.setattr(pc, name, forbidden)
     assert pc.cmd_recover(cfg(), Args(signature=signature)) == 1
@@ -96,20 +110,60 @@ def test_failed_get_cli_is_not_evidence_of_absence(monkeypatch, capsys):
 
 def test_detect_failed_get_does_not_guess_gateway_flip(monkeypatch):
     monkeypatch.setattr(pc, "probe_sandbox", lambda c: (None, "not found", None))
-    monkeypatch.setattr(pc, "_gateway_sandbox_names", lambda c: (_ for _ in ()).throw(
-        AssertionError("no gateway inference allowed")))
+    monkeypatch.setattr(pc, "_recover_source_ready", lambda c: (_ for _ in ()).throw(
+        AssertionError("no source probe or gateway inference allowed")))
     with pytest.raises(ValueError, match="Ready"):
         pc.detect_degradations(cfg(), Args())
 
 
 def test_recover_ready_cold_daemon_converges(monkeypatch, capsys):
     monkeypatch.setattr(pc, "probe_sandbox", lambda c: (True, "Ready", {"phase": "Ready"}))
-    monkeypatch.setattr(pc, "sandbox_exec", lambda c, s, timeout=30: (0, "ok"))
-    monkeypatch.setattr(pc, "_daemon_socket_present", lambda c: False)
+    monkeypatch.setattr(pc, "sandbox_exec", _source_and_daemon_exec(socket="missing"))
     conv = {"n": 0}
     monkeypatch.setattr(pc, "cmd_converge", lambda c, a: conv.__setitem__("n", conv["n"] + 1) or 0)
     assert pc.cmd_recover(cfg(), Args()) == 0
     assert "cold-daemon" in capsys.readouterr().out and conv["n"] == 1
+
+
+def test_recover_ready_mismatched_source_never_converges(monkeypatch, capsys):
+    monkeypatch.setattr(pc, "probe_sandbox", lambda c: (True, "Ready", {"phase": "Ready"}))
+    monkeypatch.setattr(pc, "sandbox_exec", lambda c, s, timeout=30: (1, "source mismatch"))
+    monkeypatch.setattr(pc, "cmd_converge", lambda c, a: (_ for _ in ()).throw(
+        AssertionError("image source cannot be repaired by converge")))
+    assert pc.cmd_recover(cfg(), Args()) == 1
+    assert "image-owned Prime Agent source identity" in capsys.readouterr().err
+
+
+def test_recover_stale_socket_or_wrong_hello_fails_closed(monkeypatch, capsys):
+    monkeypatch.setattr(pc, "probe_sandbox", lambda c: (True, "Ready", {"phase": "Ready"}))
+    monkeypatch.setattr(pc, "sandbox_exec", _source_and_daemon_exec(hello="wrong build"))
+    monkeypatch.setattr(pc, "cmd_converge", lambda c, a: (_ for _ in ()).throw(
+        AssertionError("stale socket must not converge")))
+    assert pc.cmd_recover(cfg(), Args()) == 1
+    assert "daemon RPC build identity unverified" in capsys.readouterr().err
+
+
+def test_recover_force_recreate_wipe_is_not_a_source_repair(monkeypatch, capsys):
+    monkeypatch.setattr(pc, "probe_sandbox", lambda c: (True, "Ready", {"phase": "Ready"}))
+    monkeypatch.setattr(pc, "sandbox_exec", lambda *_a, **_kw: (_ for _ in ()).throw(
+        AssertionError("unsupported signature blocked before sandbox exec")))
+    monkeypatch.setattr(pc, "cmd_converge", lambda c, a: (_ for _ in ()).throw(
+        AssertionError("no converge")))
+    assert pc.cmd_recover(cfg(), Args(signature="recreate-wipe")) == 1
+    assert "cannot reinstall image-owned source" in capsys.readouterr().err
+
+
+def test_daemon_detection_uses_socket_and_rpc_not_catalog_filename(monkeypatch):
+    calls = []
+    def exec_record(c, script, timeout=30):
+        calls.append(script)
+        return _source_and_daemon_exec()(c, script, timeout)
+    monkeypatch.setattr(pc, "sandbox_exec", exec_record)
+    assert pc._daemon_socket_present(cfg()) is True
+    assert len(calls) == 2 and "SOCKET_PRESENT" in calls[0]
+    assert "pc-daemon-identity.mts" in calls[1]
+    assert "daemon-catalog-entry[.]js" not in "".join(calls)
+    assert "hello.runtime?.buildId" in pc._prime_agent_daemon_identity_probe_script()
 
 
 @pytest.mark.parametrize("signature", ["vpn-flap", "gateway-flip"])
@@ -122,13 +176,19 @@ def test_force_absence_signature_blocked_even_when_ready(monkeypatch, capsys, si
     assert "cannot certify absence" in capsys.readouterr().err
 
 
-def test_recover_signature_forces_detection(monkeypatch, capsys):
-    # --signature forces signature selection, but still checks readiness.
+def test_recover_signature_requires_detected_cold_daemon(monkeypatch, capsys):
     monkeypatch.setattr(pc, "probe_sandbox", lambda c: (True, "Ready", {"phase": "Ready"}))
+    monkeypatch.setattr(pc, "sandbox_exec", _source_and_daemon_exec(socket="missing"))
     monkeypatch.setattr(pc, "cmd_converge", lambda c, a: 0)
     rc = pc.cmd_recover(cfg(), Args(signature="cold-daemon"))
     out = capsys.readouterr().out
     assert rc == 0 and "cold-daemon" in out
+
+    monkeypatch.setattr(pc, "sandbox_exec", _source_and_daemon_exec())
+    monkeypatch.setattr(pc, "cmd_converge", lambda c, a: (_ for _ in ()).throw(
+        AssertionError("forced healthy daemon cannot converge")))
+    assert pc.cmd_recover(cfg(), Args(signature="cold-daemon")) == 1
+    assert "cannot certify cold-daemon" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("data", [
@@ -147,7 +207,7 @@ def test_recover_existing_nonready_fails_closed(monkeypatch, capsys, data, signa
         raise AssertionError("non-Ready sandbox must not enter recovery")
 
     monkeypatch.setattr(pc, "probe_sandbox", probe)
-    for name in ("sandbox_exec", "_daemon_socket_present", "_gateway_sandbox_names",
+    for name in ("sandbox_exec", "_daemon_socket_present", "_recover_source_ready",
                  "run", "_sleep", "stage_sandbox", "cmd_converge"):
         monkeypatch.setattr(pc, name, forbidden)
     assert pc.cmd_recover(cfg(), Args(signature=signature)) == 1
