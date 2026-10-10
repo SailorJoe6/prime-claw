@@ -71,6 +71,8 @@ following the openclaw-setup pattern.)
   stopped v1 read-only preservation inventory, unknowns and owner decision boundary.
 - [derisk/3a-storage-v2-copy-build.md](derisk/3a-storage-v2-copy-build.md) —
   versioned v2 copy/build, restored-state checks and owner review boundary.
+- [derisk/3a-storage-v2-active-target.md](derisk/3a-storage-v2-active-target.md) —
+  primary-checkout v2 runtime-target binding and status compatibility limit.
 
 ## Runtime (Phase 2)
 
