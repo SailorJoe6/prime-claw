@@ -400,6 +400,8 @@ function migrateExpectedSkillSymlink(projectRoot: string, asset: AssetDefinition
 
 function removeEmptyLegacy(projectRoot: string): string[] {
   const legacyRoot = join(projectRoot, ".ralph", "skills");
+  try { assertSafePathAncestors(projectRoot, legacyRoot); }
+  catch { return [relative(projectRoot, legacyRoot)]; }
   let rootStat;
   try { rootStat = lstatSync(legacyRoot); } catch { return []; }
   if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) return [relative(projectRoot, legacyRoot)];
