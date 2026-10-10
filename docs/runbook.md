@@ -71,6 +71,26 @@ and on the accepted replacement. Do not manually unlink the socket/lock or
 infer a running daemon from `test -S`; require a successful RPC build-ID hello.
 Never assume a `Ready` phase alone proves application health.
 
+On this recovery the supervised cold start used PostgreSQL's
+`/usr/lib/postgresql/16/bin/pg_ctl -D /sandbox/pgdata -l /sandbox/pg.log -w start
+-o '-c listen_addresses=localhost -p 5433 -c unix_socket_directories=/sandbox'`
+inside the accepted sandbox, after checking that the database was not already
+serving. With source identity and zero live daemon owners checked, it launched
+`/usr/local/bin/prime-agent --mode daemon --offline` using `HOME=/sandbox`,
+`PRIME_AGENT_KERNEL_VENV=/sandbox/kernel-venv`,
+`TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json`, and the existing
+`npm-onload.js` preload. Require PostgreSQL counts and an RPC hello with
+`cwd-fix-v0.9.8-r1` build ID afterward, not merely a socket file. The exact
+checks and retained state are in the linked acceptance evidence.
+
+`bin/prime-claw status` currently reports the provider check as `BAD` because
+OpenShell 0.0.116 rejects the provider-list `--output json` option used by that
+read-only probe (tracked as `prime-claw-zwg.3`). A direct provider listing
+showed all three attached providers, and separate source/daemon/model/data
+checks passed. Do not mistake that status false negative for an expired login
+or run `validate`/`converge` to make it green. Conversely, do not infer model
+health from the CLI's socket-presence check alone.
+
 ## Required one-time brain repository setup
 
 A fresh checkout has no brain repository by design. Add your GitHub `owner/repository` slug to

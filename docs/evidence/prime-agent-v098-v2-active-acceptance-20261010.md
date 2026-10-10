@@ -97,8 +97,45 @@ installed on the host or changed in this candidate.
 
 This proves a healthy replacement runtime, not authorization for brain source
 sync, index rebuild, routed writes, Qwen cutover, or removal of the v1/v2
-fallback/checkpoint. The primary ignored target and tracked runtime code must
-be reconciled to this exact sandbox/image, then read-only status and final
-preservation/security checks must pass. `converge` and `validate` were not run:
+fallback/checkpoint. At initial capture the primary ignored target still
+pointed to the original Error sandbox; the separate primary landing and
+read-only checks are recorded below. `converge` and `validate` were not run:
 the former includes brain/index writes and the latter a validator page plus
-temporary policy change. The separate provider-status defect remains tracked.
+temporary policy change. The provider-status defect remains tracked.
+
+## Primary landing and read-only target acceptance
+
+The reviewed branch commit `6dd2ece3744c97931875b58a7c255dcc706c7859`
+was merged into primary `main` as `c3938fe055e0cf45af848e0ab5023c2721fd72a3`.
+Primary merged-tree tests passed **724 passed, 65 skipped, 75 subtests
+passed**. The candidate test suite above ran on its separate branch; neither
+test run applied a user-global plugin or invoked brain/index writes.
+
+The existing ignored `.prime-claw/runtime.local.json` was updated atomically
+and remains mode `0600`. Only `sandbox_name=prime-claw-v2r1013` and
+`image=prime-claw-brain:pa098-ts-v2root-a1faacd53ac4` were added/changed;
+the other operator-local values were unchanged. Tracked
+`config/runtime.json` remains a portable default, not the active routing
+record. The primary `bin/prime-claw status` header resolves to the **exact**
+replacement name and image tag, and its gateway, sandbox, PostgreSQL,
+gbrain-command, and daemon-socket checks return OK. Its provider check is a
+**known false negative**: OpenShell 0.0.116 rejects `sandbox provider list
+--output json` with `unexpected argument '--output'`. Thus `status` exits 1;
+we do **not** claim an all-green status. `prime-claw-zwg.3` tracks this
+read-only CLI compatibility defect separately. A direct provider list exited
+0 and showed all three expected providers.
+
+Independent of that status implementation, fresh primary-target probes passed:
+OpenShell `Ready` with the exact sandbox ID and effective policy; Docker
+running with the same container ID, immutable image ID, and exactly the three
+working-volume mounts; PostgreSQL counts/dimensions unchanged in both
+separate databases; source gate on fork/tag/commit/tree/lockfile/launcher;
+daemon RPC hello with pinned build ID plus list; and the bounded selected
+model call returned `AGENT_OK` after target promotion. The auth projection
+still contained only synthetic access and OpenShell refresh/account
+placeholders, mode `0600`, and the current provider binding. The original v2
+remained the same `Error` OpenShell ID, v1 remained the same retained `Error`
+ID, and original/checkpoint/working volumes all remained present. The
+original and checkpoint full manifests were equal after all replacement
+activity. No source sync, index rebuild, routed write, Qwen cutover, or
+fallback cleanup was performed to obtain these results.
