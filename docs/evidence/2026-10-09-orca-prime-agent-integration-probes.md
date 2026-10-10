@@ -1,6 +1,6 @@
 # Orca and Prime Agent integration probe matrix
 
-Status: **complete — design frozen** for `prime-claw-h6w.33.1`
+Status: **evidence frozen** for `prime-claw-h6w.33.1`
 
 This document records reproducible evidence used to freeze the Orca/Prime Agent
 boundary for `prime-claw-h6w.33`. It distinguishes installed-build contracts,
@@ -30,9 +30,10 @@ assumptions in this matrix.
 | Prime Agent TUI | `0.9.8` | rendered Orca terminal screen | authoritative for probe runtime |
 | Prime Agent source | `0.9.8`, build `cwd-fix-v0.9.8-r1`, commit `a1faacd53ac4473a75de1d434afaf50945c2f647` | clean checkout pinned by the installed guard shim | version-matched source authority |
 
-The installed Orca guide advertises `pi` as a known `--agent` ID, but the live
-launcher test below failed because it invoked a missing executable named `pi`.
-Runtime evidence therefore overrides the advertised capability for this host.
+The installed Orca guide advertises `pi` as a known TUI-agent ID. It is not the
+Prime Agent provider ID. The live negative probe below confirmed that `pi` tries
+to execute a separate `pi` binary. Orca's scheduled-task metadata and native
+provider registry instead identify Prime Agent as `prime-agent`.
 
 ## Matrix
 
@@ -40,23 +41,25 @@ Runtime evidence therefore overrides the advertised capability for this host.
 |---|---|---|---|
 | L1 | Exact repo lookup by path | PASS | `orca repo show --repo path:<absolute-root> --json` returns one stable repo ID. |
 | L2 | No-parent worktree creation and identity | PASS | Create returned full worktree ID, `identity.key`, instance ID, host/setup IDs, exact path, branch, head, base ref, `parentWorktreeId: null`, and terminal handle. |
-| L3 | Built-in `--agent pi --prompt` | **FAIL** | Worktree creation succeeded, but its terminal printed `zsh: command not found: pi`; no Prime Agent session or prompt admission occurred. |
+| L3 | Built-in `--agent pi --prompt` | PASS / negative distinction | The launcher tried a separate missing `pi` executable. `pi` is not Orca's Prime Agent provider ID and must not be used for Prime Claw. |
 | L4 | `tui-idle` as sole startup proof | **FAIL** | Orca returned `satisfied: true` for the idle fallback shell after `pi` failed. A rendered-screen or process/provider check is also required. |
-| L5 | Explicit `terminal create --command prime-agent` | PASS | Prime Agent 0.9.8 started in the exact worktree and rendered a ready prompt with the correct CWD. |
-| L6 | Orca terminal prompt admission | CONSTRAINT | `terminal send` returned `accepted: true` and `input_accepted`, but provider/observation were `unsupported`; rendered output proved the turn and exact response. |
+| L5 | Native `--agent prime-agent --prompt` | PASS / UX only | Orca created one separate linked worktree and one background Prime Agent visual tab without changing the operator's selected workspace. The combined call cannot preserve deterministic bundle promotion before execute, so it is not the final lifecycle sequence. |
+| L6 | Explicit `terminal create --command prime-agent` diagnostic | PASS / not preferred | The generic terminal primitive starts Prime Agent, but it is not the desired native provider UX and its prompt receipt lacks provider-aware observation. |
 | L7 | Fresh Prime Agent identity visibility | PASS | Prime Agent roster and Orca search resolved the same fresh session ID `01a12300-0f5c-72e8-9fe0-18783b414c07` and exact worktree CWD. |
 | L8 | Native Conversation-to-Episode messaging | PASS | `agent_message` delivered to the idle top-level sibling and the sibling returned `NATIVE_ACK H6W33_5233F46C6B` natively. |
 | L9 | Native transcript observation | CONSTRAINT | Family roster exposes status/identity, but `get_agent`/`recent_messages` could not hydrate this root sibling. Orca rendered terminal reads and search remained observable. |
 | L10 | Exact local cleanup | PASS | Terminal bulk close reported one stopped/closed; terminal list was empty; exact worktree show returned `selector_not_found`; Git worktree and branch were absent; setup deletion removed the scratch repo record. |
 | L11 | Prime Agent audit retention | PASS / retained | The supported cleanup removed runtime resources but retained the session JSONL at `/Users/jlanders/.prime/agent/sessions/01a12300-0f5c-72e8-9fe0-18783b414c07.jsonl`. No supported session-delete contract was assumed. |
 | L12 | Prompt-free launch plus native first assignment | PASS | A fresh `prime-agent` terminal appeared as the only exact-CWD sibling before any prompt; native `agent_message` delivered the first assignment and returned `NATIVE_FIRST_ACK H6W33_NATIVE_D42A9D76`. |
+| L13 | Prepared existing worktree → transient disabled automation → reusable Prime Agent session | PASS | After deterministic worktree mutation and commit, a disabled existing-workspace automation with `provider: prime-agent` and `reuseSession: true` admitted the assignment, retained the visible idle tab, and could be removed without stopping or removing that tab. |
 | R1 | Orca/Prime Agent resume across Orca restart | PASS / contract | Orca handles are runtime-scoped and must be re-listed; path-scoped search returns the durable session file/resume command. No live shared-runtime restart is required for the design. |
 | R2 | Prime Agent daemon restart/recovery | PASS / contract | Version-matched source/tests preserve durable session ID/file across reopen while routing ID may change; recovery refreshes `activeSessionId`. |
 | H1 | Project host/setup picker records | PASS | Ready setup rows, routing environment, stable setup ID, labels, one-vs-many gate, cancellation, and noninteractive behavior are frozen. |
 | H2 | Remote worktree plus exact bundle transport | DISABLED | Prime Claw has no ready remote setup, and Orca 1.4.223 exposes no exact local-bundle/patch/file transport into a remote worktree. |
-| A1 | Orca automations/orchestration boundary | PASS | Responsibility matrix is frozen from installed guides and Prime Agent contracts; Episode supervision does not need Orca automations or supervised orchestration. |
-| D1 | Existing-file versus upstream-template review UX | CONSTRAINT | Orca supports Git working/staged ADE diffs only. Arbitrary two-file/external-template comparison uses an honest terminal `git diff --no-index`; no staged-copy workaround. |
-| S1 | `session_start` reconcile before Episode assignment | PASS / design | Target launch sends no Orca initial prompt: wait for rendered/daemon Prime Agent readiness, bind exact durable identity, then admit the fixed ordinary daemon prompt. Awaited startup handlers therefore precede assignment. |
+| B1 | Branch selection and naming | PASS / surface distinction | Orca's GUI supports generated names, explicit `branchNameOverride`, new-branch creation, and existing-branch reuse. The installed RPC contract carries `branchNameOverride`; the 1.4.223 CLI wrapper does not expose it. Automated v1 records the CLI-created branch instead of misclassifying this as an Orca product limitation. |
+| A1 | Orca automations/orchestration boundary | PASS | A short-lived disabled automation is the supported CLI seam for native-provider launch in an already-prepared worktree. It is removed after successful admission; later Episode supervision uses Prime Agent messaging and never adds Orca Run/Task/Dispatch. |
+| D1 | Existing-file versus upstream-template review UX | PASS / explicit user gate | First explain that review will temporarily change the file and foreground its Orca worktree, then wait for the user to say they are ready; cancellation before readiness changes nothing. After approval, hold the overwrite while the focused diff is reviewed, then restore on completion/cancel/error and verify clean. A tab-open receipt is insufficient. Never invoke OS GUI-control/Accessibility APIs for this flow without separate explicit approval. Refuse dirty/non-restorable paths; preserve ambiguous interruption; `git diff --no-index` remains fallback. |
+| S1 | Prepared bundle before Episode assignment | PASS / runtime and source | Create the worktree without an agent, deterministically promote and commit the approved bundle, then launch the native provider through a disabled existing-workspace automation. The live agent read state committed before launch; Prime Agent also awaits `session_start` handlers before its first model turn. |
 | C1 | `session_compact` oversight reinjection | PASS / design | Post-compaction hook ordering is proven. The target appends one non-turn full-guide message per actual qualifying compact event; no receipt, consumed state, replay redaction, or duplicate-event protocol. |
 | F1 | Safe local fallback failure classes | PASS / design | Fallback is limited to definite pre-mutation local Orca unavailability. Any created/ambiguous Orca resource stays Orca-owned and is reconciled by exact identities; never create a duplicate direct fallback. |
 
@@ -185,10 +188,97 @@ Verified final state:
 - Prime Agent session JSONL intentionally retained as an audit artifact:
   `/Users/jlanders/.prime/agent/sessions/01a12300-0f5c-72e8-9fe0-18783b414c07.jsonl` (26725 bytes at cleanup).
 
-## Native-first assignment probe
+## Native Prime Agent provider and background-session UX
 
-A second isolated fixture tested the intended target sequence without using
-Orca's broken `--agent pi` launcher and without sending any terminal prompt:
+The operator identified that Orca scheduled tasks already create visible Prime
+Agent sessions. Read-only `orca automations list --json` receipts confirmed that
+those tasks use `agentId: "prime-agent"`, not `pi`. The installed automation
+contract describes Orca prompts run by a chosen provider in a selected existing
+workspace or new-per-run worktree.
+
+Two isolated native-provider probes then ran:
+
+```text
+orca worktree create \
+  --repo path:/Users/jlanders/code/prime-claw \
+  --name <unique-name> --no-parent \
+  --agent prime-agent \
+  --prompt '<unique harmless assignment>' \
+  --json
+```
+
+The first probe also passed `--activate`. It proved the provider contract but
+switched the operator's current Orca view to the new workspace. Removing that
+fixture caused Orca to fall back to `main`. This is not the accepted Episode UX;
+Prime Claw must never add `--activate` for background Episode creation.
+
+The second probe deliberately omitted `--activate`. Orca returned:
+
+- a distinct linked worktree at
+  `/Users/jlanders/code/prime-claw/prime-claw-background-session-probe-011734`;
+- branch `refs/heads/JLanders/prime-claw-background-session-probe-011734`;
+- `createdWithAgent: "prime-agent"` and `startupAgent: "prime-agent"`;
+- one startup terminal, one tab, one pane, and `surface: "background"`;
+- terminal metadata with `agentIdentity: "prime-agent"`;
+- a visual layout whose active tab was titled from the assignment.
+
+The rendered session showed Prime Agent 0.9.8 at the exact worktree CWD and
+completed the assignment with:
+
+```text
+PRIME_CLAW_BACKGROUND_READY
+```
+
+Fresh path-scoped Orca search resolved durable Prime Agent session
+`01a12363-25e1-72de-b560-30f0832e1501`, its retained JSONL, exact CWD, and
+resume command. The operator simultaneously confirmed that `main` remained
+selected and that the new worktree/session appeared separately in Orca:
+"That worked perfectly." This is the accepted Episode creation UX.
+
+Cleanup stopped and closed the single fixture-owned terminal, removed the exact
+Orca worktree and Git branch, and verified the path and selector were absent.
+The JSONL remains as audit evidence at
+`/Users/jlanders/.prime/agent/sessions/01a12363-25e1-72de-b560-30f0832e1501.jsonl`.
+
+That direct combined call proves the desired background UX, but the final EXPERT
+review found that it starts the assignment before Prime Claw can promote an
+approved future-plan bundle into active `.ralph/plans`. A provisioning record
+does not put uncommitted approved content into the new checkout.
+
+### Promotion-before-launch and transient automation probe
+
+The final sequence probe preserved both requirements:
+
+1. `orca worktree create` created the background worktree without an agent or
+   prompt.
+2. The deterministic tool wrote and committed a marker standing in for the
+   exact approved-bundle promotion.
+3. Prime Claw created a disabled, existing-workspace Orca automation with
+   `provider: prime-agent`, `reuseSession: true`, and the fixed assignment.
+4. `orca automations run` admitted the assignment manually.
+
+The first run returned `PROMOTION_PRECEDES_PROVIDER_READY`, proving the native
+provider read state committed before its launch. A second reusable-session run
+returned `PERSISTENT_PROMOTION_SESSION_READY` and left one connected visual
+terminal with `agentIdentity: "prime-agent"` after the run completed.
+
+A final independent fixture proved that this automation can be only a launch
+shim. After `TRANSIENT_LAUNCHER_READY`, `orca automations remove` deleted the
+disabled automation and its run history while the same Prime Agent terminal,
+tab, pane, and visual layout remained connected and writable. Later supervision
+therefore needs no automation: retain the durable Prime Agent session and Orca
+worktree/tab identities and use native `agent_message`.
+
+The automation is disabled before its manual run, so it can never fire on its
+placeholder schedule. If creation, dispatch, or removal is uncertain, preserve
+and reconcile the exact automation, run, worktree, terminal, and durable session
+identities; do not create another workspace or assignment. Promotion failure
+occurs before provider launch and therefore admits no execute turn.
+
+## Earlier prompt-free assignment diagnostic
+
+A second earlier isolated fixture tested a prompt-free sequence before the
+native `prime-agent` provider path was identified:
 
 ```text
 orca worktree create --repo id:<repo-id> --name <unique-name> \
@@ -217,13 +307,12 @@ NATIVE_FIRST_ACK H6W33_NATIVE_D42A9D76
 ```
 
 A fresh, path-scoped Orca search resolved the same durable session ID, exact
-CWD, retained JSONL, and resume command. This proves that the prompt-free process is a native messageable root sibling
-before any assignment. The deterministic creation tool should launch Prime
-Agent without an Orca prompt, wait for positive rendered and daemon readiness,
-bind the only new exact-CWD durable identity, and admit the fixed assignment
-through Prime Agent's ordinary daemon `prompt` command. Native `agent_message`
-then owns later Conversation/Episode supervision. Orca `--prompt` and `terminal
-send` do not own assignment admission.
+CWD, retained JSONL, and resume command. This proves that a prompt-free Prime
+Agent process is a native messageable root sibling before any assignment. It
+remains useful recovery evidence, but it is not the preferred creation UX now
+that Orca's native `prime-agent` provider path is proven. Native
+`agent_message` still owns later Conversation/Episode supervision after Orca
+admits the initial assignment.
 
 Cleanup closed and stopped both fixture-owned terminal surfaces, verified an
 empty exact-worktree terminal list, removed the worktree and branch, deleted
@@ -297,6 +386,22 @@ That is evidence about the current implementation, not the accepted target.
 - `worktree rm` attempts branch deletion but retains pre-existing or unproven
   unmerged branches. Verify worktree, filesystem, and branch state separately.
 
+### Branch capability correction
+
+The operator correctly reported that Orca's GUI offers generated branch names,
+a `Branch name` field, `Create new branch`, and `Reuse branch`. Exact installed
+1.4.223 package inspection confirmed `branchNameOverride` in
+`out/shared/rpc-contract/worktree-create-params.js` and in the renderer creation
+flow. `orca worktree create --help` and `orca agent-context --json` omit that
+field from the CLI surface.
+
+The design must therefore distinguish capabilities accurately: Orca supports
+branch choice, but the current supported automation CLI cannot request the GUI's
+explicit override or reuse mode. Prime Claw v1 records the branch returned by
+the CLI. It may expose explicit custom/reused branch selection later when Orca
+adds a supported non-GUI surface; it must not call private renderer code or claim
+that Orca as a product owns the branch name.
+
 ## Startup, compaction, and fallback contract
 
 Prime Agent 0.9.8 awaits `session_start` handlers serially during extension
@@ -306,18 +411,34 @@ an awaited startup handler and never starts a model turn. Conflict or degraded
 results are reported in the same session; automatic startup does not attempt to
 turn extension failure into a second approval or recovery protocol.
 
-The selected Episode launch avoids the startup-prompt race entirely:
+The selected Episode launch uses Orca's native provider while preserving
+promotion and startup ordering:
 
-1. create the Orca worktree with no agent or prompt, pass the approved base ref,
-   and treat the returned branch/head as authoritative (Orca exposes no target
-   branch-name flag);
-2. create a terminal running `prime-agent`;
-3. require positive rendered Prime Agent readiness at the exact CWD;
-4. resolve exactly one new top-level sibling at that CWD;
-5. persist durable `sessionId`/`sessionFile` plus current routing ID;
-6. have the deterministic lifecycle tool admit the fixed ordinary daemon prompt
-   exactly once with no busy queue; use native `agent_message` for later
-   Conversation/Episode supervision.
+1. persist a provisioning ownership record for the exact approved folder,
+   project-host setup, base ref, and one creation operation before mutation;
+2. create the Orca worktree with no agent, prompt, or `--activate`; record the
+   returned identity, path, generated branch, and head;
+3. deterministically overlay the exact approved folder, promote it into active
+   `.ralph/plans`, verify the canonical checkout is unchanged, and commit the
+   promotion in the Episode worktree;
+4. create a disabled existing-workspace automation with `provider: prime-agent`,
+   `reuseSession: true`, and the one fixed execute assignment, then run it
+   manually;
+5. require successful assignment admission, a connected background visual tab,
+   positive rendered readiness at the exact CWD, and exactly one new durable
+   root session; persist its session/file and current route;
+6. remove the disabled launch automation after successful binding; prove that
+   the Prime Agent tab remains connected; transition ownership to active; and
+   use native `agent_message` for every later supervision turn.
+
+Prime Agent awaits `session_start` handlers before interactive prompt processing,
+so deterministic project reconciliation also completes before the first model
+turn. Promotion itself occurs before provider launch and does not depend on the
+model. Promotion failure admits no assignment. Any ambiguous worktree,
+automation, run, prompt, or removal result is reconciled against the provisioning
+record and exact Orca/session identities; it is never retried as a new create or
+new assignment. A retained disabled automation is recoverable launch residue,
+not a scheduler for Episode continuation.
 
 Prime Agent saves a compaction entry and rebuilds session messages before it
 awaits `session_compact`. For each actual qualifying compact event, the target
@@ -394,7 +515,7 @@ it is not an implementation choice left to `.33.3`.
 | Orca worktrees and terminals | Git checkout placement, local/remote execution host, PTY/process hosting, rendered observation, human ADE tabs, exact workspace cleanup/reconciliation. |
 | Orca search | Host-scoped session discovery and durable Prime Agent session-file/resume evidence. It is not a cross-host identity registry. |
 | Orca orchestration | Reserved for explicit supervised worker DAGs, inboxes, gates, and settlement. Prime Claw's normal one-Conversation/one-Episode lifecycle does not create a Run/Task/Dispatch layer. |
-| Orca automations | User-scheduled Orca prompt runs only. They do not drive Episode continuation or replace Prime Agent heartbeats. |
+| Orca automations | User schedules plus one narrow lifecycle exception: a disabled, manually-run, existing-workspace automation launches the native reusable Prime Agent session after promotion, then is removed. It never drives continuation or replaces Prime Agent heartbeats. |
 | Prime Agent fresh session | Durable agent transcript/context, kernel, queue, native schedules, and session identity inside the Orca-hosted process. |
 | Prime Agent `agent_message`/`agent_observe` | Direct Conversation↔Episode sibling messaging and roster state. Delivery is not completion; direct root-sibling transcript hydration is not relied on. |
 | Prime Agent RLM | Recursive in-session delegation only. It does not provide Git/worktree isolation. |
@@ -411,51 +532,103 @@ orca file open-changed [--mode edit|diff|both] [--worktree <selector>] [--focus]
 ```
 
 It has no arbitrary two-file, external-path, or alternate-base compare command.
-For a customized asset versus a new upstream template, v1 must use a
-deterministic read-only terminal comparison:
+The accepted normal workflow uses Git's existing committed customized version as
+the restore source and treats operator review as a bounded live state:
 
-```text
-git diff --no-index -- <upstream-template> <customized-file>
-```
+1. tell the user that the review will temporarily replace the tracked file and
+   foreground its Orca worktree; wait for an explicit ready response, and make
+   no mutation or focus change if the user cancels;
+2. after readiness, require the target to be a clean tracked regular file with
+   no staged or unstaged changes;
+3. temporarily write the upstream template into that same worktree path;
+4. call `orca file diff <path> --worktree <exact-selector> --focus`; the user's
+   confirmation that the comparison is visible is the readiness proof, while an
+   `opened: true` receipt alone is insufficient;
+5. keep the temporary overwrite unchanged while the operator reviews; do not
+   restore merely because the open command returned;
+6. wait for the operator to explicitly complete or cancel review; and
+7. in finally-equivalent cleanup run `git restore --worktree -- <path>`, then
+   verify both the worktree and index are clean for that path. This workflow
+   uses Orca's supported file command and conversational confirmation only; it
+   must not invoke macOS Accessibility, Orca Computer Use, or another OS GUI
+   control surface without a separate explicit user request.
 
-Exit 1 means differences, not command failure. Prime Claw may also open the
-current project file with `orca file open`, but must not stage files or copy a
-template into the worktree merely to force Orca's Git diff editor. Native ADE
-two-file comparison is an Orca product gap, not a Prime Claw implementation
-surface.
+The corrected lifetime fixture was
+`prime-claw-template-review-lifetime-0150`, worktree identity
+`wt2:local:8fa4e493-4152-42f7-a97b-0c15406c103c`, prepared commit `bcc5974`.
+A focused Orca view visibly rendered
+`CUSTOMIZED_COMMITTED_VERSION` versus `UPSTREAM_TEMPLATE_VERSION` while a
+separate check returned `REVIEW_DIFF_STILL_HELD`; only after that observation
+did completion cleanup return `REVIEW_COMPLETE_RESTORED_CLEAN`. The same
+fixture returned `REVIEW_CANCELLED_RESTORED_CLEAN` for cancellation and
+`REVIEW_ERROR_RESTORED_CLEAN` after an injected selector failure. Its guard
+accepted the clean tracked regular file but rejected a pre-dirty tracked file
+and a tracked symlink. The worktree, terminal, path, and fixture branch were
+then removed.
+
+The probe also exposed a UX/safety defect in its own procedure. `--focus`
+foregrounded the disposable worktree without advance notice, and an attempted
+`orca computer get-app-state --restore-window` observation triggered a macOS
+Accessibility-control permission prompt. The operator rejected both surprises.
+The product contract therefore requires the readiness gate above and forbids
+Computer Use or OS accessibility control in this flow without separate explicit
+approval. The runtime probe did not grant that permission, and cleanup confirmed
+that no disposable worktree, terminal, path, or branch remained.
+
+No byte backup, staging, or commit is needed. If the file is already dirty,
+untracked, a symlink, or otherwise not safely restorable from Git, refuse this
+workflow. `git diff --no-index` remains an honest terminal fallback when a
+two-file comparison is still useful. An interruption can leave the known
+upstream template as an ordinary visible working-tree change. Recovery must not
+auto-restore or overwrite uncertain later edits: preserve the path, report the
+suspected interrupted review, show the committed customized version and current
+content, and require an explicit restore/keep decision. The fixture detected
+this state as `INTERRUPTED_REVIEW_DETECTED_PRESERVE_AND_REQUIRE_DECISION`, then
+proved an explicit restore returned `INTERRUPTED_REVIEW_MANUALLY_RESTORED_CLEAN`.
 
 ## Independent final review
 
-An independent read-only EXPERT review used `openai-codex/gpt-6-astra` at
-maximum reasoning against the completed matrix, retained probe evidence,
-installed Orca 1.4.223 contracts, version-matched Prime Agent 0.9.8 source, and
-the frozen parent Bead. It reported no material in-contract findings.
-
-The reviewer specifically confirmed the ordinary-daemon-prompt/native-later-
-messaging split, explicit remote and transcript-hydration constraints, durable
-restart identities, post-compaction non-turn guide message, pre-mutation-only
-fallback, and absence of the rejected receipt/replay/orchestration complexity.
+The first independent read-only EXPERT review used
+`openai-codex/gpt-6-astra` at maximum reasoning against the earlier candidate.
+After the operator corrected the launcher and GUI behavior, a second review
+found two material conflicts: the combined create-and-prompt path ran execute
+before deterministic bundle promotion, and parent design §27 still prescribed a
+superseded ordinary-daemon first assignment. The promotion-before-launch
+transient-automation proof and the corrected single provider-admission contract
+address those findings. The final review found one remaining lifetime gap: the
+first diff fixture restored before proving lazy-loaded content remained visible.
+The focused lifetime fixture and explicit user-ready/complete/cancel gate above
+resolve it. No other material in-contract finding remained, so this matrix is
+frozen for implementation.
 
 ## Current design impact
 
-1. Replace the assumed `worktree create --agent pi --prompt` path with
-   worktree creation without a prompt, explicit `terminal create --command
-   prime-agent`, rendered/daemon readiness, exact-CWD durable session binding,
-   and one ordinary daemon assignment prompt.
+1. Create the Orca worktree without an agent, prompt, or activation; promote
+   and commit the exact approved bundle; then use one disabled, manually-run,
+   reusable existing-workspace automation to launch `prime-agent` and admit the
+   fixed assignment. Remove the automation after binding without stopping the
+   visible background session.
 2. Store durable Prime Agent session ID/file and Orca worktree identity. Treat
    terminal handles and `activeSessionId` as refreshable routes.
 3. Use Orca terminal/search observation alongside Prime Agent roster and native
    messaging; do not depend on direct root-sibling transcript hydration.
 4. Disable remote Episode placement in v1. There is no ready remote Prime Claw
    setup or exact approved-bundle transport contract.
-5. Keep normal Episode supervision on native Prime Agent messaging plus
-   goals/heartbeats. Do not add Orca orchestration or automations to the ordinary
-   lifecycle.
-6. Use terminal `git diff --no-index` for customized-versus-upstream template
-   review. Orca's ADE supports only Git working/staged diffs.
-7. Implement startup reconcile as an awaited no-turn handler and compaction
+5. Keep later Episode supervision on native Prime Agent messaging plus
+   goals/heartbeats. Do not add Orca orchestration or retain an automation after
+   native session launch succeeds.
+6. Before any template overwrite or foreground switch, explain the visible
+   effect and wait for the user to say they are ready. Then review a clean
+   tracked customized template through the focused Orca working-tree diff,
+   hold it until explicit completion/cancel, and verify `git restore`. Use no
+   OS GUI-control/Accessibility API without separate approval; retain
+   `git diff --no-index` only as a terminal fallback.
+7. Record the CLI-generated branch while accurately documenting that Orca's GUI
+   and internal RPC support explicit branch override/reuse that the current CLI
+   does not expose.
+8. Implement startup reconcile as an awaited no-turn handler and compaction
    reinjection as one durable non-turn guide message per qualifying compaction,
    without authorization hashes, receipts, consumed state, or replay redaction.
-8. Permit direct local fallback only for definitive pre-mutation Orca
+9. Permit direct local fallback only for definitive pre-mutation Orca
    unavailability. Preserve and reconcile every admitted or ambiguous Orca
    mutation instead of creating a duplicate workspace.
