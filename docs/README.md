@@ -63,6 +63,9 @@ prime-claw builds on four prior projects. Read these before designing:
 - [goal-heartbeat-work-control.md](goal-heartbeat-work-control.md) — the
   neutral-kernel/managed-guide work-control split, retired-extension migration,
   and coordinated Gate B activation boundary.
+- [user-stories/](user-stories/) — the current plugin's outcome-level user
+  stories, split by lifecycle area, with implementation surfaces and candidate
+  simplification seams kept separate from the stories themselves.
 - [evidence/2026-10-09-orca-prime-agent-integration-probes.md](evidence/2026-10-09-orca-prime-agent-integration-probes.md)
   — the completed evidence matrix and frozen Orca/Prime Agent responsibility
   boundary for `prime-claw-h6w.33`.
