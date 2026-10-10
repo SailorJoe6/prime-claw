@@ -13,6 +13,8 @@ agentic capabilities.
   three-horizon context model, and why prime-agent.
 - [LONG_RANGE_PLAN.md](LONG_RANGE_PLAN.md) — the long-range, manual-first build order.
 - [docs/](docs/README.md) — design docs and lineage notes.
+- [Supported Prime Agent installation](docs/prime-agent-installation.md) — the
+  mandatory fork-source identity and Docker-only build path.
 
 ## What this repo is (and is not)
 

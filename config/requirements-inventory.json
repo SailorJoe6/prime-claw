@@ -1158,7 +1158,7 @@
     {
       "id": "R-T1-2",
       "priority": "P1",
-      "summary": "Tier-1 exact selector and offline product boundary: PRIME_AGENT_PINNED uses the vendor installer; PRIME_AGENT_SOURCE uses the canonical disposable read-only-source builder and validated run-owned release. Runtime networks are verified absent before artifact identity, explicit-root apply/check, or validated RPC probes.",
+      "summary": "Tier-1 supported candidate policy requires PRIME_AGENT_SOURCE to select the exact maintained fork identity, with canonical disposable read-only-source builder and validated run-owned release. Existing fixture provenance does not yet enforce the fork tag/commit/tree/lockfile/build-ID identity; verify it independently until that gate exists. PRIME_AGENT_PINNED vendor-installer coverage remains historical only, not a supported candidate path. Runtime networks are verified absent before artifact identity, explicit-root apply/check, or validated RPC probes.",
       "status": "pinned mode owner-accepted in Slice 1; published source candidate f0441325 owner-rejected for bounded F1/F2 correction; replacement pending",
       "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
       "proven_by": {

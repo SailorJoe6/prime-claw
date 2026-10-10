@@ -60,11 +60,17 @@ startup. The durable source belongs under `src/prime-agent-plugin/`.
 
 ## Supported runtime
 
-Prime Claw is pinned to Prime Agent v0.9.8. Do not install, activate, test-cut
-over, or claim compatibility with v0.10 through this workflow. A future change
-requires released upstream Orca support for CWD plus lifecycle, identity, and
-finality integration and new acceptance evidence; Prime Claw does not patch or
-vendor Prime Agent to supply it.
+Prime Claw is pinned to the maintained TypeScript downstream release
+`SailorJoe6/prime-agent@cwd-fix-v0.9.8-r1`. The only supported candidate
+installation is the verified Docker-only source build documented in
+[prime-agent-installation.md](prime-agent-installation.md). A plain `0.9.8`
+version result is insufficient because the current public installer can select a
+different Rust/native product that cannot load this plugin.
+
+Do not install, activate, test-cut over, or claim compatibility with v0.10
+through this workflow. A future change requires released upstream Orca support
+for CWD plus lifecycle, identity, and finality integration and new acceptance
+evidence; Prime Claw does not patch or vendor Prime Agent to supply it.
 
 ## Apply or refresh
 
