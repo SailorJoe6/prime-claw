@@ -106,8 +106,11 @@ temporary policy change. The provider-status defect remains tracked.
 ## Primary landing and read-only target acceptance
 
 The reviewed branch commit `6dd2ece3744c97931875b58a7c255dcc706c7859`
-was merged into primary `main` as `c3938fe055e0cf45af848e0ab5023c2721fd72a3`.
-Primary merged-tree tests passed **724 passed, 65 skipped, 75 subtests
+was pushed on the isolated candidate branch. The same tested patch set was
+integrated linearly into primary `main` by the required `pull --rebase` step;
+its recovery commit there is `a4850c0f8d090713acdc5ac909137f78e1d7ab8a`.
+The tracked tree was unchanged by this rebase. Primary merged-tree tests
+passed **724 passed, 65 skipped, 75 subtests
 passed**. The candidate test suite above ran on its separate branch; neither
 test run applied a user-global plugin or invoked brain/index writes.
 
