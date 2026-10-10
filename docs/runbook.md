@@ -17,10 +17,17 @@ the verb.
 `bin/prime-claw converge` is the idempotent repair for almost everything:
 it re-runs every stage in place and fixes drift (policy, provider env,
 prime-agent install, brain, spawn target) **without** recreating the sandbox.
-Reach for `recover` when you don't know *which* degradation you have, or for
-the two failures converge alone can't fix (a down gateway, an active-gateway
-flip). Exception: an unaccepted `home-qwen` selection fails ordinary lifecycle commands closed;
-use the explicit canonical-profile recovery command in the Slice 4A section below.
+Use `recover` only after confirming the existing sandbox is `Ready`. An `Error`,
+other non-Ready, or unverified sandbox state is **not** a wipe or cold-daemon
+signature: `recover` now stops before sandbox exec, gateway restart, recreation,
+or converge, including with `--signature`. `sandbox get` errors do not prove
+absence, so automatic vpn-flap/gateway-flip recovery is withheld until a safe
+absence check exists. Inspect the sandbox state and get operator approval for
+a specific repair; do not treat `--dry-run recover` as a safety check (it does
+not probe, prints no recovery plan, and exits nonzero). Do not run `converge`
+blindly on an Error sandbox. An unaccepted `home-qwen` selection also fails
+ordinary lifecycle commands closed; use the explicit canonical-profile
+recovery command in the Slice 4A section below.
 
 ## Required one-time brain repository setup
 
@@ -65,8 +72,8 @@ bin/prime-claw --dry-run create
 | # | Signature | How you notice | Recovery |
 |---|-----------|----------------|----------|
 | 0 | **brain-repository-not-configured** | `status` reports `brain-repository BAD`, or a repository-dependent command exits before any provider/sandbox action and names `PRIME_CLAW_BRAIN_REPO` plus `.prime-claw/runtime.local.json`. | Configure your own GitHub `owner/repository` slug using one of the two setup paths above. Do not add a tracked fallback or public/example brain. |
-| 1 | **vpn-flap** | GlobalProtect VPN drops -> the openshell gateway daemon (17670) dies and the sandbox container is killed. `status` shows the sandbox absent; `openshell gateway list` fails. | `brew services start openshell`, then `bin/prime-claw converge`. `recover` does both. |
-| 2 | **gateway-flip** | `active_gateway` in `~/.openshell/config.yaml` was flipped off `openshell` (e.g. by a NemoClaw tool). The sandbox is absent under the active gateway. | Re-pin `active_gateway: openshell`, then `bin/prime-claw recover` (recreates on the active gateway + converge). **Never** point prime-claw at the `nemoclaw` gateway. |
+| 1 | **vpn-flap** | GlobalProtect VPN drops -> the openshell gateway daemon (17670) dies and the sandbox container is killed. `status` may show the sandbox absent, but a failed get does not prove absence. | Diagnose gateway/network and sandbox state first; `recover` now blocks if sandbox get fails rather than automatically restarting and converging. Obtain approval for a specific repair. |
+| 2 | **gateway-flip** | `active_gateway` in `~/.openshell/config.yaml` was flipped off `openshell` (e.g. by a NemoClaw tool). Sandbox get may fail under the wrong gateway. | Diagnose and re-pin `active_gateway: openshell` only with operator approval. `recover` blocks an unverified absence; it will not automatically recreate. **Never** point prime-claw at the `nemoclaw` gateway. |
 | 3 | **recreate-wipe** | A sandbox recreate wipes `/sandbox` -> prime-agent and the brain are gone even though the sandbox shows Ready. | `bin/prime-claw converge` (re-installs both). `recover` detects the missing install and converges. |
 | 4 | **cold-daemon** | The prime-agent daemon isn't running (no `/tmp/prime-agent-*/daemon.sock`) -> spawn times out. | `bin/prime-claw converge` — `stage_prime_agent` auto-starts the daemon (`--mode daemon --offline`) with a socket-wait. |
 | 5 | **drift** | Sandbox/policy/provider drifted from expected; `status` shows a mismatch. | `bin/prime-claw converge`. |
@@ -107,7 +114,7 @@ Rebuild from scratch afterwards with `bin/prime-claw create` (fresh bring-up).
   the supervisor refuses to start (`ELOCKED`) until both are removed. The
   daemon also auto-exits when it holds no session, so a truly idle sandbox may
   have no daemon — `converge` (stage_prime_agent) cleans the lock and restarts
-  it. `recover` handles all of this.
+  it. `recover` handles this only when the sandbox is confirmed `Ready`.
 - **Single-gateway discipline**: prime-claw runs ONLY on the `openshell`
   gateway (17670, homebrew v0.0.116). `active_gateway` stays pinned to
   `openshell`. The `nemoclaw` gateway registration is stale and FORBIDDEN.
