@@ -2842,12 +2842,40 @@ def _daemon_socket_present(cfg):
     return "LIVE" in out
 
 
-def detect_degradations(cfg, args):
-    """Detect known degradations. Returns a list of signatures (empty = healthy)."""
+def _require_recover_ready(cfg, sandbox_probe):
+    """Refuse automated recovery of an existing sandbox outside Ready.
+
+    An Error sandbox can reject exec; that failure is not evidence that its
+    /sandbox volume was wiped. Keep the observed phase distinct from absence.
+    """
+    _, _, data = sandbox_probe
+    if data is None:
+        # `probe_sandbox` also returns None on timeout, CLI errors, or bad JSON.
+        # It cannot certify absence, so gateway-flip/recreation is unsafe too.
+        print(f"error: recover blocked: sandbox {cfg['sandbox_name']!r} readiness "
+              "and absence are unverified (sandbox get failed); do not infer "
+              "gateway-flip. Inspect state and get operator approval before "
+              "any repair or recreation.", file=sys.stderr)
+        return False
+    phase = data.get("phase") if isinstance(data, dict) else None
+    if phase != "Ready":
+        print(f"error: recover blocked: existing sandbox {cfg['sandbox_name']!r} "
+              f"is phase={phase!r}, not Ready; do not infer a wipe or cold daemon "
+              "from failed sandbox exec. Inspect state and get operator approval "
+              "before any repair or recreation.", file=sys.stderr)
+        return False
+    return True
+
+
+def detect_degradations(cfg, args, sandbox_probe=None):
+    """Detect known degradations only after the existing sandbox is Ready."""
     sigs = []
-    phase, label, data = probe_sandbox(cfg)
+    sandbox_probe = sandbox_probe if sandbox_probe is not None else probe_sandbox(cfg)
+    if not _require_recover_ready(cfg, sandbox_probe):
+        raise ValueError("recover requires an existing sandbox to be Ready")
+    phase, label, data = sandbox_probe
     if data is not None:
-        # Sandbox exists under our pinned gateway. Check for a recreate-wipe
+        # Sandbox exists under our pinned gateway and is Ready. Check for a recreate-wipe
         # (prime-agent gone from /sandbox) and a cold daemon.
         code, out = sandbox_exec(cfg, "test -x /sandbox/.npm-global/bin/prime-agent && echo ok", timeout=30)
         if "ok" not in out:
@@ -2925,13 +2953,22 @@ def cmd_recover(cfg, args) -> int:
     if _require_brain_repo(cfg, "recover") is None:
         return 1
     if getattr(args, "dry_run", False):
-        print("dry_run: recover = detect degradations (vpn-flap / gateway-flip / "
-              "recreate-wipe / cold-daemon), restart the gateway if down, converge, "
-              "re-validate.")
-        return 0
+        print("dry_run: no recovery plan or safety verdict: sandbox readiness is "
+              "unverified. No runtime probe or mutation was run. Inspect the "
+              "sandbox and obtain operator approval before recovery.")
+        return 1
     name = cfg["sandbox_name"]
+    # This check precedes even --signature, which only overrides signature
+    # selection; it never certifies that an Error sandbox is safe to repair.
+    sandbox_probe = probe_sandbox(cfg)
+    if not _require_recover_ready(cfg, sandbox_probe):
+        return 1
     force = [s.strip() for s in str(getattr(args, "signature", "") or "").split(",") if s.strip()]
-    sigs = force or detect_degradations(cfg, args)
+    if any(s in ("vpn-flap", "gateway-flip") for s in force):
+        print("error: recover blocked: vpn-flap/gateway-flip require verified "
+              "sandbox absence; --signature cannot certify absence.", file=sys.stderr)
+        return 1
+    sigs = force or detect_degradations(cfg, args, sandbox_probe)
     if not sigs:
         print(f"recover: no degradation detected on sandbox '{name}'.")
         return 0
