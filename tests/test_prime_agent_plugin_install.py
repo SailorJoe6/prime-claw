@@ -207,8 +207,10 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
     home = f"{base}/home"
     apply = f"{base}/primary/scripts/apply-prime-agent-plugin.sh"
     check = f"{base}/primary/scripts/check-prime-agent-plugin.sh"
+    redirected_user_agents = f"{base}/redirected-user-agents"
     runtime_env = {
         "HOME": home,
+        "PRIME_CLAW_USER_AGENTS_ROOT": redirected_user_agents,
     }
     seeded = tier1_container.run(
         "python3", WS_ROLE_MANAGER, "apply", WS_BRIDGE_CONFIG,
@@ -237,6 +239,8 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
         workdir=None, timeout=10,
     )
     assert user_skill.returncode == 0, user_skill.stdout + user_skill.stderr
+    redirected_absent = tier1_container.run("test", "!", "-e", redirected_user_agents, workdir=None, timeout=10)
+    assert redirected_absent.returncode == 0, redirected_absent.stdout + redirected_absent.stderr
     absent = tier1_container.run("test", "!", "-e", old_skill, workdir=None, wrap=False)
     assert absent.returncode == 0, absent.stderr
     state_absent = tier1_container.run("test", "!", "-e", old_state, workdir=None, wrap=False)
@@ -336,8 +340,14 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     destination = ctmp / "agent"
     destination.mkdir(parents=True)
     (destination / "APPEND_SYSTEM.md").write_text("unrelated user append\n")
-    applied = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
+    redirected_user_agents = ctmp / "redirected-user-agents"
+    applied = _run_script(
+        tier1_container, WS_APPLY, destination,
+        env={"PRIME_CLAW_USER_AGENTS_ROOT": str(redirected_user_agents)},
+        seed_bridge=True,
+    )
     assert applied.returncode == 0, applied.stdout + applied.stderr
+    assert not redirected_user_agents.exists()
     assert "selected copy is current" in applied.stdout
     for relative in (*FILES, *MANAGED_SKILL_FILES):
         expected = tier1_container.read_repo(f"src/prime-agent-plugin/{relative}")
