@@ -34,6 +34,7 @@ outside the current plugin.
 | [H](H-handoff-and-continuation.md) | Continue work across iterations | US-22–US-23 |
 | [I](I-episode-finalization.md) | Finish an Episode | US-24 |
 | [J](J-work-control.md) | Control long-running agent work | US-25–US-26 |
+| [K](K-developer-safety.md) | Develop Prime Claw safely | US-27 |
 
 ## Cross-cutting authority boundary
 
@@ -59,7 +60,9 @@ These mechanisms support the stories but are not user outcomes by themselves:
 - Orca launch-automation creation and removal;
 - daemon JSONL operations and message delivery modes;
 - exact source-versus-installed byte comparisons;
-- Docker fixtures, fake adapters, and dependency-injection seams.
+- fake adapters and dependency-injection seams;
+- Docker fixtures and isolated roots, which are mechanisms serving US-27 rather
+  than separate outcomes.
 
 Likewise, command and tool variants are usually two interfaces to one story:
 
