@@ -67,6 +67,8 @@ following the openclaw-setup pattern.)
   per-operator brain repository setup, provenance hardening, and pre-mutation gates.
 - [derisk/3a-storage-step1.md](derisk/3a-storage-step1.md) — disposable
   OpenShell 0.0.116 one-volume subpath and root-link smoke; stop at owner review.
+- [derisk/3a-storage-step2-inventory.md](derisk/3a-storage-step2-inventory.md) —
+  stopped v1 read-only preservation inventory, unknowns and owner decision boundary.
 
 ## Runtime (Phase 2)
 
