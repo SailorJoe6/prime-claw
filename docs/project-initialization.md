@@ -62,8 +62,8 @@ later upstream produces a new comparison instead of an overwrite. Safe assets
 continue when another destination is blocked.
 
 Reconciliation serializes through `.prime-claw/reconcile.lock`, reclaims only a
-well-formed lock whose recorded local PID is proven dead, rejects symlink or
-special-file collisions, writes replacements and manifests atomically, and
+well-formed lock whose recorded local PID is proven dead, rejects symlink (including dangling symlink) or
+special-file collisions in assets and state, writes replacements and manifests atomically, and
 never commits. A completed managed upstream file rename is healed if interruption left the
 prior manifest. Explicit resets use a durable reset-intent record so the same
 recovery is safe from customized or accepted-override state. Current manifest
@@ -113,8 +113,9 @@ a separate explicit lifecycle driven through `initialize_prime_claw` actions:
    then explicitly completes or cancels.
 4. Completion, cancellation, and open errors restore with
    `git restore --worktree -- <path>` and verify both index and worktree clean.
-5. If held bytes change or cleanup is uncertain, the state becomes interrupted.
-   Current bytes are preserved until explicit `review-restore` or `review-keep`.
+5. If held bytes change, cleanup is uncertain, or the process that owned a held
+   comparison exits, current bytes remain preserved until explicit `review-restore`
+   or `review-keep`. A still-live held-review owner must complete or cancel normally.
 
 A terminal tracked-file `git diff --no-ext-diff -- <path>` result is the fallback
 when Orca cannot open the comparison. The restored comparison is returned directly

@@ -34,6 +34,7 @@ interface ReviewState {
   selector: string;
   status: "prepared" | "held" | "interrupted";
   startedAt: string;
+  ownerPid?: number;
 }
 
 export interface ReviewOptions {
@@ -47,6 +48,17 @@ function digest(bytes: Buffer | string): string { return createHash("sha256").up
 
 function statePath(root: string): string { return join(root, TEMPLATE_REVIEW_STATE); }
 
+function lstatIfPresent(path: string) {
+  try { return lstatSync(path); }
+  catch (error: any) { if (error?.code === "ENOENT") return null; throw error; }
+}
+
+function processIsActive(pid: unknown): boolean {
+  if (!Number.isSafeInteger(pid) || (pid as number) <= 0) return false;
+  try { process.kill(pid as number, 0); return true; }
+  catch (error: any) { return error?.code !== "ESRCH"; }
+}
+
 function writeState(path: string, state: ReviewState): void {
   const tmp = join(dirname(path), `.template-review.tmp-${process.pid}-${randomUUID()}`);
   const fd = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
@@ -57,8 +69,8 @@ function writeState(path: string, state: ReviewState): void {
 
 function readState(root: string): ReviewState {
   const path = statePath(root);
-  if (!existsSync(path)) throw new Error("no Prime Claw template review is active");
-  const stat = lstatSync(path);
+  const stat = lstatIfPresent(path);
+  if (!stat) throw new Error("no Prime Claw template review is active");
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("template review state is not a regular file");
   const value = JSON.parse(readFileSync(path, "utf8"));
   if (!value || value.schemaVersion !== 1 || value.projectRoot !== root || typeof value.assetId !== "string") throw new Error("template review state is invalid");
@@ -114,7 +126,7 @@ function selectedAsset(cwd: string, assetId: string, options: ReviewOptions) {
 
 export function requestTemplateReview(cwd: string, assetId: string, options: ReviewOptions = {}) {
   const { project, asset, destination } = selectedAsset(cwd, assetId, options);
-  if (existsSync(statePath(project.root))) throw new Error("another template review requires completion or recovery");
+  if (lstatIfPresent(statePath(project.root))) throw new Error("another template review requires completion or recovery");
   if (!existsSync(destination)) throw new Error("template review destination is missing");
   return {
     projectRoot: project.root,
@@ -132,7 +144,7 @@ export function startTemplateReview(cwd: string, assetId: string, confirmedReady
   try {
     if (options.isActiveEpisode?.(project.root) ?? (episodeWorktreeActivity(project.root, project.kind, runner) !== "inactive")) throw new Error("active or uncertain Episode worktree retains its starting template snapshot");
     const path = statePath(project.root);
-    if (existsSync(path)) throw new Error("another template review requires completion or recovery");
+    if (lstatIfPresent(path)) throw new Error("another template review requires completion or recovery");
     assertCleanTrackedRegular(project.root, destination, runner);
     const original = readFileSync(destination);
     const upstream = readFileSync(join(pluginRoot, asset.source));
@@ -146,6 +158,7 @@ export function startTemplateReview(cwd: string, assetId: string, confirmedReady
       selector: `path:${project.root}`,
       status: "prepared",
       startedAt: new Date().toISOString(),
+      ownerPid: process.pid,
     };
     const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
     try { writeFileSync(fd, `${JSON.stringify(state, null, 2)}
@@ -183,7 +196,7 @@ export function finishTemplateReview(cwd: string, action: "complete" | "cancel",
   const project = resolveNearestProjectRoot(cwd, options.home, runner);
   const release = acquireProjectMutationLock(project.root);
   try {
-    if (action === "cancel" && !existsSync(statePath(project.root))) return { restored: false, cancelled: true, noOp: true };
+    if (action === "cancel" && !lstatIfPresent(statePath(project.root))) return { restored: false, cancelled: true, noOp: true };
     const state = readState(project.root);
     if (state.status !== "held") throw new Error("template review is interrupted; choose explicit restore or keep recovery");
     if (action === "complete" && !visibleConfirmed) throw new Error("completion requires the operator to confirm the focused comparison was visible");
@@ -198,7 +211,7 @@ export function recoverTemplateReview(cwd: string, action: "restore" | "keep", o
   const release = acquireProjectMutationLock(project.root);
   try {
     const state = readState(project.root);
-    if (state.status === "held") throw new Error("normal held review must complete or cancel; recovery is only for interrupted preparation");
+    if (state.status === "held" && processIsActive(state.ownerPid)) throw new Error("normal held review must complete or cancel; recovery is only for an interrupted or abandoned owner process");
     if (action === "keep") {
       unlinkSync(statePath(project.root));
       fsyncDirectory(dirname(statePath(project.root)));

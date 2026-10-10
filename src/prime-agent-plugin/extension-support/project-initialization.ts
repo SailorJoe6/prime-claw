@@ -260,9 +260,9 @@ function atomicWrite(path: string, bytes: Buffer | string, mode = 0o644): void {
 function writeJsonAtomic(projectRoot: string, path: string, value: unknown, mode = 0o644): boolean {
   ensureSafeDirectory(projectRoot, dirname(path));
   const bytes = `${JSON.stringify(value, null, 2)}\n`;
-  if (existsSync(path)) {
-    const stat = lstatSync(path);
-    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`unsafe JSON state destination: ${relative(projectRoot, path)}`);
+  const existing = lstatIfPresent(path);
+  if (existing) {
+    if (!existing.isFile() || existing.isSymbolicLink()) throw new Error(`unsafe JSON state destination: ${relative(projectRoot, path)}`);
     if (readFileSync(path, "utf8") === bytes) return false;
   }
   const tmp = join(dirname(path), `.${relative(dirname(path), path)}.tmp-${process.pid}-${randomUUID()}`);
@@ -275,8 +275,8 @@ function writeJsonAtomic(projectRoot: string, path: string, value: unknown, mode
 
 function readManifest(projectRoot: string): TemplateManifest {
   const path = join(projectRoot, TEMPLATE_MANIFEST);
-  if (!existsSync(path)) return { schemaVersion: SCHEMA_VERSION, assets: {} };
-  const stat = lstatSync(path);
+  const stat = lstatIfPresent(path);
+  if (!stat) return { schemaVersion: SCHEMA_VERSION, assets: {} };
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`${TEMPLATE_MANIFEST} is not a regular file`);
   const raw = jsonObject(parseJson(readFileSync(path, "utf8"), TEMPLATE_MANIFEST), TEMPLATE_MANIFEST);
   if (raw.schemaVersion !== SCHEMA_VERSION) throw new Error(`unsupported ${TEMPLATE_MANIFEST} schema`);
@@ -285,8 +285,8 @@ function readManifest(projectRoot: string): TemplateManifest {
 
 function recoverResetIntent(projectRoot: string, pluginRoot: string, inventory: AssetInventory, manifest: TemplateManifest): string | null {
   const path = join(projectRoot, RESET_INTENT);
-  if (!existsSync(path)) return null;
-  const stat = lstatSync(path);
+  const stat = lstatIfPresent(path);
+  if (!stat) return null;
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`${RESET_INTENT} is not a regular file`);
   const intent = jsonObject(parseJson(readFileSync(path, "utf8"), RESET_INTENT), RESET_INTENT);
   if (intent.schemaVersion !== 1 || intent.action !== "reset" || typeof intent.assetId !== "string" || typeof intent.destination !== "string" || typeof intent.upstreamSha256 !== "string" || !(intent.beforeSha256 === null || typeof intent.beforeSha256 === "string")) {
@@ -298,11 +298,11 @@ function recoverResetIntent(projectRoot: string, pluginRoot: string, inventory: 
   const destination = join(projectRoot, asset.destination);
   const upstream = digest(source);
   if (upstream !== intent.upstreamSha256) throw new Error(`${RESET_INTENT} upstream changed and requires explicit recovery`);
-  if (!existsSync(destination)) {
+  const destinationStat = lstatIfPresent(destination);
+  if (!destinationStat) {
     if (intent.beforeSha256 !== null) throw new Error(`${RESET_INTENT} destination disappeared and requires explicit recovery`);
     ensureSafeDirectory(projectRoot, dirname(destination)); atomicWrite(destination, source);
   } else {
-    const destinationStat = lstatSync(destination);
     if (!destinationStat.isFile() || destinationStat.isSymbolicLink()) throw new Error(`${RESET_INTENT} destination is unsafe`);
     const current = digest(readFileSync(destination));
     if (current === intent.beforeSha256) atomicWrite(destination, source);
@@ -569,7 +569,7 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
   let manifestWritten = false;
   try {
     const reviewState = join(project.root, TEMPLATE_REVIEW_STATE);
-    if (existsSync(reviewState)) throw new Error(`interrupted template review requires an explicit keep or restore decision: ${TEMPLATE_REVIEW_STATE}`);
+    if (lstatIfPresent(reviewState)) throw new Error(`interrupted template review requires an explicit keep or restore decision: ${TEMPLATE_REVIEW_STATE}`);
     const manifest = readManifest(project.root);
     const recoveredReset = recoverResetIntent(project.root, pluginRoot, inventory, manifest);
     for (const asset of inventory.assets.filter((item) => item.scope === "project")) {
@@ -671,7 +671,7 @@ export function acceptProjectOverride(cwd: string, assetId: string, options: Omi
   const release = acquireProjectMutationLock(project.root);
   try {
     if (options.isActiveEpisode?.(project.root) ?? (episodeWorktreeActivity(project.root, project.kind, runner) !== "inactive")) throw new Error("active or uncertain Episode worktree retains its starting template snapshot");
-    if (existsSync(join(project.root, TEMPLATE_REVIEW_STATE))) throw new Error("template review requires completion or recovery before accepting an override");
+    if (lstatIfPresent(join(project.root, TEMPLATE_REVIEW_STATE))) throw new Error("template review requires completion or recovery before accepting an override");
     const destination = join(project.root, asset.destination);
     const stat = lstatSync(destination);
     if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("override destination is not a regular file");
@@ -695,18 +695,18 @@ export function resetProjectAsset(cwd: string, assetId: string, options: Omit<Re
   const release = acquireProjectMutationLock(project.root);
   try {
     if (options.isActiveEpisode?.(project.root) ?? (episodeWorktreeActivity(project.root, project.kind, runner) !== "inactive")) throw new Error("active or uncertain Episode worktree retains its starting template snapshot");
-    if (existsSync(join(project.root, TEMPLATE_REVIEW_STATE))) throw new Error("template review requires completion or recovery before resetting an asset");
+    if (lstatIfPresent(join(project.root, TEMPLATE_REVIEW_STATE))) throw new Error("template review requires completion or recovery before resetting an asset");
     const sourceBytes = readFileSync(join(pluginRoot, asset.source));
     const upstream = digest(sourceBytes);
     const destination = join(project.root, asset.destination);
     let beforeSha256: string | null = null;
-    if (existsSync(destination)) {
-      const stat = lstatSync(destination);
-      if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("reset destination is not a regular file");
+    const destinationStat = lstatIfPresent(destination);
+    if (destinationStat) {
+      if (!destinationStat.isFile() || destinationStat.isSymbolicLink()) throw new Error("reset destination is not a regular file");
       beforeSha256 = digest(readFileSync(destination));
     } else ensureSafeDirectory(project.root, dirname(destination));
     const intentPath = join(project.root, RESET_INTENT);
-    if (existsSync(intentPath)) throw new Error(`${RESET_INTENT} already requires recovery`);
+    if (lstatIfPresent(intentPath)) throw new Error(`${RESET_INTENT} already requires recovery`);
     writeJsonAtomic(project.root, intentPath, { schemaVersion: 1, action: "reset", assetId: asset.id, destination: asset.destination, upstreamSha256: upstream, beforeSha256 }, 0o600);
     atomicWrite(destination, sourceBytes);
     const manifest = readManifest(project.root);

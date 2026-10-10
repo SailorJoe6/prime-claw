@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, lstatSync, symlinkSync, realpathSync, cpSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, lstatSync, symlinkSync, unlinkSync, realpathSync, cpSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -234,4 +234,15 @@ test("adapter exposes restored terminal fallback diff to both tool and slash-com
   const commands=new Map(),tools=new Map(),notifications=[];createProjectInitializationExtension({pluginRoot:PLUGIN,home:dirname(root),runner})({registerCommand(name,value){commands.set(name,value)},registerTool(value){tools.set(value.name,value)},on(){}});const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}};
   const tool=await tools.get("initialize_prime_claw").execute("fallback",{action:"review-start",assetId:"project-skill-prepare",confirmedReady:true},null,null,ctx);assert.equal(tool.isError,undefined);assert.match(tool.content[0].text,/adapter fallback customization/);assert.match(tool.content[0].text,/git-diff fallback/);
   await commands.get("initialize-prime-claw").handler("--review-ready project-skill-prepare",ctx);assert.match(notifications.at(-1).message,/adapter fallback customization/);assert.match(notifications.at(-1).message,/git-diff fallback/);
+});
+
+
+test("dangling manifest symlink is refused and preserved before asset reconciliation", (t) => {
+  const root=repo(t);const manifest=join(root,".prime-claw/templates.json");mkdirSync(dirname(manifest),{recursive:true});symlinkSync(join(root,"missing-manifest"),manifest);
+  assert.throws(()=>reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()}),/templates\.json is not a regular file/);assert.equal(lstatSync(manifest).isSymbolicLink(),true);
+});
+
+test("explicit reset refuses and preserves dangling skill and workflow leaves", (t) => {
+  const root=repo(t),runner=new Runner();reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
+  for(const [id,relative] of [["project-skill-prepare",".agents/skills/prepare/SKILL.md"],["project-workflow-handoff",".prime-claw/workflows/handoff.md"]]){const path=join(root,relative);unlinkSync(path);symlinkSync(join(root,"missing-reset",id),path);assert.throws(()=>resetProjectAsset(root,id,{pluginRoot:PLUGIN,home:dirname(root),runner,isActiveEpisode:()=>false}),/reset destination is not a regular file/);assert.equal(lstatSync(path).isSymbolicLink(),true);}
 });
