@@ -1,0 +1,255 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from runtime.Dockerfile
+#1 transferring dockerfile: 7.78kB done
+#1 WARN: SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "POSTGRES_PASSWORD") (line 127)
+#1 DONE 0.0s
+
+#2 [internal] load metadata for ghcr.io/nvidia/openshell-community/sandboxes/base:latest
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [ 1/11] FROM ghcr.io/nvidia/openshell-community/sandboxes/base:latest@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e
+#4 resolve ghcr.io/nvidia/openshell-community/sandboxes/base:latest@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e 0.0s done
+#4 DONE 0.0s
+
+#5 [ 2/11] RUN apt-get update && apt-get install -y --no-install-recommends       postgresql-16 postgresql-16-pgvector unzip     && rm -rf /var/lib/apt/lists/*     && pg_dropcluster --stop 16 main 2>/dev/null || true
+#5 CACHED
+
+#6 [ 3/11] RUN curl -fsSL https://bun.sh/install | bash     && ln -sf /usr/local/bun/bin/bun /usr/local/bin/bun     && ln -sf /usr/local/bun/bin/bunx /usr/local/bin/bunx
+#6 CACHED
+
+#7 [internal] load build context
+#7 transferring context: 440.84kB 0.4s done
+#7 DONE 0.4s
+
+#8 [ 4/11] RUN git clone --filter=blob:none --depth 1 --single-branch       --branch "cwd-fix-v0.9.8-r1"       https://github.com/SailorJoe6/prime-agent.git /opt/prime-agent     && cd /opt/prime-agent     && test "$(git remote get-url origin)" = https://github.com/SailorJoe6/prime-agent.git     && test "$(git cat-file -t "refs/tags/cwd-fix-v0.9.8-r1")" = tag     && test "$(git rev-parse "refs/tags/cwd-fix-v0.9.8-r1")" = "8ca4d5c39b7c738f71b5c86422ea46394c3d0558"     && test "$(git rev-parse "refs/tags/cwd-fix-v0.9.8-r1^{commit}")" = "a1faacd53ac4473a75de1d434afaf50945c2f647"     && test "$(git rev-parse HEAD)" = "a1faacd53ac4473a75de1d434afaf50945c2f647"     && test "$(git rev-parse HEAD^{tree})" = "5301c70d9c9d74e474ccaf258fdd3c8de982c52f"     && printf '%s  %s\n' "3e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74" package-lock.json | sha256sum -c -     && node -e 'const [major,minor]=process.versions.node.split(".").map(Number); if (major<22 || (major===22 && minor<8)) process.exit(1)'     && HUSKY=0 npm ci --no-audit --no-fund     && printf '%s  %s\n' "3e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74" package-lock.json | sha256sum -c -     && test -z "$(git status --porcelain)"     && test "$(git describe --tags --always --dirty)" = "cwd-fix-v0.9.8-r1"     && test -x prime-agent.sh
+#8 0.218 Cloning into '/opt/prime-agent'...
+#8 0.895 Note: switching to 'a1faacd53ac4473a75de1d434afaf50945c2f647'.
+#8 0.895
+#8 0.895 You are in 'detached HEAD' state. You can look around, make experimental
+#8 0.895 changes and commit them, and you can discard any commits you make in this
+#8 0.895 state without impacting any branches by switching back to a branch.
+#8 0.895
+#8 0.895 If you want to create a new branch to retain commits you create, you may
+#8 0.895 do so (now or later) by using -c with the switch command. Example:
+#8 0.895
+#8 0.895   git switch -c <new-branch-name>
+#8 0.895
+#8 0.895 Or undo this operation with:
+#8 0.895
+#8 0.895   git switch -
+#8 0.895
+#8 0.895 Turn off this advice by setting config variable advice.detachedHead to false
+#8 0.895
+#8 4.483 Updating files:   0% (2/1258)
+Updating files:   1% (13/1258)
+Updating files:   2% (26/1258)
+Updating files:   3% (38/1258)
+Updating files:   4% (51/1258)
+Updating files:   5% (63/1258)
+Updating files:   6% (76/1258)
+Updating files:   7% (89/1258)
+Updating files:   8% (101/1258)
+Updating files:   9% (114/1258)
+Updating files:  10% (126/1258)
+Updating files:  11% (139/1258)
+Updating files:  12% (151/1258)
+Updating files:  13% (164/1258)
+Updating files:  14% (177/1258)
+Updating files:  15% (189/1258)
+Updating files:  16% (202/1258)
+Updating files:  17% (214/1258)
+Updating files:  18% (227/1258)
+Updating files:  19% (240/1258)
+Updating files:  20% (252/1258)
+Updating files:  21% (265/1258)
+Updating files:  22% (277/1258)
+Updating files:  23% (290/1258)
+Updating files:  24% (302/1258)
+Updating files:  25% (315/1258)
+Updating files:  26% (328/1258)
+Updating files:  27% (340/1258)
+Updating files:  28% (353/1258)
+Updating files:  29% (365/1258)
+Updating files:  30% (378/1258)
+Updating files:  31% (390/1258)
+Updating files:  32% (403/1258)
+Updating files:  33% (416/1258)
+Updating files:  34% (428/1258)
+Updating files:  35% (441/1258)
+Updating files:  36% (453/1258)
+Updating files:  37% (466/1258)
+Updating files:  38% (479/1258)
+Updating files:  39% (491/1258)
+Updating files:  40% (504/1258)
+Updating files:  41% (516/1258)
+Updating files:  42% (529/1258)
+Updating files:  43% (541/1258)
+Updating files:  44% (554/1258)
+Updating files:  45% (567/1258)
+Updating files:  46% (579/1258)
+Updating files:  47% (592/1258)
+Updating files:  48% (604/1258)
+Updating files:  49% (617/1258)
+Updating files:  50% (629/1258)
+Updating files:  51% (642/1258)
+Updating files:  52% (655/1258)
+Updating files:  53% (667/1258)
+Updating files:  54% (680/1258)
+Updating files:  55% (692/1258)
+Updating files:  56% (705/1258)
+Updating files:  57% (718/1258)
+Updating files:  58% (730/1258)
+Updating files:  59% (743/1258)
+Updating files:  60% (755/1258)
+Updating files:  61% (768/1258)
+Updating files:  62% (780/1258)
+Updating files:  63% (793/1258)
+Updating files:  64% (806/1258)
+Updating files:  65% (818/1258)
+Updating files:  66% (831/1258)
+Updating files:  67% (843/1258)
+Updating files:  68% (856/1258)
+Updating files:  69% (869/1258)
+Updating files:  70% (881/1258)
+Updating files:  71% (894/1258)
+Updating files:  72% (906/1258)
+Updating files:  73% (919/1258)
+Updating files:  74% (931/1258)
+Updating files:  75% (944/1258)
+Updating files:  76% (957/1258)
+Updating files:  77% (969/1258)
+Updating files:  78% (982/1258)
+Updating files:  79% (994/1258)
+Updating files:  80% (1007/1258)
+Updating files:  81% (1019/1258)
+Updating files:  82% (1032/1258)
+Updating files:  83% (1045/1258)
+Updating files:  84% (1057/1258)
+Updating files:  85% (1070/1258)
+Updating files:  86% (1082/1258)
+Updating files:  87% (1095/1258)
+Updating files:  88% (1108/1258)
+Updating files:  89% (1120/1258)
+Updating files:  90% (1133/1258)
+Updating files:  91% (1145/1258)
+Updating files:  92% (1158/1258)
+Updating files:  93% (1170/1258)
+Updating files:  94% (1183/1258)
+Updating files:  95% (1196/1258)
+Updating files:  96% (1208/1258)
+Updating files:  97% (1221/1258)
+Updating files:  98% (1233/1258)
+Updating files:  99% (1246/1258)
+Updating files: 100% (1258/1258)
+Updating files: 100% (1258/1258), done.
+#8 4.622 package-lock.json: OK
+#8 9.788 npm warn deprecated @types/diff@8.0.0: This is a stub types definition. diff provides its own type definitions, so you do not need this installed.
+#8 24.97
+#8 24.97 > prime-agent@0.9.8 prepare
+#8 24.97 > husky
+#8 24.97
+#8 24.99 HUSKY=0 skip install
+#8 25.00 added 430 packages in 20s
+#8 25.00 npm notice
+#8 25.00 npm notice New minor version of npm available! 11.11.0 -> 11.21.0
+#8 25.00 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.21.0
+#8 25.00 npm notice To update run: npm install -g npm@11.21.0
+#8 25.00 npm notice
+#8 25.04 package-lock.json: OK
+#8 DONE 25.8s
+
+#9 [ 5/11] RUN printf '%s\n' '#!/usr/bin/env bash' 'exec /opt/prime-agent/prime-agent.sh "$@"'       > /usr/local/bin/prime-agent     && chmod 755 /usr/local/bin/prime-agent     && git config --system --add safe.directory /opt/prime-agent
+#9 DONE 0.3s
+
+#10 [ 6/11] COPY runtime/gbrain /opt/gbrain
+#10 DONE 0.6s
+
+#11 [ 7/11] WORKDIR /opt/gbrain
+#11 DONE 0.0s
+
+#12 [ 8/11] RUN bun install --frozen-lockfile     && TARGET=$(case $(uname -m) in aarch64|arm64) echo "bun-linux-arm64";; *) echo "bun-linux-x64";; esac)     && bun build --compile --target=$TARGET --outfile /usr/local/bin/gbrain src/cli.ts     && rm -rf /opt/gbrain
+#12 0.116 bun install v1.4.3 (c6da4a4d3)
+#12 4.860
+#12 4.861 $ bun run scripts/postinstall.ts
+#12 4.869 [gbrain] postinstall skipped. If installed via bun install -g github:...: run `gbrain doctor` and `gbrain apply-migrations --yes` manually. See https://github.com/garrytan/gbrain/issues/218
+#12 4.869
+#12 4.869 + @types/bun@1.3.11
+#12 4.869 + @types/cookie-parser@1.4.10
+#12 4.869 + @types/cors@2.8.19
+#12 4.869 + @types/express@5.0.6
+#12 4.869 + @types/js-yaml@3.12.10
+#12 4.869 + bun-types@1.3.13
+#12 4.869 + fast-check@4.8.0
+#12 4.869 + typescript@5.9.3
+#12 4.869 + @ai-sdk/anthropic@3.0.74
+#12 4.869 + @ai-sdk/google@3.0.67
+#12 4.869 + @ai-sdk/openai@3.0.58
+#12 4.869 + @ai-sdk/openai-compatible@2.0.45
+#12 4.869 + @anthropic-ai/sdk@0.30.1
+#12 4.869 + @aws-sdk/client-s3@3.1028.0
+#12 4.869 + @dqbd/tiktoken@1.0.22
+#12 4.869 + @electric-sql/pglite@0.4.3
+#12 4.869 + @jsquash/avif@2.1.1
+#12 4.869 + @jsquash/png@3.1.1
+#12 4.869 + @modelcontextprotocol/sdk@1.29.0
+#12 4.869 + ai@6.0.174
+#12 4.869 + chokidar@4.0.3
+#12 4.869 + cookie-parser@1.4.7
+#12 4.869 + cors@2.8.6
+#12 4.869 + eventsource-parser@3.0.8
+#12 4.869 + exifr@7.1.3
+#12 4.869 + express@5.2.1
+#12 4.869 + express-rate-limit@7.5.1
+#12 4.869 + heic-decode@2.1.0
+#12 4.869 + js-yaml@3.15.2
+#12 4.869 + jsonc-parser@3.3.1
+#12 4.869 + marked@18.0.6
+#12 4.869 + openai@4.104.0
+#12 4.869 + pgvector@0.2.1
+#12 4.869 + postgres@3.4.9
+#12 4.869 + tree-sitter-wasms@0.1.13
+#12 4.869 + web-tree-sitter@0.22.6
+#12 4.869 + zod@4.3.6
+#12 4.869
+#12 4.869 279 packages installed [4.75s]
+#12 5.214  [339ms]  bundle  2201 modules
+#12 5.556  [342ms] compile  /usr/local/bin/gbrain
+#12 DONE 7.0s
+
+#13 [ 9/11] RUN mkdir -p /sandbox/pgdata /var/run/postgresql     && chown -R sandbox:sandbox /sandbox /var/run/postgresql     && chmod 700 /sandbox/pgdata
+#13 DONE 4.0s
+
+#14 [10/11] WORKDIR /sandbox
+#14 DONE 0.1s
+
+#15 [11/11] RUN PRIME_AGENT_INSTALL_UV=1 /opt/prime-agent/node_modules/.bin/tsx -e     "import { ensureKernelPython } from '/opt/prime-agent/packages/coding-agent/src/core/kernel/bootstrap.ts'; ensureKernelPython().then((python) => console.log('kernel_python=' + python)).catch((error) => { console.error(error); process.exitCode = 1; })"
+#15 0.417 › setting up python kernel (one-time, ~30s)…
+#15 20.48 ✓ ready
+#15 20.48 kernel_python=/sandbox/.prime/agent/kernel-venv/bin/python
+#15 DONE 21.5s
+
+#16 exporting to image
+#16 exporting layers
+#16 exporting layers 17.3s done
+#16 exporting manifest sha256:e05846e3a3f0428c165b74e6840d38b7f8af44c656b10f323cfa3b48ee435b80 done
+#16 exporting config sha256:0e87793f82f068ddb1025a098764637c0ae3aaf73091b04a9b5d93d7eb1b0a8f done
+#16 exporting attestation manifest sha256:ef0b0241c1524cf0eeab160a1ab60dce56cf1835f0fc652a5bbb420cb60457e6 0.0s done
+#16 exporting manifest list sha256:67a5cfd584344c3a596cc93f9a52a2f895f9480e3591e5d458a7961fbbfd0114 done
+#16 naming to docker.io/library/prime-claw-brain:pa098-ts-final-a1faacd53ac4 done
+#16 unpacking to docker.io/library/prime-claw-brain:pa098-ts-final-a1faacd53ac4
+#16 unpacking to docker.io/library/prime-claw-brain:pa098-ts-final-a1faacd53ac4 9.8s done
+#16 DONE 27.1s
+
+ 1 warning found (use docker --debug to expand):
+ - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "POSTGRES_PASSWORD") (line 127)
+
+View build details: <Docker Desktop build link omitted>
+[1/2] staging gbrain build context from <operator-local gbrain checkout> (source=upstream) ...
+      templates: real
+[2/2] building image prime-claw-brain:pa098-ts-final-a1faacd53ac4 ...
+build: done (image=prime-claw-brain:pa098-ts-final-a1faacd53ac4)

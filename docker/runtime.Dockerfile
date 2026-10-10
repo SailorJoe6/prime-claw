@@ -31,6 +31,23 @@
 #   docker build -f docker/runtime.Dockerfile -t prime-claw-brain:0.1.0 docker
 FROM ghcr.io/nvidia/openshell-community/sandboxes/base:latest
 
+# Prime Agent is built from the exact downstream TypeScript source tag below,
+# not the mutable public installer (which now serves an incompatible Rust CLI).
+# Keep .git for the source launcher BUILD_ID and verify identity again at runtime.
+ARG PRIME_AGENT_REQUIRED_VERSION=0.9.8
+ENV PRIME_AGENT_SOURCE_TAG=cwd-fix-v0.9.8-r1 \
+    PRIME_AGENT_SOURCE_TAG_OBJECT=8ca4d5c39b7c738f71b5c86422ea46394c3d0558 \
+    PRIME_AGENT_SOURCE_COMMIT=a1faacd53ac4473a75de1d434afaf50945c2f647 \
+    PRIME_AGENT_SOURCE_TREE=5301c70d9c9d74e474ccaf258fdd3c8de982c52f \
+    PRIME_AGENT_SOURCE_LOCK_SHA256=3e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74 \
+    TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json
+LABEL org.prime-claw.prime-agent-required-version="${PRIME_AGENT_REQUIRED_VERSION}" \
+      org.prime-claw.prime-agent-source-tag="${PRIME_AGENT_SOURCE_TAG}" \
+      org.prime-claw.prime-agent-source-tag-object="${PRIME_AGENT_SOURCE_TAG_OBJECT}" \
+      org.prime-claw.prime-agent-source-commit="${PRIME_AGENT_SOURCE_COMMIT}" \
+      org.prime-claw.prime-agent-source-tree="${PRIME_AGENT_SOURCE_TREE}" \
+      org.prime-claw.prime-agent-source-lock-sha256="${PRIME_AGENT_SOURCE_LOCK_SHA256}"
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 # --- PostgreSQL 16 + pgvector, as root (Ubuntu noble ships both) ---
@@ -50,6 +67,32 @@ ENV BUN_INSTALL=/usr/local/bun
 RUN curl -fsSL https://bun.sh/install | bash \
     && ln -sf /usr/local/bun/bin/bun /usr/local/bin/bun \
     && ln -sf /usr/local/bun/bin/bunx /usr/local/bin/bunx
+
+# --- Immutable downstream Prime Agent TypeScript source + lockfile deps ---
+# This public clone is an upstream dependency input, not a source patch/vendor
+# tree. Do not take code, node_modules, dist, or credentials from the host.
+RUN git clone --filter=blob:none --depth 1 --single-branch \
+      --branch "$PRIME_AGENT_SOURCE_TAG" \
+      https://github.com/SailorJoe6/prime-agent.git /opt/prime-agent \
+    && cd /opt/prime-agent \
+    && test "$(git remote get-url origin)" = https://github.com/SailorJoe6/prime-agent.git \
+    && test "$(git cat-file -t "refs/tags/$PRIME_AGENT_SOURCE_TAG")" = tag \
+    && test "$(git rev-parse "refs/tags/$PRIME_AGENT_SOURCE_TAG")" = "$PRIME_AGENT_SOURCE_TAG_OBJECT" \
+    && test "$(git rev-parse "refs/tags/$PRIME_AGENT_SOURCE_TAG^{commit}")" = "$PRIME_AGENT_SOURCE_COMMIT" \
+    && test "$(git rev-parse HEAD)" = "$PRIME_AGENT_SOURCE_COMMIT" \
+    && test "$(git rev-parse HEAD^{tree})" = "$PRIME_AGENT_SOURCE_TREE" \
+    && printf '%s  %s\n' "$PRIME_AGENT_SOURCE_LOCK_SHA256" package-lock.json | sha256sum -c - \
+    && node -e 'const [major,minor]=process.versions.node.split(".").map(Number); if (major<22 || (major===22 && minor<8)) process.exit(1)' \
+    && HUSKY=0 npm ci --no-audit --no-fund \
+    && printf '%s  %s\n' "$PRIME_AGENT_SOURCE_LOCK_SHA256" package-lock.json | sha256sum -c - \
+    && test -z "$(git status --porcelain)" \
+    && test "$(git describe --tags --always --dirty)" = "$PRIME_AGENT_SOURCE_TAG" \
+    && test -x prime-agent.sh
+# The root source launcher must see its checkout, not a symlinked SCRIPT_DIR.
+RUN printf '%s\n' '#!/usr/bin/env bash' 'exec /opt/prime-agent/prime-agent.sh "$@"' \
+      > /usr/local/bin/prime-agent \
+    && chmod 755 /usr/local/bin/prime-agent \
+    && git config --system --add safe.directory /opt/prime-agent
 
 # --- gbrain CLI: compile from the staged source, install the standalone binary ---
 # Inputs staged into docker/runtime/gbrain/ by `bin/prime-claw build` from the
@@ -72,6 +115,13 @@ RUN mkdir -p /sandbox/pgdata /var/run/postgresql \
 # Back to the unprivileged runtime user the OpenShell base expects.
 USER sandbox
 WORKDIR /sandbox
+
+# Prepare the source release's Python kernel under the same sandbox HOME used
+# at runtime. The network is available during this image build, not required
+# for the first disposable offline session. Keep the checked-out source and
+# kernel runtime inside the image; do not use host packages or state.
+RUN PRIME_AGENT_INSTALL_UV=1 /opt/prime-agent/node_modules/.bin/tsx -e \
+    "import { ensureKernelPython } from '/opt/prime-agent/packages/coding-agent/src/core/kernel/bootstrap.ts'; ensureKernelPython().then((python) => console.log('kernel_python=' + python)).catch((error) => { console.error(error); process.exitCode = 1; })"
 
 # Postgres connection defaults (override at apply time if needed).
 ENV POSTGRES_USER=gbrain \

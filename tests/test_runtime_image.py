@@ -53,7 +53,33 @@ def test_runtime_dockerfile_exists_and_is_runtime():
     assert "bun build --compile" in body
     assert "USER sandbox" in body
     assert "PGDATA=/sandbox/pgdata" in body
+    assert 'org.prime-claw.prime-agent-required-version="${PRIME_AGENT_REQUIRED_VERSION}"' in body
+    assert 'https://github.com/SailorJoe6/prime-agent.git /opt/prime-agent' in body
+    assert 'git remote get-url origin' in body
+    assert 'git cat-file -t "refs/tags/$PRIME_AGENT_SOURCE_TAG"' in body
+    assert 'git rev-parse HEAD^{tree}' in body
+    assert 'sha256sum -c -' in body and 'HUSKY=0 npm ci' in body
+    assert 'TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json' in body
+    assert 'exec /opt/prime-agent/prime-agent.sh' in body
+    for exact in (pc.PRIME_AGENT_SOURCE_TAG_OBJECT, pc.PRIME_AGENT_SOURCE_COMMIT,
+                  pc.PRIME_AGENT_SOURCE_TREE, pc.PRIME_AGENT_SOURCE_LOCK_SHA256):
+        assert exact in body
+    assert 'app.primeintellect.ai/prime-agent/install.sh' not in body
 
+
+
+
+def test_build_rejects_unapproved_prime_agent_selector_without_docker(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("PRIME_AGENT_VERSION", "0.10.0")
+    assert pc.cmd_build(cfg(tmp_path), Args()) == 1
+    assert "requires Prime Agent 0.9.8" in capsys.readouterr().err
+    with pytest.raises(ValueError, match="requires Prime Agent 0.9.8"):
+        pc._build_inputs_fingerprint(cfg(tmp_path))
+
+
+def test_tracked_runtime_config_requires_prime_agent_v098():
+    tracked = json.load(open(os.path.join(REPO, "config", "runtime.json")))
+    assert tracked["prime_agent_version"] == "0.9.8"
 
 # --- staging -----------------------------------------------------------------
 
@@ -146,9 +172,16 @@ def test_build_runs_when_stale_or_forced(tmp_path, monkeypatch):
     cmd = calls["cmd"]
     assert cmd[0:2] == [pc.DOCKER, "build"]
     assert "-t" in cmd and "prime-claw-brain:0.1.0" in cmd
+    assert cmd[cmd.index("--build-arg") + 1] == "PRIME_AGENT_REQUIRED_VERSION=0.9.8"
     # stamp recorded
     stamp = json.load(open(os.path.join(tmp_path, "docker", "runtime", ".build-stamp.json")))
     assert stamp["image"] == "prime-claw-brain:0.1.0" and "inputs_sha256" in stamp
+    assert stamp["prime_agent_required_version"] == "0.9.8"
+    assert stamp["prime_agent_source_tag"] == pc.PRIME_AGENT_SOURCE_TAG
+    assert stamp["prime_agent_source_tag_object"] == pc.PRIME_AGENT_SOURCE_TAG_OBJECT
+    assert stamp["prime_agent_source_commit"] == pc.PRIME_AGENT_SOURCE_COMMIT
+    assert stamp["prime_agent_source_tree"] == pc.PRIME_AGENT_SOURCE_TREE
+    assert stamp["prime_agent_source_lock_sha256"] == pc.PRIME_AGENT_SOURCE_LOCK_SHA256
 
 
 def test_build_dry_run_no_side_effects(tmp_path, monkeypatch, capsys):
@@ -257,6 +290,8 @@ def _capture_models_json(monkeypatch):
         if "models.json" in script and "base64 -d" in script:
             payload = script.split("echo ",1)[1].split(" | base64",1)[0].strip()
             written["models"] = _b.b64decode(payload.encode()).decode()
+        if "source_identity=" in script:
+            return 0, "source_identity=cwd-fix-v0.9.8-r1 commit=" + pc.PRIME_AGENT_SOURCE_COMMIT
         return 0, "ok"
     monkeypatch.setattr(pc, "sandbox_exec", fake_exec)
     monkeypatch.setattr(pc, "REPO_ROOT", os.path.join(REPO))
