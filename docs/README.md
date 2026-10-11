@@ -29,6 +29,9 @@ prime-claw builds on four prior projects. Read these before designing:
 
 ## Design docs
 
+- [design-decisions/](design-decisions/) — evidence-backed records for
+  non-obvious constraints whose removal could repeat an observed failure or
+  violate an external API or safety boundary.
 - [information-architecture.md](information-architecture.md) — the
   multi-store routing layer: which store owns a durable fact (brain vs. docs
   vs. harness vs. beads vs. reports), the two-level routing split, and the
@@ -65,7 +68,9 @@ prime-claw builds on four prior projects. Read these before designing:
   and coordinated Gate B activation boundary.
 - [user-stories/](user-stories/) — the current plugin's outcome-level user
   stories, split by lifecycle area, with implementation surfaces and candidate
-  simplification seams kept separate from the stories themselves.
+  simplification seams kept separate from the stories themselves; its
+  [traceability matrix](user-stories/traceability.md) records observable
+  acceptance, evidence type, and explicit gaps for all 27 stories.
 - [evidence/2026-10-09-orca-prime-agent-integration-probes.md](evidence/2026-10-09-orca-prime-agent-integration-probes.md)
   — the completed evidence matrix and frozen Orca/Prime Agent responsibility
   boundary for `prime-claw-h6w.33`.

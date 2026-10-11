@@ -23,6 +23,8 @@ A fresh Episode receives:
 - the approved bundle promoted into active `.ralph/plans`;
 - a promotion commit;
 - a fresh durable Prime Agent session rooted at that worktree;
+- a visible writable Orca Prime Agent tab bound to that durable session and
+  retained after the temporary launcher is removed;
 - exactly one fixed execute assignment;
 - durable ownership by the originating Conversation.
 

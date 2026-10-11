@@ -36,6 +36,13 @@ outside the current plugin.
 | [J](J-work-control.md) | Control long-running agent work | US-25–US-26 |
 | [K](K-developer-safety.md) | Develop Prime Claw safely | US-27 |
 
+## Acceptance traceability
+
+[`traceability.md`](traceability.md) maps every story to observable acceptance,
+current behavioral/integration/manual evidence, static proxies, and explicit
+gaps. Simplification work must use that matrix rather than infer coverage from
+test names or implementation shape.
+
 ## Cross-cutting authority boundary
 
 The plugin separates responsibilities:

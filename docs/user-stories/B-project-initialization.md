@@ -27,6 +27,13 @@ reports per-asset conflicts without blocking independent safe updates.
 upstream version, so that I can deliberately preserve it, accept it, or reset
 it.**
 
+The normal review opens an in-product, focused Orca side-by-side diff of the
+tracked worktree asset. Before the temporary overwrite or focus change, it
+explains the visible effect and waits for the operator to say they are ready.
+It holds the comparison until the operator confirms it is visible and then
+completes or cancels the review. A terminal `git diff --no-index` view is a
+fallback when Orca cannot provide the intended experience, not the normal UX.
+
 The lifecycle supports `accept-override`, `reset`, `review-request`,
 `review-start`, `review-complete`, `review-cancel`, and interrupted-review
 `restore` or `keep`. It must restore exact original bytes unless the operator
