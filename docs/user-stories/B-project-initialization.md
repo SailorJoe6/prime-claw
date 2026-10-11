@@ -39,12 +39,12 @@ change, waits until the operator is ready, holds the comparison until the
 operator confirms it is visible, and restores the exact original bytes when the
 review completes or is cancelled.
 
-If and only if the worktree asset is already dirty, Prime Claw must not
-overwrite it. It instead falls back to a native Git comparison between the
-dirty asset and the upstream version. That fallback must not explicitly disable
-a custom Git diff experience configured by the user. A clean-file Orca failure
-is restored and reported; it does not silently downgrade to the terminal
-fallback.
+Prime Claw falls back to a native Git comparison when the worktree asset is
+already dirty or when Orca cannot display the comparison. A dirty asset must not
+be overwritten. After an Orca failure on a clean asset, Prime Claw restores the
+exact original bytes before falling back. In both cases, the Git comparison uses
+the worktree asset and upstream version without explicitly disabling a custom
+Git diff experience configured by the user.
 
 The lifecycle supports `accept-override`, `reset`, `review-request`,
 `review-start`, `review-complete`, `review-cancel`, and interrupted-review

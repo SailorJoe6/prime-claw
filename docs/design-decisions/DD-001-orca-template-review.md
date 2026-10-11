@@ -23,41 +23,42 @@ Evidence: probe matrix D1 and “Review UX constraint” in
 
 ## Decision
 
-There are exactly two paths:
+There are three paths:
 
-1. **Clean tracked asset — normal UX.** Explain the temporary overwrite and
-   focus change, wait for explicit readiness, place the upstream bytes at the
-   tracked path, and open the exact path with Orca's focused diff. Hold the
-   overwrite until the operator confirms the side-by-side comparison is visible
-   and completes or cancels. Then restore and verify the exact original bytes.
-2. **Already-dirty asset — fallback only.** Do not overwrite the user's dirty
-   file. Compare that file with the upstream file using native Git diff. Do not
-   pass `--no-ext-diff` or another option that explicitly disables a custom Git
-   diff experience configured by the user.
+1. **Clean tracked asset; Orca works — normal UX.** Explain the temporary
+   overwrite and focus change, wait for explicit readiness, place the upstream
+   bytes at the tracked path, and open the exact path with Orca's focused diff.
+   Hold the overwrite until the operator confirms the side-by-side comparison
+   is visible and completes or cancels. Then restore and verify the exact
+   original bytes.
+2. **Already-dirty asset — immediate fallback.** Do not overwrite the user's
+   dirty file. Compare that file with the upstream file using native Git diff.
+3. **Clean asset; Orca fails — graceful fallback.** Restore and verify the exact
+   original bytes, then compare the restored worktree file with the upstream
+   file using native Git diff.
 
-If Orca fails on the clean-file path, restore the original file and report the
-failure. Do not silently replace the required side-by-side UX with terminal
-patch output. Interrupted temporary-overwrite state continues to require an
-explicit `restore` or `keep` decision.
+Both Git fallback paths must avoid `--no-ext-diff` or any other option that
+explicitly disables a custom Git diff experience configured by the user.
+Interrupted temporary-overwrite state continues to require an explicit
+`restore` or `keep` decision.
 
 ## Rejected alternatives
 
 - Native Git patch output as the normal UX: less readable than the required Orca
   side-by-side view.
 - Overwriting an already-dirty file: risks destroying the user's work.
-- Falling back merely because Orca failed on a clean file: silently weakens the
-  promised UX.
+- Hard-failing after Orca fails on a clean file: loses useful graceful
+  degradation after the original bytes can be restored safely.
 - Passing `--no-ext-diff`: suppresses a Git diff experience the user may have
   configured.
 
 ## Current implementation gap
 
 `template-review.ts` currently rejects dirty assets before offering a fallback.
-It also falls back after an Orca error on a clean asset and invokes
-`git diff --no-ext-diff -- <path>`. That is the opposite trigger and explicitly
-disables configured external diff behavior. The focused implementation task
-must align these branches with this decision without expanding the scope beyond
-US-05.
+After an Orca error on a clean asset, it runs `git diff --no-ext-diff -- <path>`
+before restoration. The focused implementation task must add the dirty-file
+fallback and make both fallback paths compare the preserved/restored worktree
+file with upstream without disabling configured external diff behavior.
 
 ## Regression anchors
 
