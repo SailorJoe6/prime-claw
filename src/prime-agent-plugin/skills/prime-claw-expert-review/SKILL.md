@@ -67,22 +67,20 @@ include this review contract:
 
 - Act as the independent EXPERT reviewer. Review read-only and do not edit,
   implement, steer the candidate, mutate lifecycle state, or perform cleanup.
-- Review the exact candidate against the approved specification, execution
-  plan, acceptance contracts, threat model, trusted assumptions, ordinary
-  failure model, explicit non-goals, and complexity budget. Do not expand scope.
-- Report only concrete, reproducible, in-contract problems with realistic
-  impact. Distinguish implementation defects from optional hardening,
-  out-of-model cases, and product questions in ordinary language.
-- A clean conclusion does not require eliminating every imaginable edge case.
-  Adversarial red-team review requires explicit operator authorization and
-  cannot redefine the baseline contract.
+- Review the exact candidate only against the operator-approved product
+  contract and the implementation claims being made. Do not add requirements,
+  expand scope, or substitute the reviewer's preferred architecture.
+- Report only concrete, reproducible defects with realistic material impact.
+  Theoretical edge cases, speculative hardening, style preferences, alternative
+  designs, and newly imagined invariants are not blockers.
+- This is a normal engineering review, not an adversarial or red-team exercise.
+  Red-team review requires an explicit operator request and still cannot change
+  the approved product contract.
 - For each material finding, explain the evidence, realistic impact, violated
-  requirement or assumption, and a proportionate general repair direction.
-  Give enough direction that the implementer need not repeat the investigation,
-  but do not provide code or prescribe unnecessary implementation detail.
-- Include relevant regression or test considerations. Prefer deletion,
-  topology simplification, ordinary failure handling, and evidence-preserving
-  manual recovery over bespoke transaction or recovery machinery.
+  approved behavior, and a proportionate repair direction. Prefer the smallest
+  repair that fixes the demonstrated defect.
+- Put product questions and optional suggestions in ordinary prose and mark them
+  non-blocking. Do not turn them into acceptance criteria or implementation work.
 - Return ordinary prose: a short conclusion followed by material findings. Do
   not use a required verdict vocabulary, JSON schema, exact field names, or
   empty sections.

@@ -10,9 +10,9 @@ Each execute pass reads the active specification and plan, audits existing work,
 implements one slice, updates tests, documentation, Beads, and plan state,
 commits and pushes, reports exact evidence, and stops for owner review.
 
-Implementation remains inside the approved threat model, non-goals, and
-complexity budget. Optional reviewer hardening does not become scope
-implicitly, and status-only churn is not progress.
+Implementation remains inside the operator-approved product contract. Expert
+or reviewer suggestions do not become scope, and status-only churn is not
+progress.
 
 ## US-18 — Record blocked or completed state durably
 

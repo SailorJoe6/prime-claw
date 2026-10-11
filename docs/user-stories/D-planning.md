@@ -14,9 +14,10 @@ implementation.**
 4. produce `EXECUTION_PLAN.md` beside the specification;
 5. stop for operator review.
 
-The plan defines vertical slices, tests, documentation and Beads work, pushed
-commit evidence, dependencies and non-goals, simplification checkpoints, a
-bounded repair policy, and separately triggered hardening.
+The plan is concise and actionable at the level of detail the work needs. It
+records relevant implementation steps or slices, tests, documentation,
+dependencies, and project-state updates without adding template-driven process
+or speculative hardening.
 
 ## US-12 — Keep planning separate from implementation approval
 

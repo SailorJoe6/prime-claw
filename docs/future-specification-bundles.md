@@ -37,11 +37,13 @@ invents a folder.
 
 ## Implementation readiness
 
-`implement-spec` checks the complete bundle for coherent outcome and scope,
-implementation decisions, threat model, trusted assumptions, ordinary failure
-handling, non-goals, manual recovery, complexity budget, vertical slices,
-acceptance evidence, hardening separation, stop-loss rules, and operator
-approval boundaries. A material gap stops before mutation.
+`implement-spec` checks only that the complete bundle has a coherent approved
+outcome and scope, contains enough decisions and an actionable enough plan to
+implement without guessing material product choices, and has no unresolved
+contradiction or blocker that actually prevents safe implementation. The check
+is proportional to the work and does not require standard risk, recovery,
+complexity, hardening, slice, evidence, or review-process sections. A material
+gap stops before mutation.
 
 The full `prime-claw-oversee-episode` skill is included in the post-prep phase
 message as ordinary guidance. There is no authenticated disclosure or readiness

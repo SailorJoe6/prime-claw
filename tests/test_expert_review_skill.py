@@ -18,16 +18,25 @@ def test_expert_skill_uses_native_model_spawn_message_and_cleanup() -> None:
 
 
 def test_expert_skill_accepts_normal_context_and_preserves_review_judgment() -> None:
-    text = SKILL.read_text()
+    raw = SKILL.read_text()
+    text = " ".join(raw.split())
     for required in (
         "normal review request", "caller overrides", "ask the caller",
         "short conclusion", "material findings", "realistic impact",
-        "proportionate general repair direction", "Do not expand scope",
-        "Adversarial red-team review requires explicit operator authorization",
+        "operator-approved product contract", "Do not add requirements",
+        "not an adversarial or red-team exercise",
+        "Red-team review requires an explicit operator request",
+        "newly imagined invariants are not blockers",
+        "smallest repair that fixes the demonstrated defect",
     ):
         assert required in text
+    for unwanted in (
+        "threat model", "trusted assumptions", "ordinary failure model",
+        "complexity budget", "evidence-preserving manual recovery",
+    ):
+        assert unwanted not in text
     for retired in (
         "prime_claw_official_expert_review", "launch(packet)", "submit(report)",
         "prime-claw-official-expert-review-packet", "PASS`/`BLOCK",
     ):
-        assert retired not in text
+        assert retired not in raw

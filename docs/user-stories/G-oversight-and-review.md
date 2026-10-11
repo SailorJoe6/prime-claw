@@ -8,8 +8,8 @@ its next disposition without writing the implementation myself.**
 The Conversation reconciles the Episode report against branch, tree, diff,
 tests, documentation, plan, Beads, push state, and worktree identity. It may
 accept and advance, request a recorded in-scope revision, pause, or consult the
-operator. Two unsuccessful repair cycles trigger reassessment rather than
-unbounded patching.
+operator. Repeated speculative or adversarial review must stop rather than grow
+new requirements or implementation machinery.
 
 Product, scope, merge, abandonment, remote transport, and destructive cleanup
 remain operator decisions.
@@ -21,8 +21,11 @@ review of an exact candidate, so that implementation claims receive
 evidence-based challenge without granting the reviewer product authority.**
 
 The EXPERT reviews an exact candidate against its approved contract, reports
-concrete reproducible findings, answers bounded clarification, identifies its
-model, and is cleaned up afterward. Its report is evidence, not authority.
+concrete reproducible material defects, answers bounded clarification, identifies
+its model, and is cleaned up afterward. Normal review is not adversarial red
+teaming unless the operator explicitly requests it. Speculative hardening and
+reviewer-invented requirements are non-blocking. Its report is evidence, not
+authority.
 
 ## US-21 — Restore oversight after compaction
 

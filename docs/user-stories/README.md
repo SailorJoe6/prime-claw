@@ -88,8 +88,8 @@ underlying story:
 3. Ordinary handoff and owned-Episode handoff share the handoff-to-execute
    semantic chain but use different transports.
 4. Slash commands and tools duplicate adapter surfaces over shared operations.
-5. Threat model, recovery, complexity, hardening, and repair-stop policy is
-   repeated across several Markdown assets.
+5. Planning and implementation-readiness judgment is repeated across several
+   Markdown assets and must remain proportional to the actual work.
 6. Path, ownership, and Episode-state invariants are checked in several
    lifecycle operations.
 7. Preferred Orca creation and narrow local fallback maintain parallel

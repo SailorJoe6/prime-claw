@@ -19,10 +19,10 @@ answer the remaining material questions.**
 `/spec-it-out` produces the same future-bundle specification contract with a
 synthesis-first rather than discovery-first posture.
 
-Both specification paths cover the outcome, scope, safety properties, threat,
-trust, and failure model, non-goals, manual-recovery boundary, complexity
-budget, and acceptance requirements versus optional hardening. Neither plans,
-allocates an Episode, or authorizes implementation.
+Both specification paths capture the outcome, scope, required behavior, material
+constraints, and observable acceptance at a level proportional to the work.
+They do not require boilerplate risk or process sections when those are not
+material. Neither plans, allocates an Episode, or authorizes implementation.
 
 ## US-10 — Explain and recover blocked planning work
 

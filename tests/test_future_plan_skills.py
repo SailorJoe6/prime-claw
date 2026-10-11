@@ -68,64 +68,56 @@ def test_authoring_skill_has_no_active_root_artifact_destination(
 
 
 @pytest.mark.parametrize("skill_name", SKILLS)
-def test_authoring_skill_requires_a_bounded_product_contract(skill_name: str) -> None:
-    text = " ".join(
-        project_skill(skill_name).read_text().split()
-    )
+def test_authoring_skill_keeps_the_product_contract_proportional(skill_name: str) -> None:
+    text = " ".join(project_skill(skill_name).read_text().split())
 
     for fragment in (
-        "concise threat model",
-        "trusted assumptions",
-        "ordinary failure model",
-        "explicit non-goals",
-        "manual recovery",
-        "qualitative complexity budget",
-        "Separate required acceptance behavior from optional hardening",
-        "Evidence is diagnostic",
-        "reviewer-discovered invariant",
-        "operator approval",
+        "clear enough to plan without guessing material product decisions",
+        "intended outcome, scope, required behavior, material constraints",
+        "only when they are materially relevant",
+        "Do not require boilerplate sections",
+        "ask the operator rather than",
     ):
         assert fragment in text
 
+    for unwanted in (
+        "concise threat model", "trusted assumptions", "ordinary failure model",
+        "qualitative complexity budget", "optional hardening",
+        "reviewer-discovered invariant",
+    ):
+        assert unwanted not in text
 
-def test_plan_and_implementation_readiness_enforce_proportionate_delivery() -> None:
-    plan = " ".join(
-        workflow("plan-spec").read_text().split()
-    )
-    readiness = " ".join(
-        workflow("implement-spec")
-        .read_text()
-        .split()
-    )
+
+def test_plan_and_implementation_readiness_are_proportional() -> None:
+    plan = " ".join(workflow("plan-spec").read_text().split())
+    readiness = " ".join(workflow("implement-spec").read_text().split())
 
     for fragment in (
-        "threat model",
-        "trusted assumptions",
-        "ordinary failure model",
-        "explicit non-goals",
-        "manual-recovery boundary",
-        "qualitative complexity budget",
-        "simplification checkpoint",
-        "two repair/review cycles",
-        "hardening backlog",
-        "scenario, likely impact, current assumption",
-        "operator promotes it",
+        "without guessing material product decisions",
+        "Do not demand standard risk, recovery, architecture, or process sections",
+        "concise, actionable plan at the level of detail this work needs",
+        "Small changes may need only a few ordered steps",
+        "must not add process sections or hardening work merely to satisfy a template",
     ):
         assert fragment in plan
 
     for fragment in (
-        "threat model",
-        "trusted assumptions",
-        "ordinary failure model",
-        "manual-recovery boundary",
-        "qualitative complexity budget",
-        "simplification checkpoint",
-        "optional hardening",
-        "evidence-based promotion trigger",
-        "two-repair/review-cycle stop-loss",
-        "only the operator may promote",
+        "operator-approved outcome and scope",
+        "without guessing material product choices",
+        "actually prevents safe implementation",
+        "Apply this test proportionally",
+        "Do not require standard threat, failure, recovery, complexity, hardening, slice, evidence, or review-process sections",
+        "reviewer suggestion is not a missing requirement",
     ):
         assert fragment in readiness
+
+    forbidden = (
+        "trusted assumptions", "qualitative complexity budget",
+        "hardening backlog", "promotion trigger", "repair/review-cycle stop-loss",
+    )
+    for fragment in forbidden:
+        assert fragment not in plan
+        assert fragment not in readiness
 
 
 def test_design_and_spec_it_out_keep_distinct_discovery_modes() -> None:

@@ -19,22 +19,18 @@ internally consistent, and implementation-ready specification and execution
 plan. Use semantic judgment; do not assume readiness merely because particular
 filenames exist.
 
-Check that the bundle defines at least:
+Check only that the bundle:
 
-- a coherent desired outcome and bounded scope;
-- decisions and requirements sufficient to implement without conversation-only
-  assumptions;
-- a concise threat model, trusted assumptions, and ordinary failure model;
-- explicit non-goals and an evidence-preserving manual-recovery boundary;
-- a qualitative complexity budget and a simplification checkpoint;
-- an executable vertical-slice plan with acceptance evidence and dependencies;
-- separate required acceptance behavior and optional hardening, with any
-  hardening candidate carrying a concrete evidence-based promotion trigger;
-- a two-repair/review-cycle stop-loss before further scope or architecture
-  growth;
-- explicit approval boundaries, including that only the operator may promote a
-  reviewer-discovered invariant into product scope; and
-- no unresolved contradiction or blocker that makes implementation unsafe.
+- has a coherent operator-approved outcome and scope;
+- contains enough decisions and an actionable enough plan to implement without
+  guessing material product choices; and
+- has no unresolved contradiction or blocker that actually prevents safe
+  implementation.
+
+Apply this test proportionally. Do not require standard threat, failure,
+recovery, complexity, hardening, slice, evidence, or review-process sections.
+A reviewer suggestion is not a missing requirement unless the operator added it
+to the approved product contract.
 
 If anything required is missing, contradictory, or inadequate, explain every
 material deficiency to the operator with exact artifact references and concrete

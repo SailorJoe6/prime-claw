@@ -2,29 +2,9 @@
 
 Execute bead `prime-claw-rg2` in an isolated Episode worktree. Reload it before
 each implementation pass with `bd show prime-claw-rg2`. The bead is the sole
-product scope, requirements, non-goals, and acceptance contract. This file adds
-only the minimum execution controls required to admit the Episode.
+product scope, requirements, non-goals, and acceptance contract.
 
-## Strict execution limits
-
-- **Threat and failure model:** limited to an incorrect migrated task state, an
-  incorrect built artifact, a changed Beads source, or a missed active Beads
-  reference. Check only the explicit acceptance criteria in `prime-claw-rg2`.
-- **Trusted assumptions:** Beads remains read-only, the supported Backlog.md CLI
-  and ordinary Git work as documented, and the operator controls merge,
-  activation, and existing contexts or worktrees.
-- **Recovery:** if an accepted command or check fails, stop that slice and leave
-  the candidate unmerged. The unchanged Beads source and ordinary Git rejection
-  or revert are the complete recovery boundary.
-- **Complexity budget:** no shim, adapter, driver, manifest, dual-write system,
-  extra safeguard, recovery machinery, or new framework. Simplify or stop if
-  any support machinery starts growing beyond the direct migration work.
-- **No scope growth:** no red teaming, adversarial analysis, speculative risk
-  analysis, optional hardening, new invariants, broad cleanup, or audits beyond
-  the one-time cutover search required by `prime-claw-rg2`. Do not inspect,
-  coordinate, refresh, or modify operator-owned contexts or worktrees.
-
-## Ordered implementation slices
+## Ordered implementation work
 
 1. **Vendor and build.** Resolve the bounded latest stable release, pin the fork
    submodule, build the accepted host and sandbox artifacts, and report the tag,
@@ -39,17 +19,16 @@ only the minimum execution controls required to admit the Episode.
    migration checks, builds, existing relevant lifecycle tests, and required
    Docker-only plugin gates; then commit and push the candidate for review.
 
-Each slice depends on the prior slice. Report its diff plus ordinary command and
-test output; do not create a new evidence system or extra evidence documents.
-There are no optional hardening deliverables, and reviewers must not seek or
-propose them. A suggestion stays out of scope. Only the operator may create
-separate future work after a named acceptance failure or post-completion dogfood
-evidence.
+Complete this work in practical reviewable increments. The Episode may choose
+smaller steps when useful; this file does not require a fixed evidence format or
+extra process artifacts. If a material product decision is missing, stop and ask
+the operator rather than guessing.
 
-After two failed repair/review attempts for the same acceptance failure, stop
-and consult the operator instead of adding machinery or widening scope. Only the
-operator may change scope, product behavior, architecture, merge, activation,
-or acceptance requirements.
+Normal review checks the candidate against `prime-claw-rg2`. It is not an
+adversarial or red-team exercise. Reviewer suggestions, speculative hardening,
+alternative architecture, and newly imagined invariants do not change scope or
+block completion. Only a concrete material defect against the bead's accepted
+behavior requires repair.
 
 ## Operator-controlled completion
 

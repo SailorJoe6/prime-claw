@@ -144,9 +144,12 @@ transport is never retried blindly.
 
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and
-worktree identities remain authoritative across restarts. Expert review,
-bounded goals, and one heartbeat while waiting remain available; none becomes
-workspace scheduling or product authority.
+worktree identities remain authoritative across restarts. Expert review is a
+normal review of the approved contract, not adversarial red teaming unless the
+operator explicitly requests it. Speculative hardening and reviewer-invented
+requirements are non-blocking. Expert review, bounded goals, and one heartbeat
+while waiting remain available; none becomes workspace scheduling or product
+authority.
 
 ## Final bookkeeping
 

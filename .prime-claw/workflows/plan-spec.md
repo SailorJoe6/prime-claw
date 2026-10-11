@@ -17,14 +17,12 @@ conventions. For the default Prime Claw workflow, read `SPECIFICATION.md` from
 that folder. Follow links only as needed to understand the reviewed work and
 audit the repository's current state against it.
 
-If the selected folder lacks required specification material, its documents are
-internally inconsistent, or the work is not adequate to plan safely, explain the
-specific gap and stop. In particular, require a concise threat model, trusted
-assumptions, ordinary failure model, explicit non-goals, an evidence-preserving
-manual-recovery boundary, and a qualitative complexity budget. Confirm that the
-specification separates acceptance requirements from optional hardening and does
-not promote reviewer-discovered scope without operator approval. Do not create a
-partial execution plan and do not start implementation.
+If the selected folder does not make the intended outcome and scope clear enough
+to plan without guessing material product decisions, is internally
+contradictory, or has an unresolved issue that actually prevents a practical
+plan, explain that specific gap and stop. Do not demand standard risk,
+recovery, architecture, or process sections when the work does not need them.
+Do not create a partial execution plan and do not start implementation.
 
 ## Create the reviewed execution plan
 
@@ -33,27 +31,16 @@ project-customized execution plan. Save `EXECUTION_PLAN.md` in the selected
 future folder alongside its specification bundle. Keep all other planning
 artifacts in that same folder.
 
-The plan must deliver value in vertical slices. Each slice must end in a working
-capability with passing tests, current documentation, an updated bead, and a
-commit pushed for review. Size each slice for one bounded implementation
-iteration. Record dependencies, acceptance evidence, and explicit non-goals so
-an implementation episode can execute the plan without relying on conversation
-history.
+Create a concise, actionable plan at the level of detail this work needs. Small
+changes may need only a few ordered steps; larger work may use reviewable slices.
+Include the tests, documentation, dependencies, and project-state updates that
+are actually relevant. The plan must let an implementation Episode begin without
+guessing material product decisions, but it must not add process sections or
+hardening work merely to satisfy a template.
 
-Plan for ordinary failure handling and manual recovery before bespoke
-transaction or recovery machinery. Add a simplification checkpoint when support
-machinery or recovery states could grow materially faster than delivered value;
-the checkpoint considers deletion or topology simplification before more
-hardening. Limit one slice acceptance attempt, across successor candidate commits, to two
-repair/review cycles. A third cycle stops
-for owner reassessment and operator consultation when continuing would change
-scope, product behavior, architecture, or the complexity budget.
-
-Record plausible non-blocking risks only in a lightweight hardening backlog.
-Each entry needs the scenario, likely impact, current assumption, and a concrete
-promotion trigger such as an observed failure, near miss, credible user report,
-changed deployment boundary, or newly approved requirement. It is not acceptance
-scope until the operator promotes it.
+Expert and reviewer suggestions do not become plan scope. Include them only when
+the operator accepts them as product requirements or they identify a concrete
+material defect in the approved contract.
 
 ## Stop for operator plan review
 
