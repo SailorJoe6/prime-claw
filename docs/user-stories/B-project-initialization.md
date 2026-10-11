@@ -27,12 +27,24 @@ reports per-asset conflicts without blocking independent safe updates.
 upstream version, so that I can deliberately preserve it, accept it, or reset
 it.**
 
-The normal review opens an in-product, focused Orca side-by-side diff of the
-tracked worktree asset. Before the temporary overwrite or focus change, it
-explains the visible effect and waits for the operator to say they are ready.
-It holds the comparison until the operator confirms it is visible and then
-completes or cancels the review. A terminal Git diff is a fallback when Orca
-cannot provide the intended experience, not the normal UX.
+The comparison is the primary user outcome. Preserve, accept, and reset are the
+decisions that the comparison enables; the comparison is not an optional step
+after one of those decisions.
+
+The required UX is an in-product, focused Orca side-by-side comparison. Because
+Orca cannot compare two arbitrary files, a clean tracked worktree asset may be
+temporarily replaced with the upstream version so Orca can display its
+source-control diff. The lifecycle explains the visible overwrite and focus
+change, waits until the operator is ready, holds the comparison until the
+operator confirms it is visible, and restores the exact original bytes when the
+review completes or is cancelled.
+
+If and only if the worktree asset is already dirty, Prime Claw must not
+overwrite it. It instead falls back to a native Git comparison between the
+dirty asset and the upstream version. That fallback must not explicitly disable
+a custom Git diff experience configured by the user. A clean-file Orca failure
+is restored and reported; it does not silently downgrade to the terminal
+fallback.
 
 The lifecycle supports `accept-override`, `reset`, `review-request`,
 `review-start`, `review-complete`, `review-cancel`, and interrupted-review
