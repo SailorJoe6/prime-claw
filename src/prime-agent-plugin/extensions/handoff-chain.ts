@@ -1,6 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { canonicalSkillPrompt } from "../extension-support/handoff-prompts.ts";
+import {
+  admitWorkflowChain,
+  canonicalWorkflowPrompt,
+} from "../extension-support/workflow-chain.ts";
 
 /**
  * Deterministic native /handoff -> canonical execute admission.
@@ -14,14 +17,14 @@ type AdmissionResult =
   | { ok: true }
   | { ok: false; message: string; level: "warning" | "error" };
 
-function admitHandoff(
+async function admitHandoff(
   pi: ExtensionAPI,
   cwd: string,
   guidance: string,
   source: "native" | "tool",
-): AdmissionResult {
+): Promise<AdmissionResult> {
   // Preflight both canonical workflows before beginning a partial transition.
-  const handoff = canonicalSkillPrompt(cwd, "handoff", guidance.trim());
+  const handoff = canonicalWorkflowPrompt(cwd, "handoff", { guidance: guidance.trim(), legacySnapshot: true });
   if (!handoff) {
     return {
       ok: false,
@@ -29,7 +32,7 @@ function admitHandoff(
       level: "warning",
     };
   }
-  const execute = canonicalSkillPrompt(cwd, "execute");
+  const execute = canonicalWorkflowPrompt(cwd, "execute", { legacySnapshot: true });
   if (!execute) {
     return {
       ok: false,
@@ -38,29 +41,19 @@ function admitHandoff(
     };
   }
 
-  try {
-    if (source === "tool") {
-      pi.sendUserMessage(handoff, { deliverAs: "steer" });
-    } else {
-      pi.sendUserMessage(handoff);
-    }
-  } catch {
-    return {
-      ok: false,
-      message: "handoff-chain: canonical handoff could not be admitted",
-      level: "error",
-    };
-  }
-
-  try {
-    pi.sendUserMessage(execute, { deliverAs: "followUp" });
-  } catch {
-    return {
-      ok: false,
-      message: "handoff-chain: canonical execute follow-up could not be queued; continuation is infeasible",
-      level: "error",
-    };
-  }
+  const admission = await admitWorkflowChain({
+    deliverFirst: () => source === "tool"
+      ? pi.sendUserMessage(handoff, { deliverAs: "steer" })
+      : pi.sendUserMessage(handoff),
+    deliverFollowUp: () => pi.sendUserMessage(execute, { deliverAs: "followUp" }),
+  });
+  if (!admission.ok) return {
+    ok: false,
+    level: "error",
+    message: admission.stage === "first"
+      ? "handoff-chain: canonical handoff could not be admitted"
+      : "handoff-chain: handoff was admitted, but execute follow-up admission is unconfirmed; inspect and do not retry",
+  };
 
   return { ok: true };
 }
@@ -69,7 +62,7 @@ export default function handoffChain(pi: ExtensionAPI): void {
   pi.registerCommand("handoff", {
     description: "Ralph handoff phase — optional trailing text supplies compaction guidance; execute is queued independently",
     handler: async (args, ctx) => {
-      const result = admitHandoff(pi, ctx.cwd, args, "native");
+      const result = await admitHandoff(pi, ctx.cwd, args, "native");
       if (!result.ok) ctx.ui.notify(result.message, result.level);
     },
   });
@@ -96,7 +89,7 @@ export default function handoffChain(pi: ExtensionAPI): void {
       additionalProperties: false,
     } as any,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const result = admitHandoff(pi, ctx.cwd, params.guidance ?? "", "tool");
+      const result = await admitHandoff(pi, ctx.cwd, params.guidance ?? "", "tool");
       if (!result.ok) {
         return {
           content: [{ type: "text", text: result.message }],

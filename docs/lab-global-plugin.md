@@ -26,7 +26,7 @@ src/prime-agent-plugin/
     episode-ownership.ts
     conversation-oversight.ts
     episode-close.ts
-    handoff-prompts.ts
+    workflow-chain.ts
     prep-chain.ts
     reviewed-plan-support.ts
     spec-episode.ts

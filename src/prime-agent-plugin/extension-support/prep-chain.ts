@@ -1,9 +1,10 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
+import { validateFutureLocation } from "./reviewed-plan-support.ts";
 import {
-  validateFutureLocation,
-  wrapCanonicalSkill,
-} from "./reviewed-plan-support.ts";
+  admitWorkflowChain,
+  canonicalWorkflowPrompt,
+} from "./workflow-chain.ts";
 
 export interface PrepChainWorkflow {
   usage: string;
@@ -21,16 +22,15 @@ export type PrepChainAdmissionResult =
  * TypeScript. Both project-local skills are loaded before either message is
  * sent. The phase prompt is always the sole native follow-up.
  */
-export function admitPrepChain(
+export async function admitPrepChain(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
   rawLocation: string,
   workflow: PrepChainWorkflow,
   source: "native" | "tool",
-  onValidated?: (ctx: ExtensionContext, location: string) => void,
   preflight?: (ctx: ExtensionContext, location: string) => void,
   phasePreamble?: string,
-): PrepChainAdmissionResult {
+): Promise<PrepChainAdmissionResult> {
   let selected;
   try {
     selected = validateFutureLocation(ctx.cwd, rawLocation);
@@ -44,12 +44,9 @@ export function admitPrepChain(
   // Preflight both project-owned workflows before beginning a partial
   // transition. Loading them here also keeps every model instruction in the
   // Markdown skills rather than in extension code.
-  const prepPrompt = wrapCanonicalSkill(
-    selected.projectRoot,
-    workflow.prepSkillName,
-    workflow.locationTag,
-    selected.location,
-  );
+  const prepPrompt = canonicalWorkflowPrompt(selected.projectRoot, workflow.prepSkillName, {
+    location: { tag: workflow.locationTag, value: selected.location },
+  });
   if (!prepPrompt) {
     return {
       ok: false,
@@ -57,12 +54,9 @@ export function admitPrepChain(
       level: "warning",
     };
   }
-  const canonicalPhasePrompt = wrapCanonicalSkill(
-    selected.projectRoot,
-    workflow.phaseSkillName,
-    workflow.locationTag,
-    selected.location,
-  );
+  const canonicalPhasePrompt = canonicalWorkflowPrompt(selected.projectRoot, workflow.phaseSkillName, {
+    location: { tag: workflow.locationTag, value: selected.location },
+  });
   if (!canonicalPhasePrompt) {
     return {
       ok: false,
@@ -74,30 +68,19 @@ export function admitPrepChain(
   const phasePrompt = phasePreamble ? `${phasePreamble}\n\n${canonicalPhasePrompt}` : canonicalPhasePrompt;
   preflight?.(ctx, selected.location);
 
-  try {
-    if (source === "tool") {
-      pi.sendUserMessage(prepPrompt, { deliverAs: "steer" });
-    } else {
-      pi.sendUserMessage(prepPrompt);
-    }
-  } catch {
-    return {
-      ok: false,
-      message: `reviewed-plan: canonical ${workflow.prepSkillName} could not be admitted`,
-      level: "error",
-    };
-  }
+  const admission = await admitWorkflowChain({
+    deliverFirst: () => source === "tool"
+      ? pi.sendUserMessage(prepPrompt, { deliverAs: "steer" })
+      : pi.sendUserMessage(prepPrompt),
+    deliverFollowUp: () => pi.sendUserMessage(phasePrompt, { deliverAs: "followUp" }),
+  });
+  if (!admission.ok) return {
+    ok: false,
+    level: "error",
+    message: admission.stage === "first"
+      ? `reviewed-plan: canonical ${workflow.prepSkillName} could not be admitted`
+      : `reviewed-plan: ${workflow.prepSkillName} was admitted, but ${workflow.phaseSkillName} follow-up admission is unconfirmed; inspect before retrying`,
+  };
 
-  try {
-    pi.sendUserMessage(phasePrompt, { deliverAs: "followUp" });
-  } catch {
-    return {
-      ok: false,
-      message: `reviewed-plan: canonical ${workflow.phaseSkillName} follow-up could not be queued; transition is incomplete`,
-      level: "error",
-    };
-  }
-
-  onValidated?.(ctx, selected.location);
   return { ok: true, location: selected.location };
 }

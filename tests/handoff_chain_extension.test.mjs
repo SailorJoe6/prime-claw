@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 
 import handoffChain from "../src/prime-agent-plugin/extensions/handoff-chain.ts";
-import { canonicalSkillPrompt } from "../src/prime-agent-plugin/extension-support/handoff-prompts.ts";
+import { canonicalWorkflowPrompt } from "../src/prime-agent-plugin/extension-support/workflow-chain.ts";
 
 function createHarness(cwd, throwOnSend = 0) {
   const commands = new Map();
@@ -195,7 +195,7 @@ test("conversational tool reports second-send failure without claiming continuat
     options: { deliverAs: "steer" },
   }]);
   assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /follow-up could not be queued/);
+  assert.match(result.content[0].text, /follow-up admission is unconfirmed/);
   assert.doesNotMatch(result.content[0].text, /Handoff admitted/);
 });
 
@@ -249,7 +249,7 @@ test("a synchronous follow-up queue failure is visible without claiming success"
     options: undefined,
   }]);
   assert.deepEqual(f.notices, [{
-    message: "handoff-chain: canonical execute follow-up could not be queued; continuation is infeasible",
+    message: "handoff-chain: handoff was admitted, but execute follow-up admission is unconfirmed; inspect and do not retry",
     level: "error",
   }]);
 });
@@ -270,9 +270,11 @@ test("late or repeated compaction signals have no execute-admission path", async
 test("active legacy Episode snapshot remains readable without template migration", (t) => {
   const cwd=mkdtempSync(join(tmpdir(),"pc-legacy-episode-"));t.after(()=>rmSync(cwd,{recursive:true,force:true}));
   for(const name of ["handoff","execute"]){const path=join(cwd,".ralph","skills",name,"SKILL.md");mkdirSync(dirname(path),{recursive:true});writeFileSync(path,`legacy ${name} bytes\n`);}
-  const handoff=canonicalSkillPrompt(cwd,"handoff"),execute=canonicalSkillPrompt(cwd,"execute");
+  assert.equal(canonicalWorkflowPrompt(cwd,"handoff"),null);
+  const handoff=canonicalWorkflowPrompt(cwd,"handoff",{legacySnapshot:true}),execute=canonicalWorkflowPrompt(cwd,"execute",{legacySnapshot:true});
   assert.match(handoff,/legacy handoff bytes/);assert.match(handoff,/\.ralph\/skills\/handoff\/SKILL\.md/);assert.match(execute,/legacy execute bytes/);
 });
+
 
 
 test("old-layout active Episode admits handoff and execute from its unchanged snapshot", async (t) => {

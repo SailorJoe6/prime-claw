@@ -31,16 +31,11 @@ import { validateFutureLocation } from "../extension-support/reviewed-plan-suppo
 const PLAN_USAGE = "Usage: /plan-spec .ralph/plans/future/<slug>";
 const IMPLEMENT_USAGE = "Usage: /implement-spec .ralph/plans/future/<slug> [--host id:<project-host-setup-id>]";
 
-const PLAN_WORKFLOW = {
-  usage: PLAN_USAGE,
-  skillName: "plan-spec",
-  locationTag: "operator-plan-location",
-};
 const PLAN_PREP_WORKFLOW: PrepChainWorkflow = {
   usage: PLAN_USAGE,
   prepSkillName: "plan-prep",
-  phaseSkillName: PLAN_WORKFLOW.skillName,
-  locationTag: PLAN_WORKFLOW.locationTag,
+  phaseSkillName: "plan-spec",
+  locationTag: "operator-plan-location",
 };
 const IMPLEMENT_PREP_WORKFLOW: PrepChainWorkflow = {
   usage: IMPLEMENT_USAGE,
@@ -88,13 +83,12 @@ function registerPrepChainCommand(
         ctx.ui.notify(options.workflow.usage, "warning");
         return;
       }
-      const result = admitPrepChain(
+      const result = await admitPrepChain(
         pi,
         ctx,
         selection.location,
         options.workflow,
         "native",
-        undefined,
         options.preflight,
         options.phasePreamble?.(),
       );
@@ -170,7 +164,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         additionalProperties: false,
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-        const result = admitPrepChain(
+        const result = await admitPrepChain(
           pi,
           ctx,
           params.location,

@@ -31,7 +31,7 @@ files=(
   workflows/implement-spec.md
   workflows/plan-prep.md
   workflows/plan-spec.md
-  extension-support/handoff-prompts.ts
+  extension-support/workflow-chain.ts
   extension-support/prep-chain.ts
   extension-support/reviewed-plan-support.ts
   extension-support/spec-episode.ts
@@ -84,6 +84,7 @@ obsolete_files=(
   "extensions/goal-heartbeat-work-control.ts:stale retired goal heartbeat work-control extension"
   "extensions/goal-blocker-control.ts:stale obsolete goal blocker control extension"
   "extension-support/conversation-guide-metadata.ts:stale retired Conversation guide authentication metadata"
+  "extension-support/handoff-prompts.ts:stale retired handoff prompt loader"
   "extension-support/episode-finalization.ts:stale obsolete episode finalization support file"
   "extension-support/expert-review-reservation.ts:stale retired EXPERT reservation support file"
   "extension-support/role-kernel.generated.ts:stale retired generated role-kernel file"

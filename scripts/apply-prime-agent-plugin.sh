@@ -72,7 +72,7 @@ files=(
   workflows/implement-spec.md
   workflows/plan-prep.md
   workflows/plan-spec.md
-  extension-support/handoff-prompts.ts
+  extension-support/workflow-chain.ts
   extension-support/prep-chain.ts
   extension-support/reviewed-plan-support.ts
   extension-support/spec-episode.ts
@@ -157,6 +157,7 @@ obsolete_files=(
   extensions/goal-heartbeat-work-control.ts
   extensions/goal-blocker-control.ts
   extension-support/conversation-guide-metadata.ts
+  extension-support/handoff-prompts.ts
   extension-support/episode-finalization.ts
   extension-support/expert-review-reservation.ts
   extension-support/role-kernel.generated.ts

@@ -59,7 +59,7 @@ FILES = (
     "workflows/implement-spec.md",
     "workflows/plan-prep.md",
     "workflows/plan-spec.md",
-    "extension-support/handoff-prompts.ts",
+    "extension-support/workflow-chain.ts",
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
     "extension-support/spec-episode.ts",
@@ -474,6 +474,8 @@ def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container,
          "stale obsolete goal blocker control extension"),
         ("extension-support/episode-finalization.ts",
          "stale obsolete episode finalization support file"),
+        ("extension-support/handoff-prompts.ts",
+         "stale retired handoff prompt loader"),
     ],
 )
 def test_apply_removes_and_check_rejects_obsolete_managed_files(

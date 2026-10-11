@@ -110,7 +110,6 @@ export default function probe(pi){pi.on("session_start",()=>{const names=pi.getA
 
 def test_compact_first_workflows_and_normal_guide_load_are_explicit() -> None:
     extension = EXTENSION.read_text()
-    prep = (REPO / "src/prime-agent-plugin/extension-support/prep-chain.ts").read_text()
     plan_prep = (REPO / "src/prime-agent-plugin/workflows/plan-prep.md").read_text()
     implement_prep = (REPO / "src/prime-agent-plugin/workflows/implement-prep.md").read_text()
     implement = (REPO / "src/prime-agent-plugin/workflows/implement-spec.md").read_text()
@@ -118,7 +117,6 @@ def test_compact_first_workflows_and_normal_guide_load_are_explicit() -> None:
     assert 'name: "plan_spec"' in extension
     assert 'command: "plan"' not in extension
     assert 'name: "ralph_plan"' not in extension
-    assert 'deliverAs: "followUp"' in prep
     assert "compact.run(focus_hint)" in plan_prep
     assert "compact.run(focus_hint)" in implement_prep
     assert "conversationGuideText(oversightOptions)" in extension

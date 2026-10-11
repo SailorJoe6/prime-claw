@@ -15,7 +15,10 @@ import { execFileSync } from "node:child_process";
 import { createConnection, type Socket } from "node:net";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { canonicalSkillPrompt } from "./handoff-prompts.ts";
+import {
+  admitWorkflowChain,
+  canonicalWorkflowPrompt,
+} from "./workflow-chain.ts";
 import {
   episodeOwnershipPath,
   parseEpisodeOwnership,
@@ -23,7 +26,7 @@ import {
   writeEpisodeOwnership,
   type EpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
-import { validateFutureLocation, wrapCanonicalSkill } from "./reviewed-plan-support.ts";
+import { validateFutureLocation } from "./reviewed-plan-support.ts";
 
 const PROTOCOL_NAME = "prime-agent.daemon";
 const MAX_PROTOCOL_VERSION = 7;
@@ -478,23 +481,21 @@ export class PrimeSessionPublisher implements SessionPublisher {
     }
   }
   async deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string, onHandoffAdmitted?: () => void | Promise<void>, queueHandoffIfBusy = false): Promise<void> {
-    try {
-      requireSuccess(await this.client.request({
-        type: "prompt", activeSessionId, message: handoffPrompt,
-        ...(queueHandoffIfBusy ? { streamingBehavior: "followUp", queueIfBusy: true } : { queueIfBusy: false }),
-        expandPromptTemplates: false, source: "extension",
-      }), "handoff delivery");
-    } catch (error) {
-      if (isUncertainMutation(error)) throw new EpisodeStateUncertainError("Handoff admission is uncertain; inspect before another transition.", { cause: error });
-      throw error;
+    const admission = await admitWorkflowChain({
+      deliverFirst: async () => requireSuccess(await this.client.request({ type: "prompt", activeSessionId, message: handoffPrompt, ...(queueHandoffIfBusy ? { streamingBehavior: "followUp", queueIfBusy: true } : { queueIfBusy: false }), expandPromptTemplates: false, source: "extension" }), "handoff delivery"),
+      afterFirst: onHandoffAdmitted,
+      deliverFollowUp: async () => requireSuccess(await this.client.request({ type: "prompt", activeSessionId, message: executePrompt, streamingBehavior: "followUp", queueIfBusy: true, expandPromptTemplates: false, source: "extension" }), "execute follow-up delivery"),
+    });
+    if (admission.ok) return;
+    const cause = admission.error;
+    if (isUncertainMutation(cause)) {
+      const message = admission.stage === "first"
+        ? "Handoff admission is uncertain; inspect before another transition."
+        : "Execute follow-up admission is uncertain after handoff; inspect before another transition.";
+      throw new EpisodeStateUncertainError(message, { cause });
     }
-    await onHandoffAdmitted?.();
-    try {
-      requireSuccess(await this.client.request({ type: "prompt", activeSessionId, message: executePrompt, streamingBehavior: "followUp", queueIfBusy: true, expandPromptTemplates: false, source: "extension" }), "execute follow-up delivery");
-    } catch (error) {
-      if (isUncertainMutation(error)) throw new EpisodeStateUncertainError("Execute follow-up admission is uncertain after handoff; inspect before another transition.", { cause: error });
-      throw new HandoffFollowUpRejectedError(`Handoff was admitted, but canonical execute follow-up could not be queued: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
-    }
+    if (admission.stage === "first") throw cause;
+    throw new HandoffFollowUpRejectedError(`Handoff was admitted, but canonical execute follow-up could not be queued: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
   }
   async kill(activeSessionId: string): Promise<boolean> {
     requireSuccess(await this.client.request({ type: "kill", activeSessionId }), "episode cleanup kill"); return true;
@@ -827,9 +828,9 @@ export async function handoffSpecEpisode(
     publisher ??= new PrimeSessionPublisher();
     const session = await durableSession(record, publisher);
     if (sessionIsBusy(session)) throw new Error("Owned Episode is busy; handoff requires an idle Episode with an empty queue");
-    const handoffPrompt = canonicalSkillPrompt(record.worktree!, "handoff", guidance.trim());
+    const handoffPrompt = canonicalWorkflowPrompt(record.worktree!, "handoff", { guidance: guidance.trim(), legacySnapshot: true });
     if (!handoffPrompt) throw new Error("Episode worktree is missing .prime-claw/workflows/handoff.md");
-    const executePrompt = canonicalSkillPrompt(record.worktree!, "execute");
+    const executePrompt = canonicalWorkflowPrompt(record.worktree!, "execute", { legacySnapshot: true });
     if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
     const route = await reopenIfNeeded(record, session, ctx, publisher, store, repo);
     const state = await publisher.getState(route.activeSessionId);
@@ -881,7 +882,7 @@ export async function createSpecEpisode(
     const baseRef = git.head(repo);
     const operationId = randomUUID();
     const worktreeName = `${basename(repo)}-${selected.slug}-episode-${operationId.slice(0, 8)}`;
-    const executePromptAtRoot = wrapCanonicalSkill(repo, "execute", "operator-episode-source", selected.location);
+    const executePromptAtRoot = canonicalWorkflowPrompt(repo, "execute", { location: { tag: "operator-episode-source", value: selected.location } });
     if (!executePromptAtRoot) throw new Error("Project is missing .agents/skills/execute/SKILL.md");
 
     let setups: OrcaProjectSetup[];
@@ -902,7 +903,7 @@ export async function createSpecEpisode(
       filesystem.promoteBundle(worktree, selected.slug, selected.folder, approvedBundleDigest);
       const head = git.commitPromotion(worktree, selected.slug);
       if (git.head(repo) !== baseRef) throw new EpisodeStateUncertainError("Canonical checkout changed during local Episode promotion");
-      const executePrompt = wrapCanonicalSkill(worktree, "execute", "operator-episode-source", selected.location);
+      const executePrompt = canonicalWorkflowPrompt(worktree, "execute", { location: { tag: "operator-episode-source", value: selected.location } });
       if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
       const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
       const published = await publisher.createFresh({
@@ -934,7 +935,7 @@ export async function createSpecEpisode(
     const promotedHead = git.commitPromotion(worktree.path, selected.slug);
     if (git.head(repo) !== baseRef) throw new EpisodeStateUncertainError("Canonical checkout changed during Orca Episode promotion");
     record = updated(record, { head: promotedHead }); store.write(repo, record);
-    const executePrompt = wrapCanonicalSkill(worktree.path, "execute", "operator-episode-source", selected.location);
+    const executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", { location: { tag: "operator-episode-source", value: selected.location } });
     if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
     const before = new Set((await publisher.list()).map((session) => session.sessionId).filter((value): value is string => Boolean(value)));
     const launchAutomationName = `prime-claw-launch-${operationId}`;
