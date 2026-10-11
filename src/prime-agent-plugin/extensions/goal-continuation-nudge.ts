@@ -16,11 +16,9 @@ type GoalContinuationDetails = {
 };
 
 type Observation = {
-  goalId: string;
-  lastContinuationsUsed: number;
-  lastContinuationAt: number;
-  rapidContinuationCount: number;
-  nudgeCurrentContinuation: boolean;
+  continuation: GoalContinuationDetails;
+  observedAt: number;
+  rapidCount: number;
   reminder?: string;
 };
 
@@ -103,13 +101,6 @@ function continuationDetails(message: any): GoalContinuationDetails | null {
   return details as GoalContinuationDetails;
 }
 
-function latestInboundIndex(messages: any[]): number {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index]?.role === "user" || messages[index]?.role === "custom") return index;
-  }
-  return -1;
-}
-
 function appendReminder(message: any, reminder: string): any | null {
   if (typeof message.content === "string") {
     return { ...message, content: `${message.content}\n\n${reminder}` };
@@ -128,7 +119,7 @@ export function createGoalContinuationNudgeExtension(dependencies: Dependencies 
   const configPath = dependencies.configPath ?? CONFIG_PATH;
 
   return function goalContinuationNudge(pi: ExtensionAPI): void {
-    const observations = new Map<string, Observation>();
+    let observation: Observation | undefined;
 
     pi.on("session_compact", async () => {
       const config = loadGoalContinuationNudge(configPath);
@@ -140,31 +131,29 @@ export function createGoalContinuationNudgeExtension(dependencies: Dependencies 
       }, { triggerTurn: false });
     });
 
-    const clear = (_event: unknown, ctx: any) => {
-      observations.delete(ctx.sessionManager.getSessionId());
-    };
+    const clear = () => { observation = undefined; };
     pi.on("session_start", clear);
     pi.on("session_tree", clear);
     pi.on("session_shutdown", clear);
 
-    pi.on("context", (event: any, ctx: any) => {
-      const sessionId = ctx.sessionManager.getSessionId();
-      const index = latestInboundIndex(event.messages);
+    pi.on("context", (event: any) => {
+      const index = event.messages.findLastIndex(
+        (message: any) => message?.role === "user" || message?.role === "custom",
+      );
       if (index < 0) return;
 
       const details = continuationDetails(event.messages[index]);
       if (!details) {
-        observations.delete(sessionId);
+        observation = undefined;
         return;
       }
 
-      const previous = observations.get(sessionId);
+      const previous = observation;
       if (
-        previous
-        && previous.goalId === details.goalId
-        && previous.lastContinuationsUsed === details.continuationsUsed
+        previous?.continuation.goalId === details.goalId
+        && previous.continuation.continuationsUsed === details.continuationsUsed
       ) {
-        if (!previous.nudgeCurrentContinuation || !previous.reminder) return;
+        if (!previous.reminder) return;
         const updated = appendReminder(event.messages[index], previous.reminder);
         if (!updated) return;
         const messages = [...event.messages];
@@ -177,29 +166,19 @@ export function createGoalContinuationNudgeExtension(dependencies: Dependencies 
       const isRapidSuccessor = Boolean(
         previous
         && config
-        && previous.goalId === details.goalId
-        && details.continuationsUsed > previous.lastContinuationsUsed
-        && observedAt - previous.lastContinuationAt >= 0
-        && observedAt - previous.lastContinuationAt <= config.windowMs,
+        && previous.continuation.goalId === details.goalId
+        && details.continuationsUsed > previous.continuation.continuationsUsed
+        && observedAt - previous.observedAt >= 0
+        && observedAt - previous.observedAt <= config.windowMs,
       );
-      const rapidContinuationCount = isRapidSuccessor
-        ? previous!.rapidContinuationCount + 1
-        : 1;
-      const nudgeCurrentContinuation = Boolean(
-        config && rapidContinuationCount >= config.minimumRapidContinuations,
-      );
-      const observation: Observation = {
-        goalId: details.goalId,
-        lastContinuationsUsed: details.continuationsUsed,
-        lastContinuationAt: observedAt,
-        rapidContinuationCount,
-        nudgeCurrentContinuation,
-        reminder: nudgeCurrentContinuation ? config!.reminder : undefined,
-      };
-      observations.set(sessionId, observation);
+      const rapidCount = isRapidSuccessor ? previous!.rapidCount + 1 : 1;
+      const reminder = config && rapidCount >= config.minimumRapidContinuations
+        ? config.reminder
+        : undefined;
+      observation = { continuation: details, observedAt, rapidCount, reminder };
 
-      if (!observation.nudgeCurrentContinuation || !observation.reminder) return;
-      const updated = appendReminder(event.messages[index], observation.reminder);
+      if (!reminder) return;
+      const updated = appendReminder(event.messages[index], reminder);
       if (!updated) return;
       const messages = [...event.messages];
       messages[index] = updated;

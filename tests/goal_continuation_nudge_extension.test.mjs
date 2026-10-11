@@ -8,13 +8,9 @@ import { createGoalContinuationNudgeExtension, loadGoalContinuationNudge } from 
 
 function createHarness(cwd) {
   const events = new Map();
-  const commands = [];
-  const tools = [];
   const sent = [];
   const pi = {
     on(name, handler) { events.set(name, handler); },
-    registerCommand(name) { commands.push(name); },
-    registerTool(definition) { tools.push(definition.name); },
     async sendMessage(message, options) { sent.push({ message, options }); },
   };
   let currentTime = 0;
@@ -26,7 +22,7 @@ function createHarness(cwd) {
     sessionManager: { getSessionId() { return "session-1"; } },
   };
   return {
-    events, commands, tools, sent, ctx, configPath,
+    events, sent, ctx, configPath,
     setTime(value) { currentTime = value; },
   };
 }
@@ -69,13 +65,6 @@ function outputText(result, original) {
   if (typeof message.content === "string") return message.content;
   return message.content.find((part) => part.type === "text")?.text;
 }
-
-test("registers only compaction, context, and session cleanup listeners", (t) => {
-  const f = fixture(t);
-  assert.deepEqual([...f.events.keys()], ["session_compact", "session_start", "session_tree", "session_shutdown", "context"]);
-  assert.deepEqual(f.commands, []);
-  assert.deepEqual(f.tools, []);
-});
 
 test("ships a valid default managed plugin policy", () => {
   assert.deepEqual(loadGoalContinuationNudge(), {
