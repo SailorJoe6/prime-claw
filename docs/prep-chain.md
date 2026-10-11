@@ -9,7 +9,12 @@ plan_spec({"location":".ralph/plans/future/<slug>"})
 ```
 
 Each admission validates one exact project-relative future folder and preloads
-both project-owned workflow files before sending either message.
+both project-owned workflow files before sending either message. Planning,
+implementation preparation, ordinary handoff, and owned-Episode handoff use one
+internal prompt loader and one two-message admission sequence. Their public
+entry points, validation, authority, and delivery transports remain separate.
+Read-only legacy lookup is limited to `handoff` and `execute` so an active
+old-layout Episode can finish from its unchanged snapshot.
 
 | Entry point | First message | Sole follow-up |
 | --- | --- | --- |

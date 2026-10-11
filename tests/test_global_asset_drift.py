@@ -5,18 +5,18 @@ import stat
 import shutil
 
 ROOT=Path(__file__).resolve().parents[1]
-SCRIPT=ROOT/"scripts/manage-prime-agent-global-assets.py"
+SCRIPT=ROOT/"scripts/manage-prime-agent-delivery.py"
 SOURCE=ROOT/"src/prime-agent-plugin"
 
 def run(mode,root,*extra):
-    return subprocess.run([str(SCRIPT),mode,str(SOURCE),str(root),*extra],text=True,capture_output=True)
+    return subprocess.run([str(SCRIPT), mode, str(SOURCE), str(root), "--user-root", str(root / ".agents"), *extra], text=True, capture_output=True)
 
 def test_global_assets_create_converge_and_check(tmp_path):
     root=tmp_path/"agent";root.mkdir()
     first=run("apply",root);assert first.returncode==0,first.stderr
     second=run("apply",root);assert second.returncode==0,second.stderr
     checked=run("check",root);assert checked.returncode==0,checked.stderr
-    state=json.loads((root/".prime-claw/global-templates.json").read_text())
+    state=json.loads((root/".prime-claw/delivery-state.json").read_text())
     assert set(state["assets"])=={"global-goals-and-heartbeats","global-goal-continuation","global-expert-review","global-oversee-episode"}
 
 def test_unknown_or_changed_global_asset_is_preserved_by_default(tmp_path):
@@ -52,15 +52,18 @@ def test_backup_paths_are_private_unique_and_reject_symlinked_parent(tmp_path):
     shutil.rmtree(root/".prime-claw/backups")
     (root/".prime-claw/backups").symlink_to(other,target_is_directory=True)
     target.write_text("must not escape\n")
+    exact=root/"extensions/handoff-chain.ts";exact.write_text("stale exact bytes\n")
     refused=run("apply",root,"--action","backup-reset")
     assert refused.returncode==1
+    assert exact.read_text()=="stale exact bytes\n"
+    assert target.read_text()=="must not escape\n"
     assert not list(other.rglob("*"))
 
 
 def test_symlinked_global_state_is_refused_without_touching_target(tmp_path):
     root=tmp_path/"agent";root.mkdir(); pc=root/".prime-claw";pc.mkdir()
     outside=tmp_path/"outside-state";outside.write_text('{"private":true}\n')
-    (pc/"global-templates.json").symlink_to(outside)
+    (pc/"delivery-state.json").symlink_to(outside)
     result=run("apply",root)
     assert result.returncode==1
     assert outside.read_text()=='{"private":true}\n'
@@ -70,7 +73,7 @@ def test_accepted_global_override_requires_new_decision_when_upstream_changes(tm
     source=tmp_path/"source";shutil.copytree(SOURCE,source)
     root=tmp_path/"agent";root.mkdir()
     def local(mode,*extra):
-        return subprocess.run([str(SCRIPT),mode,str(source),str(root),*extra],text=True,capture_output=True)
+        return subprocess.run([str(SCRIPT), mode, str(source), str(root), "--user-root", str(root / ".agents"), *extra],text=True,capture_output=True)
     assert local("apply").returncode==0
     target=root/"skills/goals-and-heartbeats/SKILL.md";target.write_text("accepted local policy\n")
     assert local("apply","--action","accept-override").returncode==0
@@ -79,7 +82,7 @@ def test_accepted_global_override_requires_new_decision_when_upstream_changes(tm
     assert changed.returncode==3
     assert target.read_text()=="accepted local policy\n"
     row=next(item for item in json.loads(changed.stdout)["assets"] if item["id"]=="global-goals-and-heartbeats")
-    assert row["action"]=="preserved" and row["settled"] is False
+    assert row["status"]=="conflict"
 
 
 def test_preflight_detects_drift_without_mutating_files_or_state(tmp_path):
@@ -94,14 +97,14 @@ def test_exact_upstream_bytes_recover_stale_managed_and_customized_provenance(tm
     source=tmp_path/"source";shutil.copytree(SOURCE,source)
     root=tmp_path/"agent";root.mkdir()
     def local(mode,*extra):
-        return subprocess.run([str(SCRIPT),mode,str(source),str(root),*extra],text=True,capture_output=True)
+        return subprocess.run([str(SCRIPT), mode, str(source), str(root), "--user-root", str(root / ".agents"), *extra],text=True,capture_output=True)
     assert local("apply").returncode==0
     target=root/"skills/goals-and-heartbeats/SKILL.md";upstream=source/"skills/goals-and-heartbeats/SKILL.md";upstream.write_text(upstream.read_text()+"\nupstream interrupted v2\n")
     target.write_bytes(upstream.read_bytes())  # asset replacement completed, manifest save did not
     assert local("preflight").returncode==0
     repaired=local("apply");assert repaired.returncode==0,repaired.stderr
     assert local("check").returncode==0
-    row=json.loads((root/".prime-claw/global-templates.json").read_text())["assets"]["global-goals-and-heartbeats"]
+    row=json.loads((root/".prime-claw/delivery-state.json").read_text())["assets"]["global-goals-and-heartbeats"]
     assert row["state"]=="managed" and row["installedSha256"]==row["baselineSha256"]
     target.write_text("temporary local customization\n")
     assert local("apply").returncode==3

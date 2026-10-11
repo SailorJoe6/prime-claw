@@ -64,7 +64,9 @@ def test_bundle_is_deterministic_and_contains_only_plugin_assets():
     assert hashlib.sha256(first).digest() == hashlib.sha256(second).digest()
     assert names == same_names
     assert all(n.startswith(("src/prime-agent-plugin/", "scripts/")) for n in names)
-    assert "src/prime-agent-plugin/role-protocol.json" in names
+    assert "src/prime-agent-plugin/asset-inventory.json" in names
+    assert "src/prime-agent-plugin/role-protocol.json" not in names
+    assert "scripts/manage-prime-agent-delivery.py" in names
 
 
 def test_preflight_requires_exact_ready_image_policy_volume_and_source():

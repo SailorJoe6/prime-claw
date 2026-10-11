@@ -26,7 +26,7 @@ scope expansion.
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/extensions/handoff-chain.ts`
-- `src/prime-agent-plugin/extension-support/handoff-prompts.ts`
+- `src/prime-agent-plugin/extension-support/workflow-chain.ts`
 - `src/prime-agent-plugin/extension-support/spec-episode.ts`
 - `src/prime-agent-plugin/workflows/handoff.md`
 

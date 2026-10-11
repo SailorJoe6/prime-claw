@@ -10,7 +10,9 @@ the queued continuation.
 The native `/handoff` command and `ralph_handoff` tool load project
 `.prime-claw/workflows/handoff.md` and `.agents/skills/execute/SKILL.md` before
 sending either message. Native handoff uses an ordinary prompt; the model tool
-uses `steer`. Execute is queued with `followUp` in both cases.
+uses `steer`. Execute is queued with `followUp` in both cases. This uses the
+same internal loader and two-message admission sequence as planning and
+implementation preparation without merging their public or authority surfaces.
 
 Optional guidance is operator text or a bounded synthesis of already accepted
 in-scope findings. It is not arbitrary chat, a product decision, or scope

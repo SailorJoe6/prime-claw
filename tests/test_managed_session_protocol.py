@@ -24,7 +24,7 @@ EXPECTED_TYPESCRIPT = {
     "extension-support/episode-ownership.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
-    "extension-support/handoff-prompts.ts",
+    "extension-support/workflow-chain.ts",
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
     "extension-support/spec-episode.ts",

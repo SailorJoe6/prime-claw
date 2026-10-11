@@ -41,10 +41,11 @@ export interface AssetDefinition {
   customization: AssetCustomization;
   destination: string;
   lifecycleTrigger: string;
+  migrateFrom: string;
 }
 
 export interface AssetInventory {
-  schemaVersion: 1;
+  schemaVersion: 2;
   assets: AssetDefinition[];
 }
 
@@ -72,7 +73,7 @@ export interface TemplateManifest {
 export interface ReconcileItem {
   assetId: string;
   destination: string;
-  action: "created" | "migrated" | "updated" | "recovered" | "unchanged" | "preserved" | "blocked";
+  action: "created" | "migrated" | "updated" | "recovered" | "unchanged" | "retired" | "preserved" | "blocked";
   reason?: string;
 }
 
@@ -164,29 +165,77 @@ function assertRelativeFilePath(value: string, label: string): void {
 
 export function loadAssetInventory(pluginRoot = pluginRootFromModule()): AssetInventory {
   const raw = jsonObject(parseJson(readFileSync(join(pluginRoot, INVENTORY_FILE), "utf8"), "asset inventory"), "asset inventory");
-  if (raw.schemaVersion !== SCHEMA_VERSION || !Array.isArray(raw.assets)) throw new Error("unsupported asset inventory schema");
+  if (Object.keys(raw).sort().join(",") !== "assets,predecessorRetiredPluginFiles,schemaVersion"
+    || raw.schemaVersion !== 2 || !Array.isArray(raw.assets) || !Array.isArray(raw.predecessorRetiredPluginFiles)) {
+    throw new Error("unsupported asset inventory schema");
+  }
+  const retired = new Set<string>();
+  for (const item of raw.predecessorRetiredPluginFiles) {
+    const row = jsonObject(item, "predecessor retired plugin file");
+    if (Object.keys(row).sort().join(",") !== "path,sha256" || typeof row.path !== "string" || typeof row.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(row.sha256)) {
+      throw new Error("invalid predecessor retired plugin file");
+    }
+    assertRelativeFilePath(row.path, "predecessor retired plugin path");
+    if (retired.has(row.path)) throw new Error(`repeated predecessor retired plugin path: ${row.path}`);
+    retired.add(row.path);
+  }
   const ids = new Set<string>();
-  const destinations = new Set<string>();
-  const assets = raw.assets.map((item: unknown) => {
+  const sources = new Set<string>();
+  const projectDestinations = new Set<string>();
+  const assets: AssetDefinition[] = [];
+  for (const item of raw.assets) {
     const asset = jsonObject(item, "asset");
-    for (const key of ["id", "source", "scope", "exposure", "customization", "destination", "lifecycleTrigger"]) {
-      if (typeof asset[key] !== "string" || !asset[key]) throw new Error(`asset ${String(asset.id ?? "<unknown>")} has invalid ${key}`);
+    if (Object.keys(asset).sort().join(",") !== "id,source,targets") throw new Error("asset fields are malformed");
+    if (typeof asset.id !== "string" || !asset.id || typeof asset.source !== "string" || !Array.isArray(asset.targets)) {
+      throw new Error("asset has invalid id, source, or targets");
     }
     assertRelativeFilePath(asset.source, `asset ${asset.id} source`);
-    assertRelativeFilePath(asset.destination, `asset ${asset.id} destination`);
-    if (!(["global", "project"] as string[]).includes(asset.scope)
-      || !(["discoverable", "internal"] as string[]).includes(asset.exposure)
-      || !(["plugin-managed", "project-customizable"] as string[]).includes(asset.customization)) {
-      throw new Error(`asset ${asset.id} has invalid metadata`);
+    if (ids.has(asset.id) || sources.has(asset.source)) throw new Error(`asset inventory repeats ${asset.id} or ${asset.source}`);
+    ids.add(asset.id); sources.add(asset.source);
+    const source = lstatSync(join(pluginRoot, asset.source));
+    if (!source.isFile() || source.isSymbolicLink()) throw new Error(`asset ${asset.id} source is not a regular file`);
+    let project: AssetDefinition | undefined;
+    const targetKeys = new Set<string>();
+    for (const itemTarget of asset.targets) {
+      const target = jsonObject(itemTarget, `asset ${asset.id} target`);
+      const kind = target.class;
+      if (typeof kind !== "string") throw new Error(`asset ${asset.id} target has invalid class`);
+      if (kind === "selected-context-block") {
+        if (Object.keys(target).length !== 1) throw new Error(`asset ${asset.id} selected context target is malformed`);
+      } else {
+        if (typeof target.destination !== "string") throw new Error(`asset ${asset.id} target has invalid destination`);
+        assertRelativeFilePath(target.destination, `asset ${asset.id} target destination`);
+        if (kind === "project-customizable") {
+          if (target.exposure !== "discoverable" && target.exposure !== "internal") throw new Error(`asset ${asset.id} project exposure is invalid`);
+          if (typeof target.lifecycleTrigger !== "string" || !target.lifecycleTrigger || typeof target.migrateFrom !== "string") throw new Error(`asset ${asset.id} project lifecycle or migration source is invalid`);
+          assertRelativeFilePath(target.migrateFrom, `asset ${asset.id} project migration source`);
+          if (project || projectDestinations.has(target.destination)) throw new Error(`asset inventory repeats project destination ${target.destination}`);
+          projectDestinations.add(target.destination);
+          project = {
+            id: asset.id,
+            source: asset.source,
+            scope: "project",
+            exposure: target.exposure,
+            customization: "project-customizable",
+            destination: target.destination,
+            lifecycleTrigger: target.lifecycleTrigger,
+            migrateFrom: target.migrateFrom,
+          };
+        } else if (!["plugin-root-exact", "plugin-root-managed", "user-skill-exact"].includes(kind)) {
+          throw new Error(`asset ${asset.id} target class is invalid`);
+        }
+      }
+      const key = `${kind}:${String(target.destination ?? "")}`;
+      if (targetKeys.has(key)) throw new Error(`asset ${asset.id} repeats target ${key}`);
+      targetKeys.add(key);
     }
-    if (ids.has(asset.id) || destinations.has(asset.destination)) throw new Error(`asset inventory repeats ${asset.id} or ${asset.destination}`);
-    ids.add(asset.id); destinations.add(asset.destination);
-    const source = join(pluginRoot, asset.source);
-    const sourceStat = lstatSync(source);
-    if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) throw new Error(`asset ${asset.id} source is not a regular file`);
-    return asset as AssetDefinition;
-  });
-  return { schemaVersion: SCHEMA_VERSION, assets };
+    if (!asset.targets.length) throw new Error(`asset ${asset.id} has no delivery targets`);
+    if (project && !asset.targets.some((target: any) => target.class === "plugin-root-exact" && target.destination === asset.source)) {
+      throw new Error(`project asset ${asset.id} has no exact plugin staging target`);
+    }
+    if (project) assets.push(project);
+  }
+  return { schemaVersion: 2, assets };
 }
 
 function runGit(runner: CommandRunner, cwd: string, args: string[], allowFailure = false) {
@@ -329,13 +378,8 @@ function provenance(asset: AssetDefinition): TemplateEntry["provenance"] {
   return { scope: asset.scope, exposure: asset.exposure, customization: asset.customization, lifecycleTrigger: asset.lifecycleTrigger };
 }
 
-function legacyPath(projectRoot: string, asset: AssetDefinition): string | null {
-  if (asset.id.startsWith("project-skill-")) return join(projectRoot, ".ralph", "skills", asset.id.slice("project-skill-".length), "SKILL.md");
-  if (asset.id.startsWith("project-workflow-")) {
-    const name = asset.id.slice("project-workflow-".length);
-    return join(projectRoot, ".ralph", "skills", name === "plan-spec" ? "plan" : name, "SKILL.md");
-  }
-  return null;
+function legacyPath(projectRoot: string, asset: AssetDefinition): string {
+  return join(projectRoot, asset.migrateFrom);
 }
 
 function safeLegacyStat(projectRoot: string, path: string) {
@@ -351,7 +395,6 @@ function migrateExpectedSkillSymlink(projectRoot: string, asset: AssetDefinition
   if (!asset.id.startsWith("project-skill-")) return null;
   const skillDir = join(projectRoot, dirname(asset.destination));
   const expectedLegacy = legacyPath(projectRoot, asset);
-  if (!expectedLegacy) return null;
   assertSafePathAncestors(projectRoot, skillDir);
   const backupLink = `${skillDir}.prime-claw-migration-link`;
   if (existsSync(backupLink)) {
@@ -581,7 +624,34 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
     if (lstatIfPresent(reviewState)) throw new Error(`interrupted template review requires an explicit keep or restore decision: ${TEMPLATE_REVIEW_STATE}`);
     const manifest = readManifest(project.root);
     const recoveredReset = recoverResetIntent(project.root, pluginRoot, inventory, manifest);
-    for (const asset of inventory.assets.filter((item) => item.scope === "project")) {
+    const currentAssetIds = new Set(inventory.assets.map((asset) => asset.id));
+    for (const [assetId, prior] of Object.entries(manifest.assets)) {
+      if (currentAssetIds.has(assetId)) continue;
+      let action: ReconcileItem["action"] = "retired";
+      let reason: string | undefined;
+      try {
+        assertRelativeFilePath(prior.destination, `retired project asset ${assetId} destination`);
+        const destination = join(project.root, prior.destination);
+        assertSafePathAncestors(project.root, destination);
+        const destinationStat = lstatIfPresent(destination);
+        if (destinationStat) {
+          if (!destinationStat.isFile() || destinationStat.isSymbolicLink()) throw new Error("retired destination is not a regular file");
+          const current = digest(readFileSync(destination));
+          if (prior.state === "managed" && current === prior.installedSha256) {
+            unlinkSync(destination); fsyncDirectory(dirname(destination));
+          } else {
+            action = "preserved";
+            reason = "released customized retired project asset";
+          }
+        }
+        delete manifest.assets[assetId];
+      } catch (error) {
+        action = "blocked";
+        reason = error instanceof Error ? error.message : String(error);
+      }
+      items.push({ assetId, destination: prior.destination, action, ...(reason ? { reason } : {}) });
+    }
+    for (const asset of inventory.assets) {
       const sourcePath = join(pluginRoot, asset.source);
       const sourceBytes = readFileSync(sourcePath);
       const upstream = digest(sourceBytes);
@@ -666,7 +736,7 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
       } catch (error) { registration = { status: "unavailable", error: error instanceof Error ? error.message : String(error) }; }
     }
     const conflicts = items.filter((item) => item.action === "preserved" || item.action === "blocked").length + remaining.length + (registration.status === "unavailable" ? 1 : 0);
-    return { project, registration, items, manifestWritten, changed: manifestWritten || items.some((item) => ["created", "migrated", "updated", "recovered"].includes(item.action)), conflicts, legacyRemaining: remaining, skippedActiveEpisode: false };
+    return { project, registration, items, manifestWritten, changed: manifestWritten || items.some((item) => ["created", "migrated", "updated", "recovered", "retired"].includes(item.action)), conflicts, legacyRemaining: remaining, skippedActiveEpisode: false };
   } finally { release(); }
 }
 

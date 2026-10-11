@@ -1,489 +1,143 @@
 # Lab-global prime-claw plugin
 
-> Scope: supported user-global installation for the builder/lab runtime. The
-> final sandbox uses the same environment-global placement inside its isolated
-> home. Deployment follows the staged transition and restart gate below.
+> Scope: the supported Prime Agent `0.9.8` plugin installed in a user-global
+> agent directory or the isolated restored sandbox home.
 
-## Source and installed layouts
+## Source and delivery authority
 
-The builder source is deliberately inert. The current generation has one authored
-role kernel, one machine-readable final selector, thirteen managed TypeScript
-files, one 15-row Markdown inventory, and three exact managed global skill
-capabilities:
+Plugin source is inert under `src/prime-agent-plugin/`. The schema-2
+`asset-inventory.json` is the single delivery authority. Each shipped source
+appears once and declares one or more explicit policies:
 
-```text
-src/prime-agent-plugin/
-  ROLE_KERNEL.md
-  role-protocol.json              # schema 1, generation=final
-  extensions/
-    goal-continuation-nudge.ts
-    handoff-chain.ts
-    project-initialization.ts
-    reviewed-plan.ts
-  extension-support/
-    project-initialization.ts
-    template-review.ts
-    episode-ownership.ts
-    conversation-oversight.ts
-    episode-close.ts
-    handoff-prompts.ts
-    prep-chain.ts
-    reviewed-plan-support.ts
-    spec-episode.ts
-  asset-inventory.json
-  skills/
-    goals-and-heartbeats/          # managed global SKILL + continuation policy
-    prime-claw-oversee-episode/SKILL.md
-    prime-claw-expert-review/SKILL.md
-    project-templates/*.md         # non-discoverable project skill sources
-  workflows/*.md                  # non-discoverable internal workflow sources
-```
+- `plugin-root-exact`: exact installed plugin bytes;
+- `plugin-root-managed`: Markdown whose local drift needs an explicit decision;
+- `user-skill-exact`: the user-level goals skill;
+- `selected-context-block`: `ROLE_KERNEL.md` inside one global context file; and
+- `project-customizable`: project templates that become operator-owned after
+  customization.
 
-`ROLE_KERNEL.md` is the only role-kernel policy source. The role-protocol
-installer reads it directly when managing the selected global context block;
-there is no generated TypeScript copy or runtime prompt-byte authentication. The
-managed global Conversation and EXPERT skills are the plugin-managed
-role-specific judgment sources. The goals-and-heartbeats `SKILL.md` and
-`CONTINUATION.md` form one managed user-global capability bundle; the
-continuation hook loads its reminder from that bundle. The legacy APPEND source, project forwarding skill/link,
-standalone reviewer profile, and append-only manager are absent.
+`scripts/manage-prime-agent-delivery.py` interprets this authority for both
+apply and check. It records digest-bound ownership in
+`.prime-claw/delivery-state.json`. A bounded predecessor hash set supports the
+accepted schema-1 upgrade; it does not authorize unknown or changed deletion.
 
-The installed copy keeps the TypeScript layout under `~/.prime/agent/`. Prime
-Agent auto-discovers the four extension entry points; their relative imports
-resolve through the nine installed `extension-support/` files. Project skill
-sources use `.md` names below `skills/project-templates/`, so they are not global
-`SKILL.md` discovery candidates; initialization copies them to project-local
-`.agents/skills/` destinations. Do not keep
-plugin source or a second copy under this repository's or a managed project's
-`.prime/agent/extensions/` path. Cross-scope duplicate discovery can prevent
-startup. The durable source belongs under `src/prime-agent-plugin/`.
+The final-only role reconciler reads the unique `selected-context-block` source.
+It selects the first ordinary context in this order:
+
+1. `AGENTS.md`
+2. `AGENTS.MD`
+3. `CLAUDE.md`
+4. `CLAUDE.MD`
+
+It preserves unrelated bytes, requires unique role markers, rejects symlinks,
+non-regular files, hard-linked aliases, latent blocks in unselected contexts,
+and unknown ownership drift. Apply uses same-directory atomic replacement and a
+root-local lock. Compact mode-`0600` state lives at
+`.prime-claw/role-protocol-state.json`. Check requires exact source bytes and
+state. The reconciler has no bridge generation, legacy APPEND migration,
+receipt replay, restore command, or cutover transaction engine.
 
 ## Supported runtime
 
-Prime Claw is pinned to the maintained TypeScript downstream release
-`SailorJoe6/prime-agent@cwd-fix-v0.9.8-r1`. The only supported candidate
-installation is the verified Docker-only source build documented in
-[prime-agent-installation.md](prime-agent-installation.md). A plain `0.9.8`
-version result is insufficient because the current public installer can select a
-different Rust/native product that cannot load this plugin.
+Prime Agent `0.9.8` is the supported plugin runtime. Prime Agent `0.10` removed
+the extension interface required by these stories. Candidate development and
+pre-merge validation are Docker-only.
 
-Do not install, activate, test-cut over, or claim compatibility with v0.10
-through this workflow. A future change requires released upstream Orca support
-for CWD plus lifecycle, identity, and finality integration and new acceptance
-evidence; Prime Claw does not patch or vendor Prime Agent to supply it.
+Never place candidate source under this repository's `.prime/agent/extensions`.
+Prime Agent can discover both project and user scopes and fail startup on a
+duplicate extension.
 
 ## Apply or refresh
 
-The zero-argument scripts intentionally fail. Every invocation must select one
-of two target modes:
-
-1. **Development/test:** use tier 1 so Prime Agent and the plugin stay inside an
-   ephemeral Docker container. The driver and pytest fixture explicitly target
-   the container's `/root/.prime/agent`:
-
-   ```bash
-   scripts/test-tier1.sh --probe
-   python3 -m pytest tests/ -q -m container
-   ```
-
-   Final mode intentionally cannot initialize a fresh script-only root: it
-   requires an exact owned bridge manifest. Tests that need an isolated direct
-   apply seed that predecessor state from the clearly labeled historical
-   fixtures before invoking the scripts. Use the Tier 1 driver instead of
-   reproducing that test-only setup by hand.
-
-2. **Accepted user-global activation:** do not run apply/check directly. After
-   the exact final candidate is accepted and the operator separately authorizes
-   Gate B, launch the bounded coordinator from a separate terminal with the
-   verified private accepted-bridge bundle, exact operation input, and a private
-   mode-0700 state directory:
-
-   ```bash
-   python3 scripts/coordinate-prime-agent-role-cutover.py \
-     --config /private/path/gate-b-operation.json \
-     --state-dir /private/path/gate-b-state \
-     --execute --authorization <full-accepted-commit>
-   ```
-
-   The coordinator quiesces the old generation, fast-forwards the primary
-   `main`, runs user-global apply/check there, records the final installation
-   receipt, restarts once, and emits the bounded resume checklist. The direct
-   `--user-global` scripts remain guarded implementation details: they refuse
-   linked worktrees, non-`main` branches, and explicit host-root overrides.
-
-Apply copies only the allowlisted plugin support files and exact managed skill inventories. Before the first copy,
-`scripts/manage-prime-agent-role-protocol.py` selects exactly one global context
-candidate in Prime Agent priority order: `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`,
-then `CLAUDE.MD`. It creates `AGENTS.md` only when none exists. The manager owns
-only its distinct `prime-claw:role-kernel` marker region and introduced
-separators. It preserves unrelated bytes, LF/CRLF style, final-newline state,
-mode, uid, and gid. It records the selected path and ownership in mode-0600
-`$agentDir/.prime-claw/role-protocol-state.json`.
-
-Selection drift, a latent block in an unselected candidate, malformed or
-unowned markers, unsafe files/directories, fails closed before plugin copy. Apply and check do not migrate a selected file
-implicitly. The checked-in `role-protocol.json` is final. Final apply requires
-an exact owned bridge or final manifest, verifies the installed managed block
-against that ownership record, and replaces only that block with the checked-in
-`ROLE_KERNEL.md`. This permits an accepted Markdown policy refresh without
-adopting an unowned block. A bridge-to-final apply also removes only the recorded
-legacy APPEND region plus Prime Claw-owned separators. The transaction updates
-the ownership manifest and records a fixed-inventory receipt whose known
-preimages can be restored. It never reads a legacy policy source.
-
-Unrelated APPEND bytes and ordinary metadata are preserved. Malformed,
-duplicate, unowned, reappeared, or unknown state is refused. A fresh/unowned
-root is intentionally not adopted by final apply. Isolated tests seed the exact
-bridge precondition from clearly labeled historical fixtures. Live user-global
-final apply remains Gate B and is not performed by source reconciliation.
-
-The installer treats these former managed paths as retired:
-
-- `extensions/goal-heartbeat-work-control.ts`;
-- `extensions/goal-blocker-control.ts`; and
-- `extension-support/episode-finalization.ts`.
-
-The destination root, managed directories, and every current, redundant, and
-retired leaf are type-checked before the first delete or copy. Apply rejects
-symlinked or non-directory managed parents, removes only regular stale managed
-files, and preserves unrelated installed extensions. Check rejects any stale
-retired entry and verifies each current installed file byte-for-byte. Apply
-forwards its explicit target mode to that required full check, so an interrupted
-or mixed sequential generation cannot report success.
-
-The installer owns two uniquely named role skills beside the TypeScript plugin
-files: `skills/prime-claw-oversee-episode/SKILL.md` and
-`skills/prime-claw-expert-review/SKILL.md`. It validates real managed `skills/`
-and skill directories, leaves unrelated skill entries untouched, installs each
-file at mode 0644, checks bytes exactly, and requires a final full check.
-
-During an explicitly selected user-global cutover, apply validates and removes
-the exact retired `skills/prime-claw-official-expert-review` four-file layout
-and the exact `$PRIME_AGENT_CODING_AGENT_DIR/prime-claw-private/expert-review-launches`
-state directory. Symlinked, escaped, wrong-type, or unexpected old skill layouts
-fail before cleanup. This is narrow cleanup for the unshipped lab installation,
-not a migration framework.
-
-The EXPERT workflow is Markdown plus native Prime Agent APIs. It uses model
-discovery, a harmless RLM bootstrap followed by one ordinary parent-to-child
-review task, parent/child clarification messages, and normal child deletion. The
-child keeps Prime Agent's normal system prompt. There is no Python package,
-private reservation/admission state, packet schema, prompt replacement,
-structured submission, settlement, disposition, close, or purge protocol.
-
-The predecessor APPEND-only manager is retired. Final apply/check use the
-role-protocol manager for the selected context, exact owned legacy removal, and
-rollback receipts. The manager follows a trusted-local operating model: it rejects
-obvious symlinks, non-regular or unreadable leaves visible during validation,
-then serializes cooperating writers with one agent-root `flock`. It rereads each
-ordinary byte-and-metadata preimage immediately before same-directory
-`os.replace`, preserves mode/uid/gid where supported, fsyncs the new file and its
-parent directory, and refuses a changed preimage.
-
-The role kernel is shared orientation installed from `ROLE_KERNEL.md`, not a
-runtime identity credential. Provider guards no longer scan, hash, or compare
-its bytes. Conversation oversight now uses ordinary managed-skill loading and one
-post-compaction full-guide message for the exact active owner. It has no guide
-hash, receipt, activation, readiness, or transcript-redaction protocol.
-
-This is intentionally not a hostile-filesystem transaction engine. The manager
-does not maintain a multi-phase journal, continuous descriptor/inode authority,
-atomic-exchange rollback, or syscall-by-syscall crash protocol. An in-process
-ordinary write failure attempts rollback only from exact known pre/post states.
-An abrupt interruption can require guarded manual recovery; unknown state is left
-untouched. The supported wrapper accepts `--role-receipt /absolute/private/path` so the
-separately authorized coordinator can require a fresh destination-bound live
-receipt. A receipt produced by an isolated proof is never valid authority for the
-real user-global root. A
-non-cooperating same-UID process can race individual checks; that is outside the
-approved local-product threat model.
-
-### Selected-context recovery receipts
-
-Final apply can capture a mode-0600 recovery receipt outside `agentDir`:
+Bare apply and check fail closed. Supported targets are:
 
 ```bash
-python3 scripts/manage-prime-agent-role-protocol.py apply \
-  src/prime-agent-plugin/role-protocol.json \
-  src/prime-agent-plugin/ROLE_KERNEL.md \
-  /path/to/absent-retired-legacy-source \
-  /explicit/isolated/owned-bridge-agent-dir \
-  --receipt /external/private/final-transition.json
+# Docker or script-only isolated diagnostics
+PRIME_AGENT_PLUGIN_ROOT=/explicit/isolated/root scripts/apply-prime-agent-plugin.sh
+PRIME_AGENT_PLUGIN_ROOT=/explicit/isolated/root scripts/check-prime-agent-plugin.sh
 
-python3 scripts/manage-prime-agent-role-protocol.py restore \
-  /external/private/final-transition.json \
-  /explicit/isolated/owned-bridge-agent-dir
+# Restored sandbox home, from inside that container only
+scripts/apply-prime-agent-plugin.sh --sandbox-home
+scripts/check-prime-agent-plugin.sh --sandbox-home
+
+# Deliberate accepted host refresh, primary main checkout only
+scripts/apply-prime-agent-plugin.sh --user-global
+scripts/check-prime-agent-plugin.sh --user-global
 ```
 
-The legacy positional argument is retained only as the dual-mode manager ABI.
-Final mode does not read it. Final mode requires the destination's exact owned
-bridge manifest, derives the retired block digest and separators from that
-manifest, and refuses fresh or unowned state. Docker tests create the bridge
-precondition from `tests/fixtures/role-protocol-bridge.json` and the minimal
-historical marker fixture
-`tests/fixtures/role-protocol-legacy-append.md`; neither fixture is current
-policy.
+`--user-global` is refused from linked worktrees or non-`main` branches. An
+explicit root that resolves to the host user-global target is also refused.
+`--sandbox-home` requires Docker `HOME=/sandbox`, the exact mounted `.prime`
+link, and an image-owned `.agents` directory.
 
-Final `check` proves the managed APPEND region is absent. Replay preserves an
-already-absent APPEND file instead of recreating it. `restore` with the receipt
-recreates the exact accepted bridge context, APPEND, manifest bytes, and ordinary
-metadata. If any fixed-inventory path matches neither recorded preimage nor
-postimage, stop and preserve the root and receipt for manual recovery.
+Apply performs all read-only delivery, selected-context, and retired-package
+preflights before mutation. It reconciles the role block, removes only hash-proven bounded predecessor
+plugin files, applies manifest assets, and runs the exact checker. Installation is sequential rather than a generation-directory swap;
+the final check is therefore mandatory and rejects incomplete generations.
 
-The schema-1 receipt has a fixed inventory of exactly the selected context,
-`APPEND_SYSTEM.md`, and `.prime-claw/role-protocol-state.json`. Before any restore
-mutation, the manager validates the complete schema, exact paths, unique labels,
-base64/digests, ordinary metadata, selected-context/manifest relationship, and
-creation ownership. Every current destination must match its recorded preimage
-or postimage. An unknown file, marker drift, malformed inventory, contradictory
-ownership, or unrelated nominated path refuses the whole restore before
-mutation.
+A drift-managed Markdown asset supports:
 
-Restore writes exact recorded bytes and ordinary metadata, and deletes a missing
-preimage only at its fixed managed path from an exact known postimage. A receipt
-cannot nominate an unrelated file for deletion, and a pre-existing context is
-not deleted by a contradictory creation record. A partially restored set made
-only of recorded states is safely repeatable. The receipt is recovery material,
-not a tamper-proof attestation against the trusted local owner.
+- `preserve` (default): report unresolved drift and fail;
+- `backup-reset`: validate a private backup path before any mutation, save the
+  old bytes, then install current source; and
+- `accept-override`: retain the current bytes as the accepted local version.
 
-Plausible excluded hazards remain advisory hardening: parent or leaf replacement
-between individual validation and mutation syscalls, same-UID receipt
-substitution, hard exits at every rename/fsync boundary, and power-loss
-durability. Promote one only after repeatable dogfood failure, a near miss or
-user report, a changed trust boundary, or a separately approved hard requirement.
+Unknown, changed, symlinked, non-regular, or escaped retired paths fail closed.
 
-## Restored v2 sandbox home (container-only)
+## Restored v2 sandbox home
 
-For a **Ready, pinned TypeScript v0.9.8-r1** sandbox restored with separate
-`/sandbox/pgdata`, `/sandbox/brain`, and `/sandbox/home-root` mounts from the
-same accepted working volume, use the guarded container delivery step. It is
-not the host `--user-global` installer and does not run `recover`, `converge`,
-`validate`, brain writes, or a daemon restart. Run it from a committed, clean
-prime-claw checkout after Docker tier 1 and container tests pass:
+The accepted v2 replacement mounts one retained volume at `/sandbox/home-root`
+and links selected persistent state into `/sandbox`. Image-provided `.agents`,
+`.uv`, `.venv`, `.cache`, and `.local` remain real image directories. Retained
+fallback copies remain in mounted `home-root`; this repository does not remove
+them.
+
+The guarded sandbox deployer:
 
 ```bash
-python3 scripts/deploy-prime-agent-plugin-sandbox.py \
-  --sandbox <exact-ready-name> --sandbox-id <exact-openshell-id> \
-  --image-id sha256:<exact-pinned-image-id> --volume <exact-working-volume> \
-  --policy-sha256 <accepted-effective-policy-digest>
-python3 scripts/deploy-prime-agent-plugin-sandbox.py \
-  --sandbox <same-name> --sandbox-id <same-id> \
-  --image-id sha256:<same-image-id> --volume <same-volume> \
-  --policy-sha256 <same-accepted-policy-digest> --check-only
+python3 scripts/deploy-prime-agent-plugin-sandbox.py   --sandbox <name> --sandbox-id <id> --image-id <sha256:id>   --volume <name> --policy-sha256 <sha256>
 ```
 
-The script checks OpenShell readiness, immutable Docker image and tag,
-OpenShell-managed mounts, the operator-retained digest of the **whole accepted
-effective policy** (not one derived from a changed live policy), pinned source,
-mounted home topology, and duplicate project extension paths before upload.
-It packages only committed plugin assets and helper scripts into a
-content-hashed bundle, uploads it to the selected sandbox's private `/tmp`,
-and invokes the container-local installer/checker. The installer requires
-`HOME=/sandbox`, the exact `/sandbox/.prime -> home-root/.prime` link, and the
-real image-owned `/sandbox/.agents`. Its one-time fresh-final role ownership
-path refuses existing global contexts and does not invent a bridge manifest.
-The role receipt is saved under the persistent mounted home, outside the agent
-root; retain it if manual recovery is needed.
+stages a content-hashed bundle, validates the exact Ready sandbox, image,
+mounts, policy, and home topology, then runs container-local apply and check. It
+does not restart Prime Agent, refresh brains, copy credentials, or clean retained
+resources. `--check-only` performs no plugin mutation.
 
-`/sandbox/.prime/agent` persists on the accepted volume. `/sandbox/.agents`
-is **image-owned**, not mounted, so reapply this step to every replacement
-container before cutover. Never copy the host-global plugin into the sandbox.
-A successful copy/check is not activation: quiesce affected sessions,
-coordinate one full Prime Agent daemon restart, then prove the pinned build
-and uniquely discovered commands/tools in a **new daemon-backed session**.
-Check database counts, source identity, policy, and a bounded model call.
-Preserve the old container, checkpoint, working volume, and UAT resources.
-On mismatch, stop and retain the receipt and preimage evidence; do not
-blindly restore or rerun broad recovery against a live daemon.
+## Candidate validation
 
-## Cutover and rollback
+After every plugin-source change run a Docker gate, normally:
 
-A successful apply/check proves installed bytes, not the loaded generation.
-`/reload`, elapsed time, a fresh process, or container evidence alone is not
-cutover proof. Source compatibility resources were retained through Gate A and
-are now absent from the final source tree. Keep the installed bridge generation
-and the verified private accepted-bridge bundle intact until the exact final
-candidate is accepted and Gate B is separately authorized.
+```bash
+scripts/test-tier1.sh --probe
+```
 
-For Gate B:
+Tier 1 builds an immutable image, disconnects network before plugin execution,
+performs apply/check and optional native discovery, verifies teardown, and
+publishes evidence under `.test-results/`. Native Prime Agent probes must use
+`scripts/run-prime-agent-probe.sh` so settings and sessions are isolated.
 
-1. verify the private bridge bundle, its exact rollback preimages, the accepted
-   candidate commit/tree, the clean synchronized primary `main`, and the selected
-   owner/episode/ordinary checkpoints;
-2. let active work become idle or durably checkpointed, then launch the authorized
-   coordinator once from a separate terminal;
-3. let that coordinator prove quiescence, fast-forward primary `main`, run final
-   user-global apply/check, retain the exact installation receipt, and perform one
-   coordinated full Prime Agent daemon/harness restart;
-4. resume the exact owner, exact episode, and designated ordinary conversation;
-5. verify final absence, one managed lean block, zero new historical oversight
-   packages, no detailed work-control overlay, and intact lifecycle authority;
-   and
-6. obtain operator acceptance before discarding the private bundle, rollback
-   receipt, or physically cleaning retained resources.
+## Accepted refresh boundary
 
-Saved sessions are resumed, never deleted. On failure, follow the coordinator's
-last proven checkpoint and use the verified private bundle or final installation
-receipt to restore the exact accepted bridge preimages. Reapply/check that
-known-good bridge generation and repeat the full quiesce/restart discipline only
-under renewed operator authority. Do not improvise direct host apply/check or
-retry an uncertain coordinator result.
+A deliberate post-acceptance user-global or sandbox refresh remains an operator
+action. Let active work quiesce, apply and check from the authorized target,
+then perform one coordinated full Prime Agent restart. Copy success, elapsed
+time, `/reload`, or a fresh process alone does not prove loaded-generation
+cutover. Resumed owner, episode, and ordinary-session UAT provide that proof.
 
+Retained sandboxes, volumes, checkpoints, receipts, and preimage evidence are
+historical operator resources. Code retirement does not authorize deleting or
+altering them. Cleanup requires a separate explicit decision.
 
-## Generation A coordinator and preactivation bundle
+## Runtime discovery
 
-Slice 4 adds two inert, operator-launched helpers:
-
-- `scripts/coordinate-prime-agent-role-cutover.py` performs read-only preflight
-  by default. A real mutation requires both `--execute` and the full accepted
-  candidate commit as `--authorization`, plus the exact operation input. It
-  records a mode-0600 checkpoint under an operator-selected mode-0700 private
-  directory. It never reviews, accepts, retries an uncertain mutation, resumes a
-  session, or starts Gate A on its own.
-- `scripts/manage-prime-agent-cutover-bundle.py` creates and verifies the private
-  preactivation bundle. It captures only the selected global-context and APPEND
-  preimages, their known candidate postimages, the fixed managed plugin/skill
-  and ownership-manifest surface, selected-file decision, known-good generation,
-  source topology, and exact recovery tool hashes. It does not traverse
-  settings, sessions, provider/OAuth state, `.env` files, or unrelated agent
-  entries. Exact opaque preimages remain private and are never committed.
-
-The coordinator input must record the exact accepted commit/tree, synchronized
-primary `main`, expected remote ref, bundle manifest digest, ordered
-owner/episode/ordinary checkpoints, and one canonical CLI entrypoint. A compiled
-entrypoint is `[launcher]`; a Node entrypoint is `[interpreter, entrypoint]`.
-Both realpaths and artifact digests are bound, every CLI command uses the whole
-prefix, and `status --json` must report the entrypoint path, exact build, socket,
-and declared old-daemon PID. The version command uses a version-only lossless capture and must return zero,
-with exactly one raw stream equal to the configured version encoded as UTF-8 plus
-one LF byte and the other raw stream equal to `b""`. CRLF, bare CR, no LF,
-non-UTF-8 bytes, both/empty streams, whitespace, blank or extra lines, mismatch,
-nonzero exit, and timeout fail closed before status, shutdown, landing, apply, or
-start. General text-mode Git, status, process, and bundle commands remain
-unchanged.
-
-Process observation is bounded to exact `pgrep -x prime-agent` results and the
-explicitly declared PIDs, followed by targeted `ps -p`. It never parses an
-unrelated process listing. Exactly one declared old daemon and only approved old
-workers may be present. Declared client, TUI, launcher, and wrapper roles must be
-absent. The daemon status row is authoritative; a worker is recorded honestly by
-its approved parent/entrypoint relationship because the public status API does
-not publish per-worker build rows. Failed, malformed, duplicate, unknown, or
-mismatched observations stop before shutdown, landing, apply, start, or the
-scratch rollback proof.
-
-Rollback input is topology, not arbitrary shell text: an ordered explicit list
-of every linear commit from candidate back to the integration merge, the exact
-merge and ordered parents, mainline 2, accepted prelanding commit/tree, and a
-fixed commit message. Preflight resolves every commit, proves the complete
-first-parent chain, and applies the generated no-commit inverses in a temporary
-`git clone --no-local`. The resulting tree must equal the accepted prelanding
-tree. Placeholder ranges, omitted/wrong commits, wrong mainline, reset, rebase,
-force-push, and automatic live compensation are not representable or accepted.
-
-The separately authorized execute path records an intent checkpoint before each
-uncertain boundary: shutdown, landing/push, user-global apply, and runtime start.
-It uses exact `prime-agent shutdown --force --json`, proves zero stale process and
-socket state, fast-forwards and verifies local/remote equality, calls apply then
-check with a fresh live role receipt, and proves zero stale processes again. It
-then starts exactly once. A deadline- and attempt-bounded loop performs only
-read-only status/child observations. Empty or exact expected-socket unreachable
-state may wait; wrong identity, duplicates, child exit, malformed/failed status,
-or deadline stop truthfully without another start. Only one exact current row
-emits the ordered resume checklist.
-
-Recovery follows the last recorded intent/confirmation:
-
-- before shutdown request, leave the accepted generation running;
-- after shutdown request, inspect status/process/socket evidence before deciding
-  whether the old runtime is running;
-- after confirmed shutdown, only the unchanged accepted runtime is eligible to
-  restart;
-- after landing request, inspect local and remote refs without retrying;
-- after apply request, restore only fixed surfaces whose current state is an
-  exact recorded preimage/postimage, otherwise stop for manual recovery;
-- after start request, inspect status and never start a second runtime; and
-- after one proven runtime, recover owner, episode, then ordinary conversation.
-
-Bundle apply/restore proof is always performed against an explicit isolated
-agent root. Before resolving paths, the helper uses `lstat` on the originally
-supplied context, destination, bundle root, real inventory roots, and every fixed
-managed parent/leaf component. Visible or dangling links and nonregular leaves
-fail closed; it does not add descriptor-chain, ABA, or hostile-race machinery.
-`restore-installed` and `restore` classify the whole fixed inventory before any
-write, reject third states with zero partial mutation, and preserve unrelated
-sentinels. Restored equality includes bytes plus ordinary mode/uid/gid. Equal
-bytes with metadata drift trigger metadata repair or failure; only complete
-bytes-and-metadata replay reports `alreadyRestored`. Real Gate A still requires
-fresh operator authority and a fresh live destination-bound receipt.
-
-## Global Markdown drift gate
-
-The apply/check scripts reconcile inventoried global Markdown through
-`scripts/manage-prime-agent-global-assets.py`. Apply first runs a read-only
-preflight before changing plugin code, so unresolved drift cannot leave a mixed
-generation. Unknown or changed bytes are
-preserved by default and block readiness. `--global-drift-action
-accept-override` explicitly accepts current bytes against this upstream;
-`--global-drift-action backup-reset` writes and verifies a timestamped backup
-before replacement. These choices do not apply to project-customizable copies. The cutover bundle
-inventories `.prime-claw/global-templates.json` as mutable authority state and
-restores its exact preimage (or prior absence). Verified backup/reset artifacts
-are deliberately retained as recovery evidence; rollback never deletes them.
-
-## Verify runtime discovery
-
-Candidate discovery is proved only by Tier 1 Docker. After the separately
-authorized Gate B coordinator has run final apply/check from primary `main` and
-performed the coordinated restart above, use the resumed sessions for cutover
-UAT; do not substitute a linked-worktree or host candidate probe. The accepted
-installed generation should expose:
-
-- native `/handoff`, `/plan-spec`, `/implement-spec`, and `/initialize-prime-claw`
-  commands;
-- structured `ralph_handoff`, `plan_spec`, `initialize_prime_claw`,
-  `create_spec_episode`,
-  `handoff_spec_episode`, and `finalize_spec_episode` tools;
-- exactly one managed `PRIME_CLAW_ROLE_KERNEL_V1` block from the selected global
-  AGENTS/CLAUDE context, sourced directly from `ROLE_KERNEL.md`;
-- no neutral-kernel copy in provider-visible user or custom messages, and no
-  provider-visible bounded EPISODE identity package;
-- no retired `goal-heartbeat-work-control.ts` entry or
-  `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` overlay;
-- the narrow `goal-continuation-nudge.ts` context and post-compaction hook, which
-  reads the managed `skills/goals-and-heartbeats/CONTINUATION.md` plugin asset,
-  immediately reminds the next post-compaction turn, and contains no model-facing
-  work-control prose of its own; and
-- lifecycle hooks from `reviewed-plan.ts` that append one ordinary full oversight
-  guide after each qualifying owner compaction and use one project ownership
-  record; they do not authenticate role-kernel or guide prompt bytes.
-
-`finalize_spec_episode` remains a location-only, no-UI bookkeeping close after
-verified terminal work. It grants no Git, merge, abandonment, session, worktree,
-branch, cleanup, scope, or product authority. Plugin verification also does not replace project readiness. Project assets are
-reconciled separately through the tracked `.prime-claw/templates.json` manifest;
-`.ralph/plans/` remains project-owned planning state.
+A healthy loaded generation exposes the expected extension commands and tools
+exactly once. Use the Docker offline RPC probe for candidate proof. For an
+accepted live generation, use only separately authorized supported checks; do
+not start a second Prime Agent instance on the host.
 
 ## Evidence history
 
-On 2026-09-22, the original five-file global installation matched its builder
-sources byte-for-byte. A disposable offline RPC session registered all three
-commands from the global extension paths and all four structured tools available in that earlier generation.
-
-After the later Prime Agent update exposed fatal cross-scope collision behavior,
-the builder source was moved out of `.prime/agent/` and the explicit apply/check
-workflow above replaced manual copying. Post-migration, the check script proved
-byte parity and a fresh builder-rooted offline RPC process started successfully
-with exactly one `/handoff`, then-current `/plan`, and `/implement-spec`, all sourced from the
-user-global installation. A session-start probe also confirmed all five expected
-structured tools.
-
-On 2026-09-30, managed apply/check installed exact accepted goal/heartbeat repair
-`486f4af62b7c1088a0ad10eb9ca05a2e0f735401`. Independent evidence recorded all
-eight managed TypeScript files as regular, non-symlink, and byte-identical to
-builder source; the obsolete goal-blocker entry was absent and the preserving
-`APPEND_SYSTEM.md` check passed. After the sole-daemon restart, visible UAT
-confirmed obsolete-tool absence, event-driven goal-to-monitored-wait transfer
-with terminal cleanup, and a human-only blocker with no person-polling
-heartbeat. Exact receipts are on `prime-claw-h6w.24.2`; canonical behavior is in
-[goal-heartbeat-work-control.md](goal-heartbeat-work-control.md).
+Dated bridge, cutover, recovery, and activation records under `docs/evidence/`
+remain historical evidence. They are intentionally not current executable
+instructions. The accepted container activation record is
+[`prime-claw-v2r1013-plugin-activation-20261010.md`](evidence/prime-claw-v2r1013-plugin-activation-20261010.md).

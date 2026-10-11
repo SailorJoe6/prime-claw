@@ -7,7 +7,7 @@ import test from "node:test";
 
 import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 
-function fixture() {
+function fixture({ throwOnSend = 0 } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-reviewed-")); execFileSync("git", ["init", "-q", root]);
   for (const slug of ["alpha", "beta"]) mkdirSync(join(root, ".ralph", "plans", "future", slug), { recursive: true });
   mkdirSync(join(root, ".prime-claw", "workflows"), { recursive: true });
@@ -20,7 +20,8 @@ ${name.toUpperCase()} POLICY
   const guideRoot = join(root, "plugin"); mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true }); writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), `FULL OVERSIGHT GUIDE
 `);
   const commands = new Map(), tools = new Map(), events = new Map(), sent = [], created = [];
-  const pi = { registerCommand(name, value) { commands.set(name, value); }, registerTool(tool) { tools.set(tool.name, tool); }, on(name, handler) { events.set(name, handler); }, sendUserMessage(message, options) { sent.push({ message, options }); }, async sendMessage() {} };
+  let sendCount = 0;
+  const pi = { registerCommand(name, value) { commands.set(name, value); }, registerTool(tool) { tools.set(tool.name, tool); }, on(name, handler) { events.set(name, handler); }, sendUserMessage(message, options) { sendCount += 1; if (sendCount === throwOnSend) throw new Error("synthetic send failure"); sent.push({ message, options }); }, async sendMessage() {} };
   const ctx = { cwd: root, hasUI: true, ui: { notify(message, level) { sent.push({ notify: message, level }); } }, sessionManager: { getSessionId: () => "owner", getSessionFile: () => join(root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }) } };
   const episode = { version: 1, status: "active", operationId: "op", engine: "local", ownerSessionId: "owner", sourceLocation: ".ralph/plans/future/alpha", slug: "alpha", baseRef: "base", bundleDigest: "0".repeat(64), createdAt: "x", updatedAt: "x", worktree: join(root, "wt"), branch: "branch", head: "head", episodeId: "episode", episodeSessionFile: join(root, "episode.jsonl"), episodeActiveSessionId: "route", reused: false };
   const deps = { guideRoot, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
@@ -54,6 +55,15 @@ test("implement-spec queues full ordinary guide in post-prep phase before semant
   assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /IMPLEMENT-PREP POLICY/);
   assert.ok(f.sent[1].message.indexOf("FULL OVERSIGHT GUIDE") < f.sent[1].message.indexOf("IMPLEMENT-SPEC POLICY"));
   assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
+});
+
+
+test("plan_spec reports uncertain second-send admission without retrying", async () => {
+  const f = fixture({ throwOnSend: 2 });
+  const result = await f.tools.get("plan_spec").execute("tool", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, true); assert.equal(f.sent.length, 1);
+  assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
+  assert.match(result.content[0].text, /follow-up admission is unconfirmed; inspect before retrying/);
 });
 
 test("stable --host bypass is bound to the exact implementation approval", async () => {

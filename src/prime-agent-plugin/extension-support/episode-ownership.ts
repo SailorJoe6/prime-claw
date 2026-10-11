@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -98,8 +98,4 @@ export function writeEpisodeOwnership(projectRoot: string, record: EpisodeOwners
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
   renameSync(temporary, path);
-}
-
-export function removeEpisodeOwnership(projectRoot: string): void {
-  rmSync(episodeOwnershipPath(projectRoot), { force: true });
 }

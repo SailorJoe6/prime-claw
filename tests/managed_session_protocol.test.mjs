@@ -6,24 +6,10 @@ import test from "node:test";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const managed = join(root, "src", "prime-agent-plugin");
-const expected = [
-  "extensions/goal-continuation-nudge.ts",
-  "extensions/handoff-chain.ts",
-  "extensions/project-initialization.ts",
-  "extensions/reviewed-plan.ts",
-  "asset-inventory.json",
-  "extension-support/project-initialization.ts",
-  "extension-support/template-review.ts",
-  "extension-support/conversation-oversight.ts",
-  "extension-support/episode-close.ts",
-  "skills/goals-and-heartbeats/SKILL.md",
-  "skills/goals-and-heartbeats/CONTINUATION.md",
-  "extension-support/handoff-prompts.ts",
-  "extension-support/prep-chain.ts",
-  "extension-support/reviewed-plan-support.ts",
-  "extension-support/spec-episode.ts",
-  "skills/prime-claw-expert-review/SKILL.md",
-];
+const inventory = JSON.parse(readFileSync(join(managed, "asset-inventory.json"), "utf8"));
+const expected = inventory.assets.flatMap(asset => asset.targets
+  .filter(target => ["plugin-root-exact", "plugin-root-managed"].includes(target.class))
+  .map(target => target.destination));
 
 test("final protocol separates the neutral kernel from managed guidance", () => {
   const kernel = readFileSync(join(managed, "ROLE_KERNEL.md"), "utf8").trim().split(/\s+/).join(" ");

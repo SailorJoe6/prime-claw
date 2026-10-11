@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
+import { existsSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, relative, resolve, sep, win32 } from "node:path";
 import { resolveNearestProjectRoot } from "./project-initialization.ts";
 
 export interface FutureLocation {
@@ -38,26 +38,4 @@ export function validateFutureLocation(cwd: string, rawArgs: string): FutureLoca
   if (!containedBy(projectRoot, realFolder)) return null;
 
   return { location, slug: match[1], projectRoot, folder: realFolder };
-}
-
-export function wrapCanonicalSkill(
-  projectRoot: string,
-  skillName: string,
-  locationTag: string,
-  location: string,
-): string | null {
-  const path = skillName === "execute"
-    ? join(projectRoot, ".agents", "skills", "execute", "SKILL.md")
-    : join(projectRoot, ".prime-claw", "workflows", `${skillName}.md`);
-  if (!existsSync(path) || !statSync(path).isFile()) return null;
-  const body = readFileSync(path, "utf8");
-  return `<skill name="${skillName}" location="${path}">
-References are relative to ${dirname(path)}.
-
-${body}
-</skill>
-
-<${locationTag}>
-${location}
-</${locationTag}>`;
 }
