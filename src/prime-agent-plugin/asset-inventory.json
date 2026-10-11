@@ -1,140 +1,45 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "roleProtocol": "role-protocol.json",
+  "predecessorRetiredPluginFiles": [
+    {"path":"extensions/project-conversation.ts","sha256":"fd28ea1ae4f7fffc122ad14b28551e4df539db642a178d9a24d1397a192f5fd3"},
+    {"path":"extensions/goal-heartbeat-work-control.ts","sha256":"b9b145c5f1a4318e2d71caaa2039e4a045af36b3a94b5998414fbfd445db6dbb"},
+    {"path":"extensions/goal-blocker-control.ts","sha256":"166dd731d8cc8b9d8fe774cefd9fdceb8f4838ccffb0e07ada956ba14cf6daa1"},
+    {"path":"extension-support/conversation-guide-metadata.ts","sha256":"fe67120e1b1c63dc19b81999dc856e399f9d4dc7b419809477da5ef70c288e6e"},
+    {"path":"extension-support/handoff-prompts.ts","sha256":"49506cde76617590f858d92010117808b50eb36120181ec0df25a6a925c26440"},
+    {"path":"extension-support/episode-finalization.ts","sha256":"49f191a4dd6b2c591b330e40ea4f43f96cb042eb1fce02ce6ab3c06c5f584fa0"},
+    {"path":"extension-support/expert-review-reservation.ts","sha256":"e4d763769da1faf883bf9b3626b76955c1f5f0e7c769402debeda08d7e55a1c5"},
+    {"path":"extension-support/role-kernel.generated.ts","sha256":"5ca4311e85cd5867ddbec317b709e1c2bc0e63b897b69c6a68607c3124aefefc"}
+  ],
   "assets": [
-    {
-      "id": "global-role-kernel",
-      "source": "ROLE_KERNEL.md",
-      "scope": "global",
-      "exposure": "internal",
-      "customization": "plugin-managed",
-      "destination": "AGENTS.md",
-      "lifecycleTrigger": "global-plugin-apply"
-    },
-    {
-      "id": "global-goals-and-heartbeats",
-      "source": "skills/goals-and-heartbeats/SKILL.md",
-      "scope": "global",
-      "exposure": "discoverable",
-      "customization": "plugin-managed",
-      "destination": "skills/goals-and-heartbeats/SKILL.md",
-      "lifecycleTrigger": "global-plugin-apply"
-    },
-    {
-      "id": "global-goal-continuation",
-      "source": "skills/goals-and-heartbeats/CONTINUATION.md",
-      "scope": "global",
-      "exposure": "internal",
-      "customization": "plugin-managed",
-      "destination": "skills/goals-and-heartbeats/CONTINUATION.md",
-      "lifecycleTrigger": "goal-continuation-hook"
-    },
-    {
-      "id": "global-expert-review",
-      "source": "skills/prime-claw-expert-review/SKILL.md",
-      "scope": "global",
-      "exposure": "discoverable",
-      "customization": "plugin-managed",
-      "destination": "skills/prime-claw-expert-review/SKILL.md",
-      "lifecycleTrigger": "global-plugin-apply"
-    },
-    {
-      "id": "global-oversee-episode",
-      "source": "skills/prime-claw-oversee-episode/SKILL.md",
-      "scope": "global",
-      "exposure": "discoverable",
-      "customization": "plugin-managed",
-      "destination": "skills/prime-claw-oversee-episode/SKILL.md",
-      "lifecycleTrigger": "implement-spec-and-session-compact"
-    },
-    {
-      "id": "project-skill-blocked",
-      "source": "skills/project-templates/blocked.md",
-      "scope": "project",
-      "exposure": "discoverable",
-      "customization": "project-customizable",
-      "destination": ".agents/skills/blocked/SKILL.md",
-      "lifecycleTrigger": "project-reconcile"
-    },
-    {
-      "id": "project-skill-design",
-      "source": "skills/project-templates/design.md",
-      "scope": "project",
-      "exposure": "discoverable",
-      "customization": "project-customizable",
-      "destination": ".agents/skills/design/SKILL.md",
-      "lifecycleTrigger": "project-reconcile"
-    },
-    {
-      "id": "project-skill-execute",
-      "source": "skills/project-templates/execute.md",
-      "scope": "project",
-      "exposure": "discoverable",
-      "customization": "project-customizable",
-      "destination": ".agents/skills/execute/SKILL.md",
-      "lifecycleTrigger": "project-reconcile"
-    },
-    {
-      "id": "project-skill-prepare",
-      "source": "skills/project-templates/prepare.md",
-      "scope": "project",
-      "exposure": "discoverable",
-      "customization": "project-customizable",
-      "destination": ".agents/skills/prepare/SKILL.md",
-      "lifecycleTrigger": "project-reconcile"
-    },
-    {
-      "id": "project-skill-spec-it-out",
-      "source": "skills/project-templates/spec-it-out.md",
-      "scope": "project",
-      "exposure": "discoverable",
-      "customization": "project-customizable",
-      "destination": ".agents/skills/spec-it-out/SKILL.md",
-      "lifecycleTrigger": "project-reconcile"
-    },
-    {
-      "id": "project-workflow-handoff",
-      "source": "workflows/handoff.md",
-      "scope": "project",
-      "exposure": "internal",
-      "customization": "project-customizable",
-      "destination": ".prime-claw/workflows/handoff.md",
-      "lifecycleTrigger": "handoff"
-    },
-    {
-      "id": "project-workflow-implement-prep",
-      "source": "workflows/implement-prep.md",
-      "scope": "project",
-      "exposure": "internal",
-      "customization": "project-customizable",
-      "destination": ".prime-claw/workflows/implement-prep.md",
-      "lifecycleTrigger": "implement-spec"
-    },
-    {
-      "id": "project-workflow-implement-spec",
-      "source": "workflows/implement-spec.md",
-      "scope": "project",
-      "exposure": "internal",
-      "customization": "project-customizable",
-      "destination": ".prime-claw/workflows/implement-spec.md",
-      "lifecycleTrigger": "implement-spec"
-    },
-    {
-      "id": "project-workflow-plan-prep",
-      "source": "workflows/plan-prep.md",
-      "scope": "project",
-      "exposure": "internal",
-      "customization": "project-customizable",
-      "destination": ".prime-claw/workflows/plan-prep.md",
-      "lifecycleTrigger": "plan-spec"
-    },
-    {
-      "id": "project-workflow-plan-spec",
-      "source": "workflows/plan-spec.md",
-      "scope": "project",
-      "exposure": "internal",
-      "customization": "project-customizable",
-      "destination": ".prime-claw/workflows/plan-spec.md",
-      "lifecycleTrigger": "plan-spec"
-    }
+    {"id":"plugin-asset-inventory-json","source":"asset-inventory.json","targets":[{"class":"plugin-root-exact","destination":"asset-inventory.json"}]},
+    {"id":"global-role-kernel","source":"ROLE_KERNEL.md","targets":[{"class":"plugin-root-exact","destination":"ROLE_KERNEL.md"},{"class":"selected-context-block"}]},
+    {"id":"plugin-extension-support-conversation-oversight-ts","source":"extension-support/conversation-oversight.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/conversation-oversight.ts"}]},
+    {"id":"plugin-extension-support-episode-close-ts","source":"extension-support/episode-close.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/episode-close.ts"}]},
+    {"id":"plugin-extension-support-episode-ownership-ts","source":"extension-support/episode-ownership.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/episode-ownership.ts"}]},
+    {"id":"plugin-extension-support-prep-chain-ts","source":"extension-support/prep-chain.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/prep-chain.ts"}]},
+    {"id":"plugin-extension-support-project-initialization-ts","source":"extension-support/project-initialization.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/project-initialization.ts"}]},
+    {"id":"plugin-extension-support-reviewed-plan-support-ts","source":"extension-support/reviewed-plan-support.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/reviewed-plan-support.ts"}]},
+    {"id":"plugin-extension-support-spec-episode-ts","source":"extension-support/spec-episode.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/spec-episode.ts"}]},
+    {"id":"plugin-extension-support-template-review-ts","source":"extension-support/template-review.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/template-review.ts"}]},
+    {"id":"plugin-extension-support-workflow-chain-ts","source":"extension-support/workflow-chain.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/workflow-chain.ts"}]},
+    {"id":"plugin-extensions-goal-continuation-nudge-ts","source":"extensions/goal-continuation-nudge.ts","targets":[{"class":"plugin-root-exact","destination":"extensions/goal-continuation-nudge.ts"}]},
+    {"id":"plugin-extensions-handoff-chain-ts","source":"extensions/handoff-chain.ts","targets":[{"class":"plugin-root-exact","destination":"extensions/handoff-chain.ts"}]},
+    {"id":"plugin-extensions-project-initialization-ts","source":"extensions/project-initialization.ts","targets":[{"class":"plugin-root-exact","destination":"extensions/project-initialization.ts"}]},
+    {"id":"plugin-extensions-reviewed-plan-ts","source":"extensions/reviewed-plan.ts","targets":[{"class":"plugin-root-exact","destination":"extensions/reviewed-plan.ts"}]},
+    {"id":"global-goal-continuation","source":"skills/goals-and-heartbeats/CONTINUATION.md","targets":[{"class":"plugin-root-managed","destination":"skills/goals-and-heartbeats/CONTINUATION.md"}]},
+    {"id":"global-goals-and-heartbeats","source":"skills/goals-and-heartbeats/SKILL.md","targets":[{"class":"plugin-root-managed","destination":"skills/goals-and-heartbeats/SKILL.md"},{"class":"user-skill-exact","destination":"skills/goals-and-heartbeats/SKILL.md"}]},
+    {"id":"global-expert-review","source":"skills/prime-claw-expert-review/SKILL.md","targets":[{"class":"plugin-root-managed","destination":"skills/prime-claw-expert-review/SKILL.md"}]},
+    {"id":"global-oversee-episode","source":"skills/prime-claw-oversee-episode/SKILL.md","targets":[{"class":"plugin-root-managed","destination":"skills/prime-claw-oversee-episode/SKILL.md"}]},
+    {"id":"project-skill-blocked","source":"skills/project-templates/blocked.md","targets":[{"class":"plugin-root-exact","destination":"skills/project-templates/blocked.md"},{"class":"project-customizable","destination":".agents/skills/blocked/SKILL.md","exposure":"discoverable","lifecycleTrigger":"project-reconcile","migrateFrom":".ralph/skills/blocked/SKILL.md"}]},
+    {"id":"project-skill-design","source":"skills/project-templates/design.md","targets":[{"class":"plugin-root-exact","destination":"skills/project-templates/design.md"},{"class":"project-customizable","destination":".agents/skills/design/SKILL.md","exposure":"discoverable","lifecycleTrigger":"project-reconcile","migrateFrom":".ralph/skills/design/SKILL.md"}]},
+    {"id":"project-skill-execute","source":"skills/project-templates/execute.md","targets":[{"class":"plugin-root-exact","destination":"skills/project-templates/execute.md"},{"class":"project-customizable","destination":".agents/skills/execute/SKILL.md","exposure":"discoverable","lifecycleTrigger":"project-reconcile","migrateFrom":".ralph/skills/execute/SKILL.md"}]},
+    {"id":"project-skill-prepare","source":"skills/project-templates/prepare.md","targets":[{"class":"plugin-root-exact","destination":"skills/project-templates/prepare.md"},{"class":"project-customizable","destination":".agents/skills/prepare/SKILL.md","exposure":"discoverable","lifecycleTrigger":"project-reconcile","migrateFrom":".ralph/skills/prepare/SKILL.md"}]},
+    {"id":"project-skill-spec-it-out","source":"skills/project-templates/spec-it-out.md","targets":[{"class":"plugin-root-exact","destination":"skills/project-templates/spec-it-out.md"},{"class":"project-customizable","destination":".agents/skills/spec-it-out/SKILL.md","exposure":"discoverable","lifecycleTrigger":"project-reconcile","migrateFrom":".ralph/skills/spec-it-out/SKILL.md"}]},
+    {"id":"project-workflow-handoff","source":"workflows/handoff.md","targets":[{"class":"plugin-root-exact","destination":"workflows/handoff.md"},{"class":"project-customizable","destination":".prime-claw/workflows/handoff.md","exposure":"internal","lifecycleTrigger":"handoff","migrateFrom":".ralph/skills/handoff/SKILL.md"}]},
+    {"id":"project-workflow-implement-prep","source":"workflows/implement-prep.md","targets":[{"class":"plugin-root-exact","destination":"workflows/implement-prep.md"},{"class":"project-customizable","destination":".prime-claw/workflows/implement-prep.md","exposure":"internal","lifecycleTrigger":"implement-spec","migrateFrom":".ralph/skills/implement-prep/SKILL.md"}]},
+    {"id":"project-workflow-implement-spec","source":"workflows/implement-spec.md","targets":[{"class":"plugin-root-exact","destination":"workflows/implement-spec.md"},{"class":"project-customizable","destination":".prime-claw/workflows/implement-spec.md","exposure":"internal","lifecycleTrigger":"implement-spec","migrateFrom":".ralph/skills/implement-spec/SKILL.md"}]},
+    {"id":"project-workflow-plan-prep","source":"workflows/plan-prep.md","targets":[{"class":"plugin-root-exact","destination":"workflows/plan-prep.md"},{"class":"project-customizable","destination":".prime-claw/workflows/plan-prep.md","exposure":"internal","lifecycleTrigger":"plan-spec","migrateFrom":".ralph/skills/plan-prep/SKILL.md"}]},
+    {"id":"project-workflow-plan-spec","source":"workflows/plan-spec.md","targets":[{"class":"plugin-root-exact","destination":"workflows/plan-spec.md"},{"class":"project-customizable","destination":".prime-claw/workflows/plan-spec.md","exposure":"internal","lifecycleTrigger":"plan-spec","migrateFrom":".ralph/skills/plan/SKILL.md"}]}
   ]
 }

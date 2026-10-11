@@ -7,15 +7,17 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=ROOT/"src/prime-agent-plugin"
 
-def test_asset_inventory_covers_every_shipped_markdown_source_once():
+def test_delivery_manifest_covers_every_shipped_source_once():
     inventory=json.loads((SOURCE/"asset-inventory.json").read_text())
     rows=inventory["assets"]
-    assert inventory["schemaVersion"]==1 and len(rows)==15
+    assert inventory["schemaVersion"]==2 and inventory["roleProtocol"]=="role-protocol.json"
     assert len({row["id"] for row in rows})==len(rows)
-    assert len({row["destination"] for row in rows})==len(rows)
+    assert len({row["source"] for row in rows})==len(rows)
     inventoried={row["source"] for row in rows}
-    shipped={str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*.md")}
-    assert inventoried==shipped
+    shipped={str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*") if path.is_file()}
+    assert inventoried==shipped-{inventory["roleProtocol"]}
+    targets=[(target["class"],target.get("destination")) for row in rows for target in row["targets"]]
+    assert len(targets)==len(set(targets))
     assert all((SOURCE/row["source"]).is_file() and not (SOURCE/row["source"]).is_symlink() for row in rows)
 
 def test_prepare_requires_the_user_level_goals_and_heartbeats_skill():
@@ -26,7 +28,10 @@ def test_prepare_requires_the_user_level_goals_and_heartbeats_skill():
 
 
 def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
-    project_rows=[row for row in json.loads((SOURCE/"asset-inventory.json").read_text())["assets"] if row["scope"]=="project"]
+    project_rows=[]
+    for row in json.loads((SOURCE/"asset-inventory.json").read_text())["assets"]:
+        for target in row["targets"]:
+            if target["class"]=="project-customizable": project_rows.append({**row, **target})
     for row in project_rows:
         destination=ROOT/row["destination"]
         assert destination.is_file() and not destination.is_symlink()

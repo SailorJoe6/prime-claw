@@ -7,10 +7,11 @@ reconciler. They never stage or commit files.
 
 ## Asset inventory
 
-`src/prime-agent-plugin/asset-inventory.json` is the authoritative inventory for
-all 15 shipped Markdown assets. Each row records its stable identity, one source
-path, global or project scope, discoverable or internal exposure, customization
-policy, destination, and lifecycle trigger.
+`src/prime-agent-plugin/asset-inventory.json` is the schema-2 delivery
+authority for every shipped plugin source. Each source appears once. Explicit
+target classes distinguish exact plugin files, drift-managed global files, the
+user-level goals skill, the selected-context role block, and customizable
+project files.
 
 Global discoverable skills are `goals-and-heartbeats`,
 `prime-claw-expert-review`, and `prime-claw-oversee-episode`. `ROLE_KERNEL.md`
@@ -117,15 +118,15 @@ a separate explicit lifecycle driven through `initialize_prime_claw` actions:
    comparison exits, current bytes remain preserved until explicit `review-restore`
    or `review-keep`. A still-live held-review owner must complete or cancel normally.
 
-A terminal tracked-file `git diff --no-ext-diff -- <path>` result is the fallback
+A terminal tracked-file `git diff -- <path>` result is the fallback
 when Orca cannot open the comparison. The restored comparison is returned directly
 in both slash-command and model-callable tool output. Prime Claw does not invoke Orca Computer Use, macOS Accessibility,
 an OS permission prompt, or another GUI-control API for this workflow.
 
 ## Global drift
 
-`scripts/manage-prime-agent-global-assets.py` protects the global Markdown
-assets during plugin apply/check. Managed bytes update safely. Unknown or changed
+`scripts/manage-prime-agent-delivery.py` drives plugin apply/check from that
+same manifest and protects drift-managed global Markdown assets. Managed bytes update safely. Unknown or changed
 bytes are preserved by default and make readiness fail visibly. Exact current
 upstream bytes safely repair stale managed/customized provenance after an interrupted
 managed update or a manual restoration. An operator may
@@ -134,9 +135,10 @@ against this upstream or `--global-drift-action backup-reset` to create and
 verify a timestamped backup before reset. A later upstream change reopens an
 accepted override comparison.
 
-The global role kernel remains under the separate role-protocol manager because
-`AGENTS.md` can contain independently owned surrounding content. Project
-`templates.json` and plugin-global drift state are distinct authorities.
+The selected role block remains under the specialized role-protocol manager
+because `AGENTS.md` can contain independently owned surrounding content. Its
+source and generation come from the delivery manifest. Project `templates.json`
+and plugin delivery state retain their distinct ownership records.
 
 ## Validation and migration boundary
 

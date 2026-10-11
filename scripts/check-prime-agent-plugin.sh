@@ -6,143 +6,12 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/prime-agent-plugin-target.sh"
 select_prime_agent_plugin_target "$@"
 source_root="$repo_root/src/prime-agent-plugin"
-user_skill_source="$source_root/skills/goals-and-heartbeats/SKILL.md"
-user_skill_dir="$user_agents_root/skills/goals-and-heartbeats"
-user_skill_destination="$user_skill_dir/SKILL.md"
-files=(
-  extensions/goal-continuation-nudge.ts
-  extensions/handoff-chain.ts
-  extensions/project-initialization.ts
-  extensions/reviewed-plan.ts
-  asset-inventory.json
-  ROLE_KERNEL.md
-  extension-support/project-initialization.ts
-  extension-support/template-review.ts
-  extension-support/episode-ownership.ts
-  extension-support/conversation-oversight.ts
-  extension-support/episode-close.ts
-  skills/project-templates/blocked.md
-  skills/project-templates/design.md
-  skills/project-templates/execute.md
-  skills/project-templates/prepare.md
-  skills/project-templates/spec-it-out.md
-  workflows/handoff.md
-  workflows/implement-prep.md
-  workflows/implement-spec.md
-  workflows/plan-prep.md
-  workflows/plan-spec.md
-  extension-support/workflow-chain.ts
-  extension-support/prep-chain.ts
-  extension-support/reviewed-plan-support.ts
-  extension-support/spec-episode.ts
-)
-
+delivery_manager="$repo_root/scripts/manage-prime-agent-delivery.py"
 status=0
-managed_directories=(
-  "$destination_root"
-  "$destination_root/extensions"
-  "$destination_root/extension-support"
-  "$destination_root/skills"
-  "$destination_root/skills/goals-and-heartbeats"
-  "$destination_root/skills/project-templates"
-  "$destination_root/workflows"
-  "$destination_root/skills/prime-claw-oversee-episode"
-  "$destination_root/skills/prime-claw-expert-review"
-  "$destination_root/.prime-claw"
-  "$user_agents_root"
-  "$user_agents_root/skills"
-  "$user_skill_dir"
-)
-for directory in "${managed_directories[@]}"; do
-  if [[ -e "$directory" || -L "$directory" ]]; then
-    if [[ ! -d "$directory" || -L "$directory" ]]; then
-      printf 'unsafe managed plugin directory (expected absent or real directory): %s\n' "$directory" >&2
-      status=1
-    fi
-  fi
-done
-if [[ ! -e "$user_skill_destination" && ! -L "$user_skill_destination" ]]; then
-  printf 'missing user-level goals-and-heartbeats skill: %s\n' "$user_skill_destination" >&2
-  status=1
-elif [[ ! -f "$user_skill_destination" || -L "$user_skill_destination" ]]; then
-  printf 'unsafe user-level skill destination (expected regular file): %s\n' "$user_skill_destination" >&2
-  status=1
-elif ! cmp -s "$user_skill_source" "$user_skill_destination"; then
-  printf 'stale user-level goals-and-heartbeats skill: %s\n' "$user_skill_destination" >&2
+if ! python3 "$delivery_manager" check "$source_root" "$destination_root" \
+  --user-root "$user_agents_root"; then
   status=1
 fi
-
-for name in blocked design execute prepare spec-it-out; do
-  collision="$destination_root/skills/$name"
-  if [[ -e "$collision" || -L "$collision" ]]; then
-    printf 'unexpected global project-template skill collision: %s\n' "$collision" >&2
-    status=1
-  fi
-done
-
-obsolete_files=(
-  "extensions/goal-heartbeat-work-control.ts:stale retired goal heartbeat work-control extension"
-  "extensions/goal-blocker-control.ts:stale obsolete goal blocker control extension"
-  "extension-support/conversation-guide-metadata.ts:stale retired Conversation guide authentication metadata"
-  "extension-support/handoff-prompts.ts:stale retired handoff prompt loader"
-  "extension-support/episode-finalization.ts:stale obsolete episode finalization support file"
-  "extension-support/expert-review-reservation.ts:stale retired EXPERT reservation support file"
-  "extension-support/role-kernel.generated.ts:stale retired generated role-kernel file"
-)
-for entry in "${obsolete_files[@]}"; do
-  relative="${entry%%:*}"
-  diagnostic="${entry#*:}"
-  obsolete_file="$destination_root/$relative"
-  if [[ -e "$obsolete_file" || -L "$obsolete_file" ]]; then
-    if [[ ! -f "$obsolete_file" || -L "$obsolete_file" ]]; then
-      printf 'unsafe managed plugin destination (expected absent or regular file): %s\n' "$obsolete_file" >&2
-    else
-      printf '%s: %s\n' "$diagnostic" "$obsolete_file" >&2
-    fi
-    status=1
-  fi
-done
-
-stale_entry="$destination_root/extensions/project-conversation.ts"
-if [[ -e "$stale_entry" || -L "$stale_entry" ]]; then
-  if [[ ! -f "$stale_entry" || -L "$stale_entry" ]]; then
-    printf 'unsafe managed plugin destination (expected absent or regular file): %s\n' "$stale_entry" >&2
-  else
-    printf 'stale redundant project-conversation entry point: %s\n' "$stale_entry" >&2
-  fi
-  status=1
-fi
-for forbidden in   "$repo_root/.prime/agent/extensions"   "$repo_root/.prime/agent/extensions-bak"   "$repo_root/.prime/agent/extension-support"; do
-  if [[ -e "$forbidden" ]]; then
-    printf 'project-local plugin source is not inert: %s
-' "$forbidden" >&2
-    status=1
-  fi
-done
-
-for relative in "${files[@]}"; do
-  source_file="$source_root/$relative"
-  installed_file="$destination_root/$relative"
-  if [[ ! -f "$source_file" ]]; then
-    printf 'missing plugin source: %s
-' "$source_file" >&2
-    status=1
-  elif [[ -e "$installed_file" || -L "$installed_file" ]]; then
-    if [[ ! -f "$installed_file" || -L "$installed_file" ]]; then
-      printf 'unsafe managed plugin destination (expected absent or regular file): %s
-' "$installed_file" >&2
-      status=1
-    elif ! cmp -s "$source_file" "$installed_file"; then
-      printf 'stale installed plugin file: %s
-' "$installed_file" >&2
-      status=1
-    fi
-  else
-    printf 'missing installed plugin file: %s
-' "$installed_file" >&2
-    status=1
-  fi
-done
 
 cleanup_args=(check-absent --plugin-root "$destination_root")
 if [[ "$plugin_target_mode" == "user-global" || "$plugin_target_mode" == "sandbox-home" ]]; then
@@ -152,17 +21,24 @@ if ! python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "
   status=1
 fi
 
-if ! python3 "$repo_root/scripts/manage-prime-agent-global-assets.py" check   "$source_root" "$destination_root"; then
+legacy_append_source="$source_root/APPEND_SYSTEM.md"
+role_kernel_source="$(python3 "$delivery_manager" selected-context-source "$source_root")"
+role_protocol_source="$(python3 "$delivery_manager" role-protocol-source "$source_root")"
+if ! python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" check \
+  "$role_protocol_source" "$role_kernel_source" \
+  "$legacy_append_source" "$destination_root"; then
   status=1
 fi
 
-legacy_append_source="$source_root/APPEND_SYSTEM.md"
-role_kernel_source="$source_root/ROLE_KERNEL.md"
-role_protocol_source="$source_root/role-protocol.json"
-if ! python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" check \
-  "$role_protocol_source" "$role_kernel_source" "$legacy_append_source" "$destination_root"; then
-  status=1
-fi
+for forbidden in \
+  "$repo_root/.prime/agent/extensions" \
+  "$repo_root/.prime/agent/extensions-bak" \
+  "$repo_root/.prime/agent/extension-support"; do
+  if [[ -e "$forbidden" ]]; then
+    printf 'project-local plugin source is not inert: %s\n' "$forbidden" >&2
+    status=1
+  fi
+done
 
 if [[ "$status" -ne 0 ]]; then
   exit "$status"

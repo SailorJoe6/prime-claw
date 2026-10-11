@@ -7,14 +7,13 @@
 ## Source and installed layouts
 
 The builder source is deliberately inert. The current generation has one authored
-role kernel, one machine-readable final selector, thirteen managed TypeScript
-files, one 15-row Markdown inventory, and three exact managed global skill
-capabilities:
+role kernel, thirteen managed TypeScript files, one schema-2 delivery manifest
+covering all 29 shipped sources, and three managed global skill capabilities:
 
 ```text
 src/prime-agent-plugin/
   ROLE_KERNEL.md
-  role-protocol.json              # schema 1, generation=final
+  role-protocol.json              # gate-retained bridge/final reconciler input
   extensions/
     goal-continuation-nudge.ts
     handoff-chain.ts
@@ -111,8 +110,14 @@ of two target modes:
    `--user-global` scripts remain guarded implementation details: they refuse
    linked worktrees, non-`main` branches, and explicit host-root overrides.
 
-Apply copies only the allowlisted plugin support files and exact managed skill inventories. Before the first copy,
-`scripts/manage-prime-agent-role-protocol.py` selects exactly one global context
+Apply reads every destination and policy from `asset-inventory.json`; no shell
+allowlist or retired-file list defines another generation. The first schema-2
+apply bootstraps ownership only from the immediately preceding checked schema-1
+generation. A bounded set of predecessor-retired paths and hashes removes only
+that generation's exact old bytes; it is migration evidence, not an accumulating
+tombstone list. Later applies retire `prior targets - current targets` only when
+the recorded digest still matches; changed and unknown files are preserved and
+fail closed. Before the first copy, `scripts/manage-prime-agent-role-protocol.py` selects exactly one global context
 candidate in Prime Agent priority order: `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`,
 then `CLAUDE.MD`. It creates `AGENTS.md` only when none exists. The manager owns
 only its distinct `prime-claw:role-kernel` marker region and introduced
@@ -122,7 +127,8 @@ mode, uid, and gid. It records the selected path and ownership in mode-0600
 
 Selection drift, a latent block in an unselected candidate, malformed or
 unowned markers, unsafe files/directories, fails closed before plugin copy. Apply and check do not migrate a selected file
-implicitly. The checked-in `role-protocol.json` is final. Final apply requires
+implicitly. The delivery manifest names the gate-retained role-protocol input,
+whose checked-in generation is final. Final apply requires
 an exact owned bridge or final manifest, verifies the installed managed block
 against that ownership record, and replaces only that block with the checked-in
 `ROLE_KERNEL.md`. This permits an accepted Markdown policy refresh without
@@ -420,14 +426,14 @@ fresh operator authority and a fresh live destination-bound receipt.
 ## Global Markdown drift gate
 
 The apply/check scripts reconcile inventoried global Markdown through
-`scripts/manage-prime-agent-global-assets.py`. Apply first runs a read-only
+`scripts/manage-prime-agent-delivery.py`. Apply first runs a read-only
 preflight before changing plugin code, so unresolved drift cannot leave a mixed
 generation. Unknown or changed bytes are
 preserved by default and block readiness. `--global-drift-action
 accept-override` explicitly accepts current bytes against this upstream;
 `--global-drift-action backup-reset` writes and verifies a timestamped backup
 before replacement. These choices do not apply to project-customizable copies. The cutover bundle
-inventories `.prime-claw/global-templates.json` as mutable authority state and
+inventories `.prime-claw/delivery-state.json` as mutable authority state and
 restores its exact preimage (or prior absence). Verified backup/reset artifacts
 are deliberately retained as recovery evidence; rollback never deletes them.
 

@@ -20,56 +20,29 @@ from typing import Any
 
 SCHEMA_VERSION = 1
 MAX_PREIMAGE_BYTES = 8 * 1024 * 1024
-MANAGED_FILES = (
-    "extensions/goal-continuation-nudge.ts",
-    "extensions/handoff-chain.ts",
-    "extensions/project-initialization.ts",
-    "extensions/reviewed-plan.ts",
-    "asset-inventory.json",
-    "ROLE_KERNEL.md",
-    "extension-support/project-initialization.ts",
-    "extension-support/template-review.ts",
-    "extension-support/episode-ownership.ts",
-    "extension-support/conversation-oversight.ts",
-    "extension-support/episode-close.ts",
-    "skills/goals-and-heartbeats/SKILL.md",
-    "skills/goals-and-heartbeats/CONTINUATION.md",
-    "skills/project-templates/blocked.md",
-    "skills/project-templates/design.md",
-    "skills/project-templates/execute.md",
-    "skills/project-templates/prepare.md",
-    "skills/project-templates/spec-it-out.md",
-    "workflows/handoff.md",
-    "workflows/implement-prep.md",
-    "workflows/implement-spec.md",
-    "workflows/plan-prep.md",
-    "workflows/plan-spec.md",
-    "extension-support/workflow-chain.ts",
-    "extension-support/prep-chain.ts",
-    "extension-support/reviewed-plan-support.ts",
-    "extension-support/spec-episode.ts",
-    "skills/prime-claw-oversee-episode/SKILL.md",
-    "skills/prime-claw-expert-review/SKILL.md",
+_SOURCE_DELIVERY_MANIFEST = Path(__file__).resolve().parents[1] / "src/prime-agent-plugin/asset-inventory.json"
+_BUNDLED_DELIVERY_MANIFEST = Path(__file__).resolve().with_name("asset-inventory.json")
+DELIVERY_MANIFEST = _SOURCE_DELIVERY_MANIFEST if _SOURCE_DELIVERY_MANIFEST.is_file() else _BUNDLED_DELIVERY_MANIFEST
+_delivery = json.loads(DELIVERY_MANIFEST.read_text())
+MANAGED_FILES = tuple(
+    target["destination"]
+    for asset in _delivery["assets"]
+    for target in asset["targets"]
+    if target["class"] in {"plugin-root-exact", "plugin-root-managed"}
 )
-EXPECTED_ABSENT = (
-    "extensions/project-conversation.ts",
-    "extensions/goal-heartbeat-work-control.ts",
-    "extensions/goal-blocker-control.ts",
-    "extension-support/conversation-guide-metadata.ts",
-    "extension-support/handoff-prompts.ts",
-    "extension-support/episode-finalization.ts",
-    "extension-support/expert-review-reservation.ts",
-    "extension-support/role-kernel.generated.ts",
+# Preserve rollback evidence for the gate-retained EXPERT migration until tqm.8/.9.
+_GATE_RETAINED_EXPECTED_ABSENT = (
     "skills/prime-claw-official-expert-review/SKILL.md",
     "skills/prime-claw-official-expert-review/pyproject.toml",
     "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/__init__.py",
     "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/reviewer.md",
 )
+EXPECTED_ABSENT = tuple(row["path"] for row in _delivery["predecessorRetiredPluginFiles"]) + _GATE_RETAINED_EXPECTED_ABSENT
 PROTOCOL_SURFACES = (
     ".prime-claw/role-protocol-state.json",
 )
 MUTABLE_SURFACES = (
-    ".prime-claw/global-templates.json",
+    ".prime-claw/delivery-state.json",
 )
 SECRET_PATTERNS = (
     re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
@@ -281,6 +254,10 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
             raise ValueError(f"duplicate restore tool basename: {name}")
         seen_names.add(name)
         prepared_tools.append((name, tool_data))
+    delivery_data, _ = regular(DELIVERY_MANIFEST, limit=MAX_PREIMAGE_BYTES)
+    if "asset-inventory.json" in seen_names:
+        raise ValueError("delivery manifest basename collides with restore tool")
+    prepared_tools.append(("asset-inventory.json", delivery_data))
 
     bundle.mkdir(mode=0o700)
     os.chmod(bundle, 0o700)

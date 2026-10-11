@@ -38,8 +38,33 @@ class Runner {
   }
 }
 
-test("inventory is the exact 15-asset contract",()=>{
-  const inv=loadAssetInventory(PLUGIN); assert.equal(inv.assets.length,15); assert.equal(new Set(inv.assets.map(x=>x.id)).size,15); assert.equal(inv.assets.filter(x=>x.scope==="project").length,10); assert.deepEqual(inv.assets.filter(x=>x.scope==="project"&&x.exposure==="discoverable").map(x=>x.id).sort(),["project-skill-blocked","project-skill-design","project-skill-execute","project-skill-prepare","project-skill-spec-it-out"]);
+test("inventory exposes the ten manifest-authoritative project assets",()=>{
+  const inv=loadAssetInventory(PLUGIN); assert.equal(inv.schemaVersion,2); assert.equal(inv.assets.length,10); assert.equal(new Set(inv.assets.map(x=>x.id)).size,10); assert.deepEqual(inv.assets.filter(x=>x.exposure==="discoverable").map(x=>x.id).sort(),["project-skill-blocked","project-skill-design","project-skill-execute","project-skill-prepare","project-skill-spec-it-out"]);
+});
+
+test("retired managed project assets are pruned from prior ownership", t => {
+  const plugin=join(mkdtempSync(join(tmpdir(),"pc-plugin-retire-")),"plugin"); cpSync(PLUGIN,plugin,{recursive:true});
+  const root=repo(t), runner=new Runner(); reconcilePrimeClawProject({cwd:root,pluginRoot:plugin,home:dirname(root),runner});
+  const assetId="project-skill-prepare", target=join(root,".agents/skills/prepare/SKILL.md"); assert.equal(existsSync(target),true);
+  const inventoryPath=join(plugin,"asset-inventory.json"), inventory=JSON.parse(readFileSync(inventoryPath,"utf8"));
+  const row=inventory.assets.find(asset=>asset.id===assetId); inventory.assets=inventory.assets.filter(asset=>asset.id!==assetId);
+  writeFileSync(inventoryPath,JSON.stringify(inventory,null,2)+"\n"); unlinkSync(join(plugin,row.source));
+  const result=reconcilePrimeClawProject({cwd:root,pluginRoot:plugin,home:dirname(root),runner});
+  assert.equal(result.items.find(item=>item.assetId===assetId).action,"retired"); assert.equal(existsSync(target),false);
+  assert.equal(Object.hasOwn(JSON.parse(readFileSync(join(root,".prime-claw/templates.json"),"utf8")).assets,assetId),false);
+});
+
+test("retired customized project assets are preserved and released", t => {
+  const plugin=join(mkdtempSync(join(tmpdir(),"pc-plugin-release-")),"plugin"); cpSync(PLUGIN,plugin,{recursive:true});
+  const root=repo(t), runner=new Runner(); reconcilePrimeClawProject({cwd:root,pluginRoot:plugin,home:dirname(root),runner});
+  const assetId="project-skill-prepare", target=join(root,".agents/skills/prepare/SKILL.md"); writeFileSync(target,"operator policy\n");
+  const inventoryPath=join(plugin,"asset-inventory.json"), inventory=JSON.parse(readFileSync(inventoryPath,"utf8"));
+  const row=inventory.assets.find(asset=>asset.id===assetId); inventory.assets=inventory.assets.filter(asset=>asset.id!==assetId);
+  writeFileSync(inventoryPath,JSON.stringify(inventory,null,2)+"\n"); unlinkSync(join(plugin,row.source));
+  const result=reconcilePrimeClawProject({cwd:root,pluginRoot:plugin,home:dirname(root),runner});
+  const item=result.items.find(value=>value.assetId===assetId); assert.equal(item.action,"preserved"); assert.match(item.reason,/released customized/);
+  assert.equal(readFileSync(target,"utf8"),"operator policy\n");
+  assert.equal(Object.hasOwn(JSON.parse(readFileSync(join(root,".prime-claw/templates.json"),"utf8")).assets,assetId),false);
 });
 
 test("root discovery handles nested cwd, nested repo, linked worktree, submodule, and HOME ceiling",t=>{

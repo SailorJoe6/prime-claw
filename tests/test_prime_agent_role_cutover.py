@@ -58,7 +58,9 @@ def test_private_bundle_captures_exact_preimages_metadata_inventory_and_restores
     populate_managed(installed, managed_source)
     (installed / bundle.MANAGED_FILES[0]).write_text("accepted baseline\n")
     (installed / bundle.MANAGED_FILES[1]).unlink()
-    obsolete = installed / bundle.EXPECTED_ABSENT[0]; obsolete.parent.mkdir(parents=True, exist_ok=True); obsolete.write_text("accepted obsolete\n")
+    obsolete = installed / bundle.EXPECTED_ABSENT[0]
+    obsolete.parent.mkdir(parents=True, exist_ok=True)
+    obsolete.write_text("accepted obsolete\n")
     (installed / "unrelated-secret.txt").write_text("DO-NOT-COPY")
     topology = source / "topology.json"; topology.write_text(json.dumps({"branch": "episode/x", "head": "a" * 40}) + "\n")
     secret = source / "unrelated-token.txt"; secret.write_text("DO-NOT-COPY")
@@ -85,6 +87,13 @@ def test_private_bundle_captures_exact_preimages_metadata_inventory_and_restores
     assert [entry["path"] for entry in manifest["installedInventory"]] == list(bundle.MANAGED_FILES) + list(bundle.EXPECTED_ABSENT) + list(bundle.PROTOCOL_SURFACES) + list(bundle.MUTABLE_SURFACES)
     assert manifest["sourceTopology"]["branch"] == "episode/x"
     assert manifest["restoreToolset"][0]["sha256"] == bundle.digest(BUNDLE.read_bytes())
+    assert manifest["restoreToolset"][1]["name"] == "asset-inventory.json"
+    bundled_verify = subprocess.run(
+        [sys.executable, str(target / "tools" / BUNDLE.name), "verify", "--bundle", str(target)],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert bundled_verify.returncode == 0, bundled_verify.stdout + bundled_verify.stderr
+    assert json.loads(bundled_verify.stdout)["status"] == "VERIFIED"
     assert b"DO-NOT-COPY" not in b"".join(path.read_bytes() for path in target.rglob("*") if path.is_file())
 
     for relative in bundle.MANAGED_FILES:
@@ -406,39 +415,37 @@ def test_resume_order_and_runtime_inventory_are_fail_closed(tmp_path: Path) -> N
     with pytest.raises(coord.CutoverError, match="must be a non-empty string"):
         coord.Coordinator(config, tmp_path / "state-2", RecordingRunner(config)).preflight()
 
-def test_final_source_inventory_reflects_markdown_only_expert_workflow() -> None:
-    apply_text = (ROOT / "scripts/apply-prime-agent-plugin.sh").read_text()
-    check_text = (ROOT / "scripts/check-prime-agent-plugin.sh").read_text()
-    cleanup_text = (ROOT / "scripts/cleanup-retired-prime-agent-expert-review.py").read_text()
-    guide = (ROOT / "docs/lab-global-plugin.md").read_text()
-    assert len(bundle.MANAGED_FILES) == 29
-    inventoried = {
-        row["source"] for row in json.loads((ROOT / "src/prime-agent-plugin/asset-inventory.json").read_text())["assets"]
+def test_final_source_inventory_reflects_manifest_authority() -> None:
+    delivery = json.loads((ROOT / "src/prime-agent-plugin/asset-inventory.json").read_text())
+    plugin_targets = {
+        target["destination"]
+        for asset in delivery["assets"]
+        for target in asset["targets"]
+        if target["class"] in {"plugin-root-exact", "plugin-root-managed"}
     }
-    for relative in bundle.MANAGED_FILES:
-        assert Path(ROOT / "src/prime-agent-plugin" / relative).is_file(), relative
-        assert (relative in apply_text and relative in check_text) or relative in inventoried, relative
-    assert 'managed_skill_relative="skills/prime-claw-oversee-episode/SKILL.md"' in apply_text
-    assert 'expert_skill_relative="skills/prime-claw-expert-review/SKILL.md"' in apply_text
+    assert delivery["schemaVersion"] == 2 and delivery["roleProtocol"] == "role-protocol.json"
+    assert set(bundle.MANAGED_FILES) == plugin_targets
+    assert len(plugin_targets) == 29
+    assert all((ROOT / "src/prime-agent-plugin" / relative).is_file() for relative in plugin_targets)
+    retired = {row["path"] for row in delivery["predecessorRetiredPluginFiles"]}
+    assert bundle._GATE_RETAINED_EXPECTED_ABSENT == (
+        "skills/prime-claw-official-expert-review/SKILL.md",
+        "skills/prime-claw-official-expert-review/pyproject.toml",
+        "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/__init__.py",
+        "skills/prime-claw-official-expert-review/src/prime_claw_official_expert_review/reviewer.md",
+    )
+    assert set(bundle.EXPECTED_ABSENT) == retired | set(bundle._GATE_RETAINED_EXPECTED_ABSENT)
+    assert all(not (ROOT / "src/prime-agent-plugin" / relative).exists() for relative in bundle.EXPECTED_ABSENT)
+    guide = (ROOT / "docs/lab-global-plugin.md").read_text()
     assert "prime-claw-expert-review/SKILL.md" in guide
     assert "Python-backed package" not in guide
-    for relative in bundle.EXPECTED_ABSENT:
-        assert not (ROOT / "src/prime-agent-plugin" / relative).exists()
-    for relative in bundle.EXPECTED_ABSENT[:6]:
-        assert relative in apply_text and relative in check_text
-    assert "prime-claw-official-expert-review" in cleanup_text
-    assert "expert-review-launches" in cleanup_text
     assert not (ROOT / ".ralph/skills/oversee-episode").exists()
     assert not (ROOT / ".agents/skills/oversee-episode").exists()
     assert not (ROOT / ".agents/skills/oversee-episode").is_symlink()
     assert not (ROOT / ".prime/agent/profiles/expert-reviewer.md").exists()
     assert not (ROOT / "src/prime-agent-plugin/APPEND_SYSTEM.md").exists()
-    assert not (ROOT / "scripts/manage-prime-agent-append-system.py").exists()
-    assert not (ROOT / "scripts/generate-prime-agent-role-kernel.py").exists()
-    assert not (ROOT / "scripts/check-prime-agent-expert-runtime.py").exists()
-    assert json.loads((ROOT / "src/prime-agent-plugin/role-protocol.json").read_text()) == {
-        "schemaVersion": 1, "generation": "final",
-    }
+    assert json.loads((ROOT / "src/prime-agent-plugin/role-protocol.json").read_text()) == {"schemaVersion": 1, "generation": "final"}
+    assert (ROOT / "scripts/cleanup-retired-prime-agent-expert-review.py").is_file()
 
 def test_bundle_verify_rejects_unexpected_files_and_required_secret_patterns(tmp_path: Path) -> None:
     source = tmp_path / "source"; source.mkdir()

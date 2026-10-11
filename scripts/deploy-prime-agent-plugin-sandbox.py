@@ -26,7 +26,7 @@ HELPERS = (
     "apply-prime-agent-plugin.sh",
     "check-prime-agent-plugin.sh",
     "prime-agent-plugin-target.sh",
-    "manage-prime-agent-global-assets.py",
+    "manage-prime-agent-delivery.py",
     "cleanup-retired-prime-agent-expert-review.py",
     "manage-prime-agent-role-protocol.py",
 )
@@ -45,7 +45,10 @@ def bundle_bytes() -> tuple[bytes, tuple[str, ...]]:
     names = [str(p.relative_to(ROOT)) for p in source.rglob("*") if p.is_file()]
     names.extend("scripts/" + name for name in HELPERS)
     names = sorted(names)
-    if len(names) < 30 or "src/prime-agent-plugin/role-protocol.json" not in names:
+    manifest = json.loads((source / "asset-inventory.json").read_text())
+    declared = {"src/prime-agent-plugin/" + asset["source"] for asset in manifest["assets"]}
+    declared.add("src/prime-agent-plugin/" + manifest["roleProtocol"])
+    if set(name for name in names if name.startswith("src/prime-agent-plugin/")) != declared:
         raise ValueError("incomplete plugin source inventory")
     output = io.BytesIO()
     with gzip.GzipFile(fileobj=output, mode="wb", mtime=0, filename="") as zipped:

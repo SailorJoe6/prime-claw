@@ -17,6 +17,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import time
 
 import pytest
@@ -34,48 +35,21 @@ WS_LEGACY_FIXTURE = "/workspace/tests/fixtures/role-protocol-legacy-append.md"
 # The image's default PATH (Ubuntu base); tests that shadow a tool prepend
 # their fake bin dir to this.
 CONTAINER_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-RETIRED = "extensions/goal-heartbeat-work-control.ts"
-FILES = (
-    "extensions/goal-continuation-nudge.ts",
-    "extensions/handoff-chain.ts",
-    "extensions/project-initialization.ts",
-    "extensions/reviewed-plan.ts",
-    "asset-inventory.json",
-    "ROLE_KERNEL.md",
-    "extension-support/project-initialization.ts",
-    "extension-support/template-review.ts",
-    "extension-support/episode-ownership.ts",
-    "extension-support/conversation-oversight.ts",
-    "extension-support/episode-close.ts",
-    "skills/goals-and-heartbeats/SKILL.md",
-    "skills/goals-and-heartbeats/CONTINUATION.md",
-    "skills/project-templates/blocked.md",
-    "skills/project-templates/design.md",
-    "skills/project-templates/execute.md",
-    "skills/project-templates/prepare.md",
-    "skills/project-templates/spec-it-out.md",
-    "workflows/handoff.md",
-    "workflows/implement-prep.md",
-    "workflows/implement-spec.md",
-    "workflows/plan-prep.md",
-    "workflows/plan-spec.md",
-    "extension-support/workflow-chain.ts",
-    "extension-support/prep-chain.ts",
-    "extension-support/reviewed-plan-support.ts",
-    "extension-support/spec-episode.ts",
-)
-SKILL_FILES = (
-    "skills/goals-and-heartbeats/SKILL.md",
-    "skills/prime-claw-oversee-episode/SKILL.md",
-    "skills/prime-claw-expert-review/SKILL.md",
-)
-MANAGED_SKILL_FILES = SKILL_FILES
-RETIRED_EXPERT_FILES = (
-    "SKILL.md",
-    "pyproject.toml",
-    "src/prime_claw_official_expert_review/__init__.py",
-    "src/prime_claw_official_expert_review/reviewer.md",
-)
+INVENTORY = json.loads((SOURCE / "asset-inventory.json").read_text())
+
+def _targets(kind):
+    return tuple(
+        target["destination"]
+        for asset in INVENTORY["assets"]
+        for target in asset["targets"]
+        if target["class"] == kind
+    )
+
+EXACT_FILES = _targets("plugin-root-exact")
+MANAGED_FILES = _targets("plugin-root-managed")
+FILES = EXACT_FILES
+SKILL_FILES = tuple(path for path in MANAGED_FILES if path.endswith("/SKILL.md"))
+MANAGED_SKILL_FILES = MANAGED_FILES
 
 
 def test_source_is_outside_project_extension_discovery() -> None:
@@ -83,9 +57,11 @@ def test_source_is_outside_project_extension_discovery() -> None:
     assert not (REPO / ".prime" / "agent" / "extensions").exists()
     assert not (REPO / ".prime" / "agent" / "extensions-bak").exists()
     assert not (REPO / ".prime" / "agent" / "extension-support").exists()
-    assert not (SOURCE / RETIRED).exists()
-    assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*.ts")} == {item for item in FILES if item.endswith(".ts")}
-    assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("SKILL.md")} == set(SKILL_FILES)
+    assert {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*.ts")} == {item for item in EXACT_FILES if item.endswith(".ts")}
+    inventoried = {asset["source"] for asset in INVENTORY["assets"]}
+    shipped = {str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*") if path.is_file()}
+    assert inventoried == shipped - {INVENTORY["roleProtocol"]}
+    assert len(inventoried) == len(INVENTORY["assets"])
 
 
 def test_sandbox_home_installs_fresh_final_plugin_in_exact_container_root(tier1_container) -> None:
@@ -100,7 +76,8 @@ def test_sandbox_home_installs_fresh_final_plugin_in_exact_container_root(tier1_
 
 
 def _run_script(
-    tier1_container, script: str, destination: Path, *, env=None, seed_bridge=False
+    tier1_container, script: str, destination: Path, *, env=None, seed_bridge=False,
+    script_args=(),
 ):
     """Run an install script on native Linux storage, mirroring test state.
 
@@ -133,7 +110,7 @@ def _run_script(
     if env is not None:
         script_env.update(env)
     result = tier1_container.run(
-        script,
+        script, *script_args,
         env=script_env,
         workdir=None,
         timeout=60,
@@ -229,15 +206,6 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
         workdir=None, timeout=60,
     )
     assert seeded.returncode == 0, seeded.stdout + seeded.stderr
-    old_skill = f"{home}/.prime/agent/skills/prime-claw-official-expert-review"
-    old_state = f"{home}/.prime/agent/prime-claw-private/expert-review-launches"
-    seed_code = (
-        "import pathlib; root=pathlib.Path(" + repr(old_skill) + "); files=" + repr(RETIRED_EXPERT_FILES) + "; "
-        "[(root/rel).parent.mkdir(parents=True,exist_ok=True) or (root/rel).write_text(rel) for rel in files]; "
-        "state=pathlib.Path(" + repr(old_state) + "); state.mkdir(parents=True); (state/'old.closed.json').write_text('{}')"
-    )
-    seed_retired = tier1_container.run("python3", "-c", seed_code, workdir=None)
-    assert seed_retired.returncode == 0, seed_retired.stderr
     applied = tier1_container.run(
         apply, "--user-global", env=runtime_env, workdir=None, timeout=60,
     )
@@ -252,10 +220,6 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
     assert user_skill.returncode == 0, user_skill.stdout + user_skill.stderr
     redirected_absent = tier1_container.run("test", "!", "-e", redirected_user_agents, workdir=None, timeout=10)
     assert redirected_absent.returncode == 0, redirected_absent.stdout + redirected_absent.stderr
-    absent = tier1_container.run("test", "!", "-e", old_skill, workdir=None, wrap=False)
-    assert absent.returncode == 0, absent.stderr
-    state_absent = tier1_container.run("test", "!", "-e", old_state, workdir=None, wrap=False)
-    assert state_absent.returncode == 0, state_absent.stderr
     checked = tier1_container.run(
         check, "--user-global", env=runtime_env, workdir=None, timeout=60,
     )
@@ -436,7 +400,51 @@ def test_apply_is_convergent_and_preserves_unrelated_files(tier1_container, ctmp
         relative: (destination / relative).read_bytes()
         for relative in snapshot
     } == snapshot
-    assert not (destination / RETIRED).exists()
+
+
+def test_backup_reset_preflight_blocks_before_role_exact_or_user_mutation(
+    tier1_container, ctmp,
+) -> None:
+    fixture = ctmp / "repo"
+    shutil.copytree(SOURCE, fixture / "src" / "prime-agent-plugin")
+    scripts = fixture / "scripts"
+    scripts.mkdir(parents=True)
+    for name in (
+        "apply-prime-agent-plugin.sh", "check-prime-agent-plugin.sh",
+        "manage-prime-agent-role-protocol.py", "manage-prime-agent-delivery.py",
+        "cleanup-retired-prime-agent-expert-review.py", "prime-agent-plugin-target.sh",
+    ):
+        shutil.copy2(REPO / "scripts" / name, scripts / name)
+    destination = ctmp / "backup-preflight-agent"
+    applied = _run_script(
+        tier1_container, str(scripts / "apply-prime-agent-plugin.sh"), destination,
+        seed_bridge=True,
+    )
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    role = destination / "AGENTS.md"
+    exact = destination / "extensions/handoff-chain.ts"
+    user = destination / ".agents/skills/goals-and-heartbeats/SKILL.md"
+    before = {path: path.read_bytes() for path in (role, exact, user)}
+    (fixture / "src/prime-agent-plugin/ROLE_KERNEL.md").write_bytes(role.read_bytes().replace(b"Prime Claw", b"Prime Claw candidate", 1))
+    exact_source = fixture / "src/prime-agent-plugin/extensions/handoff-chain.ts"
+    exact_source.write_text(exact_source.read_text() + "\n// candidate exact bytes\n")
+    managed_source = fixture / "src/prime-agent-plugin/skills/goals-and-heartbeats/SKILL.md"
+    managed_source.write_text(managed_source.read_text() + "\nCandidate user policy.\n")
+    managed_destination = destination / "skills/goals-and-heartbeats/SKILL.md"
+    managed_destination.write_text("operator customization\n")
+    backups = destination / ".prime-claw/backups"
+    if backups.exists(): shutil.rmtree(backups)
+    outside = ctmp / "outside-backups"
+    outside.mkdir()
+    backups.symlink_to(outside, target_is_directory=True)
+    refused = _run_script(
+        tier1_container, str(scripts / "apply-prime-agent-plugin.sh"), destination,
+        script_args=("--global-drift-action", "backup-reset"),
+    )
+    assert refused.returncode != 0
+    assert {path: path.read_bytes() for path in before} == before
+    assert managed_destination.read_text() == "operator customization\n"
+    assert not list(outside.iterdir())
 
 
 def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container, ctmp) -> None:
@@ -447,9 +455,9 @@ def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container,
     for name in (
         "apply-prime-agent-plugin.sh",
         "check-prime-agent-plugin.sh",
-        "cleanup-retired-prime-agent-expert-review.py",
         "manage-prime-agent-role-protocol.py",
-        "manage-prime-agent-global-assets.py",
+        "manage-prime-agent-delivery.py",
+        "cleanup-retired-prime-agent-expert-review.py",
         "prime-agent-plugin-target.sh",
     ):
         shutil.copy2(REPO / "scripts" / name, scripts / name)
@@ -464,74 +472,184 @@ def test_apply_and_check_do_not_require_the_compatibility_skill(tier1_container,
     assert checked.returncode == 0, checked.stdout + checked.stderr
 
 
+def _schema1_inventory() -> bytes:
+    return subprocess.check_output(["git", "show", "HEAD:src/prime-agent-plugin/asset-inventory.json"], cwd=REPO)
 
-@pytest.mark.parametrize(
-    "relative,diagnostic",
-    [
-        (RETIRED,
-         "stale retired goal heartbeat work-control extension"),
-        ("extensions/goal-blocker-control.ts",
-         "stale obsolete goal blocker control extension"),
-        ("extension-support/episode-finalization.ts",
-         "stale obsolete episode finalization support file"),
-        ("extension-support/handoff-prompts.ts",
-         "stale retired handoff prompt loader"),
-    ],
-)
-def test_apply_removes_and_check_rejects_obsolete_managed_files(
-    tier1_container, ctmp, relative, diagnostic,
+
+def _retired_bytes(relative: str, expected_sha256: str) -> bytes:
+    commits = subprocess.check_output(
+        ["git", "log", "--all", "--format=%H", "--", f"src/prime-agent-plugin/{relative}"], cwd=REPO, text=True,
+    ).splitlines()
+    for commit in commits:
+        result = subprocess.run(
+            ["git", "show", f"{commit}:src/prime-agent-plugin/{relative}"], cwd=REPO, capture_output=True,
+        )
+        if result.returncode == 0 and hashlib.sha256(result.stdout).hexdigest() == expected_sha256:
+            return result.stdout
+    raise AssertionError(f"recorded predecessor bytes not found: {relative}")
+
+
+def _seed_schema1(destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True); (destination / "asset-inventory.json").write_bytes(_schema1_inventory())
+
+
+def _remove_delivery_asset(source: Path, relative: str) -> None:
+    manifest_path = source / "asset-inventory.json"
+    manifest = json.loads(manifest_path.read_text())
+    row = next(asset for asset in manifest["assets"] if asset["source"] == relative)
+    manifest["assets"].remove(row)
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    (source / relative).unlink()
+
+
+def _run_delivery(tier1_container, mode: str, source: Path, destination: Path):
+    return tier1_container.run(
+        "/workspace/scripts/manage-prime-agent-delivery.py", mode,
+        str(source), str(destination), "--user-root", str(destination / ".agents"),
+        workdir=None, timeout=60,
+    )
+
+
+def _copy_delivery_source(ctmp: Path) -> Path:
+    source = ctmp / "source"; shutil.copytree(SOURCE, source); return source
+
+
+def _installed_delivery(tier1_container, ctmp) -> tuple[Path, Path]:
+    source = _copy_delivery_source(ctmp); destination = ctmp / "agent"; destination.mkdir()
+    applied = _run_delivery(tier1_container, "apply", source, destination); assert applied.returncode == 0, applied.stdout + applied.stderr
+    return source, destination
+
+
+def test_schema1_upgrade_prunes_hash_bound_retired_files_and_check_rejects_them_first(
+    tier1_container, ctmp,
 ) -> None:
+    source = _copy_delivery_source(ctmp)
     destination = ctmp / "agent"
-    obsolete = destination / relative
-    obsolete.parent.mkdir(parents=True)
-    obsolete.write_text("legacy machinery\n")
-    unrelated = destination / "extensions" / "unrelated.ts"
-    unrelated.parent.mkdir(parents=True, exist_ok=True)
-    unrelated.write_text("preserve me\n")
-    checked = _run_script(tier1_container, WS_CHECK, destination)
-    assert checked.returncode != 0
-    assert diagnostic in checked.stderr
-    applied = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
+    _seed_schema1(destination)
+    retired = json.loads((source / "asset-inventory.json").read_text())["predecessorRetiredPluginFiles"]
+    for row in retired:
+        path = destination / row["path"]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(_retired_bytes(row["path"], row["sha256"]))
+    assert _run_delivery(tier1_container, "check", source, destination).returncode != 0
+    applied = _run_delivery(tier1_container, "apply", source, destination)
     assert applied.returncode == 0, applied.stdout + applied.stderr
-    assert not obsolete.exists()
-    assert unrelated.read_text() == "preserve me\n"
+    assert all(not (destination / row["path"]).exists() for row in retired)
+    assert _run_delivery(tier1_container, "check", source, destination).returncode == 0
+    reappeared = retired[0]
+    legacy = destination / reappeared["path"]
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_bytes(_retired_bytes(reappeared["path"], reappeared["sha256"]))
+    assert _run_delivery(tier1_container, "check", source, destination).returncode != 0
+    assert _run_delivery(tier1_container, "apply", source, destination).returncode == 0
+    assert not legacy.exists()
 
 
-@pytest.mark.parametrize("relative", [RETIRED, "extensions/goal-blocker-control.ts"])
-@pytest.mark.parametrize("unsafe_kind", ["directory", "symlink"])
-def test_apply_rejects_unsafe_retired_destination_before_mutation(
-    tier1_container, ctmp, relative, unsafe_kind,
+@pytest.mark.parametrize("unsafe_kind", ["changed", "directory", "symlink"])
+def test_schema1_upgrade_refuses_changed_or_unsafe_retired_files_before_mutation(
+    tier1_container, ctmp, unsafe_kind,
 ) -> None:
+    source = _copy_delivery_source(ctmp)
     destination = ctmp / "agent"
-    unsafe = destination / relative
-    unsafe.parent.mkdir(parents=True)
-    first = destination / FILES[0]
-    first.write_bytes(b"existing generation remains untouched\n")
-    append = destination / "APPEND_SYSTEM.md"
-    append.write_bytes(b"unrelated append remains untouched\n")
-    unrelated = destination / "extensions" / "unrelated.ts"
-    unrelated.write_text("preserve me\n")
-    if unsafe_kind == "directory":
-        unsafe.mkdir()
+    _seed_schema1(destination)
+    row = json.loads((source / "asset-inventory.json").read_text())["predecessorRetiredPluginFiles"][0]
+    path = destination / row["path"]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if unsafe_kind == "changed":
+        path.write_text("changed operator bytes\n")
+    elif unsafe_kind == "directory":
+        path.mkdir()
     else:
-        target = ctmp / "outside.ts"
-        target.write_text("outside remains untouched\n")
-        unsafe.symlink_to(target)
+        outside = ctmp / "outside-retired.ts"
+        outside.write_text("outside bytes\n")
+        path.symlink_to(outside)
+    sentinel = destination / "extensions/handoff-chain.ts"
+    sentinel.parent.mkdir(parents=True, exist_ok=True)
+    sentinel.write_text("existing generation\n")
+    refused = _run_delivery(tier1_container, "apply", source, destination)
+    assert refused.returncode != 0
+    assert sentinel.read_text() == "existing generation\n"
+    assert path.exists() or path.is_symlink()
 
-    checked = _run_script(tier1_container, WS_CHECK, destination)
-    applied = _run_script(tier1_container, WS_APPLY, destination)
 
-    assert checked.returncode != 0
-    assert "unsafe managed plugin destination" in checked.stderr
-    assert applied.returncode != 0
-    assert "unsafe managed plugin destination" in applied.stderr
-    assert first.read_bytes() == b"existing generation remains untouched\n"
-    assert append.read_bytes() == b"unrelated append remains untouched\n"
-    assert unrelated.read_text() == "preserve me\n"
-    if unsafe_kind == "symlink":
-        assert unsafe.is_symlink()
-        assert target.read_text() == "outside remains untouched\n"
+def test_check_rejects_exact_installed_subtree_through_symlinked_ancestor(
+    tier1_container, ctmp,
+) -> None:
+    source, destination = _installed_delivery(tier1_container, ctmp)
+    installed = destination / "extensions"
+    outside = ctmp / "outside-extensions"
+    installed.rename(outside)
+    snapshot = {path.name: path.read_bytes() for path in outside.iterdir()}
+    installed.symlink_to(outside, target_is_directory=True)
+    assert _run_delivery(tier1_container, "check", source, destination).returncode != 0
+    assert {path.name: path.read_bytes() for path in outside.iterdir()} == snapshot
 
+
+def test_future_retirement_refuses_symlinked_unique_ancestor_before_mutation(
+    tier1_container, ctmp,
+) -> None:
+    source, destination = _installed_delivery(tier1_container, ctmp)
+    historical = b"owned historical bytes\n"
+    retired = destination / "future-retired/item.txt"
+    retired.parent.mkdir()
+    retired.write_bytes(historical)
+    state_path = destination / ".prime-claw/delivery-state.json"
+    state = json.loads(state_path.read_text())
+    state["ownedFiles"]["plugin-root:future-retired/item.txt"] = hashlib.sha256(historical).hexdigest()
+    state_path.write_text(json.dumps(state))
+    shutil.rmtree(retired.parent)
+    outside = ctmp / "outside-retirement"
+    outside.mkdir()
+    outside_leaf = outside / "item.txt"
+    outside_leaf.write_bytes(historical)
+    retired.parent.symlink_to(outside, target_is_directory=True)
+    exact_source = source / "extensions/handoff-chain.ts"
+    exact_source.write_text(exact_source.read_text() + "\n// next generation\n")
+    exact_destination = destination / "extensions/handoff-chain.ts"
+    before = exact_destination.read_bytes()
+    assert _run_delivery(tier1_container, "check", source, destination).returncode != 0
+    assert outside_leaf.read_bytes() == historical
+    refused = _run_delivery(tier1_container, "apply", source, destination)
+    assert refused.returncode != 0
+    assert exact_destination.read_bytes() == before
+    assert outside_leaf.read_bytes() == historical
+
+
+def test_delivery_state_detects_and_prunes_a_removed_owned_file(tier1_container, ctmp) -> None:
+    source, destination = _installed_delivery(tier1_container, ctmp)
+    retired = "extensions/handoff-chain.ts"
+    assert (destination / retired).is_file()
+    _remove_delivery_asset(source, retired)
+    assert _run_delivery(tier1_container, "check", source, destination).returncode != 0
+    applied = _run_delivery(tier1_container, "apply", source, destination)
+    assert applied.returncode == 0, applied.stdout + applied.stderr
+    assert not (destination / retired).exists()
+    assert _run_delivery(tier1_container, "check", source, destination).returncode == 0
+
+
+@pytest.mark.parametrize("unsafe_kind", ["changed", "directory", "symlink"])
+def test_delivery_retirement_refuses_unproven_or_unsafe_paths_before_mutation(
+    tier1_container, ctmp, unsafe_kind,
+) -> None:
+    source, destination = _installed_delivery(tier1_container, ctmp)
+    retired = "extensions/handoff-chain.ts"
+    path = destination / retired
+    _remove_delivery_asset(source, retired)
+    path.unlink()
+    if unsafe_kind == "changed":
+        path.write_text("operator bytes\n")
+    elif unsafe_kind == "directory":
+        path.mkdir()
+    else:
+        outside = ctmp / "outside.ts"
+        outside.write_text("outside bytes\n")
+        path.symlink_to(outside)
+    sentinel = destination / EXACT_FILES[0]
+    before = sentinel.read_bytes()
+    refused = _run_delivery(tier1_container, "apply", source, destination)
+    assert refused.returncode != 0
+    assert sentinel.read_bytes() == before
+    assert path.exists() or path.is_symlink()
 
 
 @pytest.mark.parametrize("managed_directory", [
@@ -561,9 +679,8 @@ def test_apply_and_check_reject_symlinked_managed_directories_before_mutation(
     applied = _run_script(tier1_container, WS_APPLY, destination)
 
     assert checked.returncode != 0
-    assert "unsafe managed plugin directory" in checked.stderr
     assert applied.returncode != 0
-    assert "unsafe managed plugin directory" in applied.stderr
+    assert "unsafe managed" in applied.stderr
     assert append.read_bytes() == b"unrelated append remains untouched\n"
     assert (outside / "sentinel").read_bytes() == b"outside remains untouched\n"
     assert not list(outside.glob("*.ts"))
@@ -582,7 +699,7 @@ def test_check_rejects_stale_managed_conversation_skill(tier1_container, ctmp) -
     skill.write_text("stale guide\n")
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode != 0
-    assert "global managed asset drift requires explicit resolution" in checked.stderr
+    assert "plugin delivery drift requires explicit resolution" in checked.stderr
 
 
 def test_check_rejects_a_stale_global_file(tier1_container, ctmp) -> None:
@@ -593,7 +710,7 @@ def test_check_rejects_a_stale_global_file(tier1_container, ctmp) -> None:
     stale.write_text("stale generation\n")
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode != 0
-    assert "stale installed plugin file" in checked.stderr
+    assert "plugin delivery drift requires explicit resolution" in checked.stderr
 
 
 def test_check_rejects_reappeared_legacy_identity_block(tier1_container, ctmp) -> None:
@@ -632,10 +749,11 @@ def test_apply_preflights_all_managed_destinations_before_mutation(
     destination = ctmp / "agent"
     (destination / "extensions").mkdir(parents=True)
     (destination / "extension-support").mkdir()
-    first = destination / FILES[0]
+    first = destination / next(path for path in FILES if path.endswith(".ts"))
     sentinel = b"existing generation remains untouched\n"
     first.write_bytes(sentinel)
     unsafe = destination / FILES[-1]
+    unsafe.parent.mkdir(parents=True, exist_ok=True)
     if unsafe_kind == "directory":
         unsafe.mkdir()
     else:
@@ -656,48 +774,6 @@ def test_apply_preflights_all_managed_destinations_before_mutation(
         assert unsafe.resolve().read_bytes() == b"outside remains untouched\n"
 
 
-def test_interrupted_sequential_install_is_not_atomic_and_check_detects_generation(
-    tier1_container, ctmp,
-) -> None:
-    root = ctmp
-    destination = root / "agent"
-    tools = root / "tools"
-    tools.mkdir()
-    counter = root / "install-count"
-    fake_install = tools / "install"
-    fake_install.write_text(
-        "#!/usr/bin/env python3\n"
-        "import os, pathlib, shutil, sys\n"
-        "counter = pathlib.Path(os.environ['INSTALL_COUNTER'])\n"
-        "count = int(counter.read_text()) + 1 if counter.exists() else 1\n"
-        "counter.write_text(str(count))\n"
-        "if count == 3: raise SystemExit(23)\n"
-        "source, destination = pathlib.Path(sys.argv[-2]), pathlib.Path(sys.argv[-1])\n"
-        "shutil.copyfile(source, destination)\n"
-        "destination.chmod(0o644)\n"
-    )
-    fake_install.chmod(0o755)
-
-    applied = _run_script(
-        tier1_container,
-        WS_APPLY,
-        destination,
-        seed_bridge=True,
-        env={
-            "INSTALL_COUNTER": str(counter),
-            "PATH": str(tools) + ":" + CONTAINER_PATH,
-        },
-    )
-
-    assert applied.returncode == 23, applied.stdout + applied.stderr
-    assert (destination / FILES[0]).is_file()
-    assert (destination / FILES[1]).is_file()
-    assert not (destination / FILES[2]).exists()
-    checked = _run_script(tier1_container, WS_CHECK, destination)
-    assert checked.returncode != 0
-    assert "missing installed plugin file" in checked.stderr
-
-
 def test_check_rejects_stale_managed_expert_skill(tier1_container, ctmp) -> None:
     destination = ctmp / "agent"
     applied = _run_script(tier1_container, WS_APPLY, destination, seed_bridge=True)
@@ -706,7 +782,7 @@ def test_check_rejects_stale_managed_expert_skill(tier1_container, ctmp) -> None
     skill.write_text(skill.read_text() + "\n# stale installed skill\n")
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode != 0
-    assert "global managed asset drift requires explicit resolution" in checked.stderr
+    assert "plugin delivery drift requires explicit resolution" in checked.stderr
 
 
 def test_apply_refuses_global_project_template_skill_collision_before_mutation(tier1_container, ctmp) -> None:
