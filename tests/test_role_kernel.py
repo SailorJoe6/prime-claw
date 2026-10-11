@@ -29,9 +29,10 @@ def test_role_kernel_is_the_single_advisory_policy_source() -> None:
     assert not (REPO / "src/prime-agent-plugin/extension-support/role-kernel.generated.ts").exists()
     assert not (REPO / "scripts/generate-prime-agent-role-kernel.py").exists()
 
-def test_final_protocol_config_declares_one_generation() -> None:
-    manifest = json.loads((REPO / "src/prime-agent-plugin/role-protocol.json").read_text())
-    assert manifest == {"schemaVersion": 1, "generation": "final"}
+def test_delivery_manifest_selects_the_single_role_kernel() -> None:
+    manifest = json.loads((REPO / "src/prime-agent-plugin/asset-inventory.json").read_text())
+    selected = [asset for asset in manifest["assets"] if any(target["class"] == "selected-context-block" for target in asset["targets"])]
+    assert [(asset["source"], asset["id"]) for asset in selected] == [("ROLE_KERNEL.md", "global-role-kernel")]
 
 
 def test_predecessor_archive_matches_recorded_hashes() -> None:

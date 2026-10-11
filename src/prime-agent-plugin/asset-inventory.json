@@ -1,6 +1,5 @@
 {
   "schemaVersion": 2,
-  "roleProtocol": "role-protocol.json",
   "predecessorRetiredPluginFiles": [
     {"path":"extensions/project-conversation.ts","sha256":"fd28ea1ae4f7fffc122ad14b28551e4df539db642a178d9a24d1397a192f5fd3"},
     {"path":"extensions/goal-heartbeat-work-control.ts","sha256":"b9b145c5f1a4318e2d71caaa2039e4a045af36b3a94b5998414fbfd445db6dbb"},

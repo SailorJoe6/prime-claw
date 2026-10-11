@@ -4,7 +4,6 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=prime-agent-plugin-target.sh
 source "$repo_root/scripts/prime-agent-plugin-target.sh"
-role_receipt=""
 global_drift_action="preserve"
 target_args=()
 while [[ "$#" -gt 0 ]]; do
@@ -22,14 +21,6 @@ while [[ "$#" -gt 0 ]]; do
       global_drift_action="$2"
       shift 2
       ;;
-    --role-receipt)
-      if [[ "$#" -lt 2 || -z "$2" ]]; then
-        printf 'error: --role-receipt requires an absolute private receipt path\n' >&2
-        exit 64
-      fi
-      role_receipt="$2"
-      shift 2
-      ;;
     *)
       prime_agent_plugin_target_usage
       printf 'error: unknown argument: %s\n' "$1" >&2
@@ -37,10 +28,6 @@ while [[ "$#" -gt 0 ]]; do
       ;;
   esac
 done
-if [[ -n "$role_receipt" && "$role_receipt" != /* ]]; then
-  printf 'error: --role-receipt requires an absolute private receipt path\n' >&2
-  exit 64
-fi
 if [[ "${#target_args[@]}" -gt 0 ]]; then
   select_prime_agent_plugin_target "${target_args[@]}"
 else
@@ -61,25 +48,8 @@ python3 "$delivery_manager" preflight "$source_root" "$destination_root" \
   --user-root "$user_agents_root" --action "$global_drift_action"
 
 role_kernel_source="$(python3 "$delivery_manager" selected-context-source "$source_root")"
-role_protocol_source="$(python3 "$delivery_manager" role-protocol-source "$source_root")"
-cleanup_args=(validate --plugin-root "$destination_root")
-if [[ "$plugin_target_mode" == "user-global" || "$plugin_target_mode" == "sandbox-home" ]]; then
-  cleanup_args+=(--coding-agent-root "${PRIME_AGENT_CODING_AGENT_DIR:-$HOME/.prime/agent}")
-fi
-python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"
-role_apply_args=(
-  apply "$role_protocol_source" "$role_kernel_source"
-  "$source_root/APPEND_SYSTEM.md" "$destination_root"
-)
-if [[ -n "$role_receipt" ]]; then
-  role_apply_args+=(--receipt "$role_receipt")
-fi
-if [[ "$plugin_target_mode" == "sandbox-home" ]]; then
-  role_apply_args+=(--allow-fresh-final)
-fi
-python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" "${role_apply_args[@]}"
-cleanup_args[0]=remove
-python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"
+python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" apply \
+  "$role_kernel_source" "$destination_root"
 python3 "$delivery_manager" apply "$source_root" "$destination_root" \
   --user-root "$user_agents_root" --action "$global_drift_action"
 

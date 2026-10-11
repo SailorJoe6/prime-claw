@@ -135,7 +135,7 @@ against this upstream or `--global-drift-action backup-reset` to create and
 verify a timestamped backup before reset. A later upstream change reopens an
 accepted override comparison.
 
-The selected role block remains under the specialized role-protocol manager
+The selected role block remains under the final-only role reconciler
 because `AGENTS.md` can contain independently owned surrounding content. Its
 source and generation come from the delivery manifest. Project `templates.json`
 and plugin delivery state retain their distinct ownership records.

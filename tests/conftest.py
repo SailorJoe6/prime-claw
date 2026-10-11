@@ -923,23 +923,6 @@ def tier1_container(request):
         provenance.write_sanitized_json(
             tier_cap, "installed-artifact.json", artifact)
 
-        bridge = container.run(
-            "bash", "-lc",
-            "set -euo pipefail; "
-            "printf '%s\n' '{\"schemaVersion\":1,\"generation\":\"bridge\"}' "
-            "> /tmp/prime-claw-bridge.json; "
-            "python3 /workspace/scripts/manage-prime-agent-role-protocol.py apply "
-            "/tmp/prime-claw-bridge.json "
-            "/workspace/src/prime-agent-plugin/ROLE_KERNEL.md "
-            "/workspace/tests/fixtures/role-protocol-legacy-append.md "
-            "$PRIME_AGENT_PLUGIN_ROOT",
-            timeout=120, workdir=None,
-            env={"PRIME_AGENT_PLUGIN_ROOT": CONTAINER_PLUGIN_ROOT},
-        )
-        if bridge.returncode != 0:
-            raise RuntimeError("tier-1 fixture: bridge role-protocol seed failed")
-        setup_lines.append("phase=role-protocol-bridge-seeded")
-
         for script in ("apply-prime-agent-plugin.sh", "check-prime-agent-plugin.sh"):
             result = container.run(
                 f"{WORKSPACE}/scripts/{script}", timeout=120, workdir=None,

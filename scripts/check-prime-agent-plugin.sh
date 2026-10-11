@@ -13,20 +13,9 @@ if ! python3 "$delivery_manager" check "$source_root" "$destination_root" \
   status=1
 fi
 
-cleanup_args=(check-absent --plugin-root "$destination_root")
-if [[ "$plugin_target_mode" == "user-global" || "$plugin_target_mode" == "sandbox-home" ]]; then
-  cleanup_args+=(--coding-agent-root "${PRIME_AGENT_CODING_AGENT_DIR:-$HOME/.prime/agent}")
-fi
-if ! python3 "$repo_root/scripts/cleanup-retired-prime-agent-expert-review.py" "${cleanup_args[@]}"; then
-  status=1
-fi
-
-legacy_append_source="$source_root/APPEND_SYSTEM.md"
 role_kernel_source="$(python3 "$delivery_manager" selected-context-source "$source_root")"
-role_protocol_source="$(python3 "$delivery_manager" role-protocol-source "$source_root")"
 if ! python3 "$repo_root/scripts/manage-prime-agent-role-protocol.py" check \
-  "$role_protocol_source" "$role_kernel_source" \
-  "$legacy_append_source" "$destination_root"; then
+  "$role_kernel_source" "$destination_root"; then
   status=1
 fi
 

@@ -27,7 +27,6 @@ HELPERS = (
     "check-prime-agent-plugin.sh",
     "prime-agent-plugin-target.sh",
     "manage-prime-agent-delivery.py",
-    "cleanup-retired-prime-agent-expert-review.py",
     "manage-prime-agent-role-protocol.py",
 )
 DESTINATIONS = {"/sandbox/pgdata", "/sandbox/brain", "/sandbox/home-root"}
@@ -47,7 +46,6 @@ def bundle_bytes() -> tuple[bytes, tuple[str, ...]]:
     names = sorted(names)
     manifest = json.loads((source / "asset-inventory.json").read_text())
     declared = {"src/prime-agent-plugin/" + asset["source"] for asset in manifest["assets"]}
-    declared.add("src/prime-agent-plugin/" + manifest["roleProtocol"])
     if set(name for name in names if name.startswith("src/prime-agent-plugin/")) != declared:
         raise ValueError("incomplete plugin source inventory")
     output = io.BytesIO()
@@ -146,7 +144,7 @@ print('PLUGIN_HOME_READY')
         raise ValueError("mounted home topology or project extension collision unverified")
 
 
-EXTRACT_AND_RUN = '''import hashlib,os,pathlib,secrets,shutil,subprocess,sys,tarfile,tempfile
+EXTRACT_AND_RUN = '''import hashlib,os,pathlib,shutil,subprocess,sys,tarfile,tempfile
 bundle, expected_sha, action, expected_names = sys.argv[1:]
 raw=pathlib.Path(bundle).read_bytes()
 if hashlib.sha256(raw).hexdigest()!=expected_sha:raise ValueError('bundle digest mismatch')
@@ -165,18 +163,11 @@ try:
  env=dict(os.environ,HOME='/sandbox');env.pop('PRIME_AGENT_PLUGIN_ROOT',None)
  script=work/'scripts'/('apply-prime-agent-plugin.sh' if action=='apply' else 'check-prime-agent-plugin.sh')
  command=[str(script),'--sandbox-home']
- if action=='apply':
-  receipts=pathlib.Path('/sandbox/home-root/.prime-claw/plugin-role-receipts')
-  receipts.mkdir(mode=0o700,parents=True,exist_ok=True)
-  receipt=receipts/('role-'+expected_sha[:16]+'-'+secrets.token_hex(8)+'.json')
-  command+=['--role-receipt',str(receipt)]
  result=subprocess.run(command,env=env,capture_output=True,text=True,timeout=180)
  if result.returncode:
   print('container plugin '+action+' failed: '+(result.stderr or result.stdout)[-600:],file=sys.stderr)
-  if action=='apply':print('ROLE_RECEIPT_PATH='+str(receipt),file=sys.stderr)
   raise SystemExit(result.returncode)
  print('CONTAINER_PLUGIN_'+action.upper()+'_OK')
- if action=='apply':print('ROLE_RECEIPT_PATH='+str(receipt))
 finally:
  shutil.rmtree(work)
 '''
@@ -223,9 +214,6 @@ def main() -> int:
             if code != 0 or "CONTAINER_PLUGIN_" + action.upper() + "_OK" not in out:
                 raise ValueError("container plugin " + action + " failed: " + out[-500:])
         print("container plugin " + action + " checked: " + sha)
-        for line in out.splitlines():
-            if line.startswith("ROLE_RECEIPT_PATH="):
-                print(line)
         if not args.check_only:
             print("restart the isolated Prime Agent daemon before claiming activation")
         return 0

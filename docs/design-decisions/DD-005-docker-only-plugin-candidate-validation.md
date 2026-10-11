@@ -15,7 +15,7 @@ directory is redirected.
 
 Evidence: the binding boundary in [`AGENTS.md`](../../AGENTS.md),
 [`testing-strategy.md`](../testing-strategy.md), “Restored v2 sandbox home” and
-“Cutover and rollback” in [`lab-global-plugin.md`](../lab-global-plugin.md), and
+“Accepted refresh boundary” in [`lab-global-plugin.md`](../lab-global-plugin.md), and
 the separated staging/restart/live proof in
 [`prime-claw-v2r1013-plugin-activation-20261010.md`](../evidence/prime-claw-v2r1013-plugin-activation-20261010.md).
 

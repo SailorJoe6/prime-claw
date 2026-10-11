@@ -9,9 +9,9 @@ work-control policy remains.
 
 ## Supported runtime boundary
 
-The final role-protocol manager requires the recorded legacy APPEND region to be
-absent. Managed owner and EPISODE provider calls are guarded by the exact
-generated neutral role kernel in the selected global context. There is no
+The final role reconciler requires one exact, digest-owned neutral role kernel
+in the selected global context. Managed owner and EPISODE provider calls are
+guarded by that kernel. There is no
 separate `before_agent_start` policy overlay, capability gate,
 `PRIME_CLAW_GOAL_HEARTBEAT_WORK_CONTROL_V1` block, tool, or autonomous
 slash-command transport.
@@ -71,7 +71,7 @@ retired managed destinations:
 - every current and retired destination is checked before the first mutation;
 - apply removes a stale regular installed copy and rejects directories or symlinks;
 - check rejects any surviving stale or unsafe copy; and
-- unrelated installed extensions and unmanaged APPEND_SYSTEM bytes are preserved.
+- unrelated installed extensions and global context bytes are preserved.
 
 The project-local `oversee-episode` skill, its discovery link, the standalone
 reviewer profile, the legacy APPEND source, and the append-only manager are
@@ -83,26 +83,18 @@ uses an owned `.agents` subtree instead of the caller's real home. The lifecycle
 hook routes the managed reminder at repeated continuation signals and immediately
 after successful compaction.
 
-Final apply/check intentionally require exact owned bridge state; they are not a
-fresh-root diagnostic. Docker Tier 1 seeds that historical predecessor state in
-an isolated container before testing the transition. Bare commands fail closed.
-Do not invoke user-global apply/check directly.
+Final apply/check support fresh isolated roots and accepted final-owned roots. The
+final reconciler preserves unrelated context bytes, records compact digest-bound
+ownership, and rejects malformed, duplicated, unowned, stale, symlinked, or
+hard-linked role state. Bare commands fail closed; candidate validation remains
+Docker-only.
 
 Installation is not activation. `/reload`, elapsed time, copy success, a fresh
 process, or container evidence alone cannot prove the loaded generation changed.
-After the exact final candidate is accepted and Gate B is separately authorized,
-launch the bounded cutover coordinator once from a separate terminal with the
-verified private accepted-bridge bundle, exact operation input, private state
-directory, and full accepted-commit authorization. It proves quiescence,
-fast-forwards primary `main`, runs guarded user-global apply/check, retains the
-installation receipt, performs one full restart, and emits the exact
-owner/episode/ordinary resume checklist.
-
-On failure, follow the coordinator's last proven checkpoint. Restore exact bridge
-preimages from the verified private bundle or installation receipt and repeat the
-full quiesce/restart discipline only under renewed operator authority. Never retry
-an uncertain coordinator result or improvise direct host apply/check. Saved
-sessions are resumed, never deleted.
+After acceptance, a deliberate primary-`main` user-global or verified sandbox
+refresh requires quiescence, guarded apply/check, one full restart, and resumed
+owner/episode/ordinary UAT. Retained historical sandboxes, volumes, checkpoints,
+receipts, and preimages are not cleanup-authorized by code retirement.
 
 ## Automated evidence
 

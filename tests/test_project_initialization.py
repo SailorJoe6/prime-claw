@@ -10,12 +10,13 @@ SOURCE=ROOT/"src/prime-agent-plugin"
 def test_delivery_manifest_covers_every_shipped_source_once():
     inventory=json.loads((SOURCE/"asset-inventory.json").read_text())
     rows=inventory["assets"]
-    assert inventory["schemaVersion"]==2 and inventory["roleProtocol"]=="role-protocol.json"
+    assert inventory["schemaVersion"]==2
+    assert set(inventory)=={"schemaVersion","predecessorRetiredPluginFiles","assets"}
     assert len({row["id"] for row in rows})==len(rows)
     assert len({row["source"] for row in rows})==len(rows)
     inventoried={row["source"] for row in rows}
     shipped={str(path.relative_to(SOURCE)) for path in SOURCE.rglob("*") if path.is_file()}
-    assert inventoried==shipped-{inventory["roleProtocol"]}
+    assert inventoried==shipped
     targets=[(target["class"],target.get("destination")) for row in rows for target in row["targets"]]
     assert len(targets)==len(set(targets))
     assert all((SOURCE/row["source"]).is_file() and not (SOURCE/row["source"]).is_symlink() for row in rows)

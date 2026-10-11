@@ -165,11 +165,10 @@ function assertRelativeFilePath(value: string, label: string): void {
 
 export function loadAssetInventory(pluginRoot = pluginRootFromModule()): AssetInventory {
   const raw = jsonObject(parseJson(readFileSync(join(pluginRoot, INVENTORY_FILE), "utf8"), "asset inventory"), "asset inventory");
-  if (Object.keys(raw).sort().join(",") !== "assets,predecessorRetiredPluginFiles,roleProtocol,schemaVersion"
-    || raw.schemaVersion !== 2 || !Array.isArray(raw.assets) || !Array.isArray(raw.predecessorRetiredPluginFiles) || typeof raw.roleProtocol !== "string") {
+  if (Object.keys(raw).sort().join(",") !== "assets,predecessorRetiredPluginFiles,schemaVersion"
+    || raw.schemaVersion !== 2 || !Array.isArray(raw.assets) || !Array.isArray(raw.predecessorRetiredPluginFiles)) {
     throw new Error("unsupported asset inventory schema");
   }
-  assertRelativeFilePath(raw.roleProtocol, "role protocol source");
   const retired = new Set<string>();
   for (const item of raw.predecessorRetiredPluginFiles) {
     const row = jsonObject(item, "predecessor retired plugin file");

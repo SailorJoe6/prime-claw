@@ -58,14 +58,14 @@ prime-claw builds on four prior projects. Read these before designing:
   `/implement-spec` promotion, unresolved admission handling, validation scope,
   and archived design provenance.
 - [lab-global-plugin.md](lab-global-plugin.md) — the final plugin layout,
-  selected-global-context ownership, exact legacy-region removal,
-  receipt-driven recovery, staged deployment, and rollback.
+  selected-global-context ownership, manifest-authoritative delivery,
+  sandbox deployment, and accepted-refresh safety.
 - [conversation-driven-episode-oversight.md](conversation-driven-episode-oversight.md)
   — the lean managed session protocol, deterministic lifecycle mechanics,
   historical-package filtering, and managed global role guides.
 - [goal-heartbeat-work-control.md](goal-heartbeat-work-control.md) — the
   neutral-kernel/managed-guide work-control split, retired-extension migration,
-  and coordinated Gate B activation boundary.
+  and accepted final-refresh boundary.
 - [user-stories/](user-stories/) — the current plugin's outcome-level user
   stories, split by lifecycle area, with implementation surfaces and candidate
   simplification seams kept separate from the stories themselves; its

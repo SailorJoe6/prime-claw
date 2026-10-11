@@ -98,15 +98,10 @@ def safe_relative(value: object, label: str) -> str:
 
 def inventory(source: Path) -> dict:
     value = load_json(source / "asset-inventory.json")
-    if set(value) != {"schemaVersion", "roleProtocol", "predecessorRetiredPluginFiles", "assets"}:
+    if set(value) != {"schemaVersion", "predecessorRetiredPluginFiles", "assets"}:
         raise ValueError("asset inventory fields are malformed")
     if value.get("schemaVersion") != 2:
         raise ValueError("unsupported asset inventory")
-    role_protocol = safe_relative(value.get("roleProtocol"), "role protocol source")
-    role_path = source / role_protocol
-    info = role_path.lstat()
-    if not stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode):
-        raise ValueError(f"unsafe role protocol source: {role_path}")
     retired = value.get("predecessorRetiredPluginFiles")
     rows = value.get("assets")
     if not isinstance(retired, list) or not isinstance(rows, list): raise ValueError("asset inventory collections are malformed")
@@ -162,7 +157,7 @@ def inventory(source: Path) -> dict:
         for path in source.rglob("*")
         if path.is_file() and not path.is_symlink()
     }
-    expected_sources = all_sources - {value["roleProtocol"]}
+    expected_sources = all_sources
     if sources != expected_sources:
         raise ValueError(f"asset inventory source coverage mismatch: missing={sorted(expected_sources-sources)} extra={sorted(sources-expected_sources)}")
     return value
@@ -373,11 +368,10 @@ def check(source_root: Path, root: Path, user_root: Path) -> tuple[dict,int]:
 
 
 def main() -> int:
-    parser=argparse.ArgumentParser(); parser.add_argument("mode",choices=("preflight","apply","check","selected-context-source","role-protocol-source")); parser.add_argument("source_root",type=Path); parser.add_argument("destination_root",type=Path,nargs="?"); parser.add_argument("--user-root",type=Path); parser.add_argument("--action",choices=("preserve","backup-reset","accept-override"),default="preserve"); args=parser.parse_args()
+    parser=argparse.ArgumentParser(); parser.add_argument("mode",choices=("preflight","apply","check","selected-context-source")); parser.add_argument("source_root",type=Path); parser.add_argument("destination_root",type=Path,nargs="?"); parser.add_argument("--user-root",type=Path); parser.add_argument("--action",choices=("preserve","backup-reset","accept-override"),default="preserve"); args=parser.parse_args()
     try:
         source=args.source_root.resolve(strict=True); value=inventory(source)
         if args.mode=="selected-context-source": print(selected_context_source(source,value)); return 0
-        if args.mode=="role-protocol-source": print(source / value["roleProtocol"]); return 0
         if args.destination_root is None or args.user_root is None: raise ValueError("destination root and --user-root are required")
         validate_base(args.destination_root, "managed plugin")
         validate_base(args.user_root, "user skill root")
