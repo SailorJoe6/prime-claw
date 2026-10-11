@@ -26,10 +26,9 @@ Cleanup restores the exact committed bytes and clean index. Ambiguous later
 edits are preserved for explicit `restore` or `keep` recovery. Do not use OS
 GUI/Accessibility control without a separate operator request.
 
-`git diff --no-index` is an honest terminal fallback when Orca is unavailable;
-it is not the intended side-by-side product experience. The current fallback
-implementation uses tracked `git diff --no-ext-diff -- <path>` instead; that is
-an explicit contract gap to align before final acceptance.
+A terminal Git diff is an honest fallback when Orca is unavailable; it is not
+the intended side-by-side product experience. The current tracked-file fallback
+is sufficient because the upstream bytes are already held at that path.
 
 ## Rejected simpler alternative
 

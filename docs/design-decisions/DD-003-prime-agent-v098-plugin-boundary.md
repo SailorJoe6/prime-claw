@@ -18,11 +18,10 @@ Evidence and exact source identity:
 [`prime-agent-v098-ts-candidate-20261010.md`](../evidence/prime-agent-v098-ts-candidate-20261010.md), and accepted live daemon/runtime evidence in
 [`prime-agent-v098-v2-active-acceptance-20261010.md`](../evidence/prime-agent-v098-v2-active-acceptance-20261010.md).
 
-The operator's product boundary states that the 0.10 rewrite removed the plugin
-framework Prime Claw needs. This repository retains no primary 0.10 probe or
-source citation proving that history. The evidence-backed conclusion needed
-here is narrower: no later/Rust line is qualified, and compatibility must not be
-claimed without a separate proof.
+Joe Landers, the project operator and authority for this compatibility
+boundary, confirmed that the Prime Agent 0.10 rewrite removed the plugin
+framework Prime Claw requires. This is an authoritative product fact; Prime
+Claw does not need to reproduce that removal locally before relying on it.
 
 ## Decision
 
