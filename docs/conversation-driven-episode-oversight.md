@@ -62,8 +62,9 @@ markers are retired.
 
 For a ready local project-host setup, Episode creation is ordered as follows:
 
-1. Enumerate exact ready setups. Select the only row, use the native picker for
-   multiple rows, or honor the exact `id:<setup-id>` bypass. Cancellation and
+1. Enumerate exact ready local setups without querying unsupported remote
+   environments. Select the only row, use the native picker for multiple local
+   rows, or honor the exact `id:<setup-id>` bypass. Cancellation and
    noninteractive ambiguity create nothing.
 2. Bind a deterministic recursive content digest at implementation admission,
    reject unsupported bundle entries, and persist provisioning ownership with
@@ -91,8 +92,9 @@ second daemon prompt. `pi` remains Orca's distinct TUI agent ID; the native
 provider is `prime-agent`.
 
 Remote placement is disabled. Current Orca interfaces do not transport an exact
-approved local bundle into a remote checkout. Prompt text is not transport. A
-selected remote row fails before mutation and never falls back locally.
+approved local bundle into a remote checkout. Prompt text is not transport.
+Prime Claw does not inventory remote setups; an explicit ID outside the ready
+local rows fails before mutation and never falls back locally.
 
 ## Direct local fallback
 

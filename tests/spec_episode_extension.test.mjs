@@ -58,7 +58,7 @@ function harness(options = {}) {
     branch: () => wt.branch, worktrees() { return this.entries; },
     createWorktree(_repo, branch, path, base) { calls.push(["local-create", branch, path, base]); mkdirSync(path, { recursive: true }); this.entries.push({ path, branch }); mkdirSync(join(path, ".agents", "skills", "execute"), { recursive: true }); writeFileSync(join(path, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE POLICY"); mkdirSync(join(path, ".prime-claw", "workflows"), { recursive: true }); writeFileSync(join(path, ".prime-claw", "workflows", "handoff.md"), "HANDOFF POLICY"); },
     assertCleanWorktree(path) { calls.push(["clean", path]); },
-    commitPromotion(path) { calls.push(["commit", path]); return "promoted"; }, removeCreatedWorktree() { calls.push(["remove-local"]); },
+    commitPromotion(path) { calls.push(["commit", path]); return "promoted"; },
   };
   const filesystem = { exists: (path) => options.unavailable ? !String(path).includes("-alpha-episode-") : true, promoteBundle(path) { calls.push(["promote", path]); } };
   const ownership = { read: () => record, write(_root, value) { record = structuredClone(value); calls.push(["ownership", value.status]); } };
@@ -72,7 +72,7 @@ function harness(options = {}) {
     async reopen(args) { calls.push(["reopen", args]); return published; },
     async deliverExecute(_route, prompt) { calls.push(["execute", prompt]); },
     async deliverHandoff(_route, handoff, execute) { calls.push(["handoff", handoff, execute]); },
-    async kill() { return true; }, close() { calls.push(["close"]); },
+    close() { calls.push(["close"]); },
   };
   const localSetup = setup();
   const orca = {
@@ -266,7 +266,6 @@ test("CLI Orca adapter encodes background provider launch without activate", asy
     commands.push(args);
     const key = args.slice(0, 2).join(" ");
     if (key === "project setups") return JSON.stringify({ ok: true, result: { setups: [{ id: "setup", projectId: "project", hostId: "local", path: "/repo", displayName: "repo", setupState: "ready" }] } });
-    if (key === "environment list") return JSON.stringify({ ok: true, result: { environments: [] } });
     if (key === "worktree create") return JSON.stringify({ ok: true, result: { worktree: { id: "repo::/wt", identity: { key: "wt2:local:one" }, path: "/wt", branch: "refs/heads/generated", head: "base", projectHostSetupId: "setup" } } });
     if (key === "automations create") return JSON.stringify({ ok: true, result: { automation: { id: "auto" } } });
     if (key === "automations run") return JSON.stringify({ ok: true, result: { run: { id: "run" } } });
@@ -293,17 +292,14 @@ test("CLI Orca adapter encodes background provider launch without activate", asy
 });
 
 
-test("CLI setup inventory still enumerates remote-ready rows when local registration is not ready", async () => {
+test("CLI setup inventory stops at supported local project setups", async () => {
   const commands = [];
   const adapter = new CliOrcaAdapter((args) => {
     commands.push(args);
-    if (args[0] === "project" && args[1] === "setups" && !args.includes("--host")) return JSON.stringify({ ok: true, result: { setups: [{ id: "local", projectId: "project", path: "/repo", setupState: "missing" }] } });
-    if (args[0] === "environment") return JSON.stringify({ ok: true, result: { environments: [{ id: "remote-id", name: "remote" }] } });
-    if (args[0] === "project" && args[1] === "setups" && args.includes("--host")) return JSON.stringify({ ok: true, result: { setups: [{ id: "remote-setup", projectId: "project", path: "/remote/repo", displayName: "repo", setupState: "ready", platform: "linux" }] } });
-    throw new Error(`unexpected ${args}`);
+    if (args[0] === "project" && args[1] === "setups") return JSON.stringify({ ok: true, result: { setups: [{ id: "local", projectId: "project", path: "/repo", setupState: "missing" }] } });
+    throw new Error(`unexpected unsupported inventory call ${args}`);
   });
-  const rows = await adapter.listReadySetups("/repo");
-  assert.equal(rows.length, 1); assert.equal(rows[0].id, "remote-setup");
-  assert.equal(rows[0].routingEnvironmentId, "remote-id");
-  assert.equal(commands.some((args) => args.includes("runtime:remote-id")), true);
+  assert.deepEqual(await adapter.listReadySetups("/repo"), []);
+  assert.equal(commands.length, 1);
+  assert.deepEqual(commands[0].slice(0, 2), ["project", "setups"]);
 });

@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
@@ -6,6 +5,7 @@ import {
   writeEpisodeOwnership,
   type EpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
+import { resolveNearestProjectRoot } from "./project-initialization.ts";
 
 export type EpisodeCloseResult = {
   reused: boolean;
@@ -14,12 +14,6 @@ export type EpisodeCloseResult = {
 
 const SAFE_LOCATION = /^\.ralph\/plans\/future\/([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 
-function projectRoot(cwd: string): string {
-  return execFileSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  }).trim();
-}
 
 export function closeEpisodeOwnership(
   sourceLocation: string,
@@ -28,7 +22,7 @@ export function closeEpisodeOwnership(
 ): EpisodeCloseResult {
   const match = SAFE_LOCATION.exec(sourceLocation);
   if (!match) throw new Error("Episode bookkeeping location is invalid");
-  const root = projectRoot(ctx.cwd);
+  const root = resolveNearestProjectRoot(ctx.cwd).root;
   const record = readEpisodeOwnership(root);
   if (!record) throw new Error("Exact episode ownership is missing before bookkeeping close");
   if (record.slug !== match[1] || record.sourceLocation !== sourceLocation) {
@@ -47,9 +41,5 @@ export function closeEpisodeOwnership(
     updatedAt: new Date().toISOString(),
   };
   write(root, closed);
-  const persisted = readEpisodeOwnership(root);
-  if (!persisted || persisted.status !== "inactive" || persisted.operationId !== record.operationId) {
-    throw new Error("Inactive episode bookkeeping evidence did not persist");
-  }
-  return { reused: false, record: persisted };
+  return { reused: false, record: closed };
 }

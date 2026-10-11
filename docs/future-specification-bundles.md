@@ -49,9 +49,10 @@ receipt.
 
 ## Placement
 
-Prime Claw reads ready Orca project-host setups. One local row is selected
-directly. Multiple rows use a native picker whose display labels contain the
-project, environment or machine, platform when known, path, and stable ID. A
+Prime Claw reads ready local Orca project-host setups and does not enumerate
+unsupported remote environments. One row is selected directly. Multiple local
+rows use a native picker whose display labels contain the project, platform
+when known, path, and stable ID. A
 noninteractive caller uses:
 
 ```text
@@ -59,8 +60,9 @@ noninteractive caller uses:
 ```
 
 Labels are not identifiers. Cancellation and noninteractive ambiguity create
-nothing. Remote selection is rejected because exact approved-bundle transport
-has not been proven. It never falls back locally.
+nothing. Remote selection is rejected before mutation. Prime Claw does not
+inventory remote setups; an explicit ID outside the ready local rows fails and
+never falls back locally.
 
 ## Promotion and fresh Episode
 

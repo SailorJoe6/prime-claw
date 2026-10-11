@@ -14,7 +14,6 @@ import {
 import {
   assertConversationPromotionReady,
   conversationGuideText,
-  requireConversationOwnership,
   registerConversationOversight,
 } from "../extension-support/conversation-oversight.ts";
 import { closeEpisodeOwnership } from "../extension-support/episode-close.ts";
@@ -69,8 +68,8 @@ function registerPrepChainCommand(
     command: string;
     description: string;
     workflow: PrepChainWorkflow;
-    onValidated?: (ctx: ExtensionContext, location: string, selection: CommandSelection) => void;
-    preflight?: (ctx: ExtensionContext, location: string) => void;
+    onValidated?: (ctx: ExtensionContext, location: string, selection: CommandSelection, preflightValue?: string) => void;
+    preflight?: (ctx: ExtensionContext, location: string) => string | undefined;
     phasePreamble?: () => string;
     parseArgs?: (args: string) => CommandSelection | null;
   },
@@ -83,20 +82,23 @@ function registerPrepChainCommand(
         ctx.ui.notify(options.workflow.usage, "warning");
         return;
       }
+      let preflightValue: string | undefined;
       const result = await admitPrepChain(
         pi,
         ctx,
         selection.location,
         options.workflow,
         "native",
-        options.preflight,
+        options.preflight ? (callCtx, location) => {
+          preflightValue = options.preflight!(callCtx, location);
+        } : undefined,
         options.phasePreamble?.(),
       );
       if (!result.ok) {
         ctx.ui.notify(result.message, result.level);
         return;
       }
-      options.onValidated?.(ctx, result.location, selection);
+      options.onValidated?.(ctx, result.location, selection, preflightValue);
     },
   });
 }
@@ -124,17 +126,16 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         assertConversationPromotionReady(ctx, location);
         const selected = validateFutureLocation(ctx.cwd, location);
         if (!selected) throw new Error("Validated implementation folder disappeared");
-        bundleContentDigest(selected.folder);
+        return bundleContentDigest(selected.folder);
       },
       phasePreamble: () => conversationGuideText(oversightOptions),
       parseArgs: parseImplementationArgs,
-      onValidated: (ctx, location, selection) => {
-        const selected = validateFutureLocation(ctx.cwd, location);
-        if (!selected) throw new Error("Validated implementation folder disappeared");
+      onValidated: (ctx, location, selection, bundleDigest) => {
+        if (!bundleDigest) throw new Error("Implementation preflight did not bind the approved bundle");
         implementationApprovalBySession.set(ctx.sessionManager.getSessionId(), {
           location,
           ...(selection.host ? { host: selection.host } : {}),
-          bundleDigest: bundleContentDigest(selected.folder),
+          bundleDigest,
           skipNextAgentEnd: true,
         });
       },
@@ -325,7 +326,6 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         try {
-          requireConversationOwnership(ctx, params.location);
           const handoffEpisode = dependencies?.handoffEpisode ?? handoffSpecEpisode;
           const result = await handoffEpisode(
             params.location,

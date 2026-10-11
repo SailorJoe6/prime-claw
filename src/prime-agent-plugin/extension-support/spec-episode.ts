@@ -20,8 +20,6 @@ import {
   canonicalWorkflowPrompt,
 } from "./workflow-chain.ts";
 import {
-  episodeOwnershipPath,
-  parseEpisodeOwnership,
   readEpisodeOwnership,
   writeEpisodeOwnership,
   type EpisodeOwnershipRecord,
@@ -64,7 +62,6 @@ function isUncertainMutation(error: unknown): boolean {
     || error instanceof OrcaMutationUncertainError;
 }
 
-export type EpisodeIdentity = EpisodeOwnershipRecord;
 export type EpisodeResult = EpisodeOwnershipRecord & { reused: boolean };
 
 export interface SessionSummary {
@@ -105,7 +102,6 @@ export interface GitAdapter {
   createWorktree(repo: string, branch: string, worktree: string, baseRef: string): void;
   assertCleanWorktree(worktree: string): void;
   commitPromotion(worktree: string, slug: string): string;
-  removeCreatedWorktree(repo: string, branch: string, worktree: string): void;
 }
 export interface FilesystemAdapter {
   exists(path: string): boolean;
@@ -122,7 +118,6 @@ export interface SessionPublisher {
   reopen(options: { sessionFile: string; sessionId: string; worktree: string; sessionName: string; model?: { provider: string; id: string } }): Promise<PublishedSession>;
   deliverExecute(activeSessionId: string, prompt: string): Promise<void>;
   deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string, onHandoffAdmitted?: () => void | Promise<void>, queueHandoffIfBusy?: boolean): Promise<void>;
-  kill(activeSessionId: string): Promise<boolean>;
   close(): void;
 }
 export interface OrcaProjectSetup {
@@ -189,10 +184,6 @@ export class CliGitAdapter implements GitAdapter {
     this.runner(worktree, ["commit", "--allow-empty", "-m", `chore: promote ${slug} specification`]);
     return this.head(worktree);
   }
-  removeCreatedWorktree(repo: string, branch: string, worktree: string): void {
-    this.runner(repo, ["worktree", "remove", "--force", worktree]);
-    this.runner(repo, ["branch", "-D", branch]);
-  }
 }
 export function bundleContentDigest(folder: string, topNames?: string[]): string {
   const hash = createHash("sha256");
@@ -240,10 +231,6 @@ export class NodeFilesystemAdapter implements FilesystemAdapter {
   }
 }
 const defaultOwnershipStore: EpisodeOwnershipStore = { read: readEpisodeOwnership, write: writeEpisodeOwnership };
-
-export function parseEpisodeIdentity(value: unknown, path = "episode ownership"): EpisodeIdentity { return parseEpisodeOwnership(value, path); }
-export function episodeIdentityPath(projectRoot: string, _slug?: string): string { return episodeOwnershipPath(projectRoot); }
-export function episodeBootstrapReady(identity: EpisodeIdentity): boolean { return identity.status === "active"; }
 
 interface DaemonResponse {
   id?: string;
@@ -497,9 +484,6 @@ export class PrimeSessionPublisher implements SessionPublisher {
     if (admission.stage === "first") throw cause;
     throw new HandoffFollowUpRejectedError(`Handoff was admitted, but canonical execute follow-up could not be queued: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
   }
-  async kill(activeSessionId: string): Promise<boolean> {
-    requireSuccess(await this.client.request({ type: "kill", activeSessionId }), "episode cleanup kill"); return true;
-  }
   close(): void { this.client.close(); }
   private async openResident(options: { sessionFile: string; sessionId: string; worktree: string; sessionName: string; model?: { provider: string; id: string } }): Promise<PublishedSession> {
     const data = requireSuccess(await this.client.request({
@@ -549,24 +533,9 @@ export class CliOrcaAdapter implements OrcaAdapter {
     if (localProjects.length === 0) return [];
     const projectIds = new Set(localProjects.map((row) => stringField(row, "projectId", "Orca setup")));
     if (projectIds.size !== 1) throw new Error("Orca has conflicting project identities for the exact local path");
-    const projectId = [...projectIds][0];
-    const setups: OrcaProjectSetup[] = localProjects.filter((row) => row.setupState === "ready").map((row) => this.setup(row, "local", "local"));
-    let environments: JsonObject;
-    try { environments = this.json(["environment", "list"], "Orca environment inventory"); }
-    catch (error) { throw new Error(`Orca host inventory is incomplete: ${error instanceof Error ? error.message : String(error)}`); }
-    for (const value of Array.isArray(environments.environments) ? environments.environments : []) {
-      const environment = object(value, "Orca environment");
-      const id = stringField(environment, "id", "Orca environment");
-      const label = typeof environment.name === "string" && environment.name ? environment.name : `runtime:${id}`;
-      let remote: JsonObject;
-      try { remote = this.json(["project", "setups", "--project", projectId, "--host", `runtime:${id}`], "remote Orca project setup inventory"); }
-      catch (error) { throw new Error(`Orca host inventory is incomplete for runtime:${id}: ${error instanceof Error ? error.message : String(error)}`); }
-      for (const rowValue of Array.isArray(remote.setups) ? remote.setups : []) {
-        const row = object(rowValue, "remote Orca setup");
-        if (row.setupState === "ready" && row.projectId === projectId) setups.push(this.setup(row, label, `runtime:${id}`, id));
-      }
-    }
-    return setups;
+    return localProjects
+      .filter((row) => row.setupState === "ready")
+      .map((row) => this.setup(row, "local", "local"));
   }
   async createWorktree(options: { setup: OrcaProjectSetup; name: string; baseRef: string }): Promise<OrcaWorktree> {
     try {
@@ -666,7 +635,7 @@ function samePath(a: string | undefined, b: string): boolean {
 function sessionIsBusy(session: SessionSummary): boolean {
   return session.isSessionActive === true || session.isStreaming === true || session.isCompacting === true || (session.queuedCount ?? 0) > 0;
 }
-function assertIdleEpisodeState(state: EpisodeSessionState, identity: EpisodeIdentity, activeSessionId: string): void {
+function assertIdleEpisodeState(state: EpisodeSessionState, identity: EpisodeOwnershipRecord, activeSessionId: string): void {
   const matches = state.activeSessionId === activeSessionId && state.sessionId === identity.episodeId && samePath(state.sessionFile, identity.episodeSessionFile);
   if (!matches) throw new Error("Episode state does not match the durable owned identity");
   const actions = state.sessionActions;
