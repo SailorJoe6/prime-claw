@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: To Do
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-12 21:19'
+updated_date: '2026-10-12 21:22'
 labels:
   - backlog-md
   - episode-loop
@@ -58,7 +58,7 @@ Migrate every existing `To Do` task: tasks with a meaningful Implementation Plan
 
 Migrate all durable state under `.ralph/plans` into destination Backlog tasks and supported fields without losing specifications, acceptance criteria, implementation plans, decisions, execution notes, references, terminal summaries, or provenance needed to understand the work. Future or unstarted state maps to `In Design` or `In Planning` according to meaningful plan presence. Active work maps to the truthful active or blocked task state. Successfully completed archives become `Done` tasks and are completed into `backlog/completed`; do not place them in `backlog/archive`. Non-success terminal or ambiguous legacy state must be preserved and surfaced for truthful disposition rather than silently marked successful.
 
-Implement and land this change through one final old-style `.ralph/plans` migration Episode. At merge, switch all workflow authority to Backlog tasks and remove `.ralph/plans` atomically in the same accepted change. Do not leave a dual-write or indefinite compatibility phase.
+Implement and land this change through one final old-style `.ralph/plans` migration Episode. The candidate branch itself contains the completed state migration, the task-native workflow, and deletion of `.ralph/plans`. A normal accepted merge makes that repository state current; do not build runtime cutover automation, merge hooks, dual-write behavior, or a compatibility phase.
 
 ## Material constraints and non-goals
 
@@ -84,7 +84,7 @@ Implement and land this change through one final old-style `.ralph/plans` migrat
 - [ ] #7 A migration fixture proves every pre-cutover `To Do` task with a meaningful Implementation Plan becomes `In Planning`, every `To Do` task without one becomes `In Design`, and already active, blocked, or done tasks retain truthful semantics.
 - [ ] #8 A representative migration fixture covering future specs with and without plans, active work, blocked work, successful archives, and ambiguous or non-success history proves all material content and references reach a traceable destination task; successful archives end as `Done` under `backlog/completed` and no migrated item is written to `backlog/archive`.
 - [ ] #9 Repository-wide acceptance proves no live command, skill, workflow, template, test, or documentation treats `.ralph/plans` as authoritative, while historical references remain only where changing them would falsify history.
-- [ ] #10 The accepted migration lands as one final old-style Episode change that both migrates existing state and removes `.ralph/plans`; the merged tree has no dual-write mode or partially switched authority.
+- [ ] #10 The final accepted candidate tree contains the completed state migration and task-native workflow and no `.ralph/plans` directory; a normal merge applies that tree without runtime cutover automation, merge hooks, dual-write behavior, or a compatibility phase.
 - [ ] #11 The compatibility `SPECIFICATION.md` for this effort contains only a clear pointer to the created Backlog task and no duplicated mutable specification.
 - [ ] #12 Existing tests plus focused Docker-isolated plugin acceptance prove Conversation, operator, and Episode authority, exact ownership, iteration handoff, recovery, Expert review, finalization, and cleanup behavior remain intact apart from the specified task-native identity and lifecycle changes.
 - [ ] #13 Static and behavioral acceptance proves the change introduces no approval commits, Git-blob or tag approval scheme, replacement or additional digest protocol, bespoke transaction journal, Prime Agent source patch, or other unapproved scope expansion.
