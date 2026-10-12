@@ -5,6 +5,7 @@ status: In Progress
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:01'
+updated_date: '2026-10-12 01:14'
 labels: []
 dependencies: []
 priority: p1
@@ -53,5 +54,5 @@ BINDING SCOPE RESOLUTION (Joe, 2026-10-10): Prime Agent downstream maintenance r
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A reviewed compatibility matrix cites exact v0.9.8 and v0.10 sources; the simplified plugin dependency inventory is complete; Orca's Prime Agent provider contract is mapped from both repos; isolated cross-version probes cover launch, create/reuse, message/queue behavior, reconnect, daemon restart, wrong-CWD/stale identity, and rollback; sequencing and cutover gates are documented; implementation work is split into dependency-ordered beads without changing the installed runtime.
+- [ ] #1 A reviewed compatibility matrix cites exact v0.9.8 and v0.10 sources; the simplified plugin dependency inventory is complete; Orca's Prime Agent provider contract is mapped from both repos; isolated cross-version probes cover launch, create/reuse, message/queue behavior, reconnect, daemon restart, wrong-CWD/stale identity, and rollback; sequencing and cutover gates are documented; implementation work is split into dependency-ordered Backlog.md tasks without changing the installed runtime.
 <!-- AC:END -->

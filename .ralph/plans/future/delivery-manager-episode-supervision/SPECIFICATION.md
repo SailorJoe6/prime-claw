@@ -1,7 +1,7 @@
 # Specification — Delivery Manager episode supervision
 
 > **Status: requires redesign before planning or implementation.** The accepted
-> `prime-claw-h6w.32` direction supersedes this draft's generated role-kernel,
+> `PRIMECLAW-10.36` direction supersedes this draft's generated role-kernel,
 > authenticated-role, and private official-EXPERT assumptions. Prime Claw roles
 > are skill-based; the plugin may help invoke the right skills at lifecycle
 > boundaries but does not authenticate roles. EXPERT review now uses the
@@ -275,7 +275,7 @@ create a duplicate manager or EPISODE.
 For each implementation slice:
 
 1. The EPISODE chooses one small end-to-end slice within the approved scope.
-2. It implements, validates, updates required durable artifacts and Beads,
+2. It implements, validates, updates required durable artifacts and Backlog.md tasks,
    creates one reviewable commit, pushes it, and reports exact evidence to the
    DELIVERY MANAGER.
 3. The manager reconciles the report against the exact session, branch,

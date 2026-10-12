@@ -1,6 +1,6 @@
 # Slice 2 — In-sandbox index serving (R3a-2, R3a-12)
 
-**Date:** 2026-09-15 · **Bead:** prime-claw-zwg · **Status:** COMPLETE
+**Date:** 2026-09-15 · **Backlog.md task:** PRIMECLAW-7 · **Status:** COMPLETE
 
 ## What was built
 
@@ -54,7 +54,7 @@ an unrelated manual bulk embed against the same PG. Fixes:
 - **VPN-down signature**: sandbox egress to `ai-gateway.zende.sk` 403s with `RBAC: access denied`
   (istio-envoy, no rate-limit headers) whenever the host VPN is down — the daily corporate re-login
   policy guarantees this happens mid-session regularly. Diagnostic: host+real-key 200 while
-  sandbox+placeholder 403 → check `zetup vpn status` FIRST. Bead `prime-claw-z56` ports the
+  sandbox+placeholder 403 → check `zetup vpn status` FIRST. Backlog.md task `PRIMECLAW-9` ports the
   `ensure-vpn` Claude hook so credentialed stages auto-check.
 - **Provider recreate required after credential churn**: during this session the providers were
   deleted + recreated (create-time semantics) to recover from a broken placeholder binding after a

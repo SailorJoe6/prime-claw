@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backlog.md"
+  short_description: "Manage durable project work with Backlog.md"
+  default_prompt: "Use $backlog to inspect ready work and manage durable project tasks."

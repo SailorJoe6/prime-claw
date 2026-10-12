@@ -7,7 +7,7 @@ per pass, so that every iteration produces bounded, tested, documented,
 reviewable progress.**
 
 Each execute pass reads the active specification and plan, audits existing work,
-implements one slice, updates tests, documentation, Beads, and plan state,
+implements one slice, updates tests, documentation, Backlog.md tasks, and plan state,
 commits and pushes, reports exact evidence, and stops for owner review.
 
 Implementation remains inside the operator-approved product contract. Expert
@@ -20,9 +20,9 @@ progress.
 project artifacts, so that the next actor does not depend on transcript memory.**
 
 Blocked work records the exact blocker, attempts, and unblock condition, moves
-both plan documents to the blocked location, updates Beads, and stops. Completed
+both plan documents to the blocked location, updates Backlog.md tasks, and stops. Completed
 work archives the active specification and plan, updates the archive index and
-Beads, and reports verification evidence.
+Backlog.md tasks, and reports verification evidence.
 
 ## Primary implementation surfaces
 

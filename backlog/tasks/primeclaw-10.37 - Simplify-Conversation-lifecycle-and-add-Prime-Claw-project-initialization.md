@@ -4,6 +4,7 @@ title: Simplify Conversation lifecycle and add Prime Claw project initialization
 status: To Do
 assignee: []
 created_date: '2026-10-12 01:01'
+updated_date: '2026-10-12 01:16'
 labels:
   - episode-loop
   - phase4
@@ -19,7 +20,7 @@ ordinal: 95000
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
 ## Why
-The Conversation role currently works but combines normal skill guidance with hash-authenticated guide disclosure, context filtering, in-memory receipts, duplicate ownership records, recovery states, and direct worktree/session mechanics. This exceeds the threat model of a trusted knowledge-worker plugin and conflicts with the skill-based role direction established by prime-claw-h6w.32.
+The Conversation role currently works but combines normal skill guidance with hash-authenticated guide disclosure, context filtering, in-memory receipts, duplicate ownership records, recovery states, and direct worktree/session mechanics. This exceeds the threat model of a trusted knowledge-worker plugin and conflicts with the skill-based role direction established by PRIMECLAW-10.36.
 
 ## Operator direction
 - Extend the product architecture to include Orca for operator-visible scheduling, remote/supervised agent coordination, and especially native worktree creation and management, while retaining Prime Agent for sessions, REPL state, messaging, compaction, heartbeats, and lightweight recursive reasoning.

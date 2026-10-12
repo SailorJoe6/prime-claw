@@ -7,7 +7,7 @@ For contributors working on the prime-claw builder repo.
 - Git, Bash, standard Unix utilities
 - Python 3 + pytest (for the script/test layer)
 - Node.js 22.8 or newer (required by prime-agent and extension tests)
-- beads CLI (`bd`)
+- Backlog.md CLI (`backlog`), built from the pinned `deps/backlog` source
 - prime-agent (the harness this project builds on)
 - Optional: gbrain CLI (for brain/source work)
 - Optional: Docker/Podman (for sandbox runtime work, later phases)
@@ -223,4 +223,4 @@ check, or probe a candidate against the host/user-global Prime Agent install.
 
 - Never commit credential material.
 - `.env` files are local; `.env.example` files are the committed templates.
-- beads data lives under `.beads/` and syncs via `bd sync`.
+- Backlog.md task state lives in the tracked `backlog/` directory and is changed through the supported CLI.

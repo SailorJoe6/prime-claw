@@ -17,7 +17,7 @@ while working toward any goal.
 
 Then read these files, in this order:
 
-1. **[AGENTS.md](AGENTS.md)** — operating instructions, beads usage, the RLM
+1. **[AGENTS.md](AGENTS.md)** — operating instructions, Backlog.md usage, the RLM
    safe-spawn protocol, credential isolation, and the land-the-plane rule.
 2. **[VISION.md](VISION.md)** — what prime-claw is, the four-tier hierarchy,
    and the three-horizon context model.
@@ -27,7 +27,7 @@ Then read these files, in this order:
    the multi-store routing layer (consult when a task involves persisting
    anything durable).
 
-Then run `bd ready` to see unblocked work.
+Then run `backlog task list --status "To Do" --ready --plain` to see unblocked work.
 
 ## When the reasoning matters
 

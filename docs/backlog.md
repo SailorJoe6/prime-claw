@@ -47,3 +47,30 @@ labels and the build stamp record the release and commit.
 
 The build uses the vendored source. It does not install an npm package, download
 an upstream prebuilt binary, or require Bun to execute `backlog`.
+
+## Project task workflow
+
+Backlog.md is the repository's sole active task tracker. Until the accepted host
+artifact is activated, use the repository-built candidate at
+`deps/backlog/dist/backlog`; after activation, the same commands use `backlog`
+from `PATH`.
+
+```sh
+backlog task list --status "To Do" --ready --plain
+backlog task view PRIMECLAW-35 --plain
+backlog task edit PRIMECLAW-35 --status "In Progress" --assignee <name>
+backlog task create "Follow-up title" --description "Outcome and context" --type task --priority P2
+backlog task edit PRIMECLAW-35 --status "Done" --final-summary "Verified result"
+backlog task complete PRIMECLAW-35
+```
+
+The `To Do` filter is required with `--ready`; readiness alone can include work
+already `In Progress` or explicitly `Blocked`. Claiming is one supported edit
+that sets status and assignee together. Backlog.md v1.53.0 has no separate claim
+command or automatic current-identity shortcut.
+
+Use the CLI for every task mutation. Do not edit task Markdown directly. The
+tracked `backlog/` directory is canonical task state, while normal repository
+instructions retain Git commit, pull, and push authority. Durable repository
+knowledge belongs in the existing tracked documentation rather than a
+tracker-specific memory command.

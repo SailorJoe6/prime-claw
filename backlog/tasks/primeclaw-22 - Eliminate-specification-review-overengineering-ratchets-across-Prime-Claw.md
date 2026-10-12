@@ -5,6 +5,7 @@ status: In Progress
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:01'
+updated_date: '2026-10-12 01:14'
 labels:
   - done-over-perfect
   - overengineering
@@ -26,7 +27,7 @@ Prime Claw has suffered at least two P0 delivery-process incidents in which a pr
 
 This epic owns the product-level correction across the Prime Claw plugin, project skills, prompts/profiles, planning templates, oversight protocol, validation, and documentation. It also owns the two incident records:
 
-- `prime-claw-5v7.9`: project-wide testing Slice 3 adversarial spec/review ratchet.
+- `PRIMECLAW-22.1`: project-wide testing Slice 3 adversarial spec/review ratchet.
 - The official-lean role-protocol incident created under this epic.
 
 ## General failure pattern
@@ -101,7 +102,7 @@ The central-control implementation milestone is complete. Keep this epic open fo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Both incident Beads are children of or durably linked as owned incidents of this epic, with evidence and course corrections preserved.
+- [ ] #1 Both incident Backlog.md tasks are children of or durably linked as owned incidents of this epic, with evidence and course corrections preserved.
 - [ ] #2 Design/spec/plan readiness requires concise product outcomes, threat model, trusted assumptions, explicit non-goals, ordinary failure model, manual-recovery boundary, and a qualitative complexity budget.
 - [ ] #3 The official EXPERT contract defines BLOCK only for a concrete violation inside the approved threat model; plausible non-blocking edge cases are recorded as advisory hardening candidates rather than discarded or promoted automatically.
 - [ ] #4 Oversight durably classifies findings as in-contract blocker, hardening backlog, out of scope, specification defect, or operator decision; only the operator may promote new product scope.

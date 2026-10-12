@@ -119,7 +119,7 @@ Coverage proves:
 The operator-controlled restart and visible manual UAT completed on 2026-09-30
 against accepted repair `486f4af62b7c1088a0ad10eb9ca05a2e0f735401`. It proved
 the then-current no-steering goal/heartbeat semantics and remains durable on
-`prime-claw-h6w.24.2`; it does not replace this transition's restart gate.
+`PRIMECLAW-10.28.2`; it does not replace this transition's restart gate.
 
 On Prime Agent `0.9.6`, queued pause/resume transport interrupted active work and
 later delivered after its premise expired. Those incidents motivated the

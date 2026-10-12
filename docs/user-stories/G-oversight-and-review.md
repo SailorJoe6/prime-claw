@@ -6,7 +6,7 @@
 its next disposition without writing the implementation myself.**
 
 The Conversation reconciles the Episode report against branch, tree, diff,
-tests, documentation, plan, Beads, push state, and worktree identity. It may
+tests, documentation, plan, Backlog.md tasks, push state, and worktree identity. It may
 accept and advance, request a recorded in-scope revision, pause, or consult the
 operator. Repeated speculative or adversarial review must stop rather than grow
 new requirements or implementation machinery.

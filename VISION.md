@@ -45,7 +45,7 @@ hierarchy below possible natively rather than approximated:
   for weeks and come back.
 - **CWD-aware spawn.** A session inherits a working directory at creation.
   A project's context boundary is made physical: spawn with CWD = the
-  project's git folder and its beads, living docs, and repo are in scope by
+  project's git folder and its Backlog.md tasks, living docs, and repo are in scope by
   construction.
 - **A persistent Python REPL as control plane.** State lives in kernel
   variables across turns and across compaction. Files are for sharing and
@@ -93,7 +93,7 @@ in prime-agent and a natural scope of concern.
 ```
 OPERATOR (a thought worker running many parallel projects)
   └── UNIVERSAL AGENT — always on, gbrain-equipped, knows the whole universe
-        └── PROJECT CONTEXT — one per project (git folder + beads + gbrain source)
+        └── PROJECT CONTEXT — one per project (git folder + Backlog.md + gbrain source)
               └── CONVERSATION — a long-lived thread inside a project
                     └── EPISODE — a Ralph-style build loop, spawned on demand
 ```
@@ -105,7 +105,7 @@ OPERATOR (a thought worker running many parallel projects)
   extremely long-horizon tasks.
 - **Project context.** One per project. Physical form: the canonical/default-
   branch checkout of a git-tracked project in the universal agent's runtime
-  home, with its own beads issues, documentation, and registered gbrain source.
+  home, with its own Backlog.md tasks, documentation, and registered gbrain source.
   The boundary between the universal agent and a project is "a
   github/gitlab-tracked project folder."
 - **Conversation.** A long-lived prime-agent session whose CWD is the
@@ -128,7 +128,7 @@ OPERATOR (a thought worker running many parallel projects)
 The hierarchy uses real, well-known UX primitives. Two confirmed mappings:
 
 - **Telegram:** each *group* is one project (correlated to its own git
-  folder, beads, docs, gbrain source). Each *conversation* in the group is
+  folder, Backlog.md tasks, docs, gbrain source). Each *conversation* in the group is
   a separate agent session started with the project root as CWD.
 - **Slack:** each *channel* is a project. Each *top-level comment* in the
   channel is a new conversation thread in prime-agent; responses appear in
@@ -163,7 +163,7 @@ place in living docs, targeting exactly these three horizons.
 
 A companion design doc, [docs/information-architecture.md](docs/information-architecture.md),
 governs the orthogonal question: when something becomes durable, *which
-store* owns it (brain vs. docs vs. harness vs. beads vs. reports). Horizons
+store* owns it (brain vs. docs vs. harness vs. task tracker vs. reports). Horizons
 govern context lifetime; the information architecture governs durable-store
 routing.
 
