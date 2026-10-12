@@ -1,11 +1,11 @@
 ---
 id: PRIMECLAW-35
 title: Replace Beads with a vendored Backlog.md fork as-is
-status: In Progress
+status: Done
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-12 01:45'
+updated_date: '2026-10-12 02:44'
 labels:
   - backlog-md
   - migration
@@ -88,14 +88,14 @@ Treat upstream Backlog.md behavior as the initial product contract. Keep integra
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A prime-claw-owned long-lived fork exists with recorded upstream provenance and a policy to track and use the latest stable upstream release until an explicit divergence decision.
-- [ ] #2 The fork is vendored as a Git submodule pinned to the latest stable upstream release tag and resolved commit, and its source can be reproducibly compiled with Bun into a version-stamped standalone binary installed at host `~/.local/bin/backlog` and sandbox `/usr/local/bin/backlog` without a runtime Bun/npm dependency.
-- [ ] #3 The complete current Beads inventory is recreated by the implementing agent through direct supported Backlog.md CLI operations, without a migration driver or manifest, with CLI-assigned `PRIMECLAW-*` IDs, translated active references, and verified preservation of approved content, every parent link, every blocking link, and every nonblocking reference link needed to continue work; no permanent legacy-ID crosswalk is retained. The observed implementation snapshot is 120 issues (79 closed and 41 active/blocked), 85 parent links, 60 blocking links, and 10 nonblocking references. Immediately before the first Backlog.md write, re-read Beads and automatically include any ordinary issue added before that snapshot.
-- [ ] #4 Existing Prime Claw and Ralph workflows use the Backlog.md CLI instead of Beads without intentional workflow or authority changes; Backlog.md-generated AI instructions and MCP integration remain disabled. Task claiming uses one supported `task edit` command to set `In Progress` and assignee together, without a compatibility wrapper or fork modification. Ready-work discovery combines `--status "To Do"` with `--ready`, and the obsolete `bd remember` instruction is removed without introducing a new knowledge subsystem.
-- [ ] #5 A one-time cutover audit verifies that repository instructions, skills, workflows, generated assets, hooks/configuration, scripts, tests, and documentation no longer teach or invoke Beads for active work; every navigational issue reference uses the new Backlog.md ID, and old Beads text remains only in factual history or verbatim evidence. The host `bd` binary remains installed and no permanent absence test is retained.
-- [ ] #6 Integration and lifecycle tests prove current behavior remains intact.
-- [ ] #7 The isolated branch/worktree candidate proves a read-only Beads migration and one validated authority cutover; after merge and host CLI activation, the first real Backlog.md mutation on primary `main` adds the migrated epic's final summary, marks it `Done`, and is committed and pushed directly, completing this effort as dogfooding begins. Ordinary Git rejection/revert is sufficient recovery.
-- [ ] #8 Product changes to Backlog.md and Ralph-workflow replacement remain separate future decisions based on dogfood evidence.
+- [x] #1 A prime-claw-owned long-lived fork exists with recorded upstream provenance and a policy to track and use the latest stable upstream release until an explicit divergence decision.
+- [x] #2 The fork is vendored as a Git submodule pinned to the latest stable upstream release tag and resolved commit, and its source can be reproducibly compiled with Bun into a version-stamped standalone binary installed at host `~/.local/bin/backlog` and sandbox `/usr/local/bin/backlog` without a runtime Bun/npm dependency.
+- [x] #3 The complete current Beads inventory is recreated by the implementing agent through direct supported Backlog.md CLI operations, without a migration driver or manifest, with CLI-assigned `PRIMECLAW-*` IDs, translated active references, and verified preservation of approved content, every parent link, every blocking link, and every nonblocking reference link needed to continue work; no permanent legacy-ID crosswalk is retained. The observed implementation snapshot is 120 issues (79 closed and 41 active/blocked), 85 parent links, 60 blocking links, and 10 nonblocking references. Immediately before the first Backlog.md write, re-read Beads and automatically include any ordinary issue added before that snapshot.
+- [x] #4 Existing Prime Claw and Ralph workflows use the Backlog.md CLI instead of Beads without intentional workflow or authority changes; Backlog.md-generated AI instructions and MCP integration remain disabled. Task claiming uses one supported `task edit` command to set `In Progress` and assignee together, without a compatibility wrapper or fork modification. Ready-work discovery combines `--status "To Do"` with `--ready`, and the obsolete `bd remember` instruction is removed without introducing a new knowledge subsystem.
+- [x] #5 A one-time cutover audit verifies that repository instructions, skills, workflows, generated assets, hooks/configuration, scripts, tests, and documentation no longer teach or invoke Beads for active work; every navigational issue reference uses the new Backlog.md ID, and old Beads text remains only in factual history or verbatim evidence. The host `bd` binary remains installed and no permanent absence test is retained.
+- [x] #6 Integration and lifecycle tests prove current behavior remains intact.
+- [x] #7 The isolated branch/worktree candidate proves a read-only Beads migration and one validated authority cutover; after merge and host CLI activation, the first real Backlog.md mutation on primary `main` adds the migrated epic's final summary, marks it `Done`, and is committed and pushed directly, completing this effort as dogfooding begins. Ordinary Git rejection/revert is sufficient recovery.
+- [x] #8 Product changes to Backlog.md and Ralph-workflow replacement remain separate future decisions based on dogfood evidence.
 <!-- AC:END -->
 
 ## Comments
@@ -113,3 +113,9 @@ created: 2026-10-12 01:45
 Slice 4 final candidate validation is complete pending commit/push. The legacy Beads source was re-read with --readonly and remains byte-identical: 120 records, SHA-256 3101daa5c0372b7b45da074b64c9ca062b00380f986ab9daa187364c0dcf45a2. All 120 Backlog.md tasks were re-read through the supported CLI: 79 Done / 41 active, 85 parent links, 60 blocking dependencies, all 10 translated nonblocking references, 116 migrated comments plus the Slice 3 operational comment, and 256 acceptance criteria; the task tree has no drift from accepted Slice 3. Repository snapshots now omit index-mode-160000 gitlinks consistently whether initialized or absent, with a real-submodule regression and direct initialized-worktree snapshot proof. The runtime build pins Bun 1.3.11 after a floating Bun 1.4.3 cached binary produced SIGBUS; the fresh runtime upstream smoke passes and a networkless container reports Bun 1.3.11 / Backlog.md 1.53.0. Host source build passes at v1.53.0 / fd20f71493fb4eda44b021aa89f257956f17fb71. Final host-safe suite: 613 passed, 66 skipped, 75 subtests. Standard initialized-worktree scripts/test-tier1.sh --probe passes with offline RPC checks, network removal, teardown, and manifest publication. This Episode does not activate host artifacts, merge, add the final summary, mark this task Done, or close it; those remain operator-controlled post-merge steps on primary main.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Completed the Beads-to-Backlog.md authority cutover. The accepted candidate was merged to primary main in e8d1bbb after preserving pre-migration main state in 3d57834. The migration recreated 120 tasks (79 completed and 41 active/blocked), 85 parent links, 60 blocking dependencies, 10 nonblocking references, 116 source comments, and 256 acceptance criteria from the stable Beads snapshot SHA-256 3101daa5c0372b7b45da074b64c9ca062b00380f986ab9daa187364c0dcf45a2. Active repository callers, skills, workflows, documentation, tests, and configuration now use native Backlog.md operations. Final validation passed the host-safe suite (613 passed, 66 skipped), focused checks, and the standard Docker Tier 1 probe. The pinned v1.53.0 host CLI is installed at ~/.local/bin/backlog, and the rebuilt networkless runtime reports Bun 1.3.11 and Backlog.md 1.53.0. This post-merge task update is the first durable Backlog.md dogfood mutation and closes the migration effort; later Ralph reshaping and fork product evolution remain separate work.
+<!-- SECTION:FINAL_SUMMARY:END -->
