@@ -52,7 +52,8 @@ def test_runtime_dockerfile_exists_and_is_runtime():
     assert "COPY --from=backlog_source . /opt/backlog" in body
     assert 'BACKLOG_BUILD_TARGET="$TARGET"' in body
     assert "bun scripts/smoke-compiled-build.ts /usr/local/bin/backlog" in body
-    assert "postgresql-16-pgvector" in body
+    assert "postgresql-16-pgvector ripgrep unzip" in body
+    assert "test -x /usr/bin/rg && /usr/bin/rg --version" in body
     assert "bun build --compile" in body
     assert "USER sandbox" in body
     assert "PGDATA=/sandbox/pgdata" in body

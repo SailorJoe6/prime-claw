@@ -129,6 +129,30 @@ fallback. Inspect the resolved choices without mutation with:
 bin/prime-claw --dry-run create
 ```
 
+A restored sandbox can retain an older `settings.json` default and existing daemon/session
+state even after the host preference changes. Compare only the selected provider/model in
+host and sandbox settings, then test a new session with an explicit supported selector;
+`prime-agent model list` shows authenticated models, not every catalog entry. In the UI,
+`/model` starts in scoped view when a scope exists; `Alt+S` switches to all models.
+Do not assume a catalog row can make a call. For the v2r1014 recovery, the saved
+`openai-codex/gpt-5.1` was rejected for the ChatGPT account, while an explicit
+`openai-codex/gpt-5.6-sol` sessionless probe succeeded. A settings-file update does
+not retune an already running daemon or resident session. Never run broad `converge`
+against a stale sandbox overlay to fix this symptom.
+
+The gateway provider's `api_key` is an OpenShell placeholder, not a host secret.
+The daemon startup exports it as `ANTHROPIC_API_KEY` when present and correctly
+shaped, even if Codex is the default. An existing daemon cannot inherit a later
+shell export: quiesce its sessions and use a separately approved, supervised
+restart before claiming gateway models are available in the UI. A single process
+`model list` with a temporary environment is not daemon or inference proof.
+
+`rg` is an optional Prime Agent search helper. The runtime image installs
+Ubuntu's `ripgrep` package and checks `/usr/bin/rg` during its build. A previously
+created container does not acquire that image-owned executable from a tag rebuild
+or daemon restart. Keep the accepted sandbox and volumes while validating a
+separate image and planning a preservation-safe rollout.
+
 ## Failure signatures -> recovery
 
 | # | Signature | How you notice | Recovery |

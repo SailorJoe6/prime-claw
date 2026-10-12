@@ -2125,8 +2125,14 @@ def stage_prime_agent(cfg, args) -> int:
         # incompatible instance during converge. A changed provider environment
         # needs a separately supervised daemon restart, not an implicit signal.
         "SOCK=/tmp/prime-agent-$(id -u)/daemon.sock\n"
-        + ("[ -z \"${api_key:-}\" ] || export ANTHROPIC_API_KEY=\"$api_key\"\n"
-           if bool(inference.get("gateway")) else "")
+        # Both the saved Codex default and the gateway catalog may be used in new
+        # sessions. Keep the OpenShell gateway placeholder available to the daemon
+        # even when Codex is the selected default. Never export a raw key.
+        + "case \"${api_key:-}\" in\n"
+        + "  openshell:resolve:*) export ANTHROPIC_API_KEY=\"$api_key\" ;;\n"
+        + "  '') ;;\n"
+        + "  *) echo 'unexpected AI gateway credential shape' >&2; exit 1 ;;\n"
+        + "esac\n"
         + "if [ ! -S \"$SOCK\" ]; then\n"
         "  nohup prime-agent --mode daemon --offline >/sandbox/.prime-claw/daemon.log 2>&1 &\n"
         "  for i in $(seq 1 20); do [ -S \"$SOCK\" ] && break; sleep 1; done\n"

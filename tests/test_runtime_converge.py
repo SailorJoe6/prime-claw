@@ -4,7 +4,7 @@ host-safe tier-0 unit tests. Offline and recording-fake only: openshell + docker
 idempotency, create ordering, dry-run, and credential isolation (key never
 written to disk or echoed).
 """
-import json, os, sys, base64
+import json, os, sys, base64, subprocess
 from importlib.machinery import SourceFileLoader
 import pytest
 
@@ -269,6 +269,28 @@ def test_prime_agent_daemon_starts_without_implicit_kill(tmp_path, monkeypatch):
     assert "kill $PIDS" not in daemon and "rm -rf /tmp/prime-agent" not in daemon
     assert "/proc/" not in daemon
     assert "zdai_" not in daemon
+
+
+def test_codex_default_daemon_also_exports_attached_gateway_placeholder(tmp_path, monkeypatch):
+    settings = tmp_path / "settings.json"
+    models = tmp_path / "models.json"
+    settings.write_text(json.dumps({"defaultProvider": "openai-codex", "defaultModel": "gpt-5.6-sol"}))
+    models.write_text(json.dumps({"providers": {"anthropic": {
+        "baseUrl": "https://ai-gateway.zende.sk/anthropic",
+        "models": [{"id": "anthropic.kimi-k3", "name": "Kimi K3"}],
+    }}}))
+    calls, fx = _exec_recorder(monkeypatch)
+    monkeypatch.setattr(pc, "sandbox_exec", fx)
+    chosen = cfg(tmp_path, host_settings_json=str(settings), host_models_json=str(models))
+    assert pc._inference_selection(chosen)["provider"] == "openai-codex"
+    assert pc.stage_prime_agent(chosen, Args()) == 0
+    daemon = next(c for c in calls if "pc-daemon-identity.mts" in c)
+    assert 'case "${api_key:-}" in' in daemon
+    assert 'openshell:resolve:*) export ANTHROPIC_API_KEY="$api_key"' in daemon
+    assert "unexpected AI gateway credential shape" in daemon
+    assert 'if [ ! -S "$SOCK" ]; then' in daemon  # no implicit restart
+    assert subprocess.run(["bash", "-n"], input=daemon, text=True, capture_output=True).returncode == 0
+    assert "kill $PIDS" not in daemon
 
 
 def test_brain_stage_initdb_and_wiring(tmp_path, monkeypatch):

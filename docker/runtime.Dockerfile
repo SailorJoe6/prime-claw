@@ -57,9 +57,10 @@ USER root
 # (no PGDG, no extra source lines needed). `unzip` is required by the Bun
 # installer below.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      postgresql-16 postgresql-16-pgvector unzip \
+      postgresql-16 postgresql-16-pgvector ripgrep unzip \
     && rm -rf /var/lib/apt/lists/* \
-    && pg_dropcluster --stop 16 main 2>/dev/null || true
+    && (pg_dropcluster --stop 16 main 2>/dev/null || true) \
+    && test -x /usr/bin/rg && /usr/bin/rg --version
 ENV PATH="/usr/lib/postgresql/16/bin:$PATH"
 
 # --- Bun (pinned build tool for reproducible Backlog.md and gbrain binaries) ---
