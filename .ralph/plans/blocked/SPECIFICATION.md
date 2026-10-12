@@ -2,11 +2,11 @@
 
 ## Status
 
-**OWNER-ACCEPTED HANDOFF.** Begin only Slice 8 / `prime-claw-5v7.3` from
+**OWNER-ACCEPTED HANDOFF.** Begin only Slice 8 / `PRIMECLAW-20.4` from
 accepted Slice-7 commit `e4cbc59e19fe823d598456dbf2185facf0621dee`
 (tree `f0cb0910d9111f6c9a2067102c1c2a81e8cd59d7`). Slices 1–7 are immutable
 foundations. Never rerun the consumed lifecycle observer and do not inspect P0
-`prime-claw-5v7.10`.
+`PRIMECLAW-20.9`.
 
 ## Authorized outcome
 
@@ -72,7 +72,7 @@ proof, policy application, cutover, routed write, continuation, or handoff.
 - No production or operator gbrain/runtime access.
 - No Phase 3a execution, activation, mutation, or handoff.
 - No credentials, network providers, private data, or external remotes.
-- No lifecycle observer rerun and no P0 `prime-claw-5v7.10` work.
+- No lifecycle observer rerun and no P0 `PRIMECLAW-20.9` work.
 - No upstream gbrain or Prime Agent patch/fork.
 - No new orchestration framework, Docker-in-Docker, or host Docker socket.
 - No semantic embedding-quality test or interrupted-sync fault seam not
@@ -85,7 +85,7 @@ proof, policy application, cutover, routed write, continuation, or handoff.
 The focused properties, two disjoint repetitions, tier 0, supported tier 1,
 tier 2, default `test-all`, inventory, provenance, isolation, and cleanup gates
 all pass. Documentation and `R-TEST-*` inventory agree. One practical bounded
-review, one clean commit/push, and terminal `prime-claw-5v7.3` receipt complete
+review, one clean commit/push, and terminal `PRIMECLAW-20.4` receipt complete
 the slice, then work stops for owner review.
 
 ## Slice 8 completion evidence

@@ -17,18 +17,18 @@ while working toward any goal.
 
 Then read these files, in this order:
 
-1. **[AGENTS.md](AGENTS.md)** — operating instructions, beads usage, the RLM
+1. **[AGENTS.md](AGENTS.md)** — operating instructions, Backlog.md usage, the RLM
    safe-spawn protocol, credential isolation, and the land-the-plane rule.
 2. **[Vision](VISION.md)** — what prime-claw is, the four-tier hierarchy,
    and the three-horizon context model.
 3. **[Long Range Plan](LONG_RANGE_PLAN.md)** — the risk-ordered slice map and
    which phase is active.
-4. **[User Stories](docs/user-stories/README.md)** - the actual implemented features. 
+4. **[User Stories](docs/user-stories/README.md)** — the actual implemented features.
 5. **[Information Architecture](docs/information-architecture.md)** —
    the multi-store routing layer (consult when a task involves persisting
    anything durable).
 
-Then run `bd ready` to see unblocked work.
+Then run `backlog task list --status "To Do" --ready --plain` to see unblocked work.
 
 ## When the reasoning matters
 

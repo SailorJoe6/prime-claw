@@ -27,7 +27,7 @@ files, and archived this completed plan set before immutable freeze.
   `86f65e44d6a12fc0e06c0c7fc3fabb17d0cf01e3bbbf88df7db6ea6d2e219fe7`.
 
 The exact frozen candidate, post-freeze gates, official review, and operator
-disposition are recorded in private receipts and `prime-claw-h6w.30`; they do
+disposition are recorded in private receipts and `PRIMECLAW-10.34`; they do
 not mutate this candidate tree. This archive does not authorize merge, host
 final-mode apply, live Gate B, restart, episode finalization, or physical
 resource cleanup. The bead remains open pending the operator's later terminal
@@ -61,18 +61,18 @@ best-effort compaction, and queues exactly one canonical phase turn while
 preserving existing location, readiness, approval, and replay boundaries.
 
 - Slice 1 accepted at `200be5744003ac47cecd2d79a337df3e4c4aeebc`
-  (`prime-claw-h6w.26`).
+  (`PRIMECLAW-10.30`).
 - Slice 2 accepted at documentation replacement
   `c4de0a89c84aa02f1035f0f3f6ed4bc838223949`, with runtime predecessor
-  `94e4488ade82e1a2a8ce74cf956993870759d1f3` (`prime-claw-h6w.27`).
+  `94e4488ade82e1a2a8ce74cf956993870759d1f3` (`PRIMECLAW-10.31`).
 - [Archived specification](compaction-first-phase-transitions/SPECIFICATION.md)
 - [Archived execution plan](compaction-first-phase-transitions/EXECUTION_PLAN.md)
 - [Prep-chain operator contract](../../../docs/prep-chain.md)
 
 Joe explicitly deferred the planned human-operated `/plan` + `/implement-spec`
-dogfood to P1/BLOCKED Bead `prime-claw-h6w.28`, pending separate merge
+dogfood to P1/BLOCKED Backlog.md task `PRIMECLAW-10.32`, pending separate merge
 authorization and deliberate activation from primary `main`. That disposition
-matches the `prime-claw-h6w.15` precedent and is not completed dogfood evidence.
+matches the `PRIMECLAW-10.19` precedent and is not completed dogfood evidence.
 This archive does not claim merge readiness, host-global activation, merge,
 episode cleanup, or any product-scope change.
 
@@ -116,8 +116,8 @@ EXPERT review trail: slice 1 BLOCK `47d2830` → BLOCK `d8dbc5d` → PASS
 `2666843`; slice 2 BLOCK `470be98` → PASS `bc00cba`. Slice 3 had NOT received
 its final EXPERT gate at archival time; the owner runs a fresh FINAL EXPERT
 review on the complete exact candidate (`d040c02..<archival>`), so this archive
-does not record a slice-3 PASS. Beads `prime-claw-blw.1`/`.2`/`.3` are closed;
-`prime-claw-blw.4` (shared-base extraction) is deferred P2.
+does not record a slice-3 PASS. Backlog.md tasks `PRIMECLAW-19.1`/`.2`/`.3` are Done;
+`PRIMECLAW-19.4` (shared-base extraction) is deferred P2.
 
 Note: the archived EXECUTION_PLAN.md contains a historical promotion quote
 reading `/implement-spec .ralph/plans/future/plugin-test-container`; that
@@ -133,7 +133,7 @@ pause/resume transport. The accepted repair is
 `3a526ec68a13783d11acb609b3d485a577b26a91`. Joe's renewed visible UAT passed
 obsolete-tool absence, exact goal-to-monitored-wait transfer and cleanup, and an
 exact human-only blocker with no polling heartbeat. Exact receipts are on
-`prime-claw-h6w.24.2`.
+`PRIMECLAW-10.28.2`.
 
 - [Archived specification](goal-heartbeat-work-control/SPECIFICATION.md)
 - [Archived execution plan](goal-heartbeat-work-control/EXECUTION_PLAN.md)
@@ -151,7 +151,7 @@ the earlier BUFD design and execution history. They are **not** a completed or
 accepted Phase 3a implementation, and this archive does not resolve the blocked
 Qwen migration or authorize Slice 4B. The private brain-source repair remains
 unpublished due to sandbox Git transport failure; the candidate remains partial
-and there has been no cutover. Bead `prime-claw-zwg.5` tracks the live blocker.
+and there has been no cutover. Backlog.md task `PRIMECLAW-7.5` tracks the live blocker.
 The replacement, outcome-first specification is a draft for operator review at
 `.ralph/plans/future/phase3a-brain-hosting-completion/SPECIFICATION.md`.
 It has no execution plan or implementation approval yet.
@@ -162,10 +162,10 @@ Delivered default CONVERSATION identity, exact-owner EPISODE oversight, owner-dr
 handoff and independent review, and one conversational terminal decision with a
 no-UI bookkeeping close. The operator approved the reviewed feature at
 `248f944f70acdbe19d3a93c6781ebcdb2eea22d2`; it was fast-forwarded to
-`main`, the episode was stopped and cleaned up, and Bead `prime-claw-h6w.22`
+`main`, the episode was stopped and cleaned up, and Backlog.md task `PRIMECLAW-10.26`
 was closed. The completed specification and plan were archived after that merge
 because the final candidate had left them active at `.ralph/plans/`.
-Bead `prime-claw-mu1` tracks the open prevention requirement; this archive
+Backlog.md task `PRIMECLAW-14` tracks the open prevention requirement; this archive
 corrects the delivered artifact state, not the missing merge-readiness check.
 
 ## conversational-ralph-command-routing/ — Conversational routing for Ralph native commands ✅ COMPLETE (2026-09-22)
@@ -200,7 +200,7 @@ cancel, and ACP close/replacement. The integrated implementation commit is
 Node tests, 4 Python bridge/loader tests, all 247 active repository tests, and
 `git diff --check`. Two fresh exact-commit EXPERT reviews returned
 `FINAL EXPERT PASS`, after which the operator explicitly approved merge. Bead
-`prime-claw-h6w.11` holds the manual oversight and evidence record.
+`PRIMECLAW-10.15` holds the manual oversight and evidence record.
 
 ## worktree-isolated-specification-episodes/ — Reviewed future plans and episode promotion ✅ COMPLETE (2026-09-21)
 
@@ -214,17 +214,17 @@ promotion. Operator reference and recovery behavior are documented in
 [`docs/future-specification-bundles.md`](../../../docs/future-specification-bundles.md).
 
 - Slice 1: `c0ac19e4984c1332a09af8df5f8a320551796d31`
-  (`prime-claw-h6w.12`)
+  (`PRIMECLAW-10.16`)
 - Slice 2: `0eb00e6360ce607c44ae450e599d977d98703e3a`
-  (`prime-claw-h6w.13`)
+  (`PRIMECLAW-10.17`)
 - Slice 3: `67fc17408479581f164c16fe12a455a0856158df`, corrected by
   `523e9201527a099925c27d995d654adcf391f7c0`
-  (`prime-claw-h6w.14`)
+  (`PRIMECLAW-10.18`)
 
 The owner explicitly deferred the planned manual end-to-end dogfood to a
 separate future episode. This episode did not plan, modify, or promote the
 `conversation-driven-episode-oversight` bundle and created no nested episode.
-Bead `prime-claw-h6w.15` records that disposition without claiming the dogfood
+Backlog.md task `PRIMECLAW-10.19` records that disposition without claiming the dogfood
 acceptance run occurred. Final closure validation passed all 43 Node extension
 tests and all 245 repository pytest cases.
 
@@ -234,14 +234,14 @@ Proved the three load-bearing unknowns before building anything; all returned
 **GO** with committed, re-runnable spikes and evidence. No hard NO-GO occurred.
 
 - **U1** prime-agent in a fresh OpenShell sandbox → `docs/derisk/U1.md`
-  (bead `prime-claw-f7k`)
+  (Backlog.md task `PRIMECLAW-4`)
 - **U2** gbrain brain stack in-sandbox (image-baked, PG16+pgvector, embedding
-  gate) → `docs/derisk/U2.md` (bead `prime-claw-6r8`)
-- **U3** episode spawn/reap mechanics → `docs/derisk/U3.md` (bead `prime-claw-tcf`)
+  gate) → `docs/derisk/U2.md` (Backlog.md task `PRIMECLAW-1`)
+- **U3** episode spawn/reap mechanics → `docs/derisk/U3.md` (Backlog.md task `PRIMECLAW-5`)
 
 Traceability: `config/requirements-inventory.json` (R-U1-1..6, R-U2-1..6,
 R-U3-1..3, R-X-1..7 all proven/met). All three beads closed with verdict links.
-Phase 2 (`prime-claw-qcd`) unblocked.
+Phase 2 (`PRIMECLAW-6`) unblocked.
 
 Note: EXECUTION_PLAN.md contains a stale pointer reading REQUIREMENTS.md /
 SPECIFICATION.md etc. at `.ralph/plans/`; those files now live beside it in this
@@ -264,5 +264,5 @@ six vertical slices landed with offline tests + docs, committed and pushed.
 
 Traceability: `config/requirements-inventory.json` (R2-A-1..4, R2-B-1..5,
 R2-C-1..5, R2-X-1..6 all met; `tests/test_inventory_integrity.py` re-gates the
-`proven_by` paths). Bead `prime-claw-qcd` closed with links; Phase 3
-(`prime-claw-zwg`) unblocked.
+`proven_by` paths). Backlog.md task `PRIMECLAW-6` is Done with links; Phase 3
+(`PRIMECLAW-7`) unblocked.

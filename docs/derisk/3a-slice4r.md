@@ -3,7 +3,7 @@
 **Date:** 2026-09-17  
 **Requirement:** R3a-16  
 **Decision:** D3a-N  
-**Bead:** `prime-claw-zwg.2`  
+**Backlog.md task:** `PRIMECLAW-7.2`
 **Verdict:** **PASS**
 
 ## Contract proved

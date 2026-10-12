@@ -1607,10 +1607,35 @@ def _repository_paths(root_fd: int) -> list[str]:
             for part in sorted(set(item for item in raw.split(b"\0") if item))]
 
 
+def _repository_gitlinks(root_fd: int) -> set[str]:
+    """Return stage-zero index paths whose tracked value is a Git link."""
+    raw = _git(root_fd, "ls-files", "--stage", "-z")
+    gitlinks: set[str] = set()
+    for item in raw.split(b"\0"):
+        if not item:
+            continue
+        try:
+            metadata, encoded_path = item.split(b"\t", 1)
+            mode, _object_id, stage = metadata.split(b" ")
+        except ValueError as exc:
+            raise ProvenanceError("git returned a malformed index entry") from exc
+        if mode == b"160000" and stage == b"0":
+            gitlinks.add(encoded_path.decode("utf-8", "surrogateescape"))
+    return gitlinks
+
+
 def _repository_entries(root: Path, root_fd: int) -> list[tuple[str, str, int]]:
     entries = []
+    gitlinks = _repository_gitlinks(root_fd)
     for rel in _repository_paths(root_fd):
         _relative_file(root, rel)
+        # A gitlink is an index reference, not repository file content. Treat
+        # initialized and uninitialized submodules identically: the parent
+        # snapshot records the path as absent and never traverses the nested
+        # checkout. HEAD plus status still authenticate the parent index state.
+        if rel in gitlinks:
+            entries.append((rel, "missing", 0))
+            continue
         try:
             parent_fd, name = _open_path_parent_fd(root, rel, root_fd=root_fd)
             try:

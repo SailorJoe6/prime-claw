@@ -1,2 +1,0 @@
-# Beads Dolt-backed data uses its own merge strategy
-.beads/** merge=beads

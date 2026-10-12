@@ -5,11 +5,11 @@
 Slice 7 is owner-accepted at commit
 `e4cbc59e19fe823d598456dbf2185facf0621dee` (tree
 `f0cb0910d9111f6c9a2067102c1c2a81e8cd59d7`). Advance only to the final
-ordered Slice 8 / `prime-claw-5v7.3`.
+ordered Slice 8 / `PRIMECLAW-20.4`.
 
 Preserve accepted Slices 1–7. The Slice-7 lifecycle observer is consumed and
 must never be rerun. Do not inspect or recover deferred P0
-`prime-claw-5v7.10`. Do not access credentials, operator data, production brain,
+`PRIMECLAW-20.9`. Do not access credentials, operator data, production brain,
 configured runtime, private endpoints, or network providers. Do not run, hand
 off, activate, or mutate Phase 3a.
 

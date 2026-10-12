@@ -52,8 +52,8 @@ before building anything. Each unknown gets a documented go/no-go.
   changes.
 - **U2 — gbrain source isolation.** Does gbrain source-scoping actually
   isolate per-project context the way the hierarchy assumes (universal
-  default source + per-project named sources, no bleed)? (beads
-  `prime-claw-6r8`)
+  default source + per-project named sources, no bleed)? (Backlog.md task
+  `PRIMECLAW-1`)
 - **U3 — clean episode spawn/reap.** Can a parent session spawn a prime-agent
   child with CWD=project-root and reap it cleanly, around the known RLM
   automatic-preparation admission race (openclaw-setup
@@ -67,9 +67,9 @@ committed, re-runnable spikes and evidence. Verdicts: U1 → `docs/derisk/U1.md`
 (prime-agent in sandbox), U2 → `docs/derisk/U2.md` (brain stack in sandbox,
 image-baked, embedding gate), U3 → `docs/derisk/U3.md` (episode spawn/reap).
 Traceability: `config/requirements-inventory.json` (R-U1-1..6, R-U2-1..6,
-R-U3-1..3, R-X-1..7 all proven/met). No hard NO-GO occurred. Beads
-`prime-claw-f7k` / `prime-claw-6r8` / `prime-claw-tcf` closed. Phase 2
-(`prime-claw-qcd`) unblocked.
+R-U3-1..3, R-X-1..7 all proven/met). No hard NO-GO occurred. Backlog.md tasks
+`PRIMECLAW-4` / `PRIMECLAW-1` / `PRIMECLAW-5` are Done. Phase 2
+(`PRIMECLAW-6`) unblocked.
 
 ## Phase 2 — Sandbox runtime foundation
 
@@ -93,7 +93,7 @@ reachable, deny-by-default egress proven, reproducible from the runbook.
 create, converge, validate, recover, destroy) over native OpenShell primitives;
 live degrade-and-recover proven. Reference: `docs/sandbox-runtime.md`;
 operations: `docs/runbook.md`. Plan set archived to
-`.ralph/plans/archive/phase2-runtime/`. Unblocks Phase 3 (`prime-claw-zwg`).
+`.ralph/plans/archive/phase2-runtime/`. Unblocks Phase 3 (`PRIMECLAW-7`).
 
 ## Phase 3 — Tracer bullet: an end-to-end working claw  ⭐ highest-risk
 

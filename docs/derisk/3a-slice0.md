@@ -1,6 +1,6 @@
 # Slice 0 Spike — Upstream gbrain under prime-agent-as-controller (R3a-0)
 
-**Date:** 2026-09-14 · **Bead:** prime-claw-zwg · **Verdict:** **GO (conditional)** — upstream
+**Date:** 2026-09-14 · **Backlog.md task:** PRIMECLAW-7 · **Verdict:** **GO (conditional)** — upstream
 `garrytan/gbrain` runs correctly in the OpenShell sandbox; the only blocker is an
 **environmental OpenShell/AI-gateway credential fault on this box**, not upstream gbrain.
 

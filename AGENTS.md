@@ -1,15 +1,16 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+This project uses **Backlog.md** for issue tracking. Use the repository-built
+`deps/backlog/dist/backlog` candidate until the accepted host artifact is activated.
 
 ## Quick Reference
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
-bd sync               # Sync with git
+backlog task list --status "To Do" --ready --plain
+backlog task view <id> --plain
+backlog task edit <id> --status "In Progress" --assignee <name>
+backlog task edit <id> --status "Done" --final-summary "Completed"
+backlog task complete <id>
 ```
 
 ## What this repo is
@@ -135,7 +136,6 @@ Work is NOT complete until committed AND pushed (once a remote exists):
 
 ```bash
 git pull --rebase
-bd sync
 git push
 git status   # MUST show up to date with origin
 ```

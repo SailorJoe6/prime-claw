@@ -55,7 +55,7 @@ prime-claw is a four-tier agent hierarchy:
 ```
 OPERATOR (a thought worker running many parallel projects)
   └── UNIVERSAL AGENT — always on, gbrain-equipped, knows the whole universe
-        └── PROJECT CONTEXT — one per project (git folder + beads + gbrain source)
+        └── PROJECT CONTEXT — one per project (git folder + Backlog.md + gbrain source)
               └── CONVERSATION — a long-lived thread inside a project
                     └── EPISODE — a Ralph-style build loop, spawned on demand
 ```
@@ -122,7 +122,7 @@ The full treatment is [docs/information-architecture.md](information-architectur
 The founding decisions embedded in it:
 
 - **There are two routing tables at two levels of abstraction.** High-level
-  (store selection: brain vs. docs vs. harness vs. beads vs. reports) is
+  (store selection: brain vs. docs vs. harness vs. task tracker vs. reports) is
   generalizable and belongs in this repo. Low-level (entity schema *inside*
   the brain) is the operator's own gbrain hierarchy and must **NOT** be encoded
   here — every operator builds their own. Encoding one operator's taxonomy into

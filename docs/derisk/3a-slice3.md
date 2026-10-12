@@ -1,6 +1,6 @@
 # Slice 3 — Cited read/query from sandboxed prime-agent (R3a-3)
 
-**Date:** 2026-09-16 · **Bead:** `prime-claw-zwg` · **Status:** COMPLETE
+**Date:** 2026-09-16 · **Backlog.md task:** `PRIMECLAW-7` · **Status:** COMPLETE
 
 ## Outcome
 

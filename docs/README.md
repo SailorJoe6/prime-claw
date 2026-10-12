@@ -34,11 +34,13 @@ prime-claw builds on four prior projects. Read these before designing:
   violate an external API or safety boundary.
 - [information-architecture.md](information-architecture.md) — the
   multi-store routing layer: which store owns a durable fact (brain vs. docs
-  vs. harness vs. beads vs. reports), the two-level routing split, and the
+  vs. harness vs. task tracker vs. reports), the two-level routing split, and the
   report guard. Orthogonal to the three-horizon context model.
 - [prime-agent-installation.md](prime-agent-installation.md) — the only
   supported Prime Agent source, exact fork/tag/commit/tree/lockfile identity,
   Docker-only build contract, unsupported installer paths, and v0.10 boundary.
+- [backlog.md](backlog.md) — the Backlog.md fork and upstream provenance,
+  exact stable submodule pin, and reproducible host and sandbox build contracts.
 - [testing-strategy.md](testing-strategy.md) — isolation tiers, the current
   exact-image/offline tier-1 contract, provenance schema, source-mode safety
   boundary, teardown rules, and reproduction commands.
@@ -73,7 +75,7 @@ prime-claw builds on four prior projects. Read these before designing:
   acceptance, evidence type, and explicit gaps for all 27 stories.
 - [evidence/2026-10-09-orca-prime-agent-integration-probes.md](evidence/2026-10-09-orca-prime-agent-integration-probes.md)
   — the completed evidence matrix and frozen Orca/Prime Agent responsibility
-  boundary for `prime-claw-h6w.33`.
+  boundary for `PRIMECLAW-10.37`.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)

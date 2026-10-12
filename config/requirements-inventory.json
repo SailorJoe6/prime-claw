@@ -432,7 +432,7 @@
     {
       "id": "R-X-6",
       "priority": "GATE",
-      "summary": "All work landed: committed, pushed; beads prime-claw-f7k/6r8/tcf closed with verdict links.",
+      "summary": "All work landed: committed, pushed; Backlog.md tasks PRIMECLAW-4/PRIMECLAW-1/PRIMECLAW-5 Done with verdict links.",
       "status": "met",
       "proven_by": {
         "apply": [],
@@ -1264,8 +1264,8 @@
       "id": "R-T1-6",
       "priority": "P1",
       "summary": "Plugin target and development isolation guardrail: bare apply/check fail before touching a destination; explicit isolated roots are supported; --user-global is deliberate primary-main-only activation and is refused from linked worktrees; tier-1 driver/fixture pass an explicit container-local plugin root and never use host HOME; incident-topology regression preserves the sibling generation.",
-      "status": "met (prime-claw-4mw)",
-      "plan": "prime-claw-4mw (shared plugin install/test guardrail repair)",
+      "status": "met (PRIMECLAW-21)",
+      "plan": "PRIMECLAW-21 (shared plugin install/test guardrail repair)",
       "proven_by": {
         "apply": [
           "scripts/apply-prime-agent-plugin.sh",

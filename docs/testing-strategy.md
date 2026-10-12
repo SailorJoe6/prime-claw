@@ -121,8 +121,8 @@ retry.
 Sanitized evidence is under the sequencer run's `lifecycle-evidence/` directory
 and is summarized in
 `docs/evidence/2026-10-06-testing-strategy-slice7-lifecycle-destroy.md` plus the
-terminal `prime-claw-5v7.6` receipt. The deferred P0 incident
-`prime-claw-5v7.10` is outside this observer: the snapshot proves only this
+terminal `PRIMECLAW-20.6` receipt. The deferred P0 incident
+`PRIMECLAW-20.9` is outside this observer: the snapshot proves only this
 run's noninterference and authorizes no incident inspection or recovery.
 
 ## Tier-2 disposable brain stack

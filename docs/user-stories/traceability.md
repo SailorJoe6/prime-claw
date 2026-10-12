@@ -1,6 +1,6 @@
 # Prime Claw plugin user-story traceability
 
-Status: acceptance baseline for `prime-claw-tqm.1` (2026-10-11).
+Status: acceptance baseline for `PRIMECLAW-33.1` (2026-10-11).
 
 This matrix binds the outcome-level stories in this directory to observable
 acceptance and current evidence. It does not make implementation mechanisms
@@ -59,9 +59,9 @@ changes or the operator asks for it.
 
 | Story | Observable acceptance | Current evidence | Classification and gap |
 |---|---|---|---|
-| US-17 | One execute pass completes one smallest end-to-end slice with code/docs/tests/Beads/plan updates, one pushed reviewable commit, exact evidence, and then stops. | `tests/test_execute_skill.py`; repeated archived Episode deliveries in `.ralph/plans/archive/` | **S/M. Gap:** policy is statically checked; archived Episode deliveries are the existing operational evidence. |
-| US-18 | A blocked pass records attempts and unblock condition and moves both artifacts; a completed pass archives both, updates indexes/Beads, and reports evidence. | `tests/test_execute_skill.py`; `src/prime-agent-plugin/skills/project-templates/blocked.md`; archived plans | **S/M. Gap:** no focused automated block/complete filesystem fixture. |
-| US-19 | The exact owner verifies branch/tree/diff/tests/docs/plan/Beads/push/worktree evidence and chooses advance, recorded in-scope revision, pause, or consultation without implementing or taking operator authority. | `tests/test_oversee_episode_skill.py`; `docs/conversation-driven-episode-oversight.md` | **S. Gap:** no single owner-supervision receipt is indexed here. |
+| US-17 | One execute pass completes one smallest end-to-end slice with code/docs/tests/Backlog.md tasks/plan updates, one pushed reviewable commit, exact evidence, and then stops. | `tests/test_execute_skill.py`; repeated archived Episode deliveries in `.ralph/plans/archive/` | **S/M. Gap:** policy is statically checked; archived Episode deliveries are the existing operational evidence. |
+| US-18 | A blocked pass records attempts and unblock condition and moves both artifacts; a completed pass archives both, updates indexes/Backlog.md tasks, and reports evidence. | `tests/test_execute_skill.py`; `src/prime-agent-plugin/skills/project-templates/blocked.md`; archived plans | **S/M. Gap:** no focused automated block/complete filesystem fixture. |
+| US-19 | The exact owner verifies branch/tree/diff/tests/docs/plan/Backlog.md tasks/push/worktree evidence and chooses advance, recorded in-scope revision, pause, or consultation without implementing or taking operator authority. | `tests/test_oversee_episode_skill.py`; `docs/conversation-driven-episode-oversight.md` | **S. Gap:** no single owner-supervision receipt is indexed here. |
 | US-20 | A fresh independent model reviews an exact candidate read-only, identifies itself, reports reproducible bounded findings, answers clarification, and is cleaned up without acquiring product authority. | `tests/test_expert_review_skill.py`; independent review records under `docs/evidence/` | **S/M. Gap:** existing reports prove independent reviews occurred, but do not retain one current receipt for the full Markdown-native `rlm.spawn` → message → bounded clarification → `delete_subagent` workflow, especially cleanup. |
 | US-21 | One actual qualifying compaction gives the exact active owner one full non-turn guide; ordinary, Episode, foreign, and inactive sessions receive none. | `tests/test_conversation_oversight_native.py::test_native_actual_compaction_reinjects_one_full_nonturn_guide`; companion static tests in `tests/test_oversee_episode_skill.py` | **I/S.** No story gap. |
 | US-22 | Command/tool preflight both assets, admit handoff, and queue exactly one execute follow-up; first/second send failures are reported honestly and compaction alone cannot trigger execute. | `tests/handoff_chain_extension.test.mjs`; `tests/test_handoff_chain_extension.py` (native RPC); workflow-policy assertions | **B/I/S. Gap:** admission, ordering, failures, and registration are covered; no retained native acceptance proves the actual handoff-requested compaction followed by the sole execute continuation. |

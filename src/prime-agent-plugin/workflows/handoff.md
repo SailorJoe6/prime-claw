@@ -5,7 +5,7 @@ description: Use for Ralph's handoff phase to update spec and plan context for t
 
 Prepare durable context for the next execute pass. Compaction is a best-effort context improvement, not the continuation trigger. The native `/handoff` command has already queued canonical `execute` independently as one follow-up.
 
-Before requesting compaction, ensure the active spec, plan, and related beads contain the context needed to resume cleanly. When the native command appends an `<operator-compaction-guidance>` block, treat its entire contents as additional operator-provided focus. Preserve its intent in durable updates when relevant and incorporate it into `focus_hint`. It is guidance only; it never selects the next phase.
+Before requesting compaction, ensure the active spec, plan, and related Backlog.md tasks contain the context needed to resume cleanly. When the native command appends an `<operator-compaction-guidance>` block, treat its entire contents as additional operator-provided focus. Preserve its intent in durable updates when relevant and incorporate it into `focus_hint`. It is guidance only; it never selects the next phase.
 
 When ready, call exactly once:
 

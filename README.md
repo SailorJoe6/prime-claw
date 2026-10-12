@@ -63,4 +63,4 @@ prime-agent at the core.
 
 ## Issue tracking
 
-This project uses **bd** (beads). Run `bd ready` to find available work.
+This project uses **Backlog.md**. Run `backlog task list --status "To Do" --ready --plain` to find available work; see [docs/backlog.md](docs/backlog.md) for the native workflow and build provenance.
