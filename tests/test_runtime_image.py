@@ -71,6 +71,8 @@ def test_runtime_dockerfile_exists_and_is_runtime():
     assert "    - /opt/prime-agent\n" in read_only
     assert "    - /opt/prime-agent\n" not in policy.split("  read_write:\n", 1)[1].split("landlock:", 1)[0]
     assert 'exec /opt/prime-agent/prime-agent.sh' in body
+    assert '"${api_key:-}" == openshell:resolve:*' in body
+    assert 'export ANTHROPIC_API_KEY="$api_key"' in body
     for exact in (pc.PRIME_AGENT_SOURCE_TAG_OBJECT, pc.PRIME_AGENT_SOURCE_COMMIT,
                   pc.PRIME_AGENT_SOURCE_TREE, pc.PRIME_AGENT_SOURCE_LOCK_SHA256):
         assert exact in body

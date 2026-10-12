@@ -83,6 +83,24 @@ def test_no_config_resolves_kimi_gateway_embedding_and_glm_catalog(tmp_path):
     assert profiles["provider_names"] == ["prime-claw-ai-gateway", "prime-claw-github"]
 
 
+@pytest.mark.parametrize("use_codex", [False, True])
+def test_public_model_catalog_policy_is_read_only_and_unauthenticated(tmp_path, use_codex):
+    cfg = hermetic_cfg(tmp_path)
+    if use_codex:
+        cfg = codex_host_pair(tmp_path, cfg)
+    policy_text, _ = pc._render_effective_runtime_policy(cfg)
+    import yaml
+    rules = yaml.safe_load(policy_text)["network_policies"]
+    rule = rules["public_prime_agent_catalog"]
+    assert rule["name"] == "public-prime-agent-model-catalog"
+    assert rule["endpoints"] == [{
+        "host": "raw.githubusercontent.com", "port": 443,
+        "protocol": "rest", "access": "read-only", "enforcement": "enforce"}]
+    assert rule["binaries"] == [{"path": "/usr/bin/node"}]
+    assert all("raw.githubusercontent.com" not in json.dumps(other)
+               for name, other in rules.items() if name != "public_prime_agent_catalog")
+
+
 def test_valid_host_codex_overrides_inference_only(tmp_path):
     cfg = codex_host_pair(tmp_path, hermetic_cfg(tmp_path))
     profiles = pc._resolve_runtime_profiles(cfg)

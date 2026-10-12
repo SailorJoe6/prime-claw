@@ -145,10 +145,23 @@ against a stale sandbox overlay to fix this symptom.
 
 The gateway provider's `api_key` is an OpenShell placeholder, not a host secret.
 The daemon startup exports it as `ANTHROPIC_API_KEY` when present and correctly
-shaped, even if Codex is the default. An existing daemon cannot inherit a later
-shell export: quiesce its sessions and use a separately approved, supervised
-restart before claiming gateway models are available in the UI. A single process
-`model list` with a temporary environment is not daemon or inference proof.
+shaped, even if Codex is the default. The **direct TUI is a separate process**:
+its image-owned `prime-agent` launcher conditionally exports the same placeholder.
+For an older running image, a verified wrapper may be staged in writable
+`/sandbox/.venv/bin`; clear an existing Bash command cache with `hash -r` before
+relaunching `prime-agent`. Neither path copies a host credential into the sandbox.
+
+Codex model IDs are not all declared in host `models.json`. Prime Agent refreshes
+a public provider catalog from `raw.githubusercontent.com`, caches it under the
+sandbox's agent directory, then applies provider authentication. The policy grants
+only `/usr/bin/node` read-only access to that public catalog host, without a
+provider credential attachment; it is separate from GitHub push and Codex OAuth.
+A sandbox without the public cache and this egress rule falls back to its pinned
+bundled Codex entry (`gpt-5.1`), even when the Codex provider can call another
+model by explicit ID. Check a **fresh direct login-shell** `prime-agent model list`
+and the public cache, not just a daemon catalog probe. Catalog visibility still
+is not proof that every listed model is executable for this ChatGPT account.
+Never copy host OAuth tokens or broaden credentialed routes to fix catalog access.
 
 `rg` is an optional Prime Agent search helper. The runtime image installs
 Ubuntu's `ripgrep` package and checks `/usr/bin/rg` during its build. A previously

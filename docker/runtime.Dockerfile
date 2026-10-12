@@ -109,7 +109,12 @@ RUN git clone --filter=blob:none --depth 1 --single-branch \
     && test "$(git describe --tags --always --dirty)" = "$PRIME_AGENT_SOURCE_TAG" \
     && test -x prime-agent.sh
 # The root source launcher must see its checkout, not a symlinked SCRIPT_DIR.
-RUN printf '%s\n' '#!/usr/bin/env bash' 'exec /opt/prime-agent/prime-agent.sh "$@"' \
+# Export only the OpenShell gateway placeholder for direct TUI invocations; the
+# background daemon has a separate guarded export in bin/prime-claw.
+RUN printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
+      'if [[ -z "${ANTHROPIC_API_KEY:-}" && "${api_key:-}" == openshell:resolve:* ]]; then' \
+      '  export ANTHROPIC_API_KEY="$api_key"' 'fi' \
+      'exec /opt/prime-agent/prime-agent.sh "$@"' \
       > /usr/local/bin/prime-agent \
     && chmod 755 /usr/local/bin/prime-agent \
     && git config --system --add safe.directory /opt/prime-agent
