@@ -159,7 +159,7 @@ def test_codex_provider_reads_host_oauth_but_only_openshell_holds_it(tmp_path, m
     assert state.stat().st_mode & 0o777 == 0o600
 
 
-def test_prime_agent_mirrors_settings_and_projects_placeholder_only_auth(tmp_path, monkeypatch):
+def test_prime_agent_mirrors_codex_default_without_stale_scope_and_projects_placeholder_auth(tmp_path, monkeypatch):
     settings = tmp_path / "settings.json"
     settings_text = json.dumps({
         "defaultProvider": "openai-codex", "defaultModel": "gpt-5.6-sol",
@@ -170,7 +170,9 @@ def test_prime_agent_mirrors_settings_and_projects_placeholder_only_auth(tmp_pat
     models.write_text('{"providers":{}}\n')
     monkeypatch.setenv("PRIME_CLAW_HOST_SETTINGS_JSON", str(settings))
     monkeypatch.setenv("PRIME_CLAW_HOST_MODELS_JSON", str(models))
-    assert pc._prime_agent_settings_json(cfg(tmp_path)) == settings_text
+    sandbox_settings = json.loads(pc._prime_agent_settings_json(cfg(tmp_path)))
+    assert sandbox_settings == {**json.loads(settings_text), "enabledModels": []}
+    assert settings.read_text() == settings_text  # never adjust the host preference
     assert pc._prime_agent_models_json(cfg(tmp_path)) == models.read_text()
     script = pc._prime_agent_codex_auth_projection_script()
     assert "openshell:resolve:" in script

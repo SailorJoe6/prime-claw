@@ -115,7 +115,10 @@ With no usable preference, inference is `anthropic.kimi-k3` and embeddings are
 concerns independently:
 
 1. `PRIME_CLAW_MODEL` or an operator-local `model` overrides inference.
-2. Otherwise, a valid host `models.json` + `settings.json` pair is mirrored atomically.
+2. Otherwise, a valid host `models.json` + `settings.json` pair is selected together.
+   For a Codex default, the sandbox copy clears `enabledModels` so the saved
+   subscription model wins over stale models matched by the host's cycling scope;
+   host files are never edited.
 3. Otherwise, the portable Kimi/GLM gateway catalog is generated.
 4. `PRIME_CLAW_EMBEDDING_PROFILE` or ignored local embedding config selects embeddings;
    `.prime-claw/runtime.local.json` containing only `embedding_base_url` selects `home-qwen`

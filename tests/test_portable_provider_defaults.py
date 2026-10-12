@@ -79,6 +79,7 @@ def test_no_config_resolves_kimi_gateway_embedding_and_glm_catalog(tmp_path):
     catalog = json.loads(profiles["inference"]["models_text"])
     ids = {m["id"] for m in catalog["providers"]["anthropic"]["models"]}
     assert ids == {"anthropic.kimi-k3", "anthropic.glm-5.2"}
+    assert json.loads(profiles["inference"]["settings_text"])["enabledModels"] == ["anthropic/*"]
     assert profiles["provider_names"] == ["prime-claw-ai-gateway", "prime-claw-github"]
 
 
@@ -87,10 +88,34 @@ def test_valid_host_codex_overrides_inference_only(tmp_path):
     profiles = pc._resolve_runtime_profiles(cfg)
     assert profiles["inference"]["source"] == "host-settings"
     assert profiles["inference"]["selector"] == "openai-codex/gpt-5.6-sol"
+    assert profiles["inference"]["settings_text"] == (tmp_path / "settings.json").read_text()
     assert profiles["embedding"]["profile"] == "gateway"
     assert profiles["embedding"]["dimensions"] == 1536
     assert profiles["provider_names"] == [
         "prime-claw-ai-gateway", "prime-claw-github", "prime-claw-codex"]
+
+
+def test_codex_host_scope_does_not_override_saved_subscription_default(tmp_path):
+    cfg = codex_host_pair(tmp_path, hermetic_cfg(tmp_path))
+    host_path = tmp_path / "settings.json"
+    host_settings = json.loads(host_path.read_text())
+    host_settings["enabledModels"] = ["openai-codex/*", "anthropic/anthropic.kimi-k3"]
+    host_path.write_text(json.dumps(host_settings) + "\n")
+    inference = pc._inference_selection(cfg)
+    sandbox_settings = json.loads(inference["settings_text"])
+    assert inference["selector"] == "openai-codex/gpt-5.6-sol"
+    assert sandbox_settings["defaultModel"] == "gpt-5.6-sol"
+    assert sandbox_settings["enabledModels"] == []
+    assert json.loads(host_path.read_text())["enabledModels"] == host_settings["enabledModels"]
+    assert json.loads(inference["models_text"]) == json.loads((tmp_path / "models.json").read_text())
+
+
+def test_explicit_codex_selector_has_no_stale_wildcard_scope(tmp_path, monkeypatch):
+    cfg = hermetic_cfg(tmp_path)
+    monkeypatch.setenv("PRIME_CLAW_MODEL", "openai-codex/gpt-5.6-sol")
+    inference = pc._inference_selection(cfg)
+    assert inference["source"] == "environment"
+    assert json.loads(inference["settings_text"])["enabledModels"] == []
 
 
 def test_local_home_embedding_overrides_embedding_only(tmp_path):

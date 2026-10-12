@@ -750,6 +750,15 @@ def _valid_host_inference_pair(cfg: dict) -> dict[str, str] | None:
     gateway = bool(base_url and urlsplit(str(base_url)).hostname == gw_host)
     if provider == "openai-codex":
         gateway = False
+        # Prime Agent chooses the first available scoped model *before* its saved
+        # default. A Codex subscription model may be callable by explicit ID
+        # without appearing in the offline model catalog. A broad host scope
+        # could otherwise select a stale bundled model instead of this default.
+        # Limit this adjustment to the sandbox mirror; never edit host settings.
+        if settings.get("enabledModels"):
+            sandbox_settings = dict(settings)
+            sandbox_settings["enabledModels"] = []
+            settings_text = json.dumps(sandbox_settings, indent=2) + "\n"
     elif provider != "anthropic" or not gateway:
         # The current lifecycle has explicit credential/policy adapters only for
         # the Zendesk gateway and Codex. Do not mirror an unusable preference.
@@ -781,7 +790,7 @@ def _inference_selection(cfg: dict) -> dict[str, object]:
         "defaultProvider": provider,
         "defaultModel": model,
         "defaultThinkingLevel": "high",
-        "enabledModels": [provider + "/*"],
+        "enabledModels": [] if provider == "openai-codex" else [provider + "/*"],
     })
     gateway = provider == "anthropic"
     return {"provider": provider, "model": model,
@@ -2061,8 +2070,9 @@ def stage_prime_agent(cfg, args) -> int:
     if code != 0:
         print("error: onload stage: " + out.strip()[:160], file=sys.stderr)
         return code
-    # R3a-13 (updated 2026-09-16): mirror the operator's NON-SECRET models.json
-    # and settings.json verbatim, including their current default provider/model. auth.json
+    # R3a-13: mirror the operator's NON-SECRET models.json and selected default.
+    # A Codex sandbox copy may clear enabledModels so a stale cycling scope cannot
+    # override the selected subscription model. Host settings stay unchanged. auth.json
     # is input to host-side provider provisioning only; for openai-codex the sandbox gets a
     # synthetic JWT + OpenShell placeholders, never real OAuth material.
     inference = _inference_selection(cfg)
