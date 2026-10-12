@@ -4,13 +4,25 @@ One OpenShell sandbox lifecycle behind `bin/prime-claw` (Phase 2). This runbook
 maps each **observed failure signature** to its recovery command. Recovery is
 codified in `bin/prime-claw recover` (Slice 5), not tribal.
 
-Verbs: `status` (read-only expected-vs-actual) · `build` (image) ·
-`create` (fresh bring-up, destructive) · `converge` (idempotent repair of an
-existing sandbox) · `validate` (green/red acceptance gate) · `recover` (this
-file) · `destroy` (confirmed teardown).
+Verbs: `status` (read-only expected-vs-actual) · `connect` (interactive
+attach) · `build` (image) · `create` (fresh bring-up, destructive) ·
+`converge` (idempotent repair of an existing sandbox) · `validate` (green/red
+acceptance gate) · `recover` (this file) · `destroy` (confirmed teardown).
 
 The single entry point is `bin/prime-claw`. `--dry-run` is global and precedes
 the verb.
+
+## Interactive connection
+
+From a terminal, run `bin/prime-claw connect`. It reads the configured gateway,
+workspace, and sandbox name (including overrides in ignored
+`.prime-claw/runtime.local.json`), checks the exact sandbox is `Ready`, then
+attaches with inherited terminal input/output. `bin/prime-claw --dry-run connect`
+checks the target without attaching. The wrapper names the target explicitly
+instead of selecting OpenShell's last-used sandbox. It performs no create,
+converge, validate, or provider refresh step. OpenShell connect may still record
+its own last-used or session metadata. A `Ready` phase does not prove the agent
+or database is healthy.
 
 ## Golden rule
 

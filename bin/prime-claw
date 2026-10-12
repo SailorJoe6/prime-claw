@@ -5,6 +5,7 @@ Phase 2 (sandbox runtime foundation): one reliable, repeatable lifecycle built
 from native OpenShell primitives. Verbs:
 
   status    Read-only actual-vs-expected health of every component.
+  connect   Attach an interactive terminal to the configured Ready sandbox.
   create    Fresh bring-up to a fully-running runtime (idempotent).   [Slice 3]
   converge  Re-run all stages to the same known-good state.           [Slice 3]
   build     Build the runtime image reproducibly.                     [Slice 2]
@@ -130,6 +131,55 @@ def probe_sandbox(cfg) -> tuple[bool | None, str, dict | None]:
     phase = data.get("phase", "?")
     ok = phase == "Ready"
     return ok, f"{cfg['sandbox_name']} phase={phase} rev={data.get('current_policy_version')}", data
+
+
+def cmd_connect(cfg, args) -> int:
+    """Attach to exactly the configured Ready sandbox, without lifecycle stages."""
+    try:
+        scope = openshell_scope(cfg)
+        name = cfg.get("sandbox_name")
+        if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,95}", name):
+            raise ValueError("runtime sandbox name is missing or invalid")
+        forbidden = cfg["gateway"].get("forbidden", [])
+        if not isinstance(forbidden, list) or scope[1] in forbidden:
+            raise ValueError("configured gateway is forbidden or its forbidden list is invalid")
+    except (KeyError, TypeError, ValueError) as exc:
+        print(f"error: connect: {exc}", file=sys.stderr)
+        return 1
+
+    data, err = openshell_json([*scope, "sandbox", "get", name])
+    if not isinstance(data, dict):
+        print(f"error: connect: cannot verify sandbox {name!r}: {err.strip()[:200]}",
+              file=sys.stderr)
+        return 1
+    if data.get("name") != name:
+        print(f"error: connect: sandbox identity missing or mismatched for {name!r}",
+              file=sys.stderr)
+        return 1
+    if data.get("phase") != "Ready":
+        print(f"error: connect: sandbox {name!r} is not Ready (phase={data.get('phase')!r})",
+              file=sys.stderr)
+        return 1
+
+    cmd = [OPENSHELL, *scope, "sandbox", "connect", name]
+    if args.dry_run:
+        print(f"dry_run: would attach to Ready sandbox {name!r} "
+              f"(gateway={scope[1]!r}, workspace={scope[3]!r})")
+        return 0
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        print("error: connect: interactive stdin and stdout TTY required", file=sys.stderr)
+        return 1
+    try:
+        # No capture, shell, timeout, or --no-tty: OpenShell owns the terminal.
+        return subprocess.run(cmd, check=False).returncode
+    except FileNotFoundError:
+        print(f"error: connect: executable not found: {OPENSHELL}", file=sys.stderr)
+        return 127
+    except OSError as exc:
+        print(f"error: connect: cannot run {OPENSHELL}: {exc}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
 
 
 def probe_provider(cfg) -> tuple[bool, str]:
@@ -3052,7 +3102,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--config", help="path to runtime.json (default config/runtime.json)")
     ap.add_argument("--dry-run", action="store_true", help="print intended actions; do not mutate")
     sub = ap.add_subparsers(dest="verb", required=True)
-    for v in ("status", "create", "converge", "build", "embedding-preflight", "embedding-build", "validate", "recover", "destroy"):
+    for v in ("status", "connect", "create", "converge", "build", "embedding-preflight", "embedding-build", "validate", "recover", "destroy"):
         sp = sub.add_parser(v)
         if v == "build":
             sp.add_argument("--force", action="store_true", help="rebuild even if inputs unchanged")
@@ -3066,6 +3116,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 VERBS = {
     "status": cmd_status,
+    "connect": cmd_connect,
     "create": cmd_create,
     "converge": cmd_converge,
     "build": cmd_build,
