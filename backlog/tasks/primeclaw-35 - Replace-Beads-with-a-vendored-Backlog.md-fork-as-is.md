@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-12 01:24'
+updated_date: '2026-10-12 01:45'
 labels:
   - backlog-md
   - migration
@@ -105,5 +105,11 @@ author: Ralph
 created: 2026-10-12 01:24
 ---
 Slice 3 caller conversion is complete pending commit/push. Active instructions, project skills/workflows, managed templates, docs, and mutable navigational references now use native Backlog.md operations and PRIMECLAW IDs. Tracked repository-specific Beads data, hooks, merge rules, ignores, and Codex hook integration are removed. The required one-time cutover inventory scanned 510 tracked/nonignored files and added no persistent crosswalk, allowlist, or absence test. Validation: focused 12 passed / 3 deselected; full host-safe 612 passed / 66 skipped / 75 subtests; exact Docker-only plugin probe passed with offline checks, teardown, and manifest publication using the verified Prime Agent source identity. The standard initialized-worktree Tier 1 launcher currently rejects the deps/backlog gitlink directory during repository snapshotting; the plugin-only probe used a disposable non-recursive clone with that empty gitlink path absent. Final initialized-worktree gate repair/clearance, complete candidate validation, host activation, and task closure remain Slice 4 or post-merge work as already ordered.
+---
+
+author: Ralph
+created: 2026-10-12 01:45
+---
+Slice 4 final candidate validation is complete pending commit/push. The legacy Beads source was re-read with --readonly and remains byte-identical: 120 records, SHA-256 3101daa5c0372b7b45da074b64c9ca062b00380f986ab9daa187364c0dcf45a2. All 120 Backlog.md tasks were re-read through the supported CLI: 79 Done / 41 active, 85 parent links, 60 blocking dependencies, all 10 translated nonblocking references, 116 migrated comments plus the Slice 3 operational comment, and 256 acceptance criteria; the task tree has no drift from accepted Slice 3. Repository snapshots now omit index-mode-160000 gitlinks consistently whether initialized or absent, with a real-submodule regression and direct initialized-worktree snapshot proof. The runtime build pins Bun 1.3.11 after a floating Bun 1.4.3 cached binary produced SIGBUS; the fresh runtime upstream smoke passes and a networkless container reports Bun 1.3.11 / Backlog.md 1.53.0. Host source build passes at v1.53.0 / fd20f71493fb4eda44b021aa89f257956f17fb71. Final host-safe suite: 613 passed, 66 skipped, 75 subtests. Standard initialized-worktree scripts/test-tier1.sh --probe passes with offline RPC checks, network removal, teardown, and manifest publication. This Episode does not activate host artifacts, merge, add the final summary, mark this task Done, or close it; those remain operator-controlled post-merge steps on primary main.
 ---
 <!-- COMMENTS:END -->

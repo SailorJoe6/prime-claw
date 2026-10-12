@@ -45,8 +45,11 @@ inputs, performs the same frozen install and upstream smoke path, and installs a
 separately targeted Linux standalone binary at `/usr/local/bin/backlog`. Image
 labels and the build stamp record the release and commit.
 
-The build uses the vendored source. It does not install an npm package, download
-an upstream prebuilt binary, or require Bun to execute `backlog`.
+The sandbox build pins Bun `1.3.11`, matching the accepted build toolchain, so a
+floating installer release cannot silently reuse or replace the compiled
+artifact. The build uses the vendored source. It does not install an npm
+package, download an upstream prebuilt binary, or require Bun to execute
+`backlog`.
 
 ## Project task workflow
 

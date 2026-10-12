@@ -62,11 +62,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && pg_dropcluster --stop 16 main 2>/dev/null || true
 ENV PATH="/usr/lib/postgresql/16/bin:$PATH"
 
-# --- Bun (to compile gbrain) ---
+# --- Bun (pinned build tool for reproducible Backlog.md and gbrain binaries) ---
+ARG BUN_VERSION=1.3.11
 ENV BUN_INSTALL=/usr/local/bun
-RUN curl -fsSL https://bun.sh/install | bash \
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}" \
     && ln -sf /usr/local/bun/bin/bun /usr/local/bin/bun \
-    && ln -sf /usr/local/bun/bin/bunx /usr/local/bin/bunx
+    && ln -sf /usr/local/bun/bin/bunx /usr/local/bin/bunx \
+    && test "$(bun --version)" = "$BUN_VERSION"
 
 # --- Backlog.md: compile the exact vendored fork revision for this image ---
 ARG BACKLOG_VERSION=1.53.0

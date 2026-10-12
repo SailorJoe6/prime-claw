@@ -4,6 +4,7 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "1.53.0"
 COMMIT = "fd20f71493fb4eda44b021aa89f257956f17fb71"
+BUN_VERSION = "1.3.11"
 
 
 def test_backlog_submodule_pin_and_build_contract():
@@ -24,6 +25,9 @@ def test_backlog_runtime_build_is_source_compiled_and_smoke_checked():
     dockerfile = (ROOT / "docker/runtime.Dockerfile").read_text()
     assert f"ARG BACKLOG_VERSION={VERSION}" in dockerfile
     assert f"ARG BACKLOG_COMMIT={COMMIT}" in dockerfile
+    assert f"ARG BUN_VERSION={BUN_VERSION}" in dockerfile
+    assert 'bash -s "bun-v${BUN_VERSION}"' in dockerfile
+    assert 'test "$(bun --version)" = "$BUN_VERSION"' in dockerfile
     assert "COPY --from=backlog_source . /opt/backlog" in dockerfile
     assert "rm -rf node_modules dist" in dockerfile
     assert "bun install --frozen-lockfile" in dockerfile

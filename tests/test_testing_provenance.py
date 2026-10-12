@@ -354,6 +354,48 @@ class TestHashes(unittest.TestCase):
             after = provenance.repository_identity(root)
             self.assertNotEqual(before["content_sha256"], after["content_sha256"])
 
+    def test_snapshot_omits_initialized_gitlink_checkout(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td).resolve()
+            dependency = base / "dependency"
+            dependency.mkdir()
+            subprocess.run(["git", "init", "-q", str(dependency)], check=True)
+            subprocess.run(["git", "-C", str(dependency), "config", "user.email",
+                            "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(dependency), "config", "user.name",
+                            "Test"], check=True)
+            (dependency / "source.txt").write_text("dependency\n")
+            subprocess.run(["git", "-C", str(dependency), "add", "source.txt"],
+                           check=True)
+            subprocess.run(["git", "-C", str(dependency), "commit", "-qm", "base"],
+                           check=True)
+
+            repo = base / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.email",
+                            "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.name", "Test"],
+                           check=True)
+            subprocess.run([
+                "git", "-c", "protocol.file.allow=always", "-C", str(repo),
+                "submodule", "add", "-q", str(dependency), "deps/backlog",
+            ], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-qam", "base"],
+                           check=True)
+
+            manifest = provenance.repository_source_manifest(repo)
+            gitlink = next(row for row in manifest["records"]
+                           if row["path"] == "deps/backlog")
+            self.assertEqual(gitlink, {
+                "path": "deps/backlog", "kind": "missing",
+                "mode": 0, "content_sha256": None,
+            })
+            snapshot = base / "snapshot"
+            staged = provenance.stage_repository_snapshot(repo, snapshot)
+            self.assertEqual(staged, manifest["identity"])
+            self.assertFalse((snapshot / "deps/backlog").exists())
+
     def test_declared_input_hash_rejects_missing_and_path_escape(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td).resolve()

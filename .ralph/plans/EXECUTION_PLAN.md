@@ -55,14 +55,21 @@ behavior requires repair.
   reports 85 parent links, 60 blocking links, 10 nonblocking references, 116
   comments, and 256 acceptance criteria, and focused tests pass (`2 passed`).
   `PRIMECLAW-35` remains open as required.
-- **Slice 3 — complete in the pending caller-conversion commit (2026-10-12).**
-  Active repository callers and navigational task references now use native
-  Backlog.md operations and `PRIMECLAW-*` IDs. Repository-specific Beads data,
-  hooks, generated Codex hook integration, merge rules, and project guidance
-  are removed. The required one-time cutover inventory and proportional tests
-  are recorded below. `PRIMECLAW-35` remains In Progress for Slice 4.
-- **Next, and only next:** Slice 4 — run final candidate validation. Do not
-  activate host artifacts, close `PRIMECLAW-35`, or add scope in Slice 3.
+- **Slice 3 — accepted at candidate commit
+  `728f3133d13ba0c353bcf728b15a6734e0a28db0` (2026-10-12).** Branch and
+  upstream match, the worktree was clean at acceptance, caller conversion and
+  the one-time cutover inventory are recorded, focused checks pass, the
+  host-safe suite reports `612 passed, 66 skipped`, and the equivalent
+  disposable-clone Docker plugin probe passed. `PRIMECLAW-35` remains In
+  Progress for Slice 4.
+- **Slice 4 — complete in the pending final-validation commit (2026-10-12).**
+  The standard initialized-worktree Tier 1 probe passes after repository
+  snapshots learned to omit tracked gitlinks consistently whether their
+  submodule checkout is initialized or absent. Final source stability,
+  migration equivalence, host/runtime builds, lifecycle coverage, the full
+  host-safe suite, and required Docker-only gate all pass. `PRIMECLAW-35`
+  remains In Progress; host activation, merge, final summary, and Done remain
+  operator-controlled post-merge work on primary `main`.
 
 ## Slice 2 moving-source contract (approved 2026-10-12)
 
@@ -155,6 +162,35 @@ behavior requires repair.
   complete migration equivalence, builds, lifecycle suites, and final Docker
   candidate gates remain ordered Slice 4 work. Host activation and final task
   closure remain operator-controlled post-merge work.
+
+## Slice 4 final candidate validation (2026-10-12)
+
+- Re-read the legacy Beads source in explicit read-only mode. Its 120-line
+  canonical export remains byte-identical at SHA-256
+  `3101daa5c0372b7b45da074b64c9ca062b00380f986ab9daa187364c0dcf45a2`.
+- Re-read all 120 Backlog.md tasks through the supported CLI. The accepted
+  migration remains 79 Done and 41 active/blocked tasks, with 85 parent links,
+  60 blocking dependencies, all 10 translated nonblocking references, 116
+  migrated source comments plus the Slice 3 operational comment, and 256
+  acceptance criteria. The task tree has no drift from accepted Slice 3.
+- Repaired only repository snapshot handling for Git index mode `160000`:
+  initialized and absent gitlink checkouts are represented as missing snapshot
+  inputs, so nested repositories are never traversed or copied. A focused real-
+  submodule regression and a direct snapshot of this initialized worktree pass.
+- Pinned the runtime build tool to Bun `1.3.11`, matching the accepted host
+  toolchain. This cleared a concrete floating-installer failure where a cached
+  Bun `1.4.3` Backlog binary exited with `SIGBUS`. The fresh runtime build ran
+  the upstream compiled-binary smoke path and a networkless container reports
+  Bun `1.3.11` and Backlog.md `1.53.0`.
+- `scripts/build-backlog.sh` passes for `v1.53.0` at
+  `fd20f71493fb4eda44b021aa89f257956f17fb71`. The final host-safe suite passes
+  (`613 passed, 66 skipped, 11 warnings, 75 subtests`). The standard
+  initialized-worktree `scripts/test-tier1.sh --probe` passes with the verified
+  Prime Agent source selector, offline RPC checks, network removal, teardown,
+  and manifest publication.
+- Stop after committing and pushing this candidate. Do not activate either host
+  artifact, merge, close `PRIMECLAW-35`, or perform its final-summary/Done
+  mutation from this Episode.
 
 ## Operator-controlled completion
 
