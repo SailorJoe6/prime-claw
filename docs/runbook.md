@@ -179,9 +179,11 @@ agent socket or key. SSH remotes need a ProxyCommand that tunnels via the
 sandbox HTTPS proxy, a verified host-key trust source, and a separately approved
 credential-isolated SSH identity. Do not use the probe's disabled host-key
 check for normal Git operations or copy host SSH credentials into the sandbox.
-HTTPS Git reads work; authenticated SSH pull/push remains unproven. The approved `gitlab-static.net` HTTPS policy is installed, but
-that hostname and an asset subdomain did not resolve during validation; asset
-reachability is unproven until a real GitLab asset hostname is identified.
+HTTPS Git reads work; authenticated SSH pull/push remains unproven. The approved `**.gitlab-static.net` HTTPS rule includes the observed
+`user-content.gitlab-static.net` host from a public GitLab page. Its root
+returned an ordinary `404`, proving network reach. The bare
+`gitlab-static.net` apex and a guessed `assets` subdomain do not resolve;
+test content against a real page asset URL rather than those names.
 
 `rg` is an optional Prime Agent search helper. The runtime image installs
 Ubuntu's `ripgrep` package and checks `/usr/bin/rg` during its build. A previously

@@ -164,8 +164,9 @@ network_policies:
     binaries:
       - path: "/**"
 
-  # GitLab static-asset domain requested by Joe; DNS was not available for
-  # this name at validation time, so an HTTPS fetch is not yet proven.
+  # GitLab static-asset domain requested by Joe. Public GitLab pages use
+  # user-content.gitlab-static.net; its live 404 at the root proves HTTPS reach.
+  # The bare apex is not a web endpoint and did not resolve in validation.
   gitlab_public_assets:
     name: gitlab-public-assets
     endpoints:
