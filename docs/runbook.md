@@ -154,8 +154,8 @@ relaunching `prime-agent`. Neither path copies a host credential into the sandbo
 Codex model IDs are not all declared in host `models.json`. Prime Agent refreshes
 a public provider catalog from `raw.githubusercontent.com`, caches it under the
 sandbox's agent directory, then applies provider authentication. The policy grants
-only `/usr/bin/node` read-only access to that public catalog host, without a
-provider credential attachment; it is separate from GitHub push and Codex OAuth.
+all sandbox executables access to that public catalog host, without a provider
+credential attachment; it is separate from GitHub push and Codex OAuth.
 A sandbox without the public cache and this egress rule falls back to its pinned
 bundled Codex entry (`gpt-5.1`), even when the Codex provider can call another
 model by explicit ID. Check a **fresh direct login-shell** `prime-agent model list`

@@ -84,7 +84,7 @@ def test_no_config_resolves_kimi_gateway_embedding_and_glm_catalog(tmp_path):
 
 
 @pytest.mark.parametrize("use_codex", [False, True])
-def test_public_model_catalog_policy_is_read_only_and_unauthenticated(tmp_path, use_codex):
+def test_public_model_catalog_policy_is_uncredentialed_and_all_binaries(tmp_path, use_codex):
     cfg = hermetic_cfg(tmp_path)
     if use_codex:
         cfg = codex_host_pair(tmp_path, cfg)
@@ -95,8 +95,8 @@ def test_public_model_catalog_policy_is_read_only_and_unauthenticated(tmp_path, 
     assert rule["name"] == "public-prime-agent-model-catalog"
     assert rule["endpoints"] == [{
         "host": "raw.githubusercontent.com", "port": 443,
-        "protocol": "rest", "access": "read-only", "enforcement": "enforce"}]
-    assert rule["binaries"] == [{"path": "/usr/bin/node"}]
+        "protocol": "rest", "access": "read-write", "enforcement": "enforce"}]
+    assert rule["binaries"] == [{"path": "/**"}]
     assert all("raw.githubusercontent.com" not in json.dumps(other)
                for name, other in rules.items() if name != "public_prime_agent_catalog")
 

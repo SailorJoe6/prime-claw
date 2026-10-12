@@ -104,14 +104,15 @@ network_policies:
   # PRIME_CLAW_CODEX_POLICY_END
 
   # Prime Agent refreshes its public provider catalog independently of OAuth.
-  # Keep this unauthenticated, read-only, and bound to Node (TUI and daemon),
-  # separate from the credentialed GitHub and Codex policy rules.
+  # Keep this unauthenticated and separate from credentialed GitHub/Codex rules.
+  # The recursive absolute binary glob admits any sandbox executable; bare "*"
+  # matches no absolute paths under OpenShell 0.0.116.
   public_prime_agent_catalog:
     name: public-prime-agent-model-catalog
     endpoints:
-      - { host: raw.githubusercontent.com, port: 443, protocol: rest, access: read-only, enforcement: enforce }
+      - { host: raw.githubusercontent.com, port: 443, protocol: rest, access: read-write, enforcement: enforce }
     binaries:
-      - path: /usr/bin/node
+      - path: "/**"
 
   # Slice 1 (R3a-1/7): credentialed github.com for git clone/fetch/push of the brain
   # repo. The attached github-push provider injects the real token at L7; the sandbox
