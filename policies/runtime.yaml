@@ -114,6 +114,17 @@ network_policies:
     binaries:
       - path: "/**"
 
+  # Public GitLab and its first-party subdomains have no attached credential in
+  # this sandbox. Any executable may use HTTPS; private GitLab instances require
+  # a separately named host and policy decision.
+  public_gitlab:
+    name: public-gitlab-unrestricted
+    endpoints:
+      - { host: gitlab.com, port: 443, protocol: rest, access: read-write, enforcement: enforce }
+      - { host: "**.gitlab.com", port: 443, protocol: rest, access: read-write, enforcement: enforce }
+    binaries:
+      - path: "/**"
+
   # Slice 1 (R3a-1/7): credentialed github.com for git clone/fetch/push of the brain
   # repo. The attached github-push provider injects the real token at L7; the sandbox
   # only ever holds a placeholder. Declared as its own inspected `rest` rule keyed to

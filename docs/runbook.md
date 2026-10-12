@@ -163,6 +163,12 @@ and the public cache, not just a daemon catalog probe. Catalog visibility still
 is not proof that every listed model is executable for this ChatGPT account.
 Never copy host OAuth tokens or broaden credentialed routes to fix catalog access.
 
+Public `gitlab.com` and its first-party subdomains are open over HTTPS for all
+sandbox executables without an attached credential. Private GitLab installations
+need their exact hostnames. GitHub has an existing credentialed Git push route:
+new all-binary GitHub reach must be checked against its credential boundary,
+not inferred from the unauthenticated catalog or GitLab rules.
+
 `rg` is an optional Prime Agent search helper. The runtime image installs
 Ubuntu's `ripgrep` package and checks `/usr/bin/rg` during its build. A previously
 created container does not acquire that image-owned executable from a tag rebuild

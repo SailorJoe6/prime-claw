@@ -101,6 +101,19 @@ def test_public_model_catalog_policy_is_uncredentialed_and_all_binaries(tmp_path
                for name, other in rules.items() if name != "public_prime_agent_catalog")
 
 
+def test_public_gitlab_policy_covers_apex_subdomains_and_all_binaries(tmp_path):
+    import yaml
+    policy_text, _ = pc._render_effective_runtime_policy(hermetic_cfg(tmp_path))
+    rules = yaml.safe_load(policy_text)["network_policies"]
+    rule = rules["public_gitlab"]
+    assert rule["name"] == "public-gitlab-unrestricted"
+    assert {e["host"] for e in rule["endpoints"]} == {"gitlab.com", "**.gitlab.com"}
+    assert all(e["port"] == 443 and e["protocol"] == "rest" and
+               e["access"] == "read-write" and e["enforcement"] == "enforce"
+               for e in rule["endpoints"])
+    assert rule["binaries"] == [{"path": "/**"}]
+
+
 def test_valid_host_codex_overrides_inference_only(tmp_path):
     cfg = codex_host_pair(tmp_path, hermetic_cfg(tmp_path))
     profiles = pc._resolve_runtime_profiles(cfg)
