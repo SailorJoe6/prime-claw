@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: To Do
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-12 21:15'
+updated_date: '2026-10-12 21:19'
 labels:
   - backlog-md
   - episode-loop
@@ -40,7 +40,7 @@ Ordinary work uses these statuses: `In Design`, `In Planning`, `In Progress`, `B
 
 `/plan TASK-ID` writes or updates the task's optional Backlog Implementation Plan and moves the task to `In Planning`. Planning remains distinct from implementation approval.
 
-Nothing in this change restricts a human or agent from selecting any task and beginning ordinary implementation through existing project practices. Ordinary direct work remains outside Prime Claw Episode admission and does not require an Implementation Plan, Episode worktree or session, or Episode ownership state. This specification adds no `pickup` command, model-callable tool, or other direct-work plugin surface.
+Ordinary non-Episode task execution is outside the scope of this migration.
 
 The current `/implement-spec` Episode pathway already requires a usable `EXECUTION_PLAN.md`; that is not a new restriction. Its task-native replacement, `/implement-task TASK-ID`, preserves the existing planned-work admission gate by requiring a meaningful Backlog Implementation Plan in the selected task instead of an `EXECUTION_PLAN.md` file. Missing, blank, placeholder-only, or materially unresolved plans are rejected before Episode resources or ownership are created. A successful admission binds the Episode to that exact task.
 
@@ -78,15 +78,14 @@ Implement and land this change through one final old-style `.ralph/plans` migrat
 - [ ] #1 Project configuration and user-facing guidance expose `In Design`, `In Planning`, `In Progress`, `Blocked`, and `Done` for ordinary tasks, default new ordinary tasks to `In Design`, and contain no active workflow that creates or selects `To Do` after migration.
 - [ ] #2 Fresh and existing-task tests prove `/design` and `/spec-it-out` persist the specification and acceptance contract in the intended Backlog task, leave it `In Design`, do not write authoritative plan files, and do not authorize implementation.
 - [ ] #3 `/plan TASK-ID` tests prove it updates that task’s optional Implementation Plan, moves that same task to `In Planning`, and creates neither an Episode nor a second planning authority.
-- [ ] #4 Static and behavioral acceptance proves this change adds no `pickup` command, model-callable tool, or other direct-work plugin surface, and that humans or agents remain free to start ordinary task implementation through existing project practices without an Implementation Plan or Episode resources.
-- [ ] #5 `/implement-task TASK-ID` is the sole Episode admission command and preserves the existing planned-work gate currently enforced by `/implement-spec`: tests prove missing, blank, and placeholder-only task plans are rejected before any Episode mutation, while a meaningful Backlog Implementation Plan admits one Episode bound to the exact task ID.
-- [ ] #6 End-to-end Episode evidence proves multiple execute, handoff, and compaction iterations continue the same task and Episode, retain the same task identity, and do not create per-iteration tasks or plan bundles.
-- [ ] #7 Commands, model-callable tools, skills, workflow templates, initialization and reconciliation assets, ownership records, docs, and tests use Backlog task identity, fields, and statuses instead of `.ralph/plans` location or file movement as lifecycle authority.
-- [ ] #8 A migration fixture proves every pre-cutover `To Do` task with a meaningful Implementation Plan becomes `In Planning`, every `To Do` task without one becomes `In Design`, and already active, blocked, or done tasks retain truthful semantics.
-- [ ] #9 A representative migration fixture covering future specs with and without plans, active work, blocked work, successful archives, and ambiguous or non-success history proves all material content and references reach a traceable destination task; successful archives end as `Done` under `backlog/completed` and no migrated item is written to `backlog/archive`.
-- [ ] #10 Repository-wide acceptance proves no live command, skill, workflow, template, test, or documentation treats `.ralph/plans` as authoritative, while historical references remain only where changing them would falsify history.
-- [ ] #11 The accepted migration lands as one final old-style Episode change that both migrates existing state and removes `.ralph/plans`; the merged tree has no dual-write mode or partially switched authority.
-- [ ] #12 The compatibility `SPECIFICATION.md` for this effort contains only a clear pointer to the created Backlog task and no duplicated mutable specification.
-- [ ] #13 Existing tests plus focused Docker-isolated plugin acceptance prove Conversation, operator, and Episode authority, exact ownership, iteration handoff, recovery, Expert review, finalization, and cleanup behavior remain intact apart from the specified task-native identity and lifecycle changes.
-- [ ] #14 Static and behavioral acceptance proves the change introduces no approval commits, Git-blob or tag approval scheme, replacement or additional digest protocol, bespoke transaction journal, Prime Agent source patch, or other unapproved scope expansion.
+- [ ] #4 `/implement-task TASK-ID` is the sole Episode admission command and preserves the existing planned-work gate currently enforced by `/implement-spec`: tests prove missing, blank, and placeholder-only task plans are rejected before any Episode mutation, while a meaningful Backlog Implementation Plan admits one Episode bound to the exact task ID.
+- [ ] #5 End-to-end Episode evidence proves multiple execute, handoff, and compaction iterations continue the same task and Episode, retain the same task identity, and do not create per-iteration tasks or plan bundles.
+- [ ] #6 Commands, model-callable tools, skills, workflow templates, initialization and reconciliation assets, ownership records, docs, and tests use Backlog task identity, fields, and statuses instead of `.ralph/plans` location or file movement as lifecycle authority.
+- [ ] #7 A migration fixture proves every pre-cutover `To Do` task with a meaningful Implementation Plan becomes `In Planning`, every `To Do` task without one becomes `In Design`, and already active, blocked, or done tasks retain truthful semantics.
+- [ ] #8 A representative migration fixture covering future specs with and without plans, active work, blocked work, successful archives, and ambiguous or non-success history proves all material content and references reach a traceable destination task; successful archives end as `Done` under `backlog/completed` and no migrated item is written to `backlog/archive`.
+- [ ] #9 Repository-wide acceptance proves no live command, skill, workflow, template, test, or documentation treats `.ralph/plans` as authoritative, while historical references remain only where changing them would falsify history.
+- [ ] #10 The accepted migration lands as one final old-style Episode change that both migrates existing state and removes `.ralph/plans`; the merged tree has no dual-write mode or partially switched authority.
+- [ ] #11 The compatibility `SPECIFICATION.md` for this effort contains only a clear pointer to the created Backlog task and no duplicated mutable specification.
+- [ ] #12 Existing tests plus focused Docker-isolated plugin acceptance prove Conversation, operator, and Episode authority, exact ownership, iteration handoff, recovery, Expert review, finalization, and cleanup behavior remain intact apart from the specified task-native identity and lifecycle changes.
+- [ ] #13 Static and behavioral acceptance proves the change introduces no approval commits, Git-blob or tag approval scheme, replacement or additional digest protocol, bespoke transaction journal, Prime Agent source patch, or other unapproved scope expansion.
 <!-- AC:END -->
