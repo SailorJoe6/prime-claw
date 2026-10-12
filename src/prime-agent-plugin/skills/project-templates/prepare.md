@@ -1,47 +1,54 @@
 ---
 name: prepare
-description: Use for prime-claw's session orientation to load the minimum context needed before work begins.
+description: Use at the start of work in any repository to discover the minimum project context and native workflow needed for the task.
 ---
 
-# Prepare — prime-claw session orientation
+# Prepare — repository orientation
 
-prime-claw follows progressive disclosure: load the minimum context for the
-current task, follow links to detail, never bulk-load. This skill orients a
-fresh session.
+Orient by progressive discovery. Load only enough context to work safely, then
+follow links when the task needs more detail. Do not bulk-read the repository or
+its documentation.
 
-## Orientation (do this)
+## Required first step
 
-First, read and apply **`/skill:goals-and-heartbeats`** unless that exact skill
-is already present in the current context. It is mandatory and always in effect
-while working toward any goal.
+Read and apply **`/skill:goals-and-heartbeats`** unless that exact skill is
+already present in the current context. It is the only file or tool this skill
+requires. It remains mandatory while working toward any goal.
 
-Then read these files, in this order:
+## Discover the project conditionally
 
-1. **[AGENTS.md](AGENTS.md)** — operating instructions, Backlog.md usage, the RLM
-   safe-spawn protocol, credential isolation, and the land-the-plane rule.
-2. **[Vision](VISION.md)** — what prime-claw is, the four-tier hierarchy,
-   and the three-horizon context model.
-3. **[Long Range Plan](LONG_RANGE_PLAN.md)** — the risk-ordered slice map and
-   which phase is active.
-4. **[User Stories](docs/user-stories/README.md)** — the actual implemented features.
-5. **[Information Architecture](docs/information-architecture.md)** —
-   the multi-store routing layer (consult when a task involves persisting
-   anything durable).
+Start from the working directory and identify the repository root when one is
+available. Use a bounded root listing and already-visible context before opening
+files. Missing files, directories, commands, and tools are valid; skip them
+without inventing replacements.
 
-Then run `backlog task list --status "To Do" --ready --plain` to see unblocked work.
+Discover and read, in this order, only what exists and is relevant:
 
-## When the reasoning matters
+1. **Agent instructions and local policy.** Find repository or directory-scoped
+   instruction files exposed by the agent host or visible near the task. Apply
+   the most specific instructions for each file you may touch.
+2. **Project overview.** If a README, overview, manifest, or equivalent entry
+   point exists, read the smallest source that explains the project and the
+   component involved in the task.
+3. **Contribution and development guidance.** If present, consult the relevant
+   contributing, development, architecture, or setup guide before changing or
+   validating code.
+4. **Documentation map.** Prefer a documentation index. If none exists, inspect
+   one bounded listing of the documentation directory and open only the files
+   whose names or links match the task. Never recursively load all docs.
+5. **Native work commands.** Derive tracker, build, lint, and test commands from
+   discovered instructions, manifests, task-runner files, CI configuration, or
+   tool help. Use only the commands and tracker the project actually provides;
+   a project may provide none.
 
-If the task depends on *why* a design decision was made (not just what it is),
-read **[docs/founding-decisions.md](docs/founding-decisions.md)**. It is the
-curated record of the founding session's decisions and rejected alternatives.
+## Continue only as needed
 
-## Deeper context (only as needed)
+Follow references from the material above when they answer a concrete question
+about scope, design rationale, implementation, or validation. Prefer the
+narrowest useful file or command. Re-check more specific local instructions
+when work moves into another directory.
 
-- `docs/lineage/` — prior art (zbrain, ralph-pva, nemo-setup, openclaw-setup).
-- `docs/README.md` — the full documentation index.
-- The raw founding-session transcript is referenced in
-  `docs/founding-decisions.md` — consult only when the curated doc is
-  insufficiently specific.
-
-Do not read all of these up front. Pull them when the task touches them.
+Before substantive work, summarize the project purpose, applicable policy,
+likely work surface, and native validation path from the evidence found. State
+unknowns plainly instead of treating absent conventional files or tools as an
+error.

@@ -63,9 +63,10 @@ uncertain Episode worktrees retain their starting template snapshot.
 
 ## US-07 — Orient a fresh project agent
 
-**As a project agent, I want minimal progressive orientation, so that I load the
-project policy, vision, plan, information architecture when relevant, and ready
-work without flooding context.**
+**As a project agent, I want minimal progressive orientation, so that I discover
+this repository's applicable policy, overview, development guidance,
+documentation map, and native work commands without flooding context or
+requiring conventional files and tools that the project does not use.**
 
 ## Primary implementation surfaces
 

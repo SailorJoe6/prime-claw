@@ -24,12 +24,13 @@ def test_project_backlog_skill_teaches_native_ready_claim_and_completion() -> No
         assert fragment in text
 
 
-def test_ralph_templates_use_backlog_task_authority() -> None:
+def test_execute_and_handoff_keep_backlog_authority_while_prepare_discovers_native_tracker() -> None:
     execute = EXECUTE_TEMPLATE.read_text()
     prepare = PREPARE_TEMPLATE.read_text()
     handoff = HANDOFF_TEMPLATE.read_text()
 
     assert "Backlog.md-tracked projects" in execute
     assert "planning docs and Backlog.md tasks" in execute
-    assert 'backlog task list --status "To Do" --ready --plain' in prepare
+    assert "Use only the commands and tracker the project actually provides" in prepare
+    assert "Backlog.md" not in prepare
     assert "related Backlog.md tasks" in handoff

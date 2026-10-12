@@ -1,4 +1,5 @@
 """Project initialization and reconciliation acceptance coverage."""
+import hashlib
 import json
 import subprocess
 import time
@@ -21,11 +22,30 @@ def test_delivery_manifest_covers_every_shipped_source_once():
     assert len(targets)==len(set(targets))
     assert all((SOURCE/row["source"]).is_file() and not (SOURCE/row["source"]).is_symlink() for row in rows)
 
-def test_prepare_requires_the_user_level_goals_and_heartbeats_skill():
+def test_prepare_is_repository_generic_progressive_discovery():
     prepare=" ".join((SOURCE/"skills/project-templates/prepare.md").read_text().split())
     assert "`/skill:goals-and-heartbeats`" in prepare
     assert "unless that exact skill is already present in the current context" in prepare
-    assert "mandatory and always in effect" in prepare
+    assert "only file or tool this skill requires" in prepare
+    for sentinel in (
+        "Agent instructions and local policy",
+        "Project overview",
+        "Contribution and development guidance",
+        "Documentation map",
+        "Native work commands",
+        "bounded root listing",
+        "Never recursively load all docs",
+    ):
+        assert sentinel in prepare
+    assert "Missing files, directories, commands, and tools are valid" in prepare
+    assert "If a README, overview, manifest, or equivalent entry point exists" in prepare
+    assert "a project may provide none" in prepare
+    assert "Backlog.md" not in prepare
+    assert "backlog task list" not in prepare
+    assert "prime-claw" not in prepare.lower()
+    assert "VISION.md" not in prepare
+    assert "LONG_RANGE_PLAN.md" not in prepare
+    assert "docs/" not in prepare
 
 
 def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
@@ -33,14 +53,35 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
     for row in json.loads((SOURCE/"asset-inventory.json").read_text())["assets"]:
         for target in row["targets"]:
             if target["class"]=="project-customizable": project_rows.append({**row, **target})
-    for row in project_rows:
-        destination=ROOT/row["destination"]
-        assert destination.is_file() and not destination.is_symlink()
-        assert destination.read_bytes()==(SOURCE/row["source"]).read_bytes()
-    assert not (ROOT/".ralph/skills").exists()
-    assert (ROOT/".ralph/plans").is_dir()
     manifest=json.loads((ROOT/".prime-claw/templates.json").read_text())
     assert set(manifest["assets"])=={row["id"] for row in project_rows}
+    for row in project_rows:
+        destination=ROOT/row["destination"]
+        source=SOURCE/row["source"]
+        assert destination.is_file() and not destination.is_symlink()
+        if row["id"]=="project-skill-prepare":
+            customized=destination.read_text()
+            assert destination.read_bytes()!=source.read_bytes()
+            assert "Prepare — prime-claw session orientation" in customized
+            assert "docs/user-stories/README.md" in customized
+            assert "docs/information-architecture.md" in customized
+            assert 'backlog task list --status "To Do" --ready --plain' in customized
+        else:
+            installed=manifest["assets"][row["id"]]
+            assert installed["state"]=="managed"
+            assert hashlib.sha256(destination.read_bytes()).hexdigest()==installed["installedSha256"]
+    assert not (ROOT/".ralph/skills").exists()
+    assert (ROOT/".ralph/plans").is_dir()
+    prepare_state=manifest["assets"]["project-skill-prepare"]
+    assert prepare_state["state"]=="customized"
+    assert prepare_state["source"]=="skills/project-templates/prepare.md"
+    assert prepare_state["destination"]==".agents/skills/prepare/SKILL.md"
+    assert prepare_state["provenance"]=={
+        "scope":"project",
+        "exposure":"discoverable",
+        "customization":"project-customizable",
+        "lifecycleTrigger":"project-reconcile",
+    }
 
 def test_project_initialization_node_suite(tier1_container):
     result=tier1_container.run("node","--experimental-strip-types","--test","/workspace/tests/project_initialization_extension.test.mjs",timeout=180)
