@@ -1,11 +1,11 @@
 ---
 id: PRIMECLAW-22
 title: Eliminate specification/review overengineering ratchets across Prime Claw
-status: In Progress
+status: Done
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-12 01:14'
+updated_date: '2026-10-12 17:13'
 labels:
   - done-over-perfect
   - overengineering
@@ -116,3 +116,15 @@ The central-control implementation milestone is complete. Keep this epic open fo
 - [ ] #12 One concise post-dogfood retrospective checks both overengineering and under-protection, makes only evidence-backed minimal adjustments, and avoids new telemetry/scoring infrastructure.
 - [ ] #13 The epic is closed only after both live incident recoveries are reconciled, central product controls are implemented/tested/documented/pushed, and the bounded dogfood retrospective is complete or explicitly dispositioned by the operator.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-12 reconciliation: The operator explicitly dispositioned the remaining dogfood window and the original mandatory-control acceptance model. Commit `886cd9262b12e4fd9ac35336ef9d0caeb3342232` was an intermediate remediation whose required threat/failure/recovery/complexity/stop-loss formalism was later found to reproduce the same overengineering ratchet. The operator-approved final correction landed in `70f6401d7b72358ea290b543f2cd350faa320d34`: it removed that invented mandatory planning/readiness formalism while retaining proportional readiness and a narrow non-adversarial Expert-review scope guard. Independent review passed; validation included 604 passed / 1 skipped host tests, 108 Node tests, 29 focused policy tests, and Docker Tier 1 against Prime Agent 0.9.8. The original unchecked acceptance criteria are preserved as historical superseded requirements; closure does not claim they were fulfilled. Any later defect, activation, or validation work must use a separate narrowly scoped Backlog task.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Completed the incident and systemic remediation. The original `886cd92` mandatory-control design was explicitly superseded after it reproduced the overengineering failure it was intended to prevent. The final operator-approved correction landed in `70f6401`, passed independent review and host/Node/focused-policy/Docker Tier 1 validation, and preserves only proportional readiness plus a narrow non-adversarial Expert-review guard. Historical incident evidence and the superseded unchecked criteria remain intact; future work belongs in new tasks.
+<!-- SECTION:FINAL_SUMMARY:END -->
