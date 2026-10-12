@@ -80,8 +80,11 @@ re-based on prime-agent.
 - OpenShell sandbox (deny-by-default egress, no host socket/home/network/
   PID/IPC, mediated resource grants).
 - prime-agent daemon running inside, owning its `$HOME`.
-- L7 credential injection (credentials never touch sandbox disk) — preserves
-  the credential-isolation boundary.
+- L7 injection for **user** credentials (they never touch sandbox disk)
+  preserves the default credential-isolation boundary. Git uses HTTPS by
+  default; separately scoped, sandbox-owned SSH identities are an explicit
+  operator opt-in with a different trust model. See the
+  [Git authentication decision](docs/sandbox-runtime.md#git-authentication-https-default-ssh-opt-in-operator-decision-2026-10-12).
 - The apply/check/validate/test tooling grows here: `scripts/apply-*.sh`,
   `check-*.sh`, `validate-*.py`, `tests/test_*.py`, plus
   `config/requirements-inventory.json` traceability.

@@ -132,11 +132,13 @@ for targeted diagnosis:
 
 ## Operating guarantees (carried from Phase 1)
 
-- **Credential isolation** — real credentials enter only OpenShell providers;
-  they never touch sandbox disk, logs, or the repo. Host `auth.json` is read
-  in-process and never copied. Sandbox auth files contain only non-secret adapter
-  values and `openshell:resolve:` placeholders. This applies to gateway keys,
-  GitHub tokens, and openai-codex OAuth.
+- **User credential isolation (default)** — the operator's real credentials
+  enter only OpenShell providers; they never touch sandbox disk, logs, or the
+  repo. Host `auth.json` is read in-process and never copied. Sandbox auth files
+  contain only non-secret adapter values and `openshell:resolve:` placeholders.
+  This applies to gateway keys, GitHub tokens, and openai-codex OAuth. A distinct
+  sandbox-owned SSH identity is an explicit, narrower-trust opt-in described
+  below; it is **not** a way to keep that SSH credential from the sandbox.
 - **Configurable shape** — gateway endpoint / provider / baseUrl / credential
   are parameterized via `config/runtime.json` + `PRIME_CLAW_*` env overrides;
   another operator can re-point without code edits.
@@ -147,6 +149,50 @@ for targeted diagnosis:
 - **In-sandbox Postgres** — Postgres listens on `localhost:5433` inside the
   sandbox only (no host forward; deny-by-default egress). Host access is via
   `bin/prime-claw` / `openshell sandbox exec`.
+
+## Git authentication: HTTPS default, SSH opt-in (operator decision, 2026-10-12)
+
+The network policy permits GitHub and GitLab HTTPS and SSH egress from all
+sandbox executables. **Egress is not authentication.** OpenShell's inspected
+provider path substitutes gateway-held credentials in HTTP/Smart-HTTP traffic;
+SSH is opaque TCP. In the pinned OpenShell `v0.0.116` and the checked newer
+`v0.1.3`, there is no documented, supported outbound Git-SSH signer that lets
+sandbox processes authenticate while withholding both a private key **and the
+ability to use that identity** from those processes. `openshell ssh-proxy` is
+for connecting *into* a sandbox. An `ssh-agent` socket could hide key bytes,
+but any sandbox process that can reach it can ask it to sign; do not present
+agent forwarding as the original credential-isolation guarantee. Experimental
+provider files in `v0.1.3` are workload-visible non-secret configuration, not
+an SSH signer. See the [pinned GitHub provider profile](https://github.com/NVIDIA/OpenShell/blob/v0.0.116/providers/github.yaml),
+[newer provider transport boundary](https://github.com/NVIDIA/OpenShell/blob/v0.1.3/docs/how-it-works/providers/overview.mdx#L365-L406),
+and [SSH proxy's inbound modes](https://github.com/NVIDIA/OpenShell/blob/v0.1.3/crates/openshell-cli/src/main.rs#L658-L668).
+
+| Operator choice | Identity and custody | Result |
+| --- | --- | --- |
+| **Default: act on behalf of a user** | HTTPS Git with that user's appropriately scoped OpenShell-managed provider credential. The real token stays outside the sandbox; no personal SSH key or host agent socket is mounted. | Per-user attribution and Git Smart-HTTP fetch/push where the provider and policy authorize them. This is the default, not an SSH workaround. |
+| **Opt-in: act as an agent** | A separate, limited [GitHub machine user](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys#machine-users) / [GitLab service account](https://docs.gitlab.com/user/profile/service_accounts/) for multiple repos, or a repo-scoped deploy key (enable write only when push is required). Use a new identity, **never the operator's personal SSH key**. Its key or callable signing authority is available to the sandbox. | SSH Git is possible after an approved identity, trusted host keys, and the outbound proxy path are configured. A compromised sandbox can use or steal a sandbox-held key until provider-side revocation; this is a different, explicitly accepted trust model, not credential isolation. |
+| **Strict isolation** | Refuse any sandbox-accessible SSH signing authority. | Authenticated Git-over-SSH is a hard limit; use HTTPS with OpenShell-managed credentials. |
+
+A user may choose the hybrid per claw or repository: HTTPS for user-attributed
+work and a deliberately scoped agent SSH identity for work attributed to the
+agent. Do not silently switch a remote from HTTPS to SSH, forward the user's
+host agent, or change the declared identity based on a failed authentication.
+For an opt-in SSH identity, record its owner, repository/organization access,
+write and protected-branch scope, creation and rotation/revocation procedure,
+and how its trusted host keys and proxy route will be supplied. Keep any
+sandbox-owned private key out of the repo and logs; deleting a sandbox alone
+does not revoke it at GitHub or GitLab. A [GitHub deploy key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys)
+is one-repository and read-only by default; [GitLab deploy keys](https://docs.gitlab.com/user/project/deploy_keys/)
+can be read/write and have project/owner authorization nuances. Neither is a
+non-extractable OpenShell credential.
+
+**Current v2r1014 proof:** the GitHub HTTPS provider is attached and public
+HTTPS Git reads passed. GitLab has network access but no attached GitLab
+credential. SSH port 22 accepted proxy CONNECT for both hosts; an SSH protocol
+probe reached `Permission denied (publickey)` because the sandbox has no SSH
+agent or key. Authenticated SSH pull/push has **not** been proven. The
+[runbook](runbook.md) contains the operational checks. No dedicated account,
+deploy key, host-agent mount, or SSH-auth setup is implied by this decision.
 
 ## Reproduce / verify
 

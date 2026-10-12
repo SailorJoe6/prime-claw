@@ -100,6 +100,8 @@ following the openclaw-setup pattern.)
 
 - [sandbox-runtime.md](sandbox-runtime.md) — the sandbox lifecycle: verbs,
   stages, repo layout, and operating guarantees.
+- [Git authentication choice](sandbox-runtime.md#git-authentication-https-default-ssh-opt-in-operator-decision-2026-10-12)
+  — user-attributed HTTPS by default; limited sandbox-owned SSH only by explicit opt-in.
 - [home-embedding-runtime.md](home-embedding-runtime.md) — portable AI-gateway embedding
   default plus the optional, non-destructive 1536→4096 home-Qwen override contract.
 - [runbook.md](runbook.md) — operations: failure signature → recovery command.

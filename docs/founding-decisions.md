@@ -201,6 +201,18 @@ credentials injected at L7 (never touching sandbox disk), no host socket/home/
 network/PID/IPC. Credential isolation is a hard rule: never access macOS
 Keychain or browser credential stores.
 
+**2026-10-12 Git identity clarification (operator-approved):** the founding
+boundary remains the default for *user* credentials. Git acting for a user uses
+OpenShell-managed HTTPS credentials, not their SSH key. OpenShell `v0.0.116`
+(and checked `v0.1.3`) has no supported outbound SSH signing path that withholds
+both the key and signing authority from sandbox processes. A deliberately
+separate agent/machine or repo-scoped deploy-key SSH identity may be opted into
+per user or repo, but its sandbox-accessible credential is a conscious
+exception to the original no-credential-on-disk model; it is **not** described
+as credential isolation. If no such exception is acceptable, authenticated Git
+uses HTTPS only. Neither host SSH-agent forwarding nor a custom signer broker
+is part of this decision. See the [runtime choice and safeguards](sandbox-runtime.md#git-authentication-https-default-ssh-opt-in-operator-decision-2026-10-12).
+
 ## Lineage
 
 prime-claw synthesizes four prior projects (see docs/lineage/):

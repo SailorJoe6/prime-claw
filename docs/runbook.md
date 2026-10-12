@@ -175,11 +175,21 @@ proxy CONNECT received `200` for each. Direct `ssh-keyscan` did **not** resolve
 these hosts inside the sandbox; OpenShell's HTTP proxy resolves HTTPS and
 CONNECT targets. A bounded SSH probe through `nc -X connect -x` reached both
 servers and returned `Permission denied (publickey)`: the sandbox has no SSH
-agent socket or key. SSH remotes need a ProxyCommand that tunnels via the
-sandbox HTTPS proxy, a verified host-key trust source, and a separately approved
-credential-isolated SSH identity. Do not use the probe's disabled host-key
-check for normal Git operations or copy host SSH credentials into the sandbox.
-HTTPS Git reads work; authenticated SSH pull/push remains unproven. The approved `**.gitlab-static.net` HTTPS rule includes the observed
+agent socket or key. **SSH egress is not SSH authentication.** Ordinary SSH
+remotes need a ProxyCommand through the sandbox proxy, independently verified
+host keys, and an explicitly chosen *sandbox-owned* SSH identity. Such an
+identity is usable by the sandbox, not credential-isolated. Do not use the
+probe's disabled host-key check for normal Git operations or copy the user's
+personal SSH key or host agent into the sandbox. HTTPS Git reads work;
+authenticated SSH pull/push remains unproven. GitLab HTTPS push also needs a
+separately attached credential. Follow the
+[Git authentication decision](sandbox-runtime.md#git-authentication-https-default-ssh-opt-in-operator-decision-2026-10-12):
+user-attributed HTTPS with OpenShell-managed credentials by default; narrow,
+separate agent/deploy-key SSH only by explicit opt-in; otherwise HTTPS-only.
+Do not auto-fallback between identities or create keys as part of network
+recovery.
+
+The approved `**.gitlab-static.net` HTTPS rule includes the observed
 `user-content.gitlab-static.net` host from a public GitLab page. Its root
 returned an ordinary `404`, proving network reach. The bare
 `gitlab-static.net` apex and a guessed `assets` subdomain do not resolve;

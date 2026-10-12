@@ -227,8 +227,13 @@ has full control of its own `$HOME` — free to `cd` into any child folder
 and launch agents with their CWD scoped appropriately, free to run amok
 without wreaking chaos on the underlying system. The NVIDIA OpenShell
 sandbox (via NemoClaw) is the proven blueprint for this security boundary:
-deny-by-default egress, credentials injected at L7 and never touching
-sandbox disk, no host socket/home/network/PID/IPC exposure.
+deny-by-default egress, **user credentials** injected at L7 and never touching
+sandbox disk, no host socket/home/network/PID/IPC exposure. For Git, user-attributed
+HTTPS is the default. A user may explicitly opt into a distinct, limited agent
+SSH identity whose credential is available to the sandbox; that is a separate
+trust choice, never a way to forward the user's key safely. With strict
+credential isolation, authenticated Git-over-SSH is unavailable. See the
+[Git authentication decision](docs/sandbox-runtime.md#git-authentication-https-default-ssh-opt-in-operator-decision-2026-10-12).
 
 The contents of that home are a deliberate product surface, not an implicit
 copy of the operator's host home. In particular, a sandboxed claw cannot assume
