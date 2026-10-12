@@ -125,41 +125,71 @@ network_policies:
     binaries:
       - path: "/**"
 
-  # Slice 1 (R3a-1/7): credentialed github.com for git clone/fetch/push of the brain
-  # repo. The attached github-push provider injects the real token at L7; the sandbox
-  # only ever holds a placeholder. Declared as its own inspected `rest` rule keyed to
-  # /usr/bin/git (separate from kernel_bootstrap's L4 github access, which serves curl/
-  # uv and must stay unauthenticated to avoid a mixed-mode policy violation). Push needs
-  # git-receive-pack, which the builtin github profile forbids; the custom github-push
-  # profile allows it.
+  # GitHub code and API hosts carry an attached provider credential. Keep
+  # inspected REST transport on 443: only requests with the gateway placeholder
+  # receive credential substitution. Joe approved reach from every executable;
+  # this does not copy the real token into the sandbox. The custom github-push
+  # profile permits git-receive-pack for HTTPS push.
   github_brain:
     name: github-brain-push
     endpoints:
       - { host: github.com, port: 443, protocol: rest, access: read-write }
       - { host: api.github.com, port: 443, protocol: rest, access: read-write }
-    # git carries the placeholder token (L7 swaps to the real credential). uv + curl are here
-    # ONLY so the kernel-bootstrap python download (github.com/.../releases/...) is reachable:
-    # they never send the placeholder, so the L7 swap never fires for them and they traverse
-    # unauthenticated. OpenShell requires credentialed-endpoint hosts be L7 in every rule, so
-    # github.com cannot also appear as L4 in kernel_bootstrap.
     binaries:
-      - path: /usr/bin/git
-      - path: /usr/local/bin/uv
-      - path: /usr/bin/curl
+      - path: "/**"
 
-  # Slice 2 kernel bootstrap: prime-agent's persistent Python REPL needs uv +
-  # a managed Python 3.11. uv installer: astral.sh (script) then GitHub
-  # releases (binary). uv then pulls python-build-standalone from GitHub and
-  # packages from pypi/files.pythonhosted.org. uv lands at
-  # /sandbox/.local/bin/uv — bind that path (and curl for the installer).
+  # Match the existing credentialed GitHub endpoint's request metadata; a
+  # conflicting enforcement mode causes OpenShell to reject the whole policy.
+  github_first_party_https:
+    name: github-first-party-https
+    endpoints:
+      - { host: "**.github.com", port: 443, protocol: rest, access: read-write }
+    binaries:
+      - path: "/**"
+
+  # Public raw, release, and object hosts. L4 on this wildcard can coexist
+  # with the more specific inspected public catalog rule; no credential
+  # provider is attached to these content hosts.
+  github_public_content:
+    name: github-public-content
+    endpoints:
+      - { host: "**.githubusercontent.com", port: 443 }
+    binaries:
+      - path: "/**"
+
+  github_container_registry:
+    name: github-container-registry
+    endpoints:
+      - { host: ghcr.io, port: 443, protocol: rest, access: read-write, enforcement: enforce }
+    binaries:
+      - path: "/**"
+
+  # GitLab static-asset domain requested by Joe; DNS was not available for
+  # this name at validation time, so an HTTPS fetch is not yet proven.
+  gitlab_public_assets:
+    name: gitlab-public-assets
+    endpoints:
+      - { host: gitlab-static.net, port: 443, protocol: rest, access: read-write, enforcement: enforce }
+      - { host: "**.gitlab-static.net", port: 443, protocol: rest, access: read-write, enforcement: enforce }
+    binaries:
+      - path: "/**"
+
+  # SSH egress for all executables on the standard Git ports. The sandbox has
+  # no SSH agent socket or key; policy access alone does not authenticate push.
+  git_ssh:
+    name: github-gitlab-ssh
+    endpoints:
+      - { host: github.com, port: 22 }
+      - { host: gitlab.com, port: 22 }
+    binaries:
+      - path: "/**"
+
+  # Slice 2 kernel bootstrap: prime-agent's Python REPL needs uv and a
+  # managed Python 3.11. Keep original curl/uv scope on astral.sh and Python
+  # package hosts. GitHub release/object hosts are additionally reachable by
+  # all executables through the public GitHub content rule above.
   kernel_bootstrap:
     name: kernel-bootstrap-uv-python
-    # github.com + api.github.com are here as L4 for the uv python-build-standalone
-    # download (uv fetches https://github.com/astral-sh/python-build-standalone/releases/...).
-    # They are keyed to curl/uv (download tooling), which NEVER carries the github credential:
-    # the credentialed github access for git clone/push is the SEPARATE github_brain rule keyed
-    # to /usr/bin/git only. OpenShell keys credential injection per-binary, so uv/curl on
-    # github.com stay unauthenticated while git gets the L7 token swap.
     endpoints:
       - { host: astral.sh, port: 443 }
       - { host: objects.githubusercontent.com, port: 443 }

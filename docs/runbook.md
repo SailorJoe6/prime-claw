@@ -163,11 +163,25 @@ and the public cache, not just a daemon catalog probe. Catalog visibility still
 is not proof that every listed model is executable for this ChatGPT account.
 Never copy host OAuth tokens or broaden credentialed routes to fix catalog access.
 
-Public `gitlab.com` and its first-party subdomains are open over HTTPS for all
-sandbox executables without an attached credential. Private GitLab installations
-need their exact hostnames. GitHub has an existing credentialed Git push route:
-new all-binary GitHub reach must be checked against its credential boundary,
-not inferred from the unauthenticated catalog or GitLab rules.
+Public `gitlab.com` and its first-party subdomains, `github.com`, `api.github.com`,
+GitHub subdomains and public GitHub content hosts, and `ghcr.io` are open over
+HTTPS for every sandbox executable. The GitHub code/API rule remains inspected
+REST on the credential-provider-covered hosts: only a gateway placeholder is
+exchanged for a real credential, which never resides on sandbox disk. GitLab
+has no attached credential. Private GitLab installations need their exact hostnames.
+
+Port 22 is allowed for all binaries to `github.com` and `gitlab.com`, and a
+proxy CONNECT received `200` for each. Direct `ssh-keyscan` did **not** resolve
+these hosts inside the sandbox; OpenShell's HTTP proxy resolves HTTPS and
+CONNECT targets. A bounded SSH probe through `nc -X connect -x` reached both
+servers and returned `Permission denied (publickey)`: the sandbox has no SSH
+agent socket or key. SSH remotes need a ProxyCommand that tunnels via the
+sandbox HTTPS proxy, a verified host-key trust source, and a separately approved
+credential-isolated SSH identity. Do not use the probe's disabled host-key
+check for normal Git operations or copy host SSH credentials into the sandbox.
+HTTPS Git reads work; authenticated SSH pull/push remains unproven. The approved `gitlab-static.net` HTTPS policy is installed, but
+that hostname and an asset subdomain did not resolve during validation; asset
+reachability is unproven until a real GitLab asset hostname is identified.
 
 `rg` is an optional Prime Agent search helper. The runtime image installs
 Ubuntu's `ripgrep` package and checks `/usr/bin/rg` during its build. A previously

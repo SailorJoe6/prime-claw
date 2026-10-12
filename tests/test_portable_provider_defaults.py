@@ -114,6 +114,31 @@ def test_public_gitlab_policy_covers_apex_subdomains_and_all_binaries(tmp_path):
     assert rule["binaries"] == [{"path": "/**"}]
 
 
+def test_git_platform_policy_uses_all_binary_reach_without_uninspected_credentials(tmp_path):
+    import yaml
+    policy_text, _ = pc._render_effective_runtime_policy(hermetic_cfg(tmp_path))
+    rules = yaml.safe_load(policy_text)["network_policies"]
+    for name in ("github_brain", "github_first_party_https", "github_public_content",
+                 "github_container_registry", "public_gitlab", "gitlab_public_assets", "git_ssh"):
+        assert rules[name]["binaries"] == [{"path": "/**"}]
+    assert {e["host"] for e in rules["github_brain"]["endpoints"]} == {
+        "github.com", "api.github.com"}
+    assert all(e["protocol"] == "rest" and e["access"] == "read-write"
+               and not e.get("allow_uninspected_credentials", False)
+               for e in rules["github_brain"]["endpoints"])
+    assert rules["github_first_party_https"]["endpoints"] == [{
+        "host": "**.github.com", "port": 443, "protocol": "rest", "access": "read-write"}]
+    assert rules["github_public_content"]["endpoints"] == [{
+        "host": "**.githubusercontent.com", "port": 443}]
+    assert rules["github_container_registry"]["endpoints"][0]["host"] == "ghcr.io"
+    assert {e["host"] for e in rules["gitlab_public_assets"]["endpoints"]} == {
+        "gitlab-static.net", "**.gitlab-static.net"}
+    assert rules["git_ssh"]["endpoints"] == [
+        {"host": "github.com", "port": 22}, {"host": "gitlab.com", "port": 22}]
+    assert rules["kernel_bootstrap"]["binaries"] == [
+        {"path": "/usr/bin/curl"}, {"path": "/usr/local/bin/uv"}]
+
+
 def test_valid_host_codex_overrides_inference_only(tmp_path):
     cfg = codex_host_pair(tmp_path, hermetic_cfg(tmp_path))
     profiles = pc._resolve_runtime_profiles(cfg)
