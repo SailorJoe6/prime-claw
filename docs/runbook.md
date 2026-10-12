@@ -17,12 +17,14 @@ the verb.
 From a terminal, run `bin/prime-claw connect`. It reads the configured gateway,
 workspace, and sandbox name (including overrides in ignored
 `.prime-claw/runtime.local.json`), checks the exact sandbox is `Ready`, then
-attaches with inherited terminal input/output. `bin/prime-claw --dry-run connect`
-checks the target without attaching. The wrapper names the target explicitly
+runs a new login shell via `openshell sandbox exec` with the configured
+scope and `--tty -- /bin/bash -l`, inheriting terminal input/output.
+`bin/prime-claw --dry-run connect` checks the target and prints
+the exact command without attaching. The wrapper names the target explicitly
 instead of selecting OpenShell's last-used sandbox. It performs no create,
-converge, validate, or provider refresh step. OpenShell connect may still record
-its own last-used or session metadata. A `Ready` phase does not prove the agent
-or database is healthy.
+converge, validate, or provider refresh step. OpenShell may still record its
+own session metadata. A `Ready` phase does not prove the agent or database is
+healthy.
 
 ## Golden rule
 

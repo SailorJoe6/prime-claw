@@ -161,16 +161,18 @@ def cmd_connect(cfg, args) -> int:
               file=sys.stderr)
         return 1
 
-    cmd = [OPENSHELL, *scope, "sandbox", "connect", name]
+    # The proven interactive path starts a login shell; `sandbox connect`
+    # attaches to the sandbox main process and can wait without a shell prompt.
+    cmd = [OPENSHELL, "sandbox", "exec", *scope, "-n", name,
+           "--tty", "--", "/bin/bash", "-l"]
     if args.dry_run:
-        print(f"dry_run: would attach to Ready sandbox {name!r} "
-              f"(gateway={scope[1]!r}, workspace={scope[3]!r})")
+        print(f"dry_run: would run: {shlex.join(cmd)}")
         return 0
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         print("error: connect: interactive stdin and stdout TTY required", file=sys.stderr)
         return 1
     try:
-        # No capture, shell, timeout, or --no-tty: OpenShell owns the terminal.
+        # No capture, shell, or timeout: OpenShell owns the interactive TTY.
         return subprocess.run(cmd, check=False).returncode
     except FileNotFoundError:
         print(f"error: connect: executable not found: {OPENSHELL}", file=sys.stderr)

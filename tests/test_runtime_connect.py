@@ -67,8 +67,9 @@ def test_connect_inherits_stdio_and_preserves_exact_exit(monkeypatch):
     assert calls == [
         ("get", ["-g", "explicit-gw", "--workspace", "explicit-ws",
                  "sandbox", "get", "explicit-sb"]),
-        ("connect", ["/fake/openshell", "-g", "explicit-gw", "--workspace",
-                     "explicit-ws", "sandbox", "connect", "explicit-sb"],
+        ("connect", ["/fake/openshell", "sandbox", "exec", "-g", "explicit-gw",
+                     "--workspace", "explicit-ws", "-n", "explicit-sb",
+                     "--tty", "--", "/bin/bash", "-l"],
          {"check": False})]
 
 
@@ -99,7 +100,9 @@ def test_dry_run_does_not_connect_even_without_tty(monkeypatch, capsys):
     monkeypatch.setattr(pc.subprocess, "run", lambda *a, **kw: pytest.fail("unexpected connect"))
     monkeypatch.setattr(pc.sys, "stdin", SimpleNamespace(isatty=lambda: False))
     assert pc.cmd_connect(config(), SimpleNamespace(dry_run=True)) == 0
-    assert "dry_run: would attach" in capsys.readouterr().out
+    assert ("dry_run: would run: openshell sandbox exec -g explicit-gw "
+            "--workspace explicit-ws -n explicit-sb --tty -- /bin/bash -l"
+            in capsys.readouterr().out)
 
 
 def test_interactive_requires_tty(monkeypatch):
