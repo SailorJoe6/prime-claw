@@ -347,7 +347,8 @@ def _build_inputs_fingerprint(cfg) -> str:
     h.update(f"prime-agent-required:{_required_prime_agent_version(cfg)}".encode())
     for value in (PRIME_AGENT_SOURCE_TAG, PRIME_AGENT_SOURCE_TAG_OBJECT,
                   PRIME_AGENT_SOURCE_COMMIT, PRIME_AGENT_SOURCE_TREE,
-                  PRIME_AGENT_SOURCE_LOCK_SHA256):
+                  PRIME_AGENT_SOURCE_LOCK_SHA256, BACKLOG_VERSION,
+                  BACKLOG_COMMIT):
         h.update(value.encode())
     return h.hexdigest()
 
@@ -359,6 +360,17 @@ def _stamp_path() -> str:
 def _docker_image_exists(tag: str) -> bool:
     code, _ = run([DOCKER, "image", "inspect", tag], timeout=30)
     return code == 0
+
+
+def _backlog_source_identity() -> tuple[bool, str]:
+    source = os.path.join(REPO_ROOT, "deps", "backlog")
+    code, commit = run(["git", "-C", source, "rev-parse", "HEAD"])
+    if code != 0 or commit.strip() != BACKLOG_COMMIT:
+        return False, f"expected {BACKLOG_COMMIT}, found {commit.strip() or 'unavailable'}"
+    code, tag = run(["git", "-C", source, "describe", "--tags", "--exact-match"])
+    if code != 0 or tag.strip() != "v" + BACKLOG_VERSION:
+        return False, f"expected tag v{BACKLOG_VERSION}, found {tag.strip() or 'unavailable'}"
+    return True, f"v{BACKLOG_VERSION} at {BACKLOG_COMMIT}"
 
 
 def cmd_build(cfg, args) -> int:
@@ -377,7 +389,7 @@ def cmd_build(cfg, args) -> int:
     if args.dry_run:
         man = stage_gbrain_context(zsrc, ctx, dry_run=True)
         print(f"dry_run: would stage gbrain context from {zsrc} (source={gsource}, templates={man['templates']})")
-        print(f"dry_run: would run: {DOCKER} build --build-arg PRIME_AGENT_REQUIRED_VERSION={required_prime_agent} -f {df} -t {tag} {os.path.join(REPO_ROOT,'docker')}")
+        print(f"dry_run: would run: {DOCKER} build --build-context backlog_source={os.path.join(REPO_ROOT, 'deps', 'backlog')} --build-arg PRIME_AGENT_REQUIRED_VERSION={required_prime_agent} --build-arg BACKLOG_VERSION={BACKLOG_VERSION} --build-arg BACKLOG_COMMIT={BACKLOG_COMMIT} -f {df} -t {tag} {os.path.join(REPO_ROOT,'docker')}")
         print("host_credential_access: prohibited")
         return 0
 
@@ -394,6 +406,11 @@ def cmd_build(cfg, args) -> int:
         print(f"build: image {tag} up to date (inputs unchanged); skipping. Use --force to rebuild.")
         return 0
 
+    backlog_ok, backlog_detail = _backlog_source_identity()
+    if not backlog_ok:
+        print(f"error: Backlog.md submodule identity mismatch: {backlog_detail}", file=sys.stderr)
+        return 1
+
     print(f"[1/2] staging gbrain build context from {zsrc} (source={gsource}) ...")
     try:
         man = stage_gbrain_context(zsrc, ctx, dry_run=False)
@@ -403,8 +420,11 @@ def cmd_build(cfg, args) -> int:
     print(f"      templates: {man['templates']}")
 
     print(f"[2/2] building image {tag} ...")
-    code = subprocess.call([DOCKER, "build", "--build-arg",
-                            f"PRIME_AGENT_REQUIRED_VERSION={required_prime_agent}",
+    code = subprocess.call([DOCKER, "build", "--build-context",
+                            f"backlog_source={os.path.join(REPO_ROOT, 'deps', 'backlog')}",
+                            "--build-arg", f"PRIME_AGENT_REQUIRED_VERSION={required_prime_agent}",
+                            "--build-arg", f"BACKLOG_VERSION={BACKLOG_VERSION}",
+                            "--build-arg", f"BACKLOG_COMMIT={BACKLOG_COMMIT}",
                             "-f", df, "-t", tag, os.path.join(REPO_ROOT, "docker")])
     if code != 0:
         print(f"error: docker build failed (exit {code})", file=sys.stderr)
@@ -416,6 +436,8 @@ def cmd_build(cfg, args) -> int:
                "prime_agent_source_commit": PRIME_AGENT_SOURCE_COMMIT,
                "prime_agent_source_tree": PRIME_AGENT_SOURCE_TREE,
                "prime_agent_source_lock_sha256": PRIME_AGENT_SOURCE_LOCK_SHA256,
+               "backlog_version": BACKLOG_VERSION,
+               "backlog_commit": BACKLOG_COMMIT,
                "templates": man["templates"],
                "built_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()},
               open(_stamp_path(), "w"), indent=2)
@@ -443,6 +465,8 @@ PRIME_AGENT_SOURCE_TAG_OBJECT = "8ca4d5c39b7c738f71b5c86422ea46394c3d0558"
 PRIME_AGENT_SOURCE_COMMIT = "a1faacd53ac4473a75de1d434afaf50945c2f647"
 PRIME_AGENT_SOURCE_TREE = "5301c70d9c9d74e474ccaf258fdd3c8de982c52f"
 PRIME_AGENT_SOURCE_LOCK_SHA256 = "3e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74"
+BACKLOG_VERSION = "1.53.0"
+BACKLOG_COMMIT = "fd20f71493fb4eda44b021aa89f257956f17fb71"
 
 
 def _prime_agent_source_gate_script() -> str:

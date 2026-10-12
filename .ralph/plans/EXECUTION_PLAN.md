@@ -30,6 +30,22 @@ alternative architecture, and newly imagined invariants do not change scope or
 block completion. Only a concrete material defect against the bead's accepted
 behavior requires repair.
 
+## Progress
+
+- **Slice 1 — complete (2026-10-12).** Created the long-lived
+  `SailorJoe6/Backlog.md` fork connected to `MrLesk/Backlog.md`, resolved the
+  bounded latest stable release as `v1.53.0`, and pinned `deps/backlog` to
+  `fd20f71493fb4eda44b021aa89f257956f17fb71`. The host artifact passed
+  upstream's `scripts/smoke-compiled-build.ts`. `bin/prime-claw build --force`
+  completed after Docker Desktop recovery; the Linux arm64 artifact passed the
+  same upstream smoke during that build, and the published runtime image
+  returned `1.53.0` from `/usr/local/bin/backlog --version`. Focused tests
+  passed (`37 passed`), and the host-safe suite passed (`607 passed, 1 skipped,
+  65 deselected, 75 subtests`). Build and provenance usage are documented in
+  `docs/backlog.md`.
+- **Next:** Slice 2 — initialize Backlog.md with the accepted configuration and
+  migrate the complete issue inventory through direct supported CLI calls.
+
 ## Operator-controlled completion
 
 After the operator authorizes merge and activation, the migrated epic is closed

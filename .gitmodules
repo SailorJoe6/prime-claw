@@ -1,0 +1,3 @@
+[submodule "deps/backlog"]
+	path = deps/backlog
+	url = https://github.com/SailorJoe6/Backlog.md.git

@@ -49,6 +49,9 @@ def test_runtime_dockerfile_exists_and_is_runtime():
     body = open(df).read()
     assert "runtime.Dockerfile" in body
     assert "COPY runtime/gbrain /opt/gbrain" in body
+    assert "COPY --from=backlog_source . /opt/backlog" in body
+    assert 'BACKLOG_BUILD_TARGET="$TARGET"' in body
+    assert "bun scripts/smoke-compiled-build.ts /usr/local/bin/backlog" in body
     assert "postgresql-16-pgvector" in body
     assert "bun build --compile" in body
     assert "USER sandbox" in body
@@ -135,6 +138,11 @@ def test_stage_dry_run_stages_nothing(tmp_path):
 
 # --- fingerprint / idempotency -------------------------------------------------
 
+def test_backlog_source_identity_matches_pin():
+    ok, detail = pc._backlog_source_identity()
+    assert ok, detail
+
+
 def test_fingerprint_changes_with_dockerfile(tmp_path, monkeypatch):
     monkeypatch.setenv("PRIME_CLAW_ZBRAIN_SRC", str(make_zbrain(tmp_path)))
     monkeypatch.setattr(pc, "REPO_ROOT", str(tmp_path))
@@ -168,6 +176,7 @@ def test_build_runs_when_stale_or_forced(tmp_path, monkeypatch):
     os.makedirs(os.path.join(tmp_path, "docker"), exist_ok=True)
     open(os.path.join(tmp_path, "docker", "runtime.Dockerfile"), "w").write("FROM a\n")
     monkeypatch.setattr(pc, "_docker_image_exists", lambda tag: True)  # image exists but no stamp -> stale
+    monkeypatch.setattr(pc, "_backlog_source_identity", lambda: (True, "test pin"))
     calls = {}
     def fake_call(cmd):
         calls["cmd"] = cmd
@@ -179,6 +188,9 @@ def test_build_runs_when_stale_or_forced(tmp_path, monkeypatch):
     assert cmd[0:2] == [pc.DOCKER, "build"]
     assert "-t" in cmd and "prime-claw-brain:0.1.0" in cmd
     assert cmd[cmd.index("--build-arg") + 1] == "PRIME_AGENT_REQUIRED_VERSION=0.9.8"
+    assert f"backlog_source={tmp_path / 'deps' / 'backlog'}" in cmd
+    assert f"BACKLOG_VERSION={pc.BACKLOG_VERSION}" in cmd
+    assert f"BACKLOG_COMMIT={pc.BACKLOG_COMMIT}" in cmd
     # stamp recorded
     stamp = json.load(open(os.path.join(tmp_path, "docker", "runtime", ".build-stamp.json")))
     assert stamp["image"] == "prime-claw-brain:0.1.0" and "inputs_sha256" in stamp
@@ -188,6 +200,8 @@ def test_build_runs_when_stale_or_forced(tmp_path, monkeypatch):
     assert stamp["prime_agent_source_commit"] == pc.PRIME_AGENT_SOURCE_COMMIT
     assert stamp["prime_agent_source_tree"] == pc.PRIME_AGENT_SOURCE_TREE
     assert stamp["prime_agent_source_lock_sha256"] == pc.PRIME_AGENT_SOURCE_LOCK_SHA256
+    assert stamp["backlog_version"] == pc.BACKLOG_VERSION
+    assert stamp["backlog_commit"] == pc.BACKLOG_COMMIT
 
 
 def test_build_dry_run_no_side_effects(tmp_path, monkeypatch, capsys):

@@ -68,6 +68,23 @@ RUN curl -fsSL https://bun.sh/install | bash \
     && ln -sf /usr/local/bun/bin/bun /usr/local/bin/bun \
     && ln -sf /usr/local/bun/bin/bunx /usr/local/bin/bunx
 
+# --- Backlog.md: compile the exact vendored fork revision for this image ---
+ARG BACKLOG_VERSION=1.53.0
+ARG BACKLOG_COMMIT=fd20f71493fb4eda44b021aa89f257956f17fb71
+LABEL org.prime-claw.backlog-version="${BACKLOG_VERSION}" \
+      org.prime-claw.backlog-commit="${BACKLOG_COMMIT}"
+COPY --from=backlog_source . /opt/backlog
+WORKDIR /opt/backlog
+RUN test -f package.json && test -f bun.lock && test -f scripts/smoke-compiled-build.ts \
+    && rm -rf node_modules dist \
+    && HUSKY=0 bun install --frozen-lockfile \
+    && TARGET=$(case $(uname -m) in aarch64|arm64) echo "bun-linux-arm64";; *) echo "bun-linux-x64";; esac) \
+    && BACKLOG_BUILD_VERSION="$BACKLOG_VERSION" \
+       BACKLOG_BUILD_TARGET="$TARGET" \
+       BACKLOG_BUILD_OUTFILE=/usr/local/bin/backlog bun run build \
+    && bun scripts/smoke-compiled-build.ts /usr/local/bin/backlog "$BACKLOG_VERSION" \
+    && rm -rf /opt/backlog
+
 # --- Immutable downstream Prime Agent TypeScript source + lockfile deps ---
 # This public clone is an upstream dependency input, not a source patch/vendor
 # tree. Do not take code, node_modules, dist, or credentials from the host.
