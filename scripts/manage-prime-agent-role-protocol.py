@@ -92,6 +92,10 @@ def aliases(a: tuple[bytes,os.stat_result]|None,b: tuple[bytes,os.stat_result]|N
     return bool(a and b and (a[1].st_dev,a[1].st_ino)==(b[1].st_dev,b[1].st_ino))
 
 
+def one_link_case_alias(selected: str,name: str,a: tuple[bytes,os.stat_result]|None,b: tuple[bytes,os.stat_result]|None) -> bool:
+    return bool(aliases(a,b) and selected.casefold()==name.casefold() and a and b and a[1].st_nlink==b[1].st_nlink==1)
+
+
 def load_state(path: Path) -> tuple[dict[str,Any]|None,bytes|None,os.stat_result|None]:
     loaded=lstat_regular(path,"role ownership state")
     if loaded is None: return None,None,None
@@ -131,6 +135,7 @@ def inspect(root: Path,kernel: bytes) -> dict[str,Any]:
     selected_range=managed_range(selected_data,KERNEL_START,KERNEL_END,"selected global context")
     for name,loaded in found.items():
         if loaded is None or name==selected: continue
+        if one_link_case_alias(selected,name,loaded,chosen): continue
         if aliases(loaded,chosen): raise ValueError(f"hard-linked global context aliases are unsupported: {selected}, {name}")
         if managed_range(loaded[0],KERNEL_START,KERNEL_END,f"global context candidate {name}") is not None:
             raise ValueError(f"unselected global context contains a role kernel: {name}")
