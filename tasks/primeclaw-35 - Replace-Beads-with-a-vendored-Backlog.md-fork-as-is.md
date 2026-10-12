@@ -1,9 +1,11 @@
 ---
 id: PRIMECLAW-35
 title: Replace Beads with a vendored Backlog.md fork as-is
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - Joe Landers
 created_date: '2026-10-12 01:01'
+updated_date: '2026-10-12 01:24'
 labels:
   - backlog-md
   - migration
@@ -62,7 +64,7 @@ This effort is an integration and migration, not a new tracker design. It covers
 - Replacing, collapsing, or redesigning Ralph specifications, plans, phase skills, or Episode lifecycle.
 - Pre-designing prime-claw-specific Backlog.md extensions.
 - Severing the upstream relationship now.
-- Broad gstack/Ralph integration work (`prime-claw-r9h` remains separate).
+- Broad gstack/Ralph integration work (`PRIMECLAW-34` remains separate).
 
 ## Verified migration constraints
 - Backlog.md v1.53.0 accepts only letters in a configured task prefix. `prime-claw` is rejected with `Task prefix must contain only letters (a-z, A-Z).`
@@ -95,3 +97,13 @@ Treat upstream Backlog.md behavior as the initial product contract. Keep integra
 - [ ] #7 The isolated branch/worktree candidate proves a read-only Beads migration and one validated authority cutover; after merge and host CLI activation, the first real Backlog.md mutation on primary `main` adds the migrated epic's final summary, marks it `Done`, and is committed and pushed directly, completing this effort as dogfooding begins. Ordinary Git rejection/revert is sufficient recovery.
 - [ ] #8 Product changes to Backlog.md and Ralph-workflow replacement remain separate future decisions based on dogfood evidence.
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Ralph
+created: 2026-10-12 01:24
+---
+Slice 3 caller conversion is complete pending commit/push. Active instructions, project skills/workflows, managed templates, docs, and mutable navigational references now use native Backlog.md operations and PRIMECLAW IDs. Tracked repository-specific Beads data, hooks, merge rules, ignores, and Codex hook integration are removed. The required one-time cutover inventory scanned 510 tracked/nonignored files and added no persistent crosswalk, allowlist, or absence test. Validation: focused 12 passed / 3 deselected; full host-safe 612 passed / 66 skipped / 75 subtests; exact Docker-only plugin probe passed with offline checks, teardown, and manifest publication using the verified Prime Agent source identity. The standard initialized-worktree Tier 1 launcher currently rejects the deps/backlog gitlink directory during repository snapshotting; the plugin-only probe used a disposable non-recursive clone with that empty gitlink path absent. Final initialized-worktree gate repair/clearance, complete candidate validation, host activation, and task closure remain Slice 4 or post-merge work as already ordered.
+---
+<!-- COMMENTS:END -->
