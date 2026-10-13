@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 20:23'
+updated_date: '2026-10-13 20:36'
 labels:
   - backlog-md
   - episode-loop
@@ -653,4 +653,12 @@ Use `6d11d9c2797cea54ecd07171e8a5b2019d6ee530` as the exact frozen pre-cutover p
 Use no committed migration script, journal, wrapper, dual-write layer, or alternate tracker. A bounded temporary helper may only issue supported CLI operations. Add or repair representative migration validation, independently review, commit, push, and report exact mapping, counts, and provenance.
 
 This migration slice stops before compatibility retirement and cutover. Do not retire production/version-1 assets, delete or move any tracked `.ralph/plans` source, disable retained folder compatibility, perform final cutover, change this task's lifecycle status, or claim terminal acceptance. The plan's final plan-tree deletion and plan-absence/cutover assertions remain deferred until separately authorized.
+
+### Migration execution blocker — completed-record mutation has no supported CLI path
+
+At clean checkpoint `5ca6d463efa5433192e3bc7a17894a60293f4738`, preflight inventoried all 43 tracked `.ralph/plans` files at frozen tree `6d11d9c2797cea54ecd07171e8a5b2019d6ee530` and reconciled 16 present bundle owners: nine existing tasks and seven new epics. The `replace-beads` row is a no-op because neither candidate source path exists; `PRIMECLAW-35` remains unchanged.
+
+Execution stopped before any migration mutation remained. Seven required reused owners — `PRIMECLAW-6`, `PRIMECLAW-10.15`, `PRIMECLAW-10.26`, `PRIMECLAW-10.28`, `PRIMECLAW-19`, `PRIMECLAW-20`, and `PRIMECLAW-10.34` — already live under `backlog/completed/`. `backlog task view --json` resolves them, but supported `backlog task edit` returns `Task not found` because edits resolve only the active corpus. The repository-built Backlog implementation explicitly says a completed record cannot pass through `updateTask`; its diagnostics recommend direct file editing for completed records. Direct task-Markdown edits are forbidden by repository policy and contradict this migration's CLI-only contract. `task demote` assigns a new draft ID and would violate immutable task identity.
+
+A temporary create attempt for the seven new epics was fully rolled back before this blocker record. No existing task, status, parent, config, bundle, asset, or source plan changed. Unblock requires one explicit operator decision: authorize exact direct edits of only those seven completed records, authorize a separately scoped supported Backlog capability for completed-record edits, or revise the mapping so those completed IDs need no field/type import. Do not continue migration, infer an exception, move/delete plans, or change this task's lifecycle status before that decision.
 <!-- SECTION:NOTES:END -->

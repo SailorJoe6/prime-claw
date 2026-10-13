@@ -1219,6 +1219,39 @@ cutover, change `PRIMECLAW-10.38` lifecycle status, or claim terminal
 acceptance. Accordingly, step 5's final plan-tree deletion and step 6's
 plan-absence/cutover assertions remain deferred until separately authorized.
 
+#### Migration execution blocker — completed-record mutation has no supported CLI path
+
+The bounded migration preflight at clean checkpoint
+`5ca6d463efa5433192e3bc7a17894a60293f4738` inventoried all 43 tracked
+`.ralph/plans` files at frozen tree
+`6d11d9c2797cea54ecd07171e8a5b2019d6ee530` and reconciled 16 present
+bundle owners: nine existing tasks and seven new epics. The reviewed
+`replace-beads` mapping is a no-op because neither candidate source path exists
+in the frozen tree; `PRIMECLAW-35` must remain unchanged.
+
+Execution stopped before any migration mutation remained. Seven required reused
+owners — `PRIMECLAW-6`, `PRIMECLAW-10.15`, `PRIMECLAW-10.26`,
+`PRIMECLAW-10.28`, `PRIMECLAW-19`, `PRIMECLAW-20`, and
+`PRIMECLAW-10.34` — already live under `backlog/completed/`. Supported
+`backlog task view --json` resolves them, but the supported `backlog task edit`
+interface returns `Task not found` because edits resolve only the active corpus.
+The repository-built Backlog implementation explicitly states that a completed
+record cannot pass through `updateTask`, and its diagnostics recommend direct
+file editing for completed records. Direct task-Markdown edits are forbidden by
+this repository and contradict this migration's CLI-only contract. `task
+demote` is not a valid escape hatch because it assigns a new draft ID and would
+violate immutable task identity.
+
+A temporary create attempt for the seven new epics was fully rolled back; the
+working tree returned clean before this blocker record. No existing task,
+status, parent, config, bundle, asset, or source plan was changed. The unblock
+condition is one explicit operator decision that revises the approved mechanism:
+either authorize exact direct edits of only those seven completed records,
+authorize a separately scoped supported Backlog capability for completed-record
+edits, or revise the mapping so those completed IDs need no field/type import.
+Do not continue the migration, infer an exception, move/delete plan files, or
+change `PRIMECLAW-10.38` lifecycle status before that decision.
+
 ### 5. Perform the one-time task and bundle migration through Backlog CLI
 
 Freeze the committed Episode base SHA as the pre-cutover provenance commit and
