@@ -900,6 +900,29 @@ production asset retirement, `.ralph/plans` deletion, or final cutover. Existing
 IDs, parents, status, ownership/resources, operator authority, and acceptance
 evidence remain unchanged.
 
+#### Accepted revision — correct Episode edit scope and lifecycle-receipt
+ownership
+
+The operator accepted candidate
+`d8507d7dd1a5d2d31354aaeecf6c5bffbbba0575` subject to exactly two bounded
+documentation repairs. First, `docs/future-specification-bundles.md` must not say
+a task-native Episode edits only bound-task content: it implements approved
+code, documentation, and tests in its worktree, exclusively owns the bound
+task's content there, and leaves lifecycle status to the Conversation. Second,
+`docs/conversation-driven-episode-oversight.md` must not place task-native
+lifecycle receipts inside strict version-2 ownership: durable ownership stores
+identity and resource bindings, while `finalize_task_episode` actions return
+exact lifecycle receipts that the owning Conversation retains for later outcomes
+and retries. Add focused static assertions for both distinctions.
+
+Revise only those two claims and focused tests, then validate, independently
+rereview, commit, push, report, and stop. Preserve every other accepted
+activation-truth, retained version-1 compatibility, replay/recovery,
+terminal-authority, cleanup, exclusion, task identity/parent/status/acceptance,
+and no-unrelated-scope boundary. Do not begin no-`To Do` guidance migration,
+proof normalization, task/bundle migration, production retirement,
+`.ralph/plans` deletion, or final cutover.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and
