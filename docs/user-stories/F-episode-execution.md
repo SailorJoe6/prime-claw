@@ -31,11 +31,18 @@ do not become scope, and status-only churn is not progress.
 project artifacts, so that the next actor does not depend on transcript memory.**
 
 In task-native mode, blocked work records the exact blocker, attempts, evidence,
-and unblock condition in the bound task's Implementation Notes, reports through
-the existing Episode-to-Conversation channel, and stops without changing
-status. Completed candidate work records its plan, notes, acceptance evidence,
-references, and Final Summary while leaving status unchanged for Conversation
-review.
+and unblock condition in the bound task's Implementation Notes, commits and
+pushes that Episode branch while status remains `In Progress`, reports through
+the existing Episode-to-Conversation channel, and stops. The staged
+Conversation seam verifies the exact owner, active ownership, canonical primary
+`main`, committed main task bytes, exact pushed Episode head, post-admission task
+evidence, and unchanged Episode status before committing only main's task path
+as `Blocked`. A later accepted unblock commits only that main task path back to
+`In Progress`; the existing exact handoff then resumes the same worktree and
+session without admission or resource creation. Main push failure is returned as
+evidence but does not invalidate a successful local status commit. Completed
+candidate work records its plan, notes, acceptance evidence, references, and
+Final Summary while leaving status unchanged for Conversation review.
 
 Retained folder mode continues to move blocked plan documents, update related
 Backlog.md tasks, and archive completed plan bundles until final cutover.

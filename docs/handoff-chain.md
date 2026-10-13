@@ -55,8 +55,17 @@ allowed; uncommitted task bytes cannot spoof a resumed lifecycle status.
 
 The task-native handoff policy reloads that same task in the Episode worktree,
 keeps lifecycle status Conversation-owned, and permits only supported task
-content updates followed by a committed and pushed checkpoint. A task still
-`Blocked` on main cannot resume. `Ready for Merge` integration remains a later
+content updates followed by a committed and pushed checkpoint. An internal
+status seam binds an accepted report to the exact pushed Episode head and proves
+that the Episode task path has committed post-admission evidence while its
+status remains `In Progress`. Only the exact owning top-level Conversation in
+canonical primary `main` may commit the clean exact main task path as `Blocked`
+and later back to `In Progress`; unrelated main dirt is allowed and each push is
+best-effort evidence after the local commit. No Episode-owned bytes cross
+checkouts. A task still `Blocked` on main cannot hand off. After the resumed
+status commit, ordinary handoff revalidates main `HEAD` and continues the same
+ownership, worktree, and session without creating or assigning anything.
+`Ready for Merge` integration remains a later
 review-handshake increment rather than being smuggled through this ordinary
 `In Progress` continuation seam. No public task-native handoff tool is
 registered yet.

@@ -8,7 +8,8 @@ import test from "node:test";
 import {
   CliGitAdapter, CliOrcaAdapter, EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
   allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
-  handoffTaskEpisode,
+  handoffTaskEpisode, publishTaskEpisodeBlocked, publishTaskEpisodeResumed,
+  resolveBlockedWorkflowAuthority,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
@@ -324,6 +325,149 @@ test("task-native handoff continues the exact idle Episode with task-bound hando
   assert.match(call[2], /EXECUTE POLICY/);
   assert.doesNotMatch(call[2], /resume the accepted in-scope revision/);
   assert.equal(f.calls.some((value) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(value[0])), false);
+});
+
+function taskLifecycleHarness(options = {}) {
+  const f = harness({ list: (_count, session) => [session] });
+  f.ownership.write(f.root, activeTaskRecord(f));
+  f.calls.length = 0;
+  let mainStatus = options.mainStatus ?? "In Progress";
+  let mainHead = "1".repeat(40);
+  let pushCount = 0;
+  const episodeHead = options.episodeHead ?? "b".repeat(40);
+  const runner = {
+    run(command, args, runOptions = {}) {
+      if (command === "backlog") {
+        const statusIndex = args.indexOf("--status");
+        assert.notEqual(statusIndex, -1);
+        mainStatus = args[statusIndex + 1];
+        f.calls.push(["backlog-status", mainStatus]);
+        return { stdout: "", stderr: "", status: 0 };
+      }
+      try {
+        const stdout = execFileSync(command, args, { cwd: runOptions.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+        return { stdout, stderr: "", status: 0 };
+      } catch (error) {
+        if (!runOptions.allowFailure) throw error;
+        return { stdout: error.stdout?.toString() ?? "", stderr: error.stderr?.toString() ?? "", status: error.status ?? 1 };
+      }
+    },
+  };
+  const lifecycleGit = {
+    repositoryRoot: () => f.root,
+    branch: () => options.branch ?? "main",
+    head: (cwd) => cwd === f.worktree ? episodeHead : mainHead,
+    commitPaths: () => options.commitPaths ?? ["backlog/tasks/primeclaw-10.38.md"],
+    pathStatus: (cwd) => cwd === f.root ? (options.mainPathStatus ?? "") : (options.episodePathStatus ?? ""),
+    commitOnlyPath(_repo, path, message) {
+      f.calls.push(["status-commit", path, message]);
+      mainHead = mainHead === "1".repeat(40) ? "2".repeat(40) : "3".repeat(40);
+      return mainHead;
+    },
+    push() {
+      pushCount += 1;
+      f.calls.push(["status-push", pushCount]);
+      if (options.firstPushFails && pushCount === 1) throw new Error("offline");
+    },
+    upstreamHead: () => options.upstreamHead ?? episodeHead,
+    pathChangedBetween: () => options.pathChanged ?? true,
+  };
+  const taskResolver = (cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? mainStatus : (options.episodeStatus ?? "In Progress") });
+  return {
+    f, episodeHead, lifecycleGit, runner, taskResolver,
+    deps: { ...f.deps, lifecycleGit, lifecycleRunner: runner, taskResolver },
+    get mainStatus() { return mainStatus; },
+  };
+}
+
+test("blocked workflow authority routes owner Conversation to task mode and never falls back from version 2", () => {
+  const f = harness();
+  f.ownership.write(f.root, activeTaskRecord(f));
+  assert.deepEqual(
+    resolveBlockedWorkflowAuthority(undefined, f.ctx, f.deps),
+    {
+      mode: "task",
+      taskId: "PRIMECLAW-10.38",
+      taskPath: "backlog/tasks/primeclaw-10.38.md",
+      projectRoot: f.root,
+    },
+  );
+  assert.equal(resolveBlockedWorkflowAuthority("PRIMECLAW-10.38", f.ctx, f.deps).mode, "task");
+  assert.throws(
+    () => resolveBlockedWorkflowAuthority("OTHER-1", f.ctx, f.deps),
+    /does not match the exact owned Backlog task/,
+  );
+  const foreign = {
+    ...f.ctx,
+    sessionManager: { ...f.ctx.sessionManager, getSessionId: () => "foreign" },
+  };
+  assert.throws(
+    () => resolveBlockedWorkflowAuthority(undefined, foreign, f.deps),
+    /ownerSessionId/,
+  );
+  const episode = { ...f.ctx, cwd: f.worktree };
+  assert.throws(
+    () => resolveBlockedWorkflowAuthority("PRIMECLAW-10.38", episode, f.deps),
+    /repository root/,
+  );
+
+  const noTaskOwnership = harness();
+  assert.equal(resolveBlockedWorkflowAuthority(undefined, noTaskOwnership.ctx, noTaskOwnership.deps).mode, "folder");
+  assert.throws(
+    () => resolveBlockedWorkflowAuthority("PRIMECLAW-10.38", noTaskOwnership.ctx, noTaskOwnership.deps),
+    /requires active version-2 Episode ownership/,
+  );
+  const provisioning = harness({ record: taskReservation() });
+  assert.throws(
+    () => resolveBlockedWorkflowAuthority(undefined, provisioning.ctx, provisioning.deps),
+    /requires active ownership; found provisioning/,
+  );
+});
+
+test("Conversation publishes Blocked then resumes the same pushed task Episode before handoff", async () => {
+  const h = taskLifecycleHarness({ firstPushFails: true });
+  const blocked = publishTaskEpisodeBlocked("PRIMECLAW-10.38", h.episodeHead, h.f.ctx, h.deps);
+  assert.equal(blocked.status, "Blocked");
+  assert.match(blocked.pushError, /offline/);
+  assert.equal(h.mainStatus, "Blocked");
+  assert.deepEqual(h.f.calls.filter((call) => call[0] === "backlog-status").map((call) => call[1]), ["Blocked"]);
+  assert.equal(h.f.calls.filter((call) => call[0] === "ownership").length, 0);
+  assert.equal(h.f.calls.some((call) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(call[0])), false);
+
+  const resumed = publishTaskEpisodeResumed("PRIMECLAW-10.38", h.episodeHead, h.f.ctx, h.deps);
+  assert.equal(resumed.status, "In Progress");
+  assert.equal(resumed.pushError, undefined);
+  assert.equal(h.mainStatus, "In Progress");
+  assert.deepEqual(h.f.calls.filter((call) => call[0] === "status-commit").map((call) => call[1]), [
+    "backlog/tasks/primeclaw-10.38.md", "backlog/tasks/primeclaw-10.38.md",
+  ]);
+
+  const handoff = await handoffTaskEpisode(
+    "PRIMECLAW-10.38", "resume after accepted unblock", h.f.ctx,
+    { ...h.f.deps, taskResolver: h.taskResolver },
+  );
+  assert.equal(handoff.episodeId, "episode");
+  assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 1);
+  assert.equal(h.f.calls.some((call) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(call[0])), false);
+});
+
+test("task lifecycle publication fails closed before status mutation", async (t) => {
+  for (const scenario of [
+    { name: "uncommitted Episode task content", options: { episodePathStatus: " M backlog/tasks/primeclaw-10.38.md" }, pattern: /committed Episode task content/ },
+    { name: "reported Episode commit is not local HEAD", options: { episodeHead: "b".repeat(40), upstreamHead: "b".repeat(40) }, reported: "c".repeat(40), pattern: /exact reported Episode commit/ },
+    { name: "reported Episode commit is not pushed", options: { upstreamHead: "a".repeat(40) }, pattern: /upstream to contain/ },
+    { name: "Episode task has no post-admission evidence", options: { pathChanged: false }, pattern: /Episode-owned task evidence/ },
+    { name: "main task bytes are dirty", options: { mainPathStatus: " M backlog/tasks/primeclaw-10.38.md" }, pattern: /main task path to match committed HEAD/ },
+    { name: "Episode changed lifecycle status", options: { episodeStatus: "Blocked" }, pattern: /Episode task status In Progress/ },
+  ]) await t.test(scenario.name, () => {
+    const h = taskLifecycleHarness(scenario.options);
+    assert.throws(
+      () => publishTaskEpisodeBlocked("PRIMECLAW-10.38", scenario.reported ?? h.episodeHead, h.f.ctx, h.deps),
+      scenario.pattern,
+    );
+    assert.equal(h.mainStatus, "In Progress");
+    assert.equal(h.f.calls.some((call) => call[0] === "backlog-status" || call[0] === "status-commit"), false);
+  });
 });
 
 test("task-native handoff rejects dirty main task bytes before routing even when they claim In Progress", async () => {

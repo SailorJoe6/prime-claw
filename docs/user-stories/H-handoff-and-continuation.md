@@ -28,9 +28,16 @@ primary `main` checkout, exact owner/task/path, an exact main task path matching
 committed `HEAD` while unrelated main dirt remains allowed, `In Progress` on
 main and in the Episode, meaningful plans, a clean owned worktree, exact
 durable-session CWD, and a quiescent queue. It binds both handoff and execute prompts to the same
-`<operator-episode-task>` value. `Blocked` must first be resumed by the
-Conversation; `Ready for Merge` is reserved for the later constrained final
-integration handshake. No public task-native handoff surface is registered.
+`<operator-episode-task>` value. Before a blocked continuation, the internal
+Conversation lifecycle seam verifies an exact committed and pushed Episode
+report head with Episode-owned task evidence, commits main `In Progress →
+Blocked`, and later commits `Blocked → In Progress` after the unblock is
+accepted. Both status commits touch only the exact main task path; prompt push is
+best effort. The ordinary handoff then revalidates the committed resumed state
+and routes the same ownership, worktree, and session without admission or
+resource creation. `Ready for Merge` is reserved for the later constrained
+final integration handshake. No public task-native lifecycle or handoff surface
+is registered.
 
 Neither path is used for consultation, pause, merge, abandonment, cleanup,
 another Episode, or scope expansion.

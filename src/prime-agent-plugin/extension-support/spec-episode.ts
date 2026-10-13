@@ -211,6 +211,21 @@ export interface TaskEpisodeCreationDependencies extends EpisodeDependencies {
   reservationOperationId?: string;
   now?: () => string;
 }
+export interface TaskEpisodeLifecycleGit extends TaskEpisodeAdmissionGit {
+  upstreamHead(worktree: string): string;
+  pathChangedBetween(worktree: string, fromRef: string, toRef: string, path: string): boolean;
+}
+export interface TaskEpisodeLifecycleDependencies extends TaskEpisodeHandoffDependencies {
+  lifecycleGit?: TaskEpisodeLifecycleGit;
+  lifecycleRunner?: CommandRunner;
+}
+export type TaskEpisodeLifecycleResult = {
+  taskId: string;
+  status: "Blocked" | "In Progress";
+  commit: string;
+  episodeHead: string;
+  pushError?: string;
+};
 
 function runGit(cwd: string, args: string[]): string {
   return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -262,6 +277,11 @@ export class CliTaskEpisodeAdmissionGit implements TaskEpisodeAdmissionGit {
     return this.head(repo);
   }
   push(repo: string): void { runGit(repo, ["push"]); }
+  upstreamHead(worktree: string): string { return runGit(worktree, ["rev-parse", "@{upstream}"]); }
+  pathChangedBetween(worktree: string, fromRef: string, toRef: string, path: string): boolean {
+    const output = runGit(worktree, ["diff", "--name-only", `${fromRef}..${toRef}`, "--", path]);
+    return output.split(/\r?\n/).filter(Boolean).includes(path);
+  }
 }
 
 export function bundleContentDigest(folder: string, topNames?: string[]): string {
@@ -728,6 +748,66 @@ export class CliOrcaAdapter implements OrcaAdapter {
 function samePath(a: string | undefined, b: string): boolean {
   return typeof a === "string" && resolve(a) === resolve(b);
 }
+export type BlockedWorkflowAuthority =
+  | { mode: "task"; taskId: string; taskPath: string; projectRoot: string }
+  | { mode: "folder"; projectRoot: string };
+
+/**
+ * Select blocked-workflow authority before any skill follows folder fallback.
+ * A task tag is only a candidate binding; active version-2 ownership and its
+ * exact top-level owner remain authoritative.
+ */
+export function resolveBlockedWorkflowAuthority(
+  rawTaskId: string | undefined,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeHandoffDependencies = {},
+): BlockedWorkflowAuthority {
+  const git = dependencies.git ?? new CliGitAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
+  const projectRoot = git.repositoryRoot(ctx.cwd);
+  const requestedTaskId = rawTaskId?.trim();
+  if (requestedTaskId !== undefined
+    && (!requestedTaskId || /\s/.test(requestedTaskId) || requestedTaskId.startsWith("-"))) {
+    throw new Error("Blocked workflow requires a canonical Backlog task ID");
+  }
+  const record = store.read(projectRoot);
+  if (!record || isLegacyEpisodeOwnership(record)) {
+    if (requestedTaskId !== undefined) {
+      throw new Error("Task-bound blocked workflow requires active version-2 Episode ownership");
+    }
+    return { mode: "folder", projectRoot };
+  }
+  if (record.status !== "active") {
+    throw new Error(`Task-native blocked workflow requires active ownership; found ${record.status}`);
+  }
+  if (requestedTaskId !== undefined && record.taskId !== requestedTaskId) {
+    throw new Error("Task-bound blocked workflow does not match the exact owned Backlog task");
+  }
+  if (!samePath(projectRoot, realpathSync(ctx.cwd))) {
+    throw new Error("Task-native blocked workflow must run from the repository root");
+  }
+  const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
+  if (!samePath(project.root, projectRoot)
+    || project.kind === "linked-worktree"
+    || git.branch(projectRoot) !== "main") {
+    throw new Error("Task-native blocked workflow must run from the canonical primary main checkout");
+  }
+  if (!ctx.sessionManager.getSessionFile()) {
+    throw new Error("Task-native blocked workflow requires a persisted owner session");
+  }
+  if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
+    throw new Error("Task-native blocked workflow is available only from a top-level project Conversation");
+  }
+  exactOwnedTaskRecord(record, record.taskId, ctx.sessionManager.getSessionId());
+  return {
+    mode: "task",
+    taskId: record.taskId,
+    taskPath: record.taskPath,
+    projectRoot,
+  };
+}
+
 function sessionIsBusy(session: SessionSummary): boolean {
   return session.isSessionActive === true || session.isStreaming === true || session.isCompacting === true || (session.queuedCount ?? 0) > 0;
 }
@@ -1343,6 +1423,141 @@ function commitConversationTaskStatus(options: {
 function bestEffortTaskPush(git: TaskEpisodeAdmissionGit, projectRoot: string): string | undefined {
   try { git.push(projectRoot); return undefined; }
   catch (error) { return taskAdmissionError(error); }
+}
+
+type TaskEpisodeLifecycleTransition = {
+  expectedMainStatus: "In Progress" | "Blocked";
+  targetStatus: "Blocked" | "In Progress";
+  message: string;
+};
+
+function publishTaskEpisodeLifecycleStatus(
+  rawTaskId: string,
+  rawEpisodeHead: string,
+  ctx: ExtensionContext,
+  transition: TaskEpisodeLifecycleTransition,
+  dependencies: TaskEpisodeLifecycleDependencies = {},
+): TaskEpisodeLifecycleResult {
+  const git = dependencies.git ?? new CliGitAdapter();
+  const lifecycleGit = dependencies.lifecycleGit ?? new CliTaskEpisodeAdmissionGit();
+  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
+  const resolveTask = dependencies.taskResolver
+    ?? ((cwd: string, taskId: string) => resolveBacklogTask(cwd, taskId, runner));
+  const authority = resolveBlockedWorkflowAuthority(rawTaskId, ctx, {
+    git,
+    ownership: store,
+    taskRunner: runner,
+  });
+  if (authority.mode !== "task") {
+    throw new Error("Task-native lifecycle publication requires task-bound blocked-workflow authority");
+  }
+  const taskId = authority.taskId;
+  const projectRoot = authority.projectRoot;
+  const episodeHead = rawEpisodeHead.trim();
+  if (!/^[0-9a-f]{40,64}$/.test(episodeHead)) {
+    throw new Error("Task-native lifecycle publication requires the exact reported Episode commit");
+  }
+  if (!samePath(lifecycleGit.repositoryRoot(ctx.cwd), projectRoot)
+    || lifecycleGit.branch(projectRoot) !== "main") {
+    throw new Error("Task-native lifecycle publication status boundary does not match canonical primary main");
+  }
+  const record = store.read(projectRoot);
+  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
+  exactOwnedTaskRecord(record, taskId, ctx.sessionManager.getSessionId());
+  if (record.status !== "active") {
+    throw new Error(`Episode ownership is ${record.status}; inspect it before lifecycle publication`);
+  }
+  validateWorktreeRecord(record, git, filesystem, projectRoot);
+  git.assertCleanWorktree(record.worktree!);
+
+  const mainTask = exactAdmissionTask(
+    resolveTask(projectRoot, taskId), taskId, projectRoot, record.taskPath,
+  );
+  if (lifecycleGit.pathStatus(projectRoot, record.taskPath) !== "") {
+    throw new Error("Task-native lifecycle publication requires the exact main task path to match committed HEAD");
+  }
+  if (mainTask.status !== transition.expectedMainStatus) {
+    throw new Error(`Task-native lifecycle publication requires main task status ${transition.expectedMainStatus}; found ${mainTask.status}`);
+  }
+  if (!meaningfulTaskImplementationPlan(mainTask.implementationPlan)) {
+    throw new Error("Task-native lifecycle publication requires a meaningful main-task Implementation Plan");
+  }
+
+  const episodeTask = exactAdmissionTask(
+    resolveTask(record.worktree!, taskId), taskId, record.worktree!, record.taskPath,
+  );
+  if (episodeTask.status !== "In Progress") {
+    throw new Error(`Task-native lifecycle publication requires Episode task status In Progress; found ${episodeTask.status}`);
+  }
+  if (!meaningfulTaskImplementationPlan(episodeTask.implementationPlan)) {
+    throw new Error("Task-native lifecycle publication requires a meaningful Episode Implementation Plan");
+  }
+  if (lifecycleGit.pathStatus(record.worktree!, record.taskPath) !== "") {
+    throw new Error("Task-native lifecycle publication requires committed Episode task content");
+  }
+  if (lifecycleGit.head(record.worktree!) !== episodeHead) {
+    throw new Error("Task-native lifecycle publication does not match the exact reported Episode commit");
+  }
+  let upstreamHead: string;
+  try { upstreamHead = lifecycleGit.upstreamHead(record.worktree!); }
+  catch (error) {
+    throw new Error("Task-native lifecycle publication requires the reported Episode commit to be pushed upstream", { cause: error });
+  }
+  if (upstreamHead !== episodeHead) {
+    throw new Error("Task-native lifecycle publication requires upstream to contain the exact reported Episode commit");
+  }
+  if (!lifecycleGit.pathChangedBetween(record.worktree!, record.baseRef, episodeHead, record.taskPath)) {
+    throw new Error("Task-native Blocked publication requires committed Episode-owned task evidence after admission");
+  }
+
+  const published = commitConversationTaskStatus({
+    taskId,
+    projectRoot,
+    taskPath: record.taskPath,
+    status: transition.targetStatus,
+    message: transition.message,
+    runner,
+    git: lifecycleGit,
+    resolveTask,
+  });
+  const pushError = bestEffortTaskPush(lifecycleGit, projectRoot);
+  return {
+    taskId,
+    status: transition.targetStatus,
+    commit: published.commit,
+    episodeHead,
+    ...(pushError ? { pushError } : {}),
+  };
+}
+
+/** Publish an accepted blocker report without copying Episode-owned task content. */
+export function publishTaskEpisodeBlocked(
+  taskId: string,
+  episodeHead: string,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeLifecycleDependencies = {},
+): TaskEpisodeLifecycleResult {
+  return publishTaskEpisodeLifecycleStatus(taskId, episodeHead, ctx, {
+    expectedMainStatus: "In Progress",
+    targetStatus: "Blocked",
+    message: `chore: block ${taskId.trim()} episode`,
+  }, dependencies);
+}
+
+/** Publish an accepted unblock decision before continuing the same Episode. */
+export function publishTaskEpisodeResumed(
+  taskId: string,
+  episodeHead: string,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeLifecycleDependencies = {},
+): TaskEpisodeLifecycleResult {
+  return publishTaskEpisodeLifecycleStatus(taskId, episodeHead, ctx, {
+    expectedMainStatus: "Blocked",
+    targetStatus: "In Progress",
+    message: `chore: resume ${taskId.trim()} episode`,
+  }, dependencies);
 }
 
 /**

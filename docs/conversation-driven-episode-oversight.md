@@ -193,8 +193,27 @@ admits ordinary canonical handoff and queues canonical execute as its sole
 follow-up. Admission is not completion and uncertain transport is never
 retried blindly.
 
-Version-2 ownership now has an internal, deliberately unregistered
-`handoffTaskEpisode` transport seam for ordinary `In Progress` continuation.
+Version-2 ownership now has internal, deliberately unregistered Conversation
+status seams for ordinary blocker handling. `publishTaskEpisodeBlocked` and
+`publishTaskEpisodeResumed` run only for the exact top-level owner in canonical
+primary `main`, require active version-2 ownership and a clean owned worktree,
+and bind the accepted report to the exact local and upstream Episode head. The
+Episode task must remain `In Progress`, have a meaningful plan, and contain
+committed post-admission task evidence. Main must expose the expected committed
+status (`In Progress` before blocking, `Blocked` before resuming) with a clean
+exact task path; unrelated main dirt is allowed. Each transition uses Backlog,
+commits only that task path, and best-effort pushes. It never reads or copies
+Episode-owned content into main. Local commit success remains authoritative and
+a push failure is returned as evidence. The dual-mode blocked skill selects the durable ownership record before prompt
+text: active version-2 ownership forces task mode for the exact owner
+Conversation even without a task block, while an Episode or foreign owner fails
+closed and can never enter folder fallback. A task block is only a candidate
+binding that must match ownership. Task mode uses the accepted report and never
+falls back to `.ralph/plans`; retained folder blocking and restoration remain
+unchanged when no version-2 record or task block exists.
+
+After resumed `In Progress` publication, the internal, deliberately unregistered
+`handoffTaskEpisode` transport seam performs ordinary continuation.
 Before delivery it proves canonical primary-main caller context, exact owner and
 task/path in main and the Episode worktree, a main task path that matches
 committed `HEAD` even when unrelated main paths are dirty, meaningful plans,

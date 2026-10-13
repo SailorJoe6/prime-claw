@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 11:05'
+updated_date: '2026-10-13 11:29'
 labels:
   - backlog-md
   - episode-loop
@@ -394,4 +394,20 @@ Evidence:
 - `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC, teardown, and manifest publication verified at `.test-results/20261013T110322Z-62776-06322ace/tier1`.
 
 This staged dependency changes no task lifecycle state and claims no acceptance criterion. Conversation-owned `Blocked`/resume publication, `Ready for Merge` integration, operator decision mechanics, task-native finalization/abandonment, coordinated activation, retained native receipts, and final migration remain later work. AC #2/#3 and #6/#7/#8 still require their retained real-session or end-to-end evidence.
+
+## 2026-10-13 — staged inactive Conversation-owned Blocked publication and resume
+
+Added exact task-native blocker lifecycle mechanics without registering a public task lifecycle or handoff surface. `publishTaskEpisodeBlocked` and `publishTaskEpisodeResumed` require active version-2 ownership, the exact persisted top-level owner in canonical primary `main`, matching canonical task ID/path and meaningful plans in both checkouts, clean committed main task bytes, Episode status still `In Progress`, a clean exact reported Episode head that equals its upstream head, and committed post-admission task-path evidence. They mutate status only through supported Backlog operations and commit only the exact main task path. Unrelated main dirt is allowed. Main push is best-effort evidence after the authoritative local commit. No Episode-owned content crosses checkouts.
+
+After resumed `In Progress` publication, existing `handoffTaskEpisode` revalidates committed main `HEAD` and continues the same ownership, branch, worktree, and durable session. The tested sequence creates no task, admission, resource, or assignment. The managed blocked skill now selects durable ownership before prompt text: active version-2 ownership forces task mode for the exact owner Conversation even without `<operator-episode-task>`; a task block is only a candidate binding; Episode, foreign-owner, non-active, and mismatched contexts fail closed. Only no version-2 record and no task block permits retained `.ralph/plans/blocked` restoration. Source/tracked bytes and managed hashes match.
+
+Evidence:
+- Initial focused validation: 70 Node tests and 32 host-safe Python checks passed with 3 container cases deselected.
+- Independent review found one material defect: the owning Conversation had no tagged blocked assignment and could enter retained folder mode. The accepted repair added production `resolveBlockedWorkflowAuthority`, made lifecycle publication consume it, aligned policy/docs/hashes, and added an owner-Conversation-versus-Episode behavioral routing fixture.
+- Repair-focused validation: 71 Node tests and 32 host-safe Python checks passed.
+- Final broad compatibility: 144 Node tests and 55 host-safe Python checks passed with 45 container cases deselected; `git diff --check` passed.
+- Repair rereview: no material findings.
+- `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC, teardown, and manifest publication verified at `.test-results/20261013T112716Z-81931-e0b2a21c/tier1`.
+
+This staged slice changes no live task Episode lifecycle because every public task admission/lifecycle/handoff/finalization surface remains inactive. It claims no acceptance criterion. In particular, AC #8 still requires retained end-to-end Episode evidence. `Ready for Merge` integration, operator outcomes, task-native close/abandonment, coordinated activation, retained native receipts, and final migration remain later work.
 <!-- SECTION:NOTES:END -->

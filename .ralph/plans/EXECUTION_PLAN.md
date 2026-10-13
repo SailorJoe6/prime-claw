@@ -453,6 +453,50 @@ Repair rereview found no material defects. Source-mode
 teardown, and manifest evidence at
 `.test-results/20261013T110322Z-62776-06322ace/tier1`.
 
+#### Slice 3 progress — inactive task-native Blocked publication and resume (2026-10-13)
+
+Staged Conversation-owned blocker status publication without registering any
+public task-native lifecycle surface. The Episode must remain `In Progress`,
+commit its exact task evidence after admission, push the exact reported branch
+head, and leave its worktree clean. The status seam then proves exact active
+version-2 ownership, the owning persisted top-level Conversation, canonical
+primary `main`, matching task identity/path and meaningful plans in both
+checkouts, committed main task bytes, and the exact local/upstream Episode head.
+Only then may it use Backlog to commit the exact main task path from `In
+Progress` to `Blocked`. An accepted unblock repeats the same proof and commits
+only that path from `Blocked` to `In Progress`; each main push is best effort and
+its failure is returned as evidence after the authoritative local commit.
+Unrelated main dirt remains allowed and no Episode-owned content crosses
+checkouts.
+
+The existing task handoff then revalidates the committed resumed main state and
+continues the same ownership, branch, worktree, and session without a new task,
+admission, resource, or assignment. The managed blocked skill is now dual-mode:
+it selects durable ownership before prompt text, so active version-2 ownership
+forces task mode for the exact owner Conversation even without a task block,
+while an Episode/foreign owner or mismatched candidate block fails closed.
+Only the absence of version-2 ownership and a task block permits the retained
+`.ralph/plans/blocked` restoration workflow. Source and tracked skill bytes plus
+managed hashes remain aligned.
+Public `/implement-task`, `create_task_episode`, task lifecycle/handoff, and
+finalization surfaces remain inactive. `Ready for Merge`, operator outcomes,
+task-native close/abandonment, coordinated activation, retained native receipts,
+and final migration remain later work. No acceptance criterion is newly
+claimed.
+
+Initial focused validation passed 70 Node tests and 32 host-safe Python checks
+with 3 container cases deselected, plus `git diff --check`. Independent review
+then found that a discoverable owner-Conversation invocation without a task block
+could incorrectly enter retained folder mode. The accepted repair added the
+deterministic ownership-first resolver described above and a behavioral
+owner-versus-Episode routing fixture. Repair-focused validation passed 71 Node
+tests and the same 32 Python checks. Final broad validation passed 144 Node
+tests and 55 host-safe Python checks with 45 container cases deselected, plus
+`git diff --check`. Repair rereview found no material defects. Source-mode
+`scripts/test-tier1.sh --probe` passed with immutable-image, offline-RPC,
+teardown, and manifest evidence at
+`.test-results/20261013T112716Z-81931-e0b2a21c/tier1`.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and
