@@ -7,6 +7,31 @@ Older sets contain specification, requirements, decisions, and execution-plan
 files; newer project-customized sets may contain a different reviewed artifact
 collection.
 
+## project-wide-testing-strategy/ — Project-wide testing strategy ✅ COMPLETE (2026-10-07)
+
+Delivered all eight owner-accepted testing-strategy slices. The final Slice 8
+candidate is commit `5bace57e63e51bbfc034fc2e665863b74649a218`, tree
+`44ea6a640fe1ca03dc961149f0d13e5b3af3d5ac`. Earlier accepted slice commits
+are `4cca0989475d7bd670620f31b67260342b3aac5d`,
+`56afd99d3a4b5411eb37fb42210ffb36c8bf2b84`,
+`5d3db2f961d843a11289c38f5d60f646a8f65c9e`,
+`854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a`,
+`d7980cf051be8e459434ebc2a5d74753b0832e3b`,
+`fda41dcadbac15b2c957c866d9e22eafb5f6afca`, and
+`e4cbc59e19fe823d598456dbf2185facf0621dee`.
+
+- [Archived specification](project-wide-testing-strategy/SPECIFICATION.md)
+- [Archived execution plan](project-wide-testing-strategy/EXECUTION_PLAN.md)
+- [Final Slice 8 evidence](../../../docs/evidence/2026-10-07-testing-strategy-slice8-gbrain-properties.md)
+- Backlog.md tasks `PRIMECLAW-20.4` and parent `PRIMECLAW-20` are Done.
+
+The Phase 3a consumer packet was proposal-only and authorized no production
+Phase 3a action. Separate Phase 3a tasks and the testing incident remain
+independent; they do not make this completed plan blocked. Commit `6753f82`
+placed these already-completed artifacts under `.ralph/plans/blocked/` while
+installing the Backlog migration plan. This archive corrects that bookkeeping
+placement and does not claim new implementation work.
+
 ## official-lean-compatibility-cleanup/ — Official lean role protocol final candidate ✅ IMPLEMENTATION COMPLETE (2026-10-08)
 
 Delivered the official lean compatibility cleanup through owner-reviewed slices,

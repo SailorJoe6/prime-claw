@@ -1189,7 +1189,7 @@
       "priority": "P1",
       "summary": "Truthful marker and collection policy: unmarked recording-fake/static tests are tier 0; real tier-1 fixture users are auto-marked container and admitted only by exact `-m container`; arbitrary expressions cannot bypass environment guards; integration/lifecycle markers are never host-admitted.",
       "status": "owner-accepted at project-wide testing Slice-4 commit 854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a",
-      "plan": ".ralph/plans/SPECIFICATION.md (Slice 4)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md (Slice 4)",
       "proven_by": {
         "apply": [],
         "check": [
@@ -1244,7 +1244,7 @@
       "priority": "P1",
       "summary": "Dumb whole-suite sequencer: scripts/test-all.sh runs tier 0 -> tier 1 -> tier 2 sequentially, fail-fast, prints a tier summary, and logs under .test-results; exact --with-lifecycle appends only the registered lifecycle node after prerequisites, while inherited lifecycle admission variables are cleared from prerequisite processes.",
       "status": "Slice 4 owner-accepted; Slice 7 exact lifecycle extension implemented and final observer passed",
-      "plan": ".ralph/plans/EXECUTION_PLAN.md (Slices 4 and 7)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slices 4 and 7)",
       "proven_by": {
         "apply": [],
         "check": [
@@ -1294,8 +1294,8 @@
       "id": "R-TEST-1",
       "priority": "GATE",
       "summary": "Environment-dependent Tier-1 behavior retains its owner-accepted exact-image snapshot/share boundary; the separate Slice-3 integration tier bakes public test inputs into a disposable image and uses no runtime host mounts.",
-      "status": "proven for owner-accepted Slice 1 and Slice 2 tier-1 boundaries; Slice-3 disposable integration tier implemented with owner acceptance pending",
-      "plan": ".ralph/plans/SPECIFICATION.md",
+      "status": "owner-accepted across all eight project-wide testing slices; final Slice 8 accepted at 5bace57e63e51bbfc034fc2e665863b74649a218",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh",
@@ -1322,7 +1322,7 @@
       "priority": "GATE",
       "summary": "Tests use the lowest sufficient tier: host-safe mocked/static tests are tier 0, real Prime Agent/plugin execution is Docker tier 1, the guarded real-stack body is Docker tier 2, and the one host lifecycle observer is separately exact-gated and non-default.",
       "status": "owner-accepted at project-wide testing Slice-4 commit 854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a",
-      "plan": ".ralph/plans/SPECIFICATION.md (Slice 4)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md (Slice 4)",
       "proven_by": {
         "apply": [
           "pytest.ini",
@@ -1353,7 +1353,7 @@
       "priority": "GATE",
       "summary": "Tier 2 provides a credential-free Docker PostgreSQL 16 + pgvector + exact-gbrain environment with the synthetic corpus/body baked into the image, nonroot container-local HOME/database/results/Git state, and a copied result receipt.",
       "status": "owner-accepted at reduced-contract Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e; preserved by Slice 4",
-      "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 3)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slice 3)",
       "proven_by": {
         "apply": [
           "scripts/test-integration.sh",
@@ -1379,7 +1379,7 @@
       "priority": "GATE",
       "summary": "The integration assertion container receives no Docker/OpenShell socket or host-control broker; host launcher behavior is covered through pure recording fakes.",
       "status": "owner-accepted for Slice 3; host lifecycle control remains outside the integration container and is separately exact-gated",
-      "plan": ".ralph/plans/SPECIFICATION.md",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md",
       "proven_by": {
         "apply": [
           "scripts/testing/integration_driver.py"
@@ -1401,7 +1401,7 @@
       "priority": "GATE",
       "summary": "Tier-1 retains its owner-accepted exact-ID lifecycle. Slice 3 uses bounded ordinary commands, immutable iid/cid capture, normal timeout/SIGINT/SIGTERM nonzero behavior, exact run labels, and best-effort label-verified cleanup without an outer publication supervisor.",
       "status": "proven for owner-accepted Tier 1; reduced Slice-3 lifecycle owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
-      "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh",
@@ -1432,7 +1432,7 @@
       "priority": "GATE",
       "summary": "Tier-1 retains truthful schema-v2 pinned/source provenance. Slice 3 emits one simple receipt containing tested commit/content identity, locked versions, immutable runtime IDs, real-stack result, and cleanup outcomes.",
       "status": "proven for owner-accepted Tier 1; reduced Slice-3 receipt owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
-      "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
           "scripts/testing/provenance.py",
@@ -1464,7 +1464,7 @@
       "priority": "GATE",
       "summary": "Tier-1 retains its owner-accepted read-only snapshot plus writable-share mounts. Slice 3 instead has zero runtime host mounts: public source/body/fixtures are baked into the image and HOME, PostgreSQL, results, and synthetic Git state are container-local; host home, sockets, credentials, provider state, and arbitrary checkouts remain excluded.",
       "status": "proven for owner-accepted Tier 1; reduced mount-free Slice-3 boundary owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
-      "plan": ".ralph/plans/SPECIFICATION.md",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh",
@@ -1496,7 +1496,7 @@
       "priority": "GATE",
       "summary": "Prime Agent source mode reads the selected checkout only through a read-only builder mount, copies selected tracked/dirty/untracked inputs to container-local storage, builds and packs there, exports only a strict hashed release, and requires complete before/after checkout inventory equality.",
       "status": "owner-accepted at Slice-2 commit 56afd99d3a4b5411eb37fb42210ffb36c8bf2b84; preserved by Slice 3",
-      "plan": ".ralph/plans/EXECUTION_PLAN.md (Slices 1-2)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slices 1-2)",
       "proven_by": {
         "apply": [
           "scripts/build-prime-agent-test-release.sh",
@@ -1532,7 +1532,7 @@
       "priority": "GATE",
       "summary": "Lifecycle execution is fail closed by default: generated non-default workspace/resource identities, exact ownership capture, present/absent/unknown inspection, recursively sanitized evidence, and bounded exact cleanup are proven with a recording fake in tier 1; marker+fixture mismatch fails collection and absent admission skips. Slice 7 adds one separately tracked exact live observer under R-TEST-12 without weakening this baseline.",
       "status": "owner-accepted Slice-6 baseline at fda41dcadbac15b2c957c866d9e22eafb5f6afca",
-      "plan": ".ralph/plans/SPECIFICATION.md (Slice 6)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md (Slice 6)",
       "proven_by": {
         "apply": [
           "tests/lifecycle/support.py",
@@ -1564,7 +1564,7 @@
       "priority": "GATE",
       "summary": "Safety coverage preserves accepted Slice-1/Slice-2 cases. Reduced Slice-3 coverage targets ordinary build/create/body/copy failure, timeout and SIGINT/SIGTERM nonzero behavior, label mismatch, partial-resource recovery, cleanup refusal, malformed/missing result, and real mount-free stack execution; hostile same-UID races and publication micro-transactions are excluded optional hardening; Slice 6 adds default/forbidden/collision/unknown/malformed/daemon/CLI/ownership/teardown-refusal lifecycle guards with zero pre-ownership mutation and exact-owned cleanup. Slice 6 also closes tier-0 brain-query/GitHub-provider stage-stub gaps so orchestration-order tests cannot fall through to live OpenShell.",
       "status": "Slices 1-3 and Slice 6 owner-accepted; Slice-7 fake/static guard expansion and final live acceptance passed",
-      "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 1)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slice 1)",
       "proven_by": {
         "apply": [
           "scripts/testing/provenance.py",
@@ -1602,7 +1602,7 @@
       "priority": "GATE",
       "summary": "Environment-dependent unit behaviors remain non-default bodies behind six exact-marker tier-1 bridges, including the Slice-6 lifecycle recording fake. The host-observer exception registry enables only one individually reviewed Slice-7 node behind lifecycle+macos_host markers, lifecycle_scope, pytest opt-in, and exact test-all sequencer admission.",
       "status": "Slices 5 and 6 owner-accepted; exact Slice-7 host observer source validation and final live acceptance passed",
-      "plan": ".ralph/plans/SPECIFICATION.md (Slices 5-7)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md (Slices 5-7)",
       "proven_by": {
         "apply": [
           "tests/test_unit_env_bridges.py",
@@ -1638,7 +1638,7 @@
       "priority": "GATE",
       "summary": "One explicit guarded host lifecycle acceptance uses the owner-accepted Slice-6 boundary to prove product destroy removes only a generated target, preserves a generated sentinel, leaves a names-only configured-production snapshot unchanged, and finalizes only exact captured/revalidated test resources.",
       "status": "owner-accepted at Slice-7 commit e4cbc59e19fe823d598456dbf2185facf0621dee; consumed observer must not rerun",
-      "plan": ".ralph/plans/SPECIFICATION.md (Slice 7)",
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md (Slice 7)",
       "proven_by": {
         "apply": [
           "tests/lifecycle/live.py",
@@ -1674,7 +1674,7 @@
       "id": "R-TEST-13",
       "priority": "GATE",
       "summary": "The offline integration-v3 fixture proves exact installed-gbrain dry-run logical non-mutation and complete synthetic whole-source path/slug accounting twice with disjoint database/run identities, including add/modify/rename/delete, malformed-frontmatter exclusion, named negative drift proofs, and deterministic normalized equality.",
-      "status": "implemented and validated: final default tiers 0-2, repaired-contract tier-2 receipt, and deterministic negative proofs passed; owner review pending",
+      "status": "owner-accepted at final Slice-8 commit 5bace57e63e51bbfc034fc2e665863b74649a218 after repaired-contract validation and practical owner review PASS",
       "slice": 8,
       "proven_by": {
         "launcher": [
@@ -1699,7 +1699,7 @@
       },
       "evidence": "docs/evidence/2026-10-07-testing-strategy-slice8-gbrain-properties.md",
       "verdict_doc": "docs/testing-strategy.md",
-      "plan": ".ralph/plans/EXECUTION_PLAN.md (Slice 8)"
+      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slice 8)"
     }
   ],
   "phase2": {},

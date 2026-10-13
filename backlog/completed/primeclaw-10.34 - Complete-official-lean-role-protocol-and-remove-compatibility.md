@@ -1,11 +1,11 @@
 ---
 id: PRIMECLAW-10.34
 title: Complete official lean role protocol and remove compatibility
-status: In Progress
+status: Done
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-12 01:14'
+updated_date: '2026-10-13 00:51'
 labels:
   - compatibility-cleanup
   - design
@@ -592,3 +592,9 @@ OFFICIAL FINAL REVIEW CAPABILITY BLOCKER — trusted bridge owner invoked `prime
 <!-- AC:BEGIN -->
 - [ ] #1 A reviewed in-place specification and plan govern one fresh episode through bridge and final cleanup. The selected global context contains one exact neutral kernel with unrelated bytes preserved; provider evidence shows system-channel delivery and zero fresh user/custom package; managed role guidance and exact EXPERT admission work or fail closed under supported kernel modes; interim tests/review/landing/apply/restart/UAT pass before cleanup; final state removes Prime Claw's global APPEND block, old project skill/link, standalone profile, and duplicate policy while retaining historical filtering and evidence; final tests/review/landing/apply/restart/UAT pass; rollback is verified at both gates; finalization and physical cleanup retain separate operator authority.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded without claiming the broad original terminal acceptance contract. Later role-protocol and simplification work replaced or retired the archived episode machinery and obsolete official-review bootstrap path. Any current UAT or bookkeeping gap must be tracked as a narrow task against the current architecture.
+<!-- SECTION:FINAL_SUMMARY:END -->

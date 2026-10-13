@@ -1,11 +1,11 @@
 ---
 id: PRIMECLAW-10.7
 title: Concurrency-safe future specification incubation
-status: In Progress
+status: Done
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:00'
-updated_date: '2026-10-12 01:16'
+updated_date: '2026-10-13 00:50'
 labels:
   - episode-loop
   - phase4
@@ -81,3 +81,9 @@ Owner packet produced and review requested for candidate d7534d6f9af89132940b9bf
 <!-- AC:BEGIN -->
 - [ ] #1 Two concurrent temp-clone flows cannot absorb each other's changes; success produces only the three-file pushed bundle and a clean canonical checkout; failures report exact state and create no episode resources.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded without claiming the original acceptance criterion. Candidate d7534d6 was never accepted and has no retained branch; the old specification-episode implementation surface was later archived and replaced by the current Prime Claw plugin architecture. Do not resume the old candidate.
+<!-- SECTION:FINAL_SUMMARY:END -->
