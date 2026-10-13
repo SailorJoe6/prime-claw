@@ -63,4 +63,12 @@ prime-agent at the core.
 
 ## Issue tracking
 
-This project uses **Backlog.md**. Run `backlog task list --status "To Do" --ready --plain` to find available work; see [docs/backlog.md](docs/backlog.md) for the native workflow and build provenance.
+This project uses **Backlog.md**. Inspect the unblocked `In Design` and
+`In Planning` queues with:
+
+```sh
+backlog task list --status "In Design" --status "In Planning" --ready --plain
+```
+
+See [docs/backlog.md](docs/backlog.md) for the task-native lifecycle and build
+provenance.

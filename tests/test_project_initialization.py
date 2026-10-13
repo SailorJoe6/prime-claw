@@ -65,7 +65,8 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
             assert "Prepare — prime-claw session orientation" in customized
             assert "docs/user-stories/README.md" in customized
             assert "docs/information-architecture.md" in customized
-            assert 'backlog task list --status "To Do" --ready --plain' in customized
+            assert 'backlog task list --status "In Design" --status "In Planning" --ready --plain' in customized
+            assert 'backlog task list --status "To Do"' not in customized
         else:
             installed=manifest["assets"][row["id"]]
             assert installed["state"]=="managed"

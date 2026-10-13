@@ -28,7 +28,12 @@ Then read these files, in this order:
    the multi-store routing layer (consult when a task involves persisting
    anything durable).
 
-Then run `backlog task list --status "To Do" --ready --plain` to see unblocked work.
+Then inspect the unblocked task-native queues without selecting the retained
+legacy migration state:
+
+```bash
+backlog task list --status "In Design" --status "In Planning" --ready --plain
+```
 
 ## When the reasoning matters
 

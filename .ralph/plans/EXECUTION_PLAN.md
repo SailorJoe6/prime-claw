@@ -975,6 +975,42 @@ requirements-inventory deletion gating, production asset retirement,
 changes, run the required Docker-isolated candidate validation. Independently
 review the bounded candidate, commit, push, report, and stop.
 
+#### Slice 13 progress — retire active `To Do` guidance
+
+Re-audited the named operator, project, source/project `prepare`, Backlog, and
+current-documentation surfaces. Five active surfaces still selected `To Do`:
+`AGENTS.md`, `README.md`, `.agents/skills/prepare/SKILL.md`,
+`.agents/skills/backlog/SKILL.md`, and `docs/backlog.md`. The project Backlog
+skill and Backlog documentation also had creation examples that omitted status
+and therefore inherited the transitional default. The generic source `prepare`
+template was already tracker-neutral and required no change.
+
+Replaced those active selection paths with the supported repeatable-status
+`In Design` plus `In Planning` discovery command. New ordinary task examples
+now pass `--status "In Design"` explicitly. Removed generic claim, completion,
+and archive examples that bypassed the accepted task-native phase and
+Conversation authority, and replaced them with truthful `/design` or
+`/spec-it-out`, `/plan TASK-ID`, `/implement-task TASK-ID`, and owning
+Conversation lifecycle guidance. Focused static coverage protects the named
+operator/project/source surfaces, explicit authoring status, generic source
+`prepare` behavior, and the absence of an active `To Do` selector.
+
+The supported CLI accepted the repeated-status list command and returned a
+versioned `task-list`. Focused validation passed 18 host-safe tests with 8
+container cases deselected. The curated broad candidate passed 229 Node tests
+and 68 host-safe Python tests with 45 container cases deselected, plus
+`git diff --check`. Independent read-only review found no material defects and
+approved the bounded candidate. No managed plugin source changed, so Docker
+Tier 1 is not required by repository policy.
+
+The still-unmigrated tasks and transitional `backlog/config.yml` remain intact;
+`To Do` is still the temporary configured default/selectable migration state.
+No task status, bundle, production asset, retained version-1 compatibility,
+accepted activation/recovery/authority behavior, or acceptance criterion
+changed. Proof-reference normalization, requirements-inventory deletion
+gating, production asset retirement, `.ralph/plans` deletion, and final cutover
+remain separate.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

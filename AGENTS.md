@@ -6,12 +6,14 @@ This project uses **Backlog.md** for issue tracking. Use the repository-built
 ## Quick Reference
 
 ```bash
-backlog task list --status "To Do" --ready --plain
-backlog task view <id> --plain
-backlog task edit <id> --status "In Progress" --assignee <name>
-backlog task edit <id> --status "Done" --final-summary "Completed"
-backlog task complete <id>
+backlog task list --status "In Design" --status "In Planning" --ready --plain
+backlog task view --json -- <id>
+backlog task create "Short title" --status "In Design" --description "Outcome and context" --type task --priority P2 --plain
 ```
+
+Use `/design` or `/spec-it-out`, `/plan TASK-ID`, and `/implement-task TASK-ID`
+for phase transitions. The owning Conversation controls later lifecycle status;
+do not use a generic claim, completion, or archive edit to bypass it.
 
 ## What this repo is
 

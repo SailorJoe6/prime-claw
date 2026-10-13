@@ -116,18 +116,23 @@ artifact is activated, use the repository-built candidate at
 from `PATH`.
 
 ```sh
-backlog task list --status "To Do" --ready --plain
-backlog task view PRIMECLAW-35 --plain
-backlog task edit PRIMECLAW-35 --status "In Progress" --assignee <name>
-backlog task create "Follow-up title" --description "Outcome and context" --type task --priority P2
-backlog task edit PRIMECLAW-35 --status "Done" --final-summary "Verified result"
-backlog task complete PRIMECLAW-35
+backlog task list --status "In Design" --status "In Planning" --ready --plain
+backlog task view --json -- PRIMECLAW-35
+backlog task create "Follow-up title" --status "In Design" --description "Outcome and context" --type task --priority P2 --plain
 ```
 
-The `To Do` filter is required with `--ready`; readiness alone can include work
-already `In Progress` or explicitly `Blocked`. Claiming is one supported edit
-that sets status and assignee together. Backlog.md v1.53.0 has no separate claim
-command or automatic current-identity shortcut.
+The explicit filters expose the current authoring and planning queues without
+selecting the retained legacy migration state. `--ready` alone can include tasks
+whose lifecycle status does not match the phase being entered.
+New ordinary work must pass `--status "In Design"` explicitly while the
+transitional configuration still has its old default.
+
+Use `/design` or `/spec-it-out` for specification authoring, `/plan TASK-ID` for
+native planning, and `/implement-task TASK-ID` for approved admission. There is
+no generic claim edit: implementation admission and later `Blocked`, resumed
+`In Progress`, `Ready for Merge`, and terminal `Done` transitions remain under
+the reviewed Conversation lifecycle. `backlog task complete` is reserved for
+explicit one-time history cleanup, not ordinary Episode completion.
 
 Use the CLI for every task mutation. Do not edit task Markdown directly. The
 tracked `backlog/` directory is canonical task state, while normal repository

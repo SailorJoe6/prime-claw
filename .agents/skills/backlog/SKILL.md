@@ -14,44 +14,46 @@ same CLI on `PATH`.
 
 ## Core CLI workflow
 
-1. Find unblocked work that has not already started:
+1. Inspect the unblocked task-native work queues without selecting the retained
+legacy migration state:
 
 ```bash
-backlog task list --status "To Do" --ready --plain
+backlog task list --status "In Design" --status "In Planning" --ready --plain
 ```
 
-Use `--json` instead of `--plain` when structured output is needed. The explicit
-`To Do` filter is required because `--ready` alone can also include work already
-`In Progress` or explicitly `Blocked`.
+Use `--json` instead of `--plain` when structured output is needed. Keep the
+explicit lifecycle filters: `--ready` alone can include work whose lifecycle
+state does not match the phase being entered.
 
-2. Inspect a task before changing it:
+2. Inspect one exact task before changing it:
 
 ```bash
-backlog task view <id> --plain
+backlog task view --json -- <id>
 ```
 
-3. Claim work with the supported single edit operation:
+3. Create durable follow-up work explicitly in the authoring state:
 
 ```bash
-backlog task edit <id> --status "In Progress" --assignee <name>
+backlog task create "Short title" --status "In Design" --description "Why this exists and what needs to be done" --type task --priority P2 --plain
 ```
 
-Backlog.md v1.53.0 has no separate claim command or automatic current-identity
-shortcut.
+Do not rely on the temporary project default. The retained `To Do` status exists
+only until the separately approved one-time migration classifies older tasks.
 
-4. Create durable follow-up work:
+4. Respect the task-native lifecycle and its authority boundaries:
 
-```bash
-backlog task create "Short title" --description "Why this exists and what needs to be done" --type task --priority P2
-```
+- `/design` and `/spec-it-out` create or revise only `In Design` tasks through
+  supported `backlog task create` or `backlog task edit` operations.
+- `/plan TASK-ID` writes the native Implementation Plan and publishes
+  `In Planning` through one supported task edit.
+- `/implement-task TASK-ID` admits one exact approved `In Planning` task; the
+  owning Conversation publishes `In Progress` before Episode allocation.
+- Later `Blocked`, resumed `In Progress`, `Ready for Merge`, and terminal `Done`
+  transitions belong to the owning Conversation under the reviewed lifecycle.
 
-5. Mark verified work done, then move it to completed storage when cleanup is
-intended:
-
-```bash
-backlog task edit <id> --status "Done" --final-summary "Completed"
-backlog task complete <id>
-```
+There is no generic claim edit that may bypass planning or admission. Do not
+mark a task `Done`, call `backlog task complete`, or archive it unless the exact
+reviewed lifecycle and operator authority permit that action.
 
 ## What belongs in Backlog.md
 
