@@ -804,6 +804,42 @@ resource deletion, plugin activation, migration, or cutover occurred. The task
 remains `In Progress`, live ownership/resources are unchanged, and no acceptance
 criterion is newly claimed; the recorded real-session receipt gaps remain open.
 
+#### Slice 10 progress — exact managed-asset retirement rehearsal (2026-10-13)
+
+Re-audited ordered step 4 after public task-native activation. The task-native
+planning and implementation workflows are already installed beside retained
+folder compatibility. Exactly four managed project assets remain coupled to
+that compatibility path: `project-workflow-plan-prep`,
+`project-workflow-plan-spec`, `project-workflow-implement-prep`, and
+`project-workflow-implement-spec`. Removing any of them from the production
+inventory now would break retained `/plan-spec` or `/implement-spec` work, so
+production assets and version-1 ownership remain unchanged.
+
+Added an isolated cutover-retirement rehearsal to the project-initialization
+suite. It creates a copied plugin generation without exactly those four rows and
+source files, then proves a real version-1 active ownership snapshot holds every
+compatibility workflow and the retained `.ralph/plans` sentinel byte-for-byte.
+After the snapshot is released, the rehearsal proves the three unchanged
+managed compatibility files are pruned, one customized compatibility workflow
+is preserved and released from manifest ownership, every remaining managed
+asset is one of the exact ten task-native/shared assets with source-identical
+bytes, and retained plan bytes remain unchanged. A fresh project under the
+rehearsed generation receives exactly those ten assets and no `.ralph/plans`
+tree.
+
+Independent read-only review reported no material findings. Focused validation
+passed all 29 project-initialization Node checks, including a one-test isolated
+review rerun. The exact curated broad candidate passed 229 Node checks and 59
+host-safe Python checks with 45 container cases deselected, plus `git diff
+--check`. Source-mode Docker Tier-1 passed with immutable-image, offline-RPC,
+verified-teardown, and published-manifest evidence at
+`.test-results/20261013T181209Z-47602-ef7f6389/tier1`.
+
+This is preparation evidence only. No production inventory row, source asset,
+project template, command, tool, workflow, ownership record, task, bundle,
+status, or `.ralph/plans` content was removed or migrated. Final asset
+retirement remains coupled to the explicitly authorized migration/cutover.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and
