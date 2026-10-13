@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 06:06'
+updated_date: '2026-10-13 06:26'
 labels:
   - backlog-md
   - episode-loop
@@ -168,4 +168,19 @@ Evidence:
 - The earlier full host-safe suite baseline produced 634 passed, 1 skipped, 65 deselected, and 75 subtests, with one unrelated existing policy assertion because `tests/test_runtime_connect.py` says `Offline` rather than the required literal `Offline:` or `host-safe`; this slice does not modify that file.
 
 This foundation does not complete an acceptance criterion. Public task-native planning, task-native authoring, lifecycle status migration, `/implement-task`, ownership, and legacy bundle migration remain.
+
+## 2026-10-13 — staged task-native planning policy assets
+
+Added inert project-customizable `plan-task-prep` and `plan-task` workflows under new names. They define exact task-ID and `In Design`/`In Planning` checks, compact-first sole-follow-up behavior, proportional semantic readiness, native Implementation Plan mutation through Backlog CLI, exact task-only commit verification, non-gating push evidence, and the operator review stop. No command or tool loads them yet; the existing `/plan-spec` path and folder workflows remain unchanged until compatible lifecycle statuses can activate the task-native surface coherently.
+
+Added the source assets, tracked builder-project copies, asset-inventory rows, and template-manifest entries. New assets have no truthful legacy predecessor, so `migrateFrom` is now optional in both the Python delivery validator and TypeScript project reconciler; declared legacy migrations retain their prior behavior. Independent review identified the initial required-field incompatibility and stale project-initialization inventory documentation. Direct loader/fresh-reconcile coverage and dynamic documentation coverage now protect the repair.
+
+Evidence:
+- `python3 -m py_compile scripts/manage-prime-agent-delivery.py` — passed.
+- `python3 -m pytest tests/test_future_plan_skills.py tests/test_project_initialization.py::test_delivery_manifest_covers_every_shipped_source_once tests/test_project_initialization.py::test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree tests/test_project_initialization.py::test_project_initialization_docs_name_every_managed_workflow -q` — 19 passed.
+- Isolated explicit-root `scripts/apply-prime-agent-plugin.sh` diagnostic — passed after the optional-migration repair; no host-global plugin was touched.
+- Pre-repair Docker failure evidence: `.test-results/20261013T061848Z-39722-97b4ebcd/tier1` (`primary-command-failed` during plugin apply).
+- Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T062411Z-55643-de31915d/tier1`.
+
+This slice does not complete an acceptance criterion. Public planning activation, lifecycle status migration, task-native authoring, `/implement-task`, ownership, and legacy bundle migration remain.
 <!-- SECTION:NOTES:END -->

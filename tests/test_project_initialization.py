@@ -83,6 +83,21 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
         "lifecycleTrigger":"project-reconcile",
     }
 
+def test_project_initialization_docs_name_every_managed_workflow():
+    docs=(ROOT/"docs/project-initialization.md").read_text()
+    inventory=json.loads((SOURCE/"asset-inventory.json").read_text())
+    destinations={
+        Path(target["destination"]).name
+        for row in inventory["assets"]
+        for target in row["targets"]
+        if target["class"]=="project-customizable"
+        and target["destination"].startswith(".prime-claw/workflows/")
+    }
+    assert destinations
+    for name in destinations:
+        assert name in docs
+
+
 def test_project_initialization_node_suite(tier1_container):
     result=tier1_container.run("node","--experimental-strip-types","--test","/workspace/tests/project_initialization_extension.test.mjs",timeout=180)
     assert result.returncode==0,result.stdout+result.stderr

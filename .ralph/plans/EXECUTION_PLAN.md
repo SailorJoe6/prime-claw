@@ -93,16 +93,34 @@ Completed the first bounded increment of slice 1:
   task Markdown nor introduces a second tracker abstraction;
 - added focused fixtures for canonical shorthand resolution, exact argv/CWD,
   supported JSON fields, unsafe selection, command failure, malformed JSON, and
-  escaped task paths; and
+  escaped task paths;
 - documented the seam and its intentionally deferred activation boundary; and
 - passed focused host-safe policy checks plus source-mode
   `scripts/test-tier1.sh --probe`, with evidence at
   `.test-results/20261013T060350Z-97903-65a8f369/tier1`.
 
+#### Slice 1 progress — staged task-native planning policy (2026-10-13)
+
+Completed the next bounded increment of slice 1:
+
+- added inert `plan-task-prep` and `plan-task` workflow assets under new names,
+  leaving the working `/plan-spec` command and folder workflows unchanged;
+- encoded exact task/status checks, compact-first sole-follow-up behavior,
+  proportional semantic readiness, native Implementation Plan mutation, exact
+  task-only commits, non-gating push evidence, and the operator review stop;
+- reconciled source and builder-project copies through the asset inventory and
+  template manifest without registering any public command;
+- made project-asset `migrateFrom` optional in both inventory consumers so a new
+  asset with no truthful predecessor does not invent migration provenance;
+- added direct inventory-loader, fresh reconciliation, managed-copy, and dynamic
+  documentation coverage; and
+- passed 19 focused host-safe checks plus source-mode
+  `scripts/test-tier1.sh --probe`, with evidence at
+  `.test-results/20261013T062411Z-55643-de31915d/tier1`.
+
 Slice 1 remains open. Public `/plan`/`plan_task`, compatible lifecycle statuses,
-reconciled project planning workflows, task-native authoring, and
-`/implement-task` are later increments. No acceptance criterion is checked by
-this foundation alone.
+task-native authoring, and `/implement-task` are later increments. No acceptance
+criterion is checked by these foundations alone.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 

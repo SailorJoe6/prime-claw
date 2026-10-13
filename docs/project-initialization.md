@@ -23,9 +23,18 @@ plain `.md` filenames, so installing the plugin cannot expose them as global
 An initialized project contains these regular customizable files:
 
 - `.agents/skills/{blocked,design,execute,prepare,spec-it-out}/SKILL.md`
-- `.prime-claw/workflows/{handoff,implement-prep,implement-spec,plan-prep,plan-spec}.md`
+- `.prime-claw/workflows/handoff.md`
+- `.prime-claw/workflows/implement-prep.md`
+- `.prime-claw/workflows/implement-spec.md`
+- `.prime-claw/workflows/plan-prep.md`
+- `.prime-claw/workflows/plan-spec.md`
+- `.prime-claw/workflows/plan-task-prep.md`
+- `.prime-claw/workflows/plan-task.md`
 
-The workflows are lifecycle inputs, not slash-discoverable skills. The legacy
+The workflows are lifecycle inputs, not slash-discoverable skills. The
+`plan-task-prep` and `plan-task` policies are staged for the task-native planning
+command and remain inert until that command is activated with compatible
+lifecycle statuses. The legacy
 `.ralph/skills` tree and `.agents/skills` symlinks are migrated away.
 `.ralph/plans` is never moved or interpreted as template content.
 
@@ -71,7 +80,8 @@ recovery is safe from customized or accepted-override state. Current manifest
 bytes are not rewritten. Ambiguous lock or content state remains blocked. A current project is a silent no-op. An interrupted template
 review blocks reconciliation until the operator chooses recovery.
 
-Known legacy assets migrate by allowlist. A recognized `.agents/skills` symlink
+Known legacy assets migrate only when an inventory entry declares an explicit
+`migrateFrom` path. New assets with no predecessor omit that field. A recognized `.agents/skills` symlink
 is removed only when it points to the corresponding legacy skill. Customized
 legacy regular-file bytes move to the new regular destination and remain marked
 customized. Unknown legacy entries remain in place and are reported; there is no

@@ -263,3 +263,62 @@ def test_phase_transition_docs_route_plugin_execution_to_docker_tier1() -> None:
         assert "scripts/test-tier1.sh --probe" in docs
         assert "host user-global plugin" in docs
         assert "node --experimental-strip-types --test" not in docs
+
+
+def test_task_native_planning_workflows_are_staged_but_not_exposed() -> None:
+    prep = " ".join(workflow("plan-task-prep").read_text().split())
+    plan = " ".join(workflow("plan-task").read_text().split())
+
+    for fragment in (
+        "<operator-plan-task-id>",
+        "backlog task view --json -- TASK-ID",
+        "In Design",
+        "In Planning",
+        "not the authoritative planning-readiness review",
+        "sole follow-up",
+        "cannot cancel, replace, reconstruct, retry, or invoke",
+        "exact Backlog task",
+        "acceptance criteria",
+        "Conversation-to-Episode authority",
+        "Status",
+        "Evidence",
+        "Next Step",
+        "compaction requested",
+        "compaction confirmed",
+    ):
+        assert fragment in prep
+    assert prep.count("await compact.run(focus_hint)") == 1
+    assert "Do not run `prepare`" in prep
+
+    for fragment in (
+        "<operator-plan-task-id>",
+        "backlog task view --json -- TASK-ID",
+        "status to be exactly `In Design` or `In Planning`",
+        "Reject any later status without mutation",
+        "Description, Acceptance Criteria",
+        "without guessing material product decisions",
+        "Do not demand standard risk, recovery, architecture, or process sections",
+        "concise, actionable Implementation Plan",
+        "Small changes may need only a few ordered steps",
+        "backlog task edit",
+        "set or retain status `In Planning`",
+        "do not edit task Markdown directly",
+        "no path other than that exact returned task path was newly changed",
+        "Commit only the returned task path",
+        "commit contains no other path",
+        "push failure is transport evidence",
+        "does not authorize implementation",
+        "/implement-task",
+    ):
+        assert fragment in plan
+
+    for name in ("plan-task-prep", "plan-task"):
+        source = workflow(name)
+        tracked = ROOT / ".prime-claw" / "workflows" / f"{name}.md"
+        assert tracked.read_bytes() == source.read_bytes()
+
+    extension = (
+        ROOT / "src" / "prime-agent-plugin" / "extensions" / "reviewed-plan.ts"
+    ).read_text()
+    assert "plan-task-prep" not in extension
+    assert '"plan-task"' not in extension

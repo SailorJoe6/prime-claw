@@ -41,7 +41,7 @@ export interface AssetDefinition {
   customization: AssetCustomization;
   destination: string;
   lifecycleTrigger: string;
-  migrateFrom: string;
+  migrateFrom?: string;
 }
 
 export interface AssetInventory {
@@ -207,8 +207,11 @@ export function loadAssetInventory(pluginRoot = pluginRootFromModule()): AssetIn
         assertRelativeFilePath(target.destination, `asset ${asset.id} target destination`);
         if (kind === "project-customizable") {
           if (target.exposure !== "discoverable" && target.exposure !== "internal") throw new Error(`asset ${asset.id} project exposure is invalid`);
-          if (typeof target.lifecycleTrigger !== "string" || !target.lifecycleTrigger || typeof target.migrateFrom !== "string") throw new Error(`asset ${asset.id} project lifecycle or migration source is invalid`);
-          assertRelativeFilePath(target.migrateFrom, `asset ${asset.id} project migration source`);
+          if (typeof target.lifecycleTrigger !== "string" || !target.lifecycleTrigger) throw new Error(`asset ${asset.id} project lifecycle is invalid`);
+          if (target.migrateFrom !== undefined) {
+            if (typeof target.migrateFrom !== "string") throw new Error(`asset ${asset.id} project migration source is invalid`);
+            assertRelativeFilePath(target.migrateFrom, `asset ${asset.id} project migration source`);
+          }
           if (project || projectDestinations.has(target.destination)) throw new Error(`asset inventory repeats project destination ${target.destination}`);
           projectDestinations.add(target.destination);
           project = {
@@ -378,8 +381,8 @@ function provenance(asset: AssetDefinition): TemplateEntry["provenance"] {
   return { scope: asset.scope, exposure: asset.exposure, customization: asset.customization, lifecycleTrigger: asset.lifecycleTrigger };
 }
 
-function legacyPath(projectRoot: string, asset: AssetDefinition): string {
-  return join(projectRoot, asset.migrateFrom);
+function legacyPath(projectRoot: string, asset: AssetDefinition): string | null {
+  return asset.migrateFrom ? join(projectRoot, asset.migrateFrom) : null;
 }
 
 function safeLegacyStat(projectRoot: string, path: string) {
@@ -395,6 +398,7 @@ function migrateExpectedSkillSymlink(projectRoot: string, asset: AssetDefinition
   if (!asset.id.startsWith("project-skill-")) return null;
   const skillDir = join(projectRoot, dirname(asset.destination));
   const expectedLegacy = legacyPath(projectRoot, asset);
+  if (!expectedLegacy) return null;
   assertSafePathAncestors(projectRoot, skillDir);
   const backupLink = `${skillDir}.prime-claw-migration-link`;
   if (existsSync(backupLink)) {

@@ -135,10 +135,12 @@ def inventory(source: Path) -> dict:
                 if set(target) != {"class"}: raise ValueError(f"malformed selected-context target: {asset_id}")
                 destination = ""; selected += 1
             elif kind == "project-customizable":
-                if set(target) != {"class", "destination", "exposure", "lifecycleTrigger", "migrateFrom"}:
+                required = {"class", "destination", "exposure", "lifecycleTrigger"}
+                if set(target) not in (required, required | {"migrateFrom"}):
                     raise ValueError(f"malformed project target: {asset_id}")
                 destination = safe_relative(target.get("destination"), "project target")
-                safe_relative(target.get("migrateFrom"), "project migration source")
+                if "migrateFrom" in target:
+                    safe_relative(target.get("migrateFrom"), "project migration source")
                 if target.get("exposure") not in {"discoverable", "internal"} or not isinstance(target.get("lifecycleTrigger"), str) or not target["lifecycleTrigger"]:
                     raise ValueError(f"invalid project target policy: {asset_id}")
             else:
