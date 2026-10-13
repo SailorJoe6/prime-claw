@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 06:59'
+updated_date: '2026-10-13 07:15'
 labels:
   - backlog-md
   - episode-loop
@@ -215,4 +215,22 @@ Evidence:
 - Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T065752Z-55162-273d77d8/tier1`.
 
 Slice 1 remains open. AC #2 remains unchecked because policy and the disposable substrate fixture do not replace retained real-session semantic authoring evidence. AC #3 likewise still awaits retained real-session planning mutation evidence. Final lifecycle/default migration, `/implement-task`, task ownership conversion, and legacy bundle migration remain.
+
+## 2026-10-13 — staged task-native Episode-admission policy
+
+Added inert, project-customizable `implement-task-prep` and `implement-task` workflow assets. The preparation policy binds one canonical operator-selected task, performs only a light `In Planning` plus meaningful native Implementation Plan sniff, and requests focused compaction once without controlling the independently queued semantic follow-up. The semantic policy reloads the exact task, rejects every non-`In Planning` state without mutation, applies the existing proportional readiness judgment, and permits exactly one future `create_task_episode(taskId=...)` call only after the approved specification and plan are implementation-ready.
+
+The staged policy defines the trusted mechanical order without activating it: re-resolve the task; commit only its `In Progress` status change on main; persist one durable `provisioning` ownership reservation bound to the task and status-commit SHA; then create the branch, worktree, and session from that SHA. Prompt push failure alone does not block local creation. A proven clean failure before ownership/resource mutation returns the exact task to `In Planning`; any recorded, partial, or uncertain mutation publishes `Blocked`, preserves evidence/resources, and cannot be replayed as fresh creation.
+
+The new assets are reconciled through the plugin inventory and project manifest with no invented predecessor. `/implement-task` and `create_task_episode` are deliberately unregistered until trusted task-native creation mechanics land. Existing `/implement-spec`, `create_spec_episode`, and folder Episode behavior remain live and unchanged. Updated project-initialization and Episode-promotion documentation plus policy, non-activation, ordering, source-copy, and fresh-reconciliation tests.
+
+Independent review found that the first draft created the branch before the ownership reservation. The final policy repairs that material defect by reserving `provisioning` ownership before any branch/worktree/session creation and tests the required order.
+
+Evidence:
+- `node --experimental-strip-types --test tests/project_initialization_extension.test.mjs` — 28 passed.
+- `python3 -m pytest tests/test_future_plan_skills.py tests/test_project_initialization.py -q -m "not container"` — 23 passed, 3 deselected.
+- `git diff --check` — passed.
+- Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T071323Z-8630-3272b5af/tier1`.
+
+Slice 1 remains open. This staged policy alone completes no acceptance criterion. Public `/implement-task`, trusted task-native creation and ownership mechanics, retained real-session authoring/planning evidence, and final lifecycle/default migration remain.
 <!-- SECTION:NOTES:END -->

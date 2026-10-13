@@ -180,6 +180,36 @@
         "customization": "project-customizable",
         "lifecycleTrigger": "plan-task"
       }
+    },
+    "project-workflow-implement-task-prep": {
+      "source": "workflows/implement-task-prep.md",
+      "destination": ".prime-claw/workflows/implement-task-prep.md",
+      "baselineSha256": "dbb8ad0ec5844aff85e2a2d2967b74580af0ccbc55e6b4517f210e831b711b36",
+      "installedSha256": "dbb8ad0ec5844aff85e2a2d2967b74580af0ccbc55e6b4517f210e831b711b36",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "dbb8ad0ec5844aff85e2a2d2967b74580af0ccbc55e6b4517f210e831b711b36",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "internal",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "implement-task"
+      }
+    },
+    "project-workflow-implement-task": {
+      "source": "workflows/implement-task.md",
+      "destination": ".prime-claw/workflows/implement-task.md",
+      "baselineSha256": "5b958d690d2c542443f7df3da0b805804ee325ffd0e413937f69b710f7cc26e6",
+      "installedSha256": "5b958d690d2c542443f7df3da0b805804ee325ffd0e413937f69b710f7cc26e6",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "5b958d690d2c542443f7df3da0b805804ee325ffd0e413937f69b710f7cc26e6",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "internal",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "implement-task"
+      }
     }
   }
 }

@@ -163,10 +163,36 @@ Completed the next bounded increment of slice 1:
   repaired, and source-mode `scripts/test-tier1.sh --probe`, with final evidence
   at `.test-results/20261013T065752Z-55162-273d77d8/tier1`.
 
-Slice 1 remains open. Retained real-session authoring and planning mutation
-evidence, final lifecycle-default migration, and `/implement-task` are later
-increments. Acceptance criteria #2 and #3 remain unchecked until those
-real-session semantic paths are retained.
+#### Slice 1 progress — staged task-native Episode-admission policy (2026-10-13)
+
+Completed the next bounded increment of slice 1:
+
+- added inert project-customizable `implement-task-prep` and `implement-task`
+  workflow assets without registering `/implement-task` or
+  `create_task_episode` before their trusted mechanics exist;
+- encoded exact canonical task binding, structural `In Planning` plus meaningful
+  plan checks, proportional semantic readiness, and one exact tool-call boundary;
+- specified the trusted order as exact main-task `In Progress` commit, durable
+  `provisioning` ownership reservation, then branch/worktree/session creation
+  from the recorded status-commit SHA;
+- preserved best-effort push semantics, clean pre-resource rollback to `In
+  Planning`, and partial/uncertain `Blocked` outcomes without fresh replay;
+- reconciled source and builder-project copies through the inventory and
+  manifest while keeping retained `/implement-spec` assets and behavior live;
+- updated project initialization and Episode-promotion documentation and added
+  focused policy, non-activation, ordering, and fresh-reconciliation coverage;
+  and
+- passed 28 focused Node reconciliation tests, 23 host-safe Python checks with
+  3 container cases deselected, independent review after repairing one
+  provisioning-order defect, and source-mode `scripts/test-tier1.sh --probe`,
+  with final evidence at
+  `.test-results/20261013T071323Z-8630-3272b5af/tier1`.
+
+Slice 1 remains open. The public `/implement-task` and trusted task-native
+creation mechanics, retained real-session authoring and planning mutation
+evidence, and final lifecycle-default migration are later increments.
+Acceptance criteria #2 and #3 remain unchecked until their real-session
+semantic paths are retained; this staged policy alone completes no criterion.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 

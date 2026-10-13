@@ -38,9 +38,9 @@ class Runner {
   }
 }
 
-test("inventory exposes the twelve manifest-authoritative project assets",()=>{
-  const inv=loadAssetInventory(PLUGIN); assert.equal(inv.schemaVersion,2); assert.equal(inv.assets.length,12); assert.equal(new Set(inv.assets.map(x=>x.id)).size,12); assert.deepEqual(inv.assets.filter(x=>x.exposure==="discoverable").map(x=>x.id).sort(),["project-skill-blocked","project-skill-design","project-skill-execute","project-skill-prepare","project-skill-spec-it-out"]);
-  const taskPlanning=inv.assets.filter(x=>x.id.startsWith("project-workflow-plan-task")); assert.equal(taskPlanning.length,2); assert.ok(taskPlanning.every(x=>x.migrateFrom===undefined));
+test("inventory exposes the fourteen manifest-authoritative project assets",()=>{
+  const inv=loadAssetInventory(PLUGIN); assert.equal(inv.schemaVersion,2); assert.equal(inv.assets.length,14); assert.equal(new Set(inv.assets.map(x=>x.id)).size,14); assert.deepEqual(inv.assets.filter(x=>x.exposure==="discoverable").map(x=>x.id).sort(),["project-skill-blocked","project-skill-design","project-skill-execute","project-skill-prepare","project-skill-spec-it-out"]);
+  for (const prefix of ["project-workflow-plan-task","project-workflow-implement-task"]) { const taskNative=inv.assets.filter(x=>x.id.startsWith(prefix)); assert.equal(taskNative.length,2); assert.ok(taskNative.every(x=>x.migrateFrom===undefined)); }
 });
 
 test("retired managed project assets are pruned from prior ownership", t => {
@@ -80,8 +80,8 @@ test("root discovery handles nested cwd, nested repo, linked worktree, submodule
 
 test("fresh reconcile is convergent, registers once, preserves customization, and tracks later upstream",t=>{
   const root=repo(t); const runner=new Runner();
-  const first=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner,registerOrca:true}); assert.equal(first.items.filter(x=>x.action==="created").length,12); assert.equal(first.registration.status,"added"); assert.equal(runner.adds,1); assert.equal(existsSync(join(root,".ralph","plans")),false);
-  for (const name of ["plan-task-prep.md","plan-task.md"]) assert.equal(readFileSync(join(root,".prime-claw/workflows",name),"utf8"),readFileSync(join(PLUGIN,"workflows",name),"utf8"));
+  const first=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner,registerOrca:true}); assert.equal(first.items.filter(x=>x.action==="created").length,14); assert.equal(first.registration.status,"added"); assert.equal(runner.adds,1); assert.equal(existsSync(join(root,".ralph","plans")),false);
+  for (const name of ["plan-task-prep.md","plan-task.md","implement-task-prep.md","implement-task.md"]) assert.equal(readFileSync(join(root,".prime-claw/workflows",name),"utf8"),readFileSync(join(PLUGIN,"workflows",name),"utf8"));
   const manifestPath=join(root,".prime-claw/templates.json"), beforeManifest=statSync(manifestPath,{bigint:true});
   const second=reconcilePrimeClawProject({cwd:join(root,".agents"),pluginRoot:PLUGIN,home:dirname(root),runner,registerOrca:true}); const afterManifest=statSync(manifestPath,{bigint:true}); assert.equal(second.changed,false); assert.equal(second.manifestWritten,false); assert.equal(afterManifest.ino,beforeManifest.ino); assert.equal(afterManifest.mtimeNs,beforeManifest.mtimeNs); assert.equal(second.registration.status,"reused"); assert.equal(runner.adds,1);
   const target=join(root,".agents/skills/prepare/SKILL.md"); writeFileSync(target,readFileSync(target,"utf8")+"\ncustom\n");

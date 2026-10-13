@@ -26,16 +26,20 @@ An initialized project contains these regular customizable files:
 - `.prime-claw/workflows/handoff.md`
 - `.prime-claw/workflows/implement-prep.md`
 - `.prime-claw/workflows/implement-spec.md`
+- `.prime-claw/workflows/implement-task-prep.md`
+- `.prime-claw/workflows/implement-task.md`
 - `.prime-claw/workflows/plan-prep.md`
 - `.prime-claw/workflows/plan-spec.md`
 - `.prime-claw/workflows/plan-task-prep.md`
 - `.prime-claw/workflows/plan-task.md`
 
-The workflows are lifecycle inputs, not slash-discoverable skills. The
-`plan-task-prep` and `plan-task` policies are staged for the task-native planning
-command and remain inert until that command is activated with compatible
-lifecycle statuses. The legacy
-`.ralph/skills` tree and `.agents/skills` symlinks are migrated away.
+The workflows are lifecycle inputs, not slash-discoverable skills. Native
+`/plan TASK-ID` and `plan_task` load `plan-task-prep` and `plan-task`. The new
+`implement-task-prep` and `implement-task` policies are reconciled but remain
+inert until task-native admission mechanics and the `/implement-task` command
+activate them coherently. The retained `implement-prep` and `implement-spec`
+assets continue to serve existing future-folder bundles during the migration.
+The legacy `.ralph/skills` tree and `.agents/skills` symlinks are migrated away.
 `.ralph/plans` is never moved or interpreted as template content.
 
 ## Project selection and Orca registration

@@ -51,6 +51,18 @@ The one project-level ownership record can be `provisioning`, `active`,
 fallback exists only for definitive pre-mutation Orca unavailability with no
 explicit host request.
 
+## Task-native admission migration
+
+Project reconciliation now stages `implement-task-prep` and `implement-task` as
+customizable internal policies for the future exact-task admission path. They
+encode the `In Planning` structural and semantic readiness gates, the single
+`create_task_episode` call boundary, the main-task `In Progress` status commit,
+a durable provisioning reservation before branch/worktree/session creation,
+clean rollback to `In Planning`, and uncertain/partial `Blocked` outcome. They
+are intentionally inert: `/implement-task` and `create_task_episode` are not
+registered yet, and current Episode creation continues through the retained
+folder workflow above until the task-native mechanical boundary lands.
+
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/extensions/reviewed-plan.ts`
@@ -58,6 +70,8 @@ explicit host request.
 - `src/prime-agent-plugin/extension-support/episode-ownership.ts`
 - `src/prime-agent-plugin/workflows/implement-prep.md`
 - `src/prime-agent-plugin/workflows/implement-spec.md`
+- `src/prime-agent-plugin/workflows/implement-task-prep.md` (staged policy)
+- `src/prime-agent-plugin/workflows/implement-task.md` (staged policy)
 
 ## Design references
 

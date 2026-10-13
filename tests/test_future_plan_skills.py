@@ -424,3 +424,72 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
     assert 'name: "plan_task"' in extension
     assert 'command: "plan-spec"' in extension
     assert 'name: "plan_spec"' in extension
+
+
+def test_task_native_implementation_policies_are_staged_without_public_activation() -> None:
+    prep = " ".join(workflow("implement-task-prep").read_text().split())
+    implement = " ".join(workflow("implement-task").read_text().split())
+
+    for fragment in (
+        "<operator-implementation-task-id>",
+        "backlog task view --json -- TASK-ID",
+        "status is exactly `In Planning`",
+        "meaningful",
+        "not blank or an obvious placeholder",
+        "not the authoritative implementation-readiness review",
+        "sole follow-up",
+        "cannot cancel, replace, reconstruct, retry, or invoke",
+        "operator review decisions",
+        "Conversation-to-Episode authority",
+        "Status",
+        "Evidence",
+        "Next Step",
+        "compaction requested",
+        "compaction confirmed",
+    ):
+        assert fragment in prep
+    assert prep.count("await compact.run(focus_hint)") == 1
+    assert "Do not run `prepare`" in prep
+
+    for fragment in (
+        "<operator-implementation-task-id>",
+        "backlog task view --json -- TASK-ID",
+        "status to be exactly `In Planning`",
+        "Reject any other status without mutation",
+        "Description, Acceptance Criteria",
+        "Implementation Plan",
+        "without guessing material product choices",
+        "Do not demand standard threat, failure, recovery, complexity, hardening",
+        "Do not call `create_task_episode`",
+        "call `create_task_episode` exactly once",
+        "exact canonical task ID as its sole `taskId` argument",
+        "from `In Planning` to `In Progress` through Backlog",
+        "commit and verify that exact task path",
+        "persist one `provisioning` ownership record",
+        "bound to the canonical task and status-commit SHA",
+        "before creating any branch, worktree, or session",
+        "creates the Episode branch and worktree from that recorded SHA",
+        "transport failure alone does not block local Episode creation",
+        "returns the exact main task to `In Planning`",
+        "partial, or uncertain mutation publishes `Blocked`",
+        "must never be retried as a new Episode",
+        "one fixed execute assignment",
+        "Do not begin implementation in the owner Conversation",
+    ):
+        assert fragment in implement
+    assert implement.index("verified status commit") < implement.index("persist one `provisioning` ownership record")
+    assert implement.index("persist one `provisioning` ownership record") < implement.index("before creating any branch, worktree, or session")
+    assert implement.index("before creating any branch, worktree, or session") < implement.index("creates the Episode branch and worktree from that recorded SHA")
+
+    for name in ("implement-task-prep", "implement-task"):
+        source = workflow(name)
+        tracked = ROOT / ".prime-claw" / "workflows" / f"{name}.md"
+        assert tracked.read_bytes() == source.read_bytes()
+
+    extension = (
+        ROOT / "src" / "prime-agent-plugin" / "extensions" / "reviewed-plan.ts"
+    ).read_text()
+    assert 'command: "implement-task"' not in extension
+    assert 'name: "create_task_episode"' not in extension
+    assert 'command: "implement-spec"' in extension
+    assert 'name: "create_spec_episode"' in extension
