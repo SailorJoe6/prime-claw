@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 21:57'
+updated_date: '2026-10-13 22:42'
 labels:
   - backlog-md
   - episode-loop
@@ -667,4 +667,14 @@ A temporary create attempt for the seven new epics was fully rolled back before 
 The operator selected the supported-capability path. Implement and validate an upstream-quality Backlog operation that restores one exact completed record from `backlog/completed/` to active task storage without changing its ID, parent, content, or terminal `Done` status. Normal supported `task edit` may then update that same record; `task complete` must run only after all intended edits and validation.
 
 This capability is the next bounded slice and must be delivered as its own reviewable checkpoint before broader migration resumes. Keep implementation and validation in this Episode. Do not open, prepare, or pursue any upstream issue or pull request; the owning Conversation may assign that transport separately only after accepting the capability candidate. No direct-edit exception, migration mutation, plan movement/deletion, or lifecycle-status change is authorized by this decision.
+
+### Completed-task restore capability candidate
+
+Implemented the operator-selected unblock as dependency commit `5d556c1954f7724abd180f6211cf528e9253ad4c`. `backlog task restore <taskId>` now restores one exact local completed file to active storage without parsing or reserializing it, preserving ID, `parent_task_id`, filename, raw bytes/content, and terminal status. It uses a per-task lock and no-clobber hard-link/unlink move; ContentStore publishes the record only in the active corpus. The normal `task edit` path then works, and `task complete` returns the record to completed storage only after intended edits and validation.
+
+Auto-commit prepares both paths in a temporary Git index and publishes them atomically. Staging/commit failure restores owned index state and the byte-identical completed file; ownership loss reports partial state. Core now forces working-copy-only resolution even when a caller omits options. Independent review identified and the implementation repaired the earlier partial-staging and caller-locality defects.
+
+Validation: 125 focused/regression tests passed, including exact preservation, destination collision, restore→edit→complete, prior-staged-state commit rollback, staging-failure index atomicity, custom prefixes, cache transition, and local-only resolution. `bun run check`, `bun run check:types`, and `bun run build` passed. The full dependency run recorded 2,892 passes and 8 skips; its 13 unrelated failures were triaged: four cleared in isolation/sequentially, eight TUI move failures/errors reproduce on the untouched base, and the branch-loader mock-count assertion also reproduces on the untouched base in this nested submodule path. The project host-safe suite recorded 653 passes, 1 skip, 65 deselections, and 75 subtests with the same two known unrelated static-policy failures. `git diff --check` passed.
+
+No migration record, historical epic, To Do status, config, asset, lifecycle status, or plan location changed. Broader migration remains paused until the owning Conversation accepts this separate capability checkpoint. No upstream issue or pull request was opened or prepared.
 <!-- SECTION:NOTES:END -->

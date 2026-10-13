@@ -134,6 +134,13 @@ no generic claim edit: implementation admission and later `Blocked`, resumed
 the reviewed Conversation lifecycle. `backlog task complete` is reserved for
 explicit one-time history cleanup, not ordinary Episode completion.
 
+For an explicitly approved history migration, `backlog task restore TASK-ID`
+moves that exact record from `backlog/completed/` back to active task storage
+without changing its ID, parent, content, filename, or terminal status. It does
+not reopen the task: apply intended changes through normal `task edit`, validate
+them, and only then use `task complete` to return the record to completed
+storage.
+
 Use the CLI for every task mutation. Do not edit task Markdown directly. The
 tracked `backlog/` directory is canonical task state, while normal repository
 instructions retain Git commit, pull, and push authority. Durable repository

@@ -1260,6 +1260,56 @@ the capability checkpoint is accepted, do not resume the migration, infer a
 direct-edit exception, move/delete plan files, or change `PRIMECLAW-10.38`
 lifecycle status.
 
+#### Supported completed-task restore capability checkpoint
+
+The operator-selected unblock is implemented as an isolated Backlog capability
+candidate. Dependency commit
+`5d556c1954f7724abd180f6211cf528e9253ad4c` adds
+`backlog task restore <taskId>` as a canonical CLI operation. It resolves one
+exact local completed identity, holds its task lock, moves the same file back to
+active storage with no-clobber hard-link/unlink semantics, and never parses or
+serializes the record. The ID, `parent_task_id`, filename, raw bytes, and
+terminal status therefore remain unchanged. The restored record is published
+coherently into the active ContentStore corpus; normal `task edit` works, and
+`task complete` returns it to completed storage only after intended edits and
+validation.
+
+The implementation also makes auto-commit staging transactional. Both sides of
+the move are prepared in a temporary Git index and published to the real index
+in one `update-index` operation. A staging or commit failure conditionally
+restores owned index entries and moves the byte-identical file back; ownership
+loss reports explicit partial state instead of inviting a blind retry. Core
+forces working-copy-only resolution even when an internal caller omits read
+options. Independent review found the earlier partial-staging and caller-locality
+defects; both were repaired before this checkpoint.
+
+Validation evidence:
+
+- 125 focused/regression tests passed across restore lifecycle, custom-prefix ID
+  resolution, ContentStore transitions, and local command boundaries.
+- Restore proof covers byte-for-byte identity/content/parent/status preservation,
+  occupied-destination no-clobber behavior, restore → normal edit → complete,
+  commit-failure rollback that preserves prior staged work, and staging-failure
+  rollback that leaves the real index unchanged.
+- `bun run check`, `bun run check:types`, and `bun run build` passed.
+- The complete native dependency suite recorded 2,892 passes and 8 skips. Its 13
+  unrelated failures were triaged: MCP search, Git timeout, bulk move, and
+  ContentStore watcher failures cleared on isolated/sequential rerun; the eight
+  TUI move failures/errors reproduce unchanged on the untouched dependency base;
+  and the branch-loader mock-count assertion also fails on the untouched base in
+  this nested submodule path while passing in an external clean worktree.
+- The project host-safe suite recorded 653 passes, 1 skip, 65 deselections, and
+  75 subtests; its two failures are the already-recorded unrelated static-policy
+  baseline failures.
+- `git diff --check` passed, and the built candidate exposes the documented
+  `task restore` help contract.
+
+This checkpoint changes no migration record. The seven completed owners remain
+under `backlog/completed/`; no historical epic, `To Do` classification, config,
+asset, lifecycle status, or plan location changed. Broader migration remains
+paused pending Conversation acceptance of this capability candidate. No issue
+or pull request was opened or prepared.
+
 ### 5. Perform the one-time task and bundle migration through Backlog CLI
 
 Freeze the committed Episode base SHA as the pre-cutover provenance commit and
