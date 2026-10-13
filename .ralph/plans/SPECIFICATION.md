@@ -1,14 +1,15 @@
-# Replace Beads with a vendored Backlog.md fork as-is
+# Replace `.ralph/plans` with task-native Backlog/Ralph lifecycle
 
-## Authoritative specification
+The authoritative specification for this future bundle is Backlog.md epic
+`PRIMECLAW-10.38`.
 
-Backlog.md task `PRIMECLAW-35` is the complete and sole authoritative
-specification for this work. Before implementation, reload it from the
-repository with:
+Read it through the supported project interface:
 
-```sh
-backlog task view PRIMECLAW-35 --plain
+```bash
+backlog task view PRIMECLAW-10.38 --plain
 ```
 
-Implement that task exactly as written. This compatibility document adds no
-requirements, scope, or authority beyond the task.
+This file exists only to satisfy the current Prime Claw future-specification
+bundle contract. It defines no independent or additional scope. Revise the
+Backlog task through the supported CLI rather than duplicating specification
+content here.

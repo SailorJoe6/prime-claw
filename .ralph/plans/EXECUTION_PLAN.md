@@ -1,199 +1,267 @@
-# Execution plan — `PRIMECLAW-35`
+# Execution Plan — Task-native Backlog/Ralph lifecycle
 
-Execute Backlog.md task `PRIMECLAW-35` in an isolated Episode worktree. Reload
-it before each implementation pass with `backlog task view PRIMECLAW-35
---plain`. The task is the sole product scope, requirements, non-goals, and
-acceptance contract.
+> **Authoritative product contract:** Backlog epic `PRIMECLAW-10.38`
+>
+> **Final old-style admission bundle:** `.ralph/plans/future/replace-ralph-plans-with-backlog`
+>
+> This is the last plan stored under `.ralph/plans`. Its accepted implementation
+> migrates this plan into `PRIMECLAW-10.38` and deletes `.ralph/plans` in the
+> candidate tree. Planning does not authorize implementation.
 
-## Ordered implementation work
+## Implementation boundary
 
-1. **Vendor and build.** Resolve the bounded latest stable release, pin the fork
-   submodule, build the accepted host and sandbox artifacts, and report the tag,
-   commit, and existing smoke-check output.
-2. **Initialize and migrate.** Initialize the accepted configuration, recreate
-   every issue through the native CLI, and run the exact count, content,
-   comment, relationship, and reference checks required by the bead.
-3. **Convert callers.** Replace active repository Beads usage and navigational
-   IDs, remove repository-specific Beads integration, and perform only the
-   bead's required one-time cutover search.
-4. **Validate the candidate.** Run the final Beads source-stability check,
-   migration checks, builds, existing relevant lifecycle tests, and required
-   Docker-only plugin gates; then commit and push the candidate for review.
+Replace plan-folder identity with one exact Backlog task across design, planning,
+Episode admission, execution, handoff, review, completion, and abandonment. Reuse
+the current prep/follow-up chain, Orca/local worktree creation, durable Prime
+Agent sessions, exact-owner checks, and uncertainty handling. Do not add a
+second tracker abstraction, cross-checkout wrapper, status-sync protocol,
+replacement digest, transaction journal, custom merge driver, runtime cutover
+hook, or Prime Agent change.
 
-Complete this work in practical reviewable increments. The Episode may choose
-smaller steps when useful; this file does not require a fixed evidence format or
-extra process artifacts. If a material product decision is missing, stop and ask
-the operator rather than guessing.
+The implementation Episode must use the repository-built Backlog candidate for
+development and migration commands. Plugin runtime code may invoke the supported
+`backlog` CLI from `PATH`; it must not parse or edit task Markdown directly.
+Plugin-source validation remains Docker-only and must not apply or probe the
+user-global candidate.
 
-Normal review checks the candidate against Backlog.md task `PRIMECLAW-35`. It is not an
-adversarial or red-team exercise. Reviewer suggestions, speculative hardening,
-alternative architecture, and newly imagined invariants do not change scope or
-block completion. Only a concrete material defect against the bead's accepted
-behavior requires repair.
+## Final old-style admission prerequisite
 
-## Progress
+This migration is admitted through the existing `/implement-spec` path, but its
+branch must already start from truthful task state. After the future bundle is
+approved and the implementation-readiness review passes, the owning Conversation
+must, before calling `create_spec_episode`:
 
-- **Slice 1 — accepted at candidate commit
-  `16a826d005a45ffd70befa1da9cf162e77356a28` (2026-10-12).** Branch and
-  upstream match, the worktree was clean at acceptance, the runtime reports
-  `1.53.0`, and focused tests pass (`37 passed`). Created the long-lived
-  `SailorJoe6/Backlog.md` fork connected to `MrLesk/Backlog.md`, resolved the
-  bounded latest stable release as `v1.53.0`, and pinned `deps/backlog` to
-  `fd20f71493fb4eda44b021aa89f257956f17fb71`. The host artifact passed
-  upstream's `scripts/smoke-compiled-build.ts`. `bin/prime-claw build --force`
-  completed after Docker Desktop recovery; the Linux arm64 artifact passed the
-  same upstream smoke during that build, and the published runtime image
-  returned `1.53.0` from `/usr/local/bin/backlog --version`. Focused tests
-  passed (`37 passed`), and the host-safe suite passed (`607 passed, 1 skipped,
-  65 deselected, 75 subtests`). Build and provenance usage are documented in
-  `docs/backlog.md`.
-- **Slice 2 — accepted at candidate commit
-  `4e024dee684d26450d2ae36ee06d7909b1659b99` (2026-10-12).** Branch and
-  upstream match, the worktree was clean at acceptance, the final Beads source
-  hash matches `3101daa5c0372b7b45da074b64c9ca062b00380f986ab9daa187364c0dcf45a2`,
-  destination counts are 120 total / 79 completed / 41 active, exact validation
-  reports 85 parent links, 60 blocking links, 10 nonblocking references, 116
-  comments, and 256 acceptance criteria, and focused tests pass (`2 passed`).
-  `PRIMECLAW-35` remains open as required.
-- **Slice 3 — accepted at candidate commit
-  `728f3133d13ba0c353bcf728b15a6734e0a28db0` (2026-10-12).** Branch and
-  upstream match, the worktree was clean at acceptance, caller conversion and
-  the one-time cutover inventory are recorded, focused checks pass, the
-  host-safe suite reports `612 passed, 66 skipped`, and the equivalent
-  disposable-clone Docker plugin probe passed. `PRIMECLAW-35` remains In
-  Progress for Slice 4.
-- **Slice 4 — complete in the pending final-validation commit (2026-10-12).**
-  The standard initialized-worktree Tier 1 probe passes after repository
-  snapshots learned to omit tracked gitlinks consistently whether their
-  submodule checkout is initialized or absent. Final source stability,
-  migration equivalence, host/runtime builds, lifecycle coverage, the full
-  host-safe suite, and required Docker-only gate all pass. `PRIMECLAW-35`
-  remains In Progress; host activation, merge, final summary, and Done remain
-  operator-controlled post-merge work on primary `main`.
+1. update only `PRIMECLAW-10.38` to `In Progress` through the Backlog CLI;
+2. commit only the returned task path on main and verify the commit contains no
+   other path;
+3. attempt a prompt push when the remote is available, without making push
+   success a local creation gate; and
+4. call the existing Episode-creation tool so its `baseRef` is that exact status
+   commit.
 
-## Slice 2 moving-source contract (approved 2026-10-12)
+The pre-cutover config does not yet admit `In Planning`. If this final old-style
+creation fails before any resource or ownership mutation and the failure is
+proven clean, restore its exact pre-admission `To Do` state in a task-only
+commit; this is a one-time compatibility rollback, not the new product
+behavior. If creation is partial or uncertain, set the task `Blocked` with the
+exact recovery condition and do not retry it as a new Episode. The implemented
+`/implement-task` path must use the specified `In Planning` clean rollback.
 
-- The operator approved migration of the complete current Beads snapshot taken
-  immediately before the first Backlog.md write. Ordinary issues added before
-  that snapshot are included automatically and are not a blocker or a new
-  decision. Current observed values are 120 issues (79 closed and 41
-  active/blocked), 85 parent links, 60 blocking links, and 10 nonblocking
-  references; the actual migration and validation use the final snapshot's
-  exact counts and content.
-- The pinned `v1.53.0` host artifact was rebuilt and smoke-tested successfully.
-  The exact noninteractive initialization command was probed with
-  `--integration-mode none`, visible `backlog/`, prefix `primeclaw`,
-  active-branch checking enabled, and remote operations disabled.
-- Resume Slice 2 by taking the final read-only Beads snapshot immediately before
-  initialization, then migrate it fully through direct supported CLI calls and
-  validate exact snapshot equivalence. Commit and push Slice 2, then stop before
-  caller conversion.
+## Ordered implementation slices
 
+### 1. Establish task-native lifecycle and reviewed authoring/planning
 
-## Slice 2 parent-order resolution (approved 2026-10-12)
+- Add focused Backlog CLI support in the plugin for resolving an exact task by
+  ID and consuming its supported JSON fields. Keep this as a narrow command
+  seam for existing lifecycle code and tests, not a parallel task model or a
+  Markdown parser.
+- Replace folder validation and public reviewed-plan surfaces in
+  `src/prime-agent-plugin/extensions/reviewed-plan.ts` and
+  `extension-support/reviewed-plan-support.ts` with task identity:
+  `/plan TASK-ID`, `plan_task`, `/implement-task TASK-ID`,
+  `create_task_episode`, `handoff_task_episode`, and
+  `finalize_task_episode`. Preserve the existing
+  prep-turn, focused-compaction, sole-follow-up, ephemeral approval, and
+  optional exact Orca host-selection behavior.
+- Update `backlog/config.yml` to the final ordered statuses `In Design`,
+  `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, `Done`, with
+  default `In Design`. During the one-time state migration only, temporarily
+  retain `To Do` in the uncommitted working configuration until every existing
+  task has a truthful replacement status.
+- Rewrite the source `design` and `spec-it-out` project templates to create a
+  new `In Design` task or update only an explicitly selected task already in
+  `In Design`. Store specification narrative, native acceptance criteria,
+  constraints, references, and documentation in supported task fields. Reject
+  later states and stop for review without planning or implementation.
+- Replace plan-prep/plan-spec policy with task-native planning. Native preflight
+  accepts only `In Design` or `In Planning`; the semantic turn reloads the task,
+  writes a meaningful native Implementation Plan through the CLI, changes or
+  retains `In Planning`, commits only that task path, attempts a prompt push,
+  links the task for review, and stops. Later states reject without mutation.
+- Cover fresh/existing authoring, exact-ID resolution, status matrices, blank or
+  placeholder plans, task-only commits, and non-gating push failure in focused
+  Node/Python fixtures.
 
-- The first snapshot was intentionally superseded after the operator updated
-  only `PRIMECLAW-35` to record the approved five-child exception. The
-  uncommitted generated destination was discarded, then the final read-only
-  Beads snapshot was taken immediately before clean reinitialization. It
-  contains 120 ordinary issues (79 closed and 41 active/blocked), 85 parent
-  links, 60 blocking links, 10 nonblocking references, and 116 comments; its
-  canonical JSONL SHA-256 is
-  `3101daa5c0372b7b45da074b64c9ca062b00380f986ab9daa187364c0dcf45a2`.
-  Visible `backlog/` initialization uses integration mode `none`, prefix
-  `primeclaw`, active-branch checking enabled, remote operations disabled, and
-  auto-commit disabled.
-- The operator approved the only in-scope as-is resolution now recorded in
-  `PRIMECLAW-35`: preserve chronological creation order for all ordinary
-  tasks, but defer only the five affected children until immediately after
-  their required parent exists, then create them through supported
-  `task create --parent`. The affected pairs are `PRIMECLAW-22.1` under
-  `PRIMECLAW-22`, plus `PRIMECLAW-10.1`, `PRIMECLAW-10.4`,
-  `PRIMECLAW-10.3`, and `PRIMECLAW-10.2` under `PRIMECLAW-10`.
-- Migration completed without modifying the fork or task Markdown. Direct CLI
-  task views validate all 120 titles, statuses, priorities, types, assignees,
-  labels, descriptions plus labeled legacy sections, 256 conservatively split
-  acceptance criteria, final summaries, spec references, comments, and null
-  implementation-plan/implementation-notes fields. Backlog.md's supported
-  Markdown writer canonically collapsed one redundant blank-line run; all
-  source text otherwise compares exactly through the CLI representation.
-- Exact translated graph validation passes: 85 parent links, 60 blocking
-  dependencies, and 10 nonblocking task references. All 116 comments preserve
-  source order, body, and author. The 79 closed tasks are in
-  `backlog/completed/`; 41 active/blocked tasks remain in `backlog/tasks/`.
-  `python3 -m pytest tests/test_backlog_build.py -q` passes (`2 passed`),
-  `git diff --check` passes, and a fresh read-only Beads export still hashes to
-  `3101daa5c0372b7b45da074b64c9ca062b00380f986ab9daa187364c0dcf45a2`.
-- Stop after committing and pushing Slice 2. Caller conversion remains Slice 3.
+### 2. Bind Episode creation and durable ownership to the exact task
 
-## Slice 3 caller conversion and one-time cutover audit (2026-10-12)
+- Refactor `extension-support/spec-episode.ts` around exact `taskId` and
+  `taskPath`. Remove bundle hashing, copy/promotion, reserved plan directories,
+  and plan-promotion commits while retaining the current Orca/local allocation,
+  durable session publication, one fixed execute assignment, route recovery,
+  and uncertain-mutation safeguards.
+- Replace ownership version 1 plan fields (`sourceLocation`, `slug`,
+  `bundleDigest`) in `episode-ownership.ts` with the minimal exact task plus
+  existing owner/base/worktree/session identity. Update strict parsing, atomic
+  writes, Conversation lookup, idempotent close, and display/branch naming;
+  derive a safe branch label from the task ID without making it authority.
+- Make the trusted post-readiness creation path verify `In Planning` plus a
+  meaningful plan, update the exact main task to `In Progress` through the CLI,
+  commit only that path, and create the branch from the resulting SHA. A push is
+  prompt and best effort, never the branch-creation gate.
+- Define and test the recovery boundary: a failure proven to have created no
+  ownership/resource returns main to `In Planning`; any recorded, partial, or
+  uncertain mutation publishes `Blocked` with its recovery condition, retains
+  evidence/resources, and rejects replay as a fresh creation.
+- Inject the exact task ID into the Episode execute prompt. Prove the new
+  worktree starts at the status commit and one ownership record continues across
+  execute, compaction, handoff, route reopen, and revision passes.
 
-- Performed the required repository-wide cutover inventory once across 510
-  tracked/nonignored files. It found 266 files containing candidate Beads,
-  `.beads`, `bd` command, or former-ID text. The transient Slice 2 ID mapping
-  resolved genuine issue IDs; similarly shaped runtime names and image tags
-  were not treated as task references. No audit allowlist, crosswalk, migration
-  driver, or permanent absence test was added.
-- Replaced the project Beads skill with direct Backlog.md guidance. Ready work
-  uses `backlog task list --status "To Do" --ready --plain`; claiming uses one
-  `backlog task edit <id> --status "In Progress" --assignee <name>` operation.
-  Execute, prepare, blocked, and handoff project assets plus their managed source
-  templates now use Backlog.md without changing lifecycle authority.
-- Removed tracked `.beads/`, Beads merge rules and ignores, and Beads-generated
-  Codex hooks. Updated repository instructions, current/future planning
-  material, current architectural docs, and active Backlog.md task content.
-  Active task mutations used the supported CLI. Navigational references in
-  current docs and mutable historical indexes use translated `PRIMECLAW-*` IDs. Old names, commands, and IDs remain only in
-  factual migration history, immutable archived plans/evidence/reports, and
-  verbatim migrated completed-task/comment history.
-- Added native workflow documentation to `docs/backlog.md` and positive
-  regression coverage in `tests/test_backlog_workflow.py`; no lasting absence
-  assertion was introduced. Focused validation passes (`12 passed, 3
-  deselected`); the full host-safe suite passes (`612 passed, 66 skipped, 11 warnings, 75 subtests`); and
-  `git diff --check` passes. The Docker-only plugin probe passed in a
-  disposable non-recursive clone after the standard initialized-worktree limitation below was isolated.
-- The standard initialized-worktree Tier 1 launcher currently fails before
-  Docker execution because its repository snapshot code treats the initialized
-  `deps/backlog` gitlink directory as an unsupported non-file input. Slice 3
-  does not redesign the provenance subsystem. Its required plugin-only probe passed from a disposable non-recursive clone with the empty gitlink path
-  absent. Slice 4 must repair or otherwise clear the standard initialized-
-  worktree gate before final candidate acceptance.
-- Stop after committing and pushing Slice 3. Final Beads source stability,
-  complete migration equivalence, builds, lifecycle suites, and final Docker
-  candidate gates remain ordered Slice 4 work. Host activation and final task
-  closure remain operator-controlled post-merge work.
+### 3. Convert Episode work and Conversation oversight without changing authority
 
-## Slice 4 final candidate validation (2026-10-12)
+- Rewrite `execute` so the Episode reloads its bound task and changes only task
+  content on its branch: in-scope plan refinements, Implementation Notes,
+  acceptance evidence/check state, blocker details, references, and Final
+  Summary. It never changes lifecycle status and no longer reads, moves, or
+  archives plan files.
+- Rewrite `blocked` and `handoff` so blockers and resumable context live in the
+  same task. The Episode reports through existing messaging; the Conversation
+  publishes `Blocked` or resumed `In Progress` on main with exact task-only
+  commits and prompt pushes, then continues the same Episode.
+- Update `prime-claw-oversee-episode` and Expert-review artifact language to the
+  approved task fields. Keep Expert review read-only and findings bounded by
+  the approved contract.
+- Implement and test the final-review handshake: the candidate task is complete
+  but remains `In Progress`; Conversation acceptance publishes
+  `Ready for Merge` on main; the same Episode integrates main and resolves the
+  expected task-file divergence by retaining all Episode-owned content plus the
+  main-owned status; the Conversation verifies that refreshed candidate before
+  asking for merge authority.
+- Encode the operator outcomes in guidance and fixtures: delay retains
+  `Ready for Merge` and all resources; requested changes publish `In Progress`
+  and resume the same Episode; verified merge is followed immediately by the
+  exact main task `Done` commit/push; ownership and resources remain until the
+  separately authorized finalization/cleanup path.
+- Document and test confirmed abandonment without a new tool: bind the exact
+  Episode head/task path, snapshot main status and invariant ID/parent metadata,
+  select only the Episode task blob, reapply captured status through the CLI,
+  verify the effective diff imports only Episode-owned task content and no code,
+  add the abandonment Final Summary, archive without `Done`, commit/push the
+  exact archival state, verify it, and only then perform authorized cleanup.
 
-- Re-read the legacy Beads source in explicit read-only mode. Its 120-line
-  canonical export remains byte-identical at SHA-256
-  `3101daa5c0372b7b45da074b64c9ca062b00380f986ab9daa187364c0dcf45a2`.
-- Re-read all 120 Backlog.md tasks through the supported CLI. The accepted
-  migration remains 79 Done and 41 active/blocked tasks, with 85 parent links,
-  60 blocking dependencies, all 10 translated nonblocking references, 116
-  migrated source comments plus the Slice 3 operational comment, and 256
-  acceptance criteria. The task tree has no drift from accepted Slice 3.
-- Repaired only repository snapshot handling for Git index mode `160000`:
-  initialized and absent gitlink checkouts are represented as missing snapshot
-  inputs, so nested repositories are never traversed or copied. A focused real-
-  submodule regression and a direct snapshot of this initialized worktree pass.
-- Pinned the runtime build tool to Bun `1.3.11`, matching the accepted host
-  toolchain. This cleared a concrete floating-installer failure where a cached
-  Bun `1.4.3` Backlog binary exited with `SIGBUS`. The fresh runtime build ran
-  the upstream compiled-binary smoke path and a networkless container reports
-  Bun `1.3.11` and Backlog.md `1.53.0`.
-- `scripts/build-backlog.sh` passes for `v1.53.0` at
-  `fd20f71493fb4eda44b021aa89f257956f17fb71`. The final host-safe suite passes
-  (`613 passed, 66 skipped, 11 warnings, 75 subtests`). The standard
-  initialized-worktree `scripts/test-tier1.sh --probe` passes with the verified
-  Prime Agent source selector, offline RPC checks, network removal, teardown,
-  and manifest publication.
-- Stop after committing and pushing this candidate. Do not activate either host
-  artifact, merge, close `PRIMECLAW-35`, or perform its final-summary/Done
-  mutation from this Episode.
+### 4. Reconcile managed assets, current documentation, and traceability
 
-## Operator-controlled completion
+- Rename or retire old plan-folder workflow assets in
+  `asset-inventory.json`; install task-native project-customizable workflows and
+  preserve customized assets through the existing project-initialization
+  reconciliation rules. Update the builder project's tracked `.agents` and
+  `.prime-claw` copies and `.prime-claw/templates.json` from source inventory;
+  do not use the installed user-global plugin.
+- Update initialization tests so a current project receives task-native assets
+  and no `.ralph/plans` tree. Keep active-Episode snapshot protection and safe
+  customized-template behavior unchanged.
+- Rewrite current architecture and operator guidance in `AGENTS.md`,
+  `README.md`, `VISION.md`, `LONG_RANGE_PLAN.md`, `DEVELOPERS.md`,
+  `.agents/skills/backlog/SKILL.md`, the source/project `prepare` guidance, and
+  the relevant docs for backlog, preparation/handoff, project initialization,
+  Conversation oversight, user stories C–I, story traceability, and the docs
+  index. Replace live plan links with task IDs and `backlog task view` guidance.
+  The Backlog skill must discover and claim work through the new lifecycle and
+  must not retain an active `--status "To Do"` selection path; this does not add
+  an ordinary-work plugin command.
+- Update `config/requirements-inventory.json` and inventory tests so every live
+  proof path survives deletion. Keep literal old paths only in clearly
+  historical evidence, reports, completed-task prose, or provenance statements
+  where rewriting would falsify history; convert broken live links to task
+  references or `path @ pre-cutover commit` provenance.
 
-After the operator authorizes merge and activation, the migrated epic is closed
-from primary `main` exactly as required by `PRIMECLAW-35`. This is not Episode
-implementation work and the Episode must not perform or automate it.
+### 5. Perform the one-time task and bundle migration through Backlog CLI
+
+Freeze the committed Episode base SHA as the pre-cutover provenance commit and
+inventory tracked files from that tree, not unrelated dirty or untracked files
+in another checkout. Do not commit a runtime migration script or journal. Use a
+bounded temporary REPL/helper only to issue supported Backlog CLI operations,
+then validate the resulting tracked state.
+
+Apply this reviewed mapping; preserve existing task IDs and every existing
+`parent_task_id`:
+
+| Legacy bundle | Destination |
+|---|---|
+| active root `replace-beads` pair, plus any byte-identical `archive/replace-beads` copy present in the bound tree | deduplicate as one bundle; reuse existing epic `PRIMECLAW-35` and record every present source path |
+| `archive/phase2-runtime` | reuse `PRIMECLAW-6`, promote type to epic |
+| `archive/handoff-continuation-resilience` | reuse `PRIMECLAW-10.15`, promote to epic |
+| `archive/conversation-driven-episode-oversight` | reuse `PRIMECLAW-10.26`, promote to epic |
+| `archive/goal-heartbeat-work-control` | reuse `PRIMECLAW-10.28`, promote to epic |
+| `archive/plugin-test-container` and its review files | reuse existing epic `PRIMECLAW-19` |
+| `archive/project-wide-testing-strategy` | reuse `PRIMECLAW-20`, promote to epic |
+| `archive/official-lean-compatibility-cleanup` | reuse `PRIMECLAW-10.34`, promote to epic |
+| this migration bundle | reuse existing epic `PRIMECLAW-10.38` |
+| `archive/phase1-derisk-gate` | create one Done historical epic; reference `PRIMECLAW-1`, `-4`, `-5` |
+| `archive/worktree-isolated-specification-episodes` | create one Done historical epic; reference `PRIMECLAW-10.16`–`.18` and plausible predecessor lineage `.5`–`.7` |
+| `archive/conversational-ralph-command-routing` | create one Done historical epic; reference `PRIMECLAW-10.22`–`.25` |
+| `archive/compaction-first-phase-transitions` | create one Done historical epic; reference `PRIMECLAW-10.30`, `.31`, and separately blocked dogfood `.32` |
+| `archive/official-lean-session-protocol` | create one Done historical epic with bidirectional replacement reference to `PRIMECLAW-10.34` |
+| `archive/phase3a-bufd-superseded-incomplete` | create one Done completed-but-partial historical epic with evidence-based checked/unchecked criteria and a superseded Final Summary; link it bidirectionally with replacement epic `PRIMECLAW-7` |
+| `future/phase3a-brain-hosting-completion` | reuse exact owner `PRIMECLAW-7`, promote it to epic, retain truthful `Blocked`, and reference existing children `.3`, `.4`, `.5`, `.6` without changing their parents |
+| `future/delivery-manager-episode-supervision` | create one `In Design` epic; reference superseding role work `PRIMECLAW-10.36` without treating it as owner |
+
+Treat `.ralph/plans/archive/README.md` as shared evidence for every affected
+bundle: import its material terminal/status outcome into the corresponding task
+and include the index path in provenance rather than silently discarding it.
+Account for every tracked file under `.ralph/plans` at the bound pre-cutover
+commit as mapped bundle content, shared evidence/provenance, nested review
+evidence, or the intentional `PRIMECLAW-10.38` compatibility pointer.
+
+For each bundle, merge specification/requirements into Description and native
+acceptance criteria, the execution plan into Implementation Plan, durable
+execution history into Implementation Notes, and terminal outcome into Final
+Summary. Import true criteria in source order, retain legacy criterion IDs in
+text, and set checked state only where source evidence supports it. Record the
+pre-cutover commit and every source path; rely on Git history for verbatim
+bytes. Add references rather than guessing hierarchy when ownership is not
+one-to-one.
+
+Migrate all existing `To Do` tasks after the new statuses are available:
+meaningful native plan → `In Planning`; otherwise → `In Design`, unless stronger
+recorded evidence establishes another state. Explicitly treat
+`PRIMECLAW-10.37` as `Done` because its three implementation children and landed
+product evidence are complete. For `PRIMECLAW-7.6`, verify the recorded accepted
+candidate/branch at cutover: use `Ready for Merge` only if that exact pending
+merge state remains true; otherwise use `Blocked` with the exact recovery
+condition rather than pretending it is unstarted. Preserve the existing blocked
+Phase 3 tasks. Remove `To Do` from final config only after proving no active task
+still uses it.
+
+Move successful historical epics to `backlog/completed/` only through
+`backlog task complete`; keep current `Done` work on the active board unless it
+is part of this explicit one-time history cleanup. Put no existing bundle in
+`backlog/archive/`. Finally import this plan and implementation evidence into
+`PRIMECLAW-10.38`, then delete the entire tracked `.ralph/plans` tree.
+
+### 6. Prove the cutover and leave a reviewable candidate
+
+- Add representative disposable-repository fixtures for status migration,
+  one-epic-per-bundle mapping, ordered and checked legacy criteria, immutable
+  IDs/parents, provenance, completed history, partial/superseded Phase 3a,
+  ambiguous references, and absence of soft-deleted legacy work.
+- Run focused Node and Python suites for reviewed task planning, Episode
+  admission and failure recovery, ownership, multi-pass handoff, blocked/resume,
+  final review/integration, delay/change/merge/Done, abandonment, finalization,
+  project initialization, inventory, role policy, and user-story traces.
+- Run `git diff --check`, the host-safe repository suite, and the required
+  Docker-isolated plugin gate (`scripts/test-tier1.sh --probe`; run
+  `scripts/test-all.sh` when the environment supports the full accepted gate).
+  Never run a user-global candidate apply/check or unwrapped native mutation
+  probe.
+- Verify task parsing and counts through Backlog CLI; zero live `To Do`; final
+  status order/default; all preexisting IDs and parents unchanged; one epic per
+  unique bundle; required bidirectional references; no migrated bundle under
+  `backlog/archive/`; and no `.ralph/plans` path in the candidate tree.
+- Run a final tracked search. No live command, tool, skill, workflow, template,
+  test, or current doc may treat `.ralph/plans`, `/plan-spec`,
+  `/implement-spec`, `plan_spec`, or plan-folder ownership as authority.
+  Remaining literals must be explicitly historical or pre-cutover provenance.
+- Update `PRIMECLAW-10.38` on the Episode branch with Implementation Notes,
+  acceptance evidence/check state, references, and Final Summary while leaving
+  status unchanged. Commit and push reviewable slices. The Episode reports the
+  exact candidate for Conversation review; it does not mark status, merge,
+  finalize, clean resources, or apply the plugin globally.
+
+## Completion evidence
+
+The candidate is ready for Conversation review only when the task-native flows
+work end to end, the migration assertions and required Docker gate pass, the
+candidate task contains enough evidence to understand the result, the branch is
+clean and pushed, and `.ralph/plans` is absent. The owning Conversation then
+uses the `Ready for Merge` integration handshake and asks the operator for the
+separate merge decision.
