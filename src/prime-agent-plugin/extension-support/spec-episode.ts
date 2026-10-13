@@ -36,6 +36,7 @@ import {
 } from "./reviewed-plan-support.ts";
 import {
   ProcessCommandRunner,
+  resolveNearestProjectRoot,
   type CommandRunner,
 } from "./project-initialization.ts";
 import {
@@ -174,6 +175,7 @@ export interface EpisodeCreationOptions { host?: string; approvedBundleDigest?: 
 
 export interface TaskEpisodeAdmissionGit {
   repositoryRoot(cwd: string): string;
+  branch(repo: string): string;
   head(repo: string): string;
   commitPaths(repo: string, ref: string): string[];
   pathStatus(repo: string, path: string): string;
@@ -235,6 +237,7 @@ export class CliGitAdapter implements GitAdapter {
 }
 export class CliTaskEpisodeAdmissionGit implements TaskEpisodeAdmissionGit {
   repositoryRoot(cwd: string): string { return realpathSync(runGit(cwd, ["rev-parse", "--show-toplevel"])); }
+  branch(repo: string): string { return runGit(repo, ["symbolic-ref", "--short", "HEAD"]); }
   head(repo: string): string { return runGit(repo, ["rev-parse", "HEAD"]); }
   commitPaths(repo: string, ref: string): string[] {
     const output = runGit(repo, ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", ref, "--"]);
@@ -1180,6 +1183,12 @@ export async function createTaskEpisode(
     projectRoot = git.repositoryRoot(ctx.cwd);
     if (!samePath(projectRoot, realpathSync(ctx.cwd))) {
       throw new Error("Task-native Episode creation must run from the repository root");
+    }
+    const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
+    if (!samePath(project.root, projectRoot)
+      || project.kind === "linked-worktree"
+      || git.branch(projectRoot) !== "main") {
+      throw new Error("Task-native Episode creation must run from the canonical primary main checkout");
     }
     if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode creation requires a persisted owner session");
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {

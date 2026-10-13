@@ -71,11 +71,13 @@ bundle promotion, binds one durable exact-CWD session, and sends one execute
 assignment carrying the task ID. Active replay validates the worktree and
 session ID/file/CWD before reopening without reassigning; partial provisioning
 or allocation failure becomes `uncertain` and cannot replay fresh. An inactive
-trusted-admission transaction now commits the exact clean `In Planning` task as
-`In Progress`, best-effort pushes, reserves and allocates from that SHA, and
-verifies durable active identity. Proven-clean pre-ownership failure commits the
-task back to `In Planning`; any recorded or uncertain mutation commits
-`Blocked` with its exact recovery condition while retaining evidence. Folder
+trusted-admission transaction first proves it is at the repository root of the
+primary Git worktree on `main`; linked worktrees and other branches fail before
+any task, Git, ownership, or allocator mutation. It then commits the exact clean
+`In Planning` task as `In Progress`, best-effort pushes, reserves and allocates
+from that SHA, and verifies durable active identity. Proven-clean pre-ownership
+failure commits the task back to `In Planning`; any recorded or uncertain
+mutation commits `Blocked` with its exact recovery condition while retaining evidence. Folder
 admission and close operations explicitly reject version 2 until their
 corresponding task-native surfaces replace them.
 

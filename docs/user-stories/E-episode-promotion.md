@@ -77,11 +77,14 @@ reopen that same identity without replaying the assignment. Partial
 `provisioning` or any failed allocation becomes `uncertain` and cannot replay
 as fresh work.
 
-An inactive trusted-admission transaction now joins those seams. It accepts
-only a clean exact `In Planning` task with a meaningful plan and no non-terminal
-project ownership. It changes that task to `In Progress` through Backlog,
-commits only its canonical path, treats push failure as non-gating transport
-evidence, reserves ownership against that exact commit, allocates, and verifies
+An inactive trusted-admission transaction now joins those seams. Before task
+lookup or mutation, it requires the caller to be at the repository root of the
+primary Git worktree on `main`; a linked worktree or another branch is rejected
+without changing task bytes, Git state, ownership, or allocator state. It then
+accepts only a clean exact `In Planning` task with a meaningful plan and no
+non-terminal project ownership. It changes that task to `In Progress` through
+Backlog, commits only its canonical path, treats push failure as non-gating
+transport evidence, reserves ownership against that exact commit, allocates, and verifies
 the durable active identity plus unchanged main-task state. A proven clean
 failure before ownership or resource mutation commits the exact task back to
 `In Planning`. Any durable or uncertain mutation instead commits `Blocked` plus

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,6 +58,7 @@ function fixture() {
   writeFileSync(join(root, "unrelated.txt"), "baseline\n");
   git(root, "add", "--", "backlog/config.yml", "unrelated.txt");
   git(root, "commit", "-q", "-m", "fixture baseline");
+  git(root, "branch", "-M", "main");
   execFileSync(BACKLOG, [
     "task", "create", "Task-native admission fixture",
     "--status", "In Planning",
@@ -208,6 +209,54 @@ test("post-reservation allocation failure publishes Blocked with exact recovery 
   assert.equal(git(f.root, "rev-parse", "HEAD"), head);
 });
 
+test("task admission rejects linked main and primary non-main checkouts before every mutation", async () => {
+  const f = fixture();
+  git(f.root, "branch", "keeper");
+  git(f.root, "checkout", "-q", "keeper");
+  const linkedParent = mkdtempSync(join(tmpdir(), "prime-claw-foreign-checkout-"));
+  const linked = join(linkedParent, "linked-main");
+  git(f.root, "worktree", "add", "-q", linked, "main");
+
+  const linkedTask = join(linked, f.task.path);
+  const before = {
+    linkedTask: readFileSync(linkedTask),
+    linkedHead: git(linked, "rev-parse", "HEAD"),
+    linkedStatus: git(linked, "status", "--short"),
+    primaryTask: readFileSync(join(f.root, f.task.path)),
+    primaryHead: git(f.root, "rev-parse", "HEAD"),
+    primaryStatus: git(f.root, "status", "--short"),
+  };
+  let reservationCalls = 0;
+  let allocatorCalls = 0;
+
+  const guardedDependencies = {
+    ...f.dependencies,
+    reserveTaskOwnership() { reservationCalls += 1; throw new Error("must not reserve"); },
+    allocateTaskEpisode: async () => { allocatorCalls += 1; throw new Error("must not allocate"); },
+  };
+  await assert.rejects(
+    createTaskEpisode("PRIMECLAW-1", "tool-call", { ...f.ctx, cwd: linked }, guardedDependencies, { engine: "local" }),
+    /canonical primary main checkout/,
+  );
+  await assert.rejects(
+    createTaskEpisode("PRIMECLAW-1", "tool-call", f.ctx, guardedDependencies, { engine: "local" }),
+    /canonical primary main checkout/,
+  );
+
+  assert.equal(git(linked, "branch", "--show-current"), "main");
+  assert.deepEqual(readFileSync(linkedTask), before.linkedTask);
+  assert.equal(git(linked, "rev-parse", "HEAD"), before.linkedHead);
+  assert.equal(git(linked, "status", "--short"), before.linkedStatus);
+  assert.deepEqual(readFileSync(join(f.root, f.task.path)), before.primaryTask);
+  assert.equal(git(f.root, "rev-parse", "HEAD"), before.primaryHead);
+  assert.equal(git(f.root, "status", "--short"), before.primaryStatus);
+  assert.equal(f.record, null);
+  assert.equal(existsSync(join(linked, ".prime-claw", "ownership.json")), false);
+  assert.equal(reservationCalls, 0);
+  assert.equal(allocatorCalls, 0);
+  assert.deepEqual(f.events, []);
+});
+
 test("task admission preflight rejects unclean task and nonterminal ownership without mutation", async () => {
   const dirty = fixture();
   writeFileSync(join(dirty.root, dirty.task.path), `${readFileSync(join(dirty.root, dirty.task.path), "utf8")}\nlocal change\n`);
@@ -268,6 +317,7 @@ test("failed In Progress commit is recovered by one exact In Planning commit", a
   let commits = 0;
   const admissionGit = {
     repositoryRoot: (cwd) => real.repositoryRoot(cwd),
+    branch: (repo) => real.branch(repo),
     head: (repo) => real.head(repo),
     commitPaths: (repo, ref) => real.commitPaths(repo, ref),
     pathStatus: (repo, path) => real.pathStatus(repo, path),

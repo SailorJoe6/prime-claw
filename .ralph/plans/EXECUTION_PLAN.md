@@ -270,21 +270,32 @@ admission:
   source-mode `scripts/test-tier1.sh --probe`, with final evidence at
   `.test-results/20261013T090020Z-68646-c18d94ca/tier1`.
 
-An operator-accepted follow-up revision remains before activation:
-`createTaskEpisode` currently proves only that `ctx.cwd` is a repository root.
-The trusted pre-mutation boundary must additionally reject any linked or foreign
-worktree that is not the canonical primary main checkout before Backlog edit,
-commit, ownership write, or allocation. A disposable eligible `In Planning`
-linked-worktree fixture must prove zero task, Git, ownership, and allocator
-mutation while preserving the accepted transaction behavior and KISS scope.
+#### Slice 2 repair — canonical primary-main admission boundary (2026-10-13)
+
+Completed the operator-accepted repair without activating public admission:
+
+- `createTaskEpisode` now proves the caller is at the repository root of the
+  primary Git worktree on `main` before task lookup or any mutation;
+- linked worktrees and a primary checkout on another branch fail before Backlog
+  edit, commit, ownership read/write, reservation, or allocation;
+- a disposable linked worktree on `main` carries an eligible `In Planning` task
+  and no ownership record, and proves unchanged task bytes, HEAD, worktree
+  status, primary-checkout state, ownership, reservation count, and allocator
+  count; and
+- the accepted admission transaction, retained folder compatibility, and
+  inactive `/implement-task` / `create_task_episode` surface remain unchanged.
+
+Validation passed 114 focused Node tests, 36 host-safe Python checks with 10
+container cases deselected, independent review with no material findings, and
+source-mode `scripts/test-tier1.sh --probe`, with final evidence at
+`.test-results/20261013T091936Z-61769-1fbb9755/tier1`.
 
 Slices 1 and 2 remain open. Public `/implement-task` and
-`create_task_episode`, the canonical-primary-main checkout repair, task-native
-placement selection and approval wiring, retained real-session authoring and
-planning mutation evidence, and final lifecycle/default migration remain later
-increments. Acceptance criteria #2 and #3 remain unchecked until their
-real-session semantic paths are retained; this inactive transaction alone
-completes no criterion.
+`create_task_episode`, task-native placement selection and approval wiring,
+retained real-session authoring and planning mutation evidence, and final
+lifecycle/default migration remain later increments. Acceptance criteria #2
+and #3 remain unchecked until their real-session semantic paths are retained;
+this inactive repair alone completes no criterion.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 
