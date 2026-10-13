@@ -1011,6 +1011,31 @@ changed. Proof-reference normalization, requirements-inventory deletion
 gating, production asset retirement, `.ralph/plans` deletion, and final cutover
 remain separate.
 
+#### Accepted next dependency — normalize proof references and gate inventory
+
+The owning Conversation accepted pushed checkpoint
+`4a40a0832d561e380da32099f07d3ea2195e7e65`. The next execute pass must
+implement only the next already-approved ordered step-4 prerequisite: first
+re-audit the exact tracked `config/requirements-inventory.json` and every
+affected live proof reference, then make all live proof paths deletion-safe and
+add or repair the inventory test gate that proves they will survive later
+deletion of `.ralph/plans`.
+
+Preserve literal old paths only where they are clearly historical evidence,
+reports, completed-task prose, or provenance whose rewriting would falsify
+history. Convert live proof authority to durable task references or explicit Git
+provenance as the approved plan permits. Keep this to one bounded
+proof-normalization and inventory-gating slice.
+
+Do not migrate tasks, statuses, or bundles; do not remove `To Do` from
+configuration; do not retire production assets or retained version-1
+compatibility; do not delete or move `.ralph/plans`; and do not begin final
+cutover. Preserve existing IDs, parents,
+lifecycle state, ownership/resources, acceptance criteria, and operator
+authority. If managed plugin source changes, run the required Docker-isolated
+candidate validation. Validate the relevant inventory and static contracts,
+independently review the bounded candidate, commit, push, report, and stop.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and
