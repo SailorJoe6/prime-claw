@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 05:38'
+updated_date: '2026-10-13 06:06'
 labels:
   - backlog-md
   - episode-loop
@@ -151,3 +151,21 @@ The compatibility `SPECIFICATION.md` for this effort remains only a pointer to t
 - [ ] #18 Existing tests plus focused Docker-isolated plugin acceptance prove Conversation, operator, Episode, and Expert authority; exact ownership; isolated code worktrees; iteration handoff; recovery; review; post-merge `Done` before separately authorized finalization/cleanup; final bookkeeping; and cleanup boundaries remain intact apart from the specified task-native lifecycle.
 - [ ] #19 Static and behavioral acceptance proves no pickup surface, Backlog reparenting feature, cross-checkout Backlog wrapper, branch-projection rule, approval commit/blob/tag scheme, replacement digest protocol, bespoke transaction journal, Prime Agent patch, or other unapproved scope expansion is introduced.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## 2026-10-13 — Backlog task-resolution foundation
+
+Implemented the first bounded increment of execution-plan slice 1. `resolveBacklogTask` now invokes `backlog task view --json -- <task-id>` from the nearest project root, lets Backlog normalize supported IDs, consumes the supported v1 task-view envelope, and returns the canonical ID, title, status, optional Implementation Plan, project root, and contained regular task path. The seam rejects unsafe selector text and fails closed on command, schema, JSON, and path errors. It does not parse task Markdown or introduce a second task model.
+
+Added focused Node fixtures for canonical shorthand resolution, exact command argv/CWD, supported fields, unsafe selection, nonzero command failure, malformed JSON, and escaped paths. Documented the seam and explicitly deferred public `/plan` activation until compatible lifecycle statuses and reconciled project workflow assets can land together.
+
+Evidence:
+- `python3 -m pytest tests/test_reviewed_plan_extension.py tests/test_future_plan_skills.py -q -m "not container"` — 20 passed, 5 deselected.
+- `git diff --check` — passed.
+- `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T060350Z-97903-65a8f369/tier1`.
+- The earlier full host-safe suite baseline produced 634 passed, 1 skipped, 65 deselected, and 75 subtests, with one unrelated existing policy assertion because `tests/test_runtime_connect.py` says `Offline` rather than the required literal `Offline:` or `host-safe`; this slice does not modify that file.
+
+This foundation does not complete an acceptance criterion. Public task-native planning, task-native authoring, lifecycle status migration, `/implement-task`, ownership, and legacy bundle migration remain.
+<!-- SECTION:NOTES:END -->
