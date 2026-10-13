@@ -903,9 +903,11 @@ evidence remain unchanged.
 #### Accepted revision — correct Episode edit scope and lifecycle-receipt
 ownership
 
-The operator accepted candidate
-`d8507d7dd1a5d2d31354aaeecf6c5bffbbba0575` subject to exactly two bounded
-documentation repairs. First, `docs/future-specification-bundles.md` must not say
+The owning Conversation requested an in-scope revision of candidate
+`d8507d7dd1a5d2d31354aaeecf6c5bffbbba0575` after Conversation and independent
+EXPERT review demonstrated two concrete defects against the already
+operator-approved contract. First, `docs/future-specification-bundles.md` must
+not say
 a task-native Episode edits only bound-task content: it implements approved
 code, documentation, and tests in its worktree, exclusively owns the bound
 task's content there, and leaves lifecycle status to the Conversation. Second,
