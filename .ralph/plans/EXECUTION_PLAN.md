@@ -270,12 +270,21 @@ admission:
   source-mode `scripts/test-tier1.sh --probe`, with final evidence at
   `.test-results/20261013T090020Z-68646-c18d94ca/tier1`.
 
+An operator-accepted follow-up revision remains before activation:
+`createTaskEpisode` currently proves only that `ctx.cwd` is a repository root.
+The trusted pre-mutation boundary must additionally reject any linked or foreign
+worktree that is not the canonical primary main checkout before Backlog edit,
+commit, ownership write, or allocation. A disposable eligible `In Planning`
+linked-worktree fixture must prove zero task, Git, ownership, and allocator
+mutation while preserving the accepted transaction behavior and KISS scope.
+
 Slices 1 and 2 remain open. Public `/implement-task` and
-`create_task_episode`, task-native placement selection and approval wiring,
-retained real-session authoring and planning mutation evidence, and final
-lifecycle/default migration remain later increments. Acceptance criteria #2
-and #3 remain unchecked until their real-session semantic paths are retained;
-this inactive transaction alone completes no criterion.
+`create_task_episode`, the canonical-primary-main checkout repair, task-native
+placement selection and approval wiring, retained real-session authoring and
+planning mutation evidence, and final lifecycle/default migration remain later
+increments. Acceptance criteria #2 and #3 remain unchecked until their
+real-session semantic paths are retained; this inactive transaction alone
+completes no criterion.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 
