@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 07:48'
+updated_date: '2026-10-13 08:17'
 labels:
   - backlog-md
   - episode-loop
@@ -251,4 +251,20 @@ Evidence:
 - Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T074625Z-51506-443b013a/tier1`.
 
 Slices 1 and 2 remain open. This inactive foundation completes no acceptance criterion. Next work must audit before choosing a bounded allocator or activation increment and must preserve folder compatibility and the transitional `To Do` configuration.
+
+## 2026-10-13 — inactive task-native allocation after reservation
+
+Added the next bounded Slice 2 mechanics without registering public task admission. Internal `allocateReservedTaskEpisode` consumes only the exact version-2 task/owner `provisioning` reservation. It derives non-authoritative branch, worktree, and session labels from the canonical task ID. The local path persists the expected worktree/branch identity before mutation, creates the worktree from the reserved task-only `baseRef`, verifies the clean worktree starts at that exact SHA, creates one durable exact-CWD Prime Agent session, and delivers one execute assignment containing the task ID. The Orca path re-resolves the exact reserved ready local setup, creates the worktree from the same `baseRef`, preserves the existing visible writable retained-tab binding flow, and embeds the task ID in the one automation assignment. Neither path copies a bundle, moves a plan, or creates a promotion commit.
+
+Active task-native replay validates the exact task and owner, worktree/branch, Orca identity when applicable, durable session ID/file, and session CWD. It may reopen the same durable session with a task-derived name, but does not recreate resources or replay execute. A `provisioning` record that already contains any resource identity is treated as partial and becomes `uncertain`. Missing reserved placement and all failures after the durable reservation likewise preserve `uncertain` evidence and cannot replay as fresh allocation.
+
+Independent review found that the first draft matched an active durable session by ID/file without also proving its CWD. The final allocator rejects a correct ID/file rooted in main or another checkout before reopen or assignment. The version-1 folder path remains unchanged.
+
+Evidence:
+- Focused Node command covering task allocation/reservation, retained folder creation, Conversation compaction, final bookkeeping, reviewed-plan behavior, and project initialization — 106 passed.
+- Focused host-safe Python command covering discovery, policy, Conversation oversight, managed source inventory, project initialization, and staged workflow assets — 36 passed, 10 deselected.
+- `git diff --check` — passed.
+- Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T081542Z-76164-4158db63/tier1`.
+
+Slices 1 and 2 remain open. `/implement-task` and `create_task_episode` remain unregistered. Status mutation/commit, the combined reservation/allocation transaction, proven-clean rollback to `In Planning`, and Conversation-owned `Blocked` publication remain later work. This inactive allocator completes no acceptance criterion.
 <!-- SECTION:NOTES:END -->
