@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 10:08'
+updated_date: '2026-10-13 10:16'
 labels:
   - backlog-md
   - episode-loop
@@ -341,4 +341,10 @@ Evidence:
 - Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T100557Z-41220-9a097e6b/tier1`.
 
 Slices 1 through 3 remain open. Public task admission/handoff/finalization, Conversation-owned Blocked/resume publication, oversight and Expert task authority, Ready-for-Merge integration, operator decision outcomes, abandonment/finalization, retained real-session evidence, and final lifecycle/default migration remain. AC #2, #3, #6, #7, and #8 remain unchecked; this inactive continuation seam alone completes no acceptance criterion.
+
+## 2026-10-13 — accepted continuation preflight revision after b1f49bf
+
+The accepted inactive task-native continuation has one remaining in-scope defect before public activation: `handoffTaskEpisode` resolves the main task from working-tree bytes but does not prove the exact main task path matches its committed state. A committed `Blocked` or `Ready for Merge` task can be edited locally and uncommitted back to `In Progress`, allowing ordinary continuation before the Conversation has truthfully published the status commit.
+
+Next execution must require the exact main task path to be clean against HEAD before any route reopen, ownership refresh, handoff, or execute delivery, while allowing unrelated dirty main paths. Add a regression with committed non-resumable status plus dirty task-path bytes that resolve as `In Progress` and prove zero reopen, ownership refresh, handoff, or execute delivery. Also prove unrelated main dirt does not block valid continuation. Preserve the otherwise accepted continuation behavior, retained folder compatibility, and inactive public task admission/handoff/finalization surfaces.
 <!-- SECTION:NOTES:END -->
