@@ -955,6 +955,26 @@ behavior remains unchanged. The separate no-`To Do` guidance migration, proof
 normalization, task/bundle migration, production retirement, `.ralph/plans`
 deletion, and final cutover remain unstarted and unauthorized.
 
+#### Accepted next dependency — retire active `To Do` guidance
+
+The operator accepted pushed checkpoint
+`1ef3ce44cc0c5e6855a591af0e612bf8f2dc024c`. The next execute pass must
+implement only the next already-approved ordered step-4 prerequisite: re-audit
+and remove active guidance that creates or selects `To Do`, including the
+operator/project guidance and source/project `prepare` or backlog surfaces named
+by the approved plan. Replace it with truthful task-native lifecycle guidance
+that uses supported Backlog CLI behavior.
+
+Keep all still-unmigrated tasks and the transitional configuration intact for
+the later one-time migration. Do not migrate task statuses or bundles and do not
+remove `To Do` from final configuration in this slice. Preserve retained
+version-1 compatibility and all accepted activation, recovery, authority,
+cleanup, and exclusion behavior. Keep proof-reference normalization,
+requirements-inventory deletion gating, production asset retirement,
+`.ralph/plans` deletion, and final cutover separate. If managed plugin source
+changes, run the required Docker-isolated candidate validation. Independently
+review the bounded candidate, commit, push, report, and stop.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

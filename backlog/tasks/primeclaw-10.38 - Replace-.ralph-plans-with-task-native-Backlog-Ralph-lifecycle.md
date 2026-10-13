@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 19:17'
+updated_date: '2026-10-13 19:26'
 labels:
   - backlog-md
   - episode-loop
@@ -594,4 +594,10 @@ Repaired the two accepted documentation defects in candidate `d8507d7dd1a5d2d313
 A focused static contract protects every part of both distinctions and rejects the former false claims. Independent read-only rereview reported no material findings. Validation passed 32 focused host-safe policy tests with 5 container cases deselected, 63 curated broad host-safe Python tests with 45 container cases deselected, 218 broad Node tests, and `git diff --check`. This documentation/static-test-only repair changes no plugin source or managed asset, so Docker Tier 1 was not required.
 
 No lifecycle status, task/bundle, production asset, ownership/resource, or acceptance criterion changed. All other task-native-primary, retained version-1 compatibility, replay/recovery, terminal-authority, cleanup, exclusion, task identity/parent/status/acceptance, and no-unrelated-scope behavior remains unchanged. The separate no-`To Do` guidance migration, proof normalization, task/bundle migration, production retirement, `.ralph/plans` deletion, and final cutover remain unstarted and unauthorized.
+
+### Accepted next dependency — retire active `To Do` guidance
+
+The operator accepted pushed checkpoint `1ef3ce44cc0c5e6855a591af0e612bf8f2dc024c`. The next execute pass must implement only the next already-approved ordered step-4 prerequisite: re-audit and remove active guidance that creates or selects `To Do`, including the operator/project guidance and source/project `prepare` or backlog surfaces named by the approved plan. Replace it with truthful task-native lifecycle guidance that uses supported Backlog CLI behavior.
+
+Keep all still-unmigrated tasks and the transitional configuration intact for the later one-time migration. Do not migrate task statuses or bundles and do not remove `To Do` from final configuration in this slice. Preserve retained version-1 compatibility and all accepted activation, recovery, authority, cleanup, and exclusion behavior. Keep proof-reference normalization, requirements-inventory deletion gating, production asset retirement, `.ralph/plans` deletion, and final cutover separate. If managed plugin source changes, run the required Docker-isolated candidate validation. Independently review the bounded candidate, commit, push, report, and stop.
 <!-- SECTION:NOTES:END -->
