@@ -51,6 +51,25 @@ artifact. The build uses the vendored source. It does not install an npm
 package, download an upstream prebuilt binary, or require Bun to execute
 `backlog`.
 
+## Plugin task-resolution seam
+
+Prime Claw plugin lifecycle code resolves an explicitly selected task through
+the supported structured command:
+
+```sh
+backlog task view --json -- TASK-ID
+```
+
+The narrow resolver binds the canonical ID, current status, optional
+Implementation Plan, and CLI-returned task path. It verifies that the path is a
+contained regular file. It does not read or parse task Markdown and does not
+introduce a second task model. The `--` boundary lets Backlog own supported task
+ID normalization without allowing an ID to become a command option.
+
+This seam is foundational only. Public task-native planning is activated in a
+later slice together with compatible lifecycle statuses and reconciled project
+workflow assets.
+
 ## Project task workflow
 
 Backlog.md is the repository's sole active task tracker. Until the accepted host

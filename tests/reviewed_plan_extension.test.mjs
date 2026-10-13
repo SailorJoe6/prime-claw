@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
+import { resolveBacklogTask } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
 
 function fixture({ throwOnSend = 0 } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-reviewed-")); execFileSync("git", ["init", "-q", root]);
@@ -103,4 +104,55 @@ test("tool guidance preserves operator authority and fixed fresh assignment", ()
   const f = fixture(); const create = f.tools.get("create_spec_episode"); const handoff = f.tools.get("handoff_spec_episode"); const finalize = f.tools.get("finalize_spec_episode");
   assert.match(create.promptGuidelines.join(" "), /fresh Episode/); assert.match(create.promptGuidelines.join(" "), /never send an initial handoff/);
   assert.match(handoff.promptGuidelines.join(" "), /product decisions/); assert.match(finalize.promptGuidelines.join(" "), /operator/);
+});
+
+
+test("task resolver binds canonical Backlog JSON identity and regular task path", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-task-resolver-"));
+  execFileSync("git", ["init", "-q", root]);
+  const relativeTaskPath = "backlog/tasks/primeclaw-10.38 - planning.md";
+  mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
+  writeFileSync(join(root, relativeTaskPath), "task fixture");
+  const calls = [];
+  const runner = { run(command, args, options) {
+    calls.push({ command, args, options });
+    return { stdout: JSON.stringify({ schemaVersion: 1, kind: "task-view", task: {
+      id: "PRIMECLAW-10.38", title: "Planning fixture", status: "In Planning",
+      implementationPlan: "One meaningful step", path: relativeTaskPath,
+    } }), stderr: "", status: 0 };
+  } };
+
+  const selected = resolveBacklogTask(root, "10.38", runner);
+  assert.equal(selected.taskId, "PRIMECLAW-10.38");
+  assert.equal(selected.status, "In Planning");
+  assert.equal(selected.implementationPlan, "One meaningful step");
+  assert.equal(selected.projectRoot, realpathSync(root));
+  assert.equal(selected.taskPath, realpathSync(join(root, relativeTaskPath)));
+  assert.deepEqual(calls, [{
+    command: "backlog",
+    args: ["task", "view", "--json", "--", "10.38"],
+    options: { cwd: realpathSync(root), allowFailure: true },
+  }]);
+});
+
+test("task resolver rejects unsafe selection without invoking Backlog", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-task-resolver-"));
+  execFileSync("git", ["init", "-q", root]);
+  const runner = { run() { throw new Error("runner must not be called"); } };
+  assert.equal(resolveBacklogTask(root, "--help", runner), null);
+  assert.equal(resolveBacklogTask(root, "two tasks", runner), null);
+});
+
+test("task resolver fails closed on command, schema, and path errors", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-task-resolver-"));
+  execFileSync("git", ["init", "-q", root]);
+  const failed = { run() { return { stdout: "", stderr: "not found", status: 1 }; } };
+  assert.throws(() => resolveBacklogTask(root, "PRIMECLAW-10.38", failed), /could not resolve.*not found/);
+  const malformed = { run() { return { stdout: "not json", stderr: "", status: 0 }; } };
+  assert.throws(() => resolveBacklogTask(root, "PRIMECLAW-10.38", malformed), /invalid JSON/);
+  const escaped = { run() { return { stdout: JSON.stringify({ schemaVersion: 1, kind: "task-view", task: {
+    id: "PRIMECLAW-10.38", title: "Planning fixture", status: "In Planning",
+    implementationPlan: null, path: "../outside.md",
+  } }), stderr: "", status: 0 }; } };
+  assert.throws(() => resolveBacklogTask(root, "PRIMECLAW-10.38", escaped), /outside the project or disappeared/);
 });

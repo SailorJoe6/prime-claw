@@ -82,6 +82,28 @@ exact recovery condition and do not retry it as a new Episode. The implemented
   placeholder plans, task-only commits, and non-gating push failure in focused
   Node/Python fixtures.
 
+#### Slice 1 progress — Backlog task-resolution foundation (2026-10-13)
+
+Completed the first bounded increment of slice 1:
+
+- added a narrow `backlog task view --json -- <task-id>` command seam that lets
+  Backlog normalize supported IDs and binds the canonical returned ID, current
+  status, optional Implementation Plan, and contained regular task path;
+- kept Backlog as the task model and Markdown owner; plugin code neither parses
+  task Markdown nor introduces a second tracker abstraction;
+- added focused fixtures for canonical shorthand resolution, exact argv/CWD,
+  supported JSON fields, unsafe selection, command failure, malformed JSON, and
+  escaped task paths; and
+- documented the seam and its intentionally deferred activation boundary; and
+- passed focused host-safe policy checks plus source-mode
+  `scripts/test-tier1.sh --probe`, with evidence at
+  `.test-results/20261013T060350Z-97903-65a8f369/tier1`.
+
+Slice 1 remains open. Public `/plan`/`plan_task`, compatible lifecycle statuses,
+reconciled project planning workflows, task-native authoring, and
+`/implement-task` are later increments. No acceptance criterion is checked by
+this foundation alone.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and
