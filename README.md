@@ -35,11 +35,11 @@ full phase status and blockers.
 
 ## Phase 4 operator workflows
 
-- [Reviewed future specification bundles](docs/future-specification-bundles.md)
-  — author with `/skill:design` or `/skill:spec-it-out`, pass separate
-  specification and
-  plan review gates, then cross the implementation boundary explicitly with
-  `/implement-spec`.
+- [Task-native specification authoring and retained bundle compatibility](docs/future-specification-bundles.md)
+  — author or revise one exact `In Design` task with `/skill:design` or
+  `/skill:spec-it-out`, then use `/plan TASK-ID` for separate plan review.
+  Existing future bundles retain `/plan-spec` and `/implement-spec` until their
+  ordered Episode-admission cutover.
 - [Native handoff chain](docs/handoff-chain.md) — update durable records and
   continue an approved episode iteration through focused compaction and the
   canonical execute workflow.

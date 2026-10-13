@@ -81,6 +81,16 @@ truthfully classify every existing item. The existing `/plan-spec` and
 `plan_spec` folder surface remains available during that bounded migration;
 this activation does not change implementation admission.
 
+Specification authoring is now task-native. `/design` and `/spec-it-out` create
+exactly one task with explicit `In Design` status when no task was selected, or
+revise only one exact operator-selected task already in `In Design`. They use
+the supported Description, native Acceptance Criteria, References, and
+Documentation fields, commit only the returned task path, and stop for operator
+review. Later states reject without mutation; neither skill writes an
+Implementation Plan or authorizes an Episode. Existing future folders remain
+available only for the ordered compatibility path described in
+[`future-specification-bundles.md`](future-specification-bundles.md).
+
 ## Project task workflow
 
 Backlog.md is the repository's sole active task tracker. Until the accepted host

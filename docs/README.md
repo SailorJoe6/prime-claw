@@ -55,10 +55,10 @@ prime-claw builds on four prior projects. Read these before designing:
   implementation-promotion boundaries: project-owned prep policy, fail-closed
   two-skill preflight, deterministic admission ordering, one-deep approval
   survival, and best-effort compaction semantics.
-- [future-specification-bundles.md](future-specification-bundles.md) — operator
-  walkthrough for reviewed future-folder authoring, native `/plan-spec`, explicit
-  `/implement-spec` promotion, unresolved admission handling, validation scope,
-  and archived design provenance.
+- [future-specification-bundles.md](future-specification-bundles.md) — migration
+  boundary between task-native `/design` and `/spec-it-out` authoring and the
+  retained future-folder `/plan-spec` and `/implement-spec` compatibility path,
+  including unresolved admission handling and validation scope.
 - [lab-global-plugin.md](lab-global-plugin.md) — the final plugin layout,
   selected-global-context ownership, manifest-authoritative delivery,
   sandbox deployment, and accepted-refresh safety.

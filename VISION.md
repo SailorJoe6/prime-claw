@@ -112,13 +112,13 @@ OPERATOR (a thought worker running many parallel projects)
   project's canonical checkout. Conversational context clarity comes from CWD
   scoping. A project can have many sibling conversations, each focused on one
   aspect of the project. Some conversations stay pure brainstorm for weeks.
-  When work becomes concrete, the conversation develops its specification and
-  execution plan under `.ralph/plans/future/`, with separate operator review of
-  each, before implementation resources are allocated.
+  When work becomes concrete, the conversation develops one exact Backlog task
+  through separate specification and plan review before implementation
+  resources are allocated.
 - **Episode.** A temporary prime-agent session, logically owned by the project
   conversation that created it, with its own feature branch and git worktree.
-  It begins only after the operator explicitly promotes an approved
-  specification-and-plan bundle. The episode runs Ralph-style execute → handoff
+  It begins only after the operator explicitly promotes an approved task whose
+  specification and Implementation Plan are ready. The episode runs Ralph-style execute → handoff
   iterations, holds invocation-tier state in its own REPL, updates the project's
   living docs, stays available through the PR and review lifecycle, and is
   reaped after merge or explicit abandonment.
@@ -172,31 +172,29 @@ routing.
 The boundary begins when the operator invokes `/design` or `/spec-it-out`
 inside a project conversation. `/design` is for work that still needs
 requirements discovery; `/spec-it-out` is for work whose design is already
-substantially present in the conversation. Their exact questions and artifacts remain project-customizable Markdown:
-discoverable skills under `.agents/skills/` and lifecycle-only workflows under
-`.prime-claw/workflows/`.
+substantially present in the conversation. Their exact questions and mutation
+policy remain project-customizable Markdown under `.agents/skills/`.
 
-Both workflows write their output into a new named folder under
-`.ralph/plans/future/`, link the resulting artifacts, and ask the operator to
-review them. They do not allocate an episode. The operator may request as many
-specification revisions as needed.
+Both skills create one explicit `In Design` Backlog task or revise one exact
+operator-selected task already in `In Design`. Description, native Acceptance
+Criteria, References, and Documentation hold the living specification. Each
+workflow commits only the task, asks the operator to review it, and allocates no
+Episode. The operator may request as many specification revisions as needed.
 
-When the specification is ready for planning, the operator invokes
-`/plan-spec .ralph/plans/future/<slug>`. Native command code validates and passes the
-folder to the project-customizable plan skill. Planning output remains in the
-same future folder, and the project conversation again stops for operator
-review. Specification approval authorizes planning; it does not authorize
-implementation.
+When the specification is ready for planning, the operator invokes `/plan
+TASK-ID`. Native command code resolves the exact task and accepts only `In
+Design` or `In Planning`; the project-customizable workflow writes the native
+Implementation Plan, leaves the task `In Planning`, and stops for a separate
+operator review. Specification approval authorizes planning only.
 
-Only the explicit
-`/implement-spec .ralph/plans/future/<slug>` command crosses the episode
-boundary. Its customizable skill verifies that the project-required
-specification and planning material is ready. Trusted host mechanics then create
-a feature branch and isolated worktree, promote the approved folder contents to
-the active `.ralph/plans/` location inside that worktree only, carry the active
-conversation into a durable worktree-rooted episode session, and record the
-originating conversation as logical owner. The episode starts the customizable
-execute workflow; specification and planning do not repeat inside it.
+The target implementation boundary is the explicit `/implement-task TASK-ID`
+path described by the active migration plan. It is not active yet. During the
+ordered cutover, already-created `.ralph/plans/future/<slug>` bundles retain the
+bounded `/plan-spec` and `/implement-spec` compatibility path and existing
+folder-based Episode mechanics. New `/design` and `/spec-it-out` invocations do
+not create those folders. A task-native Episode begins only after the remaining
+admission and ownership conversion lands; no current authoring or planning step
+implicitly authorizes implementation.
 
 The episode remains available through bounded execute/handoff iterations,
 implementation, PR review, updates, and rebasing. Archiving its completed active

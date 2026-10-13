@@ -1,6 +1,8 @@
-"""Contract tests for future-folder specification authoring skills."""
+"""Contract tests for task-native authoring and retained folder compatibility."""
 
+import json
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -15,56 +17,152 @@ def workflow(name: str) -> Path:
     return ROOT / "src" / "prime-agent-plugin" / "workflows" / f"{name}.md"
 
 
-@pytest.mark.parametrize("skill_name", SKILLS)
-def test_authoring_skill_creates_one_new_future_specification(skill_name: str) -> None:
-    text = project_skill(skill_name).read_text()
+def run(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(args, cwd=cwd, text=True, capture_output=True)
+    if check and result.returncode != 0:
+        raise AssertionError(result.stdout + result.stderr)
+    return result
 
-    required_fragments = (
-        ".ralph/plans/future/<slug>/",
-        "filesystem-safe slug",
-        "It must be a",
-        "never overwrite or merge into an existing specification",
-        "Create `SPECIFICATION.md` inside that folder",
-        "Document the current system",
-        "Do not write newly generated specification artifacts directly under",
+
+def test_documented_task_authoring_cli_sequence_is_atomic_and_task_only(tmp_path: Path) -> None:
+    backlog = ROOT / "deps" / "backlog" / "dist" / "backlog"
+    (tmp_path / "backlog").mkdir()
+    (tmp_path / "backlog" / "config.yml").write_text(
+        (ROOT / "backlog" / "config.yml").read_text()
     )
-    for fragment in required_fragments:
+    run(tmp_path, "git", "init", "-q")
+    run(tmp_path, "git", "config", "user.name", "Fixture")
+    run(tmp_path, "git", "config", "user.email", "fixture@example.test")
+    (tmp_path / "unrelated.txt").write_text("baseline\n")
+    run(tmp_path, "git", "add", "backlog/config.yml", "unrelated.txt")
+    run(tmp_path, "git", "commit", "-q", "-m", "fixture baseline")
+    (tmp_path / "unrelated.txt").write_text("unrelated working change\n")
+
+    created = run(
+        tmp_path, str(backlog), "task", "create", "Fixture work",
+        "--status", "In Design", "--description", "Initial outcome",
+        "--ac", "Observable result", "--ref", "PRIMECLAW-OTHER",
+        "--doc", "docs/example.md", "--plain",
+    )
+    assert "Task PRIMECLAW-1 - Fixture work" in created.stdout
+    task = json.loads(run(
+        tmp_path, str(backlog), "task", "view", "--json", "--", "PRIMECLAW-1",
+    ).stdout)["task"]
+    task_path = tmp_path / task["path"]
+    assert task["status"] == "In Design"
+    assert task["description"] == "Initial outcome"
+    assert [item["text"] for item in task["acceptanceCriteria"]] == ["Observable result"]
+    assert task["references"] == ["PRIMECLAW-OTHER"]
+    assert task["documentation"] == ["docs/example.md"]
+    assert task["implementationPlan"] is None
+    assert task_path.is_file() and task_path.parent == tmp_path / "backlog" / "tasks"
+
+    run(tmp_path, "git", "add", "--", task["path"])
+    run(tmp_path, "git", "commit", "-q", "--only", "-m", "author task", "--", task["path"])
+    assert run(tmp_path, "git", "show", "--pretty=", "--name-only", "HEAD").stdout.strip() == task["path"]
+    committed_head = run(tmp_path, "git", "rev-parse", "HEAD").stdout.strip()
+    assert run(tmp_path, "git", "push", check=False).returncode != 0
+    assert run(tmp_path, "git", "rev-parse", "HEAD").stdout.strip() == committed_head
+    assert run(tmp_path, "git", "status", "--short").stdout.strip() == "M unrelated.txt"
+
+    run(
+        tmp_path, str(backlog), "task", "edit",
+        "--description", "Revised outcome", "--acceptance-criteria", "Revised result",
+        "--ref", "PRIMECLAW-OTHER", "--ref", "PRIMECLAW-SECOND",
+        "--doc", "docs/example.md", "--doc", "docs/revised.md",
+        "--", "PRIMECLAW-1",
+    )
+    revised = json.loads(run(
+        tmp_path, str(backlog), "task", "view", "--json", "--", "PRIMECLAW-1",
+    ).stdout)["task"]
+    assert revised["status"] == "In Design"
+    assert revised["description"] == "Revised outcome"
+    assert [item["text"] for item in revised["acceptanceCriteria"]] == ["Revised result"]
+    assert revised["references"] == ["PRIMECLAW-OTHER", "PRIMECLAW-SECOND"]
+    assert revised["documentation"] == ["docs/example.md", "docs/revised.md"]
+    assert revised["implementationPlan"] is None
+    run(tmp_path, "git", "add", "--", task["path"])
+    run(tmp_path, "git", "commit", "-q", "--only", "-m", "revise task", "--", task["path"])
+    assert run(tmp_path, "git", "show", "--pretty=", "--name-only", "HEAD").stdout.strip() == task["path"]
+    assert run(tmp_path, "git", "status", "--short").stdout.strip() == "M unrelated.txt"
+
+
+@pytest.mark.parametrize("skill_name", SKILLS)
+def test_authoring_skill_binds_one_exact_in_design_task(skill_name: str) -> None:
+    text = " ".join(project_skill(skill_name).read_text().split())
+
+    for fragment in (
+        "operator explicitly selected an existing task",
+        "ask the operator before mutation",
+        "backlog task view --json -- TASK-ID",
+        "returned canonical ID to match the selected task",
+        "status to be exactly `In Design`",
+        "`In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, or `Done`",
+        "stop without mutation",
+        "create exactly one new task",
+        '--status "In Design"',
+        "do not rely on the project's temporary default status",
+        "Treat this as one mutation attempt",
+        "do not issue another create",
+        "retry only after proving that no task was created",
+        "Never create a folder under `.ralph/plans`",
+    ):
         assert fragment in text
 
-    assert "Create every specification artifact inside that folder" not in text
-    assert "REQUIREMENTS.md" not in text
-    assert "DECISIONS.md" not in text
+
+@pytest.mark.parametrize("skill_name", SKILLS)
+def test_authoring_skill_uses_supported_backlog_specification_fields(skill_name: str) -> None:
+    text = " ".join(project_skill(skill_name).read_text().split())
+
+    for fragment in (
+        "Description: the current system or context",
+        "Acceptance Criteria: one or more observable outcomes",
+        "References: related task IDs or source artifacts",
+        "Documentation: relevant living project documentation",
+        "backlog task create",
+        "--description",
+        "--ac",
+        "backlog task edit",
+        "--acceptance-criteria",
+        "pass its complete desired value from the reloaded task",
+        "Do not edit task Markdown directly",
+        "meaningful Description, native Acceptance Criteria",
+    ):
+        assert fragment in text
+
+    for forbidden in (
+        "Create `SPECIFICATION.md`",
+        ".ralph/plans/future/<slug>",
+        "REQUIREMENTS.md",
+        "DECISIONS.md",
+    ):
+        assert forbidden not in text
+
+
+@pytest.mark.parametrize("skill_name", SKILLS)
+def test_authoring_skill_commits_only_the_task_and_stops_for_review(
+    skill_name: str,
+) -> None:
+    text = " ".join(project_skill(skill_name).read_text().split())
+
+    for fragment in (
+        "selected existing task path and Git index to be clean",
+        "no path other than that exact returned task path was newly changed",
+        "Commit only the returned task path",
+        "commit contains no other path",
+        "push failure is transport evidence",
+        "report the canonical task ID and exact task path",
+        "explicitly ask the operator to review the saved specification",
+        "stop without planning, writing an Implementation Plan",
+        "Apply requested specification revisions to the same `In Design` task",
+        "/plan TASK-ID",
+        "never authorizes implementation",
+    ):
+        assert fragment in text
+
     assert "living source of truth" in text
     assert "Do not defer updates until the end" in text
-    assert "Replace stale" in text
-
-
-@pytest.mark.parametrize("skill_name", SKILLS)
-def test_authoring_skill_stops_at_operator_specification_review(
-    skill_name: str,
-) -> None:
-    text = project_skill(skill_name).read_text()
-
-    required_fragments = (
-        "report the exact project-relative future-folder path",
-        "link `SPECIFICATION.md` so the operator can review it now",
-        "explicitly ask the operator to review the saved specification",
-        "stop without planning, implementing, creating a branch or worktree, or",
-        "starting an episode",
-        "revisions to the same future folder",
-        "Do not advance to planning unless the operator",
-    )
-    for fragment in required_fragments:
-        assert fragment in text
-
-
-@pytest.mark.parametrize("skill_name", SKILLS)
-def test_authoring_skill_has_no_active_root_artifact_destination(
-    skill_name: str,
-) -> None:
-    text = project_skill(skill_name).read_text()
-
-    assert ".ralph/plans/SPECIFICATION.md" not in text
+    assert "Replace stale content" in text
 
 
 @pytest.mark.parametrize("skill_name", SKILLS)

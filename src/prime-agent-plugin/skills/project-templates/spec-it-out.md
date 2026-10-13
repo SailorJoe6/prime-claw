@@ -1,61 +1,106 @@
 ---
 name: spec-it-out
-description: Use when the conversation already contains most of a design and a reviewable future specification is needed.
+description: Use when the conversation already contains most of a design and one reviewable Backlog task is needed.
 ---
 
 Use the current conversation to specify the proposed work. Do not start
 implementation. Ask only the remaining questions that need operator input, one
 at a time. For small details that are already clear, use your best judgment.
 
-## Create the future specification
+## Bind one exact Backlog task
 
-When the specification is ready to save:
+If the operator explicitly selected an existing task, use only that exact task
+ID. Do not search for, infer, or substitute another task. If the request might
+mean either create new work or revise existing work but no exact ID is given,
+ask the operator before mutation. Reload a selected task through the supported
+structured interface:
 
-1. Derive a concise filesystem-safe slug from the work. Use lowercase ASCII
-   letters, digits, and hyphens only.
-2. Use `.ralph/plans/future/<slug>/` as the specification folder. It must be a
-   new folder. If that path already exists, choose a different specific slug;
-   never overwrite or merge into an existing specification.
-3. Create `SPECIFICATION.md` inside that folder detailing the specification.
-4. Do not write newly generated specification artifacts directly under
-   `.ralph/plans/`.
+```sh
+backlog task view --json -- TASK-ID
+```
 
-Document the current system, the required change, and the intended end state in
-`SPECIFICATION.md`. Be thorough but avoid repetition. Specify behavior and
-important boundaries without inventing implementation architecture. This phase
-specifies the work; it does not create an execution plan.
+Require the returned canonical ID to match the selected task and its current
+status to be exactly `In Design`. If the task is missing, malformed, ambiguous,
+or in `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, or `Done`,
+explain the exact problem and stop without mutation. Later states already have
+planning or execution history that this authoring phase may not invalidate.
 
-## Keep the product contract proportional
+If the operator did not select an existing task, create exactly one new task
+only after the specification is ready to save. Choose a concise title and pass
+`--status "In Design"` explicitly; do not rely on the project's temporary
+default status. Use the supported `backlog task create --plain` interface and
+bind the exact created task ID from its output. Treat this as one mutation
+attempt: if the exit result, output, returned identity, or post-create reload is
+uncertain, do not issue another create. Stop, preserve the evidence, and report
+the exact recovery need; retry only after proving that no task was created.
+Never create a folder under `.ralph/plans`.
+
+## Write the native specification
+
+Use supported Backlog fields as the durable product contract:
+
+- Description: the current system or context, intended outcome, scope, required
+  behavior, material constraints, and important non-goals;
+- Acceptance Criteria: one or more observable outcomes, kept proportional to
+  the work and stored as native criteria in source order;
+- References: related task IDs or source artifacts that materially inform the
+  work; and
+- Documentation: relevant living project documentation.
+
+Use `backlog task create` with `--description`, repeated `--ac`, and optional
+repeated `--ref` and `--doc` arguments for a new task. Use one supported
+`backlog task edit` operation for an existing task, with `--description` and
+repeated `--acceptance-criteria`; preserve existing references and
+documentation unless the reviewed specification intentionally changes them. If
+either list changes, pass its complete desired value from the reloaded task plus
+the approved revisions so unrelated entries are not dropped. Keep real newlines
+in Markdown arguments. Do not edit task Markdown directly, change the task out
+of `In Design`, or write an
+Implementation Plan, Implementation Notes, or Final Summary.
 
 Make the specification clear enough to plan without guessing material product
-decisions. State the intended outcome, scope, required behavior, material
-constraints, and observable acceptance. Include safety, failure handling,
-recovery, or non-goals only when they are materially relevant to this work.
-Do not require boilerplate sections, invent risks, or prescribe implementation
-architecture.
+decisions. Be thorough but avoid repetition. Include safety, failure handling,
+recovery, or non-goals only when they are materially relevant. Do not require
+boilerplate sections, invent risks, or prescribe implementation architecture. If a material
+product decision remains unresolved, ask the operator rather than silently
+deciding it or turning a reviewer suggestion into a requirement.
 
-If a material product decision remains unresolved, ask the operator rather than
-silently deciding it or turning a reviewer suggestion into a requirement.
+## Verify and preserve the task
+
+Before mutation, record Git status and require the selected existing task path
+and Git index to be clean. After creation or revision, reload the exact task
+through `backlog task view --json -- TASK-ID` and verify its canonical ID,
+`In Design` status, meaningful Description, native Acceptance Criteria, and
+returned regular task path. Verify no path other than that exact returned task
+path was newly changed and do not stage unrelated pre-existing changes.
+
+Commit only the returned task path and verify the commit contains no other path.
+Attempt a prompt push when a remote is available. A push failure is transport
+evidence to report, not permission to undo the valid local specification,
+create another task, or begin planning.
 
 ## Keep the specification alive
 
-A specification under `.ralph/plans/future/` is a living source of truth, not a
-point-in-time report. Update it promptly whenever discussion, review, or manual
-POC work produces a durable clarification, correction, constraint, or learning.
-Do not defer updates until the end of a long conversation or rely on chat
-history, memory, or a later compaction summary to preserve them. Replace stale
-text instead of accumulating a chronological journal.
+The selected Backlog task is the living source of truth. Update its supported
+specification fields promptly whenever discussion, review, or manual POC work
+produces a durable clarification, correction, constraint, or learning. Do not
+defer updates until the end of a long conversation or rely on chat history,
+memory, or a later compaction summary. Replace stale content instead of
+accumulating a chronological journal.
 
 ## Stop for operator review
 
-After saving the specification:
+After the verified task-only commit:
 
-- report the exact project-relative future-folder path;
-- link `SPECIFICATION.md` so the operator can review it now;
+- report the canonical task ID and exact task path;
+- link the task so the operator can review its specification now;
+- report local commit and push evidence separately;
 - explicitly ask the operator to review the saved specification; and
-- stop without planning, implementing, creating a branch or worktree, or
-  starting an episode.
+- stop without planning, writing an Implementation Plan, creating a branch or
+  worktree, creating ownership state, or starting an Episode.
 
-Apply requested specification revisions to the same future folder and link the
-updated specification again. Do not advance to planning unless the operator
-later invokes the separate planning workflow.
+Apply requested specification revisions to the same `In Design` task, using the
+same exact-task and task-only commit rules, and link it again. Do not advance to
+planning unless the operator later invokes the separate `/plan TASK-ID`
+workflow. Specification approval authorizes planning only; it never authorizes
+implementation.

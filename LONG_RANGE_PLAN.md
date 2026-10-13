@@ -160,54 +160,53 @@ validated as an isolated candidate, and explicit apply/check tooling updates the
 one global lab copy only at an accepted deployment checkpoint. Neither the
 builder nor a managed project keeps a project-local copy while that global
 installation is active. The final sandbox uses the same
-environment-global placement inside its isolated home. In both stages the
-universal agent ensures
-every managed project has a local `.ralph/plans/` tree, regular customizable
-skills under `.agents/skills/`, and lifecycle-only customizable workflows under
-`.prime-claw/workflows/`, reconciled without overwriting project changes.
+environment-global placement inside its isolated home. In both stages the universal agent ensures every managed project has Backlog
+state, regular customizable skills under `.agents/skills/`, and lifecycle-only
+customizable workflows under `.prime-claw/workflows/`, reconciled without
+overwriting project changes. Existing `.ralph/plans/` trees remain available
+only through the ordered migration and are removed at the final task-native
+cutover.
 
 - **4a — phase skills and proven transitions.** Discoverable project skills
   under `.agents/skills/` and internal workflows under `.prime-claw/workflows/`
   remain editable per operator and project. Native commands load that Markdown
-  rather than duplicating workflow policy. Dogfooding
-  established one stable transition, implemented and regression-tested as
-  native `/handoff` → focused compaction → execute; see
-  [docs/handoff-chain.md](docs/handoff-chain.md). Add native
-  `/plan-spec <future-folder>` with the same loader pattern, while keeping artifact
-  interpretation and planning behavior in the customizable plan skill.
-- **4b — episode mechanics.** Implement `/implement-spec <future-folder>` as
-  the explicit promotion boundary: customizable Markdown decides whether the
-  approved folder contains the project-required specification and plan; trusted
-  mechanics create the feature branch, worktree, durable sibling session, active
-  plan placement, and owner/episode identity. The episode starts the
-  customizable execute workflow and stays resumable through implementation, PR
-  review, updates, and rebasing. Its owner reaps the session and worktree only
-  after the operator authorizes merge or abandonment and terminal work is
-  verified.
+  rather than duplicating workflow policy. Dogfooding established one stable
+  transition, implemented and regression-tested as native `/handoff` → focused
+  compaction → execute; see [docs/handoff-chain.md](docs/handoff-chain.md).
+  Folder-based `/plan-spec` was delivered first. The active migration has now
+  made `/design` and `/spec-it-out` author or revise an exact `In Design`
+  Backlog task and has added `/plan TASK-ID`; retained folders stay live for
+  compatibility until Episode admission is converted.
+- **4b — episode mechanics.** Existing `/implement-spec <future-folder>`
+  mechanics create the feature branch, worktree, durable sibling session,
+  active plan placement, and owner/Episode identity for retained bundles. The
+  task-native migration will replace that authority with `/implement-task
+  TASK-ID`, a meaningful native Implementation Plan, and minimal exact-task
+  ownership while preserving isolated allocation, durable sessions, recovery,
+  and operator merge, abandonment, and cleanup authority.
 - **4c — reviewed conversation → episode workflow.** `/design` and
-  `/spec-it-out` retain different customizable starting assumptions, but both
-  write to a named `.ralph/plans/future/<slug>/` folder and stop for operator
-  review. The operator explicitly invokes `/plan-spec <future-folder>`; the plan is
-  written to that same folder and receives a second operator review. Only
-  `/implement-spec <future-folder>` authorizes implementation and creates the
-  worktree-rooted episode. Manually prove that the owning conversation retains
-  the returned identity, coordinates execute/handoff iterations and any useful
-  EXPERT reviews, recognizes archived plans as a readiness claim, presents the
-  evidence for the operator's merge or abandonment decision, and then performs
-  and verifies only the authorized cleanup.
+  `/spec-it-out` retain different customizable starting assumptions but share
+  one exact-task specification contract and stop for operator review. The
+  operator invokes `/plan TASK-ID` for a second review gate. Only the planned
+  explicit `/implement-task TASK-ID` boundary may authorize and create the
+  worktree-rooted Episode. Existing `/plan-spec` and `/implement-spec` remain a
+  bounded compatibility route for already-created future bundles during this
+  conversion. Manual proof must show that one task and owner identity survive
+  execute/handoff iterations, useful EXPERT reviews, candidate revision,
+  merge or abandonment decisions, and separately authorized cleanup.
 - **4d — `upgrade-this-to-prime-agent` command.** Convert a Ralph
   codex/claude-skills project to prime-agent skills without manual copy-paste;
   dogfood on the ralph repo.
 
-Done when: a project conversation has created a future specification through
-`/design` or `/spec-it-out`, received operator specification approval, created a
-future-folder execution plan through `/plan-spec`, received operator plan approval,
-and promoted it through `/implement-spec` into a worktree-rooted episode that
-shipped a real feature through bounded execute/handoff iterations, merge, and
-safe cleanup. The customizable-policy versus deterministic-mechanics boundary,
-context crossing, ownership, and review gates must be documented and proven by
-manual dogfood before wider orchestration.
-
+Done when: a project conversation has created or revised one `In Design` task
+through `/design` or `/spec-it-out`, received operator specification approval,
+written and reviewed its native Implementation Plan through `/plan TASK-ID`,
+and promoted it through `/implement-task TASK-ID` into a worktree-rooted Episode
+that shipped a real feature through bounded execute/handoff iterations, merge,
+and safe cleanup. The final candidate removes `.ralph/plans`; the
+customizable-policy versus deterministic-mechanics boundary, context crossing,
+ownership, and review gates are documented and proven by manual dogfood before
+wider orchestration.
 
 ## Phase 5 — Communication channels
 

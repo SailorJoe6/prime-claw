@@ -6,9 +6,9 @@
 discovery, so that the conversation produces a bounded, reviewable
 specification without beginning implementation.**
 
-`/design` creates a new
-`.ralph/plans/future/<slug>/SPECIFICATION.md`, keeps it as a living document,
-and stops for explicit review.
+`/design` keeps its discovery-first posture. It either creates exactly one new
+Backlog task with explicit `In Design` status or revises one exact
+operator-selected task that is already `In Design`.
 
 ## US-09 — Turn an existing conversation into a specification
 
@@ -16,13 +16,21 @@ and stops for explicit review.
 conversation synthesized into a durable specification, so that I only need to
 answer the remaining material questions.**
 
-`/spec-it-out` produces the same future-bundle specification contract with a
-synthesis-first rather than discovery-first posture.
+`/spec-it-out` uses the same exact-task contract with a synthesis-first posture.
+It asks only the material questions that remain.
 
-Both specification paths capture the outcome, scope, required behavior, material
-constraints, and observable acceptance at a level proportional to the work.
-They do not require boilerplate risk or process sections when those are not
-material. Neither plans, allocates an Episode, or authorizes implementation.
+Both paths store the living product contract in supported Backlog fields:
+Description, native Acceptance Criteria, References, and Documentation. They
+reject `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, and `Done`
+without mutation. New tasks spell out `In Design` rather than relying on the
+temporary project default. After a verified task-only commit and prompt push
+attempt, both stop for operator review. Neither writes an Implementation Plan,
+allocates an Episode, or authorizes implementation.
+
+The specification captures the outcome, scope, required behavior, material
+constraints, and observable acceptance at a level proportional to the work. It
+does not require boilerplate risk or process sections when those are not
+material. Revisions remain on the same exact `In Design` task.
 
 ## US-10 — Explain and recover blocked planning work
 
@@ -30,13 +38,17 @@ material. Neither plans, allocates an Episode, or authorizes implementation.
 and the artifacts restored after resolution, so that planning or implementation
 can resume without reconstructing state.**
 
+The current blocked-folder workflow remains a migration-compatibility surface
+until Episode work and ownership are converted to task identity.
+
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/skills/project-templates/design.md`
 - `src/prime-agent-plugin/skills/project-templates/spec-it-out.md`
-- `src/prime-agent-plugin/skills/project-templates/blocked.md`
+- `src/prime-agent-plugin/skills/project-templates/blocked.md` (migration compatibility)
 
 ## Design references
 
+- [`backlog.md`](../backlog.md)
 - [`future-specification-bundles.md`](../future-specification-bundles.md)
 - [`VISION.md`](../../VISION.md)

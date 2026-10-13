@@ -1,18 +1,26 @@
-# Future specification bundles
+# Future specification bundles — migration compatibility
 
-Future bundles let a Conversation design and review work without changing the
-active Ralph plan. Each bundle lives at:
+New specification authoring is task-native. `/design` and `/spec-it-out` create
+one explicit `In Design` Backlog task or revise one exact operator-selected task
+already in `In Design`. The task Description, native Acceptance Criteria,
+References, and Documentation are the living specification. Both authoring
+skills make an exact task-only commit, attempt a prompt push, and stop for
+operator review without planning or Episode admission.
+
+Existing future bundles remain operational during the ordered migration. This
+compatibility surface lets a Conversation finish work already stored at:
 
 ```text
 .ralph/plans/future/<slug>/
 ```
 
-The default bundle contains `SPECIFICATION.md` and `EXECUTION_PLAN.md`, plus any
-supporting artifacts needed to make the work self-contained.
+A retained bundle contains `SPECIFICATION.md` and `EXECUTION_PLAN.md`, plus any
+supporting artifacts needed to make the work self-contained. New `/design` and
+`/spec-it-out` invocations do not create this folder.
 
-## Lifecycle
+## Retained bundle lifecycle
 
-1. Create or select one exact future folder.
+1. Select one exact existing future folder.
 2. Run `/plan-spec .ralph/plans/future/<slug>` or ask the Conversation to use
    `plan_spec` for that exact path.
 3. Review and revise `EXECUTION_PLAN.md` in the same folder. Planning stops for
@@ -24,9 +32,9 @@ supporting artifacts needed to make the work self-contained.
 6. The host promotes the exact bundle in a fresh isolated Episode and admits
    one fixed execute assignment.
 
-`.ralph/plans/future`, `.ralph/plans/archive`, and `.ralph/plans/blocked` are
-reserved lifecycle directories. Bundle contents may not collide with those
-names when promoted.
+`.ralph/plans/future`, `.ralph/plans/archive`, and `.ralph/plans/blocked` remain
+reserved lifecycle directories until the final cutover. Bundle contents may not
+collide with those names when promoted.
 
 ## Planning surface
 

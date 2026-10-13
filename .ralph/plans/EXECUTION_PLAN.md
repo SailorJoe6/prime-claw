@@ -138,10 +138,35 @@ Completed the next bounded increment of slice 1:
   with final evidence at
   `.test-results/20261013T063848Z-99892-f5ef0597/tier1`.
 
-Slice 1 remains open. Task-native authoring, retained real-session planning
-mutation evidence, final lifecycle-default migration, and `/implement-task` are
-later increments. No acceptance criterion is checked by these bounded
-foundations alone.
+#### Slice 1 progress — task-native specification authoring (2026-10-13)
+
+Completed the next bounded increment of slice 1:
+
+- converted the managed `design` and `spec-it-out` skills from new future-folder
+  artifacts to one new explicit `In Design` task or one exact selected existing
+  task already in `In Design`, while preserving their distinct discovery modes;
+- made Description, native Acceptance Criteria, References, and Documentation
+  the living specification fields and prohibited Implementation Plan, notes,
+  final-summary, status, and Episode mutation during authoring;
+- rejected later lifecycle states without mutation, required clarification when
+  new-versus-existing intent is ambiguous, and made an uncertain create a
+  fail-closed no-blind-retry result;
+- required canonical reload/path verification, exact task-only commits, prompt
+  non-gating pushes, and an explicit operator specification-review stop;
+- updated required orientation and operator docs so new authoring is task-native
+  while `/plan-spec`, `/implement-spec`, and existing folder Episodes remain a
+  bounded compatibility path;
+- added a disposable Backlog/Git fixture that executes fresh creation, existing
+  revision, native field preservation, exact path binding, task-only commits in
+  a dirty worktree, and non-gating push failure; and
+- passed 22 focused host-safe checks, independent review with all findings
+  repaired, and source-mode `scripts/test-tier1.sh --probe`, with final evidence
+  at `.test-results/20261013T065752Z-55162-273d77d8/tier1`.
+
+Slice 1 remains open. Retained real-session authoring and planning mutation
+evidence, final lifecycle-default migration, and `/implement-task` are later
+increments. Acceptance criteria #2 and #3 remain unchecked until those
+real-session semantic paths are retained.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 
