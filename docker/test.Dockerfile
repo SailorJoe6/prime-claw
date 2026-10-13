@@ -1,6 +1,6 @@
 # test.Dockerfile — prime-claw tier-1 slim test image.
 #
-# The tier-1 environment (see .ralph/plans/SPECIFICATION.md "Test tiers"):
+# The tier-1 environment (see docs/testing-strategy.md):
 # anything needing Node + a prime-agent install + the plugin, but NOT the
 # brain stack (no Postgres, no pgvector, no gbrain) and NOT OpenShell (plain
 # Docker isolation only; no egress policy or credential mediation).

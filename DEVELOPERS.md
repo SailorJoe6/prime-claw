@@ -37,7 +37,8 @@ openclaw-setup:
 
 ## Testing
 
-Tests use the isolation tiers in `docs/testing-strategy.md`; the completed design is archived under `.ralph/plans/archive/project-wide-testing-strategy/`. Unmarked
+Tests use the isolation tiers in `docs/testing-strategy.md`; completed design and
+acceptance evidence are recorded by Backlog task `PRIMECLAW-20`. Unmarked
 mock/static tests are tier 0. Real Prime Agent/plugin execution is tier 1 under
 the `container` marker. The explicit real-stack launcher is tier 2.
 `tests/conftest.py` auto-marks every tier-1 fixture user and admits it only for

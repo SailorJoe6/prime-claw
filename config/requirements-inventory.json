@@ -1,8 +1,9 @@
 {
   "version": 1,
   "project": "prime-claw",
+  "legacyPlanProofCommit": "4a40a0832d561e380da32099f07d3ea2195e7e65",
   "phase": "1 \u2014 de-risk gate",
-  "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
+  "spec": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
   "requirements": [
     {
       "id": "R-U1-1",
@@ -414,7 +415,7 @@
         "validate": [],
         "tests": []
       },
-      "verdict_doc": ".ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md"
+      "verdict_doc": ".ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65"
     },
     {
       "id": "R-X-5",
@@ -498,7 +499,7 @@
           "tests/test_runtime_status.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 1)"
     },
     {
       "id": "R2-A-4",
@@ -515,7 +516,7 @@
           "tests/test_runtime_status.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 1)"
     },
     {
       "id": "R2-C-1",
@@ -532,7 +533,7 @@
           "tests/test_runtime_status.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 1)"
     },
     {
       "id": "R2-X-3",
@@ -549,7 +550,7 @@
           "tests/test_runtime_status.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 1)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 1)"
     },
     {
       "id": "R2-B-1",
@@ -566,7 +567,7 @@
           "tests/test_runtime_image.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 2)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 2)"
     },
     {
       "id": "R2-X-5",
@@ -591,7 +592,7 @@
           "tests/test_runtime_validate.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 4)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 4)"
     },
     {
       "id": "R2-A-2",
@@ -608,7 +609,7 @@
           "tests/test_runtime_converge.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 3a)"
     },
     {
       "id": "R2-B-2",
@@ -625,7 +626,7 @@
           "tests/test_runtime_converge.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 3a)"
     },
     {
       "id": "R2-B-3",
@@ -642,7 +643,7 @@
           "tests/test_runtime_converge.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 3a)"
     },
     {
       "id": "R2-B-4",
@@ -659,7 +660,7 @@
           "tests/test_runtime_converge.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 3a)"
     },
     {
       "id": "R2-B-5",
@@ -676,7 +677,7 @@
           "tests/test_runtime_converge.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 3a)"
     },
     {
       "id": "R2-X-1",
@@ -693,7 +694,7 @@
           "tests/test_runtime_converge.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 3a)"
     },
     {
       "id": "R2-X-2",
@@ -710,7 +711,7 @@
           "tests/test_runtime_converge.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 3a)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 3a)"
     },
     {
       "id": "R2-C-2",
@@ -735,7 +736,7 @@
           "tests/test_runtime_validate.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 4)"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 4)"
     },
     {
       "id": "R2-C-3",
@@ -760,7 +761,7 @@
           "tests/test_runtime_recover.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
     },
     {
       "id": "R2-C-4",
@@ -785,7 +786,7 @@
           "tests/test_runtime_recover.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
     },
     {
       "id": "R2-C-5",
@@ -810,7 +811,7 @@
           "tests/test_runtime_recover.py"
         ]
       },
-      "verdict_doc": ".ralph/plans/EXECUTION_PLAN.md (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
+      "verdict_doc": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (Phase 2, Slice 5); docs/runbook.md; docs/evidence/recover-<utc>.json"
     },
     {
       "id": "R2-X-4",
@@ -1136,7 +1137,7 @@
       "priority": "P1",
       "summary": "Tier-1 slim test container image + standalone driver: docker/test.Dockerfile (Ubuntu 24.04 + Node 22 + python3/pytest), scripts/test-tier1.sh builds the image and runs one ephemeral container; --smoke, --dry-run (never contacts Docker), --rebuild; informational paths are Docker-free.",
       "status": "met (slice 1, EXPERT PASS on 2666843 \u2261 b2f6b86)",
-      "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
+      "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (test tiers)",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh"
@@ -1160,7 +1161,7 @@
       "priority": "P1",
       "summary": "Tier-1 supported candidate policy requires PRIME_AGENT_SOURCE to select the exact maintained fork identity, with canonical disposable read-only-source builder and validated run-owned release. Existing fixture provenance does not yet enforce the fork tag/commit/tree/lockfile/build-ID identity; verify it independently until that gate exists. PRIME_AGENT_PINNED vendor-installer coverage remains historical only, not a supported candidate path. Runtime networks are verified absent before artifact identity, explicit-root apply/check, or validated RPC probes.",
       "status": "pinned mode owner-accepted in Slice 1; published source candidate f0441325 owner-rejected for bounded F1/F2 correction; replacement pending",
-      "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
+      "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (test tiers)",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh",
@@ -1189,7 +1190,7 @@
       "priority": "P1",
       "summary": "Truthful marker and collection policy: unmarked recording-fake/static tests are tier 0; real tier-1 fixture users are auto-marked container and admitted only by exact `-m container`; arbitrary expressions cannot bypass environment guards; integration/lifecycle markers are never host-admitted.",
       "status": "owner-accepted at project-wide testing Slice-4 commit 854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md (Slice 4)",
+      "plan": "PRIMECLAW-20.3 (Slice 4)",
       "proven_by": {
         "apply": [],
         "check": [
@@ -1212,7 +1213,7 @@
       "priority": "P1",
       "summary": "Session-scoped tier-1 container fixture + migrated plugin suites: one exact iidfile image and cidfile container per pytest run, read-only repository, run-owned share, online pinned install followed by verified network absence, offline explicit-root plugin apply/check, exec/popen helpers with hard timeouts, and captured-ID teardown with absent/present/unknown evidence.",
       "status": "met; strengthened by project-wide testing Slice 1",
-      "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md (test tiers)",
+      "plan": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65 (test tiers)",
       "proven_by": {
         "apply": [
           "tests/conftest.py"
@@ -1244,7 +1245,7 @@
       "priority": "P1",
       "summary": "Dumb whole-suite sequencer: scripts/test-all.sh runs tier 0 -> tier 1 -> tier 2 sequentially, fail-fast, prints a tier summary, and logs under .test-results; exact --with-lifecycle appends only the registered lifecycle node after prerequisites, while inherited lifecycle admission variables are cleared from prerequisite processes.",
       "status": "Slice 4 owner-accepted; Slice 7 exact lifecycle extension implemented and final observer passed",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slices 4 and 7)",
+      "plan": "PRIMECLAW-20.3 (Slice 4); PRIMECLAW-20.6 (Slice 7)",
       "proven_by": {
         "apply": [],
         "check": [
@@ -1295,7 +1296,7 @@
       "priority": "GATE",
       "summary": "Environment-dependent Tier-1 behavior retains its owner-accepted exact-image snapshot/share boundary; the separate Slice-3 integration tier bakes public test inputs into a disposable image and uses no runtime host mounts.",
       "status": "owner-accepted across all eight project-wide testing slices; final Slice 8 accepted at 5bace57e63e51bbfc034fc2e665863b74649a218",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md",
+      "plan": "PRIMECLAW-20 (all eight accepted slices)",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh",
@@ -1322,7 +1323,7 @@
       "priority": "GATE",
       "summary": "Tests use the lowest sufficient tier: host-safe mocked/static tests are tier 0, real Prime Agent/plugin execution is Docker tier 1, the guarded real-stack body is Docker tier 2, and the one host lifecycle observer is separately exact-gated and non-default.",
       "status": "owner-accepted at project-wide testing Slice-4 commit 854dedb2c4161c3cbd8c0282d0c2b0b9fc0cfe9a",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md (Slice 4)",
+      "plan": "PRIMECLAW-20.3 (Slice 4)",
       "proven_by": {
         "apply": [
           "pytest.ini",
@@ -1353,7 +1354,7 @@
       "priority": "GATE",
       "summary": "Tier 2 provides a credential-free Docker PostgreSQL 16 + pgvector + exact-gbrain environment with the synthetic corpus/body baked into the image, nonroot container-local HOME/database/results/Git state, and a copied result receipt.",
       "status": "owner-accepted at reduced-contract Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e; preserved by Slice 4",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slice 3)",
+      "plan": "PRIMECLAW-20.5 (Slice 3)",
       "proven_by": {
         "apply": [
           "scripts/test-integration.sh",
@@ -1379,7 +1380,7 @@
       "priority": "GATE",
       "summary": "The integration assertion container receives no Docker/OpenShell socket or host-control broker; host launcher behavior is covered through pure recording fakes.",
       "status": "owner-accepted for Slice 3; host lifecycle control remains outside the integration container and is separately exact-gated",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md",
+      "plan": "PRIMECLAW-20.5 (Slice 3)",
       "proven_by": {
         "apply": [
           "scripts/testing/integration_driver.py"
@@ -1401,7 +1402,7 @@
       "priority": "GATE",
       "summary": "Tier-1 retains its owner-accepted exact-ID lifecycle. Slice 3 uses bounded ordinary commands, immutable iid/cid capture, normal timeout/SIGINT/SIGTERM nonzero behavior, exact run labels, and best-effort label-verified cleanup without an outer publication supervisor.",
       "status": "proven for owner-accepted Tier 1; reduced Slice-3 lifecycle owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slice 1)",
+      "plan": "PRIMECLAW-20.2 (Slice 1); PRIMECLAW-20.5 (Slice 3)",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh",
@@ -1432,7 +1433,7 @@
       "priority": "GATE",
       "summary": "Tier-1 retains truthful schema-v2 pinned/source provenance. Slice 3 emits one simple receipt containing tested commit/content identity, locked versions, immutable runtime IDs, real-stack result, and cleanup outcomes.",
       "status": "proven for owner-accepted Tier 1; reduced Slice-3 receipt owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slice 1)",
+      "plan": "PRIMECLAW-20.2 (Slice 1); PRIMECLAW-20.5 (Slice 3)",
       "proven_by": {
         "apply": [
           "scripts/testing/provenance.py",
@@ -1464,7 +1465,7 @@
       "priority": "GATE",
       "summary": "Tier-1 retains its owner-accepted read-only snapshot plus writable-share mounts. Slice 3 instead has zero runtime host mounts: public source/body/fixtures are baked into the image and HOME, PostgreSQL, results, and synthetic Git state are container-local; host home, sockets, credentials, provider state, and arbitrary checkouts remain excluded.",
       "status": "proven for owner-accepted Tier 1; reduced mount-free Slice-3 boundary owner-accepted at Slice-3 commit 5d3db2f961d843a11289c38f5d60f646a8f65c9e",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md",
+      "plan": "PRIMECLAW-20.2 (Slice 1); PRIMECLAW-20.5 (Slice 3)",
       "proven_by": {
         "apply": [
           "scripts/test-tier1.sh",
@@ -1496,7 +1497,7 @@
       "priority": "GATE",
       "summary": "Prime Agent source mode reads the selected checkout only through a read-only builder mount, copies selected tracked/dirty/untracked inputs to container-local storage, builds and packs there, exports only a strict hashed release, and requires complete before/after checkout inventory equality.",
       "status": "owner-accepted at Slice-2 commit 56afd99d3a4b5411eb37fb42210ffb36c8bf2b84; preserved by Slice 3",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slices 1-2)",
+      "plan": "PRIMECLAW-20.2 (Slice 1); PRIMECLAW-20.1 (Slice 2)",
       "proven_by": {
         "apply": [
           "scripts/build-prime-agent-test-release.sh",
@@ -1532,7 +1533,7 @@
       "priority": "GATE",
       "summary": "Lifecycle execution is fail closed by default: generated non-default workspace/resource identities, exact ownership capture, present/absent/unknown inspection, recursively sanitized evidence, and bounded exact cleanup are proven with a recording fake in tier 1; marker+fixture mismatch fails collection and absent admission skips. Slice 7 adds one separately tracked exact live observer under R-TEST-12 without weakening this baseline.",
       "status": "owner-accepted Slice-6 baseline at fda41dcadbac15b2c957c866d9e22eafb5f6afca",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md (Slice 6)",
+      "plan": "PRIMECLAW-20.7 (Slice 6)",
       "proven_by": {
         "apply": [
           "tests/lifecycle/support.py",
@@ -1564,7 +1565,7 @@
       "priority": "GATE",
       "summary": "Safety coverage preserves accepted Slice-1/Slice-2 cases. Reduced Slice-3 coverage targets ordinary build/create/body/copy failure, timeout and SIGINT/SIGTERM nonzero behavior, label mismatch, partial-resource recovery, cleanup refusal, malformed/missing result, and real mount-free stack execution; hostile same-UID races and publication micro-transactions are excluded optional hardening; Slice 6 adds default/forbidden/collision/unknown/malformed/daemon/CLI/ownership/teardown-refusal lifecycle guards with zero pre-ownership mutation and exact-owned cleanup. Slice 6 also closes tier-0 brain-query/GitHub-provider stage-stub gaps so orchestration-order tests cannot fall through to live OpenShell.",
       "status": "Slices 1-3 and Slice 6 owner-accepted; Slice-7 fake/static guard expansion and final live acceptance passed",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slice 1)",
+      "plan": "PRIMECLAW-20.2 (Slice 1); PRIMECLAW-20.1 (Slice 2); PRIMECLAW-20.5 (Slice 3); PRIMECLAW-20.7 (Slice 6); PRIMECLAW-20.6 (Slice 7)",
       "proven_by": {
         "apply": [
           "scripts/testing/provenance.py",
@@ -1602,7 +1603,7 @@
       "priority": "GATE",
       "summary": "Environment-dependent unit behaviors remain non-default bodies behind six exact-marker tier-1 bridges, including the Slice-6 lifecycle recording fake. The host-observer exception registry enables only one individually reviewed Slice-7 node behind lifecycle+macos_host markers, lifecycle_scope, pytest opt-in, and exact test-all sequencer admission.",
       "status": "Slices 5 and 6 owner-accepted; exact Slice-7 host observer source validation and final live acceptance passed",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md (Slices 5-7)",
+      "plan": "PRIMECLAW-20.8 (Slice 5); PRIMECLAW-20.7 (Slice 6); PRIMECLAW-20.6 (Slice 7)",
       "proven_by": {
         "apply": [
           "tests/test_unit_env_bridges.py",
@@ -1638,7 +1639,7 @@
       "priority": "GATE",
       "summary": "One explicit guarded host lifecycle acceptance uses the owner-accepted Slice-6 boundary to prove product destroy removes only a generated target, preserves a generated sentinel, leaves a names-only configured-production snapshot unchanged, and finalizes only exact captured/revalidated test resources.",
       "status": "owner-accepted at Slice-7 commit e4cbc59e19fe823d598456dbf2185facf0621dee; consumed observer must not rerun",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md (Slice 7)",
+      "plan": "PRIMECLAW-20.6 (Slice 7)",
       "proven_by": {
         "apply": [
           "tests/lifecycle/live.py",
@@ -1699,20 +1700,20 @@
       },
       "evidence": "docs/evidence/2026-10-07-testing-strategy-slice8-gbrain-properties.md",
       "verdict_doc": "docs/testing-strategy.md",
-      "plan": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md (Slice 8)"
+      "plan": "PRIMECLAW-20.4 (Slice 8)"
     }
   ],
   "phase2": {},
   "officialLeanRoleProtocol": {
-    "spec": ".ralph/plans/archive/official-lean-compatibility-cleanup/SPECIFICATION.md",
-    "plan": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md",
+    "spec": ".ralph/plans/archive/official-lean-compatibility-cleanup/SPECIFICATION.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
+    "plan": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
     "activeSlice": "S7 immutable final candidate freeze and review",
     "requirements": [
       {
         "id": "ORP-001",
         "summary": "canonical neutral kernel",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1723,7 +1724,7 @@
         "id": "ORP-002",
         "summary": "guarded selected context",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1734,7 +1735,7 @@
         "id": "ORP-003",
         "summary": "system channel only",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1745,7 +1746,7 @@
         "id": "ORP-004",
         "summary": "per-provider integrity",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1756,7 +1757,7 @@
         "id": "ORP-005",
         "summary": "explicit context opt-out",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1767,7 +1768,7 @@
         "id": "ORP-006",
         "summary": "lean Conversation skill",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1778,7 +1779,7 @@
         "id": "ORP-007",
         "summary": "guidance activation",
         "status": "accepted-gate-a",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
           "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
@@ -1790,7 +1791,7 @@
         "id": "ORP-008",
         "summary": "bounded execute role",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1801,7 +1802,7 @@
         "id": "ORP-009",
         "summary": "retired official EXPERT protocol (superseded by skill-based review)",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1812,7 +1813,7 @@
         "id": "ORP-010",
         "summary": "semantic read-only",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1823,7 +1824,7 @@
         "id": "ORP-011",
         "summary": "role scoping",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1834,7 +1835,7 @@
         "id": "ORP-012",
         "summary": "historical filtering",
         "status": "active-s6-final-replay-audit",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
           "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
@@ -1847,7 +1848,7 @@
         "id": "ORP-013",
         "summary": "retired overlay absent",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1858,7 +1859,7 @@
         "id": "ORP-014",
         "summary": "one fresh complete episode",
         "status": "accepted-gate-a",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
           "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
@@ -1870,7 +1871,7 @@
         "id": "ORP-015",
         "summary": "bridge generation",
         "status": "accepted-gate-a",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
           "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
@@ -1882,14 +1883,14 @@
         "id": "ORP-016",
         "summary": "interim UAT",
         "status": "accepted-gate-a",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": []
       },
       {
         "id": "ORP-017",
         "summary": "compatibility removal",
         "status": "active-s6-final-source",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-08-slice-5-practical-legacy-removal.md",
           "docs/evidence/official-lean-role-protocol/2026-10-08-slice-6-final-source-reconciliation.md"
@@ -1899,14 +1900,14 @@
         "id": "ORP-018",
         "summary": "final UAT/completion",
         "status": "pending-gate-b",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": []
       },
       {
         "id": "ORP-019",
         "summary": "isolated gates",
         "status": "active-s6-final-gates",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
           "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
@@ -1920,7 +1921,7 @@
         "id": "ORP-020",
         "summary": "correlatable evidence",
         "status": "active-s6-final-evidence",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
           "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
@@ -1934,7 +1935,7 @@
         "id": "ORP-021",
         "summary": "two rollback points",
         "status": "accepted-through-s5",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-07-slice-4-generation-a-readiness.md",
           "docs/evidence/official-lean-role-protocol/2026-10-07-section-31-generation-a-review-repair.md",
@@ -1947,7 +1948,7 @@
         "id": "ORP-022",
         "summary": "current documentation",
         "status": "active-s6-final-docs",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",
@@ -1963,7 +1964,7 @@
         "id": "ORP-023",
         "summary": "immutable history",
         "status": "accepted-through-s3",
-        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability",
+        "authority": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md#5-requirement-traceability @ 4a40a0832d561e380da32099f07d3ea2195e7e65",
         "evidence": [
           "docs/evidence/official-lean-role-protocol/2026-10-04-slice-1-kernel-installer-lineage.md",
           "docs/evidence/official-lean-role-protocol/2026-10-06-slice-2-coverage-reconciliation.md",

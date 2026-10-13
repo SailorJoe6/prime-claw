@@ -1,8 +1,10 @@
 # docs/derisk — Phase 1 de-risk verdicts and evidence
 
 One verdict document per load-bearing unknown, plus the raw evidence the
-verdicts stand on. Spec: [.ralph/plans/SPECIFICATION.md](../../.ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md)
-· Requirements: [.ralph/plans/REQUIREMENTS.md](../../.ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md)
+verdicts stand on. Historical spec provenance:
+`.ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65`
+· Historical requirements provenance:
+`.ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65`
 · Traceability: [config/requirements-inventory.json](../../config/requirements-inventory.json)
 
 ## Verdict documents

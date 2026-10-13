@@ -1036,6 +1036,57 @@ authority. If managed plugin source changes, run the required Docker-isolated
 candidate validation. Validate the relevant inventory and static contracts,
 independently review the bounded candidate, commit, push, report, and stop.
 
+#### Slice 14 progress — normalize proof authority and gate deletion
+
+Re-audited the exact tracked `config/requirements-inventory.json` before
+editing. It contained 62 scalar references, across 21 distinct strings, to
+eight `.ralph/plans` files. Seventeen Phase 2 verdicts incorrectly reused the
+current active root plan even though their actual source is the archived Phase
+2 runtime plan. Fifteen project-wide-testing rows incorrectly reused the final
+Slice 8 archive files for claims from Slices 1–7.
+
+Normalized the 17 Phase 2 verdicts to explicit Git provenance at
+`.ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 4a40a0832d561e380da32099f07d3ea2195e7e65`.
+The other still-historical plan sources use the same accepted pre-cutover
+checkpoint. The 15 project-wide-testing rows now use their exact durable
+Backlog authorities: `PRIMECLAW-20` for the aggregate and `PRIMECLAW-20.1`
+through `PRIMECLAW-20.8` for the applicable slice, including every source for
+composite claims. The resulting inventory has 47 explicit Git references to six
+audited files plus the slice-correct task references; no live proof claim
+depends on the working-tree plan path.
+
+Removed the remaining deletion-sensitive current proof links from
+`DEVELOPERS.md`, `LONG_RANGE_PLAN.md`, `docker/test.Dockerfile`, the three
+`docs/derisk` verdict surfaces, and user-story traceability. Current guidance
+now uses canonical docs or durable Backlog tasks. Historical Phase 1 spec and
+requirements paths remain truthful as explicit `path @ 4a40a0832d561e380da32099f07d3ea2195e7e65`
+provenance. Historical reports, completed-task prose, retained version-1
+compatibility behavior, and migration descriptions remain unchanged.
+
+Expanded `tests/test_inventory_integrity.py` to scan every inventory string,
+reject any unpinned plan reference, require the exact 47-reference/six-file
+audited set and common provenance commit, resolve every Git object, enforce the
+15 per-row project-wide-testing task mappings, resolve each task to exactly one
+canonical tracked Markdown file, and protect the named current proof surfaces.
+Initial independent read-only review found the false Phase 2 and testing-slice
+source mappings. Both were repaired; its rereview reported no material findings
+in the repaired inventory and gate.
+
+Focused inventory and deletion-safety validation passed 7 tests. The curated broad
+host-safe suite passed 653 tests plus 75 subtests, with 1 skip, 67 deselections,
+and 12 warnings; `git diff --check` passed. An initial unrestricted host-safe
+run also exposed two unrelated static-policy failures already present at the
+handoff base: the `test_runtime_connect.py` literal-policy check and the missing
+pytest bridge for `task_episode_admission_extension.test.mjs`. Their source and
+policy files are unchanged by this slice. No managed plugin source changed, so
+Docker Tier 1 is not required by repository policy.
+
+No task identity, status, bundle, `backlog/config.yml`, production asset, plugin source,
+retained version-1 compatibility behavior, lifecycle state,
+ownership/resource, acceptance criterion, or operator authority changed. No
+migration, retirement, plan deletion or movement, final cutover, host-global
+apply, or live resource cleanup occurred.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and
