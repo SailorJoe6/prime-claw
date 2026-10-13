@@ -590,6 +590,9 @@ function stringField(value: JsonObject, field: string, label: string): string {
 function runOrcaCommand(args: string[]): string {
   return execFileSync("orca", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
+function commandIsDefinitelyMissing(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "ENOENT");
+}
 export class CliOrcaAdapter implements OrcaAdapter {
   private readonly runner: (args: string[]) => string;
   constructor(runner: (args: string[]) => string = runOrcaCommand) { this.runner = runner; }
@@ -603,10 +606,7 @@ export class CliOrcaAdapter implements OrcaAdapter {
     if (envelope.ok !== true) throw new Error(`${label} failed: ${typeof envelope.error === "string" ? envelope.error : "unknown error"}`);
     return object(envelope.result, `${label}.result`);
   }
-  async listReadySetups(projectRoot: string): Promise<OrcaProjectSetup[]> {
-    let localResult: JsonObject;
-    try { localResult = this.json(["project", "setups"], "Orca project setup inventory"); }
-    catch (error) { throw new OrcaUnavailableError("Orca CLI/runtime is unavailable before Episode mutation", { cause: error }); }
+  private readyLocalSetups(projectRoot: string, localResult: JsonObject): OrcaProjectSetup[] {
     const localRows = Array.isArray(localResult.setups) ? localResult.setups.map((value) => object(value, "Orca setup")) : [];
     const localProjects = localRows.filter((row) => typeof row.path === "string" && samePath(row.path, projectRoot));
     if (localProjects.length === 0) return [];
@@ -615,6 +615,23 @@ export class CliOrcaAdapter implements OrcaAdapter {
     return localProjects
       .filter((row) => row.setupState === "ready")
       .map((row) => this.setup(row, "local", "local"));
+  }
+  async listReadySetups(projectRoot: string): Promise<OrcaProjectSetup[]> {
+    let localResult: JsonObject;
+    try { localResult = this.json(["project", "setups"], "Orca project setup inventory"); }
+    catch (error) { throw new OrcaUnavailableError("Orca CLI/runtime is unavailable before Episode mutation", { cause: error }); }
+    return this.readyLocalSetups(projectRoot, localResult);
+  }
+  async listReadyTaskPlacementSetups(projectRoot: string): Promise<OrcaProjectSetup[]> {
+    let localResult: JsonObject;
+    try { localResult = this.json(["project", "setups"], "Orca project setup inventory"); }
+    catch (error) {
+      if (commandIsDefinitelyMissing(error)) {
+        throw new OrcaUnavailableError("Orca CLI is absent before task Episode placement", { cause: error });
+      }
+      throw error;
+    }
+    return this.readyLocalSetups(projectRoot, localResult);
   }
   async createWorktree(options: { setup: OrcaProjectSetup; name: string; baseRef: string }): Promise<OrcaWorktree> {
     try {
@@ -790,6 +807,43 @@ async function selectSetup(setups: OrcaProjectSetup[], host: string | undefined,
   }
   return selected;
 }
+export interface TaskEpisodePlacementInventory {
+  listReadyTaskPlacementSetups(projectRoot: string): Promise<OrcaProjectSetup[]>;
+}
+export interface TaskEpisodePlacementDependencies {
+  orca?: TaskEpisodePlacementInventory;
+}
+
+/**
+ * Resolve task-native Episode placement before any task, Git, ownership, or
+ * resource mutation. Local worktree fallback is allowed only when Orca
+ * inventory is proven unavailable and no explicit setup was requested.
+ */
+export async function resolveTaskEpisodePlacement(
+  projectRoot: string,
+  host: string | undefined,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodePlacementDependencies = {},
+): Promise<TaskEpisodeAdmissionOptions> {
+  const orca = dependencies.orca ?? new CliOrcaAdapter();
+  let setups: OrcaProjectSetup[];
+  try {
+    setups = await orca.listReadyTaskPlacementSetups(projectRoot);
+  } catch (error) {
+    if (!(error instanceof OrcaUnavailableError)) throw error;
+    if (host) {
+      throw new Error(`Explicit Episode host ${host} could not be resolved because Orca inventory is unavailable`);
+    }
+    return { engine: "local" };
+  }
+  const setup = await selectSetup(setups, host, ctx);
+  return {
+    engine: "orca",
+    projectSetupId: setup.id,
+    ...(setup.routingEnvironmentId ? { routingEnvironmentId: setup.routingEnvironmentId } : {}),
+  };
+}
+
 async function reservedTaskSetup(
   record: TaskEpisodeOwnershipRecord,
   repo: string,

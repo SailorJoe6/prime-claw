@@ -60,6 +60,23 @@ encode the `In Planning` structural and semantic readiness gates, the single
 a durable provisioning reservation before branch/worktree/session creation,
 clean rollback to `In Planning`, and uncertain/partial `Blocked` outcome.
 
+An inactive deterministic admission helper now resolves placement before it
+queues either compact-first workflow message. It accepts one exact ready local
+Orca setup, selected automatically when sole, by stable ID, or by the native UI
+picker. Zero ready setups, remote setup, noninteractive ambiguity, and picker
+cancellation fail without task, Git, ownership, or resource mutation. Direct
+local fallback exists only when the production Orca command is definitively
+absent and never when an explicit setup was requested. Malformed JSON, a
+negative inventory envelope, and other inventory failures propagate and fail
+closed rather than selecting local execution.
+
+Only after placement and both workflow messages succeed does the helper grant
+one ephemeral approval bound to the owner session, canonical task ID/path and
+project root, and exact placement. The prep-turn end exposes it to the semantic
+turn; one exact consume removes it, while phase end, session start, or shutdown
+clears it. The full ordinary oversight guide precedes `implement-task` semantic
+readiness. No approval is durable or inferred from planning.
+
 The ownership store now accepts either retained version-1 folder identity or
 strict version-2 task identity, never a mixture. An internal reservation seam
 re-resolves and verifies that the exact task is `In Progress`, still has a
@@ -91,9 +108,9 @@ failure before ownership or resource mutation commits the exact task back to
 the exact inspection/reconciliation condition and preserves all evidence.
 
 This remains an inactive foundation: `/implement-task` and
-`create_task_episode` are not registered, so no public task-native admission
-path calls the transaction yet. Current public Episode creation continues
-through the retained folder workflow above.
+`create_task_episode` are not registered, so neither the staged chain nor its
+single-use approval can call the transaction yet. Current public Episode
+creation continues through the retained folder workflow above.
 
 ## Primary implementation surfaces
 

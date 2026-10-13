@@ -26,10 +26,14 @@ export interface TaskPrepChainWorkflow extends PrepChainWorkflow {
 }
 
 export type TaskPrepChainAdmissionResult =
-  | { ok: true; taskId: string }
+  | { ok: true; taskId: string; taskPath: string; projectRoot: string }
   | { ok: false; message: string; level: "warning" | "error" };
 
 type BacklogTaskResolver = (cwd: string, rawTaskId: string) => BacklogTaskSelection | null;
+type TaskPrepChainPreflight = (
+  ctx: ExtensionContext,
+  selection: BacklogTaskSelection,
+) => void | Promise<void>;
 
 async function admitResolvedPrepChain(
   pi: ExtensionAPI,
@@ -128,6 +132,8 @@ export async function admitTaskPrepChain(
   workflow: TaskPrepChainWorkflow,
   source: "native" | "tool",
   taskResolver: BacklogTaskResolver = resolveBacklogTask,
+  preflight?: TaskPrepChainPreflight,
+  phasePreamble?: string,
 ): Promise<TaskPrepChainAdmissionResult> {
   let selected: BacklogTaskSelection | null;
   try {
@@ -147,6 +153,17 @@ export async function admitTaskPrepChain(
       level: "warning",
     };
   }
+  if (preflight) {
+    try {
+      await preflight(ctx, selected);
+    } catch (error) {
+      return {
+        ok: false,
+        message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}`,
+        level: "error",
+      };
+    }
+  }
   const result = await admitResolvedPrepChain(
     pi,
     ctx,
@@ -154,6 +171,13 @@ export async function admitTaskPrepChain(
     selected.taskId,
     workflow,
     source,
+    undefined,
+    phasePreamble,
   );
-  return result.ok ? { ok: true, taskId: result.location } : result;
+  return result.ok ? {
+    ok: true,
+    taskId: result.location,
+    taskPath: selected.taskPath,
+    projectRoot: selected.projectRoot,
+  } : result;
 }

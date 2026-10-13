@@ -28,6 +28,17 @@ old-layout Episode can finish from its unchanged snapshot.
 | Native `/plan-spec` | wrapped `plan-prep`, ordinary delivery | wrapped `plan-spec` |
 | `plan_spec` | wrapped `plan-prep`, `steer` delivery | wrapped `plan-spec` |
 | Native `/implement-spec` | wrapped `implement-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-spec` |
+| Staged, inactive `/implement-task` helper | wrapped `implement-task-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-task` |
+
+The task-native implementation helper is intentionally not registered. Before
+it admits either message, deterministic code resolves the exact `In Planning`
+task and selects one exact ready local Orca setup. A sole setup or explicit
+stable setup ID is accepted; UI cancellation, noninteractive ambiguity, no ready
+setup, or remote placement fails without queueing a workflow. Direct local
+fallback is selected only when the production Orca command is definitively
+absent and no explicit setup was requested. Malformed or negative inventory
+responses fail closed. Placement selection performs no task, Git,
+ownership, worktree, or session mutation.
 
 The prep workflow may request focused compaction. It does not wait for a compact
 event, recreate the phase prompt, or control the already queued follow-up. The
@@ -38,13 +49,21 @@ Task-native planning updates only the selected task; folder-compatible planning
 updates only the selected future bundle. Both stop for operator review and never
 authorize implementation.
 
-Implementation admission records a minimal in-memory guard for the current
-owner session, exact folder, and optional stable setup ID. The guard survives
-the prep turn, is consumed by one exact `create_spec_episode` call during the
-phase turn, and is cleared if that turn ends without creation. It is not a
-durable approval or guide receipt.
+Retained implementation admission records a minimal in-memory guard for the
+current owner session, exact folder, and optional stable setup ID. The guard
+survives the prep turn, is consumed by one exact `create_spec_episode` call
+during the phase turn, and is cleared if that turn ends without creation.
 
-`create_spec_episode` remains the only mechanical promotion boundary. Semantic
+The staged task-native helper records the same kind of ephemeral authority only
+after exact placement and both workflow messages succeed. It binds owner
+session, canonical task ID, canonical task path and project root, plus the exact
+`orca` setup or proven-unavailable `local` fallback. The guard is unavailable in
+the prep turn, consumable once only for the same re-resolved task during the
+semantic phase, and cleared on phase end, session start, or shutdown. Neither
+guard is a durable approval or guide receipt.
+
+`create_spec_episode` remains the only mechanical promotion boundary exposed to
+users. The staged task approval has no public consumer yet. Semantic
 readiness stays in `implement-spec`; deterministic code owns placement,
 promotion, session binding, and one fixed execute assignment. Missing or
 mismatched admission fails before lifecycle mutation.

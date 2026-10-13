@@ -414,6 +414,45 @@ independent bounded diff review found no material defects, and source-mode
 teardown, and manifest evidence at
 `.test-results/20261013T103834Z-65715-7dcc0310/tier1`.
 
+#### Slice 3 progress — inactive task placement and ephemeral approval (2026-10-13)
+
+Staged the deterministic task-native compact-first admission seam without
+registering `/implement-task` or `create_task_episode`. Before either workflow
+message, it resolves the exact `In Planning` task and selects one exact ready
+local Orca setup: a sole setup, explicit stable ID, or native picker result.
+Zero ready setups, remote placement, noninteractive ambiguity, cancellation,
+and other inventory errors fail before queueing. Direct local fallback is
+allowed only when the production Orca command is definitively absent and no
+explicit setup was requested; malformed or negative inventory fails closed.
+Placement selection performs no task, Git, ownership, worktree, session, or
+other resource mutation.
+
+Only after placement and both workflow messages succeed does the seam grant one
+in-memory approval bound to the owner session, canonical task ID/path and
+project root, and exact placement. The prep-turn end exposes it to the semantic
+turn; exact identity is required, one consume removes it, and phase end,
+session start, or shutdown clears it. The full ordinary oversight guide is
+prepended to `implement-task` semantic readiness. Retained folder admission and
+all currently registered public surfaces remain unchanged.
+
+This slice connects no approval consumer to the trusted task-creation
+transaction and changes no lifecycle state. Conversation-owned `Blocked`/resume
+publication, `Ready for Merge` integration, operator outcomes, task-native
+close/abandonment, coordinated public activation, retained native receipts, and
+final migration remain later work. No acceptance criterion is newly claimed.
+
+Focused validation passed 32 Node tests. Broad validation passed 107 Node tests
+and 43 host-safe Python checks with 43 container cases deselected, plus
+`git diff --check`. Independent review identified an overbroad production Orca
+fallback classification: retained inventory translated malformed and negative
+responses into `OrcaUnavailableError`. The accepted repair added a strict
+Task-placement inventory path that falls back only for process `ENOENT`, leaves
+retained behavior unchanged, and proves malformed/negative responses fail.
+Repair rereview found no material defects. Source-mode
+`scripts/test-tier1.sh --probe` passed with immutable-image, offline-RPC,
+teardown, and manifest evidence at
+`.test-results/20261013T110322Z-62776-06322ace/tier1`.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

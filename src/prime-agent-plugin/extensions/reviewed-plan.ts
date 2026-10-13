@@ -5,12 +5,16 @@ import {
   createSpecEpisode,
   episodeResultText,
   handoffSpecEpisode,
+  resolveTaskEpisodePlacement,
   type EpisodeDependencies,
+  type TaskEpisodeAdmissionOptions,
+  type TaskEpisodePlacementDependencies,
 } from "../extension-support/spec-episode.ts";
 import {
   admitPrepChain,
   admitTaskPrepChain,
   type PrepChainWorkflow,
+  type TaskPrepChainAdmissionResult,
   type TaskPrepChainWorkflow,
 } from "../extension-support/prep-chain.ts";
 import {
@@ -22,6 +26,7 @@ import { closeEpisodeOwnership } from "../extension-support/episode-close.ts";
 import {
   resolveBacklogTask,
   validateFutureLocation,
+  type BacklogTaskSelection,
 } from "../extension-support/reviewed-plan-support.ts";
 
 /**
@@ -55,9 +60,18 @@ const IMPLEMENT_PREP_WORKFLOW: PrepChainWorkflow = {
   phaseSkillName: "implement-spec",
   locationTag: "operator-implementation-location",
 };
+const IMPLEMENT_TASK_USAGE = "Usage: /implement-task TASK-ID [--host id:<project-host-setup-id>]";
+const IMPLEMENT_TASK_PREP_WORKFLOW: TaskPrepChainWorkflow = {
+  usage: IMPLEMENT_TASK_USAGE,
+  prepSkillName: "implement-task-prep",
+  phaseSkillName: "implement-task",
+  locationTag: "operator-implementation-task-id",
+  allowedStatuses: ["In Planning"],
+};
 
 
 type CommandSelection = { location: string; host?: string };
+type TaskCommandSelection = { taskId: string; host?: string };
 
 function parseImplementationArgs(args: string): CommandSelection | null {
   const tokens = args.trim().split(/\s+/).filter(Boolean);
@@ -68,12 +82,120 @@ function parseImplementationArgs(args: string): CommandSelection | null {
   return null;
 }
 
+function parseTaskImplementationArgs(args: string): TaskCommandSelection | null {
+  const selected = parseImplementationArgs(args);
+  return selected ? { taskId: selected.location, ...(selected.host ? { host: selected.host } : {}) } : null;
+}
+
 type ImplementationApproval = {
   location: string;
   host?: string;
   bundleDigest: string;
   skipNextAgentEnd: boolean;
 };
+
+export type TaskImplementationApproval = {
+  ownerSessionId: string;
+  taskId: string;
+  taskPath: string;
+  projectRoot: string;
+  placement: TaskEpisodeAdmissionOptions;
+  skipNextAgentEnd: boolean;
+};
+
+/** One-turn, single-use authority for the exact task and preselected placement. */
+export class TaskImplementationApprovalStore {
+  private readonly approvals = new Map<string, TaskImplementationApproval>();
+
+  grant(
+    ctx: ExtensionContext,
+    task: BacklogTaskSelection,
+    placement: TaskEpisodeAdmissionOptions,
+  ): void {
+    const ownerSessionId = ctx.sessionManager.getSessionId();
+    this.approvals.set(ownerSessionId, {
+      ownerSessionId,
+      taskId: task.taskId,
+      taskPath: task.taskPath,
+      projectRoot: task.projectRoot,
+      placement: { ...placement },
+      skipNextAgentEnd: true,
+    });
+  }
+
+  consume(
+    ctx: ExtensionContext,
+    task: BacklogTaskSelection,
+  ): TaskImplementationApproval | null {
+    const ownerSessionId = ctx.sessionManager.getSessionId();
+    const approval = this.approvals.get(ownerSessionId);
+    if (!approval || approval.skipNextAgentEnd
+      || approval.ownerSessionId !== ownerSessionId
+      || approval.taskId !== task.taskId
+      || approval.taskPath !== task.taskPath
+      || approval.projectRoot !== task.projectRoot) return null;
+    this.approvals.delete(ownerSessionId);
+    return { ...approval, placement: { ...approval.placement } };
+  }
+
+  agentEnd(ownerSessionId: string): void {
+    const approval = this.approvals.get(ownerSessionId);
+    if (!approval) return;
+    if (approval.skipNextAgentEnd) {
+      this.approvals.set(ownerSessionId, { ...approval, skipNextAgentEnd: false });
+      return;
+    }
+    this.approvals.delete(ownerSessionId);
+  }
+
+  clear(ownerSessionId: string): void {
+    this.approvals.delete(ownerSessionId);
+  }
+}
+
+export interface TaskImplementationAdmissionDependencies {
+  taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+  placementResolver?: typeof resolveTaskEpisodePlacement;
+  placement?: TaskEpisodePlacementDependencies;
+  guideRoot?: string;
+}
+
+/**
+ * Stage the inactive task-native compact-first admission chain. Placement is
+ * resolved before either workflow message, and approval is recorded only after
+ * both messages are admitted.
+ */
+export async function admitTaskImplementationPrepChain(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  args: string,
+  approvals: TaskImplementationApprovalStore,
+  dependencies: TaskImplementationAdmissionDependencies = {},
+): Promise<TaskPrepChainAdmissionResult> {
+  const parsed = parseTaskImplementationArgs(args);
+  if (!parsed) return { ok: false, message: IMPLEMENT_TASK_USAGE, level: "warning" };
+  let selected: BacklogTaskSelection | undefined;
+  let placement: TaskEpisodeAdmissionOptions | undefined;
+  const result = await admitTaskPrepChain(
+    pi,
+    ctx,
+    parsed.taskId,
+    IMPLEMENT_TASK_PREP_WORKFLOW,
+    "native",
+    dependencies.taskResolver,
+    async (callCtx, task) => {
+      selected = task;
+      const resolvePlacement = dependencies.placementResolver ?? resolveTaskEpisodePlacement;
+      placement = await resolvePlacement(task.projectRoot, parsed.host, callCtx, dependencies.placement);
+    },
+    conversationGuideText({ guideRoot: dependencies.guideRoot }),
+  );
+  if (result.ok) {
+    if (!selected || !placement) throw new Error("Task implementation admission lost its exact placement binding");
+    approvals.grant(ctx, selected, placement);
+  }
+  return result;
+}
 
 function registerPrepChainCommand(
   pi: ExtensionAPI,
@@ -120,11 +242,14 @@ type ReviewedPlanDependencies = EpisodeDependencies & {
   createEpisode?: typeof createSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
   taskResolver?: typeof resolveBacklogTask;
+  taskImplementationApprovals?: TaskImplementationApprovalStore;
 };
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
     const implementationApprovalBySession = new Map<string, ImplementationApproval>();
+    const taskImplementationApprovals = dependencies?.taskImplementationApprovals
+      ?? new TaskImplementationApprovalStore();
     const oversightOptions = { guideRoot: dependencies?.guideRoot };
     registerConversationOversight(pi, oversightOptions);
     registerPrepChainCommand(pi, {
@@ -267,10 +392,13 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     });
 
     pi.on("session_start", (_event, ctx) => {
-      implementationApprovalBySession.delete(ctx.sessionManager.getSessionId());
+      const sessionId = ctx.sessionManager.getSessionId();
+      implementationApprovalBySession.delete(sessionId);
+      taskImplementationApprovals.clear(sessionId);
     });
     pi.on("agent_end", (_event, ctx) => {
       const sessionId = ctx.sessionManager.getSessionId();
+      taskImplementationApprovals.agentEnd(sessionId);
       const approval = implementationApprovalBySession.get(sessionId);
       if (!approval) return;
       if (approval.skipNextAgentEnd) {
@@ -283,7 +411,9 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       implementationApprovalBySession.delete(sessionId);
     });
     pi.on("session_shutdown", (_event, ctx) => {
-      implementationApprovalBySession.delete(ctx.sessionManager.getSessionId());
+      const sessionId = ctx.sessionManager.getSessionId();
+      implementationApprovalBySession.delete(sessionId);
+      taskImplementationApprovals.clear(sessionId);
     });
 
     pi.registerTool({

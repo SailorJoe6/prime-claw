@@ -36,10 +36,25 @@ The post-preparation message contains the complete ordinary
 There is no guide activation, disclosure, hash, version, receipt, readiness
 query, collision check, consumed state, or transcript redaction protocol.
 
-A failed or interrupted pre-creation chain is rerun visibly. The ephemeral
-approval guard exists only to bind the current owner session, selected folder,
-and optional setup ID across the two-turn compact-first chain. It is not a
-second approval UX.
+A failed or interrupted pre-creation chain is rerun visibly. The retained
+folder approval guard exists only to bind the current owner session, selected
+folder, and optional setup ID across the two-turn compact-first chain. It is not
+a second approval UX.
+
+The staged task-native chain remains inactive. Before either workflow message,
+it resolves the exact `In Planning` task and one exact ready local Orca setup,
+or uses direct local fallback only when the production Orca command is absent
+and no explicit setup was requested. Cancellation, ambiguity, zero ready setups,
+remote selection, malformed or negative inventory, and other inventory failures
+grant no approval and queue no workflow.
+Placement performs no task, Git, ownership, or resource mutation.
+
+After both messages are admitted, its ephemeral approval binds the owner
+session, canonical task ID/path and project root, and exact placement. The
+first phase boundary exposes it to the semantic turn; one exact consume removes
+it. A completed phase without creation, session start, or shutdown clears it.
+The complete ordinary oversight guide precedes task semantic readiness. This
+adds no public `/implement-task` command or `create_task_episode` tool.
 
 ## One durable ownership record
 

@@ -7,8 +7,11 @@ import { execFileSync, spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  CliOrcaAdapter,
   CliTaskEpisodeAdmissionGit,
   createTaskEpisode,
+  OrcaUnavailableError,
+  resolveTaskEpisodePlacement,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import {
   resolveBacklogTask,
@@ -356,4 +359,98 @@ test("allocator return without durable active identity is published as Blocked",
   assert.equal(view(f.root).status, "Blocked");
   assert.equal(f.record.status, "provisioning");
   assert.match(JSON.stringify(view(f.root)), /reconcile every recorded task, worktree, and session identity/);
+});
+
+
+test("task placement binds one exact ready local Orca setup without mutation", async () => {
+  const setup = {
+    id: "123e4567-e89b-12d3-a456-426614174000",
+    projectId: "project",
+    hostId: "local",
+    path: "/project",
+    displayName: "Local setup",
+    environmentLabel: "Local",
+  };
+  let inventories = 0;
+  const orca = { async listReadyTaskPlacementSetups(projectRoot) {
+    inventories += 1;
+    assert.equal(projectRoot, "/project");
+    return [setup];
+  } };
+  const ctx = { hasUI: false, ui: {} };
+  assert.deepEqual(
+    await resolveTaskEpisodePlacement("/project", undefined, ctx, { orca }),
+    { engine: "orca", projectSetupId: setup.id },
+  );
+  assert.deepEqual(
+    await resolveTaskEpisodePlacement("/project", `id:${setup.id}`, ctx, { orca }),
+    { engine: "orca", projectSetupId: setup.id },
+  );
+  assert.equal(inventories, 2);
+});
+
+test("task placement fails closed on zero, ambiguous, cancelled, or remote Orca setup", async () => {
+  const local = (id) => ({
+    id, projectId: "project", hostId: "local", path: `/project/${id}`,
+    displayName: id, environmentLabel: "Local",
+  });
+  const noUi = { hasUI: false, ui: {} };
+  await assert.rejects(
+    resolveTaskEpisodePlacement("/project", undefined, noUi, { orca: { async listReadyTaskPlacementSetups() { return []; } } }),
+    /No ready Orca project-host setup/,
+  );
+  await assert.rejects(
+    resolveTaskEpisodePlacement("/project", undefined, noUi, { orca: { async listReadyTaskPlacementSetups() { return [local("a"), local("b")]; } } }),
+    /require --host.*noninteractive/,
+  );
+  await assert.rejects(
+    resolveTaskEpisodePlacement("/project", undefined, { hasUI: true, ui: { async select() { return undefined; } } }, { orca: { async listReadyTaskPlacementSetups() { return [local("a"), local("b")]; } } }),
+    /selection was cancelled; nothing was created/,
+  );
+  await assert.rejects(
+    resolveTaskEpisodePlacement("/project", undefined, noUi, { orca: { async listReadyTaskPlacementSetups() { return [{ ...local("a"), hostId: "remote" }]; } } }),
+    /Remote Episode placement is disabled/,
+  );
+});
+
+test("task placement uses local fallback only for proven Orca unavailability", async () => {
+  const unavailable = { async listReadyTaskPlacementSetups() { throw new OrcaUnavailableError("orca missing"); } };
+  const ctx = { hasUI: false, ui: {} };
+  assert.deepEqual(
+    await resolveTaskEpisodePlacement("/project", undefined, ctx, { orca: unavailable }),
+    { engine: "local" },
+  );
+  await assert.rejects(
+    resolveTaskEpisodePlacement("/project", "id:123e4567-e89b-12d3-a456-426614174000", ctx, { orca: unavailable }),
+    /Explicit Episode host.*inventory is unavailable/,
+  );
+  await assert.rejects(
+    resolveTaskEpisodePlacement("/project", undefined, ctx, { orca: { async listReadyTaskPlacementSetups() { throw new Error("bad inventory"); } } }),
+    /bad inventory/,
+  );
+});
+
+
+test("production task placement falls back only when the Orca command is absent", async () => {
+  const ctx = { hasUI: false, ui: {} };
+  const missing = new CliOrcaAdapter(() => {
+    const error = new Error("spawn orca ENOENT");
+    error.code = "ENOENT";
+    throw error;
+  });
+  assert.deepEqual(
+    await resolveTaskEpisodePlacement("/project", undefined, ctx, { orca: missing }),
+    { engine: "local" },
+  );
+
+  const malformed = new CliOrcaAdapter(() => "not-json");
+  await assert.rejects(
+    resolveTaskEpisodePlacement("/project", undefined, ctx, { orca: malformed }),
+    /returned malformed JSON/,
+  );
+  const rejected = new CliOrcaAdapter(() => JSON.stringify({ ok: false, error: "inventory denied" }));
+  await assert.rejects(
+    resolveTaskEpisodePlacement("/project", undefined, ctx, { orca: rejected }),
+    /inventory denied/,
+  );
 });
