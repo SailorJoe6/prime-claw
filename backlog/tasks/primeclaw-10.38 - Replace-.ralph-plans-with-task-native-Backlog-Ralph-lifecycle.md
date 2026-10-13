@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 09:42'
+updated_date: '2026-10-13 10:08'
 labels:
   - backlog-md
   - episode-loop
@@ -324,4 +324,21 @@ Evidence:
 - Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T094041Z-49232-6f8646b6/tier1`.
 
 Slices 1 through 3 remain open. Public task admission, placement/approval wiring, task-native handoff/block/resume/review/finalization mechanics, retained real-session evidence, and final lifecycle/default migration remain later work. AC #2, #3, #6, #7, and #8 remain unchecked; this staged policy alone completes no acceptance criterion.
+
+## 2026-10-13 — inactive task-native Episode continuation
+
+Added the next bounded Slice 3 increment without registering public `/implement-task`, `create_task_episode`, task-native handoff, or task-native finalization surfaces. Internal `handoffTaskEpisode` now continues only the exact active version-2 Episode owned by the top-level Conversation from the canonical primary `main` checkout. It requires the bound task to resolve to the exact recorded ID/path both on main and in the Episode worktree, requires both copies to remain `In Progress` with meaningful Implementation Plans, requires a clean owned worktree with matching Git and optional Orca identity, and requires the durable session ID/file and exact worktree CWD plus a fully quiescent route before delivery.
+
+The same `<operator-episode-task>` binding is appended to canonical handoff and the sole queued execute follow-up. Operator or accepted in-scope focus appears only in handoff. A stale active route may reopen the same durable session and update only active routing identity; continuation does not create or replace a worktree, session, assignment, ownership record, or other resource. It rejects `Blocked` until the Conversation publishes a truthful resumed `In Progress` state and rejects `Ready for Merge` until the later constrained final-integration handshake exists. Identity/path/plan drift, non-active ownership, a dirty Episode checkout, a foreign durable-session CWD, or noncanonical caller checkout reject before delivery.
+
+The managed handoff workflow now selects task mode only from exactly one `<operator-episode-task>` block. Task mode treats the bound Backlog task as sole durable authority, uses supported task edits only in the Episode worktree when genuinely needed, keeps lifecycle status Conversation-owned, and never consults `.ralph/plans` or copies task content across checkouts. With no task block, the existing folder-plan handoff remains operational. The retained `handoffSpecEpisode` public tool is unchanged. Source/project workflow copies and `.prime-claw/templates.json` hashes match.
+
+Evidence:
+- Focused task handoff mechanics and policy — 48 Node tests and 23 host-safe Python checks passed, with 2 container cases deselected.
+- Broader handoff/admission/initialization/review compatibility — 115 Node tests and 41 host-safe Python checks passed, with 11 container cases deselected.
+- Independent bounded review — no material findings.
+- `git diff --check` — passed.
+- Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T100557Z-41220-9a097e6b/tier1`.
+
+Slices 1 through 3 remain open. Public task admission/handoff/finalization, Conversation-owned Blocked/resume publication, oversight and Expert task authority, Ready-for-Merge integration, operator decision outcomes, abandonment/finalization, retained real-session evidence, and final lifecycle/default migration remain. AC #2, #3, #6, #7, and #8 remain unchecked; this inactive continuation seam alone completes no acceptance criterion.
 <!-- SECTION:NOTES:END -->

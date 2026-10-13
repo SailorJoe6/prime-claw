@@ -491,5 +491,7 @@ def test_task_native_implementation_policies_are_staged_without_public_activatio
     ).read_text()
     assert 'command: "implement-task"' not in extension
     assert 'name: "create_task_episode"' not in extension
+    assert 'name: "handoff_task_episode"' not in extension
+    assert 'name: "finalize_task_episode"' not in extension
     assert 'command: "implement-spec"' in extension
     assert 'name: "create_spec_episode"' in extension

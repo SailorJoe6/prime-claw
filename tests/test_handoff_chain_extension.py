@@ -83,7 +83,9 @@ def test_handoff_skill_has_only_one_slash_command_surface():
 
 def test_handoff_skill_reports_compaction_without_owning_execute_admission():
     """The workflow must report immediate compaction state and not route execute."""
-    skill = (REPO / ".prime-claw" / "workflows" / "handoff.md").read_text()
+    skill = " ".join(
+        (REPO / ".prime-claw" / "workflows" / "handoff.md").read_text().split()
+    )
     assert "<operator-compaction-guidance>" in skill
     assert "compaction_result = await compact.run(focus_hint)" in skill
     assert "It is guidance only; it never selects the next phase." in skill
@@ -92,3 +94,23 @@ def test_handoff_skill_reports_compaction_without_owning_execute_admission():
     assert "canonical `execute` is already queued independently" in skill
     assert "Do not wait for `session_compact`" in skill
     assert "invoke execute yourself" in skill
+
+
+def test_handoff_skill_keeps_task_native_and_folder_authorities_disjoint():
+    skill = " ".join(
+        (REPO / ".prime-claw" / "workflows" / "handoff.md").read_text().split()
+    )
+    for fragment in (
+        "<operator-episode-task>",
+        "backlog task view --json -- TASK-ID",
+        "status to remain exactly `In Progress`",
+        "task is the sole durable handoff authority",
+        "supported `backlog task edit` operations only in this Episode worktree",
+        "commit and push the single-purpose checkpoint before compacting",
+        "Never pass `--status`",
+        "consult `.ralph/plans`",
+        "owning Conversation alone publishes lifecycle status on main",
+        "If there is no task block, retain the existing folder-plan handoff mode",
+        "Never mix the two modes",
+    ):
+        assert fragment in skill

@@ -98,6 +98,10 @@ export interface EpisodeHandoffResult {
   admitted: true; sourceLocation: string; episodeId: string; episodeActiveSessionId: string;
   handoffDelivery: "prompt"; executeDelivery: "followUp";
 }
+export interface TaskEpisodeHandoffResult {
+  admitted: true; taskId: string; episodeId: string; episodeActiveSessionId: string;
+  handoffDelivery: "prompt"; executeDelivery: "followUp";
+}
 export interface PublishedSession { activeSessionId: string; sessionId: string; sessionFile: string }
 
 export function episodeResultText(result: EpisodeResult): string {
@@ -170,6 +174,10 @@ export interface EpisodeDependencies {
   guideRoot?: string;
   wait?: (ms: number) => Promise<void>;
   bindingAttempts?: number;
+}
+export interface TaskEpisodeHandoffDependencies extends EpisodeDependencies {
+  taskRunner?: CommandRunner;
+  taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
 }
 export interface EpisodeCreationOptions { host?: string; approvedBundleDigest?: string }
 
@@ -879,6 +887,52 @@ async function reopenIfNeeded<T extends EpisodeOwnershipRecord>(
   return { record: current, activeSessionId };
 }
 
+async function deliverOwnedEpisodeHandoff(
+  record: EpisodeOwnershipRecord,
+  guidance: string,
+  repo: string,
+  ctx: ExtensionContext,
+  git: GitAdapter,
+  filesystem: FilesystemAdapter,
+  orca: OrcaAdapter,
+  publisher: SessionPublisher,
+  store: EpisodeOwnershipStore,
+  promptIdentity: { legacySnapshot?: boolean; taskId?: string; requireExactCwd?: boolean },
+): Promise<string> {
+  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before handoff`);
+  validateWorktreeRecord(record, git, filesystem, repo);
+  if (record.engine === "orca") {
+    const worktree = await orca.showWorktree(record.worktreeId!, record.routingEnvironmentId);
+    if (worktree.identity !== record.worktreeIdentity || !samePath(worktree.path, record.worktree!)) {
+      throw new Error("Orca worktree identity no longer matches Episode ownership");
+    }
+  }
+  const session = await durableSession(record, publisher);
+  if (promptIdentity.requireExactCwd && (!session.cwd || !samePath(session.cwd, record.worktree!))) {
+    throw new Error("Episode durable session is not rooted at the owned worktree");
+  }
+  if (sessionIsBusy(session)) throw new Error("Owned Episode is busy; handoff requires an idle Episode with an empty queue");
+  const location = promptIdentity.taskId
+    ? { tag: "operator-episode-task", value: promptIdentity.taskId }
+    : undefined;
+  const handoffPrompt = canonicalWorkflowPrompt(record.worktree!, "handoff", {
+    guidance: guidance.trim(),
+    legacySnapshot: promptIdentity.legacySnapshot,
+    location,
+  });
+  if (!handoffPrompt) throw new Error("Episode worktree is missing .prime-claw/workflows/handoff.md");
+  const executePrompt = canonicalWorkflowPrompt(record.worktree!, "execute", {
+    legacySnapshot: promptIdentity.legacySnapshot,
+    location,
+  });
+  if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
+  const route = await reopenIfNeeded(record, session, ctx, publisher, store, repo);
+  const state = await publisher.getState(route.activeSessionId);
+  assertIdleEpisodeState(state, route.record, route.activeSessionId);
+  await publisher.deliverHandoff(route.activeSessionId, handoffPrompt, executePrompt);
+  return route.activeSessionId;
+}
+
 export async function handoffSpecEpisode(
   rawLocation: string,
   guidance: string,
@@ -899,26 +953,107 @@ export async function handoffSpecEpisode(
     const record = store.read(repo);
     if (!record) throw new Error(`No durable episode ownership exists for ${selected.location}`);
     exactOwnedRecord(record, selected.location, ctx.sessionManager.getSessionId());
-    if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before handoff`);
-    validateWorktreeRecord(record, git, filesystem, repo);
-    if (record.engine === "orca") {
-      const worktree = await orca.showWorktree(record.worktreeId!, record.routingEnvironmentId);
-      if (worktree.identity !== record.worktreeIdentity || !samePath(worktree.path, record.worktree!)) throw new Error("Orca worktree identity no longer matches Episode ownership");
-    }
     publisher ??= new PrimeSessionPublisher();
-    const session = await durableSession(record, publisher);
-    if (sessionIsBusy(session)) throw new Error("Owned Episode is busy; handoff requires an idle Episode with an empty queue");
-    const handoffPrompt = canonicalWorkflowPrompt(record.worktree!, "handoff", { guidance: guidance.trim(), legacySnapshot: true });
-    if (!handoffPrompt) throw new Error("Episode worktree is missing .prime-claw/workflows/handoff.md");
-    const executePrompt = canonicalWorkflowPrompt(record.worktree!, "execute", { legacySnapshot: true });
-    if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
-    const route = await reopenIfNeeded(record, session, ctx, publisher, store, repo);
-    const state = await publisher.getState(route.activeSessionId);
-    assertIdleEpisodeState(state, route.record, route.activeSessionId);
-    await publisher.deliverHandoff(route.activeSessionId, handoffPrompt, executePrompt);
-    return { admitted: true, sourceLocation: selected.location, episodeId: record.episodeId!, episodeActiveSessionId: route.activeSessionId, handoffDelivery: "prompt", executeDelivery: "followUp" };
+    const activeSessionId = await deliverOwnedEpisodeHandoff(
+      record, guidance, repo, ctx, git, filesystem, orca, publisher, store,
+      { legacySnapshot: true },
+    );
+    return {
+      admitted: true,
+      sourceLocation: selected.location,
+      episodeId: record.episodeId!,
+      episodeActiveSessionId: activeSessionId,
+      handoffDelivery: "prompt",
+      executeDelivery: "followUp",
+    };
   } finally { try { publisher?.close(); } catch { /* do not mask lifecycle result */ } }
 }
+
+/**
+ * Continue one exact active task-native Episode after the owning Conversation
+ * has published the main task's resumable `In Progress` state. This internal
+ * seam remains unregistered until the task-native lifecycle is complete.
+ */
+export async function handoffTaskEpisode(
+  rawTaskId: string,
+  guidance: string,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeHandoffDependencies = {},
+): Promise<TaskEpisodeHandoffResult> {
+  const git = dependencies.git ?? new CliGitAdapter();
+  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const orca = dependencies.orca ?? new CliOrcaAdapter();
+  const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
+  const resolveTask = dependencies.taskResolver
+    ?? ((cwd: string, taskId: string) => resolveBacklogTask(cwd, taskId, runner));
+  let publisher = dependencies.publisher;
+  try {
+    const taskId = rawTaskId.trim();
+    if (!taskId || /\s/.test(taskId) || taskId.startsWith("-")) {
+      throw new Error("Task-native Episode handoff requires a canonical Backlog task ID");
+    }
+    const repo = git.repositoryRoot(ctx.cwd);
+    if (!samePath(repo, realpathSync(ctx.cwd))) {
+      throw new Error("Task-native Episode handoff must run from the repository root");
+    }
+    const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
+    if (!samePath(project.root, repo) || project.kind === "linked-worktree" || git.branch(repo) !== "main") {
+      throw new Error("Task-native Episode handoff must run from the canonical primary main checkout");
+    }
+    if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
+      throw new Error("Episode handoff is available only from a top-level project Conversation");
+    }
+    const record = store.read(repo);
+    if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
+    exactOwnedTaskRecord(record, taskId, ctx.sessionManager.getSessionId());
+    if (record.status !== "active") {
+      throw new Error(`Episode ownership is ${record.status}; inspect it before handoff`);
+    }
+    validateWorktreeRecord(record, git, filesystem, repo);
+    git.assertCleanWorktree(record.worktree!);
+    const mainTask = resolveTask(repo, taskId);
+    if (!mainTask
+      || mainTask.taskId !== record.taskId
+      || !samePath(mainTask.projectRoot, repo)
+      || mainTask.taskPathRelative !== record.taskPath) {
+      throw new Error("Task-native Episode handoff does not match the exact owned Backlog task on main");
+    }
+    if (mainTask.status !== "In Progress") {
+      throw new Error(`Task-native Episode handoff requires main task status In Progress; found ${mainTask.status}`);
+    }
+    if (!meaningfulTaskImplementationPlan(mainTask.implementationPlan)) {
+      throw new Error("Task-native Episode handoff requires a meaningful main-task Implementation Plan");
+    }
+    const episodeTask = resolveTask(record.worktree!, taskId);
+    if (!episodeTask
+      || episodeTask.taskId !== record.taskId
+      || !samePath(episodeTask.projectRoot, record.worktree!)
+      || episodeTask.taskPathRelative !== record.taskPath) {
+      throw new Error("Task-native Episode handoff does not match the exact owned Backlog task in the Episode worktree");
+    }
+    if (episodeTask.status !== "In Progress") {
+      throw new Error(`Task-native Episode handoff requires Episode task status In Progress; found ${episodeTask.status}`);
+    }
+    if (!meaningfulTaskImplementationPlan(episodeTask.implementationPlan)) {
+      throw new Error("Task-native Episode handoff requires a meaningful Episode Implementation Plan");
+    }
+    publisher ??= new PrimeSessionPublisher();
+    const activeSessionId = await deliverOwnedEpisodeHandoff(
+      record, guidance, repo, ctx, git, filesystem, orca, publisher, store,
+      { taskId: record.taskId, requireExactCwd: true },
+    );
+    return {
+      admitted: true,
+      taskId: record.taskId,
+      episodeId: record.episodeId!,
+      episodeActiveSessionId: activeSessionId,
+      handoffDelivery: "prompt",
+      executeDelivery: "followUp",
+    };
+  } finally { try { publisher?.close(); } catch { /* do not mask lifecycle result */ } }
+}
+
 
 /**
  * Allocate resources only after `reserveTaskEpisodeOwnership` has durably bound

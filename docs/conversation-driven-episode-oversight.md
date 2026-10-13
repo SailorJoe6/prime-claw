@@ -163,12 +163,22 @@ one post hook for one saved compaction. The guide references
 ## Supervision and continuation
 
 The Conversation checks the Episode's exact candidate, tree, diff, tests,
-documentation, plan, Bead chronology, and push state. It then chooses one
-bounded disposition from the managed oversight skill. Accepted advancement or
-an accepted in-scope revision uses `handoff_spec_episode` for the exact idle
-owner record. The tool admits ordinary canonical handoff and queues canonical
-execute as its sole follow-up. Admission is not completion and uncertain
-transport is never retried blindly.
+documentation, durable authority, chronology, and push state. It then chooses
+one bounded disposition from the managed oversight skill. Retained folder
+Episodes use `handoff_spec_episode` for the exact idle owner record. The tool
+admits ordinary canonical handoff and queues canonical execute as its sole
+follow-up. Admission is not completion and uncertain transport is never
+retried blindly.
+
+Version-2 ownership now has an internal, deliberately unregistered
+`handoffTaskEpisode` transport seam for ordinary `In Progress` continuation.
+Before delivery it proves canonical primary-main caller context, exact owner and
+task/path in main and the Episode worktree, meaningful plans, clean owned
+worktree, exact Git/Orca and durable-session CWD identity, and quiescence. It
+binds both prompts to the exact task. It rejects `Blocked` until the Conversation
+publishes a resumed `In Progress` state, and rejects `Ready for Merge` until the
+later constrained final-integration handshake exists. Public task-native
+admission and handoff remain inactive.
 
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and

@@ -321,13 +321,45 @@ host-safe Python checks with 9 deselected, 70 focused Node tests,
 `git diff --check`, and source-mode `scripts/test-tier1.sh --probe`, with final
 evidence at `.test-results/20261013T094041Z-49232-6f8646b6/tier1`.
 
-Slices 1 through 3 remain open. Public `/implement-task` and
-`create_task_episode`, task-native placement selection and approval wiring,
-task-native handoff/block/resume/review/finalization mechanics, retained
-real-session authoring, planning, and execution evidence, and final
-lifecycle/default migration remain later increments. Acceptance criteria #2,
-#3, #6, #7, and #8 remain unchecked until their real-session or end-to-end
-semantic paths are retained; this staged policy alone completes no criterion.
+#### Slice 3 progress — inactive task-native continuation (2026-10-13)
+
+Added the internal task-native handoff transport and dual-mode handoff policy
+without registering a public task admission, handoff, or finalization surface:
+
+- `handoffTaskEpisode` accepts only the exact top-level owner in the canonical
+  primary `main` checkout with strict active version-2 ownership;
+- main and the Episode worktree must resolve the same bound task ID/path, both
+  remain `In Progress` with meaningful plans, and the owned Episode worktree
+  must be clean with matching Git and optional Orca identity;
+- the durable session must match its recorded ID/file and exact owned worktree
+  CWD, and the route must be fully quiescent before delivery;
+- canonical handoff and its sole execute follow-up both carry the same
+  `<operator-episode-task>` binding, guidance appears only in handoff, route
+  reopen may refresh only active routing identity, and no resource is created
+  or replaced; and
+- task-mode handoff uses supported Backlog task fields only, never status or
+  `.ralph/plans`, while no-block handoff and `handoffSpecEpisode` retain the
+  complete folder workflow. Source/project copies and template hashes match.
+
+The seam rejects `Blocked` until the Conversation has truthfully published a
+resumed `In Progress` state and rejects `Ready for Merge` until the constrained
+final-integration handshake exists. It also rejects identity/path/plan drift,
+non-active ownership, dirty worktrees, foreign session CWD, and noncanonical
+caller checkout before delivery. Independent review found no material defect.
+Validation passed 41 host-safe Python checks with 11 deselected, 115 focused
+Node tests, `git diff --check`, and source-mode
+`scripts/test-tier1.sh --probe`, with final evidence at
+`.test-results/20261013T100557Z-41220-9a097e6b/tier1`.
+
+Slices 1 through 3 remain open. Public `/implement-task`,
+`create_task_episode`, and task-native handoff/finalization remain inactive.
+Task-native placement/approval wiring, Conversation-owned Blocked/resume status
+publication, oversight/Expert task authority, Ready-for-Merge integration,
+operator decision outcomes, finalization/abandonment, retained real-session
+evidence, and final lifecycle/default migration remain later increments.
+Acceptance criteria #2, #3, #6, #7, and #8 remain unchecked until their
+real-session or end-to-end semantic paths are retained; this inactive
+continuation slice alone completes no criterion.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 

@@ -8,6 +8,7 @@ import test from "node:test";
 import {
   CliOrcaAdapter, EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
   allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
+  handoffTaskEpisode,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
@@ -55,7 +56,7 @@ function harness(options = {}) {
   const git = {
     entries: [{ path: disk.root, branch: "main" }, { path: disk.worktree, branch: wt.branch }],
     repositoryRoot: () => disk.root, head: (path) => path === disk.root ? "base" : "promoted",
-    branch: () => wt.branch, worktrees() { return this.entries; },
+    branch: (path) => path === disk.root ? "main" : wt.branch, worktrees() { return this.entries; },
     createWorktree(_repo, branch, path, base) { calls.push(["local-create", branch, path, base]); mkdirSync(path, { recursive: true }); this.entries.push({ path, branch }); mkdirSync(join(path, ".agents", "skills", "execute"), { recursive: true }); writeFileSync(join(path, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE POLICY"); mkdirSync(join(path, ".prime-claw", "workflows"), { recursive: true }); writeFileSync(join(path, ".prime-claw", "workflows", "handoff.md"), "HANDOFF POLICY"); },
     assertCleanWorktree(path) { calls.push(["clean", path]); },
     commitPromotion(path) { calls.push(["commit", path]); return "promoted"; },
@@ -119,6 +120,37 @@ function bindTaskOrcaHead(f) {
     f.calls.push(["orca-create", args]);
     return { ...f.wt, head: TASK_BASE, projectSetupId: args.setup.id };
   };
+}
+
+function activeTaskRecord(f, overrides = {}) {
+  return parseEpisodeOwnership({
+    ...taskReservation(),
+    status: "active",
+    worktreeName: "prime-claw-primeclaw-10-38-episode-task-oper",
+    worktree: f.worktree,
+    branch: f.wt.branch,
+    head: TASK_BASE,
+    episodeId: "episode",
+    episodeSessionFile: join(f.root, "episode.jsonl"),
+    episodeActiveSessionId: "route",
+    ...overrides,
+  });
+}
+function taskSelection(f, overrides = {}) {
+  const projectRoot = overrides.projectRoot ?? f.root;
+  return {
+    taskId: "PRIMECLAW-10.38",
+    title: "Task-native lifecycle",
+    status: "In Progress",
+    implementationPlan: "Implement one bounded lifecycle slice.",
+    projectRoot,
+    taskPath: join(projectRoot, "backlog", "tasks", "primeclaw-10.38.md"),
+    taskPathRelative: "backlog/tasks/primeclaw-10.38.md",
+    ...overrides,
+  };
+}
+function boundTaskResolver(f, overrides = {}) {
+  return (cwd) => taskSelection(f, { projectRoot: cwd, ...overrides });
 }
 
 
@@ -261,6 +293,146 @@ test("handoff uses exact active ownership and queues canonical execute only afte
   const result = await handoffSpecEpisode(LOCATION, "fix accepted defect", f.ctx, f.deps);
   assert.equal(result.handoffDelivery, "prompt"); assert.equal(result.executeDelivery, "followUp");
   const call = f.calls.find((value) => value[0] === "handoff"); assert.match(call[1], /fix accepted defect/); assert.match(call[2], /EXECUTE POLICY/);
+});
+
+test("task-native handoff continues the exact idle Episode with task-bound handoff and execute", async () => {
+  const f = harness({ list: (_count, session) => [session] });
+  f.ownership.write(f.root, activeTaskRecord(f));
+  const result = await handoffTaskEpisode(
+    "PRIMECLAW-10.38",
+    "resume the accepted in-scope revision",
+    f.ctx,
+    { ...f.deps, taskResolver: boundTaskResolver(f) },
+  );
+  assert.equal(result.taskId, "PRIMECLAW-10.38");
+  assert.equal(result.episodeId, "episode");
+  assert.equal(result.episodeActiveSessionId, "route");
+  const call = f.calls.find((value) => value[0] === "handoff");
+  assert.match(call[1], /resume the accepted in-scope revision/);
+  assert.match(call[1], /<operator-episode-task>\s*PRIMECLAW-10\.38\s*<\/operator-episode-task>/);
+  assert.match(call[2], /<operator-episode-task>\s*PRIMECLAW-10\.38\s*<\/operator-episode-task>/);
+  assert.match(call[2], /EXECUTE POLICY/);
+  assert.doesNotMatch(call[2], /resume the accepted in-scope revision/);
+  assert.equal(f.calls.some((value) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(value[0])), false);
+});
+
+test("task-native handoff preserves exact Orca identity without allocating resources", async () => {
+  const f = harness({ list: (_count, session) => [session] });
+  f.ownership.write(f.root, activeTaskRecord(f, {
+    engine: "orca",
+    projectSetupId: f.wt.projectSetupId,
+    worktreeId: f.wt.id,
+    worktreeIdentity: f.wt.identity,
+    terminalHandle: "terminal",
+  }));
+  const result = await handoffTaskEpisode(
+    "PRIMECLAW-10.38", "continue", f.ctx,
+    { ...f.deps, taskResolver: boundTaskResolver(f) },
+  );
+  assert.equal(result.taskId, "PRIMECLAW-10.38");
+  assert.equal(f.calls.filter((value) => value[0] === "orca-show").length, 1);
+  assert.equal(f.calls.filter((value) => value[0] === "handoff").length, 1);
+  assert.equal(f.calls.some((value) => ["orca-create", "auto-create", "fresh"].includes(value[0])), false);
+});
+
+test("task-native handoff rejects non-active ownership and a dirty Episode checkout before task routing", async (t) => {
+  await t.test("non-active ownership", async () => {
+    const f = harness({ record: taskReservation() });
+    await assert.rejects(
+      handoffTaskEpisode(
+        "PRIMECLAW-10.38", "continue", f.ctx,
+        { ...f.deps, taskResolver: boundTaskResolver(f) },
+      ),
+      /ownership is provisioning/,
+    );
+    assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
+  });
+  await t.test("primary checkout is not on main", async () => {
+    const f = harness();
+    f.ownership.write(f.root, activeTaskRecord(f));
+    f.git.branch = () => "feature";
+    await assert.rejects(
+      handoffTaskEpisode(
+        "PRIMECLAW-10.38", "continue", f.ctx,
+        { ...f.deps, taskResolver: boundTaskResolver(f) },
+      ),
+      /canonical primary main checkout/,
+    );
+    assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
+  });
+  await t.test("dirty Episode checkout", async () => {
+    const f = harness();
+    f.ownership.write(f.root, activeTaskRecord(f));
+    f.git.assertCleanWorktree = () => { throw new Error("Episode worktree is dirty"); };
+    await assert.rejects(
+      handoffTaskEpisode(
+        "PRIMECLAW-10.38", "continue", f.ctx,
+        { ...f.deps, taskResolver: boundTaskResolver(f) },
+      ),
+      /Episode worktree is dirty/,
+    );
+    assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
+  });
+});
+
+test("task-native handoff rejects changed task state and foreign durable session before delivery", async (t) => {
+  for (const scenario of [
+    {
+      name: "main status is still Blocked",
+      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? "Blocked" : "In Progress" }),
+      list: undefined,
+      pattern: /requires main task status In Progress; found Blocked/,
+    },
+    {
+      name: "main status is already Ready for Merge",
+      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? "Ready for Merge" : "In Progress" }),
+      list: undefined,
+      pattern: /requires main task status In Progress; found Ready for Merge/,
+    },
+    {
+      name: "main plan is placeholder-only",
+      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, implementationPlan: cwd === f.root ? "TODO" : "Implement the task." }),
+      list: undefined,
+      pattern: /meaningful main-task Implementation Plan/,
+    },
+    {
+      name: "task path no longer matches ownership",
+      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, taskPathRelative: "backlog/tasks/other.md" }),
+      list: undefined,
+      pattern: /does not match the exact owned Backlog task on main/,
+    },
+    {
+      name: "Episode task status drifted",
+      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? "In Progress" : "Blocked" }),
+      list: undefined,
+      pattern: /requires Episode task status In Progress; found Blocked/,
+    },
+    {
+      name: "Episode plan is placeholder-only",
+      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, implementationPlan: cwd === f.root ? "Implement the task." : "TBD" }),
+      list: undefined,
+      pattern: /meaningful Episode Implementation Plan/,
+    },
+    {
+      name: "durable session is rooted in another checkout",
+      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd }),
+      list: (_count, session) => [{ ...session, cwd: "/foreign" }],
+      pattern: /durable session is not rooted at the owned worktree/,
+    },
+  ]) await t.test(scenario.name, async () => {
+    const f = harness({ ...(scenario.list ? { list: scenario.list } : {}) });
+    f.ownership.write(f.root, activeTaskRecord(f));
+    await assert.rejects(
+      handoffTaskEpisode(
+        "PRIMECLAW-10.38",
+        "continue",
+        f.ctx,
+        { ...f.deps, taskResolver: (cwd) => scenario.selection(f, cwd) },
+      ),
+      scenario.pattern,
+    );
+    assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
+  });
 });
 
 test("ownership parser requires active durable and Orca bindings", () => {

@@ -22,9 +22,9 @@ normal queue lifecycle.
 
 ## Owned Episode continuation
 
-`handoff_spec_episode(location, guidance?)` is available only to the exact owner
-of the one active `.prime-claw/ownership.json` record. Before messaging, it
-verifies:
+The retained `handoff_spec_episode(location, guidance?)` surface remains
+available only to the exact owner of one active version-1 folder Episode. Before
+messaging, it verifies:
 
 - exact owner session and approved future-folder location;
 - active lifecycle status;
@@ -41,6 +41,23 @@ After preflight, the tool admits canonical handoff as the ordinary Episode
 prompt and queues canonical execute as the sole follow-up. Admission can be
 immediate or queued but is not completion. An uncertain transport result is
 preserved and never retried automatically.
+
+The internal, deliberately unregistered
+`handoffTaskEpisode(taskId, guidance)` seam stages the equivalent continuation
+for version-2 task ownership. It additionally requires the canonical primary
+checkout on `main`, the exact owner and active ownership record, the bound task
+ID and path, and main status `In Progress`. Both canonical prompts carry the
+same `<operator-episode-task>` binding, so handoff and execute cannot fall back
+to folder authority. The durable session must be rooted at the exact owned
+worktree before any message is sent.
+
+The task-native handoff policy reloads that same task in the Episode worktree,
+keeps lifecycle status Conversation-owned, and permits only supported task
+content updates followed by a committed and pushed checkpoint. A task still
+`Blocked` on main cannot resume. `Ready for Merge` integration remains a later
+review-handshake increment rather than being smuggled through this ordinary
+`In Progress` continuation seam. No public task-native handoff tool is
+registered yet.
 
 The initial Episode creation is different: it starts a fresh session with one
 fixed execute assignment after bundle promotion. It does **not** run handoff.

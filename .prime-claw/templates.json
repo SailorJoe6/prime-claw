@@ -79,10 +79,10 @@
     "project-workflow-handoff": {
       "source": "workflows/handoff.md",
       "destination": ".prime-claw/workflows/handoff.md",
-      "baselineSha256": "b9b1b0bc5eb9b6e32437a87a996df613e15c134dc3388791d1daa6f7142f1031",
-      "installedSha256": "b9b1b0bc5eb9b6e32437a87a996df613e15c134dc3388791d1daa6f7142f1031",
+      "baselineSha256": "ca7700bfa5640f55b1eab282f9778b2a57fbd3fb2e8835e778f8496876d0ebd7",
+      "installedSha256": "ca7700bfa5640f55b1eab282f9778b2a57fbd3fb2e8835e778f8496876d0ebd7",
       "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "b9b1b0bc5eb9b6e32437a87a996df613e15c134dc3388791d1daa6f7142f1031",
+      "availableUpstreamSha256": "ca7700bfa5640f55b1eab282f9778b2a57fbd3fb2e8835e778f8496876d0ebd7",
       "state": "managed",
       "provenance": {
         "scope": "project",

@@ -17,11 +17,22 @@ reported as completion and compaction itself never triggers execute.
 accepted in-scope revision, so that exactly one handoff and one subsequent
 execute pass reach the correct idle Episode.**
 
-`handoff_spec_episode(location, guidance?)` verifies the owner, retained
-location, Git/Orca worktree, durable session, active route, and idle queue. It
-may refresh a stale route but never replays an uncertain transport. It is not
-used for consultation, pause, merge, abandonment, cleanup, another Episode, or
-scope expansion.
+The retained `handoff_spec_episode(location, guidance?)` verifies the owner,
+future-folder location, Git/Orca worktree, durable session, active route, and
+idle queue. It may refresh a stale route but never replays an uncertain
+transport.
+
+An internal, unregistered `handoffTaskEpisode(taskId, guidance)` now stages the
+same continuation for strict version-2 ownership. It requires the canonical
+primary `main` checkout, exact owner/task/path, `In Progress` on main and in the
+Episode, meaningful plans, a clean owned worktree, exact durable-session CWD,
+and a quiescent queue. It binds both handoff and execute prompts to the same
+`<operator-episode-task>` value. `Blocked` must first be resumed by the
+Conversation; `Ready for Merge` is reserved for the later constrained final
+integration handshake. No public task-native handoff surface is registered.
+
+Neither path is used for consultation, pause, merge, abandonment, cleanup,
+another Episode, or scope expansion.
 
 ## Primary implementation surfaces
 
