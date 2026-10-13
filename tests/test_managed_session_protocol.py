@@ -28,6 +28,7 @@ EXPECTED_TYPESCRIPT = {
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
     "extension-support/spec-episode.ts",
+    "extension-support/task-episode-ownership.ts",
 }
 
 
@@ -62,7 +63,7 @@ def test_final_protocol_separates_neutral_kernel_from_managed_guidance() -> None
     assert (MANAGED_SOURCE / "skills/prime-claw-expert-review/SKILL.md").is_file()
     assert not (MANAGED_SOURCE / "skills/prime-claw-official-expert-review").exists()
 
-def test_managed_plugin_has_ten_typescript_files_and_no_retired_work_control_transport() -> None:
+def test_managed_plugin_has_exact_typescript_inventory_and_no_retired_work_control_transport() -> None:
     actual = {
         str(path.relative_to(MANAGED_SOURCE))
         for path in MANAGED_SOURCE.rglob("*.ts")

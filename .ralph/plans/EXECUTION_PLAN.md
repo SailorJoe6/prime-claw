@@ -188,11 +188,43 @@ Completed the next bounded increment of slice 1:
   with final evidence at
   `.test-results/20261013T071323Z-8630-3272b5af/tier1`.
 
-Slice 1 remains open. The public `/implement-task` and trusted task-native
-creation mechanics, retained real-session authoring and planning mutation
-evidence, and final lifecycle-default migration are later increments.
-Acceptance criteria #2 and #3 remain unchecked until their real-session
-semantic paths are retained; this staged policy alone completes no criterion.
+#### Slice 2 progress — task-native ownership reservation foundation (2026-10-13)
+
+Completed the first bounded increment of slice 2 without activating public
+admission:
+
+- added a strict version-2 ownership identity containing the canonical Backlog
+  task ID and project-relative task path while retaining disjoint version-1
+  folder identity for existing Episodes;
+- added an internal `reserveTaskEpisodeOwnership` boundary that re-resolves the
+  exact canonical task, requires committed `In Progress` plus a meaningful
+  native plan, and proves HEAD contains only that clean task path;
+- made the first task-native write a minimal `provisioning` reservation bound to
+  the status-commit SHA, with no branch, worktree name/identity, session, or
+  assignment identity and no arbitrary fields that could become shadow
+  lifecycle authority;
+- blocked every non-terminal ownership replay, preserved existing inactive
+  replacement behavior, taught Conversation compaction to retain either
+  identity, and made retained folder admission/close reject task-native
+  ownership rather than misinterpret it;
+- kept `/implement-task`, `create_task_episode`, and task-native allocation
+  unregistered and preserved existing `/implement-spec` creation behavior;
+- added executable Git fixtures for exact task re-resolution, status/plan gates,
+  task-only HEAD commits, post-commit cleanliness, strict schema separation,
+  replay rejection, Orca placement binding, and absence of resource identities;
+  and
+- passed 97 focused Node tests, 18 host-safe Python checks with 10 container
+  cases deselected, independent review after repairing strict-field,
+  placeholder-plan, and premature-worktree-name defects, and source-mode
+  `scripts/test-tier1.sh --probe`, with final evidence at
+  `.test-results/20261013T074625Z-51506-443b013a/tier1`.
+
+Slices 1 and 2 remain open. The public `/implement-task`, trusted task-native
+allocation after reservation, status rollback/Blocked publication, retained
+real-session authoring and planning mutation evidence, and final
+lifecycle-default migration are later increments. Acceptance criteria #2 and
+#3 remain unchecked until their real-session semantic paths are retained; this
+internal foundation alone completes no criterion.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 

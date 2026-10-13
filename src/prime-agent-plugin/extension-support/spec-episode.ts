@@ -20,9 +20,11 @@ import {
   canonicalWorkflowPrompt,
 } from "./workflow-chain.ts";
 import {
+  isLegacyEpisodeOwnership,
   readEpisodeOwnership,
   writeEpisodeOwnership,
   type EpisodeOwnershipRecord,
+  type LegacyEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 import { validateFutureLocation } from "./reviewed-plan-support.ts";
 
@@ -62,7 +64,7 @@ function isUncertainMutation(error: unknown): boolean {
     || error instanceof OrcaMutationUncertainError;
 }
 
-export type EpisodeResult = EpisodeOwnershipRecord & { reused: boolean };
+export type EpisodeResult = LegacyEpisodeOwnershipRecord & { reused: boolean };
 
 export interface SessionSummary {
   activeSessionId?: string; id?: string; sessionId?: string; sessionFile?: string;
@@ -646,7 +648,12 @@ function assertIdleEpisodeState(state: EpisodeSessionState, identity: EpisodeOwn
     && Array.isArray(actions.followUps) && actions.followUps.length === 0 && actions.active == null;
   if (!idle) throw new Error("Owned Episode is not quiescent; handoff requires no active turn, tools, compaction, children, or queued actions");
 }
-function exactOwnedRecord(record: EpisodeOwnershipRecord, location: string, ownerSessionId: string): void {
+function exactOwnedRecord(
+  record: EpisodeOwnershipRecord,
+  location: string,
+  ownerSessionId: string,
+): asserts record is LegacyEpisodeOwnershipRecord {
+  if (!isLegacyEpisodeOwnership(record)) throw new Error("Existing task-native episode ownership conflicts with future-folder admission");
   if (record.sourceLocation !== location) throw new Error("Existing episode ownership conflicts on sourceLocation");
   if (record.ownerSessionId !== ownerSessionId) throw new Error("Existing episode ownership conflicts on ownerSessionId");
 }
@@ -693,7 +700,7 @@ function newRecord(options: {
   bundleDigest: string;
   setup?: OrcaProjectSetup;
   worktreeName: string;
-}): EpisodeOwnershipRecord {
+}): LegacyEpisodeOwnershipRecord {
   const now = new Date().toISOString();
   return {
     version: 1, status: "provisioning", operationId: options.operationId, engine: options.engine,
@@ -702,10 +709,10 @@ function newRecord(options: {
     ...(options.setup ? { projectSetupId: options.setup.id, ...(options.setup.routingEnvironmentId ? { routingEnvironmentId: options.setup.routingEnvironmentId } : {}) } : {}),
   };
 }
-function updated(record: EpisodeOwnershipRecord, patch: Partial<EpisodeOwnershipRecord>): EpisodeOwnershipRecord {
+function updated<T extends EpisodeOwnershipRecord>(record: T, patch: Partial<T>): T {
   return { ...record, ...patch, updatedAt: new Date().toISOString() };
 }
-function markUncertain(store: EpisodeOwnershipStore, repo: string, record: EpisodeOwnershipRecord, error: unknown): EpisodeOwnershipRecord {
+function markUncertain<T extends EpisodeOwnershipRecord>(store: EpisodeOwnershipStore, repo: string, record: T, error: unknown): T {
   const uncertain = updated(record, {
     status: "uncertain",
     uncertaintyReason: error instanceof Error ? error.message : String(error),
@@ -746,7 +753,7 @@ async function waitForOrcaBinding(options: {
   throw new EpisodeStateUncertainError("Timed out binding the fresh Prime Agent session and connected Orca tab at the exact Episode CWD");
 }
 async function reopenIfNeeded(
-  record: EpisodeOwnershipRecord,
+  record: LegacyEpisodeOwnershipRecord,
   session: SessionSummary,
   ctx: ExtensionContext,
   publisher: SessionPublisher,
@@ -821,7 +828,7 @@ export async function createSpecEpisode(
   const store = dependencies?.ownership ?? defaultOwnershipStore;
   const orca = dependencies?.orca ?? new CliOrcaAdapter();
   let publisher = dependencies?.publisher;
-  let record: EpisodeOwnershipRecord | undefined;
+  let record: LegacyEpisodeOwnershipRecord | undefined;
   let repo = "";
   try {
     const selected = validateFutureLocation(ctx.cwd, rawLocation);

@@ -58,6 +58,17 @@ retain exact bindings needed for restart recovery and idempotent final
 bookkeeping. The former per-slug identity directory and transcript oversight
 markers are retired.
 
+During the ordered task-native migration, the same file has two strict,
+disjoint schemas. Version 1 retains the folder location, slug, and bundle digest
+for existing `/implement-spec` Episodes. Version 2 replaces those fields with
+the canonical Backlog task ID and project-relative task path; its `baseRef` is
+the exact task-only `In Progress` status commit. The inactive task-native
+reservation seam re-resolves the exact task and verifies that commit plus a clean task, then writes
+`provisioning` before any branch, worktree, session, or assignment identity.
+It rejects any non-terminal ownership instead of replaying allocation. Folder
+admission and close operations explicitly reject version 2 until their
+corresponding task-native surfaces replace them.
+
 ## Preferred Orca creation
 
 For a ready local project-host setup, Episode creation is ordered as follows:

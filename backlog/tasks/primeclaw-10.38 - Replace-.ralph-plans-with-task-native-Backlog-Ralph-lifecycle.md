@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 07:15'
+updated_date: '2026-10-13 07:48'
 labels:
   - backlog-md
   - episode-loop
@@ -233,4 +233,22 @@ Evidence:
 - Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T071323Z-8630-3272b5af/tier1`.
 
 Slice 1 remains open. This staged policy alone completes no acceptance criterion. Public `/implement-task`, trusted task-native creation and ownership mechanics, retained real-session authoring/planning evidence, and final lifecycle/default migration remain.
+
+## 2026-10-13 — task-native ownership reservation foundation
+
+Added the first bounded Slice 2 mechanics without activating public task admission. The ownership store now parses two strict, disjoint schemas: retained version 1 binds existing future-folder location/slug/bundle digest, while version 2 binds only the canonical Backlog task ID and project-relative task path plus existing lifecycle/resource fields. Version 2 requires an exact Git object ID in `baseRef`, rejects legacy identity fields and every unknown field, and therefore cannot carry copied plan, progress, or status authority.
+
+Added internal `reserveTaskEpisodeOwnership`. It re-resolves the exact canonical task through the supported Backlog seam; requires current `In Progress` and a meaningful native Implementation Plan; verifies the resolved regular task remains in the same project; requires HEAD to be an exact Git status commit containing only that task path; rejects post-commit task changes; refuses every non-terminal ownership replay; and atomically writes one version-2 `provisioning` reservation bound to the status-commit SHA. The initial reservation contains no branch, worktree name/identity, session, terminal, automation, or assignment identity. Orca placement may be bound before allocation; no resource is created.
+
+Retained version-1 `/implement-spec` behavior remains live. Folder admission and final bookkeeping fail closed on a version-2 collision. Conversation compaction can retain either folder or task identity. The new support file is included in the authoritative plugin asset inventory. `/implement-task`, `create_task_episode`, task-native allocation, clean rollback, and uncertain `Blocked` publication remain intentionally unregistered/unimplemented.
+
+Independent review identified three material defects in the first draft: arbitrary version-2 fields could preserve shadow authority, a small exact-string placeholder regex admitted multiline/TODO-framed placeholder plans, and the first reservation persisted `worktreeName` too early. The final implementation uses exact per-version field allowlists, a lightweight multiline/Markdown placeholder-only rejection, and zero resource identity in the initial reservation.
+
+Evidence:
+- Focused Node command covering task ownership, retained folder creation, Conversation oversight, final bookkeeping, reviewed-plan behavior, and project initialization — 97 passed.
+- Focused host-safe Python command covering discovery, extension policy, Conversation oversight, managed source inventory, and project initialization — 18 passed, 10 deselected.
+- `git diff --check` — passed.
+- Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T074625Z-51506-443b013a/tier1`.
+
+Slices 1 and 2 remain open. This inactive foundation completes no acceptance criterion. Next work must audit before choosing a bounded allocator or activation increment and must preserve folder compatibility and the transitional `To Do` configuration.
 <!-- SECTION:NOTES:END -->

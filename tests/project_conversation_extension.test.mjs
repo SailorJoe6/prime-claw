@@ -12,7 +12,7 @@ import {
 } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
 import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
-function fixture({ status = "active", owner = "owner" } = {}) {
+function fixture({ status = "active", owner = "owner", taskNative = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-oversight-"));
   execFileSync("git", ["init", "-q", root]);
   const guideRoot = join(root, "plugin");
@@ -20,8 +20,10 @@ function fixture({ status = "active", owner = "owner" } = {}) {
   writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), `FULL OVERSIGHT GUIDE
 `);
   if (status) writeEpisodeOwnership(root, {
-    version: 1, status, operationId: "op", engine: "local", ownerSessionId: owner,
-    sourceLocation: ".ralph/plans/future/alpha", slug: "alpha", baseRef: "base", bundleDigest: "0".repeat(64),
+    ...(taskNative
+      ? { version: 2, taskId: "PRIMECLAW-10.38", taskPath: "backlog/tasks/task.md" }
+      : { version: 1, sourceLocation: ".ralph/plans/future/alpha", slug: "alpha", bundleDigest: "0".repeat(64) }),
+    status, operationId: "op", engine: "local", ownerSessionId: owner, baseRef: taskNative ? "a".repeat(40) : "base",
     createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
     worktree: join(root, "wt"), branch: "actual-branch", head: "head",
     episodeId: "episode", episodeSessionFile: join(root, "episode.jsonl"), episodeActiveSessionId: "route",
@@ -80,6 +82,15 @@ test("promotion preflight allows only terminal or exact-owner state", () => {
   const f = fixture();
   assert.doesNotThrow(() => assertConversationPromotionReady(f.ctx, ".ralph/plans/future/alpha"));
   assert.throws(() => assertConversationPromotionReady(f.ctx, ".ralph/plans/future/beta"), /already has non-terminal/);
+});
+
+
+test("task-native ownership survives compaction without pretending to be a folder", async () => {
+  const f = fixture({ taskNative: true });
+  await f.events.get("session_compact")({ type: "session_compact", compactionEntry: { id: "task" } }, f.ctx);
+  assert.equal(f.sent.length, 1);
+  assert.deepEqual(f.sent[0].message.details, { taskId: "PRIMECLAW-10.38", episodeId: "episode" });
+  assert.throws(() => assertConversationPromotionReady(f.ctx, ".ralph/plans/future/alpha"), /PRIMECLAW-10.38/);
 });
 
 

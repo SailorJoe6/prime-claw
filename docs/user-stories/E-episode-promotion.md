@@ -53,21 +53,33 @@ explicit host request.
 
 ## Task-native admission migration
 
-Project reconciliation now stages `implement-task-prep` and `implement-task` as
+Project reconciliation stages `implement-task-prep` and `implement-task` as
 customizable internal policies for the future exact-task admission path. They
 encode the `In Planning` structural and semantic readiness gates, the single
 `create_task_episode` call boundary, the main-task `In Progress` status commit,
 a durable provisioning reservation before branch/worktree/session creation,
-clean rollback to `In Planning`, and uncertain/partial `Blocked` outcome. They
-are intentionally inert: `/implement-task` and `create_task_episode` are not
-registered yet, and current Episode creation continues through the retained
-folder workflow above until the task-native mechanical boundary lands.
+clean rollback to `In Planning`, and uncertain/partial `Blocked` outcome.
+
+The ownership store now accepts either retained version-1 folder identity or
+strict version-2 task identity, never a mixture. An internal reservation seam
+re-resolves and verifies that the exact task is `In Progress`, still has a meaningful plan, is
+clean after a HEAD commit containing only its canonical Backlog path, and then
+persists version-2 `provisioning` ownership before any resource identity exists.
+A non-terminal record blocks replay. Conversation compaction can retain either
+identity, while folder commands reject a task-native record rather than treating
+it as a folder Episode.
+
+This remains an inactive foundation: `/implement-task` and
+`create_task_episode` are not registered, the task-native allocator does not
+exist yet, and current Episode creation continues through the retained folder
+workflow above.
 
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/extensions/reviewed-plan.ts`
 - `src/prime-agent-plugin/extension-support/spec-episode.ts`
 - `src/prime-agent-plugin/extension-support/episode-ownership.ts`
+- `src/prime-agent-plugin/extension-support/task-episode-ownership.ts` (inactive reservation foundation)
 - `src/prime-agent-plugin/workflows/implement-prep.md`
 - `src/prime-agent-plugin/workflows/implement-spec.md`
 - `src/prime-agent-plugin/workflows/implement-task-prep.md` (staged policy)

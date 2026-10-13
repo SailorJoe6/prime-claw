@@ -1,20 +1,16 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
 
 export type EpisodeLifecycleStatus = "provisioning" | "active" | "uncertain" | "inactive";
 export type EpisodeLifecycleEngine = "orca" | "local";
 
-export interface EpisodeOwnershipRecord {
-  version: 1;
+interface EpisodeOwnershipBase {
   status: EpisodeLifecycleStatus;
   operationId: string;
   engine: EpisodeLifecycleEngine;
   ownerSessionId: string;
-  sourceLocation: string;
-  slug: string;
   baseRef: string;
-  bundleDigest: string;
   createdAt: string;
   updatedAt: string;
   projectSetupId?: string;
@@ -35,16 +31,60 @@ export interface EpisodeOwnershipRecord {
   uncertaintyReason?: string;
 }
 
+/** Retained compatibility identity for an already-created future-folder Episode. */
+export interface LegacyEpisodeOwnershipRecord extends EpisodeOwnershipBase {
+  version: 1;
+  sourceLocation: string;
+  slug: string;
+  bundleDigest: string;
+}
+
+/** Task-native identity. The exact task and its status commit replace plan authority. */
+export interface TaskEpisodeOwnershipRecord extends EpisodeOwnershipBase {
+  version: 2;
+  taskId: string;
+  taskPath: string;
+}
+
+export type EpisodeOwnershipRecord = LegacyEpisodeOwnershipRecord | TaskEpisodeOwnershipRecord;
+
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DIGEST = /^[0-9a-f]{64}$/;
-const STRING_FIELDS = [
-  "operationId", "ownerSessionId", "sourceLocation", "slug", "baseRef", "bundleDigest", "createdAt", "updatedAt",
+const GIT_OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const COMMON_STRING_FIELDS = [
+  "operationId", "ownerSessionId", "baseRef", "createdAt", "updatedAt",
 ] as const;
 const OPTIONAL_STRING_FIELDS = [
   "projectSetupId", "routingEnvironmentId", "worktreeId", "worktreeIdentity", "worktree", "branch", "head",
   "episodeId", "episodeSessionFile", "episodeActiveSessionId", "terminalHandle", "worktreeName",
   "launchAutomationName", "launchAutomationId", "launchRunId", "uncertaintyReason",
 ] as const;
+const COMMON_RECORD_FIELDS = new Set<string>([
+  "version", "status", "engine", ...COMMON_STRING_FIELDS, ...OPTIONAL_STRING_FIELDS,
+]);
+const LEGACY_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "sourceLocation", "slug", "bundleDigest"]);
+const TASK_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "taskId", "taskPath"]);
+
+function hasOnlyFields(item: Record<string, unknown>, allowed: Set<string>): boolean {
+  return Object.keys(item).every((field) => allowed.has(field));
+}
+
+function safeTaskPath(value: unknown): value is string {
+  if (typeof value !== "string" || !value || isAbsolute(value) || win32.isAbsolute(value) || value.includes("\\")) return false;
+  return value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+}
+
+function canonicalTaskId(value: unknown): value is string {
+  return typeof value === "string" && value !== "" && !/\s/.test(value) && !value.startsWith("-");
+}
+
+export function isLegacyEpisodeOwnership(record: EpisodeOwnershipRecord): record is LegacyEpisodeOwnershipRecord {
+  return record.version === 1;
+}
+
+export function isTaskEpisodeOwnership(record: EpisodeOwnershipRecord): record is TaskEpisodeOwnershipRecord {
+  return record.version === 2;
+}
 
 export function episodeOwnershipPath(projectRoot: string): string {
   return join(projectRoot, ".prime-claw", "ownership.json");
@@ -55,16 +95,30 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
     throw new Error(`Episode ownership has an unsupported shape: ${path}`);
   }
   const item = value as Record<string, unknown>;
-  if (item.version !== 1
-    || !["provisioning", "active", "uncertain", "inactive"].includes(String(item.status))
-    || !["orca", "local"].includes(String(item.engine))
-    || !STRING_FIELDS.every((field) => typeof item[field] === "string" && item[field] !== "")
-    || !OPTIONAL_STRING_FIELDS.every((field) => item[field] === undefined || (typeof item[field] === "string" && item[field] !== ""))
-    || !SLUG.test(String(item.slug))
-    || !DIGEST.test(String(item.bundleDigest))
-    || item.sourceLocation !== `.ralph/plans/future/${item.slug}`) {
-    throw new Error(`Episode ownership has an unsupported shape: ${path}`);
+  const common = (item.version === 1 || item.version === 2)
+    && ["provisioning", "active", "uncertain", "inactive"].includes(String(item.status))
+    && ["orca", "local"].includes(String(item.engine))
+    && COMMON_STRING_FIELDS.every((field) => typeof item[field] === "string" && item[field] !== "")
+    && OPTIONAL_STRING_FIELDS.every((field) => item[field] === undefined || (typeof item[field] === "string" && item[field] !== ""));
+  if (!common) throw new Error(`Episode ownership has an unsupported shape: ${path}`);
+
+  if (item.version === 1) {
+    const legacy = typeof item.sourceLocation === "string"
+      && typeof item.slug === "string"
+      && typeof item.bundleDigest === "string"
+      && SLUG.test(item.slug)
+      && DIGEST.test(item.bundleDigest)
+      && item.sourceLocation === `.ralph/plans/future/${item.slug}`
+      && hasOnlyFields(item, LEGACY_RECORD_FIELDS);
+    if (!legacy) throw new Error(`Episode ownership has an unsupported shape: ${path}`);
+  } else {
+    const task = canonicalTaskId(item.taskId)
+      && safeTaskPath(item.taskPath)
+      && GIT_OID.test(String(item.baseRef))
+      && hasOnlyFields(item, TASK_RECORD_FIELDS);
+    if (!task) throw new Error(`Episode ownership has an unsupported shape: ${path}`);
   }
+
   if (item.engine === "orca" && typeof item.projectSetupId !== "string") {
     throw new Error(`Episode ownership is missing its Orca project setup: ${path}`);
   }

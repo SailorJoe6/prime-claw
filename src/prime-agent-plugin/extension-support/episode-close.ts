@@ -1,9 +1,11 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
+  isLegacyEpisodeOwnership,
   readEpisodeOwnership,
   writeEpisodeOwnership,
   type EpisodeOwnershipRecord,
+  type LegacyEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 import { resolveNearestProjectRoot } from "./project-initialization.ts";
 
@@ -25,6 +27,7 @@ export function closeEpisodeOwnership(
   const root = resolveNearestProjectRoot(ctx.cwd).root;
   const record = readEpisodeOwnership(root);
   if (!record) throw new Error("Exact episode ownership is missing before bookkeeping close");
+  if (!isLegacyEpisodeOwnership(record)) throw new Error("Episode bookkeeping location does not match task-native ownership state");
   if (record.slug !== match[1] || record.sourceLocation !== sourceLocation) {
     throw new Error("Episode bookkeeping location does not match exact ownership state");
   }
@@ -35,7 +38,7 @@ export function closeEpisodeOwnership(
   if (record.status !== "active") {
     throw new Error(`Episode bookkeeping cannot close ${record.status} ownership`);
   }
-  const closed: EpisodeOwnershipRecord = {
+  const closed: LegacyEpisodeOwnershipRecord = {
     ...record,
     status: "inactive",
     updatedAt: new Date().toISOString(),

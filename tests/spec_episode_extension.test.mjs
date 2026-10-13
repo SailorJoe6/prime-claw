@@ -218,6 +218,16 @@ test("uncertain replay never replays assignment", async () => {
   assert.equal(f.calls.some((call) => ["auto-run", "execute", "fresh"].includes(call[0])), false);
 });
 
+test("task-native ownership blocks retained folder admission without resource mutation", async () => {
+  const f = harness({ record: {
+    version: 2, status: "provisioning", operationId: "task-op", engine: "local", ownerSessionId: "owner",
+    taskId: "PRIMECLAW-10.38", taskPath: "backlog/tasks/task.md", baseRef: "a".repeat(40),
+    createdAt: "x", updatedAt: "x",
+  } });
+  await assert.rejects(createApproved(f), /task-native episode ownership conflicts/);
+  assert.equal(f.calls.some((call) => ["setups", "orca-create", "local-create", "fresh", "execute"].includes(call[0])), false);
+});
+
 test("handoff uses exact active ownership and queues canonical execute only after quiescence", async () => {
   const f0 = harness(); const active = await createApproved(f0);
   const f = harness({ record: { ...active, reused: undefined }, list: () => [{ activeSessionId: "route", sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree, isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 }] });
