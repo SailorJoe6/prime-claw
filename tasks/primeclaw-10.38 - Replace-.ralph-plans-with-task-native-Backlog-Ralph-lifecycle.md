@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 10:42'
+updated_date: '2026-10-13 11:05'
 labels:
   - backlog-md
   - episode-loop
@@ -378,4 +378,20 @@ Evidence:
 - `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC probe, teardown, and manifest publication verified at `.test-results/20261013T103834Z-65715-7dcc0310/tier1`.
 
 This policy-only slice registers no task-native command/tool and changes no lifecycle state. Public `/implement-task`, `create_task_episode`, task handoff, and task finalization remain inactive. Placement/approval wiring, Conversation-owned `Blocked`/resume publication, Ready-for-Merge integration, operator decision mechanics, task-native finalization/abandonment, retained real-session evidence, and final migration remain later work. No acceptance criterion is newly claimed; AC #2/#3 and #6/#7/#8 still require their retained real-session or end-to-end evidence.
+
+## 2026-10-13 — staged inactive task placement and ephemeral implementation approval
+
+Added the deterministic compact-first task admission seam without registering `/implement-task` or `create_task_episode`. Before either workflow message, it resolves the exact `In Planning` task and one exact ready local Orca setup through sole selection, explicit stable ID, or the native picker. Zero ready setups, remote selection, noninteractive ambiguity, cancellation, malformed or rejected inventory, and other inventory failures stop before workflow delivery or any task, Git, ownership, worktree, session, or resource mutation. Direct local fallback is allowed only when the production `orca` command is absent (`ENOENT`) and no explicit host was requested. Retained folder inventory/fallback behavior is unchanged.
+
+Only after exact placement and both workflow messages succeed does the seam grant one in-memory approval. It binds the owner session, canonical task ID/path and project root, and exact placement. It is unavailable during the prep turn, becomes usable for the semantic turn after the first phase boundary, requires the same re-resolved task, is removed by one exact consume, and clears on phase end, session start, or shutdown. The complete ordinary oversight guide precedes the `implement-task` semantic workflow. The trusted task-creation transaction remains disconnected and every public task Episode surface remains inactive.
+
+Evidence:
+- Focused reviewed-plan/task-admission validation: 32 Node tests passed.
+- Broad compatibility: 107 Node tests passed; 43 host-safe Python checks passed with 43 container cases deselected.
+- `git diff --check`: passed.
+- Independent review found one material defect: production task placement inherited overbroad retained Orca-unavailable classification. The accepted repair added a strict task-placement inventory path that permits fallback only for process `ENOENT`, propagates malformed/negative/other failures, and leaves retained behavior unchanged.
+- Repair rereview: no material findings.
+- `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC, teardown, and manifest publication verified at `.test-results/20261013T110322Z-62776-06322ace/tier1`.
+
+This staged dependency changes no task lifecycle state and claims no acceptance criterion. Conversation-owned `Blocked`/resume publication, `Ready for Merge` integration, operator decision mechanics, task-native finalization/abandonment, coordinated activation, retained native receipts, and final migration remain later work. AC #2/#3 and #6/#7/#8 still require their retained real-session or end-to-end evidence.
 <!-- SECTION:NOTES:END -->
