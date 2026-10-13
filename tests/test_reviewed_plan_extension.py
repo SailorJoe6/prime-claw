@@ -165,3 +165,60 @@ def test_current_docs_preserve_authority_and_transport_boundaries() -> None:
         assert phrase in future
     assert "operator alone decides" in oversight.lower()
     assert "never retried automatically" in handoff
+
+def test_activation_truth_docs_are_task_native_first_with_explicit_folder_compatibility() -> None:
+    expected_terms = {
+        "VISION.md": ("/implement-task task-id", "version-2 ownership", "retained version-1 compatibility"),
+        "docs/backlog.md": ("/plan task-id", "/implement-task task-id", "retained version-1 compatibility"),
+        "docs/future-specification-bundles.md": ("primary task-native lifecycle", "create_task_episode", "retained version-1 compatibility"),
+        "docs/conversation-driven-episode-oversight.md": (
+            "primary task-native path",
+            "finalize_task_episode",
+            "reject existing non-terminal ownership",
+            "retained version-1 compatibility",
+        ),
+        "docs/user-stories/README.md": ("primary task-native lifecycle", "handoff_task_episode", "retained version-1 compatibility"),
+        "docs/user-stories/C-specification.md": ("primary version-2 task episodes", "retained version-1 compatibility"),
+        "docs/user-stories/E-episode-promotion.md": (
+            "/implement-task task-id",
+            "create_task_episode",
+            "public admission replay fails closed",
+            "proven clean failure",
+            "blocked",
+            "retained version-1 compatibility",
+        ),
+        "docs/user-stories/H-handoff-and-continuation.md": ("primary task-native continuation", "handoff_task_episode", "retained version-1 compatibility"),
+        "docs/user-stories/I-episode-finalization.md": ("primary task-native lifecycle", "finalize_task_episode", "retained version-1 compatibility"),
+        "docs/user-stories/traceability.md": ("primary task-native", "finalize_task_episode", "retained version-1 compatibility"),
+    }
+
+    for path, terms in expected_terms.items():
+        text = " ".join((REPO / path).read_text().lower().split())
+        for term in terms:
+            assert term in text, (path, term)
+
+
+def test_traceability_covers_both_episode_schemas_at_creation_recovery_and_finish() -> None:
+    lines = (REPO / "docs/user-stories/traceability.md").read_text().splitlines()
+    rows = {
+        parts[1].strip(): line.lower()
+        for line in lines
+        if line.startswith("| US-")
+        for parts in [line.split("|")]
+    }
+
+    for story in ("US-11", "US-12", "US-14", "US-16", "US-24"):
+        assert "retained version-1 compatibility" in rows[story]
+
+    assert "no bundle copy" in rows["US-14"]
+    assert "public task-native admission replay fails closed on existing non-terminal ownership" in rows["US-14"]
+    assert "retained version-1 compatibility promotes and commits the exact approved bundle, and `create_spec_episode` may return" in rows["US-14"]
+
+    assert "primary task-native recovery returns the exact task to `in planning` after a proven clean failure before ownership/resource mutation" in rows["US-16"]
+    assert "publishes `blocked` with exact recovery evidence after any recorded, partial, or uncertain ownership/resource mutation" in rows["US-16"]
+    assert "retained version-1 compatibility preserves partial provisioning/allocation as exact `uncertain` ownership" in rows["US-16"]
+    assert "public admission replay fails closed" in rows["US-16"]
+
+    assert "finalize_task_episode" in rows["US-24"]
+    assert "separate operator decision" in rows["US-24"]
+    assert "finalize_spec_episode" in rows["US-24"]

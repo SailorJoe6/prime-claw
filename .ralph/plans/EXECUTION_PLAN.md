@@ -859,6 +859,47 @@ normalization, task/bundle migration, production asset retirement,
 operator authority, supported interfaces, Docker-only plugin validation when
 applicable, and the no-unrelated-scope boundary.
 
+#### Slice 11 progress — task-native activation truth and retained version-1
+compatibility
+
+Reconciled the current architecture, operator workflow, user-story map, and
+traceability matrix with the active runtime. `/plan TASK-ID` followed by
+`/implement-task TASK-ID`, exact version-2 task ownership, task-bound execution,
+`handoff_task_episode`, and guarded `finalize_task_episode` outcomes are now the
+primary current lifecycle. Every retained folder procedure in the approved
+surfaces is explicitly labeled version-1 compatibility and remains operational:
+`/plan-spec`, `plan_spec`, `/implement-spec`, bundle promotion,
+`create_spec_episode`, `handoff_spec_episode`, folder blocking/archival, and the
+bookkeeping-only `finalize_spec_episode` close.
+
+The traceability rows for US-11 through US-16 and US-24 now distinguish the two
+schemas and their observable behavior. Public task-native admission fails closed
+on existing non-terminal ownership; only retained version-1
+`create_spec_episode` may return its matching Episode. Primary task-native
+recovery rolls a proven-clean pre-ownership/resource failure back to `In
+Planning`, publishes `Blocked` after recorded/partial/uncertain mutation, and
+never duplicates resources. Retained version-1 partial provisioning/allocation
+persists exact `uncertain` ownership and cannot replay fresh. Task-native
+terminal review publishes `Ready for Merge`, refreshes the same Episode,
+verifies the resulting handshake, and waits for explicit operator authority;
+cleanup remains separately confirmed and closes ownership last.
+
+Focused static contracts now bind those authority, replay, recovery, and
+compatibility claims to their exact documents and traceability rows. Independent
+review found and drove repairs for the public replay overstatement, the collapsed
+recovery model, and initially weak bag-of-words assertions; final rereview found
+no material findings. Validation passed 31 focused host-safe policy checks with
+5 container cases deselected, 229 broad Node checks, 62 curated broad host-safe
+Python checks with 45 container cases deselected, and `git diff --check`.
+
+This slice changes documentation and host-safe static tests only. It does not
+change plugin source or managed assets, so Docker Tier 1 is not required by the
+repository validation policy. It does not begin the separate no-`To Do`
+guidance migration, proof-reference normalization, task/bundle migration,
+production asset retirement, `.ralph/plans` deletion, or final cutover. Existing
+IDs, parents, status, ownership/resources, operator authority, and acceptance
+evidence remain unchanged.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

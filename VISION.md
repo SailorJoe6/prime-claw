@@ -187,21 +187,26 @@ Design` or `In Planning`; the project-customizable workflow writes the native
 Implementation Plan, leaves the task `In Planning`, and stops for a separate
 operator review. Specification approval authorizes planning only.
 
-The target implementation boundary is the explicit `/implement-task TASK-ID`
-path described by the active migration plan. It is not active yet. During the
-ordered cutover, already-created `.ralph/plans/future/<slug>` bundles retain the
-bounded `/plan-spec` and `/implement-spec` compatibility path and existing
-folder-based Episode mechanics. New `/design` and `/spec-it-out` invocations do
-not create those folders. A task-native Episode begins only after the remaining
-admission and ownership conversion lands; no current authoring or planning step
-implicitly authorizes implementation.
+The primary implementation boundary is the active `/implement-task TASK-ID`
+path. It resolves one exact approved `In Planning` task, performs the final
+semantic readiness check, commits its transition to `In Progress`, reserves
+version-2 ownership before resource creation, and creates one isolated Episode
+whose sole durable authority is that task. Planning approval never implicitly
+authorizes implementation, and the Conversation retains lifecycle status while
+the Episode owns task content on its branch.
 
-The episode remains available through bounded execute/handoff iterations,
-implementation, PR review, updates, and rebasing. Archiving its completed active
-plans is the episode's claim that it is ready for owner review; the owning
-conversation verifies the work and presents evidence, the operator decides
-whether to merge or abandon, and the owner performs verified terminal work and
-bookkeeping before reaping the session or worktree.
+Already-created `.ralph/plans/future/<slug>` bundles remain operational through
+the retained version-1 compatibility path: `/plan-spec`, `/implement-spec`, and
+the existing folder-based Episode mechanics. New `/design` and `/spec-it-out`
+invocations do not create those folders.
+
+A task-native Episode remains available through bounded execute and handoff
+iterations, independent review, refreshed-candidate verification, and explicit
+operator outcomes. Merge, abandonment, and destructive cleanup stay separate
+operator decisions; the active coordinator verifies each outcome and closes
+ownership only after separately authorized cleanup removes the exact resources.
+For a retained version-1 compatibility Episode, archiving completed active plans
+remains its readiness signal and finalization remains bookkeeping-only.
 
 The hard problem at this boundary remains *what context crosses*: too little
 and the episode is past-design-blind; too much and the context-rot problem is
@@ -246,10 +251,12 @@ sandbox each explicitly apply it to Prime Agent's global plugin location for
 that isolated environment. The builder and managed projects must not retain a
 project-local plugin copy while that global installation is active because
 cross-scope discovery can prevent Prime Agent startup. In both stages, each
-managed project keeps its own `.ralph/plans/`, regular customizable skills
-under `.agents/skills/`, and lifecycle-only workflows under
-`.prime-claw/workflows/`. The awaited reconciler installs independently safe
-template updates and preserves customization.
+managed project keeps regular customizable skills under `.agents/skills/` and
+lifecycle-only workflows under `.prime-claw/workflows/`. Projects with retained
+version-1 compatibility work also keep their existing `.ralph/plans/` tree until
+the explicit final cutover; task-native authority does not create or consult
+that tree. The reconciler installs independently safe template updates and
+preserves customization.
 
 ## The builder repo
 

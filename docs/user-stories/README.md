@@ -28,7 +28,7 @@ outside the current plugin.
 | [B](B-project-initialization.md) | Initialize and maintain a project | US-03–US-07 |
 | [C](C-specification.md) | Develop a specification | US-08–US-10 |
 | [D](D-planning.md) | Produce and review an implementation plan | US-11–US-12 |
-| [E](E-episode-promotion.md) | Promote an approved bundle into an Episode | US-13–US-16 |
+| [E](E-episode-promotion.md) | Admit an approved task or retained version-1 bundle into an Episode | US-13–US-16 |
 | [F](F-episode-execution.md) | Implement work inside an Episode | US-17–US-18 |
 | [G](G-oversight-and-review.md) | Supervise and review implementation | US-19–US-21 |
 | [H](H-handoff-and-continuation.md) | Continue work across iterations | US-22–US-23 |
@@ -71,11 +71,15 @@ These mechanisms support the stories but are not user outcomes by themselves:
 - Docker fixtures and isolated roots, which are mechanisms serving US-27 rather
   than separate outcomes.
 
-Likewise, command and tool variants are usually two interfaces to one story:
-
-- `/initialize-prime-claw` and `initialize_prime_claw`;
-- `/plan-spec` and `plan_spec`;
-- `/handoff` and `ralph_handoff`.
+Likewise, command and tool variants are usually two interfaces to one story.
+The primary task-native lifecycle uses `/plan` with `plan_task`,
+`/implement-task` with `create_task_episode`, `handoff_task_episode`, and the
+guarded `finalize_task_episode` coordinator. Retained version-1 compatibility
+keeps `/plan-spec` with `plan_spec`, `/implement-spec` with
+`create_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`.
+Ordinary `/handoff` and `ralph_handoff` remain the non-Episode pair, while
+`/initialize-prime-claw` and `initialize_prime_claw` remain the initialization
+pair.
 
 ## Candidate simplification seams
 
@@ -83,8 +87,9 @@ These overlaps are places to investigate simplification without deleting the
 underlying story:
 
 1. `design` and `spec-it-out` share nearly the same artifact contract.
-2. Planning and implementation share an exact-folder, prep, compaction, and
-   sole-follow-up admission pattern.
+2. Primary task-native planning and implementation share exact-task prep,
+   compaction, and sole-follow-up admission; retained version-1 compatibility
+   preserves the corresponding exact-folder pattern.
 3. Ordinary handoff and owned-Episode handoff share the handoff-to-execute
    semantic chain but use different transports.
 4. Slash commands and tools duplicate adapter surfaces over shared operations.

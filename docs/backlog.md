@@ -66,30 +66,47 @@ contained regular file. It does not read or parse task Markdown and does not
 introduce a second task model. The `--` boundary lets Backlog own supported task
 ID normalization without allowing an ID to become a command option.
 
-The `/plan TASK-ID` command and `plan_task({"taskId":"TASK-ID"})` tool use
-this seam to admit one exact task only when its current status is `In Design` or
-`In Planning`. They preload the project-customizable `plan-task-prep` and
-`plan-task` workflows, request focused compaction on a best-effort basis, queue
-the semantic planning turn as the sole follow-up, and stop without authorizing
-implementation. The semantic workflow writes a meaningful native Implementation
-Plan, changes or retains `In Planning`, commits only the exact returned task
-path, and treats push failure as transport evidence.
+## Primary task-native lifecycle
 
-The compatible statuses are staged in `backlog/config.yml`. `To Do` remains the
-temporary default and remains selectable until the one-time task migration can
-truthfully classify every existing item. The existing `/plan-spec` and
-`plan_spec` folder surface remains available during that bounded migration;
-this activation does not change implementation admission.
-
-Specification authoring is now task-native. `/design` and `/spec-it-out` create
+Specification authoring is task-native. `/design` and `/spec-it-out` create
 exactly one task with explicit `In Design` status when no task was selected, or
 revise only one exact operator-selected task already in `In Design`. They use
 the supported Description, native Acceptance Criteria, References, and
 Documentation fields, commit only the returned task path, and stop for operator
 review. Later states reject without mutation; neither skill writes an
-Implementation Plan or authorizes an Episode. Existing future folders remain
-available only for the ordered compatibility path described in
-[`future-specification-bundles.md`](future-specification-bundles.md).
+Implementation Plan or authorizes an Episode.
+
+The `/plan TASK-ID` command and `plan_task({"taskId":"TASK-ID"})` tool admit one
+exact task only when its current status is `In Design` or `In Planning`. They
+preload the project-customizable `plan-task-prep` and `plan-task` workflows,
+request focused compaction on a best-effort basis, queue the semantic planning
+turn as the sole follow-up, and stop without authorizing implementation. The
+semantic workflow writes a meaningful native Implementation Plan, changes or
+retains `In Planning`, commits only the exact returned task path, and treats
+push failure as transport evidence.
+
+After separate operator approval, `/implement-task TASK-ID` is the primary
+implementation path. It resolves the exact `In Planning` task and placement,
+queues one compact-first readiness turn, and permits `create_task_episode` to
+consume that bound approval once. Trusted admission commits only the task's
+`In Progress` transition before version-2 ownership and resource allocation.
+The resulting Episode uses the exact task as its sole durable authority, skips
+bundle copy and promotion, and leaves every later lifecycle status transition
+to the owning Conversation. Continuation uses `handoff_task_episode`; guarded
+review, reversible outcomes, merge or abandonment, and separately confirmed
+cleanup use `finalize_task_episode` without weakening operator authority.
+
+## Retained version-1 compatibility
+
+Existing future folders remain available only through `/plan-spec`, `plan_spec`,
+`/implement-spec`, and their folder ownership mechanics during the ordered
+migration. Those procedures remain operational and are documented in
+[`future-specification-bundles.md`](future-specification-bundles.md); they are
+not the authority for a task-native Episode.
+
+The compatible statuses are staged in `backlog/config.yml`. `To Do` remains the
+temporary default and remains selectable until the one-time task migration can
+truthfully classify every existing item.
 
 ## Project task workflow
 

@@ -114,3 +114,19 @@ def test_current_docs_keep_owner_authority_and_honest_transport_boundaries():
         assert fragment in current + " " + handoff
     assert "not permission to retry" in future
     assert "never retried automatically" in handoff
+
+
+def test_current_docs_lead_with_task_native_and_label_folder_compatibility():
+    current = DOC.read_text()
+    future = FUTURE_DOC.read_text()
+
+    assert "### Primary task-native path" in current
+    assert "### Retained version-1 compatibility path" in current
+    assert "## Task-native terminal outcomes and cleanup" in current
+    assert "## Retained version-1 compatibility finalization" in current
+
+    assert "## Primary task-native lifecycle" in future
+    assert "## Retained version-1 compatibility" in future
+    assert "## Retained version-1 bundle lifecycle" in future
+    for surface in ("/plan TASK-ID", "/implement-task TASK-ID", "create_task_episode", "finalize_task_episode"):
+        assert surface in current + future

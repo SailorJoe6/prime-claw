@@ -38,8 +38,12 @@ material. Revisions remain on the same exact `In Design` task.
 and the artifacts restored after resolution, so that planning or implementation
 can resume without reconstructing state.**
 
-The current blocked-folder workflow remains a migration-compatibility surface
-until Episode work and ownership are converted to task identity.
+The current blocked-folder workflow remains operational only for retained
+version-1 compatibility Episodes and their plan authority. Primary version-2
+task Episodes already use exact-task ownership: the Episode records blocker
+evidence in its bound task while the Conversation alone publishes `Blocked` and
+resumed `In Progress` lifecycle status. Neither schema reconstructs work in a
+new artifact.
 
 ## Primary implementation surfaces
 

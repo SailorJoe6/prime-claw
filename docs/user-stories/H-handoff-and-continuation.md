@@ -17,12 +17,14 @@ reported as completion and compaction itself never triggers execute.
 accepted in-scope revision, so that exactly one handoff and one subsequent
 execute pass reach the correct idle Episode.**
 
-The retained `handoff_spec_episode(location, guidance?)` verifies the owner,
-future-folder location, Git/Orca worktree, durable session, active route, and
-idle queue. It may refresh a stale route but never replays an uncertain
+The primary task-native continuation is
+`handoff_task_episode(taskId, guidance?)`, described below. Retained version-1
+compatibility uses `handoff_spec_episode(location, guidance?)`; it verifies the
+owner, future-folder location, Git/Orca worktree, durable session, active route,
+and idle queue. It may refresh a stale route but never replays an uncertain
 transport.
 
-`handoff_task_episode(taskId, guidance?)` now exposes the
+`handoff_task_episode(taskId, guidance?)` exposes the
 same continuation for strict version-2 ownership. It requires the canonical
 primary `main` checkout, exact owner/task/path, an exact main task path matching
 committed `HEAD` while unrelated main dirt remains allowed, `In Progress` on
@@ -67,7 +69,7 @@ retains ownership and resources pending separate cleanup authority.
 
 Cleanup also never routes through handoff. Its separate explicit authority must
 bind the exact terminal outcome and every recorded Episode resource. The
-inactive coordinator verifies pushed terminal work, removes the exact idle
+guarded task-native coordinator verifies pushed terminal work, removes the exact idle
 runtime/worktree/branch in monotonic order, preserves active ownership through
 an interrupted exact-prefix retry, and marks ownership inactive only after all
 resources are absent. It creates no continuation, assignment, or replacement
