@@ -17,7 +17,8 @@ import {
   verifyTaskEpisodeChangesRequested, resumeTaskEpisodeChangesRequested,
   resolveBlockedWorkflowAuthority, resolveTaskReviewSnapshot, resolveTaskAbandonmentSnapshot,
   resolveTaskAbandonmentFileSnapshot, assertNoTaskArchiveCleanupTargets,
-  assertNoHistoricalTaskArchiveCollision,
+  assertNoHistoricalTaskArchiveCollision, finalizeTaskEpisodeCleanup,
+  taskEpisodeCleanupResourceIdentity,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
@@ -862,6 +863,7 @@ test("confirmed abandonment imports only task content, preserves status, archive
     archivedTaskPath: h.archivePath,
     parentTaskId: "PRIMECLAW-10",
     episodeTaskContentDigest: "e".repeat(64),
+    archivedTaskFileDigest: "f".repeat(64),
     resourcesRetained: true,
   });
   assert.equal(h.mainStatus, "Blocked");
@@ -939,6 +941,232 @@ test("abandonment fails closed on stale, dirty, cross-path, hierarchy, relations
     const h = taskAbandonmentHarness({ mainStatus: "Done" });
     await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /without publishing Done/);
   });
+});
+
+
+function taskCleanupHarness(outcome = "merged", options = {}) {
+  const f = harness();
+  const taskPath = "backlog/tasks/primeclaw-10.38.md";
+  const episodeHead = "b".repeat(40);
+  const terminalCommit = outcome === "merged" ? "d".repeat(40) : "a".repeat(40);
+  const priorMainHead = "1".repeat(40);
+  const archivePath = "backlog/archive/tasks/primeclaw-10.38.md";
+  f.ownership.write(f.root, activeTaskRecord(f));
+  f.calls.length = 0;
+  const resources = taskEpisodeCleanupResourceIdentity(f.record, episodeHead);
+  const initialStage = options.stage ?? 0;
+  let runtimePresent = initialStage < 1;
+  let worktreePresent = initialStage < 2;
+  let branchPresent = initialStage < 3;
+  if (options.unsafeGap) { runtimePresent = false; worktreePresent = true; branchPresent = false; }
+  let failRuntime = Boolean(options.failRuntimeOnce);
+  const snapshot = () => ({
+    ...(runtimePresent ? { runtime: { resources: structuredClone(resources), cwd: f.worktree, idle: options.busy !== true } } : {}),
+    ...(worktreePresent ? { worktree: { path: f.worktree, branch: f.record.branch, head: episodeHead, clean: true } } : {}),
+    ...(branchPresent ? { branch: { name: f.record.branch, head: episodeHead } } : {}),
+  });
+  const cleanup = {
+    async inspect() { f.calls.push(["cleanup-inspect"]); return snapshot(); },
+    async removeRuntime() {
+      f.calls.push(["remove-runtime", f.record.status]);
+      runtimePresent = false;
+      if (options.runtimeRemovesWorktree) worktreePresent = false;
+      if (failRuntime) { failRuntime = false; throw new Error("runtime removal interrupted"); }
+    },
+    async removeWorktree() {
+      f.calls.push(["remove-worktree", f.record.status]);
+      worktreePresent = false;
+      if (options.worktreeRemovesBranch) branchPresent = false;
+    },
+    async removeBranch() { f.calls.push(["remove-branch", f.record.status]); branchPresent = false; },
+  };
+  const terminalGit = {
+    head: () => terminalCommit,
+    upstreamHead: () => terminalCommit,
+    isAncestor: (_repo, ancestor, descendant) => (
+      (ancestor === terminalCommit && descendant === terminalCommit)
+      || (ancestor === TASK_BASE && descendant === episodeHead && (worktreePresent || branchPresent))
+    ),
+    parents: (_repo, ref) => ref === terminalCommit
+      ? [outcome === "merged" ? episodeHead : priorMainHead] : [],
+    commitPaths: (_repo, ref) => ref === terminalCommit
+      ? (outcome === "merged" ? [taskPath] : [taskPath, archivePath]) : [],
+  };
+  const mergedResult = {
+    verified: true,
+    outcome: "merged",
+    taskId: "PRIMECLAW-10.38",
+    status: "Done",
+    priorMainHead,
+    mergedHead: episodeHead,
+    doneCommit: terminalCommit,
+    parentTaskId: "PRIMECLAW-10",
+    episodeTaskContentDigest: "e".repeat(64),
+  };
+  const abandonDecision = {
+    operatorDecision: "abandon",
+    taskId: "PRIMECLAW-10.38",
+    taskPath,
+    mainHead: priorMainHead,
+    episodeHead,
+    mainStatus: "Blocked",
+    candidateMainRelationship: "main-ancestor",
+    parentTaskId: "PRIMECLAW-10",
+    episodeTaskContentDigest: "e".repeat(64),
+    finalSummary: "Operator confirmed abandonment; no candidate code was merged.",
+  };
+  const abandonedResult = {
+    verified: true,
+    outcome: "abandoned",
+    taskId: "PRIMECLAW-10.38",
+    status: "Blocked",
+    priorMainHead,
+    episodeHead,
+    archiveCommit: terminalCommit,
+    archivedTaskPath: archivePath,
+    parentTaskId: "PRIMECLAW-10",
+    episodeTaskContentDigest: "e".repeat(64),
+    archivedTaskFileDigest: "f".repeat(64),
+    resourcesRetained: true,
+  };
+  const evidence = outcome === "merged"
+    ? { outcome: "merged", result: mergedResult }
+    : { outcome: "abandoned", decision: abandonDecision, result: abandonedResult };
+  const decision = {
+    operatorDecision: "cleanup",
+    taskId: "PRIMECLAW-10.38",
+    taskPath,
+    ownerSessionId: "owner",
+    episodeHead,
+    terminalOutcome: outcome,
+    terminalCommit,
+    resources: structuredClone(resources),
+  };
+  const deps = {
+    ...f.deps,
+    cleanup,
+    abandonmentGit: terminalGit,
+    taskResolver: (cwd) => outcome === "merged" ? taskSelection(f, {
+      projectRoot: cwd, status: "Done", taskPathRelative: taskPath, taskPath: join(cwd, taskPath),
+    }) : null,
+    taskSnapshotResolver: () => ({
+      taskId: "PRIMECLAW-10.38", taskPath, parentTaskId: "PRIMECLAW-10",
+      status: "Done", implementationPlan: "Plan", contentDigest: "e".repeat(64),
+    }),
+    abandonmentFileSnapshotResolver: () => ({
+      status: "Blocked", finalSummary: abandonDecision.finalSummary, contentDigest: "f".repeat(64),
+    }),
+    now: () => "2026-10-13T15:00:00.000Z",
+  };
+  return {
+    f, deps, decision, evidence, mergedResult, abandonedResult, abandonDecision,
+    snapshot, get runtimePresent() { return runtimePresent; },
+    get worktreePresent() { return worktreePresent; }, get branchPresent() { return branchPresent; },
+  };
+}
+
+test("authorized merged-task cleanup removes exact resources in order before closing ownership", async () => {
+  const h = taskCleanupHarness("merged");
+  assert.equal(h.f.record.head, TASK_BASE);
+  assert.notEqual(h.f.record.head, h.decision.episodeHead);
+  const result = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
+  assert.deepEqual(result, {
+    verified: true, outcome: "merged", taskId: "PRIMECLAW-10.38",
+    terminalCommit: "d".repeat(40), resourcesRemoved: true, ownershipStatus: "inactive", reused: false,
+  });
+  assert.deepEqual(
+    h.f.calls.filter((call) => call[0].startsWith("remove-")),
+    [["remove-runtime", "active"], ["remove-worktree", "active"], ["remove-branch", "active"]],
+  );
+  assert.equal(h.f.record.status, "inactive");
+  assert.equal(h.runtimePresent || h.worktreePresent || h.branchPresent, false);
+  const replay = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
+  assert.equal(replay.reused, true);
+});
+
+test("authorized abandonment cleanup verifies archived non-Done evidence before resource removal", async () => {
+  const h = taskCleanupHarness("abandoned", { worktreeRemovesBranch: true });
+  const result = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
+  assert.equal(result.outcome, "abandoned");
+  assert.equal(result.terminalCommit, "a".repeat(40));
+  assert.deepEqual(
+    h.f.calls.filter((call) => call[0].startsWith("remove-")),
+    [["remove-runtime", "active"], ["remove-worktree", "active"]],
+  );
+  assert.equal(h.f.record.status, "inactive");
+  const replay = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
+  assert.equal(replay.reused, true);
+});
+
+test("cleanup rejects missing authority, foreign resources, mixed terminal evidence, and busy runtime before mutation", async (t) => {
+  await t.test("missing cleanup decision", async () => {
+    const h = taskCleanupHarness("merged"); h.decision.operatorDecision = "delay";
+    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /separate explicit operator cleanup authority/);
+    assert.equal(h.f.record.status, "active");
+  });
+  await t.test("foreign resource binding", async () => {
+    const h = taskCleanupHarness("merged"); h.decision.resources.episodeId = "foreign";
+    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /every exact Episode resource/);
+    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
+  });
+  await t.test("mixed terminal boundary", async () => {
+    const h = taskCleanupHarness("abandoned");
+    const mixed = { outcome: "merged", result: h.abandonedResult };
+    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, mixed), /does not match the explicit cleanup authority/);
+    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
+  });
+  await t.test("unverified transport", async () => {
+    const h = taskCleanupHarness("merged"); h.evidence.result.pushError = "offline";
+    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /merge evidence/);
+    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
+  });
+  await t.test("busy runtime", async () => {
+    const h = taskCleanupHarness("merged", { busy: true });
+    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /runtime is busy/);
+    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
+  });
+  await t.test("unsafe missing-resource order", async () => {
+    const h = taskCleanupHarness("merged", { unsafeGap: true });
+    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /missing in an unsafe order/);
+    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
+  });
+  await t.test("runtime removal crosses its exact boundary", async () => {
+    const h = taskCleanupHarness("merged", { runtimeRemovesWorktree: true });
+    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /runtime removal was not verified exactly/);
+    assert.equal(h.f.record.status, "active");
+  });
+  await t.test("uncertain ownership", async () => {
+    const h = taskCleanupHarness("merged");
+    h.f.ownership.write(h.f.root, { ...h.f.record, status: "uncertain" });
+    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /cannot finalize uncertain ownership/);
+    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
+  });
+});
+
+test("all-absent abandonment retry closes ownership without requiring the deleted Episode ref", async () => {
+  const h = taskCleanupHarness("abandoned", { stage: 3 });
+  assert.equal(h.f.record.status, "active");
+  const result = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
+  assert.equal(result.reused, false);
+  assert.equal(h.f.record.status, "inactive");
+  assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
+});
+
+test("interrupted cleanup retains active ownership and resumes only the exact monotonic prefix", async () => {
+  const h = taskCleanupHarness("merged", { failRuntimeOnce: true });
+  await assert.rejects(
+    finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence),
+    /runtime removal interrupted/,
+  );
+  assert.equal(h.f.record.status, "active");
+  assert.equal(h.runtimePresent, false);
+  const result = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
+  assert.equal(result.reused, false);
+  assert.deepEqual(
+    h.f.calls.filter((call) => call[0] === "remove-runtime"),
+    [["remove-runtime", "active"]],
+  );
+  assert.equal(h.f.record.status, "inactive");
 });
 
 test("verified local abandonment remains authoritative when its final push fails", async () => {

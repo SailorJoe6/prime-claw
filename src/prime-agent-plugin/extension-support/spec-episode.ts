@@ -369,8 +369,68 @@ export type TaskEpisodeAbandonmentResult = {
   archivedTaskPath: string;
   parentTaskId: string | null;
   episodeTaskContentDigest: string;
+  archivedTaskFileDigest: string;
   resourcesRetained: true;
   pushError?: string;
+};
+export type TaskEpisodeCleanupResourceIdentity = {
+  engine: "orca" | "local";
+  worktree: string;
+  branch: string;
+  head: string;
+  episodeId: string;
+  episodeSessionFile: string;
+  episodeActiveSessionId: string;
+  projectSetupId?: string;
+  routingEnvironmentId?: string;
+  worktreeId?: string;
+  worktreeIdentity?: string;
+  terminalHandle?: string;
+  worktreeName?: string;
+  launchAutomationName?: string;
+  launchAutomationId?: string;
+  launchRunId?: string;
+};
+export type TaskEpisodeCleanupDecision = {
+  operatorDecision: "cleanup";
+  taskId: string;
+  taskPath: string;
+  ownerSessionId: string;
+  episodeHead: string;
+  terminalOutcome: "merged" | "abandoned";
+  terminalCommit: string;
+  resources: TaskEpisodeCleanupResourceIdentity;
+};
+export type TaskEpisodeTerminalEvidence =
+  | { outcome: "merged"; result: TaskEpisodeMergeResult }
+  | { outcome: "abandoned"; decision: TaskEpisodeAbandonmentDecision; result: TaskEpisodeAbandonmentResult };
+export type TaskEpisodeCleanupSnapshot = {
+  runtime?: {
+    resources: TaskEpisodeCleanupResourceIdentity;
+    cwd: string;
+    idle: boolean;
+  };
+  worktree?: { path: string; branch: string; head: string; clean: boolean };
+  branch?: { name: string; head: string };
+};
+export interface TaskEpisodeCleanupAdapter {
+  inspect(record: TaskEpisodeOwnershipRecord): Promise<TaskEpisodeCleanupSnapshot>;
+  removeRuntime(record: TaskEpisodeOwnershipRecord): Promise<void>;
+  removeWorktree(record: TaskEpisodeOwnershipRecord): Promise<void>;
+  removeBranch(record: TaskEpisodeOwnershipRecord): Promise<void>;
+}
+export interface TaskEpisodeFinalizationDependencies extends TaskEpisodeAbandonmentDependencies {
+  cleanup: TaskEpisodeCleanupAdapter;
+  now?: () => string;
+}
+export type TaskEpisodeFinalizationResult = {
+  verified: true;
+  outcome: "merged" | "abandoned";
+  taskId: string;
+  terminalCommit: string;
+  resourcesRemoved: true;
+  ownershipStatus: "inactive";
+  reused: boolean;
 };
 export type TaskEpisodeOperatorDecision =
   | { operatorDecision: "delay" }
@@ -2815,8 +2875,258 @@ export async function abandonTaskEpisode(
     archivedTaskPath: archivePath,
     parentTaskId: decision.parentTaskId,
     episodeTaskContentDigest: decision.episodeTaskContentDigest,
+    archivedTaskFileDigest: archivedFile.contentDigest,
     resourcesRetained: true,
     ...(pushError ? { pushError } : {}),
+  };
+}
+
+
+export function taskEpisodeCleanupResourceIdentity(
+  record: TaskEpisodeOwnershipRecord,
+  episodeHead: string,
+): TaskEpisodeCleanupResourceIdentity {
+  if (!record.worktree || !record.branch || !record.episodeId
+    || !record.episodeSessionFile || !record.episodeActiveSessionId
+    || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(episodeHead)) {
+    throw new Error("Task Episode cleanup requires every exact core resource binding");
+  }
+  return {
+    engine: record.engine,
+    worktree: record.worktree,
+    branch: record.branch,
+    head: episodeHead,
+    episodeId: record.episodeId,
+    episodeSessionFile: record.episodeSessionFile,
+    episodeActiveSessionId: record.episodeActiveSessionId,
+    ...(record.projectSetupId ? { projectSetupId: record.projectSetupId } : {}),
+    ...(record.routingEnvironmentId ? { routingEnvironmentId: record.routingEnvironmentId } : {}),
+    ...(record.worktreeId ? { worktreeId: record.worktreeId } : {}),
+    ...(record.worktreeIdentity ? { worktreeIdentity: record.worktreeIdentity } : {}),
+    ...(record.terminalHandle ? { terminalHandle: record.terminalHandle } : {}),
+    ...(record.worktreeName ? { worktreeName: record.worktreeName } : {}),
+    ...(record.launchAutomationName ? { launchAutomationName: record.launchAutomationName } : {}),
+    ...(record.launchAutomationId ? { launchAutomationId: record.launchAutomationId } : {}),
+    ...(record.launchRunId ? { launchRunId: record.launchRunId } : {}),
+  };
+}
+
+function taskCleanupStage(
+  snapshot: TaskEpisodeCleanupSnapshot,
+  resources: TaskEpisodeCleanupResourceIdentity,
+): number {
+  if (snapshot.runtime) {
+    if (stableJson(snapshot.runtime.resources) !== stableJson(resources)
+      || !samePath(snapshot.runtime.cwd, resources.worktree)
+      || !snapshot.runtime.idle) {
+      throw new Error("Task Episode cleanup runtime is busy, foreign, or no longer exact");
+    }
+  }
+  if (snapshot.worktree
+    && (!samePath(snapshot.worktree.path, resources.worktree)
+      || snapshot.worktree.branch !== resources.branch
+      || snapshot.worktree.head !== resources.head
+      || !snapshot.worktree.clean)) {
+    throw new Error("Task Episode cleanup worktree is dirty, foreign, or no longer exact");
+  }
+  if (snapshot.branch
+    && (snapshot.branch.name !== resources.branch || snapshot.branch.head !== resources.head)) {
+    throw new Error("Task Episode cleanup branch is foreign or no longer exact");
+  }
+  const present = [Boolean(snapshot.runtime), Boolean(snapshot.worktree), Boolean(snapshot.branch)];
+  if (present.every(Boolean)) return 0;
+  if (!present[0] && present[1] && present[2]) return 1;
+  if (!present[0] && !present[1] && present[2]) return 2;
+  if (present.every((value) => !value)) return 3;
+  throw new Error("Task Episode cleanup resources are missing in an unsafe order");
+}
+
+function taskFinalizationTerminalCommit(evidence: TaskEpisodeTerminalEvidence): string {
+  return evidence.outcome === "merged" ? evidence.result.doneCommit : evidence.result.archiveCommit;
+}
+
+function taskFinalizationEpisodeHead(evidence: TaskEpisodeTerminalEvidence): string {
+  return evidence.outcome === "merged" ? evidence.result.mergedHead : evidence.result.episodeHead;
+}
+
+function verifyTaskEpisodeTerminalEvidence(
+  projectRoot: string,
+  record: TaskEpisodeOwnershipRecord,
+  episodeHead: string,
+  evidence: TaskEpisodeTerminalEvidence,
+  git: TaskEpisodeAbandonmentGit,
+  resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null,
+  resolveSnapshot: (cwd: string, taskId: string) => TaskReviewSnapshot,
+  resolveFile: (cwd: string, taskPath: string) => TaskAbandonmentFileSnapshot,
+): void {
+  const currentHead = git.head(projectRoot);
+  if (git.upstreamHead(projectRoot) !== currentHead) {
+    throw new Error("Task Episode cleanup requires canonical main terminal work to be pushed and exact");
+  }
+  if (evidence.outcome === "merged") {
+    const result = evidence.result;
+    if (!result.verified || result.outcome !== "merged" || result.pushError
+      || result.taskId !== record.taskId || result.status !== "Done"
+      || result.mergedHead !== episodeHead) {
+      throw new Error("Task Episode cleanup merge evidence does not bind the exact owned Episode");
+    }
+    if (!git.isAncestor(projectRoot, result.doneCommit, currentHead)
+      || !exactPathSet(git.parents(projectRoot, result.doneCommit), [result.mergedHead])
+      || !exactPathSet(git.commitPaths(projectRoot, result.doneCommit), [record.taskPath])) {
+      throw new Error("Task Episode cleanup merge terminal commit is not the verified exact task child");
+    }
+    const task = exactAdmissionTask(resolveTask(projectRoot, record.taskId), record.taskId, projectRoot, record.taskPath);
+    const snapshot = resolveSnapshot(projectRoot, record.taskId);
+    if (task.status !== "Done" || snapshot.status !== "Done"
+      || snapshot.taskPath !== record.taskPath
+      || snapshot.parentTaskId !== result.parentTaskId
+      || snapshot.contentDigest !== result.episodeTaskContentDigest) {
+      throw new Error("Task Episode cleanup merge terminal task changed identity, hierarchy, status, or content");
+    }
+    return;
+  }
+
+  const { decision, result } = evidence;
+  if (!result.verified || result.outcome !== "abandoned" || result.pushError
+    || result.resourcesRetained !== true || decision.operatorDecision !== "abandon"
+    || result.taskId !== record.taskId || decision.taskId !== record.taskId
+    || decision.taskPath !== record.taskPath || result.episodeHead !== episodeHead
+    || decision.episodeHead !== episodeHead || result.status !== decision.mainStatus
+    || result.priorMainHead !== decision.mainHead
+    || result.parentTaskId !== decision.parentTaskId
+    || result.episodeTaskContentDigest !== decision.episodeTaskContentDigest) {
+    throw new Error("Task Episode cleanup abandonment evidence does not bind the exact owned Episode");
+  }
+  const archivePath = expectedArchivedTaskPath(record.taskPath);
+  if (result.archivedTaskPath !== archivePath
+    || !git.isAncestor(projectRoot, result.archiveCommit, currentHead)
+    || !exactPathSet(git.parents(projectRoot, result.archiveCommit), [decision.mainHead])
+    || !exactPathSet(git.commitPaths(projectRoot, result.archiveCommit), [record.taskPath, archivePath])) {
+    throw new Error("Task Episode cleanup abandonment terminal commit is not the verified exact archive child");
+  }
+  if (resolveTask(projectRoot, record.taskId) !== null) {
+    throw new Error("Task Episode cleanup abandonment evidence conflicts with an active task");
+  }
+  const archived = resolveFile(projectRoot, archivePath);
+  if (archived.status !== decision.mainStatus || archived.status === "Done"
+    || archived.finalSummary !== decision.finalSummary
+    || archived.contentDigest !== result.archivedTaskFileDigest) {
+    throw new Error("Task Episode cleanup archived task changed status, summary, or content");
+  }
+}
+
+export async function finalizeTaskEpisodeCleanup(
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeFinalizationDependencies,
+  decision: TaskEpisodeCleanupDecision,
+  terminalEvidence: TaskEpisodeTerminalEvidence,
+): Promise<TaskEpisodeFinalizationResult> {
+  if (decision.operatorDecision !== "cleanup") {
+    throw new Error("Task Episode cleanup requires separate explicit operator cleanup authority");
+  }
+  if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
+    throw new Error("Task Episode cleanup is available only to the top-level owning Conversation");
+  }
+  if (!ctx.sessionManager.getSessionFile()) {
+    throw new Error("Task Episode cleanup requires a persisted owning Conversation session");
+  }
+  const git = dependencies.git ?? new CliGitAdapter();
+  const terminalGit = dependencies.abandonmentGit
+    ?? (dependencies.mergeGit as TaskEpisodeAbandonmentGit | undefined)
+    ?? new CliTaskEpisodeAdmissionGit();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
+  const resolveTask = dependencies.taskResolver
+    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
+  const resolveSnapshot = dependencies.taskSnapshotResolver
+    ?? ((cwd: string, id: string) => resolveTaskReviewSnapshot(cwd, id, runner));
+  const resolveFile = dependencies.abandonmentFileSnapshotResolver
+    ?? ((cwd: string, path: string) => resolveTaskAbandonmentFileSnapshot(cwd, path));
+  const projectRoot = git.repositoryRoot(ctx.cwd);
+  if (!samePath(projectRoot, ctx.cwd) || git.branch(projectRoot) !== "main") {
+    throw new Error("Task Episode cleanup must run from the canonical primary main checkout");
+  }
+  const record = store.read(projectRoot);
+  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${decision.taskId}`);
+  exactOwnedTaskRecord(record, decision.taskId, ctx.sessionManager.getSessionId());
+  if (record.status !== "active" && record.status !== "inactive") {
+    throw new Error(`Task Episode cleanup cannot finalize ${record.status} ownership`);
+  }
+  if (decision.ownerSessionId !== record.ownerSessionId || decision.taskPath !== record.taskPath) {
+    throw new Error("Task Episode cleanup authority does not bind the exact owner and task path");
+  }
+  const episodeHead = taskFinalizationEpisodeHead(terminalEvidence);
+  if (!terminalEvidence.result || terminalEvidence.result.taskId !== decision.taskId
+    || terminalEvidence.outcome !== decision.terminalOutcome
+    || taskFinalizationTerminalCommit(terminalEvidence) !== decision.terminalCommit
+    || episodeHead !== decision.episodeHead) {
+    throw new Error("Task Episode cleanup terminal evidence does not match the explicit cleanup authority");
+  }
+  const resources = taskEpisodeCleanupResourceIdentity(record, episodeHead);
+  if (stableJson(decision.resources) !== stableJson(resources)) {
+    throw new Error("Task Episode cleanup authority does not bind every exact Episode resource");
+  }
+  let snapshot = await dependencies.cleanup.inspect(record);
+  let stage = taskCleanupStage(snapshot, resources);
+  if (stage !== 3 && !terminalGit.isAncestor(projectRoot, record.baseRef, episodeHead)) {
+    throw new Error("Task Episode cleanup terminal head is not descended from the owned Episode base");
+  }
+  git.assertCleanWorktree(projectRoot);
+  verifyTaskEpisodeTerminalEvidence(
+    projectRoot, record, episodeHead, terminalEvidence, terminalGit, resolveTask, resolveSnapshot, resolveFile,
+  );
+
+  if (record.status === "inactive") {
+    if (stage !== 3) throw new Error("Inactive task Episode ownership still has retained resources");
+    return {
+      verified: true,
+      outcome: terminalEvidence.outcome,
+      taskId: record.taskId,
+      terminalCommit: taskFinalizationTerminalCommit(terminalEvidence),
+      resourcesRemoved: true,
+      ownershipStatus: "inactive",
+      reused: true,
+    };
+  }
+
+  const advance = async (
+    remove: () => Promise<void>,
+    label: string,
+    expectedStages: number[],
+  ): Promise<void> => {
+    await remove();
+    snapshot = await dependencies.cleanup.inspect(record);
+    stage = taskCleanupStage(snapshot, resources);
+    if (!expectedStages.includes(stage)) throw new Error(`Task Episode cleanup ${label} was not verified exactly`);
+  };
+  if (stage === 0) await advance(() => dependencies.cleanup.removeRuntime(record), "runtime removal", [1]);
+  if (stage === 1) await advance(() => dependencies.cleanup.removeWorktree(record), "worktree removal", [2, 3]);
+  if (stage === 2) await advance(() => dependencies.cleanup.removeBranch(record), "branch removal", [3]);
+  if (stage !== 3) throw new Error("Task Episode cleanup did not remove every exact resource");
+
+  const retained = store.read(projectRoot);
+  if (!retained || stableJson(retained) !== stableJson(record)) {
+    throw new Error("Task Episode ownership changed during authorized cleanup");
+  }
+  const closed: TaskEpisodeOwnershipRecord = {
+    ...record,
+    status: "inactive",
+    updatedAt: dependencies.now?.() ?? new Date().toISOString(),
+  };
+  store.write(projectRoot, closed);
+  const verified = store.read(projectRoot);
+  if (!verified || !isTaskEpisodeOwnership(verified) || verified.status !== "inactive"
+    || stableJson(verified) !== stableJson(closed)) {
+    throw new Error("Task Episode cleanup could not verify inactive ownership bookkeeping");
+  }
+  return {
+    verified: true,
+    outcome: terminalEvidence.outcome,
+    taskId: record.taskId,
+    terminalCommit: taskFinalizationTerminalCommit(terminalEvidence),
+    resourcesRemoved: true,
+    ownershipStatus: "inactive",
+    reused: false,
   };
 }
 

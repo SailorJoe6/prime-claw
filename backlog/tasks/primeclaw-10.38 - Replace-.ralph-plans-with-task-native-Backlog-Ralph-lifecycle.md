@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 14:57'
+updated_date: '2026-10-13 15:34'
 labels:
   - backlog-md
   - episode-loop
@@ -479,4 +479,14 @@ Final evidence: 119 focused Node tests and 4 policy checks; 204 broad Node tests
 ### Accepted next dependency — inactive task-native finalization and cleanup
 
 The operator accepted clean checkpoint `4588abcd60f78b0ccb40241d296c1003a885642a`, including the complete inactive abandonment slice and archive-collision repair. The next bounded execute pass is the already-approved inactive task-native finalization/cleanup dependency. Keep all public task-native surfaces inactive. Preserve separate explicit operator authority for destructive cleanup, retained ownership and every Episode resource until authorized terminal work is verified, exact task/Episode identity, and the current lifecycle boundaries. Add no unrelated scope.
+
+### Implemented slice — inactive task-native finalization and cleanup
+
+Added the internal unregistered `finalizeTaskEpisodeCleanup` coordinator with a required injected host adapter. A separate explicit Cleanup decision binds the exact task/path, owner Conversation, terminal Episode head/outcome/commit, durable session/route, worktree/branch, and every optional local or Orca resource. It re-verifies canonical main/upstream and either the pushed one-task Merge/`Done` child or pushed non-`Done` Abandon/archive child before deletion; abandonment results now retain the verified archived-file digest.
+
+Cleanup accepts only exact monotonic states: all resources present, runtime absent, worktree absent, or all absent. It removes exact idle runtime, worktree, and branch in order and verifies each boundary. Ownership remains active across interruption and becomes inactive only after every bound resource is absent. Exact partial-prefix retry and inactive replay are idempotent. Busy, dirty, foreign, mixed, unpushed, drifted, unsafe-gap, provisioning, and uncertain states fail closed.
+
+Independent review found two material defects. The first bound cleanup to the stale allocation-time ownership head; the repair explicitly binds the terminal Episode head, proves admission-base ancestry while resources exist, and uses that head for worktree/branch identity. The second made all-absent abandonment replay depend on the deliberately deleted Episode ref; stage 3 now skips only that impossible ancestry check while preserving canonical-main terminal proof. Final rereview found no material findings.
+
+Final evidence: 132 focused task-native Node tests, 4 retained close tests, and 4 oversight policy checks; 217 broad Node tests and 59 host-safe Python checks with 45 container cases deselected; `git diff --check`; Docker Tier-1 `.test-results/20261013T153144Z-87272-78cdefce/tier1`. No actual cleanup, finalization, resource deletion, merge, abandonment, status change, public activation, host adapter, vendor/Prime Agent patch, migration, or new acceptance claim occurred. Live ownership/resources remain unchanged.
 <!-- SECTION:NOTES:END -->

@@ -65,6 +65,15 @@ abandonment Final Summary, proves that no Episode code entered main, and archive
 the task. The Episode performs none of these lifecycle operations and all of its
 resources remain retained for separately authorized cleanup.
 
+Only a later explicit Cleanup decision can remove them. The inactive coordinator
+binds that decision to the exact task, owner, Episode head, branch, worktree,
+durable session/route, and optional local or Orca resource identities. It first
+re-verifies the pushed exact Merge/`Done` or Abandon/archive result, then removes
+only the idle runtime, worktree, and branch. Ownership remains active until all
+three are verified absent, including across an interrupted exact-prefix retry;
+only then does it become inactive. The Episode cannot authorize or perform this
+cleanup itself, and no public task-native cleanup surface is registered.
+
 Retained folder mode continues to move blocked plan documents, update related
 Backlog.md tasks, and archive completed plan bundles until final cutover.
 

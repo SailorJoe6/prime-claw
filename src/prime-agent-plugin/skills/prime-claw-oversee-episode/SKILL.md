@@ -27,6 +27,8 @@ Apply **Merge** only when the operator explicitly authorizes the exact verified 
 
 Apply **Abandon** only after explicit operator confirmation binds exact owner, task path, main head/status, Episode head, candidate/main relationship, parent, and Episode task digest. Reject any archive destination tracked at the bound main head and any inbound task links before mutation. Select only that task blob. Reapply captured status through Backlog, add the truthful Final Summary, prove no Episode code entered main, archive without `Done`, and commit/push the exact move. Retry only exact task-preparation, archival-move, or archival-child states. Keep active ownership and every resource; cleanup needs separate authority.
 
+Apply **Cleanup** only after separate explicit operator authority binds exact task, owner, Episode, and all resources. Reverify pushed terminal evidence. Remove exact idle runtime, worktree, then branch. Keep ownership active through interruption; close only after all resources are absent. This internal seam remains unregistered.
+
 When required, use `prime-claw-expert-review`. Treat every review conclusion as evidence. A finding blocks only for a concrete material defect against the operator-approved product contract. Speculative hardening, alternative architecture, and reviewer-invented invariants are non-blocking. If review invents requirements, stop that review loop and consult. Do not request or implement another repair merely to satisfy adversarial review.
 
 Maintain a bounded goal. Use one exact heartbeat only while waiting for Episode or Expert work. The operator alone decides scope, product direction, merge, abandonment, and cleanup.

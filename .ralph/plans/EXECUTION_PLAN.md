@@ -706,14 +706,44 @@ No actual abandonment, status change, archive, finalization, cleanup, public
 activation, or migration occurred. No acceptance criterion is newly claimed;
 AC #8/#9 still require retained end-to-end and operator-outcome receipts.
 
-The operator accepted checkpoint
-`4588abcd60f78b0ccb40241d296c1003a885642a`, including the complete inactive
-abandonment slice and archive-collision repair. The next bounded execute pass is
-the already-approved inactive task-native finalization/cleanup dependency.
-Preserve public task-native inactivity, require separate explicit operator
-authority for destructive cleanup, retain ownership and all Episode resources
-until authorized terminal work is verified, bind exact task/Episode identity,
-and add no unrelated scope.
+#### Slice 8 progress — inactive task-native finalization and cleanup (2026-10-13)
+
+Implemented the internal `finalizeTaskEpisodeCleanup` coordinator without
+registering a task-native tool or host cleanup adapter. A separate explicit
+Cleanup decision binds the exact task/path, owner Conversation, terminal Episode
+head/outcome/commit, durable session and route, worktree/branch, and every
+optional local or Orca resource. Before deletion it re-verifies canonical main
+and upstream plus either the pushed one-task Merge/`Done` child or the pushed
+non-`Done` Abandon/archive child. Abandonment results now retain the verified
+archived-file digest for this terminal proof.
+
+Resource inspection accepts only the exact monotonic states: all present,
+runtime absent, worktree absent, or all absent. The injected host adapter removes
+only the exact idle runtime, worktree, and branch in that order, verifying each
+boundary; exact worktree removal may also remove its exact branch. Ownership
+remains active across interrupted removal and changes to inactive only after all
+resources are absent. Exact prefix retry and inactive replay are idempotent.
+Busy, dirty, foreign, mixed-outcome, unpushed, identity-drifted, unsafe-gap,
+provisioning, and uncertain states fail closed.
+
+Independent review found two material defects. First, cleanup incorrectly bound
+the terminal branch head to the stale allocation-time ownership head; the repair
+binds the explicit terminal Episode head, proves it descends from the owned
+admission base while resources exist, and uses it for branch/worktree identity.
+Second, all-absent abandonment replay required the deliberately deleted Episode
+ref; the repair skips only that no-longer-possible ancestry check at stage 3
+while retaining all canonical-main terminal proofs. Final rereview found no
+material findings.
+
+Final validation passed 132 focused task-native Node tests, 4 retained close
+tests, and 4 oversight policy checks; 217 broad Node tests and 59 host-safe
+Python checks with 45 container cases deselected; `git diff --check`; and
+source-mode Docker Tier-1 with immutable-image, offline-RPC, teardown, and
+manifest evidence at `.test-results/20261013T153144Z-87272-78cdefce/tier1`.
+
+No actual finalization, resource deletion, abandonment, merge, status change,
+public activation, host-adapter registration, migration, or acceptance-criterion
+claim occurred. The live Episode ownership and resources remain unchanged.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 

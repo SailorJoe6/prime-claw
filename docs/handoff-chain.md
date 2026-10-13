@@ -109,6 +109,19 @@ archival child is verified and pushed. Retry recognizes only exact task
 preparation, archival move/stage, or archival-child state. Ownership and every
 Episode resource remain active because cleanup needs separate authority.
 
+Cleanup is likewise not handoff. The inactive coordinator requires a new
+explicit Cleanup decision bound to the exact task, owner, Episode head, branch,
+worktree, durable session/route, and all optional resource identities. The
+terminal Episode head must descend from the admission base and, rather than the
+stale allocation head, is the branch/worktree head authorized for cleanup. It
+re-verifies the pushed Merge/`Done` or Abandon/archive terminal child before
+mutation, then removes only the exact idle runtime, worktree, and branch in a
+verified monotonic sequence. Ownership stays active through interruption and
+becomes inactive only after all resources are absent. Exact partial-prefix retry
+and inactive replay are idempotent. The coordinator rejects busy, dirty,
+foreign, mixed-outcome, unpushed, and out-of-order states and remains
+unregistered.
+
 The initial Episode creation is different: it starts a fresh session with one
 fixed execute assignment after bundle promotion. It does **not** run handoff.
 Handoff begins only with later owner-supervised continuation.

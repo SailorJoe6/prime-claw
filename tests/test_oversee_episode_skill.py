@@ -62,6 +62,13 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Reapply captured status through Backlog",
         "archive without `Done`",
         "cleanup needs separate authority",
+        "Apply **Cleanup** only after separate explicit operator authority",
+        "binds exact task, owner, Episode, and all resources",
+        "Reverify pushed terminal evidence",
+        "Remove exact idle runtime, worktree, then branch",
+        "Keep ownership active through interruption",
+        "close only after all resources are absent",
+        "This internal seam remains unregistered",
     ]:
         assert phrase in text
     assert "Bead chronology" not in raw

@@ -67,6 +67,14 @@ archives without `Done`. Exact task-preparation, archival-move/stage, and direct
 archival-child states are retryable without repeating archive mutation. It
 retains ownership and resources pending separate cleanup authority.
 
+Cleanup also never routes through handoff. Its separate explicit authority must
+bind the exact terminal outcome and every recorded Episode resource. The
+inactive coordinator verifies pushed terminal work, removes the exact idle
+runtime/worktree/branch in monotonic order, preserves active ownership through
+an interrupted exact-prefix retry, and marks ownership inactive only after all
+resources are absent. It creates no continuation, assignment, or replacement
+resource and has no registered public surface.
+
 These paths are not used for consultation, pause, destructive cleanup, another
 Episode, or scope expansion.
 

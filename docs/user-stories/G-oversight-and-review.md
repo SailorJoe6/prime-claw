@@ -64,6 +64,16 @@ archival-move/stage, or direct archival-child recovery states. The verified loca
 archive remains authoritative when final transport fails. Ownership and every
 Episode resource stay active until separately authorized cleanup.
 
+A later Cleanup decision is independently explicit and binds every exact owner,
+task, Episode, session, worktree, branch, and optional Orca identity. Before any
+deletion, the Conversation must reverify the pushed exact `Done` child or exact
+non-`Done` archival child and a clean idle resource set. Cleanup removes runtime,
+worktree, and branch only in a verified monotonic sequence. An interrupted
+prefix retains active ownership for exact retry; inactive bookkeeping is written
+only after all resources are absent. Mixed terminal evidence, failed transport,
+identity drift, busy or dirty resources, unsafe gaps, provisioning, and
+uncertain ownership fail closed. This internal coordinator remains inactive.
+
 Product, scope, merge, abandonment, remote transport, and destructive cleanup
 remain operator decisions.
 

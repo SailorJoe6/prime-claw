@@ -305,6 +305,27 @@ and ownership are also rechecked.
 The branch, worktree, durable session, and every resource remain active; any
 finalization or destructive cleanup needs separate operator authority.
 
+The inactive task-native cleanup coordinator accepts only a separate explicit
+Cleanup decision that binds the exact task/path, owning Conversation, Episode
+head/branch/worktree, durable session/route, and every optional local or Orca
+resource recorded in ownership. The authorized terminal Episode head must
+descend from the owned admission base; resource inspection binds that terminal
+head rather than the allocation-time ownership head. Before deletion it
+re-verifies either the pushed one-task `Done` child from Merge or the pushed
+exact non-`Done` archival child from Abandon. Mixed outcomes, transport errors, changed task or archive
+content, a busy runtime, dirty or foreign worktree, changed branch head, and
+unsafe resource gaps reject without deletion. Authorized cleanup removes the
+exact idle runtime first, then its worktree, then its branch. Each absence is
+verified. A host cleanup that also removes the exact branch may advance that
+monotonic sequence, but no out-of-order gap is accepted. Ownership remains
+`active` across an interruption or uncertain removal and changes to `inactive`
+only after every bound resource is proven absent. Once all resources are absent,
+retry and inactive replay do not require the deliberately deleted Episode ref;
+the pushed terminal main evidence remains authoritative. Exact partial-prefix
+retry and inactive replay are idempotent; provisioning and uncertain ownership cannot be
+cleaned. This coordinator is internal and unregistered, so the live task-native
+surface remains inactive.
+
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and
 worktree identities remain authoritative across restarts. Expert review follows
