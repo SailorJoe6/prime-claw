@@ -957,7 +957,7 @@ deletion, and final cutover remain unstarted and unauthorized.
 
 #### Accepted next dependency — retire active `To Do` guidance
 
-The operator accepted pushed checkpoint
+The owning Conversation accepted pushed checkpoint
 `1ef3ce44cc0c5e6855a591af0e612bf8f2dc024c`. The next execute pass must
 implement only the next already-approved ordered step-4 prerequisite: re-audit
 and remove active guidance that creates or selects `To Do`, including the
@@ -999,9 +999,9 @@ The supported CLI accepted the repeated-status list command and returned a
 versioned `task-list`. Focused validation passed 18 host-safe tests with 8
 container cases deselected. The curated broad candidate passed 229 Node tests
 and 68 host-safe Python tests with 45 container cases deselected, plus
-`git diff --check`. Independent read-only review found no material defects and
-approved the bounded candidate. No managed plugin source changed, so Docker
-Tier 1 is not required by repository policy.
+`git diff --check`. Independent read-only review reported no material defects.
+No managed plugin source changed, so Docker Tier 1 is not required by repository
+policy.
 
 The still-unmigrated tasks and transitional `backlog/config.yml` remain intact;
 `To Do` is still the temporary configured default/selectable migration state.
