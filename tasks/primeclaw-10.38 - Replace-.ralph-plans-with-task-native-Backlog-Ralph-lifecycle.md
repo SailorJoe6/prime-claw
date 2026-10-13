@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 18:28'
+updated_date: '2026-10-13 18:43'
 labels:
   - backlog-md
   - episode-loop
@@ -48,6 +48,12 @@ modified_files:
   - tests/test_reviewed_plan_extension.py
   - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
   - tests/project_initialization_extension.test.mjs
+  - VISION.md
+  - docs/backlog.md
+  - docs/future-specification-bundles.md
+  - docs/user-stories/README.md
+  - docs/user-stories/C-specification.md
+  - docs/user-stories/I-episode-finalization.md
 parent_task_id: PRIMECLAW-10
 priority: p1
 type: epic
@@ -562,4 +568,16 @@ No production asset row, source asset, project template, command, tool, workflow
 The operator accepted pushed checkpoint `bf1b320e8649f252b6bf3031c0563ded17bffc9f`, including the isolated exact managed-asset retirement rehearsal. The next execute pass is the explicitly recorded ordered step-4 documentation prerequisite: make the already-active task-native lifecycle the primary current architecture and operator path, and label every retained folder procedure clearly as version-1 compatibility. Reconcile the current architecture, operator, user-story, and traceability surfaces identified by the recorded audit while keeping those compatibility procedures operational and documented.
 
 Do not begin the separate no-`To Do` guidance migration, proof-reference normalization, task/bundle migration, production asset retirement, `.ralph/plans` deletion, or final cutover. Preserve exact IDs and parents, operator authority, supported interfaces, Docker-only plugin validation when applicable, and the no-unrelated-scope boundary.
+
+### Implemented slice — task-native activation truth and retained version-1 compatibility
+
+Reconciled the approved current architecture, operator workflow, user-story, and traceability surfaces with the active runtime. `/plan TASK-ID` followed by `/implement-task TASK-ID`, exact version-2 task ownership, task-bound execution, `handoff_task_episode`, and guarded `finalize_task_episode` outcomes are now documented as the primary current lifecycle. Every retained folder procedure in these surfaces is explicitly version-1 compatibility and remains operational: `/plan-spec`, `plan_spec`, `/implement-spec`, bundle promotion, `create_spec_episode`, `handoff_spec_episode`, folder blocking/archival, and the bookkeeping-only `finalize_spec_episode` close.
+
+Traceability now distinguishes the schemas and their observable behavior. Public task-native admission fails closed on existing non-terminal ownership; only retained version-1 `create_spec_episode` may return its matching Episode. A proven-clean primary task failure before ownership/resource mutation returns the exact task to `In Planning`; recorded, partial, or uncertain mutation publishes `Blocked` with exact recovery evidence. Retained version-1 partial provisioning/allocation persists exact `uncertain` ownership and cannot replay fresh. Task-native terminal review publishes `Ready for Merge`, refreshes the same Episode, verifies the resulting handshake, and waits for explicit operator authority; destructive cleanup remains separately confirmed and closes ownership last.
+
+Independent review found three material truth/test gaps: public replay was overstated, the two recovery models were collapsed, and the first static assertions were loose bag-of-words checks. All three were repaired with schema-bound documentation and clause-level traceability contracts. Final rereview reported no material findings.
+
+Validation passed 31 focused host-safe policy checks with 5 container cases deselected, 229 broad Node checks, 62 curated broad host-safe Python checks with 45 container cases deselected, and `git diff --check`. This documentation/static-test-only slice changes no plugin source or managed asset, so Docker Tier 1 is not required by repository policy.
+
+No lifecycle status, task/bundle, production asset, ownership/resource, or acceptance criterion changed. The separate no-`To Do` guidance migration, proof-reference normalization, production retirement, `.ralph/plans` deletion, and final cutover remain unstarted and unauthorized.
 <!-- SECTION:NOTES:END -->
