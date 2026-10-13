@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 19:05'
+updated_date: '2026-10-13 19:10'
 labels:
   - backlog-md
   - episode-loop
@@ -586,4 +586,12 @@ No lifecycle status, task/bundle, production asset, ownership/resource, or accep
 The operator accepted candidate `d8507d7dd1a5d2d31354aaeecf6c5bffbbba0575` subject to exactly two bounded documentation repairs. First, `docs/future-specification-bundles.md` must not say a task-native Episode edits only bound-task content: it implements approved code, documentation, and tests in its worktree, exclusively owns the bound task's content there, and leaves lifecycle status to the Conversation. Second, `docs/conversation-driven-episode-oversight.md` must not place task-native lifecycle receipts inside strict version-2 ownership: durable ownership stores identity and resource bindings, while `finalize_task_episode` actions return exact lifecycle receipts that the owning Conversation retains for later outcomes and retries. Add focused static assertions for both distinctions.
 
 Revise only those two claims and focused tests, then validate, independently rereview, commit, push, report, and stop. Preserve every other accepted activation-truth, retained version-1 compatibility, replay/recovery, terminal-authority, cleanup, exclusion, task identity/parent/status/acceptance, and no-unrelated-scope boundary. Do not begin no-`To Do` guidance migration, proof normalization, task/bundle migration, production retirement, `.ralph/plans` deletion, or final cutover.
+
+### Completed repair — Episode edit scope and lifecycle-receipt ownership
+
+Repaired the two accepted documentation defects in candidate `d8507d7dd1a5d2d31354aaeecf6c5bffbbba0575`. `docs/future-specification-bundles.md` now states that a task-native Episode implements approved code, documentation, and tests in its isolated worktree, exclusively owns the bound task's content there, and leaves lifecycle status on main to the Conversation. `docs/conversation-driven-episode-oversight.md` now keeps strict ownership to lifecycle state plus durable owner, authority, placement, and resource bindings. Ready, phased-progress, and terminal action receipts are returned by `finalize_task_episode` and retained by the owning Conversation for later authorized outcomes or bounded retries; they are not ownership fields or event-journal entries.
+
+A focused static contract protects every part of both distinctions and rejects the former false claims. Independent read-only rereview reported no material findings. Validation passed 32 focused host-safe policy tests with 5 container cases deselected, 63 curated broad host-safe Python tests with 45 container cases deselected, 218 broad Node tests, and `git diff --check`. This documentation/static-test-only repair changes no plugin source or managed asset, so Docker Tier 1 was not required.
+
+No lifecycle status, task/bundle, production asset, ownership/resource, or acceptance criterion changed. All other task-native-primary, retained version-1 compatibility, replay/recovery, terminal-authority, cleanup, exclusion, task identity/parent/status/acceptance, and no-unrelated-scope behavior remains unchanged. The separate no-`To Do` guidance migration, proof normalization, task/bundle migration, production retirement, `.ralph/plans` deletion, and final cutover remain unstarted and unauthorized.
 <!-- SECTION:NOTES:END -->
