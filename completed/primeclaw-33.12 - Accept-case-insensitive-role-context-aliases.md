@@ -1,10 +1,11 @@
 ---
 id: PRIMECLAW-33.12
 title: Accept case-insensitive role context aliases
-status: In Progress
+status: Done
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:01'
+updated_date: '2026-10-13 00:50'
 labels:
   - prime-agent-plugin
   - simplification
@@ -29,8 +30,14 @@ Committed and pushed b921750 to feature branch and main. Primary main and origin
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Case-insensitive filename variants of one context file are treated as one candidate and do not block apply/check.
-- [ ] #2 Genuine hard-linked distinct context candidates remain rejected before mutation.
-- [ ] #3 The change is narrowly covered by tests and the pinned Prime Agent 0.9.8 Tier 1 gate passes.
-- [ ] #4 User-global apply/check from primary main succeeds without deleting or rewriting unrelated context bytes.
+- [x] #1 Case-insensitive filename variants of one context file are treated as one candidate and do not block apply/check.
+- [x] #2 Genuine hard-linked distinct context candidates remain rejected before mutation.
+- [x] #3 The change is narrowly covered by tests and the pinned Prime Agent 0.9.8 Tier 1 gate passes.
+- [x] #4 User-global apply/check from primary main succeeds without deleting or rewriting unrelated context bytes.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Completed. The case-insensitive role-context alias fix landed on main in b921750. APFS one-link aliases and genuine hard-link rejection are covered; real user-global apply/check passed; a later pinned Prime Agent 0.9.8 Tier 1 gate passed.
+<!-- SECTION:FINAL_SUMMARY:END -->
