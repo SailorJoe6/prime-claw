@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 17:56'
+updated_date: '2026-10-13 18:14'
 labels:
   - backlog-md
   - episode-loop
@@ -47,6 +47,7 @@ modified_files:
   - tests/test_project_conversation_extension.py
   - tests/test_reviewed_plan_extension.py
   - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
+  - tests/project_initialization_extension.test.mjs
 parent_task_id: PRIMECLAW-10
 priority: p1
 type: epic
@@ -543,4 +544,16 @@ No live Episode transition, merge, abandonment, finalization, cleanup, resource 
 The operator accepted pushed checkpoint `afe284cf7ffe7917e5c63221a60c166fde66f126`, including coherent task-native public activation and the supported production cleanup-host adapter. The intervening daemon restart preserved the exact active owner, saved session file, worktree, branch, clean Episode head, and upstream equality.
 
 The next execute pass must take the smallest coherent already-approved prerequisite from ordered plan step 4, **Reconcile managed assets, current documentation, and traceability**. First re-audit what remains after the activation slice, then implement one bounded cutover-preparation dependency. Keep all retained folder commands, tools, workflows, templates, ownership parsing, and existing `.ralph/plans` content operational until the explicitly authorized final migration/cutover. Do not begin plan step 5, migrate tasks or bundles, remove `To Do`, delete `.ralph/plans`, change existing IDs/parents, apply the plugin globally, or perform any live lifecycle or cleanup transition. Preserve operator authority, supported Backlog/Prime Agent/Orca interfaces, Docker-only plugin validation, and the unrelated-scope boundary.
+
+### Implemented cutover preparation — exact managed-asset retirement rehearsal
+
+Re-audited ordered plan step 4 after public activation. Task-native planning and implementation workflows are already managed beside retained folder compatibility. Exactly four project workflow assets remain coupled to that compatibility path: `project-workflow-plan-prep`, `project-workflow-plan-spec`, `project-workflow-implement-prep`, and `project-workflow-implement-spec`. They remain live because production removal now would break retained `/plan-spec` or `/implement-spec` work.
+
+Added an isolated project-initialization rehearsal using a copied future plugin generation with exactly those four inventory rows and source files absent. A real version-1 active ownership record holds all four compatibility workflow bytes, the managed manifest, and retained `.ralph/plans` content unchanged. After releasing the snapshot, the rehearsal proves three unchanged managed compatibility files are pruned; one customized compatibility workflow is preserved and released from manifest ownership; the remaining manifest contains exactly ten task-native/shared managed assets with source-identical bytes; and retained plan bytes stay unchanged. A fresh project under the rehearsed generation receives exactly those ten assets and no `.ralph/plans` tree.
+
+Independent read-only review reported no material findings. Focused validation passed 29 project-initialization Node checks and the reviewer reran the isolated new case successfully. The exact curated broad candidate passed 229 Node checks and 59 host-safe Python checks with 45 container cases deselected, plus `git diff --check`. Source-mode Docker Tier-1 passed with immutable-image, offline-RPC, verified-teardown, and published-manifest evidence at `.test-results/20261013T181209Z-47602-ef7f6389/tier1`.
+
+The parallel step-4 audit also identified the remaining ordered prerequisites without changing them: current architecture/operator/story/traceability documents still need to make the active task-native path primary while labeling folder mechanics as retained version-1 compatibility; then legacy proof references need normalization and a deterministic deletion gate before the pre-cutover SHA is frozen. Those are later bounded slices. This slice does not start them.
+
+No production asset row, source asset, project template, command, tool, workflow, ownership record, task, bundle, status, or `.ralph/plans` content was removed or migrated. No live lifecycle transition, cleanup, plugin activation, final cutover, or acceptance-criterion claim occurred. Final asset retirement remains coupled to explicitly authorized migration/cutover.
 <!-- SECTION:NOTES:END -->
