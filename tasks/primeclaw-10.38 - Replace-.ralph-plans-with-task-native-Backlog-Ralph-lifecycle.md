@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 16:48'
+updated_date: '2026-10-13 17:56'
 labels:
   - backlog-md
   - episode-loop
@@ -537,4 +537,10 @@ Independent architecture and cleanup reviews found material recovery, authority,
 Final evidence: 181 focused Node lifecycle/cleanup tests; 4 focused oversight-policy checks; 228 broad Node tests; 59 host-safe Python checks with 45 container cases deselected; `git diff --check`; source-mode Docker Tier-1 at `.test-results/20261013T164613Z-92027-eedd4a14/tier1` with immutable image, offline RPC probe, verified teardown, and published manifest.
 
 No live Episode transition, merge, abandonment, finalization, cleanup, resource deletion, plugin activation, migration, or cutover occurred. `PRIMECLAW-10.38` remains `In Progress`; live ownership/resources are unchanged. No acceptance criterion is newly claimed: AC #2/#3/#6/#7/#8/#9 still require their retained real-session receipts.
+
+### Accepted next dependency — ordered managed-asset and documentation cutover preparation
+
+The operator accepted pushed checkpoint `afe284cf7ffe7917e5c63221a60c166fde66f126`, including coherent task-native public activation and the supported production cleanup-host adapter. The intervening daemon restart preserved the exact active owner, saved session file, worktree, branch, clean Episode head, and upstream equality.
+
+The next execute pass must take the smallest coherent already-approved prerequisite from ordered plan step 4, **Reconcile managed assets, current documentation, and traceability**. First re-audit what remains after the activation slice, then implement one bounded cutover-preparation dependency. Keep all retained folder commands, tools, workflows, templates, ownership parsing, and existing `.ralph/plans` content operational until the explicitly authorized final migration/cutover. Do not begin plan step 5, migrate tasks or bundles, remove `To Do`, delete `.ralph/plans`, change existing IDs/parents, apply the plugin globally, or perform any live lifecycle or cleanup transition. Preserve operator authority, supported Backlog/Prime Agent/Orca interfaces, Docker-only plugin validation, and the unrelated-scope boundary.
 <!-- SECTION:NOTES:END -->
