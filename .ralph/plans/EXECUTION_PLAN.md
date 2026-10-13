@@ -706,6 +706,15 @@ No actual abandonment, status change, archive, finalization, cleanup, public
 activation, or migration occurred. No acceptance criterion is newly claimed;
 AC #8/#9 still require retained end-to-end and operator-outcome receipts.
 
+The operator accepted checkpoint
+`4588abcd60f78b0ccb40241d296c1003a885642a`, including the complete inactive
+abandonment slice and archive-collision repair. The next bounded execute pass is
+the already-approved inactive task-native finalization/cleanup dependency.
+Preserve public task-native inactivity, require separate explicit operator
+authority for destructive cleanup, retain ownership and all Episode resources
+until authorized terminal work is verified, bind exact task/Episode identity,
+and add no unrelated scope.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and
