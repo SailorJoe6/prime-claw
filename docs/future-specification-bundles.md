@@ -17,8 +17,10 @@ operator review without planning or Episode admission.
 4. Trusted admission commits the exact task as `In Progress`, persists
    version-2 ownership, and creates one isolated Episode from that commit. It
    copies no bundle and creates no `.ralph/plans` promotion commit.
-5. The Episode edits only its bound task content. The Conversation owns status,
-   review, `handoff_task_episode` continuation, and the guarded
+5. The Episode implements approved code, documentation, and tests in its
+   isolated worktree and exclusively owns the bound task's content there. The
+   Conversation exclusively owns lifecycle status on main, review,
+   `handoff_task_episode` continuation, and the guarded
    `finalize_task_episode` actions.
 6. Merge or abandonment requires an explicit operator decision. Destructive
    cleanup requires a separate explicit decision and closes ownership only

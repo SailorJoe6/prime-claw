@@ -923,6 +923,36 @@ and no-unrelated-scope boundary. Do not begin no-`To Do` guidance migration,
 proof normalization, task/bundle migration, production retirement,
 `.ralph/plans` deletion, or final cutover.
 
+#### Slice 12 progress — correct Episode edit scope and lifecycle-receipt
+ownership
+
+Repaired the two accepted documentation defects in candidate
+`d8507d7dd1a5d2d31354aaeecf6c5bffbbba0575`.
+`docs/future-specification-bundles.md` now states that a task-native Episode
+implements approved code, documentation, and tests in its isolated worktree,
+exclusively owns the bound task's content there, and leaves lifecycle status on
+main to the Conversation. `docs/conversation-driven-episode-oversight.md` now
+keeps strict ownership to lifecycle state plus durable owner, authority,
+placement, and resource bindings. Ready, phased-progress, and terminal action
+receipts are returned by `finalize_task_episode` and retained by the owning
+Conversation for later authorized outcomes or bounded retries; they are not
+ownership fields or event-journal entries.
+
+A focused static contract protects every part of both distinctions and rejects
+the former false claims. Independent read-only rereview reported no material
+findings. Validation passed 32 focused host-safe policy tests with 5 container
+cases deselected, 63 curated broad host-safe Python tests with 45 container
+cases deselected, 218 broad Node tests, and `git diff --check`.
+
+This repair changes only the two approved documentation files, one focused
+static test, and durable task/plan evidence. It changes no plugin source or
+managed asset, so Docker Tier 1 is not required. All other task-native-primary,
+retained version-1 compatibility, replay/recovery, terminal-authority, cleanup,
+exclusion, task identity/parent/status/acceptance, and no-unrelated-scope
+behavior remains unchanged. The separate no-`To Do` guidance migration, proof
+normalization, task/bundle migration, production retirement, `.ralph/plans`
+deletion, and final cutover remain unstarted and unauthorized.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

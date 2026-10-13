@@ -74,13 +74,20 @@ schemas are strict and disjoint:
 
 - primary version 2 binds the owner Conversation, canonical Backlog task ID and
   project-relative path, project root, exact task-only `In Progress` `baseRef`,
-  placement, and task-native lifecycle receipts;
+  and placement;
 - retained version-1 compatibility binds the owner Conversation, approved
   future-folder location and slug, and a digest of the exact bundle bytes; and
 - both bind the creation operation and engine, selected Orca setup and routing
   environment when applicable, exact worktree and branch identity, durable
   Episode session ID/file and refreshable route, terminal handles, and lifecycle
   status: `provisioning`, `active`, `uncertain`, or `inactive`.
+
+The strict ownership record persists lifecycle state plus durable owner,
+authority, placement, and resource bindings. It does not store Ready,
+phased-progress, or terminal action receipts. `finalize_task_episode` returns
+those exact receipts to the owning Conversation, which retains them for later
+authorized outcomes or bounded retries. The receipts are request/response
+evidence, not ownership fields or event-journal entries.
 
 The record is written before external mutation. It is updated at genuine
 external boundaries, but it is not an event journal. Active and inactive state

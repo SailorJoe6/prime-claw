@@ -130,3 +130,25 @@ def test_current_docs_lead_with_task_native_and_label_folder_compatibility():
     assert "## Retained version-1 bundle lifecycle" in future
     for surface in ("/plan TASK-ID", "/implement-task TASK-ID", "create_task_episode", "finalize_task_episode"):
         assert surface in current + future
+
+def test_current_docs_distinguish_episode_edit_scope_status_and_action_receipts():
+    future = " ".join(FUTURE_DOC.read_text().split())
+    current = " ".join(DOC.read_text().split())
+
+    assert (
+        "The Episode implements approved code, documentation, and tests in its isolated worktree "
+        "and exclusively owns the bound task's content there. The Conversation exclusively owns "
+        "lifecycle status on main"
+    ) in future
+    assert "The Episode edits only its bound task content" not in future
+
+    assert (
+        "The strict ownership record persists lifecycle state plus durable owner, authority, "
+        "placement, and resource bindings. It does not store Ready, phased-progress, or terminal "
+        "action receipts."
+    ) in current
+    assert (
+        "`finalize_task_episode` returns those exact receipts to the owning Conversation, which "
+        "retains them for later authorized outcomes or bounded retries."
+    ) in current
+    assert "placement, and task-native lifecycle receipts" not in current
