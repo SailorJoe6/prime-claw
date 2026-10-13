@@ -118,9 +118,30 @@ Completed the next bounded increment of slice 1:
   `scripts/test-tier1.sh --probe`, with evidence at
   `.test-results/20261013T062411Z-55643-de31915d/tier1`.
 
-Slice 1 remains open. Public `/plan`/`plan_task`, compatible lifecycle statuses,
-task-native authoring, and `/implement-task` are later increments. No acceptance
-criterion is checked by these foundations alone.
+#### Slice 1 progress — additive task-native planning activation (2026-10-13)
+
+Completed the next bounded increment of slice 1:
+
+- exposed `/plan TASK-ID` and structured `plan_task({"taskId":"TASK-ID"})`
+  while preserving `/plan-spec`, `plan_spec`, and implementation admission;
+- resolved operator input through Backlog, admitted only exact `In Design` or
+  `In Planning`, and passed the canonical returned task ID into both preloaded
+  workflows;
+- reused the compact-first two-message chain without changing native ordinary
+  delivery, tool `steer` delivery, sole `followUp`, or uncertain-send behavior;
+- staged `In Design` and `In Planning` in Backlog configuration while retaining
+  `To Do` as the temporary default and selectable pre-migration state;
+- updated current planning docs, story traceability, command/tool discovery,
+  status matrices, and folder-compatibility regressions; and
+- passed 17 focused Node behavior tests, 29 host-safe checks, independent review
+  with no material findings, and source-mode `scripts/test-tier1.sh --probe`,
+  with final evidence at
+  `.test-results/20261013T063848Z-99892-f5ef0597/tier1`.
+
+Slice 1 remains open. Task-native authoring, retained real-session planning
+mutation evidence, final lifecycle-default migration, and `/implement-task` are
+later increments. No acceptance criterion is checked by these bounded
+foundations alone.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 

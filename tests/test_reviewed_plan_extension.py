@@ -6,6 +6,8 @@ remain host-safe Tier 0.
 import json
 from pathlib import Path
 
+import yaml
+
 REPO = Path(__file__).resolve().parents[1]
 EXTENSION = REPO / "src/prime-agent-plugin/extensions/reviewed-plan.ts"
 EPISODE_EXTENSION = REPO / "src/prime-agent-plugin/extension-support/spec-episode.ts"
@@ -86,7 +88,7 @@ def test_prime_agent_rpc_loads_renamed_commands_and_simplified_tools(tier1_conta
     probe = ctmp / "tool-probe.ts"
     probe.write_text("""import {writeFileSync} from "node:fs";
 const out=process.env.TOOL_SNAPSHOT;
-export default function probe(pi){pi.on("session_start",()=>{const names=pi.getAllTools().map(t=>t.name).sort();writeFileSync(out,JSON.stringify(names));if(names.includes("plan_spec")&&names.includes("create_spec_episode")&&names.includes("handoff_spec_episode")&&names.includes("finalize_spec_episode")&&!names.includes("ralph_plan")&&!names.includes("prime_claw_activate_conversation_guide")&&!names.includes("prime_claw_conversation_guide_status")){pi.registerCommand("probe-reviewed-plan-tools",{description:"proof",handler:async()=>{}})}})}""")
+export default function probe(pi){pi.on("session_start",()=>{const names=pi.getAllTools().map(t=>t.name).sort();writeFileSync(out,JSON.stringify(names));if(names.includes("plan_spec")&&names.includes("plan_task")&&names.includes("create_spec_episode")&&names.includes("handoff_spec_episode")&&names.includes("finalize_spec_episode")&&!names.includes("ralph_plan")&&!names.includes("prime_claw_activate_conversation_guide")&&!names.includes("prime_claw_conversation_guide_status")){pi.registerCommand("probe-reviewed-plan-tools",{description:"proof",handler:async()=>{}})}})}""")
     snapshot = ctmp / "tools.json"
     result = tier1_container.run(
         "/workspace/scripts/run-prime-agent-probe.sh", tier1_container.prime_agent, "--mode", "rpc", "--offline", "--no-session", "--no-skills",
@@ -98,14 +100,22 @@ export default function probe(pi){pi.on("session_start",()=>{const names=pi.getA
     response = json.loads(result.stdout.strip().splitlines()[-1])
     assert response["success"] is True
     commands = response["data"]["commands"]
-    for name in ("plan-spec", "implement-spec"):
+    for name in ("plan-spec", "plan", "implement-spec"):
         matches = [command for command in commands if command["name"] == name]
         assert len(matches) == 1
         assert matches[0]["sourceInfo"]["path"] == WS_EXTENSION
     assert [command["name"] for command in commands].count("probe-reviewed-plan-tools") == 1
     tools = json.loads(snapshot.read_text())
-    for name in ("plan_spec", "create_spec_episode", "handoff_spec_episode", "finalize_spec_episode"):
+    for name in ("plan_spec", "plan_task", "create_spec_episode", "handoff_spec_episode", "finalize_spec_episode"):
         assert name in tools
+
+
+def test_task_planning_statuses_are_staged_without_retiring_to_do_early() -> None:
+    config = yaml.safe_load((REPO / "backlog/config.yml").read_text())
+    assert config["default_status"] == "To Do"
+    assert config["statuses"] == [
+        "To Do", "In Design", "In Planning", "In Progress", "Blocked", "Done",
+    ]
 
 
 def test_compact_first_workflows_and_normal_guide_load_are_explicit() -> None:
@@ -115,7 +125,8 @@ def test_compact_first_workflows_and_normal_guide_load_are_explicit() -> None:
     implement = (REPO / "src/prime-agent-plugin/workflows/implement-spec.md").read_text()
     assert 'command: "plan-spec"' in extension
     assert 'name: "plan_spec"' in extension
-    assert 'command: "plan"' not in extension
+    assert 'pi.registerCommand("plan"' in extension
+    assert 'name: "plan_task"' in extension
     assert 'name: "ralph_plan"' not in extension
     assert "compact.run(focus_hint)" in plan_prep
     assert "compact.run(focus_hint)" in implement_prep

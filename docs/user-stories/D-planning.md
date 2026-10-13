@@ -2,17 +2,25 @@
 
 ## US-11 — Plan one exact reviewed specification
 
-**As an operator, I want one exact future specification converted into an
-execution plan, so that I can review implementation slices before authorizing
-implementation.**
+**As an operator, I want one exact reviewed specification converted into an
+implementation plan, so that I can review implementation slices before
+authorizing implementation.**
 
-`/plan-spec .ralph/plans/future/<slug>` and `plan_spec(location=...)`:
+`/plan TASK-ID` and `plan_task(taskId=...)`:
 
-1. validate the exact operator-selected folder;
-2. load the canonical planning preparation and planning workflows;
-3. request focused compaction on a best-effort basis;
-4. produce `EXECUTION_PLAN.md` beside the specification;
-5. stop for operator review.
+1. resolve the exact operator-selected task through Backlog's structured CLI;
+2. admit only a task in `In Design` or `In Planning`;
+3. load the canonical task-planning preparation and planning workflows;
+4. request focused compaction on a best-effort basis;
+5. write a meaningful native Implementation Plan and leave the task in
+   `In Planning`; and
+6. commit only that exact task path, attempt a prompt push, and stop for
+   operator review.
+
+During the bounded migration, `/plan-spec .ralph/plans/future/<slug>` and
+`plan_spec(location=...)` retain the established folder workflow. They validate
+one exact folder, produce `EXECUTION_PLAN.md` beside the specification, and stop
+for the same separate operator review.
 
 The plan is concise and actionable at the level of detail the work needs. It
 records relevant implementation steps or slices, tests, documentation,
@@ -25,16 +33,19 @@ or speculative hardening.
 approval, so that planning cannot accidentally create branches, worktrees,
 sessions, or active work.**
 
-The plugin does not search for, infer, or invent the selected future folder.
-An inadequate specification produces actionable deficiencies rather than a
-partial plan.
+The plugin does not search for, infer, or invent the selected task or retained
+future folder. An inadequate specification produces actionable deficiencies
+rather than a partial plan. Planning does not create Episode resources or grant
+implementation approval.
 
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/extensions/reviewed-plan.ts`
 - `src/prime-agent-plugin/extension-support/prep-chain.ts`
-- `src/prime-agent-plugin/workflows/plan-prep.md`
-- `src/prime-agent-plugin/workflows/plan-spec.md`
+- `src/prime-agent-plugin/workflows/plan-task-prep.md`
+- `src/prime-agent-plugin/workflows/plan-task.md`
+- `src/prime-agent-plugin/workflows/plan-prep.md` (migration compatibility)
+- `src/prime-agent-plugin/workflows/plan-spec.md` (migration compatibility)
 
 ## Design references
 

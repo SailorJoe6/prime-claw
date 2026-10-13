@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 06:26'
+updated_date: '2026-10-13 06:40'
 labels:
   - backlog-md
   - episode-loop
@@ -183,4 +183,21 @@ Evidence:
 - Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T062411Z-55643-de31915d/tier1`.
 
 This slice does not complete an acceptance criterion. Public planning activation, lifecycle status migration, task-native authoring, `/implement-task`, ownership, and legacy bundle migration remain.
+
+## 2026-10-13 — additive task-native planning activation
+
+Activated `/plan TASK-ID` and `plan_task({"taskId":"TASK-ID"})` as additive task-native planning surfaces. Native admission resolves the exact operator input through Backlog's supported JSON view, accepts only `In Design` or `In Planning`, and passes the canonical returned ID into both preloaded project workflows. The shared compact-first chain preserves ordinary delivery for the command, `steer` for the tool, one sole `followUp`, preloading before either send, and explicit uncertainty after a failed second send. The semantic workflow independently reloads and rechecks identity/status before any task mutation.
+
+Staged `In Design` and `In Planning` in `backlog/config.yml` while retaining `To Do` as both the temporary default and a selectable migration state. `/plan-spec`, `plan_spec`, `/implement-spec`, and all current folder-Episode mechanics remain live and unchanged. This slice does not add `/implement-task`, change ordinary task creation, migrate tasks, or claim real-session semantic mutation acceptance.
+
+Updated planning/backlog/prep-chain docs, US-11/US-12 traceability, native RPC/tool discovery, command provenance checks, full disallowed-status behavior, canonical-ID binding, missing-workflow atomicity, and transitional config coverage. Independent review found no material defects.
+
+Evidence:
+- `node --experimental-strip-types --test tests/reviewed_plan_extension.test.mjs` — 17 passed.
+- `python3 -m pytest tests/test_reviewed_plan_extension.py tests/test_future_plan_skills.py tests/test_tier1_driver.py -q -m "not container"` — 29 passed, 5 deselected.
+- `deps/backlog/dist/backlog task view PRIMECLAW-10.38 --json` — passed against the transitional config.
+- `git diff --check` — passed.
+- Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC command/tool discovery, teardown, and manifest publication verified. Evidence: `.test-results/20261013T063848Z-99892-f5ef0597/tier1`.
+
+Slice 1 remains open. Task-native authoring, retained real-session planning mutation evidence, final lifecycle-default migration, `/implement-task`, ownership conversion, and legacy bundle migration remain.
 <!-- SECTION:NOTES:END -->

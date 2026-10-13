@@ -9,7 +9,9 @@ import {
 } from "../extension-support/spec-episode.ts";
 import {
   admitPrepChain,
+  admitTaskPrepChain,
   type PrepChainWorkflow,
+  type TaskPrepChainWorkflow,
 } from "../extension-support/prep-chain.ts";
 import {
   assertConversationPromotionReady,
@@ -17,7 +19,10 @@ import {
   registerConversationOversight,
 } from "../extension-support/conversation-oversight.ts";
 import { closeEpisodeOwnership } from "../extension-support/episode-close.ts";
-import { validateFutureLocation } from "../extension-support/reviewed-plan-support.ts";
+import {
+  resolveBacklogTask,
+  validateFutureLocation,
+} from "../extension-support/reviewed-plan-support.ts";
 
 /**
  * Native reviewed planning and implementation-promotion boundaries.
@@ -28,6 +33,7 @@ import { validateFutureLocation } from "../extension-support/reviewed-plan-suppo
  */
 
 const PLAN_USAGE = "Usage: /plan-spec .ralph/plans/future/<slug>";
+const PLAN_TASK_USAGE = "Usage: /plan TASK-ID";
 const IMPLEMENT_USAGE = "Usage: /implement-spec .ralph/plans/future/<slug> [--host id:<project-host-setup-id>]";
 
 const PLAN_PREP_WORKFLOW: PrepChainWorkflow = {
@@ -35,6 +41,13 @@ const PLAN_PREP_WORKFLOW: PrepChainWorkflow = {
   prepSkillName: "plan-prep",
   phaseSkillName: "plan-spec",
   locationTag: "operator-plan-location",
+};
+const PLAN_TASK_PREP_WORKFLOW: TaskPrepChainWorkflow = {
+  usage: PLAN_TASK_USAGE,
+  prepSkillName: "plan-task-prep",
+  phaseSkillName: "plan-task",
+  locationTag: "operator-plan-task-id",
+  allowedStatuses: ["In Design", "In Planning"],
 };
 const IMPLEMENT_PREP_WORKFLOW: PrepChainWorkflow = {
   usage: IMPLEMENT_USAGE,
@@ -106,6 +119,7 @@ function registerPrepChainCommand(
 type ReviewedPlanDependencies = EpisodeDependencies & {
   createEpisode?: typeof createSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
+  taskResolver?: typeof resolveBacklogTask;
 };
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
@@ -117,6 +131,20 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       command: "plan-spec",
       description: "Plan a reviewed specification from an explicit .ralph/plans/future/<slug> folder",
       workflow: PLAN_PREP_WORKFLOW,
+    });
+    pi.registerCommand("plan", {
+      description: "Plan one exact reviewed Backlog task in In Design or In Planning",
+      handler: async (args, ctx) => {
+        const result = await admitTaskPrepChain(
+          pi,
+          ctx,
+          args,
+          PLAN_TASK_PREP_WORKFLOW,
+          "native",
+          dependencies?.taskResolver,
+        );
+        if (!result.ok) ctx.ui.notify(result.message, result.level);
+      },
     });
     registerPrepChainCommand(pi, {
       command: "implement-spec",
@@ -185,6 +213,55 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             text: `Planning admitted for ${result.location}: canonical plan-prep was steered and canonical plan was queued as the sole follow-up. Planning has not completed, and implementation is not authorized.`,
           }],
           details: { admitted: true, location: result.location },
+        };
+      },
+    });
+
+    pi.registerTool({
+      name: "plan_task",
+      label: "Plan reviewed Backlog task",
+      description: "Queue the canonical task-native planning workflow for one exact Backlog task in In Design or In Planning. This creates or revises a plan only and never authorizes implementation.",
+      promptSnippet: "Queue canonical planning for one exact reviewed Backlog task",
+      promptGuidelines: [
+        "Call plan_task only when the operator clearly asks to plan one exact Backlog task ID.",
+        "Before calling plan_task, ask the operator if the task ID is missing or materially ambiguous; never search for, select, or invent a task.",
+        "plan_task accepts only In Design or In Planning and never authorizes implementation or creates Episode resources.",
+        "Treat plan_task as a terminal routing action: after successful admission, do not continue planning in the current turn.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: {
+            type: "string",
+            description: "Exact Backlog task ID selected by the operator",
+          },
+        },
+        required: ["taskId"],
+        additionalProperties: false,
+      } as any,
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        const result = await admitTaskPrepChain(
+          pi,
+          ctx,
+          params.taskId,
+          PLAN_TASK_PREP_WORKFLOW,
+          "tool",
+          dependencies?.taskResolver,
+        );
+        if (!result.ok) {
+          return {
+            content: [{ type: "text", text: result.message }],
+            details: { admitted: false, error: result.message },
+            isError: true,
+          };
+        }
+        return {
+          content: [{
+            type: "text",
+            text: `Planning admitted for ${result.taskId}: canonical plan-task-prep was steered and canonical plan-task was queued as the sole follow-up. Planning has not completed, and implementation is not authorized.`,
+          }],
+          details: { admitted: true, taskId: result.taskId },
         };
       },
     });

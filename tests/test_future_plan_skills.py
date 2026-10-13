@@ -265,7 +265,7 @@ def test_phase_transition_docs_route_plugin_execution_to_docker_tier1() -> None:
         assert "node --experimental-strip-types --test" not in docs
 
 
-def test_task_native_planning_workflows_are_staged_but_not_exposed() -> None:
+def test_task_native_planning_workflows_are_exposed_without_removing_folder_compatibility() -> None:
     prep = " ".join(workflow("plan-task-prep").read_text().split())
     plan = " ".join(workflow("plan-task").read_text().split())
 
@@ -320,5 +320,9 @@ def test_task_native_planning_workflows_are_staged_but_not_exposed() -> None:
     extension = (
         ROOT / "src" / "prime-agent-plugin" / "extensions" / "reviewed-plan.ts"
     ).read_text()
-    assert "plan-task-prep" not in extension
-    assert '"plan-task"' not in extension
+    assert 'prepSkillName: "plan-task-prep"' in extension
+    assert 'phaseSkillName: "plan-task"' in extension
+    assert 'pi.registerCommand("plan"' in extension
+    assert 'name: "plan_task"' in extension
+    assert 'command: "plan-spec"' in extension
+    assert 'name: "plan_spec"' in extension

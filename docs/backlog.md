@@ -66,15 +66,20 @@ contained regular file. It does not read or parse task Markdown and does not
 introduce a second task model. The `--` boundary lets Backlog own supported task
 ID normalization without allowing an ID to become a command option.
 
-This seam is foundational only. The plugin also ships inert, project-customizable
-`plan-task-prep` and `plan-task` workflow assets that define the future
-compact-first task planning policy. They resolve the exact task through the
-structured CLI, admit only `In Design` or `In Planning`, write a meaningful
-native Implementation Plan, make an exact task-only commit, and treat push
-failure as transport evidence. They are deliberately not loaded by a public
-command yet. Public task-native planning is activated in a later slice together
-with compatible lifecycle statuses; the existing folder command and workflows
-remain unchanged until that coherent activation.
+The `/plan TASK-ID` command and `plan_task({"taskId":"TASK-ID"})` tool use
+this seam to admit one exact task only when its current status is `In Design` or
+`In Planning`. They preload the project-customizable `plan-task-prep` and
+`plan-task` workflows, request focused compaction on a best-effort basis, queue
+the semantic planning turn as the sole follow-up, and stop without authorizing
+implementation. The semantic workflow writes a meaningful native Implementation
+Plan, changes or retains `In Planning`, commits only the exact returned task
+path, and treats push failure as transport evidence.
+
+The compatible statuses are staged in `backlog/config.yml`. `To Do` remains the
+temporary default and remains selectable until the one-time task migration can
+truthfully classify every existing item. The existing `/plan-spec` and
+`plan_spec` folder surface remains available during that bounded migration;
+this activation does not change implementation admission.
 
 ## Project task workflow
 
