@@ -255,7 +255,30 @@ task digest, hierarchy, and status to remain exact. Only
 `resumeTaskEpisodeChangesRequested` then invokes canonical task handoff. These
 phases preserve the successful status publication across a retryable integration
 failure without a journal, duplicate status transition, new admission, or new
-resource. Public task-native admission, lifecycle, integration, and handoff
+resource.
+
+The inactive terminal merge seam accepts only an explicit operator Merge
+decision bound to the still-current exact task, canonical-main head, and pushed
+refreshed candidate. It re-runs the review verification, requires the whole
+canonical main checkout clean and its upstream exact, requires the candidate to
+remain pushed with the reviewed two-parent ancestry, and performs only an exact
+fast-forward. It never forces, rebases, or creates a substitute merge. A replay
+accepts only the original verified main with `Ready for Merge`, the exact
+candidate with `Ready for Merge`, that candidate plus only the exact dirty or
+staged task already at `Done`, or one exact task-only `Done` child. It can finish
+the one-path commit, verification, or transport without a second fast-forward
+or lifecycle mutation and rejects every other intermediate state. Candidate
+preflight also re-proves that the exact Ready publication commit remains in the
+verified main history. After main reaches
+the candidate, Backlog immediately changes only the exact task to `Done`; the
+resulting one-path commit must directly parent the candidate and preserve the
+supported content digest, path, parent identity, and merged code. A successful
+local `Done` commit remains authoritative. Push failure, upstream lookup error,
+or an observed remote mismatch is returned as best-effort transport evidence
+rather than invalidating that local result. Final verification leaves active
+ownership and the idle Episode branch, worktree, durable session, and resources
+unchanged for a separately authorized finalization or cleanup decision. Public
+task-native admission, lifecycle, integration, handoff, merge, and finalization
 remain inactive.
 
 Later routing refreshes `activeSessionId` from the durable Episode session

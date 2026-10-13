@@ -36,6 +36,20 @@ canonical task handoff. A failed integration can retry from its already-returned
 publication without repeating the status transition, admission, allocation, or
 assignment.
 
+If the operator explicitly chooses Merge, the decision must name that exact
+verified task, current main, and pushed refreshed candidate. The inactive seam
+requires clean canonical main and exact upstream state, fast-forwards only to
+the reviewed candidate, then immediately changes only the task to `Done` through
+Backlog and creates a direct one-path commit. A retry accepts only the exact
+pre-merge head, candidate, candidate plus its sole dirty/staged `Done` task, or
+one-task `Done` child. It can finish the commit without repeating a successful
+fast-forward or lifecycle mutation. It re-proves the Ready publication commit in
+main history and verifies candidate ancestry, merged code, content digest, path,
+parent identity, and status. A successful local
+`Done` commit remains authoritative when push or remote verification fails.
+Ownership and the idle Episode resources remain active for separate finalization
+or cleanup.
+
 Product, scope, merge, abandonment, remote transport, and destructive cleanup
 remain operator decisions.
 

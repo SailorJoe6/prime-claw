@@ -49,6 +49,11 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Request Changes** only after the operator explicitly chooses it",
         "Publish exact-task-only `In Progress`",
         "Retry failed integration from its returned publication",
+        "Apply **Merge** only when the operator explicitly authorizes the exact verified",
+        "Fast-forward only to that candidate; never force",
+        "Immediately publish `Done` through Backlog",
+        "local `Done` commit is authoritative",
+        "Keep active ownership",
     ]:
         assert phrase in text
     assert "Bead chronology" not in raw

@@ -53,6 +53,14 @@ candidate. Only then use canonical task handoff with accepted in-scope focus.
 Retry failed integration from its returned publication; never repeat status,
 admit another Episode, or hand off an unverified candidate.
 
+Apply **Merge** only when the operator explicitly authorizes the exact verified
+task, main, and candidate. Require clean main and exact upstreams. Fast-forward only to that candidate; never force or rebase. On retry,
+accept only prior main, candidate, its exact dirty `Done` task, or one-task child.
+Immediately publish `Done` through Backlog and commit only the task. The local
+`Done` commit is authoritative; return transport failure.
+Verify code, content, path, parent, and status. Keep active ownership and Episode
+resources for separate finalization or cleanup.
+
 When required, use `prime-claw-expert-review`. Treat every review conclusion as
 evidence. A finding blocks only for a concrete material defect against the
 operator-approved product contract. Speculative hardening, alternative

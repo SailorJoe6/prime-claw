@@ -50,7 +50,12 @@ and pushes a refreshed candidate for Conversation verification. If the operator
 then requests changes, the Conversation alone reverses main to `In Progress`;
 the same Episode receives that status only through constrained integration and
 is resumed only after the new pushed candidate verifies. Delay does not wake or
-change the Episode.
+change the Episode. If the operator instead authorizes the exact verified merge,
+the Conversation fast-forwards clean canonical main only to that pushed
+candidate, immediately publishes only the exact task as `Done`, and verifies
+merged code plus task content, path, parent, and status. The Episode does not
+perform this merge or status change. Its ownership and all idle resources remain
+until separate finalization or cleanup authority.
 
 Retained folder mode continues to move blocked plan documents, update related
 Backlog.md tasks, and archive completed plan bundles until final cutover.

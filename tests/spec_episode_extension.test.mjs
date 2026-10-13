@@ -12,6 +12,7 @@ import {
   handoffTaskEpisode, publishTaskEpisodeBlocked, publishTaskEpisodeResumed,
   publishTaskEpisodeReadyForMerge, integrateTaskEpisodeReadyForMerge,
   verifyTaskEpisodeReadyForMerge, delayTaskEpisodeReadyForMerge,
+  mergeTaskEpisodeReadyForMerge,
   publishTaskEpisodeChangesRequested, integrateTaskEpisodeChangesRequested,
   verifyTaskEpisodeChangesRequested, resumeTaskEpisodeChangesRequested,
   resolveBlockedWorkflowAuthority, resolveTaskReviewSnapshot,
@@ -334,12 +335,26 @@ test("task-native handoff continues the exact idle Episode with task-bound hando
 
 function taskLifecycleHarness(options = {}) {
   const f = harness({ list: (_count, session) => [session] });
-  f.ownership.write(f.root, activeTaskRecord(f));
+  f.ownership.write(f.root, activeTaskRecord(f, options.orcaEngine ? {
+    engine: "orca",
+    worktreeId: f.wt.id,
+    worktreeIdentity: f.wt.identity,
+    projectSetupId: f.wt.projectSetupId,
+  } : {}));
   f.calls.length = 0;
   let mainStatus = options.mainStatus ?? "In Progress";
   let episodeStatus = options.episodeStatus ?? "In Progress";
   let mainHead = "1".repeat(40);
+  let mainUpstream = mainHead;
   let pushCount = 0;
+  let fastForwardFailed = false;
+  let doneSnapshotFailed = false;
+  let doneEditFailed = false;
+  let doneMutationInterrupted = false;
+  let doneCommitInterrupted = false;
+  let mainChanges = [];
+  let mainCommitCount = 0;
+  let publicationAncestor = options.publicationAncestor ?? true;
   let episodeHead = options.episodeHead ?? "b".repeat(40);
   let episodeUpstream = options.upstreamHead ?? episodeHead;
   const acceptedEpisodeHead = episodeHead;
@@ -350,8 +365,20 @@ function taskLifecycleHarness(options = {}) {
         const statusIndex = args.indexOf("--status");
         assert.notEqual(statusIndex, -1);
         const nextStatus = args[statusIndex + 1];
+        if (runOptions.cwd !== f.worktree && nextStatus === "Done"
+          && options.doneEditFailsOnce && !doneEditFailed) {
+          doneEditFailed = true;
+          throw new Error("Done edit interrupted");
+        }
         if (runOptions.cwd === f.worktree) episodeStatus = nextStatus;
-        else mainStatus = nextStatus;
+        else {
+          mainStatus = nextStatus;
+          mainChanges = [{ status: " M", path: "backlog/tasks/primeclaw-10.38.md" }];
+          if (nextStatus === "Done" && options.interruptAfterDoneMutationOnce && !doneMutationInterrupted) {
+            doneMutationInterrupted = true;
+            throw new Error("interrupted after Done mutation");
+          }
+        }
         f.calls.push(["backlog-status", nextStatus, runOptions.cwd]);
         return { stdout: "", stderr: "", status: 0 };
       }
@@ -364,15 +391,30 @@ function taskLifecycleHarness(options = {}) {
       }
     },
   };
+  f.git.assertCleanWorktree = (cwd) => {
+    f.calls.push(["clean", cwd]);
+    if (cwd === f.root && (options.mainDirty || mainChanges.length > 0)) throw new Error("canonical main is dirty");
+  };
   const lifecycleGit = {
     repositoryRoot: () => f.root,
     branch: () => options.branch ?? "main",
     head: (cwd) => cwd === f.worktree ? episodeHead : mainHead,
     commitPaths: () => options.commitPaths ?? ["backlog/tasks/primeclaw-10.38.md"],
-    pathStatus: (cwd) => cwd === f.root ? (options.mainPathStatus ?? "") : (options.episodePathStatus ?? ""),
+    pathStatus: (cwd) => cwd === f.root
+      ? (options.mainPathStatus ?? (mainChanges.length > 0 ? `${mainChanges[0].status} ${mainChanges[0].path}` : ""))
+      : (options.episodePathStatus ?? ""),
     commitOnlyPath(_repo, path, message) {
       f.calls.push(["status-commit", path, message]);
+      if (options.interruptAfterDoneStageOnce && mainStatus === "Done" && !doneCommitInterrupted) {
+        doneCommitInterrupted = true;
+        mainChanges = [{ status: "M ", path }];
+        throw new Error("interrupted after Done staging");
+      }
+      const previousMainHead = mainHead;
       mainHead = mainHead === "1".repeat(40) ? "2".repeat(40) : "3".repeat(40);
+      mergeParents.set(mainHead, [previousMainHead]);
+      mainChanges = [];
+      mainCommitCount += 1;
       return mainHead;
     },
     push(cwd) {
@@ -384,10 +426,24 @@ function taskLifecycleHarness(options = {}) {
         throw new Error("episode push offline");
       }
       if (cwd === f.worktree) episodeUpstream = episodeHead;
+      else {
+        if (options.finalPushFails && mainStatus === "Done") throw new Error("main push offline");
+        mainUpstream = options.upstreamMismatchAfterDone && mainStatus === "Done"
+          ? "8".repeat(40) : mainHead;
+      }
     },
-    upstreamHead: () => episodeUpstream,
+    upstreamHead: (cwd) => {
+      if (cwd !== f.worktree && options.upstreamLookupFailsAfterDone && mainStatus === "Done") {
+        throw new Error("upstream unavailable");
+      }
+      return cwd === f.worktree ? episodeUpstream : mainUpstream;
+    },
     pathChangedBetween: () => options.pathChanged ?? true,
-    isAncestor: () => options.isAncestor ?? true,
+    isAncestor: (_repo, ancestor, descendant) => {
+      if (!publicationAncestor
+        && ancestor === "2".repeat(40) && descendant === "2".repeat(40)) return false;
+      return options.isAncestor ?? true;
+    },
     mergeMain(worktree, mergedMain, taskPath) { f.calls.push(["merge-main", worktree, mergedMain, taskPath]); if (options.mergeError) throw options.mergeError; },
     restoreTaskFromHead(worktree, taskPath) { f.calls.push(["restore-task", worktree, taskPath]); },
     stagePath(worktree, taskPath) { f.calls.push(["stage-task", worktree, taskPath]); },
@@ -401,21 +457,47 @@ function taskLifecycleHarness(options = {}) {
     },
     abortMerge(worktree) { f.calls.push(["merge-abort", worktree]); },
     parents(_cwd, ref) { return options.parents ?? mergeParents.get(ref) ?? []; },
+    fastForward(repo, candidateHead) {
+      f.calls.push(["fast-forward", repo, candidateHead]);
+      if (options.fastForwardError) throw options.fastForwardError;
+      mainHead = candidateHead;
+      if (options.failFastForwardAfterMutationOnce && !fastForwardFailed) {
+        fastForwardFailed = true;
+        throw new Error("interrupted after fast-forward");
+      }
+    },
+    worktreeChanges(cwd) {
+      if (cwd === f.root && options.mainDirty) return [{ status: "??", path: "unrelated.txt" }];
+      return cwd === f.root ? structuredClone(mainChanges) : [];
+    },
   };
   const taskResolver = (cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? mainStatus : episodeStatus });
-  const taskSnapshotResolver = (cwd) => ({
-    taskId: "PRIMECLAW-10.38",
-    taskPath: "backlog/tasks/primeclaw-10.38.md",
-    parentTaskId: options.parentTaskId ?? "PRIMECLAW-10",
-    status: cwd === f.root ? mainStatus : episodeStatus,
-    implementationPlan: "Implement one bounded lifecycle slice.",
-    contentDigest: options.contentDigest ?? "d".repeat(64),
-  });
+  const taskSnapshotResolver = (cwd) => {
+    if (cwd === f.root && mainStatus === "Done" && options.failDoneSnapshotOnce && !doneSnapshotFailed) {
+      doneSnapshotFailed = true;
+      throw new Error("interrupted after Done commit");
+    }
+    return {
+      taskId: "PRIMECLAW-10.38",
+      taskPath: "backlog/tasks/primeclaw-10.38.md",
+      parentTaskId: options.parentTaskId ?? "PRIMECLAW-10",
+      status: cwd === f.root ? mainStatus : episodeStatus,
+      implementationPlan: "Implement one bounded lifecycle slice.",
+      contentDigest: options.contentDigest ?? "d".repeat(64),
+    };
+  };
   return {
     f, get episodeHead() { return episodeHead; }, acceptedEpisodeHead, lifecycleGit, runner, taskResolver, taskSnapshotResolver,
-    deps: { ...f.deps, lifecycleGit, reviewGit: lifecycleGit, lifecycleRunner: runner, taskResolver, taskSnapshotResolver },
+    deps: { ...f.deps, lifecycleGit, reviewGit: lifecycleGit, mergeGit: lifecycleGit, lifecycleRunner: runner, taskResolver, taskSnapshotResolver },
     get mainStatus() { return mainStatus; }, get episodeStatus() { return episodeStatus; }, get mainHead() { return mainHead; },
+    get mainCommitCount() { return mainCommitCount; },
     advanceMain() { mainHead = "4".repeat(40); },
+    divergeMainUpstream() { mainUpstream = "9".repeat(40); },
+    setEpisodeUpstream(value) { episodeUpstream = value; },
+    setParents(ref, parents) { mergeParents.set(ref, parents); },
+    addMainChange(change) { mainChanges.push(change); },
+    setMainStatus(value) { mainStatus = value; },
+    setPublicationAncestor(value) { publicationAncestor = value; },
   };
 }
 
@@ -552,6 +634,284 @@ test("Delay preserves the exact verified Ready-for-Merge state without transport
     before,
   );
   assert.equal(h.f.calls.filter((call) => call[0] === "ownership").length, 0);
+});
+
+test("explicit Merge fast-forwards exact candidate, publishes only task Done, and retains Episode resources", async () => {
+  const h = taskLifecycleHarness({ orcaEngine: true });
+  const evidence = await completeReadyHandshake(h);
+  const ownershipBefore = structuredClone(h.f.record);
+  const result = await mergeTaskEpisodeReadyForMerge(
+    evidence, h.f.ctx, h.deps,
+    {
+      operatorDecision: "merge",
+      taskId: evidence.verification.taskId,
+      mainHead: evidence.verification.mainHead,
+      refreshedEpisodeHead: evidence.verification.refreshedEpisodeHead,
+    },
+  );
+  assert.deepEqual(result, {
+    verified: true,
+    outcome: "merged",
+    taskId: "PRIMECLAW-10.38",
+    status: "Done",
+    priorMainHead: evidence.verification.mainHead,
+    mergedHead: evidence.verification.refreshedEpisodeHead,
+    doneCommit: "3".repeat(40),
+    parentTaskId: "PRIMECLAW-10",
+    episodeTaskContentDigest: "d".repeat(64),
+  });
+  assert.equal(h.mainStatus, "Done");
+  assert.equal(h.episodeStatus, "Ready for Merge");
+  assert.equal(h.mainHead, result.doneCommit);
+  assert.deepEqual(h.f.record, ownershipBefore);
+  assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
+  assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
+  assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 0);
+  assert.equal(h.f.calls.filter((call) => call[0] === "ownership").length, 0);
+  assert.equal(h.f.calls.some((call) => ["fresh", "execute", "promote", "local-create", "orca-create", "auto-remove"].includes(call[0])), false);
+  const sessions = await h.f.publisher.list();
+  const session = sessions.find((entry) => entry.sessionId === ownershipBefore.episodeId);
+  assert.equal(session.cwd, ownershipBefore.worktree);
+  const orcaWorktree = await h.f.orca.showWorktree(ownershipBefore.worktreeId);
+  assert.equal(orcaWorktree.identity, ownershipBefore.worktreeIdentity);
+  assert.equal(orcaWorktree.path, ownershipBefore.worktree);
+});
+
+test("successful local Done remains authoritative when its final push fails", async () => {
+  const h = taskLifecycleHarness({ finalPushFails: true });
+  const evidence = await completeReadyHandshake(h);
+  const result = await mergeTaskEpisodeReadyForMerge(
+    evidence, h.f.ctx, h.deps,
+    {
+      operatorDecision: "merge",
+      taskId: evidence.verification.taskId,
+      mainHead: evidence.verification.mainHead,
+      refreshedEpisodeHead: evidence.verification.refreshedEpisodeHead,
+    },
+  );
+  assert.equal(result.status, "Done");
+  assert.equal(h.mainStatus, "Done");
+  assert.equal(h.mainHead, result.doneCommit);
+  assert.match(result.pushError, /main push offline/);
+});
+
+test("Merge recovery resumes exact partial states without duplicate mutation", async (t) => {
+  const decisionFor = (evidence) => ({
+    operatorDecision: "merge",
+    taskId: evidence.verification.taskId,
+    mainHead: evidence.verification.mainHead,
+    refreshedEpisodeHead: evidence.verification.refreshedEpisodeHead,
+  });
+  await t.test("interruption immediately after fast-forward resumes at Done", async () => {
+    const h = taskLifecycleHarness({ failFastForwardAfterMutationOnce: true });
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /interrupted after fast-forward/,
+    );
+    const result = await mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence));
+    assert.equal(result.status, "Done");
+    assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
+  });
+  await t.test("interruption before Done edit resumes from exact candidate", async () => {
+    const h = taskLifecycleHarness({ doneEditFailsOnce: true });
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /Done edit interrupted/,
+    );
+    const result = await mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence));
+    assert.equal(result.status, "Done");
+    assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
+  });
+  await t.test("interruption after Done mutation commits the exact dirty task once", async () => {
+    const h = taskLifecycleHarness({ interruptAfterDoneMutationOnce: true });
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /interrupted after Done mutation/,
+    );
+    const result = await mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence));
+    assert.equal(result.status, "Done");
+    assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
+    assert.equal(h.mainCommitCount, 2);
+  });
+  await t.test("interruption after Done staging commits the exact staged task once", async () => {
+    const h = taskLifecycleHarness({ interruptAfterDoneStageOnce: true });
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /interrupted after Done staging/,
+    );
+    const result = await mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence));
+    assert.equal(result.status, "Done");
+    assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
+    assert.equal(h.mainCommitCount, 2);
+  });
+  await t.test("dirty Done recovery rejects an extra changed path", async () => {
+    const h = taskLifecycleHarness({ interruptAfterDoneMutationOnce: true });
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /interrupted after Done mutation/,
+    );
+    h.addMainChange({ status: "??", path: "unrelated.txt" });
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /rejects canonical-main changes outside the exact modified task/,
+    );
+    assert.equal(h.mainCommitCount, 1);
+  });
+  await t.test("dirty recovery rejects a non-Done task", async () => {
+    const h = taskLifecycleHarness({ interruptAfterDoneMutationOnce: true });
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /interrupted after Done mutation/,
+    );
+    h.setMainStatus("Ready for Merge");
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /Dirty Done recovery does not preserve/,
+    );
+    assert.equal(h.mainCommitCount, 1);
+  });
+  await t.test("interruption after Done commit verifies and pushes the exact existing child", async () => {
+    const h = taskLifecycleHarness({ failDoneSnapshotOnce: true });
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /interrupted after Done commit/,
+    );
+    const result = await mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence));
+    assert.equal(result.status, "Done");
+    assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
+  });
+  await t.test("mismatched existing Done child fails closed", async () => {
+    const h = taskLifecycleHarness({ failDoneSnapshotOnce: true });
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /interrupted after Done commit/,
+    );
+    h.setParents(h.mainHead, ["e".repeat(40)]);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /neither the verified pre-merge head, exact candidate, nor exact Done child/,
+    );
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
+  });
+});
+
+test("post-Done remote verification remains best-effort evidence", async (t) => {
+  for (const scenario of [
+    { name: "upstream lookup error", options: { upstreamLookupFailsAfterDone: true }, pattern: /upstream unavailable/ },
+    { name: "observed upstream mismatch", options: { upstreamMismatchAfterDone: true }, pattern: /expected .* but observed/ },
+  ]) await t.test(scenario.name, async () => {
+    const h = taskLifecycleHarness(scenario.options);
+    const evidence = await completeReadyHandshake(h);
+    const result = await mergeTaskEpisodeReadyForMerge(
+      evidence, h.f.ctx, h.deps,
+      {
+        operatorDecision: "merge",
+        taskId: evidence.verification.taskId,
+        mainHead: evidence.verification.mainHead,
+        refreshedEpisodeHead: evidence.verification.refreshedEpisodeHead,
+      },
+    );
+    assert.equal(result.status, "Done");
+    assert.equal(h.mainStatus, "Done");
+    assert.equal(h.mainHead, result.doneCommit);
+    assert.match(result.pushError, scenario.pattern);
+  });
+});
+
+test("Merge and Done fail closed before canonical-main mutation", async (t) => {
+  const decisionFor = (evidence, overrides = {}) => ({
+    operatorDecision: "merge",
+    taskId: evidence.verification.taskId,
+    mainHead: evidence.verification.mainHead,
+    refreshedEpisodeHead: evidence.verification.refreshedEpisodeHead,
+    ...overrides,
+  });
+  await t.test("wrong operator outcome is not merge authority", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, { operatorDecision: "delay" }),
+      /explicit operator Merge decision/,
+    );
+    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
+  });
+  await t.test("authority must bind exact task, main, and candidate", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(
+        evidence, h.f.ctx, h.deps, decisionFor(evidence, { refreshedEpisodeHead: "e".repeat(40) }),
+      ),
+      /does not bind the exact verified task, main, and refreshed candidate/,
+    );
+    assert.equal(h.mainStatus, "Ready for Merge");
+    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
+  });
+  await t.test("Ready publication commit must remain in verified main history", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    h.setPublicationAncestor(false);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /exact reviewed ancestry/,
+    );
+    assert.equal(h.mainStatus, "Ready for Merge");
+    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
+  });
+  await t.test("dirty canonical main blocks merge", async () => {
+    const h = taskLifecycleHarness({ mainDirty: true });
+    const evidence = await completeReadyHandshake(h);
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /rejects canonical-main changes outside the exact modified task/,
+    );
+    assert.equal(h.mainStatus, "Ready for Merge");
+    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
+  });
+  await t.test("diverged canonical-main upstream blocks merge", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    h.divergeMainUpstream();
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /canonical main and its upstream to remain at the exact verified head/,
+    );
+    assert.equal(h.mainStatus, "Ready for Merge");
+    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
+  });
+  await t.test("unpushed refreshed candidate blocks merge", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    h.setEpisodeUpstream("e".repeat(40));
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /exact refreshed Episode candidate to remain pushed/,
+    );
+    assert.equal(h.mainStatus, "Ready for Merge");
+    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
+  });
+  await t.test("stale main blocks merge", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    h.advanceMain();
+    await assert.rejects(
+      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
+      /neither the verified pre-merge head, exact candidate, nor exact Done child/,
+    );
+    assert.equal(h.mainStatus, "Ready for Merge");
+    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
+  });
 });
 
 test("Request Changes reverses status, refreshes the same Episode, verifies, then hands off once", async () => {
@@ -832,6 +1192,11 @@ test("CLI review integration merges current main, restores the Episode task, and
   assert.notEqual(refreshed, episodeHead);
 
   git("checkout", "-q", "main");
+  adapter.fastForward(root, refreshed);
+  assert.equal(git("rev-parse", "HEAD"), refreshed);
+  assert.match(readFileSync(join(root, taskPath), "utf8"), /status: In Progress[\s\S]*episode evidence/);
+
+  git("checkout", "-q", "main");
   writeFileSync(join(root, taskPath), "---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\nbase\n");
   writeFileSync(join(root, "revision.txt"), "request changes\n");
   git("add", "-A"); git("commit", "-q", "-m", "request changes");
@@ -846,6 +1211,44 @@ test("CLI review integration merges current main, restores the Episode task, and
   assert.deepEqual(adapter.parents(root, revisionCandidate), [refreshed, changesMainHead]);
   assert.equal(adapter.isAncestor(root, refreshed, revisionCandidate), true);
   assert.equal(adapter.isAncestor(root, changesMainHead, revisionCandidate), true);
+});
+
+test("CLI merge adapter reports clean, modified, staged, extra, untracked, and renamed paths", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-merge-status-")));
+  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Prime Claw Test");
+  git("config", "user.email", "test@example.invalid");
+  mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
+  const taskPath = "backlog/tasks/primeclaw-10.38.md";
+  writeFileSync(join(root, taskPath), "status: Ready for Merge\n");
+  writeFileSync(join(root, "other.txt"), "base\n");
+  git("add", "-A"); git("commit", "-q", "-m", "base");
+  const adapter = new CliTaskEpisodeAdmissionGit();
+  assert.deepEqual(adapter.worktreeChanges(root), []);
+
+  writeFileSync(join(root, taskPath), "status: Done\n");
+  assert.deepEqual(adapter.worktreeChanges(root), [{ status: " M", path: taskPath }]);
+  git("add", "--", taskPath);
+  assert.deepEqual(adapter.worktreeChanges(root), [{ status: "M ", path: taskPath }]);
+  writeFileSync(join(root, taskPath), "status: Done\nfinal summary: recorded\n");
+  assert.deepEqual(adapter.worktreeChanges(root), [{ status: "MM", path: taskPath }]);
+  git("add", "--", taskPath);
+  git("commit", "-q", "-m", "done task");
+
+  writeFileSync(join(root, "other.txt"), "changed\n");
+  writeFileSync(join(root, "untracked.txt"), "new\n");
+  assert.deepEqual(adapter.worktreeChanges(root), [
+    { status: " M", path: "other.txt" },
+    { status: "??", path: "untracked.txt" },
+  ]);
+  git("add", "-A"); git("commit", "-q", "-m", "other changes");
+  git("mv", "other.txt", "renamed.txt");
+  const renamed = adapter.worktreeChanges(root);
+  assert.equal(renamed.length, 1);
+  assert.match(renamed[0].status, /R/);
+  assert.match(renamed[0].path, /other\.txt|renamed\.txt/);
+  assert.match(renamed[0].path, / -> /);
 });
 
 test("task lifecycle publication fails closed before status mutation", async (t) => {

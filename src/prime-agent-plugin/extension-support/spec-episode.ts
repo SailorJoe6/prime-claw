@@ -224,6 +224,11 @@ export interface TaskEpisodeReviewGit extends TaskEpisodeLifecycleGit {
   abortMerge(worktree: string): void;
   parents(repo: string, ref: string): string[];
 }
+export type GitWorktreeChange = { status: string; path: string };
+export interface TaskEpisodeMergeGit extends TaskEpisodeReviewGit {
+  fastForward(repo: string, candidateHead: string): void;
+  worktreeChanges(repo: string): GitWorktreeChange[];
+}
 export type TaskReviewSnapshot = {
   taskId: string;
   taskPath: string;
@@ -238,6 +243,7 @@ export interface TaskEpisodeLifecycleDependencies extends TaskEpisodeHandoffDepe
 }
 export interface TaskEpisodeReadyForMergeDependencies extends TaskEpisodeLifecycleDependencies {
   reviewGit?: TaskEpisodeReviewGit;
+  mergeGit?: TaskEpisodeMergeGit;
   taskSnapshotResolver?: (cwd: string, taskId: string) => TaskReviewSnapshot;
 }
 export type TaskEpisodeLifecycleResult = {
@@ -302,12 +308,33 @@ export type TaskEpisodeChangesResumeResult = {
   verification: TaskEpisodeChangesVerificationResult;
   handoff: TaskEpisodeHandoffResult;
 };
+export type TaskEpisodeMergeDecision = {
+  operatorDecision: "merge";
+  taskId: string;
+  mainHead: string;
+  refreshedEpisodeHead: string;
+};
+export type TaskEpisodeMergeResult = {
+  verified: true;
+  outcome: "merged";
+  taskId: string;
+  status: "Done";
+  priorMainHead: string;
+  mergedHead: string;
+  doneCommit: string;
+  parentTaskId: string | null;
+  episodeTaskContentDigest: string;
+  pushError?: string;
+};
 export type TaskEpisodeOperatorDecision =
   | { operatorDecision: "delay" }
   | { operatorDecision: "request-changes" };
 
+function runGitRaw(cwd: string, args: string[]): string {
+  return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
 function runGit(cwd: string, args: string[]): string {
-  return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  return runGitRaw(cwd, args).trim();
 }
 export class CliGitAdapter implements GitAdapter {
   private readonly runner: (cwd: string, args: string[]) => string;
@@ -386,6 +413,25 @@ export class CliTaskEpisodeAdmissionGit implements TaskEpisodeAdmissionGit {
   parents(repo: string, ref: string): string[] {
     const values = runGit(repo, ["rev-list", "--parents", "-n", "1", ref]).split(/\s+/).filter(Boolean);
     return values.slice(1);
+  }
+  fastForward(repo: string, candidateHead: string): void {
+    runGit(repo, ["merge", "--ff-only", candidateHead]);
+  }
+  worktreeChanges(repo: string): GitWorktreeChange[] {
+    const values = runGitRaw(repo, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])
+      .split("\0").filter(Boolean);
+    const changes: GitWorktreeChange[] = [];
+    for (let index = 0; index < values.length; index += 1) {
+      const value = values[index];
+      const status = value.slice(0, 2);
+      const path = value.slice(3);
+      if (status.includes("R") || status.includes("C")) {
+        const destination = values[index + 1] ?? "";
+        changes.push({ status, path: `${path} -> ${destination}` });
+        index += 1;
+      } else changes.push({ status, path });
+    }
+    return changes;
   }
 }
 
@@ -1549,7 +1595,7 @@ function commitConversationTaskStatus(options: {
   taskId: string;
   projectRoot: string;
   taskPath: string;
-  status: "In Progress" | "In Planning" | "Blocked" | "Ready for Merge";
+  status: "In Progress" | "In Planning" | "Blocked" | "Ready for Merge" | "Done";
   message: string;
   note?: string;
   runner: CommandRunner;
@@ -2094,6 +2140,233 @@ export async function delayTaskEpisodeReadyForMerge(
   }
   const verified = await verifyReadyOperatorDecision(evidence, ctx, dependencies);
   return { ...verified, outcome: "delayed" };
+}
+
+/** Merge only an explicitly authorized exact candidate, then publish exact-task Done. */
+export async function mergeTaskEpisodeReadyForMerge(
+  evidence: TaskEpisodeReadyHandshakeEvidence,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeReadyForMergeDependencies = {},
+  decision: TaskEpisodeMergeDecision,
+): Promise<TaskEpisodeMergeResult> {
+  if (decision.operatorDecision !== "merge") {
+    throw new Error("Merge requires the explicit operator Merge decision");
+  }
+  const { publication, integration, verification } = evidence;
+  if (publication.status !== "Ready for Merge"
+    || integration.taskId !== publication.taskId
+    || integration.readyCommit !== publication.commit
+    || integration.acceptedEpisodeHead !== publication.episodeHead
+    || integration.parentTaskId !== publication.parentTaskId
+    || integration.episodeTaskContentDigest !== publication.episodeTaskContentDigest
+    || !verification.verified
+    || verification.taskId !== publication.taskId
+    || verification.mainHead !== integration.integratedMainHead
+    || verification.refreshedEpisodeHead !== integration.refreshedEpisodeHead) {
+    throw new Error("Merge requires one exact previously verified Ready-for-Merge handshake");
+  }
+  if (decision.taskId !== verification.taskId
+    || decision.mainHead !== verification.mainHead
+    || decision.refreshedEpisodeHead !== verification.refreshedEpisodeHead) {
+    throw new Error("Merge authority does not bind the exact verified task, main, and refreshed candidate");
+  }
+  const mergeGit = dependencies.mergeGit
+    ?? (dependencies.reviewGit as TaskEpisodeMergeGit | undefined)
+    ?? new CliTaskEpisodeAdmissionGit();
+  if (typeof mergeGit.fastForward !== "function") {
+    throw new Error("Task-native merge requires an exact fast-forward Git adapter");
+  }
+  const git = dependencies.git ?? new CliGitAdapter();
+  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
+  const resolveTask = dependencies.taskResolver
+    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
+  const resolveSnapshot = dependencies.taskSnapshotResolver
+    ?? ((cwd: string, id: string) => resolveTaskReviewSnapshot(cwd, id, runner));
+  const authority = resolveBlockedWorkflowAuthority(verification.taskId, ctx, {
+    git, ownership: store, taskRunner: runner,
+  });
+  if (authority.mode !== "task") throw new Error("Merge requires task-native owner authority");
+  const projectRoot = authority.projectRoot;
+  const record = store.read(projectRoot);
+  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
+  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
+  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before merge`);
+  validateWorktreeRecord(record, git, filesystem, projectRoot);
+  await assertReadyIntegrationEpisodeIdle(record, { ...dependencies, reviewGit: mergeGit });
+  const retainedOwnership = stableJson(record);
+
+  git.assertCleanWorktree(record.worktree!);
+  if (mergeGit.head(record.worktree!) !== verification.refreshedEpisodeHead
+    || mergeGit.upstreamHead(record.worktree!) !== verification.refreshedEpisodeHead) {
+    throw new Error("Merge requires the exact refreshed Episode candidate to remain pushed");
+  }
+  const episodeTask = exactAdmissionTask(
+    resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
+  );
+  const episodeSnapshot = resolveSnapshot(record.worktree!, authority.taskId);
+  if (episodeTask.status !== "Ready for Merge" || episodeSnapshot.status !== "Ready for Merge"
+    || episodeSnapshot.taskPath !== record.taskPath
+    || episodeSnapshot.parentTaskId !== publication.parentTaskId
+    || episodeSnapshot.contentDigest !== publication.episodeTaskContentDigest) {
+    throw new Error("Merge candidate no longer preserves the exact reviewed task content, hierarchy, and status");
+  }
+  const candidateParents = mergeGit.parents(record.worktree!, verification.refreshedEpisodeHead);
+  if (candidateParents.length !== 2
+    || candidateParents[0] !== publication.episodeHead
+    || candidateParents[1] !== verification.mainHead
+    || !mergeGit.isAncestor(projectRoot, publication.commit, verification.mainHead)
+    || !mergeGit.isAncestor(record.worktree!, verification.mainHead, verification.refreshedEpisodeHead)) {
+    throw new Error("Merge candidate no longer has the exact reviewed ancestry");
+  }
+
+  let mainHead = mergeGit.head(projectRoot);
+  let mainChanges = mergeGit.worktreeChanges(projectRoot);
+  let recoverDirtyDone = false;
+  if (mainChanges.length > 0) {
+    const onlyTaskModification = mainHead === verification.refreshedEpisodeHead
+      && mainChanges.length === 1
+      && mainChanges[0].path === record.taskPath
+      && /^[ M]{2}$/.test(mainChanges[0].status)
+      && mainChanges[0].status.includes("M");
+    if (!onlyTaskModification) {
+      throw new Error("Merge recovery rejects canonical-main changes outside the exact modified task");
+    }
+    const partialTask = exactAdmissionTask(
+      resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath,
+    );
+    const partialSnapshot = resolveSnapshot(projectRoot, authority.taskId);
+    if (partialTask.status !== "Done" || partialSnapshot.status !== "Done"
+      || partialSnapshot.taskPath !== record.taskPath
+      || partialSnapshot.parentTaskId !== publication.parentTaskId
+      || partialSnapshot.contentDigest !== publication.episodeTaskContentDigest) {
+      throw new Error("Dirty Done recovery does not preserve the exact task content, identity, and hierarchy");
+    }
+    recoverDirtyDone = true;
+  } else git.assertCleanWorktree(projectRoot);
+
+  let doneCommit: string | undefined;
+  if (mainHead === verification.mainHead) {
+    if (recoverDirtyDone || mergeGit.upstreamHead(projectRoot) !== verification.mainHead) {
+      throw new Error("Merge requires canonical main and its upstream to remain at the exact verified head");
+    }
+    const mainTask = exactAdmissionTask(
+      resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath,
+    );
+    const mainSnapshot = resolveSnapshot(projectRoot, authority.taskId);
+    if (mainTask.status !== "Ready for Merge" || mainSnapshot.status !== "Ready for Merge"
+      || mainSnapshot.taskPath !== record.taskPath
+      || mainSnapshot.parentTaskId !== publication.parentTaskId) {
+      throw new Error("Merge requires the exact current Ready-for-Merge task on canonical main");
+    }
+    mergeGit.fastForward(projectRoot, verification.refreshedEpisodeHead);
+    mainHead = mergeGit.head(projectRoot);
+    if (mainHead !== verification.refreshedEpisodeHead) {
+      throw new Error("Canonical main did not reach the exact reviewed candidate");
+    }
+    mainChanges = mergeGit.worktreeChanges(projectRoot);
+    if (mainChanges.length > 0) {
+      throw new Error("Canonical main became dirty after the exact candidate fast-forward");
+    }
+    git.assertCleanWorktree(projectRoot);
+  }
+
+  if (mainHead === verification.refreshedEpisodeHead) {
+    const upstream = mergeGit.upstreamHead(projectRoot);
+    if (upstream !== verification.mainHead && upstream !== verification.refreshedEpisodeHead) {
+      throw new Error("Merged candidate recovery requires canonical main upstream at the prior main or exact candidate");
+    }
+    if (recoverDirtyDone) {
+      doneCommit = mergeGit.commitOnlyPath(
+        projectRoot, record.taskPath, `chore: complete ${authority.taskId}`,
+      );
+      mainHead = doneCommit;
+    } else {
+      const mergedTask = exactAdmissionTask(
+        resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath,
+      );
+      const mergedSnapshot = resolveSnapshot(projectRoot, authority.taskId);
+      if (mergedTask.status !== "Ready for Merge" || mergedSnapshot.status !== "Ready for Merge"
+        || mergedSnapshot.taskPath !== record.taskPath
+        || mergedSnapshot.parentTaskId !== publication.parentTaskId
+        || mergedSnapshot.contentDigest !== publication.episodeTaskContentDigest) {
+        throw new Error("Merged candidate does not preserve the exact reviewed task content, hierarchy, and status");
+      }
+      const done = commitConversationTaskStatus({
+        taskId: authority.taskId,
+        projectRoot,
+        taskPath: record.taskPath,
+        status: "Done",
+        message: `chore: complete ${authority.taskId}`,
+        runner,
+        git: mergeGit,
+        resolveTask,
+      });
+      doneCommit = done.commit;
+      mainHead = done.commit;
+    }
+  } else {
+    if (recoverDirtyDone) {
+      throw new Error("Dirty Done recovery requires canonical main at the exact merged candidate");
+    }
+    const parents = mergeGit.parents(projectRoot, mainHead);
+    const paths = mergeGit.commitPaths(projectRoot, mainHead);
+    if (parents.length !== 1 || parents[0] !== verification.refreshedEpisodeHead
+      || paths.length !== 1 || paths[0] !== record.taskPath) {
+      throw new Error("Canonical main is neither the verified pre-merge head, exact candidate, nor exact Done child");
+    }
+    doneCommit = mainHead;
+  }
+
+  const doneParents = mergeGit.parents(projectRoot, doneCommit);
+  const donePaths = mergeGit.commitPaths(projectRoot, doneCommit);
+  if (mergeGit.head(projectRoot) !== doneCommit
+    || doneParents.length !== 1 || doneParents[0] !== verification.refreshedEpisodeHead
+    || donePaths.length !== 1 || donePaths[0] !== record.taskPath) {
+    throw new Error("Done publication does not directly follow the exact merged candidate as a one-task commit");
+  }
+  const doneTask = exactAdmissionTask(
+    resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath,
+  );
+  const doneSnapshot = resolveSnapshot(projectRoot, authority.taskId);
+  if (doneTask.status !== "Done" || doneSnapshot.status !== "Done"
+    || doneSnapshot.taskPath !== record.taskPath
+    || doneSnapshot.parentTaskId !== publication.parentTaskId
+    || doneSnapshot.contentDigest !== publication.episodeTaskContentDigest) {
+    throw new Error("Done publication changed the exact task content, identity, or hierarchy");
+  }
+  git.assertCleanWorktree(projectRoot);
+  const retained = store.read(projectRoot);
+  if (!retained) throw new Error("Task-native ownership disappeared after merge");
+  exactOwnedTaskRecord(retained, authority.taskId, ctx.sessionManager.getSessionId());
+  if (retained.status !== "active" || stableJson(retained) !== retainedOwnership) {
+    throw new Error("Merge and Done publication must retain the exact active Episode ownership and resources");
+  }
+
+  let pushError = bestEffortTaskPush(mergeGit, projectRoot);
+  if (!pushError) {
+    try {
+      const observed = mergeGit.upstreamHead(projectRoot);
+      if (observed !== doneCommit) {
+        pushError = `Done push verification expected ${doneCommit} but observed ${observed}`;
+      }
+    } catch (error) {
+      pushError = `Done push verification failed: ${taskAdmissionError(error)}`;
+    }
+  }
+  return {
+    verified: true,
+    outcome: "merged",
+    taskId: authority.taskId,
+    status: "Done",
+    priorMainHead: verification.mainHead,
+    mergedHead: verification.refreshedEpisodeHead,
+    doneCommit,
+    parentTaskId: doneSnapshot.parentTaskId,
+    episodeTaskContentDigest: doneSnapshot.contentDigest,
+    ...(pushError ? { pushError } : {}),
+  };
 }
 
 export function verifyTaskEpisodeChangesRequested(

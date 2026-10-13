@@ -576,6 +576,50 @@ teardown, and manifest evidence at
 newly claimed; AC #8/#9 still require retained end-to-end, refreshed-candidate,
 and operator-outcome receipts.
 
+#### Slice 6 progress — inactive exact Merge and `Done` publication (2026-10-13)
+
+Staged the terminal accepted-candidate outcome without registering a public
+surface or merging this live Episode. `mergeTaskEpisodeReadyForMerge` requires
+an explicit operator Merge decision bound to the still-current exact task,
+verified canonical-main head, and pushed refreshed candidate. It revalidates the
+exact owner, active ownership, idle durable Episode and Orca identity, candidate
+status/content/path/parent, two-parent ancestry, the Ready publication commit in
+verified main history, clean canonical primary `main`, and exact upstream state.
+It then fast-forwards only to that candidate; there is no force, rebase, or
+substitute merge. Backlog immediately changes only the exact task to `Done`, the
+resulting one-path commit must directly parent the candidate, and final checks
+prove merged code, task digest/path/parent/status, and retained ownership,
+branch, worktree, durable session, and resources. The verified local `Done`
+commit is authoritative; push, upstream lookup, or observed-remote mismatch is
+returned as best-effort transport evidence.
+
+The journal-free replay boundary accepts only four exact states: original main
+plus `Ready for Merge`, the candidate plus `Ready for Merge`, that candidate
+with only the bound task dirty or staged as exact `Done`, or one exact task-only
+`Done` child. It completes the missing fast-forward, task commit, verification,
+or push without duplicating lifecycle mutation. Extra paths, rename/delete or
+untracked state, wrong task status/content/hierarchy, stale ancestry, stale
+main, or unpushed candidate fail closed. Production porcelain parsing uses raw
+NUL-delimited Git output so leading status columns remain intact; a disposable
+repository test covers clean, unstaged, staged, mixed staged/unstaged, extra,
+untracked, and renamed states.
+
+Independent review found four material defects across successive passes:
+post-fast-forward replay, post-`Done` transport verification, the dirty/staged
+mutation window plus missing Ready-publication ancestry, and production raw-Git
+parsing. Each finding was accepted and repaired with focused recovery and
+negative tests. Final rereview found no material defects. Focused validation
+passed 101 Node tests and 4 policy checks. Final broad validation passed 186
+Node tests and 59 host-safe Python checks with 45 container cases deselected,
+plus `git diff --check`. Source-mode `scripts/test-tier1.sh --probe` passed with
+immutable-image, offline-RPC, teardown, and manifest evidence at
+`.test-results/20261013T130723Z-39269-445a6588/tier1`.
+
+No actual merge or live `Done` transition was performed. No abandonment,
+finalization, cleanup, public activation, or migration mechanic is included. No
+acceptance criterion is newly claimed; AC #8/#9 still require retained
+end-to-end, refreshed-candidate, and operator-outcome receipts.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

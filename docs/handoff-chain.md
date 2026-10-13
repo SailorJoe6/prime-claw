@@ -80,8 +80,20 @@ integrates that status commit in the same Episode with the same constrained
 reconciliation, pushes and verifies a second refreshed candidate, and only then
 uses ordinary task handoff. Publication, integration, verification, and resume
 are separate retryable phases: an integration failure cannot cause another
-status transition or a duplicate admission. No public task-native handoff tool
-is registered yet.
+status transition or a duplicate admission. Explicit Merge is not handoff: the
+inactive terminal seam binds the operator decision to the exact verified
+task/main/candidate, requires clean canonical main and exact main/candidate
+upstream heads, fast-forwards only to that reviewed candidate, and immediately
+commits only the exact task as `Done`. A retry recognizes only exact pre-merge,
+post-fast-forward, exact-task dirty/staged `Done`, or one-task `Done`-child
+state. It finishes the commit or transport without duplicating merge or
+lifecycle mutation. It also re-proves the Ready publication commit in main
+history, direct candidate ancestry, merged code, content digest,
+path, hierarchy, and status. Push or remote-verification failure is returned
+without invalidating the local `Done` commit. Ownership and every idle Episode
+resource remain active until separate finalization or cleanup authority. No
+public task-native lifecycle, handoff, merge, or finalization tool is registered
+yet.
 
 The initial Episode creation is different: it starts a fresh session with one
 fixed execute assignment after bundle promotion. It does **not** run handoff.

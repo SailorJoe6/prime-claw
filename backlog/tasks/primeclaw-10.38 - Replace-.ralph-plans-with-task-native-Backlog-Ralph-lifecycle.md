@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 12:26'
+updated_date: '2026-10-13 13:09'
 labels:
   - backlog-md
   - episode-loop
@@ -443,4 +443,14 @@ Evidence:
 - `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC, teardown, and manifest publication verified at `.test-results/20261013T122422Z-16240-2b8e093d/tier1`.
 
 This slice adds no merge authorization, merge, `Done`, abandonment, finalization, cleanup, coordinated activation, or migration mechanics. Public task Episode surfaces remain inactive. It claims no acceptance criterion; AC #8/#9 still require retained end-to-end, refreshed-candidate, and operator-outcome receipts.
+
+## 2026-10-13 — staged inactive exact Merge and Done publication
+
+Added the unregistered terminal accepted-candidate seam only; this did not merge the live Episode or change its task status. `mergeTaskEpisodeReadyForMerge` accepts an explicit operator Merge decision only when it binds the exact task, verified canonical-main head, and pushed refreshed candidate from one coherent Ready-for-Merge handshake. It revalidates canonical primary `main`, the exact active owner, idle durable Episode/Orca identity, candidate upstream, content digest/path/parent/status, two-parent ancestry, and the exact Ready publication commit in verified main history. Canonical main must have the exact upstream and no unrelated dirty state. Integration is exact fast-forward only, never force/rebase/substitute merge. Backlog then changes only the exact task to `Done`; its one-path commit must directly parent the candidate. Final verification proves merged code, task digest/path/parent/status, and unchanged active ownership, branch, worktree, durable session, and resources. The local verified `Done` commit is authoritative; push failure, upstream lookup error, or observed mismatch is returned as transport evidence.
+
+Journal-free recovery accepts only four exact states: original main + `Ready for Merge`; exact candidate + `Ready for Merge`; candidate plus only the bound modified/staged task already at exact `Done`; or one exact task-only `Done` child. It resumes the missing fast-forward, commit, verification, or transport without duplicate lifecycle mutation. Extra paths, rename/delete/untracked state, wrong task fields, stale ancestry/main, or unpushed candidate fail closed. Raw NUL-delimited porcelain parsing preserves leading Git status columns; real disposable tests cover clean, ` M`, `M `, `MM`, extra, untracked, and rename states.
+
+Independent review found and drove repairs for post-fast-forward replay, post-`Done` best-effort transport, the dirty/staged mutation window, missing Ready-publication ancestry, and production raw-Git parsing. Final rereview reported no material findings. Evidence: 101 focused Node tests and 4 policy checks passed; final broad 186 Node and 59 host-safe Python tests passed with 45 container cases deselected; `git diff --check` passed; source-mode Docker Tier-1 passed at `.test-results/20261013T130723Z-39269-445a6588/tier1` with immutable image, offline RPC, teardown, and manifest publication verified.
+
+No abandonment, finalization, cleanup, public activation, or migration was added. No acceptance criterion is newly claimed; AC #8/#9 still require retained end-to-end, refreshed-candidate, and operator-outcome receipts.
 <!-- SECTION:NOTES:END -->
