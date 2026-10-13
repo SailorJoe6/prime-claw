@@ -245,13 +245,37 @@ admission:
   replay defect, and source-mode `scripts/test-tier1.sh --probe`, with final
   evidence at `.test-results/20261013T081542Z-76164-4158db63/tier1`.
 
-Slices 1 and 2 remain open. The public `/implement-task`, trusted status
-mutation plus reservation/allocation transaction, clean rollback and
-Conversation-owned `Blocked` publication, retained real-session authoring and
-planning mutation evidence, and final lifecycle-default migration are later
-increments. Acceptance criteria #2 and #3 remain unchecked until their
-real-session semantic paths are retained; this inactive allocator alone
-completes no criterion.
+#### Slice 2 progress — trusted task-native admission transaction (2026-10-13)
+
+Completed the next bounded slice-2 increment without activating public
+admission:
+
+- added an internal transaction that accepts only the exact clean `In Planning`
+  task with a meaningful native plan and no non-terminal project ownership;
+- changed the task to `In Progress` through supported Backlog CLI, committed
+  only its canonical path, and treated push failure as non-gating evidence;
+- reserved ownership against that exact status-commit SHA, called the existing
+  allocator, and verified strict durable active identity plus unchanged main
+  task status, HEAD, and path cleanliness before returning success;
+- made a proven clean failure before ownership/resource mutation publish one
+  exact task-only rollback commit to `In Planning`;
+- made every recorded, partial, uncertain, or missing-active-postcondition
+  outcome publish `Blocked` plus a precise `.prime-claw/ownership.json`
+  reconciliation condition, retain all evidence/resources, and reject fresh
+  replay;
+- kept `/implement-task` and `create_task_episode` unregistered and preserved
+  the version-1 folder admission path unchanged; and
+- passed 113 focused Node tests, 36 host-safe Python checks with 10 container
+  cases deselected, independent review with no material findings, and
+  source-mode `scripts/test-tier1.sh --probe`, with final evidence at
+  `.test-results/20261013T090020Z-68646-c18d94ca/tier1`.
+
+Slices 1 and 2 remain open. Public `/implement-task` and
+`create_task_episode`, task-native placement selection and approval wiring,
+retained real-session authoring and planning mutation evidence, and final
+lifecycle/default migration remain later increments. Acceptance criteria #2
+and #3 remain unchecked until their real-session semantic paths are retained;
+this inactive transaction alone completes no criterion.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 

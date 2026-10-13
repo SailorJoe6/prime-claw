@@ -22,13 +22,27 @@ import {
 import {
   isLegacyEpisodeOwnership,
   isTaskEpisodeOwnership,
+  parseEpisodeOwnership,
   readEpisodeOwnership,
   writeEpisodeOwnership,
   type EpisodeOwnershipRecord,
   type LegacyEpisodeOwnershipRecord,
   type TaskEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
-import { validateFutureLocation } from "./reviewed-plan-support.ts";
+import {
+  resolveBacklogTask,
+  validateFutureLocation,
+  type BacklogTaskSelection,
+} from "./reviewed-plan-support.ts";
+import {
+  ProcessCommandRunner,
+  type CommandRunner,
+} from "./project-initialization.ts";
+import {
+  meaningfulTaskImplementationPlan,
+  reserveTaskEpisodeOwnership,
+  type TaskEpisodeReservationInput,
+} from "./task-episode-ownership.ts";
 
 const PROTOCOL_NAME = "prime-agent.daemon";
 const MAX_PROTOCOL_VERSION = 7;
@@ -158,6 +172,35 @@ export interface EpisodeDependencies {
 }
 export interface EpisodeCreationOptions { host?: string; approvedBundleDigest?: string }
 
+export interface TaskEpisodeAdmissionGit {
+  repositoryRoot(cwd: string): string;
+  head(repo: string): string;
+  commitPaths(repo: string, ref: string): string[];
+  pathStatus(repo: string, path: string): string;
+  commitOnlyPath(repo: string, path: string, message: string): string;
+  push(repo: string): void;
+}
+
+export interface TaskEpisodeAdmissionOptions {
+  engine: "orca" | "local";
+  projectSetupId?: string;
+  routingEnvironmentId?: string;
+}
+
+export type TaskEpisodeCreationResult = TaskEpisodeResult & {
+  admissionPushError?: string;
+};
+
+export interface TaskEpisodeCreationDependencies extends EpisodeDependencies {
+  admissionGit?: TaskEpisodeAdmissionGit;
+  admissionRunner?: CommandRunner;
+  taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+  reserveTaskOwnership?: typeof reserveTaskEpisodeOwnership;
+  allocateTaskEpisode?: typeof allocateReservedTaskEpisode;
+  reservationOperationId?: string;
+  now?: () => string;
+}
+
 function runGit(cwd: string, args: string[]): string {
   return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
@@ -190,6 +233,22 @@ export class CliGitAdapter implements GitAdapter {
     return this.head(worktree);
   }
 }
+export class CliTaskEpisodeAdmissionGit implements TaskEpisodeAdmissionGit {
+  repositoryRoot(cwd: string): string { return realpathSync(runGit(cwd, ["rev-parse", "--show-toplevel"])); }
+  head(repo: string): string { return runGit(repo, ["rev-parse", "HEAD"]); }
+  commitPaths(repo: string, ref: string): string[] {
+    const output = runGit(repo, ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", ref, "--"]);
+    return output ? output.split(/\r?\n/).filter(Boolean) : [];
+  }
+  pathStatus(repo: string, path: string): string { return runGit(repo, ["status", "--porcelain", "--", path]); }
+  commitOnlyPath(repo: string, path: string, message: string): string {
+    runGit(repo, ["add", "--", path]);
+    runGit(repo, ["commit", "--only", "-m", message, "--", path]);
+    return this.head(repo);
+  }
+  push(repo: string): void { runGit(repo, ["push"]); }
+}
+
 export function bundleContentDigest(folder: string, topNames?: string[]): string {
   const hash = createHash("sha256");
   const walk = (absolute: string, relativePath: string): void => {
@@ -1026,6 +1085,234 @@ export async function allocateReservedTaskEpisode(
     throw error;
   } finally {
     try { publisher?.close(); } catch { /* do not mask lifecycle result */ }
+  }
+}
+
+function taskAdmissionError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/\s+/g, " ").trim().slice(0, 1000) || "unknown failure";
+}
+
+function exactAdmissionTask(
+  selection: BacklogTaskSelection | null,
+  taskId: string,
+  projectRoot: string,
+  taskPath: string,
+): BacklogTaskSelection {
+  if (!selection || selection.taskId !== taskId) throw new Error(`Backlog task ${taskId} could not be re-resolved exactly`);
+  if (!samePath(selection.projectRoot, projectRoot) || selection.taskPathRelative !== taskPath) {
+    throw new Error(`Backlog task ${taskId} changed project or path during Episode admission`);
+  }
+  return selection;
+}
+
+function commitConversationTaskStatus(options: {
+  taskId: string;
+  projectRoot: string;
+  taskPath: string;
+  status: "In Progress" | "In Planning" | "Blocked";
+  message: string;
+  note?: string;
+  runner: CommandRunner;
+  git: TaskEpisodeAdmissionGit;
+  resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+}): { selection: BacklogTaskSelection; commit: string } {
+  const args = ["task", "edit", "--status", options.status];
+  if (options.note) args.push("--append-notes", options.note);
+  args.push("--plain", "--", options.taskId);
+  options.runner.run("backlog", args, { cwd: options.projectRoot });
+  const selection = exactAdmissionTask(
+    options.resolveTask(options.projectRoot, options.taskId),
+    options.taskId,
+    options.projectRoot,
+    options.taskPath,
+  );
+  if (selection.status !== options.status) {
+    throw new Error(`Backlog task ${options.taskId} did not reach ${options.status}`);
+  }
+  const commit = options.git.commitOnlyPath(options.projectRoot, options.taskPath, options.message);
+  const paths = options.git.commitPaths(options.projectRoot, commit);
+  if (paths.length !== 1 || paths[0] !== options.taskPath) {
+    throw new Error(`Task-native Episode status commit contains paths other than ${options.taskPath}`);
+  }
+  if (options.git.pathStatus(options.projectRoot, options.taskPath) !== "") {
+    throw new Error(`Backlog task ${options.taskId} changed after its ${options.status} commit`);
+  }
+  return { selection, commit };
+}
+
+function bestEffortTaskPush(git: TaskEpisodeAdmissionGit, projectRoot: string): string | undefined {
+  try { git.push(projectRoot); return undefined; }
+  catch (error) { return taskAdmissionError(error); }
+}
+
+/**
+ * Execute the trusted task-native admission transaction without exposing a
+ * public command: exact status commit, durable reservation, then allocation.
+ * Clean pre-reservation failures roll back; any recorded or uncertain mutation
+ * is published as Blocked and cannot be replayed as fresh creation.
+ */
+export async function createTaskEpisode(
+  rawTaskId: string,
+  _toolCallId: string,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeCreationDependencies = {},
+  options: TaskEpisodeAdmissionOptions,
+): Promise<TaskEpisodeCreationResult> {
+  const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
+  const git = dependencies.admissionGit ?? new CliTaskEpisodeAdmissionGit();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const resolveTask = dependencies.taskResolver
+    ?? ((cwd: string, taskId: string) => resolveBacklogTask(cwd, taskId, runner));
+  const reserve = dependencies.reserveTaskOwnership ?? reserveTaskEpisodeOwnership;
+  const allocate = dependencies.allocateTaskEpisode ?? allocateReservedTaskEpisode;
+  const taskId = rawTaskId.trim();
+  let projectRoot = "";
+  let taskPath = "";
+  let preAdmissionHead = "";
+  let statusMutationStarted = false;
+  let admissionPushError: string | undefined;
+
+  try {
+    if (!taskId || /\s/.test(taskId) || taskId.startsWith("-")) {
+      throw new Error("Task-native Episode creation requires a canonical Backlog task ID");
+    }
+    projectRoot = git.repositoryRoot(ctx.cwd);
+    if (!samePath(projectRoot, realpathSync(ctx.cwd))) {
+      throw new Error("Task-native Episode creation must run from the repository root");
+    }
+    if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode creation requires a persisted owner session");
+    if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
+      throw new Error("Episode creation is available only from a top-level project Conversation");
+    }
+    if (options.engine === "orca" && !options.projectSetupId) {
+      throw new Error("Task-native Orca admission requires an exact project setup");
+    }
+    if (options.engine === "local" && (options.projectSetupId || options.routingEnvironmentId)) {
+      throw new Error("Task-native local admission cannot carry Orca placement identity");
+    }
+
+    const selected = resolveTask(projectRoot, taskId);
+    if (!selected || selected.taskId !== taskId) {
+      throw new Error("Task-native Episode creation requires the exact canonical Backlog task ID");
+    }
+    if (!samePath(selected.projectRoot, projectRoot)) throw new Error("Task-native Episode task resolved in a different project");
+    taskPath = selected.taskPathRelative;
+    if (selected.status !== "In Planning") throw new Error("Task-native Episode creation requires the exact task to be In Planning");
+    if (!meaningfulTaskImplementationPlan(selected.implementationPlan)) {
+      throw new Error("Task-native Episode creation requires a meaningful Implementation Plan");
+    }
+    if (git.pathStatus(projectRoot, taskPath) !== "") {
+      throw new Error("Task-native Episode creation requires the exact task path to be clean before status mutation");
+    }
+    const existing = store.read(projectRoot);
+    if (existing && existing.status !== "inactive") {
+      const identity = isTaskEpisodeOwnership(existing) ? existing.taskId : existing.sourceLocation;
+      throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
+    }
+    preAdmissionHead = git.head(projectRoot);
+
+    statusMutationStarted = true;
+    const admitted = commitConversationTaskStatus({
+      taskId,
+      projectRoot,
+      taskPath,
+      status: "In Progress",
+      message: `chore: admit ${taskId} episode`,
+      runner,
+      git,
+      resolveTask,
+    });
+    admissionPushError = bestEffortTaskPush(git, projectRoot);
+
+    const reservationInput: TaskEpisodeReservationInput = {
+      projectRoot,
+      taskId,
+      ownerSessionId: ctx.sessionManager.getSessionId(),
+      engine: options.engine,
+      ...(options.projectSetupId ? { projectSetupId: options.projectSetupId } : {}),
+      ...(options.routingEnvironmentId ? { routingEnvironmentId: options.routingEnvironmentId } : {}),
+      ...(dependencies.reservationOperationId ? { operationId: dependencies.reservationOperationId } : {}),
+    };
+    const reservation = reserve(reservationInput, {
+      git,
+      ownership: store,
+      taskResolver: resolveTask,
+      now: dependencies.now,
+    });
+    if (reservation.baseRef !== admitted.commit) {
+      throw new Error("Task-native Episode reservation did not bind the exact In Progress status commit");
+    }
+    const result = await allocate(taskId, ctx, dependencies);
+    const storedActive = store.read(projectRoot);
+    if (!storedActive) throw new Error("Task-native Episode allocation returned without durable ownership");
+    const active = parseEpisodeOwnership(storedActive, "task-native Episode admission result");
+    exactOwnedTaskRecord(active, taskId, ctx.sessionManager.getSessionId());
+    if (active.status !== "active" || active.baseRef !== admitted.commit || active.operationId !== reservation.operationId) {
+      throw new Error("Task-native Episode allocation returned without the exact active reservation identity");
+    }
+    const finalTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
+    if (finalTask.status !== "In Progress" || git.head(projectRoot) !== admitted.commit || git.pathStatus(projectRoot, taskPath) !== "") {
+      throw new Error("Task-native Episode allocation did not preserve the exact committed In Progress task state");
+    }
+    return { ...active, reused: result.reused, ...(admissionPushError ? { admissionPushError } : {}) };
+  } catch (error) {
+    if (!statusMutationStarted || !projectRoot || !taskPath) throw error;
+    const cause = taskAdmissionError(error);
+    let ownership: EpisodeOwnershipRecord | null = null;
+    let ownershipUncertain = false;
+    try { ownership = store.read(projectRoot); }
+    catch { ownershipUncertain = true; }
+    const recordedMutation = ownershipUncertain || Boolean(ownership && ownership.status !== "inactive");
+
+    if (recordedMutation) {
+      const note = [
+        `Episode admission blocked after durable or uncertain mutation at ${dependencies.now?.() ?? new Date().toISOString()}.`,
+        `Recovery condition: inspect .prime-claw/ownership.json and reconcile every recorded task, worktree, and session identity to ${taskId} before continuing; do not retry it as fresh creation.`,
+        `Cause: ${cause}`,
+      ].join("\n");
+      try {
+        commitConversationTaskStatus({
+          taskId,
+          projectRoot,
+          taskPath,
+          status: "Blocked",
+          message: `chore: block ${taskId} episode admission`,
+          note,
+          runner,
+          git,
+          resolveTask,
+        });
+      } catch (recoveryError) {
+        throw new Error(`Task-native Episode creation failed after durable or uncertain mutation, and Blocked publication failed. Preserve all evidence and recover ${taskId} manually. Cause: ${cause}. Publication failure: ${taskAdmissionError(recoveryError)}`);
+      }
+      const recoveryPushError = bestEffortTaskPush(git, projectRoot);
+      throw new Error(`Task-native Episode creation failed after durable or uncertain mutation; ${taskId} is Blocked and requires exact recovery before retry. Cause: ${cause}${recoveryPushError ? ` Push also failed: ${recoveryPushError}` : ""}`);
+    }
+
+    let current: BacklogTaskSelection | null = null;
+    try { current = resolveTask(projectRoot, taskId); } catch { /* handled below */ }
+    const unchanged = current?.taskId === taskId
+      && current.status === "In Planning"
+      && git.head(projectRoot) === preAdmissionHead
+      && git.pathStatus(projectRoot, taskPath) === "";
+    if (unchanged) throw error;
+    try {
+      commitConversationTaskStatus({
+        taskId,
+        projectRoot,
+        taskPath,
+        status: "In Planning",
+        message: `chore: roll back ${taskId} episode admission`,
+        runner,
+        git,
+        resolveTask,
+      });
+    } catch (recoveryError) {
+      throw new Error(`Task-native Episode creation failed before ownership or resource mutation, and clean rollback failed. Preserve the checkout and recover ${taskId} manually. Cause: ${cause}. Rollback failure: ${taskAdmissionError(recoveryError)}`);
+    }
+    const recoveryPushError = bestEffortTaskPush(git, projectRoot);
+    throw new Error(`Task-native Episode creation failed before ownership or resource mutation; ${taskId} was returned to In Planning. Cause: ${cause}${recoveryPushError ? ` Push also failed: ${recoveryPushError}` : ""}`);
   }
 }
 

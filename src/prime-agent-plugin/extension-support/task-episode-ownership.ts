@@ -76,7 +76,7 @@ function portableRelativePath(projectRoot: string, taskPath: string): string {
   return path;
 }
 
-function meaningfulPlan(plan: string | null): boolean {
+export function meaningfulTaskImplementationPlan(plan: string | null): boolean {
   if (!plan || !plan.trim()) return false;
   const lines = plan.split(/\r?\n/).map((line) => line.trim()
     .replace(/^>\s*/, "")
@@ -115,7 +115,7 @@ export function reserveTaskEpisodeOwnership(
   if (resolve(repositoryRoot) !== resolve(projectRoot)) throw new Error("Task-native Episode reservation must run from the repository root");
   if (!input.ownerSessionId) throw new Error("Task-native Episode reservation requires an exact owner session");
   if (selection.status !== "In Progress") throw new Error("Task-native Episode reservation requires the exact task to be committed as In Progress");
-  if (!meaningfulPlan(selection.implementationPlan)) throw new Error("Task-native Episode reservation requires a meaningful Implementation Plan");
+  if (!meaningfulTaskImplementationPlan(selection.implementationPlan)) throw new Error("Task-native Episode reservation requires a meaningful Implementation Plan");
 
   const selectedTaskPath = resolve(selection.taskPath);
   const stat = lstatSync(selectedTaskPath);
