@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 08:17'
+updated_date: '2026-10-13 09:02'
 labels:
   - backlog-md
   - episode-loop
@@ -267,4 +267,23 @@ Evidence:
 - Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T081542Z-76164-4158db63/tier1`.
 
 Slices 1 and 2 remain open. `/implement-task` and `create_task_episode` remain unregistered. Status mutation/commit, the combined reservation/allocation transaction, proven-clean rollback to `In Planning`, and Conversation-owned `Blocked` publication remain later work. This inactive allocator completes no acceptance criterion.
+
+## 2026-10-13 — inactive trusted task-native admission transaction
+
+Joined the existing task-native reservation and allocator behind one internal transaction without registering public task admission. `createTaskEpisode` accepts only the exact canonical task in `In Planning`, with a meaningful native Implementation Plan, a clean canonical task path, a persisted top-level owner Conversation, and no non-terminal project ownership. Before ownership or resource mutation, it changes the task to `In Progress` through the supported Backlog CLI, re-resolves exact identity/path/status, commits only that task path, verifies the commit path and post-commit cleanliness, and attempts a prompt non-gating push.
+
+The transaction then reserves version-2 ownership against that exact status-commit SHA, runs the existing local or exact reserved Orca allocator, and returns only after strict parsing proves one durable active ownership record with the same task, owner, operation, and base SHA while the main task remains clean `In Progress` at that exact commit. Push failure is returned as transport evidence and does not block local allocation.
+
+A failure with no ownership/resource mutation is classified only after re-reading ownership and task/Git state. It either leaves a proven unchanged `In Planning` task alone or commits one exact rollback to `In Planning`. Any durable, partial, uncertain, unreadable, or missing-active-postcondition outcome instead commits the task `Blocked`, appends the precise recovery condition to inspect `.prime-claw/ownership.json` and reconcile every recorded task/worktree/session identity, preserves all resources and evidence, and rejects fresh replay. Failure to publish rollback or `Blocked` is itself reported as an unreconciled recovery failure rather than claimed successful.
+
+Disposable Backlog/Git fixtures execute the real vendored Backlog CLI and prove: status-only admission commit order and reservation SHA binding; non-gating push failure; unrelated dirty-path isolation; clean pre-reservation rollback; recovery from a failed first status commit; preflight rejection for wrong status, placeholder plan, dirty task path, and non-terminal ownership; `Blocked` plus recovery notes after uncertain allocation; no fresh replay; and `Blocked` publication when an allocator returns without durable active identity.
+
+Evidence:
+- Focused Node command covering admission, reservation/allocation, retained folder creation, Conversation compaction, final bookkeeping, reviewed-plan behavior, and project initialization — 113 passed.
+- Focused host-safe Python command covering discovery, policy, Conversation oversight, managed source inventory, project initialization, and staged workflow assets — 36 passed, 10 deselected.
+- Independent bounded review — no material findings.
+- `git diff --check` — passed.
+- Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T090020Z-68646-c18d94ca/tier1`.
+
+Slices 1 and 2 remain open. `/implement-task` and `create_task_episode` remain unregistered. Task-native placement selection, ephemeral readiness approval wiring, retained real-session authoring/planning evidence, and final lifecycle/default migration remain later work. This inactive transaction completes no acceptance criterion.
 <!-- SECTION:NOTES:END -->
