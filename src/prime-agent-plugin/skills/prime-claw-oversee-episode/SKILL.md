@@ -51,6 +51,13 @@ accepted advance or revision, use only the canonical handoff for the exact
 owned idle Episode and its current authority mode. Admission is not completion;
 inspect the next report before deciding again. Do not retry uncertain transport.
 
+For an accepted task-native no-fix candidate, never hand off or request merge
+from that head. The handshake must publish `Ready for Merge`, integrate
+main in the idle Episode, preserve task content and parent identity, push a
+two-parent candidate, and verify its head, ancestry, digest, hierarchy, and
+status. Only then request the operator's merge decision. Any uncertain or stale
+step stops without continuation or a merge request.
+
 When project policy requires independent review or a concrete material risk
 warrants it, load and follow the managed `prime-claw-expert-review` skill. Treat
 every review conclusion as evidence, not product, merge, or owner authority. A

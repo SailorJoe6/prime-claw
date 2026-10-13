@@ -6,10 +6,12 @@ import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
-  CliGitAdapter, CliOrcaAdapter, EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
+  CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit,
+  EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
   allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
   handoffTaskEpisode, publishTaskEpisodeBlocked, publishTaskEpisodeResumed,
-  resolveBlockedWorkflowAuthority,
+  publishTaskEpisodeReadyForMerge, integrateTaskEpisodeReadyForMerge,
+  verifyTaskEpisodeReadyForMerge, resolveBlockedWorkflowAuthority, resolveTaskReviewSnapshot,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
@@ -332,16 +334,22 @@ function taskLifecycleHarness(options = {}) {
   f.ownership.write(f.root, activeTaskRecord(f));
   f.calls.length = 0;
   let mainStatus = options.mainStatus ?? "In Progress";
+  let episodeStatus = options.episodeStatus ?? "In Progress";
   let mainHead = "1".repeat(40);
   let pushCount = 0;
-  const episodeHead = options.episodeHead ?? "b".repeat(40);
+  let episodeHead = options.episodeHead ?? "b".repeat(40);
+  let episodeUpstream = options.upstreamHead ?? episodeHead;
+  const acceptedEpisodeHead = episodeHead;
+  const mergeParents = new Map();
   const runner = {
     run(command, args, runOptions = {}) {
       if (command === "backlog") {
         const statusIndex = args.indexOf("--status");
         assert.notEqual(statusIndex, -1);
-        mainStatus = args[statusIndex + 1];
-        f.calls.push(["backlog-status", mainStatus]);
+        const nextStatus = args[statusIndex + 1];
+        if (runOptions.cwd === f.worktree) episodeStatus = nextStatus;
+        else mainStatus = nextStatus;
+        f.calls.push(["backlog-status", nextStatus, runOptions.cwd]);
         return { stdout: "", stderr: "", status: 0 };
       }
       try {
@@ -364,19 +372,43 @@ function taskLifecycleHarness(options = {}) {
       mainHead = mainHead === "1".repeat(40) ? "2".repeat(40) : "3".repeat(40);
       return mainHead;
     },
-    push() {
+    push(cwd) {
       pushCount += 1;
-      f.calls.push(["status-push", pushCount]);
+      f.calls.push(["status-push", pushCount, cwd]);
       if (options.firstPushFails && pushCount === 1) throw new Error("offline");
+      if (options.episodePushFails && cwd === f.worktree) throw new Error("episode push offline");
+      if (cwd === f.worktree) episodeUpstream = episodeHead;
     },
-    upstreamHead: () => options.upstreamHead ?? episodeHead,
+    upstreamHead: () => episodeUpstream,
     pathChangedBetween: () => options.pathChanged ?? true,
+    isAncestor: () => options.isAncestor ?? true,
+    mergeMain(worktree, mergedMain, taskPath) { f.calls.push(["merge-main", worktree, mergedMain, taskPath]); if (options.mergeError) throw options.mergeError; },
+    restoreTaskFromHead(worktree, taskPath) { f.calls.push(["restore-task", worktree, taskPath]); },
+    stagePath(worktree, taskPath) { f.calls.push(["stage-task", worktree, taskPath]); },
+    commitMerge(worktree, message) {
+      f.calls.push(["merge-commit", worktree, message]);
+      const refreshed = "c".repeat(40);
+      mergeParents.set(refreshed, [acceptedEpisodeHead, mainHead]);
+      episodeHead = refreshed;
+      return refreshed;
+    },
+    abortMerge(worktree) { f.calls.push(["merge-abort", worktree]); },
+    parents(_cwd, ref) { return options.parents ?? mergeParents.get(ref) ?? []; },
   };
-  const taskResolver = (cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? mainStatus : (options.episodeStatus ?? "In Progress") });
+  const taskResolver = (cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? mainStatus : episodeStatus });
+  const taskSnapshotResolver = (cwd) => ({
+    taskId: "PRIMECLAW-10.38",
+    taskPath: "backlog/tasks/primeclaw-10.38.md",
+    parentTaskId: options.parentTaskId ?? "PRIMECLAW-10",
+    status: cwd === f.root ? mainStatus : episodeStatus,
+    implementationPlan: "Implement one bounded lifecycle slice.",
+    contentDigest: options.contentDigest ?? "d".repeat(64),
+  });
   return {
-    f, episodeHead, lifecycleGit, runner, taskResolver,
-    deps: { ...f.deps, lifecycleGit, lifecycleRunner: runner, taskResolver },
-    get mainStatus() { return mainStatus; },
+    f, get episodeHead() { return episodeHead; }, acceptedEpisodeHead, lifecycleGit, runner, taskResolver, taskSnapshotResolver,
+    deps: { ...f.deps, lifecycleGit, reviewGit: lifecycleGit, lifecycleRunner: runner, taskResolver, taskSnapshotResolver },
+    get mainStatus() { return mainStatus; }, get episodeStatus() { return episodeStatus; }, get mainHead() { return mainHead; },
+    advanceMain() { mainHead = "4".repeat(40); },
   };
 }
 
@@ -449,6 +481,173 @@ test("Conversation publishes Blocked then resumes the same pushed task Episode b
   assert.equal(handoff.episodeId, "episode");
   assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 1);
   assert.equal(h.f.calls.some((call) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(call[0])), false);
+});
+
+test("Ready-for-Merge handshake publishes, integrates current main in the same Episode, and verifies the pushed refreshed candidate", async () => {
+  const h = taskLifecycleHarness({ firstPushFails: true });
+  const publication = publishTaskEpisodeReadyForMerge(
+    "PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps,
+  );
+  assert.equal(publication.status, "Ready for Merge");
+  assert.match(publication.pushError, /offline/);
+  assert.equal(h.mainStatus, "Ready for Merge");
+  assert.equal(publication.episodeTaskContentDigest, "d".repeat(64));
+  assert.deepEqual(h.f.calls.filter((call) => call[0] === "status-commit").map((call) => call[1]), [
+    "backlog/tasks/primeclaw-10.38.md",
+  ]);
+
+  const integration = await integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps);
+  assert.equal(integration.acceptedEpisodeHead, h.acceptedEpisodeHead);
+  assert.equal(integration.integratedMainHead, publication.commit);
+  assert.equal(integration.refreshedEpisodeHead, "c".repeat(40));
+  assert.equal(integration.pushError, undefined);
+  assert.equal(h.episodeStatus, "Ready for Merge");
+  const names = h.f.calls.map((call) => call[0]);
+  assert.ok(names.indexOf("merge-main") < names.indexOf("restore-task"));
+  assert.ok(names.indexOf("restore-task") < names.lastIndexOf("backlog-status"));
+  assert.ok(names.lastIndexOf("backlog-status") < names.indexOf("stage-task"));
+  assert.ok(names.indexOf("stage-task") < names.indexOf("merge-commit"));
+  assert.equal(names.includes("handoff"), false);
+  assert.equal(names.some((name) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(name)), false);
+
+  const verified = verifyTaskEpisodeReadyForMerge(publication, integration, h.f.ctx, h.deps);
+  assert.deepEqual(verified, {
+    verified: true,
+    taskId: "PRIMECLAW-10.38",
+    mainHead: publication.commit,
+    refreshedEpisodeHead: "c".repeat(40),
+  });
+});
+
+test("Ready-for-Merge handshake fails closed on changed content, unsafe merge, stale main, and unpushed refreshed candidate", async (t) => {
+  await t.test("owned Episode must be idle before worktree mutation", async () => {
+    const h = taskLifecycleHarness();
+    const publication = publishTaskEpisodeReadyForMerge("PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps);
+    h.f.publisher.getState = async () => ({
+      activeSessionId: "route", sessionId: "episode", sessionFile: join(h.f.root, "episode.jsonl"),
+      cwd: h.f.worktree, isSessionActive: true, isStreaming: true, isCompacting: false,
+      isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false,
+      unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: {} },
+    });
+    await assert.rejects(
+      integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps),
+      /not quiescent|idle Episode|must be idle|busy/,
+    );
+    assert.equal(h.f.calls.some((call) => call[0] === "merge-main"), false);
+  });
+  await t.test("candidate content changed after publication", async () => {
+    const h = taskLifecycleHarness();
+    const publication = publishTaskEpisodeReadyForMerge("PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps);
+    const snapshots = (cwd, id) => ({ ...h.taskSnapshotResolver(cwd, id), contentDigest: "e".repeat(64) });
+    await assert.rejects(
+      integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, { ...h.deps, taskSnapshotResolver: snapshots }),
+      /candidate content or invariant identity changed/,
+    );
+    assert.equal(h.f.calls.some((call) => call[0] === "merge-main"), false);
+  });
+  await t.test("merge conflict outside the task aborts without a refreshed commit", async () => {
+    const h = taskLifecycleHarness({ mergeError: new Error("conflict outside task") });
+    const publication = publishTaskEpisodeReadyForMerge("PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps);
+    await assert.rejects(integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps), /conflict outside task/);
+    assert.equal(h.f.calls.filter((call) => call[0] === "merge-abort").length, 1);
+    assert.equal(h.f.calls.some((call) => call[0] === "merge-commit"), false);
+    assert.equal(h.episodeStatus, "In Progress");
+  });
+  await t.test("refreshed candidate must be pushed", async () => {
+    const h = taskLifecycleHarness({ episodePushFails: true });
+    const publication = publishTaskEpisodeReadyForMerge("PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps);
+    const integration = await integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps);
+    assert.match(integration.pushError, /episode push offline/);
+    assert.throws(
+      () => verifyTaskEpisodeReadyForMerge(publication, integration, h.f.ctx, h.deps),
+      /exact refreshed Episode candidate to be pushed/,
+    );
+  });
+  await t.test("main advancing after integration makes the refreshed candidate stale", async () => {
+    const h = taskLifecycleHarness();
+    const publication = publishTaskEpisodeReadyForMerge("PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps);
+    const integration = await integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps);
+    h.advanceMain();
+    assert.throws(
+      () => verifyTaskEpisodeReadyForMerge(publication, integration, h.f.ctx, h.deps),
+      /refreshed candidate against current main/,
+    );
+  });
+});
+
+test("review snapshot digest excludes lifecycle metadata while retaining hierarchy and task content", () => {
+  const baseTask = {
+    id: "PRIMECLAW-10.38",
+    path: "backlog/tasks/primeclaw-10.38.md",
+    parentTaskId: "PRIMECLAW-10",
+    status: "In Progress",
+    updatedAt: "2026-10-13T00:00:00Z",
+    title: "Task",
+    implementationPlan: "Implement exact integration.",
+    implementationNotes: "Episode-owned evidence",
+    acceptanceCriteria: [{ id: 1, checked: true, text: "works" }],
+  };
+  const runnerFor = (task) => ({ run: () => ({ stdout: JSON.stringify({ schemaVersion: 1, kind: "task-view", task }), stderr: "", status: 0 }) });
+  const before = resolveTaskReviewSnapshot("/repo", baseTask.id, runnerFor(baseTask));
+  const lifecycleOnly = resolveTaskReviewSnapshot("/repo", baseTask.id, runnerFor({
+    ...baseTask,
+    status: "Ready for Merge",
+    updatedAt: "2026-10-13T01:00:00Z",
+    isReady: false,
+    readiness: { ready: false, blockers: ["OTHER-2"] },
+    dependencyGraph: { blockedBy: ["OTHER-2"] },
+    subtasks: [{ id: "OTHER-3" }],
+    acceptanceCriteriaCompleted: 1,
+    acceptanceCriteriaCount: 1,
+  }));
+  assert.equal(before.contentDigest, lifecycleOnly.contentDigest);
+  assert.equal(before.parentTaskId, "PRIMECLAW-10");
+  const changed = resolveTaskReviewSnapshot("/repo", baseTask.id, runnerFor({
+    ...baseTask, implementationNotes: "different Episode content",
+  }));
+  assert.notEqual(before.contentDigest, changed.contentDigest);
+});
+
+test("CLI review integration merges current main, restores the Episode task, and rejects conflicts outside it", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-ready-merge-")));
+  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Prime Claw Test");
+  git("config", "user.email", "test@example.invalid");
+  mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
+  const taskPath = "backlog/tasks/primeclaw-10.38.md";
+  writeFileSync(join(root, taskPath), "---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\nbase\n");
+  writeFileSync(join(root, "landed.txt"), "base\n");
+  writeFileSync(join(root, "shared.txt"), "base\n");
+  git("add", "-A"); git("commit", "-q", "-m", "base");
+  git("checkout", "-q", "-b", "episode");
+  writeFileSync(join(root, taskPath), "---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\nbase\nepisode evidence\n");
+  writeFileSync(join(root, "shared.txt"), "episode\n");
+  git("add", "-A"); git("commit", "-q", "-m", "episode candidate");
+  const episodeHead = git("rev-parse", "HEAD");
+  git("checkout", "-q", "main");
+  writeFileSync(join(root, taskPath), "---\nid: PRIMECLAW-10.38\nstatus: Ready for Merge\n---\nbase\n");
+  writeFileSync(join(root, "landed.txt"), "landed on main\n");
+  writeFileSync(join(root, "shared.txt"), "main\n");
+  git("add", "-A"); git("commit", "-q", "-m", "main ready");
+  const mainHead = git("rev-parse", "HEAD");
+  git("checkout", "-q", "episode");
+  const adapter = new CliTaskEpisodeAdmissionGit();
+  assert.throws(() => adapter.mergeMain(root, mainHead, taskPath), /conflicts outside/);
+  adapter.abortMerge(root);
+
+  writeFileSync(join(root, "shared.txt"), "base\n");
+  git("add", "shared.txt"); git("commit", "-q", "-m", "avoid unrelated conflict");
+  const acceptedHead = git("rev-parse", "HEAD");
+  adapter.mergeMain(root, mainHead, taskPath);
+  adapter.restoreTaskFromHead(root, taskPath);
+  assert.match(readFileSync(join(root, taskPath), "utf8"), /status: In Progress[\s\S]*episode evidence/);
+  assert.equal(readFileSync(join(root, "landed.txt"), "utf8"), "landed on main\n");
+  adapter.stagePath(root, taskPath);
+  const refreshed = adapter.commitMerge(root, "integrate main");
+  assert.deepEqual(adapter.parents(root, refreshed), [acceptedHead, mainHead]);
+  assert.equal(adapter.isAncestor(root, mainHead, refreshed), true);
+  assert.notEqual(refreshed, episodeHead);
 });
 
 test("task lifecycle publication fails closed before status mutation", async (t) => {

@@ -16,6 +16,16 @@ request an in-scope revision, pause, or consult the operator. Repeated
 speculative or adversarial review must stop rather than grow new requirements or
 implementation machinery.
 
+When a task-native candidate is accepted with no fixes remaining, the
+Conversation does not ask for merge authority from that stale candidate. The
+inactive review handshake first commits only the exact main task as `Ready for
+Merge`, then integrates current main in the same idle owned Episode worktree.
+It restores the accepted Episode task, reapplies only the Conversation-owned
+status through Backlog, preserves task content and parent identity, creates and
+pushes one exact two-parent refreshed candidate, and verifies that candidate is
+still based on current main. Only a successful verification permits an operator
+merge request. Ordinary handoff is not used at this status.
+
 Product, scope, merge, abandonment, remote transport, and destructive cleanup
 remain operator decisions.
 

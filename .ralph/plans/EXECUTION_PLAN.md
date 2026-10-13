@@ -497,6 +497,46 @@ tests and 55 host-safe Python checks with 45 container cases deselected, plus
 teardown, and manifest evidence at
 `.test-results/20261013T112716Z-81931-e0b2a21c/tier1`.
 
+#### Slice 4 progress — inactive Ready-for-Merge integration handshake (2026-10-13)
+
+Staged the final-review handshake without registering a public task-native
+surface or implementing operator outcomes. From an accepted exact pushed
+candidate, only the exact persisted top-level owner in canonical primary
+`main` may publish `Ready for Merge`. The status mutation reuses the existing
+ownership and candidate guards, commits only the clean exact task path, and
+returns best-effort push failure as evidence after the authoritative local
+commit. A supported task-view snapshot binds the accepted task path, parent,
+and all Episode-owned fields; lifecycle status, volatile update time, and derived readiness,
+dependency-graph, subtask, and acceptance-count projections are excluded from
+its digest while their owning supported fields remain bound.
+
+The same active durable Episode must be clean and idle at its exact recorded
+worktree/session. It integrates current main without handoff, admission, or
+resource creation. Merge conflicts outside the exact task abort. Within the
+Episode worktree, the accepted task is restored from the Episode parent and
+Backlog reapplies only `Ready for Merge`; the content digest and parent must
+remain exact. The resulting commit must have exactly the accepted candidate and
+current main as its parents, and its branch is pushed. Conversation verification
+then requires main not to have advanced, the exact refreshed local/upstream
+head, clean state, both parents and ancestry, unchanged task content/path/parent,
+and `Ready for Merge` in both checkouts. Until that succeeds, policy forbids
+calling the candidate ready or requesting merge authorization. Ordinary handoff
+continues to reject `Ready for Merge`.
+
+The handshake remains deliberately inactive. Delay, requested changes, merge,
+`Done`, abandonment, finalization, cleanup, coordinated activation, retained
+native receipts, and migration remain later work. No acceptance criterion is
+newly claimed; AC #8/#9 still require retained end-to-end and refreshed-candidate
+evidence.
+
+Focused validation passed 80 Node tests and 18 host-safe Python checks with 3
+container cases deselected, plus `git diff --check`. Final broad validation
+passed 153 Node tests and 59 host-safe Python checks with 45 container cases
+deselected, plus `git diff --check`. Independent review found no material
+defects. Source-mode `scripts/test-tier1.sh --probe` passed with immutable-image,
+offline-RPC, teardown, and manifest evidence at
+`.test-results/20261013T115543Z-40109-e5bf6466/tier1`.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

@@ -65,10 +65,17 @@ best-effort evidence after the local commit. No Episode-owned bytes cross
 checkouts. A task still `Blocked` on main cannot hand off. After the resumed
 status commit, ordinary handoff revalidates main `HEAD` and continues the same
 ownership, worktree, and session without creating or assigning anything.
-`Ready for Merge` integration remains a later
-review-handshake increment rather than being smuggled through this ordinary
-`In Progress` continuation seam. No public task-native handoff tool is
-registered yet.
+`Ready for Merge` is never smuggled through this ordinary `In Progress`
+continuation seam. The internal review handshake instead proves the accepted
+pushed head, publishes an exact-task-only main status commit, requires the same
+durable Episode to be idle, and integrates current main in its existing
+worktree. Only the task conflict is tolerated: the accepted Episode task is
+restored locally, Backlog applies `Ready for Merge`, all other Episode-owned
+fields and parent identity must retain the accepted digest, and the exact
+two-parent refreshed candidate must be pushed. The Conversation then verifies
+that current main and the refreshed upstream head still match before asking the
+operator for merge authority. No public task-native handoff tool is registered
+yet.
 
 The initial Episode creation is different: it starts a fresh session with one
 fixed execute assignment after bundle promotion. It does **not** run handoff.

@@ -218,11 +218,29 @@ Before delivery it proves canonical primary-main caller context, exact owner and
 task/path in main and the Episode worktree, a main task path that matches
 committed `HEAD` even when unrelated main paths are dirty, meaningful plans,
 clean owned worktree, exact Git/Orca and durable-session CWD identity, and
-quiescence. It
-binds both prompts to the exact task. It rejects `Blocked` until the Conversation
-publishes a resumed `In Progress` state, and rejects `Ready for Merge` until the
-later constrained final-integration handshake exists. Public task-native
-admission and handoff remain inactive.
+quiescence. It binds both prompts to the exact task. It rejects `Blocked` until the
+Conversation publishes a resumed `In Progress` state and always rejects `Ready
+for Merge` because ordinary continuation ends at review.
+
+The internal, deliberately unregistered final-review handshake starts only from
+an accepted exact pushed candidate. `publishTaskEpisodeReadyForMerge` reuses the
+exact owner/status guard and commits only main's task path as `Ready for Merge`;
+push remains best-effort evidence after the authoritative local commit.
+`integrateTaskEpisodeReadyForMerge` then proves the same durable Episode and
+worktree are active, exact, clean, and idle, proves current main contains the
+status commit, and accepts no merge conflict outside the bound task. Inside that
+Episode worktree it restores the accepted task from the Episode parent, changes
+only status through Backlog, and compares the supported task-view digest with
+status/update time and derived cross-task projections excluded. Task content,
+exact path, and parent identity must
+remain unchanged. All current-main changes and this reconciliation become one
+exact two-parent merge commit and the Episode branch is pushed.
+`verifyTaskEpisodeReadyForMerge` finally requires current main not to have
+advanced, the exact refreshed local/upstream head, clean worktree, both parents,
+main ancestry, and the same task digest, hierarchy, and `Ready for Merge`
+status. Only that verified refreshed candidate may be described to the operator
+as ready or used to request the separate merge decision. Public task-native
+admission, lifecycle, integration, and handoff remain inactive.
 
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and

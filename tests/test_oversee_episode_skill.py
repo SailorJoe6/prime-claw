@@ -39,6 +39,11 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "The Episode owns task content on its branch; the Conversation owns lifecycle status on main",
         "For retained version 1 folder ownership",
         "do not edit, copy, or mirror Episode-owned task content",
+        "never hand off or request merge from that head",
+        "publish `Ready for Merge`",
+        "preserve task content and parent identity",
+        "push a two-parent candidate",
+        "Only then request the operator's merge decision",
     ]:
         assert phrase in text
     assert "Bead chronology" not in raw

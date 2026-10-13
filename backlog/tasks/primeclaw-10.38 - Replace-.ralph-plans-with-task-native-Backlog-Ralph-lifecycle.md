@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 11:29'
+updated_date: '2026-10-13 11:58'
 labels:
   - backlog-md
   - episode-loop
@@ -410,4 +410,20 @@ Evidence:
 - `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC, teardown, and manifest publication verified at `.test-results/20261013T112716Z-81931-e0b2a21c/tier1`.
 
 This staged slice changes no live task Episode lifecycle because every public task admission/lifecycle/handoff/finalization surface remains inactive. It claims no acceptance criterion. In particular, AC #8 still requires retained end-to-end Episode evidence. `Ready for Merge` integration, operator outcomes, task-native close/abandonment, coordinated activation, retained native receipts, and final migration remain later work.
+
+## 2026-10-13 — staged inactive Ready-for-Merge integration handshake
+
+Added the internal final-review handshake without registering a public task lifecycle, integration, or handoff surface. From an accepted exact pushed `In Progress` candidate, `publishTaskEpisodeReadyForMerge` requires active version-2 ownership, the exact persisted top-level owner in canonical primary `main`, exact task ID/path/parent and meaningful plan, committed task bytes in both checkouts, and the accepted local/upstream Episode head with post-admission task evidence. It uses supported Backlog status mutation and commits only the exact main task path as `Ready for Merge`; unrelated main dirt remains allowed and push failure is returned as best-effort evidence after the authoritative local commit.
+
+`integrateTaskEpisodeReadyForMerge` requires the same owned durable Episode, branch, worktree, and session to be exact, clean, and idle. It proves current main contains the status commit and the accepted Episode head is still local and upstream. Conflicts outside the exact task abort. In the Episode worktree it restores the accepted task from the Episode parent and uses Backlog to apply only `Ready for Merge`. A supported task-view digest preserves every task-owned field plus exact path and parent while excluding lifecycle status, volatile update time, and derived readiness/dependency/subtask/acceptance-count projections. The refreshed commit must have exactly the accepted candidate and current main as parents. The branch is pushed; no handoff, admission, session, worktree, resource, or assignment is created.
+
+`verifyTaskEpisodeReadyForMerge` then requires main not to have advanced, the exact refreshed local/upstream head, clean worktree, exact parents and ancestry, unchanged task path/parent/content digest, and `Ready for Merge` in both checkouts. Policy permits calling the candidate ready or requesting the separate operator merge decision only after this verification. Ordinary task handoff continues to reject `Ready for Merge`.
+
+Evidence:
+- Focused: 80 Node tests and 18 host-safe Python checks passed with 3 container cases deselected; `git diff --check` passed.
+- Broad: 153 Node tests and 59 host-safe Python checks passed with 45 container cases deselected; `git diff --check` passed.
+- Independent review: no material findings.
+- `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC, teardown, and manifest publication verified at `.test-results/20261013T115543Z-40109-e5bf6466/tier1`.
+
+This slice implements no delay, request-changes, merge, `Done`, abandonment, finalization, cleanup, coordinated activation, or migration mechanics. All public task Episode surfaces remain inactive. It claims no acceptance criterion; AC #8/#9 still require retained end-to-end and refreshed-candidate receipts.
 <!-- SECTION:NOTES:END -->

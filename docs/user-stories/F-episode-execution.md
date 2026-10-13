@@ -42,7 +42,11 @@ as `Blocked`. A later accepted unblock commits only that main task path back to
 session without admission or resource creation. Main push failure is returned as
 evidence but does not invalidate a successful local status commit. Completed
 candidate work records its plan, notes, acceptance evidence, references, and
-Final Summary while leaving status unchanged for Conversation review.
+Final Summary while leaving status unchanged for Conversation review. After
+acceptance, the separate inactive review-integration seam—not ordinary execute
+or handoff—merges current main in the same idle Episode worktree, preserves that
+accepted task content, applies main's `Ready for Merge` status through Backlog,
+and pushes a refreshed candidate for Conversation verification.
 
 Retained folder mode continues to move blocked plan documents, update related
 Backlog.md tasks, and archive completed plan bundles until final cutover.

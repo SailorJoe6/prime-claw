@@ -35,9 +35,13 @@ Blocked`, and later commits `Blocked → In Progress` after the unblock is
 accepted. Both status commits touch only the exact main task path; prompt push is
 best effort. The ordinary handoff then revalidates the committed resumed state
 and routes the same ownership, worktree, and session without admission or
-resource creation. `Ready for Merge` is reserved for the later constrained
-final integration handshake. No public task-native lifecycle or handoff surface
-is registered.
+resource creation. Main `Ready for Merge` rejects ordinary handoff. The
+inactive final-review seam instead requires the same idle durable Episode,
+integrates current main in its existing worktree, preserves Episode-owned task
+content and parent identity while applying only the main-owned status, commits
+and pushes the exact two-parent refreshed candidate, and requires Conversation
+verification before any operator merge request. No public task-native lifecycle
+or handoff surface is registered.
 
 Neither path is used for consultation, pause, merge, abandonment, cleanup,
 another Episode, or scope expansion.
