@@ -74,8 +74,14 @@ restored locally, Backlog applies `Ready for Merge`, all other Episode-owned
 fields and parent identity must retain the accepted digest, and the exact
 two-parent refreshed candidate must be pushed. The Conversation then verifies
 that current main and the refreshed upstream head still match before asking the
-operator for merge authority. No public task-native handoff tool is registered
-yet.
+operator for merge authority. Delay re-verifies and retains that exact state
+without transport. Explicit Request Changes publishes main `In Progress`,
+integrates that status commit in the same Episode with the same constrained
+reconciliation, pushes and verifies a second refreshed candidate, and only then
+uses ordinary task handoff. Publication, integration, verification, and resume
+are separate retryable phases: an integration failure cannot cause another
+status transition or a duplicate admission. No public task-native handoff tool
+is registered yet.
 
 The initial Episode creation is different: it starts a fresh session with one
 fixed execute assignment after bundle promotion. It does **not** run handoff.

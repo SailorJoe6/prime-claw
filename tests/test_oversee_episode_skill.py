@@ -44,6 +44,11 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "preserve task content and parent identity",
         "push a two-parent candidate",
         "Only then request the operator's merge decision",
+        "Delay** is a strict no-op",
+        "Delay is not abandonment",
+        "Request Changes** only after the operator explicitly chooses it",
+        "Publish exact-task-only `In Progress`",
+        "Retry failed integration from its returned publication",
     ]:
         assert phrase in text
     assert "Bead chronology" not in raw

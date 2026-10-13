@@ -268,6 +268,43 @@ export type TaskEpisodeReadyVerificationResult = {
   mainHead: string;
   refreshedEpisodeHead: string;
 };
+export type TaskEpisodeReadyHandshakeEvidence = {
+  publication: TaskEpisodeReadyPublicationResult;
+  integration: TaskEpisodeReadyIntegrationResult;
+  verification: TaskEpisodeReadyVerificationResult;
+};
+export type TaskEpisodeDelayResult = TaskEpisodeReadyVerificationResult & {
+  outcome: "delayed";
+};
+export type TaskEpisodeChangesPublicationResult = TaskEpisodeLifecycleResult & {
+  status: "In Progress";
+  parentTaskId: string | null;
+  episodeTaskContentDigest: string;
+};
+export type TaskEpisodeChangesIntegrationResult = {
+  taskId: string;
+  changesCommit: string;
+  previousRefreshedEpisodeHead: string;
+  integratedMainHead: string;
+  refreshedEpisodeHead: string;
+  parentTaskId: string | null;
+  episodeTaskContentDigest: string;
+  pushError?: string;
+};
+export type TaskEpisodeChangesVerificationResult = {
+  verified: true;
+  taskId: string;
+  mainHead: string;
+  refreshedEpisodeHead: string;
+  status: "In Progress";
+};
+export type TaskEpisodeChangesResumeResult = {
+  verification: TaskEpisodeChangesVerificationResult;
+  handoff: TaskEpisodeHandoffResult;
+};
+export type TaskEpisodeOperatorDecision =
+  | { operatorDecision: "delay" }
+  | { operatorDecision: "request-changes" };
 
 function runGit(cwd: string, args: string[]): string {
   return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -334,7 +371,7 @@ export class CliTaskEpisodeAdmissionGit implements TaskEpisodeAdmissionGit {
       const conflicts = runGit(worktree, ["diff", "--name-only", "--diff-filter=U", "--"])
         .split(/\r?\n/).filter(Boolean);
       if (conflicts.length === 1 && conflicts[0] === taskPath) return;
-      throw new Error(`Ready-for-Merge integration has conflicts outside ${taskPath}: ${conflicts.join(", ") || "unknown merge failure"}`, { cause: error });
+      throw new Error(`Task-native review integration has conflicts outside ${taskPath}: ${conflicts.join(", ") || "unknown merge failure"}`, { cause: error });
     }
   }
   restoreTaskFromHead(worktree: string, taskPath: string): void {
@@ -1549,7 +1586,9 @@ function bestEffortTaskPush(git: TaskEpisodeAdmissionGit, projectRoot: string): 
 }
 
 type TaskEpisodeLifecycleTransition = {
-  expectedMainStatus: "In Progress" | "Blocked";
+  expectedMainStatus: "In Progress" | "Blocked" | "Ready for Merge";
+  expectedEpisodeStatus?: "In Progress" | "Ready for Merge";
+  expectedMainHead?: string;
   targetStatus: "Blocked" | "In Progress" | "Ready for Merge";
   message: string;
 };
@@ -1601,6 +1640,9 @@ function publishTaskEpisodeLifecycleStatus(
   if (lifecycleGit.pathStatus(projectRoot, record.taskPath) !== "") {
     throw new Error("Task-native lifecycle publication requires the exact main task path to match committed HEAD");
   }
+  if (transition.expectedMainHead && lifecycleGit.head(projectRoot) !== transition.expectedMainHead) {
+    throw new Error("Task-native lifecycle publication requires the previously verified exact main head");
+  }
   if (mainTask.status !== transition.expectedMainStatus) {
     throw new Error(`Task-native lifecycle publication requires main task status ${transition.expectedMainStatus}; found ${mainTask.status}`);
   }
@@ -1611,8 +1653,9 @@ function publishTaskEpisodeLifecycleStatus(
   const episodeTask = exactAdmissionTask(
     resolveTask(record.worktree!, taskId), taskId, record.worktree!, record.taskPath,
   );
-  if (episodeTask.status !== "In Progress") {
-    throw new Error(`Task-native lifecycle publication requires Episode task status In Progress; found ${episodeTask.status}`);
+  const expectedEpisodeStatus = transition.expectedEpisodeStatus ?? "In Progress";
+  if (episodeTask.status !== expectedEpisodeStatus) {
+    throw new Error(`Task-native lifecycle publication requires Episode task status ${expectedEpisodeStatus}; found ${episodeTask.status}`);
   }
   if (!meaningfulTaskImplementationPlan(episodeTask.implementationPlan)) {
     throw new Error("Task-native lifecycle publication requires a meaningful Episode Implementation Plan");
@@ -1755,11 +1798,34 @@ async function assertReadyIntegrationEpisodeIdle(
  * task is restored from the accepted candidate and only its Conversation-owned
  * lifecycle status is changed through Backlog before the merge commit.
  */
-export async function integrateTaskEpisodeReadyForMerge(
-  publication: TaskEpisodeReadyPublicationResult,
+type TaskEpisodeReviewTransition = {
+  label: "Ready-for-Merge" | "Request-Changes";
+  taskId: string;
+  statusCommit: string;
+  baseEpisodeHead: string;
+  expectedMainStatus: "Ready for Merge" | "In Progress";
+  expectedEpisodeStatus: "In Progress" | "Ready for Merge";
+  targetEpisodeStatus: "Ready for Merge" | "In Progress";
+  parentTaskId: string | null;
+  episodeTaskContentDigest: string;
+  mergeMessage: string;
+};
+type TaskEpisodeReviewTransitionIntegration = {
+  taskId: string;
+  statusCommit: string;
+  baseEpisodeHead: string;
+  integratedMainHead: string;
+  refreshedEpisodeHead: string;
+  parentTaskId: string | null;
+  episodeTaskContentDigest: string;
+  pushError?: string;
+};
+
+async function integrateTaskEpisodeReviewTransition(
+  transition: TaskEpisodeReviewTransition,
   ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies = {},
-): TaskEpisodeReadyIntegrationResult {
+  dependencies: TaskEpisodeReadyForMergeDependencies,
+): Promise<TaskEpisodeReviewTransitionIntegration> {
   const git = dependencies.git ?? new CliGitAdapter();
   const reviewGit = dependencies.reviewGit ?? new CliTaskEpisodeAdmissionGit();
   const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
@@ -1769,12 +1835,11 @@ export async function integrateTaskEpisodeReadyForMerge(
     ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
   const resolveSnapshot = dependencies.taskSnapshotResolver
     ?? ((cwd: string, id: string) => resolveTaskReviewSnapshot(cwd, id, runner));
-  if (publication.status !== "Ready for Merge") throw new Error("Ready-for-Merge integration requires its exact publication result");
-  const authority = resolveBlockedWorkflowAuthority(publication.taskId, ctx, { git, ownership: store, taskRunner: runner });
-  if (authority.mode !== "task") throw new Error("Ready-for-Merge integration requires task-native owner authority");
+  const authority = resolveBlockedWorkflowAuthority(transition.taskId, ctx, { git, ownership: store, taskRunner: runner });
+  if (authority.mode !== "task") throw new Error(`${transition.label} integration requires task-native owner authority`);
   const projectRoot = authority.projectRoot;
   if (!samePath(reviewGit.repositoryRoot(ctx.cwd), projectRoot) || reviewGit.branch(projectRoot) !== "main") {
-    throw new Error("Ready-for-Merge integration status boundary does not match canonical primary main");
+    throw new Error(`${transition.label} integration status boundary does not match canonical primary main`);
   }
   const record = store.read(projectRoot);
   if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
@@ -1784,41 +1849,68 @@ export async function integrateTaskEpisodeReadyForMerge(
   await assertReadyIntegrationEpisodeIdle(record, dependencies);
   git.assertCleanWorktree(record.worktree!);
   if (reviewGit.pathStatus(projectRoot, record.taskPath) !== "") {
-    throw new Error("Ready-for-Merge integration requires the exact main task path to match committed HEAD");
+    throw new Error(`${transition.label} integration requires the exact main task path to match committed HEAD`);
   }
   const mainTask = exactAdmissionTask(resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath);
   const mainSnapshot = resolveSnapshot(projectRoot, authority.taskId);
-  if (mainSnapshot.taskPath !== record.taskPath || mainSnapshot.parentTaskId !== publication.parentTaskId) {
-    throw new Error("Ready-for-Merge integration main task identity or hierarchy changed after publication");
+  if (mainSnapshot.taskPath !== record.taskPath || mainSnapshot.parentTaskId !== transition.parentTaskId) {
+    throw new Error(`${transition.label} integration main task identity or hierarchy changed after publication`);
   }
-  if (mainTask.status !== "Ready for Merge" || mainSnapshot.status !== "Ready for Merge") {
-    throw new Error(`Ready-for-Merge integration requires main task status Ready for Merge; found ${mainTask.status}`);
+  if (mainTask.status !== transition.expectedMainStatus || mainSnapshot.status !== transition.expectedMainStatus) {
+    throw new Error(`${transition.label} integration requires main task status ${transition.expectedMainStatus}; found ${mainTask.status}`);
   }
-  const publicationPaths = reviewGit.commitPaths(projectRoot, publication.commit);
+  const publicationPaths = reviewGit.commitPaths(projectRoot, transition.statusCommit);
   if (publicationPaths.length !== 1 || publicationPaths[0] !== record.taskPath) {
-    throw new Error("Ready-for-Merge publication commit must contain only the exact task path");
+    throw new Error(`${transition.label} publication commit must contain only the exact task path`);
   }
   const mainHead = reviewGit.head(projectRoot);
-  if (!reviewGit.isAncestor(projectRoot, publication.commit, mainHead)) {
-    throw new Error("Ready-for-Merge publication commit is not contained in current main");
+  if (!reviewGit.isAncestor(projectRoot, transition.statusCommit, mainHead)) {
+    throw new Error(`${transition.label} publication commit is not contained in current main`);
   }
-  if (reviewGit.head(record.worktree!) !== publication.episodeHead
-    || reviewGit.upstreamHead(record.worktree!) !== publication.episodeHead) {
-    throw new Error("Ready-for-Merge integration requires the accepted Episode head to remain exact and pushed");
-  }
+  const episodeHead = reviewGit.head(record.worktree!);
+  const upstreamHead = reviewGit.upstreamHead(record.worktree!);
   if (reviewGit.pathStatus(record.worktree!, record.taskPath) !== "") {
-    throw new Error("Ready-for-Merge integration requires committed Episode task content");
+    throw new Error(`${transition.label} integration requires committed Episode task content`);
   }
   const episodeTask = exactAdmissionTask(
     resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
   );
-  if (episodeTask.status !== "In Progress") {
-    throw new Error(`Ready-for-Merge integration requires accepted Episode status In Progress; found ${episodeTask.status}`);
-  }
   const before = resolveSnapshot(record.worktree!, authority.taskId);
-  if (before.taskPath !== record.taskPath || before.parentTaskId !== publication.parentTaskId
-    || before.contentDigest !== publication.episodeTaskContentDigest) {
-    throw new Error("Ready-for-Merge integration candidate content or invariant identity changed after acceptance");
+
+  if (episodeHead !== transition.baseEpisodeHead) {
+    const parents = reviewGit.parents(record.worktree!, episodeHead);
+    if (parents.length !== 2 || parents[0] !== transition.baseEpisodeHead || parents[1] !== mainHead
+      || episodeTask.status !== transition.targetEpisodeStatus
+      || before.status !== transition.targetEpisodeStatus
+      || before.taskPath !== record.taskPath
+      || before.parentTaskId !== transition.parentTaskId
+      || before.contentDigest !== transition.episodeTaskContentDigest) {
+      throw new Error(`${transition.label} integration local head is not the exact retryable two-parent candidate`);
+    }
+    if (upstreamHead !== transition.baseEpisodeHead && upstreamHead !== episodeHead) {
+      throw new Error(`${transition.label} integration upstream head is neither the prior nor exact refreshed candidate`);
+    }
+    const pushError = upstreamHead === episodeHead ? undefined : bestEffortTaskPush(reviewGit, record.worktree!);
+    return {
+      taskId: authority.taskId,
+      statusCommit: transition.statusCommit,
+      baseEpisodeHead: transition.baseEpisodeHead,
+      integratedMainHead: mainHead,
+      refreshedEpisodeHead: episodeHead,
+      parentTaskId: before.parentTaskId,
+      episodeTaskContentDigest: before.contentDigest,
+      ...(pushError ? { pushError } : {}),
+    };
+  }
+  if (upstreamHead !== transition.baseEpisodeHead) {
+    throw new Error(`${transition.label} integration requires the prior Episode candidate to remain exact and pushed`);
+  }
+  if (episodeTask.status !== transition.expectedEpisodeStatus) {
+    throw new Error(`${transition.label} integration requires Episode status ${transition.expectedEpisodeStatus}; found ${episodeTask.status}`);
+  }
+  if (before.taskPath !== record.taskPath || before.parentTaskId !== transition.parentTaskId
+    || before.contentDigest !== transition.episodeTaskContentDigest) {
+    throw new Error(`${transition.label} integration candidate content or invariant identity changed after status publication`);
   }
 
   let mergeStarted = false;
@@ -1826,32 +1918,30 @@ export async function integrateTaskEpisodeReadyForMerge(
     mergeStarted = true;
     reviewGit.mergeMain(record.worktree!, mainHead, record.taskPath);
     reviewGit.restoreTaskFromHead(record.worktree!, record.taskPath);
-    runner.run("backlog", ["task", "edit", "--status", "Ready for Merge", "--plain", "--", authority.taskId], { cwd: record.worktree! });
+    runner.run("backlog", ["task", "edit", "--status", transition.targetEpisodeStatus, "--plain", "--", authority.taskId], { cwd: record.worktree! });
     const mergedTask = exactAdmissionTask(
       resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
     );
     const after = resolveSnapshot(record.worktree!, authority.taskId);
-    if (mergedTask.status !== "Ready for Merge" || after.status !== "Ready for Merge") {
-      throw new Error("Ready-for-Merge integration did not retain the Conversation-owned lifecycle status");
+    if (mergedTask.status !== transition.targetEpisodeStatus || after.status !== transition.targetEpisodeStatus) {
+      throw new Error(`${transition.label} integration did not retain the Conversation-owned lifecycle status`);
     }
     if (after.parentTaskId !== before.parentTaskId || after.contentDigest !== before.contentDigest) {
-      throw new Error("Ready-for-Merge integration changed Episode-owned task content or hierarchy");
+      throw new Error(`${transition.label} integration changed Episode-owned task content or hierarchy`);
     }
     reviewGit.stagePath(record.worktree!, record.taskPath);
-    const refreshedEpisodeHead = reviewGit.commitMerge(
-      record.worktree!, `chore: integrate main for ${authority.taskId} review`,
-    );
+    const refreshedEpisodeHead = reviewGit.commitMerge(record.worktree!, transition.mergeMessage);
     mergeStarted = false;
     const parents = reviewGit.parents(record.worktree!, refreshedEpisodeHead);
-    if (parents.length !== 2 || parents[0] !== publication.episodeHead || parents[1] !== mainHead) {
-      throw new Error("Ready-for-Merge integration did not create the exact two-parent refreshed candidate");
+    if (parents.length !== 2 || parents[0] !== transition.baseEpisodeHead || parents[1] !== mainHead) {
+      throw new Error(`${transition.label} integration did not create the exact two-parent refreshed candidate`);
     }
     git.assertCleanWorktree(record.worktree!);
     const pushError = bestEffortTaskPush(reviewGit, record.worktree!);
     return {
       taskId: authority.taskId,
-      readyCommit: publication.commit,
-      acceptedEpisodeHead: publication.episodeHead,
+      statusCommit: transition.statusCommit,
+      baseEpisodeHead: transition.baseEpisodeHead,
       integratedMainHead: mainHead,
       refreshedEpisodeHead,
       parentTaskId: after.parentTaskId,
@@ -1862,6 +1952,36 @@ export async function integrateTaskEpisodeReadyForMerge(
     if (mergeStarted) { try { reviewGit.abortMerge(record.worktree!); } catch { /* preserve original integration failure */ } }
     throw error;
   }
+}
+
+export async function integrateTaskEpisodeReadyForMerge(
+  publication: TaskEpisodeReadyPublicationResult,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeReadyForMergeDependencies = {},
+): Promise<TaskEpisodeReadyIntegrationResult> {
+  if (publication.status !== "Ready for Merge") throw new Error("Ready-for-Merge integration requires its exact publication result");
+  const integrated = await integrateTaskEpisodeReviewTransition({
+    label: "Ready-for-Merge",
+    taskId: publication.taskId,
+    statusCommit: publication.commit,
+    baseEpisodeHead: publication.episodeHead,
+    expectedMainStatus: "Ready for Merge",
+    expectedEpisodeStatus: "In Progress",
+    targetEpisodeStatus: "Ready for Merge",
+    parentTaskId: publication.parentTaskId,
+    episodeTaskContentDigest: publication.episodeTaskContentDigest,
+    mergeMessage: `chore: integrate main for ${publication.taskId} review`,
+  }, ctx, dependencies);
+  return {
+    taskId: integrated.taskId,
+    readyCommit: integrated.statusCommit,
+    acceptedEpisodeHead: integrated.baseEpisodeHead,
+    integratedMainHead: integrated.integratedMainHead,
+    refreshedEpisodeHead: integrated.refreshedEpisodeHead,
+    parentTaskId: integrated.parentTaskId,
+    episodeTaskContentDigest: integrated.episodeTaskContentDigest,
+    ...(integrated.pushError ? { pushError: integrated.pushError } : {}),
+  };
 }
 
 /** Verify the pushed refreshed candidate before any operator merge decision. */
@@ -1935,6 +2055,193 @@ export function verifyTaskEpisodeReadyForMerge(
     mainHead: integration.integratedMainHead,
     refreshedEpisodeHead: integration.refreshedEpisodeHead,
   };
+}
+
+async function verifyReadyOperatorDecision(
+  evidence: TaskEpisodeReadyHandshakeEvidence,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeReadyForMergeDependencies,
+): Promise<TaskEpisodeReadyVerificationResult> {
+  const current = verifyTaskEpisodeReadyForMerge(evidence.publication, evidence.integration, ctx, dependencies);
+  if (!evidence.verification.verified
+    || evidence.verification.taskId !== current.taskId
+    || evidence.verification.mainHead !== current.mainHead
+    || evidence.verification.refreshedEpisodeHead !== current.refreshedEpisodeHead) {
+    throw new Error("Operator outcome requires the previously verified exact refreshed candidate and current main");
+  }
+  const git = dependencies.git ?? new CliGitAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
+  const authority = resolveBlockedWorkflowAuthority(current.taskId, ctx, { git, ownership: store, taskRunner: runner });
+  if (authority.mode !== "task") throw new Error("Operator outcome requires task-native owner authority");
+  const record = store.read(authority.projectRoot);
+  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
+  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
+  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before an operator outcome`);
+  await assertReadyIntegrationEpisodeIdle(record, dependencies);
+  return current;
+}
+
+/** Record the reversible Delay decision without mutating or transporting any state. */
+export async function delayTaskEpisodeReadyForMerge(
+  evidence: TaskEpisodeReadyHandshakeEvidence,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeReadyForMergeDependencies = {},
+  decision: TaskEpisodeOperatorDecision,
+): Promise<TaskEpisodeDelayResult> {
+  if (decision.operatorDecision !== "delay") {
+    throw new Error("Delay requires the explicit operator Delay decision");
+  }
+  const verified = await verifyReadyOperatorDecision(evidence, ctx, dependencies);
+  return { ...verified, outcome: "delayed" };
+}
+
+export function verifyTaskEpisodeChangesRequested(
+  publication: TaskEpisodeChangesPublicationResult,
+  integration: TaskEpisodeChangesIntegrationResult,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeReadyForMergeDependencies,
+): TaskEpisodeChangesVerificationResult {
+  const git = dependencies.git ?? new CliGitAdapter();
+  const reviewGit = dependencies.reviewGit ?? new CliTaskEpisodeAdmissionGit();
+  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
+  const resolveTask = dependencies.taskResolver
+    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
+  const resolveSnapshot = dependencies.taskSnapshotResolver
+    ?? ((cwd: string, id: string) => resolveTaskReviewSnapshot(cwd, id, runner));
+  if (publication.status !== "In Progress"
+    || integration.taskId !== publication.taskId
+    || integration.changesCommit !== publication.commit
+    || integration.previousRefreshedEpisodeHead !== publication.episodeHead
+    || integration.parentTaskId !== publication.parentTaskId
+    || integration.episodeTaskContentDigest !== publication.episodeTaskContentDigest) {
+    throw new Error("Request-Changes verification inputs do not describe one exact handshake");
+  }
+  const authority = resolveBlockedWorkflowAuthority(publication.taskId, ctx, { git, ownership: store, taskRunner: runner });
+  if (authority.mode !== "task") throw new Error("Request-Changes verification requires task-native owner authority");
+  const projectRoot = authority.projectRoot;
+  const record = store.read(projectRoot);
+  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
+  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
+  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before change verification`);
+  validateWorktreeRecord(record, git, filesystem, projectRoot);
+  if (reviewGit.head(projectRoot) !== integration.integratedMainHead) {
+    throw new Error("Request-Changes verification requires a refreshed candidate against current main");
+  }
+  if (reviewGit.pathStatus(projectRoot, record.taskPath) !== "") {
+    throw new Error("Request-Changes verification requires committed main task content");
+  }
+  const mainTask = exactAdmissionTask(resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath);
+  const mainSnapshot = resolveSnapshot(projectRoot, authority.taskId);
+  if (mainTask.status !== "In Progress" || mainSnapshot.status !== "In Progress") {
+    throw new Error(`Request-Changes verification requires main status In Progress; found ${mainTask.status}`);
+  }
+  if (mainSnapshot.taskPath !== record.taskPath || mainSnapshot.parentTaskId !== publication.parentTaskId) {
+    throw new Error("Request-Changes verification found changed main task identity or hierarchy");
+  }
+  if (reviewGit.head(record.worktree!) !== integration.refreshedEpisodeHead
+    || reviewGit.upstreamHead(record.worktree!) !== integration.refreshedEpisodeHead) {
+    throw new Error("Request-Changes verification requires the exact refreshed Episode candidate to be pushed");
+  }
+  git.assertCleanWorktree(record.worktree!);
+  const episodeTask = exactAdmissionTask(
+    resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
+  );
+  const snapshot = resolveSnapshot(record.worktree!, authority.taskId);
+  if (episodeTask.status !== "In Progress" || snapshot.status !== "In Progress"
+    || snapshot.parentTaskId !== publication.parentTaskId
+    || snapshot.contentDigest !== publication.episodeTaskContentDigest) {
+    throw new Error("Request-Changes refreshed candidate does not preserve exact task content, hierarchy, and status");
+  }
+  const parents = reviewGit.parents(record.worktree!, integration.refreshedEpisodeHead);
+  if (parents.length !== 2
+    || parents[0] !== integration.previousRefreshedEpisodeHead
+    || parents[1] !== integration.integratedMainHead
+    || !reviewGit.isAncestor(projectRoot, publication.commit, integration.integratedMainHead)
+    || !reviewGit.isAncestor(record.worktree!, integration.previousRefreshedEpisodeHead, integration.refreshedEpisodeHead)) {
+    throw new Error("Request-Changes refreshed candidate does not contain the exact verified candidate and current main");
+  }
+  return {
+    verified: true,
+    taskId: authority.taskId,
+    mainHead: integration.integratedMainHead,
+    refreshedEpisodeHead: integration.refreshedEpisodeHead,
+    status: "In Progress",
+  };
+}
+
+/** Publish an explicit Request Changes decision against exact verified review evidence. */
+export async function publishTaskEpisodeChangesRequested(
+  evidence: TaskEpisodeReadyHandshakeEvidence,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeReadyForMergeDependencies = {},
+  decision: TaskEpisodeOperatorDecision,
+): Promise<TaskEpisodeChangesPublicationResult> {
+  if (decision.operatorDecision !== "request-changes") {
+    throw new Error("Request Changes requires explicit operator authority");
+  }
+  const prior = await verifyReadyOperatorDecision(evidence, ctx, dependencies);
+  const reversed = publishTaskEpisodeLifecycleStatus(prior.taskId, prior.refreshedEpisodeHead, ctx, {
+    expectedMainStatus: "Ready for Merge",
+    expectedEpisodeStatus: "Ready for Merge",
+    expectedMainHead: prior.mainHead,
+    targetStatus: "In Progress",
+    message: `chore: request changes for ${prior.taskId}`,
+  }, dependencies);
+  return {
+    ...reversed,
+    status: "In Progress",
+    parentTaskId: evidence.publication.parentTaskId,
+    episodeTaskContentDigest: evidence.publication.episodeTaskContentDigest,
+  };
+}
+
+/** Refresh the same Episode against the accepted Request Changes publication. */
+export async function integrateTaskEpisodeChangesRequested(
+  publication: TaskEpisodeChangesPublicationResult,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeReadyForMergeDependencies = {},
+): Promise<TaskEpisodeChangesIntegrationResult> {
+  if (publication.status !== "In Progress") {
+    throw new Error("Request-Changes integration requires its exact In Progress publication result");
+  }
+  const integrated = await integrateTaskEpisodeReviewTransition({
+    label: "Request-Changes",
+    taskId: publication.taskId,
+    statusCommit: publication.commit,
+    baseEpisodeHead: publication.episodeHead,
+    expectedMainStatus: "In Progress",
+    expectedEpisodeStatus: "Ready for Merge",
+    targetEpisodeStatus: "In Progress",
+    parentTaskId: publication.parentTaskId,
+    episodeTaskContentDigest: publication.episodeTaskContentDigest,
+    mergeMessage: `chore: integrate requested changes for ${publication.taskId}`,
+  }, ctx, dependencies);
+  return {
+    taskId: integrated.taskId,
+    changesCommit: integrated.statusCommit,
+    previousRefreshedEpisodeHead: integrated.baseEpisodeHead,
+    integratedMainHead: integrated.integratedMainHead,
+    refreshedEpisodeHead: integrated.refreshedEpisodeHead,
+    parentTaskId: integrated.parentTaskId,
+    episodeTaskContentDigest: integrated.episodeTaskContentDigest,
+    ...(integrated.pushError ? { pushError: integrated.pushError } : {}),
+  };
+}
+
+/** Verify the pushed revision candidate, then resume only through canonical handoff. */
+export async function resumeTaskEpisodeChangesRequested(
+  publication: TaskEpisodeChangesPublicationResult,
+  integration: TaskEpisodeChangesIntegrationResult,
+  guidance: string,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeReadyForMergeDependencies = {},
+): Promise<TaskEpisodeChangesResumeResult> {
+  const verification = verifyTaskEpisodeChangesRequested(publication, integration, ctx, dependencies);
+  const handoff = await handoffTaskEpisode(publication.taskId, guidance, ctx, dependencies);
+  return { verification, handoff };
 }
 
 /**

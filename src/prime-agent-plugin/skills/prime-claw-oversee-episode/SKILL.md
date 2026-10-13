@@ -5,76 +5,64 @@ description: Supervise one exact owned Prime Claw episode through evidence-based
 
 # Oversee one owned episode
 
-Use this guidance only when the one durable Prime Claw ownership record says
-this Conversation owns one active Episode.
+Use this only when one durable Prime Claw ownership record says this
+Conversation owns one active Episode. Keep its authority mode; never mix modes
+or copy content between them.
 
-## Select the durable authority
+For version 2 task-native ownership, bind the exact Backlog task ID and
+project-relative task path. Reload it through the supported structured interface
+in canonical main and the Episode worktree. Its supported fields are the sole
+durable product and execution contract. Never consult `.ralph/plans` in this
+mode. The Episode owns task content on its branch; the Conversation owns
+lifecycle status on main. For retained version 1 folder ownership, keep the
+approved specification and plan; never substitute a task.
 
-Keep the authority mode in the ownership record. Never mix modes or copy content
-between them.
+Review one reported vertical slice at a time. Check ownership, branch,
+candidate, tree, diff, tests, docs, push, and worktree. In task mode also check
+ID, path, parent, content, acceptance evidence, plan, notes, and summary. A
+report is evidence, not approval.
 
-- For version 2 task-native ownership, bind supervision to the exact Backlog
-  task ID and project-relative task path. Reload that task through the supported
-  structured interface in the canonical main checkout and the Episode
-  worktree. The task Description, Acceptance Criteria, constraints, references,
-  documentation, Implementation Plan, Implementation Notes, modified files,
-  and Final Summary are the sole durable product and execution contract. Never
-  consult `.ralph/plans` in this mode. The Episode owns task content on its
-  branch; the Conversation owns lifecycle status on main.
-- For retained version 1 folder ownership, keep the approved specification and
-  execution plan as the scope boundary. Do not substitute a Backlog task for
-  that exact folder authority.
+Choose one disposition:
 
-Review one reported vertical slice at a time. Reconcile the report against the
-exact ownership identity, branch, candidate commit and tree, diff, tests,
-documentation, push state, and worktree state. In task-native mode also verify
-the exact task ID, path, parent identity, branch content, acceptance evidence,
-and meaningful plan, notes, and summary. An Episode report is evidence, not
-approval.
-
-Choose exactly one disposition:
-
-- **Accept and advance** when the candidate is within approved scope, evidence is
-  sufficient, required checks pass, and the next bounded slice is already
-  approved.
-- **Request an in-scope revision** when a concrete defect violates the approved
-  contract. Record the acceptance decision and evidence in Conversation context
-  before continuation. In task-native mode, send the accepted bounded finding
-  through the exact task handoff; do not edit, copy, or mirror Episode-owned
-  task content from the Conversation checkout.
-- **Pause** when work should stop without a product decision.
+- **Accept and advance** only when scope and evidence are sound and the next
+  bounded slice is approved.
+- **Request an in-scope revision** only for a concrete contract defect. Record
+  the decision before continuation. In task mode, send the accepted finding by
+  exact task handoff; do not edit, copy, or mirror Episode-owned task content.
+- **Pause** without a product decision.
 - **Consult the operator** for scope, product, merge, abandonment, destructive
-  cleanup, conflicting evidence, or an unresolved blocker.
+  cleanup, conflicting evidence, or unresolved blockers.
 
-Never implement the Episode's work or steer it through ordinary chat. For an
-accepted advance or revision, use only the canonical handoff for the exact
-owned idle Episode and its current authority mode. Admission is not completion;
-inspect the next report before deciding again. Do not retry uncertain transport.
+Never implement or steer through ordinary chat. Continue only by canonical
+handoff to the exact owned idle Episode. Admission is not completion. Inspect
+the next report. Do not retry uncertain transport.
 
-For an accepted task-native no-fix candidate, never hand off or request merge
-from that head. The handshake must publish `Ready for Merge`, integrate
-main in the idle Episode, preserve task content and parent identity, push a
-two-parent candidate, and verify its head, ancestry, digest, hierarchy, and
-status. Only then request the operator's merge decision. Any uncertain or stale
-step stops without continuation or a merge request.
+For an accepted task candidate with no fixes, never hand off or request merge
+from that head. The handshake must publish `Ready for Merge`, integrate main in
+the idle Episode, preserve task content and parent identity, push a two-parent
+candidate, and verify head, ancestry, digest, hierarchy, and status. Only then
+request the operator's merge decision. Stale or uncertain evidence stops.
 
-When project policy requires independent review or a concrete material risk
-warrants it, load and follow the managed `prime-claw-expert-review` skill. Treat
-every review conclusion as evidence, not product, merge, or owner authority. A
-finding may block only when it demonstrates a concrete material defect against
-the operator-approved product contract. Speculative hardening, theoretical edge
-cases, alternative architecture, and reviewer-invented invariants are
-non-blocking and must not become scope without operator approval.
+On that verified candidate, **Delay** is a strict no-op. Keep main, candidate,
+ownership, and idle Episode unchanged. Send no transport. Delay is not
+abandonment. Apply **Request Changes** only after the operator explicitly
+chooses it against the still-current handshake. Publish exact-task-only
+`In Progress` on canonical main. Integrate it in the same Episode while
+preserving task content and identity. Push and verify the new two-parent
+candidate. Only then use canonical task handoff with accepted in-scope focus.
+Retry failed integration from its returned publication; never repeat status,
+admit another Episode, or hand off an unverified candidate.
 
-If review starts generating new requirements or hardening, stop that review loop
-and consult the operator. Do not request or implement another repair merely to
-satisfy adversarial review. If the required Expert workflow is unavailable or
-uncertain, consult the operator rather than substituting an informal reviewer.
+When required, use `prime-claw-expert-review`. Treat every review conclusion as
+evidence. A finding blocks only for a concrete material defect against the
+operator-approved product contract. Speculative hardening, alternative
+architecture, and reviewer-invented invariants are non-blocking without
+operator approval. If review invents requirements, stop that review loop and
+consult. Do not request or implement another repair merely to satisfy
+adversarial review. Do not substitute an informal reviewer for an unavailable
+required Expert.
 
-Maintain a bounded goal during substantive oversight. Create one exact heartbeat
-only while waiting for observable Episode or Expert work, remove it when the
-wait ends, and create no heartbeat while waiting for the operator.
-
-The operator alone decides scope, product direction, merge, abandonment, and
-destructive cleanup. Final bookkeeping follows verified terminal work; it never
-supplies terminal authority.
+Maintain a bounded goal. Use one exact heartbeat only while waiting for
+observable Episode or Expert work; never while waiting for the operator. The
+operator alone decides scope, product direction, merge, abandonment, and
+cleanup. Bookkeeping supplies no terminal authority.

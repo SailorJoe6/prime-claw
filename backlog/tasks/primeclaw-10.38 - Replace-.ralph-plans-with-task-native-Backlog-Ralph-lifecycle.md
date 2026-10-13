@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 11:58'
+updated_date: '2026-10-13 12:26'
 labels:
   - backlog-md
   - episode-loop
@@ -426,4 +426,21 @@ Evidence:
 - `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC, teardown, and manifest publication verified at `.test-results/20261013T115543Z-40109-e5bf6466/tier1`.
 
 This slice implements no delay, request-changes, merge, `Done`, abandonment, finalization, cleanup, coordinated activation, or migration mechanics. All public task Episode surfaces remain inactive. It claims no acceptance criterion; AC #8/#9 still require retained end-to-end and refreshed-candidate receipts.
+
+## 2026-10-13 — staged inactive reversible operator outcomes
+
+Added only Delay and Request Changes behind the deliberately unregistered task-native review boundary. `delayTaskEpisodeReadyForMerge` requires the explicit Delay decision, re-verifies the exact still-current Ready-for-Merge publication/integration/verification evidence and same idle Episode, then returns `delayed` without a status edit, merge, push, handoff, resource mutation, or other state transport. Main remains `Ready for Merge`; the refreshed candidate, ownership, branch, worktree, durable session, and resources remain exact. Delay is not abandonment.
+
+Request Changes is split into four retryable phases. `publishTaskEpisodeChangesRequested` requires the explicit operator decision, exact owning top-level Conversation in canonical primary `main`, still-current verified refreshed candidate/main, and the same idle Episode; it commits only the exact main task from `Ready for Merge` to `In Progress`, with push retained as best-effort evidence after the authoritative local commit. `integrateTaskEpisodeChangesRequested` reuses the constrained review integration: current main is merged into the same active clean idle Episode, conflicts outside the task abort, Episode-owned content is restored, only `In Progress` is applied through Backlog, content digest/path/parent identity remain exact, and a two-parent candidate is pushed. `verifyTaskEpisodeChangesRequested` requires current main, exact local/upstream head, parents and ancestry, content/hierarchy, and status. Only `resumeTaskEpisodeChangesRequested` then invokes canonical task handoff; no admission, branch, worktree, session, resource, or assignment is duplicated.
+
+Independent review found one material recovery defect: after the request integration created its merge commit, a transient Episode push failure left local HEAD advanced and made integration non-retryable. The accepted repair idempotently recognizes only the exact clean existing candidate with parents `[returned publication base, current main]`, exact target status/content/path/parent digest, and upstream at either the base or candidate. It retries or confirms only that candidate push and returns the same integration evidence without another status commit, merge, admission, resource, assignment, or journal. Tests cover fail-once push recovery followed by verification/handoff with exactly one reversal and one request merge, persistent push failure with no handoff, and retry after pre-commit merge failure.
+
+Evidence:
+- Initial focused: 76 Node tests and 11 host-safe Python checks passed; `git diff --check` passed.
+- Independent review: one actionable P1 retry finding; accepted repair implemented.
+- Repair-focused: 78 Node tests and 4 policy checks passed; rereview found no material findings.
+- Final broad: 163 Node tests and 59 host-safe Python checks passed with 45 container cases deselected; `git diff --check` passed.
+- `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC, teardown, and manifest publication verified at `.test-results/20261013T122422Z-16240-2b8e093d/tier1`.
+
+This slice adds no merge authorization, merge, `Done`, abandonment, finalization, cleanup, coordinated activation, or migration mechanics. Public task Episode surfaces remain inactive. It claims no acceptance criterion; AC #8/#9 still require retained end-to-end, refreshed-candidate, and operator-outcome receipts.
 <!-- SECTION:NOTES:END -->

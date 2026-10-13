@@ -46,7 +46,11 @@ Final Summary while leaving status unchanged for Conversation review. After
 acceptance, the separate inactive review-integration seam—not ordinary execute
 or handoff—merges current main in the same idle Episode worktree, preserves that
 accepted task content, applies main's `Ready for Merge` status through Backlog,
-and pushes a refreshed candidate for Conversation verification.
+and pushes a refreshed candidate for Conversation verification. If the operator
+then requests changes, the Conversation alone reverses main to `In Progress`;
+the same Episode receives that status only through constrained integration and
+is resumed only after the new pushed candidate verifies. Delay does not wake or
+change the Episode.
 
 Retained folder mode continues to move blocked plan documents, update related
 Backlog.md tasks, and archive completed plan bundles until final cutover.

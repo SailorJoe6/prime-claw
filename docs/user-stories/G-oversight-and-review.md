@@ -26,6 +26,16 @@ pushes one exact two-parent refreshed candidate, and verifies that candidate is
 still based on current main. Only a successful verification permits an operator
 merge request. Ordinary handoff is not used at this status.
 
+If the operator chooses Delay, the Conversation re-verifies that exact
+handshake and idle Episode but changes nothing and sends no transport. Delay is
+not abandonment. If the operator explicitly requests changes, the inactive
+outcome phases publish only the main task back to `In Progress`, integrate that
+commit in the same Episode while preserving task content and parent identity,
+push and verify a new exact two-parent candidate, and only then resume through
+canonical task handoff. A failed integration can retry from its already-returned
+publication without repeating the status transition, admission, allocation, or
+assignment.
+
 Product, scope, merge, abandonment, remote transport, and destructive cleanup
 remain operator decisions.
 

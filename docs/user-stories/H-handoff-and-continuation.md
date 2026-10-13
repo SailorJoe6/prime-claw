@@ -40,8 +40,14 @@ inactive final-review seam instead requires the same idle durable Episode,
 integrates current main in its existing worktree, preserves Episode-owned task
 content and parent identity while applying only the main-owned status, commits
 and pushes the exact two-parent refreshed candidate, and requires Conversation
-verification before any operator merge request. No public task-native lifecycle
-or handoff surface is registered.
+verification before any operator merge request. Delay preserves this exact
+review state and performs no transport. After explicit Request Changes, the
+Conversation publishes exact-task-only `In Progress`, the same idle Episode
+integrates it into a newly pushed and verified two-parent candidate, and only
+then ordinary handoff resumes that same ownership, branch, worktree, and durable
+session. A returned status publication can survive a retryable integration
+failure; no second lifecycle commit, admission, resource, or assignment is
+created. No public task-native lifecycle or handoff surface is registered.
 
 Neither path is used for consultation, pause, merge, abandonment, cleanup,
 another Episode, or scope expansion.

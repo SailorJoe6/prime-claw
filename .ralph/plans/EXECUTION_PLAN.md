@@ -537,6 +537,45 @@ defects. Source-mode `scripts/test-tier1.sh --probe` passed with immutable-image
 offline-RPC, teardown, and manifest evidence at
 `.test-results/20261013T115543Z-40109-e5bf6466/tier1`.
 
+#### Slice 5 progress — inactive reversible operator outcomes (2026-10-13)
+
+Staged only Delay and Request Changes behind the unregistered task-native review
+boundary. Delay takes an explicit operator decision, re-verifies the exact
+Ready-for-Merge publication/integration/verification evidence and current idle
+Episode, then returns `delayed` without status mutation, merge, push, handoff, or
+other transport. It retains main `Ready for Merge`, the exact refreshed
+candidate, ownership, branch, worktree, session, and resources; it is never
+abandonment.
+
+Request Changes also requires an explicit operator decision and the still-current
+verified handshake. Its phases are deliberately separate. The publication phase
+commits only the exact main task back to `In Progress` with best-effort push.
+The integration phase requires that returned commit, the same active clean idle
+Episode and exact previous refreshed upstream head; it merges current main,
+restores Episode-owned content, applies only `In Progress` through Backlog,
+preserves the content digest/path/parent, creates an exact two-parent commit, and
+pushes it. Verification requires current main, exact local/upstream head,
+parents/ancestry, task content/hierarchy, and status. Only the resume phase then
+calls canonical task handoff. This separation permits retrying integration after
+a bounded failure without repeating the status transition or creating an
+admission, resource, assignment, branch, worktree, session, or journal.
+
+No merge authorization, merge, `Done`, abandonment, finalization, cleanup,
+public activation, or migration mechanic is included. Initial focused
+validation passed 76 Node tests and 11 host-safe Python checks. Independent
+review found one material retry defect after a merge commit whose Episode push
+failed. The accepted repair recognizes only an exact clean existing two-parent
+candidate, retries or confirms only its idempotent push, and never repeats the
+status transition, merge, admission, resource, or assignment. Repair-focused
+validation passed 78 Node tests and 4 policy checks; rereview found no material
+defects. Final broad validation passed 163 Node tests and 59 host-safe Python
+checks with 45 container cases deselected, plus `git diff --check`. Source-mode
+`scripts/test-tier1.sh --probe` passed with immutable-image, offline-RPC,
+teardown, and manifest evidence at
+`.test-results/20261013T122422Z-16240-2b8e093d/tier1`. No acceptance criterion is
+newly claimed; AC #8/#9 still require retained end-to-end, refreshed-candidate,
+and operator-outcome receipts.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

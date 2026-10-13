@@ -11,7 +11,10 @@ import {
   allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
   handoffTaskEpisode, publishTaskEpisodeBlocked, publishTaskEpisodeResumed,
   publishTaskEpisodeReadyForMerge, integrateTaskEpisodeReadyForMerge,
-  verifyTaskEpisodeReadyForMerge, resolveBlockedWorkflowAuthority, resolveTaskReviewSnapshot,
+  verifyTaskEpisodeReadyForMerge, delayTaskEpisodeReadyForMerge,
+  publishTaskEpisodeChangesRequested, integrateTaskEpisodeChangesRequested,
+  verifyTaskEpisodeChangesRequested, resumeTaskEpisodeChangesRequested,
+  resolveBlockedWorkflowAuthority, resolveTaskReviewSnapshot,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
@@ -376,7 +379,10 @@ function taskLifecycleHarness(options = {}) {
       pushCount += 1;
       f.calls.push(["status-push", pushCount, cwd]);
       if (options.firstPushFails && pushCount === 1) throw new Error("offline");
-      if (options.episodePushFails && cwd === f.worktree) throw new Error("episode push offline");
+      if ((options.episodePushFails || options.failEpisodePushNumber === pushCount
+        || (options.failEpisodePushFrom && pushCount >= options.failEpisodePushFrom)) && cwd === f.worktree) {
+        throw new Error("episode push offline");
+      }
       if (cwd === f.worktree) episodeUpstream = episodeHead;
     },
     upstreamHead: () => episodeUpstream,
@@ -387,8 +393,9 @@ function taskLifecycleHarness(options = {}) {
     stagePath(worktree, taskPath) { f.calls.push(["stage-task", worktree, taskPath]); },
     commitMerge(worktree, message) {
       f.calls.push(["merge-commit", worktree, message]);
-      const refreshed = "c".repeat(40);
-      mergeParents.set(refreshed, [acceptedEpisodeHead, mainHead]);
+      const previousEpisodeHead = episodeHead;
+      const refreshed = episodeHead === acceptedEpisodeHead ? "c".repeat(40) : "d".repeat(40);
+      mergeParents.set(refreshed, [previousEpisodeHead, mainHead]);
       episodeHead = refreshed;
       return refreshed;
     },
@@ -516,6 +523,181 @@ test("Ready-for-Merge handshake publishes, integrates current main in the same E
     taskId: "PRIMECLAW-10.38",
     mainHead: publication.commit,
     refreshedEpisodeHead: "c".repeat(40),
+  });
+});
+
+async function completeReadyHandshake(h) {
+  const publication = publishTaskEpisodeReadyForMerge(
+    "PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps,
+  );
+  const integration = await integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps);
+  const verification = verifyTaskEpisodeReadyForMerge(publication, integration, h.f.ctx, h.deps);
+  return { publication, integration, verification };
+}
+
+test("Delay preserves the exact verified Ready-for-Merge state without transport", async () => {
+  const h = taskLifecycleHarness();
+  const evidence = await completeReadyHandshake(h);
+  const transportNames = new Set(["backlog-status", "status-commit", "status-push", "merge-main", "merge-commit", "handoff"]);
+  const before = h.f.calls.filter((call) => transportNames.has(call[0])).map((call) => structuredClone(call));
+  const delayed = await delayTaskEpisodeReadyForMerge(
+    evidence, h.f.ctx, h.deps, { operatorDecision: "delay" },
+  );
+  assert.deepEqual(delayed, { ...evidence.verification, outcome: "delayed" });
+  assert.equal(h.mainStatus, "Ready for Merge");
+  assert.equal(h.episodeStatus, "Ready for Merge");
+  assert.equal(h.episodeHead, evidence.verification.refreshedEpisodeHead);
+  assert.deepEqual(
+    h.f.calls.filter((call) => transportNames.has(call[0])),
+    before,
+  );
+  assert.equal(h.f.calls.filter((call) => call[0] === "ownership").length, 0);
+});
+
+test("Request Changes reverses status, refreshes the same Episode, verifies, then hands off once", async () => {
+  const h = taskLifecycleHarness();
+  const evidence = await completeReadyHandshake(h);
+  const publication = await publishTaskEpisodeChangesRequested(
+    evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" },
+  );
+  const integration = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
+  const verified = verifyTaskEpisodeChangesRequested(publication, integration, h.f.ctx, h.deps);
+  assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
+  const result = await resumeTaskEpisodeChangesRequested(
+    publication, integration, "repair only the accepted findings", h.f.ctx, h.deps,
+  );
+  assert.equal(publication.status, "In Progress");
+  assert.equal(publication.episodeHead, evidence.verification.refreshedEpisodeHead);
+  assert.equal(integration.previousRefreshedEpisodeHead, evidence.verification.refreshedEpisodeHead);
+  assert.equal(integration.refreshedEpisodeHead, "d".repeat(40));
+  assert.equal(verified.status, "In Progress");
+  assert.equal(verified.refreshedEpisodeHead, "d".repeat(40));
+  assert.deepEqual(result.verification, verified);
+  assert.equal(result.handoff.taskId, "PRIMECLAW-10.38");
+  assert.equal(h.mainStatus, "In Progress");
+  assert.equal(h.episodeStatus, "In Progress");
+  assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
+  assert.equal(h.f.calls.filter((call) => call[0] === "merge-commit").length, 2);
+  assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 1);
+  assert.equal(h.f.calls.filter((call) => call[0] === "ownership").length, 0);
+  assert.equal(h.f.calls.some((call) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(call[0])), false);
+});
+
+test("reversible operator outcomes fail closed before mutation or handoff", async (t) => {
+  await t.test("wrong decision cannot authorize Delay", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    const statusCommits = h.f.calls.filter((call) => call[0] === "status-commit").length;
+    await assert.rejects(
+      delayTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" }),
+      /explicit operator Delay decision/,
+    );
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, statusCommits);
+    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
+  });
+  await t.test("wrong decision cannot authorize Request Changes", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    const statusCommits = h.f.calls.filter((call) => call[0] === "status-commit").length;
+    await assert.rejects(
+      publishTaskEpisodeChangesRequested(evidence, h.f.ctx, h.deps, { operatorDecision: "delay" }),
+      /explicit operator authority/,
+    );
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, statusCommits);
+    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
+  });
+  await t.test("stale verified main cannot be reversed", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    h.advanceMain();
+    await assert.rejects(
+      publishTaskEpisodeChangesRequested(evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" }),
+      /refreshed candidate against current main/,
+    );
+    assert.equal(h.mainStatus, "Ready for Merge");
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 1);
+    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
+  });
+  await t.test("published reversal can retry integration without another status mutation", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    h.lifecycleGit.mergeMain = () => { throw new Error("conflict outside task"); };
+    const publication = await publishTaskEpisodeChangesRequested(
+      evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" },
+    );
+    const statusCommits = h.f.calls.filter((call) => call[0] === "status-commit").length;
+    await assert.rejects(
+      integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps),
+      /conflict outside task/,
+    );
+    assert.equal(h.mainStatus, "In Progress");
+    assert.equal(h.episodeStatus, "Ready for Merge");
+    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
+    h.lifecycleGit.mergeMain = (worktree, mergedMain, taskPath) => {
+      h.f.calls.push(["merge-main", worktree, mergedMain, taskPath]);
+    };
+    const integration = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
+    const resumed = await resumeTaskEpisodeChangesRequested(publication, integration, "retry accepted integration", h.f.ctx, h.deps);
+    assert.equal(resumed.verification.status, "In Progress");
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, statusCommits);
+    assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 1);
+  });
+  await t.test("transient candidate push retries the exact existing merge before handoff", async () => {
+    const h = taskLifecycleHarness({ failEpisodePushNumber: 4 });
+    const evidence = await completeReadyHandshake(h);
+    const publication = await publishTaskEpisodeChangesRequested(
+      evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" },
+    );
+    const first = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
+    assert.match(first.pushError, /episode push offline/);
+    const statusCommits = h.f.calls.filter((call) => call[0] === "status-commit").length;
+    const mergeCommits = h.f.calls.filter((call) => call[0] === "merge-commit").length;
+    const retried = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
+    assert.equal(retried.pushError, undefined);
+    assert.equal(retried.refreshedEpisodeHead, first.refreshedEpisodeHead);
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, statusCommits);
+    assert.equal(h.f.calls.filter((call) => call[0] === "merge-commit").length, mergeCommits);
+    const resumed = await resumeTaskEpisodeChangesRequested(publication, retried, "retry push", h.f.ctx, h.deps);
+    assert.equal(resumed.verification.status, "In Progress");
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
+    assert.equal(h.f.calls.filter((call) => call[0] === "merge-commit").length, 2);
+    assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 1);
+  });
+  await t.test("persistently unpushable requested-changes candidate is never handed off", async () => {
+    const h = taskLifecycleHarness({ failEpisodePushFrom: 4 });
+    const evidence = await completeReadyHandshake(h);
+    const publication = await publishTaskEpisodeChangesRequested(
+      evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" },
+    );
+    const first = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
+    const retried = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
+    assert.match(first.pushError, /episode push offline/);
+    assert.match(retried.pushError, /episode push offline/);
+    await assert.rejects(
+      resumeTaskEpisodeChangesRequested(publication, retried, "", h.f.ctx, h.deps),
+      /exact refreshed Episode candidate to be pushed/,
+    );
+    assert.equal(h.mainStatus, "In Progress");
+    assert.equal(h.episodeStatus, "In Progress");
+    assert.equal(h.f.calls.filter((call) => call[0] === "merge-commit").length, 2);
+    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
+  });
+  await t.test("busy Episode blocks Delay without transport", async () => {
+    const h = taskLifecycleHarness();
+    const evidence = await completeReadyHandshake(h);
+    h.f.publisher.getState = async () => ({
+      activeSessionId: "route", sessionId: "episode", sessionFile: join(h.f.root, "episode.jsonl"),
+      cwd: h.f.worktree, isSessionActive: true, isStreaming: true, isCompacting: false,
+      isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false,
+      unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: {} },
+    });
+    const before = h.f.calls.filter((call) => call[0] === "status-commit").length;
+    await assert.rejects(
+      delayTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, { operatorDecision: "delay" }),
+      /not quiescent|idle Episode|must be idle|busy/,
+    );
+    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, before);
+    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
   });
 });
 
@@ -648,6 +830,22 @@ test("CLI review integration merges current main, restores the Episode task, and
   assert.deepEqual(adapter.parents(root, refreshed), [acceptedHead, mainHead]);
   assert.equal(adapter.isAncestor(root, mainHead, refreshed), true);
   assert.notEqual(refreshed, episodeHead);
+
+  git("checkout", "-q", "main");
+  writeFileSync(join(root, taskPath), "---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\nbase\n");
+  writeFileSync(join(root, "revision.txt"), "request changes\n");
+  git("add", "-A"); git("commit", "-q", "-m", "request changes");
+  const changesMainHead = git("rev-parse", "HEAD");
+  git("checkout", "-q", "episode");
+  adapter.mergeMain(root, changesMainHead, taskPath);
+  adapter.restoreTaskFromHead(root, taskPath);
+  assert.match(readFileSync(join(root, taskPath), "utf8"), /status: In Progress[\s\S]*episode evidence/);
+  assert.equal(readFileSync(join(root, "revision.txt"), "utf8"), "request changes\n");
+  adapter.stagePath(root, taskPath);
+  const revisionCandidate = adapter.commitMerge(root, "integrate request changes");
+  assert.deepEqual(adapter.parents(root, revisionCandidate), [refreshed, changesMainHead]);
+  assert.equal(adapter.isAncestor(root, refreshed, revisionCandidate), true);
+  assert.equal(adapter.isAncestor(root, changesMainHead, revisionCandidate), true);
 });
 
 test("task lifecycle publication fails closed before status mutation", async (t) => {

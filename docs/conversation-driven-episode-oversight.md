@@ -239,8 +239,24 @@ exact two-parent merge commit and the Episode branch is pushed.
 advanced, the exact refreshed local/upstream head, clean worktree, both parents,
 main ancestry, and the same task digest, hierarchy, and `Ready for Merge`
 status. Only that verified refreshed candidate may be described to the operator
-as ready or used to request the separate merge decision. Public task-native
-admission, lifecycle, integration, and handoff remain inactive.
+as ready or used to request the separate merge decision.
+
+Two reversible operator outcomes are staged behind the same inactive boundary.
+`delayTaskEpisodeReadyForMerge` re-verifies the exact current handshake and idle
+Episode, then returns `delayed` without status mutation, merge, push, handoff, or
+other transport. It does not mean abandonment. For an explicit Request Changes
+decision, `publishTaskEpisodeChangesRequested` re-verifies the exact current
+handshake and commits only the main task back to `In Progress`; main push is
+best-effort evidence. `integrateTaskEpisodeChangesRequested` merges that current
+main into the same idle Episode, restores all Episode-owned task content, applies
+only `In Progress` through Backlog, and pushes another exact two-parent
+candidate. `verifyTaskEpisodeChangesRequested` requires its main/head/ancestry,
+task digest, hierarchy, and status to remain exact. Only
+`resumeTaskEpisodeChangesRequested` then invokes canonical task handoff. These
+phases preserve the successful status publication across a retryable integration
+failure without a journal, duplicate status transition, new admission, or new
+resource. Public task-native admission, lifecycle, integration, and handoff
+remain inactive.
 
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and
