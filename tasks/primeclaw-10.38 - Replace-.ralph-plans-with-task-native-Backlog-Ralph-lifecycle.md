@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 19:36'
+updated_date: '2026-10-13 19:46'
 labels:
   - backlog-md
   - episode-loop
@@ -597,7 +597,7 @@ No lifecycle status, task/bundle, production asset, ownership/resource, or accep
 
 ### Accepted next dependency — retire active `To Do` guidance
 
-The operator accepted pushed checkpoint `1ef3ce44cc0c5e6855a591af0e612bf8f2dc024c`. The next execute pass must implement only the next already-approved ordered step-4 prerequisite: re-audit and remove active guidance that creates or selects `To Do`, including the operator/project guidance and source/project `prepare` or backlog surfaces named by the approved plan. Replace it with truthful task-native lifecycle guidance that uses supported Backlog CLI behavior.
+The owning Conversation accepted pushed checkpoint `1ef3ce44cc0c5e6855a591af0e612bf8f2dc024c`. The next execute pass must implement only the next already-approved ordered step-4 prerequisite: re-audit and remove active guidance that creates or selects `To Do`, including the operator/project guidance and source/project `prepare` or backlog surfaces named by the approved plan. Replace it with truthful task-native lifecycle guidance that uses supported Backlog CLI behavior.
 
 Keep all still-unmigrated tasks and the transitional configuration intact for the later one-time migration. Do not migrate task statuses or bundles and do not remove `To Do` from final configuration in this slice. Preserve retained version-1 compatibility and all accepted activation, recovery, authority, cleanup, and exclusion behavior. Keep proof-reference normalization, requirements-inventory deletion gating, production asset retirement, `.ralph/plans` deletion, and final cutover separate. If managed plugin source changes, run the required Docker-isolated candidate validation. Independently review the bounded candidate, commit, push, report, and stop.
 
@@ -607,7 +607,7 @@ Re-audited the named operator, project, source/project `prepare`, Backlog, and c
 
 Replaced those active selection paths with the supported repeatable-status `In Design` plus `In Planning` discovery command. New ordinary task examples now pass `--status "In Design"` explicitly. Removed generic claim, completion, and archive examples that bypassed the accepted task-native phase and Conversation authority, and replaced them with truthful `/design` or `/spec-it-out`, `/plan TASK-ID`, `/implement-task TASK-ID`, and owning Conversation lifecycle guidance. Focused static coverage protects the named operator/project/source surfaces, explicit authoring status, generic source `prepare` behavior, and the absence of an active `To Do` selector.
 
-The supported CLI accepted the repeated-status list command and returned a versioned `task-list`. Focused validation passed 18 host-safe tests with 8 container cases deselected. The curated broad candidate passed 229 Node tests and 68 host-safe Python tests with 45 container cases deselected, plus `git diff --check`. Independent read-only review found no material defects and approved the bounded candidate. No managed plugin source changed, so Docker Tier 1 is not required by repository policy.
+The supported CLI accepted the repeated-status list command and returned a versioned `task-list`. Focused validation passed 18 host-safe tests with 8 container cases deselected. The curated broad candidate passed 229 Node tests and 68 host-safe Python tests with 45 container cases deselected, plus `git diff --check`. Independent read-only review reported no material defects. No managed plugin source changed, so Docker Tier 1 is not required by repository policy.
 
 The still-unmigrated tasks and transitional `backlog/config.yml` remain intact; `To Do` is still the temporary configured default/selectable migration state. No task status, bundle, production asset, retained version-1 compatibility, accepted activation/recovery/authority behavior, or acceptance criterion changed. Proof-reference normalization, requirements-inventory deletion gating, production asset retirement, `.ralph/plans` deletion, and final cutover remain separate.
 <!-- SECTION:NOTES:END -->
