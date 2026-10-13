@@ -667,6 +667,19 @@ Python checks with 45 container cases deselected, plus `git diff --check`.
 Source-mode Docker Tier-1 passed with immutable-image, offline-RPC, teardown, and
 manifest evidence at `.test-results/20261013T140634Z-37005-1a3b77c9/tier1`.
 
+An accepted in-scope follow-up revision remains for the next execute pass. Before
+any canonical-main task restore, Backlog edit, or archive mutation, compute the
+exact archive destination and fail closed when it already exists from tracked
+history. Backlog deliberately reuses archived IDs, and a same-ID/same-title
+archive currently succeeds by replacing the historical file, leaving active
+`D` plus archive `M` only after mutation. Preserve the already-authorized exact
+task-preparation, archive-move/stage, and committed-child recovery states, where
+the destination is expected as part of the partial state. Add a clean-Git real
+vendored-CLI regression proving collision rejection occurs before mutation,
+historical archive bytes remain exact, the active task remains present, and
+main remains clean. Keep the repair inside Prime Claw; do not patch Backlog or
+add recovery machinery.
+
 No actual abandonment, status change, archive, finalization, cleanup, public
 activation, or migration occurred. No acceptance criterion is newly claimed;
 AC #8/#9 still require retained end-to-end and operator-outcome receipts.
