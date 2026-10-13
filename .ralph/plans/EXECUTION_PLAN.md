@@ -745,6 +745,16 @@ No actual finalization, resource deletion, abandonment, merge, status change,
 public activation, host-adapter registration, migration, or acceptance-criterion
 claim occurred. The live Episode ownership and resources remain unchanged.
 
+The operator accepted checkpoint
+`e3266cafb426c291579c6206c5e987e466d4e160`, including the complete inactive
+task-native lifecycle mechanics through finalization and cleanup. The next
+bounded execute pass is the already-approved coherent task-native public
+activation plus its required host cleanup adapter. Preserve retained folder
+compatibility until final migration/cutover, exact task/Episode ownership,
+operator authority for merge, abandonment, and destructive cleanup, supported
+Prime Agent and Backlog interfaces, Docker-only plugin validation, and no
+unrelated scope.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

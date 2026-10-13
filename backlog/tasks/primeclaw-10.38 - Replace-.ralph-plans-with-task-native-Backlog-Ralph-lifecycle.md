@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 15:34'
+updated_date: '2026-10-13 15:49'
 labels:
   - backlog-md
   - episode-loop
@@ -489,4 +489,8 @@ Cleanup accepts only exact monotonic states: all resources present, runtime abse
 Independent review found two material defects. The first bound cleanup to the stale allocation-time ownership head; the repair explicitly binds the terminal Episode head, proves admission-base ancestry while resources exist, and uses that head for worktree/branch identity. The second made all-absent abandonment replay depend on the deliberately deleted Episode ref; stage 3 now skips only that impossible ancestry check while preserving canonical-main terminal proof. Final rereview found no material findings.
 
 Final evidence: 132 focused task-native Node tests, 4 retained close tests, and 4 oversight policy checks; 217 broad Node tests and 59 host-safe Python checks with 45 container cases deselected; `git diff --check`; Docker Tier-1 `.test-results/20261013T153144Z-87272-78cdefce/tier1`. No actual cleanup, finalization, resource deletion, merge, abandonment, status change, public activation, host adapter, vendor/Prime Agent patch, migration, or new acceptance claim occurred. Live ownership/resources remain unchanged.
+
+### Accepted next dependency — coherent task-native public activation and host adapter
+
+The operator accepted clean checkpoint `e3266cafb426c291579c6206c5e987e466d4e160`, including the complete inactive task-native lifecycle mechanics through finalization and cleanup. The next bounded execute pass is the already-approved coherent task-native public activation plus its required host cleanup adapter. Preserve retained folder compatibility until final migration/cutover, exact task/Episode ownership, operator authority for merge, abandonment, and destructive cleanup, supported Prime Agent and Backlog interfaces, Docker-only plugin validation, and no unrelated scope.
 <!-- SECTION:NOTES:END -->
