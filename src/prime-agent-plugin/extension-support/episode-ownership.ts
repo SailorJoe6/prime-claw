@@ -24,6 +24,7 @@ interface EpisodeOwnershipBase {
   episodeSessionFile?: string;
   episodeActiveSessionId?: string;
   terminalHandle?: string;
+  terminalHandles?: string[];
   worktreeName?: string;
   launchAutomationName?: string;
   launchAutomationId?: string;
@@ -60,7 +61,7 @@ const OPTIONAL_STRING_FIELDS = [
   "launchAutomationName", "launchAutomationId", "launchRunId", "uncertaintyReason",
 ] as const;
 const COMMON_RECORD_FIELDS = new Set<string>([
-  "version", "status", "engine", ...COMMON_STRING_FIELDS, ...OPTIONAL_STRING_FIELDS,
+  "version", "status", "engine", "terminalHandles", ...COMMON_STRING_FIELDS, ...OPTIONAL_STRING_FIELDS,
 ]);
 const LEGACY_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "sourceLocation", "slug", "bundleDigest"]);
 const TASK_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "taskId", "taskPath"]);
@@ -99,7 +100,11 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
     && ["provisioning", "active", "uncertain", "inactive"].includes(String(item.status))
     && ["orca", "local"].includes(String(item.engine))
     && COMMON_STRING_FIELDS.every((field) => typeof item[field] === "string" && item[field] !== "")
-    && OPTIONAL_STRING_FIELDS.every((field) => item[field] === undefined || (typeof item[field] === "string" && item[field] !== ""));
+    && OPTIONAL_STRING_FIELDS.every((field) => item[field] === undefined || (typeof item[field] === "string" && item[field] !== ""))
+    && (item.terminalHandles === undefined || (Array.isArray(item.terminalHandles)
+      && item.terminalHandles.length > 0
+      && item.terminalHandles.every((handle) => typeof handle === "string" && handle !== "")
+      && new Set(item.terminalHandles).size === item.terminalHandles.length));
   if (!common) throw new Error(`Episode ownership has an unsupported shape: ${path}`);
 
   if (item.version === 1) {
@@ -124,11 +129,19 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
   }
   if (["active", "inactive"].includes(String(item.status))) {
     const bound = ["worktree", "branch", "head", "episodeId", "episodeSessionFile"];
+    if (item.version === 2) bound.push("episodeActiveSessionId");
     if (!bound.every((field) => typeof item[field] === "string" && item[field] !== "")) {
       throw new Error(`Episode ownership is missing active bindings: ${path}`);
     }
-    if (item.engine === "orca" && !["worktreeId", "worktreeIdentity"].every((field) => typeof item[field] === "string" && item[field] !== "")) {
+    const orcaBound = item.version === 2
+      ? ["worktreeId", "worktreeIdentity", "terminalHandle"]
+      : ["worktreeId", "worktreeIdentity"];
+    if (item.engine === "orca" && !orcaBound.every((field) => typeof item[field] === "string" && item[field] !== "")) {
       throw new Error(`Episode ownership is missing active Orca bindings: ${path}`);
+    }
+    if (item.version === 2 && item.engine === "orca" && item.terminalHandles !== undefined
+      && !(item.terminalHandles as string[]).includes(String(item.terminalHandle))) {
+      throw new Error(`Episode ownership terminal inventory omits its primary terminal: ${path}`);
     }
   }
   return item as unknown as EpisodeOwnershipRecord;

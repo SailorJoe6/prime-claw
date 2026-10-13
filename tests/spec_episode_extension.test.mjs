@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
-  CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit,
+  CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit, PrimeSessionPublisher,
   EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
   allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
   handoffTaskEpisode, publishTaskEpisodeBlocked, publishTaskEpisodeResumed,
@@ -21,6 +21,7 @@ import {
   taskEpisodeCleanupResourceIdentity,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
+import { CliTaskEpisodeCleanupAdapter } from "../src/prime-agent-plugin/extension-support/task-episode-cleanup.ts";
 
 const LOCATION = ".ralph/plans/future/alpha";
 function diskFixture() {
@@ -134,7 +135,7 @@ function bindTaskOrcaHead(f) {
 }
 
 function activeTaskRecord(f, overrides = {}) {
-  return parseEpisodeOwnership({
+  const value = {
     ...taskReservation(),
     status: "active",
     worktreeName: "prime-claw-primeclaw-10-38-episode-task-oper",
@@ -145,7 +146,9 @@ function activeTaskRecord(f, overrides = {}) {
     episodeSessionFile: join(f.root, "episode.jsonl"),
     episodeActiveSessionId: "route",
     ...overrides,
-  });
+  };
+  if (value.engine === "orca" && !value.terminalHandle) value.terminalHandle = "terminal";
+  return parseEpisodeOwnership(value);
 }
 function taskSelection(f, overrides = {}) {
   const projectRoot = overrides.projectRoot ?? f.root;
@@ -2196,11 +2199,16 @@ test("reserved task allocates a local worktree from the status commit and assign
 test("reserved task allocates through exact Orca placement without bundle promotion", async () => {
   const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local" }) });
   bindTaskOrcaHead(f);
+  f.orca.listTerminals = async () => [
+    { handle: "fallback", connected: true, writable: true, agentIdentity: "shell", worktreeId: f.wt.id, worktreePath: f.wt.path, visible: true },
+    { handle: "terminal", connected: true, writable: true, agentIdentity: "prime-agent", worktreeId: f.wt.id, worktreePath: f.wt.path, tabId: "tab", leafId: "leaf", visible: true },
+  ];
   const result = await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
   assert.equal(result.version, 2);
   assert.equal(result.engine, "orca");
   assert.equal(result.status, "active");
   assert.equal(result.head, TASK_BASE);
+  assert.deepEqual(result.terminalHandles, ["fallback", "terminal"]);
   const names = f.calls.map((call) => call[0]);
   assert.ok(names.indexOf("ownership") < names.indexOf("orca-create"));
   assert.equal(names.includes("promote"), false);
@@ -2326,4 +2334,151 @@ test("task-native local mutation failure preserves bound identity as uncertain",
   assert.match(f.record.branch, /^episode\/primeclaw-10-38-task-ope/);
   assert.equal(f.record.head, TASK_BASE);
   assert.equal(f.calls.some((call) => ["fresh", "execute"].includes(call[0])), false);
+});
+
+
+test("production local cleanup adapter proves exact idle runtime, worktree, and unmerged branch removal", async () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-cleanup-host-"));
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  execFileSync("git", ["-C", root, "config", "user.name", "Fixture"]);
+  execFileSync("git", ["-C", root, "config", "user.email", "fixture@example.test"]);
+  writeFileSync(join(root, "README.md"), "base\n");
+  execFileSync("git", ["-C", root, "add", "README.md"]);
+  execFileSync("git", ["-C", root, "commit", "-qm", "base"]);
+  const base = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  const worktree = join(dirname(root), `${root.split("/").pop()}-cleanup-wt-${Date.now()}`);
+  execFileSync("git", ["-C", root, "worktree", "add", "-q", "-b", "episode-cleanup", worktree, base]);
+  writeFileSync(join(worktree, "episode.txt"), "terminal\n");
+  execFileSync("git", ["-C", worktree, "add", "episode.txt"]);
+  execFileSync("git", ["-C", worktree, "commit", "-qm", "episode"]);
+  const terminalHead = execFileSync("git", ["-C", worktree, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  const sessionFile = join(root, "episode.jsonl"); writeFileSync(sessionFile, "{}\n");
+  let rows = [{ activeSessionId: "route", sessionId: "episode", sessionFile, cwd: worktree, isSessionActive: false }];
+  const calls = []; let deleteAttempts = 0; let stateCwd = worktree;
+  const sessions = {
+    async list() { return rows.map((row) => ({ ...row })); },
+    async getState() { return { ...rows[0], cwd: stateCwd, isStreaming: false, isCompacting: false, isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null } }; },
+    async kill(id) { calls.push(["kill", id]); rows = rows.map(({ activeSessionId, ...row }) => row); },
+    async deleteSaved(path) {
+      calls.push(["delete", path]); deleteAttempts += 1;
+      if (deleteAttempts === 1) throw new Error("synthetic uncertain delete");
+      if (existsSync(path)) unlinkSync(path); rows = [];
+    },
+  };
+  const record = parseEpisodeOwnership({ version: 2, status: "active", operationId: "op", engine: "local", ownerSessionId: "owner", taskId: "PRIMECLAW-1", taskPath: "backlog/tasks/task.md", baseRef: base, createdAt: "x", updatedAt: "x", worktree, branch: "episode-cleanup", head: base, episodeId: "episode", episodeSessionFile: sessionFile, episodeActiveSessionId: "route" });
+  const adapter = new CliTaskEpisodeCleanupAdapter(root, terminalHead, { sessions });
+  rows.push({ activeSessionId: "foreign-route", sessionId: "foreign", sessionFile: join(root, "foreign.jsonl"), cwd: worktree, isSessionActive: false });
+  await assert.rejects(adapter.inspect(record), /foreign or duplicate Prime Agent session identity/);
+  rows.pop();
+  stateCwd = root;
+  assert.equal((await adapter.inspect(record)).runtime.idle, false);
+  stateCwd = worktree;
+  let snapshot = await adapter.inspect(record);
+  assert.equal(snapshot.runtime.idle, true);
+  assert.equal(snapshot.runtime.resources.head, terminalHead);
+  assert.equal(snapshot.worktree.head, terminalHead);
+  assert.equal(snapshot.branch.head, terminalHead);
+  await assert.rejects(adapter.removeRuntime(record), /synthetic uncertain delete/);
+  snapshot = await adapter.inspect(record);
+  assert.equal(snapshot.runtime.idle, true);
+  await adapter.removeRuntime(record);
+  snapshot = await adapter.inspect(record);
+  assert.equal(snapshot.runtime, undefined);
+  assert.ok(snapshot.worktree); assert.ok(snapshot.branch);
+  await adapter.removeWorktree(record);
+  snapshot = await adapter.inspect(record);
+  assert.equal(snapshot.worktree, undefined); assert.ok(snapshot.branch);
+  await adapter.removeBranch(record);
+  snapshot = await adapter.inspect(record);
+  assert.deepEqual(snapshot, {});
+  assert.deepEqual(calls, [["kill", "route"], ["delete", sessionFile], ["delete", sessionFile]]);
+});
+
+test("production cleanup adapter fails closed when a saved-session file is missing from daemon inventory", async () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-cleanup-untracked-"));
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  execFileSync("git", ["-C", root, "config", "user.name", "Fixture"]);
+  execFileSync("git", ["-C", root, "config", "user.email", "fixture@example.test"]);
+  writeFileSync(join(root, "README.md"), "base\n"); execFileSync("git", ["-C", root, "add", "."]); execFileSync("git", ["-C", root, "commit", "-qm", "base"]);
+  const head = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  const worktree = join(dirname(root), `${root.split("/").pop()}-wt`); execFileSync("git", ["-C", root, "worktree", "add", "-q", "-b", "episode-untracked", worktree, head]);
+  const sessionFile = join(root, "untracked.jsonl"); writeFileSync(sessionFile, "{}\n");
+  const record = parseEpisodeOwnership({ version: 2, status: "active", operationId: "op", engine: "local", ownerSessionId: "owner", taskId: "PRIMECLAW-1", taskPath: "backlog/tasks/task.md", baseRef: head, createdAt: "x", updatedAt: "x", worktree, branch: "episode-untracked", head, episodeId: "episode", episodeSessionFile: sessionFile, episodeActiveSessionId: "route" });
+  const sessions = { async list() { return []; }, async getState() { throw new Error("unused"); } };
+  const adapter = new CliTaskEpisodeCleanupAdapter(root, head, { sessions });
+  await assert.rejects(adapter.inspect(record), /untracked saved-session file/);
+});
+
+
+test("production Orca cleanup adapter removes one exact terminal-bearing worktree without force", async () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-cleanup-orca-"));
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  execFileSync("git", ["-C", root, "config", "user.name", "Fixture"]); execFileSync("git", ["-C", root, "config", "user.email", "fixture@example.test"]);
+  writeFileSync(join(root, "README.md"), "base\n"); execFileSync("git", ["-C", root, "add", "."]); execFileSync("git", ["-C", root, "commit", "-qm", "base"]);
+  const base = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  const worktree = join(dirname(root), `${root.split("/").pop()}-wt`); execFileSync("git", ["-C", root, "worktree", "add", "-q", "-b", "episode-orca", worktree, base]);
+  writeFileSync(join(worktree, "episode.txt"), "head\n"); execFileSync("git", ["-C", worktree, "add", "."]); execFileSync("git", ["-C", worktree, "commit", "-qm", "episode"]);
+  const head = execFileSync("git", ["-C", worktree, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  const sessionFile = join(root, "orca.jsonl"); writeFileSync(sessionFile, "{}\n");
+  let sessionRows = [{ activeSessionId: "route", sessionId: "episode", sessionFile, cwd: worktree, isSessionActive: false }];
+  let terminalPresent = true, worktreePresent = true; const calls = [];
+  const sessions = {
+    async list() { return sessionRows.map((row) => ({ ...row })); },
+    async getState() { return { ...sessionRows[0], isStreaming: false, isCompacting: false, isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null } }; },
+    async kill() { sessionRows = sessionRows.map(({ activeSessionId, ...row }) => row); },
+    async deleteSaved() { unlinkSync(sessionFile); sessionRows = []; },
+  };
+  const runner = { run(command, args, options = {}) {
+    if (command === "git") {
+      try { return { stdout: execFileSync("git", args, { cwd: options.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }), stderr: "", status: 0 }; }
+      catch (error) { return { stdout: String(error.stdout ?? ""), stderr: String(error.stderr ?? error), status: Number.isInteger(error.status) ? error.status : 1 }; }
+    }
+    assert.equal(command, "orca"); calls.push(args);
+    const ok = (result) => ({ stdout: JSON.stringify({ ok: true, result }), stderr: "", status: 0 });
+    if (args[0] === "worktree" && args[1] === "show") {
+      if (!worktreePresent) return { stdout: JSON.stringify({ ok: false, error: { code: "selector_not_found", message: "missing" } }), stderr: "", status: 1 };
+      return ok({ worktree: { id: "wt", identity: { key: "identity" }, path: worktree, branch: "refs/heads/episode-orca", head, projectHostSetupId: "setup" } });
+    }
+    if (args[0] === "terminal" && args[1] === "list") return ok({ terminals: terminalPresent ? [
+      { handle: "fallback", worktreeId: "wt", worktreePath: worktree, agentIdentity: "shell" },
+      { handle: "term", worktreeId: "wt", worktreePath: worktree, agentIdentity: "prime-agent" },
+    ] : [] });
+    if (args[0] === "terminal" && args[1] === "close") { terminalPresent = false; return ok({ closed: true }); }
+    if (args[0] === "worktree" && args[1] === "rm") { execFileSync("git", ["-C", root, "worktree", "remove", "--", worktree]); terminalPresent = false; worktreePresent = false; return ok({ removed: true }); }
+    throw new Error(`unexpected Orca command ${args.join(" ")}`);
+  } };
+  const record = parseEpisodeOwnership({ version: 2, status: "active", operationId: "op", engine: "orca", ownerSessionId: "owner", taskId: "PRIMECLAW-1", taskPath: "backlog/tasks/task.md", baseRef: base, createdAt: "x", updatedAt: "x", projectSetupId: "setup", worktreeId: "wt", worktreeIdentity: "identity", worktree, branch: "episode-orca", head: base, episodeId: "episode", episodeSessionFile: sessionFile, episodeActiveSessionId: "route", terminalHandle: "term", terminalHandles: ["fallback", "term"] });
+  const adapter = new CliTaskEpisodeCleanupAdapter(root, head, { sessions, runner });
+  assert.ok((await adapter.inspect(record)).runtime);
+  await adapter.removeRuntime(record);
+  await adapter.removeWorktree(record);
+  assert.ok((await adapter.inspect(record)).branch);
+  await adapter.removeBranch(record);
+  assert.deepEqual(await adapter.inspect(record), {});
+  assert.equal(calls.some((args) => args[0] === "terminal" && args[1] === "close"), false);
+  const remove = calls.find((args) => args[0] === "worktree" && args[1] === "rm");
+  assert.ok(remove.includes("id:wt")); assert.equal(remove.includes("--force"), false);
+});
+
+
+test("Prime cleanup host uses supported kill and delete_saved_session daemon commands", async () => {
+  const commands = [];
+  const client = {
+    async request(command) {
+      commands.push(command);
+      if (command.type === "kill") return { success: true, data: {} };
+      if (command.type === "delete_saved_session") return { success: true, data: { ok: true, method: "unlink" } };
+      throw new Error(`unexpected ${command.type}`);
+    },
+    close() {},
+  };
+  const publisher = new PrimeSessionPublisher(client);
+  await publisher.kill("route");
+  await publisher.deleteSaved("/tmp/episode.jsonl");
+  assert.deepEqual(commands, [
+    { type: "kill", activeSessionId: "route" },
+    { type: "delete_saved_session", sessionPath: "/tmp/episode.jsonl" },
+  ]);
+  const failed = new PrimeSessionPublisher({ async request() { return { success: true, data: { ok: false, error: "refused" } }; }, close() {} });
+  await assert.rejects(failed.deleteSaved("/tmp/episode.jsonl"), /refused/);
 });

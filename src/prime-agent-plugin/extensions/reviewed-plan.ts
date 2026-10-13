@@ -1,15 +1,42 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
+  abandonTaskEpisode,
   bundleContentDigest,
   createSpecEpisode,
+  createTaskEpisode,
+  delayTaskEpisodeReadyForMerge,
   episodeResultText,
+  finalizeTaskEpisodeCleanup,
   handoffSpecEpisode,
+  handoffTaskEpisode,
+  integrateTaskEpisodeChangesRequested,
+  integrateTaskEpisodeReadyForMerge,
+  mergeTaskEpisodeReadyForMerge,
+  prepareTaskEpisodeAbandonmentDecision,
+  prepareTaskEpisodeCleanupDecision,
+  publishTaskEpisodeBlocked,
+  publishTaskEpisodeChangesRequested,
+  publishTaskEpisodeReadyForMerge,
+  publishTaskEpisodeResumed,
   resolveTaskEpisodePlacement,
+  resumeTaskEpisodeChangesRequested,
+  verifyTaskEpisodeReadyForMerge,
+  CliGitAdapter,
+  HandoffFollowUpRejectedError,
+  EpisodeStateUncertainError,
   type EpisodeDependencies,
   type TaskEpisodeAdmissionOptions,
+  type TaskEpisodeChangesIntegrationResult,
+  type TaskEpisodeChangesPublicationResult,
+  type TaskEpisodeCreationDependencies,
+  type TaskEpisodeFinalizationDependencies,
+  type TaskEpisodeReadyForMergeDependencies,
+  type TaskEpisodeReadyHandshakeEvidence,
   type TaskEpisodePlacementDependencies,
+  type TaskEpisodeTerminalEvidence,
 } from "../extension-support/spec-episode.ts";
+import { CliTaskEpisodeCleanupAdapter } from "../extension-support/task-episode-cleanup.ts";
 import {
   admitPrepChain,
   admitTaskPrepChain,
@@ -161,7 +188,7 @@ export interface TaskImplementationAdmissionDependencies {
 }
 
 /**
- * Stage the inactive task-native compact-first admission chain. Placement is
+ * Admit the task-native compact-first implementation chain. Placement is
  * resolved before either workflow message, and approval is recorded only after
  * both messages are admitted.
  */
@@ -238,12 +265,223 @@ function registerPrepChainCommand(
   });
 }
 
-type ReviewedPlanDependencies = EpisodeDependencies & {
+type TaskEpisodePublicActions = {
+  create: typeof createTaskEpisode;
+  handoff: typeof handoffTaskEpisode;
+  block: typeof publishTaskEpisodeBlocked;
+  resume: typeof publishTaskEpisodeResumed;
+  readyPublish: typeof publishTaskEpisodeReadyForMerge;
+  readyIntegrate: typeof integrateTaskEpisodeReadyForMerge;
+  readyVerify: typeof verifyTaskEpisodeReadyForMerge;
+  delay: typeof delayTaskEpisodeReadyForMerge;
+  changesPublish: typeof publishTaskEpisodeChangesRequested;
+  changesIntegrate: typeof integrateTaskEpisodeChangesRequested;
+  changesResume: typeof resumeTaskEpisodeChangesRequested;
+  merge: typeof mergeTaskEpisodeReadyForMerge;
+  prepareAbandonment: typeof prepareTaskEpisodeAbandonmentDecision;
+  abandon: typeof abandonTaskEpisode;
+  prepareCleanup: typeof prepareTaskEpisodeCleanupDecision;
+  cleanup: typeof finalizeTaskEpisodeCleanup;
+};
+
+const DEFAULT_TASK_ACTIONS: TaskEpisodePublicActions = {
+  create: createTaskEpisode,
+  handoff: handoffTaskEpisode,
+  block: publishTaskEpisodeBlocked,
+  resume: publishTaskEpisodeResumed,
+  readyPublish: publishTaskEpisodeReadyForMerge,
+  readyIntegrate: integrateTaskEpisodeReadyForMerge,
+  readyVerify: verifyTaskEpisodeReadyForMerge,
+  delay: delayTaskEpisodeReadyForMerge,
+  changesPublish: publishTaskEpisodeChangesRequested,
+  changesIntegrate: integrateTaskEpisodeChangesRequested,
+  changesResume: resumeTaskEpisodeChangesRequested,
+  merge: mergeTaskEpisodeReadyForMerge,
+  prepareAbandonment: prepareTaskEpisodeAbandonmentDecision,
+  abandon: abandonTaskEpisode,
+  prepareCleanup: prepareTaskEpisodeCleanupDecision,
+  cleanup: finalizeTaskEpisodeCleanup,
+};
+
+type ReviewedPlanDependencies = EpisodeDependencies & TaskEpisodeCreationDependencies & TaskEpisodeReadyForMergeDependencies & {
   createEpisode?: typeof createSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
   taskResolver?: typeof resolveBacklogTask;
   taskImplementationApprovals?: TaskImplementationApprovalStore;
+  placementResolver?: typeof resolveTaskEpisodePlacement;
+  taskActions?: Partial<TaskEpisodePublicActions>;
+  taskCleanup?: TaskEpisodeFinalizationDependencies["cleanup"];
 };
+
+type TaskEpisodeActionParams = {
+  action: "block" | "resume" | "accept-candidate" | "delay" | "request-changes" | "merge" | "abandon" | "cleanup";
+  taskId: string;
+  episodeHead?: string;
+  guidance?: string;
+  readyReceipt?: TaskEpisodeReadyHandshakeEvidence;
+  resumeProgress?: { publication?: ReturnType<typeof publishTaskEpisodeResumed> };
+  readyProgress?: {
+    publication?: TaskEpisodeReadyHandshakeEvidence["publication"];
+    integration?: TaskEpisodeReadyHandshakeEvidence["integration"];
+  };
+  changesProgress?: {
+    publication?: TaskEpisodeChangesPublicationResult;
+    integration?: TaskEpisodeChangesIntegrationResult;
+  };
+  terminalEvidence?: TaskEpisodeTerminalEvidence;
+  finalSummary?: string;
+  confirmed?: boolean;
+};
+
+class TaskEpisodeActionPhaseError extends Error {
+  readonly details: Record<string, unknown>;
+  constructor(message: string, details: Record<string, unknown>) { super(message); this.details = details; }
+}
+
+async function runTaskEpisodeAction(
+  params: TaskEpisodeActionParams,
+  ctx: ExtensionContext,
+  dependencies: ReviewedPlanDependencies,
+): Promise<Record<string, unknown>> {
+  const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies.taskActions };
+  const taskId = params.taskId.trim();
+  if (!taskId || /\s/.test(taskId) || taskId.startsWith("-")) {
+    throw new Error("Task Episode action requires one exact Backlog task ID");
+  }
+  const requireTaskReceipt = (receiptTaskId: string | undefined, label: string) => {
+    if (receiptTaskId !== taskId) throw new Error(`${label} does not bind the exact requested task`);
+  };
+  if (params.readyProgress?.integration && !params.readyProgress.publication) {
+    throw new Error("Ready progress cannot contain integration without its publication");
+  }
+  if (params.changesProgress?.integration && !params.changesProgress.publication) {
+    throw new Error("Changes progress cannot contain integration without its publication");
+  }
+  if (params.readyReceipt) requireTaskReceipt(params.readyReceipt.publication?.taskId, "Ready receipt");
+  if (params.readyProgress?.publication) requireTaskReceipt(params.readyProgress.publication.taskId, "Ready progress");
+  if (params.changesProgress?.publication) requireTaskReceipt(params.changesProgress.publication.taskId, "Changes progress");
+  if (params.resumeProgress?.publication) requireTaskReceipt(params.resumeProgress.publication.taskId, "Resume progress");
+  if (params.terminalEvidence) requireTaskReceipt(params.terminalEvidence.result?.taskId, "Terminal evidence");
+  if (params.action === "block") {
+    if (!params.episodeHead) throw new Error("Block requires the exact pushed Episode report head");
+    return { action: params.action, result: actions.block(taskId, params.episodeHead, ctx, dependencies) };
+  }
+  if (params.action === "resume") {
+    if (!params.episodeHead && !params.resumeProgress?.publication) {
+      throw new Error("Resume requires the exact accepted blocked Episode head");
+    }
+    let publication = params.resumeProgress?.publication;
+    try {
+      publication ??= actions.resume(taskId, params.episodeHead!, ctx, dependencies);
+      const handoff = await actions.handoff(taskId, params.guidance ?? "", ctx, dependencies);
+      return { action: params.action, publication, handoff };
+    } catch (error) {
+      throw new TaskEpisodeActionPhaseError(
+        error instanceof Error ? error.message : String(error),
+        (error instanceof HandoffFollowUpRejectedError || error instanceof EpisodeStateUncertainError)
+          ? { action: params.action, resumeProgress: { ...(publication ? { publication } : {}) }, transportUncertain: true, retryable: false }
+          : { action: params.action, resumeProgress: { ...(publication ? { publication } : {}) }, retryable: true },
+      );
+    }
+  }
+  if (params.action === "accept-candidate") {
+    if (!params.episodeHead && !params.readyProgress?.publication) {
+      throw new Error("Candidate acceptance requires the exact pushed Episode candidate head");
+    }
+    let publication = params.readyProgress?.publication;
+    let integration = params.readyProgress?.integration;
+    try {
+      publication ??= actions.readyPublish(taskId, params.episodeHead!, ctx, dependencies);
+      if (!integration || integration.pushError) {
+        integration = await actions.readyIntegrate(publication, ctx, dependencies);
+      }
+      const verification = actions.readyVerify(publication, integration, ctx, dependencies);
+      return { action: params.action, readyReceipt: { publication, integration, verification } };
+    } catch (error) {
+      throw new TaskEpisodeActionPhaseError(
+        error instanceof Error ? error.message : String(error),
+        { action: params.action, readyProgress: { ...(publication ? { publication } : {}), ...(integration ? { integration } : {}) }, retryable: true },
+      );
+    }
+  }
+  if (params.action === "delay") {
+    if (!params.confirmed || !params.readyReceipt) throw new Error("Delay requires explicit operator authority and the exact Ready-for-Merge receipt");
+    return { action: params.action, result: await actions.delay(params.readyReceipt, ctx, dependencies, { operatorDecision: "delay" }) };
+  }
+  if (params.action === "request-changes") {
+    if (!params.confirmed || !params.readyReceipt) throw new Error("Request Changes requires explicit operator authority and the exact Ready-for-Merge receipt");
+    let publication = params.changesProgress?.publication;
+    let integration = params.changesProgress?.integration;
+    try {
+      publication ??= await actions.changesPublish(
+        params.readyReceipt, ctx, dependencies, { operatorDecision: "request-changes" },
+      );
+      if (!integration || integration.pushError) {
+        integration = await actions.changesIntegrate(publication, ctx, dependencies);
+      }
+      const resumed = await actions.changesResume(publication, integration, params.guidance ?? "", ctx, dependencies);
+      return { action: params.action, changesReceipt: { publication, integration, ...resumed } };
+    } catch (error) {
+      const progress = { ...(publication ? { publication } : {}), ...(integration ? { integration } : {}) };
+      throw new TaskEpisodeActionPhaseError(
+        error instanceof Error ? error.message : String(error),
+        (error instanceof HandoffFollowUpRejectedError || error instanceof EpisodeStateUncertainError)
+          ? { action: params.action, changesProgress: progress, transportUncertain: true, retryable: false }
+          : { action: params.action, changesProgress: progress, retryable: true },
+      );
+    }
+  }
+  if (params.action === "merge") {
+    if (!params.confirmed || !params.readyReceipt) {
+      throw new Error("Merge requires explicit confirmation and the exact Ready-for-Merge receipt");
+    }
+    const verified = params.readyReceipt.verification;
+    const result = await actions.merge(params.readyReceipt, ctx, dependencies, {
+      operatorDecision: "merge",
+      taskId: verified.taskId,
+      mainHead: verified.mainHead,
+      refreshedEpisodeHead: verified.refreshedEpisodeHead,
+    });
+    return { action: params.action, terminalEvidence: { outcome: "merged", result } };
+  }
+  if (params.action === "abandon") {
+    if (!params.confirmed) throw new Error("Abandon requires explicit operator confirmation");
+    if (params.terminalEvidence) {
+      if (params.terminalEvidence.outcome !== "abandoned" || !params.terminalEvidence.result.pushError) {
+        throw new Error("Abandon replay requires exact unpushed abandonment terminal evidence");
+      }
+      const decision = params.terminalEvidence.decision;
+      const result = await actions.abandon(ctx, dependencies, decision);
+      return { action: params.action, terminalEvidence: { outcome: "abandoned", decision, result } };
+    }
+    if (!params.episodeHead || !params.finalSummary) {
+      throw new Error("Abandon requires the exact pushed Episode head and truthful Final Summary");
+    }
+    const decision = actions.prepareAbandonment(
+      taskId, params.episodeHead, params.finalSummary, ctx, dependencies,
+    );
+    const result = await actions.abandon(ctx, dependencies, decision);
+    return { action: params.action, terminalEvidence: { outcome: "abandoned", decision, result } };
+  }
+  if (!params.confirmed || !params.terminalEvidence) {
+    throw new Error("Cleanup requires separate explicit confirmation and exact terminal evidence");
+  }
+  const git = dependencies.git ?? new CliGitAdapter();
+  const projectRoot = git.repositoryRoot(ctx.cwd);
+  const terminalHead = params.terminalEvidence.outcome === "merged"
+    ? params.terminalEvidence.result.mergedHead
+    : params.terminalEvidence.result.episodeHead;
+  const ownedCleanup = dependencies.taskCleanup ? undefined : new CliTaskEpisodeCleanupAdapter(projectRoot, terminalHead);
+  const cleanup = dependencies.taskCleanup ?? ownedCleanup!;
+  const cleanupDependencies = { ...dependencies, cleanup } as TaskEpisodeFinalizationDependencies;
+  try {
+    const decision = actions.prepareCleanup(taskId, params.terminalEvidence, ctx, cleanupDependencies);
+    const result = await actions.cleanup(ctx, cleanupDependencies, decision, params.terminalEvidence);
+    return { action: params.action, result };
+  } finally {
+    ownedCleanup?.close();
+  }
+}
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
@@ -291,6 +529,24 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           bundleDigest,
           skipNextAgentEnd: true,
         });
+      },
+    });
+    pi.registerCommand("implement-task", {
+      description: "Review and admit one exact planned Backlog task into an isolated implementation Episode",
+      handler: async (args, ctx) => {
+        const result = await admitTaskImplementationPrepChain(
+          pi,
+          ctx,
+          args,
+          taskImplementationApprovals,
+          {
+            taskResolver: dependencies?.taskResolver,
+            placementResolver: dependencies?.placementResolver,
+            placement: dependencies,
+            guideRoot: dependencies?.guideRoot,
+          },
+        );
+        if (!result.ok) ctx.ui.notify(result.message, result.level);
       },
     });
 
@@ -468,6 +724,44 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     });
 
     pi.registerTool({
+      name: "create_task_episode",
+      label: "Create task Episode",
+      description: "Create or return the one isolated Episode for the exact implementation-ready Backlog task admitted by the current /implement-task chain.",
+      promptSnippet: "Create one exact task-native Episode after implementation readiness succeeds",
+      promptGuidelines: [
+        "Call create_task_episode exactly once only after the current /implement-task readiness workflow approves its exact In Planning task.",
+        "Pass only the exact canonical task ID selected by the operator; placement is already bound by /implement-task and cannot be overridden here.",
+        "The host publishes In Progress, reserves ownership, creates one Episode, and sends one fixed execute assignment; never add an initial handoff or second assignment.",
+        "Treat uncertain or partial creation as a blocker. Never retry it as a fresh Episode.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: { taskId: { type: "string", description: "Exact canonical Backlog task ID admitted by /implement-task" } },
+        required: ["taskId"],
+        additionalProperties: false,
+      } as any,
+      async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+        const resolver = dependencies?.taskResolver ?? resolveBacklogTask;
+        try {
+          const task = resolver(ctx.cwd, params.taskId);
+          if (!task) throw new Error(`Backlog task ${params.taskId} is unavailable`);
+          const approval = taskImplementationApprovals.consume(ctx, task);
+          if (!approval) throw new Error("no matching active /implement-task approval");
+          const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
+          const result = await actions.create(task.taskId, toolCallId, ctx, dependencies, approval.placement);
+          return {
+            content: [{ type: "text", text: `Task Episode created for ${result.taskId}. One fixed execute assignment was admitted to ${result.episodeId}.` }],
+            details: result,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { content: [{ type: "text", text: `Task Episode creation failed: ${message}` }], details: { error: message }, isError: true };
+        }
+      },
+    });
+
+    pi.registerTool({
       name: "finalize_spec_episode",
       label: "Close specification episode bookkeeping",
       description: "Idempotently clear exact owned episode identity and oversight state after the owning conversation verifies terminal work.",
@@ -499,6 +793,91 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return { content: [{ type: "text", text: `Episode bookkeeping close failed: ${message}` }], details: { error: message }, isError: true };
+        }
+      },
+    });
+
+    pi.registerTool({
+      name: "finalize_task_episode",
+      label: "Advance or finalize task Episode lifecycle",
+      description: "Apply one exact Conversation-owned task Episode lifecycle action, preserving review receipts and explicit operator authority for outcomes and cleanup.",
+      promptSnippet: "Apply one guarded lifecycle action to the exact owned task Episode",
+      promptGuidelines: [
+        "Use finalize_task_episode only for one exact task-native Episode owned by this Conversation. Never use it for retained folder ownership.",
+        "Use block only from an accepted pushed blocker report; resume only after accepting the unblock; accept-candidate only after accepting the exact pushed candidate.",
+        "Delay, request-changes, and merge require the exact Ready receipt returned by accept-candidate and the operator's explicit decision.",
+        "Abandon requires explicit operator confirmation, the exact pushed Episode head, and a truthful Final Summary. If its returned evidence has pushError, replay abandon only with that exact terminal evidence.",
+        "Cleanup requires a separate explicit operator confirmation and the exact terminal evidence returned by Merge or Abandon. It alone may remove exact idle resources.",
+        "If a phased action returns retryable progress, retry only with that exact receipt. If it reports transportUncertain or retryable false, inspect and never retry the lifecycle action.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["block", "resume", "accept-candidate", "delay", "request-changes", "merge", "abandon", "cleanup"] },
+          taskId: { type: "string", description: "Exact canonical Backlog task ID owned by this Conversation" },
+          episodeHead: { type: "string", description: "Exact pushed Episode head for block, resume, accepted candidate, or abandonment" },
+          guidance: { type: "string", description: "Optional bounded handoff focus for resume or request-changes" },
+          resumeProgress: { type: "object", description: "Exact partial resume progress returned after a failed handoff phase" },
+          readyReceipt: { type: "object", description: "Exact Ready-for-Merge receipt returned by accept-candidate" },
+          readyProgress: { type: "object", description: "Exact partial accept-candidate progress returned after a failed phase" },
+          changesProgress: { type: "object", description: "Exact partial request-changes progress returned after a failed phase" },
+          terminalEvidence: { type: "object", description: "Exact Merge or Abandon terminal evidence returned by this tool, also used only to replay an unpushed Abandon result" },
+          finalSummary: { type: "string", description: "Truthful normalized non-success Final Summary for confirmed abandonment" },
+          confirmed: { type: "boolean", description: "True only after the operator explicitly chooses Delay, Request Changes, Merge, Abandon, or destructive Cleanup" },
+        },
+        required: ["action", "taskId"],
+        additionalProperties: false,
+      } as any,
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        try {
+          const details = await runTaskEpisodeAction(params as TaskEpisodeActionParams, ctx, dependencies ?? {});
+          return {
+            content: [{ type: "text", text: `Task Episode ${params.action} completed for ${params.taskId}. Retain the returned receipt for the next authorized boundary.` }],
+            details,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const details = error instanceof TaskEpisodeActionPhaseError
+            ? { error: message, ...error.details }
+            : { error: message, action: params.action, taskId: params.taskId };
+          return { content: [{ type: "text", text: `Task Episode ${params.action} failed: ${message}` }], details, isError: true };
+        }
+      },
+    });
+
+    pi.registerTool({
+      name: "handoff_task_episode",
+      label: "Hand off task Episode",
+      description: "Continue one exact owned idle task-native Episode after an accepted in-scope advance or recorded revision.",
+      promptSnippet: "Hand off the exact task-native Episode and queue its next execute pass",
+      promptGuidelines: [
+        "Call handoff_task_episode only after this exact owner accepts an in-scope advance or recorded revision while the task remains In Progress.",
+        "Pass only the exact canonical task ID and optional bounded focus. Never infer another task or copy Episode-owned task content.",
+        "Never use ordinary handoff for Blocked, Ready for Merge, merge, abandonment, cleanup, consultation, pause, or scope expansion.",
+        "Treat handoff as terminal routing. Never retry uncertain transport or claim compaction or execute completion from admission alone.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string", description: "Exact canonical Backlog task ID bound to the owned Episode" },
+          guidance: { type: "string", description: "Optional bounded compaction focus inside the accepted scope" },
+        },
+        required: ["taskId"],
+        additionalProperties: false,
+      } as any,
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        try {
+          const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
+          const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, dependencies);
+          return {
+            content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.` }],
+            details: result,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { content: [{ type: "text", text: `Task Episode handoff failed: ${message}` }], details: { error: message }, isError: true };
         }
       },
     });

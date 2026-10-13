@@ -42,8 +42,7 @@ prompt and queues canonical execute as the sole follow-up. Admission can be
 immediate or queued but is not completion. An uncertain transport result is
 preserved and never retried automatically.
 
-The internal, deliberately unregistered
-`handoffTaskEpisode(taskId, guidance)` seam stages the equivalent continuation
+The public `handoff_task_episode(taskId, guidance?)` tool seam stages the equivalent continuation
 for version-2 task ownership. It additionally requires the canonical primary
 checkout on `main`, the exact owner and active ownership record, the bound task
 ID and path, and main status `In Progress`. Both canonical prompts carry the
@@ -66,7 +65,7 @@ checkouts. A task still `Blocked` on main cannot hand off. After the resumed
 status commit, ordinary handoff revalidates main `HEAD` and continues the same
 ownership, worktree, and session without creating or assigning anything.
 `Ready for Merge` is never smuggled through this ordinary `In Progress`
-continuation seam. The internal review handshake instead proves the accepted
+continuation seam. The `finalize_task_episode` review handshake instead proves the accepted
 pushed head, publishes an exact-task-only main status commit, requires the same
 durable Episode to be idle, and integrates current main in its existing
 worktree. Only the task conflict is tolerated: the accepted Episode task is
@@ -81,7 +80,7 @@ reconciliation, pushes and verifies a second refreshed candidate, and only then
 uses ordinary task handoff. Publication, integration, verification, and resume
 are separate retryable phases: an integration failure cannot cause another
 status transition or a duplicate admission. Explicit Merge is not handoff: the
-inactive terminal seam binds the operator decision to the exact verified
+guarded terminal action binds the operator decision to the exact verified
 task/main/candidate, requires clean canonical main and exact main/candidate
 upstream heads, fast-forwards only to that reviewed candidate, and immediately
 commits only the exact task as `Done`. A retry recognizes only exact pre-merge,
@@ -91,11 +90,9 @@ lifecycle mutation. It also re-proves the Ready publication commit in main
 history, direct candidate ancestry, merged code, content digest,
 path, hierarchy, and status. Push or remote-verification failure is returned
 without invalidating the local `Done` commit. Ownership and every idle Episode
-resource remain active until separate finalization or cleanup authority. No
-public task-native lifecycle, handoff, merge, or finalization tool is registered
-yet.
+resource remain active until separate finalization or cleanup authority. Task-native lifecycle and terminal actions are exposed only through `finalize_task_episode`; ordinary continuation remains `handoff_task_episode`.
 
-Confirmed abandonment is also not handoff. The inactive internal seam binds the
+Confirmed abandonment is also not handoff. The guarded Abandon action binds the
 operator decision to the exact owner, task path, current main head/status,
 pushed Episode head, candidate/main relationship, parent, Episode-content
 digest, and abandonment Final Summary. It first rejects an archive destination
@@ -109,7 +106,7 @@ archival child is verified and pushed. Retry recognizes only exact task
 preparation, archival move/stage, or archival-child state. Ownership and every
 Episode resource remain active because cleanup needs separate authority.
 
-Cleanup is likewise not handoff. The inactive coordinator requires a new
+Cleanup is likewise not handoff. The separately confirmed Cleanup action requires a new
 explicit Cleanup decision bound to the exact task, owner, Episode head, branch,
 worktree, durable session/route, and all optional resource identities. The
 terminal Episode head must descend from the admission base and, rather than the
@@ -119,8 +116,7 @@ mutation, then removes only the exact idle runtime, worktree, and branch in a
 verified monotonic sequence. Ownership stays active through interruption and
 becomes inactive only after all resources are absent. Exact partial-prefix retry
 and inactive replay are idempotent. The coordinator rejects busy, dirty,
-foreign, mixed-outcome, unpushed, and out-of-order states and remains
-unregistered.
+foreign, mixed-outcome, unpushed, and out-of-order states and is exposed only through `finalize_task_episode`.
 
 The initial Episode creation is different: it starts a fresh session with one
 fixed execute assignment after bundle promotion. It does **not** run handoff.

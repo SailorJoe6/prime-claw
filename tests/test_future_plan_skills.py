@@ -349,7 +349,7 @@ def test_phase_prep_documentation_requires_docker_only_plugin_validation() -> No
         "isolated Docker Tier 1", "Never apply", "host user-global plugin",
         "python3 -m pytest tests/ -q -m container", "scripts/test-tier1.sh --probe",
         "scripts/test-all.sh", "reviewed-plan Node behavior bridge",
-        "`create_spec_episode` remains the only mechanical promotion boundary",
+        "`create_spec_episode` remains the retained folder promotion boundary",
     ):
         assert fragment in normalized
 
@@ -426,7 +426,7 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
     assert 'name: "plan_spec"' in extension
 
 
-def test_task_native_implementation_policies_are_staged_without_public_activation() -> None:
+def test_task_native_implementation_policies_are_publicly_activated_with_folder_compatibility() -> None:
     prep = " ".join(workflow("implement-task-prep").read_text().split())
     implement = " ".join(workflow("implement-task").read_text().split())
 
@@ -489,9 +489,11 @@ def test_task_native_implementation_policies_are_staged_without_public_activatio
     extension = (
         ROOT / "src" / "prime-agent-plugin" / "extensions" / "reviewed-plan.ts"
     ).read_text()
-    assert 'command: "implement-task"' not in extension
-    assert 'name: "create_task_episode"' not in extension
-    assert 'name: "handoff_task_episode"' not in extension
-    assert 'name: "finalize_task_episode"' not in extension
+    assert 'pi.registerCommand("implement-task"' in extension
+    assert 'name: "create_task_episode"' in extension
+    assert 'name: "handoff_task_episode"' in extension
+    assert 'name: "finalize_task_episode"' in extension
     assert 'command: "implement-spec"' in extension
     assert 'name: "create_spec_episode"' in extension
+    assert 'name: "handoff_spec_episode"' in extension
+    assert 'name: "finalize_spec_episode"' in extension

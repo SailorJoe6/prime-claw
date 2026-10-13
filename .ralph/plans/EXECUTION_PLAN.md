@@ -755,6 +755,55 @@ operator authority for merge, abandonment, and destructive cleanup, supported
 Prime Agent and Backlog interfaces, Docker-only plugin validation, and no
 unrelated scope.
 
+#### Slice 9 progress — public task-native activation and production cleanup host (2026-10-13)
+
+Activated the complete guarded task-native surface beside retained folder
+compatibility: `/implement-task`, `create_task_episode`,
+`handoff_task_episode`, and the single `finalize_task_episode` lifecycle
+coordinator. Creation consumes one exact post-preparation approval and its bound
+placement once. Ordinary handoff remains disjoint from blocker, final-review,
+operator-outcome, abandonment, and cleanup boundaries.
+
+The lifecycle coordinator exposes Block, Resume, Accept Candidate, Delay,
+Request Changes, Merge, Abandon, and Cleanup without exposing internal phase
+ordering. It returns exact publication, integration, Ready, changes, and
+terminal receipts; exact partial receipts resume completed phases without
+repeating lifecycle mutations. Delay and Request Changes require explicit
+operator decisions, as do Merge and Abandon. Cleanup requires a separate
+explicit decision and exact Merge or Abandon terminal evidence. Integration
+push errors replay only the existing merge head, unpushed abandonment reuses
+its original decision, and admitted or uncertain handoff transport is never
+reported as retryable.
+
+Added the production cleanup adapter over supported Prime Agent daemon, Orca
+CLI, and Git interfaces. It rejects foreign/duplicate sessions, route/file/CWD
+drift, untracked saved-session files, dirty or changed worktrees, moved branch
+heads, unsafe resource gaps, malformed/unavailable inventory, and later Orca
+terminals. Task-native Orca activation now inventories every retained terminal,
+including its fallback/default and primary Prime terminals. Cleanup deletes the
+exact idle Prime session first, then uses exact non-force Orca worktree removal
+so Orca must prove all bound PTYs stopped; local cleanup rechecks path, head,
+branch, and cleanliness at each mutation edge. The owned daemon connection is
+closed after every action.
+
+Independent architecture and cleanup reviews found material retry, authority,
+session-collision, mutation-edge, daemon-lifetime, and normal Orca-topology
+defects. Every finding was repaired and both final rereviews reported no
+material findings. Retained `/plan-spec`, `/implement-spec`, `plan_spec`,
+`create_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`
+remain active until explicit final migration/cutover.
+
+Final validation passed 181 focused Node lifecycle/cleanup checks and 4 focused
+oversight-policy checks; 228 broad Node tests and 59 host-safe Python checks
+with 45 container cases deselected; `git diff --check`; and source-mode Docker
+Tier-1 with immutable-image, offline-RPC, teardown, and manifest evidence at
+`.test-results/20261013T164613Z-92027-eedd4a14/tier1`.
+
+No live Episode lifecycle transition, merge, abandonment, finalization, cleanup,
+resource deletion, plugin activation, migration, or cutover occurred. The task
+remains `In Progress`, live ownership/resources are unchanged, and no acceptance
+criterion is newly claimed; the recorded real-session receipt gaps remain open.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

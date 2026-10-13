@@ -9,6 +9,7 @@ plan_task({"taskId":"TASK-ID"})
 /plan-spec .ralph/plans/future/<slug>
 plan_spec({"location":".ralph/plans/future/<slug>"})
 /implement-spec .ralph/plans/future/<slug> [--host id:<project-host-setup-id>]
+/implement-task TASK-ID [--host id:<project-host-setup-id>]
 ```
 
 Task planning resolves one exact task through Backlog's structured CLI and
@@ -28,9 +29,9 @@ old-layout Episode can finish from its unchanged snapshot.
 | Native `/plan-spec` | wrapped `plan-prep`, ordinary delivery | wrapped `plan-spec` |
 | `plan_spec` | wrapped `plan-prep`, `steer` delivery | wrapped `plan-spec` |
 | Native `/implement-spec` | wrapped `implement-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-spec` |
-| Staged, inactive `/implement-task` helper | wrapped `implement-task-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-task` |
+| Native `/implement-task` | wrapped `implement-task-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-task` |
 
-The task-native implementation helper is intentionally not registered. Before
+The task-native implementation chain is registered alongside the retained folder path. Before
 it admits either message, deterministic code resolves the exact `In Planning`
 task and selects one exact ready local Orca setup. A sole setup or explicit
 stable setup ID is accepted; UI cancellation, noninteractive ambiguity, no ready
@@ -54,7 +55,7 @@ current owner session, exact folder, and optional stable setup ID. The guard
 survives the prep turn, is consumed by one exact `create_spec_episode` call
 during the phase turn, and is cleared if that turn ends without creation.
 
-The staged task-native helper records the same kind of ephemeral authority only
+The task-native chain records the same kind of ephemeral authority only
 after exact placement and both workflow messages succeed. It binds owner
 session, canonical task ID, canonical task path and project root, plus the exact
 `orca` setup or proven-unavailable `local` fallback. The guard is unavailable in
@@ -62,11 +63,12 @@ the prep turn, consumable once only for the same re-resolved task during the
 semantic phase, and cleared on phase end, session start, or shutdown. Neither
 guard is a durable approval or guide receipt.
 
-`create_spec_episode` remains the only mechanical promotion boundary exposed to
-users. The staged task approval has no public consumer yet. Semantic
-readiness stays in `implement-spec`; deterministic code owns placement,
-promotion, session binding, and one fixed execute assignment. Missing or
-mismatched admission fails before lifecycle mutation.
+`create_spec_episode` remains the retained folder promotion boundary, while
+`create_task_episode` consumes only the exact matching task approval. Semantic
+readiness stays in the corresponding phase workflow; deterministic code owns
+placement, status publication, reservation, session binding, and one fixed
+execute assignment. Missing or mismatched admission fails before lifecycle
+mutation.
 
 
 ## Validation policy

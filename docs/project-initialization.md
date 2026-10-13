@@ -34,10 +34,9 @@ An initialized project contains these regular customizable files:
 - `.prime-claw/workflows/plan-task.md`
 
 The workflows are lifecycle inputs, not slash-discoverable skills. Native
-`/plan TASK-ID` and `plan_task` load `plan-task-prep` and `plan-task`. The new
-`implement-task-prep` and `implement-task` policies are reconciled but remain
-inert until task-native admission mechanics and the `/implement-task` command
-activate them coherently. The retained `implement-prep` and `implement-spec`
+`/plan TASK-ID` and `plan_task` load `plan-task-prep` and `plan-task`. `/implement-task TASK-ID` now loads the reconciled `implement-task-prep` and
+`implement-task` policies before one exact `create_task_episode` call. The
+retained `implement-prep` and `implement-spec`
 assets continue to serve existing future-folder bundles during the migration.
 The legacy `.ralph/skills` tree and `.agents/skills` symlinks are migrated away.
 `.ralph/plans` is never moved or interpreted as template content.

@@ -60,7 +60,7 @@ encode the `In Planning` structural and semantic readiness gates, the single
 a durable provisioning reservation before branch/worktree/session creation,
 clean rollback to `In Planning`, and uncertain/partial `Blocked` outcome.
 
-An inactive deterministic admission helper now resolves placement before it
+The deterministic admission helper now resolves placement before it
 queues either compact-first workflow message. It accepts one exact ready local
 Orca setup, selected automatically when sole, by stable ID, or by the native UI
 picker. Zero ready setups, remote setup, noninteractive ambiguity, and picker
@@ -94,7 +94,7 @@ reopen that same identity without replaying the assignment. Partial
 `provisioning` or any failed allocation becomes `uncertain` and cannot replay
 as fresh work.
 
-An inactive trusted-admission transaction now joins those seams. Before task
+The trusted-admission transaction now joins those seams. Before task
 lookup or mutation, it requires the caller to be at the repository root of the
 primary Git worktree on `main`; a linked worktree or another branch is rejected
 without changing task bytes, Git state, ownership, or allocator state. It then
@@ -107,21 +107,21 @@ failure before ownership or resource mutation commits the exact task back to
 `In Planning`. Any durable or uncertain mutation instead commits `Blocked` plus
 the exact inspection/reconciliation condition and preserves all evidence.
 
-This remains an inactive foundation: `/implement-task` and
-`create_task_episode` are not registered, so neither the staged chain nor its
-single-use approval can call the transaction yet. Current public Episode
-creation continues through the retained folder workflow above.
+`/implement-task` and `create_task_episode` now expose this complete guarded
+transaction. The public create tool consumes only the matching one-turn
+approval and accepts no caller-supplied placement or resource identity. Current
+folder Episode creation remains available through the retained workflow above.
 
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/extensions/reviewed-plan.ts`
-- `src/prime-agent-plugin/extension-support/spec-episode.ts` (retained allocator plus inactive task-native admission transaction)
+- `src/prime-agent-plugin/extension-support/spec-episode.ts` (retained allocator plus public task-native admission transaction)
 - `src/prime-agent-plugin/extension-support/episode-ownership.ts`
-- `src/prime-agent-plugin/extension-support/task-episode-ownership.ts` (inactive reservation foundation)
+- `src/prime-agent-plugin/extension-support/task-episode-ownership.ts` (task-native reservation foundation)
 - `src/prime-agent-plugin/workflows/implement-prep.md`
 - `src/prime-agent-plugin/workflows/implement-spec.md`
-- `src/prime-agent-plugin/workflows/implement-task-prep.md` (staged policy)
-- `src/prime-agent-plugin/workflows/implement-task.md` (staged policy)
+- `src/prime-agent-plugin/workflows/implement-task-prep.md` (task-native policy)
+- `src/prime-agent-plugin/workflows/implement-task.md` (task-native policy)
 
 ## Design references
 

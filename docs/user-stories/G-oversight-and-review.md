@@ -17,8 +17,7 @@ speculative or adversarial review must stop rather than grow new requirements or
 implementation machinery.
 
 When a task-native candidate is accepted with no fixes remaining, the
-Conversation does not ask for merge authority from that stale candidate. The
-inactive review handshake first commits only the exact main task as `Ready for
+Conversation does not ask for merge authority from that stale candidate. The public review handshake first commits only the exact main task as `Ready for
 Merge`, then integrates current main in the same idle owned Episode worktree.
 It restores the accepted Episode task, reapplies only the Conversation-owned
 status through Backlog, preserves task content and parent identity, creates and
@@ -28,8 +27,7 @@ merge request. Ordinary handoff is not used at this status.
 
 If the operator chooses Delay, the Conversation re-verifies that exact
 handshake and idle Episode but changes nothing and sends no transport. Delay is
-not abandonment. If the operator explicitly requests changes, the inactive
-outcome phases publish only the main task back to `In Progress`, integrate that
+not abandonment. If the operator explicitly requests changes, the guarded outcome phases publish only the main task back to `In Progress`, integrate that
 commit in the same Episode while preserving task content and parent identity,
 push and verify a new exact two-parent candidate, and only then resume through
 canonical task handoff. A failed integration can retry from its already-returned
@@ -37,7 +35,7 @@ publication without repeating the status transition, admission, allocation, or
 assignment.
 
 If the operator explicitly chooses Merge, the decision must name that exact
-verified task, current main, and pushed refreshed candidate. The inactive seam
+verified task, current main, and pushed refreshed candidate. The guarded abandonment action
 requires clean canonical main and exact upstream state, fast-forwards only to
 the reviewed candidate, then immediately changes only the task to `Done` through
 Backlog and creates a direct one-path commit. A retry accepts only the exact
@@ -56,8 +54,7 @@ Episode head, candidate/main relationship, invariant parent, Episode-content
 digest, and Final Summary. It first rejects an archive destination already
 tracked at the bound main head, preserving historical bytes across task-ID reuse,
 and rejects any active or completed inbound link whose supported archive cleanup
-would modify another task. The inactive seam
-selects only the task blob, reapplies the Conversation-owned status through
+would modify another task. The guarded abandonment action selects only the task blob, reapplies the Conversation-owned status through
 Backlog, verifies a task-only effective
 diff, and archives without `Done`. It accepts only exact task-preparation,
 archival-move/stage, or direct archival-child recovery states. The verified local
@@ -72,7 +69,7 @@ worktree, and branch only in a verified monotonic sequence. An interrupted
 prefix retains active ownership for exact retry; inactive bookkeeping is written
 only after all resources are absent. Mixed terminal evidence, failed transport,
 identity drift, busy or dirty resources, unsafe gaps, provisioning, and
-uncertain ownership fail closed. This internal coordinator remains inactive.
+uncertain ownership fail closed. The coordinator is exposed only as the separately confirmed cleanup action of `finalize_task_episode`.
 
 Product, scope, merge, abandonment, remote transport, and destructive cleanup
 remain operator decisions.

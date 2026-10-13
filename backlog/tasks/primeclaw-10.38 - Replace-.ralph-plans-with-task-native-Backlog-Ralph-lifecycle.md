@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 15:49'
+updated_date: '2026-10-13 16:48'
 labels:
   - backlog-md
   - episode-loop
@@ -15,6 +15,38 @@ dependencies: []
 references:
   - PRIMECLAW-35
   - PRIMECLAW-10.37
+modified_files:
+  - .ralph/plans/EXECUTION_PLAN.md
+  - LONG_RANGE_PLAN.md
+  - README.md
+  - backlog/config.yml
+  - >-
+    backlog/tasks/primeclaw-10.38 -
+    Replace-.ralph-plans-with-task-native-Backlog-Ralph-lifecycle.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/handoff-chain.md
+  - docs/prep-chain.md
+  - docs/project-initialization.md
+  - docs/user-stories/E-episode-promotion.md
+  - docs/user-stories/F-episode-execution.md
+  - docs/user-stories/G-oversight-and-review.md
+  - docs/user-stories/H-handoff-and-continuation.md
+  - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/asset-inventory.json
+  - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - tests/managed_session_protocol.test.mjs
+  - tests/reviewed_plan_extension.test.mjs
+  - tests/spec_episode_extension.test.mjs
+  - tests/task_episode_ownership_extension.test.mjs
+  - tests/test_future_plan_skills.py
+  - tests/test_managed_session_protocol.py
+  - tests/test_oversee_episode_skill.py
+  - tests/test_project_conversation_extension.py
+  - tests/test_reviewed_plan_extension.py
+  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
 parent_task_id: PRIMECLAW-10
 priority: p1
 type: epic
@@ -493,4 +525,16 @@ Final evidence: 132 focused task-native Node tests, 4 retained close tests, and 
 ### Accepted next dependency — coherent task-native public activation and host adapter
 
 The operator accepted clean checkpoint `e3266cafb426c291579c6206c5e987e466d4e160`, including the complete inactive task-native lifecycle mechanics through finalization and cleanup. The next bounded execute pass is the already-approved coherent task-native public activation plus its required host cleanup adapter. Preserve retained folder compatibility until final migration/cutover, exact task/Episode ownership, operator authority for merge, abandonment, and destructive cleanup, supported Prime Agent and Backlog interfaces, Docker-only plugin validation, and no unrelated scope.
+
+### Implemented slice — public task-native activation and production cleanup host
+
+Activated the coherent guarded task-native product surface beside retained folder compatibility: `/implement-task`, `create_task_episode`, `handoff_task_episode`, and the single `finalize_task_episode` coordinator. Task creation consumes one exact ephemeral approval and bound placement once. The lifecycle coordinator preserves exact phase receipts across retryable status/integration failures, never retries uncertain handoff transport, requires explicit operator decisions for Delay, Request Changes, Merge, and Abandon, and requires a separate explicit Cleanup decision with exact terminal evidence. Unpushed abandonment replays only from its returned decision/evidence.
+
+Added `CliTaskEpisodeCleanupAdapter` over supported Prime Agent daemon, Orca CLI, and Git boundaries. It verifies exact session route/ID/file/CWD and idleness, rejects untracked or colliding sessions, rechecks clean worktree/branch/head identity at mutation edges, and closes its owned daemon connection. Task-native Orca activation inventories every retained fallback/default and primary Prime terminal. Cleanup permits only that exact set and delegates PTY stop proof to exact non-force Orca worktree removal before branch cleanup. Ownership closes only after every exact resource is absent.
+
+Independent architecture and cleanup reviews found material recovery, authority, collision, mutation-edge, daemon-lifetime, and normal Orca-topology defects. Every finding was repaired; final rereviews reported no material findings. Retained `/plan-spec`, `/implement-spec`, `plan_spec`, `create_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode` remain active until explicit final migration/cutover.
+
+Final evidence: 181 focused Node lifecycle/cleanup tests; 4 focused oversight-policy checks; 228 broad Node tests; 59 host-safe Python checks with 45 container cases deselected; `git diff --check`; source-mode Docker Tier-1 at `.test-results/20261013T164613Z-92027-eedd4a14/tier1` with immutable image, offline RPC probe, verified teardown, and published manifest.
+
+No live Episode transition, merge, abandonment, finalization, cleanup, resource deletion, plugin activation, migration, or cutover occurred. `PRIMECLAW-10.38` remains `In Progress`; live ownership/resources are unchanged. No acceptance criterion is newly claimed: AC #2/#3/#6/#7/#8/#9 still require their retained real-session receipts.
 <!-- SECTION:NOTES:END -->

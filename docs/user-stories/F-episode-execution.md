@@ -33,8 +33,7 @@ project artifacts, so that the next actor does not depend on transcript memory.*
 In task-native mode, blocked work records the exact blocker, attempts, evidence,
 and unblock condition in the bound task's Implementation Notes, commits and
 pushes that Episode branch while status remains `In Progress`, reports through
-the existing Episode-to-Conversation channel, and stops. The staged
-Conversation seam verifies the exact owner, active ownership, canonical primary
+the existing Episode-to-Conversation channel, and stops. The public Conversation lifecycle coordinator verifies the exact owner, active ownership, canonical primary
 `main`, committed main task bytes, exact pushed Episode head, post-admission task
 evidence, and unchanged Episode status before committing only main's task path
 as `Blocked`. A later accepted unblock commits only that main task path back to
@@ -43,8 +42,7 @@ session without admission or resource creation. Main push failure is returned as
 evidence but does not invalidate a successful local status commit. Completed
 candidate work records its plan, notes, acceptance evidence, references, and
 Final Summary while leaving status unchanged for Conversation review. After
-acceptance, the separate inactive review-integration seam—not ordinary execute
-or handoff—merges current main in the same idle Episode worktree, preserves that
+acceptance, the separate review-integration action—not ordinary execute or handoff—merges current main in the same idle Episode worktree, preserves that
 accepted task content, applies main's `Ready for Merge` status through Backlog,
 and pushes a refreshed candidate for Conversation verification. If the operator
 then requests changes, the Conversation alone reverses main to `In Progress`;
@@ -57,22 +55,20 @@ merged code plus task content, path, parent, and status. The Episode does not
 perform this merge or status change. Its ownership and all idle resources remain
 until separate finalization or cleanup authority.
 
-If the operator instead confirms abandonment, the separate inactive Conversation
-seam first rejects an archive destination already tracked at the bound main head,
+If the operator instead confirms abandonment, the separate guarded Conversation action first rejects an archive destination already tracked at the bound main head,
 then imports only the pushed Episode task content into the exact bound main task,
 restores main's captured non-`Done` lifecycle status, writes a truthful
 abandonment Final Summary, proves that no Episode code entered main, and archives
 the task. The Episode performs none of these lifecycle operations and all of its
 resources remain retained for separately authorized cleanup.
 
-Only a later explicit Cleanup decision can remove them. The inactive coordinator
-binds that decision to the exact task, owner, Episode head, branch, worktree,
+Only a later explicit Cleanup decision can remove them. The cleanup action binds that decision to the exact task, owner, Episode head, branch, worktree,
 durable session/route, and optional local or Orca resource identities. It first
 re-verifies the pushed exact Merge/`Done` or Abandon/archive result, then removes
 only the idle runtime, worktree, and branch. Ownership remains active until all
 three are verified absent, including across an interrupted exact-prefix retry;
 only then does it become inactive. The Episode cannot authorize or perform this
-cleanup itself, and no public task-native cleanup surface is registered.
+cleanup itself, and cleanup is exposed only behind separate explicit confirmation in `finalize_task_episode`.
 
 Retained folder mode continues to move blocked plan documents, update related
 Backlog.md tasks, and archive completed plan bundles until final cutover.

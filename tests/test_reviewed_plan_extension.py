@@ -88,7 +88,7 @@ def test_prime_agent_rpc_loads_renamed_commands_and_simplified_tools(tier1_conta
     probe = ctmp / "tool-probe.ts"
     probe.write_text("""import {writeFileSync} from "node:fs";
 const out=process.env.TOOL_SNAPSHOT;
-export default function probe(pi){pi.on("session_start",()=>{const names=pi.getAllTools().map(t=>t.name).sort();writeFileSync(out,JSON.stringify(names));if(names.includes("plan_spec")&&names.includes("plan_task")&&names.includes("create_spec_episode")&&names.includes("handoff_spec_episode")&&names.includes("finalize_spec_episode")&&!names.includes("ralph_plan")&&!names.includes("prime_claw_activate_conversation_guide")&&!names.includes("prime_claw_conversation_guide_status")){pi.registerCommand("probe-reviewed-plan-tools",{description:"proof",handler:async()=>{}})}})}""")
+export default function probe(pi){pi.on("session_start",()=>{const names=pi.getAllTools().map(t=>t.name).sort();writeFileSync(out,JSON.stringify(names));if(names.includes("plan_spec")&&names.includes("plan_task")&&names.includes("create_spec_episode")&&names.includes("handoff_spec_episode")&&names.includes("finalize_spec_episode")&&names.includes("create_task_episode")&&names.includes("handoff_task_episode")&&names.includes("finalize_task_episode")&&!names.includes("ralph_plan")&&!names.includes("prime_claw_activate_conversation_guide")&&!names.includes("prime_claw_conversation_guide_status")){pi.registerCommand("probe-reviewed-plan-tools",{description:"proof",handler:async()=>{}})}})}""")
     snapshot = ctmp / "tools.json"
     result = tier1_container.run(
         "/workspace/scripts/run-prime-agent-probe.sh", tier1_container.prime_agent, "--mode", "rpc", "--offline", "--no-session", "--no-skills",
@@ -100,13 +100,13 @@ export default function probe(pi){pi.on("session_start",()=>{const names=pi.getA
     response = json.loads(result.stdout.strip().splitlines()[-1])
     assert response["success"] is True
     commands = response["data"]["commands"]
-    for name in ("plan-spec", "plan", "implement-spec"):
+    for name in ("plan-spec", "plan", "implement-spec", "implement-task"):
         matches = [command for command in commands if command["name"] == name]
         assert len(matches) == 1
         assert matches[0]["sourceInfo"]["path"] == WS_EXTENSION
     assert [command["name"] for command in commands].count("probe-reviewed-plan-tools") == 1
     tools = json.loads(snapshot.read_text())
-    for name in ("plan_spec", "plan_task", "create_spec_episode", "handoff_spec_episode", "finalize_spec_episode"):
+    for name in ("plan_spec", "plan_task", "create_spec_episode", "handoff_spec_episode", "finalize_spec_episode", "create_task_episode", "handoff_task_episode", "finalize_task_episode"):
         assert name in tools
 
 
@@ -114,7 +114,7 @@ def test_task_planning_statuses_are_staged_without_retiring_to_do_early() -> Non
     config = yaml.safe_load((REPO / "backlog/config.yml").read_text())
     assert config["default_status"] == "To Do"
     assert config["statuses"] == [
-        "To Do", "In Design", "In Planning", "In Progress", "Blocked", "Done",
+        "To Do", "In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done",
     ]
 
 

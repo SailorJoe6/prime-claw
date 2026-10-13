@@ -176,19 +176,19 @@ cutover.
   Folder-based `/plan-spec` was delivered first. The active migration has now
   made `/design` and `/spec-it-out` author or revise an exact `In Design`
   Backlog task and has added `/plan TASK-ID`; retained folders stay live for
-  compatibility until Episode admission is converted.
-- **4b — episode mechanics.** Existing `/implement-spec <future-folder>`
-  mechanics create the feature branch, worktree, durable sibling session,
-  active plan placement, and owner/Episode identity for retained bundles. The
-  task-native migration will replace that authority with `/implement-task
-  TASK-ID`, a meaningful native Implementation Plan, and minimal exact-task
-  ownership while preserving isolated allocation, durable sessions, recovery,
-  and operator merge, abandonment, and cleanup authority.
+  compatibility until final migration.
+- **4b — episode mechanics.** `/implement-task TASK-ID` now creates a
+  worktree-rooted Episode from one meaningful native Implementation Plan and
+  exact-task ownership. `handoff_task_episode` continues that exact durable
+  session, while `finalize_task_episode` coordinates review, operator outcomes,
+  retained receipts, and separately authorized host cleanup. Existing
+  `/implement-spec <future-folder>` mechanics remain active for retained bundles
+  until final migration.
 - **4c — reviewed conversation → episode workflow.** `/design` and
   `/spec-it-out` retain different customizable starting assumptions but share
   one exact-task specification contract and stop for operator review. The
-  operator invokes `/plan TASK-ID` for a second review gate. Only the planned
-  explicit `/implement-task TASK-ID` boundary may authorize and create the
+  operator invokes `/plan TASK-ID` for a second review gate. Only the explicit
+  `/implement-task TASK-ID` boundary may authorize and create the
   worktree-rooted Episode. Existing `/plan-spec` and `/implement-spec` remain a
   bounded compatibility route for already-created future bundles during this
   conversion. Manual proof must show that one task and owner identity survive

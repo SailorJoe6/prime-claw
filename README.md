@@ -38,8 +38,8 @@ full phase status and blockers.
 - [Task-native specification authoring and retained bundle compatibility](docs/future-specification-bundles.md)
   — author or revise one exact `In Design` task with `/skill:design` or
   `/skill:spec-it-out`, then use `/plan TASK-ID` for separate plan review.
-  Existing future bundles retain `/plan-spec` and `/implement-spec` until their
-  ordered Episode-admission cutover.
+  Use `/implement-task TASK-ID` for new task-native Episodes. Existing future
+  bundles retain `/plan-spec` and `/implement-spec` until final migration.
 - [Native handoff chain](docs/handoff-chain.md) — update durable records and
   continue an approved episode iteration through focused compaction and the
   canonical execute workflow.

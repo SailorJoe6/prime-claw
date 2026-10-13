@@ -16,7 +16,7 @@ test("final protocol separates the neutral kernel from managed guidance", () => 
   const guide = readFileSync(join(managed, "skills/prime-claw-oversee-episode/SKILL.md"), "utf8").trim().split(/\s+/).join(" ");
   for (const phrase of ["Roles are skill-based responsibilities", "CONVERSATION supervises", "EPISODE implements", "EXPERT reviews"])
     assert.match(kernel, new RegExp(phrase));
-  for (const phrase of ["one reported vertical slice at a time", "canonical handoff", "bounded goal", "one exact heartbeat"])
+  for (const phrase of ["one reported slice at a time", "canonical handoff", "bounded goal", "one exact heartbeat"])
     assert.match(guide, new RegExp(phrase));
   assert.equal(existsSync(join(managed, "APPEND_SYSTEM.md")), false);
 });

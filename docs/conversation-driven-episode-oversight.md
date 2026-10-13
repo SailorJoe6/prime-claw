@@ -41,7 +41,7 @@ folder approval guard exists only to bind the current owner session, selected
 folder, and optional setup ID across the two-turn compact-first chain. It is not
 a second approval UX.
 
-The staged task-native chain remains inactive. Before either workflow message,
+The public task-native chain starts at `/implement-task`. Before either workflow message,
 it resolves the exact `In Planning` task and one exact ready local Orca setup,
 or uses direct local fallback only when the production Orca command is absent
 and no explicit setup was requested. Cancellation, ambiguity, zero ready setups,
@@ -53,8 +53,7 @@ After both messages are admitted, its ephemeral approval binds the owner
 session, canonical task ID/path and project root, and exact placement. The
 first phase boundary exposes it to the semantic turn; one exact consume removes
 it. A completed phase without creation, session start, or shutdown clears it.
-The complete ordinary oversight guide precedes task semantic readiness. This
-adds no public `/implement-task` command or `create_task_episode` tool.
+The complete ordinary oversight guide precedes task semantic readiness. `create_task_episode` then consumes this approval exactly once; callers cannot override its placement or resource identity.
 
 ## One durable ownership record
 
@@ -80,10 +79,9 @@ During the ordered task-native migration, the same file has two strict,
 disjoint schemas. Version 1 retains the folder location, slug, and bundle digest
 for existing `/implement-spec` Episodes. Version 2 replaces those fields with
 the canonical Backlog task ID and project-relative task path; its `baseRef` is
-the exact task-only `In Progress` status commit. The inactive task-native
-reservation seam re-resolves the exact task and verifies that commit plus a
+the exact task-only `In Progress` status commit. The task-native reservation seam re-resolves the exact task and verifies that commit plus a
 clean task, then writes `provisioning` before any branch, worktree, session, or
-assignment identity. Its inactive allocator consumes only that exact
+assignment identity. Its allocator consumes only that exact
 reservation, creates the selected local or Orca worktree from `baseRef`, skips
 bundle promotion, binds one durable exact-CWD session, and sends one execute
 assignment carrying the task ID. The staged execute policy now treats that task
@@ -93,16 +91,14 @@ reserves every lifecycle transition on main for the Conversation. Folder-bound
 assignments retain their existing plan workflow during migration. Active replay
 validates the worktree and session ID/file/CWD before reopening without
 reassigning; partial provisioning
-or allocation failure becomes `uncertain` and cannot replay fresh. An inactive
-trusted-admission transaction first proves it is at the repository root of the
+or allocation failure becomes `uncertain` and cannot replay fresh. The trusted-admission transaction first proves it is at the repository root of the
 primary Git worktree on `main`; linked worktrees and other branches fail before
 any task, Git, ownership, or allocator mutation. It then commits the exact clean
 `In Planning` task as `In Progress`, best-effort pushes, reserves and allocates
 from that SHA, and verifies durable active identity. Proven-clean pre-ownership
 failure commits the task back to `In Planning`; any recorded or uncertain
 mutation commits `Blocked` with its exact recovery condition while retaining
-evidence. Folder admission and close operations explicitly reject version 2
-until their corresponding task-native surfaces replace them.
+evidence. Folder admission and close operations explicitly reject version 2; task-native creation, handoff, lifecycle, and cleanup use their separate public surfaces.
 
 ## Preferred Orca creation
 
@@ -193,8 +189,7 @@ admits ordinary canonical handoff and queues canonical execute as its sole
 follow-up. Admission is not completion and uncertain transport is never
 retried blindly.
 
-Version-2 ownership now has internal, deliberately unregistered Conversation
-status seams for ordinary blocker handling. `publishTaskEpisodeBlocked` and
+Version-2 ownership exposes Conversation-owned blocker and resume actions through `finalize_task_episode`. `publishTaskEpisodeBlocked` and
 `publishTaskEpisodeResumed` run only for the exact top-level owner in canonical
 primary `main`, require active version-2 ownership and a clean owned worktree,
 and bind the accepted report to the exact local and upstream Episode head. The
@@ -212,8 +207,7 @@ binding that must match ownership. Task mode uses the accepted report and never
 falls back to `.ralph/plans`; retained folder blocking and restoration remain
 unchanged when no version-2 record or task block exists.
 
-After resumed `In Progress` publication, the internal, deliberately unregistered
-`handoffTaskEpisode` transport seam performs ordinary continuation.
+After resumed `In Progress` publication, `finalize_task_episode` invokes the same guarded task handoff transport for ordinary continuation.
 Before delivery it proves canonical primary-main caller context, exact owner and
 task/path in main and the Episode worktree, a main task path that matches
 committed `HEAD` even when unrelated main paths are dirty, meaningful plans,
@@ -222,8 +216,7 @@ quiescence. It binds both prompts to the exact task. It rejects `Blocked` until 
 Conversation publishes a resumed `In Progress` state and always rejects `Ready
 for Merge` because ordinary continuation ends at review.
 
-The internal, deliberately unregistered final-review handshake starts only from
-an accepted exact pushed candidate. `publishTaskEpisodeReadyForMerge` reuses the
+The `finalize_task_episode` final-review handshake starts only from an accepted exact pushed candidate. `publishTaskEpisodeReadyForMerge` reuses the
 exact owner/status guard and commits only main's task path as `Ready for Merge`;
 push remains best-effort evidence after the authoritative local commit.
 `integrateTaskEpisodeReadyForMerge` then proves the same durable Episode and
@@ -241,7 +234,7 @@ main ancestry, and the same task digest, hierarchy, and `Ready for Merge`
 status. Only that verified refreshed candidate may be described to the operator
 as ready or used to request the separate merge decision.
 
-Two reversible operator outcomes are staged behind the same inactive boundary.
+Two reversible operator outcomes are exposed through the same guarded `finalize_task_episode` boundary.
 `delayTaskEpisodeReadyForMerge` re-verifies the exact current handshake and idle
 Episode, then returns `delayed` without status mutation, merge, push, handoff, or
 other transport. It does not mean abandonment. For an explicit Request Changes
@@ -255,9 +248,12 @@ task digest, hierarchy, and status to remain exact. Only
 `resumeTaskEpisodeChangesRequested` then invokes canonical task handoff. These
 phases preserve the successful status publication across a retryable integration
 failure without a journal, duplicate status transition, new admission, or new
-resource.
+resource. An integration receipt carrying `pushError` is replayed through the
+same integration helper so only its exact existing merge head is pushed again.
+A handoff whose first message was admitted but whose follow-up is rejected is
+reported as transport-uncertain and is never exposed as retryable.
 
-The inactive terminal merge seam accepts only an explicit operator Merge
+The guarded terminal Merge action accepts only an explicit operator Merge
 decision bound to the still-current exact task, canonical-main head, and pushed
 refreshed candidate. It re-runs the review verification, requires the whole
 canonical main checkout clean and its upstream exact, requires the candidate to
@@ -277,12 +273,9 @@ local `Done` commit remains authoritative. Push failure, upstream lookup error,
 or an observed remote mismatch is returned as best-effort transport evidence
 rather than invalidating that local result. Final verification leaves active
 ownership and the idle Episode branch, worktree, durable session, and resources
-unchanged for a separately authorized finalization or cleanup decision. Public
-task-native admission, lifecycle, integration, handoff, merge, and finalization
-remain inactive.
+unchanged for a separately authorized finalization or cleanup decision. Public task-native admission, lifecycle, integration, handoff, merge, and cleanup are active through `/implement-task`, `create_task_episode`, `handoff_task_episode`, and `finalize_task_episode`.
 
-Confirmed abandonment uses a separate inactive internal seam, not handoff or a
-new public tool. `abandonTaskEpisode` requires explicit operator authority bound
+Confirmed abandonment uses the separate guarded Abandon action of `finalize_task_episode`, never handoff. `abandonTaskEpisode` requires explicit operator authority bound
 to the exact owner, active task path, main head and captured non-`Done` status,
 Episode head, candidate/main relationship, invariant parent, Episode-content
 digest, and truthful Final Summary. The idle Episode head must remain pushed.
@@ -301,11 +294,13 @@ archival-move/stage, or committed archival-child states. Backlog structured data
 verifies identity, parent, status, and summary before archive; afterward a
 normalized exact file digest and Git blob/move evidence verify unchanged content
 without pretending archived tasks remain viewable. Path, ancestry relationship,
-and ownership are also rechecked.
+and ownership are also rechecked. An archival child with `pushError` can be
+replayed only from its exact returned decision and terminal evidence; the
+archive mutation is not prepared or repeated.
 The branch, worktree, durable session, and every resource remain active; any
 finalization or destructive cleanup needs separate operator authority.
 
-The inactive task-native cleanup coordinator accepts only a separate explicit
+The task-native Cleanup action accepts only a separate explicit
 Cleanup decision that binds the exact task/path, owning Conversation, Episode
 head/branch/worktree, durable session/route, and every optional local or Orca
 resource recorded in ownership. The authorized terminal Episode head must
@@ -319,12 +314,19 @@ exact idle runtime first, then its worktree, then its branch. Each absence is
 verified. A host cleanup that also removes the exact branch may advance that
 monotonic sequence, but no out-of-order gap is accepted. Ownership remains
 `active` across an interruption or uncertain removal and changes to `inactive`
-only after every bound resource is proven absent. Once all resources are absent,
+only after every bound resource is proven absent. Local removal rechecks the
+registered path, branch, terminal head, and cleanliness at the mutation edge.
+Task-native Orca activation inventories every terminal retained in its newly
+created worktree, including the default/fallback terminal and the primary Prime
+terminal. Cleanup rejects any later unbound handle and uses one exact non-force
+worktree removal so Orca itself must prove all bound terminals stopped before it
+can retire the worktree; no tab-wide, workspace-wide, or forced terminal command
+is used. The production-owned Prime daemon client is closed after each action.
+Once all resources are absent,
 retry and inactive replay do not require the deliberately deleted Episode ref;
 the pushed terminal main evidence remains authoritative. Exact partial-prefix
 retry and inactive replay are idempotent; provisioning and uncertain ownership cannot be
-cleaned. This coordinator is internal and unregistered, so the live task-native
-surface remains inactive.
+cleaned. `finalize_task_episode` invokes the production host adapter only for this separately confirmed action; all other lifecycle actions retain resources.
 
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and

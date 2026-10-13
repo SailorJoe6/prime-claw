@@ -28,6 +28,7 @@ EXPECTED_TYPESCRIPT = {
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
     "extension-support/spec-episode.ts",
+    "extension-support/task-episode-cleanup.ts",
     "extension-support/task-episode-ownership.ts",
 }
 
@@ -51,7 +52,7 @@ def test_final_protocol_separates_neutral_kernel_from_managed_guidance() -> None
     ):
         assert phrase in kernel
     for phrase in (
-        "one reported vertical slice at a time",
+        "one reported slice at a time",
         "canonical handoff",
         "bounded goal",
         "one exact heartbeat",

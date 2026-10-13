@@ -109,6 +109,15 @@ test("legacy and task-native ownership schemas coexist without mixing authority"
   assert.throws(() => parseEpisodeOwnership({ ...task, baseRef: "not-a-status-commit" }), /unsupported shape/);
   assert.throws(() => parseEpisodeOwnership({ ...task, implementationPlan: "shadow authority" }), /unsupported shape/);
   assert.throws(() => parseEpisodeOwnership({ ...legacy, taskNotes: "shadow authority" }), /unsupported shape/);
+  const activeTask = {
+    ...task, status: "active", worktree: "/tmp/task-wt", branch: "task-episode", head: task.baseRef,
+    episodeId: "episode", episodeSessionFile: "/tmp/episode.jsonl", episodeActiveSessionId: "route",
+  };
+  assert.equal(parseEpisodeOwnership(activeTask).episodeActiveSessionId, "route");
+  assert.throws(() => parseEpisodeOwnership({ ...activeTask, episodeActiveSessionId: undefined }), /missing active bindings/);
+  const activeOrca = { ...activeTask, engine: "orca", projectSetupId: "setup", worktreeId: "wt", worktreeIdentity: "identity", terminalHandle: "term" };
+  assert.equal(parseEpisodeOwnership(activeOrca).terminalHandle, "term");
+  assert.throws(() => parseEpisodeOwnership({ ...activeOrca, terminalHandle: undefined }), /missing active Orca bindings/);
 });
 
 for (const [name, selection, pattern] of [

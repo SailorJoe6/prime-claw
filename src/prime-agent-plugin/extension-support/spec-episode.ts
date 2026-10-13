@@ -139,6 +139,8 @@ export interface EpisodeOwnershipStore {
 export interface SessionPublisher {
   list(): Promise<SessionSummary[]>;
   getState(activeSessionId: string): Promise<EpisodeSessionState>;
+  kill?(activeSessionId: string): Promise<void>;
+  deleteSaved?(sessionFile: string): Promise<void>;
   createFresh(options: { worktree: string; sessionName: string; model?: { provider: string; id: string }; onAllocated?: (identity: { sessionId: string; sessionFile: string }) => void | Promise<void> }): Promise<PublishedSession>;
   reopen(options: { sessionFile: string; sessionId: string; worktree: string; sessionName: string; model?: { provider: string; id: string } }): Promise<PublishedSession>;
   deliverExecute(activeSessionId: string, prompt: string): Promise<void>;
@@ -386,6 +388,7 @@ export type TaskEpisodeCleanupResourceIdentity = {
   worktreeId?: string;
   worktreeIdentity?: string;
   terminalHandle?: string;
+  terminalHandles?: string[];
   worktreeName?: string;
   launchAutomationName?: string;
   launchAutomationId?: string;
@@ -674,7 +677,7 @@ export class DaemonJsonlClient {
     };
     return new Promise<DaemonResponse>((resolveResponse, rejectResponse) => {
       const commandType = String(command.type);
-      const acknowledge = ["create", "prompt", "kill"].includes(commandType);
+      const acknowledge = ["create", "prompt", "kill", "delete_saved_session"].includes(commandType);
       const timer = setTimeout(() => {
         this.pending.delete(id);
         rejectResponse(acknowledge
@@ -810,6 +813,21 @@ export class PrimeSessionPublisher implements SessionPublisher {
     const data = requireSuccess(await this.client.request({ type: "get_state", activeSessionId }), "episode state check");
     if (!data || typeof data !== "object") throw new Error("Episode state check returned no usable state");
     return data as EpisodeSessionState;
+  }
+  async kill(activeSessionId: string): Promise<void> {
+    requireSuccess(await this.client.request({ type: "kill", activeSessionId }), "episode session kill");
+  }
+  async deleteSaved(sessionFile: string): Promise<void> {
+    const data = requireSuccess(
+      await this.client.request({ type: "delete_saved_session", sessionPath: sessionFile }),
+      "episode saved-session delete",
+    );
+    if (!data || typeof data !== "object" || (data as { ok?: unknown }).ok !== true) {
+      const error = data && typeof data === "object" && typeof (data as { error?: unknown }).error === "string"
+        ? (data as { error: string }).error
+        : "daemon did not confirm deletion";
+      throw new Error(`episode saved-session delete failed: ${error}`);
+    }
   }
   async createFresh(options: { worktree: string; sessionName: string; model?: { provider: string; id: string }; onAllocated?: (identity: { sessionId: string; sessionFile: string }) => void | Promise<void> }): Promise<PublishedSession> {
     if (!this.SessionManager) throw new Error("Episode publication is missing the runtime SessionManager");
@@ -1124,7 +1142,7 @@ function taskReservationHasResourceIdentity(record: TaskEpisodeOwnershipRecord):
   return [
     record.worktreeName, record.worktreeId, record.worktreeIdentity, record.worktree,
     record.branch, record.head, record.episodeId, record.episodeSessionFile,
-    record.episodeActiveSessionId, record.terminalHandle, record.launchAutomationName,
+    record.episodeActiveSessionId, record.terminalHandle, record.terminalHandles, record.launchAutomationName,
     record.launchAutomationId, record.launchRunId,
   ].some((value) => value !== undefined);
 }
@@ -1385,7 +1403,7 @@ export async function handoffSpecEpisode(
 /**
  * Continue one exact active task-native Episode after the owning Conversation
  * has published the main task's resumable `In Progress` state. This internal
- * seam remains unregistered until the task-native lifecycle is complete.
+ * seam is the guarded ordinary-continuation path for the public task lifecycle.
  */
 export async function handoffTaskEpisode(
   rawTaskId: string,
@@ -1620,14 +1638,22 @@ export async function allocateReservedTaskEpisode(
     });
     store.write(repo, record);
     await orca.removeAutomation(automationId, setup.routingEnvironmentId);
-    const retained = (await orca.listTerminals(worktree.id, setup.routingEnvironmentId))
+    const retainedTerminals = await orca.listTerminals(worktree.id, setup.routingEnvironmentId);
+    const retained = retainedTerminals
       .find((terminal) => terminal.handle === binding.terminal.handle && terminal.connected && terminal.writable
         && terminal.agentIdentity === "prime-agent" && terminal.visible
         && samePath(terminal.worktreePath, worktree.path)
         && terminal.tabId === binding.terminal.tabId && terminal.leafId === binding.terminal.leafId);
     if (!retained) throw new EpisodeStateUncertainError("Prime Agent tab was not retained after launch automation removal");
+    if (retainedTerminals.some((terminal) => !terminal.handle
+      || terminal.worktreeId !== worktree.id
+      || (terminal.worktreePath !== undefined && !samePath(terminal.worktreePath, worktree.path)))) {
+      throw new EpisodeStateUncertainError("Orca terminal inventory is not bound to the exact task Episode worktree");
+    }
+    const terminalHandles = [...new Set(retainedTerminals.map((terminal) => terminal.handle))].sort();
     record = updated(record, {
       status: "active",
+      terminalHandles,
       launchAutomationId: undefined,
       launchRunId: undefined,
       uncertaintyReason: undefined,
@@ -2666,6 +2692,56 @@ function exactArchiveMoveChanges(
     && (archived.status === "??" || archived.status.includes("A")));
 }
 
+export function prepareTaskEpisodeAbandonmentDecision(
+  taskId: string,
+  episodeHead: string,
+  finalSummary: string,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeAbandonmentDependencies = {},
+): TaskEpisodeAbandonmentDecision {
+  if (!finalSummary.trim() || finalSummary !== finalSummary.trim()) {
+    throw new Error("Task abandonment requires one normalized truthful non-empty Final Summary");
+  }
+  const git = dependencies.git ?? new CliGitAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
+  const abandonmentGit = dependencies.abandonmentGit
+    ?? (dependencies.mergeGit as TaskEpisodeAbandonmentGit | undefined)
+    ?? new CliTaskEpisodeAdmissionGit();
+  const resolveAbandonment = dependencies.abandonmentSnapshotResolver
+    ?? ((cwd: string, id: string) => resolveTaskAbandonmentSnapshot(cwd, id, runner));
+  const authority = resolveBlockedWorkflowAuthority(taskId, ctx, {
+    git, ownership: store, taskRunner: runner,
+  });
+  if (authority.mode !== "task") throw new Error("Task abandonment requires task-native owner authority");
+  const record = store.read(authority.projectRoot);
+  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
+  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
+  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before abandonment`);
+  const mainHead = abandonmentGit.head(authority.projectRoot);
+  const mainSnapshot = resolveAbandonment(authority.projectRoot, authority.taskId);
+  const episodeSnapshot = resolveAbandonment(record.worktree!, authority.taskId);
+  const relationship = mainHead === episodeHead
+    ? "same"
+    : abandonmentGit.isAncestor(authority.projectRoot, mainHead, episodeHead)
+      ? "main-ancestor"
+      : abandonmentGit.isAncestor(authority.projectRoot, episodeHead, mainHead)
+        ? "episode-ancestor"
+        : "diverged";
+  return {
+    operatorDecision: "abandon",
+    taskId: authority.taskId,
+    taskPath: record.taskPath,
+    mainHead,
+    episodeHead,
+    mainStatus: mainSnapshot.status,
+    candidateMainRelationship: relationship,
+    parentTaskId: episodeSnapshot.parentTaskId,
+    episodeTaskContentDigest: episodeSnapshot.abandonmentContentDigest,
+    finalSummary,
+  };
+}
+
 export async function abandonTaskEpisode(
   ctx: ExtensionContext,
   dependencies: TaskEpisodeAbandonmentDependencies = {},
@@ -2904,6 +2980,7 @@ export function taskEpisodeCleanupResourceIdentity(
     ...(record.worktreeId ? { worktreeId: record.worktreeId } : {}),
     ...(record.worktreeIdentity ? { worktreeIdentity: record.worktreeIdentity } : {}),
     ...(record.terminalHandle ? { terminalHandle: record.terminalHandle } : {}),
+    ...(record.terminalHandles ? { terminalHandles: [...record.terminalHandles] } : {}),
     ...(record.worktreeName ? { worktreeName: record.worktreeName } : {}),
     ...(record.launchAutomationName ? { launchAutomationName: record.launchAutomationName } : {}),
     ...(record.launchAutomationId ? { launchAutomationId: record.launchAutomationId } : {}),
@@ -2947,6 +3024,34 @@ function taskFinalizationTerminalCommit(evidence: TaskEpisodeTerminalEvidence): 
 
 function taskFinalizationEpisodeHead(evidence: TaskEpisodeTerminalEvidence): string {
   return evidence.outcome === "merged" ? evidence.result.mergedHead : evidence.result.episodeHead;
+}
+
+export function prepareTaskEpisodeCleanupDecision(
+  taskId: string,
+  evidence: TaskEpisodeTerminalEvidence,
+  ctx: ExtensionContext,
+  dependencies: Pick<TaskEpisodeFinalizationDependencies, "git" | "ownership"> = {},
+): TaskEpisodeCleanupDecision {
+  const git = dependencies.git ?? new CliGitAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const projectRoot = git.repositoryRoot(ctx.cwd);
+  const record = store.read(projectRoot);
+  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
+  exactOwnedTaskRecord(record, taskId, ctx.sessionManager.getSessionId());
+  if (record.status !== "active" && record.status !== "inactive") {
+    throw new Error(`Task Episode cleanup cannot finalize ${record.status} ownership`);
+  }
+  const episodeHead = taskFinalizationEpisodeHead(evidence);
+  return {
+    operatorDecision: "cleanup",
+    taskId: record.taskId,
+    taskPath: record.taskPath,
+    ownerSessionId: record.ownerSessionId,
+    episodeHead,
+    terminalOutcome: evidence.outcome,
+    terminalCommit: taskFinalizationTerminalCommit(evidence),
+    resources: taskEpisodeCleanupResourceIdentity(record, episodeHead),
+  };
 }
 
 function verifyTaskEpisodeTerminalEvidence(
