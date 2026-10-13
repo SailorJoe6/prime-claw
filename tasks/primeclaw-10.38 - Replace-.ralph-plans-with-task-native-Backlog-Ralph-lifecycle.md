@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 06:40'
+updated_date: '2026-10-13 06:59'
 labels:
   - backlog-md
   - episode-loop
@@ -200,4 +200,19 @@ Evidence:
 - Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC command/tool discovery, teardown, and manifest publication verified. Evidence: `.test-results/20261013T063848Z-99892-f5ef0597/tier1`.
 
 Slice 1 remains open. Task-native authoring, retained real-session planning mutation evidence, final lifecycle-default migration, `/implement-task`, ownership conversion, and legacy bundle migration remain.
+
+## 2026-10-13 — task-native specification authoring
+
+Converted the managed `design` and `spec-it-out` source/project skills from creating new `.ralph/plans/future/` artifacts to one exact Backlog specification task. Both now create exactly one task with explicit `In Design` status when no task was selected, or revise only an exact operator-selected task already in `In Design`. They preserve their discovery-first versus synthesis-first postures while making Description, native Acceptance Criteria, References, and Documentation the living product contract. They do not write an Implementation Plan, mutate later statuses, allocate Episode resources, or authorize implementation.
+
+Authoring now fails closed on ambiguous new-versus-existing intent and every later lifecycle state. A fresh create is one mutation attempt: uncertain exit/output/identity/reload evidence stops without blind retry. Successful creation or revision reloads the canonical task and contained regular path, verifies meaningful supported fields and `In Design`, commits only that path, attempts a prompt non-gating push, and stops for explicit operator specification review. Existing `/plan-spec`, `/implement-spec`, and folder Episode mechanics remain the bounded compatibility path for already-created bundles.
+
+Updated required orientation and current operator documentation (`README.md`, `VISION.md`, and `LONG_RANGE_PLAN.md` included), managed template hashes, story documentation, and traceability. Independent review found stale authority documents, missing executable CLI/Git substrate evidence, and the uncertain-create retry gap; all findings were repaired. A disposable repository fixture now executes fresh create and existing revision through the vendored Backlog CLI, verifies native fields/status/path, proves exact task-only commits with an unrelated dirty path, and proves a failed push does not undo the local commit.
+
+Evidence:
+- `python3 -m pytest tests/test_future_plan_skills.py tests/test_project_initialization.py -q -m "not container"` — 22 passed, 3 deselected.
+- `git diff --check` — passed.
+- Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T065752Z-55162-273d77d8/tier1`.
+
+Slice 1 remains open. AC #2 remains unchecked because policy and the disposable substrate fixture do not replace retained real-session semantic authoring evidence. AC #3 likewise still awaits retained real-session planning mutation evidence. Final lifecycle/default migration, `/implement-task`, task ownership conversion, and legacy bundle migration remain.
 <!-- SECTION:NOTES:END -->
