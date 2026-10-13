@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 20:19'
+updated_date: '2026-10-13 20:23'
 labels:
   - backlog-md
   - episode-loop
@@ -645,4 +645,12 @@ No task identity, status, bundle, `backlog/config.yml`, production asset, plugin
 Corrected the active US-17 traceability row after review of candidate `88f66e559b70ab7fb2e2cc22244440674e305415`. It now states the accepted three scope distinctions: a task-native Episode implements approved code, documentation, and tests in its isolated worktree; it exclusively owns the bound task's content there; and lifecycle status remains with the Conversation. The retained version-1 compatibility clause and durable Backlog evidence references remain unchanged.
 
 Extended the existing focused Episode-scope contract in `tests/test_oversee_episode_skill.py` to require all three distinctions on the active traceability surface, reject the former task-content-only claim, and preserve the compatibility and evidence clauses. Focused scope plus inventory validation passed 13 host-safe tests and `git diff --check` passed. No proof mapping, inventory gate, current-proof normalization, historical/version-1 exclusion, task identity/status/acceptance, plugin source, migration, configuration/default, asset, plan placement, or cutover behavior changed.
+
+### Accepted next dependency — one-time Backlog migration without cutover
+
+Use `6d11d9c2797cea54ecd07171e8a5b2019d6ee530` as the exact frozen pre-cutover provenance tree. Perform only the reviewed task and historical-bundle migration in `.ralph/plans/EXECUTION_PLAN.md` step 5. Inventory every tracked `.ralph/plans` file at that commit and apply the reviewed mapping/classification rules exactly through the supported Backlog CLI. Preserve every existing ID and `parent_task_id`; reuse or create only the named epics; retain `PRIMECLAW-7` as the sole Blocked Phase-3a replacement with children `.3`–`.6`; preserve both supersession directions; import source-ordered criteria/content/history/outcomes/index evidence/source paths truthfully; and use `backlog task complete` only for explicitly successful historical epics. Classify all existing `To Do` tasks by meaningful plan or stronger evidence, including the recorded special handling for `PRIMECLAW-10.37` and `PRIMECLAW-7.6`. Remove `To Do` from final configuration only after proving no active task still uses it. Put no migrated bundle in `backlog/archive/`.
+
+Use no committed migration script, journal, wrapper, dual-write layer, or alternate tracker. A bounded temporary helper may only issue supported CLI operations. Add or repair representative migration validation, independently review, commit, push, and report exact mapping, counts, and provenance.
+
+This migration slice stops before compatibility retirement and cutover. Do not retire production/version-1 assets, delete or move any tracked `.ralph/plans` source, disable retained folder compatibility, perform final cutover, change this task's lifecycle status, or claim terminal acceptance. The plan's final plan-tree deletion and plan-absence/cutover assertions remain deferred until separately authorized.
 <!-- SECTION:NOTES:END -->

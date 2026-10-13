@@ -1188,6 +1188,37 @@ configuration/default, asset, plan placement, or cutover behavior changed.
   where rewriting would falsify history; convert broken live links to task
   references or `path @ pre-cutover commit` provenance.
 
+#### Accepted next dependency — one-time Backlog migration without cutover
+
+The next bounded slice uses
+`6d11d9c2797cea54ecd07171e8a5b2019d6ee530` as the exact frozen
+pre-cutover provenance tree and performs only the reviewed task and historical
+bundle migration in step 5. Inventory every tracked `.ralph/plans` file at that
+commit. Apply the table and classification rules exactly through the supported
+Backlog CLI: preserve every existing ID and `parent_task_id`; reuse or create
+only the named epics; retain `PRIMECLAW-7` as the sole Blocked Phase-3a
+replacement with children `.3`–`.6`; preserve both supersession directions;
+import source-ordered criteria, content, execution history, terminal outcome,
+index evidence, and all source paths truthfully; and call `backlog task
+complete` only for explicitly successful historical epics. Classify every
+existing `To Do` task by meaningful native plan or stronger recorded evidence,
+including the recorded special handling for `PRIMECLAW-10.37` and
+`PRIMECLAW-7.6`. Remove `To Do` from final configuration only after proving no
+active task still uses it. Put no migrated bundle in `backlog/archive/`.
+
+Use no committed migration script, journal, wrapper, dual-write layer, or
+alternate tracker. A bounded temporary helper may only issue supported CLI
+operations. Add or repair the approved representative migration validation,
+independently review the result, commit, push, and report exact mapping, counts,
+and provenance.
+
+This migration slice stops before compatibility retirement and cutover. It does
+not retire production or version-1 assets, delete or move any tracked
+`.ralph/plans` source, disable retained folder compatibility, perform final
+cutover, change `PRIMECLAW-10.38` lifecycle status, or claim terminal
+acceptance. Accordingly, step 5's final plan-tree deletion and step 6's
+plan-absence/cutover assertions remain deferred until separately authorized.
+
 ### 5. Perform the one-time task and bundle migration through Backlog CLI
 
 Freeze the committed Episode base SHA as the pre-cutover provenance commit and
