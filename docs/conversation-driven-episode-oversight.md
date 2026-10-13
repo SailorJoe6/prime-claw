@@ -173,8 +173,10 @@ retried blindly.
 Version-2 ownership now has an internal, deliberately unregistered
 `handoffTaskEpisode` transport seam for ordinary `In Progress` continuation.
 Before delivery it proves canonical primary-main caller context, exact owner and
-task/path in main and the Episode worktree, meaningful plans, clean owned
-worktree, exact Git/Orca and durable-session CWD identity, and quiescence. It
+task/path in main and the Episode worktree, a main task path that matches
+committed `HEAD` even when unrelated main paths are dirty, meaningful plans,
+clean owned worktree, exact Git/Orca and durable-session CWD identity, and
+quiescence. It
 binds both prompts to the exact task. It rejects `Blocked` until the Conversation
 publishes a resumed `In Progress` state, and rejects `Ready for Merge` until the
 later constrained final-integration handshake exists. Public task-native

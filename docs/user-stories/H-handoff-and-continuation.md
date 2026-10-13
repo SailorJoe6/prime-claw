@@ -24,9 +24,10 @@ transport.
 
 An internal, unregistered `handoffTaskEpisode(taskId, guidance)` now stages the
 same continuation for strict version-2 ownership. It requires the canonical
-primary `main` checkout, exact owner/task/path, `In Progress` on main and in the
-Episode, meaningful plans, a clean owned worktree, exact durable-session CWD,
-and a quiescent queue. It binds both handoff and execute prompts to the same
+primary `main` checkout, exact owner/task/path, an exact main task path matching
+committed `HEAD` while unrelated main dirt remains allowed, `In Progress` on
+main and in the Episode, meaningful plans, a clean owned worktree, exact
+durable-session CWD, and a quiescent queue. It binds both handoff and execute prompts to the same
 `<operator-episode-task>` value. `Blocked` must first be resumed by the
 Conversation; `Ready for Merge` is reserved for the later constrained final
 integration handshake. No public task-native handoff surface is registered.

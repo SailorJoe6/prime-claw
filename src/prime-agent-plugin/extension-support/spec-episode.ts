@@ -125,6 +125,7 @@ export interface GitAdapter {
   worktrees(repo: string): Array<{ path: string; branch?: string }>;
   createWorktree(repo: string, branch: string, worktree: string, baseRef: string): void;
   assertCleanWorktree(worktree: string): void;
+  pathStatus(worktree: string, path: string): string;
   commitPromotion(worktree: string, slug: string): string;
 }
 export interface FilesystemAdapter {
@@ -236,6 +237,9 @@ export class CliGitAdapter implements GitAdapter {
   assertCleanWorktree(worktree: string): void {
     const status = this.runner(worktree, ["status", "--porcelain"]);
     if (status !== "") throw new Error(`New episode worktree is not clean: ${status}`);
+  }
+  pathStatus(worktree: string, path: string): string {
+    return this.runner(worktree, ["status", "--porcelain", "--untracked-files=all", "--", path]);
   }
   commitPromotion(worktree: string, slug: string): string {
     this.runner(worktree, ["add", "-A"]);
@@ -1018,6 +1022,9 @@ export async function handoffTaskEpisode(
       || !samePath(mainTask.projectRoot, repo)
       || mainTask.taskPathRelative !== record.taskPath) {
       throw new Error("Task-native Episode handoff does not match the exact owned Backlog task on main");
+    }
+    if (git.pathStatus(repo, record.taskPath) !== "") {
+      throw new Error("Task-native Episode handoff requires the exact main task path to match committed HEAD");
     }
     if (mainTask.status !== "In Progress") {
       throw new Error(`Task-native Episode handoff requires main task status In Progress; found ${mainTask.status}`);

@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 10:16'
+updated_date: '2026-10-13 10:26'
 labels:
   - backlog-md
   - episode-loop
@@ -347,4 +347,19 @@ Slices 1 through 3 remain open. Public task admission/handoff/finalization, Conv
 The accepted inactive task-native continuation has one remaining in-scope defect before public activation: `handoffTaskEpisode` resolves the main task from working-tree bytes but does not prove the exact main task path matches its committed state. A committed `Blocked` or `Ready for Merge` task can be edited locally and uncommitted back to `In Progress`, allowing ordinary continuation before the Conversation has truthfully published the status commit.
 
 Next execution must require the exact main task path to be clean against HEAD before any route reopen, ownership refresh, handoff, or execute delivery, while allowing unrelated dirty main paths. Add a regression with committed non-resumable status plus dirty task-path bytes that resolve as `In Progress` and prove zero reopen, ownership refresh, handoff, or execute delivery. Also prove unrelated main dirt does not block valid continuation. Preserve the otherwise accepted continuation behavior, retained folder compatibility, and inactive public task admission/handoff/finalization surfaces.
+
+## 2026-10-13 — completed exact main task-path HEAD guard
+
+Repaired the accepted inactive-continuation preflight defect recorded after `b1f49bf`. After resolving and matching the exact main task, `handoffTaskEpisode` now checks path-scoped Git status for only the recorded task path and requires it to match committed HEAD before status/plan acceptance, route reopen, ownership refresh, handoff, or execute delivery. Unrelated dirty paths in the canonical main checkout remain allowed.
+
+The regression creates a real Git commit whose task status is `Blocked`, changes only that task's working-tree bytes to `In Progress`, verifies the committed and dirty views differ, and proves zero reopen, ownership refresh, handoff, or execute delivery. A companion regression proves an unrelated uncommitted main path does not block valid continuation. The accepted task-bound prompts, strict ownership/session/worktree checks, folder compatibility, and inactive public `/implement-task`, `create_task_episode`, task handoff, and finalization surfaces are unchanged.
+
+Evidence:
+- Focused continuation validation: 50 Node tests passed; 23 host-safe Python checks passed with 2 container cases deselected.
+- Broader handoff/admission/initialization/review compatibility: 117 Node tests passed; 41 host-safe Python checks passed with 11 container cases deselected.
+- Independent bounded review: no material findings.
+- `git diff --check`: passed.
+- `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC probe, teardown, and manifest publication verified at `.test-results/20261013T102307Z-99098-156da715/tier1`.
+
+No acceptance criterion is newly claimed. AC #2/#3 still require retained real-session authoring/planning evidence. AC #6/#7/#8 still require retained end-to-end task Episode lifecycle evidence. Public task Episode surfaces remain inactive.
 <!-- SECTION:NOTES:END -->

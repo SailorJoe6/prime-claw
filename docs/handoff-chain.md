@@ -49,7 +49,9 @@ checkout on `main`, the exact owner and active ownership record, the bound task
 ID and path, and main status `In Progress`. Both canonical prompts carry the
 same `<operator-episode-task>` binding, so handoff and execute cannot fall back
 to folder authority. The durable session must be rooted at the exact owned
-worktree before any message is sent.
+worktree before any message is sent. The exact main task path must match committed
+`HEAD` before the task is resolved, while unrelated dirty main paths remain
+allowed; uncommitted task bytes cannot spoof a resumed lifecycle status.
 
 The task-native handoff policy reloads that same task in the Episode worktree,
 keeps lifecycle status Conversation-owned, and permits only supported task

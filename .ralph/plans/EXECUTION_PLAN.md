@@ -351,22 +351,25 @@ Node tests, `git diff --check`, and source-mode
 `scripts/test-tier1.sh --probe`, with final evidence at
 `.test-results/20261013T100557Z-41220-9a097e6b/tier1`.
 
-#### Accepted follow-up revision after b1f49bf (2026-10-13)
+#### Completed follow-up repair after b1f49bf (2026-10-13)
 
-Before public activation, repair one remaining in-scope continuation defect:
-`handoffTaskEpisode` currently resolves the main task from working-tree bytes
-without proving the exact task path matches its committed state. A committed
-`Blocked` or `Ready for Merge` task can therefore be edited locally and
-uncommitted back to `In Progress`, incorrectly admitting ordinary continuation
-before the Conversation truthfully publishes the status commit.
+Repaired the accepted continuation preflight defect before public activation.
+After resolving and matching the exact main task, `handoffTaskEpisode` now runs
+path-scoped Git status for only the recorded task path and requires it to match
+committed `HEAD` before status/plan acceptance, route reopen, ownership refresh,
+handoff, or execute delivery. Unrelated dirty main paths remain allowed.
 
-The next execute pass must require the exact main task path to be clean against
-HEAD before any route reopen, ownership refresh, handoff, or execute delivery,
-while allowing unrelated dirty main paths. Add a regression whose committed
-status is non-resumable but whose dirty task bytes resolve as `In Progress` and
-prove zero routing or delivery mutation; also prove unrelated main dirt does
-not block a valid continuation. Preserve all other accepted continuation
-behavior, folder compatibility, and the inactive public task surfaces.
+The regression commits a `Blocked` task, changes only its working-tree bytes to
+`In Progress`, proves the committed and working views differ, and verifies zero
+reopen, ownership refresh, handoff, or execute delivery. A companion regression
+proves unrelated main dirt still permits valid continuation. The repair
+preserves the accepted task-native transport, folder compatibility, and
+inactive public task surfaces. Independent review found no material defect.
+Validation passed 50 focused Node tests, 23 focused host-safe Python checks with
+2 deselected, 117 broad Node tests, 41 broad host-safe Python checks with 11
+deselected, `git diff --check`, and source-mode
+`scripts/test-tier1.sh --probe`; final Docker evidence is at
+`.test-results/20261013T102307Z-99098-156da715/tier1`.
 
 Slices 1 through 3 remain open. Public `/implement-task`,
 `create_task_episode`, and task-native handoff/finalization remain inactive.

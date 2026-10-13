@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
-  CliOrcaAdapter, EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
+  CliGitAdapter, CliOrcaAdapter, EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
   allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
   handoffTaskEpisode,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
@@ -59,6 +59,7 @@ function harness(options = {}) {
     branch: (path) => path === disk.root ? "main" : wt.branch, worktrees() { return this.entries; },
     createWorktree(_repo, branch, path, base) { calls.push(["local-create", branch, path, base]); mkdirSync(path, { recursive: true }); this.entries.push({ path, branch }); mkdirSync(join(path, ".agents", "skills", "execute"), { recursive: true }); writeFileSync(join(path, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE POLICY"); mkdirSync(join(path, ".prime-claw", "workflows"), { recursive: true }); writeFileSync(join(path, ".prime-claw", "workflows", "handoff.md"), "HANDOFF POLICY"); },
     assertCleanWorktree(path) { calls.push(["clean", path]); },
+    pathStatus(path, taskPath) { calls.push(["path-status", path, taskPath]); return ""; },
     commitPromotion(path) { calls.push(["commit", path]); return "promoted"; },
   };
   const filesystem = { exists: (path) => options.unavailable ? !String(path).includes("-alpha-episode-") : true, promoteBundle(path) { calls.push(["promote", path]); } };
@@ -151,6 +152,15 @@ function taskSelection(f, overrides = {}) {
 }
 function boundTaskResolver(f, overrides = {}) {
   return (cwd) => taskSelection(f, { projectRoot: cwd, ...overrides });
+}
+function commitMainTask(f, status) {
+  const relative = "backlog/tasks/primeclaw-10.38.md";
+  const taskPath = join(f.root, relative);
+  mkdirSync(join(f.root, "backlog", "tasks"), { recursive: true });
+  writeFileSync(taskPath, `---\nid: PRIMECLAW-10.38\nstatus: ${status}\n---\n`);
+  execFileSync("git", ["-C", f.root, "add", "--", relative]);
+  execFileSync("git", ["-C", f.root, "-c", "user.name=Prime Claw Test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", `commit ${status}`]);
+  return { relative, taskPath };
 }
 
 
@@ -314,6 +324,45 @@ test("task-native handoff continues the exact idle Episode with task-bound hando
   assert.match(call[2], /EXECUTE POLICY/);
   assert.doesNotMatch(call[2], /resume the accepted in-scope revision/);
   assert.equal(f.calls.some((value) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(value[0])), false);
+});
+
+test("task-native handoff rejects dirty main task bytes before routing even when they claim In Progress", async () => {
+  const f = harness({ list: (_count, session) => [session] });
+  const { relative, taskPath } = commitMainTask(f, "Blocked");
+  writeFileSync(taskPath, "---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\n");
+  assert.match(readFileSync(taskPath, "utf8"), /status: In Progress/);
+  assert.match(execFileSync("git", ["-C", f.root, "show", `HEAD:${relative}`], { encoding: "utf8" }), /status: Blocked/);
+  const cliGit = new CliGitAdapter();
+  f.git.pathStatus = (repo, path) => cliGit.pathStatus(repo, path);
+  f.ownership.write(f.root, activeTaskRecord(f));
+  f.calls.length = 0;
+  let resolverCalls = 0;
+  await assert.rejects(
+    handoffTaskEpisode(
+      "PRIMECLAW-10.38", "continue", f.ctx,
+      { ...f.deps, taskResolver: (cwd) => { resolverCalls += 1; return taskSelection(f, { projectRoot: cwd }); } },
+    ),
+    /exact main task path to match committed HEAD/,
+  );
+  assert.equal(resolverCalls, 1);
+  assert.equal(f.calls.some((value) => ["reopen", "ownership", "handoff", "execute"].includes(value[0])), false);
+});
+
+test("task-native handoff allows unrelated dirty main paths", async () => {
+  const f = harness({ list: (_count, session) => [session] });
+  commitMainTask(f, "In Progress");
+  writeFileSync(join(f.root, "unrelated.txt"), "uncommitted unrelated work\n");
+  const cliGit = new CliGitAdapter();
+  f.git.pathStatus = (repo, path) => cliGit.pathStatus(repo, path);
+  f.ownership.write(f.root, activeTaskRecord(f));
+  f.calls.length = 0;
+  const result = await handoffTaskEpisode(
+    "PRIMECLAW-10.38", "continue", f.ctx,
+    { ...f.deps, taskResolver: boundTaskResolver(f) },
+  );
+  assert.equal(result.admitted, true);
+  assert.equal(f.calls.filter((value) => value[0] === "handoff").length, 1);
+  assert.match(execFileSync("git", ["-C", f.root, "status", "--porcelain", "--", "unrelated.txt"], { encoding: "utf8" }), /unrelated\.txt/);
 });
 
 test("task-native handoff preserves exact Orca identity without allocating resources", async () => {
