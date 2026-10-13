@@ -25,7 +25,7 @@ def test_project_backlog_skill_teaches_native_ready_claim_and_completion() -> No
 
 
 def test_execute_and_handoff_keep_backlog_authority_while_prepare_discovers_native_tracker() -> None:
-    execute = EXECUTE_TEMPLATE.read_text()
+    execute = " ".join(EXECUTE_TEMPLATE.read_text().split())
     prepare = PREPARE_TEMPLATE.read_text()
     handoff = HANDOFF_TEMPLATE.read_text()
 

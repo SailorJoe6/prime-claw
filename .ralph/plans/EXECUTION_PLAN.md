@@ -290,12 +290,44 @@ container cases deselected, independent review with no material findings, and
 source-mode `scripts/test-tier1.sh --probe`, with final evidence at
 `.test-results/20261013T091936Z-61769-1fbb9755/tier1`.
 
-Slices 1 and 2 remain open. Public `/implement-task` and
+#### Slice 3 progress — task-native execute policy (2026-10-13)
+
+Staged the task-bound Episode execution contract without activating public
+admission:
+
+- an execute assignment carrying `<operator-episode-task>` now reloads that
+  exact Backlog task and rejects changed identity, path, parent, or non-
+  `In Progress` status rather than selecting replacement work;
+- the task specification fields, Implementation Plan, Implementation Notes,
+  acceptance evidence, references, documentation, modified files, and Final
+  Summary are the sole durable authority in task-native mode;
+- Episode-owned content changes use supported Backlog CLI operations only in
+  the Episode worktree, while lifecycle status stays Conversation-owned on
+  main with no `--status`, completion, archive, cross-checkout copy, mirroring,
+  or dual write;
+- blocked passes must commit and push their exact durable blocker checkpoint
+  before reporting, and candidate passes likewise leave status unchanged and
+  report a pushed reviewable commit; and
+- assignments without a task block retain the complete folder-plan execute
+  workflow for existing `/implement-spec` Episodes. Source, tracked project
+  asset, and managed-template hashes remain synchronized.
+
+A disposable Backlog fixture proves supported plan/note/criterion/modified-file
+updates preserve canonical ID, task path, parent, `In Progress` status, and an
+unrelated dirty path while allowing an exact task commit. Independent review
+found and the final policy repaired the missing blocked-pass commit/push gate;
+repair review found no remaining material defect. Validation passed 40
+host-safe Python checks with 9 deselected, 70 focused Node tests,
+`git diff --check`, and source-mode `scripts/test-tier1.sh --probe`, with final
+evidence at `.test-results/20261013T094041Z-49232-6f8646b6/tier1`.
+
+Slices 1 through 3 remain open. Public `/implement-task` and
 `create_task_episode`, task-native placement selection and approval wiring,
-retained real-session authoring and planning mutation evidence, and final
-lifecycle/default migration remain later increments. Acceptance criteria #2
-and #3 remain unchecked until their real-session semantic paths are retained;
-this inactive repair alone completes no criterion.
+task-native handoff/block/resume/review/finalization mechanics, retained
+real-session authoring, planning, and execution evidence, and final
+lifecycle/default migration remain later increments. Acceptance criteria #2,
+#3, #6, #7, and #8 remain unchecked until their real-session or end-to-end
+semantic paths are retained; this staged policy alone completes no criterion.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 

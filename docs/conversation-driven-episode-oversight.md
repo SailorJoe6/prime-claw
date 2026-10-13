@@ -68,8 +68,13 @@ clean task, then writes `provisioning` before any branch, worktree, session, or
 assignment identity. Its inactive allocator consumes only that exact
 reservation, creates the selected local or Orca worktree from `baseRef`, skips
 bundle promotion, binds one durable exact-CWD session, and sends one execute
-assignment carrying the task ID. Active replay validates the worktree and
-session ID/file/CWD before reopening without reassigning; partial provisioning
+assignment carrying the task ID. The staged execute policy now treats that task
+as the sole durable authority, permits only Episode-owned content edits through
+Backlog in the Episode worktree, verifies status remains `In Progress`, and
+reserves every lifecycle transition on main for the Conversation. Folder-bound
+assignments retain their existing plan workflow during migration. Active replay
+validates the worktree and session ID/file/CWD before reopening without
+reassigning; partial provisioning
 or allocation failure becomes `uncertain` and cannot replay fresh. An inactive
 trusted-admission transaction first proves it is at the repository root of the
 primary Git worktree on `main`; linked worktrees and other branches fail before
@@ -77,9 +82,9 @@ any task, Git, ownership, or allocator mutation. It then commits the exact clean
 `In Planning` task as `In Progress`, best-effort pushes, reserves and allocates
 from that SHA, and verifies durable active identity. Proven-clean pre-ownership
 failure commits the task back to `In Planning`; any recorded or uncertain
-mutation commits `Blocked` with its exact recovery condition while retaining evidence. Folder
-admission and close operations explicitly reject version 2 until their
-corresponding task-native surfaces replace them.
+mutation commits `Blocked` with its exact recovery condition while retaining
+evidence. Folder admission and close operations explicitly reject version 2
+until their corresponding task-native surfaces replace them.
 
 ## Preferred Orca creation
 

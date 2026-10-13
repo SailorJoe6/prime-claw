@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 09:21'
+updated_date: '2026-10-13 09:42'
 labels:
   - backlog-md
   - episode-loop
@@ -307,4 +307,21 @@ Evidence:
 - Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T091936Z-61769-1fbb9755/tier1`.
 
 Slices 1 and 2 remain open. `/implement-task` and `create_task_episode` remain unregistered. Task-native placement selection and approval wiring, retained real-session authoring/planning evidence, and final lifecycle/default migration remain later work. This inactive repair completes no acceptance criterion.
+
+## 2026-10-13 — staged task-native execute policy
+
+Added the next bounded Slice 3 increment without registering `/implement-task` or `create_task_episode`. An execute assignment carrying `<operator-episode-task>` now binds the exact Backlog task as its sole durable authority. The policy reloads the canonical ID and returned task path, requires normal execution to remain `In Progress` with a meaningful Implementation Plan, and stops rather than selecting replacement work when identity, path, parent, or status changes.
+
+The Episode may update only its task content in its own worktree through supported Backlog CLI operations: in-scope plan refinements, Implementation Notes, acceptance evidence/check state, references, documentation, modified files, and Final Summary. It may not pass `--status`, complete or archive the task, mark `Blocked`, `Ready for Merge`, or `Done`, or perform cross-checkout copy, mirroring, or dual write. Blocked work must record the exact blocker/attempts/evidence/unblock condition, verify identity and unchanged status, commit the exact durable checkpoint plus only safe in-scope resumable changes, push, and report commit/push evidence before stopping. A complete candidate likewise remains `In Progress` and is committed/pushed for Conversation review. Assignments without a task block retain the existing folder-plan execute workflow.
+
+The source execute template, tracked `.agents` copy, and `.prime-claw/templates.json` hashes are synchronized. A disposable CLI fixture proves supported plan, notes, acceptance-check, and modified-file updates preserve canonical ID, task path, parent, and `In Progress` status; an unrelated dirty path remains untouched and the task can be committed exactly. Independent review found one material gap in the first draft: blocked task evidence was not required to be committed and pushed. The final policy adds that gate and a static regression; repair review found no material findings.
+
+Evidence:
+- Focused task execute/backlog policy checks — 9 passed.
+- Host-safe Python checks covering execute, Backlog workflow, task policies, initialization, reviewed-plan discovery, and managed protocol — 40 passed, 9 deselected.
+- Focused Node checks covering initialization, retained folder Episodes, task allocation/admission, and exact task ownership — 70 passed.
+- `git diff --check` — passed.
+- Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T094041Z-49232-6f8646b6/tier1`.
+
+Slices 1 through 3 remain open. Public task admission, placement/approval wiring, task-native handoff/block/resume/review/finalization mechanics, retained real-session evidence, and final lifecycle/default migration remain later work. AC #2, #3, #6, #7, and #8 remain unchecked; this staged policy alone completes no acceptance criterion.
 <!-- SECTION:NOTES:END -->

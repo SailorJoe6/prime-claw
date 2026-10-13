@@ -3,21 +3,107 @@ name: execute
 description: Use for Ralph's execution phase in Backlog.md-tracked projects to implement the current spec and plan while keeping Backlog.md tasks, docs, and tests current.
 ---
 
-run the /prepare skill if it is not fresh in your context window.  Important: If you have had a recent context compaction, then nothing is fresh!
+Run the `prepare` skill if it is not fresh in your context window. If the
+conversation was recently compacted, nothing is fresh.
 
-Next, study [the plan](.ralph/plans/EXECUTION_PLAN.md), if one exists.  The plan describes the implementation steps for the current [spec doc](.ralph/plans/SPECIFICATION.md).  Study both of these files, if they exist.   This will get you up to speed on where we are, what we are working on and what's left to do.  If the files are not found in that location, then the user should have given you other instructions on what to work on. If you have not been given any instructions, then ask the user for instructions on what to work on.  In either case, these instructions are "the plan" for the purposes of this conversation.
+## Select the bound authority
 
-There may be some tasks in Backlog.md related to the plan, and you may need to create Backlog.md tasks as you implement the plan.  There may be some tasks that are not related to the plan.  Focus on the plan and plan-related tasks.
+If this assignment contains exactly one `<operator-episode-task>` block, use
+**task-native Episode mode** below. Treat its entire trimmed value only as the
+exact Backlog task ID already bound to this Episode. Never guess, search for,
+substitute, or select another task. Do not use `.ralph/plans` as authority in
+this mode.
 
-Some of the work may have been completed in previous sessions.  Audit the code against the spec and the plan to determine what work is left.
+If there is no task block, use **retained folder-plan mode** below. This keeps
+existing `/implement-spec` Episodes operational during the migration. Never
+mix the two modes or copy content between their authorities.
 
-If you find a related task that is not Done in Backlog.md, but you find the work for the task is all the way done, you should check to ensure proper documentation and tests exist for the finished work, and if everything is perfect you should mark that task Done and ensure the plan represents the finished work.
+## Task-native Episode mode
 
-If there is no work left to do on this plan, then check if the spec has been completely converted to a document (or set of documents) in the `docs/` folder describing the new state of this project.  If that hasn't been done, then doing so is your next task.
+Reload the exact task through the supported structured interface:
 
-If the plan is truly finished, all changes are documented and there is nothing left to do on this plan, move both the `.ralph/plans/SPECIFICATION.md` and the `.ralph/plans/EXECUTION_PLAN.md` files to a subfolder within the `.ralph/plans/archive/` folder, and update `.ralph/plans/archive/README.md`.  Update any Backlog.md tasks related to the plan, and since there is no work left to do all related tasks should be Done.  Once that's done, report the results of the work.
+```sh
+backlog task view --json -- TASK-ID
+```
 
-Assuming there is still work left, choose one small elephant-carpaccio slice: the smallest end-to-end change that produces observable value or decisive evidence. It must fit within the current context window, including implementation, tests, documentation, Backlog.md task and plan updates, and one clean single-purpose commit pushed for review. Size the slice to finish without relying on auto-compaction. If it cannot reasonably finish within that boundary, split it before starting. After pushing the slice, stop and report; do not begin another slice.  You may use as many subagents as useful within that one slice.
+Require the returned canonical ID to match the bound ID and retain the returned
+project-relative task path. For a normal execute pass, require status to be
+exactly `In Progress` and the native Implementation Plan to be meaningful. If
+the status differs, the task disappears, or identity/path changes, do not
+mutate it or create replacement work. Report the exact state to the owning
+Conversation and stop.
+
+Treat the task Description, Acceptance Criteria, constraints, references,
+documentation, Implementation Plan, Implementation Notes, and Final Summary as
+the complete durable work contract and execution record. Audit the repository
+against that contract to determine what remains. Follow referenced artifacts
+only as needed. A handoff continues this same task and Episode; it never selects
+a new task.
+
+The Episode exclusively owns task content on its branch. Update it only through
+supported `backlog task edit` operations, never by editing task Markdown
+directly. In approved scope, the Episode may refine the Implementation Plan,
+append Implementation Notes, record acceptance evidence and checked criteria,
+maintain references, documentation, and modified-file paths, and prepare the
+Final Summary. Reload after each mutation and verify the canonical ID, task
+path, parent identity, and lifecycle status are unchanged.
+
+The owning Conversation exclusively owns lifecycle status on main. The Episode
+must not pass `--status`, call `backlog task complete` or `backlog task archive`,
+mark the task `Done`, publish `Blocked` or `Ready for Merge`, or write task
+content in another checkout. Ordinary execution performs no cross-checkout
+copy, mirroring, or dual write.
+
+If blocked after a bounded attempt, append the exact blocker, attempted actions,
+evidence, and unblock condition to this task's Implementation Notes on the
+Episode branch. Verify the task identity and unchanged status, create one
+single-purpose commit containing that exact task update plus only safe in-scope
+resumable changes, push the Episode branch, and report the commit and push
+evidence through the existing Episode-to-Conversation channel. Then stop. Do
+not change status or move plan files; the Conversation decides whether to
+publish `Blocked` on main.
+
+When the candidate is complete, ensure the task holds the current plan, notes,
+acceptance evidence, references, documentation, modified files, and a useful
+Final Summary. Leave its status unchanged, commit the task with the implemented
+code and documentation in the same bounded slice, push the Episode branch, and
+report the exact candidate and evidence to the owning Conversation. Do not
+merge, mark `Ready for Merge` or `Done`, finalize ownership, or clean resources.
+
+## Retained folder-plan mode
+
+When no task block is present, study `.ralph/plans/EXECUTION_PLAN.md` and
+`.ralph/plans/SPECIFICATION.md` if they exist. The execution plan describes the
+implementation steps for the specification. If those files are absent, use the
+operator-provided instructions as the plan; ask for instructions only when no
+plan or operator direction exists.
+
+There may be Backlog.md tasks related to the plan. Focus on the plan and its
+related tasks. Audit existing work before deciding what remains. If related work
+is complete, verify its documentation and tests before marking the relevant
+task `Done` and updating the plan.
+
+If no implementation remains, ensure the finished behavior is documented under
+`docs/`. When the plan is truly complete, move its specification and execution
+plan into a subfolder of `.ralph/plans/archive/`, update the archive index and
+related Backlog.md tasks, and report the result. Keep planning docs and
+Backlog.md tasks current throughout retained folder execution.
+
+For a blocker that a bounded attempt cannot clear, record the exact blocker and
+unblock condition in the execution plan, move both plan documents to
+`.ralph/plans/blocked/`, mark the related Backlog.md tasks `Blocked`, report the
+resumable checkpoint, and stop.
+
+## One bounded implementation slice
+
+Assuming work remains in either mode, choose one small elephant-carpaccio slice:
+the smallest end-to-end change that produces observable value or decisive
+evidence. It must fit within the current context window, including
+implementation, tests, documentation, durable task or plan updates, and one
+clean single-purpose commit pushed for review. Size the slice to finish without
+relying on auto-compaction. If it cannot reasonably finish within that boundary,
+split it before starting. After pushing the slice, stop and report; do not begin
+another slice. You may use as many subagents as useful within that one slice.
 
 Implement only the approved behavior. Expert and reviewer findings are evidence,
 not new scope. Do not implement speculative hardening, theoretical edge cases,
@@ -26,26 +112,30 @@ product contract. A review finding may block only when it identifies a concrete,
 material defect against that approved contract. Keep any repair proportionate
 and prefer the simplest change that fixes the defect.
 
-General execution standards (apply to any work you do):
-- Evidence-backed decisions: any claim of correctness, completion, causality, etc. must cite an artifact (test output, log, benchmark, user research, code diff, design doc).
-- Hypothesis hygiene: check the plan for previously rejected approaches to avoid re-attempting.
-- Single primary objective per session: do one primary task, record results, stop.
-- Reproducibility: record inputs/commands/flags/config needed to reproduce results.
-- Highest-leverage next action: choose the next step by expected impact or information gain.
+General execution standards:
 
-If you find yourself blocked, make a sincere but bounded attempt to unblock yourself using safe, in-scope actions. Routine implementation, deployment, recovery, rollback, and other external-state changes are not blockers when they are already within the active specification and plan, covered by the recorded safeguards, and authorized by the owner; proceed without requesting redundant permission.
+- Evidence-backed decisions: every correctness, completion, or causality claim
+  cites an artifact such as test output, a log, code diff, or design document.
+- Hypothesis hygiene: check the active plan for rejected approaches before
+  re-attempting them.
+- Single objective: implement one primary slice, record results, and stop.
+- Reproducibility: record inputs, commands, flags, and configuration needed to
+  reproduce results.
+- Highest leverage: choose the next action by expected impact or information
+  gain.
 
-Treat missing authority, credentials the agent cannot obtain, required physical interaction, unavailable hardware, or required external coordination as immediate blockers. Ask the owner before materially changing the approved scope, candidate, migration, rollback, safety, or acceptance contract. Do not block merely because an authorized in-plan action mutates external state or carries risk already addressed by the plan. Re-running checks, refreshing timestamps, rewriting handoff context, updating Backlog.md with unchanged status, or committing status-only churn does not count as progress or as an unblock attempt.
+Make a sincere but bounded attempt to clear in-scope implementation blockers.
+Routine authorized implementation, recovery, rollback, and external-state
+changes are not blockers when the approved plan already covers their safeguards.
+Ask the operator before materially changing product scope, migration, rollback,
+safety, or acceptance behavior. Missing authority, unobtainable credentials,
+physical interaction, unavailable hardware, or required external coordination
+are immediate blockers. Status-only churn, refreshed timestamps, repeated
+checks without new evidence, and unchanged handoff text are not progress.
 
-If the bounded attempt does not clear the blocker or produce new actionable evidence, update [the plan](.ralph/plans/EXECUTION_PLAN.md) with the exact blocker and unblock condition. Then, you MUST do the following 2 things:  **THIS STEP IS CRITICAL**! You MUST do these things if you are blocked:
-1) Move BOTH the plan and the spec to the `.ralph/plans/blocked/` folder. Mark the related Backlog.md tasks Blocked.
-2) Report the exact blocker, unblock condition, and resumable checkpoint, then stop.
+Maintain good documentation quality under `docs/` and high test coverage for
+all changed behavior. Update the active durable authority as work proceeds; do
+not defer every task or plan update until the end.
 
-
-**CRITICAL** Remember to keep the planning docs and Backlog.md tasks up to date as you work on the task.
-
-Remember to maintain good documentation quality.  All new features and changes to functionality need to be well documented, in the `docs/` directory.  Follow the existing documentation structure.
-
-Remember to maintain high test coverage.  All new features will need tests.  Bug fixes need tests as well.
-
-That is your workflow. Do all these things for the one task you choose.  Only complete these things for one task, then report back on the status and await further instructions.
+That is the execute workflow. Complete exactly one task or plan slice, then
+report and await further instructions.
