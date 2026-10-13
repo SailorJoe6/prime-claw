@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 14:40'
+updated_date: '2026-10-13 14:57'
 labels:
   - backlog-md
   - episode-loop
@@ -475,4 +475,8 @@ The inactive abandonment seam now computes the exact canonical archive destinati
 A real vendored-CLI clean-Git fixture archives `PRIMECLAW-1`, commits the historical file, reuses the ID with the same Unicode title `Reusable Café`, commits the active task, and proves the production guard rejects before mutation while historical archive bytes remain identical, the active task remains present, and main stays clean. Unit evidence proves the guard precedes selection and a collision performs no select, Backlog edit, archive, or commit. Independent review found one material `core.quotePath` Unicode bypass in the initial implementation; raw `-z` parsing repaired it and final rereview reported no material findings.
 
 Final evidence: 119 focused Node tests and 4 policy checks; 204 broad Node tests and 59 host-safe Python checks with 45 container cases deselected; `git diff --check`; source-mode Docker Tier-1 `.test-results/20261013T143741Z-33220-7f0043db/tier1` with immutable image, offline RPC, teardown, and manifest publication verified. No actual abandonment, status change, archive, `Done`, finalization, cleanup, public activation, vendor patch, migration, or new recovery machinery occurred. No acceptance criterion is newly claimed.
+
+### Accepted next dependency — inactive task-native finalization and cleanup
+
+The operator accepted clean checkpoint `4588abcd60f78b0ccb40241d296c1003a885642a`, including the complete inactive abandonment slice and archive-collision repair. The next bounded execute pass is the already-approved inactive task-native finalization/cleanup dependency. Keep all public task-native surfaces inactive. Preserve separate explicit operator authority for destructive cleanup, retained ownership and every Episode resource until authorized terminal work is verified, exact task/Episode identity, and the current lifecycle boundaries. Add no unrelated scope.
 <!-- SECTION:NOTES:END -->
