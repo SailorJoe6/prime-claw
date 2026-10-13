@@ -98,9 +98,11 @@ yet.
 Confirmed abandonment is also not handoff. The inactive internal seam binds the
 operator decision to the exact owner, task path, current main head/status,
 pushed Episode head, candidate/main relationship, parent, Episode-content
-digest, and abandonment Final Summary. A structured active/completed-record scan
-first rejects inbound links that Backlog archive would otherwise clean from
-another task. It selects only the Episode task blob, reapplies the captured
+digest, and abandonment Final Summary. It first rejects an archive destination
+already tracked at the bound main head, so Backlog ID reuse cannot replace
+historical archive bytes. A structured active/completed-record scan also rejects
+inbound links that Backlog archive would otherwise clean from another task. It
+selects only the Episode task blob, reapplies the captured
 Conversation lifecycle status through Backlog, proves no
 code or unrelated path entered main, and archives without `Done`. Its direct
 archival child is verified and pushed. Retry recognizes only exact task

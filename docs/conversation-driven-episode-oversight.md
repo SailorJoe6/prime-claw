@@ -287,9 +287,11 @@ to the exact owner, active task path, main head and captured non-`Done` status,
 Episode head, candidate/main relationship, invariant parent, Episode-content
 digest, and truthful Final Summary. The idle Episode head must remain pushed.
 Canonical main and its upstream must remain at the bound head. Before mutation,
-a supported structured scan of active and completed Backlog records rejects any
-inbound dependency or exact task reference whose archive cleanup would change a
-second task. Git selects only
+the exact canonical archive destination is computed and rejected if it is
+already tracked at the bound main head; a reused Backlog ID must never replace
+historical archive bytes. A supported structured scan of active and completed
+Backlog records also rejects any inbound dependency or exact task reference
+whose archive cleanup would change a second task. Git selects only
 the Episode task blob; Backlog reapplies the captured main status and Final
 Summary, then archives that task without `Done`. Before commit, the effective
 diff must contain only the task preparation and its exact active-to-archive

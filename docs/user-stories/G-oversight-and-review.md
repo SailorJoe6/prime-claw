@@ -53,8 +53,10 @@ or cleanup.
 If the operator explicitly confirms abandonment instead, the authority binds the
 exact owner, active path, main head and captured non-`Done` status, pushed
 Episode head, candidate/main relationship, invariant parent, Episode-content
-digest, and Final Summary. It first rejects any active or completed inbound link
-whose supported archive cleanup would modify another task. The inactive seam
+digest, and Final Summary. It first rejects an archive destination already
+tracked at the bound main head, preserving historical bytes across task-ID reuse,
+and rejects any active or completed inbound link whose supported archive cleanup
+would modify another task. The inactive seam
 selects only the task blob, reapplies the Conversation-owned status through
 Backlog, verifies a task-only effective
 diff, and archives without `Done`. It accepts only exact task-preparation,

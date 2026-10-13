@@ -680,6 +680,28 @@ historical archive bytes remain exact, the active task remains present, and
 main remains clean. Keep the repair inside Prime Claw; do not patch Backlog or
 add recovery machinery.
 
+The accepted follow-up is now implemented. `TaskEpisodeAbandonmentGit` exposes
+an exact tracked-path-at-ref query. The CLI adapter reads raw NUL-delimited
+`git ls-tree -z --name-only` output so Git path quoting cannot hide Unicode
+archive names. `abandonTaskEpisode` computes the canonical destination and
+rejects it when tracked at the bound main head before cleanup preflight, main
+state classification, task selection, Backlog edit, or archive. Checking the
+bound head preserves the authorized preparation, move/stage, and direct-child
+recovery states because their destination was absent from that history.
+
+The real vendored-CLI clean-Git regression archives `PRIMECLAW-1`, commits the
+historical bytes, reuses the ID with the same Unicode title `Reusable Café`,
+commits the active task, and proves the production guard rejects with historical
+bytes unchanged, the active task present, and main clean. Unit evidence proves
+the check precedes every mutation and collision runs no select/edit/archive or
+commit action. Independent review identified one material `core.quotePath`
+Unicode bypass in the initial implementation; raw `-z` parsing repaired it and
+final rereview found no material findings. Final validation passed 119 focused
+Node tests and 4 policy checks, 204 broad Node tests and 59 host-safe Python
+checks with 45 container cases deselected, `git diff --check`, and source-mode
+Docker Tier-1 with immutable-image, offline-RPC, teardown, and manifest evidence
+at `.test-results/20261013T143741Z-33220-7f0043db/tier1`.
+
 No actual abandonment, status change, archive, finalization, cleanup, public
 activation, or migration occurred. No acceptance criterion is newly claimed;
 AC #8/#9 still require retained end-to-end and operator-outcome receipts.

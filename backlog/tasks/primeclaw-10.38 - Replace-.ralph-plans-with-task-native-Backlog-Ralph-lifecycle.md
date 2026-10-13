@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 14:20'
+updated_date: '2026-10-13 14:40'
 labels:
   - backlog-md
   - episode-loop
@@ -467,4 +467,12 @@ No actual abandonment, `Done`, finalization, cleanup, public activation, or migr
 ### Accepted follow-up revision — preflight tracked archive-destination collision
 
 The next execute pass must repair one in-scope abandonment edge case before any canonical-main task restore, Backlog edit, or archive mutation. Compute the exact archive destination and fail closed if it already exists from tracked history. Backlog deliberately reuses archived IDs; with a reused ID and the same title, the vendored `backlog task archive` currently succeeds while replacing the historical archive file, leaving active `D` plus archive `M` only after mutation. Preserve the existing exact task-preparation, archive-move/stage, and committed-child recovery paths, where the destination is expected as part of the authorized partial state. Add a real vendored-CLI clean-Git regression proving rejection occurs before mutation, historical archive bytes remain identical, the active task remains present, and main remains clean. Keep this repair inside Prime Claw; do not patch Backlog or add recovery machinery or scope. The accepted base checkpoint is the actual clean pushed commit `039d4d204d0c2b3bb636be971161c96d30ba5409`.
+
+### Implemented follow-up — tracked archive-destination collision guard
+
+The inactive abandonment seam now computes the exact canonical archive destination and rejects it when it was already tracked at the bound main head, before cleanup preflight, main-state classification, task selection, Backlog edit, or archive mutation. `TaskEpisodeAbandonmentGit.pathTrackedAtRef` uses raw NUL-delimited `git ls-tree -z --name-only` output so Git quoting cannot hide Unicode task paths. Binding the check to the pre-abandonment main head preserves the authorized exact task-preparation, archive-move/stage, and direct archival-child recovery states because their destination was absent from that history.
+
+A real vendored-CLI clean-Git fixture archives `PRIMECLAW-1`, commits the historical file, reuses the ID with the same Unicode title `Reusable Café`, commits the active task, and proves the production guard rejects before mutation while historical archive bytes remain identical, the active task remains present, and main stays clean. Unit evidence proves the guard precedes selection and a collision performs no select, Backlog edit, archive, or commit. Independent review found one material `core.quotePath` Unicode bypass in the initial implementation; raw `-z` parsing repaired it and final rereview reported no material findings.
+
+Final evidence: 119 focused Node tests and 4 policy checks; 204 broad Node tests and 59 host-safe Python checks with 45 container cases deselected; `git diff --check`; source-mode Docker Tier-1 `.test-results/20261013T143741Z-33220-7f0043db/tier1` with immutable image, offline RPC, teardown, and manifest publication verified. No actual abandonment, status change, archive, `Done`, finalization, cleanup, public activation, vendor patch, migration, or new recovery machinery occurred. No acceptance criterion is newly claimed.
 <!-- SECTION:NOTES:END -->

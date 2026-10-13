@@ -230,6 +230,7 @@ export interface TaskEpisodeMergeGit extends TaskEpisodeReviewGit {
   worktreeChanges(repo: string): GitWorktreeChange[];
 }
 export interface TaskEpisodeAbandonmentGit extends TaskEpisodeMergeGit {
+  pathTrackedAtRef(repo: string, ref: string, path: string): boolean;
   restorePathFromRef(repo: string, ref: string, path: string): void;
   commitOnlyPaths(repo: string, paths: string[], message: string): string;
 }
@@ -461,6 +462,10 @@ export class CliTaskEpisodeAdmissionGit implements TaskEpisodeAdmissionGit {
   }
   fastForward(repo: string, candidateHead: string): void {
     runGit(repo, ["merge", "--ff-only", candidateHead]);
+  }
+  pathTrackedAtRef(repo: string, ref: string, path: string): boolean {
+    const output = runGitRaw(repo, ["ls-tree", "-z", "--name-only", ref, "--", path]);
+    return output.split("\0").filter(Boolean).includes(path);
   }
   restorePathFromRef(repo: string, ref: string, path: string): void {
     runGit(repo, ["restore", `--source=${ref}`, "--worktree", "--", path]);
@@ -2568,6 +2573,17 @@ function expectedArchivedTaskPath(taskPath: string): string {
   return join(dirname(activeDirectory), "archive", "tasks", basename(taskPath));
 }
 
+export function assertNoHistoricalTaskArchiveCollision(
+  repo: string,
+  boundMainHead: string,
+  archivePath: string,
+  git: Pick<TaskEpisodeAbandonmentGit, "pathTrackedAtRef">,
+): void {
+  if (git.pathTrackedAtRef(repo, boundMainHead, archivePath)) {
+    throw new Error(`Abandonment archive destination already exists in bound main history: ${archivePath}`);
+  }
+}
+
 function exactPathSet(actual: string[], expected: string[]): boolean {
   return actual.length === expected.length
     && [...actual].sort().every((value, index) => value === [...expected].sort()[index]);
@@ -2619,7 +2635,8 @@ export async function abandonTaskEpisode(
   const abandonmentGit = dependencies.abandonmentGit
     ?? (dependencies.mergeGit as TaskEpisodeAbandonmentGit | undefined)
     ?? new CliTaskEpisodeAdmissionGit();
-  if (typeof abandonmentGit.restorePathFromRef !== "function"
+  if (typeof abandonmentGit.pathTrackedAtRef !== "function"
+    || typeof abandonmentGit.restorePathFromRef !== "function"
     || typeof abandonmentGit.commitOnlyPaths !== "function") {
     throw new Error("Task abandonment requires exact task-blob selection and archival Git support");
   }
@@ -2668,6 +2685,7 @@ export async function abandonTaskEpisode(
   }
 
   const archivePath = expectedArchivedTaskPath(record.taskPath);
+  assertNoHistoricalTaskArchiveCollision(projectRoot, decision.mainHead, archivePath, abandonmentGit);
   assertNoCleanupTargets(projectRoot, authority.taskId, record.taskPath);
   let mainHead = abandonmentGit.head(projectRoot);
   let changes = abandonmentGit.worktreeChanges(projectRoot);

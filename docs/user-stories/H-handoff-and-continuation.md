@@ -60,7 +60,8 @@ It preserves ownership and every idle Episode resource. No public task-native
 lifecycle, handoff, merge, or finalization surface is registered.
 
 Confirmed abandonment never routes through handoff. Its inactive internal seam
-selects only the exact pushed Episode task blob, restores the captured main
+first rejects an archive destination already tracked at the bound main head,
+then selects only the exact pushed Episode task blob, restores the captured main
 status, adds the abandonment Final Summary, proves no code entered main, and
 archives without `Done`. Exact task-preparation, archival-move/stage, and direct
 archival-child states are retryable without repeating archive mutation. It

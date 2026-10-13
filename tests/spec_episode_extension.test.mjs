@@ -17,6 +17,7 @@ import {
   verifyTaskEpisodeChangesRequested, resumeTaskEpisodeChangesRequested,
   resolveBlockedWorkflowAuthority, resolveTaskReviewSnapshot, resolveTaskAbandonmentSnapshot,
   resolveTaskAbandonmentFileSnapshot, assertNoTaskArchiveCleanupTargets,
+  assertNoHistoricalTaskArchiveCollision,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
@@ -574,6 +575,10 @@ function taskAbandonmentHarness(options = {}) {
     upstreamHead: (cwd) => cwd === f.worktree ? episodeHead : mainUpstream,
     worktreeChanges: (cwd) => cwd === f.root ? structuredClone(changes) : [],
     isAncestor: () => options.related !== false,
+    pathTrackedAtRef(_repo, ref, path) {
+      f.calls.push(["tracked-at-ref", ref, path]);
+      return options.historicalArchive === true && ref === priorMainHead && path === archivePath;
+    },
     restorePathFromRef(_repo, ref, path) {
       assert.equal(ref, episodeHead); assert.equal(path, activePath);
       mainDigest = episodeDigest;
@@ -866,6 +871,10 @@ test("confirmed abandonment imports only task content, preserves status, archive
   assert.equal(h.f.calls.filter((call) => call[0] === "abandon-edit").length, 1);
   assert.equal(h.f.calls.filter((call) => call[0] === "abandon-archive").length, 1);
   assert.equal(h.f.calls.filter((call) => call[0] === "archive-commit").length, 1);
+  assert.ok(
+    h.f.calls.findIndex((call) => call[0] === "tracked-at-ref")
+      < h.f.calls.findIndex((call) => call[0] === "select-task-blob"),
+  );
   assert.equal(h.f.calls.some((call) => ["fast-forward", "status-commit", "auto-remove"].includes(call[0])), false);
 });
 
@@ -892,6 +901,20 @@ test("abandonment recovery resumes exact task-only partial states without duplic
 });
 
 test("abandonment fails closed on stale, dirty, cross-path, hierarchy, relationship, and Done state", async (t) => {
+  await t.test("historical archive destination collision", async () => {
+    const h = taskAbandonmentHarness({ historicalArchive: true });
+    await assert.rejects(
+      abandonTaskEpisode(h.f.ctx, h.deps, h.decision),
+      /archive destination already exists in bound main history/,
+    );
+    assert.equal(h.mainPath, h.activePath);
+    assert.deepEqual(h.changes, []);
+    assert.equal(h.f.calls.filter((call) => call[0] === "tracked-at-ref").length, 1);
+    assert.equal(
+      h.f.calls.some((call) => ["select-task-blob", "abandon-edit", "abandon-archive", "archive-commit"].includes(call[0])),
+      false,
+    );
+  });
   await t.test("unrelated canonical-main path", async () => {
     const h = taskAbandonmentHarness({ mainChanges: [{ status: "??", path: "src/code.ts" }] });
     await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /outside the exact Episode task blob/);
@@ -1448,6 +1471,42 @@ test("vendored Backlog abandonment fixtures expose archive visibility and reject
   assert.equal(existsSync(join(exact, active)), false);
   assert.deepEqual(readFileSync(join(exact, archive)), before);
   assert.equal(run(exact, ["task", "view", "--json", "--", "PRIMECLAW-1"], true).status, 1);
+
+  const collision = makeProject();
+  const collisionGit = (...args) => execFileSync(
+    "git", ["-C", collision, ...args], { encoding: "utf8" },
+  ).trim();
+  collisionGit("config", "user.name", "Prime Claw Test");
+  collisionGit("config", "user.email", "test@example.invalid");
+  run(collision, ["task", "create", "Reusable Café", "--status", "Blocked", "--plan", "Historical plan", "--plain"]);
+  const historicalActive = JSON.parse(
+    run(collision, ["task", "view", "--json", "--", "PRIMECLAW-1"]).stdout,
+  ).task.path;
+  const historicalArchive = historicalActive.replace("/tasks/", "/archive/tasks/");
+  mkdirSync(dirname(join(collision, historicalArchive)), { recursive: true });
+  run(collision, ["task", "archive", "--", "PRIMECLAW-1"]);
+  const historicalBytes = readFileSync(join(collision, historicalArchive));
+  collisionGit("add", "-A");
+  collisionGit("commit", "-q", "-m", "historical archive");
+  run(collision, ["task", "create", "Reusable Café", "--status", "Blocked", "--plan", "Current plan", "--plain"]);
+  const reused = JSON.parse(
+    run(collision, ["task", "view", "--json", "--", "PRIMECLAW-1"]).stdout,
+  ).task;
+  assert.equal(reused.path, historicalActive);
+  collisionGit("add", "-A");
+  collisionGit("commit", "-q", "-m", "reused active id");
+  const collisionHead = collisionGit("rev-parse", "HEAD");
+  const collisionAdapter = new CliTaskEpisodeAdmissionGit();
+  assert.equal(collisionAdapter.pathTrackedAtRef(collision, collisionHead, historicalArchive), true);
+  assert.throws(
+    () => assertNoHistoricalTaskArchiveCollision(
+      collision, collisionHead, historicalArchive, collisionAdapter,
+    ),
+    /archive destination already exists in bound main history/,
+  );
+  assert.deepEqual(readFileSync(join(collision, historicalArchive)), historicalBytes);
+  assert.equal(existsSync(join(collision, historicalActive)), true);
+  assert.equal(collisionGit("status", "--porcelain"), "");
 
   const activeInbound = makeProject();
   run(activeInbound, ["task", "create", "Target", "--status", "Blocked", "--plan", "Plan", "--plain"]);

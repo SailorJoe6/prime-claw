@@ -58,7 +58,8 @@ perform this merge or status change. Its ownership and all idle resources remain
 until separate finalization or cleanup authority.
 
 If the operator instead confirms abandonment, the separate inactive Conversation
-seam imports only the pushed Episode task content into the exact bound main task,
+seam first rejects an archive destination already tracked at the bound main head,
+then imports only the pushed Episode task content into the exact bound main task,
 restores main's captured non-`Done` lifecycle status, writes a truthful
 abandonment Final Summary, proves that no Episode code entered main, and archives
 the task. The Episode performs none of these lifecycle operations and all of its
