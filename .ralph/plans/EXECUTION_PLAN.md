@@ -620,6 +620,57 @@ finalization, cleanup, public activation, or migration mechanic is included. No
 acceptance criterion is newly claimed; AC #8/#9 still require retained
 end-to-end, refreshed-candidate, and operator-outcome receipts.
 
+#### Slice 7 progress — inactive confirmed abandonment (2026-10-13)
+
+Staged the explicit non-success terminal outcome without registering a public
+tool or abandoning this live Episode. `abandonTaskEpisode` requires explicit
+operator confirmation bound to the exact active owner, project-relative task
+path, canonical-main head and captured non-`Done` status, pushed idle Episode
+head, candidate/main relationship, invariant parent, Episode-content digest,
+and normalized truthful Final Summary. Canonical main/upstream and the Episode
+head/upstream must remain exact. Before any main mutation, active and completed
+Backlog task records are resolved through supported structured task view and
+checked for inbound dependencies or exact task references whose archive cleanup
+would rewrite another task. Comparison follows Backlog task-ID identity for
+case, optional dependency prefixes, required reference prefixes, dotted numeric
+segments, leading zeroes, and surrounding whitespace.
+
+Git selects only the exact Episode task blob; Episode code is never integrated.
+Supported Backlog edit reapplies the captured Conversation lifecycle status and
+Final Summary. Structured semantic checks and a normalized task-file digest
+prove that every Episode-owned field is retained while excluding only path,
+lifecycle/update metadata, and the Conversation-owned abandonment summary.
+After creating the otherwise-untracked canonical `backlog/archive/tasks`
+directory, the supported Backlog archive command moves the task without `Done`.
+The effective worktree state must be exactly the active deletion and archive
+addition/staged rename; a direct two-path child is committed and verified.
+Archived tasks are intentionally not resolvable through `task view`, so
+post-archive verification uses the regular archived file, normalized digest,
+exact Git paths/parent, clean worktree, and unchanged active ownership/resources
+rather than inventing archived-task resolution. Local verified archival state is
+authoritative; push or remote-verification failure is returned as transport
+evidence. Journal-free replay accepts only exact task preparation, archive
+move/stage, or direct archival child and rejects stale, dirty, ambiguous,
+mismatched, and cross-path states. Cleanup remains separately authorized.
+
+Actual vendored-CLI fixtures prove missing-directory behavior, archive
+visibility semantics, exact byte movement, active dependency and completed
+reference preflight, and alias spellings `PRIMECLAW-01`, `primeclaw-1`, and
+whitespace-normalized references. A real Git fixture proves task-only blob
+selection and archival commit while Episode code remains absent. Independent
+review found five material defects across its passes: impossible archived-task
+lookup, missing archive directory, path-sensitive digest, inbound-link cleanup,
+and alias identity mismatch. All were accepted and repaired; final rereview
+found no material findings. Focused validation passed 118 Node tests and 4
+policy checks. Final broad validation passed 203 Node tests and 59 host-safe
+Python checks with 45 container cases deselected, plus `git diff --check`.
+Source-mode Docker Tier-1 passed with immutable-image, offline-RPC, teardown, and
+manifest evidence at `.test-results/20261013T140634Z-37005-1a3b77c9/tier1`.
+
+No actual abandonment, status change, archive, finalization, cleanup, public
+activation, or migration occurred. No acceptance criterion is newly claimed;
+AC #8/#9 still require retained end-to-end and operator-outcome receipts.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

@@ -95,6 +95,18 @@ resource remain active until separate finalization or cleanup authority. No
 public task-native lifecycle, handoff, merge, or finalization tool is registered
 yet.
 
+Confirmed abandonment is also not handoff. The inactive internal seam binds the
+operator decision to the exact owner, task path, current main head/status,
+pushed Episode head, candidate/main relationship, parent, Episode-content
+digest, and abandonment Final Summary. A structured active/completed-record scan
+first rejects inbound links that Backlog archive would otherwise clean from
+another task. It selects only the Episode task blob, reapplies the captured
+Conversation lifecycle status through Backlog, proves no
+code or unrelated path entered main, and archives without `Done`. Its direct
+archival child is verified and pushed. Retry recognizes only exact task
+preparation, archival move/stage, or archival-child state. Ownership and every
+Episode resource remain active because cleanup needs separate authority.
+
 The initial Episode creation is different: it starts a fresh session with one
 fixed execute assignment after bundle promotion. It does **not** run handoff.
 Handoff begins only with later owner-supervised continuation.

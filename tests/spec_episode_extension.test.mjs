@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
@@ -12,10 +12,11 @@ import {
   handoffTaskEpisode, publishTaskEpisodeBlocked, publishTaskEpisodeResumed,
   publishTaskEpisodeReadyForMerge, integrateTaskEpisodeReadyForMerge,
   verifyTaskEpisodeReadyForMerge, delayTaskEpisodeReadyForMerge,
-  mergeTaskEpisodeReadyForMerge,
+  mergeTaskEpisodeReadyForMerge, abandonTaskEpisode,
   publishTaskEpisodeChangesRequested, integrateTaskEpisodeChangesRequested,
   verifyTaskEpisodeChangesRequested, resumeTaskEpisodeChangesRequested,
-  resolveBlockedWorkflowAuthority, resolveTaskReviewSnapshot,
+  resolveBlockedWorkflowAuthority, resolveTaskReviewSnapshot, resolveTaskAbandonmentSnapshot,
+  resolveTaskAbandonmentFileSnapshot, assertNoTaskArchiveCleanupTargets,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
@@ -501,6 +502,170 @@ function taskLifecycleHarness(options = {}) {
   };
 }
 
+function taskAbandonmentHarness(options = {}) {
+  const f = harness({ list: (_count, session) => [session] });
+  f.ownership.write(f.root, activeTaskRecord(f));
+  f.calls.length = 0;
+  const activePath = "backlog/tasks/primeclaw-10.38.md";
+  const archivePath = "backlog/archive/tasks/primeclaw-10.38.md";
+  const episodeHead = "b".repeat(40);
+  const priorMainHead = "1".repeat(40);
+  const archiveHead = "a".repeat(40);
+  const episodeDigest = "e".repeat(64);
+  let mainHead = priorMainHead;
+  let mainUpstream = priorMainHead;
+  let mainPath = activePath;
+  let mainStatus = options.mainStatus ?? "Blocked";
+  let mainDigest = "m".repeat(64);
+  let finalSummary = null;
+  let changes = options.mainChanges ? structuredClone(options.mainChanges) : [];
+  let restoreInterrupted = false;
+  let archiveInterrupted = false;
+  let stageInterrupted = false;
+  let verifyInterrupted = false;
+  let pushCount = 0;
+  const parents = new Map([[archiveHead, [priorMainHead]]]);
+  const paths = new Map([[archiveHead, [activePath, archivePath]]]);
+
+  f.git.assertCleanWorktree = (cwd) => {
+    f.calls.push(["clean", cwd]);
+    if (cwd === f.root && changes.length) throw new Error("canonical main is dirty");
+  };
+  const runner = {
+    run(command, args, runOptions = {}) {
+      if (command !== "backlog") {
+        try {
+          const stdout = execFileSync(command, args, { cwd: runOptions.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+          return { stdout, stderr: "", status: 0 };
+        } catch (error) {
+          if (!runOptions.allowFailure) throw error;
+          return { stdout: error.stdout?.toString() ?? "", stderr: error.stderr?.toString() ?? "", status: error.status ?? 1 };
+        }
+      }
+      if (args[1] === "edit") {
+        const statusIndex = args.indexOf("--status");
+        const summaryIndex = args.indexOf("--final-summary");
+        mainStatus = args[statusIndex + 1];
+        finalSummary = args[summaryIndex + 1];
+        changes = [{ status: " M", path: activePath }];
+        f.calls.push(["abandon-edit", mainStatus, finalSummary]);
+        return { stdout: "", stderr: "", status: 0 };
+      }
+      if (args[1] === "archive") {
+        mainPath = archivePath;
+        changes = [
+          { status: " D", path: activePath },
+          { status: "??", path: archivePath },
+        ];
+        f.calls.push(["abandon-archive", args.at(-1)]);
+        if (options.interruptAfterArchive && !archiveInterrupted) {
+          archiveInterrupted = true;
+          throw new Error("interrupted after archive move");
+        }
+        return { stdout: "Archived task", stderr: "", status: 0 };
+      }
+      throw new Error(`unexpected Backlog arguments ${args.join(" ")}`);
+    },
+  };
+  const abandonmentGit = {
+    repositoryRoot: () => f.root,
+    branch: () => "main",
+    head: (cwd) => cwd === f.worktree ? episodeHead : mainHead,
+    upstreamHead: (cwd) => cwd === f.worktree ? episodeHead : mainUpstream,
+    worktreeChanges: (cwd) => cwd === f.root ? structuredClone(changes) : [],
+    isAncestor: () => options.related !== false,
+    restorePathFromRef(_repo, ref, path) {
+      assert.equal(ref, episodeHead); assert.equal(path, activePath);
+      mainDigest = episodeDigest;
+      changes = [{ status: " M", path: activePath }];
+      f.calls.push(["select-task-blob", ref, path]);
+      if (options.interruptAfterRestore && !restoreInterrupted) {
+        restoreInterrupted = true;
+        throw new Error("interrupted after task blob selection");
+      }
+    },
+    commitOnlyPaths(_repo, commitPaths, message) {
+      f.calls.push(["archive-commit", [...commitPaths], message]);
+      if (options.interruptAfterStage && !stageInterrupted) {
+        stageInterrupted = true;
+        changes = [{ status: "R ", path: `${archivePath} -> ${activePath}` }];
+        throw new Error("interrupted after archive staging");
+      }
+      mainHead = archiveHead;
+      changes = [];
+      return archiveHead;
+    },
+    parents: (_repo, ref) => parents.get(ref) ?? [],
+    commitPaths: (_repo, ref) => paths.get(ref) ?? [],
+    pathStatus: () => "",
+    commitOnlyPath: () => { throw new Error("single-path commit is not allowed"); },
+    push() {
+      pushCount += 1;
+      f.calls.push(["archive-push", pushCount]);
+      if (options.pushFails) throw new Error("archive push offline");
+      mainUpstream = mainHead;
+    },
+  };
+  const taskResolver = (cwd) => taskSelection(f, {
+    projectRoot: cwd,
+    status: cwd === f.worktree ? (options.episodeStatus ?? "In Progress") : mainStatus,
+    taskPathRelative: cwd === f.worktree ? activePath : mainPath,
+    taskPath: join(cwd, cwd === f.worktree ? activePath : mainPath),
+  });
+  const abandonmentSnapshotResolver = (cwd) => {
+    const episode = cwd === f.worktree;
+    return {
+      taskId: "PRIMECLAW-10.38",
+      taskPath: episode ? activePath : mainPath,
+      parentTaskId: options.parentTaskId ?? "PRIMECLAW-10",
+      status: episode ? (options.episodeStatus ?? "In Progress") : mainStatus,
+      implementationPlan: "Implement exact abandonment.",
+      contentDigest: episode ? episodeDigest : mainDigest,
+      abandonmentContentDigest: episode ? episodeDigest : mainDigest,
+      finalSummary: episode ? null : finalSummary,
+    };
+  };
+  const abandonmentFileSnapshotResolver = (cwd) => {
+    if (cwd === f.root && mainHead === archiveHead && options.interruptAfterCommit
+      && !verifyInterrupted) {
+      verifyInterrupted = true;
+      throw new Error("interrupted after archive commit");
+    }
+    return {
+      status: cwd === f.worktree ? (options.episodeStatus ?? "In Progress") : mainStatus,
+      finalSummary: cwd === f.worktree ? null : finalSummary,
+      contentDigest: "f".repeat(64),
+    };
+  };
+  const deps = {
+    ...f.deps,
+    lifecycleRunner: runner,
+    taskResolver,
+    abandonmentSnapshotResolver,
+    abandonmentFileSnapshotResolver,
+    abandonmentGit,
+  };
+  const decision = {
+    operatorDecision: "abandon",
+    taskId: "PRIMECLAW-10.38",
+    taskPath: activePath,
+    mainHead: priorMainHead,
+    episodeHead,
+    mainStatus: options.mainStatus ?? "Blocked",
+    candidateMainRelationship: "main-ancestor",
+    parentTaskId: options.decisionParentTaskId ?? "PRIMECLAW-10",
+    episodeTaskContentDigest: options.decisionDigest ?? episodeDigest,
+    finalSummary: "Operator confirmed abandonment; Episode code was not merged and resources remain retained.",
+  };
+  return {
+    f, deps, decision, activePath, archivePath, episodeHead, priorMainHead, archiveHead,
+    get mainHead() { return mainHead; }, get mainPath() { return mainPath; },
+    get mainStatus() { return mainStatus; }, get changes() { return changes; },
+    setChanges(value) { changes = structuredClone(value); },
+    advanceMain() { mainHead = "9".repeat(40); },
+  };
+}
+
 test("blocked workflow authority routes owner Conversation to task mode and never falls back from version 2", () => {
   const f = harness();
   f.ownership.write(f.root, activeTaskRecord(f));
@@ -675,6 +840,91 @@ test("explicit Merge fast-forwards exact candidate, publishes only task Done, an
   const orcaWorktree = await h.f.orca.showWorktree(ownershipBefore.worktreeId);
   assert.equal(orcaWorktree.identity, ownershipBefore.worktreeIdentity);
   assert.equal(orcaWorktree.path, ownershipBefore.worktree);
+});
+
+test("confirmed abandonment imports only task content, preserves status, archives without Done, and retains resources", async () => {
+  const h = taskAbandonmentHarness();
+  const ownershipBefore = structuredClone(h.f.record);
+  const result = await abandonTaskEpisode(h.f.ctx, h.deps, h.decision);
+  assert.deepEqual(result, {
+    verified: true,
+    outcome: "abandoned",
+    taskId: "PRIMECLAW-10.38",
+    status: "Blocked",
+    priorMainHead: h.priorMainHead,
+    episodeHead: h.episodeHead,
+    archiveCommit: h.archiveHead,
+    archivedTaskPath: h.archivePath,
+    parentTaskId: "PRIMECLAW-10",
+    episodeTaskContentDigest: "e".repeat(64),
+    resourcesRetained: true,
+  });
+  assert.equal(h.mainStatus, "Blocked");
+  assert.equal(h.mainPath, h.archivePath);
+  assert.deepEqual(h.f.record, ownershipBefore);
+  assert.equal(h.f.calls.filter((call) => call[0] === "select-task-blob").length, 1);
+  assert.equal(h.f.calls.filter((call) => call[0] === "abandon-edit").length, 1);
+  assert.equal(h.f.calls.filter((call) => call[0] === "abandon-archive").length, 1);
+  assert.equal(h.f.calls.filter((call) => call[0] === "archive-commit").length, 1);
+  assert.equal(h.f.calls.some((call) => ["fast-forward", "status-commit", "auto-remove"].includes(call[0])), false);
+});
+
+test("abandonment recovery resumes exact task-only partial states without duplicate archival mutation", async (t) => {
+  for (const [name, options, error] of [
+    ["selected task blob", { interruptAfterRestore: true }, /interrupted after task blob selection/],
+    ["archived move", { interruptAfterArchive: true }, /interrupted after archive move/],
+    ["staged archive", { interruptAfterStage: true }, /interrupted after archive staging/],
+    ["committed archive", { interruptAfterCommit: true }, /interrupted after archive commit/],
+  ]) {
+    await t.test(name, async () => {
+      const h = taskAbandonmentHarness(options);
+      await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), error);
+      const result = await abandonTaskEpisode(h.f.ctx, h.deps, h.decision);
+      assert.equal(result.archiveCommit, h.archiveHead);
+      assert.equal(h.f.calls.filter((call) => call[0] === "select-task-blob").length, 1);
+      assert.equal(h.f.calls.filter((call) => call[0] === "abandon-archive").length, 1);
+      assert.equal(
+        h.f.calls.filter((call) => call[0] === "archive-commit").length,
+        options.interruptAfterStage ? 2 : 1,
+      );
+    });
+  }
+});
+
+test("abandonment fails closed on stale, dirty, cross-path, hierarchy, relationship, and Done state", async (t) => {
+  await t.test("unrelated canonical-main path", async () => {
+    const h = taskAbandonmentHarness({ mainChanges: [{ status: "??", path: "src/code.ts" }] });
+    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /outside the exact Episode task blob/);
+  });
+  await t.test("stale main", async () => {
+    const h = taskAbandonmentHarness(); h.advanceMain();
+    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /neither the bound pre-abandonment head nor its exact archival child/);
+  });
+  await t.test("wrong bound path", async () => {
+    const h = taskAbandonmentHarness(); h.decision.taskPath = "backlog/tasks/other.md";
+    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /exact owned task path/);
+  });
+  await t.test("parent mismatch", async () => {
+    const h = taskAbandonmentHarness({ parentTaskId: "OTHER-1" });
+    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /exact bound task content and hierarchy/);
+  });
+  await t.test("candidate not descended from main", async () => {
+    const h = taskAbandonmentHarness({ related: false });
+    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /candidate\/main relationship/);
+  });
+  await t.test("Done cannot be abandoned", async () => {
+    const h = taskAbandonmentHarness({ mainStatus: "Done" });
+    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /without publishing Done/);
+  });
+});
+
+test("verified local abandonment remains authoritative when its final push fails", async () => {
+  const h = taskAbandonmentHarness({ pushFails: true });
+  const result = await abandonTaskEpisode(h.f.ctx, h.deps, h.decision);
+  assert.equal(result.archiveCommit, h.archiveHead);
+  assert.match(result.pushError, /archive push offline/);
+  assert.equal(h.mainPath, h.archivePath);
+  assert.deepEqual(h.changes, []);
 });
 
 test("successful local Done remains authoritative when its final push fails", async () => {
@@ -1148,6 +1398,104 @@ test("review snapshot digest excludes lifecycle metadata while retaining hierarc
     ...baseTask, implementationNotes: "different Episode content",
   }));
   assert.notEqual(before.contentDigest, changed.contentDigest);
+  const abandonmentBefore = resolveTaskAbandonmentSnapshot("/repo", baseTask.id, runnerFor(baseTask));
+  const abandonmentTerminal = resolveTaskAbandonmentSnapshot("/repo", baseTask.id, runnerFor({
+    ...baseTask, path: "backlog/archive/tasks/primeclaw-10.38.md",
+    status: "Blocked", finalSummary: "Operator confirmed abandonment.",
+  }));
+  assert.equal(abandonmentBefore.abandonmentContentDigest, abandonmentTerminal.abandonmentContentDigest);
+  assert.equal(abandonmentTerminal.finalSummary, "Operator confirmed abandonment.");
+});
+
+test("vendored Backlog abandonment fixtures expose archive visibility and reject inbound cleanup", () => {
+  const backlog = resolve("deps/backlog/dist/backlog");
+  const config = readFileSync(resolve("backlog/config.yml"), "utf8");
+  const makeProject = () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-abandon-backlog-")));
+    mkdirSync(join(root, "backlog"), { recursive: true });
+    writeFileSync(join(root, "backlog", "config.yml"), config);
+    execFileSync("git", ["-C", root, "init", "-q", "-b", "main"]);
+    return root;
+  };
+  const run = (root, args, allowFailure = false) => {
+    try {
+      const stdout = execFileSync(backlog, args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+      return { stdout, stderr: "", status: 0 };
+    } catch (error) {
+      if (!allowFailure) throw error;
+      return { stdout: error.stdout?.toString() ?? "", stderr: error.stderr?.toString() ?? "", status: error.status ?? 1 };
+    }
+  };
+  const runner = { run(command, args, options = {}) {
+    assert.equal(command, "backlog");
+    return run(options.cwd, args, options.allowFailure ?? false);
+  } };
+
+  const exact = makeProject();
+  run(exact, ["task", "create", "Archive target", "--status", "Blocked", "--plan", "Plan", "--plain"]);
+  const active = JSON.parse(run(exact, ["task", "view", "--json", "--", "PRIMECLAW-1"]).stdout).task.path;
+  const episodeFile = resolveTaskAbandonmentFileSnapshot(exact, active);
+  run(exact, ["task", "edit", "--status", "Blocked", "--final-summary", "Operator abandoned", "--plain", "--", "PRIMECLAW-1"]);
+  const preparedFile = resolveTaskAbandonmentFileSnapshot(exact, active);
+  assert.equal(preparedFile.contentDigest, episodeFile.contentDigest);
+  assert.equal(preparedFile.finalSummary, "Operator abandoned");
+  const archive = active.replace("/tasks/", "/archive/tasks/");
+  assert.doesNotThrow(() => assertNoTaskArchiveCleanupTargets(exact, "PRIMECLAW-1", active, runner));
+  const before = readFileSync(join(exact, active));
+  assert.equal(run(exact, ["task", "archive", "--", "PRIMECLAW-1"], true).status, 1);
+  mkdirSync(dirname(join(exact, archive)), { recursive: true });
+  run(exact, ["task", "archive", "--", "PRIMECLAW-1"]);
+  assert.equal(existsSync(join(exact, active)), false);
+  assert.deepEqual(readFileSync(join(exact, archive)), before);
+  assert.equal(run(exact, ["task", "view", "--json", "--", "PRIMECLAW-1"], true).status, 1);
+
+  const activeInbound = makeProject();
+  run(activeInbound, ["task", "create", "Target", "--status", "Blocked", "--plan", "Plan", "--plain"]);
+  run(activeInbound, ["task", "create", "Dependent", "--status", "Blocked", "--plan", "Plan", "--depends-on", "PRIMECLAW-1", "--plain"]);
+  assert.throws(
+    () => assertNoTaskArchiveCleanupTargets(activeInbound, "PRIMECLAW-1", "backlog/tasks/primeclaw-1 - Target.md", runner),
+    /would rewrite dependencies/,
+  );
+
+  for (const reference of ["PRIMECLAW-01", "primeclaw-1", "  PRIMECLAW-1  "]) {
+    const aliasInbound = makeProject();
+    run(aliasInbound, ["task", "create", "Target", "--status", "Blocked", "--plan", "Plan", "--plain"]);
+    run(aliasInbound, ["task", "create", "Alias reference", "--status", "Blocked", "--plan", "Plan", "--ref", reference, "--plain"]);
+    assert.throws(
+      () => assertNoTaskArchiveCleanupTargets(aliasInbound, "PRIMECLAW-1", "backlog/tasks/target.md", runner),
+      /would rewrite references/,
+      reference,
+    );
+  }
+
+  const completedInbound = makeProject();
+  run(completedInbound, ["task", "create", "Target", "--status", "Blocked", "--plan", "Plan", "--plain"]);
+  run(completedInbound, ["task", "create", "Historical reference", "--status", "Done", "--final-summary", "Done", "--ref", "PRIMECLAW-1", "--plain"]);
+  mkdirSync(join(completedInbound, "backlog", "completed"), { recursive: true });
+  run(completedInbound, ["task", "complete", "PRIMECLAW-2"]);
+  assert.throws(
+    () => assertNoTaskArchiveCleanupTargets(completedInbound, "PRIMECLAW-1", "backlog/tasks/primeclaw-1 - Target.md", runner),
+    /would rewrite references/,
+  );
+});
+
+test("abandonment file digest excludes only lifecycle metadata and Final Summary", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-abandon-digest-")));
+  const activePath = "backlog/tasks/primeclaw-10.38.md";
+  const archivePath = "backlog/archive/tasks/primeclaw-10.38.md";
+  mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
+  mkdirSync(join(root, "backlog", "archive", "tasks"), { recursive: true });
+  writeFileSync(join(root, activePath), `---\nid: PRIMECLAW-10.38\nstatus: In Progress\nupdated_date: '2026-10-13 12:00'\nparent_task_id: PRIMECLAW-10\n---\n\n## Implementation Notes\n\nEpisode content\n`);
+  writeFileSync(join(root, archivePath), `---\nid: PRIMECLAW-10.38\nstatus: Blocked\nupdated_date: '2026-10-13 13:00'\nparent_task_id: PRIMECLAW-10\n---\n\n## Implementation Notes\n\nEpisode content\n\n## Final Summary\n\n<!-- SECTION:FINAL_SUMMARY:BEGIN -->\nOperator confirmed abandonment.\n<!-- SECTION:FINAL_SUMMARY:END -->\n`);
+  const active = resolveTaskAbandonmentFileSnapshot(root, activePath);
+  const archived = resolveTaskAbandonmentFileSnapshot(root, archivePath);
+  assert.equal(active.status, "In Progress");
+  assert.equal(active.finalSummary, null);
+  assert.equal(archived.status, "Blocked");
+  assert.equal(archived.finalSummary, "Operator confirmed abandonment.");
+  assert.equal(active.contentDigest, archived.contentDigest);
+  writeFileSync(join(root, archivePath), readFileSync(join(root, archivePath), "utf8").replace("Episode content", "changed content"));
+  assert.notEqual(active.contentDigest, resolveTaskAbandonmentFileSnapshot(root, archivePath).contentDigest);
 });
 
 test("CLI review integration merges current main, restores the Episode task, and rejects conflicts outside it", () => {
@@ -1249,6 +1597,39 @@ test("CLI merge adapter reports clean, modified, staged, extra, untracked, and r
   assert.match(renamed[0].status, /R/);
   assert.match(renamed[0].path, /other\.txt|renamed\.txt/);
   assert.match(renamed[0].path, / -> /);
+});
+
+test("CLI abandonment adapter selects only the Episode task blob and commits only its archive move", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-abandon-adapter-")));
+  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Prime Claw Test");
+  git("config", "user.email", "test@example.invalid");
+  const taskPath = "backlog/tasks/primeclaw-10.38.md";
+  const archivePath = "backlog/archive/tasks/primeclaw-10.38.md";
+  mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
+  writeFileSync(join(root, taskPath), "main task\\n");
+  writeFileSync(join(root, "code.ts"), "main code\\n");
+  git("add", "-A"); git("commit", "-q", "-m", "main");
+  git("checkout", "-q", "-b", "episode");
+  writeFileSync(join(root, taskPath), "episode task\\n");
+  writeFileSync(join(root, "code.ts"), "episode code\\n");
+  git("add", "-A"); git("commit", "-q", "-m", "episode candidate");
+  const episodeHead = git("rev-parse", "HEAD");
+  git("checkout", "-q", "main");
+
+  const adapter = new CliTaskEpisodeAdmissionGit();
+  adapter.restorePathFromRef(root, episodeHead, taskPath);
+  assert.equal(readFileSync(join(root, taskPath), "utf8"), "episode task\\n");
+  assert.equal(readFileSync(join(root, "code.ts"), "utf8"), "main code\\n");
+  assert.deepEqual(adapter.worktreeChanges(root), [{ status: " M", path: taskPath }]);
+
+  mkdirSync(join(root, "backlog", "archive", "tasks"), { recursive: true });
+  git("mv", taskPath, archivePath);
+  const commit = adapter.commitOnlyPaths(root, [taskPath, archivePath], "archive task");
+  assert.deepEqual(adapter.commitPaths(root, commit).sort(), [archivePath, taskPath].sort());
+  assert.deepEqual(adapter.worktreeChanges(root), []);
+  assert.equal(readFileSync(join(root, "code.ts"), "utf8"), "main code\\n");
 });
 
 test("task lifecycle publication fails closed before status mutation", async (t) => {

@@ -9,7 +9,7 @@ import {
   lstatSync,
   readFileSync,
 } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { createConnection, type Socket } from "node:net";
@@ -229,6 +229,10 @@ export interface TaskEpisodeMergeGit extends TaskEpisodeReviewGit {
   fastForward(repo: string, candidateHead: string): void;
   worktreeChanges(repo: string): GitWorktreeChange[];
 }
+export interface TaskEpisodeAbandonmentGit extends TaskEpisodeMergeGit {
+  restorePathFromRef(repo: string, ref: string, path: string): void;
+  commitOnlyPaths(repo: string, paths: string[], message: string): string;
+}
 export type TaskReviewSnapshot = {
   taskId: string;
   taskPath: string;
@@ -245,6 +249,21 @@ export interface TaskEpisodeReadyForMergeDependencies extends TaskEpisodeLifecyc
   reviewGit?: TaskEpisodeReviewGit;
   mergeGit?: TaskEpisodeMergeGit;
   taskSnapshotResolver?: (cwd: string, taskId: string) => TaskReviewSnapshot;
+}
+export type TaskAbandonmentSnapshot = TaskReviewSnapshot & {
+  finalSummary: string | null;
+  abandonmentContentDigest: string;
+};
+export type TaskAbandonmentFileSnapshot = {
+  status: string;
+  finalSummary: string | null;
+  contentDigest: string;
+};
+export interface TaskEpisodeAbandonmentDependencies extends TaskEpisodeReadyForMergeDependencies {
+  abandonmentGit?: TaskEpisodeAbandonmentGit;
+  abandonmentSnapshotResolver?: (cwd: string, taskId: string) => TaskAbandonmentSnapshot;
+  abandonmentFileSnapshotResolver?: (cwd: string, taskPath: string) => TaskAbandonmentFileSnapshot;
+  assertNoArchiveCleanupTargets?: (cwd: string, taskId: string, taskPath: string) => void;
 }
 export type TaskEpisodeLifecycleResult = {
   taskId: string;
@@ -324,6 +343,32 @@ export type TaskEpisodeMergeResult = {
   doneCommit: string;
   parentTaskId: string | null;
   episodeTaskContentDigest: string;
+  pushError?: string;
+};
+export type TaskEpisodeAbandonmentDecision = {
+  operatorDecision: "abandon";
+  taskId: string;
+  taskPath: string;
+  mainHead: string;
+  episodeHead: string;
+  mainStatus: string;
+  candidateMainRelationship: "same" | "main-ancestor" | "episode-ancestor" | "diverged";
+  parentTaskId: string | null;
+  episodeTaskContentDigest: string;
+  finalSummary: string;
+};
+export type TaskEpisodeAbandonmentResult = {
+  verified: true;
+  outcome: "abandoned";
+  taskId: string;
+  status: string;
+  priorMainHead: string;
+  episodeHead: string;
+  archiveCommit: string;
+  archivedTaskPath: string;
+  parentTaskId: string | null;
+  episodeTaskContentDigest: string;
+  resourcesRetained: true;
   pushError?: string;
 };
 export type TaskEpisodeOperatorDecision =
@@ -416,6 +461,20 @@ export class CliTaskEpisodeAdmissionGit implements TaskEpisodeAdmissionGit {
   }
   fastForward(repo: string, candidateHead: string): void {
     runGit(repo, ["merge", "--ff-only", candidateHead]);
+  }
+  restorePathFromRef(repo: string, ref: string, path: string): void {
+    runGit(repo, ["restore", `--source=${ref}`, "--worktree", "--", path]);
+  }
+  commitOnlyPaths(repo: string, paths: string[], message: string): string {
+    if (paths.length < 2) throw new Error("Archival commit requires distinct active and archive paths");
+    const parts = paths.map((path) => path.split("/").filter(Boolean));
+    let shared = 0;
+    while (parts.every((value) => value[shared] !== undefined && value[shared] === parts[0][shared])) shared += 1;
+    const boundary = parts[0].slice(0, shared).join("/");
+    if (!boundary) throw new Error("Archival paths do not share a project-relative boundary");
+    runGit(repo, ["add", "-A", "--", boundary]);
+    runGit(repo, ["commit", "-m", message]);
+    return this.head(repo);
   }
   worktreeChanges(repo: string): GitWorktreeChange[] {
     const values = runGitRaw(repo, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])
@@ -1545,11 +1604,11 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export function resolveTaskReviewSnapshot(
+function resolveTaskViewObject(
   cwd: string,
   taskId: string,
-  runner: CommandRunner = new ProcessCommandRunner(),
-): TaskReviewSnapshot {
+  runner: CommandRunner,
+): Record<string, unknown> {
   const result = runner.run("backlog", ["task", "view", "--json", "--", taskId], { cwd });
   let parsed: unknown;
   try { parsed = JSON.parse(result.stdout); }
@@ -1574,6 +1633,14 @@ export function resolveTaskReviewSnapshot(
     && typeof object.implementationPlan !== "string") {
     throw new Error(`Backlog task ${taskId} review plan is invalid`);
   }
+  if (object.finalSummary !== null && object.finalSummary !== undefined
+    && typeof object.finalSummary !== "string") {
+    throw new Error(`Backlog task ${taskId} final summary is invalid`);
+  }
+  return object;
+}
+
+function taskContentObject(object: Record<string, unknown>): Record<string, unknown> {
   const episodeOwned = { ...object };
   delete episodeOwned.status;
   delete episodeOwned.updatedAt;
@@ -1581,14 +1648,138 @@ export function resolveTaskReviewSnapshot(
     "isReady", "readiness", "dependencyGraph", "subtasks",
     "acceptanceCriteriaCompleted", "acceptanceCriteriaCount",
   ]) delete episodeOwned[derived];
+  return episodeOwned;
+}
+
+export function resolveTaskReviewSnapshot(
+  cwd: string,
+  taskId: string,
+  runner: CommandRunner = new ProcessCommandRunner(),
+): TaskReviewSnapshot {
+  const object = resolveTaskViewObject(cwd, taskId, runner);
+  const episodeOwned = taskContentObject(object);
   return {
     taskId,
-    taskPath: object.path,
+    taskPath: object.path as string,
     parentTaskId: typeof object.parentTaskId === "string" ? object.parentTaskId : null,
-    status: object.status,
+    status: object.status as string,
     implementationPlan: typeof object.implementationPlan === "string" ? object.implementationPlan : null,
     contentDigest: createHash("sha256").update(stableJson(episodeOwned)).digest("hex"),
   };
+}
+
+export function resolveTaskAbandonmentSnapshot(
+  cwd: string,
+  taskId: string,
+  runner: CommandRunner = new ProcessCommandRunner(),
+): TaskAbandonmentSnapshot {
+  const object = resolveTaskViewObject(cwd, taskId, runner);
+  const episodeOwned = taskContentObject(object);
+  delete episodeOwned.finalSummary;
+  delete episodeOwned.path;
+  return {
+    taskId,
+    taskPath: object.path as string,
+    parentTaskId: typeof object.parentTaskId === "string" ? object.parentTaskId : null,
+    status: object.status as string,
+    implementationPlan: typeof object.implementationPlan === "string" ? object.implementationPlan : null,
+    contentDigest: createHash("sha256").update(stableJson(taskContentObject(object))).digest("hex"),
+    finalSummary: typeof object.finalSummary === "string" ? object.finalSummary : null,
+    abandonmentContentDigest: createHash("sha256").update(stableJson(episodeOwned)).digest("hex"),
+  };
+}
+
+function unquoteBacklogScalar(value: string): string {
+  const trimmed = value.trim();
+  if ((trimmed.startsWith("'") && trimmed.endsWith("'"))
+    || (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+export function resolveTaskAbandonmentFileSnapshot(
+  cwd: string,
+  taskPath: string,
+): TaskAbandonmentFileSnapshot {
+  const absolute = resolve(cwd, taskPath);
+  const root = realpathSync(cwd);
+  const parent = realpathSync(dirname(absolute));
+  const info = lstatSync(absolute);
+  const realFile = realpathSync(absolute);
+  if ((!samePath(parent, root) && !parent.startsWith(`${root}/`))
+    || (!samePath(realFile, root) && !realFile.startsWith(`${root}/`))
+    || !info.isFile() || info.isSymbolicLink()) {
+    throw new Error("Abandonment task file is not a regular project file");
+  }
+  const raw = readFileSync(absolute, "utf8");
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw)?.[1];
+  if (frontmatter === undefined) throw new Error("Abandonment task file has no Backlog frontmatter");
+  const statusValue = /^status:\s*(.+)$/m.exec(frontmatter)?.[1];
+  if (statusValue === undefined) throw new Error("Abandonment task file has no lifecycle status");
+  const summaryMatch = /<!-- SECTION:FINAL_SUMMARY:BEGIN -->\r?\n([\s\S]*?)\r?\n<!-- SECTION:FINAL_SUMMARY:END -->/.exec(raw);
+  const normalized = `${raw
+    .replace(/^(status:)\s*.*$/m, "$1 <lifecycle-status>")
+    .replace(/^updated_date:\s*.*(?:\r?\n)?/m, "")
+    .replace(/\r?\n## Final Summary\r?\n\r?\n<!-- SECTION:FINAL_SUMMARY:BEGIN -->[\s\S]*?<!-- SECTION:FINAL_SUMMARY:END -->(?:\r?\n)?/, "\n")
+    .trimEnd()}\n`;
+  return {
+    status: unquoteBacklogScalar(statusValue),
+    finalSummary: summaryMatch ? summaryMatch[1].trim() : null,
+    contentDigest: createHash("sha256").update(normalized).digest("hex"),
+  };
+}
+
+function sameBacklogTaskIdentity(value: string, taskId: string, requirePrefix: boolean): boolean {
+  const target = /^([a-z]+)-([0-9]+(?:\.[0-9]+)*)$/i.exec(taskId.trim());
+  const candidate = /^(?:([a-z]+)-)?([0-9]+(?:\.[0-9]+)*)$/i.exec(value.trim());
+  if (!target || !candidate || (requirePrefix && !candidate[1])) return false;
+  if (candidate[1] && candidate[1].toLowerCase() !== target[1].toLowerCase()) return false;
+  const canonical = (body: string) => body.split(".")
+    .map((part) => part.replace(/^0+/, "") || "0").join(".");
+  return canonical(candidate[2]) === canonical(target[2]);
+}
+
+export function assertNoTaskArchiveCleanupTargets(
+  cwd: string,
+  taskId: string,
+  taskPath: string,
+  runner: CommandRunner,
+): void {
+  const backlogRoot = dirname(dirname(resolve(cwd, taskPath)));
+  const target = taskId.toUpperCase();
+  for (const directory of [join(backlogRoot, "tasks"), join(backlogRoot, "completed")]) {
+    if (!existsSync(directory)) continue;
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      const absolute = join(directory, entry.name);
+      const info = lstatSync(absolute);
+      if (!info.isFile() || info.isSymbolicLink()) {
+        throw new Error("Abandonment preflight rejects non-regular Backlog task records");
+      }
+      const raw = readFileSync(absolute, "utf8");
+      const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw)?.[1];
+      const idValue = frontmatter ? /^id:\s*(.+)$/m.exec(frontmatter)?.[1] : undefined;
+      if (!idValue) throw new Error(`Abandonment preflight could not identify ${entry.name}`);
+      const id = unquoteBacklogScalar(idValue);
+      if (id.toUpperCase() === target) continue;
+      const object = resolveTaskViewObject(cwd, id, runner);
+      const expectedPath = relative(cwd, absolute).split("\\").join("/");
+      if (object.path !== expectedPath) {
+        throw new Error(`Abandonment preflight found ambiguous Backlog identity ${id}`);
+      }
+      for (const field of ["dependencies", "references"] as const) {
+        const values = object[field];
+        if (!Array.isArray(values) || values.some((value) => typeof value !== "string")) {
+          throw new Error(`Abandonment preflight found invalid ${field} on ${id}`);
+        }
+        const requirePrefix = field === "references";
+        if ((values as string[]).some((value) => sameBacklogTaskIdentity(value, taskId, requirePrefix))) {
+          throw new Error(`Abandonment would rewrite ${field} on ${id}; remove that inbound link first`);
+        }
+      }
+    }
+  }
 }
 
 function commitConversationTaskStatus(options: {
@@ -2365,6 +2556,248 @@ export async function mergeTaskEpisodeReadyForMerge(
     doneCommit,
     parentTaskId: doneSnapshot.parentTaskId,
     episodeTaskContentDigest: doneSnapshot.contentDigest,
+    ...(pushError ? { pushError } : {}),
+  };
+}
+
+function expectedArchivedTaskPath(taskPath: string): string {
+  const activeDirectory = dirname(taskPath);
+  if (basename(activeDirectory) !== "tasks") {
+    throw new Error("Task abandonment requires the canonical Backlog active-task path");
+  }
+  return join(dirname(activeDirectory), "archive", "tasks", basename(taskPath));
+}
+
+function exactPathSet(actual: string[], expected: string[]): boolean {
+  return actual.length === expected.length
+    && [...actual].sort().every((value, index) => value === [...expected].sort()[index]);
+}
+
+function exactArchiveMoveChanges(
+  changes: GitWorktreeChange[],
+  activePath: string,
+  archivePath: string,
+): boolean {
+  if (changes.length === 1 && changes[0].status.includes("R")) {
+    const names = changes[0].path.split(" -> ");
+    return exactPathSet(names, [activePath, archivePath]);
+  }
+  if (changes.length !== 2) return false;
+  const active = changes.find((change) => change.path === activePath);
+  const archived = changes.find((change) => change.path === archivePath);
+  return Boolean(active && archived
+    && active.status.includes("D")
+    && (archived.status === "??" || archived.status.includes("A")));
+}
+
+export async function abandonTaskEpisode(
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeAbandonmentDependencies = {},
+  decision: TaskEpisodeAbandonmentDecision,
+): Promise<TaskEpisodeAbandonmentResult> {
+  if (decision.operatorDecision !== "abandon") {
+    throw new Error("Task abandonment requires the explicit operator Abandon decision");
+  }
+  if (!decision.finalSummary.trim() || decision.finalSummary !== decision.finalSummary.trim()) {
+    throw new Error("Task abandonment requires one normalized truthful non-empty Final Summary");
+  }
+  if (decision.mainStatus === "Done") {
+    throw new Error("Task abandonment archives without publishing Done");
+  }
+  const git = dependencies.git ?? new CliGitAdapter();
+  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
+  const resolveTask = dependencies.taskResolver
+    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
+  const resolveAbandonment = dependencies.abandonmentSnapshotResolver
+    ?? ((cwd: string, id: string) => resolveTaskAbandonmentSnapshot(cwd, id, runner));
+  const resolveFile = dependencies.abandonmentFileSnapshotResolver
+    ?? ((cwd: string, path: string) => resolveTaskAbandonmentFileSnapshot(cwd, path));
+  const assertNoCleanupTargets = dependencies.assertNoArchiveCleanupTargets
+    ?? ((cwd: string, id: string, path: string) => assertNoTaskArchiveCleanupTargets(cwd, id, path, runner));
+  const abandonmentGit = dependencies.abandonmentGit
+    ?? (dependencies.mergeGit as TaskEpisodeAbandonmentGit | undefined)
+    ?? new CliTaskEpisodeAdmissionGit();
+  if (typeof abandonmentGit.restorePathFromRef !== "function"
+    || typeof abandonmentGit.commitOnlyPaths !== "function") {
+    throw new Error("Task abandonment requires exact task-blob selection and archival Git support");
+  }
+
+  const authority = resolveBlockedWorkflowAuthority(decision.taskId, ctx, {
+    git, ownership: store, taskRunner: runner,
+  });
+  if (authority.mode !== "task") throw new Error("Task abandonment requires task-native owner authority");
+  const projectRoot = authority.projectRoot;
+  const record = store.read(projectRoot);
+  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
+  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
+  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before abandonment`);
+  if (decision.taskPath !== record.taskPath || decision.parentTaskId === undefined) {
+    throw new Error("Abandonment authority does not bind the exact owned task path and parent identity");
+  }
+  validateWorktreeRecord(record, git, filesystem, projectRoot);
+  await assertReadyIntegrationEpisodeIdle(record, { ...dependencies, reviewGit: abandonmentGit });
+  const retainedOwnership = stableJson(record);
+
+  git.assertCleanWorktree(record.worktree!);
+  if (abandonmentGit.head(record.worktree!) !== decision.episodeHead
+    || abandonmentGit.upstreamHead(record.worktree!) !== decision.episodeHead) {
+    throw new Error("Abandonment requires the exact Episode head to remain pushed");
+  }
+  const candidateMainRelationship = decision.mainHead === decision.episodeHead
+    ? "same"
+    : abandonmentGit.isAncestor(projectRoot, decision.mainHead, decision.episodeHead)
+      ? "main-ancestor"
+      : abandonmentGit.isAncestor(projectRoot, decision.episodeHead, decision.mainHead)
+        ? "episode-ancestor"
+        : "diverged";
+  if (candidateMainRelationship !== decision.candidateMainRelationship) {
+    throw new Error("Abandonment candidate/main relationship no longer matches the explicit authority");
+  }
+  const episodeTask = exactAdmissionTask(
+    resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
+  );
+  const episodeSnapshot = resolveAbandonment(record.worktree!, authority.taskId);
+  const episodeFile = resolveFile(record.worktree!, record.taskPath);
+  if (episodeTask.status === "Done" || episodeSnapshot.status === "Done" || episodeFile.status === "Done"
+    || episodeSnapshot.taskPath !== record.taskPath
+    || episodeSnapshot.parentTaskId !== decision.parentTaskId
+    || episodeSnapshot.abandonmentContentDigest !== decision.episodeTaskContentDigest) {
+    throw new Error("Abandonment Episode head does not preserve the exact bound task content and hierarchy");
+  }
+
+  const archivePath = expectedArchivedTaskPath(record.taskPath);
+  assertNoCleanupTargets(projectRoot, authority.taskId, record.taskPath);
+  let mainHead = abandonmentGit.head(projectRoot);
+  let changes = abandonmentGit.worktreeChanges(projectRoot);
+  let archiveCommit: string | undefined;
+
+  if (mainHead === decision.mainHead) {
+    if (abandonmentGit.upstreamHead(projectRoot) !== decision.mainHead) {
+      throw new Error("Abandonment requires canonical main and upstream at the exact bound head");
+    }
+    const alreadyArchived = exactArchiveMoveChanges(changes, record.taskPath, archivePath);
+    if (!alreadyArchived) {
+      const mainTask = exactAdmissionTask(
+        resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath,
+      );
+      const mainSnapshot = resolveAbandonment(projectRoot, authority.taskId);
+      if (mainTask.status === "Done" || mainSnapshot.status === "Done"
+        || mainSnapshot.taskPath !== record.taskPath
+        || mainSnapshot.parentTaskId !== decision.parentTaskId) {
+        throw new Error("Abandonment main task changed identity, path, status, or parent");
+      }
+      if (changes.length === 0) {
+        if (mainSnapshot.status !== decision.mainStatus) {
+          throw new Error("Abandonment main status no longer matches the captured lifecycle status");
+        }
+        abandonmentGit.restorePathFromRef(projectRoot, decision.episodeHead, record.taskPath);
+      } else {
+        const exactTaskChange = changes.length === 1
+          && changes[0].path === record.taskPath
+          && /^[ M]{2}$/.test(changes[0].status)
+          && changes[0].status.includes("M");
+        if (!exactTaskChange || mainSnapshot.abandonmentContentDigest !== decision.episodeTaskContentDigest) {
+          throw new Error("Abandonment recovery rejects dirty canonical-main content outside the exact Episode task blob");
+        }
+      }
+      runner.run("backlog", [
+        "task", "edit", "--status", decision.mainStatus,
+        "--final-summary", decision.finalSummary, "--plain", "--", authority.taskId,
+      ], { cwd: projectRoot });
+      const prepared = resolveAbandonment(projectRoot, authority.taskId);
+      const preparedFile = resolveFile(projectRoot, record.taskPath);
+      if (prepared.taskPath !== record.taskPath || prepared.status !== decision.mainStatus
+        || prepared.parentTaskId !== decision.parentTaskId
+        || prepared.abandonmentContentDigest !== decision.episodeTaskContentDigest
+        || prepared.finalSummary !== decision.finalSummary
+        || preparedFile.status !== decision.mainStatus
+        || preparedFile.finalSummary !== decision.finalSummary
+        || preparedFile.contentDigest !== episodeFile.contentDigest) {
+        throw new Error("Abandonment task preparation did not preserve Episode content and captured lifecycle state");
+      }
+      changes = abandonmentGit.worktreeChanges(projectRoot);
+      const exactPreparedChange = changes.length === 0
+        || (changes.length === 1 && changes[0].path === record.taskPath
+          && /^[ M]{2}$/.test(changes[0].status) && changes[0].status.includes("M"));
+      if (!exactPreparedChange) {
+        throw new Error("Abandonment task preparation changed paths outside the exact task");
+      }
+      mkdirSync(join(projectRoot, dirname(archivePath)), { recursive: true });
+      runner.run("backlog", ["task", "archive", "--", authority.taskId], { cwd: projectRoot });
+      changes = abandonmentGit.worktreeChanges(projectRoot);
+    }
+    if (!exactArchiveMoveChanges(changes, record.taskPath, archivePath)) {
+      throw new Error("Abandonment archive must move only the exact task into Backlog archive");
+    }
+    const archivedFile = resolveFile(projectRoot, archivePath);
+    if (archivedFile.status !== decision.mainStatus || archivedFile.status === "Done"
+      || archivedFile.finalSummary !== decision.finalSummary
+      || archivedFile.contentDigest !== episodeFile.contentDigest) {
+      throw new Error("Archived abandonment task does not preserve the authorized content and lifecycle state");
+    }
+    archiveCommit = abandonmentGit.commitOnlyPaths(
+      projectRoot, [record.taskPath, archivePath], `chore: abandon ${authority.taskId}`,
+    );
+    mainHead = archiveCommit;
+  } else {
+    if (changes.length !== 0) {
+      throw new Error("Abandonment recovery rejects a dirty committed archival state");
+    }
+    const parents = abandonmentGit.parents(projectRoot, mainHead);
+    const paths = abandonmentGit.commitPaths(projectRoot, mainHead);
+    if (parents.length !== 1 || parents[0] !== decision.mainHead
+      || !exactPathSet(paths, [record.taskPath, archivePath])) {
+      throw new Error("Canonical main is neither the bound pre-abandonment head nor its exact archival child");
+    }
+    archiveCommit = mainHead;
+  }
+
+  const archiveParents = abandonmentGit.parents(projectRoot, archiveCommit);
+  const archivePaths = abandonmentGit.commitPaths(projectRoot, archiveCommit);
+  if (abandonmentGit.head(projectRoot) !== archiveCommit
+    || archiveParents.length !== 1 || archiveParents[0] !== decision.mainHead
+    || !exactPathSet(archivePaths, [record.taskPath, archivePath])) {
+    throw new Error("Abandonment commit must directly archive only the exact bound task");
+  }
+  const archivedFile = resolveFile(projectRoot, archivePath);
+  if (archivedFile.status !== decision.mainStatus || archivedFile.status === "Done"
+    || archivedFile.finalSummary !== decision.finalSummary
+    || archivedFile.contentDigest !== episodeFile.contentDigest) {
+    throw new Error("Abandonment verification failed exact task content, lifecycle status, or summary");
+  }
+  git.assertCleanWorktree(projectRoot);
+  const retained = store.read(projectRoot);
+  if (!retained) throw new Error("Task-native ownership disappeared after abandonment");
+  exactOwnedTaskRecord(retained, authority.taskId, ctx.sessionManager.getSessionId());
+  if (retained.status !== "active" || stableJson(retained) !== retainedOwnership) {
+    throw new Error("Abandonment must retain exact Episode ownership and every resource pending cleanup authority");
+  }
+
+  let pushError = bestEffortTaskPush(abandonmentGit, projectRoot);
+  if (!pushError) {
+    try {
+      const observed = abandonmentGit.upstreamHead(projectRoot);
+      if (observed !== archiveCommit) {
+        pushError = `Abandonment push verification expected ${archiveCommit} but observed ${observed}`;
+      }
+    } catch (error) {
+      pushError = `Abandonment push verification failed: ${taskAdmissionError(error)}`;
+    }
+  }
+  return {
+    verified: true,
+    outcome: "abandoned",
+    taskId: authority.taskId,
+    status: decision.mainStatus,
+    priorMainHead: decision.mainHead,
+    episodeHead: decision.episodeHead,
+    archiveCommit,
+    archivedTaskPath: archivePath,
+    parentTaskId: decision.parentTaskId,
+    episodeTaskContentDigest: decision.episodeTaskContentDigest,
+    resourcesRetained: true,
     ...(pushError ? { pushError } : {}),
   };
 }

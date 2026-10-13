@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 13:09'
+updated_date: '2026-10-13 14:09'
 labels:
   - backlog-md
   - episode-loop
@@ -453,4 +453,14 @@ Journal-free recovery accepts only four exact states: original main + `Ready for
 Independent review found and drove repairs for post-fast-forward replay, post-`Done` best-effort transport, the dirty/staged mutation window, missing Ready-publication ancestry, and production raw-Git parsing. Final rereview reported no material findings. Evidence: 101 focused Node tests and 4 policy checks passed; final broad 186 Node and 59 host-safe Python tests passed with 45 container cases deselected; `git diff --check` passed; source-mode Docker Tier-1 passed at `.test-results/20261013T130723Z-39269-445a6588/tier1` with immutable image, offline RPC, teardown, and manifest publication verified.
 
 No abandonment, finalization, cleanup, public activation, or migration was added. No acceptance criterion is newly claimed; AC #8/#9 still require retained end-to-end, refreshed-candidate, and operator-outcome receipts.
+
+## 2026-10-13 — staged inactive confirmed abandonment
+
+Added only the unregistered explicit abandonment seam; this did not abandon the live Episode, change its status, archive its task, or clean resources. `abandonTaskEpisode` requires operator confirmation bound to the exact active owner, task path, canonical-main head and captured non-`Done` status, pushed idle Episode head, candidate/main relationship, invariant parent, Episode-content digest, and normalized truthful Final Summary. Main/upstream and Episode head/upstream must remain exact. Before mutation, active and completed records are resolved through supported structured Backlog task view and rejected if inbound dependencies or exact task references would make archive rewrite another task. Identity comparison matches Backlog case, prefix, dotted-numeric, leading-zero, and whitespace semantics.
+
+Git selects only the Episode task blob, never Episode code. Supported Backlog edit reapplies the captured Conversation status and Final Summary. Structured semantics and a normalized file digest prove all Episode-owned content remains exact while excluding only path, lifecycle/update metadata, and abandonment summary. The seam creates the canonical archive directory when absent, invokes supported `backlog task archive`, accepts only the exact active-delete/archive-add or staged rename state, and commits a direct two-path child without `Done`. Because supported `task view` intentionally cannot resolve archived tasks, post-archive verification uses the regular archived file, normalized digest, exact Git parent/paths, clean tree, and unchanged active ownership/resources. Local verified archival state is authoritative; final transport failure is evidence. Journal-free replay accepts only exact task preparation, archive move/stage, or direct archival child. Cleanup remains separately authorized.
+
+Actual vendored-CLI fixtures cover missing archive directory, archived-task invisibility, exact byte move, active dependency and completed reference rejection, plus `PRIMECLAW-01`, case, and whitespace aliases. A real Git fixture proves task-only selection and no code import. Independent review found and drove repairs for archived lookup, missing directory, path digest, inbound cleanup, and alias identity; final rereview reported no material findings. Evidence: 118 focused Node tests and 4 policy checks; final broad 203 Node and 59 host-safe Python tests with 45 container cases deselected; `git diff --check`; source-mode Docker Tier-1 `.test-results/20261013T140634Z-37005-1a3b77c9/tier1` with immutable image, offline RPC, teardown, and manifest publication verified.
+
+No actual abandonment, `Done`, finalization, cleanup, public activation, or migration occurred. No acceptance criterion is newly claimed; AC #8/#9 still require retained end-to-end and operator-outcome receipts.
 <!-- SECTION:NOTES:END -->

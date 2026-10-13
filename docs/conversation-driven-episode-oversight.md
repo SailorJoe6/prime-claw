@@ -281,6 +281,28 @@ unchanged for a separately authorized finalization or cleanup decision. Public
 task-native admission, lifecycle, integration, handoff, merge, and finalization
 remain inactive.
 
+Confirmed abandonment uses a separate inactive internal seam, not handoff or a
+new public tool. `abandonTaskEpisode` requires explicit operator authority bound
+to the exact owner, active task path, main head and captured non-`Done` status,
+Episode head, candidate/main relationship, invariant parent, Episode-content
+digest, and truthful Final Summary. The idle Episode head must remain pushed.
+Canonical main and its upstream must remain at the bound head. Before mutation,
+a supported structured scan of active and completed Backlog records rejects any
+inbound dependency or exact task reference whose archive cleanup would change a
+second task. Git selects only
+the Episode task blob; Backlog reapplies the captured main status and Final
+Summary, then archives that task without `Done`. Before commit, the effective
+diff must contain only the task preparation and its exact active-to-archive
+move, so no Episode code or unrelated path can enter main. The direct archival
+child is verified and pushed best-effort. Retry accepts only exact selected-task,
+archival-move/stage, or committed archival-child states. Backlog structured data
+verifies identity, parent, status, and summary before archive; afterward a
+normalized exact file digest and Git blob/move evidence verify unchanged content
+without pretending archived tasks remain viewable. Path, ancestry relationship,
+and ownership are also rechecked.
+The branch, worktree, durable session, and every resource remain active; any
+finalization or destructive cleanup needs separate operator authority.
+
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and
 worktree identities remain authoritative across restarts. Expert review follows

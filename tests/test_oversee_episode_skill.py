@@ -54,6 +54,13 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Immediately publish `Done` through Backlog",
         "local `Done` commit is authoritative",
         "Keep active ownership",
+        "Apply **Abandon** only after explicit operator confirmation",
+        "candidate/main relationship",
+        "Reject inbound task links before mutation",
+        "Select only that task blob",
+        "Reapply captured status through Backlog",
+        "archive without `Done`",
+        "cleanup needs separate authority",
     ]:
         assert phrase in text
     assert "Bead chronology" not in raw

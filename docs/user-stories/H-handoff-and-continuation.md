@@ -59,8 +59,15 @@ remains authoritative if push or remote verification fails.
 It preserves ownership and every idle Episode resource. No public task-native
 lifecycle, handoff, merge, or finalization surface is registered.
 
-Neither path is used for consultation, pause, merge, abandonment, cleanup,
-another Episode, or scope expansion.
+Confirmed abandonment never routes through handoff. Its inactive internal seam
+selects only the exact pushed Episode task blob, restores the captured main
+status, adds the abandonment Final Summary, proves no code entered main, and
+archives without `Done`. Exact task-preparation, archival-move/stage, and direct
+archival-child states are retryable without repeating archive mutation. It
+retains ownership and resources pending separate cleanup authority.
+
+These paths are not used for consultation, pause, destructive cleanup, another
+Episode, or scope expansion.
 
 ## Primary implementation surfaces
 
