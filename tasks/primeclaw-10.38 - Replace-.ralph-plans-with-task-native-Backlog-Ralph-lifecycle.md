@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 14:09'
+updated_date: '2026-10-13 14:20'
 labels:
   - backlog-md
   - episode-loop
@@ -463,4 +463,8 @@ Git selects only the Episode task blob, never Episode code. Supported Backlog ed
 Actual vendored-CLI fixtures cover missing archive directory, archived-task invisibility, exact byte move, active dependency and completed reference rejection, plus `PRIMECLAW-01`, case, and whitespace aliases. A real Git fixture proves task-only selection and no code import. Independent review found and drove repairs for archived lookup, missing directory, path digest, inbound cleanup, and alias identity; final rereview reported no material findings. Evidence: 118 focused Node tests and 4 policy checks; final broad 203 Node and 59 host-safe Python tests with 45 container cases deselected; `git diff --check`; source-mode Docker Tier-1 `.test-results/20261013T140634Z-37005-1a3b77c9/tier1` with immutable image, offline RPC, teardown, and manifest publication verified.
 
 No actual abandonment, `Done`, finalization, cleanup, public activation, or migration occurred. No acceptance criterion is newly claimed; AC #8/#9 still require retained end-to-end and operator-outcome receipts.
+
+### Accepted follow-up revision — preflight tracked archive-destination collision
+
+The next execute pass must repair one in-scope abandonment edge case before any canonical-main task restore, Backlog edit, or archive mutation. Compute the exact archive destination and fail closed if it already exists from tracked history. Backlog deliberately reuses archived IDs; with a reused ID and the same title, the vendored `backlog task archive` currently succeeds while replacing the historical archive file, leaving active `D` plus archive `M` only after mutation. Preserve the existing exact task-preparation, archive-move/stage, and committed-child recovery paths, where the destination is expected as part of the authorized partial state. Add a real vendored-CLI clean-Git regression proving rejection occurs before mutation, historical archive bytes remain identical, the active task remains present, and main remains clean. Keep this repair inside Prime Claw; do not patch Backlog or add recovery machinery or scope. The accepted base checkpoint is the actual clean pushed commit `039d4d204d0c2b3bb636be971161c96d30ba5409`.
 <!-- SECTION:NOTES:END -->
