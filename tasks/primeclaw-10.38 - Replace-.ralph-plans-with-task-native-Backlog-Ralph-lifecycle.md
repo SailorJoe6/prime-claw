@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 10:26'
+updated_date: '2026-10-13 10:42'
 labels:
   - backlog-md
   - episode-loop
@@ -362,4 +362,20 @@ Evidence:
 - `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC probe, teardown, and manifest publication verified at `.test-results/20261013T102307Z-99098-156da715/tier1`.
 
 No acceptance criterion is newly claimed. AC #2/#3 still require retained real-session authoring/planning evidence. AC #6/#7/#8 still require retained end-to-end task Episode lifecycle evidence. Public task Episode surfaces remain inactive.
+
+## 2026-10-13 — staged task-native oversight and Expert authority
+
+Converted the managed Conversation oversight and independent Expert review policies to select one disjoint durable authority from ownership. Version 2 binds supervision and review to the exact Backlog task ID/path, parent identity, candidate commit, and supported task fields as the sole durable contract. It never consults `.ralph/plans`, substitutes a related task, or copies/mirrors Episode-owned task content from the Conversation checkout. Retained version 1 keeps its exact approved specification/plan folder.
+
+The Conversation guide remains judgment-only. It preserves the four bounded dispositions, recorded acceptance evidence, canonical exact-owner handoff, operator-only product/merge/abandonment/cleanup authority, non-adversarial review boundary, and goals/heartbeat discipline. The Expert workflow remains read-only and evidence-only and retains its native RLM bootstrap/message/observe/delete lifecycle. The post-compaction hook still reinjects the full guide only for the exact active owner.
+
+Evidence:
+- Focused oversight/Expert policy: 6 passed.
+- Broad host-safe policy, installation, initialization, and discovery compatibility: 31 Python passed with 43 container cases deselected; 56 Node passed.
+- `git diff --check`: passed.
+- Independent remaining-gap audit: endorsed this as the smallest coherent next dependency.
+- Independent bounded diff review: no material findings.
+- `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed; immutable image, offline RPC probe, teardown, and manifest publication verified at `.test-results/20261013T103834Z-65715-7dcc0310/tier1`.
+
+This policy-only slice registers no task-native command/tool and changes no lifecycle state. Public `/implement-task`, `create_task_episode`, task handoff, and task finalization remain inactive. Placement/approval wiring, Conversation-owned `Blocked`/resume publication, Ready-for-Merge integration, operator decision mechanics, task-native finalization/abandonment, retained real-session evidence, and final migration remain later work. No acceptance criterion is newly claimed; AC #2/#3 and #6/#7/#8 still require their retained real-session or end-to-end evidence.
 <!-- SECTION:NOTES:END -->
