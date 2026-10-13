@@ -219,12 +219,39 @@ admission:
   `scripts/test-tier1.sh --probe`, with final evidence at
   `.test-results/20261013T074625Z-51506-443b013a/tier1`.
 
-Slices 1 and 2 remain open. The public `/implement-task`, trusted task-native
-allocation after reservation, status rollback/Blocked publication, retained
-real-session authoring and planning mutation evidence, and final
-lifecycle-default migration are later increments. Acceptance criteria #2 and
-#3 remain unchecked until their real-session semantic paths are retained; this
-internal foundation alone completes no criterion.
+#### Slice 2 progress — task-native allocation after reservation (2026-10-13)
+
+Completed the next bounded slice-2 increment without activating public
+admission:
+
+- added an internal allocator that accepts only the exact version-2 task/owner
+  reservation and derives non-authoritative branch/worktree/session labels from
+  the canonical task ID;
+- made local and exact reserved local-Orca worktrees start from the bound
+  task-only status-commit SHA, with no bundle copy, plan promotion, or promotion
+  commit;
+- bound one durable exact-CWD Prime Agent session, retained the visible Orca tab
+  behavior, and injected the exact task ID into one execute assignment;
+- made active replay validate worktree, provider, durable session ID/file, and
+  exact session CWD, reopening the same session when needed without replaying
+  allocation or assignment;
+- changed partial provisioning and all post-reservation allocation failures to
+  durable `uncertain` ownership that cannot replay as fresh allocation, while
+  leaving later Conversation-owned `Blocked` publication unwired;
+- kept `/implement-task` and `create_task_episode` unregistered and preserved
+  the complete version-1 folder allocator and public compatibility path; and
+- passed 106 focused Node tests, 36 host-safe Python checks with 10 container
+  cases deselected, independent review after repairing a foreign-session-CWD
+  replay defect, and source-mode `scripts/test-tier1.sh --probe`, with final
+  evidence at `.test-results/20261013T081542Z-76164-4158db63/tier1`.
+
+Slices 1 and 2 remain open. The public `/implement-task`, trusted status
+mutation plus reservation/allocation transaction, clean rollback and
+Conversation-owned `Blocked` publication, retained real-session authoring and
+planning mutation evidence, and final lifecycle-default migration are later
+increments. Acceptance criteria #2 and #3 remain unchecked until their
+real-session semantic paths are retained; this inactive allocator alone
+completes no criterion.
 
 ### 2. Bind Episode creation and durable ownership to the exact task
 

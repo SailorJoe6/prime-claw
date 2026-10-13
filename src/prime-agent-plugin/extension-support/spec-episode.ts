@@ -21,10 +21,12 @@ import {
 } from "./workflow-chain.ts";
 import {
   isLegacyEpisodeOwnership,
+  isTaskEpisodeOwnership,
   readEpisodeOwnership,
   writeEpisodeOwnership,
   type EpisodeOwnershipRecord,
   type LegacyEpisodeOwnershipRecord,
+  type TaskEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 import { validateFutureLocation } from "./reviewed-plan-support.ts";
 
@@ -65,6 +67,7 @@ function isUncertainMutation(error: unknown): boolean {
 }
 
 export type EpisodeResult = LegacyEpisodeOwnershipRecord & { reused: boolean };
+export type TaskEpisodeResult = TaskEpisodeOwnershipRecord & { reused: boolean };
 
 export interface SessionSummary {
   activeSessionId?: string; id?: string; sessionId?: string; sessionFile?: string;
@@ -657,6 +660,28 @@ function exactOwnedRecord(
   if (record.sourceLocation !== location) throw new Error("Existing episode ownership conflicts on sourceLocation");
   if (record.ownerSessionId !== ownerSessionId) throw new Error("Existing episode ownership conflicts on ownerSessionId");
 }
+function exactOwnedTaskRecord(
+  record: EpisodeOwnershipRecord,
+  taskId: string,
+  ownerSessionId: string,
+): asserts record is TaskEpisodeOwnershipRecord {
+  if (!isTaskEpisodeOwnership(record)) throw new Error("Existing future-folder episode ownership conflicts with task-native allocation");
+  if (record.taskId !== taskId) throw new Error("Existing episode ownership conflicts on taskId");
+  if (record.ownerSessionId !== ownerSessionId) throw new Error("Existing episode ownership conflicts on ownerSessionId");
+}
+function safeTaskLabel(taskId: string): string {
+  const label = taskId.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!label) throw new Error("Task-native Episode allocation could not derive a safe task label");
+  return label;
+}
+function taskReservationHasResourceIdentity(record: TaskEpisodeOwnershipRecord): boolean {
+  return [
+    record.worktreeName, record.worktreeId, record.worktreeIdentity, record.worktree,
+    record.branch, record.head, record.episodeId, record.episodeSessionFile,
+    record.episodeActiveSessionId, record.terminalHandle, record.launchAutomationName,
+    record.launchAutomationId, record.launchRunId,
+  ].some((value) => value !== undefined);
+}
 function validateWorktreeRecord(record: EpisodeOwnershipRecord, git: GitAdapter, filesystem: FilesystemAdapter, repo: string): void {
   if (!record.worktree || !record.branch || !filesystem.exists(record.worktree)) throw new Error("Episode ownership references a missing worktree");
   const worktree = git.worktrees(repo).find((entry) => samePath(entry.path, record.worktree));
@@ -690,6 +715,22 @@ async function selectSetup(setups: OrcaProjectSetup[], host: string | undefined,
     throw new Error("Remote Episode placement is disabled until exact approved-bundle transport is proven end to end");
   }
   return selected;
+}
+async function reservedTaskSetup(
+  record: TaskEpisodeOwnershipRecord,
+  repo: string,
+  orca: OrcaAdapter,
+): Promise<OrcaProjectSetup> {
+  const setups = await orca.listReadySetups(repo);
+  const setup = setups.find((candidate) => candidate.id === record.projectSetupId);
+  if (!setup) throw new EpisodeStateUncertainError("Reserved Orca project setup is no longer ready; no allocation was attempted");
+  if (setup.hostId !== "local" || setup.routingEnvironmentId) {
+    throw new EpisodeStateUncertainError("Reserved task-native Episode placement is no longer an approved local setup");
+  }
+  if (record.routingEnvironmentId !== setup.routingEnvironmentId) {
+    throw new EpisodeStateUncertainError("Reserved Orca routing identity changed before task-native allocation");
+  }
+  return setup;
 }
 function newRecord(options: {
   selected: { slug: string; location: string };
@@ -752,19 +793,20 @@ async function waitForOrcaBinding(options: {
   }
   throw new EpisodeStateUncertainError("Timed out binding the fresh Prime Agent session and connected Orca tab at the exact Episode CWD");
 }
-async function reopenIfNeeded(
-  record: LegacyEpisodeOwnershipRecord,
+async function reopenIfNeeded<T extends EpisodeOwnershipRecord>(
+  record: T,
   session: SessionSummary,
   ctx: ExtensionContext,
   publisher: SessionPublisher,
   store: EpisodeOwnershipStore,
   repo: string,
-): Promise<{ record: EpisodeOwnershipRecord; activeSessionId: string }> {
+): Promise<{ record: T; activeSessionId: string }> {
   let activeSessionId = session.activeSessionId;
   let current = record;
   if (!activeSessionId) {
     const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
-    const reopened = await publisher.reopen({ sessionFile: record.episodeSessionFile!, sessionId: record.episodeId!, worktree: record.worktree!, sessionName: `${record.slug}-episode`, model });
+    const label = isLegacyEpisodeOwnership(record) ? record.slug : safeTaskLabel(record.taskId);
+    const reopened = await publisher.reopen({ sessionFile: record.episodeSessionFile!, sessionId: record.episodeId!, worktree: record.worktree!, sessionName: `${label}-episode`, model });
     activeSessionId = reopened.activeSessionId;
   }
   if (!activeSessionId) throw new EpisodeStateUncertainError("Episode has no usable active routing identity");
@@ -814,6 +856,177 @@ export async function handoffSpecEpisode(
     await publisher.deliverHandoff(route.activeSessionId, handoffPrompt, executePrompt);
     return { admitted: true, sourceLocation: selected.location, episodeId: record.episodeId!, episodeActiveSessionId: route.activeSessionId, handoffDelivery: "prompt", executeDelivery: "followUp" };
   } finally { try { publisher?.close(); } catch { /* do not mask lifecycle result */ } }
+}
+
+/**
+ * Allocate resources only after `reserveTaskEpisodeOwnership` has durably bound
+ * one exact task and status-commit SHA. This remains an internal migration seam
+ * until the status mutation and failure-publication transaction is complete.
+ */
+export async function allocateReservedTaskEpisode(
+  rawTaskId: string,
+  ctx: ExtensionContext,
+  dependencies?: EpisodeDependencies,
+): Promise<TaskEpisodeResult> {
+  const git = dependencies?.git ?? new CliGitAdapter();
+  const filesystem = dependencies?.filesystem ?? new NodeFilesystemAdapter();
+  const store = dependencies?.ownership ?? defaultOwnershipStore;
+  const orca = dependencies?.orca ?? new CliOrcaAdapter();
+  let publisher = dependencies?.publisher;
+  let record: TaskEpisodeOwnershipRecord | undefined;
+  let repo = "";
+  try {
+    if (!rawTaskId || /\s/.test(rawTaskId) || rawTaskId.startsWith("-")) {
+      throw new Error("Task-native Episode allocation requires a canonical Backlog task ID");
+    }
+    repo = git.repositoryRoot(ctx.cwd);
+    if (resolve(repo) !== resolve(realpathSync(ctx.cwd))) throw new Error("Task-native Episode allocation must run from the repository root");
+    if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode allocation requires a persisted owner session");
+    if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) throw new Error("Episode allocation is available only from a top-level project Conversation");
+    const ownerSessionId = ctx.sessionManager.getSessionId();
+    publisher ??= new PrimeSessionPublisher(undefined, runtimeSessionManagerClass(ctx.sessionManager));
+
+    const existing = store.read(repo);
+    if (!existing) throw new Error(`No durable task-native Episode reservation exists for ${rawTaskId}`);
+    exactOwnedTaskRecord(existing, rawTaskId, ownerSessionId);
+    if (existing.status === "active") {
+      validateWorktreeRecord(existing, git, filesystem, repo);
+      if (existing.engine === "orca") {
+        const current = await orca.showWorktree(existing.worktreeId!, existing.routingEnvironmentId);
+        if (current.identity !== existing.worktreeIdentity || !samePath(current.path, existing.worktree!)) {
+          throw new Error("Existing Orca worktree does not match task-native Episode ownership");
+        }
+      }
+      const session = await durableSession(existing, publisher);
+      if (!samePath(session.cwd, existing.worktree!)) {
+        throw new Error("Task-native Episode session is not rooted at the owned worktree");
+      }
+      const route = await reopenIfNeeded(existing, session, ctx, publisher, store, repo);
+      return { ...route.record, reused: true };
+    }
+    if (existing.status !== "provisioning") {
+      throw new EpisodeStateUncertainError(`Existing task-native Episode ownership is ${existing.status}; inspect exact resources before continuing. No assignment was replayed.`);
+    }
+    record = existing;
+    if (taskReservationHasResourceIdentity(record)) {
+      throw new EpisodeStateUncertainError("Task-native provisioning already contains resource identity; inspect exact resources instead of replaying allocation");
+    }
+
+    const taskLabel = safeTaskLabel(record.taskId);
+    const worktreeName = `${basename(repo)}-${taskLabel}-episode-${record.operationId.slice(0, 8)}`;
+    const executePromptAtRoot = canonicalWorkflowPrompt(repo, "execute", {
+      location: { tag: "operator-episode-task", value: record.taskId },
+    });
+    if (!executePromptAtRoot) throw new Error("Project is missing .agents/skills/execute/SKILL.md");
+
+    if (record.engine === "local") {
+      const branch = `episode/${taskLabel}-${record.operationId.slice(0, 8)}`;
+      const worktree = resolve(dirname(repo), worktreeName);
+      if (filesystem.exists(worktree) || git.worktrees(repo).some((entry) => samePath(entry.path, worktree))) {
+        throw new EpisodeStateUncertainError(`Task-native Episode worktree path already exists: ${worktree}`);
+      }
+      record = updated(record, { worktreeName, worktree, branch, head: record.baseRef });
+      store.write(repo, record);
+      git.createWorktree(repo, branch, worktree, record.baseRef);
+      git.assertCleanWorktree(worktree);
+      if (git.head(worktree) !== record.baseRef) throw new EpisodeStateUncertainError("Local task-native Episode did not start at the reserved status commit");
+      const executePrompt = canonicalWorkflowPrompt(worktree, "execute", {
+        location: { tag: "operator-episode-task", value: record.taskId },
+      });
+      if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
+      const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
+      const published = await publisher.createFresh({
+        worktree, sessionName: `${taskLabel}-episode`, model,
+        onAllocated: (identity) => {
+          record = updated(record!, { episodeId: identity.sessionId, episodeSessionFile: identity.sessionFile });
+          store.write(repo, record);
+        },
+      });
+      record = updated(record, {
+        episodeId: published.sessionId,
+        episodeSessionFile: published.sessionFile,
+        episodeActiveSessionId: published.activeSessionId,
+      });
+      store.write(repo, record);
+      await publisher.deliverExecute(published.activeSessionId, executePrompt);
+      record = updated(record, { status: "active", uncertaintyReason: undefined });
+      store.write(repo, record);
+      return { ...record, reused: false };
+    }
+
+    const setup = await reservedTaskSetup(record, repo, orca);
+    record = updated(record, { worktreeName });
+    store.write(repo, record);
+    const worktree = await orca.createWorktree({ setup, name: worktreeName, baseRef: record.baseRef });
+    if (worktree.projectSetupId !== setup.id || worktree.head !== record.baseRef) {
+      throw new EpisodeStateUncertainError("Orca worktree binding does not match the reserved setup and status commit");
+    }
+    record = updated(record, {
+      worktreeId: worktree.id,
+      worktreeIdentity: worktree.identity,
+      worktree: worktree.path,
+      branch: worktree.branch,
+      head: worktree.head,
+    });
+    store.write(repo, record);
+    git.assertCleanWorktree(worktree.path);
+    const executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", {
+      location: { tag: "operator-episode-task", value: record.taskId },
+    });
+    if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
+    const before = new Set((await publisher.list()).map((session) => session.sessionId).filter((value): value is string => Boolean(value)));
+    const launchAutomationName = `prime-claw-launch-${record.operationId}`;
+    record = updated(record, { launchAutomationName });
+    store.write(repo, record);
+    const automationId = await orca.createLaunchAutomation({
+      worktreeId: worktree.id,
+      name: launchAutomationName,
+      prompt: executePrompt,
+      routingEnvironmentId: setup.routingEnvironmentId,
+    });
+    record = updated(record, { launchAutomationId: automationId });
+    store.write(repo, record);
+    const runId = await orca.runAutomation(automationId, setup.routingEnvironmentId);
+    record = updated(record, { launchRunId: runId });
+    store.write(repo, record);
+    const binding = await waitForOrcaBinding({
+      before,
+      worktree,
+      publisher,
+      orca,
+      routingEnvironmentId: setup.routingEnvironmentId,
+      wait: dependencies?.wait ?? ((ms) => new Promise((resolveWait) => setTimeout(resolveWait, ms))),
+      attempts: dependencies?.bindingAttempts ?? 240,
+    });
+    if (!binding.published.activeSessionId) throw new EpisodeStateUncertainError("Fresh Episode session has no active routing identity");
+    record = updated(record, {
+      episodeId: binding.published.sessionId,
+      episodeSessionFile: binding.published.sessionFile,
+      episodeActiveSessionId: binding.published.activeSessionId,
+      terminalHandle: binding.terminal.handle,
+    });
+    store.write(repo, record);
+    await orca.removeAutomation(automationId, setup.routingEnvironmentId);
+    const retained = (await orca.listTerminals(worktree.id, setup.routingEnvironmentId))
+      .find((terminal) => terminal.handle === binding.terminal.handle && terminal.connected && terminal.writable
+        && terminal.agentIdentity === "prime-agent" && terminal.visible
+        && samePath(terminal.worktreePath, worktree.path)
+        && terminal.tabId === binding.terminal.tabId && terminal.leafId === binding.terminal.leafId);
+    if (!retained) throw new EpisodeStateUncertainError("Prime Agent tab was not retained after launch automation removal");
+    record = updated(record, {
+      status: "active",
+      launchAutomationId: undefined,
+      launchRunId: undefined,
+      uncertaintyReason: undefined,
+    });
+    store.write(repo, record);
+    return { ...record, reused: false };
+  } catch (error) {
+    if (record && repo) markUncertain(store, repo, record, error);
+    throw error;
+  } finally {
+    try { publisher?.close(); } catch { /* do not mask lifecycle result */ }
+  }
 }
 
 export async function createSpecEpisode(

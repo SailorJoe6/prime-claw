@@ -63,11 +63,16 @@ disjoint schemas. Version 1 retains the folder location, slug, and bundle digest
 for existing `/implement-spec` Episodes. Version 2 replaces those fields with
 the canonical Backlog task ID and project-relative task path; its `baseRef` is
 the exact task-only `In Progress` status commit. The inactive task-native
-reservation seam re-resolves the exact task and verifies that commit plus a clean task, then writes
-`provisioning` before any branch, worktree, session, or assignment identity.
-It rejects any non-terminal ownership instead of replaying allocation. Folder
-admission and close operations explicitly reject version 2 until their
-corresponding task-native surfaces replace them.
+reservation seam re-resolves the exact task and verifies that commit plus a
+clean task, then writes `provisioning` before any branch, worktree, session, or
+assignment identity. Its inactive allocator consumes only that exact
+reservation, creates the selected local or Orca worktree from `baseRef`, skips
+bundle promotion, binds one durable exact-CWD session, and sends one execute
+assignment carrying the task ID. Active replay validates the worktree and
+session ID/file/CWD before reopening without reassigning; partial provisioning
+or allocation failure becomes `uncertain`
+and cannot replay fresh. Folder admission and close operations explicitly
+reject version 2 until their corresponding task-native surfaces replace them.
 
 ## Preferred Orca creation
 

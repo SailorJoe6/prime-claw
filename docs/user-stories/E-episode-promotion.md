@@ -62,22 +62,31 @@ clean rollback to `In Planning`, and uncertain/partial `Blocked` outcome.
 
 The ownership store now accepts either retained version-1 folder identity or
 strict version-2 task identity, never a mixture. An internal reservation seam
-re-resolves and verifies that the exact task is `In Progress`, still has a meaningful plan, is
-clean after a HEAD commit containing only its canonical Backlog path, and then
-persists version-2 `provisioning` ownership before any resource identity exists.
-A non-terminal record blocks replay. Conversation compaction can retain either
-identity, while folder commands reject a task-native record rather than treating
-it as a folder Episode.
+re-resolves and verifies that the exact task is `In Progress`, still has a
+meaningful plan, is clean after a HEAD commit containing only its canonical
+Backlog path, and then persists version-2 `provisioning` ownership before any
+resource identity exists.
+
+An internal task-native allocator now consumes only that exact reservation. It
+derives non-authoritative branch/worktree labels from the task ID, creates the
+local or exact reserved Orca worktree from the bound status-commit SHA, skips
+all bundle copy and promotion-commit behavior, binds one durable exact-CWD
+session, and injects the exact task ID into one execute assignment. Active
+replay validates the worktree plus durable session ID, file, and CWD, and may
+reopen that same identity without replaying the assignment. Partial
+`provisioning` or any failed allocation becomes `uncertain` and cannot replay
+as fresh work.
 
 This remains an inactive foundation: `/implement-task` and
-`create_task_episode` are not registered, the task-native allocator does not
-exist yet, and current Episode creation continues through the retained folder
+`create_task_episode` are not registered, and the status mutation, clean
+rollback, and Conversation-owned `Blocked` publication transaction is not yet
+wired. Current public Episode creation continues through the retained folder
 workflow above.
 
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/extensions/reviewed-plan.ts`
-- `src/prime-agent-plugin/extension-support/spec-episode.ts`
+- `src/prime-agent-plugin/extension-support/spec-episode.ts` (retained allocator plus inactive task-native allocation)
 - `src/prime-agent-plugin/extension-support/episode-ownership.ts`
 - `src/prime-agent-plugin/extension-support/task-episode-ownership.ts` (inactive reservation foundation)
 - `src/prime-agent-plugin/workflows/implement-prep.md`

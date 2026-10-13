@@ -7,7 +7,7 @@ import test from "node:test";
 
 import {
   CliOrcaAdapter, EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
-  bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
+  allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
@@ -97,6 +97,30 @@ function createApproved(f, options = {}) {
   const approvedBundleDigest = bundleContentDigest(join(f.root, ".ralph", "plans", "future", "alpha"));
   return createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, { ...options, approvedBundleDigest });
 }
+
+const TASK_BASE = "a".repeat(40);
+function taskReservation(overrides = {}) {
+  return parseEpisodeOwnership({
+    version: 2,
+    status: "provisioning",
+    operationId: "task-operation-1234",
+    engine: "local",
+    ownerSessionId: "owner",
+    taskId: "PRIMECLAW-10.38",
+    taskPath: "backlog/tasks/primeclaw-10.38.md",
+    baseRef: TASK_BASE,
+    createdAt: "2026-10-13T08:00:00.000Z",
+    updatedAt: "2026-10-13T08:00:00.000Z",
+    ...overrides,
+  });
+}
+function bindTaskOrcaHead(f) {
+  f.orca.createWorktree = async (args) => {
+    f.calls.push(["orca-create", args]);
+    return { ...f.wt, head: TASK_BASE, projectSetupId: args.setup.id };
+  };
+}
+
 
 test("Orca creation promotes before exactly one native execute assignment and removes launcher", async () => {
   const f = harness(); const result = await createApproved(f);
@@ -312,4 +336,161 @@ test("CLI setup inventory stops at supported local project setups", async () => 
   assert.deepEqual(await adapter.listReadySetups("/repo"), []);
   assert.equal(commands.length, 1);
   assert.deepEqual(commands[0].slice(0, 2), ["project", "setups"]);
+});
+
+
+test("reserved task allocates a local worktree from the status commit and assigns execute once", async () => {
+  const f = harness({ record: taskReservation() });
+  f.filesystem.exists = () => false;
+  f.git.head = () => TASK_BASE;
+  const result = await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
+  assert.equal(result.version, 2);
+  assert.equal(result.status, "active");
+  assert.equal(result.reused, false);
+  assert.equal(result.head, TASK_BASE);
+  const localCreate = f.calls.find((call) => call[0] === "local-create");
+  assert.equal(localCreate[3], TASK_BASE);
+  const names = f.calls.map((call) => call[0]);
+  assert.ok(names.indexOf("ownership") < names.indexOf("local-create"));
+  assert.equal(names.filter((name) => name === "fresh").length, 1);
+  assert.equal(names.filter((name) => name === "execute").length, 1);
+  assert.equal(names.includes("promote"), false);
+  assert.equal(names.includes("commit"), false);
+  const execute = f.calls.find((call) => call[0] === "execute");
+  assert.match(execute[1], /<operator-episode-task>\s*PRIMECLAW-10\.38\s*<\/operator-episode-task>/);
+});
+
+test("reserved task allocates through exact Orca placement without bundle promotion", async () => {
+  const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local" }) });
+  bindTaskOrcaHead(f);
+  const result = await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
+  assert.equal(result.version, 2);
+  assert.equal(result.engine, "orca");
+  assert.equal(result.status, "active");
+  assert.equal(result.head, TASK_BASE);
+  const names = f.calls.map((call) => call[0]);
+  assert.ok(names.indexOf("ownership") < names.indexOf("orca-create"));
+  assert.equal(names.includes("promote"), false);
+  assert.equal(names.includes("commit"), false);
+  assert.equal(names.includes("fresh"), false);
+  assert.equal(names.includes("execute"), false);
+  assert.deepEqual(names.filter((name) => name === "auto-run"), ["auto-run"]);
+  const automation = f.calls.find((call) => call[0] === "auto-create")[1];
+  assert.match(automation.prompt, /<operator-episode-task>\s*PRIMECLAW-10\.38\s*<\/operator-episode-task>/);
+});
+
+
+test("missing reserved Orca setup becomes uncertain without resource creation", async () => {
+  const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local" }), setups: [] });
+  await assert.rejects(
+    allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps),
+    /no longer ready/,
+  );
+  assert.equal(f.record.status, "uncertain");
+  assert.equal(f.calls.some((call) => ["orca-create", "auto-create", "auto-run", "fresh", "execute"].includes(call[0])), false);
+});
+
+test("active task-native allocation replay validates identity without replaying assignment", async () => {
+  const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local" }) });
+  bindTaskOrcaHead(f);
+  await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
+  f.calls.length = 0;
+  const result = await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
+  assert.equal(result.status, "active");
+  assert.equal(result.reused, true);
+  assert.equal(f.calls.some((call) => ["orca-create", "local-create", "auto-create", "auto-run", "fresh", "execute"].includes(call[0])), false);
+  assert.equal(f.calls.some((call) => call[0] === "orca-show"), true);
+});
+
+
+test("active task-native replay reopens the durable session with the task-derived name", async () => {
+  const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local" }) });
+  bindTaskOrcaHead(f);
+  await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
+  f.calls.length = 0;
+  f.publisher.list = async () => [{
+    sessionId: "episode",
+    sessionFile: join(f.root, "episode.jsonl"),
+    cwd: f.worktree,
+    isSessionActive: false,
+    isStreaming: false,
+    isCompacting: false,
+    queuedCount: 0,
+  }];
+  const result = await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
+  assert.equal(result.reused, true);
+  const reopen = f.calls.find((call) => call[0] === "reopen");
+  assert.equal(reopen[1].sessionName, "primeclaw-10-38-episode");
+  assert.equal(f.calls.some((call) => ["orca-create", "auto-create", "auto-run", "execute"].includes(call[0])), false);
+});
+
+
+test("active task-native replay rejects the durable session in a foreign checkout", async () => {
+  const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local" }) });
+  bindTaskOrcaHead(f);
+  await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
+  f.calls.length = 0;
+  f.publisher.list = async () => [{
+    activeSessionId: "foreign-route",
+    sessionId: "episode",
+    sessionFile: join(f.root, "episode.jsonl"),
+    cwd: f.root,
+    isSessionActive: false,
+    isStreaming: false,
+    isCompacting: false,
+    queuedCount: 0,
+  }];
+  await assert.rejects(
+    allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps),
+    /not rooted at the owned worktree/,
+  );
+  assert.equal(f.calls.some((call) => ["reopen", "orca-create", "auto-create", "auto-run", "fresh", "execute"].includes(call[0])), false);
+});
+
+test("task-native allocation rejects mismatched ownership before resource mutation", async () => {
+  const f = harness({ record: taskReservation() });
+  await assert.rejects(
+    allocateReservedTaskEpisode("PRIMECLAW-99", f.ctx, f.deps),
+    /conflicts on taskId/,
+  );
+  assert.equal(f.record.status, "provisioning");
+  assert.equal(f.calls.some((call) => ["ownership", "orca-create", "local-create", "fresh", "execute"].includes(call[0])), false);
+  f.ctx.sessionManager.getSessionId = () => "foreign-owner";
+  await assert.rejects(
+    allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps),
+    /conflicts on ownerSessionId/,
+  );
+  assert.equal(f.record.status, "provisioning");
+  assert.equal(f.calls.some((call) => ["ownership", "orca-create", "local-create", "fresh", "execute"].includes(call[0])), false);
+});
+
+test("partial provisioning becomes uncertain and cannot replay allocation", async () => {
+  const f = harness({ record: taskReservation({ worktreeName: "already-derived" }) });
+  await assert.rejects(
+    allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps),
+    /already contains resource identity/,
+  );
+  assert.equal(f.record.status, "uncertain");
+  assert.equal(f.calls.some((call) => ["orca-create", "local-create", "fresh", "execute"].includes(call[0])), false);
+  f.calls.length = 0;
+  await assert.rejects(
+    allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps),
+    /ownership is uncertain/,
+  );
+  assert.equal(f.calls.some((call) => ["orca-create", "local-create", "fresh", "execute"].includes(call[0])), false);
+});
+
+test("task-native local mutation failure preserves bound identity as uncertain", async () => {
+  const f = harness({ record: taskReservation() });
+  f.filesystem.exists = () => false;
+  f.git.createWorktree = () => { throw new Error("ambiguous task worktree create"); };
+  await assert.rejects(
+    allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps),
+    /ambiguous task worktree create/,
+  );
+  assert.equal(f.record.status, "uncertain");
+  assert.match(f.record.worktreeName, /primeclaw-10-38-episode-task-ope/);
+  assert.match(f.record.branch, /^episode\/primeclaw-10-38-task-ope/);
+  assert.equal(f.record.head, TASK_BASE);
+  assert.equal(f.calls.some((call) => ["fresh", "execute"].includes(call[0])), false);
 });
