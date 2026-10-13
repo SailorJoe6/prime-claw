@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 20:36'
+updated_date: '2026-10-13 21:57'
 labels:
   - backlog-md
   - episode-loop
@@ -661,4 +661,10 @@ At clean checkpoint `5ca6d463efa5433192e3bc7a17894a60293f4738`, preflight invent
 Execution stopped before any migration mutation remained. Seven required reused owners — `PRIMECLAW-6`, `PRIMECLAW-10.15`, `PRIMECLAW-10.26`, `PRIMECLAW-10.28`, `PRIMECLAW-19`, `PRIMECLAW-20`, and `PRIMECLAW-10.34` — already live under `backlog/completed/`. `backlog task view --json` resolves them, but supported `backlog task edit` returns `Task not found` because edits resolve only the active corpus. The repository-built Backlog implementation explicitly says a completed record cannot pass through `updateTask`; its diagnostics recommend direct file editing for completed records. Direct task-Markdown edits are forbidden by repository policy and contradict this migration's CLI-only contract. `task demote` assigns a new draft ID and would violate immutable task identity.
 
 A temporary create attempt for the seven new epics was fully rolled back before this blocker record. No existing task, status, parent, config, bundle, asset, or source plan changed. Unblock requires one explicit operator decision: authorize exact direct edits of only those seven completed records, authorize a separately scoped supported Backlog capability for completed-record edits, or revise the mapping so those completed IDs need no field/type import. Do not continue migration, infer an exception, move/delete plans, or change this task's lifecycle status before that decision.
+
+### Operator-selected unblock — supported completed-task restore capability
+
+The operator selected the supported-capability path. Implement and validate an upstream-quality Backlog operation that restores one exact completed record from `backlog/completed/` to active task storage without changing its ID, parent, content, or terminal `Done` status. Normal supported `task edit` may then update that same record; `task complete` must run only after all intended edits and validation.
+
+This capability is the next bounded slice and must be delivered as its own reviewable checkpoint before broader migration resumes. Keep implementation and validation in this Episode. Do not open, prepare, or pursue any upstream issue or pull request; the owning Conversation may assign that transport separately only after accepting the capability candidate. No direct-edit exception, migration mutation, plan movement/deletion, or lifecycle-status change is authorized by this decision.
 <!-- SECTION:NOTES:END -->

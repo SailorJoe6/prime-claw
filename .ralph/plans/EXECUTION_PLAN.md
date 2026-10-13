@@ -1244,13 +1244,21 @@ violate immutable task identity.
 
 A temporary create attempt for the seven new epics was fully rolled back; the
 working tree returned clean before this blocker record. No existing task,
-status, parent, config, bundle, asset, or source plan was changed. The unblock
-condition is one explicit operator decision that revises the approved mechanism:
-either authorize exact direct edits of only those seven completed records,
-authorize a separately scoped supported Backlog capability for completed-record
-edits, or revise the mapping so those completed IDs need no field/type import.
-Do not continue the migration, infer an exception, move/delete plan files, or
-change `PRIMECLAW-10.38` lifecycle status before that decision.
+status, parent, config, bundle, asset, or source plan was changed.
+
+The operator selected the supported-capability unblock. Before broader migration
+resumes, implement and validate an upstream-quality Backlog operation that
+restores one exact completed record to active task storage without changing its
+ID, parent, content, or terminal `Done` status. The normal supported `task edit`
+flow may then update that same record, and `task complete` must run only after
+all intended edits and validation. Land the capability as its own reviewable
+checkpoint; do not combine its acceptance with migration mutation. Keep the
+implementation and validation in this Episode, but do not open, prepare, or
+pursue an upstream issue or pull request. The owning Conversation may assign
+that separate transport only after it accepts the capability candidate. Until
+the capability checkpoint is accepted, do not resume the migration, infer a
+direct-edit exception, move/delete plan files, or change `PRIMECLAW-10.38`
+lifecycle status.
 
 ### 5. Perform the one-time task and bundle migration through Backlog CLI
 
