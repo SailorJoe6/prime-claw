@@ -840,6 +840,25 @@ project template, command, tool, workflow, ownership record, task, bundle,
 status, or `.ralph/plans` content was removed or migrated. Final asset
 retirement remains coupled to the explicitly authorized migration/cutover.
 
+#### Accepted next dependency — activation-truth documentation and traceability
+reconciliation
+
+The operator accepted pushed checkpoint
+`bf1b320e8649f252b6bf3031c0563ded17bffc9f`, including the isolated exact
+managed-asset retirement rehearsal. The next execute pass is the explicitly
+recorded ordered step-4 documentation prerequisite: make the already-active
+task-native lifecycle the primary current architecture and operator path, and
+label every retained folder procedure clearly as version-1 compatibility.
+Reconcile the current architecture, operator, user-story, and traceability
+surfaces identified by the recorded audit while keeping those compatibility
+procedures operational and documented.
+
+Do not begin the separate no-`To Do` guidance migration, proof-reference
+normalization, task/bundle migration, production asset retirement,
+`.ralph/plans` deletion, or final cutover. Preserve exact IDs and parents,
+operator authority, supported interfaces, Docker-only plugin validation when
+applicable, and the no-unrelated-scope boundary.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and
