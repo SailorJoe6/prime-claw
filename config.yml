@@ -1,6 +1,6 @@
 project_name: "prime-claw"
 default_status: "To Do"
-statuses: ["To Do", "In Design", "In Planning", "In Progress", "Blocked", "Done"]
+statuses: ["To Do", "In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]
 labels: []
 types: ["bug", "feature", "enhancement", "task", "chore", "docs", "spike", "epic", "decision"]
 priorities: ["P0", "P1", "P2", "P3", "P4"]
