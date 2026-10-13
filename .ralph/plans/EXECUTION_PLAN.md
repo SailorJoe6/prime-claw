@@ -1087,6 +1087,25 @@ ownership/resource, acceptance criterion, or operator authority changed. No
 migration, retirement, plan deletion or movement, final cutover, host-global
 apply, or live resource cleanup occurred.
 
+#### Post-review repair — align US-17 Episode scope
+
+Corrected the active US-17 traceability row after review of candidate
+`88f66e559b70ab7fb2e2cc22244440674e305415`. It now states the accepted three
+scope distinctions: a task-native Episode implements approved code,
+documentation, and tests in its isolated worktree; it exclusively owns the
+bound task's content there; and lifecycle status remains with the Conversation.
+The retained version-1 compatibility clause and durable Backlog evidence
+references remain unchanged.
+
+Extended the existing focused Episode-scope contract in
+`tests/test_oversee_episode_skill.py` to require all three distinctions on the
+active traceability surface, reject the former task-content-only claim, and
+preserve the compatibility and evidence clauses. Focused scope plus inventory
+validation passed 13 host-safe tests and `git diff --check` passed. No proof
+mapping, inventory gate, current-proof normalization, historical/version-1
+exclusion, task identity/status/acceptance, plugin source, migration,
+configuration/default, asset, plan placement, or cutover behavior changed.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

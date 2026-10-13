@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 20:12'
+updated_date: '2026-10-13 20:19'
 labels:
   - backlog-md
   - episode-loop
@@ -639,4 +639,10 @@ Expanded `tests/test_inventory_integrity.py` to scan every inventory string, rej
 Focused inventory and deletion-safety validation passed 7 tests. The curated broad host-safe suite passed 653 tests plus 75 subtests, with 1 skip, 67 deselections, and 12 warnings; `git diff --check` passed. An initial unrestricted host-safe run also exposed two unrelated static-policy failures already present at the handoff base: the `test_runtime_connect.py` literal-policy check and the missing pytest bridge for `task_episode_admission_extension.test.mjs`. Their source and policy files are unchanged by this slice. No managed plugin source changed, so Docker Tier 1 is not required by repository policy.
 
 No task identity, status, bundle, `backlog/config.yml`, production asset, plugin source, retained version-1 compatibility behavior, lifecycle state, ownership/resource, acceptance criterion, or operator authority changed. No migration, retirement, plan deletion or movement, final cutover, host-global apply, or live resource cleanup occurred.
+
+### Post-review repair — align US-17 Episode scope
+
+Corrected the active US-17 traceability row after review of candidate `88f66e559b70ab7fb2e2cc22244440674e305415`. It now states the accepted three scope distinctions: a task-native Episode implements approved code, documentation, and tests in its isolated worktree; it exclusively owns the bound task's content there; and lifecycle status remains with the Conversation. The retained version-1 compatibility clause and durable Backlog evidence references remain unchanged.
+
+Extended the existing focused Episode-scope contract in `tests/test_oversee_episode_skill.py` to require all three distinctions on the active traceability surface, reject the former task-content-only claim, and preserve the compatibility and evidence clauses. Focused scope plus inventory validation passed 13 host-safe tests and `git diff --check` passed. No proof mapping, inventory gate, current-proof normalization, historical/version-1 exclusion, task identity/status/acceptance, plugin source, migration, configuration/default, asset, plan placement, or cutover behavior changed.
 <!-- SECTION:NOTES:END -->

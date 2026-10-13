@@ -6,6 +6,7 @@ GUIDE = REPO / "src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.m
 DOC = REPO / "docs/conversation-driven-episode-oversight.md"
 FUTURE_DOC = REPO / "docs/future-specification-bundles.md"
 HANDOFF_DOC = REPO / "docs/handoff-chain.md"
+TRACEABILITY = REPO / "docs/user-stories/traceability.md"
 
 
 def test_managed_conversation_guide_is_lean_judgment_only():
@@ -152,3 +153,15 @@ def test_current_docs_distinguish_episode_edit_scope_status_and_action_receipts(
         "retains them for later authorized outcomes or bounded retries."
     ) in current
     assert "placement, and task-native lifecycle receipts" not in current
+
+    traceability = " ".join(TRACEABILITY.read_text().split())
+    assert (
+        "A task-native Episode implements approved code, documentation, and tests in its isolated "
+        "worktree, exclusively owns the bound task's content there, and leaves lifecycle status "
+        "to the Conversation"
+    ) in traceability
+    assert "A task-bound Episode edits only its exact Backlog task content" not in traceability
+    assert "retained version-1 compatibility folder Episodes keep their plan workflow" in traceability
+    assert (
+        "`PRIMECLAW-10.15`, `PRIMECLAW-10.24`, and `PRIMECLAW-10.26`"
+    ) in traceability
