@@ -381,6 +381,39 @@ Acceptance criteria #2, #3, #6, #7, and #8 remain unchecked until their
 real-session or end-to-end semantic paths are retained; this inactive
 continuation slice alone completes no criterion.
 
+#### Slice 3 progress — task-native oversight and Expert authority (2026-10-13)
+
+Converted the managed Conversation and Expert review policies to select one
+disjoint durable authority from ownership. Version 2 binds the exact Backlog
+task ID/path, supported task fields, parent identity, and candidate commit;
+Conversation supervision and independent review never consult `.ralph/plans`,
+do not substitute a related task, and do not copy or mirror Episode-owned task
+content. Version 1 retains its exact approved specification/plan folder.
+
+The Conversation guide remains judgment-only and preserves the four bounded
+dispositions, recorded acceptance evidence, canonical exact-owner handoff,
+non-adversarial review boundary, goals/heartbeat discipline, and operator-only
+product/merge/abandonment/cleanup authority. The Expert workflow retains native
+RLM bootstrap/message/observe/delete mechanics and now sends the selected
+exact-task or exact-folder contract to the read-only reviewer. Static policy and
+managed-protocol tests cover both modes, and the existing compaction hook still
+reinjects the complete guide only for the exact active owner.
+
+This is a policy-only dependency slice. It registers no task-native command or
+tool, changes no lifecycle state, and leaves public task admission, handoff, and
+finalization inactive. Conversation-owned `Blocked`/resume publication,
+`Ready for Merge` integration, operator decision mechanics, retained native
+receipts, and final migration remain later work. No acceptance criterion is
+newly claimed by this staged policy.
+
+Validation passed 6 focused policy checks, 31 broad host-safe Python checks with
+43 container cases deselected, 56 broad Node checks, and `git diff --check`.
+The dependency audit endorsed this as the smallest coherent next slice, the
+independent bounded diff review found no material defects, and source-mode
+`scripts/test-tier1.sh --probe` passed with immutable-image, offline-RPC,
+teardown, and manifest evidence at
+`.test-results/20261013T103834Z-65715-7dcc0310/tier1`.
+
 ### 2. Bind Episode creation and durable ownership to the exact task
 
 - Refactor `extension-support/spec-episode.ts` around exact `taskId` and

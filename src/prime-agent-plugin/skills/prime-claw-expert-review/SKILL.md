@@ -25,6 +25,18 @@ not require active-episode ownership, a particular worktree or branch, push
 state, a fixed packet object, or repository snapshot hashes. If information
 needed for a bounded review is unclear, ask the caller instead of guessing.
 
+Select the candidate's durable authority explicitly:
+
+- For a task-native candidate, bind the review to the exact Backlog task ID and
+  project-relative task path at the candidate commit. Reload it through the
+  supported structured interface. Treat its Description, Acceptance Criteria,
+  constraints, references, documentation, Implementation Plan, Implementation
+  Notes, modified files, and Final Summary as the sole review contract. Verify
+  exact ID, path, and parent identity, and do not consult `.ralph/plans` or copy
+  task content from another checkout.
+- For a retained folder candidate, use its exact approved specification and
+  execution plan. Do not substitute a related Backlog task as authority.
+
 ## Select and start the reviewer
 
 Use `await rlm.find_models(...)` to resolve an operator-selected model. Without

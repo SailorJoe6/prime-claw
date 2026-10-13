@@ -12,7 +12,10 @@ The operator alone decides product direction, scope changes, merge,
 abandonment, destructive cleanup, and any future remote transport. The
 Conversation may review evidence, accept an in-scope candidate, record a bounded
 revision, pause, or consult the operator. It does not implement Episode work.
-The Episode implements only the promoted specification and execution plan.
+A retained version-1 Episode implements only its promoted specification and
+execution plan. A version-2 Episode implements only its exact Backlog task,
+whose supported specification, plan, execution, and outcome fields replace the
+folder authority without changing role authority.
 
 ## Planning and implementation admission
 
@@ -162,9 +165,14 @@ one post hook for one saved compaction. The guide references
 
 ## Supervision and continuation
 
-The Conversation checks the Episode's exact candidate, tree, diff, tests,
-documentation, durable authority, chronology, and push state. It then chooses
-one bounded disposition from the managed oversight skill. Retained folder
+The Conversation selects the authority mode from exact ownership before it
+reviews a report. Version 1 retains its approved specification/plan folder.
+Version 2 binds the exact Backlog task ID/path in main and the Episode worktree;
+the task's supported fields are the sole durable contract, `.ralph/plans` is not
+consulted, and the Conversation never copies or mirrors Episode-owned task
+content. It checks the exact candidate, tree, diff, tests, documentation,
+durable authority, chronology, and push state, then chooses one bounded
+disposition from the managed oversight skill. Retained folder
 Episodes use `handoff_spec_episode` for the exact idle owner record. The tool
 admits ordinary canonical handoff and queues canonical execute as its sole
 follow-up. Admission is not completion and uncertain transport is never
@@ -184,7 +192,10 @@ admission and handoff remain inactive.
 
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and
-worktree identities remain authoritative across restarts. Expert review is a
+worktree identities remain authoritative across restarts. Expert review follows
+the same disjoint authority selection: an exact
+task-native candidate uses only the bound task fields at its candidate commit,
+while a retained candidate uses its approved specification/plan folder. It is a
 normal review of the approved contract, not adversarial red teaming unless the
 operator explicitly requests it. Speculative hardening and reviewer-invented
 requirements are non-blocking. Expert review, bounded goals, and one heartbeat

@@ -32,8 +32,16 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "bounded goal",
         "one exact heartbeat",
         "operator alone decides scope",
+        "For version 2 task-native ownership",
+        "exact Backlog task ID and project-relative task path",
+        "sole durable product and execution contract",
+        "Never consult `.ralph/plans` in this mode",
+        "The Episode owns task content on its branch; the Conversation owns lifecycle status on main",
+        "For retained version 1 folder ownership",
+        "do not edit, copy, or mirror Episode-owned task content",
     ]:
         assert phrase in text
+    assert "Bead chronology" not in raw
     for forbidden in [
         "ownerSessionId", "episodeId", "toolCallId", "receipt", "rlm.find_models",
         "openai-codex/", "prime-claw-h6w", "15-minute", "delete worktree",

@@ -28,6 +28,12 @@ def test_expert_skill_accepts_normal_context_and_preserves_review_judgment() -> 
         "Red-team review requires an explicit operator request",
         "newly imagined invariants are not blockers",
         "smallest repair that fixes the demonstrated defect",
+        "For a task-native candidate",
+        "exact Backlog task ID and project-relative task path",
+        "sole review contract",
+        "do not consult `.ralph/plans`",
+        "For a retained folder candidate",
+        "Do not substitute a related Backlog task as authority",
     ):
         assert required in text
     for unwanted in (
