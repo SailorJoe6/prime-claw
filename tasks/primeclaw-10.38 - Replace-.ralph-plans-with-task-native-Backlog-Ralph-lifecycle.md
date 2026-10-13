@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 09:11'
+updated_date: '2026-10-13 09:21'
 labels:
   - backlog-md
   - episode-loop
@@ -292,4 +292,19 @@ Slices 1 and 2 remain open. `/implement-task` and `create_task_episode` remain u
 The accepted inactive admission transaction has one remaining in-scope defect before public activation: `createTaskEpisode` currently proves only that `ctx.cwd` is a Git repository root. A top-level session rooted in a linked worktree or other foreign checkout with no local ownership record could therefore mutate that branch task to `In Progress` and allocate a nested Episode, violating the Conversation-owned canonical-main status boundary.
 
 Next execution must repair the trusted pre-mutation boundary so task-native admission proves it is running in the canonical primary main checkout before any Backlog edit, Git commit, ownership write, or allocator call. Add a disposable linked-worktree/foreign-checkout fixture whose task is eligible `In Planning` and whose checkout has no ownership record; it must prove zero task bytes, Git HEAD/status, ownership, and allocator mutation. Preserve the accepted transaction behavior, KISS scope, retained folder compatibility, and inactive public `/implement-task` / `create_task_episode` surface.
+
+## 2026-10-13 — canonical primary-main admission boundary repair
+
+Repaired the accepted inactive `createTaskEpisode` transaction before public activation. The trusted pre-mutation boundary now resolves the exact project checkout, rejects a linked Git worktree, and requires the primary worktree to be on `main` before task lookup, Backlog edit, commit, ownership access, reservation, or allocator invocation. The accepted task-only status transaction, non-gating push, reservation/allocation binding, clean rollback, uncertain `Blocked` publication, strict active postconditions, retained folder behavior, and inactive public surfaces are unchanged.
+
+The disposable regression creates an eligible `In Planning` task in a linked worktree whose checked-out branch is `main`, leaves that checkout without a local ownership record, and also puts the primary worktree on another branch. Both calls reject at the canonical-checkout boundary. The test proves byte-identical task files in both checkouts, unchanged HEAD and worktree status in both checkouts, no in-memory or on-disk ownership, zero ownership operations, zero reservation calls, and zero allocator calls.
+
+Evidence:
+- Focused Node command covering admission, reservation/allocation, retained folder creation, Conversation compaction, final bookkeeping, reviewed-plan behavior, and project initialization — 114 passed.
+- Focused host-safe Python command covering discovery, policy, Conversation oversight, managed source inventory, project initialization, and staged workflow assets — 36 passed, 10 deselected.
+- Independent bounded review — no material findings.
+- `git diff --check` — passed.
+- Final `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe` — passed; immutable image, offline RPC probe, teardown, and manifest publication verified. Evidence: `.test-results/20261013T091936Z-61769-1fbb9755/tier1`.
+
+Slices 1 and 2 remain open. `/implement-task` and `create_task_episode` remain unregistered. Task-native placement selection and approval wiring, retained real-session authoring/planning evidence, and final lifecycle/default migration remain later work. This inactive repair completes no acceptance criterion.
 <!-- SECTION:NOTES:END -->
