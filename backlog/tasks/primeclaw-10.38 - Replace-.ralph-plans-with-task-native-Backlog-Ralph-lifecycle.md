@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: To Do
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-12 21:22'
+updated_date: '2026-10-13 04:11'
 labels:
   - backlog-md
   - episode-loop
@@ -26,66 +26,128 @@ ordinal: 121000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 ## Context
 
-The Beads-to-Backlog migration intentionally adopted Backlog.md as-is and preserved the existing Ralph specification, planning, and Episode workflow. It also explicitly deferred the product decision about reshaping Ralph around Backlog.md. That split now leaves two authorities for the same unit of work: Backlog tasks track durable project work while `.ralph/plans` folders separately track design, planning, promotion, active execution, and archival state. The duplication adds file movement, compatibility machinery, and lifecycle ambiguity.
+The Beads-to-Backlog migration intentionally adopted Backlog.md as-is and preserved the existing Ralph specification, planning, and Episode workflow. That leaves Backlog tasks and `.ralph/plans` folders as duplicate authorities for the same work. Replace that split with one Backlog task that carries the durable design, plan, execution record, lifecycle status, and terminal history for one complete Episode.
 
-Make one Backlog task the durable source of truth from first design through planning, direct execution or Episode execution, handoff iterations, and completion. Keep the established Conversation/operator/Episode authority boundaries and proven Episode mechanics unless this specification changes them explicitly.
+Keep the established Conversation/operator/Episode authority boundaries and proven Episode mechanics unless this specification changes them explicitly.
 
-## Required product contract
+## Task lifecycle
 
-### Task lifecycle
+Ordinary work uses these ordered statuses:
 
-Ordinary work uses these statuses: `In Design`, `In Planning`, `In Progress`, `Blocked`, and `Done`. New ordinary tasks default to `In Design`; `To Do` is retired after migration.
+1. `In Design`
+2. `In Planning`
+3. `In Progress`
+4. `Blocked`
+5. `Ready for Merge`
+6. `Done`
 
-`/design` and `/spec-it-out` create a new task or update the explicitly selected task and leave it in `In Design`. The task itself holds the durable specification, acceptance criteria, constraints, and references. These commands do not plan or authorize implementation.
+`Done` remains the sole successful terminal lifecycle status. Confirmed abandonment uses Backlog soft-deletion as an explicit non-success disposition outside the ordinary status progression and never marks the task `Done`. New ordinary tasks default to `In Design`; `To Do` is retired after migration.
 
-`/plan TASK-ID` writes or updates the task's optional Backlog Implementation Plan and moves the task to `In Planning`. Planning remains distinct from implementation approval.
+`/design` and `/spec-it-out` create a new `In Design` task or update an explicitly selected task that is already `In Design`. They reject later lifecycle states rather than silently invalidating a plan. The task Description, Acceptance Criteria, constraints, references, and documentation hold the durable specification. These skills do not plan or authorize implementation.
 
-Ordinary non-Episode task execution is outside the scope of this migration.
+`/plan TASK-ID` accepts only `In Design` or `In Planning`. It writes or revises the task's optional Backlog Implementation Plan and leaves the task `In Planning`. It rejects `In Progress`, `Blocked`, `Ready for Merge`, and `Done`; active Episode revisions use the existing review and handoff loop instead of restarting planning.
 
-The current `/implement-spec` Episode pathway already requires a usable `EXECUTION_PLAN.md`; that is not a new restriction. Its task-native replacement, `/implement-task TASK-ID`, preserves the existing planned-work admission gate by requiring a meaningful Backlog Implementation Plan in the selected task instead of an `EXECUTION_PLAN.md` file. Missing, blank, placeholder-only, or materially unresolved plans are rejected before Episode resources or ownership are created. A successful admission binds the Episode to that exact task.
+Ordinary non-Episode task execution is outside this migration's scope.
 
-One task represents one complete Episode across as many execute → handoff → compact → execute iterations as needed. A handoff continues the same task and Episode; it does not create a new task or planning bundle.
+## Episode admission
 
-### Authority replacement
+The current `/implement-spec` pathway already requires a usable `EXECUTION_PLAN.md`; the task-native workflow preserves rather than invents that gate. `/implement-task TASK-ID` is the only new-Episode admission path and accepts only an `In Planning` task with a meaningful Backlog Implementation Plan. The existing proportional two-stage review remains: a light structural sniff may reject missing, blank, or obvious-placeholder content, and the semantic workflow rejects unresolved contradictions, blockers, or material product decisions. Do not add a rigid plan schema or bespoke parser.
 
-Backlog task fields and statuses replace all `.ralph/plans` authority, including future specification folders, active plan files, promotion or movement between folders, and plan archives. Runtime ownership records may keep only the minimal task/Episode identity needed by existing mechanics; they must not recreate a second specification or plan authority.
+After semantic readiness succeeds, but before creating a branch, worktree, session, or ownership record, the Conversation changes the exact task on main to `In Progress` through the Backlog CLI and commits that exact task change. That local commit is the hard admission gate and the Episode branch is created from that committed SHA. Push promptly when a remote is available, but remote transport success is not a prerequisite for local Episode creation.
 
-Update Prime Claw's commands, tools, skills, project templates, initialization and reconciliation behavior, documentation, tests, and lifecycle language to use task IDs, task fields, and task statuses. The `SPECIFICATION.md` for this migration is only a compatibility pointer to this Backlog task, not a second source of truth.
+A proven-clean creation failure with no Episode resource or ownership mutation returns the main task to `In Planning`. Any uncertain or partial mutation changes main to `Blocked` with the exact recovery condition; never retry uncertain creation as a new Episode.
 
-### Migration and cutover
+## Task and status ownership during an Episode
 
-Migrate every existing `To Do` task: tasks with a meaningful Implementation Plan become `In Planning`; tasks without one become `In Design`. Preserve `In Progress`, `Blocked`, and `Done` semantics unless the corresponding legacy plan state supplies stronger truthful evidence.
+One task represents one complete Episode across as many execute, handoff, compaction, review, and revision iterations as needed. A handoff continues the same task and Episode; it is not a task or Episode boundary.
 
-Migrate all durable state under `.ralph/plans` into destination Backlog tasks and supported fields without losing specifications, acceptance criteria, implementation plans, decisions, execution notes, references, terminal summaries, or provenance needed to understand the work. Future or unstarted state maps to `In Design` or `In Planning` according to meaningful plan presence. Active work maps to the truthful active or blocked task state. Successfully completed archives become `Done` tasks and are completed into `backlog/completed`; do not place them in `backlog/archive`. Non-success terminal or ambiguous legacy state must be preserved and surfaced for truthful disposition rather than silently marked successful.
+While the Episode branch exists:
 
-Implement and land this change through one final old-style `.ralph/plans` migration Episode. The candidate branch itself contains the completed state migration, the task-native workflow, and deletion of `.ralph/plans`. A normal accepted merge makes that repository state current; do not build runtime cutover automation, merge hooks, dual-write behavior, or a compatibility phase.
+- the Episode exclusively owns task content on its branch, including Implementation Plan revisions inside approved scope, Implementation Notes, Acceptance Criteria evidence, blocker details, references, and Final Summary;
+- the Episode does not independently change task status;
+- the Conversation exclusively owns and publishes the true lifecycle status on main, using immediate exact-task commits and prompt pushes;
+- main may move `In Progress → Blocked → In Progress` from accepted Episode reports while Episode content remains on the branch; and
+- no role copies, mirrors, or dual-writes task content across checkouts during ordinary execution.
+
+The existing Episode-to-Conversation reporting and Conversation-to-Episode continuation channels carry progress, blockers, review findings, and instructions. Do not add a new status signaling mechanism.
+
+## Review, merge readiness, and completion
+
+The Episode reports a candidate while remaining `In Progress`. Its candidate task content must include the current plan, notes, acceptance evidence, references, and Final Summary needed to understand the claimed outcome. The Conversation reviews the exact candidate and may request independent Expert evidence. Accepted findings return to the same Episode through the existing revision/handoff path.
+
+When the Conversation accepts the candidate with no fixes remaining, it does not request merge immediately. It first changes the main task to `Ready for Merge`, commits, and pushes. The Episode then integrates current main into its branch, thereby incorporating the Conversation-owned status and all other landed work. It resolves the expected task-file divergence by preserving the complete Episode-owned content and the Conversation-owned `Ready for Merge` status. The Conversation verifies that refreshed candidate before telling the user it is ready and requesting merge authorization.
+
+At that decision:
+
+- **Delay:** leave main `Ready for Merge` and retain the idle Episode, branch, worktree, session, and ownership.
+- **Request changes:** return main to `In Progress`, commit and push, integrate main into the same Episode, and resume it.
+- **Authorize merge:** the Conversation performs and verifies the merge. Immediately after verified merge, the Conversation changes the exact merged main task from `Ready for Merge` to `Done`, commits, and pushes. Episode ownership records and resources remain until the existing separately authorized finalization and cleanup paths complete.
+- **Decline:** means explicit project abandonment, not delay. Require strong confirmation before any destructive action.
+
+`backlog task complete` is periodic cleanup, not a per-Episode lifecycle step. Leave `Done` tasks on the active board until normal batch cleanup moves them to `backlog/completed/`.
+
+For confirmed abandonment, preserve history without merging candidate code: stop the Episode; bind its exact head and task path; snapshot the Conversation-owned main status and invariant task identity/hierarchy metadata; restore only the bound task blob from the Episode branch; immediately reapply the captured main status through the Backlog CLI; and verify the effective diff preserves identity, hierarchy, and Conversation-owned status while importing only Episode-owned task content and no code path. Then add an abandonment Final Summary through the Backlog CLI, run `backlog task archive TASK-ID` without marking it `Done`, commit and push the exact archival change, verify it, and only then destroy the branch, worktree, session, and ownership resources. `backlog/archive/` remains reserved for soft-deleted work.
+
+## Authority replacement
+
+Backlog task fields and statuses replace every `.ralph/plans` authority, including future specification folders, active plan files, blocked-folder movement, promotion commits, and plan archives. Runtime ownership may retain only the minimal exact task/Episode identity needed by existing mechanics; it must not recreate specification, plan, progress, or status authority.
+
+Update Prime Claw commands, model-callable tools, skills, managed templates, initialization and reconciliation assets, documentation, tests, recovery, handoff, review, and finalization language to use exact task identity and supported Backlog fields. Preserve Conversation supervision, exact Episode ownership, isolated code worktrees and sessions, handoff and compaction continuation, Expert review boundaries, recovery behavior, operator merge/abandonment/cleanup authority, and no-UI final bookkeeping.
+
+## Legacy bundle and task migration
+
+Migrate every existing `To Do` task: a task with a meaningful Implementation Plan becomes `In Planning`; one without becomes `In Design`. Preserve truthful `In Progress`, `Blocked`, `Ready for Merge`, and `Done` states where stronger legacy evidence exists.
+
+Every durable legacy specification/plan bundle becomes one Backlog epic:
+
+- reuse an exact one-to-one owning task and change its type to `epic` when needed;
+- otherwise create one epic and link related existing tickets through Backlog references;
+- never change existing task IDs or `parent_task_id` values, and add no Backlog reparenting feature;
+- merge specification narrative into Description, true acceptance criteria into native Acceptance Criteria, the execution plan into Implementation Plan, execution history into Implementation Notes, and terminal outcome into Final Summary;
+- import true acceptance criteria in source order so Backlog assigns native sequential markers, retaining legacy requirement IDs inside criterion text for provenance;
+- preserve material meaning in supported task fields and record the exact pre-cutover commit and source paths so verbatim originals remain retrievable from Git history; and
+- when ownership relationships are ambiguous, add references for every plausible relationship and flag the ambiguity for explicit disposition rather than guessing or duplicating tasks.
+
+Successfully completed and accepted-historical bundles become truthful `Done` epics and may be moved to `backlog/completed/` as part of the one-time migration cleanup. The superseded incomplete Phase 3a bundle also becomes a `Done` completed epic because it records real work later reworked: preserve evidence-based checked and unchecked criteria, state the partial/superseded outcome in Final Summary, and link the replacement epic in both directions. Do not use `backlog/archive/` for any existing bundle; the current inventory contains no truly abandoned bundle.
+
+## Cutover
+
+Implement and land this change through one final old-style `.ralph/plans` migration Episode. The candidate branch itself contains the completed state migration, task-native workflow, and deletion of `.ralph/plans`. A normal accepted merge makes that repository state current. Do not build runtime cutover automation, merge hooks, a dual-write compatibility phase, or another tracker abstraction.
+
+The compatibility `SPECIFICATION.md` for this effort remains only a pointer to this task until that final candidate deletes `.ralph/plans`.
 
 ## Material constraints and non-goals
 
-- Preserve operator authority over product and scope changes, Episode admission, merge, abandonment, and destructive cleanup.
-- Preserve Conversation supervision, exact Episode ownership, isolated worktree and session mechanics, handoff and compaction continuation, Expert review boundaries, recovery behavior, and finalization mechanics except where their old plan-folder identity must become task identity.
-- Keep the migration KISS: minimally adapt the existing admission guard from the selected plan bundle to the selected task. Do not add approval commits, Git-blob or tag approval schemes, replacement or additional digest protocols, transaction journals, or other bespoke approval machinery.
-- Do not redesign Backlog.md generally or create a parallel tracker abstraction.
+- Preserve operator authority over product and scope changes, Episode admission, merge, delay, abandonment, and destructive cleanup.
+- Keep the migration KISS: adapt existing lifecycle guards and ownership from exact plan-folder identity to exact task identity.
+- Do not add a pickup command or other ordinary direct-work plugin surface.
 - Do not make every task require planning or an Episode.
-- Do not split one Episode into a task per execute or handoff iteration.
-- Do not broaden this work into Orca redesign, Prime Agent upstream changes, general plugin simplification, or unrelated workflow cleanup.
+- Do not split one Episode into tasks per execute or handoff iteration.
+- Do not add Backlog reparenting, cross-checkout task wrappers, branch-projection rules, status-sync protocols, approval commits, Git-blob or tag approval schemes, replacement digest protocols, transaction journals, or custom merge drivers.
+- Do not broaden this work into Orca redesign, Prime Agent upstream changes, general plugin simplification, or unrelated cleanup.
 - Use supported Prime Agent and Backlog.md interfaces. Prime Agent remains an upstream dependency, not a development target.
 - Validate plugin-source changes only through the repository's Docker-isolated candidate path; do not mutate the installed user-global plugin during development.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Project configuration and user-facing guidance expose `In Design`, `In Planning`, `In Progress`, `Blocked`, and `Done` for ordinary tasks, default new ordinary tasks to `In Design`, and contain no active workflow that creates or selects `To Do` after migration.
-- [ ] #2 Fresh and existing-task tests prove `/design` and `/spec-it-out` persist the specification and acceptance contract in the intended Backlog task, leave it `In Design`, do not write authoritative plan files, and do not authorize implementation.
-- [ ] #3 `/plan TASK-ID` tests prove it updates that task’s optional Implementation Plan, moves that same task to `In Planning`, and creates neither an Episode nor a second planning authority.
-- [ ] #4 `/implement-task TASK-ID` is the sole Episode admission command and preserves the existing planned-work gate currently enforced by `/implement-spec`: tests prove missing, blank, and placeholder-only task plans are rejected before any Episode mutation, while a meaningful Backlog Implementation Plan admits one Episode bound to the exact task ID.
-- [ ] #5 End-to-end Episode evidence proves multiple execute, handoff, and compaction iterations continue the same task and Episode, retain the same task identity, and do not create per-iteration tasks or plan bundles.
-- [ ] #6 Commands, model-callable tools, skills, workflow templates, initialization and reconciliation assets, ownership records, docs, and tests use Backlog task identity, fields, and statuses instead of `.ralph/plans` location or file movement as lifecycle authority.
-- [ ] #7 A migration fixture proves every pre-cutover `To Do` task with a meaningful Implementation Plan becomes `In Planning`, every `To Do` task without one becomes `In Design`, and already active, blocked, or done tasks retain truthful semantics.
-- [ ] #8 A representative migration fixture covering future specs with and without plans, active work, blocked work, successful archives, and ambiguous or non-success history proves all material content and references reach a traceable destination task; successful archives end as `Done` under `backlog/completed` and no migrated item is written to `backlog/archive`.
-- [ ] #9 Repository-wide acceptance proves no live command, skill, workflow, template, test, or documentation treats `.ralph/plans` as authoritative, while historical references remain only where changing them would falsify history.
-- [ ] #10 The final accepted candidate tree contains the completed state migration and task-native workflow and no `.ralph/plans` directory; a normal merge applies that tree without runtime cutover automation, merge hooks, dual-write behavior, or a compatibility phase.
-- [ ] #11 The compatibility `SPECIFICATION.md` for this effort contains only a clear pointer to the created Backlog task and no duplicated mutable specification.
-- [ ] #12 Existing tests plus focused Docker-isolated plugin acceptance prove Conversation, operator, and Episode authority, exact ownership, iteration handoff, recovery, Expert review, finalization, and cleanup behavior remain intact apart from the specified task-native identity and lifecycle changes.
-- [ ] #13 Static and behavioral acceptance proves the change introduces no approval commits, Git-blob or tag approval scheme, replacement or additional digest protocol, bespoke transaction journal, Prime Agent source patch, or other unapproved scope expansion.
+- [ ] #1 Project configuration, guidance, and tests expose the ordered statuses `In Design`, `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, and terminal `Done`; default new ordinary tasks to `In Design`; and contain no active workflow that creates or selects `To Do` after migration.
+- [ ] #2 Fresh and existing-task tests prove `/design` and `/spec-it-out` create or update only `In Design` tasks, persist specification content in supported task fields, and reject later states without planning or implementation authorization.
+- [ ] #3 `/plan TASK-ID` tests prove only `In Design` and `In Planning` are accepted; the same task receives a meaningful Implementation Plan and becomes or remains `In Planning`; later states are rejected without mutation or Episode creation.
+- [ ] #4 `/implement-task TASK-ID` is the sole new-Episode admission command and accepts only an `In Planning` task. Structural and semantic tests preserve the existing proportional plan-readiness gate and reject missing, blank, placeholder-only, contradictory, blocked, or materially unresolved plans before Episode resources or ownership are created.
+- [ ] #5 Admission tests prove semantic readiness precedes an exact main-task `In Progress` commit; the Episode branch starts from that committed SHA; prompt push failure alone does not block local creation; a proven-clean creation failure returns the task to `In Planning`; and uncertain partial creation marks main `Blocked` without retry.
+- [ ] #6 End-to-end evidence proves one task spans one Episode across multiple execute, handoff, compaction, review, and revision iterations and retains exact task, owner, branch, worktree, and session identity.
+- [ ] #7 Ownership tests prove the Episode alone mutates task content on its branch, the Conversation alone mutates lifecycle status on main, the Episode never independently changes status, and ordinary execution performs no cross-checkout content copy, mirroring, or dual write.
+- [ ] #8 Blocked/resume tests prove an Episode records blocker content on its branch through existing reporting, the Conversation publishes `Blocked` and resumed `In Progress` on main through exact commits, and the same Episode resumes without a new task or admission.
+- [ ] #9 Final-review tests prove Expert or Conversation findings can revise the same Episode; final Conversation acceptance publishes `Ready for Merge` on main before merge authorization; the Episode integrates current main and preserves Episode content plus Conversation status; and the Conversation verifies the refreshed candidate before requesting user authorization.
+- [ ] #10 Operator-decision tests prove delay retains `Ready for Merge` and all Episode resources, requested changes return main to `In Progress` and resume the same Episode, and authorized merge is verified before the Conversation immediately commits the exact main task as `Done`; ownership records and resources remain until separately authorized finalization/cleanup; `backlog task complete` is not invoked per Episode.
+- [ ] #11 Confirmed-abandonment tests prove strong confirmation precedes mutation; only the exact bound Episode task blob is selected; the effective main diff imports Episode-owned content while preserving Conversation-owned status plus invariant identity/hierarchy metadata; no candidate code is merged; an abandonment Final Summary is recorded; the task is archived without being marked `Done`; and exact archival state is committed and pushed before destructive Episode cleanup.
+- [ ] #12 Commands, tools, skills, managed templates, initialization/reconciliation assets, ownership records, docs, recovery, review, handoff, finalization, and tests use exact Backlog task identity and supported fields instead of `.ralph/plans` location or file movement as lifecycle authority.
+- [ ] #13 A task-status migration fixture proves every pre-cutover `To Do` task with a meaningful Implementation Plan becomes `In Planning`, every `To Do` task without one becomes `In Design`, and existing active, blocked, ready, and done work retains truthful semantics.
+- [ ] #14 A bundle migration fixture proves each legacy bundle becomes one epic; exact owning tasks are reused when unambiguous; otherwise new epics reference related tickets without changing any existing task ID or parent; specification, plan, notes, outcomes, criteria state, legacy IDs, source paths, and pre-cutover commit provenance remain traceable.
+- [ ] #15 A representative terminal-history fixture proves completed and accepted-historical bundles become truthful `Done` epics, the superseded incomplete Phase 3a bundle remains explicitly partial with evidence-based unchecked criteria and bidirectional replacement references, one-time successful history may enter `backlog/completed/`, and no existing bundle enters `backlog/archive/`.
+- [ ] #16 Repository-wide acceptance proves no live command, skill, workflow, template, test, or documentation treats `.ralph/plans` as authoritative; historical references remain only where changing them would falsify history.
+- [ ] #17 The final candidate tree contains the completed state migration and task-native workflow and no `.ralph/plans` directory; normal merge applies that tree without runtime cutover automation, merge hooks, dual-write compatibility, custom merge drivers, or another tracker abstraction.
+- [ ] #18 Existing tests plus focused Docker-isolated plugin acceptance prove Conversation, operator, Episode, and Expert authority; exact ownership; isolated code worktrees; iteration handoff; recovery; review; post-merge `Done` before separately authorized finalization/cleanup; final bookkeeping; and cleanup boundaries remain intact apart from the specified task-native lifecycle.
+- [ ] #19 Static and behavioral acceptance proves no pickup surface, Backlog reparenting feature, cross-checkout Backlog wrapper, branch-projection rule, approval commit/blob/tag scheme, replacement digest protocol, bespoke transaction journal, Prime Agent patch, or other unapproved scope expansion is introduced.
 <!-- AC:END -->
