@@ -37,8 +37,9 @@ backlog task view --json -- <id>
 backlog task create "Short title" --status "In Design" --description "Why this exists and what needs to be done" --type task --priority P2 --plain
 ```
 
-Do not rely on the temporary project default. The retained `To Do` status exists
-only until the separately approved one-time migration classifies older tasks.
+This repository now defaults new ordinary tasks to `In Design`. Keep the explicit
+status in commands so the intended authoring state remains self-contained and
+auditable.
 
 4. Respect the task-native lifecycle and its authority boundaries:
 

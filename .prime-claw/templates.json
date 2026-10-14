@@ -23,7 +23,7 @@
       "installedSha256": "12f6128d93b97e113a86181dadcadbc18ffb6569a55717ad1fda6c7d759682e5",
       "acceptedOverrideSha256": null,
       "availableUpstreamSha256": "12f6128d93b97e113a86181dadcadbc18ffb6569a55717ad1fda6c7d759682e5",
-      "state": "managed",
+      "state": "customized",
       "provenance": {
         "scope": "project",
         "exposure": "discoverable",
@@ -83,7 +83,7 @@
       "installedSha256": "c8045a8c4e31e3874432026acbf55ea3cdfe9b9a8fef4a8e948a0c9dd045263f",
       "acceptedOverrideSha256": null,
       "availableUpstreamSha256": "c8045a8c4e31e3874432026acbf55ea3cdfe9b9a8fef4a8e948a0c9dd045263f",
-      "state": "managed",
+      "state": "customized",
       "provenance": {
         "scope": "project",
         "exposure": "discoverable",

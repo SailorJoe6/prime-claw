@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-10
 title: 'Phase 4: Ralph episode loop — manual-first, codify-last'
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:00'
-updated_date: '2026-10-12 01:16'
+updated_date: '2026-10-14 14:45'
 labels:
   - episode-loop
   - phase4

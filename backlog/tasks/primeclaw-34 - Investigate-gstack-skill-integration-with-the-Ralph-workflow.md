@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-34
 title: Investigate gstack skill integration with the Ralph workflow
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:01'
+updated_date: '2026-10-14 14:45'
 labels: []
 dependencies: []
 priority: p2

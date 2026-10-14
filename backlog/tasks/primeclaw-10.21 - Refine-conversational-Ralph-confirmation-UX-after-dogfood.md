@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-10.21
 title: Refine conversational Ralph confirmation UX after dogfood
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:00'
+updated_date: '2026-10-14 14:45'
 labels:
   - conversational-routing
   - episode-loop

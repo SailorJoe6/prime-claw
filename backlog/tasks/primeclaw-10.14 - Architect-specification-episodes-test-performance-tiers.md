@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-10.14
 title: Architect specification-episodes test performance tiers
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:00'
-updated_date: '2026-10-12 01:02'
+updated_date: '2026-10-14 14:45'
 labels:
   - episode-loop
   - performance

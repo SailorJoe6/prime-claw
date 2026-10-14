@@ -3,10 +3,10 @@ id: PRIMECLAW-9
 title: >-
   Port ensure-vpn check to prime-claw/prime-agent (daily VPN re-login breaks
   gateway RBAC)
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:00'
-updated_date: '2026-10-12 01:02'
+updated_date: '2026-10-14 14:45'
 labels:
   - devex
   - phase3

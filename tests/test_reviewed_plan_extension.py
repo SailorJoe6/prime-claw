@@ -110,12 +110,13 @@ export default function probe(pi){pi.on("session_start",()=>{const names=pi.getA
         assert name in tools
 
 
-def test_task_planning_statuses_are_staged_without_retiring_to_do_early() -> None:
+def test_repository_status_cutover_uses_task_native_order_without_to_do() -> None:
     config = yaml.safe_load((REPO / "backlog/config.yml").read_text())
-    assert config["default_status"] == "To Do"
+    assert config["default_status"] == "In Design"
     assert config["statuses"] == [
-        "To Do", "In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done",
+        "In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done",
     ]
+    assert "To Do" not in config["statuses"]
 
 
 def test_compact_first_workflows_and_normal_guide_load_are_explicit() -> None:

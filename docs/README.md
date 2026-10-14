@@ -44,7 +44,7 @@ prime-claw builds on four prior projects. Read these before designing:
 - [testing-strategy.md](testing-strategy.md) — isolation tiers, the current
   exact-image/offline tier-1 contract, provenance schema, source-mode safety
   boundary, teardown rules, and reproduction commands.
-- [project-initialization.md](project-initialization.md) — the 15-asset
+- [project-initialization.md](project-initialization.md) — the 16-asset
   inventory, project initialization and migration topology, template manifest,
   safe reconciliation, Orca registration, startup ordering, review recovery,
   and global-drift controls.
@@ -76,6 +76,9 @@ prime-claw builds on four prior projects. Read these before designing:
 - [evidence/2026-10-09-orca-prime-agent-integration-probes.md](evidence/2026-10-09-orca-prime-agent-integration-probes.md)
   — the completed evidence matrix and frozen Orca/Prime Agent responsibility
   boundary for `PRIMECLAW-10.37`.
+- [evidence/task-native-backlog-cutover/2026-10-14-step-6-status-migration.json](evidence/task-native-backlog-cutover/2026-10-14-step-6-status-migration.json)
+  — the repository-local pre/post status, identity, parent, and configuration
+  receipt for the one-time `PRIMECLAW-10.38` Step 6 cutover.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)

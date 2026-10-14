@@ -1,0 +1,362 @@
+{
+  "schemaVersion": 1,
+  "kind": "prime-claw-task-status-cutover-receipt",
+  "repository": "prime-claw",
+  "preCutoverCommit": "9cd16a40c0bbc0ff9c610bbbdb1c8395c30ac47e",
+  "classificationRule": {
+    "meaningfulNativeImplementationPlan": "In Planning",
+    "noMeaningfulNativeImplementationPlan": "In Design",
+    "strongerExistingStatus": "preserve"
+  },
+  "before": {
+    "activeTaskCount": 41,
+    "statusCounts": {
+      "Blocked": 4,
+      "Done": 2,
+      "In Design": 1,
+      "In Progress": 3,
+      "To Do": 31
+    },
+    "toDoCount": 31
+  },
+  "classification": {
+    "meaningfulPlanCount": 0,
+    "noMeaningfulPlanCount": 31,
+    "ambiguousCount": 0
+  },
+  "afterMigrationBeforeConfigRemoval": {
+    "activeTaskCount": 41,
+    "statusCounts": {
+      "Blocked": 4,
+      "Done": 2,
+      "In Design": 32,
+      "In Progress": 3
+    },
+    "toDoCount": 0,
+    "identityOrParentDriftCount": 0
+  },
+  "configuration": {
+    "defaultStatus": "In Design",
+    "statuses": [
+      "In Design",
+      "In Planning",
+      "In Progress",
+      "Blocked",
+      "Ready for Merge",
+      "Done"
+    ],
+    "toDoRemovedAfterObservedActiveCount": 0
+  },
+  "migrations": [
+    {
+      "id": "PRIMECLAW-20.9",
+      "path": "backlog/tasks/primeclaw-20.9 - Incident-source-host-tests-may-have-contacted-OpenShell-and-GitHub-provider-stages.md",
+      "parentTaskId": "PRIMECLAW-20",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-7.6",
+      "path": "backlog/tasks/primeclaw-7.6 - Phase-3a-preserve-and-migrate-sandbox-state-to-durable-volumes-in-prime-claw-v2.md",
+      "parentTaskId": "PRIMECLAW-7",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10",
+      "path": "backlog/tasks/primeclaw-10 - Phase-4-Ralph-episode-loop-—-manual-first-codify-last.md",
+      "parentTaskId": null,
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.1",
+      "path": "backlog/tasks/primeclaw-10.1 - Phase-4a-refine-the-imported-prime-agent-phase-skills-by-manual-driving.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.1.3",
+      "path": "backlog/tasks/primeclaw-10.1.3 - Prove-session-bound-handoff-message-delivery-with-shared-RLM-extension-runtime.md",
+      "parentTaskId": "PRIMECLAW-10.1",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.8",
+      "path": "backlog/tasks/primeclaw-10.8 - Durable-promoted-episode-allocation-and-transcript-fork.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.9",
+      "path": "backlog/tasks/primeclaw-10.9 - Exactly-once-prepared-episode-task-admission.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.10",
+      "path": "backlog/tasks/primeclaw-10.10 - Durable-episode-coordination-through-PR-lifetime.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.11",
+      "path": "backlog/tasks/primeclaw-10.11 - Four-file-archive-and-owner-readiness-gate.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.12",
+      "path": "backlog/tasks/primeclaw-10.12 - Owner-authorized-safe-terminal-episode-cleanup.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.13",
+      "path": "backlog/tasks/primeclaw-10.13 - Future-promotion-and-complete-real-dogfood-acceptance.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.33",
+      "path": "backlog/tasks/primeclaw-10.33 - Design-probable-hung-episode-tool-detection-and-owner-scoped-recovery.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.35",
+      "path": "backlog/tasks/primeclaw-10.35 - Document-native-in-place-episode-context-reset.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.37",
+      "path": "backlog/tasks/primeclaw-10.37 - Simplify-Conversation-lifecycle-and-add-Prime-Claw-project-initialization.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.37.4",
+      "path": "backlog/tasks/primeclaw-10.37.4 - Preserve-customized-project-templates-during-read-only-diff-review-and-simplify-hash-state.md",
+      "parentTaskId": "PRIMECLAW-10.37",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-33",
+      "path": "backlog/tasks/primeclaw-33 - Simplify-Prime-Claw-plugin-implementation-without-weakening-user-stories.md",
+      "parentTaskId": null,
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-33.10",
+      "path": "backlog/tasks/primeclaw-33.10 - Run-final-story-acceptance-and-measure-simplification.md",
+      "parentTaskId": "PRIMECLAW-33",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-7.3",
+      "path": "backlog/tasks/primeclaw-7.3 - Fix-OpenShell-sandbox-provider-status-compatibility.md",
+      "parentTaskId": "PRIMECLAW-7",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-8",
+      "path": "backlog/tasks/primeclaw-8 - Phase-5-communication-channels-Telegram-groups-Slack-channels.md",
+      "parentTaskId": null,
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-9",
+      "path": "backlog/tasks/primeclaw-9 - Port-ensure-vpn-check-to-prime-claw-prime-agent-daily-VPN-re-login-breaks-gateway-RBAC.md",
+      "parentTaskId": null,
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.2",
+      "path": "backlog/tasks/primeclaw-10.2 - Phase-4b-episode-mechanics-spawnable-reapable-prime-agent-child.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.3",
+      "path": "backlog/tasks/primeclaw-10.3 - Phase-4c-conversation-to-episode-boundary-spec-it-out-trigger.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.4",
+      "path": "backlog/tasks/primeclaw-10.4 - Phase-4d-upgrade-this-to-prime-agent-command.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.14",
+      "path": "backlog/tasks/primeclaw-10.14 - Architect-specification-episodes-test-performance-tiers.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-18",
+      "path": "backlog/tasks/primeclaw-18 - Repair-native-RPC-discovery-probe-and-timeout-cleanup.md",
+      "parentTaskId": null,
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-19.4",
+      "path": "backlog/tasks/primeclaw-19.4 - Follow-up-extract-shared-image-base-deferred-from-Slice-1.md",
+      "parentTaskId": "PRIMECLAW-19",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-32",
+      "path": "backlog/tasks/primeclaw-32 - Repair-synthetic-source-generation-Tier-1-prep-kernel-fixture.md",
+      "parentTaskId": null,
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-33.7",
+      "path": "backlog/tasks/primeclaw-33.7 - Right-size-focused-plugin-tests-around-user-story-outcomes.md",
+      "parentTaskId": "PRIMECLAW-33",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-34",
+      "path": "backlog/tasks/primeclaw-34 - Investigate-gstack-skill-integration-with-the-Ralph-workflow.md",
+      "parentTaskId": null,
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-2",
+      "path": "backlog/tasks/primeclaw-2 - Phase-6-orchestrator-universal-agent-build-LAST.md",
+      "parentTaskId": null,
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    },
+    {
+      "id": "PRIMECLAW-10.21",
+      "path": "backlog/tasks/primeclaw-10.21 - Refine-conversational-Ralph-confirmation-UX-after-dogfood.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "implementationPlan": null,
+      "from": "To Do",
+      "to": "In Design"
+    }
+  ],
+  "preserved": [
+    {
+      "id": "PRIMECLAW-7.5",
+      "path": "backlog/tasks/primeclaw-7.5 - Complete-default-gateway-brain-source-current-indexing-and-retrieval.md",
+      "parentTaskId": "PRIMECLAW-7",
+      "status": "Blocked"
+    },
+    {
+      "id": "PRIMECLAW-15",
+      "path": "backlog/tasks/primeclaw-15 - Episode-handoff-must-identify-durable-session-by-immutable-ID-not-mutable-name.md",
+      "parentTaskId": null,
+      "status": "In Progress"
+    },
+    {
+      "id": "PRIMECLAW-22",
+      "path": "backlog/tasks/primeclaw-22 - Eliminate-specification-review-overengineering-ratchets-across-Prime-Claw.md",
+      "parentTaskId": null,
+      "status": "Done"
+    },
+    {
+      "id": "PRIMECLAW-7",
+      "path": "backlog/tasks/primeclaw-7 - Phase-3-tracer-bullet-end-to-end-working-claw.md",
+      "parentTaskId": null,
+      "status": "Blocked"
+    },
+    {
+      "id": "PRIMECLAW-7.4",
+      "path": "backlog/tasks/primeclaw-7.4 - Slice-4B-routed-brain-write-and-push-back.md",
+      "parentTaskId": "PRIMECLAW-7",
+      "status": "Blocked"
+    },
+    {
+      "id": "PRIMECLAW-10.32",
+      "path": "backlog/tasks/primeclaw-10.32 - Post-merge-operator-dogfood-for-compaction-first-phase-transitions.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "status": "Blocked"
+    },
+    {
+      "id": "PRIMECLAW-10.38",
+      "path": "backlog/tasks/primeclaw-10.38 - Replace-.ralph-plans-with-task-native-Backlog-Ralph-lifecycle.md",
+      "parentTaskId": "PRIMECLAW-10",
+      "status": "In Progress"
+    },
+    {
+      "id": "PRIMECLAW-27",
+      "path": "backlog/tasks/primeclaw-27 - Assess-and-plan-Prime-Agent-v0.10-Rust-migration.md",
+      "parentTaskId": null,
+      "status": "In Progress"
+    },
+    {
+      "id": "PRIMECLAW-35",
+      "path": "backlog/tasks/primeclaw-35 - Replace-Beads-with-a-vendored-Backlog.md-fork-as-is.md",
+      "parentTaskId": null,
+      "status": "Done"
+    },
+    {
+      "id": "PRIMECLAW-42",
+      "path": "backlog/tasks/primeclaw-42 - Design-delivery-manager-episode-supervision.md",
+      "parentTaskId": null,
+      "status": "In Design"
+    }
+  ]
+}

@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-10.9
 title: Exactly-once prepared episode task admission
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:00'
-updated_date: '2026-10-12 01:02'
+updated_date: '2026-10-14 14:45'
 labels:
   - episode-loop
   - phase4

@@ -3,9 +3,10 @@ id: PRIMECLAW-10.37.4
 title: >-
   Preserve customized project templates during read-only diff review and
   simplify hash state
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-13 14:34'
+updated_date: '2026-10-14 14:45'
 labels:
   - project-initialization
   - templates

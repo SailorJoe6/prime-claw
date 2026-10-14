@@ -59,6 +59,7 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
         destination=ROOT/row["destination"]
         source=SOURCE/row["source"]
         assert destination.is_file() and not destination.is_symlink()
+        installed=manifest["assets"][row["id"]]
         if row["id"]=="project-skill-prepare":
             customized=destination.read_text()
             assert destination.read_bytes()!=source.read_bytes()
@@ -67,8 +68,15 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
             assert "docs/information-architecture.md" in customized
             assert 'backlog task list --status "In Design" --status "In Planning" --ready --plain' in customized
             assert 'backlog task list --status "To Do"' not in customized
+            assert installed["state"]=="customized"
+        elif row["id"] in {"project-skill-design", "project-skill-spec-it-out"}:
+            customized=destination.read_text()
+            assert destination.read_bytes()!=source.read_bytes()
+            assert "This repository now defaults to `In Design`" in customized
+            assert "temporary default" not in customized
+            assert installed["state"]=="customized"
+            assert installed["installedSha256"]==hashlib.sha256(source.read_bytes()).hexdigest()
         else:
-            installed=manifest["assets"][row["id"]]
             assert installed["state"]=="managed"
             assert hashlib.sha256(destination.read_bytes()).hexdigest()==installed["installedSha256"]
     assert not (ROOT/".ralph/skills").exists()

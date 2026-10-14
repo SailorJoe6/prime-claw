@@ -299,12 +299,24 @@ def test_design_and_spec_it_out_keep_distinct_discovery_modes() -> None:
     assert "Ask only the remaining questions" in spec_it_out
 
 
-def test_prime_skill_exposure_resolves_to_canonical_authoring_skills() -> None:
+def test_prime_skill_exposure_preserves_canonical_policy_with_repository_cutover_wording() -> None:
+    manifest = json.loads((ROOT / ".prime-claw/templates.json").read_text())
+    source_wording = """Choose a concise title and pass
+`--status "In Design"` explicitly; do not rely on the project's temporary
+default status. Use the supported `backlog task create --plain` interface and
+"""
+    repository_wording = """Choose a concise title and pass
+`--status "In Design"` explicitly. This repository now defaults to `In Design`,
+but the explicit status keeps the authoring command self-contained and auditable.
+Use the supported `backlog task create --plain` interface and
+"""
     for skill_name in SKILLS:
         exposed = ROOT / ".agents" / "skills" / skill_name / "SKILL.md"
         canonical = project_skill(skill_name)
         assert exposed.is_file() and not exposed.is_symlink()
-        assert exposed.read_bytes() == canonical.read_bytes()
+        expected = canonical.read_text().replace(source_wording, repository_wording)
+        assert exposed.read_text() == expected
+        assert manifest["assets"][f"project-skill-{skill_name}"]["state"] == "customized"
 
 
 def test_plan_prep_skill_owns_compaction_prompt_and_bounded_continuation() -> None:

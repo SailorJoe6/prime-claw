@@ -41,6 +41,13 @@ assets continue to serve existing future-folder bundles during the migration.
 The legacy `.ralph/skills` tree and `.agents/skills` symlinks are migrated away.
 `.ralph/plans` is never moved or interpreted as template content.
 
+This builder repository intentionally records `prepare`, `design`, and
+`spec-it-out` as project customizations. Its authoring copies state the
+repository-local task-native default after data cutover, while the plugin-root
+delivery sources stay generic for other initialized repositories. Reconciliation
+preserves those bounded customizations; it does not use tracker choice to retire
+the separately named legacy assets.
+
 ## Project selection and Orca registration
 
 Initialization starts at the current directory and uses Git's nearest-worktree

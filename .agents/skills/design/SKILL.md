@@ -30,8 +30,9 @@ planning or execution history that this authoring phase may not invalidate.
 
 If the operator did not select an existing task, create exactly one new task
 only after the specification is ready to save. Choose a concise title and pass
-`--status "In Design"` explicitly; do not rely on the project's temporary
-default status. Use the supported `backlog task create --plain` interface and
+`--status "In Design"` explicitly. This repository now defaults to `In Design`,
+but the explicit status keeps the authoring command self-contained and auditable.
+Use the supported `backlog task create --plain` interface and
 bind the exact created task ID from its output. Treat this as one mutation
 attempt: if the exit result, output, returned identity, or post-create reload is
 uncertain, do not issue another create. Stop, preserve the evidence, and report

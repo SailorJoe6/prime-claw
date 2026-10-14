@@ -3,10 +3,10 @@ id: PRIMECLAW-20.9
 title: >-
   Incident: source host tests may have contacted OpenShell and GitHub-provider
   stages
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-12 01:14'
+updated_date: '2026-10-14 14:45'
 labels:
   - credentials
   - incident

@@ -1,4 +1,8 @@
+from collections import Counter
+import json
 from pathlib import Path
+
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,7 +60,7 @@ def test_project_backlog_skill_teaches_supported_task_native_lifecycle() -> None
         LIFECYCLE_LIST,
         'backlog task view --json -- <id>',
         'backlog task create "Short title" --status "In Design"',
-        'Do not rely on the temporary project default.',
+        'This repository now defaults new ordinary tasks to `In Design`.',
         '`/plan TASK-ID` writes the native Implementation Plan',
         '`/implement-task TASK-ID` admits one exact approved `In Planning` task',
         'There is no generic claim edit that may bypass planning or admission.',
@@ -87,3 +91,65 @@ def test_execute_and_handoff_keep_backlog_authority_while_prepare_discovers_nati
     assert "Use only the commands and tracker the project actually provides" in prepare
     assert "Backlog.md" not in prepare
     assert "Related Backlog tasks are references only" in handoff
+
+def _task_frontmatter(path: Path) -> dict | None:
+    text = path.read_text()
+    if not text.startswith("---\n"):
+        return None
+    _, raw, _ = text.split("---", 2)
+    value = yaml.safe_load(raw)
+    return value if isinstance(value, dict) else None
+
+
+def test_repository_status_migration_receipt_and_live_data_are_consistent() -> None:
+    receipt = json.loads((
+        ROOT / "docs/evidence/task-native-backlog-cutover/2026-10-14-step-6-status-migration.json"
+    ).read_text())
+    assert receipt["preCutoverCommit"] == "9cd16a40c0bbc0ff9c610bbbdb1c8395c30ac47e"
+    assert receipt["before"] == {
+        "activeTaskCount": 41,
+        "statusCounts": {
+            "Blocked": 4, "Done": 2, "In Design": 1, "In Progress": 3, "To Do": 31,
+        },
+        "toDoCount": 31,
+    }
+    assert receipt["classification"] == {
+        "meaningfulPlanCount": 0,
+        "noMeaningfulPlanCount": 31,
+        "ambiguousCount": 0,
+    }
+    assert receipt["afterMigrationBeforeConfigRemoval"] == {
+        "activeTaskCount": 41,
+        "statusCounts": {"Blocked": 4, "Done": 2, "In Design": 32, "In Progress": 3},
+        "toDoCount": 0,
+        "identityOrParentDriftCount": 0,
+    }
+    assert receipt["configuration"] == {
+        "defaultStatus": "In Design",
+        "statuses": ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"],
+        "toDoRemovedAfterObservedActiveCount": 0,
+    }
+    assert len(receipt["migrations"]) == 31
+    assert len({row["id"] for row in receipt["migrations"]}) == 31
+    assert all(row["implementationPlan"] is None for row in receipt["migrations"])
+    assert all((row["from"], row["to"]) == ("To Do", "In Design") for row in receipt["migrations"])
+    assert Counter(row["status"] for row in receipt["preserved"]) == {
+        "Blocked": 4, "Done": 2, "In Design": 1, "In Progress": 3,
+    }
+    assert receipt["afterMigrationBeforeConfigRemoval"]["toDoCount"] == 0
+    assert receipt["afterMigrationBeforeConfigRemoval"]["identityOrParentDriftCount"] == 0
+
+    records = {}
+    for directory in (ROOT / "backlog/tasks", ROOT / "backlog/completed", ROOT / "backlog/archive"):
+        if not directory.exists():
+            continue
+        for path in directory.rglob("*.md"):
+            record = _task_frontmatter(path)
+            if record and record.get("id"):
+                assert record["id"] not in records
+                records[record["id"]] = record
+    assert records
+    assert all(record.get("status") != "To Do" for record in records.values())
+    for row in receipt["migrations"] + receipt["preserved"]:
+        assert row["id"] in records
+        assert records[row["id"]].get("parent_task_id") == row["parentTaskId"]

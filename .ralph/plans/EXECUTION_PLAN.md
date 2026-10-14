@@ -1654,3 +1654,25 @@ The next execute pass is authorized for Step 6 only: this repository's status, c
 - Produce one clean pushed Step 6 candidate for review, then stop.
 
 Do not start Step 7, delete `.ralph/plans`, publish final lifecycle state, merge, finalize ownership, clean resources, or apply user-global assets.
+
+## Step 6 repository-local cutover completion
+
+Completed only Step 6, "Cut over this repository's status, configuration, and data," from pushed checkpoint `9cd16a40c0bbc0ff9c610bbbdb1c8395c30ac47e`.
+
+- The supported structured Backlog interface found 41 active tasks before migration: 31 `To Do`, 1 `In Design`, 3 `In Progress`, 4 `Blocked`, and 2 `Done`.
+- Exact `task view --json` inspection proved all 31 `To Do` tasks had `implementationPlan: null`. The approved rule therefore classified all 31 as `In Design`, with zero `In Planning` classifications and zero ambiguities.
+- One supported `backlog task edit ... --status "In Design"` operation migrated those exact 31 tasks. Post-edit reload proved no ID, path, or parent drift and no change to the 10 stronger existing statuses. Task-file diffs contain only the status plus Backlog-managed `updated_date`.
+- Only after the active `To Do` count reached zero, `backlog/config.yml` changed to default `In Design` and the exact ordered statuses `In Design`, `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, and `Done`.
+- Current repository guidance now describes the completed cutover. The project-local `design` and `spec-it-out` runtime copies state the final repository default while retaining explicit `In Design` creation; their manifest rows are intentionally `customized`. Generic plugin delivery sources, vendored Backlog behavior, legacy workflow assets, and hybrid ownership routing remain unchanged.
+- `docs/evidence/task-native-backlog-cutover/2026-10-14-step-6-status-migration.json` records the pre/post counts, classification, exact IDs/paths/parents, preserved states, and configuration gate.
+
+Validation evidence:
+- focused host-safe configuration, receipt, guidance, initialization, inventory, and lifecycle checks: 50 passed, 42 deselected;
+- focused current-guidance/status subset after final receipt assertions: 40 passed, 8 deselected;
+- initialization and reviewed-lifecycle Node suites: 59/59 passed;
+- broad non-container suite: 656 passed, 1 skipped, 65 deselected, 75 subtests passed, with only the same three accepted-base/environment failures (runtime-test host-safe marker wording, existing missing pytest bridge, and existing Backlog source pin mismatch);
+- independent read-only review: no material findings; it independently reclassified all 31 tasks, compared every task diff, verified all identities/parents/stronger states, and confirmed repository-only scope and the Step 7 boundary;
+- final post-edit `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed with immutable source-mode image, offline RPC probe, network absence, verified teardown, and published manifest;
+- `git diff --check`: passed.
+
+Step 7 remains unstarted. `.ralph/plans` stays active, `PRIMECLAW-10.38` remains `In Progress`, version-1 ownership remains active, and no final lifecycle publication, plan-tree deletion, merge, finalization, cleanup, or user-global asset application occurred.

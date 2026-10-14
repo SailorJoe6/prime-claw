@@ -104,9 +104,12 @@ migration. Those procedures remain operational and are documented in
 [`future-specification-bundles.md`](future-specification-bundles.md); they are
 not the authority for a task-native Episode.
 
-The compatible statuses are staged in `backlog/config.yml`. `To Do` remains the
-temporary default and remains selectable until the one-time task migration can
-truthfully classify every existing item.
+This repository's ordered statuses are configured in `backlog/config.yml` as
+`In Design`, `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, and
+terminal `Done`. New ordinary tasks default to `In Design`. The completed
+one-time migration removed active `To Do` only after every former item was
+classified from its native Implementation Plan while preserving stronger
+states, IDs, and parents.
 
 ## Project task workflow
 
@@ -124,8 +127,8 @@ backlog task create "Follow-up title" --status "In Design" --description "Outcom
 The explicit filters expose the current authoring and planning queues without
 selecting the retained legacy migration state. `--ready` alone can include tasks
 whose lifecycle status does not match the phase being entered.
-New ordinary work must pass `--status "In Design"` explicitly while the
-transitional configuration still has its old default.
+New ordinary work should continue to pass `--status "In Design"` explicitly so
+the intended authoring state is visible even though it is now the project default.
 
 Use `/design` or `/spec-it-out` for specification authoring, `/plan TASK-ID` for
 native planning, and `/implement-task TASK-ID` for approved admission. There is
