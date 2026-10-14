@@ -1676,3 +1676,19 @@ Validation evidence:
 - `git diff --check`: passed.
 
 Step 7 remains unstarted. `.ralph/plans` stays active, `PRIMECLAW-10.38` remains `In Progress`, version-1 ownership remains active, and no final lifecycle publication, plan-tree deletion, merge, finalization, cleanup, or user-global asset application occurred.
+
+## Step 6 acceptance revision after candidate `8ef465d132231d35bdacef64627f4ec3162a43dd`
+
+Candidate `8ef465d132231d35bdacef64627f4ec3162a43dd` is not accepted because AC #13 lacks one bounded synthetic branch-coverage fixture.
+
+Keep the truthful real migration and its receipt unchanged. All 31 actual pre-cutover `To Do` tasks had `implementationPlan: null` and correctly became `In Design`; the recorded counts, IDs, paths, parents, stronger real states, configuration, generic-plugin isolation, and Step 7 boundary are sound.
+
+Repair only the acceptance-evidence gap:
+
+- Add a small deterministic synthetic migration fixture/test with at least one meaningful-plan `To Do`, one planless `To Do`, and representative stronger statuses including `In Progress`, `Blocked`, `Ready for Merge`, and `Done`.
+- Prove the two exact classifications: meaningful-plan `To Do` becomes `In Planning`; planless `To Do` becomes `In Design`.
+- Prove unchanged ID, parent, path, and every stronger status.
+- Do not add migration wrappers or production machinery.
+- Re-run focused validation, commit and push one clean repair candidate, then stop.
+
+Do not alter the actual migration receipt, actual task statuses, `backlog/config.yml`, or other accepted Step 6 data. Do not start Step 7, delete `.ralph/plans`, publish final lifecycle state, merge, finalize ownership, clean resources, or apply user-global assets.
