@@ -3,10 +3,10 @@ id: PRIMECLAW-7.6
 title: >-
   Phase 3a: preserve and migrate sandbox state to durable volumes in
   prime-claw-v2
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-12 01:14'
+updated_date: '2026-10-14 14:45'
 labels: []
 dependencies: []
 parent_task_id: PRIMECLAW-7

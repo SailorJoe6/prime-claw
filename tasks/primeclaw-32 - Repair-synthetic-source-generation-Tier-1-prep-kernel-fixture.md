@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-32
 title: Repair synthetic source-generation Tier-1 prep-kernel fixture
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:01'
+updated_date: '2026-10-14 14:45'
 labels: []
 dependencies: []
 priority: p2

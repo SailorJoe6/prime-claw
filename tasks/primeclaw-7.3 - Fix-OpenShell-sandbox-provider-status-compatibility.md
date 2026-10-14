@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-7.3
 title: Fix OpenShell sandbox provider status compatibility
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:00'
+updated_date: '2026-10-14 14:45'
 labels: []
 dependencies: []
 parent_task_id: PRIMECLAW-7

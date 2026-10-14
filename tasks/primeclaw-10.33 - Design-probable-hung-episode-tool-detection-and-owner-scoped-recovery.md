@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-10.33
 title: Design probable-hung episode tool detection and owner-scoped recovery
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:01'
+updated_date: '2026-10-14 14:45'
 labels:
   - design
   - episode-loop

@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-10.1
 title: 'Phase 4a: refine the imported prime-agent phase skills by manual driving'
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:00'
-updated_date: '2026-10-12 01:16'
+updated_date: '2026-10-14 14:45'
 labels: []
 dependencies:
   - PRIMECLAW-7

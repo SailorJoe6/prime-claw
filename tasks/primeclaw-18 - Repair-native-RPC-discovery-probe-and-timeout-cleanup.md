@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-18
 title: Repair native RPC discovery probe and timeout cleanup
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-12 01:02'
+updated_date: '2026-10-14 14:45'
 labels:
   - episode-loop
   - prime-agent

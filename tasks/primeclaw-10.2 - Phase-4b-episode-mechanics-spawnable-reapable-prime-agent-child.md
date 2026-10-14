@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-10.2
 title: 'Phase 4b: episode mechanics (spawnable, reapable prime-agent child)'
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:00'
-updated_date: '2026-10-12 01:02'
+updated_date: '2026-10-14 14:45'
 labels: []
 dependencies:
   - PRIMECLAW-10.1

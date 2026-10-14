@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-33.10
 title: Run final story acceptance and measure simplification
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-12 01:02'
+updated_date: '2026-10-14 14:45'
 labels:
   - acceptance
   - prime-agent-plugin

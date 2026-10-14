@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-33
 title: Simplify Prime Claw plugin implementation without weakening user stories
-status: To Do
+status: In Design
 assignee: []
 created_date: '2026-10-12 01:01'
+updated_date: '2026-10-14 14:45'
 labels:
   - prime-agent-plugin
   - simplification
