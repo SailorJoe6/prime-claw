@@ -54,6 +54,8 @@ export interface LegacyTaskOwnershipTransitionInput {
   ownerSessionId: string;
   expectedMainHead: string;
   expectedEpisodeHead: string;
+  expectedPreviousEpisodeActiveSessionId: string;
+  verifiedCurrentEpisodeActiveSessionId: string;
   confirmedReady: boolean;
 }
 
@@ -279,6 +281,9 @@ export function transitionLegacyEpisodeOwnershipToTask(
     throw new Error("Ownership transition requires one exact canonical Backlog task ID");
   }
   if (!input.ownerSessionId) throw new Error("Ownership transition requires the exact owner Conversation session");
+  if (!input.expectedPreviousEpisodeActiveSessionId || !input.verifiedCurrentEpisodeActiveSessionId) {
+    throw new Error("Ownership transition requires exact previous and verified current runtime routes");
+  }
   if (!TRANSITION_GIT_OID.test(input.expectedMainHead) || !TRANSITION_GIT_OID.test(input.expectedEpisodeHead)) {
     throw new Error("Ownership transition requires exact main and Episode Git heads");
   }
@@ -305,8 +310,12 @@ export function transitionLegacyEpisodeOwnershipToTask(
 
   if (isLegacyEpisodeOwnership(initial)) {
     if (initial.sourceLocation !== input.sourceLocation) throw new Error("Ownership transition source location does not match active ownership");
+    if (initial.episodeActiveSessionId !== input.expectedPreviousEpisodeActiveSessionId) {
+      throw new Error("Ownership transition previous runtime route drifted before atomic replacement");
+    }
   } else {
-    if (initial.taskId !== input.taskId || initial.taskPath !== taskPath) {
+    if (initial.taskId !== input.taskId || initial.taskPath !== taskPath
+      || initial.episodeActiveSessionId !== input.verifiedCurrentEpisodeActiveSessionId) {
       throw new Error("Existing task-native ownership does not match the completed transition binding");
     }
   }
@@ -374,6 +383,7 @@ export function transitionLegacyEpisodeOwnershipToTask(
     version: 2,
     taskId: input.taskId,
     taskPath,
+    episodeActiveSessionId: input.verifiedCurrentEpisodeActiveSessionId,
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
   }) as TaskEpisodeOwnershipRecord;
 

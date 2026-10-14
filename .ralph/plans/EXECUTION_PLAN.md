@@ -1790,3 +1790,16 @@ Repair these two reproduced defects only:
 Add focused regression tests for both defects. Update lifecycle and oversight documentation to distinguish an ephemeral runtime-route refresh from preservation of durable Episode/session/resource identity. Before presenting the repaired candidate, ensure the temporarily restored `.ralph/plans/future/replace-ralph-plans-with-backlog` pair is absent and prove that its absence does not affect the active root `.ralph/plans/SPECIFICATION.md` and `.ralph/plans/EXECUTION_PLAN.md` pair. At this handoff the obsolete source folder was absent and both active root files were present and non-empty.
 
 Do not execute the live transition; delete the active root pair or any unrelated plan tree; alter `PRIMECLAW-10.38` status; publish `Ready for Merge`; merge; finalize; clean resources; retire generic legacy compatibility; or touch the preserved untracked canonical-main archive. This is a repair candidate only and requires focused validation, independent review, commit, and push before returning to the owning Conversation.
+
+## Post-restart ownership-bridge repair candidate — completed
+
+Integrated canonical `origin/main` commit `a577df50a299e501386f2c57ff6e5cecc4566834` through merge commit `d0fb9c1`, making the reviewed post-restart manifest and exact source-bundle recovery history ancestors of this candidate.
+
+Implemented the two accepted repairs:
+
+- ownership transition preflight now accepts a replacement runtime route only when exactly one durable session matches the recorded Episode ID, session file, exact worktree CWD, owner, branch, and resources; the session and full state are idle; and the recorded route is absent. Concurrent old routes, duplicate durable matches, missing routes, foreign ownership, identity drift, or unavailable evidence fail closed. The verified route is passed with the exact previous route into the low-level transition and is bound in the same atomic ownership-file replacement. Durable Episode, session ID/file, worktree, branch, head, terminal, Orca, operation, and owner identity remain unchanged;
+- retained version-1 handoff now validates strict future-source syntax and exact persisted ownership before bundle storage, so the obsolete promoted future folder may be absent. Exact owner, active root plan pair, worktree, branch, session, route, and resource identity remain mandatory, and missing or mismatched ownership fails closed.
+
+Focused Node validation passed 207/207 across transition, Episode, and public registration suites. Focused host policy validation passed 35 with 5 environment skips. Exact-current-source Docker Tier-1 passed immutable-image launch, network absence, plugin checks, offline RPC discovery, teardown, and manifest publication at `.test-results/20261014T195838Z-87657-4cdd8ad3/tier1`. `git diff --check` passed.
+
+The temporarily restored `.ralph/plans/future/replace-ralph-plans-with-backlog` pair was removed again. The active root `.ralph/plans/SPECIFICATION.md` and `.ralph/plans/EXECUTION_PLAN.md` remain present and non-empty. Canonical ownership remains active version 1 for Episode `01a133c6-0834-7465-8597-91cf46c0b19e`; no live transition, lifecycle/status publication, merge to main, finalization, cleanup, or generic compatibility retirement occurred.

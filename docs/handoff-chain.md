@@ -29,7 +29,9 @@ requires the recorded worktree's readable, non-empty active specification and
 implementation plan (`EXECUTION_PLAN.md` remains the retained spelling). Before
 messaging, it verifies:
 
-- exact owner session and approved future-folder location;
+- strict source-location syntax and the exact persisted binding, without requiring
+  the obsolete promoted future folder to remain on disk;
+- exact owner session;
 - active lifecycle status;
 - the recorded Git worktree and actual branch;
 - exact Orca worktree identity for the Orca engine;

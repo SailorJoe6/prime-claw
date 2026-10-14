@@ -20,8 +20,10 @@ execute pass reach the correct idle Episode.**
 The primary task-native continuation is
 `handoff_task_episode(taskId, guidance?)`, described below. Retained version-1
 compatibility uses `handoff_spec_episode(location, guidance?)`; it verifies the
-owner, future-folder location, readable active plan pair, Git/Orca worktree,
-durable session, active route, and idle queue. That pair stays active through
+strict location syntax and exact persisted source binding before bundle storage,
+so the obsolete promoted future folder may be absent. The owner, readable active
+root plan pair, Git/Orca worktree, durable session, active route, and idle queue
+remain mandatory. That pair stays active through
 blocked, candidate-review, and revision states. An older already-blocked pair
 requires the separate operator-authorized exact version-1 restore and
 live-identity revalidation before handoff. Missing files never switch modes. It

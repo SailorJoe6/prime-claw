@@ -60,9 +60,13 @@ dirt except the required untracked ownership record, a wholly clean Episode,
 complete task/active-plan equality, live owner and resource
 identity, and an idle exact-CWD durable session. For Orca it also proves the
 same setup, worktree identity, path, branch, head, and connected writable
-visible terminal handles. The atomic record replacement preserves the existing
-Episode, session, worktree, branch, admission `baseRef`, historical recorded
-head, and optional Orca resources. It creates or deletes nothing and performs
+visible terminal handles. If a restart replaced the recorded ephemeral route,
+the host requires exactly one idle durable session with the same ID, file, CWD,
+owner, worktree, branch, and resources, requires the old route to be absent,
+and binds the verified current route in the same atomic write. The replacement
+preserves the existing Episode, durable session, worktree, branch, admission
+`baseRef`, historical recorded head, and optional Orca resources. It creates or
+deletes nothing and performs
 no status change, assignment, handoff, merge, finalization, or cleanup.
 
 An exact same-binding replay is a no-op. Every different, partial, dirty,
@@ -147,7 +151,10 @@ The Conversation stays selected.
 The Episode does not inherit Conversation history. Creation does not run an
 initial handoff and does not send a second assignment. Later supervision uses
 the durable Prime Agent session and `handoff_spec_episode`; the launch
-automation is not retained.
+automation is not retained. That handoff validates the exact persisted source
+binding before bundle existence, so the promoted future folder may be absent.
+Strict source syntax, exact owner, the active root plan pair, and complete live
+Episode identity are still required.
 
 ## Retained version-1 recovery
 

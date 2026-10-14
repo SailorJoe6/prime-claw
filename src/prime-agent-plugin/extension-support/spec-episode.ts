@@ -31,6 +31,7 @@ import {
 } from "./episode-ownership.ts";
 import {
   resolveBacklogTask,
+  resolveFutureLocationSyntax,
   validateFutureLocation,
   type BacklogTaskSelection,
 } from "./reviewed-plan-support.ts";
@@ -1131,6 +1132,9 @@ export function resolveBlockedWorkflowAuthority(
 function sessionIsBusy(session: SessionSummary): boolean {
   return session.isSessionActive === true || session.isStreaming === true || session.isCompacting === true || (session.queuedCount ?? 0) > 0;
 }
+function sessionRuntimeRoute(session: SessionSummary): string | undefined {
+  return session.activeSessionId ?? session.id;
+}
 function assertIdleEpisodeState(state: EpisodeSessionState, identity: EpisodeOwnershipRecord, activeSessionId: string): void {
   const matches = state.activeSessionId === activeSessionId && state.sessionId === identity.episodeId && samePath(state.sessionFile, identity.episodeSessionFile);
   if (!matches) throw new Error("Episode state does not match the durable owned identity");
@@ -1467,8 +1471,8 @@ export async function handoffSpecEpisode(
   const orca = dependencies?.orca ?? new CliOrcaAdapter();
   let publisher = dependencies?.publisher;
   try {
-    const selected = validateFutureLocation(ctx.cwd, rawLocation);
-    if (!selected) throw new Error("Invalid future-plan folder");
+    const selected = resolveFutureLocationSyntax(ctx.cwd, rawLocation);
+    if (!selected) throw new Error("Invalid future-plan source location");
     const repo = git.repositoryRoot(selected.projectRoot);
     if (resolve(repo) !== resolve(selected.projectRoot)) throw new Error("The operation must run from the repository root");
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) throw new Error("Episode handoff is available only from a top-level project Conversation");
@@ -1554,17 +1558,22 @@ export async function transitionSpecEpisodeToTaskOwnership(
 
     publisher ??= new PrimeSessionPublisher(undefined, runtimeSessionManagerClass(ctx.sessionManager));
     const sessions = await publisher.list();
-    const matches = sessions.filter((session) => session.sessionId === record.episodeId
-      && Boolean(session.sessionFile) && samePath(session.sessionFile!, record.episodeSessionFile!));
-    if (matches.length !== 1) throw new Error("Ownership transition requires one exact durable Episode session");
-    const session = matches[0];
-    if (!session.cwd || !samePath(session.cwd, record.worktree!)
-      || session.activeSessionId !== record.episodeActiveSessionId) {
-      throw new Error("Ownership transition durable session route or CWD no longer matches ownership");
+    const durableMatches = sessions.filter((session) => session.sessionId === record.episodeId);
+    if (durableMatches.length !== 1) throw new Error("Ownership transition requires one unambiguous durable Episode session");
+    const session = durableMatches[0];
+    if (!session.sessionFile || !samePath(session.sessionFile, record.episodeSessionFile!)
+      || !session.cwd || !samePath(session.cwd, record.worktree!)) {
+      throw new Error("Ownership transition durable session file or CWD no longer matches ownership");
+    }
+    const currentRoute = sessionRuntimeRoute(session);
+    if (!currentRoute) throw new Error("Ownership transition durable session has no verified current runtime route");
+    if (currentRoute !== record.episodeActiveSessionId
+      && sessions.some((candidate) => sessionRuntimeRoute(candidate) === record.episodeActiveSessionId)) {
+      throw new Error("Ownership transition previous runtime route is still live alongside the current durable session");
     }
     if (sessionIsBusy(session)) throw new Error("Ownership transition requires the owned Episode to be idle");
-    const state = await publisher.getState(record.episodeActiveSessionId!);
-    assertIdleEpisodeState(state, record, record.episodeActiveSessionId!);
+    const state = await publisher.getState(currentRoute);
+    assertIdleEpisodeState(state, record, currentRoute);
 
     const transition = dependencies.transitionOwnership ?? transitionLegacyEpisodeOwnershipToTask;
     return transition({
@@ -1574,6 +1583,8 @@ export async function transitionSpecEpisodeToTaskOwnership(
       ownerSessionId: ctx.sessionManager.getSessionId(),
       expectedMainHead: mainHead,
       expectedEpisodeHead: episodeHead,
+      expectedPreviousEpisodeActiveSessionId: record.episodeActiveSessionId!,
+      verifiedCurrentEpisodeActiveSessionId: currentRoute,
       confirmedReady,
     }, {
       ...(dependencies.transitionGit ? { git: dependencies.transitionGit } : {}),
