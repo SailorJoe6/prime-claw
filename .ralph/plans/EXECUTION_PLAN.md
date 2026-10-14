@@ -1639,3 +1639,18 @@ Validation evidence:
 - `git diff --check`: passed.
 
 This completion does not change repository lifecycle status/configuration/data cutover, publish final lifecycle state, retire compatibility assets, delete `.ralph/plans`, merge/finalize, clean resources, or apply user-global assets.
+
+## Operator acceptance and Step 6 authorization
+
+Step 5 is accepted at exact pushed candidate `5cdabed7a6850e6f684465acd77ea3d589ec213a`.
+
+The next execute pass is authorized for Step 6 only: this repository's status, configuration, and data cutover exactly as already approved in `PRIMECLAW-10.38` and this plan.
+
+- Configure only this repository for the task-native workflow.
+- Migrate remaining task statuses truthfully.
+- Remove active `To Do` use only after proving the repository data state permits it.
+- Update this repository's current guidance and runtime surfaces.
+- Preserve task IDs, parent relationships, stronger existing statuses, generic legacy compatibility, tracker/specification orthogonality, and all operator authority boundaries.
+- Produce one clean pushed Step 6 candidate for review, then stop.
+
+Do not start Step 7, delete `.ralph/plans`, publish final lifecycle state, merge, finalize ownership, clean resources, or apply user-global assets.
