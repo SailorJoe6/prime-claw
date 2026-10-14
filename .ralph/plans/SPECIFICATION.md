@@ -1,7 +1,6 @@
-# Replace `.ralph/plans` with task-native Backlog/Ralph lifecycle
+# Repository-local `.ralph/plans` cutover with generic legacy workflow preservation
 
-The authoritative specification for this future bundle is Backlog.md epic
-`PRIMECLAW-10.38`.
+The authoritative specification is Backlog epic `PRIMECLAW-10.38`.
 
 Read it through the supported project interface:
 
@@ -9,7 +8,6 @@ Read it through the supported project interface:
 backlog task view PRIMECLAW-10.38 --plain
 ```
 
-This file exists only to satisfy the current Prime Claw future-specification
-bundle contract. It defines no independent or additional scope. Revise the
-Backlog task through the supported CLI rather than duplicating specification
-content here.
+This repository is moving its own `.ralph/plans` data to the task-native workflow. The generic plugin continues to support the legacy workflow for other initialized repositories. Tracker migration and specification authority are orthogonal; the exact coexistence, routing, compatibility, and cutover requirements live only in `PRIMECLAW-10.38`.
+
+This file is a temporary pointer required by this repository's current legacy workflow. It defines no independent or additional scope. Revise the Backlog task through the supported CLI instead of duplicating its specification here.

@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-14 04:34'
+updated_date: '2026-10-14 04:40'
 labels:
   - backlog-md
   - episode-loop
@@ -78,6 +78,7 @@ modified_files:
     backlog/completed/primeclaw-41 -
     Historical-Superseded-incomplete-Phase-3a-brain-hosting-BUFD.md
   - backlog/tasks/primeclaw-42 - Design-delivery-manager-episode-supervision.md
+  - .ralph/plans/SPECIFICATION.md
 parent_task_id: PRIMECLAW-10
 priority: p1
 type: epic
@@ -87,15 +88,17 @@ ordinal: 121000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-## Context
+## Outcome
 
-The Beads-to-Backlog migration intentionally adopted Backlog.md as-is and preserved the existing Ralph specification, planning, and Episode workflow. That leaves Backlog tasks and `.ralph/plans` folders as duplicate authorities for the same work. Replace that split with one Backlog task that carries the durable design, plan, execution record, lifecycle status, and terminal history for one complete Episode.
+`PRIMECLAW-10.38` performs this repository's own `.ralph/plans` data cutover to the task-native workflow. It does not remove the generic plugin's legacy workflow. Other initialized repositories may continue to use the legacy workflow, including repositories that use Backlog for tracking.
 
-Keep the established Conversation/operator/Episode authority boundaries and proven Episode mechanics unless this specification changes them explicitly.
+Tracker migration and specification authority are orthogonal. Backlog tracking may coexist with legacy bundles. Beads migration is optional and separate from workflow selection. A Beads-only repository initializes the task-native workflow. Archive-only bundles do not force the legacy workflow.
 
-## Task lifecycle
+Keep the established Conversation, operator, Episode, and Expert authority boundaries. Preserve exact task identity, Episode ownership, isolated worktrees and sessions, handoff and compaction continuation, review, recovery, merge authority, abandonment authority, finalization, and cleanup boundaries.
 
-Ordinary work uses these ordered statuses:
+## Task-native workflow
+
+This repository's task-native workflow uses these ordered statuses:
 
 1. `In Design`
 2. `In Planning`
@@ -104,114 +107,60 @@ Ordinary work uses these ordered statuses:
 5. `Ready for Merge`
 6. `Done`
 
-`Done` remains the sole successful terminal lifecycle status. Confirmed abandonment uses Backlog soft-deletion as an explicit non-success disposition outside the ordinary status progression and never marks the task `Done`. New ordinary tasks default to `In Design`; `To Do` is retired after migration.
+`Done` is the successful terminal status. Confirmed abandonment uses Backlog soft deletion and never marks the task `Done`. New ordinary tasks default to `In Design`; this repository removes active `To Do` guidance only after its data migration is proven.
 
-`/design` and `/spec-it-out` create a new `In Design` task or update an explicitly selected task that is already `In Design`. They reject later lifecycle states rather than silently invalidating a plan. The task Description, Acceptance Criteria, constraints, references, and documentation hold the durable specification. These skills do not plan or authorize implementation.
+`/design` and `/spec-it-out` create or revise `In Design` tasks. `/plan TASK-ID` accepts only `In Design` or `In Planning`, writes the native Implementation Plan, and leaves the task `In Planning`. `/implement-task TASK-ID` is the task-native workflow's new-Episode admission command. It accepts only an `In Planning` task with a meaningful native plan and preserves the proportional structural and semantic readiness gate.
 
-`/plan TASK-ID` accepts only `In Design` or `In Planning`. It writes or revises the task's optional Backlog Implementation Plan and leaves the task `In Planning`. It rejects `In Progress`, `Blocked`, `Ready for Merge`, and `Done`; active Episode revisions use the existing review and handoff loop instead of restarting planning.
+After readiness succeeds, the Conversation changes the exact task on main to `In Progress` and commits that exact path before creating Episode resources. The Episode branch starts at that commit. A proven-clean failure returns the task to `In Planning`; uncertain or partial creation publishes `Blocked` with the exact recovery condition and is not retried as a new Episode.
 
-Ordinary non-Episode task execution is outside this migration's scope.
+During a task-native Episode, the Episode owns task content on its branch and never changes lifecycle status. The Conversation owns lifecycle status on main. The same task and ownership record span execute, handoff, compaction, review, blocked/resume, and revision passes. Candidate acceptance publishes `Ready for Merge` on main before integration and merge authorization. After verified merge, the Conversation publishes `Done`; ownership and resources remain until separately authorized finalization and cleanup. Confirmed abandonment imports only the bound Episode task content, preserves Conversation-owned status and invariant identity/hierarchy metadata, archives without `Done`, verifies the archival commit, and only then permits cleanup.
 
-## Episode admission
+## Legacy workflow preserved by the generic plugin
 
-The current `/implement-spec` pathway already requires a usable `EXECUTION_PLAN.md`; the task-native workflow preserves rather than invents that gate. `/implement-task TASK-ID` is the only new-Episode admission path and accepts only an `In Planning` task with a meaningful Backlog Implementation Plan. The existing proportional two-stage review remains: a light structural sniff may reject missing, blank, or obvious-placeholder content, and the semantic workflow rejects unresolved contradictions, blockers, or material product decisions. Do not add a rigid plan schema or bespoke parser.
+The generic plugin retains the legacy workflow for initialized repositories that select it. Preserve the four project-local legacy workflow assets:
 
-After semantic readiness succeeds, but before creating a branch, worktree, session, or ownership record, the Conversation changes the exact task on main to `In Progress` through the Backlog CLI and commits that exact task change. That local commit is the hard admission gate and the Episode branch is created from that committed SHA. Push promptly when a remote is available, but remote transport success is not a prerequisite for local Episode creation.
+- `project-workflow-plan-prep`
+- `project-workflow-plan-spec`
+- `project-workflow-implement-prep`
+- `project-workflow-implement-spec`
 
-A proven-clean creation failure with no Episode resource or ownership mutation returns the main task to `In Planning`. Any uncertain or partial mutation changes main to `Blocked` with the exact recovery condition; never retry uncertain creation as a new Episode.
+Preserve `/plan-spec`, `/implement-spec`, `plan_spec`, `create_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`. Preserve ownership version 1 parsing and the legacy promotion, recovery, handoff, review, finalization, and cleanup behavior needed by existing Episodes. Preserve old active-snapshot fallback for `.ralph/skills/handoff` and `.ralph/skills/execute`.
 
-## Task and status ownership during an Episode
+Execute, handoff, blocked handling, Expert review, and Conversation oversight use hybrid routing. Persisted ownership decides the workflow before prompt-tag absence: a valid ownership version 1 record selects the legacy workflow and a valid ownership version 2 record selects the task-native workflow. `<operator-episode-task>` is only a candidate task binding when ownership does not decide. Active plan placement alone is not live Episode identity. A live ownership version 1 Episode requires its ownership record plus active files in that Episode worktree.
 
-One task represents one complete Episode across as many execute, handoff, compaction, review, and revision iterations as needed. A handoff continues the same task and Episode; it is not a task or Episode boundary.
+Legacy workflow completion wording must not claim or mutate task-native Backlog lifecycle authority. The generic plugin also retains separately named project-local `design-legacy` and `spec-it-out-legacy` authoring assets that preserve current-main legacy authoring without mechanically duplicating neutral or shared Markdown.
 
-While the Episode branch exists:
+Project-local `.prime-claw/workflows` files are the runtime surfaces. Plugin-root copies are delivery sources installed or reconciled into projects. Tests and inventory must preserve that distinction.
 
-- the Episode exclusively owns task content on its branch, including Implementation Plan revisions inside approved scope, Implementation Notes, Acceptance Criteria evidence, blocker details, references, and Final Summary;
-- the Episode does not independently change task status;
-- the Conversation exclusively owns and publishes the true lifecycle status on main, using immediate exact-task commits and prompt pushes;
-- main may move `In Progress → Blocked → In Progress` from accepted Episode reports while Episode content remains on the branch; and
-- no role copies, mirrors, or dual-writes task content across checkouts during ordinary execution.
+## Repository-local migration and cutover
 
-The existing Episode-to-Conversation reporting and Conversation-to-Episode continuation channels carry progress, blockers, review findings, and instructions. Do not add a new status signaling mechanism.
+The completed historical migration maps the frozen `.ralph/plans` inventory to durable Backlog owners while preserving IDs, parents, source content, checked-state evidence, source paths, and Git provenance. This tracking migration does not select a workflow for another repository and does not retire generic compatibility.
 
-## Review, merge readiness, and completion
+Remaining work is split into three ordered slices:
 
-The Episode reports a candidate while remaining `In Progress`. Its candidate task content must include the current plan, notes, acceptance evidence, references, and Final Summary needed to understand the claimed outcome. The Conversation reviews the exact candidate and may request independent Expert evidence. Accepted findings return to the same Episode through the existing revision/handoff path.
+1. **Compatibility preservation and mode resolution.** Preserve the legacy workflow assets and commands, both ownership schemas, hybrid role routing, old active-snapshot fallback, the identity rules above, separate legacy authoring assets, and runtime-versus-delivery-source behavior while completing the task-native workflow.
+2. **This repository's status, configuration, and data cutover.** Migrate this repository's remaining task statuses and guidance, remove its active `To Do` use only after proving the data state, and configure this repository to use the task-native workflow without changing generic plugin defaults or another repository's workflow.
+3. **This repository's `.ralph/plans` deletion and final validation.** Delete only this repository's tracked plan tree after all live evidence has moved to durable task or documentation surfaces. Final searches require task-native surfaces to reject legacy authority while retained legacy workflow surfaces continue to use it.
 
-When the Conversation accepts the candidate with no fixes remaining, it does not request merge immediately. It first changes the main task to `Ready for Merge`, commits, and pushes. The Episode then integrates current main into its branch, thereby incorporating the Conversation-owned status and all other landed work. It resolves the expected task-file divergence by preserving the complete Episode-owned content and the Conversation-owned `Ready for Merge` status. The Conversation verifies that refreshed candidate before telling the user it is ready and requesting merge authorization.
+The final tree deletion is repository-local. It does not retire the legacy workflow, its generic commands or tools, ownership version 1, or compatibility assets.
 
-At that decision:
+## Historical bundle evidence
 
-- **Delay:** leave main `Ready for Merge` and retain the idle Episode, branch, worktree, session, and ownership.
-- **Request changes:** return main to `In Progress`, commit and push, integrate main into the same Episode, and resume it.
-- **Authorize merge:** the Conversation performs and verifies the merge. Immediately after verified merge, the Conversation changes the exact merged main task from `Ready for Merge` to `Done`, commits, and pushes. Episode ownership records and resources remain until the existing separately authorized finalization and cleanup paths complete.
-- **Decline:** means explicit project abandonment, not delay. Require strong confirmation before any destructive action.
+Every durable historical bundle has one Backlog epic. Exact owners were reused where unambiguous; new epics preserve references where ownership was not one-to-one. Material specification, plan, notes, outcome, criteria state, legacy IDs, source paths, and the frozen provenance commit remain traceable. Successful historical epics may live in `backlog/completed/`; no historical bundle is placed in `backlog/archive/`. The superseded incomplete Phase 3a epic remains completed-but-partial with evidence-based unchecked criteria and bidirectional replacement references.
 
-`backlog task complete` is periodic cleanup, not a per-Episode lifecycle step. Leave `Done` tasks on the active board until normal batch cleanup moves them to `backlog/completed/`.
+## Constraints and non-goals
 
-For confirmed abandonment, preserve history without merging candidate code: stop the Episode; bind its exact head and task path; snapshot the Conversation-owned main status and invariant task identity/hierarchy metadata; restore only the bound task blob from the Episode branch; immediately reapply the captured main status through the Backlog CLI; and verify the effective diff preserves identity, hierarchy, and Conversation-owned status while importing only Episode-owned task content and no code path. Then add an abandonment Final Summary through the Backlog CLI, run `backlog task archive TASK-ID` without marking it `Done`, commit and push the exact archival change, verify it, and only then destroy the branch, worktree, session, and ownership resources. `backlog/archive/` remains reserved for soft-deleted work.
-
-## Authority replacement
-
-Backlog task fields and statuses replace every `.ralph/plans` authority, including future specification folders, active plan files, blocked-folder movement, promotion commits, and plan archives. Runtime ownership may retain only the minimal exact task/Episode identity needed by existing mechanics; it must not recreate specification, plan, progress, or status authority.
-
-Update Prime Claw commands, model-callable tools, skills, managed templates, initialization and reconciliation assets, documentation, tests, recovery, handoff, review, and finalization language to use exact task identity and supported Backlog fields. Preserve Conversation supervision, exact Episode ownership, isolated code worktrees and sessions, handoff and compaction continuation, Expert review boundaries, recovery behavior, operator merge/abandonment/cleanup authority, and no-UI final bookkeeping.
-
-## Legacy bundle and task migration
-
-Migrate every existing `To Do` task: a task with a meaningful Implementation Plan becomes `In Planning`; one without becomes `In Design`. Preserve truthful `In Progress`, `Blocked`, `Ready for Merge`, and `Done` states where stronger legacy evidence exists.
-
-Every durable legacy specification/plan bundle becomes one Backlog epic:
-
-- reuse an exact one-to-one owning task and change its type to `epic` when needed;
-- otherwise create one epic and link related existing tickets through Backlog references;
-- never change existing task IDs or `parent_task_id` values, and add no Backlog reparenting feature;
-- merge specification narrative into Description, true acceptance criteria into native Acceptance Criteria, the execution plan into Implementation Plan, execution history into Implementation Notes, and terminal outcome into Final Summary;
-- import true acceptance criteria in source order so Backlog assigns native sequential markers, retaining legacy requirement IDs inside criterion text for provenance;
-- preserve material meaning in supported task fields and record the exact pre-cutover commit and source paths so verbatim originals remain retrievable from Git history; and
-- when ownership relationships are ambiguous, add references for every plausible relationship and flag the ambiguity for explicit disposition rather than guessing or duplicating tasks.
-
-Successfully completed and accepted-historical bundles become truthful `Done` epics and may be moved to `backlog/completed/` as part of the one-time migration cleanup. The superseded incomplete Phase 3a bundle also becomes a `Done` completed epic because it records real work later reworked: preserve evidence-based checked and unchecked criteria, state the partial/superseded outcome in Final Summary, and link the replacement epic in both directions. Do not use `backlog/archive/` for any existing bundle; the current inventory contains no truly abandoned bundle.
-
-## Cutover
-
-Implement and land this change through one final old-style `.ralph/plans` migration Episode. The candidate branch itself contains the completed state migration, task-native workflow, and deletion of `.ralph/plans`. A normal accepted merge makes that repository state current. Do not build runtime cutover automation, merge hooks, a dual-write compatibility phase, or another tracker abstraction.
-
-The compatibility `SPECIFICATION.md` for this effort remains only a pointer to this task until that final candidate deletes `.ralph/plans`.
-
-## Material constraints and non-goals
-
-- Preserve operator authority over product and scope changes, Episode admission, merge, delay, abandonment, and destructive cleanup.
-- Keep the migration KISS: adapt existing lifecycle guards and ownership from exact plan-folder identity to exact task identity.
-- Do not add a pickup command or other ordinary direct-work plugin surface.
-- Do not make every task require planning or an Episode.
-- Do not split one Episode into tasks per execute or handoff iteration.
-- Do not add Backlog reparenting, cross-checkout task wrappers, branch-projection rules, status-sync protocols, approval commits, Git-blob or tag approval schemes, replacement digest protocols, transaction journals, or custom merge drivers.
-- Do not broaden this work into Orca redesign, Prime Agent upstream changes, general plugin simplification, or unrelated cleanup.
-- Use supported Prime Agent and Backlog.md interfaces. Prime Agent remains an upstream dependency, not a development target.
-- Validate plugin-source changes only through the repository's Docker-isolated candidate path; do not mutate the installed user-global plugin during development.
+- Preserve operator authority over scope, admission, merge, delay, abandonment, finalization, and destructive cleanup.
+- Use supported Backlog and Prime Agent interfaces. Prime Agent remains an upstream dependency.
+- Do not add a pickup surface, make every task require an Episode, split one Episode per execute pass, or add task reparenting.
+- Do not add cross-checkout task wrappers, branch projections, status-sync protocols, approval blobs or tags, replacement digests, transaction journals, custom merge drivers, or another tracker abstraction.
+- Do not infer workflow selection from tracker choice, archive-only bundles, active plan placement alone, or missing prompt tags when ownership exists.
+- Validate plugin-source changes only through the Docker-isolated candidate path. Never apply a candidate to the installed user-global plugin.
+- This specification reconciliation changes no code, asset, template, test, status, configuration, plan placement, or cutover state.
 
 ## Migrated bundle authority
 
-Imported from frozen pre-cutover tree `6d11d9c2797cea54ecd07171e8a5b2019d6ee530`. Verbatim bytes remain available through the source references below; this task is the durable Backlog authority for the bundle's content and outcome.
-
-## Specification imported from `.ralph/plans/SPECIFICATION.md`
-
-# Replace `.ralph/plans` with task-native Backlog/Ralph lifecycle
-
-The authoritative specification for this future bundle is Backlog.md epic
-`PRIMECLAW-10.38`.
-
-Read it through the supported project interface:
-
-```bash
-backlog task view PRIMECLAW-10.38 --plain
-```
-
-This file exists only to satisfy the current Prime Claw future-specification
-bundle contract. It defines no independent or additional scope. Revise the
-Backlog task through the supported CLI rather than duplicating specification
-content here.
+The pre-cutover source tree remains available at `6d11d9c2797cea54ecd07171e8a5b2019d6ee530`. The task's references, Implementation Plan, Implementation Notes, and Git history preserve the completed migration and repair evidence. This task is the authoritative specification for this repository's remaining cutover work.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -219,7 +168,7 @@ content here.
 - [ ] #1 Project configuration, guidance, and tests expose the ordered statuses `In Design`, `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, and terminal `Done`; default new ordinary tasks to `In Design`; and contain no active workflow that creates or selects `To Do` after migration.
 - [ ] #2 Fresh and existing-task tests prove `/design` and `/spec-it-out` create or update only `In Design` tasks, persist specification content in supported task fields, and reject later states without planning or implementation authorization.
 - [ ] #3 `/plan TASK-ID` tests prove only `In Design` and `In Planning` are accepted; the same task receives a meaningful Implementation Plan and becomes or remains `In Planning`; later states are rejected without mutation or Episode creation.
-- [ ] #4 `/implement-task TASK-ID` is the sole new-Episode admission command and accepts only an `In Planning` task. Structural and semantic tests preserve the existing proportional plan-readiness gate and reject missing, blank, placeholder-only, contradictory, blocked, or materially unresolved plans before Episode resources or ownership are created.
+- [ ] #4 Task-native admission tests prove `/implement-task TASK-ID` is the sole new-Episode admission command for the task-native workflow and accepts only an `In Planning` task. Structural and semantic tests preserve the proportional plan-readiness gate and reject missing, blank, placeholder-only, contradictory, blocked, or materially unresolved plans before Episode resources or ownership are created.
 - [ ] #5 Admission tests prove semantic readiness precedes an exact main-task `In Progress` commit; the Episode branch starts from that committed SHA; prompt push failure alone does not block local creation; a proven-clean creation failure returns the task to `In Planning`; and uncertain partial creation marks main `Blocked` without retry.
 - [ ] #6 End-to-end evidence proves one task spans one Episode across multiple execute, handoff, compaction, review, and revision iterations and retains exact task, owner, branch, worktree, and session identity.
 - [ ] #7 Ownership tests prove the Episode alone mutates task content on its branch, the Conversation alone mutates lifecycle status on main, the Episode never independently changes status, and ordinary execution performs no cross-checkout content copy, mirroring, or dual write.
@@ -227,14 +176,24 @@ content here.
 - [ ] #9 Final-review tests prove Expert or Conversation findings can revise the same Episode; final Conversation acceptance publishes `Ready for Merge` on main before merge authorization; the Episode integrates current main and preserves Episode content plus Conversation status; and the Conversation verifies the refreshed candidate before requesting user authorization.
 - [ ] #10 Operator-decision tests prove delay retains `Ready for Merge` and all Episode resources, requested changes return main to `In Progress` and resume the same Episode, and authorized merge is verified before the Conversation immediately commits the exact main task as `Done`; ownership records and resources remain until separately authorized finalization/cleanup; `backlog task complete` is not invoked per Episode.
 - [ ] #11 Confirmed-abandonment tests prove strong confirmation precedes mutation; only the exact bound Episode task blob is selected; the effective main diff imports Episode-owned content while preserving Conversation-owned status plus invariant identity/hierarchy metadata; no candidate code is merged; an abandonment Final Summary is recorded; the task is archived without being marked `Done`; and exact archival state is committed and pushed before destructive Episode cleanup.
-- [ ] #12 Commands, tools, skills, managed templates, initialization/reconciliation assets, ownership records, docs, recovery, review, handoff, finalization, and tests use exact Backlog task identity and supported fields instead of `.ralph/plans` location or file movement as lifecycle authority.
+- [ ] #12 Task-native commands, tools, skills, managed templates, initialization/reconciliation assets, ownership version 2 records, docs, recovery, review, handoff, finalization, and tests use exact Backlog task identity and supported fields instead of `.ralph/plans` location or file movement as task-native lifecycle authority.
 - [ ] #13 A task-status migration fixture proves every pre-cutover `To Do` task with a meaningful Implementation Plan becomes `In Planning`, every `To Do` task without one becomes `In Design`, and existing active, blocked, ready, and done work retains truthful semantics.
 - [ ] #14 A bundle migration fixture proves each legacy bundle becomes one epic; exact owning tasks are reused when unambiguous; otherwise new epics reference related tickets without changing any existing task ID or parent; specification, plan, notes, outcomes, criteria state, legacy IDs, source paths, and pre-cutover commit provenance remain traceable.
 - [ ] #15 A representative terminal-history fixture proves completed and accepted-historical bundles become truthful `Done` epics, the superseded incomplete Phase 3a bundle remains explicitly partial with evidence-based unchecked criteria and bidirectional replacement references, one-time successful history may enter `backlog/completed/`, and no existing bundle enters `backlog/archive/`.
-- [ ] #16 Repository-wide acceptance proves no live command, skill, workflow, template, test, or documentation treats `.ralph/plans` as authoritative; historical references remain only where changing them would falsify history.
-- [ ] #17 The final candidate tree contains the completed state migration and task-native workflow and no `.ralph/plans` directory; normal merge applies that tree without runtime cutover automation, merge hooks, dual-write compatibility, custom merge drivers, or another tracker abstraction.
+- [ ] #16 Repository-wide acceptance proves task-native surfaces and this repository's current task-native guidance do not treat `.ralph/plans` as authoritative. Historical provenance remains truthful, and retained legacy workflow surfaces may continue to use legacy bundles where that workflow requires them.
+- [ ] #17 This repository's final candidate tree contains its completed state migration and task-native workflow and no `.ralph/plans` directory. That repository-local deletion does not retire generic legacy workflow compatibility, assets, commands, tools, ownership parsing, or another initialized repository's bundles.
 - [ ] #18 Existing tests plus focused Docker-isolated plugin acceptance prove Conversation, operator, Episode, and Expert authority; exact ownership; isolated code worktrees; iteration handoff; recovery; review; post-merge `Done` before separately authorized finalization/cleanup; final bookkeeping; and cleanup boundaries remain intact apart from the specified task-native lifecycle.
 - [ ] #19 Static and behavioral acceptance proves no pickup surface, Backlog reparenting feature, cross-checkout Backlog wrapper, branch-projection rule, approval commit/blob/tag scheme, replacement digest protocol, bespoke transaction journal, Prime Agent patch, or other unapproved scope expansion is introduced.
+- [ ] #20 The generic plugin retains the project-local legacy workflow assets `project-workflow-plan-prep`, `project-workflow-plan-spec`, `project-workflow-implement-prep`, and `project-workflow-implement-spec`; initialization, reconciliation, inventory, and tests preserve customized instances correctly.
+- [ ] #21 The legacy workflow retains `/plan-spec`, `/implement-spec`, `plan_spec`, `create_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`, with tests covering their current authority and operator gates.
+- [ ] #22 Compatibility tests retain ownership version 1 parsing and the legacy workflow promotion, recovery, handoff, review, finalization, and cleanup behavior required by existing Episodes.
+- [ ] #23 Execute, handoff, blocked handling, Expert review, and Conversation oversight route across both workflows, and old active-snapshot fallback remains supported for `.ralph/skills/handoff` and `.ralph/skills/execute`.
+- [ ] #24 Persisted ownership decides routing before prompt-tag absence: a valid ownership version 1 record selects the legacy workflow, a valid ownership version 2 record selects the task-native workflow, and `<operator-episode-task>` is only a candidate task binding when ownership does not decide.
+- [ ] #25 Active plan placement alone is not live Episode identity; a live ownership version 1 Episode requires persisted ownership plus active files in that Episode worktree.
+- [ ] #26 Legacy workflow execute completion wording cannot claim or mutate task-native Backlog lifecycle authority, status, completion, archival, or cleanup decisions.
+- [ ] #27 Separately named project-local `design-legacy` and `spec-it-out-legacy` assets preserve current-main legacy authoring without mechanically duplicating neutral or shared Markdown.
+- [ ] #28 Workflow selection remains orthogonal to tracker migration and specification storage: Backlog tracking may coexist with legacy bundles, Beads migration is optional and separate, Beads-only repositories initialize the task-native workflow, and archive-only bundles do not force the legacy workflow.
+- [ ] #29 Project-local `.prime-claw/workflows` files are tested as runtime surfaces while plugin-root copies remain delivery sources installed or reconciled into projects.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -1663,107 +1622,149 @@ criteria no longer mark explicitly deferred manual dogfood as complete.
 No new dogfood ran. No lifecycle status, other mapping/content, asset,
 `.ralph/plans` location, cutover, or unrelated cleanup changed.
 
-### 5. Perform the one-time task and bundle migration through Backlog CLI
+### Operator-approved compatibility-preservation correction
 
-Freeze the committed Episode base SHA as the pre-cutover provenance commit and
-inventory tracked files from that tree, not unrelated dirty or untracked files
-in another checkout. Do not commit a runtime migration script or journal. Use a
-bounded temporary REPL/helper only to issue supported Backlog CLI operations,
-then validate the resulting tracked state.
+This correction is the current planning authority and supersedes the Slice 10
+four-asset retirement rehearsal, the former Steps 2–6 where they remove generic
+legacy workflow behavior, and every later generic compatibility-retirement or
+repository-wide plan-absence instruction. Those records remain historical
+execution evidence only.
 
-Apply this reviewed mapping; preserve existing task IDs and every existing
-`parent_task_id`:
+`PRIMECLAW-10.38` cuts over this repository's own `.ralph/plans` data and
+current guidance to the task-native workflow. The generic plugin continues to
+provide the legacy workflow for other initialized repositories. Tracker
+migration and specification authority are orthogonal: Backlog tracking may
+coexist with legacy bundles; Beads migration is optional and separate;
+Beads-only repositories initialize the task-native workflow; and archive-only
+bundles do not force the legacy workflow.
 
-| Legacy bundle | Destination |
-|---|---|
-| active root `replace-beads` pair, plus any byte-identical `archive/replace-beads` copy present in the bound tree | deduplicate as one bundle; reuse existing epic `PRIMECLAW-35` and record every present source path |
-| `archive/phase2-runtime` | reuse `PRIMECLAW-6`, promote type to epic |
-| `archive/handoff-continuation-resilience` | reuse `PRIMECLAW-10.15`, promote to epic |
-| `archive/conversation-driven-episode-oversight` | reuse `PRIMECLAW-10.26`, promote to epic |
-| `archive/goal-heartbeat-work-control` | reuse `PRIMECLAW-10.28`, promote to epic |
-| `archive/plugin-test-container` and its review files | reuse existing epic `PRIMECLAW-19` |
-| `archive/project-wide-testing-strategy` | reuse `PRIMECLAW-20`, promote to epic |
-| `archive/official-lean-compatibility-cleanup` | reuse `PRIMECLAW-10.34`, promote to epic |
-| this migration bundle | reuse existing epic `PRIMECLAW-10.38` |
-| `archive/phase1-derisk-gate` | create one Done historical epic; reference `PRIMECLAW-1`, `-4`, `-5` |
-| `archive/worktree-isolated-specification-episodes` | create one Done historical epic; reference `PRIMECLAW-10.16`–`.18` and plausible predecessor lineage `.5`–`.7` |
-| `archive/conversational-ralph-command-routing` | create one Done historical epic; reference `PRIMECLAW-10.22`–`.25` |
-| `archive/compaction-first-phase-transitions` | create one Done historical epic; reference `PRIMECLAW-10.30`, `.31`, and separately blocked dogfood `.32` |
-| `archive/official-lean-session-protocol` | create one Done historical epic with bidirectional replacement reference to `PRIMECLAW-10.34` |
-| `archive/phase3a-bufd-superseded-incomplete` | create one Done completed-but-partial historical epic with evidence-based checked/unchecked criteria and a superseded Final Summary; link it bidirectionally with replacement epic `PRIMECLAW-7` |
-| `future/phase3a-brain-hosting-completion` | reuse exact owner `PRIMECLAW-7`, promote it to epic, retain truthful `Blocked`, and reference existing children `.3`, `.4`, `.5`, `.6` without changing their parents |
-| `future/delivery-manager-episode-supervision` | create one `In Design` epic; reference superseding role work `PRIMECLAW-10.36` without treating it as owner |
+The generic plugin must preserve:
 
-Treat `.ralph/plans/archive/README.md` as shared evidence for every affected
-bundle: import its material terminal/status outcome into the corresponding task
-and include the index path in provenance rather than silently discarding it.
-Account for every tracked file under `.ralph/plans` at the bound pre-cutover
-commit as mapped bundle content, shared evidence/provenance, nested review
-evidence, or the intentional `PRIMECLAW-10.38` compatibility pointer.
+- the project-local legacy workflow assets `project-workflow-plan-prep`,
+  `project-workflow-plan-spec`, `project-workflow-implement-prep`, and
+  `project-workflow-implement-spec`;
+- `/plan-spec`, `/implement-spec`, `plan_spec`, `create_spec_episode`,
+  `handoff_spec_episode`, and `finalize_spec_episode`;
+- ownership version 1 parsing and the legacy workflow promotion, recovery,
+  handoff, review, finalization, and cleanup behavior needed by existing
+  Episodes;
+- hybrid routing for execute, handoff, blocked handling, Expert review, and
+  Conversation oversight;
+- old active-snapshot fallback for `.ralph/skills/handoff` and
+  `.ralph/skills/execute`; and
+- separately named project-local `design-legacy` and `spec-it-out-legacy`
+  authoring assets that preserve current-main legacy authoring without
+  mechanically duplicating neutral or shared Markdown.
 
-For each bundle, merge specification/requirements into Description and native
-acceptance criteria, the execution plan into Implementation Plan, durable
-execution history into Implementation Notes, and terminal outcome into Final
-Summary. Import true criteria in source order, retain legacy criterion IDs in
-text, and set checked state only where source evidence supports it. Record the
-pre-cutover commit and every source path; rely on Git history for verbatim
-bytes. Add references rather than guessing hierarchy when ownership is not
-one-to-one.
+Persisted ownership decides routing before prompt-tag absence. A valid ownership
+version 1 record selects the legacy workflow and a valid ownership version 2
+record selects the task-native workflow. `<operator-episode-task>` is only a
+candidate task binding when ownership does not decide. Active plan placement
+alone is not live Episode identity; a live ownership version 1 Episode requires
+persisted ownership plus active files in that Episode worktree. Legacy workflow
+execute completion wording cannot claim or mutate task-native Backlog lifecycle
+authority.
 
-Migrate all existing `To Do` tasks after the new statuses are available:
-meaningful native plan → `In Planning`; otherwise → `In Design`, unless stronger
-recorded evidence establishes another state. Explicitly treat
-`PRIMECLAW-10.37` as `Done` because its three implementation children and landed
-product evidence are complete. For `PRIMECLAW-7.6`, verify the recorded accepted
-candidate/branch at cutover: use `Ready for Merge` only if that exact pending
-merge state remains true; otherwise use `Blocked` with the exact recovery
-condition rather than pretending it is unstarted. Preserve the existing blocked
-Phase 3 tasks. Remove `To Do` from final config only after proving no active task
-still uses it.
+Project-local `.prime-claw/workflows` files are runtime surfaces. Plugin-root
+copies are delivery sources installed or reconciled into projects. Inventory,
+initialization, reconciliation, and tests must preserve that distinction.
 
-Move successful historical epics to `backlog/completed/` only through
-`backlog task complete`; keep current `Done` work on the active board unless it
-is part of this explicit one-time history cleanup. Put no existing bundle in
-`backlog/archive/`. Finally import this plan and implementation evidence into
-`PRIMECLAW-10.38`, then delete the entire tracked `.ralph/plans` tree.
+No code, skill, template, test, asset, status, configuration, plan placement,
+or cutover mutation is authorized by this specification-only reconciliation.
+Remaining implementation is split into the three ordered slices below.
 
-### 6. Prove the cutover and leave a reviewable candidate
+### 5. Preserve compatibility and resolve workflow mode
 
-- Add representative disposable-repository fixtures for status migration,
-  one-epic-per-bundle mapping, ordered and checked legacy criteria, immutable
-  IDs/parents, provenance, completed history, partial/superseded Phase 3a,
-  ambiguous references, and absence of soft-deleted legacy work.
-- Run focused Node and Python suites for reviewed task planning, Episode
-  admission and failure recovery, ownership, multi-pass handoff, blocked/resume,
-  final review/integration, delay/change/merge/Done, abandonment, finalization,
-  project initialization, inventory, role policy, and user-story traces.
-- Run `git diff --check`, the host-safe repository suite, and the required
-  Docker-isolated plugin gate (`scripts/test-tier1.sh --probe`; run
-  `scripts/test-all.sh` when the environment supports the full accepted gate).
-  Never run a user-global candidate apply/check or unwrapped native mutation
-  probe.
-- Verify task parsing and counts through Backlog CLI; zero live `To Do`; final
-  status order/default; all preexisting IDs and parents unchanged; one epic per
-  unique bundle; required bidirectional references; no migrated bundle under
-  `backlog/archive/`; and no `.ralph/plans` path in the candidate tree.
-- Run a final tracked search. No live command, tool, skill, workflow, template,
-  test, or current doc may treat `.ralph/plans`, `/plan-spec`,
-  `/implement-spec`, `plan_spec`, or plan-folder ownership as authority.
-  Remaining literals must be explicitly historical or pre-cutover provenance.
-- Update `PRIMECLAW-10.38` on the Episode branch with Implementation Notes,
-  acceptance evidence/check state, references, and Final Summary while leaving
-  status unchanged. Commit and push reviewable slices. The Episode reports the
-  exact candidate for Conversation review; it does not mark status, merge,
-  finalize, clean resources, or apply the plugin globally.
+- Restore or retain the four named project-local legacy workflow assets and
+  their initialization/reconciliation inventory. Preserve customized instances
+  under the existing reconciliation rules.
+- Retain all six named legacy commands/tools, ownership version 1 parsing, and
+  legacy promotion, recovery, handoff, review, finalization, and cleanup paths.
+- Make execute, handoff, blocked handling, Expert review, and Conversation
+  oversight route from persisted ownership first. Ownership version 1 selects
+  the legacy workflow; ownership version 2 selects the task-native workflow.
+  Only when ownership does not decide may `<operator-episode-task>` become a
+  candidate task binding.
+- Require ownership plus active files in the Episode worktree for live
+  ownership version 1 Episode identity. Do not treat active plan placement
+  alone as identity. Retain old active-snapshot fallback for
+  `.ralph/skills/handoff` and `.ralph/skills/execute`.
+- Bound completion language by workflow: legacy workflow execution may record
+  its own result but must not claim or mutate task-native Backlog status,
+  completion, archival, finalization, or cleanup authority.
+- Add separately named project-local `design-legacy` and
+  `spec-it-out-legacy` assets by preserving the current-main legacy authoring
+  behavior and reusing neutral/shared Markdown rather than mechanically copying
+  it.
+- Treat project-local `.prime-claw/workflows` as runtime surfaces and plugin-root
+  copies as delivery sources. Prove initialization, reconciliation, inventory,
+  customization preservation, and both workflow routes through focused tests
+  and Docker-isolated plugin acceptance.
+
+Stop after a reviewable compatibility-preservation/mode-resolution candidate.
+Do not change this repository's status configuration, migrate remaining data,
+delete `.ralph/plans`, or perform cutover in the same slice.
+
+### 6. Cut over this repository's status, configuration, and data
+
+- Configure only this repository for the task-native workflow. Do not change the
+  generic plugin's legacy workflow support or infer another repository's mode
+  from its tracker.
+- Complete this repository's remaining status migration: meaningful native plan
+  means `In Planning`; no meaningful plan means `In Design`; stronger active,
+  blocked, ready, or done evidence remains authoritative. Preserve every ID and
+  parent. Remove active `To Do` configuration/guidance only after proving no
+  active task still uses it.
+- Update this repository's current guidance and task-native runtime surfaces to
+  exact Backlog identity and supported task fields. Backlog tracking may still
+  coexist with legacy bundles elsewhere.
+- Keep Beads migration optional and separate. A Beads-only repository
+  initializes the task-native workflow. Archive-only bundles do not select the
+  legacy workflow.
+- Validate exact status counts, unchanged identity/hierarchy, configuration,
+  current guidance, initialization selection, and the retained generic legacy
+  workflow. Stop before deleting this repository's `.ralph/plans` tree.
+
+### 7. Delete this repository's `.ralph/plans` tree and run final validation
+
+- Confirm every live repository-local specification, plan, progress, blocker,
+  and outcome needed by the task-native workflow is durable in Backlog tasks or
+  current documentation, then delete only this repository's tracked
+  `.ralph/plans` tree.
+- Scope final searches by workflow. Task-native surfaces and this repository's
+  current task-native guidance must reject legacy authority. Retained legacy
+  workflow surfaces may and must continue to use their legacy bundles,
+  commands, tools, ownership version 1, and compatibility assets. Historical
+  literals and frozen provenance remain truthful.
+- Prove both ownership parsers and routing precedence; live ownership version 1
+  identity requirements; candidate task binding only when ownership does not
+  decide; old active-snapshot fallback; bounded completion wording; separate
+  legacy authoring assets; runtime-versus-delivery-source behavior; and all
+  preserved operator boundaries.
+- Run focused Node and Python suites, task parsing/count checks,
+  `git diff --check`, the host-safe suite, and the required Docker-isolated
+  plugin gate. Never run a user-global candidate apply/check or an unwrapped
+  native mutation probe.
+- Update `PRIMECLAW-10.38` with final plan, notes, acceptance evidence,
+  references, modified files, and Final Summary while leaving lifecycle status
+  unchanged. Commit and push the candidate for Conversation review. Do not
+  merge, mark status, finalize ownership, or clean resources.
+
+Repository-local deletion completes this task's data cutover only. It does not
+retire generic legacy workflow support.
 
 ## Completion evidence
 
-The candidate is ready for Conversation review only when the task-native flows
-work end to end, the migration assertions and required Docker gate pass, the
-candidate task contains enough evidence to understand the result, the branch is
-clean and pushed, and `.ralph/plans` is absent. The owning Conversation then
-uses the `Ready for Merge` integration handshake and asks the operator for the
-separate merge decision.
+The candidate is ready for Conversation review only when all three remaining
+slices are complete: the generic plugin demonstrably preserves both workflows
+and resolves mode from persisted ownership; this repository's status,
+configuration, data, and current guidance use the task-native workflow; this
+repository's tracked `.ralph/plans` tree is absent; task-native searches reject
+legacy authority without breaking retained legacy workflow surfaces; required
+focused, host-safe, and Docker-isolated validation passes; and
+`PRIMECLAW-10.38` contains the complete evidence while remaining `In Progress`.
+The owning Conversation then performs the separate review, lifecycle, merge,
+finalization, and cleanup decisions.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -2298,4 +2299,12 @@ Do not run new dogfood, change lifecycle status, alter another mapping or conten
 Repaired the one accepted material finding against migration candidate `2ddd6dc45bbf47665354b6983e930daaa23e8f86` without running dogfood or changing lifecycle status. `PRIMECLAW-39` restored byte-for-byte (39856 bytes, SHA-256 `69cd72ccf3032710d84a0e8c77c7514cff110f820dffde83bd170b0f15b854b0`), retained its ID, null parent, filename, and `Done` status, and returned to `backlog/completed/primeclaw-39 - Historical-Compaction-first-phase-transitions.md` with criteria 3 and 4 checked and 1, 2, and 5 unchecked (2/5). `PRIMECLAW-37` restored byte-for-byte (44721 bytes, SHA-256 `fc5f8b0eeed910885393308388a05158425095288e2955d212740e57213031ef`), retained the same invariants, and returned to `backlog/completed/primeclaw-37 - Historical-Reviewed-future-plans-and-worktree-isolated-specification-episodes.md` with criteria 1–16 checked and deferred Slice 4 criteria 17–21 unchecked (16/21).
 
 Focused validation: `python3 -m pytest tests/test_backlog_workflow.py tests/test_backlog_build.py -q` → 7 passed. Exact criterion-state, identity, storage, bounded four-file diff, and `git diff --check` validation passed. No other mapping/content, asset, plan location, cutover, or unrelated cleanup changed.
+
+## Operator-approved compatibility-preservation scope correction
+
+Accepted repair candidate `b00d7bded447e4d303050dcaca0db444f91df308` and reconciled the authoritative specification without implementing behavior. `PRIMECLAW-10.38` now governs this repository's own `.ralph/plans` data cutover to the task-native workflow while the generic plugin retains the legacy workflow for other initialized repositories.
+
+The revised specification makes tracker migration and specification authority orthogonal; preserves the named legacy assets, commands, tools, ownership version 1, hybrid role routing, old active-snapshot fallback, separate legacy authoring assets, and runtime-versus-delivery-source distinction; makes persisted ownership decide routing before prompt-tag absence; and confines final plan-tree deletion to this repository. Remaining work is ordered as compatibility preservation and mode resolution, this repository's status/configuration/data cutover, then this repository's `.ralph/plans` deletion and final validation.
+
+This reconciliation changed only `PRIMECLAW-10.38`, `.ralph/plans/SPECIFICATION.md`, and `.ralph/plans/EXECUTION_PLAN.md`. It changed no code, skill, template, test, asset, status, configuration, plan placement, or cutover state. The task remains `In Progress` under `PRIMECLAW-10` with the same canonical path and ownership binding.
 <!-- SECTION:NOTES:END -->
