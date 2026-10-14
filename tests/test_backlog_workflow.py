@@ -25,6 +25,61 @@ LIFECYCLE_LIST = (
 )
 
 
+SYNTHETIC_STATUS_MIGRATION_FIXTURE = (
+    {
+        "id": "SYNTHETIC-1",
+        "parentTaskId": "SYNTHETIC-ROOT",
+        "path": "backlog/tasks/synthetic-1.md",
+        "status": "To Do",
+        "implementationPlan": "1. Make the bounded change.\n2. Verify the result.",
+    },
+    {
+        "id": "SYNTHETIC-2",
+        "parentTaskId": "SYNTHETIC-ROOT",
+        "path": "backlog/tasks/synthetic-2.md",
+        "status": "To Do",
+        "implementationPlan": None,
+    },
+    {
+        "id": "SYNTHETIC-3",
+        "parentTaskId": "SYNTHETIC-ROOT",
+        "path": "backlog/tasks/synthetic-3.md",
+        "status": "In Progress",
+        "implementationPlan": "Already executing.",
+    },
+    {
+        "id": "SYNTHETIC-4",
+        "parentTaskId": "SYNTHETIC-ROOT",
+        "path": "backlog/tasks/synthetic-4.md",
+        "status": "Blocked",
+        "implementationPlan": None,
+    },
+    {
+        "id": "SYNTHETIC-5",
+        "parentTaskId": "SYNTHETIC-ROOT",
+        "path": "backlog/tasks/synthetic-5.md",
+        "status": "Ready for Merge",
+        "implementationPlan": "Candidate complete.",
+    },
+    {
+        "id": "SYNTHETIC-6",
+        "parentTaskId": None,
+        "path": "backlog/completed/synthetic-6.md",
+        "status": "Done",
+        "implementationPlan": None,
+    },
+)
+
+
+def _apply_synthetic_status_migration(record: dict) -> dict:
+    """Apply the approved one-time cutover policy to synthetic records only."""
+    migrated = dict(record)
+    if record["status"] == "To Do":
+        plan = record["implementationPlan"]
+        migrated["status"] = "In Planning" if isinstance(plan, str) and plan.strip() else "In Design"
+    return migrated
+
+
 def normalized(path: Path) -> str:
     return " ".join(path.read_text().split())
 
@@ -99,6 +154,35 @@ def _task_frontmatter(path: Path) -> dict | None:
     _, raw, _ = text.split("---", 2)
     value = yaml.safe_load(raw)
     return value if isinstance(value, dict) else None
+
+
+def test_synthetic_status_migration_classifies_to_do_and_preserves_stronger_states() -> None:
+    before = {row["id"]: dict(row) for row in SYNTHETIC_STATUS_MIGRATION_FIXTURE}
+    after = {
+        row["id"]: _apply_synthetic_status_migration(row)
+        for row in SYNTHETIC_STATUS_MIGRATION_FIXTURE
+    }
+
+    assert {task_id: row["status"] for task_id, row in after.items()} == {
+        "SYNTHETIC-1": "In Planning",
+        "SYNTHETIC-2": "In Design",
+        "SYNTHETIC-3": "In Progress",
+        "SYNTHETIC-4": "Blocked",
+        "SYNTHETIC-5": "Ready for Merge",
+        "SYNTHETIC-6": "Done",
+    }
+    for task_id in before:
+        assert (
+            after[task_id]["id"],
+            after[task_id]["parentTaskId"],
+            after[task_id]["path"],
+        ) == (
+            before[task_id]["id"],
+            before[task_id]["parentTaskId"],
+            before[task_id]["path"],
+        )
+    for task_id in ("SYNTHETIC-3", "SYNTHETIC-4", "SYNTHETIC-5", "SYNTHETIC-6"):
+        assert after[task_id] == before[task_id]
 
 
 def test_repository_status_migration_receipt_and_live_data_are_consistent() -> None:

@@ -1692,3 +1692,15 @@ Repair only the acceptance-evidence gap:
 - Re-run focused validation, commit and push one clean repair candidate, then stop.
 
 Do not alter the actual migration receipt, actual task statuses, `backlog/config.yml`, or other accepted Step 6 data. Do not start Step 7, delete `.ralph/plans`, publish final lifecycle state, merge, finalize ownership, clean resources, or apply user-global assets.
+
+## Step 6 AC #13 synthetic-fixture repair completion
+
+Completed the bounded acceptance-evidence repair from pushed handoff `b06f823b6e94ed1cf442762eb3a0d76a73762486` without changing production behavior or accepted repository data.
+
+- `tests/test_backlog_workflow.py` now has one deterministic six-record synthetic migration fixture: meaningful-plan and planless `To Do` records plus representative `In Progress`, `Blocked`, `Ready for Merge`, and `Done` records.
+- The test-only policy application proves meaningful-plan `To Do` becomes `In Planning`, planless `To Do` becomes `In Design`, every ID/parent/path tuple remains exact, and each stronger-state record remains entirely unchanged.
+- Focused migration test: 7 passed.
+- Focused cutover/guidance/initialization/lifecycle validation: 41 passed, 8 deselected.
+- The actual migration receipt and `backlog/config.yml` remain byte-identical to candidate `8ef465d132231d35bdacef64627f4ec3162a43dd`; no actual task file, generic plugin source, vendored Backlog source, or production migration machinery changed.
+
+Step 7 remains unstarted. `.ralph/plans` stays active, `PRIMECLAW-10.38` remains `In Progress`, version-1 ownership remains active, and no final lifecycle publication, plan deletion, merge, finalization, cleanup, or user-global asset application occurred.
