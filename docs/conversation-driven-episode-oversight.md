@@ -233,8 +233,16 @@ text: active version-2 ownership forces task mode for the exact owner
 Conversation even without a task block, while an Episode or foreign owner fails
 closed and can never enter folder fallback. A task block is only a candidate
 binding that must match ownership. Task mode uses the accepted report and never
-falls back to `.ralph/plans`; retained version-1 compatibility folder blocking and restoration remain
-unchanged when no version-2 record or task block exists.
+falls back to `.ralph/plans`.
+
+Persisted active version-1 ownership keeps its specification/plan pair active
+while blocked and throughout candidate review or revision. An older blocked
+snapshot with no active pair is not live: only after an explicit operator
+unblock decision may the blocked skill call `restore_blocked_spec_episode` for
+the exact owned future folder. The tool restores the exact readable pair from
+the recorded worktree with no clobber or mode fallback and revalidates the same
+active identity before continuation. No-ownership old in-place blocking
+remains a separate legacy behavior.
 
 After resumed `In Progress` publication, `finalize_task_episode` invokes the same guarded task handoff transport for ordinary continuation.
 Before delivery it proves canonical primary-main caller context, exact owner and
@@ -391,7 +399,10 @@ proven absent and closes last. No other action implies cleanup.
 
 After the operator's terminal decision has been carried out and verified,
 `finalize_spec_episode(location)` changes only the exact active version-1
-ownership record to `inactive`. It performs no Git operation, merge,
-abandonment, session stop, worktree removal, branch deletion, or cleanup. An
-identical close replay is idempotent. Owner, location, and nonterminal-state
-mismatches fail closed.
+ownership record to `inactive`. The active plan pair remains in place until that
+close succeeds. The tool performs no Git operation, plan archival, merge,
+abandonment, session stop, worktree removal, branch deletion, or cleanup. Any
+legacy plan archival requires separate explicit post-terminal authority. This
+repair adds no archival tool, so the plans remain until a later action is
+approved. An identical close replay is idempotent. Owner, location, and
+nonterminal-state mismatches fail closed.

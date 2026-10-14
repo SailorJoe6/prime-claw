@@ -30,9 +30,12 @@ implicitly performs cleanup.
 `finalize_spec_episode(location)` remains the bookkeeping-only close for an
 exact matching active folder Episode. It changes the version-1 ownership record
 to `inactive`; identical replay is idempotent, while missing, mismatched,
-`provisioning`, or `uncertain` ownership blocks closure. It performs no Git
-operation, merge, abandonment, session termination, worktree or branch removal,
-or destructive cleanup.
+`provisioning`, or `uncertain` ownership blocks closure. The active plan pair is
+retained until that close succeeds. It performs no Git operation, plan archival,
+merge, abandonment, session termination, worktree or branch removal, or
+destructive cleanup. Legacy archival requires separate explicit post-terminal
+authority; this repair adds no archival tool, so the plans remain until a later
+action is approved.
 
 ## Primary implementation surfaces
 

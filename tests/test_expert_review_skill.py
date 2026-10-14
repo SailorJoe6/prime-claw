@@ -39,6 +39,8 @@ def test_expert_skill_accepts_normal_context_and_preserves_review_judgment() -> 
         "A task tag is only a candidate when ownership does not decide",
         "old in-place folder review without creating live Episode identity",
         "live version-1 Episode requires persisted version-1 ownership plus those active files",
+        "active pair remains the review contract through candidate review and any bounded revision",
+        "exact version-1 blocked recovery path rather than task-native fallback",
         "cannot claim or mutate task-native Backlog status, completion, archival, finalization, or cleanup authority",
     ):
         assert required in text

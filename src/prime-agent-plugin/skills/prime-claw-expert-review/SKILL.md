@@ -34,7 +34,10 @@ a complete active legacy `SPECIFICATION.md` plus `IMPLEMENTATION_PLAN.md` pair
 on canonical main (including the retained `EXECUTION_PLAN.md` spelling) selects
 old in-place folder review without creating live Episode identity. A live
 version-1 Episode requires persisted version-1 ownership plus those active files
-in its recorded Episode worktree; placement alone is not identity.
+in its recorded Episode worktree; placement alone is not identity. The active
+pair remains the review contract through candidate review and any bounded
+revision. Missing active files are not reviewable live identity and require the
+exact version-1 blocked recovery path rather than task-native fallback.
 
 - For a task-native candidate, bind the review to the exact Backlog task ID and
   project-relative task path at the candidate commit. Reload it through the

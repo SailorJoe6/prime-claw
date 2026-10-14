@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -9,6 +9,7 @@ import {
   CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit, PrimeSessionPublisher,
   EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
   allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
+  restoreBlockedSpecEpisode,
   handoffTaskEpisode, publishTaskEpisodeBlocked, publishTaskEpisodeResumed,
   publishTaskEpisodeReadyForMerge, integrateTaskEpisodeReadyForMerge,
   verifyTaskEpisodeReadyForMerge, delayTaskEpisodeReadyForMerge,
@@ -331,6 +332,111 @@ test("legacy active replay and handoff require the promoted active plan pair", a
   handoff.orca.showWorktree=async()=>({...handoff.wt,id:active.worktreeId,identity:active.worktreeIdentity,path:active.worktree,branch:active.branch,projectSetupId:active.projectSetupId,head:active.head});
   await assert.rejects(handoffSpecEpisode(LOCATION,"resume",handoff.ctx,handoff.deps),/ownership is not live.*active specification and implementation plan/);
   assert.equal(handoff.calls.some(call=>["reopen","handoff"].includes(call[0])),false);
+});
+
+function useDiskLegacyGate(f) {
+  f.filesystem.hasActiveLegacyPlanFiles = (worktree) => existsSync(join(worktree,".ralph/plans/SPECIFICATION.md"))
+    && (existsSync(join(worktree,".ralph/plans/IMPLEMENTATION_PLAN.md")) || existsSync(join(worktree,".ralph/plans/EXECUTION_PLAN.md")));
+}
+function writeBlockedLegacyPair(f, planName = "EXECUTION_PLAN.md") {
+  const blocked=join(f.worktree,".ralph/plans/blocked");mkdirSync(blocked,{recursive:true});
+  writeFileSync(join(blocked,"SPECIFICATION.md"),"blocked spec\n");
+  writeFileSync(join(blocked,planName),"recorded blocker and unblock condition\n");
+}
+function writeActiveLegacyPair(f) {
+  const plans=join(f.worktree,".ralph/plans");mkdirSync(plans,{recursive:true});
+  writeFileSync(join(plans,"SPECIFICATION.md"),"active spec\n");
+  writeFileSync(join(plans,"EXECUTION_PLAN.md"),"active plan\n");
+}
+
+test("operator-cleared blocked pair restores and continues the same version-one Episode", async () => {
+  const f=harness();await createApproved(f);f.calls.length=0;useDiskLegacyGate(f);writeBlockedLegacyPair(f);
+  const identity=structuredClone(f.record);
+  const restored=await restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps);
+  assert.equal(restored.restored,true);assert.equal(restored.episodeId,identity.episodeId);assert.equal(restored.worktree,identity.worktree);
+  assert.equal(existsSync(join(f.worktree,".ralph/plans/SPECIFICATION.md")),true);
+  assert.equal(existsSync(join(f.worktree,".ralph/plans/EXECUTION_PLAN.md")),true);
+  assert.deepEqual(f.record,identity);
+
+  const continued=await handoffSpecEpisode(LOCATION,"operator accepted the recorded unblock",f.ctx,f.deps);
+  assert.equal(continued.episodeId,identity.episodeId);assert.equal(continued.episodeActiveSessionId,identity.episodeActiveSessionId);
+  assert.deepEqual(f.record,identity);
+  assert.equal(f.calls.filter(call=>call[0]==="handoff").length,1);
+  assert.equal(f.calls.some(call=>["fresh","reopen","execute","promote","local-create","orca-create","ownership"].includes(call[0])),false);
+});
+
+test("completed version-one candidate remains live through review and bounded revision handoff", async () => {
+  const f=harness();await createApproved(f);f.calls.length=0;useDiskLegacyGate(f);writeActiveLegacyPair(f);
+  const identity=structuredClone(f.record), plan=join(f.worktree,".ralph/plans/EXECUTION_PLAN.md");
+  appendFileSync(plan,"candidate completed; active for review\n");
+  const accepted=await handoffSpecEpisode(LOCATION,"accepted candidate advance",f.ctx,f.deps);
+  appendFileSync(plan,"accepted bounded review revision\n");
+  const revised=await handoffSpecEpisode(LOCATION,"implement accepted revision",f.ctx,f.deps);
+  assert.equal(accepted.episodeId,identity.episodeId);assert.equal(revised.episodeId,identity.episodeId);
+  assert.equal(accepted.episodeActiveSessionId,identity.episodeActiveSessionId);assert.equal(revised.episodeActiveSessionId,identity.episodeActiveSessionId);
+  assert.deepEqual(f.record,identity);
+  assert.equal(f.calls.filter(call=>call[0]==="handoff").length,2);
+  assert.equal(f.calls.some(call=>["fresh","execute","promote","local-create","orca-create","ownership"].includes(call[0])),false);
+});
+
+test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, and collisions", async (t) => {
+  await t.test("explicit operator decision is required before mutation",async()=>{
+    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,false,f.ctx,f.deps),/explicit unblock decision/);
+    assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
+  });
+  await t.test("missing ownership never falls through",async()=>{
+    const f=harness();useDiskLegacyGate(f);writeBlockedLegacyPair(f);
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/No durable episode ownership/);
+  });
+  await t.test("version two ownership never enters folder recovery",async()=>{
+    const f=harness();f.ownership.write(f.root,activeTaskRecord(f));useDiskLegacyGate(f);writeBlockedLegacyPair(f);
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/task-native episode ownership conflicts/);
+  });
+  await t.test("foreign owner and inactive ownership fail closed",async()=>{
+    const foreign=harness();await createApproved(foreign);useDiskLegacyGate(foreign);writeBlockedLegacyPair(foreign);foreign.ownership.write(foreign.root,{...foreign.record,ownerSessionId:"other"});
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,foreign.ctx,foreign.deps),/ownerSessionId/);
+    const inactive=harness();await createApproved(inactive);useDiskLegacyGate(inactive);writeBlockedLegacyPair(inactive);inactive.ownership.write(inactive.root,{...inactive.record,status:"inactive"});
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,inactive.ctx,inactive.deps),/requires active version-1 ownership/);
+  });
+  await t.test("worktree mismatch fails before moving files",async()=>{
+    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);f.git.entries=[{path:f.root,branch:"main"}];
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/missing or different worktree/);
+    assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
+  });
+  await t.test("canonical-main and Orca identity drift fail before moving files",async()=>{
+    const wrongBranch=harness();await createApproved(wrongBranch);useDiskLegacyGate(wrongBranch);writeBlockedLegacyPair(wrongBranch);wrongBranch.git.branch=()=>"feature";
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,wrongBranch.ctx,wrongBranch.deps),/canonical primary main checkout/);
+    const wrongOrca=harness();await createApproved(wrongOrca);useDiskLegacyGate(wrongOrca);writeBlockedLegacyPair(wrongOrca);wrongOrca.orca.showWorktree=async()=>({...wrongOrca.wt,identity:"foreign"});
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,wrongOrca.ctx,wrongOrca.deps),/Orca worktree identity/);
+    assert.equal(existsSync(join(wrongOrca.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
+  });
+  await t.test("incomplete or empty blocked pair is rejected",async()=>{
+    const incomplete=harness();await createApproved(incomplete);useDiskLegacyGate(incomplete);const blocked=join(incomplete.worktree,".ralph/plans/blocked");mkdirSync(blocked,{recursive:true});writeFileSync(join(blocked,"SPECIFICATION.md"),"blocked spec\n");
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,incomplete.ctx,incomplete.deps),/exactly one implementation plan/);
+    const empty=harness();await createApproved(empty);useDiskLegacyGate(empty);writeBlockedLegacyPair(empty);writeFileSync(join(empty.worktree,".ralph/plans/blocked/EXECUTION_PLAN.md"),"");
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,empty.ctx,empty.deps),/readable non-empty regular specification/);
+  });
+  await t.test("ambiguous plan spelling is rejected",async()=>{
+    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);writeFileSync(join(f.worktree,".ralph/plans/blocked/IMPLEMENTATION_PLAN.md"),"second plan\n");
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/exactly one implementation plan/);
+  });
+  await t.test("symlinked blocked input is rejected",async()=>{
+    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);unlinkSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md"));symlinkSync(join(f.root,".ralph/plans/future/alpha/SPECIFICATION.md"),join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md"));
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/readable non-empty regular specification/);
+  });
+  await t.test("symlinked lifecycle directory is rejected",async()=>{
+    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);const blocked=join(f.worktree,".ralph/plans/blocked"), external=join(f.root,"external-blocked");rmSync(blocked,{recursive:true,force:true});mkdirSync(external);writeFileSync(join(external,"SPECIFICATION.md"),"blocked spec\n");writeFileSync(join(external,"EXECUTION_PLAN.md"),"blocked plan\n");symlinkSync(external,blocked,"dir");
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/real in-worktree lifecycle directories/);
+    assert.equal(existsSync(join(external,"SPECIFICATION.md")),true);
+  });
+  await t.test("active destination collision is rejected without overwrite",async()=>{
+    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);const activeSpec=join(f.worktree,".ralph/plans/SPECIFICATION.md");mkdirSync(join(f.worktree,".ralph/plans"),{recursive:true});writeFileSync(activeSpec,"partial active spec\n");
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/destination collision or partial active pair/);
+    assert.equal(readFileSync(activeSpec,"utf8"),"partial active spec\n");
+    assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
+    assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/EXECUTION_PLAN.md")),true);
+  });
 });
 
 test("task-native handoff continues the exact idle Episode with task-bound handoff and execute", async () => {

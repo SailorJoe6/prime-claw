@@ -20,6 +20,7 @@ import {
   publishTaskEpisodeReadyForMerge,
   publishTaskEpisodeResumed,
   resolveTaskEpisodePlacement,
+  restoreBlockedSpecEpisode,
   resumeTaskEpisodeChangesRequested,
   verifyTaskEpisodeReadyForMerge,
   CliGitAdapter,
@@ -305,6 +306,7 @@ const DEFAULT_TASK_ACTIONS: TaskEpisodePublicActions = {
 
 type ReviewedPlanDependencies = EpisodeDependencies & TaskEpisodeCreationDependencies & TaskEpisodeReadyForMergeDependencies & {
   createEpisode?: typeof createSpecEpisode;
+  restoreBlockedEpisode?: typeof restoreBlockedSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
   taskResolver?: typeof resolveBacklogTask;
   taskImplementationApprovals?: TaskImplementationApprovalStore;
@@ -769,7 +771,8 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       promptGuidelines: [
         "Call finalize_spec_episode only after the operator's conversational terminal decision has been carried out and verified for this exact owned episode.",
         "Pass only the exact retained future-folder location used to create the owned episode.",
-        "This is a no-UI bookkeeping close. It performs no Git, merge, abandonment, session, worktree, branch, or cleanup action.",
+        "This is a no-UI bookkeeping close. It performs no Git, merge, abandonment, session, worktree, branch, plan archival, or cleanup action.",
+        "Keep the active legacy plan pair in place until this bookkeeping close succeeds; plan archival is outside this tool and this repair and requires separate explicit post-terminal legacy authority.",
         "An identical replay is idempotent; any owner, location, identity, or state mismatch remains a blocker.",
       ],
       executionMode: "sequential",
@@ -883,12 +886,48 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     });
 
     pi.registerTool({
+      name: "restore_blocked_spec_episode",
+      label: "Restore blocked specification episode",
+      description: "After the operator explicitly clears the recorded blocker, restore only the exact blocked plan pair for the persisted active version-1 Episode and revalidate its same worktree identity.",
+      promptSnippet: "Restore one exact operator-cleared blocked version-1 Episode plan pair",
+      promptGuidelines: [
+        "Call restore_blocked_spec_episode only after the operator explicitly decides that the recorded unblock condition is satisfied.",
+        "Pass only the exact retained future-folder location already bound by active version-1 ownership and set confirmedUnblocked true; never search, infer another Episode, or use this for version 2.",
+        "The host requires the canonical primary main Conversation, exact owner, active version-1 record, recorded worktree and branch, absent active pair, one unambiguous readable regular blocked pair, and collision-free destinations.",
+        "A successful restore re-reads unchanged ownership and revalidates live active identity. Only then may ordinary handoff continue the same Episode; never create, promote, or fall through to task-native mode.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          location: { type: "string", description: "Exact .ralph/plans/future/<slug> folder owned by the blocked version-1 Episode" },
+          confirmedUnblocked: { type: "boolean", description: "True only after the operator explicitly accepts the recorded unblock condition" },
+        },
+        required: ["location", "confirmedUnblocked"],
+        additionalProperties: false,
+      } as any,
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        try {
+          const restoreEpisode = dependencies?.restoreBlockedEpisode ?? restoreBlockedSpecEpisode;
+          const result = await restoreEpisode(params.location, params.confirmedUnblocked, ctx, dependencies);
+          return {
+            content: [{ type: "text", text: `Blocked Episode plan pair restored for ${result.sourceLocation}. Active identity was revalidated in the same recorded worktree; ordinary handoff may now continue that Episode.` }],
+            details: result,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { content: [{ type: "text", text: `Blocked Episode restore failed: ${message}` }], details: { error: message }, isError: true };
+        }
+      },
+    });
+
+    pi.registerTool({
       name: "handoff_spec_episode",
       label: "Hand off specification episode",
-      description: "Continue one exact owned idle episode after its owner accepts an in-scope advance or recorded revision: run canonical handoff, then queue canonical execute as its sole follow-up.",
+      description: "Continue one exact owned idle episode after its owner accepts an in-scope advance, recorded revision, or operator-cleared blocked recovery whose active identity was revalidated: run canonical handoff, then queue canonical execute as its sole follow-up.",
       promptSnippet: "Hand off an exact owned Ralph episode and queue its next execute pass",
       promptGuidelines: [
-        "Call handoff_spec_episode only when this exact owner has selected advance after candidate acceptance or revise from accepted findings already recorded inside the approved scope; no new operator transport request is required.",
+        "Call handoff_spec_episode only when this exact owner has selected advance after candidate acceptance, revise from accepted findings already recorded inside the approved scope, or continuation after the operator accepted the exact recorded unblock and the restored active version-1 plan identity was revalidated; no new operator transport request is required.",
         "Pass handoff_spec_episode the exact retained future-folder location used to create that episode; never search for or infer another episode.",
         "Pass only optional operator focus or a bounded compaction-focus synthesis of the accepted recorded in-scope findings; never route arbitrary chat, unaccepted findings, product decisions, or scope expansion.",
         "Never call handoff_spec_episode for consult, pause, merge, abandonment, cleanup, or another episode; those boundaries retain their existing operator authority.",

@@ -72,6 +72,7 @@ def test_retained_legacy_entry_surfaces_and_snapshot_fallback_remain_bounded() -
         'command: "plan-spec"', 'command: "implement-spec"',
         'name: "plan_spec"', 'name: "create_spec_episode"',
         'name: "handoff_spec_episode"', 'name: "finalize_spec_episode"',
+        'name: "restore_blocked_spec_episode"',
     ):
         assert surface in extension
     workflow_chain = (ROOT / "src/prime-agent-plugin/extension-support/workflow-chain.ts").read_text()

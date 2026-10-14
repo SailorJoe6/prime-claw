@@ -93,10 +93,14 @@ merge, mark `Ready for Merge` or `Done`, finalize ownership, or clean resources.
 ## Retained folder-plan mode
 
 Use the active `.ralph/plans/SPECIFICATION.md` with its retained
-`.ralph/plans/EXECUTION_PLAN.md` or `.ralph/plans/IMPLEMENTATION_PLAN.md`. The plan describes the
-implementation steps for the specification. If those files are absent and this
-is not a recorded live version-1 Episode, use clear operator-provided legacy
-instructions as the plan; ask only when no plan or direction exists.
+`.ralph/plans/EXECUTION_PLAN.md` or `.ralph/plans/IMPLEMENTATION_PLAN.md`. The
+plan describes the implementation steps for the specification. A persisted
+version-1 record with a missing active pair must stop and use only
+`restore_blocked_spec_episode` after the operator's explicit unblock decision;
+execute cannot use chat instructions or any fallback before successful
+live-identity revalidation. Only when no persisted ownership exists may clear
+operator-provided legacy instructions serve as the plan; ask only when no plan
+or direction exists.
 
 There may be Backlog.md tasks related to the plan. They are references, not
 lifecycle authority for this compatibility workflow. Audit existing work before
@@ -105,16 +109,23 @@ Backlog task's status, mark it `Done` or `Blocked`, complete or archive it,
 finalize task-native ownership, or clean task-native resources from retained
 folder-plan mode.
 
-If no implementation remains, ensure the finished behavior is documented under
-`docs/`. The retained workflow may archive its own specification and execution
-plan under `.ralph/plans/archive/` and update that legacy archive index. That
-legacy plan archival does not claim Backlog status, completion, archival,
-finalization, or cleanup authority.
+For persisted active version-1 ownership, keep both active plan files in
+`.ralph/plans/` while work is blocked and throughout candidate review or
+revision. If no implementation remains, ensure the finished behavior is
+documented under `docs/`, leave the active pair in place, and report the
+candidate for Conversation review. Do not archive or move either file until the
+operator's terminal decision has been carried out and the exact ownership
+record is inactive. For a blocker that a bounded attempt cannot clear, record
+the exact blocker and unblock condition in the active execution plan, leave the
+pair active, report the resumable checkpoint, and stop without a Backlog
+lifecycle mutation.
 
-For a blocker that a bounded attempt cannot clear, record the exact blocker and
-unblock condition in the execution plan, move only the legacy plan documents to
-`.ralph/plans/blocked/`, report the resumable checkpoint, and stop without a
-Backlog lifecycle mutation.
+With no ownership, preserve the old in-place folder workflow. It may archive
+its finished specification and execution plan under `.ralph/plans/archive/`
+and update that legacy archive index, or move only its blocked plan pair to
+`.ralph/plans/blocked/`. Those legacy file transitions do not create Episode
+identity or claim Backlog status, completion, archival, finalization, or cleanup
+authority.
 
 ## One bounded implementation slice
 

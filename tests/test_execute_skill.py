@@ -102,6 +102,15 @@ def test_task_native_execute_retains_folder_episode_compatibility() -> None:
         "`.ralph/plans/EXECUTION_PLAN.md`",
         "`.ralph/plans/archive/`",
         "`.ralph/plans/blocked/`",
+        "keep both active plan files in `.ralph/plans/` while work is blocked",
+        "throughout candidate review or revision",
+        "leave the active pair in place",
+        "until the operator's terminal decision has been carried out and the exact ownership record is inactive",
+        "With no ownership, preserve the old in-place folder workflow",
+        "persisted version-1 record with a missing active pair must stop",
+        "use only `restore_blocked_spec_episode` after the operator's explicit unblock decision",
+        "execute cannot use chat instructions or any fallback before successful live-identity revalidation",
+        "Only when no persisted ownership exists may clear operator-provided legacy instructions serve as the plan",
     ):
         assert fragment in text
 
@@ -111,11 +120,14 @@ def test_task_native_execute_retains_folder_episode_compatibility() -> None:
         "Never change a Backlog task's status",
         "mark it `Done` or `Blocked`",
         "finalize task-native ownership",
-        "legacy plan archival does not claim Backlog status, completion, archival, finalization, or cleanup authority",
+        "legacy file transitions do not create Episode identity or claim Backlog status, completion, archival, finalization, or cleanup authority",
         "stop without a Backlog lifecycle mutation",
     ):
         assert fragment in legacy
-    for forbidden in ("backlog task complete", "backlog task archive"):
+    for forbidden in (
+        "backlog task complete", "backlog task archive",
+        "if those files are absent and this is not a recorded live version-1 episode",
+    ):
         assert forbidden not in legacy.lower()
 
 

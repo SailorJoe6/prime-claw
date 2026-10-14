@@ -13,8 +13,10 @@ candidate when ownership does not decide and never overrides a record.
 For retained version 1 folder ownership, require readable, non-empty active
 `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files in the recorded Episode
 worktree, accepting the retained `EXECUTION_PLAN.md` spelling. Placement alone
-is not live Episode identity. Keep the approved specification and plan, use only
-legacy `handoff_spec_episode` and `finalize_spec_episode` paths, and never claim
+is not live Episode identity. Keep that pair active through blocking, candidate
+review, and revision. A missing pair uses only exact operator-authorized
+version-1 recovery; it is never live and never switches modes. Use only legacy
+`handoff_spec_episode` and `finalize_spec_episode` paths, and never claim
 or mutate task-native Backlog status, completion, archival, finalization, or
 cleanup authority. With no ownership, active legacy files on canonical main are
 old in-place work, not an Episode, so this owned-Episode skill must stop.

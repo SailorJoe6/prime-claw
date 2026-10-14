@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -39,7 +39,7 @@ function fixture({ status = "active", owner = "owner", taskNative = false, legac
   };
   const ctx = { cwd: root, sessionManager: { getSessionId: () => "owner" } };
   registerConversationOversight(pi, { guideRoot });
-  return { root, events, tools, sent, ctx };
+  return { root, worktree, events, tools, sent, ctx };
 }
 
 test("oversight registers no activation or readiness tools", () => {
@@ -76,6 +76,19 @@ test("legacy ownership without active worktree files does not claim live oversig
   const f=fixture({legacyFiles:false});
   await f.events.get("session_compact")({type:"session_compact",compactionEntry:{id:"missing"}},f.ctx);
   assert.deepEqual(f.sent,[]);
+});
+
+test("completed legacy candidate remains the same live Episode through review and revision", async () => {
+  const f=fixture(), plan=join(f.worktree,".ralph/plans/EXECUTION_PLAN.md"), compact=f.events.get("session_compact");
+  appendFileSync(plan,"candidate ready for review\n");
+  await compact({type:"session_compact",compactionEntry:{id:"candidate"}},f.ctx);
+  appendFileSync(plan,"accepted bounded revision\n");
+  await compact({type:"session_compact",compactionEntry:{id:"revision"}},f.ctx);
+  assert.equal(f.sent.length,2);
+  assert.deepEqual(f.sent.map(({message})=>message.details),[
+    {sourceLocation:".ralph/plans/future/alpha",episodeId:"episode"},
+    {sourceLocation:".ralph/plans/future/alpha",episodeId:"episode"},
+  ]);
 });
 
 test("no ownership plus canonical-main legacy files remains old in-place work, not an Episode", async () => {

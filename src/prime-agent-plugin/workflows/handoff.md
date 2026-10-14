@@ -13,8 +13,10 @@ not proof that ownership is absent.
 Version-1 ownership selects retained folder-plan handoff. Require readable,
 non-empty active `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files in the
 recorded Episode worktree for live version-1 Episode identity, accepting the
-retained `EXECUTION_PLAN.md` spelling used by this project. If they are absent,
-stop for exact recovery. Version-2 ownership selects task-native handoff and
+retained `EXECUTION_PLAN.md` spelling used by this project. If they are absent, stop for
+exact version-1 blocked-pair recovery through the `blocked` workflow; missing
+files are never live identity and never fall through to task-native mode.
+Version-2 ownership selects task-native handoff and
 binds its exact task ID and path. If an `<operator-episode-task>` block is also
 present, require its entire trimmed value to match that persisted task ID. A
 prompt tag never overrides persisted ownership.
@@ -47,7 +49,9 @@ content across checkouts. The owning Conversation alone publishes lifecycle
 status on main.
 
 In retained folder-plan handoff, ensure the active specification and plan
-contain the context needed to resume cleanly. Related Backlog tasks are
+contain the context needed to resume cleanly. Persisted active version-1
+ownership keeps that pair active through blockers, candidate review, and
+revisions; handoff must not archive or move it. Related Backlog tasks are
 references only; do not mutate their status, completion, archival,
 finalization, or cleanup state. Never mix the two modes or copy content between
 their authorities.

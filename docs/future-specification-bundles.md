@@ -144,10 +144,23 @@ separate operator authority.
 ## Retained version-1 completion
 
 The Conversation reviews evidence and may accept, request a bounded in-scope
-revision, pause, or consult the operator. Accepted continuation uses canonical
-handoff followed by one execute follow-up. After verified terminal work,
-`finalize_spec_episode` changes only ownership bookkeeping to `inactive`. It
-does not clean up resources or decide merge/abandonment.
+revision, pause, or consult the operator. Persisted active version-1 ownership
+keeps the promoted specification and plan active through blockers, candidate
+review, and every bounded revision. Accepted continuation uses canonical
+handoff followed by one execute follow-up.
+
+An older already-blocked version-1 snapshot is not live. After the operator
+explicitly accepts its recorded unblock condition, the blocked skill calls
+`restore_blocked_spec_episode` for the exact owned future folder. The tool
+restores only the exact readable pair in the ownership record's worktree, then
+revalidates the same active Episode identity before continuation. Missing or
+ambiguous files never select task-native mode.
+
+After verified terminal work, `finalize_spec_episode` changes only ownership
+bookkeeping to `inactive`. It does not archive plans, clean up resources, or
+decide merge/abandonment. Any retained-folder archival requires separate explicit legacy authority after
+that successful terminal close. This repair adds no archival tool, so the plans
+remain in place until such a later action is approved.
 
 
 ## Validation policy

@@ -107,9 +107,12 @@ read-only fallback to the corresponding legacy `.ralph/skills/{handoff,execute}`
 bytes, so an old-layout active Episode can finish without policy migration. The implementation has an injected activity seam for the one minimal ownership
 record and a bounded reader that scans the current Git worktree set to find that
 record in the canonical project checkout when startup occurs inside a linked
-Episode worktree. Linked-worktree enumeration or identity
-uncertainty fails closed and reports a degraded skip. Reset, override acceptance,
-and review-start mutations use the same protection.
+Episode worktree. Live version-1 activity also requires its readable active plan
+pair. An older blocked-only pair is uncertain until the exact
+operator-authorized restore revalidates that same recorded worktree; the
+reconciler never restores it or selects another mode. Linked-worktree
+enumeration or identity uncertainty fails closed and reports a degraded skip.
+Reset, override acceptance, and review-start mutations use the same protection.
 
 ## Customized-template review
 

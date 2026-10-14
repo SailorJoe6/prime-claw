@@ -36,6 +36,13 @@ messaging, it verifies:
 - durable Prime Agent session ID/file; and
 - a quiescent Episode with no active turn, tool, compaction, child, or queue.
 
+Persisted active version-1 ownership keeps that plan pair active through
+blockers, candidate review, and bounded revisions, so ordinary continuation
+never archives or moves it. If an older blocked snapshot has no active pair,
+handoff stops: only the operator-authorized exact version-1 recovery in the
+blocked workflow may restore the recorded worktree's pair and revalidate live
+identity. Missing files never fall through to task-native continuation.
+
 If the active route is stale, Prime Claw reopens the durable session file at the
 recorded worktree CWD and persists the refreshed `activeSessionId`. Terminal
 handles are also refreshable and never replace durable identity.

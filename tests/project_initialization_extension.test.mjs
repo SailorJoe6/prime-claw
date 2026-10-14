@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, lstatSync, symlinkSync, unlinkSync, realpathSync, cpSync, rmSync, statSync } from "node:fs";
+import { appendFileSync, chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, lstatSync, renameSync, symlinkSync, unlinkSync, realpathSync, cpSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -221,6 +221,26 @@ test("legacy Episode identity requires version-one ownership plus active worktre
   unlinkSync(join(plans,"IMPLEMENTATION_PLAN.md"));writeFileSync(join(plans,"EXECUTION_PLAN.md"),"retained execution spelling\n");
   assert.equal(hasActiveLegacyPlanFiles(worktree),true);
   assert.equal(episodeWorktreeActivity(worktree,"linked-worktree",new Runner()),"active");
+
+  const identityBefore=readFileSync(ownership,"utf8"), blocked=join(plans,"blocked");mkdirSync(blocked);
+  renameSync(join(plans,"SPECIFICATION.md"),join(blocked,"SPECIFICATION.md"));
+  renameSync(join(plans,"EXECUTION_PLAN.md"),join(blocked,"EXECUTION_PLAN.md"));
+  assert.equal(hasActiveLegacyPlanFiles(worktree),false);
+  assert.equal(episodeWorktreeActivity(worktree,"linked-worktree",new Runner()),"uncertain");
+
+  // Exact operator-authorized blocked-pair restoration revives only this same Episode.
+  renameSync(join(blocked,"SPECIFICATION.md"),join(plans,"SPECIFICATION.md"));
+  renameSync(join(blocked,"EXECUTION_PLAN.md"),join(plans,"EXECUTION_PLAN.md"));
+  assert.equal(hasActiveLegacyPlanFiles(worktree),true);
+  assert.equal(episodeWorktreeActivity(worktree,"linked-worktree",new Runner()),"active");
+  assert.equal(readFileSync(ownership,"utf8"),identityBefore);
+
+  // Candidate review and a bounded revision retain the active pair and identity.
+  appendFileSync(join(plans,"EXECUTION_PLAN.md"),"candidate ready for review\n");
+  assert.equal(episodeWorktreeActivity(worktree,"linked-worktree",new Runner()),"active");
+  appendFileSync(join(plans,"EXECUTION_PLAN.md"),"accepted review revision\n");
+  assert.equal(episodeWorktreeActivity(worktree,"linked-worktree",new Runner()),"active");
+  assert.equal(readFileSync(ownership,"utf8"),identityBefore);
 });
 
 test("legacy symlink is preserved when its source leaf is unsafe or missing", (t) => {

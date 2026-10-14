@@ -25,7 +25,7 @@ ${name.toUpperCase()} POLICY
   mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true }); writeFileSync(join(root, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE POLICY");
   const guideRoot = join(root, "plugin"); mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true }); writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), `FULL OVERSIGHT GUIDE
 `);
-  const commands = new Map(), tools = new Map(), events = new Map(), sent = [], created = [], resolved = [], taskCalls = [];
+  const commands = new Map(), tools = new Map(), events = new Map(), sent = [], created = [], restored = [], resolved = [], taskCalls = [];
   let sendCount = 0;
   const pi = { registerCommand(name, value) { commands.set(name, value); }, registerTool(tool) { tools.set(tool.name, tool); }, on(name, handler) { events.set(name, handler); }, sendUserMessage(message, options) { sendCount += 1; if (sendCount === throwOnSend) throw new Error("synthetic send failure"); sent.push({ message, options }); }, async sendMessage() {} };
   const ctx = { cwd: root, hasUI: true, ui: { notify(message, level) { sent.push({ notify: message, level }); } }, sessionManager: { getSessionId: () => "owner", getSessionFile: () => join(root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }) } };
@@ -52,9 +52,9 @@ ${name.toUpperCase()} POLICY
     prepareCleanup(taskId, evidence) { taskCalls.push(["prepare-cleanup", taskId, evidence.outcome]); return { operatorDecision: "cleanup", taskId, taskPath: "task.md", ownerSessionId: "owner", episodeHead: evidence.result.mergedHead ?? evidence.result.episodeHead, terminalOutcome: evidence.outcome, terminalCommit: evidence.result.doneCommit ?? evidence.result.archiveCommit, resources: {} }; },
     async cleanup(_ctx, _dependencies, decision) { taskCalls.push(["cleanup", decision.taskId]); return { verified: true, outcome: decision.terminalOutcome, taskId: decision.taskId, terminalCommit: decision.terminalCommit, resourcesRemoved: true, ownershipStatus: "inactive", reused: false }; },
   };
-  const deps = { guideRoot, taskImplementationApprovals, taskActions, taskCleanup: {}, taskResolver(cwd, rawTaskId) { resolved.push({ cwd, rawTaskId }); if (rawTaskId.trim() === "missing") return null; return { taskId: "PRIMECLAW-10.38", title: "Planning fixture", status: taskStatus, implementationPlan: taskStatus === "In Planning" ? "Implement exact fixture" : null, projectRoot: root, taskPath: join(root, "task.md"), taskPathRelative: "task.md" }; }, async placementResolver() { return { engine: "local" }; }, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
+  const deps = { guideRoot, taskImplementationApprovals, taskActions, taskCleanup: {}, taskResolver(cwd, rawTaskId) { resolved.push({ cwd, rawTaskId }); if (rawTaskId.trim() === "missing") return null; return { taskId: "PRIMECLAW-10.38", title: "Planning fixture", status: taskStatus, implementationPlan: taskStatus === "In Planning" ? "Implement exact fixture" : null, projectRoot: root, taskPath: join(root, "task.md"), taskPathRelative: "task.md" }; }, async placementResolver() { return { engine: "local" }; }, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async restoreBlockedEpisode(location, confirmedUnblocked) { restored.push({location,confirmedUnblocked}); return { restored:true, sourceLocation:episode.sourceLocation, episodeId:"episode", worktree:episode.worktree, specification:join(episode.worktree,".ralph/plans/SPECIFICATION.md"), implementation:join(episode.worktree,".ralph/plans/EXECUTION_PLAN.md") }; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
   createReviewedPlanExtension(deps)(pi);
-  return { root, commands, tools, events, sent, created, resolved, taskCalls, readyReceipt: { publication: readyPublication, integration: readyIntegration, verification: readyVerification }, ctx, episode, deps, taskImplementationApprovals, pi };
+  return { root, commands, tools, events, sent, created, restored, resolved, taskCalls, readyReceipt: { publication: readyPublication, integration: readyIntegration, verification: readyVerification }, ctx, episode, deps, taskImplementationApprovals, pi };
 }
 
 test("registers complete task lifecycle beside retained folder compatibility", () => {
@@ -62,7 +62,7 @@ test("registers complete task lifecycle beside retained folder compatibility", (
   assert.deepEqual([...f.commands.keys()].sort(), ["implement-spec", "implement-task", "plan", "plan-spec"]);
   assert.deepEqual([...f.tools.keys()].sort(), [
     "create_spec_episode", "create_task_episode", "finalize_spec_episode", "finalize_task_episode",
-    "handoff_spec_episode", "handoff_task_episode", "plan_spec", "plan_task",
+    "handoff_spec_episode", "handoff_task_episode", "plan_spec", "plan_task", "restore_blocked_spec_episode",
   ]);
   assert.equal(f.tools.has("ralph_plan"), false);
   assert.equal(f.tools.has("prime_claw_activate_conversation_guide"), false);
@@ -303,10 +303,21 @@ test("phase completion without creation clears ephemeral approval", async () => 
   assert.equal(result.isError, true);
 });
 
+test("blocked restore tool carries explicit operator confirmation to the exact version-one recovery", async () => {
+  const f=fixture(), tool=f.tools.get("restore_blocked_spec_episode");
+  assert.match(tool.promptGuidelines.join(" "),/operator explicitly decides/);
+  assert.match(tool.promptGuidelines.join(" "),/never search, infer another Episode, or use this for version 2/);
+  assert.match(tool.promptGuidelines.join(" "),/revalidates live active identity/);
+  const result=await tool.execute("restore",{location:".ralph/plans/future/alpha",confirmedUnblocked:true},undefined,undefined,f.ctx);
+  assert.equal(result.isError,undefined);assert.deepEqual(f.restored,[{location:".ralph/plans/future/alpha",confirmedUnblocked:true}]);
+  assert.equal(result.details.episodeId,"episode");
+});
+
 test("tool guidance preserves operator authority and fixed fresh assignment", () => {
   const f = fixture(); const create = f.tools.get("create_spec_episode"); const handoff = f.tools.get("handoff_spec_episode"); const finalize = f.tools.get("finalize_spec_episode");
   assert.match(create.promptGuidelines.join(" "), /fresh Episode/); assert.match(create.promptGuidelines.join(" "), /never send an initial handoff/);
-  assert.match(handoff.promptGuidelines.join(" "), /product decisions/); assert.match(finalize.promptGuidelines.join(" "), /operator/);
+  assert.match(handoff.promptGuidelines.join(" "), /product decisions/); assert.match(handoff.promptGuidelines.join(" "), /operator accepted the exact recorded unblock/); assert.match(handoff.promptGuidelines.join(" "), /restored active version-1 plan identity was revalidated/); assert.match(finalize.promptGuidelines.join(" "), /operator/);
+  assert.match(finalize.promptGuidelines.join(" "), /active legacy plan pair/); assert.match(finalize.promptGuidelines.join(" "), /separate explicit post-terminal legacy authority/);
   const taskCreate = f.tools.get("create_task_episode"); const taskHandoff = f.tools.get("handoff_task_episode"); const taskFinalize = f.tools.get("finalize_task_episode");
   assert.match(taskCreate.promptGuidelines.join(" "), /exactly once/); assert.match(taskCreate.promptGuidelines.join(" "), /cannot be overridden/);
   assert.match(taskHandoff.promptGuidelines.join(" "), /Never use ordinary handoff for Blocked, Ready for Merge/);

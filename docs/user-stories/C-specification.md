@@ -45,12 +45,20 @@ review contract rather than carrying a second copy.
 and the artifacts restored after resolution, so that planning or implementation
 can resume without reconstructing state.**
 
-The current blocked-folder workflow remains operational only for retained
-version-1 compatibility Episodes and their plan authority. Primary version-2
-task Episodes already use exact-task ownership: the Episode records blocker
-evidence in its bound task while the Conversation alone publishes `Blocked` and
-resumed `In Progress` lifecycle status. Neither schema reconstructs work in a
-new artifact.
+Retained version-1 compatibility keeps persisted active Episodes' blockers in their active execution
+plan and keep the exact plan pair in place. For an older already-blocked
+snapshot, missing active files are not live identity: after an explicit operator
+unblock decision, the blocked skill calls `restore_blocked_spec_episode` for
+the exact owned future-folder location. The host restores only the readable,
+non-empty pair from the persisted record's worktree and revalidates that same
+active Episode before continuation. It never falls through to task mode or
+creates another Episode. The no-ownership old in-place blocked-folder workflow
+remains separate.
+
+Primary version-2 task Episodes use exact-task ownership: the Episode records
+blocker evidence in its bound task while the Conversation alone publishes
+`Blocked` and resumed `In Progress` lifecycle status. Neither schema
+reconstructs work in a new artifact.
 
 ## Primary implementation surfaces
 
@@ -59,6 +67,9 @@ new artifact.
 - `src/prime-agent-plugin/skills/project-templates/design-legacy.md` (retained compatibility)
 - `src/prime-agent-plugin/skills/project-templates/spec-it-out-legacy.md` (retained compatibility)
 - `src/prime-agent-plugin/skills/project-templates/blocked.md` (migration compatibility)
+- `src/prime-agent-plugin/extensions/reviewed-plan.ts` (`restore_blocked_spec_episode`)
+- `src/prime-agent-plugin/extension-support/legacy-workflow.ts`
+- `src/prime-agent-plugin/extension-support/spec-episode.ts`
 
 ## Design references
 

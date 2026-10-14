@@ -9,7 +9,9 @@ The Conversation first selects the authority mode from exact ownership. A
 version-2 Episode is reviewed only against its exact Backlog task ID/path and
 supported task fields; `.ralph/plans` is not consulted and the Conversation does
 not copy or mirror Episode-owned task content. A retained version-1 Episode
-continues to use its exact specification/plan folder. In either mode the
+continues to use its exact active specification/plan pair through blockers,
+candidate review, and bounded revision; it is not archived while ownership is
+active. In either mode the
 Conversation reconciles the report against ownership, branch, tree, diff, tests,
 documentation, push state, and worktree identity. It may accept and advance,
 request an in-scope revision, pause, or consult the operator. Repeated

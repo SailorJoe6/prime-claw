@@ -76,7 +76,9 @@ The primary task-native lifecycle uses `/plan` with `plan_task`,
 `/implement-task` with `create_task_episode`, `handoff_task_episode`, and the
 guarded `finalize_task_episode` coordinator. Retained version-1 compatibility
 keeps `/plan-spec` with `plan_spec`, `/implement-spec` with
-`create_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`.
+`create_spec_episode`, exact blocked recovery with
+`restore_blocked_spec_episode`, `handoff_spec_episode`, and
+`finalize_spec_episode`.
 Ordinary `/handoff` and `ralph_handoff` remain the non-Episode pair, while
 `/initialize-prime-claw` and `initialize_prime_claw` remain the initialization
 pair.

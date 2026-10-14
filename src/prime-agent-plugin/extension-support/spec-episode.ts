@@ -39,7 +39,7 @@ import {
   resolveNearestProjectRoot,
   type CommandRunner,
 } from "./project-initialization.ts";
-import { activeLegacyPlanFiles } from "./legacy-workflow.ts";
+import { activeLegacyPlanFiles, restoreBlockedLegacyPlanFiles } from "./legacy-workflow.ts";
 import {
   meaningfulTaskImplementationPlan,
   reserveTaskEpisodeOwnership,
@@ -98,6 +98,10 @@ export interface EpisodeSessionState extends SessionSummary {
 export interface EpisodeHandoffResult {
   admitted: true; sourceLocation: string; episodeId: string; episodeActiveSessionId: string;
   handoffDelivery: "prompt"; executeDelivery: "followUp";
+}
+export interface BlockedLegacyRestoreResult {
+  restored: true; sourceLocation: string; episodeId: string; worktree: string;
+  specification: string; implementation: string;
 }
 export interface TaskEpisodeHandoffResult {
   admitted: true; taskId: string; episodeId: string; episodeActiveSessionId: string;
@@ -1158,11 +1162,14 @@ function taskReservationHasResourceIdentity(record: TaskEpisodeOwnershipRecord):
     record.launchAutomationId, record.launchRunId,
   ].some((value) => value !== undefined);
 }
-function validateWorktreeRecord(record: EpisodeOwnershipRecord, git: GitAdapter, filesystem: FilesystemAdapter, repo: string): void {
+function validateWorktreeBinding(record: EpisodeOwnershipRecord, git: GitAdapter, filesystem: FilesystemAdapter, repo: string): void {
   if (!record.worktree || !record.branch || !filesystem.exists(record.worktree)) throw new Error("Episode ownership references a missing worktree");
   const worktree = git.worktrees(repo).find((entry) => samePath(entry.path, record.worktree));
   if (!worktree || worktree.branch !== record.branch) throw new Error("Episode ownership references a missing or different worktree");
-  if (isLegacyEpisodeOwnership(record) && record.status === "active" && !filesystem.hasActiveLegacyPlanFiles(record.worktree)) {
+}
+function validateWorktreeRecord(record: EpisodeOwnershipRecord, git: GitAdapter, filesystem: FilesystemAdapter, repo: string): void {
+  validateWorktreeBinding(record, git, filesystem, repo);
+  if (isLegacyEpisodeOwnership(record) && record.status === "active" && !filesystem.hasActiveLegacyPlanFiles(record.worktree!)) {
     throw new Error("Legacy Episode ownership is not live: the recorded worktree is missing its readable non-empty active specification and implementation plan");
   }
 }
@@ -1377,6 +1384,64 @@ async function deliverOwnedEpisodeHandoff(
   assertIdleEpisodeState(state, route.record, route.activeSessionId);
   await publisher.deliverHandoff(route.activeSessionId, handoffPrompt, executePrompt);
   return route.activeSessionId;
+}
+
+export async function restoreBlockedSpecEpisode(
+  rawLocation: string,
+  operatorConfirmed: boolean,
+  ctx: ExtensionContext,
+  dependencies?: EpisodeDependencies,
+): Promise<BlockedLegacyRestoreResult> {
+  const git = dependencies?.git ?? new CliGitAdapter();
+  const filesystem = dependencies?.filesystem ?? new NodeFilesystemAdapter();
+  const store = dependencies?.ownership ?? defaultOwnershipStore;
+  const orca = dependencies?.orca ?? new CliOrcaAdapter();
+  if (operatorConfirmed !== true) throw new Error("Blocked legacy recovery requires the operator's explicit unblock decision");
+  const selected = validateFutureLocation(ctx.cwd, rawLocation);
+  if (!selected) throw new Error("Invalid future-plan folder");
+  const repo = git.repositoryRoot(selected.projectRoot);
+  if (!samePath(repo, realpathSync(ctx.cwd)) || git.branch(repo) !== "main") {
+    throw new Error("Blocked legacy recovery must run from the canonical primary main checkout");
+  }
+  if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
+    throw new Error("Blocked legacy recovery is available only from a top-level project Conversation");
+  }
+  const record = store.read(repo);
+  if (!record) throw new Error(`No durable episode ownership exists for ${selected.location}`);
+  exactOwnedRecord(record, selected.location, ctx.sessionManager.getSessionId());
+  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; blocked recovery requires active version-1 ownership`);
+  validateWorktreeBinding(record, git, filesystem, repo);
+  if (record.engine === "orca") {
+    const current = await orca.showWorktree(record.worktreeId!, record.routingEnvironmentId);
+    if (current.identity !== record.worktreeIdentity || !samePath(current.path, record.worktree!)) {
+      throw new Error("Orca worktree identity no longer matches Episode ownership");
+    }
+  }
+  if (filesystem.hasActiveLegacyPlanFiles(record.worktree!)) {
+    throw new Error("Legacy Episode already has a live active plan pair; blocked recovery is not applicable");
+  }
+
+  const exactRecord = JSON.stringify(record);
+  const restored = restoreBlockedLegacyPlanFiles(record.worktree!);
+  const reloaded = store.read(repo);
+  if (!reloaded) throw new Error("Episode ownership disappeared during blocked recovery");
+  exactOwnedRecord(reloaded, selected.location, ctx.sessionManager.getSessionId());
+  if (JSON.stringify(reloaded) !== exactRecord) throw new Error("Episode ownership changed during blocked recovery");
+  validateWorktreeRecord(reloaded, git, filesystem, repo);
+  if (reloaded.engine === "orca") {
+    const current = await orca.showWorktree(reloaded.worktreeId!, reloaded.routingEnvironmentId);
+    if (current.identity !== reloaded.worktreeIdentity || !samePath(current.path, reloaded.worktree!)) {
+      throw new Error("Orca worktree identity changed during blocked recovery");
+    }
+  }
+  return {
+    restored: true,
+    sourceLocation: reloaded.sourceLocation,
+    episodeId: reloaded.episodeId!,
+    worktree: reloaded.worktree!,
+    specification: restored.specification,
+    implementation: restored.implementation,
+  };
 }
 
 export async function handoffSpecEpisode(

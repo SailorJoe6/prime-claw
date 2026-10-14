@@ -70,8 +70,11 @@ three are verified absent, including across an interrupted exact-prefix retry;
 only then does it become inactive. The Episode cannot authorize or perform this
 cleanup itself, and cleanup is exposed only behind separate explicit confirmation in `finalize_task_episode`.
 
-Retained folder mode continues to move blocked plan documents, update related
-Backlog.md tasks, and archive completed plan bundles until final cutover.
+A persisted active version-1 Episode records blockers in its active execution
+plan and keeps both files active through blocked, candidate-review, and revision
+states. It does not archive the pair until ownership is terminal, and it never
+mutates related Backlog lifecycle state. The separate no-ownership old in-place
+folder workflow retains its existing blocked-folder and archive transitions.
 
 ## Primary implementation surfaces
 

@@ -1616,3 +1616,26 @@ Repair requirements:
 7. Preserve all other reviewed Step 5 behavior. Host checks passed (55 Python and 179 Node) and configured Docker Tier-1 passed for the rejected candidate; do not reopen sound areas without concrete evidence.
 
 Do not start Step 6. Do not change repository lifecycle status/configuration/data cutover, publish final lifecycle state, retire compatibility assets, delete `.ralph/plans`, merge/finalize, clean resources, or apply user-global assets.
+
+## Step 5 active-lifecycle revision completion
+
+Completed the accepted revision after rejected candidate `d3545929163cded2872cf027cf96ffee138f3fc0`.
+
+- Persisted active version-1 Episodes keep their specification/implementation pair in `.ralph/plans/` while blocked and throughout candidate review and bounded revision. The distinct no-ownership old in-place workflow retains its historical blocked/archive transitions.
+- `restore_blocked_spec_episode` is the sole guarded recovery surface for an older blocked-only version-1 snapshot. It requires the operator's explicit unblock decision, the exact top-level owner in canonical primary `main`, active version-1 ownership, the recorded Git/Orca worktree identity, an absent active pair, one readable non-empty regular blocked pair under real in-worktree directories, and collision-free destinations. It restores only those two files with rollback checks, re-reads unchanged ownership, and revalidates live identity. It never selects task-native mode, allocates resources, or creates another Episode.
+- `handoff_spec_episode` permits ordinary same-Episode continuation only after successful restore/revalidation. Missing active files remain non-live and fail closed. `execute` cannot substitute chat instructions or any no-ownership fallback while a version-1 record exists.
+- Candidate review/revision keeps the same active pair, ownership, worktree, and durable session. Conversation oversight and Expert review continue to bind that pair.
+- `finalize_spec_episode` remains bookkeeping-only and performs no plan archival. The pair stays active until ownership becomes terminal; this repair adds no archival tool, and any later archival requires separate explicit legacy authority.
+- Delivery-source and project-runtime copies, managed hashes, docs, public tool discovery, and focused lifecycle regressions are synchronized. Step 6 remains unstarted.
+
+Validation evidence:
+- directly affected Node suites: 222/222 passed in independent review;
+- final `tests/spec_episode_extension.test.mjs`: 151/151 passed after recovery safety hardening;
+- focused host-safe policy suites: 56 passed, 12 deselected;
+- inventory/install/workflow suites: 13 passed, 33 deselected;
+- broad non-container suite: 655 passed, 1 skipped, 65 deselected, 75 subtests passed, with only the same three accepted-base/environment failures (runtime-test host-safe marker wording, existing missing pytest bridge, and existing Backlog source pin mismatch);
+- independent review found one material execute-policy fallback contradiction; the delivery/runtime wording and static rejection coverage were repaired, and all other reviewed revision behavior was sound;
+- post-repair `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed with immutable source-mode image, offline RPC probe, network absence, verified teardown, and published manifest;
+- `git diff --check`: passed.
+
+This completion does not change repository lifecycle status/configuration/data cutover, publish final lifecycle state, retire compatibility assets, delete `.ralph/plans`, merge/finalize, clean resources, or apply user-global assets.
