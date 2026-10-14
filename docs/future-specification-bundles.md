@@ -43,6 +43,33 @@ A retained bundle contains `SPECIFICATION.md` and `EXECUTION_PLAN.md`, plus any
 supporting artifacts needed to make the work self-contained. New `/design` and
 `/spec-it-out` invocations do not create this folder.
 
+## Exceptional same-Episode authority cutover
+
+A retained version-1 Episode is never re-admitted as a task Episode. When an
+approved migration requires the same live Episode to continue under task
+authority, the separately activated `transition_spec_episode_to_task` tool can
+replace only its ownership authority fields. The operator must first approve a
+bridge candidate, merge it to canonical primary `main`, apply that accepted
+plugin generation user-globally, complete a coordinated Prime Agent restart,
+and prove the loaded generation by UAT.
+
+The owning top-level Conversation passes the exact retained source, canonical
+`In Progress` task ID, reviewed pushed Episode head, activated pushed main head,
+and readiness confirmation. The host then proves exact upstream Git state and ancestry, no canonical-main
+dirt except the required untracked ownership record, a wholly clean Episode,
+complete task/active-plan equality, live owner and resource
+identity, and an idle exact-CWD durable session. For Orca it also proves the
+same setup, worktree identity, path, branch, head, and connected writable
+visible terminal handles. The atomic record replacement preserves the existing
+Episode, session, worktree, branch, admission `baseRef`, historical recorded
+head, and optional Orca resources. It creates or deletes nothing and performs
+no status change, assignment, handoff, merge, finalization, or cleanup.
+
+An exact same-binding replay is a no-op. Every different, partial, dirty,
+unpushed, busy, foreign, or unverifiable state fails closed. The active plan
+pair remains present after transition. Removing this repository's pair is a
+later separately reviewed data-cutover step, not part of the bridge.
+
 ## Retained version-1 bundle lifecycle
 
 1. Select one exact existing future folder.

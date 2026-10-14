@@ -9,7 +9,7 @@ import {
   CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit, PrimeSessionPublisher,
   EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
   allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
-  restoreBlockedSpecEpisode,
+  restoreBlockedSpecEpisode, transitionSpecEpisodeToTaskOwnership,
   handoffTaskEpisode, publishTaskEpisodeBlocked, publishTaskEpisodeResumed,
   publishTaskEpisodeReadyForMerge, integrateTaskEpisodeReadyForMerge,
   verifyTaskEpisodeReadyForMerge, delayTaskEpisodeReadyForMerge,
@@ -177,6 +177,88 @@ function commitMainTask(f, status) {
   return { relative, taskPath };
 }
 
+
+function activeLegacyTransitionRecord(f, overrides = {}) {
+  return parseEpisodeOwnership({
+    version: 1, status: "active", operationId: "legacy-transition", engine: "orca", ownerSessionId: "owner",
+    sourceLocation: LOCATION, slug: "alpha", baseRef: "a".repeat(40), bundleDigest: "c".repeat(64),
+    createdAt: "2026-10-13T08:00:00.000Z", updatedAt: "2026-10-14T08:00:00.000Z",
+    projectSetupId: f.wt.projectSetupId, worktreeId: f.wt.id, worktreeIdentity: f.wt.identity,
+    worktree: f.worktree, branch: f.wt.branch, head: "d".repeat(40),
+    episodeId: "episode", episodeSessionFile: join(f.root, "episode.jsonl"), episodeActiveSessionId: "route",
+    terminalHandle: "terminal",
+    ...overrides,
+  });
+}
+
+function transitionSession(f, overrides = {}) {
+  return {
+    activeSessionId: "route", sessionId: "episode", sessionFile: join(f.root, "episode.jsonl"),
+    cwd: f.worktree, isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0,
+    ...overrides,
+  };
+}
+
+test("ownership bridge preflight proves exact idle session and Orca resources before one transition call", async () => {
+  const f = harness();
+  const episodeHead = "e".repeat(40), mainHead = "f".repeat(40);
+  f.wt.head = episodeHead;
+  const legacy = activeLegacyTransitionRecord(f);
+  f.ownership.write(f.root, legacy);
+  const session = transitionSession(f);
+  f.publisher.list = async () => [session];
+  const calls = [];
+  const result = await transitionSpecEpisodeToTaskOwnership(LOCATION, "PRIMECLAW-10.38", episodeHead, mainHead, true, f.ctx, {
+    ...f.deps,
+    transitionOwnership(input, dependencies) {
+      calls.push({ input, dependencies });
+      const { version: _version, sourceLocation: _source, slug: _slug, bundleDigest: _digest, ...preserved } = legacy;
+      return {
+        record: parseEpisodeOwnership({
+          ...preserved, version: 2, taskId: "PRIMECLAW-10.38", taskPath: "backlog/tasks/primeclaw-10.38.md",
+        }),
+        reused: false, mainHead, episodeHead,
+        activeSpecification: { path: ".ralph/plans/SPECIFICATION.md", blob: "1".repeat(40) },
+        activeImplementationPlan: { path: ".ralph/plans/EXECUTION_PLAN.md", blob: "2".repeat(40) },
+      };
+    },
+  });
+  assert.equal(result.record.version, 2);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].input, {
+    projectRoot: f.root, sourceLocation: LOCATION, taskId: "PRIMECLAW-10.38", ownerSessionId: "owner",
+    expectedMainHead: mainHead, expectedEpisodeHead: episodeHead, confirmedReady: true,
+  });
+  assert.equal(calls[0].dependencies.ownership, f.ownership);
+  assert.equal(f.calls.some((entry) => entry[0] === "orca-show"), true);
+  assert.equal(f.calls.at(-1)[0], "close");
+});
+
+test("ownership bridge preflight rejects busy, foreign-terminal, and non-owner runtime state before transition", async () => {
+  const busy = harness(); busy.wt.head = "e".repeat(40); busy.ownership.write(busy.root, activeLegacyTransitionRecord(busy));
+  busy.publisher.list = async () => [transitionSession(busy, { isSessionActive: true })];
+  let transitions = 0;
+  await assert.rejects(transitionSpecEpisodeToTaskOwnership(LOCATION, "PRIMECLAW-10.38", busy.wt.head, "f".repeat(40), true, busy.ctx, {
+    ...busy.deps, transitionOwnership() { transitions += 1; throw new Error("must not run"); },
+  }), /Episode to be idle/);
+  assert.equal(transitions, 0);
+
+  const terminal = harness({ terminals: [{ handle: "foreign", connected: true, writable: true, visible: true, worktreeId: "foreign" }] });
+  terminal.wt.head = "e".repeat(40); terminal.ownership.write(terminal.root, activeLegacyTransitionRecord(terminal));
+  terminal.publisher.list = async () => [transitionSession(terminal)];
+  await assert.rejects(transitionSpecEpisodeToTaskOwnership(LOCATION, "PRIMECLAW-10.38", terminal.wt.head, "f".repeat(40), true, terminal.ctx, {
+    ...terminal.deps, transitionOwnership() { transitions += 1; throw new Error("must not run"); },
+  }), /terminal evidence/);
+  assert.equal(transitions, 0);
+
+  const foreign = harness(); foreign.wt.head = "e".repeat(40);
+  foreign.ownership.write(foreign.root, activeLegacyTransitionRecord(foreign, { ownerSessionId: "another-owner" }));
+  foreign.publisher.list = async () => [transitionSession(foreign)];
+  await assert.rejects(transitionSpecEpisodeToTaskOwnership(LOCATION, "PRIMECLAW-10.38", foreign.wt.head, "f".repeat(40), true, foreign.ctx, {
+    ...foreign.deps, transitionOwnership() { transitions += 1; throw new Error("must not run"); },
+  }), /exact owner Conversation/);
+  assert.equal(transitions, 0);
+});
 
 test("Orca creation promotes before exactly one native execute assignment and removes launcher", async () => {
   const f = harness(); const result = await createApproved(f);

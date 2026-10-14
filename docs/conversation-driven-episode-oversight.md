@@ -129,6 +129,43 @@ evidence. Folder admission and close operations explicitly reject version 2;
 task-native creation, handoff, lifecycle, and cleanup use their separate public
 surfaces.
 
+## Guarded version-1 to version-2 ownership bridge
+
+A live retained Episode can become task-native without creating a second
+Episode only through `transition_spec_episode_to_task`. This exceptional
+cutover is not admission or ordinary handoff. It is available only after its
+bridge candidate has been separately reviewed, merged to canonical primary
+`main`, applied user-globally from that checkout, followed by a full Prime Agent
+restart, and proven by UAT. The exact owner supplies the retained source,
+canonical task ID, reviewed pushed Episode head, activated pushed main head, and
+explicit readiness confirmation.
+
+Before the one atomic ownership write, the host proves:
+
+- the caller is the top-level owner Conversation in pushed primary `main`, with
+  no dirt except the required exact untracked `.prime-claw/ownership.json`;
+- active version-1 ownership matches the exact source, operation, Episode,
+  session route, worktree identity/path, branch, and optional Orca resources;
+- the exact `In Progress` task path and meaningful native plan are committed on
+  main and byte-identical on the reviewed Episode head, and an exact task
+  reference retains the superseded legacy source binding for replay proof;
+- the task plan exactly equals the active execution plan, while the readable
+  active specification and plan remain tracked at that head;
+- the original task-only admission `baseRef`, historical recorded head,
+  reviewed Episode head, and activated main head have safe ancestry; and
+- the durable Episode session is unique, exact-CWD, and fully idle, with exact
+  connected writable visible Orca terminal inventory when applicable.
+
+The atomic replacement removes only `version`, `sourceLocation`, `slug`, and
+`bundleDigest`; adds version 2 plus the canonical `taskId` and `taskPath`;
+updates bookkeeping time; and preserves every common owner, operation,
+`baseRef`, Episode, session, worktree, branch, recorded-head, and Orca field.
+The tool creates no resource, assignment, task/status commit, merge, handoff,
+finalization, deletion, or cleanup. Only an exact same-binding replay is
+idempotent. Dirty, partial, foreign, divergent, unpushed, busy, missing, or
+unverifiable state fails closed. The active pair remains until the later,
+separately reviewed repository-local deletion.
+
 ## Retained version-1 compatibility Orca creation
 
 For a ready local project-host setup, Episode creation is ordered as follows:

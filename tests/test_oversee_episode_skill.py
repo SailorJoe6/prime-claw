@@ -13,7 +13,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
     body = raw.split("---", 2)[-1]
     words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 750
+    assert 300 <= len(words) <= 950
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
@@ -38,6 +38,10 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "sole durable product and execution contract",
         "Never consult `.ralph/plans` in this mode",
         "The Episode owns task content on its branch; the Conversation owns lifecycle status on main",
+        "exceptional `transition_spec_episode_to_task` cutover surface",
+        "reviewed, merged to canonical primary `main`, activated user-globally",
+        "An exact same-binding replay is the only idempotent replay",
+        "plan deletion remains a separate reviewed step",
         "For retained version 1 folder ownership",
         "Inspect persisted `.prime-claw/ownership.json` from the canonical primary checkout before prompt tags",
         "Version 1 selects retained folder oversight; version 2 selects task-native oversight",
@@ -109,6 +113,9 @@ def test_current_docs_describe_ordinary_guide_and_single_record_boundary():
         "`.prime-claw/ownership.json` is the sole durable lifecycle record",
         "one full `prime-claw-oversee-episode` custom message",
         "operator alone decides product direction",
+        "Guarded version-1 to version-2 ownership bridge",
+        "transition_spec_episode_to_task",
+        "Only an exact same-binding replay is idempotent",
     ):
         assert phrase in text
 
@@ -140,7 +147,7 @@ def test_current_docs_lead_with_task_native_and_label_folder_compatibility():
     assert "## Primary task-native lifecycle" in future
     assert "## Retained version-1 compatibility" in future
     assert "## Retained version-1 bundle lifecycle" in future
-    for surface in ("/plan TASK-ID", "/implement-task TASK-ID", "create_task_episode", "finalize_task_episode"):
+    for surface in ("/plan TASK-ID", "/implement-task TASK-ID", "create_task_episode", "finalize_task_episode", "transition_spec_episode_to_task"):
         assert surface in current + future
 
 def test_current_docs_distinguish_episode_edit_scope_status_and_action_receipts():

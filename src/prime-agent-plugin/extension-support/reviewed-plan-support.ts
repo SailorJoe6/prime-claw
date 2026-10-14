@@ -23,6 +23,7 @@ export interface BacklogTaskSelection {
   title: string;
   status: string;
   implementationPlan: string | null;
+  references?: string[];
   projectRoot: string;
   taskPath: string;
   taskPathRelative: string;
@@ -50,6 +51,7 @@ function parseTaskView(stdout: string, selectedTaskId: string): {
   title: string;
   status: string;
   implementationPlan: string | null;
+  references?: string[];
   taskPathRelative: string;
 } {
   let parsed: unknown;
@@ -75,6 +77,10 @@ function parseTaskView(stdout: string, selectedTaskId: string): {
   if (task.implementationPlan !== null && typeof task.implementationPlan !== "string") {
     throw new Error(`Backlog task ${selectedTaskId} has an invalid implementation plan field`);
   }
+  if (task.references !== undefined && (!Array.isArray(task.references)
+    || task.references.some((reference) => typeof reference !== "string" || reference === ""))) {
+    throw new Error(`Backlog task ${selectedTaskId} has an invalid references field`);
+  }
   if (typeof task.path !== "string" || !task.path || isAbsolute(task.path) || win32.isAbsolute(task.path)) {
     throw new Error(`Backlog task ${selectedTaskId} has an invalid task path`);
   }
@@ -83,6 +89,7 @@ function parseTaskView(stdout: string, selectedTaskId: string): {
     title: task.title,
     status: task.status,
     implementationPlan: task.implementationPlan,
+    ...(task.references === undefined ? {} : { references: task.references as string[] }),
     taskPathRelative: task.path,
   };
 }

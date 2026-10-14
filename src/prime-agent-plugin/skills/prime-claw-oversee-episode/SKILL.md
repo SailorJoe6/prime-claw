@@ -27,6 +27,23 @@ fields are the sole durable product and execution contract. Never consult
 `.ralph/plans` in this mode. The Episode owns task content on its branch; the
 Conversation owns lifecycle status on main.
 
+A retained Episode may cross from version 1 to version 2 only through the
+exceptional `transition_spec_episode_to_task` cutover surface. Use it only after
+the bridge candidate was independently reviewed, merged to canonical primary
+`main`, activated user-globally from that checkout, followed by a full Prime
+Agent restart, and proven by UAT. Require the operator's explicit readiness
+confirmation plus the exact retained source, canonical task ID, reviewed pushed
+Episode head, and activated pushed main head. The host must prove the exact
+owner, top-level Conversation, `In Progress` task and complete plan, clean and
+pushed Git ancestry, active plan identity, idle durable session, and unchanged
+worktree/branch/Orca resources before atomically replacing only version-1
+authority fields with the version-2 task binding. Any drift or unavailable
+evidence blocks. An exact same-binding replay is the only idempotent replay.
+The transition does not delete the active pair, create or reassign resources,
+change task status, hand off, merge, finalize, or clean anything. After it
+succeeds, version-2 task authority applies; later plan deletion remains a
+separate reviewed step.
+
 Review one reported slice at a time. Check ownership, candidate, diff, tests,
 worktree, and mode-specific identity/content/evidence. A report is evidence,
 not approval.

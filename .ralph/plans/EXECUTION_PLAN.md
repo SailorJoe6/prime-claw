@@ -1745,3 +1745,34 @@ The operator approved a revised two-stage same-Episode cutover design. The next 
 - Run the required host-safe and Docker-isolated plugin validation, commit and push one clean candidate, report it, and stop.
 
 Do not execute the live ownership transition, delete or archive the active pair, publish `Ready for Merge`, merge, apply globally, restart, finalize, clean resources, or reopen accepted Step 5 or Step 6 behavior. The prior Step 7 blocker remains truthful evidence; this approved bridge is its recorded unblock design, not permission to perform the later live transition or deletion.
+
+## Pre-activation ownership bridge candidate completed
+
+Implemented only the approved dormant version-1-to-version-2 authority bridge. `transition_spec_episode_to_task` is a public sequential tool gated on explicit post-review, post-merge, primary-main global activation, full restart, and UAT confirmation. It binds the exact owner Conversation, retained source, task ID/path, task-only admission `baseRef`, historical recorded head, reviewed pushed Episode head, activated pushed main head, active plan Git blobs, committed task blob and exact plan content, worktree/branch identity, durable Episode/session route, and optional Orca setup/worktree/terminal resources.
+
+The guarded transition requires clean primary `main` and Episode worktrees with exact upstream heads and safe ancestry. It requires the committed `In Progress` main task and reviewed Episode task to be byte-identical, the task Implementation Plan to equal the active execution plan modulo terminal-newline normalization, and an exact task reference to preserve the superseded legacy source for same-binding replay proof. Runtime preflight requires one exact idle durable session at the owned CWD; Orca mode also requires the exact setup, worktree identity/path/branch/head, and connected writable visible terminal inventory.
+
+The atomic write removes only version-1 authority fields (`version`, `sourceLocation`, `slug`, and `bundleDigest`), adds version 2 plus canonical `taskId` and `taskPath`, updates only bookkeeping time, and preserves every common owner, operation, `baseRef`, Episode, session, worktree, branch, recorded-head, and Orca field. Exact replay of the same durable owner/Episode/task/resource binding performs no write after revalidating the supplied current heads and active plan. A different durable binding, unsafe or unmerged current head/plan, foreign resource or route, partial record, dirty state beyond the mandatory untracked ownership file, unavailable evidence, unsafe ancestry, or ownership drift fails closed. A write error is reconciled only when disk already contains the exact target; otherwise the tool fails without inference.
+
+`PRIMECLAW-10.38` now contains the complete authoritative execution plan through the supported Backlog CLI. Its notes and references preserve the accepted Step 5/6 evidence, the rolled-back Step 7 blocker, bridge authorization, exact active-plan Git/blob/SHA provenance, and the exact superseded future-source binding. The thin active specification explicitly records that the task supersedes it as specification authority while remaining present for live version-1 identity.
+
+Validation evidence:
+
+- focused transition/registration Node rerun: 51 passed;
+- focused ownership, runtime preflight, public registration, and existing lifecycle Node suite before the final source-reference tightening: 203 passed; the final 50-test rerun covers that tightening;
+- focused host-safe policy checks: 35 passed, 5 skipped;
+- broad host-safe suite: 657 passed, 1 skipped, 65 deselected, 75 subtests passed; only the three unchanged accepted failures remained (two Node/Pytest bridge-topology checks and the existing Backlog source-pin mismatch);
+- source-mode Docker Tier-1 with `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env` and `--probe`: passed immutable-image launch, network absence, plugin checks, offline RPC discovery, teardown, and manifest publication at `.test-results/20261014T172001Z-94283-f4b0ce0a/tier1`; and
+- `git diff --check`: passed before final commit preparation.
+
+No live ownership transition, plan deletion/archive, lifecycle status change, merge, user-global apply, restart, finalization, resource cleanup, Step 7 deletion, or Step 5/6 behavior change occurred. Canonical ownership remains active version 1 and both active plan files remain present for separate candidate review and any revision.
+
+## Accepted independent-review repair — mandatory ownership file cleanliness
+
+Independent GPT-6 Astra review of candidate `b39900a1574bb070cacb8b17d69dddde32c2ed87` reproduced one material in-scope defect: canonical-main cleanliness treated the required untracked `.prime-claw/ownership.json` authority record as unrelated dirt, so a valid live version-1 Episode could never transition unless a repository happened to hide that file. The original fixture masked the defect with a test-only ignore rule.
+
+The production guard now accepts either an otherwise empty status or exactly one untracked `.prime-claw/ownership.json` line. Every other tracked or untracked canonical-main change still fails closed. The transition fixture no longer adds an ignore rule and explicitly proves the required untracked ownership file is present while the success case proceeds; the existing unrelated-dirt case still rejects before mutation.
+
+The reviewer also asked whether idempotent replay freezes the original transition heads and active-plan blobs. The approved constraint forbids a hidden transition receipt or additional ownership fields. The resolved interpretation is that the completed binding is the durable owner/Episode/task/resource binding. Exact replay performs no write only after fresh full validation of the caller-supplied current pushed heads, safe ancestry, exact source reference, task/plan equality, active pair, session, and resources. Wording that overclaimed every later safe head/plan as drift was corrected. The reviewer accepted this interpretation as non-defective.
+
+Post-repair validation passed the focused transition/registration suite (51 passed) and exact-current-source Docker Tier-1 offline probe with immutable-image, network-absence, teardown, and manifest evidence at `.test-results/20261014T172001Z-94283-f4b0ce0a/tier1`. No live transition or lifecycle/resource mutation occurred.

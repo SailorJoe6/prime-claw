@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -10,8 +10,13 @@ import {
   isTaskEpisodeOwnership,
   parseEpisodeOwnership,
   readEpisodeOwnership,
+  writeEpisodeOwnership,
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
-import { reserveTaskEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
+import {
+  CliLegacyTaskOwnershipTransitionGit,
+  reserveTaskEpisodeOwnership,
+  transitionLegacyEpisodeOwnershipToTask,
+} from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
 
 function git(root, ...args) {
   return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -64,6 +69,196 @@ function reserve(f, overrides = {}, dependencies = {}) {
     ...dependencies,
   });
 }
+
+function transitionFixture() {
+  const rawRoot = mkdtempSync(join(tmpdir(), "prime-claw-transition-main-"));
+  execFileSync("git", ["init", "-q", "-b", "main", rawRoot]);
+  const root = realpathSync(rawRoot);
+  const remote = mkdtempSync(join(tmpdir(), "prime-claw-transition-remote-"));
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  git(root, "remote", "add", "origin", remote);
+  git(root, "config", "user.name", "Prime Claw Test");
+  git(root, "config", "user.email", "prime-claw@example.invalid");
+  const relative = "backlog/tasks/primeclaw-10.38 - Transition fixture.md";
+  mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
+  writeFileSync(join(root, relative), "status: In Planning\nplan: implement transition fixture\n");
+  git(root, "add", relative);
+  git(root, "commit", "-q", "-m", "seed transition fixture");
+  writeFileSync(join(root, relative), "status: In Progress\nplan: implement transition fixture\n");
+  git(root, "add", "--", relative);
+  git(root, "commit", "-q", "-m", "admit exact transition task");
+  const baseRef = git(root, "rev-parse", "HEAD");
+  git(root, "push", "-q", "-u", "origin", "main");
+  const legacyHeadRoot = join(mkdtempSync(join(tmpdir(), "prime-claw-transition-legacy-head-")), "legacy");
+  execFileSync("git", ["-C", root, "worktree", "add", "-q", "-b", "legacy-promotion", legacyHeadRoot, baseRef]);
+  writeFileSync(join(legacyHeadRoot, "legacy-promotion.txt"), "historical promotion head\n");
+  git(legacyHeadRoot, "add", "legacy-promotion.txt");
+  git(legacyHeadRoot, "commit", "-q", "-m", "historical legacy promotion");
+  const legacyHead = git(legacyHeadRoot, "rev-parse", "HEAD");
+  execFileSync("git", ["-C", root, "worktree", "remove", "-f", legacyHeadRoot]);
+
+  const episodeRaw = mkdtempSync(join(tmpdir(), "prime-claw-transition-episode-parent-"));
+  const episodeRoot = join(episodeRaw, "episode");
+  execFileSync("git", ["-C", root, "worktree", "add", "-q", "-b", "episode-transition", episodeRoot, baseRef]);
+  mkdirSync(join(episodeRoot, ".ralph", "plans"), { recursive: true });
+  writeFileSync(join(episodeRoot, ".ralph", "plans", "SPECIFICATION.md"), "Superseded by PRIMECLAW-10.38\n");
+  writeFileSync(join(episodeRoot, ".ralph", "plans", "EXECUTION_PLAN.md"), "Complete bridge candidate plan\n");
+  writeFileSync(join(episodeRoot, relative), "status: In Progress\nplan: complete bridge candidate with evidence\n");
+  git(episodeRoot, "add", ".ralph/plans/SPECIFICATION.md", ".ralph/plans/EXECUTION_PLAN.md", relative);
+  git(episodeRoot, "commit", "-q", "-m", "bridge candidate");
+  const episodeHead = git(episodeRoot, "rev-parse", "HEAD");
+  git(episodeRoot, "push", "-q", "-u", "origin", "episode-transition");
+  git(root, "merge", "-q", "--no-ff", "episode-transition", "-m", "merge bridge candidate");
+  const mainHead = git(root, "rev-parse", "HEAD");
+  git(root, "push", "-q", "origin", "main");
+
+  const transcript = join(mkdtempSync(join(tmpdir(), "prime-claw-transition-session-")), "episode.jsonl");
+  writeFileSync(transcript, "{\"session\":\"episode\"}\n");
+  const legacy = {
+    version: 1, status: "active", operationId: "operation-transition", engine: "local", ownerSessionId: "owner-session",
+    sourceLocation: ".ralph/plans/future/replace-ralph-plans-with-backlog", slug: "replace-ralph-plans-with-backlog",
+    baseRef, bundleDigest: "a".repeat(64), createdAt: "2026-10-13T08:00:00.000Z", updatedAt: "2026-10-14T08:00:00.000Z",
+    worktreeName: "episode-transition", worktree: realpathSync(episodeRoot), branch: "episode-transition", head: legacyHead,
+    episodeId: "episode-id", episodeSessionFile: transcript, episodeActiveSessionId: "active-session-id",
+  };
+  writeEpisodeOwnership(root, legacy);
+  const selection = {
+    taskId: "PRIMECLAW-10.38", title: "Transition fixture", status: "In Progress",
+    implementationPlan: "Complete bridge candidate plan",
+    references: ["legacy-episode-source=.ralph/plans/future/replace-ralph-plans-with-backlog; superseded-by=PRIMECLAW-10.38"], projectRoot: root,
+    taskPath: realpathSync(join(root, relative)), taskPathRelative: relative,
+  };
+  return { root, relative, episodeRoot: realpathSync(episodeRoot), baseRef, legacyHead, episodeHead, mainHead, transcript, legacy, selection };
+}
+
+function transition(f, overrides = {}, dependencies = {}) {
+  return transitionLegacyEpisodeOwnershipToTask({
+    projectRoot: f.root,
+    sourceLocation: f.legacy.sourceLocation,
+    taskId: f.selection.taskId,
+    ownerSessionId: f.legacy.ownerSessionId,
+    expectedMainHead: f.mainHead,
+    expectedEpisodeHead: f.episodeHead,
+    confirmedReady: true,
+    ...overrides,
+  }, {
+    taskResolver: () => f.selection,
+    now: () => "2026-10-14T09:00:00.000Z",
+    ...dependencies,
+  });
+}
+
+test("guarded transition atomically replaces only legacy authority and preserves exact resources", () => {
+  const f = transitionFixture();
+  assert.equal(new CliLegacyTaskOwnershipTransitionGit().status(f.root), "?? .prime-claw/ownership.json");
+  assert.throws(() => execFileSync("git", ["-C", f.root, "merge-base", "--is-ancestor", f.legacyHead, f.episodeHead], { stdio: "ignore" }));
+  const result = transition(f);
+  assert.equal(result.reused, false);
+  assert.equal(result.mainHead, f.mainHead);
+  assert.equal(result.episodeHead, f.episodeHead);
+  assert.match(result.activeSpecification.blob, /^[0-9a-f]{40}$/);
+  assert.match(result.activeImplementationPlan.blob, /^[0-9a-f]{40}$/);
+  assert.equal(result.record.version, 2);
+  assert.equal(result.record.taskId, f.selection.taskId);
+  assert.equal(result.record.taskPath, f.relative);
+  assert.equal(result.record.updatedAt, "2026-10-14T09:00:00.000Z");
+  for (const removed of ["sourceLocation", "slug", "bundleDigest"]) assert.equal(result.record[removed], undefined);
+  for (const preserved of [
+    "status", "operationId", "engine", "ownerSessionId", "baseRef", "createdAt", "worktreeName",
+    "worktree", "branch", "head", "episodeId", "episodeSessionFile", "episodeActiveSessionId",
+  ]) assert.deepEqual(result.record[preserved], f.legacy[preserved]);
+  assert.deepEqual(readEpisodeOwnership(f.root), result.record);
+
+  const replay = transition(f);
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.record, result.record);
+  assert.throws(() => transition(f, { sourceLocation: ".ralph/plans/future/different" }), /superseded legacy source binding/);
+});
+
+test("guarded transition requires explicit readiness, exact owner, and exact bindings", () => {
+  const unconfirmed = transitionFixture();
+  assert.throws(() => transition(unconfirmed, { confirmedReady: false }), /explicit confirmation/);
+  assert.deepEqual(readEpisodeOwnership(unconfirmed.root), unconfirmed.legacy);
+
+  const foreign = transitionFixture();
+  assert.throws(() => transition(foreign, { ownerSessionId: "foreign-owner" }), /exact owner Conversation/);
+  assert.deepEqual(readEpisodeOwnership(foreign.root), foreign.legacy);
+
+  const sourceDrift = transitionFixture();
+  assert.throws(() => transition(sourceDrift, { sourceLocation: ".ralph/plans/future/different" }), /does not match active ownership/);
+  assert.deepEqual(readEpisodeOwnership(sourceDrift.root), sourceDrift.legacy);
+
+  const headDrift = transitionFixture();
+  assert.throws(() => transition(headDrift, { expectedEpisodeHead: headDrift.baseRef }), /Episode HEAD or upstream drifted/);
+  assert.deepEqual(readEpisodeOwnership(headDrift.root), headDrift.legacy);
+});
+
+test("guarded transition fails closed on dirty state, missing evidence, and unsafe ancestry", () => {
+  const dirtyMain = transitionFixture();
+  writeFileSync(join(dirtyMain.root, "dirty.txt"), "dirty\n");
+  assert.throws(() => transition(dirtyMain), /Canonical main is dirty/);
+  assert.deepEqual(readEpisodeOwnership(dirtyMain.root), dirtyMain.legacy);
+
+  const dirtyEpisode = transitionFixture();
+  writeFileSync(join(dirtyEpisode.episodeRoot, "dirty.txt"), "dirty\n");
+  assert.throws(() => transition(dirtyEpisode), /Episode worktree is dirty/);
+  assert.deepEqual(readEpisodeOwnership(dirtyEpisode.root), dirtyEpisode.legacy);
+
+  const missingSession = transitionFixture();
+  unlinkSync(missingSession.transcript);
+  assert.throws(() => transition(missingSession), /session transcript/);
+  assert.deepEqual(readEpisodeOwnership(missingSession.root), missingSession.legacy);
+
+  const unsafe = transitionFixture();
+  const baseGit = new CliLegacyTaskOwnershipTransitionGit();
+  const gitProxy = new Proxy(baseGit, { get(target, property) {
+    if (property === "isAncestor") return () => false;
+    const value = target[property];
+    return typeof value === "function" ? value.bind(target) : value;
+  } });
+  assert.throws(() => transition(unsafe, {}, { git: gitProxy }), /ancestry is unsafe/);
+  assert.deepEqual(readEpisodeOwnership(unsafe.root), unsafe.legacy);
+});
+
+test("guarded transition requires the complete task plan to equal the active execution plan", () => {
+  const f = transitionFixture();
+  assert.throws(() => transition(f, {}, { taskResolver: () => ({ ...f.selection, implementationPlan: "stale partial plan" }) }), /does not exactly match/);
+  assert.deepEqual(readEpisodeOwnership(f.root), f.legacy);
+});
+
+test("guarded transition detects ownership drift before its sole write", () => {
+  const f = transitionFixture();
+  let reads = 0, writes = 0;
+  const ownership = {
+    read() { reads += 1; return reads === 1 ? f.legacy : { ...f.legacy, updatedAt: "concurrent-drift" }; },
+    write() { writes += 1; },
+  };
+  assert.throws(() => transition(f, {}, { ownership }), /changed during transition validation/);
+  assert.equal(writes, 0);
+});
+
+test("guarded transition fails cleanly when an atomic write leaves the exact old record", () => {
+  const f = transitionFixture();
+  const ownership = {
+    read() { return structuredClone(f.legacy); },
+    write() { throw new Error("pre-rename interruption"); },
+  };
+  assert.throws(() => transition(f, {}, { ownership }), /did not complete atomically/);
+  assert.deepEqual(ownership.read(), f.legacy);
+});
+
+test("guarded transition treats an atomic write that completed before an error as success", () => {
+  const f = transitionFixture();
+  let current = f.legacy;
+  const ownership = {
+    read() { return structuredClone(current); },
+    write(_root, record) { current = structuredClone(record); throw new Error("post-rename interruption"); },
+  };
+  const result = transition(f, {}, { ownership });
+  assert.equal(result.reused, false);
+  assert.equal(result.record.version, 2);
+  assert.equal(current.taskId, f.selection.taskId);
+});
 
 test("exact status commit becomes one durable task-native provisioning reservation before resources", () => {
   const f = fixture();

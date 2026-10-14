@@ -22,11 +22,13 @@ import {
   resolveTaskEpisodePlacement,
   restoreBlockedSpecEpisode,
   resumeTaskEpisodeChangesRequested,
+  transitionSpecEpisodeToTaskOwnership,
   verifyTaskEpisodeReadyForMerge,
   CliGitAdapter,
   HandoffFollowUpRejectedError,
   EpisodeStateUncertainError,
   type EpisodeDependencies,
+  type EpisodeOwnershipTransitionDependencies,
   type TaskEpisodeAdmissionOptions,
   type TaskEpisodeChangesIntegrationResult,
   type TaskEpisodeChangesPublicationResult,
@@ -304,10 +306,11 @@ const DEFAULT_TASK_ACTIONS: TaskEpisodePublicActions = {
   cleanup: finalizeTaskEpisodeCleanup,
 };
 
-type ReviewedPlanDependencies = EpisodeDependencies & TaskEpisodeCreationDependencies & TaskEpisodeReadyForMergeDependencies & {
+type ReviewedPlanDependencies = EpisodeDependencies & EpisodeOwnershipTransitionDependencies & TaskEpisodeCreationDependencies & TaskEpisodeReadyForMergeDependencies & {
   createEpisode?: typeof createSpecEpisode;
   restoreBlockedEpisode?: typeof restoreBlockedSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
+  transitionLegacyOwnership?: typeof transitionSpecEpisodeToTaskOwnership;
   taskResolver?: typeof resolveBacklogTask;
   taskImplementationApprovals?: TaskImplementationApprovalStore;
   placementResolver?: typeof resolveTaskEpisodePlacement;
@@ -759,6 +762,56 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return { content: [{ type: "text", text: `Task Episode creation failed: ${message}` }], details: { error: message }, isError: true };
+        }
+      },
+    });
+
+    pi.registerTool({
+      name: "transition_spec_episode_to_task",
+      label: "Transition specification Episode ownership to task",
+      description: "Atomically replace one exact live version-1 Episode authority binding with its reviewed task-native binding without changing or recreating Episode resources.",
+      promptSnippet: "Transition one exact reviewed specification Episode to task-native ownership",
+      promptGuidelines: [
+        "Call transition_spec_episode_to_task only after the bridge candidate was separately reviewed, merged to canonical primary main, activated user-globally, followed by a full restart, and proven by UAT.",
+        "The exact owning Conversation must pass the retained source location, canonical task ID, reviewed primary-main HEAD, and reviewed Episode HEAD, and set confirmedReady true only after all prerequisites are true.",
+        "The transition changes ownership authority only. It must preserve the same Episode, session, worktree, branch, and Orca resources and keep the active plan pair present.",
+        "Any foreign owner, drift, partial identity, dirty checkout, unsafe ancestry, task mismatch, unavailable evidence, or different replay is a blocker. Never repair or infer values inside this tool.",
+        "A successful same-binding replay is idempotent. After success, continue only through task-native lifecycle surfaces; plan deletion remains a separate reviewed step.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          location: { type: "string", description: "Exact retained .ralph/plans/future/<slug> source bound by active version-1 ownership" },
+          taskId: { type: "string", description: "Exact canonical Backlog task ID that supersedes the retained bundle" },
+          mainHead: { type: "string", description: "Exact reviewed and activated canonical primary-main HEAD" },
+          episodeHead: { type: "string", description: "Exact reviewed clean Episode branch HEAD merged into main" },
+          confirmedReady: { type: "boolean", description: "True only after separate review, merge, global activation, full restart, and successful UAT" },
+        },
+        required: ["location", "taskId", "mainHead", "episodeHead", "confirmedReady"],
+        additionalProperties: false,
+      } as any,
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        try {
+          const transition = dependencies?.transitionLegacyOwnership ?? transitionSpecEpisodeToTaskOwnership;
+          const result = await transition(
+            params.location,
+            params.taskId,
+            params.episodeHead,
+            params.mainHead,
+            params.confirmedReady,
+            ctx,
+            dependencies,
+          );
+          return {
+            content: [{ type: "text", text: result.reused
+              ? `Episode ownership already has the exact task-native binding for ${result.record.taskId}; no state changed.`
+              : `Episode ownership transitioned atomically to task-native authority for ${result.record.taskId}. The same Episode resources were preserved.` }],
+            details: result,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { content: [{ type: "text", text: `Episode ownership transition failed: ${message}` }], details: { error: message }, isError: true };
         }
       },
     });

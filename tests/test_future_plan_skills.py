@@ -573,6 +573,7 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     assert 'name: "create_task_episode"' in extension
     assert 'name: "handoff_task_episode"' in extension
     assert 'name: "finalize_task_episode"' in extension
+    assert 'name: "transition_spec_episode_to_task"' in extension
     assert 'command: "implement-spec"' in extension
     assert 'name: "create_spec_episode"' in extension
     assert 'name: "handoff_spec_episode"' in extension

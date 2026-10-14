@@ -43,6 +43,9 @@ import { activeLegacyPlanFiles, restoreBlockedLegacyPlanFiles } from "./legacy-w
 import {
   meaningfulTaskImplementationPlan,
   reserveTaskEpisodeOwnership,
+  transitionLegacyEpisodeOwnershipToTask,
+  type LegacyTaskOwnershipTransitionGit,
+  type LegacyTaskOwnershipTransitionResult,
   type TaskEpisodeReservationInput,
 } from "./task-episode-ownership.ts";
 
@@ -188,6 +191,14 @@ export interface TaskEpisodeHandoffDependencies extends EpisodeDependencies {
   taskRunner?: CommandRunner;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
 }
+export interface EpisodeOwnershipTransitionDependencies extends EpisodeDependencies {
+  transitionGit?: LegacyTaskOwnershipTransitionGit;
+  taskRunner?: CommandRunner;
+  taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+  transitionNow?: () => string;
+  transitionOwnership?: typeof transitionLegacyEpisodeOwnershipToTask;
+}
+
 export interface EpisodeCreationOptions { host?: string; approvedBundleDigest?: string }
 
 export interface TaskEpisodeAdmissionGit {
@@ -1478,6 +1489,99 @@ export async function handoffSpecEpisode(
       executeDelivery: "followUp",
     };
   } finally { try { publisher?.close(); } catch { /* do not mask lifecycle result */ } }
+}
+
+/**
+ * Guard the one-way authority conversion with live Conversation, Episode,
+ * session, and optional Orca evidence before the atomic record replacement.
+ */
+export async function transitionSpecEpisodeToTaskOwnership(
+  sourceLocation: string,
+  taskId: string,
+  episodeHead: string,
+  mainHead: string,
+  confirmedReady: boolean,
+  ctx: ExtensionContext,
+  dependencies: EpisodeOwnershipTransitionDependencies = {},
+): Promise<LegacyTaskOwnershipTransitionResult> {
+  const git = dependencies.git ?? new CliGitAdapter();
+  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const orca = dependencies.orca ?? new CliOrcaAdapter();
+  const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
+  const resolveTask = dependencies.taskResolver
+    ?? ((cwd: string, exactTaskId: string) => resolveBacklogTask(cwd, exactTaskId, runner));
+  let publisher = dependencies.publisher;
+  try {
+    const repo = git.repositoryRoot(ctx.cwd);
+    if (!samePath(repo, realpathSync(ctx.cwd))) throw new Error("Ownership transition must run from the repository root");
+    const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
+    if (!samePath(project.root, repo) || project.kind === "linked-worktree" || git.branch(repo) !== "main") {
+      throw new Error("Ownership transition must run from the canonical primary main checkout");
+    }
+    if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
+      throw new Error("Ownership transition is available only from the top-level owning Conversation");
+    }
+    const record = store.read(repo);
+    if (!record) throw new Error("Exact Episode ownership is missing before ownership transition");
+    if (record.status !== "active") throw new Error(`Ownership transition requires active ownership; found ${record.status}`);
+    if (record.ownerSessionId !== ctx.sessionManager.getSessionId()) {
+      throw new Error("Ownership transition requires the exact owner Conversation");
+    }
+    if (isLegacyEpisodeOwnership(record)) {
+      if (record.sourceLocation !== sourceLocation) throw new Error("Ownership transition source location does not match active ownership");
+    } else if (record.taskId !== taskId) {
+      throw new Error("Existing task-native ownership does not match the completed transition binding");
+    }
+    validateWorktreeRecord(record, git, filesystem, repo);
+
+    if (record.engine === "orca") {
+      const current = await orca.showWorktree(record.worktreeId!, record.routingEnvironmentId);
+      if (current.id !== record.worktreeId || current.identity !== record.worktreeIdentity
+        || !samePath(current.path, record.worktree!) || current.branch !== record.branch
+        || current.head !== episodeHead || current.projectSetupId !== record.projectSetupId) {
+        throw new Error("Ownership transition Orca worktree evidence no longer matches ownership and the reviewed Episode head");
+      }
+      const expectedHandles = new Set(record.terminalHandles ?? [record.terminalHandle!]);
+      const currentHandles = new Set((await orca.listTerminals(record.worktreeId!, record.routingEnvironmentId))
+        .filter((terminal) => terminal.worktreeId === record.worktreeId && terminal.connected && terminal.writable && terminal.visible)
+        .map((terminal) => terminal.handle));
+      if (expectedHandles.size === 0 || currentHandles.size !== expectedHandles.size
+        || [...expectedHandles].some((handle) => !currentHandles.has(handle))) {
+        throw new Error("Ownership transition Orca terminal evidence no longer matches the exact owned resources");
+      }
+    }
+
+    publisher ??= new PrimeSessionPublisher(undefined, runtimeSessionManagerClass(ctx.sessionManager));
+    const sessions = await publisher.list();
+    const matches = sessions.filter((session) => session.sessionId === record.episodeId
+      && Boolean(session.sessionFile) && samePath(session.sessionFile!, record.episodeSessionFile!));
+    if (matches.length !== 1) throw new Error("Ownership transition requires one exact durable Episode session");
+    const session = matches[0];
+    if (!session.cwd || !samePath(session.cwd, record.worktree!)
+      || session.activeSessionId !== record.episodeActiveSessionId) {
+      throw new Error("Ownership transition durable session route or CWD no longer matches ownership");
+    }
+    if (sessionIsBusy(session)) throw new Error("Ownership transition requires the owned Episode to be idle");
+    const state = await publisher.getState(record.episodeActiveSessionId!);
+    assertIdleEpisodeState(state, record, record.episodeActiveSessionId!);
+
+    const transition = dependencies.transitionOwnership ?? transitionLegacyEpisodeOwnershipToTask;
+    return transition({
+      projectRoot: repo,
+      sourceLocation,
+      taskId,
+      ownerSessionId: ctx.sessionManager.getSessionId(),
+      expectedMainHead: mainHead,
+      expectedEpisodeHead: episodeHead,
+      confirmedReady,
+    }, {
+      ...(dependencies.transitionGit ? { git: dependencies.transitionGit } : {}),
+      ownership: store,
+      taskResolver: resolveTask,
+      ...(dependencies.transitionNow ? { now: dependencies.transitionNow } : {}),
+    });
+  } finally { try { publisher?.close(); } catch { /* do not mask transition result */ } }
 }
 
 /**

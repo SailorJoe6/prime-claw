@@ -25,7 +25,7 @@ ${name.toUpperCase()} POLICY
   mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true }); writeFileSync(join(root, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE POLICY");
   const guideRoot = join(root, "plugin"); mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true }); writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), `FULL OVERSIGHT GUIDE
 `);
-  const commands = new Map(), tools = new Map(), events = new Map(), sent = [], created = [], restored = [], resolved = [], taskCalls = [];
+  const commands = new Map(), tools = new Map(), events = new Map(), sent = [], created = [], restored = [], transitioned = [], resolved = [], taskCalls = [];
   let sendCount = 0;
   const pi = { registerCommand(name, value) { commands.set(name, value); }, registerTool(tool) { tools.set(tool.name, tool); }, on(name, handler) { events.set(name, handler); }, sendUserMessage(message, options) { sendCount += 1; if (sendCount === throwOnSend) throw new Error("synthetic send failure"); sent.push({ message, options }); }, async sendMessage() {} };
   const ctx = { cwd: root, hasUI: true, ui: { notify(message, level) { sent.push({ notify: message, level }); } }, sessionManager: { getSessionId: () => "owner", getSessionFile: () => join(root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }) } };
@@ -52,9 +52,9 @@ ${name.toUpperCase()} POLICY
     prepareCleanup(taskId, evidence) { taskCalls.push(["prepare-cleanup", taskId, evidence.outcome]); return { operatorDecision: "cleanup", taskId, taskPath: "task.md", ownerSessionId: "owner", episodeHead: evidence.result.mergedHead ?? evidence.result.episodeHead, terminalOutcome: evidence.outcome, terminalCommit: evidence.result.doneCommit ?? evidence.result.archiveCommit, resources: {} }; },
     async cleanup(_ctx, _dependencies, decision) { taskCalls.push(["cleanup", decision.taskId]); return { verified: true, outcome: decision.terminalOutcome, taskId: decision.taskId, terminalCommit: decision.terminalCommit, resourcesRemoved: true, ownershipStatus: "inactive", reused: false }; },
   };
-  const deps = { guideRoot, taskImplementationApprovals, taskActions, taskCleanup: {}, taskResolver(cwd, rawTaskId) { resolved.push({ cwd, rawTaskId }); if (rawTaskId.trim() === "missing") return null; return { taskId: "PRIMECLAW-10.38", title: "Planning fixture", status: taskStatus, implementationPlan: taskStatus === "In Planning" ? "Implement exact fixture" : null, projectRoot: root, taskPath: join(root, "task.md"), taskPathRelative: "task.md" }; }, async placementResolver() { return { engine: "local" }; }, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async restoreBlockedEpisode(location, confirmedUnblocked) { restored.push({location,confirmedUnblocked}); return { restored:true, sourceLocation:episode.sourceLocation, episodeId:"episode", worktree:episode.worktree, specification:join(episode.worktree,".ralph/plans/SPECIFICATION.md"), implementation:join(episode.worktree,".ralph/plans/EXECUTION_PLAN.md") }; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
+  const deps = { guideRoot, taskImplementationApprovals, taskActions, taskCleanup: {}, taskResolver(cwd, rawTaskId) { resolved.push({ cwd, rawTaskId }); if (rawTaskId.trim() === "missing") return null; return { taskId: "PRIMECLAW-10.38", title: "Planning fixture", status: taskStatus, implementationPlan: taskStatus === "In Planning" ? "Implement exact fixture" : null, projectRoot: root, taskPath: join(root, "task.md"), taskPathRelative: "task.md" }; }, async placementResolver() { return { engine: "local" }; }, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async restoreBlockedEpisode(location, confirmedUnblocked) { restored.push({location,confirmedUnblocked}); return { restored:true, sourceLocation:episode.sourceLocation, episodeId:"episode", worktree:episode.worktree, specification:join(episode.worktree,".ralph/plans/SPECIFICATION.md"), implementation:join(episode.worktree,".ralph/plans/EXECUTION_PLAN.md") }; }, transitionLegacyOwnership(location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies) { transitioned.push({ location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies }); return { record: { ...episode, version: 2, taskId, taskPath: "task.md" }, reused: false, mainHead, episodeHead, activeSpecification: { path: ".ralph/plans/SPECIFICATION.md", blob: "a".repeat(40) }, activeImplementationPlan: { path: ".ralph/plans/EXECUTION_PLAN.md", blob: "b".repeat(40) } }; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
   createReviewedPlanExtension(deps)(pi);
-  return { root, commands, tools, events, sent, created, restored, resolved, taskCalls, readyReceipt: { publication: readyPublication, integration: readyIntegration, verification: readyVerification }, ctx, episode, deps, taskImplementationApprovals, pi };
+  return { root, commands, tools, events, sent, created, restored, transitioned, resolved, taskCalls, readyReceipt: { publication: readyPublication, integration: readyIntegration, verification: readyVerification }, ctx, episode, deps, taskImplementationApprovals, pi };
 }
 
 test("registers complete task lifecycle beside retained folder compatibility", () => {
@@ -63,6 +63,7 @@ test("registers complete task lifecycle beside retained folder compatibility", (
   assert.deepEqual([...f.tools.keys()].sort(), [
     "create_spec_episode", "create_task_episode", "finalize_spec_episode", "finalize_task_episode",
     "handoff_spec_episode", "handoff_task_episode", "plan_spec", "plan_task", "restore_blocked_spec_episode",
+    "transition_spec_episode_to_task",
   ]);
   assert.equal(f.tools.has("ralph_plan"), false);
   assert.equal(f.tools.has("prime_claw_activate_conversation_guide"), false);
@@ -313,6 +314,45 @@ test("blocked restore tool carries explicit operator confirmation to the exact v
   assert.equal(result.details.episodeId,"episode");
 });
 
+test("ownership transition tool binds exact reviewed heads and owner confirmation", async () => {
+  const f = fixture();
+  const tool = f.tools.get("transition_spec_episode_to_task");
+  assert.match(tool.promptGuidelines.join(" "), /reviewed, merged to canonical primary main, activated user-globally/);
+  assert.match(tool.promptGuidelines.join(" "), /plan deletion remains a separate reviewed step/);
+  const mainHead = "a".repeat(40), episodeHead = "b".repeat(40);
+  const result = await tool.execute("transition", {
+    location: ".ralph/plans/future/alpha", taskId: "PRIMECLAW-10.38",
+    mainHead, episodeHead, confirmedReady: true,
+  }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined);
+  assert.equal(result.details.record.version, 2);
+  assert.equal(f.transitioned.length, 1);
+  assert.deepEqual({
+    location: f.transitioned[0].location,
+    taskId: f.transitioned[0].taskId,
+    episodeHead: f.transitioned[0].episodeHead,
+    mainHead: f.transitioned[0].mainHead,
+    confirmedReady: f.transitioned[0].confirmedReady,
+    callCtx: f.transitioned[0].callCtx,
+  }, {
+    location: ".ralph/plans/future/alpha", taskId: "PRIMECLAW-10.38",
+    episodeHead, mainHead, confirmedReady: true, callCtx: f.ctx,
+  });
+  assert.equal(f.transitioned[0].transitionDependencies, f.deps);
+});
+
+test("ownership transition tool reports guarded failures without fallback", async () => {
+  const f = fixture();
+  f.deps.transitionLegacyOwnership = () => { throw new Error("foreign owner or drift"); };
+  const result = await f.tools.get("transition_spec_episode_to_task").execute("transition", {
+    location: ".ralph/plans/future/alpha", taskId: "PRIMECLAW-10.38",
+    mainHead: "a".repeat(40), episodeHead: "b".repeat(40), confirmedReady: true,
+  }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /foreign owner or drift/);
+  assert.deepEqual(result.details, { error: "foreign owner or drift" });
+});
+
 test("tool guidance preserves operator authority and fixed fresh assignment", () => {
   const f = fixture(); const create = f.tools.get("create_spec_episode"); const handoff = f.tools.get("handoff_spec_episode"); const finalize = f.tools.get("finalize_spec_episode");
   assert.match(create.promptGuidelines.join(" "), /fresh Episode/); assert.match(create.promptGuidelines.join(" "), /never send an initial handoff/);
@@ -338,7 +378,7 @@ test("task resolver binds canonical Backlog JSON identity and regular task path"
     calls.push({ command, args, options });
     return { stdout: JSON.stringify({ schemaVersion: 1, kind: "task-view", task: {
       id: "PRIMECLAW-10.38", title: "Planning fixture", status: "In Planning",
-      implementationPlan: "One meaningful step", path: relativeTaskPath,
+      implementationPlan: "One meaningful step", references: ["legacy-episode-source=.ralph/plans/future/alpha; superseded-by=PRIMECLAW-10.38"], path: relativeTaskPath,
     } }), stderr: "", status: 0 };
   } };
 
@@ -346,6 +386,7 @@ test("task resolver binds canonical Backlog JSON identity and regular task path"
   assert.equal(selected.taskId, "PRIMECLAW-10.38");
   assert.equal(selected.status, "In Planning");
   assert.equal(selected.implementationPlan, "One meaningful step");
+  assert.deepEqual(selected.references, ["legacy-episode-source=.ralph/plans/future/alpha; superseded-by=PRIMECLAW-10.38"]);
   assert.equal(selected.projectRoot, realpathSync(root));
   assert.equal(selected.taskPath, realpathSync(join(root, relativeTaskPath)));
   assert.deepEqual(calls, [{

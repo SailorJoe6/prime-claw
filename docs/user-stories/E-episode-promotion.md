@@ -43,6 +43,18 @@ bundle into active `.ralph/plans` and records its promotion commit before the
 same fresh-session and one-assignment boundary. Neither schema inherits the
 Conversation transcript or receives an initial handoff.
 
+A separately reviewed migration may move that same live retained Episode to
+version-2 authority through `transition_spec_episode_to_task`. This is not a
+second admission: after the bridge is merged, globally activated, restarted,
+and UAT-proven, the exact owner supplies reviewed pushed main/Episode heads and
+explicit confirmation. The host proves clean Git ancestry, complete committed
+task and active-plan identity, an idle exact durable session, and unchanged
+worktree/branch/Orca resources. One atomic ownership replacement removes only
+the legacy authority fields and adds the exact task binding. It preserves every
+resource, keeps the active pair, and creates no assignment, commit, status
+change, handoff, finalization, deletion, or cleanup. Only exact replay is
+idempotent; drift or missing evidence fails closed.
+
 ## US-15 — Select Episode placement explicitly
 
 **As an operator with multiple Orca setups, I want to choose the exact local
