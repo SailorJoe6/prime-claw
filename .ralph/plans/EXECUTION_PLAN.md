@@ -1704,3 +1704,19 @@ Completed the bounded acceptance-evidence repair from pushed handoff `b06f823b6e
 - The actual migration receipt and `backlog/config.yml` remain byte-identical to candidate `8ef465d132231d35bdacef64627f4ec3162a43dd`; no actual task file, generic plugin source, vendored Backlog source, or production migration machinery changed.
 
 Step 7 remains unstarted. `.ralph/plans` stays active, `PRIMECLAW-10.38` remains `In Progress`, version-1 ownership remains active, and no final lifecycle publication, plan deletion, merge, finalization, cleanup, or user-global asset application occurred.
+
+## Step 6 acceptance and Step 7 authorization
+
+Step 6 is accepted at exact clean pushed candidate `c63dae91dfa15c4059914eeeeb5dace6debd56fa` and must not be reopened.
+
+The next execute pass is authorized for approved Step 7 only:
+
+1. Confirm every live repository-local specification, plan, progress, blocker, and outcome needed by the task-native workflow is durable in Backlog tasks or current docs.
+2. Delete only this repository's tracked `.ralph/plans` tree.
+3. Keep generic plugin legacy workflow support intact: retained legacy bundles, commands, and tools; ownership version-1 parsing and live-identity rules; no-ownership old active-snapshot fallback; hybrid routing precedence; separate legacy authoring assets; runtime-versus-delivery sources; and operator authority.
+4. Scope final searches so task-native/current project surfaces reject legacy authority while retained legacy surfaces may still require it. Historical literals and frozen provenance must remain truthful.
+5. Run the approved focused Node/Python checks, task parsing/count checks, `git diff --check`, host-safe suite, and Docker-isolated plugin gate.
+6. Update `PRIMECLAW-10.38` through the supported Backlog CLI with final plan, notes, evidence, references, modified files, and Final Summary while leaving status exactly `In Progress`.
+7. Commit and push one clean candidate, report it, and stop.
+
+Do not publish `Ready for Merge`, merge, finalize ownership, clean resources, apply user-global assets, or retire generic legacy compatibility.
