@@ -1598,3 +1598,21 @@ Validation:
 - `git diff --check`: passed.
 
 Steps 6 and 7 remain unstarted. This checkpoint does not change repository lifecycle status/configuration/data cutover, publish final lifecycle state, retire compatibility assets, delete `.ralph/plans`, merge/finalize, clean resources, or apply user-global assets.
+
+## Accepted Step 5 revision after candidate `d3545929163cded2872cf027cf96ffee138f3fc0`
+
+Candidate `d3545929163cded2872cf027cf96ffee138f3fc0` is not accepted. Repair one concrete in-scope legacy-compatibility defect before reconsidering Step 5 acceptance.
+
+The live version-1 active-file gate currently conflicts with normal retained-workflow transitions. `execute` may move the active specification/implementation pair to `.ralph/plans/blocked/` when work blocks and may archive it at candidate completion. That absence then makes `blocked`, replay/handoff, Conversation oversight, and review/revision reject the same persisted version-1 Episode.
+
+Repair requirements:
+
+1. Keep the active specification/implementation pair available throughout live version-1 blocked and candidate-review/revision states. Defer destructive archival until the owned version-1 lifecycle is terminal.
+2. Preserve the distinct no-ownership old in-place workflow behavior.
+3. Add a narrow exact-version-1 recovery path for already-blocked snapshots. It must use persisted version-1 ownership and the recorded worktree, restore only that Episode's blocked pair after the required operator unblock decision, and revalidate active identity before ordinary continuation.
+4. Missing active files never count as live and never fall through to task-native mode.
+5. Add focused blocked → restore → same-Episode continuation coverage and completed-candidate → review/revision coverage.
+6. Synchronize every affected plugin delivery source, project runtime copy, asset inventory/manifest entry, documentation, and focused test.
+7. Preserve all other reviewed Step 5 behavior. Host checks passed (55 Python and 179 Node) and configured Docker Tier-1 passed for the rejected candidate; do not reopen sound areas without concrete evidence.
+
+Do not start Step 6. Do not change repository lifecycle status/configuration/data cutover, publish final lifecycle state, retire compatibility assets, delete `.ralph/plans`, merge/finalize, clean resources, or apply user-global assets.
