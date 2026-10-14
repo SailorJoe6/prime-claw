@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-14 04:40'
+updated_date: '2026-10-14 04:46'
 labels:
   - backlog-md
   - episode-loop
@@ -126,7 +126,7 @@ The generic plugin retains the legacy workflow for initialized repositories that
 
 Preserve `/plan-spec`, `/implement-spec`, `plan_spec`, `create_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`. Preserve ownership version 1 parsing and the legacy promotion, recovery, handoff, review, finalization, and cleanup behavior needed by existing Episodes. Preserve old active-snapshot fallback for `.ralph/skills/handoff` and `.ralph/skills/execute`.
 
-Execute, handoff, blocked handling, Expert review, and Conversation oversight use hybrid routing. Persisted ownership decides the workflow before prompt-tag absence: a valid ownership version 1 record selects the legacy workflow and a valid ownership version 2 record selects the task-native workflow. `<operator-episode-task>` is only a candidate task binding when ownership does not decide. Active plan placement alone is not live Episode identity. A live ownership version 1 Episode requires its ownership record plus active files in that Episode worktree.
+Execute, handoff, blocked handling, Expert review, and Conversation oversight use hybrid routing. Persisted ownership decides the workflow before prompt-tag absence: a valid ownership version 1 record selects the legacy workflow and a valid ownership version 2 record selects the task-native workflow. `<operator-episode-task>` is only a candidate task binding when ownership does not decide. When persisted ownership is absent, active legacy `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files on canonical main may represent the old in-place legacy workflow without any live Prime Claw Episode or ownership version 1 record; that remains a valid legacy workflow case. This no-ownership fallback selects old in-place work only and does not establish Episode identity. Active plan placement alone does not prove live Episode identity. A live ownership version 1 Episode requires persisted version 1 ownership plus active files in that Episode worktree.
 
 Legacy workflow completion wording must not claim or mutate task-native Backlog lifecycle authority. The generic plugin also retains separately named project-local `design-legacy` and `spec-it-out-legacy` authoring assets that preserve current-main legacy authoring without mechanically duplicating neutral or shared Markdown.
 
@@ -189,7 +189,7 @@ The pre-cutover source tree remains available at `6d11d9c2797cea54ecd07171e8a5b2
 - [ ] #22 Compatibility tests retain ownership version 1 parsing and the legacy workflow promotion, recovery, handoff, review, finalization, and cleanup behavior required by existing Episodes.
 - [ ] #23 Execute, handoff, blocked handling, Expert review, and Conversation oversight route across both workflows, and old active-snapshot fallback remains supported for `.ralph/skills/handoff` and `.ralph/skills/execute`.
 - [ ] #24 Persisted ownership decides routing before prompt-tag absence: a valid ownership version 1 record selects the legacy workflow, a valid ownership version 2 record selects the task-native workflow, and `<operator-episode-task>` is only a candidate task binding when ownership does not decide.
-- [ ] #25 Active plan placement alone is not live Episode identity; a live ownership version 1 Episode requires persisted ownership plus active files in that Episode worktree.
+- [ ] #25 Persisted ownership decides first when it exists. With no ownership, active legacy `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files on canonical main remain a valid old in-place legacy workflow case without a live Prime Claw Episode or ownership version 1 record. This fallback does not make active plan placement proof of live Episode identity; a live ownership version 1 Episode requires persisted version 1 ownership plus active files in that Episode worktree.
 - [ ] #26 Legacy workflow execute completion wording cannot claim or mutate task-native Backlog lifecycle authority, status, completion, archival, or cleanup decisions.
 - [ ] #27 Separately named project-local `design-legacy` and `spec-it-out-legacy` assets preserve current-main legacy authoring without mechanically duplicating neutral or shared Markdown.
 - [ ] #28 Workflow selection remains orthogonal to tracker migration and specification storage: Backlog tracking may coexist with legacy bundles, Beads migration is optional and separate, Beads-only repositories initialize the task-native workflow, and archive-only bundles do not force the legacy workflow.
@@ -1659,11 +1659,16 @@ The generic plugin must preserve:
 Persisted ownership decides routing before prompt-tag absence. A valid ownership
 version 1 record selects the legacy workflow and a valid ownership version 2
 record selects the task-native workflow. `<operator-episode-task>` is only a
-candidate task binding when ownership does not decide. Active plan placement
-alone is not live Episode identity; a live ownership version 1 Episode requires
-persisted ownership plus active files in that Episode worktree. Legacy workflow
-execute completion wording cannot claim or mutate task-native Backlog lifecycle
-authority.
+candidate task binding when ownership does not decide. When persisted ownership
+is absent, active legacy `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files
+on canonical main may represent the old in-place legacy workflow without any
+live Prime Claw Episode or ownership version 1 record; that remains a valid
+legacy workflow case. This no-ownership fallback selects old in-place work only
+and does not establish Episode identity. Active plan placement alone does not
+prove live Episode identity; a live ownership version 1 Episode requires
+persisted version 1 ownership plus active files in that Episode worktree.
+Legacy workflow execute completion wording cannot claim or mutate task-native
+Backlog lifecycle authority.
 
 Project-local `.prime-claw/workflows` files are runtime surfaces. Plugin-root
 copies are delivery sources installed or reconciled into projects. Inventory,
@@ -1685,10 +1690,15 @@ Remaining implementation is split into the three ordered slices below.
   the legacy workflow; ownership version 2 selects the task-native workflow.
   Only when ownership does not decide may `<operator-episode-task>` become a
   candidate task binding.
-- Require ownership plus active files in the Episode worktree for live
-  ownership version 1 Episode identity. Do not treat active plan placement
-  alone as identity. Retain old active-snapshot fallback for
-  `.ralph/skills/handoff` and `.ralph/skills/execute`.
+- With no persisted ownership, retain active legacy `SPECIFICATION.md` and
+  `IMPLEMENTATION_PLAN.md` files on canonical main as a valid old in-place
+  legacy workflow case without a live Prime Claw Episode or ownership version 1
+  record. Only this no-ownership old in-place case falls back to active legacy
+  files.
+- Do not treat active plan placement alone as proof of live Episode identity.
+  Require persisted version 1 ownership plus active files in the Episode
+  worktree for a live ownership version 1 Episode. Retain old active-snapshot
+  fallback for `.ralph/skills/handoff` and `.ralph/skills/execute`.
 - Bound completion language by workflow: legacy workflow execution may record
   its own result but must not claim or mutate task-native Backlog status,
   completion, archival, finalization, or cleanup authority.
@@ -2307,4 +2317,10 @@ Accepted repair candidate `b00d7bded447e4d303050dcaca0db444f91df308` and reconci
 The revised specification makes tracker migration and specification authority orthogonal; preserves the named legacy assets, commands, tools, ownership version 1, hybrid role routing, old active-snapshot fallback, separate legacy authoring assets, and runtime-versus-delivery-source distinction; makes persisted ownership decide routing before prompt-tag absence; and confines final plan-tree deletion to this repository. Remaining work is ordered as compatibility preservation and mode resolution, this repository's status/configuration/data cutover, then this repository's `.ralph/plans` deletion and final validation.
 
 This reconciliation changed only `PRIMECLAW-10.38`, `.ralph/plans/SPECIFICATION.md`, and `.ralph/plans/EXECUTION_PLAN.md`. It changed no code, skill, template, test, asset, status, configuration, plan placement, or cutover state. The task remains `In Progress` under `PRIMECLAW-10` with the same canonical path and ownership binding.
+
+## Accepted routing clarification — old in-place legacy workflow
+
+Conversation review of `2287a37c7f3ed66db07a8a3dcf8093a1a881dd3e` identified one missing distinction. Persisted ownership version 1 or version 2 still decides routing first. When no ownership exists, active legacy `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files on canonical main may represent valid old in-place legacy workflow work without any live Prime Claw Episode or ownership version 1 record. That fallback does not establish live Episode identity: a live version 1 Episode still requires persisted version 1 ownership plus active files in that Episode worktree.
+
+This repair changes wording only in this task and `.ralph/plans/EXECUTION_PLAN.md`. It changes no code, skill, template, test, asset, other criterion or scope, lifecycle status, configuration, retirement, cutover, or plan placement. `.ralph/plans/SPECIFICATION.md` remains unchanged.
 <!-- SECTION:NOTES:END -->
