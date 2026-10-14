@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-14 02:56'
+updated_date: '2026-10-14 04:31'
 labels:
   - backlog-md
   - episode-loop
@@ -1642,6 +1642,32 @@ or existing lifecycle statuses, delete or move `.ralph/plans`, retire assets,
 perform final cutover, initiate upstream outreach, or do unrelated cleanup.
 Those actions remain deferred for separate Conversation authority.
 
+#### Accepted review correction — deferred dogfood criteria remain unchecked
+
+Conversation accepts one material in-scope finding against migration candidate
+`2ddd6dc45bbf47665354b6983e930daaa23e8f86`: two completed historical epics
+incorrectly marked explicitly deferred manual dogfood criteria as complete.
+
+The next execute pass must repair only that checked-state evidence through
+supported Backlog CLI operations:
+
+1. Restore `PRIMECLAW-39`, verify exact ID, parent, filename, bytes, and `Done`
+   status through restore, uncheck criteria 1, 2, and 5 while retaining criteria
+   3 and 4 checked, validate the truthful 2/5 state, then complete it back to
+   its exact completed path.
+2. Restore `PRIMECLAW-37`, verify the same identity and storage invariants,
+   uncheck deferred Slice 4 criteria 17–21 while retaining criteria 1–16
+   checked, validate the truthful 16/21 state, then complete it back to its
+   exact completed path.
+3. Update only the affected count/evidence claims in `PRIMECLAW-10.38` and this
+   execution plan. Re-run the existing focused Backlog checks and `git diff
+   --check`, commit and push the exact repair candidate, and stop idle for
+   Conversation review.
+
+Do not run new dogfood, change lifecycle status, alter any other mapping or
+content, retire assets, delete `.ralph/plans`, perform cutover, or do unrelated
+cleanup.
+
 ### 5. Perform the one-time task and bundle migration through Backlog CLI
 
 Freeze the committed Episode base SHA as the pre-cutover provenance commit and
@@ -2263,4 +2289,12 @@ This bounded slice does not delete or move `.ralph/plans`, retire assets, change
 Completed the reviewed bounded migration from frozen provenance `6d11d9c2797cea54ecd07171e8a5b2019d6ee530`. All 43 tracked plan paths reconcile to 16 exact owners; the shared archive index supplies terminal/status evidence. The seven reused completed owners passed exact pre-edit restore receipts and returned to completed storage only after supported CLI edits and validation. New historical epics are `PRIMECLAW-36` through `PRIMECLAW-41`; `PRIMECLAW-42` is the retained `In Design` delivery-manager bundle. `PRIMECLAW-7` remains the sole Blocked Phase 3a replacement. Superseded-history links are bidirectional (`PRIMECLAW-7` ↔ `PRIMECLAW-41`, `PRIMECLAW-10.34` ↔ `PRIMECLAW-40`). `PRIMECLAW-35` is unchanged because its reviewed source bundle is absent.
 
 Focused repository validation: `python3 -m pytest tests/test_backlog_workflow.py tests/test_backlog_build.py -q` → 7 passed. Full mapping, content, identity, storage, hierarchy, and provenance audits passed in the bounded migration helper. No configuration, asset, source-plan location, cutover, upstream, or existing lifecycle-status change is included.
+
+## Accepted migration review correction
+
+Conversation accepts one material in-scope finding against `2ddd6dc45bbf47665354b6983e930daaa23e8f86`: imported native criteria falsely mark explicitly deferred manual dogfood as complete.
+
+Repair only checked-state evidence through supported CLI operations. Restore `PRIMECLAW-39`; uncheck criteria 1, 2, and 5 while retaining 3 and 4 checked (2/5); validate and complete it back to its exact completed path. Restore `PRIMECLAW-37`; uncheck deferred Slice 4 criteria 17–21 while retaining 1–16 checked (16/21); validate and complete it back to its exact completed path. Preserve both tasks' `Done` status, IDs, parents, filenames, and completed paths. Update only affected migration count/evidence claims here and in `.ralph/plans/EXECUTION_PLAN.md`, rerun the existing focused Backlog checks and `git diff --check`, commit and push, then stop idle.
+
+Do not run new dogfood, change lifecycle status, alter another mapping or content, retire assets, delete `.ralph/plans`, perform cutover, or do unrelated cleanup.
 <!-- SECTION:NOTES:END -->

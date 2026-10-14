@@ -1400,6 +1400,32 @@ or existing lifecycle statuses, delete or move `.ralph/plans`, retire assets,
 perform final cutover, initiate upstream outreach, or do unrelated cleanup.
 Those actions remain deferred for separate Conversation authority.
 
+#### Accepted review correction — deferred dogfood criteria remain unchecked
+
+Conversation accepts one material in-scope finding against migration candidate
+`2ddd6dc45bbf47665354b6983e930daaa23e8f86`: two completed historical epics
+incorrectly marked explicitly deferred manual dogfood criteria as complete.
+
+The next execute pass must repair only that checked-state evidence through
+supported Backlog CLI operations:
+
+1. Restore `PRIMECLAW-39`, verify exact ID, parent, filename, bytes, and `Done`
+   status through restore, uncheck criteria 1, 2, and 5 while retaining criteria
+   3 and 4 checked, validate the truthful 2/5 state, then complete it back to
+   its exact completed path.
+2. Restore `PRIMECLAW-37`, verify the same identity and storage invariants,
+   uncheck deferred Slice 4 criteria 17–21 while retaining criteria 1–16
+   checked, validate the truthful 16/21 state, then complete it back to its
+   exact completed path.
+3. Update only the affected count/evidence claims in `PRIMECLAW-10.38` and this
+   execution plan. Re-run the existing focused Backlog checks and `git diff
+   --check`, commit and push the exact repair candidate, and stop idle for
+   Conversation review.
+
+Do not run new dogfood, change lifecycle status, alter any other mapping or
+content, retire assets, delete `.ralph/plans`, perform cutover, or do unrelated
+cleanup.
+
 ### 5. Perform the one-time task and bundle migration through Backlog CLI
 
 Freeze the committed Episode base SHA as the pre-cutover provenance commit and
