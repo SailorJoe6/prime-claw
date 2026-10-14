@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-14 04:46'
+updated_date: '2026-10-14 13:57'
 labels:
   - backlog-md
   - episode-loop
@@ -35,50 +35,47 @@ references:
   - PRIMECLAW-42
   - .ralph/plans/archive/README.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530
 modified_files:
+  - .agents/skills/blocked/SKILL.md
+  - .agents/skills/design-legacy/SKILL.md
+  - .agents/skills/execute/SKILL.md
+  - .agents/skills/spec-it-out-legacy/SKILL.md
+  - .prime-claw/templates.json
+  - .prime-claw/workflows/handoff.md
   - .ralph/plans/EXECUTION_PLAN.md
-  - >-
-    backlog/completed/primeclaw-10.15 -
-    POC-conversation-owned-episode-for-resilient-conversational-handoff.md
-  - >-
-    backlog/completed/primeclaw-10.26 -
-    Implement-conversation-driven-episode-oversight-plugin.md
-  - >-
-    backlog/completed/primeclaw-10.28 -
-    Implement-plugin-global-goal-and-heartbeat-work-control.md
-  - >-
-    backlog/completed/primeclaw-10.34 -
-    Complete-official-lean-role-protocol-and-remove-compatibility.md
-  - >-
-    backlog/completed/primeclaw-19 -
-    Test-tier-architecture-tier-1-plugin-test-container.md
-  - >-
-    backlog/completed/primeclaw-20 -
-    Project-wide-testing-strategy-specification-planning-only.md
-  - >-
-    backlog/completed/primeclaw-6 -
-    Phase-2-sandbox-runtime-foundation-prime-agent-in-OpenShell.md
   - >-
     backlog/tasks/primeclaw-10.38 -
     Replace-.ralph-plans-with-task-native-Backlog-Ralph-lifecycle.md
-  - backlog/tasks/primeclaw-7 - Phase-3-tracer-bullet-end-to-end-working-claw.md
-  - backlog/completed/primeclaw-36 - Historical-Phase-1-de-risk-gate.md
-  - >-
-    backlog/completed/primeclaw-37 -
-    Historical-Reviewed-future-plans-and-worktree-isolated-specification-episodes.md
-  - >-
-    backlog/completed/primeclaw-38 -
-    Historical-Conversational-Ralph-command-routing.md
-  - >-
-    backlog/completed/primeclaw-39 -
-    Historical-Compaction-first-phase-transitions.md
-  - >-
-    backlog/completed/primeclaw-40 -
-    Historical-Official-lean-session-protocol.md
-  - >-
-    backlog/completed/primeclaw-41 -
-    Historical-Superseded-incomplete-Phase-3a-brain-hosting-BUFD.md
-  - backlog/tasks/primeclaw-42 - Design-delivery-manager-episode-supervision.md
-  - .ralph/plans/SPECIFICATION.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/handoff-chain.md
+  - docs/project-initialization.md
+  - docs/user-stories/B-project-initialization.md
+  - docs/user-stories/C-specification.md
+  - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/asset-inventory.json
+  - src/prime-agent-plugin/extension-support/conversation-oversight.ts
+  - src/prime-agent-plugin/extension-support/legacy-workflow.ts
+  - src/prime-agent-plugin/extension-support/project-initialization.ts
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - src/prime-agent-plugin/skills/project-templates/design-legacy.md
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - src/prime-agent-plugin/skills/project-templates/spec-it-out-legacy.md
+  - src/prime-agent-plugin/workflows/handoff.md
+  - tests/project_conversation_extension.test.mjs
+  - tests/project_initialization_extension.test.mjs
+  - tests/spec_episode_extension.test.mjs
+  - tests/test_backlog_workflow.py
+  - tests/test_blocked_skill.py
+  - tests/test_conversation_oversight_native.py
+  - tests/test_execute_skill.py
+  - tests/test_expert_review_skill.py
+  - tests/test_future_plan_skills.py
+  - tests/test_handoff_chain_extension.py
+  - tests/test_managed_session_protocol.py
+  - tests/test_oversee_episode_skill.py
+  - tests/test_project_initialization.py
 parent_task_id: PRIMECLAW-10
 priority: p1
 type: epic
@@ -184,16 +181,16 @@ The pre-cutover source tree remains available at `6d11d9c2797cea54ecd07171e8a5b2
 - [ ] #17 This repository's final candidate tree contains its completed state migration and task-native workflow and no `.ralph/plans` directory. That repository-local deletion does not retire generic legacy workflow compatibility, assets, commands, tools, ownership parsing, or another initialized repository's bundles.
 - [ ] #18 Existing tests plus focused Docker-isolated plugin acceptance prove Conversation, operator, Episode, and Expert authority; exact ownership; isolated code worktrees; iteration handoff; recovery; review; post-merge `Done` before separately authorized finalization/cleanup; final bookkeeping; and cleanup boundaries remain intact apart from the specified task-native lifecycle.
 - [ ] #19 Static and behavioral acceptance proves no pickup surface, Backlog reparenting feature, cross-checkout Backlog wrapper, branch-projection rule, approval commit/blob/tag scheme, replacement digest protocol, bespoke transaction journal, Prime Agent patch, or other unapproved scope expansion is introduced.
-- [ ] #20 The generic plugin retains the project-local legacy workflow assets `project-workflow-plan-prep`, `project-workflow-plan-spec`, `project-workflow-implement-prep`, and `project-workflow-implement-spec`; initialization, reconciliation, inventory, and tests preserve customized instances correctly.
-- [ ] #21 The legacy workflow retains `/plan-spec`, `/implement-spec`, `plan_spec`, `create_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`, with tests covering their current authority and operator gates.
-- [ ] #22 Compatibility tests retain ownership version 1 parsing and the legacy workflow promotion, recovery, handoff, review, finalization, and cleanup behavior required by existing Episodes.
-- [ ] #23 Execute, handoff, blocked handling, Expert review, and Conversation oversight route across both workflows, and old active-snapshot fallback remains supported for `.ralph/skills/handoff` and `.ralph/skills/execute`.
-- [ ] #24 Persisted ownership decides routing before prompt-tag absence: a valid ownership version 1 record selects the legacy workflow, a valid ownership version 2 record selects the task-native workflow, and `<operator-episode-task>` is only a candidate task binding when ownership does not decide.
-- [ ] #25 Persisted ownership decides first when it exists. With no ownership, active legacy `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files on canonical main remain a valid old in-place legacy workflow case without a live Prime Claw Episode or ownership version 1 record. This fallback does not make active plan placement proof of live Episode identity; a live ownership version 1 Episode requires persisted version 1 ownership plus active files in that Episode worktree.
-- [ ] #26 Legacy workflow execute completion wording cannot claim or mutate task-native Backlog lifecycle authority, status, completion, archival, or cleanup decisions.
-- [ ] #27 Separately named project-local `design-legacy` and `spec-it-out-legacy` assets preserve current-main legacy authoring without mechanically duplicating neutral or shared Markdown.
-- [ ] #28 Workflow selection remains orthogonal to tracker migration and specification storage: Backlog tracking may coexist with legacy bundles, Beads migration is optional and separate, Beads-only repositories initialize the task-native workflow, and archive-only bundles do not force the legacy workflow.
-- [ ] #29 Project-local `.prime-claw/workflows` files are tested as runtime surfaces while plugin-root copies remain delivery sources installed or reconciled into projects.
+- [x] #20 The generic plugin retains the project-local legacy workflow assets `project-workflow-plan-prep`, `project-workflow-plan-spec`, `project-workflow-implement-prep`, and `project-workflow-implement-spec`; initialization, reconciliation, inventory, and tests preserve customized instances correctly.
+- [x] #21 The legacy workflow retains `/plan-spec`, `/implement-spec`, `plan_spec`, `create_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`, with tests covering their current authority and operator gates.
+- [x] #22 Compatibility tests retain ownership version 1 parsing and the legacy workflow promotion, recovery, handoff, review, finalization, and cleanup behavior required by existing Episodes.
+- [x] #23 Execute, handoff, blocked handling, Expert review, and Conversation oversight route across both workflows, and old active-snapshot fallback remains supported for `.ralph/skills/handoff` and `.ralph/skills/execute`.
+- [x] #24 Persisted ownership decides routing before prompt-tag absence: a valid ownership version 1 record selects the legacy workflow, a valid ownership version 2 record selects the task-native workflow, and `<operator-episode-task>` is only a candidate task binding when ownership does not decide.
+- [x] #25 Persisted ownership decides first when it exists. With no ownership, active legacy `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files on canonical main remain a valid old in-place legacy workflow case without a live Prime Claw Episode or ownership version 1 record. This fallback does not make active plan placement proof of live Episode identity; a live ownership version 1 Episode requires persisted version 1 ownership plus active files in that Episode worktree.
+- [x] #26 Legacy workflow execute completion wording cannot claim or mutate task-native Backlog lifecycle authority, status, completion, archival, or cleanup decisions.
+- [x] #27 Separately named project-local `design-legacy` and `spec-it-out-legacy` assets preserve current-main legacy authoring without mechanically duplicating neutral or shared Markdown.
+- [x] #28 Workflow selection remains orthogonal to tracker migration and specification storage: Backlog tracking may coexist with legacy bundles, Beads migration is optional and separate, Beads-only repositories initialize the task-native workflow, and archive-only bundles do not force the legacy workflow.
+- [x] #29 Project-local `.prime-claw/workflows` files are tested as runtime surfaces while plugin-root copies remain delivery sources installed or reconciled into projects.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -1775,6 +1772,30 @@ focused, host-safe, and Docker-isolated validation passes; and
 `PRIMECLAW-10.38` contains the complete evidence while remaining `In Progress`.
 The owning Conversation then performs the separate review, lifecycle, merge,
 finalization, and cleanup decisions.
+
+## Step 5 compatibility-preservation completion checkpoint
+
+Completed only Step 5, "Preserve compatibility and resolve workflow mode," against accepted base `e4d1cdd46fd96f7b6f4f529e286b316bb60adf77`.
+
+- Retained the four customizable legacy workflow assets and all six legacy command/tool surfaces, version-1 ownership parsing, promotion, replay, recovery, handoff, review, finalization, and cleanup behavior.
+- Made persisted ownership authoritative before prompt text: version 1 selects retained-folder mode and version 2 selects task-native mode. Without ownership, complete active files on canonical main remain valid old in-place work but do not create Episode identity.
+- Required live version-1 Episode identity to include readable, non-empty active specification and implementation files in the recorded Episode worktree. Missing files now fail closed for replay, handoff, oversight, and initialization reconciliation.
+- Accepted `IMPLEMENTATION_PLAN.md` plus retained `EXECUTION_PLAN.md`, and kept `.ralph/skills` snapshot fallback limited to `handoff` and `execute`.
+- Added separately named `design-legacy` and `spec-it-out-legacy` project skills. Their shared future-folder contract has one owner, and the new assets have no competing migration source.
+- Bounded legacy completion and blocking so retained-folder actions cannot claim or mutate task-native Backlog lifecycle, finalization, or cleanup authority.
+- Preserved runtime project copies separately from plugin delivery sources, including customized initialized-project assets.
+
+Validation:
+- focused host-safe suites: 56 passed, 11 deselected;
+- managed inventory/workflow suites: 15 passed, 34 deselected;
+- broad non-container suite: 655 passed, 1 skipped, 65 deselected, 75 subtests passed, with only three unchanged accepted-base/environment failures;
+- full focused Docker bridge: 136/137 Node cases passed; the sole failure is the unchanged pre-Step-5 test that expects the ignored host-built `deps/backlog/dist/backlog` artifact inside the read-only snapshot;
+- final Step-5 Docker selection excluding that exact unchanged baseline: 11 passed, 21 deselected;
+- independent read-only review: no material findings; directly affected suites passed;
+- `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed with offline RPC probe, verified teardown, and published manifest;
+- `git diff --check`: passed.
+
+Steps 6 and 7 remain unstarted. This checkpoint does not change repository lifecycle status/configuration/data cutover, publish final lifecycle state, retire compatibility assets, delete `.ralph/plans`, merge/finalize, clean resources, or apply user-global assets.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -2323,4 +2344,12 @@ This reconciliation changed only `PRIMECLAW-10.38`, `.ralph/plans/SPECIFICATION.
 Conversation review of `2287a37c7f3ed66db07a8a3dcf8093a1a881dd3e` identified one missing distinction. Persisted ownership version 1 or version 2 still decides routing first. When no ownership exists, active legacy `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files on canonical main may represent valid old in-place legacy workflow work without any live Prime Claw Episode or ownership version 1 record. That fallback does not establish live Episode identity: a live version 1 Episode still requires persisted version 1 ownership plus active files in that Episode worktree.
 
 This repair changes wording only in this task and `.ralph/plans/EXECUTION_PLAN.md`. It changes no code, skill, template, test, asset, other criterion or scope, lifecycle status, configuration, retirement, cutover, or plan placement. `.ralph/plans/SPECIFICATION.md` remains unchanged.
+
+## Step 5 compatibility-preservation implementation evidence
+
+Implemented and validated the approved compatibility-preservation slice only. Persisted ownership now selects version-1 retained-folder or version-2 task-native routing before prompt tags. Old in-place active legacy files on canonical main remain valid without claiming Episode identity. Live version-1 identity requires ownership plus readable, non-empty active files in the recorded worktree and fails closed when they are absent. The four customizable legacy workflows, six legacy commands/tools, version-1 lifecycle mechanics, and bounded handoff/execute snapshot fallback remain available. Added separate `design-legacy` and `spec-it-out-legacy` assets without competing migration sources or duplicated common policy. Legacy completion/blocking cannot mutate task-native Backlog lifecycle, finalization, or cleanup authority.
+
+Validation passed: focused host-safe 56 passed; managed inventory/workflow 15 passed; final Step-5 Docker selection 11 passed; independent review found no material defects; source-mode `scripts/test-tier1.sh --probe` passed with verified teardown and manifest publication; `git diff --check` passed. The earlier full Docker bridge passed every Step 5 case and 136/137 Node cases overall; its sole failure is an unchanged pre-Step-5 test that expects ignored host-built `deps/backlog/dist/backlog` inside the read-only container snapshot. The broad non-container suite reached 655 passed with only three unchanged accepted-base/environment failures.
+
+No Step 6 or 7 status/configuration/data cutover, final publication, retirement, plan deletion, merge/finalization, cleanup, or user-global application occurred.
 <!-- SECTION:NOTES:END -->

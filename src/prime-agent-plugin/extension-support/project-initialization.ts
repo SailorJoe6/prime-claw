@@ -20,6 +20,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { activeLegacyPlanFiles } from "./legacy-workflow.ts";
 
 export const TEMPLATE_MANIFEST = ".prime-claw/templates.json";
 export const TEMPLATE_REVIEW_STATE = ".prime-claw/template-review.json";
@@ -561,6 +562,12 @@ function sameExistingPath(left: string, right: string): boolean {
 
 export type EpisodeWorktreeActivity = "active" | "inactive" | "uncertain";
 
+/** Active plan placement is evidence only. Live legacy Episode identity also
+ * requires persisted version-1 ownership that points at this worktree. */
+export function hasActiveLegacyPlanFiles(worktreeRoot: string): boolean {
+  return activeLegacyPlanFiles(worktreeRoot) !== null;
+}
+
 function ownershipActivityAt(ownerRoot: string, worktreeRoot: string): EpisodeWorktreeActivity {
   const path = join(ownerRoot, ".prime-claw", "ownership.json");
   let stat;
@@ -569,7 +576,14 @@ function ownershipActivityAt(ownerRoot: string, worktreeRoot: string): EpisodeWo
   try {
     if (!stat.isFile() || stat.isSymbolicLink()) return "uncertain";
     const record = jsonObject(parseJson(readFileSync(path, "utf8"), relative(ownerRoot, path)), relative(ownerRoot, path));
-    if (record.status !== "inactive" && typeof record.worktree === "string" && sameExistingPath(record.worktree, worktreeRoot)) return "active";
+    if (record.status !== "inactive" && typeof record.worktree === "string" && sameExistingPath(record.worktree, worktreeRoot)) {
+      // Version-1 ownership without its promoted active files is not a live
+      // Episode. Keep reconciliation fail-closed while recovery is needed.
+      if (record.version === 1 && !hasActiveLegacyPlanFiles(worktreeRoot)) return "uncertain";
+      return "active";
+    }
+    if (record.version === 1 && ["provisioning", "uncertain"].includes(String(record.status))) return "uncertain";
+    if (record.version === 1 && record.status === "active" && typeof record.worktree !== "string") return "uncertain";
     return "inactive";
   } catch { return "uncertain"; }
 }

@@ -4,10 +4,10 @@
     "project-skill-blocked": {
       "source": "skills/project-templates/blocked.md",
       "destination": ".agents/skills/blocked/SKILL.md",
-      "baselineSha256": "e46cb99b1f61585dc5d00f0ab64013de601a5c3179e6557f740100778ff18933",
-      "installedSha256": "e46cb99b1f61585dc5d00f0ab64013de601a5c3179e6557f740100778ff18933",
+      "baselineSha256": "669c359a01f867d22b59a1e71b85b66e52f7adef93ade6f1299b7e6c974eaf0b",
+      "installedSha256": "669c359a01f867d22b59a1e71b85b66e52f7adef93ade6f1299b7e6c974eaf0b",
       "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "e46cb99b1f61585dc5d00f0ab64013de601a5c3179e6557f740100778ff18933",
+      "availableUpstreamSha256": "669c359a01f867d22b59a1e71b85b66e52f7adef93ade6f1299b7e6c974eaf0b",
       "state": "managed",
       "provenance": {
         "scope": "project",
@@ -31,13 +31,28 @@
         "lifecycleTrigger": "project-reconcile"
       }
     },
+    "project-skill-design-legacy": {
+      "source": "skills/project-templates/design-legacy.md",
+      "destination": ".agents/skills/design-legacy/SKILL.md",
+      "baselineSha256": "a67da0e6a0a463b426c6a68d170421aef297bd97f07da4c29e727ede256d2369",
+      "installedSha256": "a67da0e6a0a463b426c6a68d170421aef297bd97f07da4c29e727ede256d2369",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "a67da0e6a0a463b426c6a68d170421aef297bd97f07da4c29e727ede256d2369",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "discoverable",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "project-reconcile"
+      }
+    },
     "project-skill-execute": {
       "source": "skills/project-templates/execute.md",
       "destination": ".agents/skills/execute/SKILL.md",
-      "baselineSha256": "0fef54628550915df1998d838cb054b0d34ffd93d4fedd4452a9b54c36cc4ef2",
-      "installedSha256": "0fef54628550915df1998d838cb054b0d34ffd93d4fedd4452a9b54c36cc4ef2",
+      "baselineSha256": "f96a46c29effd48ab5a061dca7226efb3cf8b48e11ad561c948529102236e391",
+      "installedSha256": "f96a46c29effd48ab5a061dca7226efb3cf8b48e11ad561c948529102236e391",
       "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "0fef54628550915df1998d838cb054b0d34ffd93d4fedd4452a9b54c36cc4ef2",
+      "availableUpstreamSha256": "f96a46c29effd48ab5a061dca7226efb3cf8b48e11ad561c948529102236e391",
       "state": "managed",
       "provenance": {
         "scope": "project",
@@ -76,13 +91,28 @@
         "lifecycleTrigger": "project-reconcile"
       }
     },
+    "project-skill-spec-it-out-legacy": {
+      "source": "skills/project-templates/spec-it-out-legacy.md",
+      "destination": ".agents/skills/spec-it-out-legacy/SKILL.md",
+      "baselineSha256": "6411597b4bc07d6490e06419dc6ef110392458475cb80899d75debf3e7f8aa75",
+      "installedSha256": "6411597b4bc07d6490e06419dc6ef110392458475cb80899d75debf3e7f8aa75",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "6411597b4bc07d6490e06419dc6ef110392458475cb80899d75debf3e7f8aa75",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "discoverable",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "project-reconcile"
+      }
+    },
     "project-workflow-handoff": {
       "source": "workflows/handoff.md",
       "destination": ".prime-claw/workflows/handoff.md",
-      "baselineSha256": "ca7700bfa5640f55b1eab282f9778b2a57fbd3fb2e8835e778f8496876d0ebd7",
-      "installedSha256": "ca7700bfa5640f55b1eab282f9778b2a57fbd3fb2e8835e778f8496876d0ebd7",
+      "baselineSha256": "07aad8b243a1eab2c64f4f9dcce92e53544fa08104b68b9904cdad273f711320",
+      "installedSha256": "07aad8b243a1eab2c64f4f9dcce92e53544fa08104b68b9904cdad273f711320",
       "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "ca7700bfa5640f55b1eab282f9778b2a57fbd3fb2e8835e778f8496876d0ebd7",
+      "availableUpstreamSha256": "07aad8b243a1eab2c64f4f9dcce92e53544fa08104b68b9904cdad273f711320",
       "state": "managed",
       "provenance": {
         "scope": "project",

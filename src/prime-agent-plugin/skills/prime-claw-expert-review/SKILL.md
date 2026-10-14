@@ -25,7 +25,16 @@ not require active-episode ownership, a particular worktree or branch, push
 state, a fixed packet object, or repository snapshot hashes. If information
 needed for a bounded review is unclear, ask the caller instead of guessing.
 
-Select the candidate's durable authority explicitly:
+Select the candidate's durable authority explicitly. Inspect persisted
+`.prime-claw/ownership.json` from the canonical primary checkout before prompt
+tags or candidate prose. Version 1 selects the retained folder contract;
+version 2 selects the exact task contract. A task tag is only a candidate when
+ownership does not decide and never overrides either record. With no ownership,
+a complete active legacy `SPECIFICATION.md` plus `IMPLEMENTATION_PLAN.md` pair
+on canonical main (including the retained `EXECUTION_PLAN.md` spelling) selects
+old in-place folder review without creating live Episode identity. A live
+version-1 Episode requires persisted version-1 ownership plus those active files
+in its recorded Episode worktree; placement alone is not identity.
 
 - For a task-native candidate, bind the review to the exact Backlog task ID and
   project-relative task path at the candidate commit. Reload it through the
@@ -35,7 +44,9 @@ Select the candidate's durable authority explicitly:
   exact ID, path, and parent identity, and do not consult `.ralph/plans` or copy
   task content from another checkout.
 - For a retained folder candidate, use its exact approved specification and
-  execution plan. Do not substitute a related Backlog task as authority.
+  execution plan. Do not substitute a related Backlog task as authority. Legacy
+  review is evidence only and cannot claim or mutate task-native Backlog status,
+  completion, archival, finalization, or cleanup authority.
 
 ## Select and start the reviewer
 

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, lstatSync, symlinkSync, unlinkSync, realpathSync, cpSync, rmSync, statSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, lstatSync, symlinkSync, unlinkSync, realpathSync, cpSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -13,6 +13,8 @@ import {
   ensureOrcaRegistration,
   isOrcaRegistered,
   resolveNearestProjectRoot,
+  episodeWorktreeActivity,
+  hasActiveLegacyPlanFiles,
 } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { createProjectInitializationExtension } from "../src/prime-agent-plugin/extensions/project-initialization.ts";
 import { startTemplateReview } from "../src/prime-agent-plugin/extension-support/template-review.ts";
@@ -38,8 +40,12 @@ class Runner {
   }
 }
 
-test("inventory exposes the fourteen manifest-authoritative project assets",()=>{
-  const inv=loadAssetInventory(PLUGIN); assert.equal(inv.schemaVersion,2); assert.equal(inv.assets.length,14); assert.equal(new Set(inv.assets.map(x=>x.id)).size,14); assert.deepEqual(inv.assets.filter(x=>x.exposure==="discoverable").map(x=>x.id).sort(),["project-skill-blocked","project-skill-design","project-skill-execute","project-skill-prepare","project-skill-spec-it-out"]);
+test("inventory exposes sixteen manifest-authoritative project assets including retained compatibility",()=>{
+  const inv=loadAssetInventory(PLUGIN); assert.equal(inv.schemaVersion,2); assert.equal(inv.assets.length,16); assert.equal(new Set(inv.assets.map(x=>x.id)).size,16);
+  assert.deepEqual(inv.assets.filter(x=>x.exposure==="discoverable").map(x=>x.id).sort(),[
+    "project-skill-blocked","project-skill-design","project-skill-design-legacy","project-skill-execute","project-skill-prepare","project-skill-spec-it-out","project-skill-spec-it-out-legacy",
+  ]);
+  for (const id of ["project-skill-design-legacy","project-skill-spec-it-out-legacy"]) assert.equal(inv.assets.find(x=>x.id===id).migrateFrom,undefined);
   for (const prefix of ["project-workflow-plan-task","project-workflow-implement-task"]) { const taskNative=inv.assets.filter(x=>x.id.startsWith(prefix)); assert.equal(taskNative.length,2); assert.ok(taskNative.every(x=>x.migrateFrom===undefined)); }
 });
 
@@ -68,47 +74,61 @@ test("retired customized project assets are preserved and released", t => {
   assert.equal(Object.hasOwn(JSON.parse(readFileSync(join(root,".prime-claw/templates.json"),"utf8")).assets,assetId),false);
 });
 
-test("task-native cutover rehearsal retires only exact folder workflow assets without touching active snapshots or retained plans", t => {
+test("retained legacy workflow assets initialize and reconcile without replacing customized runtime policy", t => {
   const compatibility = [
-    ["project-workflow-plan-prep", ".prime-claw/workflows/plan-prep.md"],
-    ["project-workflow-plan-spec", ".prime-claw/workflows/plan-spec.md"],
-    ["project-workflow-implement-prep", ".prime-claw/workflows/implement-prep.md"],
-    ["project-workflow-implement-spec", ".prime-claw/workflows/implement-spec.md"],
+    ["project-workflow-plan-prep", "workflows/plan-prep.md", ".prime-claw/workflows/plan-prep.md"],
+    ["project-workflow-plan-spec", "workflows/plan-spec.md", ".prime-claw/workflows/plan-spec.md"],
+    ["project-workflow-implement-prep", "workflows/implement-prep.md", ".prime-claw/workflows/implement-prep.md"],
+    ["project-workflow-implement-spec", "workflows/implement-spec.md", ".prime-claw/workflows/implement-spec.md"],
   ];
-  const retiredIds = new Set(compatibility.map(([id]) => id));
-  const plugin=join(mkdtempSync(join(tmpdir(),"pc-task-cutover-rehearsal-")),"plugin"); cpSync(PLUGIN,plugin,{recursive:true});
-  const root=repo(t), runner=new Runner(); reconcilePrimeClawProject({cwd:root,pluginRoot:plugin,home:dirname(root),runner});
-  const plan=join(root,".ralph/plans/future/retained/SPECIFICATION.md"); mkdirSync(dirname(plan),{recursive:true}); writeFileSync(plan,"retained plan bytes\n");
-  const customizedId="project-workflow-plan-spec", customizedPath=join(root,compatibility.find(([id])=>id===customizedId)[1]); writeFileSync(customizedPath,"operator folder compatibility policy\n");
-
-  const inventoryPath=join(plugin,"asset-inventory.json"), inventory=JSON.parse(readFileSync(inventoryPath,"utf8"));
-  const retiredRows=inventory.assets.filter(asset=>retiredIds.has(asset.id)); assert.equal(retiredRows.length,4);
-  inventory.assets=inventory.assets.filter(asset=>!retiredIds.has(asset.id)); writeFileSync(inventoryPath,JSON.stringify(inventory,null,2)+"\n");
-  for (const row of retiredRows) rmSync(join(plugin,row.source));
-  const taskNative=loadAssetInventory(plugin).assets; assert.equal(taskNative.length,10); assert.ok(taskNative.every(asset=>!retiredIds.has(asset.id)));
-
-  const ownership=join(root,".prime-claw/ownership.json"); writeFileSync(ownership,JSON.stringify({version:1,status:"active",sourceLocation:".ralph/plans/future/retained",slug:"retained",bundleDigest:"0".repeat(64),worktree:root}));
-  const heldManifest=readFileSync(join(root,".prime-claw/templates.json"));
-  const heldCompatibility=new Map(compatibility.map(([id,destination])=>[id,readFileSync(join(root,destination))]));
-  const held=reconcilePrimeClawProject({cwd:root,pluginRoot:plugin,home:dirname(root),runner});
-  assert.equal(held.skippedActiveEpisode,true); assert.equal(held.skipReason,"active-episode"); assert.deepEqual(readFileSync(join(root,".prime-claw/templates.json")),heldManifest);
-  for (const [id,destination] of compatibility) assert.deepEqual(readFileSync(join(root,destination)),heldCompatibility.get(id));
-  assert.equal(readFileSync(plan,"utf8"),"retained plan bytes\n"); unlinkSync(ownership);
-
-  const result=reconcilePrimeClawProject({cwd:root,pluginRoot:plugin,home:dirname(root),runner});
-  for (const [id,destination] of compatibility) {
-    const item=result.items.find(value=>value.assetId===id);
-    if (id===customizedId) { assert.equal(item.action,"preserved"); assert.match(item.reason,/released customized/); assert.equal(readFileSync(join(root,destination),"utf8"),"operator folder compatibility policy\n"); }
-    else { assert.equal(item.action,"retired"); assert.equal(existsSync(join(root,destination)),false); }
+  const plugin=join(mkdtempSync(join(tmpdir(),"pc-retained-workflows-")),"plugin"); cpSync(PLUGIN,plugin,{recursive:true});
+  const root=repo(t), runner=new Runner(); const first=reconcilePrimeClawProject({cwd:root,pluginRoot:plugin,home:dirname(root),runner});
+  const manifestPath=join(root,".prime-claw/templates.json"); let manifest=JSON.parse(readFileSync(manifestPath,"utf8"));
+  for (const [id,source,destination] of compatibility) {
+    assert.equal(first.items.find(item=>item.assetId===id).action,"created");
+    assert.deepEqual(readFileSync(join(root,destination)),readFileSync(join(plugin,source)));
+    assert.equal(manifest.assets[id].state,"managed");
+    assert.equal(manifest.assets[id].destination,destination);
   }
-  const manifest=JSON.parse(readFileSync(join(root,".prime-claw/templates.json"),"utf8")); assert.deepEqual(Object.keys(manifest.assets).sort(),taskNative.map(asset=>asset.id).sort());
-  for (const asset of taskNative) { assert.equal(manifest.assets[asset.id].state,"managed"); assert.deepEqual(readFileSync(join(root,asset.destination)),readFileSync(join(plugin,asset.source))); }
-  assert.equal(readFileSync(plan,"utf8"),"retained plan bytes\n");
+
+  const customizedId="project-workflow-plan-spec", customized=compatibility.find(([id])=>id===customizedId);
+  writeFileSync(join(root,customized[2]),"operator folder compatibility policy\n");
+  for (const [,source] of compatibility) writeFileSync(join(plugin,source),readFileSync(join(plugin,source),"utf8")+"\nupstream compatibility revision\n");
+  const second=reconcilePrimeClawProject({cwd:root,pluginRoot:plugin,home:dirname(root),runner}); manifest=JSON.parse(readFileSync(manifestPath,"utf8"));
+  for (const [id,source,destination] of compatibility) {
+    const item=second.items.find(value=>value.assetId===id);
+    if (id===customizedId) {
+      assert.equal(item.action,"preserved"); assert.match(item.reason,/customized/);
+      assert.equal(readFileSync(join(root,destination),"utf8"),"operator folder compatibility policy\n");
+      assert.equal(manifest.assets[id].state,"customized");
+      assert.notEqual(manifest.assets[id].installedSha256,manifest.assets[id].availableUpstreamSha256);
+    } else {
+      assert.equal(item.action,"updated");
+      assert.deepEqual(readFileSync(join(root,destination)),readFileSync(join(plugin,source)));
+      assert.equal(manifest.assets[id].state,"managed");
+    }
+  }
 
   const fresh=repo(t), freshResult=reconcilePrimeClawProject({cwd:fresh,pluginRoot:plugin,home:dirname(fresh),runner:new Runner()});
-  assert.equal(freshResult.items.filter(item=>item.action==="created").length,10); assert.equal(existsSync(join(fresh,".ralph/plans")),false);
-  assert.deepEqual(Object.keys(JSON.parse(readFileSync(join(fresh,".prime-claw/templates.json"),"utf8")).assets).sort(),taskNative.map(asset=>asset.id).sort());
-  for (const [,destination] of compatibility) assert.equal(existsSync(join(fresh,destination)),false);
+  assert.equal(freshResult.items.filter(item=>item.action==="created").length,16);
+  for (const [id,source,destination] of compatibility) {
+    assert.deepEqual(readFileSync(join(fresh,destination)),readFileSync(join(plugin,source)),id);
+    assert.equal(JSON.parse(readFileSync(join(fresh,".prime-claw/templates.json"),"utf8")).assets[id].state,"managed");
+  }
+});
+
+test("tracker and archive layout do not retire either workflow family or invent Episode identity", t => {
+  for (const layout of ["beads-only","archive-only"]) {
+    const root=repo(t), runner=new Runner();
+    if (layout==="beads-only") { mkdirSync(join(root,".beads"),{recursive:true});writeFileSync(join(root,".beads/issues.jsonl"),"{}\n"); }
+    else { const archive=join(root,".ralph/plans/archive/old");mkdirSync(archive,{recursive:true});writeFileSync(join(archive,"SPECIFICATION.md"),"historical\n");writeFileSync(join(archive,"EXECUTION_PLAN.md"),"historical plan\n"); }
+    const result=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
+    assert.equal(result.items.filter(item=>item.action==="created").length,16);
+    for (const name of ["plan-task.md","implement-task.md","plan-spec.md","implement-spec.md"]) assert.equal(existsSync(join(root,".prime-claw/workflows",name)),true);
+    assert.equal(existsSync(join(root,".prime-claw/ownership.json")),false);
+    assert.equal(hasActiveLegacyPlanFiles(root),false);
+    assert.equal(episodeWorktreeActivity(root,"repository",runner),"inactive");
+  }
 });
 
 test("root discovery handles nested cwd, nested repo, linked worktree, submodule, and HOME ceiling",t=>{
@@ -123,7 +143,7 @@ test("root discovery handles nested cwd, nested repo, linked worktree, submodule
 
 test("fresh reconcile is convergent, registers once, preserves customization, and tracks later upstream",t=>{
   const root=repo(t); const runner=new Runner();
-  const first=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner,registerOrca:true}); assert.equal(first.items.filter(x=>x.action==="created").length,14); assert.equal(first.registration.status,"added"); assert.equal(runner.adds,1); assert.equal(existsSync(join(root,".ralph","plans")),false);
+  const first=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner,registerOrca:true}); assert.equal(first.items.filter(x=>x.action==="created").length,16); assert.equal(first.registration.status,"added"); assert.equal(runner.adds,1); assert.equal(existsSync(join(root,".ralph","plans")),false);
   for (const name of ["plan-task-prep.md","plan-task.md","implement-task-prep.md","implement-task.md"]) assert.equal(readFileSync(join(root,".prime-claw/workflows",name),"utf8"),readFileSync(join(PLUGIN,"workflows",name),"utf8"));
   const manifestPath=join(root,".prime-claw/templates.json"), beforeManifest=statSync(manifestPath,{bigint:true});
   const second=reconcilePrimeClawProject({cwd:join(root,".agents"),pluginRoot:PLUGIN,home:dirname(root),runner,registerOrca:true}); const afterManifest=statSync(manifestPath,{bigint:true}); assert.equal(second.changed,false); assert.equal(second.manifestWritten,false); assert.equal(afterManifest.ino,beforeManifest.ino); assert.equal(afterManifest.mtimeNs,beforeManifest.mtimeNs); assert.equal(second.registration.status,"reused"); assert.equal(runner.adds,1);
@@ -151,7 +171,7 @@ test("extension shares core across command, tool, and awaited startup without a 
   const pi={registerCommand(n,d){commands.set(n,d)},registerTool(d){tools.set(d.name,d)},on(n,h){events.set(n,h)}};
   createProjectInitializationExtension({pluginRoot:PLUGIN,home:dirname(root),runner})(pi);
   assert.deepEqual([...commands.keys()],["initialize-prime-claw"]); assert.deepEqual([...tools.keys()],["initialize_prime_claw"]); assert.ok(events.has("session_start")); assert.ok(events.has("resources_discover"));
-  const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}}; await events.get("session_start")({},ctx); assert.ok(existsSync(join(root,".prime-claw/templates.json"))); assert.equal(notifications.length,1); const discovered=await events.get("resources_discover")({},ctx); assert.equal(discovered.skillPaths.length,5); assert.ok(discovered.skillPaths.every(path=>path.endsWith("SKILL.md"))); assert.equal(await events.get("resources_discover")({},ctx),undefined); await events.get("session_start")({},ctx); assert.equal(notifications.length,1);
+  const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}}; await events.get("session_start")({},ctx); assert.ok(existsSync(join(root,".prime-claw/templates.json"))); assert.equal(notifications.length,1); const discovered=await events.get("resources_discover")({},ctx); assert.equal(discovered.skillPaths.length,7); assert.ok(discovered.skillPaths.every(path=>path.endsWith("SKILL.md"))); assert.equal(await events.get("resources_discover")({},ctx),undefined); await events.get("session_start")({},ctx); assert.equal(notifications.length,1);
   const result=await tools.get("initialize_prime_claw").execute("id",{action:"reconcile"},null,null,ctx); assert.equal(result.isError,undefined); assert.equal(runner.adds,0);
   await commands.get("initialize-prime-claw").handler("--review project-skill-prepare",ctx);
   assert.match(notifications.at(-1).message,/temporarily overwrite/);
@@ -174,6 +194,33 @@ test("one owner-worktree record protects the linked Episode snapshot", (t) => {
   assert.throws(()=>acceptProjectOverride(worktree,"project-skill-prepare",{pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()}),/active or uncertain Episode/);
   assert.throws(()=>resetProjectAsset(worktree,"project-skill-prepare",{pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()}),/active or uncertain Episode/);
   assert.throws(()=>startTemplateReview(worktree,"project-skill-prepare",true,{pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()}),/active or uncertain Episode/);
+});
+
+test("legacy Episode identity requires version-one ownership plus active worktree files", (t) => {
+  const root=repo(t), worktree=join(dirname(root),"legacy-episode-worktree");
+  git(root,"worktree","add","-q","-b","episode/legacy",worktree);
+  t.after(()=>{try{git(root,"worktree","remove","--force",worktree)}catch{};rmSync(worktree,{recursive:true,force:true})});
+  const rootPlans=join(root,".ralph/plans");mkdirSync(rootPlans,{recursive:true});writeFileSync(join(rootPlans,"SPECIFICATION.md"),"old in-place spec\n");writeFileSync(join(rootPlans,"IMPLEMENTATION_PLAN.md"),"old in-place plan\n");
+  assert.equal(hasActiveLegacyPlanFiles(root),true);
+  assert.equal(episodeWorktreeActivity(root,"repository",new Runner()),"inactive");
+
+  const ownership=join(root,".prime-claw/ownership.json");mkdirSync(dirname(ownership),{recursive:true});
+  writeFileSync(ownership,JSON.stringify({version:1,status:"active",worktree}));
+  assert.equal(episodeWorktreeActivity(root,"repository",new Runner()),"inactive");
+  assert.equal(hasActiveLegacyPlanFiles(worktree),false);
+  assert.equal(episodeWorktreeActivity(worktree,"linked-worktree",new Runner()),"uncertain");
+
+  const plans=join(worktree,".ralph/plans");mkdirSync(plans,{recursive:true});writeFileSync(join(plans,"SPECIFICATION.md"),"episode spec\n");writeFileSync(join(plans,"IMPLEMENTATION_PLAN.md"),"episode plan\n");
+  assert.equal(hasActiveLegacyPlanFiles(worktree),true);
+  assert.equal(episodeWorktreeActivity(worktree,"linked-worktree",new Runner()),"active");
+  if (process.getuid?.() !== 0) {
+    const specification=join(plans,"SPECIFICATION.md");chmodSync(specification,0o000);
+    try { assert.equal(hasActiveLegacyPlanFiles(worktree),false); }
+    finally { chmodSync(specification,0o600); }
+  }
+  unlinkSync(join(plans,"IMPLEMENTATION_PLAN.md"));writeFileSync(join(plans,"EXECUTION_PLAN.md"),"retained execution spelling\n");
+  assert.equal(hasActiveLegacyPlanFiles(worktree),true);
+  assert.equal(episodeWorktreeActivity(worktree,"linked-worktree",new Runner()),"active");
 });
 
 test("legacy symlink is preserved when its source leaf is unsafe or missing", (t) => {

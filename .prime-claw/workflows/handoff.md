@@ -5,15 +5,36 @@ description: Use for Ralph's handoff phase to update durable task or plan contex
 
 ## Select the bound authority
 
-If this assignment contains exactly one `<operator-episode-task>` block, treat
-its entire trimmed value only as the exact Backlog task ID already bound to this
-Episode. Reload it through the supported structured interface:
+Inspect persisted `.prime-claw/ownership.json` from the canonical primary
+checkout before interpreting prompt tags. In a linked Episode worktree, locate
+that checkout through Git worktree metadata; a missing worktree-local record is
+not proof that ownership is absent.
+
+Version-1 ownership selects retained folder-plan handoff. Require readable,
+non-empty active `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files in the
+recorded Episode worktree for live version-1 Episode identity, accepting the
+retained `EXECUTION_PLAN.md` spelling used by this project. If they are absent,
+stop for exact recovery. Version-2 ownership selects task-native handoff and
+binds its exact task ID and path. If an `<operator-episode-task>` block is also
+present, require its entire trimmed value to match that persisted task ID. A
+prompt tag never overrides persisted ownership.
+
+With no ownership, active legacy `SPECIFICATION.md` and
+`IMPLEMENTATION_PLAN.md` files on canonical main (or the retained
+`EXECUTION_PLAN.md` spelling) select valid old in-place folder work without
+creating Episode identity. Only when neither ownership nor those old in-place
+files decides may `<operator-episode-task>` become a candidate task binding.
+The tag alone cannot establish a live Episode or authorize task handoff; stop
+for exact version-2 ownership recovery before task-native continuation.
+
+For task-native handoff, reload the bound candidate through the supported
+structured interface:
 
 ```sh
 backlog task view --json -- TASK-ID
 ```
 
-Require the returned canonical ID and task path to match the bound task, and
+Require the returned canonical ID and task path to match the binding, and
 require status to remain exactly `In Progress`. The task is the sole durable
 handoff authority in this mode. Ensure its Implementation Plan, Implementation
 Notes, acceptance evidence, references, documentation, modified files, and
@@ -25,10 +46,11 @@ archive the task, select replacement work, consult `.ralph/plans`, or copy task
 content across checkouts. The owning Conversation alone publishes lifecycle
 status on main.
 
-If there is no task block, retain the existing folder-plan handoff mode. Ensure
-the active specification, execution plan, and related Backlog.md tasks contain
-the context needed to resume cleanly. Never mix the two modes or copy content
-between their authorities.
+In retained folder-plan handoff, ensure the active specification and plan
+contain the context needed to resume cleanly. Related Backlog tasks are
+references only; do not mutate their status, completion, archival,
+finalization, or cleanup state. Never mix the two modes or copy content between
+their authorities.
 
 ## Request compaction once
 

@@ -73,7 +73,7 @@ function harness(options = {}) {
     pathStatus(path, taskPath) { calls.push(["path-status", path, taskPath]); return ""; },
     commitPromotion(path) { calls.push(["commit", path]); return "promoted"; },
   };
-  const filesystem = { exists: (path) => options.unavailable ? !String(path).includes("-alpha-episode-") : true, promoteBundle(path) { calls.push(["promote", path]); } };
+  const filesystem = { exists: (path) => options.unavailable ? !String(path).includes("-alpha-episode-") : true, hasActiveLegacyPlanFiles: () => options.legacyPlanFiles !== false, promoteBundle(path) { calls.push(["promote", path]); } };
   const ownership = { read: () => record, write(_root, value) { record = structuredClone(value); calls.push(["ownership", value.status]); } };
   const published = { activeSessionId: "route", sessionId: "episode", sessionFile: join(disk.root, "episode.jsonl") };
   let listCount = 0;
@@ -316,6 +316,21 @@ test("handoff uses exact active ownership and queues canonical execute only afte
   const result = await handoffSpecEpisode(LOCATION, "fix accepted defect", f.ctx, f.deps);
   assert.equal(result.handoffDelivery, "prompt"); assert.equal(result.executeDelivery, "followUp");
   const call = f.calls.find((value) => value[0] === "handoff"); assert.match(call[1], /fix accepted defect/); assert.match(call[2], /EXECUTE POLICY/);
+});
+
+test("legacy active replay and handoff require the promoted active plan pair", async () => {
+  const createdHarness=harness(); const active=await createApproved(createdHarness);
+  const replay=harness({ record:{...active,reused:undefined}, legacyPlanFiles:false, list:()=>[{sessionId:"episode",sessionFile:active.episodeSessionFile,cwd:active.worktree}] });
+  replay.git.entries=[{path:replay.root,branch:"main"},{path:active.worktree,branch:active.branch}]; replay.filesystem.exists=()=>true;
+  replay.orca.showWorktree=async()=>({...replay.wt,id:active.worktreeId,identity:active.worktreeIdentity,path:active.worktree,branch:active.branch,projectSetupId:active.projectSetupId,head:active.head});
+  await assert.rejects(createApproved(replay),/ownership is not live.*active specification and implementation plan/);
+  assert.equal(replay.calls.some(call=>["reopen","execute","handoff"].includes(call[0])),false);
+
+  const handoff=harness({ record:{...active,reused:undefined}, legacyPlanFiles:false, list:(_count,session)=>[session] });
+  handoff.git.entries=[{path:handoff.root,branch:"main"},{path:active.worktree,branch:active.branch}];
+  handoff.orca.showWorktree=async()=>({...handoff.wt,id:active.worktreeId,identity:active.worktreeIdentity,path:active.worktree,branch:active.branch,projectSetupId:active.projectSetupId,head:active.head});
+  await assert.rejects(handoffSpecEpisode(LOCATION,"resume",handoff.ctx,handoff.deps),/ownership is not live.*active specification and implementation plan/);
+  assert.equal(handoff.calls.some(call=>["reopen","handoff"].includes(call[0])),false);
 });
 
 test("task-native handoff continues the exact idle Episode with task-bound handoff and execute", async () => {
@@ -712,6 +727,9 @@ test("blocked workflow authority routes owner Conversation to task mode and neve
     () => resolveBlockedWorkflowAuthority("PRIMECLAW-10.38", noTaskOwnership.ctx, noTaskOwnership.deps),
     /requires active version-2 Episode ownership/,
   );
+  const legacyOwnership = harness({ record: { version: 1, status: "active", worktree: "/legacy" } });
+  assert.equal(resolveBlockedWorkflowAuthority("not a canonical task id", legacyOwnership.ctx, legacyOwnership.deps).mode,"folder");
+
   const provisioning = harness({ record: taskReservation() });
   assert.throws(
     () => resolveBlockedWorkflowAuthority(undefined, provisioning.ctx, provisioning.deps),

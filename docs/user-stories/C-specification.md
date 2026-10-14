@@ -32,6 +32,13 @@ constraints, and observable acceptance at a level proportional to the work. It
 does not require boilerplate risk or process sections when those are not
 material. Revisions remain on the same exact `In Design` task.
 
+Retained repositories can explicitly choose the separately named
+`design-legacy` or `spec-it-out-legacy` skills. They preserve current-main
+future-folder authoring under `.ralph/plans/future/<slug>/SPECIFICATION.md` and
+stop for operator review without creating or mutating a Backlog task. The
+synthesis skill references the discovery skill's common folder-persistence and
+review contract rather than carrying a second copy.
+
 ## US-10 — Explain and recover blocked planning work
 
 **As an operator facing blocked Ralph artifacts, I want the blocker explained
@@ -49,6 +56,8 @@ new artifact.
 
 - `src/prime-agent-plugin/skills/project-templates/design.md`
 - `src/prime-agent-plugin/skills/project-templates/spec-it-out.md`
+- `src/prime-agent-plugin/skills/project-templates/design-legacy.md` (retained compatibility)
+- `src/prime-agent-plugin/skills/project-templates/spec-it-out-legacy.md` (retained compatibility)
 - `src/prime-agent-plugin/skills/project-templates/blocked.md` (migration compatibility)
 
 ## Design references

@@ -79,10 +79,11 @@ def test_operator_guidance_creates_new_work_explicitly_in_design() -> None:
 def test_execute_and_handoff_keep_backlog_authority_while_prepare_discovers_native_tracker() -> None:
     execute = " ".join(EXECUTE_TEMPLATE.read_text().split())
     prepare = PREPARE_TEMPLATE.read_text()
-    handoff = HANDOFF_TEMPLATE.read_text()
+    handoff = " ".join(HANDOFF_TEMPLATE.read_text().split())
 
     assert "Backlog.md-tracked projects" in execute
-    assert "planning docs and Backlog.md tasks" in execute
+    assert "The Episode exclusively owns task content on its branch" in execute
+    assert "references, not lifecycle authority" in execute
     assert "Use only the commands and tracker the project actually provides" in prepare
     assert "Backlog.md" not in prepare
-    assert "related Backlog.md tasks" in handoff
+    assert "Related Backlog tasks are references only" in handoff

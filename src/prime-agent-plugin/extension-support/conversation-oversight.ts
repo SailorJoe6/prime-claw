@@ -9,6 +9,7 @@ import {
   type EpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 import { resolveNearestProjectRoot } from "./project-initialization.ts";
+import { assertLiveLegacyEpisodeFiles } from "./legacy-workflow.ts";
 
 export const CONVERSATION_GUIDE_MESSAGE_TYPE = "prime-claw-conversation-guide";
 export const CONVERSATION_GUIDE_NAME = "prime-claw-oversee-episode";
@@ -31,6 +32,10 @@ export function currentConversationOwnership(ctx: ExtensionContext): EpisodeOwne
   catch { return null; }
   const record = readEpisodeOwnership(root);
   if (!record || record.ownerSessionId !== ctx.sessionManager.getSessionId()) return null;
+  if (isLegacyEpisodeOwnership(record) && record.status === "active") {
+    try { assertLiveLegacyEpisodeFiles(record, "Conversation oversight"); }
+    catch { return null; }
+  }
   return record;
 }
 

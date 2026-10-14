@@ -73,6 +73,8 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
             assert hashlib.sha256(destination.read_bytes()).hexdigest()==installed["installedSha256"]
     assert not (ROOT/".ralph/skills").exists()
     assert (ROOT/".ralph/plans").is_dir()
+    for name in ("design-legacy", "spec-it-out-legacy"):
+        assert (ROOT/".agents/skills"/name/"SKILL.md").is_file()
     prepare_state=manifest["assets"]["project-skill-prepare"]
     assert prepare_state["state"]=="customized"
     assert prepare_state["source"]=="skills/project-templates/prepare.md"
@@ -147,6 +149,6 @@ def test_first_native_v098_session_discovers_initialized_skills(tier1_container,
     command_response=next(row for row in responses if row.get("id")=="commands")
     commands=command_response["data"]["commands"]
     by_name={row["name"]:row for row in commands}
-    for name in ("skill:prepare","skill:execute"):
+    for name in ("skill:prepare","skill:execute","skill:design-legacy","skill:spec-it-out-legacy"):
         assert name in by_name
         assert by_name[name]["sourceInfo"]["path"]==str(project/".agents/skills"/name.split(":",1)[1]/"SKILL.md")

@@ -61,7 +61,7 @@ def test_task_native_execute_binds_exact_task_and_preserves_status_authority() -
 
     for fragment in (
         "<operator-episode-task>",
-        "exact Backlog task ID already bound to this Episode",
+        "version-2 ownership record selects **task-native Episode mode** and binds its exact task ID and path",
         "backlog task view --json -- TASK-ID",
         "returned canonical ID to match the bound ID",
         "status to be exactly `In Progress`",
@@ -91,15 +91,32 @@ def test_task_native_execute_retains_folder_episode_compatibility() -> None:
     text = " ".join(EXECUTE_SKILL.read_text().split())
 
     for fragment in (
-        "If there is no task block, use **retained folder-plan mode**",
-        "existing `/implement-spec` Episodes operational",
+        "persisted `.prime-claw/ownership.json` record",
+        "version-1 ownership record selects **retained folder-plan mode**",
+        "version-2 ownership record selects **task-native Episode mode**",
+        "A prompt tag never overrides persisted ownership",
+        "Only when neither ownership nor old in-place files decides may `<operator-episode-task>` become a candidate task binding",
+        "tag alone does not establish live Episode identity or grant Episode mutation or lifecycle authority",
+        "active legacy `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files on canonical main",
+        "This fallback is not a live Episode",
         "`.ralph/plans/EXECUTION_PLAN.md`",
-        "`.ralph/plans/SPECIFICATION.md`",
         "`.ralph/plans/archive/`",
         "`.ralph/plans/blocked/`",
-        "Keep planning docs and Backlog.md tasks current",
     ):
         assert fragment in text
+
+    legacy = text.split("## Retained folder-plan mode", 1)[1].split("## One bounded implementation slice", 1)[0]
+    for fragment in (
+        "references, not lifecycle authority",
+        "Never change a Backlog task's status",
+        "mark it `Done` or `Blocked`",
+        "finalize task-native ownership",
+        "legacy plan archival does not claim Backlog status, completion, archival, finalization, or cleanup authority",
+        "stop without a Backlog lifecycle mutation",
+    ):
+        assert fragment in legacy
+    for forbidden in ("backlog task complete", "backlog task archive"):
+        assert forbidden not in legacy.lower()
 
 
 def test_supported_task_content_edits_leave_status_and_unrelated_work_unchanged(tmp_path: Path) -> None:

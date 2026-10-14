@@ -23,7 +23,10 @@ normal queue lifecycle.
 ## Owned Episode continuation
 
 The retained `handoff_spec_episode(location, guidance?)` surface remains
-available only to the exact owner of one active version-1 folder Episode. Before
+available only to the exact owner of one active version-1 folder Episode.
+Persisted ownership decides before any prompt tag, and live version-1 identity
+requires the recorded worktree's readable, non-empty active specification and
+implementation plan (`EXECUTION_PLAN.md` remains the retained spelling). Before
 messaging, it verifies:
 
 - exact owner session and approved future-folder location;

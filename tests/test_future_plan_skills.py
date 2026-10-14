@@ -16,6 +16,73 @@ def project_skill(name: str) -> Path:
 def workflow(name: str) -> Path:
     return ROOT / "src" / "prime-agent-plugin" / "workflows" / f"{name}.md"
 
+LEGACY_SKILLS = ("design-legacy", "spec-it-out-legacy")
+
+
+def test_legacy_authoring_assets_are_separate_project_local_compatibility_skills() -> None:
+    inventory = json.loads((ROOT / "src/prime-agent-plugin/asset-inventory.json").read_text())
+    rows = {row["id"]: row for row in inventory["assets"]}
+    expected = {
+        "project-skill-design-legacy": ("skills/project-templates/design-legacy.md", ".agents/skills/design-legacy/SKILL.md"),
+        "project-skill-spec-it-out-legacy": ("skills/project-templates/spec-it-out-legacy.md", ".agents/skills/spec-it-out-legacy/SKILL.md"),
+    }
+    for asset_id, (source, destination) in expected.items():
+        row = rows[asset_id]
+        target = next(value for value in row["targets"] if value["class"] == "project-customizable")
+        assert row["source"] == source
+        assert target["destination"] == destination
+        assert target["exposure"] == "discoverable"
+        assert target["lifecycleTrigger"] == "project-reconcile"
+        assert "migrateFrom" not in target
+        assert (ROOT / destination).read_bytes() == (ROOT / "src/prime-agent-plugin" / source).read_bytes()
+
+
+def test_legacy_authoring_preserves_current_main_folder_behavior_without_duplicate_shared_policy() -> None:
+    design = project_skill("design-legacy").read_text()
+    synthesis = project_skill("spec-it-out-legacy").read_text()
+    normalized = " ".join(design.split())
+    for fragment in (
+        "name: design-legacy",
+        ".ralph/plans/future/<slug>/",
+        "Create `SPECIFICATION.md`",
+        "living source of truth",
+        "explicitly ask the operator to review the saved specification",
+        "stop without planning, implementing, creating a branch or worktree",
+    ):
+        assert fragment in normalized
+    assert "backlog task create" not in design.lower()
+    assert "backlog task edit" not in design.lower()
+
+    compact = " ".join(synthesis.split())
+    for fragment in (
+        "name: spec-it-out-legacy",
+        "read the project-local `design-legacy` skill",
+        "single common authority",
+        "Do not repeat or replace that shared Markdown here",
+        "does not create or edit a Backlog task",
+    ):
+        assert fragment in compact
+    assert not any(line == "## Create the future specification" for line in synthesis.splitlines())
+    assert len(synthesis) < len(design) / 2
+
+
+def test_retained_legacy_entry_surfaces_and_snapshot_fallback_remain_bounded() -> None:
+    extension = (ROOT / "src/prime-agent-plugin/extensions/reviewed-plan.ts").read_text()
+    for surface in (
+        'command: "plan-spec"', 'command: "implement-spec"',
+        'name: "plan_spec"', 'name: "create_spec_episode"',
+        'name: "handoff_spec_episode"', 'name: "finalize_spec_episode"',
+    ):
+        assert surface in extension
+    workflow_chain = (ROOT / "src/prime-agent-plugin/extension-support/workflow-chain.ts").read_text()
+    assert 'new Set(["handoff", "execute"])' in workflow_chain
+    assert 'join(root, ".ralph", "skills", name, "SKILL.md")' in workflow_chain
+    ownership = (ROOT / "src/prime-agent-plugin/extension-support/episode-ownership.ts").read_text()
+    assert "item.version === 1 || item.version === 2" in ownership
+    assert "isLegacyEpisodeOwnership" in ownership
+    assert "isTaskEpisodeOwnership" in ownership
+
+
 
 def run(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(args, cwd=cwd, text=True, capture_output=True)

@@ -14,7 +14,9 @@ def test_blocked_skill_supports_disjoint_task_and_retained_folder_authority() ->
     for fragment in (
         ".prime-claw/ownership.json",
         "prompt text alone never grants owner or lifecycle authority",
-        "task mode is mandatory even when the current assignment has no task block",
+        "version-1 record selects retained folder mode even when a task block is present",
+        "version-2 record selects task mode even when the assignment has no task block",
+        "task block is a candidate only when neither persisted ownership nor old in-place legacy files selects the mode",
         "Never fall back to folder mode while any version-2 ownership record exists",
         "task-bound Episode session follows its execute policy",
         "backlog task view --json -- TASK-ID",
@@ -28,9 +30,11 @@ def test_blocked_skill_supports_disjoint_task_and_retained_folder_authority() ->
         "Push is prompt best-effort evidence and local commit success remains authoritative",
         "same ownership, branch, worktree, and session",
         "Never create a new task, admission, Episode resource, or status-sync message",
-        "Only when there is no version-2 ownership record and no task block",
+        "With no ownership, use it for active legacy plan files on canonical main",
+        "not a live Episode",
         ".ralph/plans/blocked/EXECUTION_PLAN.md",
         ".ralph/plans/blocked/SPECIFICATION.md",
+        "Do not mutate task-native Backlog status, completion, archival, finalization, or cleanup state",
         "Never mix the two modes",
     ):
         assert fragment in normalized

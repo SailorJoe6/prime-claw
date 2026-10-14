@@ -1574,3 +1574,27 @@ focused, host-safe, and Docker-isolated validation passes; and
 `PRIMECLAW-10.38` contains the complete evidence while remaining `In Progress`.
 The owning Conversation then performs the separate review, lifecycle, merge,
 finalization, and cleanup decisions.
+
+## Step 5 compatibility-preservation completion checkpoint
+
+Completed only Step 5, "Preserve compatibility and resolve workflow mode," against accepted base `e4d1cdd46fd96f7b6f4f529e286b316bb60adf77`.
+
+- Retained the four customizable legacy workflow assets and all six legacy command/tool surfaces, version-1 ownership parsing, promotion, replay, recovery, handoff, review, finalization, and cleanup behavior.
+- Made persisted ownership authoritative before prompt text: version 1 selects retained-folder mode and version 2 selects task-native mode. Without ownership, complete active files on canonical main remain valid old in-place work but do not create Episode identity.
+- Required live version-1 Episode identity to include readable, non-empty active specification and implementation files in the recorded Episode worktree. Missing files now fail closed for replay, handoff, oversight, and initialization reconciliation.
+- Accepted `IMPLEMENTATION_PLAN.md` plus retained `EXECUTION_PLAN.md`, and kept `.ralph/skills` snapshot fallback limited to `handoff` and `execute`.
+- Added separately named `design-legacy` and `spec-it-out-legacy` project skills. Their shared future-folder contract has one owner, and the new assets have no competing migration source.
+- Bounded legacy completion and blocking so retained-folder actions cannot claim or mutate task-native Backlog lifecycle, finalization, or cleanup authority.
+- Preserved runtime project copies separately from plugin delivery sources, including customized initialized-project assets.
+
+Validation:
+- focused host-safe suites: 56 passed, 11 deselected;
+- managed inventory/workflow suites: 15 passed, 34 deselected;
+- broad non-container suite: 655 passed, 1 skipped, 65 deselected, 75 subtests passed, with only three unchanged accepted-base/environment failures;
+- full focused Docker bridge: 136/137 Node cases passed; the sole failure is the unchanged pre-Step-5 test that expects the ignored host-built `deps/backlog/dist/backlog` artifact inside the read-only snapshot;
+- final Step-5 Docker selection excluding that exact unchanged baseline: 11 passed, 21 deselected;
+- independent read-only review: no material findings; directly affected suites passed;
+- `TIER1_ENV_FILE=/tmp/prime-claw-tier1-source.env scripts/test-tier1.sh --probe`: passed with offline RPC probe, verified teardown, and published manifest;
+- `git diff --check`: passed.
+
+Steps 6 and 7 remain unstarted. This checkpoint does not change repository lifecycle status/configuration/data cutover, publish final lifecycle state, retire compatibility assets, delete `.ralph/plans`, merge/finalize, clean resources, or apply user-global assets.

@@ -8,7 +8,9 @@ skills and workflows.**
 
 `/initialize-prime-claw` and `initialize_prime_claw(action="reconcile")`
 install or reconcile the project-owned `prepare`, `design`, `spec-it-out`,
-`execute`, and `blocked` skills plus the `handoff`, planning, and implementation
+`design-legacy`, `spec-it-out-legacy`, `execute`, and `blocked` skills plus the
+`handoff`, task-native planning/implementation workflows, and the retained
+`plan-prep`, `plan-spec`, `implement-prep`, and `implement-spec` runtime
 workflows. Reconciliation never stages or commits project files.
 
 ## US-04 — Upgrade templates without destroying customization

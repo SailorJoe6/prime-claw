@@ -15,7 +15,12 @@ revision, pause, or consult the operator. It does not implement Episode work.
 A retained version-1 Episode implements only its promoted specification and
 execution plan. A version-2 Episode implements only its exact Backlog task,
 whose supported specification, plan, execution, and outcome fields replace the
-folder authority without changing role authority.
+folder authority without changing role authority. Persisted ownership decides
+the mode before prompt tags: version 1 selects folder authority and version 2
+selects task authority. A live version-1 Episode additionally requires readable,
+non-empty active specification and implementation-plan files in its recorded
+worktree. With no ownership, equivalent files on canonical main remain valid
+old in-place legacy work but do not create Episode identity.
 
 ## Planning and implementation admission
 

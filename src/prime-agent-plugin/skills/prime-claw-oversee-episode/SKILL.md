@@ -4,11 +4,30 @@ description: Supervise one exact owned Prime Claw episode through evidence-based
 ---
 # Oversee one owned episode
 
-Use only for one active Episode owned by this Conversation. Keep modes disjoint.
+Use only for one active Episode owned by this Conversation. Inspect persisted
+`.prime-claw/ownership.json` from the canonical primary checkout before prompt
+tags or reports, and keep modes disjoint. Version 1 selects retained folder
+oversight; version 2 selects task-native oversight. A task tag is only a
+candidate when ownership does not decide and never overrides a record.
 
-For version 2 task-native ownership, bind the exact Backlog task ID and project-relative task path. Reload both through the structured interface; those fields are the sole durable product and execution contract. Never consult `.ralph/plans` in this mode. The Episode owns task content on its branch; the Conversation owns lifecycle status on main. For retained version 1 folder ownership, keep the approved specification and plan.
+For retained version 1 folder ownership, require readable, non-empty active
+`SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files in the recorded Episode
+worktree, accepting the retained `EXECUTION_PLAN.md` spelling. Placement alone
+is not live Episode identity. Keep the approved specification and plan, use only
+legacy `handoff_spec_episode` and `finalize_spec_episode` paths, and never claim
+or mutate task-native Backlog status, completion, archival, finalization, or
+cleanup authority. With no ownership, active legacy files on canonical main are
+old in-place work, not an Episode, so this owned-Episode skill must stop.
 
-Review one reported slice at a time. Check ownership, candidate, diff, tests, worktree, and task identity/content/evidence. A report is evidence, not approval.
+For version 2 task-native ownership, bind the exact Backlog task ID and
+project-relative task path. Reload both through the structured interface; those
+fields are the sole durable product and execution contract. Never consult
+`.ralph/plans` in this mode. The Episode owns task content on its branch; the
+Conversation owns lifecycle status on main.
+
+Review one reported slice at a time. Check ownership, candidate, diff, tests,
+worktree, and mode-specific identity/content/evidence. A report is evidence,
+not approval.
 
 Choose one disposition:
 
@@ -18,6 +37,8 @@ Choose one disposition:
 - **Consult the operator** for scope, product, merge, abandonment, destructive cleanup, conflicting evidence, or blockers.
 
 Never steer through chat. Continue only by canonical handoff to the idle Episode. Do not retry uncertain transport.
+
+The remaining outcome and cleanup flow applies only to version 2 task-native ownership.
 
 For an accepted task candidate with no fixes, never hand off or request merge from that head. The handshake must publish `Ready for Merge`, integrate main in the Episode, preserve task content and parent identity, push a two-parent candidate, and verify head, ancestry, digest, hierarchy, and status. Only then request the operator's merge decision.
 

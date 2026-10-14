@@ -12,20 +12,23 @@ import {
 } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
 import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
-function fixture({ status = "active", owner = "owner", taskNative = false } = {}) {
+function fixture({ status = "active", owner = "owner", taskNative = false, legacyFiles = true, mainLegacyFiles = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-oversight-"));
   execFileSync("git", ["init", "-q", root]);
   const guideRoot = join(root, "plugin");
   mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true });
   writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), `FULL OVERSIGHT GUIDE
 `);
+  const worktree=join(root,"wt");mkdirSync(worktree,{recursive:true});
+  if (!taskNative && legacyFiles) { const plans=join(worktree,".ralph/plans");mkdirSync(plans,{recursive:true});writeFileSync(join(plans,"SPECIFICATION.md"),"spec\n");writeFileSync(join(plans,"EXECUTION_PLAN.md"),"plan\n"); }
+  if (mainLegacyFiles) { const plans=join(root,".ralph/plans");mkdirSync(plans,{recursive:true});writeFileSync(join(plans,"SPECIFICATION.md"),"old in-place spec\n");writeFileSync(join(plans,"IMPLEMENTATION_PLAN.md"),"old in-place plan\n"); }
   if (status) writeEpisodeOwnership(root, {
     ...(taskNative
       ? { version: 2, taskId: "PRIMECLAW-10.38", taskPath: "backlog/tasks/task.md" }
       : { version: 1, sourceLocation: ".ralph/plans/future/alpha", slug: "alpha", bundleDigest: "0".repeat(64) }),
     status, operationId: "op", engine: "local", ownerSessionId: owner, baseRef: taskNative ? "a".repeat(40) : "base",
     createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
-    worktree: join(root, "wt"), branch: "actual-branch", head: "head",
+    worktree, branch: "actual-branch", head: "head",
     episodeId: "episode", episodeSessionFile: join(root, "episode.jsonl"), episodeActiveSessionId: "route",
   });
   const events = new Map(); const tools = new Map(); const sent = [];
@@ -67,6 +70,18 @@ for (const [name, status, owner] of [
   const f = fixture({ status, owner });
   await f.events.get("session_compact")({ type: "session_compact", compactionEntry: { id: "one" } }, f.ctx);
   assert.deepEqual(f.sent, []);
+});
+
+test("legacy ownership without active worktree files does not claim live oversight", async () => {
+  const f=fixture({legacyFiles:false});
+  await f.events.get("session_compact")({type:"session_compact",compactionEntry:{id:"missing"}},f.ctx);
+  assert.deepEqual(f.sent,[]);
+});
+
+test("no ownership plus canonical-main legacy files remains old in-place work, not an Episode", async () => {
+  const f=fixture({status:null,mainLegacyFiles:true});
+  await f.events.get("session_compact")({type:"session_compact",compactionEntry:{id:"in-place"}},f.ctx);
+  assert.deepEqual(f.sent,[]);
 });
 
 test("ordinary guide loading ignores project skill collisions", async () => {

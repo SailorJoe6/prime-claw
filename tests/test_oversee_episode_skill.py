@@ -13,7 +13,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
     body = raw.split("---", 2)[-1]
     words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 600
+    assert 300 <= len(words) <= 750
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
@@ -39,6 +39,14 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Never consult `.ralph/plans` in this mode",
         "The Episode owns task content on its branch; the Conversation owns lifecycle status on main",
         "For retained version 1 folder ownership",
+        "Inspect persisted `.prime-claw/ownership.json` from the canonical primary checkout before prompt tags",
+        "Version 1 selects retained folder oversight; version 2 selects task-native oversight",
+        "A task tag is only a candidate when ownership does not decide",
+        "Placement alone is not live Episode identity",
+        "use only legacy `handoff_spec_episode` and `finalize_spec_episode` paths",
+        "never claim or mutate task-native Backlog status, completion, archival, finalization, or cleanup authority",
+        "old in-place work, not an Episode",
+        "remaining outcome and cleanup flow applies only to version 2 task-native ownership",
         "do not edit, copy, or mirror Episode-owned task content",
         "never hand off or request merge from that head",
         "publish `Ready for Merge`",

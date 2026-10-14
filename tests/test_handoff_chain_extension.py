@@ -110,7 +110,14 @@ def test_handoff_skill_keeps_task_native_and_folder_authorities_disjoint():
         "Never pass `--status`",
         "consult `.ralph/plans`",
         "owning Conversation alone publishes lifecycle status on main",
-        "If there is no task block, retain the existing folder-plan handoff mode",
+        "Inspect persisted `.prime-claw/ownership.json` from the canonical primary checkout before interpreting prompt tags",
+        "Version-1 ownership selects retained folder-plan handoff",
+        "Version-2 ownership selects task-native handoff",
+        "A prompt tag never overrides persisted ownership",
+        "Only when neither ownership nor those old in-place files decides may `<operator-episode-task>` become a candidate task binding",
+        "tag alone cannot establish a live Episode or authorize task handoff",
+        "old in-place folder work without creating Episode identity",
+        "Related Backlog tasks are references only",
         "Never mix the two modes",
     ):
         assert fragment in skill

@@ -39,6 +39,7 @@ import {
   resolveNearestProjectRoot,
   type CommandRunner,
 } from "./project-initialization.ts";
+import { activeLegacyPlanFiles } from "./legacy-workflow.ts";
 import {
   meaningfulTaskImplementationPlan,
   reserveTaskEpisodeOwnership,
@@ -130,6 +131,7 @@ export interface GitAdapter {
 }
 export interface FilesystemAdapter {
   exists(path: string): boolean;
+  hasActiveLegacyPlanFiles(worktree: string): boolean;
   promoteBundle(worktree: string, slug: string, canonicalFolder: string, expectedDigest: string): void;
 }
 export interface EpisodeOwnershipStore {
@@ -585,6 +587,7 @@ export function bundleContentDigest(folder: string, topNames?: string[]): string
 
 export class NodeFilesystemAdapter implements FilesystemAdapter {
   exists(path: string): boolean { return existsSync(path); }
+  hasActiveLegacyPlanFiles(worktree: string): boolean { return activeLegacyPlanFiles(worktree) !== null; }
   promoteBundle(worktree: string, slug: string, canonicalFolder: string, expectedDigest: string): void {
     const plans = join(worktree, ".ralph", "plans");
     const source = join(plans, "future", slug);
@@ -605,6 +608,9 @@ export class NodeFilesystemAdapter implements FilesystemAdapter {
     if (bundleContentDigest(plans, names) !== expectedDigest) throw new Error("Promoted active plan does not match the approved bundle");
     if (bundleContentDigest(canonicalFolder) !== expectedDigest) throw new Error("Approved bundle changed during promotion");
     rmSync(source, { recursive: true, force: false });
+    if (!this.hasActiveLegacyPlanFiles(worktree)) {
+      throw new Error("Promoted legacy Episode is missing its readable non-empty active specification and implementation plan");
+    }
   }
 }
 const defaultOwnershipStore: EpisodeOwnershipStore = { read: readEpisodeOwnership, write: writeEpisodeOwnership };
@@ -1059,13 +1065,19 @@ export function resolveBlockedWorkflowAuthority(
   const store = dependencies.ownership ?? defaultOwnershipStore;
   const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
   const projectRoot = git.repositoryRoot(ctx.cwd);
+  const record = store.read(projectRoot);
+  // Persisted ownership decides before prompt text. A version-1 record keeps
+  // the retained folder workflow even if a stale or conflicting task tag is
+  // present; the tag is not parsed as a binding in that mode.
+  if (record && isLegacyEpisodeOwnership(record)) {
+    return { mode: "folder", projectRoot };
+  }
   const requestedTaskId = rawTaskId?.trim();
   if (requestedTaskId !== undefined
     && (!requestedTaskId || /\s/.test(requestedTaskId) || requestedTaskId.startsWith("-"))) {
     throw new Error("Blocked workflow requires a canonical Backlog task ID");
   }
-  const record = store.read(projectRoot);
-  if (!record || isLegacyEpisodeOwnership(record)) {
+  if (!record) {
     if (requestedTaskId !== undefined) {
       throw new Error("Task-bound blocked workflow requires active version-2 Episode ownership");
     }
@@ -1150,6 +1162,9 @@ function validateWorktreeRecord(record: EpisodeOwnershipRecord, git: GitAdapter,
   if (!record.worktree || !record.branch || !filesystem.exists(record.worktree)) throw new Error("Episode ownership references a missing worktree");
   const worktree = git.worktrees(repo).find((entry) => samePath(entry.path, record.worktree));
   if (!worktree || worktree.branch !== record.branch) throw new Error("Episode ownership references a missing or different worktree");
+  if (isLegacyEpisodeOwnership(record) && record.status === "active" && !filesystem.hasActiveLegacyPlanFiles(record.worktree)) {
+    throw new Error("Legacy Episode ownership is not live: the recorded worktree is missing its readable non-empty active specification and implementation plan");
+  }
 }
 async function durableSession(record: EpisodeOwnershipRecord, publisher: SessionPublisher): Promise<SessionSummary> {
   const sessions = await publisher.list();
@@ -3620,6 +3635,7 @@ export async function createSpecEpisode(
       git.createWorktree(repo, branch, worktree, baseRef);
       git.assertCleanWorktree(worktree);
       filesystem.promoteBundle(worktree, selected.slug, selected.folder, approvedBundleDigest);
+      if (!filesystem.hasActiveLegacyPlanFiles(worktree)) throw new Error("Promoted legacy Episode is missing its active specification and implementation plan");
       const head = git.commitPromotion(worktree, selected.slug);
       if (git.head(repo) !== baseRef) throw new EpisodeStateUncertainError("Canonical checkout changed during local Episode promotion");
       const executePrompt = canonicalWorkflowPrompt(worktree, "execute", { location: { tag: "operator-episode-source", value: selected.location } });
@@ -3651,6 +3667,7 @@ export async function createSpecEpisode(
     store.write(repo, record);
     git.assertCleanWorktree(worktree.path);
     filesystem.promoteBundle(worktree.path, selected.slug, selected.folder, approvedBundleDigest);
+    if (!filesystem.hasActiveLegacyPlanFiles(worktree.path)) throw new Error("Promoted legacy Episode is missing its active specification and implementation plan");
     const promotedHead = git.commitPromotion(worktree.path, selected.slug);
     if (git.head(repo) !== baseRef) throw new EpisodeStateUncertainError("Canonical checkout changed during Orca Episode promotion");
     record = updated(record, { head: promotedHead }); store.write(repo, record);

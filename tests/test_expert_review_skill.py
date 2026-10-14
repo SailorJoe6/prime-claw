@@ -34,6 +34,12 @@ def test_expert_skill_accepts_normal_context_and_preserves_review_judgment() -> 
         "do not consult `.ralph/plans`",
         "For a retained folder candidate",
         "Do not substitute a related Backlog task as authority",
+        "Inspect persisted `.prime-claw/ownership.json` from the canonical primary checkout before prompt tags",
+        "Version 1 selects the retained folder contract; version 2 selects the exact task contract",
+        "A task tag is only a candidate when ownership does not decide",
+        "old in-place folder review without creating live Episode identity",
+        "live version-1 Episode requires persisted version-1 ownership plus those active files",
+        "cannot claim or mutate task-native Backlog status, completion, archival, finalization, or cleanup authority",
     ):
         assert required in text
     for unwanted in (

@@ -8,19 +8,39 @@ conversation was recently compacted, nothing is fresh.
 
 ## Select the bound authority
 
-If this assignment contains exactly one `<operator-episode-task>` block, use
-**task-native Episode mode** below. Treat its entire trimmed value only as the
-exact Backlog task ID already bound to this Episode. Never guess, search for,
-substitute, or select another task. Do not use `.ralph/plans` as authority in
-this mode.
+Inspect the one persisted `.prime-claw/ownership.json` record from the canonical
+primary checkout before interpreting prompt tags. When running in a linked
+Episode worktree, locate that canonical checkout through Git worktree metadata;
+the absence of a worktree-local ownership file does not mean ownership is
+absent.
 
-If there is no task block, use **retained folder-plan mode** below. This keeps
-existing `/implement-spec` Episodes operational during the migration. Never
-mix the two modes or copy content between their authorities.
+A valid version-1 ownership record selects **retained folder-plan mode**. A live
+version-1 Episode requires that record plus readable, non-empty active
+`SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files in its recorded Episode
+worktree; also accept the retained `EXECUTION_PLAN.md` spelling used by this
+project. If those active files are missing, stop for exact ownership recovery
+instead of switching modes. A valid version-2 ownership record selects
+**task-native Episode mode** and binds its exact task ID and path. If an
+`<operator-episode-task>` block is also present, require its entire trimmed
+value to match the persisted version-2 task ID. A prompt tag never overrides
+persisted ownership.
+
+With no ownership, active legacy `SPECIFICATION.md` and
+`IMPLEMENTATION_PLAN.md` files on canonical main select valid old in-place
+folder work; the retained `EXECUTION_PLAN.md` spelling is equivalent. This
+fallback is not a live Episode. Only when neither ownership nor old in-place
+files decides may `<operator-episode-task>` become a candidate task binding.
+The tag alone does not establish live Episode identity or grant Episode mutation
+or lifecycle authority; stop for exact version-2 ownership recovery before a
+task-native execute pass. Otherwise use retained folder-plan mode only for clear
+operator-provided legacy instructions. Never guess, search for, or substitute
+another task, mix the two modes, or copy content between their authorities.
 
 ## Task-native Episode mode
 
-Reload the exact task through the supported structured interface:
+Use the exact task ID and path selected above. Do not use `.ralph/plans` as
+authority in this mode. Reload the exact task through the supported structured
+interface:
 
 ```sh
 backlog task view --json -- TASK-ID
@@ -72,27 +92,29 @@ merge, mark `Ready for Merge` or `Done`, finalize ownership, or clean resources.
 
 ## Retained folder-plan mode
 
-When no task block is present, study `.ralph/plans/EXECUTION_PLAN.md` and
-`.ralph/plans/SPECIFICATION.md` if they exist. The execution plan describes the
-implementation steps for the specification. If those files are absent, use the
-operator-provided instructions as the plan; ask for instructions only when no
-plan or operator direction exists.
+Use the active `.ralph/plans/SPECIFICATION.md` with its retained
+`.ralph/plans/EXECUTION_PLAN.md` or `.ralph/plans/IMPLEMENTATION_PLAN.md`. The plan describes the
+implementation steps for the specification. If those files are absent and this
+is not a recorded live version-1 Episode, use clear operator-provided legacy
+instructions as the plan; ask only when no plan or direction exists.
 
-There may be Backlog.md tasks related to the plan. Focus on the plan and its
-related tasks. Audit existing work before deciding what remains. If related work
-is complete, verify its documentation and tests before marking the relevant
-task `Done` and updating the plan.
+There may be Backlog.md tasks related to the plan. They are references, not
+lifecycle authority for this compatibility workflow. Audit existing work before
+deciding what remains, and keep the active legacy plan current. Never change a
+Backlog task's status, mark it `Done` or `Blocked`, complete or archive it,
+finalize task-native ownership, or clean task-native resources from retained
+folder-plan mode.
 
 If no implementation remains, ensure the finished behavior is documented under
-`docs/`. When the plan is truly complete, move its specification and execution
-plan into a subfolder of `.ralph/plans/archive/`, update the archive index and
-related Backlog.md tasks, and report the result. Keep planning docs and
-Backlog.md tasks current throughout retained folder execution.
+`docs/`. The retained workflow may archive its own specification and execution
+plan under `.ralph/plans/archive/` and update that legacy archive index. That
+legacy plan archival does not claim Backlog status, completion, archival,
+finalization, or cleanup authority.
 
 For a blocker that a bounded attempt cannot clear, record the exact blocker and
-unblock condition in the execution plan, move both plan documents to
-`.ralph/plans/blocked/`, mark the related Backlog.md tasks `Blocked`, report the
-resumable checkpoint, and stop.
+unblock condition in the execution plan, move only the legacy plan documents to
+`.ralph/plans/blocked/`, report the resumable checkpoint, and stop without a
+Backlog lifecycle mutation.
 
 ## One bounded implementation slice
 
