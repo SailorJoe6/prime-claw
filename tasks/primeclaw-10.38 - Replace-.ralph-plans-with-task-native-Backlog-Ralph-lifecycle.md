@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-13 22:42'
+updated_date: '2026-10-14 02:47'
 labels:
   - backlog-md
   - episode-loop
@@ -677,4 +677,12 @@ Auto-commit prepares both paths in a temporary Git index and publishes them atom
 Validation: 125 focused/regression tests passed, including exact preservation, destination collision, restore→edit→complete, prior-staged-state commit rollback, staging-failure index atomicity, custom prefixes, cache transition, and local-only resolution. `bun run check`, `bun run check:types`, and `bun run build` passed. The full dependency run recorded 2,892 passes and 8 skips; its 13 unrelated failures were triaged: four cleared in isolation/sequentially, eight TUI move failures/errors reproduce on the untouched base, and the branch-loader mock-count assertion also reproduces on the untouched base in this nested submodule path. The project host-safe suite recorded 653 passes, 1 skip, 65 deselections, and 75 subtests with the same two known unrelated static-policy failures. `git diff --check` passed.
 
 No migration record, historical epic, To Do status, config, asset, lifecycle status, or plan location changed. Broader migration remains paused until the owning Conversation accepts this separate capability checkpoint. No upstream issue or pull request was opened or prepared.
+
+### Conversation acceptance and next migration slice
+
+The completed-task restore checkpoint is accepted and pushed: Backlog dependency `5d556c1954f7724abd180f6211cf528e9253ad4c` and parent `817a5936607fcb9493630ad14544c744030ebb40` are clean, upstream-equal, and linked exactly.
+
+Resume only the reviewed one-time task and historical-bundle migration. Use `backlog task restore` for `PRIMECLAW-6`, `PRIMECLAW-10.15`, `PRIMECLAW-10.26`, `PRIMECLAW-10.28`, `PRIMECLAW-19`, `PRIMECLAW-20`, and `PRIMECLAW-10.34`; preserve each exact ID, parent, filename, bytes/content, and `Done` status through restore; make only supported CLI edits; validate; then run `backlog task complete` after all intended edits. Reconcile the frozen 43 source paths into the 16 recorded bundle owners, preserving the approved `PRIMECLAW-7` Phase 3a mapping, bidirectional superseded-history references, and `PRIMECLAW-35` no-op when its source bundle is absent.
+
+Do not perform upstream outreach, asset retirement, `.ralph/plans` deletion, final cutover, lifecycle status changes, or unrelated cleanup in this slice. Commit and push the bounded migration candidate, report exact evidence, and stop idle for Conversation review.
 <!-- SECTION:NOTES:END -->
