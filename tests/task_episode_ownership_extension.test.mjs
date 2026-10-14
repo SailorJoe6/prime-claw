@@ -139,6 +139,8 @@ function transition(f, overrides = {}, dependencies = {}) {
     ownerSessionId: f.legacy.ownerSessionId,
     expectedMainHead: f.mainHead,
     expectedEpisodeHead: f.episodeHead,
+    expectedPreviousEpisodeActiveSessionId: f.legacy.episodeActiveSessionId,
+    verifiedCurrentEpisodeActiveSessionId: f.legacy.episodeActiveSessionId,
     confirmedReady: true,
     ...overrides,
   }, {
@@ -173,6 +175,28 @@ test("guarded transition atomically replaces only legacy authority and preserves
   assert.equal(replay.reused, true);
   assert.deepEqual(replay.record, result.record);
   assert.throws(() => transition(f, { sourceLocation: ".ralph/plans/future/different" }), /superseded legacy source binding/);
+});
+
+test("guarded transition atomically replaces an obsolete runtime route with the verified current route", () => {
+  const f = transitionFixture();
+  const currentRoute = "current-active-session-id";
+  assert.throws(() => transition(f, {
+    expectedPreviousEpisodeActiveSessionId: "foreign-previous-route",
+    verifiedCurrentEpisodeActiveSessionId: currentRoute,
+  }), /previous runtime route drifted/);
+  assert.deepEqual(readEpisodeOwnership(f.root), f.legacy);
+
+  const result = transition(f, { verifiedCurrentEpisodeActiveSessionId: currentRoute });
+  assert.equal(result.record.episodeActiveSessionId, currentRoute);
+  for (const preserved of [
+    "status", "operationId", "engine", "ownerSessionId", "baseRef", "createdAt", "worktreeName",
+    "worktree", "branch", "head", "episodeId", "episodeSessionFile",
+  ]) assert.deepEqual(result.record[preserved], f.legacy[preserved]);
+  assert.deepEqual(readEpisodeOwnership(f.root), result.record);
+
+  const replay = transition(f, { verifiedCurrentEpisodeActiveSessionId: currentRoute });
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.record, result.record);
 });
 
 test("guarded transition requires explicit readiness, exact owner, and exact bindings", () => {

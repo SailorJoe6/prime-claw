@@ -37,8 +37,11 @@ Episode head, and activated pushed main head. The host must prove the exact
 owner, top-level Conversation, `In Progress` task and complete plan, clean and
 pushed Git ancestry, active plan identity, idle durable session, and unchanged
 worktree/branch/Orca resources before atomically replacing only version-1
-authority fields with the version-2 task binding. Any drift or unavailable
-evidence blocks. An exact same-binding replay is the only idempotent replay.
+authority fields with the version-2 task binding. A restart route change is
+acceptable only with the old route absent and one idle session matching durable
+ID/file, CWD, owner, and resources; atomically bind its current route. Ambiguity,
+concurrency, drift, or unavailable evidence blocks. An exact same-binding
+replay is the only idempotent replay.
 The transition does not delete the active pair, create or reassign resources,
 change task status, hand off, merge, finalize, or clean anything. After it
 succeeds, version-2 task authority applies; later plan deletion remains a

@@ -227,11 +227,72 @@ test("ownership bridge preflight proves exact idle session and Orca resources be
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].input, {
     projectRoot: f.root, sourceLocation: LOCATION, taskId: "PRIMECLAW-10.38", ownerSessionId: "owner",
-    expectedMainHead: mainHead, expectedEpisodeHead: episodeHead, confirmedReady: true,
+    expectedMainHead: mainHead, expectedEpisodeHead: episodeHead,
+    expectedPreviousEpisodeActiveSessionId: "route", verifiedCurrentEpisodeActiveSessionId: "route", confirmedReady: true,
   });
   assert.equal(calls[0].dependencies.ownership, f.ownership);
   assert.equal(f.calls.some((entry) => entry[0] === "orca-show"), true);
   assert.equal(f.calls.at(-1)[0], "close");
+});
+
+test("ownership bridge preflight atomically forwards the sole idle replacement route and rejects route ambiguity", async () => {
+  const f = harness();
+  const episodeHead = "e".repeat(40), mainHead = "f".repeat(40), currentRoute = "current-route";
+  f.wt.head = episodeHead;
+  const legacy = activeLegacyTransitionRecord(f, { episodeActiveSessionId: "old-route" });
+  f.ownership.write(f.root, legacy);
+  f.publisher.list = async () => [transitionSession(f, { activeSessionId: currentRoute })];
+  let inspectedRoute;
+  f.publisher.getState = async (route) => {
+    inspectedRoute = route;
+    return {
+      ...transitionSession(f, { activeSessionId: currentRoute }), isBashRunning: false, isRunningTools: false,
+      hasRunningRlmChildren: false, unfinishedActionCount: 0,
+      sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null },
+    };
+  };
+  let transitionInput;
+  const result = await transitionSpecEpisodeToTaskOwnership(LOCATION, "PRIMECLAW-10.38", episodeHead, mainHead, true, f.ctx, {
+    ...f.deps,
+    transitionOwnership(input) {
+      transitionInput = input;
+      const { version: _version, sourceLocation: _source, slug: _slug, bundleDigest: _digest, ...preserved } = legacy;
+      return {
+        record: parseEpisodeOwnership({
+          ...preserved, version: 2, taskId: "PRIMECLAW-10.38", taskPath: "backlog/tasks/primeclaw-10.38.md",
+          episodeActiveSessionId: input.verifiedCurrentEpisodeActiveSessionId,
+        }),
+        reused: false, mainHead, episodeHead,
+        activeSpecification: { path: ".ralph/plans/SPECIFICATION.md", blob: "1".repeat(40) },
+        activeImplementationPlan: { path: ".ralph/plans/EXECUTION_PLAN.md", blob: "2".repeat(40) },
+      };
+    },
+  });
+  assert.equal(inspectedRoute, currentRoute);
+  assert.equal(transitionInput.expectedPreviousEpisodeActiveSessionId, "old-route");
+  assert.equal(transitionInput.verifiedCurrentEpisodeActiveSessionId, currentRoute);
+  assert.equal(result.record.episodeActiveSessionId, currentRoute);
+  assert.equal(result.record.episodeId, legacy.episodeId);
+  assert.equal(result.record.episodeSessionFile, legacy.episodeSessionFile);
+  assert.equal(result.record.worktree, legacy.worktree);
+  assert.equal(result.record.branch, legacy.branch);
+  assert.equal(result.record.ownerSessionId, legacy.ownerSessionId);
+
+  const oldLive = harness(); oldLive.wt.head = episodeHead;
+  oldLive.ownership.write(oldLive.root, activeLegacyTransitionRecord(oldLive, { episodeActiveSessionId: "old-route" }));
+  oldLive.publisher.list = async () => [
+    transitionSession(oldLive, { activeSessionId: currentRoute }),
+    { id: "old-route", sessionId: "other-session", sessionFile: join(oldLive.root, "other.jsonl"), cwd: oldLive.worktree },
+  ];
+  await assert.rejects(transitionSpecEpisodeToTaskOwnership(LOCATION, "PRIMECLAW-10.38", episodeHead, mainHead, true, oldLive.ctx, oldLive.deps), /previous runtime route is still live/);
+
+  const ambiguous = harness(); ambiguous.wt.head = episodeHead;
+  ambiguous.ownership.write(ambiguous.root, activeLegacyTransitionRecord(ambiguous, { episodeActiveSessionId: "old-route" }));
+  ambiguous.publisher.list = async () => [
+    transitionSession(ambiguous, { activeSessionId: currentRoute }),
+    transitionSession(ambiguous, { activeSessionId: "second-current-route" }),
+  ];
+  await assert.rejects(transitionSpecEpisodeToTaskOwnership(LOCATION, "PRIMECLAW-10.38", episodeHead, mainHead, true, ambiguous.ctx, ambiguous.deps), /one unambiguous durable Episode session/);
 });
 
 test("ownership bridge preflight rejects busy, foreign-terminal, and non-owner runtime state before transition", async () => {
@@ -399,6 +460,37 @@ test("handoff uses exact active ownership and queues canonical execute only afte
   const result = await handoffSpecEpisode(LOCATION, "fix accepted defect", f.ctx, f.deps);
   assert.equal(result.handoffDelivery, "prompt"); assert.equal(result.executeDelivery, "followUp");
   const call = f.calls.find((value) => value[0] === "handoff"); assert.match(call[1], /fix accepted defect/); assert.match(call[2], /EXECUTE POLICY/);
+});
+
+test("retained handoff uses exact ownership when the obsolete promoted source folder is absent", async () => {
+  const created = harness(); const active = await createApproved(created);
+  const f = harness({
+    record: { ...active, reused: undefined },
+    list: () => [{ activeSessionId: "route", sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree, isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 }],
+  });
+  f.git.entries = [{ path: f.root, branch: "main" }, { path: active.worktree, branch: active.branch }];
+  f.orca.showWorktree = async () => ({ ...f.wt, id: active.worktreeId, identity: active.worktreeIdentity, path: active.worktree, branch: active.branch, projectSetupId: active.projectSetupId, head: active.head });
+  f.publisher.getState = async () => ({ activeSessionId: "route", sessionId: "episode", sessionFile: active.episodeSessionFile, isSessionActive: false, isStreaming: false, isCompacting: false, isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null } });
+  useDiskLegacyGate(f);
+  mkdirSync(join(active.worktree, ".ralph", "plans"), { recursive: true });
+  writeFileSync(join(active.worktree, ".ralph", "plans", "SPECIFICATION.md"), "active spec\n");
+  writeFileSync(join(active.worktree, ".ralph", "plans", "EXECUTION_PLAN.md"), "active plan\n");
+  rmSync(join(f.root, ".ralph", "plans", "future", "alpha"), { recursive: true, force: true });
+  assert.equal(existsSync(join(f.root, ".ralph", "plans", "future", "alpha")), false);
+  assert.equal(existsSync(join(active.worktree, ".ralph", "plans", "SPECIFICATION.md")), true);
+  assert.equal(existsSync(join(active.worktree, ".ralph", "plans", "EXECUTION_PLAN.md")), true);
+
+  const result = await handoffSpecEpisode(LOCATION, "continue exact retained Episode", f.ctx, f.deps);
+  assert.equal(result.sourceLocation, LOCATION);
+  assert.equal(result.episodeId, active.episodeId);
+  assert.equal(f.calls.filter((call) => call[0] === "handoff").length, 1);
+
+  await assert.rejects(handoffSpecEpisode(".ralph/plans/future/../alpha", "invalid", f.ctx, f.deps), /Invalid future-plan source location/);
+  await assert.rejects(handoffSpecEpisode(".ralph/plans/future/beta", "mismatch", f.ctx, f.deps), /conflicts on sourceLocation/);
+
+  const missing = harness({ record: null });
+  rmSync(join(missing.root, ".ralph", "plans", "future", "alpha"), { recursive: true, force: true });
+  await assert.rejects(handoffSpecEpisode(LOCATION, "missing ownership", missing.ctx, missing.deps), /No durable episode ownership exists/);
 });
 
 test("legacy active replay and handoff require the promoted active plan pair", async () => {

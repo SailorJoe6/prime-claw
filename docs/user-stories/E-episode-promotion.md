@@ -49,9 +49,12 @@ second admission: after the bridge is merged, globally activated, restarted,
 and UAT-proven, the exact owner supplies reviewed pushed main/Episode heads and
 explicit confirmation. The host proves clean Git ancestry, complete committed
 task and active-plan identity, an idle exact durable session, and unchanged
-worktree/branch/Orca resources. One atomic ownership replacement removes only
-the legacy authority fields and adds the exact task binding. It preserves every
-resource, keeps the active pair, and creates no assignment, commit, status
+worktree/branch/Orca resources. When restart changed only the ephemeral route,
+the host additionally requires one sole matching idle durable session and an
+absent old route, then binds the verified current route in the same atomic
+ownership replacement. That write removes only the legacy authority fields,
+adds the exact task binding, preserves every durable resource, keeps the active
+pair, and creates no assignment, commit, status
 change, handoff, finalization, deletion, or cleanup. Only exact replay is
 idempotent; drift or missing evidence fails closed.
 

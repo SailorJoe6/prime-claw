@@ -145,7 +145,9 @@ Before the one atomic ownership write, the host proves:
 - the caller is the top-level owner Conversation in pushed primary `main`, with
   no dirt except the required exact untracked `.prime-claw/ownership.json`;
 - active version-1 ownership matches the exact source, operation, Episode,
-  session route, worktree identity/path, branch, and optional Orca resources;
+  worktree identity/path, branch, and optional Orca resources; the recorded
+  runtime route must either remain exact or be absent while one sole idle
+  durable session exposes a verified current replacement route;
 - the exact `In Progress` task path and meaningful native plan are committed on
   main and byte-identical on the reviewed Episode head, and an exact task
   reference retains the superseded legacy source binding for replay proof;
@@ -159,7 +161,11 @@ Before the one atomic ownership write, the host proves:
 The atomic replacement removes only `version`, `sourceLocation`, `slug`, and
 `bundleDigest`; adds version 2 plus the canonical `taskId` and `taskPath`;
 updates bookkeeping time; and preserves every common owner, operation,
-`baseRef`, Episode, session, worktree, branch, recorded-head, and Orca field.
+`baseRef`, Episode, durable session ID/file, worktree, branch, recorded-head,
+and Orca field. When a full restart replaced only the ephemeral runtime route,
+the same atomic write binds that sole verified current route; it refuses the
+refresh if the recorded route is still live, another durable match exists, or
+any owner, CWD, branch, worktree, session-file, or resource evidence differs.
 The tool creates no resource, assignment, task/status commit, merge, handoff,
 finalization, deletion, or cleanup. Only an exact same-binding replay is
 idempotent. Dirty, partial, foreign, divergent, unpushed, busy, missing, or
@@ -250,10 +256,14 @@ consulted, and the Conversation never copies or mirrors Episode-owned task
 content. It checks the exact candidate, tree, diff, tests, documentation,
 durable authority, chronology, and push state, then chooses one bounded
 disposition from the managed oversight skill. Retained version-1 compatibility folder Episodes use
-`handoff_spec_episode` for the exact idle owner record. The tool
-admits ordinary canonical handoff and queues canonical execute as its sole
-follow-up. Admission is not completion and uncertain transport is never
-retried blindly.
+`handoff_spec_episode` for the exact idle owner record. Handoff resolves strict
+source-location syntax and exact persisted ownership before consulting bundle
+storage, so the obsolete promoted future folder may be absent after merge. The
+exact owner, active root plan pair, worktree/branch/session/resource identity,
+and idle state remain mandatory; missing or mismatched ownership never falls
+through. The tool admits ordinary canonical handoff and queues canonical
+execute as its sole follow-up. Admission is not completion and uncertain
+transport is never retried blindly.
 
 Version-2 ownership exposes Conversation-owned blocker and resume actions through `finalize_task_episode`. `publishTaskEpisodeBlocked` and
 `publishTaskEpisodeResumed` run only for the exact top-level owner in canonical

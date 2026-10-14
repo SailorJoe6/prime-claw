@@ -134,7 +134,7 @@ export function resolveBacklogTask(
   };
 }
 
-export function validateFutureLocation(cwd: string, rawArgs: string): FutureLocation | null {
+export function resolveFutureLocationSyntax(cwd: string, rawArgs: string): FutureLocation | null {
   const location = rawArgs.trim();
   if (!location || /\s/.test(location)) return null;
   if (isAbsolute(location) || win32.isAbsolute(location)) return null;
@@ -144,13 +144,18 @@ export function validateFutureLocation(cwd: string, rawArgs: string): FutureLoca
   const projectRoot = resolveNearestProjectRoot(cwd).root;
   const futureRoot = resolve(projectRoot, ".ralph", "plans", "future");
   const folder = resolve(projectRoot, location);
-  if (!containedBy(futureRoot, folder)) return null;
-  if (!existsSync(folder) || !statSync(folder).isDirectory()) return null;
+  if (!containedBy(futureRoot, folder) || !containedBy(projectRoot, folder)) return null;
+  return { location, slug: match[1], projectRoot, folder };
+}
 
-  const realFutureRoot = realpathSync(futureRoot);
-  const realFolder = realpathSync(folder);
+export function validateFutureLocation(cwd: string, rawArgs: string): FutureLocation | null {
+  const selected = resolveFutureLocationSyntax(cwd, rawArgs);
+  if (!selected || !existsSync(selected.folder) || !statSync(selected.folder).isDirectory()) return null;
+
+  const realFutureRoot = realpathSync(resolve(selected.projectRoot, ".ralph", "plans", "future"));
+  const realFolder = realpathSync(selected.folder);
   if (!containedBy(realFutureRoot, realFolder)) return null;
-  if (!containedBy(projectRoot, realFolder)) return null;
+  if (!containedBy(selected.projectRoot, realFolder)) return null;
 
-  return { location, slug: match[1], projectRoot, folder: realFolder };
+  return { ...selected, folder: realFolder };
 }
