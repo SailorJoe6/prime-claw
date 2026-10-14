@@ -1730,3 +1730,18 @@ The deletion cannot safely proceed under the current authority state. Canonical 
 The attempted deletion, task update, receipt, documentation, and test edits were all uncommitted and were fully restored. The worktree returned to the exact clean pushed checkpoint `298146d24b0c6efb98d9d33dbb836140ba85c0f2` before this blocker note was added. No `.ralph/plans` content, task content/status, compatibility source, configuration, ownership state, or lifecycle resource changed.
 
 Unblock requires an explicit reviewed lifecycle transition that reconciles the final repository-local deletion with current active version-1 ownership while preserving review and revision capability. For example, the owning Conversation must authorize and implement a safe ownership-mode transition or another exact mechanism before deletion; Step 7 cannot infer that product/authority change. After that decision is durably recorded, resume from this same Episode without reopening accepted Step 6.
+
+## Operator-approved two-stage cutover — pre-activation ownership bridge
+
+The operator approved a revised two-stage same-Episode cutover design. The next execute pass is authorized only for the pre-activation ownership-bridge candidate. Do not resume Step 7 plan-tree deletion in that pass.
+
+- Keep canonical ownership active version 1 and keep this worktree's active `.ralph/plans/SPECIFICATION.md` plus `EXECUTION_PLAN.md` present throughout the candidate.
+- Through the supported Backlog CLI, migrate the complete authoritative execution-plan detail and necessary notes/evidence into `PRIMECLAW-10.38`, record the thin specification wrapper as superseded by that task, preserve exact Git/path/hash provenance, and leave status exactly `In Progress`.
+- Add one narrow guarded canonical transition surface for later execution only after this candidate is separately reviewed, merged, globally activated from primary `main`, restarted, and proven by UAT.
+- The transition must bind the exact owner Conversation, active version-1 ownership, source location, operation/Episode/session, worktree identity/path, branch/head ancestry, task ID/path, committed-main task status/evidence, and active-plan identity.
+- It must atomically replace only version-1 authority fields with version-2 task binding while preserving the same Episode, session, worktree, branch, and optional Orca resources.
+- It must be one-way, exact, idempotent only for the same completed binding, and fail closed on drift, partial state, foreign owner, dirty or unsafe state, or unavailable evidence.
+- Add the focused tests, documentation, public/canonical registration, and authority guidance needed for post-activation use.
+- Run the required host-safe and Docker-isolated plugin validation, commit and push one clean candidate, report it, and stop.
+
+Do not execute the live ownership transition, delete or archive the active pair, publish `Ready for Merge`, merge, apply globally, restart, finalize, clean resources, or reopen accepted Step 5 or Step 6 behavior. The prior Step 7 blocker remains truthful evidence; this approved bridge is its recorded unblock design, not permission to perform the later live transition or deletion.
