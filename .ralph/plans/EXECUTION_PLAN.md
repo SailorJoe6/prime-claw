@@ -1720,3 +1720,13 @@ The next execute pass is authorized for approved Step 7 only:
 7. Commit and push one clean candidate, report it, and stop.
 
 Do not publish `Ready for Merge`, merge, finalize ownership, clean resources, apply user-global assets, or retire generic legacy compatibility.
+
+## Step 7 blocked — active version-1 identity conflicts with pre-review plan deletion
+
+A bounded Step 7 attempt confirmed that all 43 tracked `.ralph/plans` paths have durable frozen-Git provenance and mapped Backlog owners, and that the active specification is only a pointer to `PRIMECLAW-10.38`. Before deletion, the complete active execution plan was also successfully round-tripped into the task through the supported CLI without changing task identity, parent, path, or `In Progress` status.
+
+The deletion cannot safely proceed under the current authority state. Canonical ownership remains active version 1 for this exact Episode. The accepted Step 5 live-identity rule requires that ownership plus readable, non-empty active specification and execution-plan files remain present in the recorded Episode worktree throughout candidate review and revision. Deleting this worktree's active pair before review makes the Episode non-live; execute, handoff, Conversation oversight, and Expert review then fail closed. The Step 7 instruction also expressly forbids finalizing ownership, so this pass has no authority to remove or replace the ownership record first.
+
+The attempted deletion, task update, receipt, documentation, and test edits were all uncommitted and were fully restored. The worktree returned to the exact clean pushed checkpoint `298146d24b0c6efb98d9d33dbb836140ba85c0f2` before this blocker note was added. No `.ralph/plans` content, task content/status, compatibility source, configuration, ownership state, or lifecycle resource changed.
+
+Unblock requires an explicit reviewed lifecycle transition that reconciles the final repository-local deletion with current active version-1 ownership while preserving review and revision capability. For example, the owning Conversation must authorize and implement a safe ownership-mode transition or another exact mechanism before deletion; Step 7 cannot infer that product/authority change. After that decision is durably recorded, resume from this same Episode without reopening accepted Step 6.
