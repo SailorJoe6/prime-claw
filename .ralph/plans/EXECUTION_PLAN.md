@@ -1338,7 +1338,7 @@ other 42 paths are owned exactly once by the groups below. The reviewed
 | Bundle group | Source paths | Owner | Status | Storage path | Checked criteria |
 |---|---:|---|---|---|---:|
 | `active-root` | 2 | `PRIMECLAW-10.38` | `In Progress` | `backlog/tasks/primeclaw-10.38 - Replace-.ralph-plans-with-task-native-Backlog-Ralph-lifecycle.md` | 0/19 |
-| `archive/compaction-first-phase-transitions` | 2 | `PRIMECLAW-39` | `Done` | `backlog/completed/primeclaw-39 - Historical-Compaction-first-phase-transitions.md` | 5/5 |
+| `archive/compaction-first-phase-transitions` | 2 | `PRIMECLAW-39` | `Done` | `backlog/completed/primeclaw-39 - Historical-Compaction-first-phase-transitions.md` | 2/5 |
 | `archive/conversation-driven-episode-oversight` | 2 | `PRIMECLAW-10.26` | `Done` | `backlog/completed/primeclaw-10.26 - Implement-conversation-driven-episode-oversight-plugin.md` | 13/13 |
 | `archive/conversational-ralph-command-routing` | 2 | `PRIMECLAW-38` | `Done` | `backlog/completed/primeclaw-38 - Historical-Conversational-Ralph-command-routing.md` | 9/9 |
 | `archive/goal-heartbeat-work-control` | 2 | `PRIMECLAW-10.28` | `Done` | `backlog/completed/primeclaw-10.28 - Implement-plugin-global-goal-and-heartbeat-work-control.md` | 13/13 |
@@ -1350,7 +1350,7 @@ other 42 paths are owned exactly once by the groups below. The reviewed
 | `archive/phase3a-bufd-superseded-incomplete` | 4 | `PRIMECLAW-41` | `Done` | `backlog/completed/primeclaw-41 - Historical-Superseded-incomplete-Phase-3a-brain-hosting-BUFD.md` | 10/17 |
 | `archive/plugin-test-container` | 7 | `PRIMECLAW-19` | `Done` | `backlog/completed/primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md` | 7/7 |
 | `archive/project-wide-testing-strategy` | 2 | `PRIMECLAW-20` | `Done` | `backlog/completed/primeclaw-20 - Project-wide-testing-strategy-specification-planning-only.md` | 5/5 |
-| `archive/worktree-isolated-specification-episodes` | 2 | `PRIMECLAW-37` | `Done` | `backlog/completed/primeclaw-37 - Historical-Reviewed-future-plans-and-worktree-isolated-specification-episodes.md` | 21/21 |
+| `archive/worktree-isolated-specification-episodes` | 2 | `PRIMECLAW-37` | `Done` | `backlog/completed/primeclaw-37 - Historical-Reviewed-future-plans-and-worktree-isolated-specification-episodes.md` | 16/21 |
 | `future/delivery-manager-episode-supervision` | 1 | `PRIMECLAW-42` | `In Design` | `backlog/tasks/primeclaw-42 - Design-delivery-manager-episode-supervision.md` | 0/17 |
 | `future/phase3a-brain-hosting-completion` | 2 | `PRIMECLAW-7` | `Blocked` | `backlog/tasks/primeclaw-7 - Phase-3-tracer-bullet-end-to-end-working-claw.md` | 0/5 |
 
@@ -1402,29 +1402,24 @@ Those actions remain deferred for separate Conversation authority.
 
 #### Accepted review correction — deferred dogfood criteria remain unchecked
 
-Conversation accepts one material in-scope finding against migration candidate
-`2ddd6dc45bbf47665354b6983e930daaa23e8f86`: two completed historical epics
-incorrectly marked explicitly deferred manual dogfood criteria as complete.
+The accepted material finding against migration candidate
+`2ddd6dc45bbf47665354b6983e930daaa23e8f86` is repaired. Imported native
+criteria no longer mark explicitly deferred manual dogfood as complete.
 
-The next execute pass must repair only that checked-state evidence through
-supported Backlog CLI operations:
+- `PRIMECLAW-39` was restored byte-for-byte before editing (39856
+  bytes, SHA-256 `69cd72ccf3032710d84a0e8c77c7514cff110f820dffde83bd170b0f15b854b0`), retained its exact ID, null parent,
+  filename, and `Done` status, and returned to its exact completed path with
+  only criteria 3 and 4 checked (2/5). Criteria 1, 2, and 5 remain unchecked.
+- `PRIMECLAW-37` was restored byte-for-byte before editing (44721
+  bytes, SHA-256 `fc5f8b0eeed910885393308388a05158425095288e2955d212740e57213031ef`), retained its exact ID, null parent,
+  filename, and `Done` status, and returned to its exact completed path with
+  criteria 1–16 checked and deferred Slice 4 criteria 17–21 unchecked (16/21).
+- `python3 -m pytest tests/test_backlog_workflow.py tests/test_backlog_build.py
+  -q` passed: 7 tests. Exact criterion-state, identity, storage, bounded-diff,
+  and `git diff --check` validation passed before the repair commit.
 
-1. Restore `PRIMECLAW-39`, verify exact ID, parent, filename, bytes, and `Done`
-   status through restore, uncheck criteria 1, 2, and 5 while retaining criteria
-   3 and 4 checked, validate the truthful 2/5 state, then complete it back to
-   its exact completed path.
-2. Restore `PRIMECLAW-37`, verify the same identity and storage invariants,
-   uncheck deferred Slice 4 criteria 17–21 while retaining criteria 1–16
-   checked, validate the truthful 16/21 state, then complete it back to its
-   exact completed path.
-3. Update only the affected count/evidence claims in `PRIMECLAW-10.38` and this
-   execution plan. Re-run the existing focused Backlog checks and `git diff
-   --check`, commit and push the exact repair candidate, and stop idle for
-   Conversation review.
-
-Do not run new dogfood, change lifecycle status, alter any other mapping or
-content, retire assets, delete `.ralph/plans`, perform cutover, or do unrelated
-cleanup.
+No new dogfood ran. No lifecycle status, other mapping/content, asset,
+`.ralph/plans` location, cutover, or unrelated cleanup changed.
 
 ### 5. Perform the one-time task and bundle migration through Backlog CLI
 

@@ -4,7 +4,7 @@ title: 'Historical: Compaction-first phase transitions'
 status: Done
 assignee: []
 created_date: '2026-10-14 02:51'
-updated_date: '2026-10-14 02:51'
+updated_date: '2026-10-14 04:33'
 labels: []
 dependencies: []
 references:
@@ -227,11 +227,11 @@ proves the race is closed.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 `/plan <folder>` on a real reviewed specification: observed compaction (or a truthful `scheduled: false` report) followed by exactly one canonical planning turn running on compacted context.
-- [x] #2 `/implement-spec <folder>` on a real approved bundle: the same, with `create_spec_episode` succeeding under the corrected approval mechanics — regression-proving the `agent_end` race is closed.
+- [ ] #1 `/plan <folder>` on a real reviewed specification: observed compaction (or a truthful `scheduled: false` report) followed by exactly one canonical planning turn running on compacted context.
+- [ ] #2 `/implement-spec <folder>` on a real approved bundle: the same, with `create_spec_episode` succeeding under the corrected approval mechanics — regression-proving the `agent_end` race is closed.
 - [x] #3 Both surfaces reject malformed input exactly as today (location validation unchanged).
 - [x] #4 Deterministic coverage in the handoff-chain test style (node test + pytest bridge), plus documentation alongside `docs/handoff-chain.md`.
-- [x] #5 Dogfooded end-to-end by the operator through a real plan and episode promotion.
+- [ ] #5 Dogfooded end-to-end by the operator through a real plan and episode promotion.
 <!-- AC:END -->
 
 ## Implementation Plan
