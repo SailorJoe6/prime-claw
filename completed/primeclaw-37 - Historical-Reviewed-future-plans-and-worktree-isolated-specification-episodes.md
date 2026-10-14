@@ -4,7 +4,7 @@ title: 'Historical: Reviewed future plans and worktree-isolated specification ep
 status: Done
 assignee: []
 created_date: '2026-10-14 02:51'
-updated_date: '2026-10-14 02:51'
+updated_date: '2026-10-14 04:33'
 labels: []
 dependencies: []
 references:
@@ -436,11 +436,11 @@ the native reviewed transitions once those slices land.
 - [x] #14 The sibling session inherits the active conversation, uses the episode worktree as CWD, and receives execute exactly once.
 - [x] #15 The owner receives stable episode identity for subsequent observation and handoff.
 - [x] #16 Focused unit, temporary-Git, and offline RPC integration tests pass.
-- [x] #17 The two human review gates are observable in a real workflow.
-- [x] #18 No branch, worktree, or episode is created during specification or planning.
-- [x] #19 `/implement-spec` alone crosses the implementation boundary.
-- [x] #20 The episode starts at execute, remains owner-observable, and can use the existing handoff chain.
-- [x] #21 Tests, documentation, Git history, and cleanup evidence agree with the actual behavior.
+- [ ] #17 The two human review gates are observable in a real workflow.
+- [ ] #18 No branch, worktree, or episode is created during specification or planning.
+- [ ] #19 `/implement-spec` alone crosses the implementation boundary.
+- [ ] #20 The episode starts at execute, remains owner-observable, and can use the existing handoff chain.
+- [ ] #21 Tests, documentation, Git history, and cleanup evidence agree with the actual behavior.
 <!-- AC:END -->
 
 ## Implementation Plan
