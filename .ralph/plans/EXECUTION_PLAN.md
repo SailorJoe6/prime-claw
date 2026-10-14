@@ -1327,6 +1327,79 @@ lifecycle status changes, or unrelated cleanup. Commit and push this bounded
 migration candidate, report exact evidence, and stop idle for Conversation
 review.
 
+#### Bounded historical-bundle migration candidate — completed
+
+The accepted one-time migration used frozen provenance tree `6d11d9c2797cea54ecd07171e8a5b2019d6ee530` and
+reconciled its 43 tracked `.ralph/plans` paths into 16 owners. The shared
+`.ralph/plans/archive/README.md` is recorded as terminal/status evidence; the
+other 42 paths are owned exactly once by the groups below. The reviewed
+`replace-beads` source paths are absent, so `PRIMECLAW-35` remains unchanged.
+
+| Bundle group | Source paths | Owner | Status | Storage path | Checked criteria |
+|---|---:|---|---|---|---:|
+| `active-root` | 2 | `PRIMECLAW-10.38` | `In Progress` | `backlog/tasks/primeclaw-10.38 - Replace-.ralph-plans-with-task-native-Backlog-Ralph-lifecycle.md` | 0/19 |
+| `archive/compaction-first-phase-transitions` | 2 | `PRIMECLAW-39` | `Done` | `backlog/completed/primeclaw-39 - Historical-Compaction-first-phase-transitions.md` | 5/5 |
+| `archive/conversation-driven-episode-oversight` | 2 | `PRIMECLAW-10.26` | `Done` | `backlog/completed/primeclaw-10.26 - Implement-conversation-driven-episode-oversight-plugin.md` | 13/13 |
+| `archive/conversational-ralph-command-routing` | 2 | `PRIMECLAW-38` | `Done` | `backlog/completed/primeclaw-38 - Historical-Conversational-Ralph-command-routing.md` | 9/9 |
+| `archive/goal-heartbeat-work-control` | 2 | `PRIMECLAW-10.28` | `Done` | `backlog/completed/primeclaw-10.28 - Implement-plugin-global-goal-and-heartbeat-work-control.md` | 13/13 |
+| `archive/handoff-continuation-resilience` | 2 | `PRIMECLAW-10.15` | `Done` | `backlog/completed/primeclaw-10.15 - POC-conversation-owned-episode-for-resilient-conversational-handoff.md` | 9/9 |
+| `archive/official-lean-compatibility-cleanup` | 2 | `PRIMECLAW-10.34` | `Done` | `backlog/completed/primeclaw-10.34 - Complete-official-lean-role-protocol-and-remove-compatibility.md` | 20/20 |
+| `archive/official-lean-session-protocol` | 2 | `PRIMECLAW-40` | `Done` | `backlog/completed/primeclaw-40 - Historical-Official-lean-session-protocol.md` | 16/16 |
+| `archive/phase1-derisk-gate` | 4 | `PRIMECLAW-36` | `Done` | `backlog/completed/primeclaw-36 - Historical-Phase-1-de-risk-gate.md` | 22/22 |
+| `archive/phase2-runtime` | 4 | `PRIMECLAW-6` | `Done` | `backlog/completed/primeclaw-6 - Phase-2-sandbox-runtime-foundation-prime-agent-in-OpenShell.md` | 20/20 |
+| `archive/phase3a-bufd-superseded-incomplete` | 4 | `PRIMECLAW-41` | `Done` | `backlog/completed/primeclaw-41 - Historical-Superseded-incomplete-Phase-3a-brain-hosting-BUFD.md` | 10/17 |
+| `archive/plugin-test-container` | 7 | `PRIMECLAW-19` | `Done` | `backlog/completed/primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md` | 7/7 |
+| `archive/project-wide-testing-strategy` | 2 | `PRIMECLAW-20` | `Done` | `backlog/completed/primeclaw-20 - Project-wide-testing-strategy-specification-planning-only.md` | 5/5 |
+| `archive/worktree-isolated-specification-episodes` | 2 | `PRIMECLAW-37` | `Done` | `backlog/completed/primeclaw-37 - Historical-Reviewed-future-plans-and-worktree-isolated-specification-episodes.md` | 21/21 |
+| `future/delivery-manager-episode-supervision` | 1 | `PRIMECLAW-42` | `In Design` | `backlog/tasks/primeclaw-42 - Design-delivery-manager-episode-supervision.md` | 0/17 |
+| `future/phase3a-brain-hosting-completion` | 2 | `PRIMECLAW-7` | `Blocked` | `backlog/tasks/primeclaw-7 - Phase-3-tracer-bullet-end-to-end-working-claw.md` | 0/5 |
+
+Before editing each reused completed owner, `backlog task restore` moved the
+exact completed file to active storage without changing its bytes, ID, parent,
+filename, or `Done` status. These pre-edit byte receipts were verified after
+each restore:
+
+| Owner | Parent | Filename | Bytes | SHA-256 before and immediately after restore |
+|---|---|---|---:|---|
+| `PRIMECLAW-6` | `null` | `primeclaw-6 - Phase-2-sandbox-runtime-foundation-prime-agent-in-OpenShell.md` | 4758 | `79168c7f1fbd4339c4dafed49b3fdb224d21bc55d7762fca597fe57dd10f33ed` |
+| `PRIMECLAW-10.15` | `PRIMECLAW-10` | `primeclaw-10.15 - POC-conversation-owned-episode-for-resilient-conversational-handoff.md` | 34126 | `ae4e0d7ce36ecd75a49134959c4fe1a72271110147938d0b96e5a7606bed7a16` |
+| `PRIMECLAW-10.26` | `PRIMECLAW-10` | `primeclaw-10.26 - Implement-conversation-driven-episode-oversight-plugin.md` | 484000 | `f4cf57d8770280b78a51fb4364546e6513b09ddd3d9bb0a0c76c3d3c0721af24` |
+| `PRIMECLAW-10.28` | `PRIMECLAW-10` | `primeclaw-10.28 - Implement-plugin-global-goal-and-heartbeat-work-control.md` | 13708 | `81c2822934ceb858f22829ec176ef032ef1c61ee61c3da79cc880560556ce339` |
+| `PRIMECLAW-19` | `null` | `primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md` | 42404 | `bc414298280d29e4842ca30d37ee95464d36cab1f0d66b41ae91244d8fca7fed` |
+| `PRIMECLAW-20` | `null` | `primeclaw-20 - Project-wide-testing-strategy-specification-planning-only.md` | 3335 | `fecd81ce8f13e7cec1fc1d4945574fe8284772f305bcea629504b50708c250bb` |
+| `PRIMECLAW-10.34` | `PRIMECLAW-10` | `primeclaw-10.34 - Complete-official-lean-role-protocol-and-remove-compatibility.md` | 195925 | `ac40110fdb8000115645e12ef1c390464152ff33e3ce0dd34cd02fa210fc1437` |
+
+All task mutations used supported Backlog CLI operations. Each successful
+historical owner was validated before `backlog task complete` returned it to
+`backlog/completed/`. `PRIMECLAW-41` is intentionally completed-but-partial
+with 10/17 source-supported criteria; it links bidirectionally with the sole
+live Blocked Phase 3a replacement, `PRIMECLAW-7`. Historical predecessor
+`PRIMECLAW-40` links bidirectionally with replacement `PRIMECLAW-10.34`.
+`PRIMECLAW-42` remains `In Design`. `PRIMECLAW-10.38` remains `In Progress`
+under `PRIMECLAW-10` with 0/19 criteria checked.
+
+Validation evidence:
+
+- an in-memory audit proved the frozen inventory is exactly 43 unique paths,
+  the 16 non-index groups map to 16 exact task owners, every source path and
+  frozen commit appears in owner provenance, imported specifications,
+  requirements, plans, decisions, and nested reviews survive normalized
+  Backlog serialization, and the archive index outcome is present for every
+  historical bundle;
+- identity/storage checks proved the seven restored owners retain their exact
+  IDs, parents, filenames, `Done` status, and completed storage after edits;
+- hierarchy checks proved `PRIMECLAW-7.3` through `.7.6` retain parent
+  `PRIMECLAW-7` and their pre-migration statuses;
+- `git diff --quiet 7df23e5c811afbb49ebf877734870730206dcb48 -- <PRIMECLAW-35 path>`
+  passed, proving the absent-source no-op;
+- `python3 -m pytest tests/test_backlog_workflow.py tests/test_backlog_build.py -q`
+  passed: 7 tests.
+
+This candidate does not classify remaining `To Do` work, change configuration
+or existing lifecycle statuses, delete or move `.ralph/plans`, retire assets,
+perform final cutover, initiate upstream outreach, or do unrelated cleanup.
+Those actions remain deferred for separate Conversation authority.
+
 ### 5. Perform the one-time task and bundle migration through Backlog CLI
 
 Freeze the committed Episode base SHA as the pre-cutover provenance commit and
