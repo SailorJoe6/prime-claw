@@ -1304,11 +1304,28 @@ Validation evidence:
 - `git diff --check` passed, and the built candidate exposes the documented
   `task restore` help contract.
 
-This checkpoint changes no migration record. The seven completed owners remain
+This checkpoint changed no migration record. The seven completed owners remain
 under `backlog/completed/`; no historical epic, `To Do` classification, config,
-asset, lifecycle status, or plan location changed. Broader migration remains
-paused pending Conversation acceptance of this capability candidate. No issue
-or pull request was opened or prepared.
+asset, lifecycle status, or plan location changed. The owning Conversation has
+accepted and pushed the capability at Backlog dependency
+`5d556c1954f7724abd180f6211cf528e9253ad4c` and parent
+`817a5936607fcb9493630ad14544c744030ebb40`; both were verified clean,
+upstream-equal, and linked exactly.
+
+The next execute pass is approved only for the reviewed one-time task and
+historical-bundle migration in Step 5. Restore `PRIMECLAW-6`,
+`PRIMECLAW-10.15`, `PRIMECLAW-10.26`, `PRIMECLAW-10.28`, `PRIMECLAW-19`,
+`PRIMECLAW-20`, and `PRIMECLAW-10.34` through `backlog task restore`; preserve
+each exact ID, parent, filename, bytes/content, and `Done` status through the
+restore; make only supported CLI edits; validate; and run `backlog task
+complete` only after all intended edits. Reconcile the frozen 43 source paths
+into the 16 recorded bundle owners, preserve the approved `PRIMECLAW-7` Phase
+3a mapping and bidirectional superseded-history references, and leave
+`PRIMECLAW-35` unchanged when its source bundle is absent. Do not perform
+upstream outreach, asset retirement, `.ralph/plans` deletion, final cutover,
+lifecycle status changes, or unrelated cleanup. Commit and push this bounded
+migration candidate, report exact evidence, and stop idle for Conversation
+review.
 
 ### 5. Perform the one-time task and bundle migration through Backlog CLI
 
