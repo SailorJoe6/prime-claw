@@ -319,6 +319,51 @@ Use the supported `backlog task create --plain` interface and
         assert manifest["assets"][f"project-skill-{skill_name}"]["state"] == "customized"
 
 
+@pytest.mark.parametrize(
+    ("name", "mission"),
+    (
+        ("plan-prep", "plan the selected specification"),
+        ("plan-task-prep", "plan the selected task"),
+        ("implement-prep", "review the selected bundle for implementation promotion"),
+        ("implement-task-prep", "review the selected task for implementation admission"),
+    ),
+)
+def test_phase_prep_composes_context_aware_hint_without_fixed_inventory(
+    name: str, mission: str,
+) -> None:
+    skill = " ".join(workflow(name).read_text().split())
+    hint_policy = skill.split("## Standard compaction request", 1)[1].split(
+        "Then call exactly once:", 1,
+    )[0]
+    for fragment in (
+        "reason from your current conversation context",
+        "compose a concise `focus_hint`",
+        mission,
+        "Use your judgment to decide what context will be most useful for that mission",
+    ):
+        assert fragment in hint_policy
+    if name.startswith("implement"):
+        assert "supervise the resulting Episode" in hint_policy
+    for fragment in (
+        "fixed text", "substituting only", "<selected-folder>", "<task-id>",
+        "Preserve", "Retain", "operator review decisions", "acceptance criteria",
+        "constraints", "material non-goals", "durable artifact and bead references",
+        "Conversation-to-Episode authority",
+    ):
+        assert fragment not in hint_policy
+    assert skill.count("await compact.run(focus_hint)") == 1
+    for fragment in (
+        "sole follow-up",
+        "Interpret only the immediate result",
+        "`scheduled: true`", "not confirmation that compaction completed",
+        "`scheduled: false`", "without treating it as a workflow failure",
+        "If the call raises", "without pasting a traceback or raw provider data",
+        "follow-up remains independently queued",
+        "Do not wait for a compaction event or infer a later outcome",
+    ):
+        assert fragment in skill
+
+
 def test_plan_prep_skill_owns_compaction_prompt_and_bounded_continuation() -> None:
     """Plan prep owns model policy while the extension owns admission mechanics."""
     skill = workflow("plan-prep").read_text()
@@ -333,15 +378,6 @@ def test_plan_prep_skill_owns_compaction_prompt_and_bounded_continuation() -> No
         "not the authoritative planning-readiness review",
         "do not request compaction",
         "Standard compaction request",
-        "You are about to plan the reviewed specification",
-        "operator-selected future folder",
-        "operator review decisions",
-        "constraints",
-        "material non-goals",
-        "durable artifact and bead references",
-        "If the operator later approves implementation",
-        "this same conversation will own and supervise the resulting",
-        "implementation episode to completion",
         "Status",
         "Evidence",
         "Next Step",
@@ -385,15 +421,6 @@ def test_implement_prep_skill_owns_compaction_prompt_and_bounded_continuation() 
         "not the authoritative implementation-readiness review",
         "do not request compaction",
         "Standard compaction request",
-        "review and promote the operator-approved specification",
-        "operator-selected future folder",
-        "operator review decisions",
-        "constraints",
-        "material non-goals",
-        "durable artifact and bead references",
-        "create its isolated implementation episode",
-        "owner-supervision role",
-        "supervises the episode to completion",
         "Status",
         "Evidence",
         "Next Step",
@@ -455,9 +482,6 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
         "not the authoritative planning-readiness review",
         "sole follow-up",
         "cannot cancel, replace, reconstruct, retry, or invoke",
-        "exact Backlog task",
-        "acceptance criteria",
-        "Conversation-to-Episode authority",
         "Status",
         "Evidence",
         "Next Step",
@@ -490,7 +514,8 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
     ):
         assert fragment in plan
 
-    for name in ("plan-task-prep", "plan-task"):
+    # Installed prep policy may differ until deliberate candidate activation.
+    for name in ("plan-task",):
         source = workflow(name)
         tracked = ROOT / ".prime-claw" / "workflows" / f"{name}.md"
         assert tracked.read_bytes() == source.read_bytes()
@@ -519,8 +544,6 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "not the authoritative implementation-readiness review",
         "sole follow-up",
         "cannot cancel, replace, reconstruct, retry, or invoke",
-        "operator review decisions",
-        "Conversation-to-Episode authority",
         "Status",
         "Evidence",
         "Next Step",
@@ -561,7 +584,8 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     assert implement.index("persist one `provisioning` ownership record") < implement.index("before creating any branch, worktree, or session")
     assert implement.index("before creating any branch, worktree, or session") < implement.index("creates the Episode branch and worktree from that recorded SHA")
 
-    for name in ("implement-task-prep", "implement-task"):
+    # Installed prep policy may differ until deliberate candidate activation.
+    for name in ("implement-task",):
         source = workflow(name)
         tracked = ROOT / ".prime-claw" / "workflows" / f"{name}.md"
         assert tracked.read_bytes() == source.read_bytes()
