@@ -47,8 +47,10 @@ A separately reviewed migration may move that same live retained Episode to
 version-2 authority through `transition_spec_episode_to_task`. This is not a
 second admission: after the bridge is merged, globally activated, restarted,
 and UAT-proven, the exact owner supplies reviewed pushed main/Episode heads and
-explicit confirmation. The host proves clean Git ancestry, complete committed
-task and active-plan identity, an idle exact durable session, and unchanged
+explicit confirmation. The host proves exact reviewed main/upstream identity,
+no staged or tracked canonical-main changes, no in-progress merge/rebase/cherry-pick/revert,
+exact ancestry, complete committed task and active-plan identity, an idle exact
+durable session, and unchanged
 worktree/branch/Orca resources. When restart changed only the ephemeral route,
 the host additionally requires one sole matching idle durable session and an
 absent old route, then binds the verified current route in the same atomic

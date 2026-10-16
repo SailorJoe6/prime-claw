@@ -1,4 +1,4 @@
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -66,6 +66,7 @@ export interface LegacyTaskOwnershipTransitionGit {
   head(repo: string): string;
   upstreamHead(repo: string): string;
   status(repo: string): string;
+  operationInProgress(repo: string): boolean;
   worktrees(repo: string): Array<{ path: string; branch: string; head: string }>;
   isAncestor(repo: string, ancestor: string, descendant: string): boolean;
   commitPaths(repo: string, ref: string): string[];
@@ -113,6 +114,10 @@ export class CliLegacyTaskOwnershipTransitionGit implements LegacyTaskOwnershipT
   head(repo: string): string { return runGit(repo, ["rev-parse", "HEAD"]); }
   upstreamHead(repo: string): string { return runGit(repo, ["rev-parse", "@{upstream}"]); }
   status(repo: string): string { return runGit(repo, ["status", "--porcelain=v1", "--untracked-files=all"]); }
+  operationInProgress(repo: string): boolean {
+    return ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer"]
+      .some((marker) => existsSync(resolve(repo, runGit(repo, ["rev-parse", "--git-path", marker]))));
+  }
   worktrees(repo: string): Array<{ path: string; branch: string; head: string }> {
     const output = runGit(repo, ["worktree", "list", "--porcelain"]);
     const rows: Array<{ path: string; branch: string; head: string }> = [];
@@ -258,8 +263,7 @@ function sameOwnership(left: EpisodeOwnershipRecord | null, right: EpisodeOwners
 
 function canonicalMainStatusIsSafe(status: string): boolean {
   if (status === "") return true;
-  const lines = status.split(/\r?\n/).filter(Boolean);
-  return lines.length === 1 && lines[0] === "?? .prime-claw/ownership.json";
+  return status.split(/\r?\n/).filter(Boolean).every((line) => line.startsWith("?? "));
 }
 
 /**
@@ -294,13 +298,19 @@ export function transitionLegacyEpisodeOwnershipToTask(
   const requestedRoot = realpathSync(input.projectRoot);
   const root = git.repositoryRoot(requestedRoot);
   if (root !== requestedRoot) throw new Error("Ownership transition must run from the repository root");
-  if (!git.isPrimaryWorktree(root) || git.branch(root) !== "main") {
+  if (!git.isPrimaryWorktree(root)) {
+    throw new Error("Ownership transition must run from the canonical primary main checkout");
+  }
+  if (git.operationInProgress(root)) {
+    throw new Error("Canonical main has a merge, rebase, cherry-pick, or revert in progress; ownership transition made no change");
+  }
+  if (git.branch(root) !== "main") {
     throw new Error("Ownership transition must run from the canonical primary main checkout");
   }
   if (git.head(root) !== input.expectedMainHead || git.upstreamHead(root) !== input.expectedMainHead) {
     throw new Error("Canonical main HEAD or upstream drifted from the reviewed transition evidence");
   }
-  if (!canonicalMainStatusIsSafe(git.status(root))) throw new Error("Canonical main is dirty beyond its exact ownership record; ownership transition made no change");
+  if (!canonicalMainStatusIsSafe(git.status(root))) throw new Error("Canonical main has staged or tracked working-tree changes; ownership transition made no change");
 
   const { selection, taskPath } = exactTransitionTask(root, input, resolver);
   const initial = ownership.read(root);
@@ -387,8 +397,9 @@ export function transitionLegacyEpisodeOwnershipToTask(
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
   }) as TaskEpisodeOwnershipRecord;
 
-  if (git.head(root) !== input.expectedMainHead || git.upstreamHead(root) !== input.expectedMainHead || !canonicalMainStatusIsSafe(git.status(root))
-    || git.head(episodeRoot) !== input.expectedEpisodeHead || git.upstreamHead(episodeRoot) !== input.expectedEpisodeHead || git.status(episodeRoot) !== "") {
+  if (git.operationInProgress(root) || git.head(root) !== input.expectedMainHead || git.upstreamHead(root) !== input.expectedMainHead
+    || !canonicalMainStatusIsSafe(git.status(root)) || git.head(episodeRoot) !== input.expectedEpisodeHead
+    || git.upstreamHead(episodeRoot) !== input.expectedEpisodeHead || git.status(episodeRoot) !== "") {
     throw new Error("Git state changed during ownership transition validation");
   }
   const beforeWrite = ownership.read(root);
