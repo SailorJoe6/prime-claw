@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-14 20:02'
+updated_date: '2026-10-16 14:46'
 labels:
   - backlog-md
   - episode-loop
@@ -2015,6 +2015,22 @@ Implemented the two accepted repairs:
 Focused Node validation passed 207/207 across transition, Episode, and public registration suites. Focused host policy validation passed 35 with 5 environment skips. Exact-current-source Docker Tier-1 passed immutable-image launch, network absence, plugin checks, offline RPC discovery, teardown, and manifest publication at `.test-results/20261014T195838Z-87657-4cdd8ad3/tier1`. `git diff --check` passed.
 
 The temporarily restored `.ralph/plans/future/replace-ralph-plans-with-backlog` pair was removed again. The active root `.ralph/plans/SPECIFICATION.md` and `.ralph/plans/EXECUTION_PLAN.md` remain present and non-empty. Canonical ownership remains active version 1 for Episode `01a133c6-0834-7465-8597-91cf46c0b19e`; no live transition, lifecycle/status publication, merge to main, finalization, cleanup, or generic compatibility retirement occurred.
+
+## Accepted canonical-main safety-guard revision — execute next
+
+The operator accepted one narrowly bounded revision to the ownership-transition canonical-main safety guard. A committed main advancement is valid when canonical `HEAD` equals both its upstream and the exact reviewed expected main head. The guard must reject staged changes, tracked working-tree changes, and any in-progress merge, rebase, cherry-pick, or revert state, but it must not reject unrelated untracked paths.
+
+Preserve every existing exact task-path, ownership, Episode, active-plan, ancestry, route/session/resource, and before-write revalidation guard. Add focused regression tests proving unrelated untracked paths pass while staged or tracked drift and each in-progress Git operation fails closed. Update only directly relevant documentation when needed.
+
+Do not touch `.ralph/plans/archive/replace-beads/`; transition ownership; delete active or unrelated plans; change task lifecycle status; activate plugin assets globally; finalize; or clean resources. Complete one clean validated candidate, synchronize the exact target task plan to the active execution plan through the supported CLI before review, push it, and report evidence to the owning Conversation.
+
+## Canonical-main transition safety guard — completed
+
+Revised only the ownership-transition canonical-main safety guard. Canonical `HEAD` and upstream must still equal the exact reviewed expected main head. Porcelain status now permits any untracked path while rejecting every staged or tracked change. The Git adapter detects `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `rebase-merge`, `rebase-apply`, and `sequencer`; any matching operation fails before transition. Operation, head, upstream, and staged/tracked cleanliness are revalidated immediately before the sole ownership write. Episode cleanliness and all task-path, ownership, Episode, active-plan, ancestry, route/session/resource, and before-write ownership guards remain unchanged.
+
+Focused regressions cover clean committed main, unrelated untracked paths, staged changes, tracked unstaged changes, merge/rebase/cherry-pick/revert and sequencer state, exact expected-head/upstream mismatch, and operation drift before write. Exact-current-source Node validation passed 210/210. Focused policy validation passed 35 with 5 environment skips. Docker Tier 1 passed immutable-image launch, network absence, checks, teardown, and manifest publication at `.test-results/20261016T144354Z-80085-a24d2404/tier1`. `git diff --check` passed.
+
+No live ownership transition, plan deletion, task lifecycle status change, user-global activation, merge, finalization, cleanup, or protected archive modification occurred. Canonical ownership remains active version 1 and the active root plan pair remains present.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
