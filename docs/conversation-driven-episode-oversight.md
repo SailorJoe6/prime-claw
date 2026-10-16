@@ -142,8 +142,10 @@ explicit readiness confirmation.
 
 Before the one atomic ownership write, the host proves:
 
-- the caller is the top-level owner Conversation in pushed primary `main`, with
-  no dirt except the required exact untracked `.prime-claw/ownership.json`;
+- the caller is the top-level owner Conversation in pushed primary `main`, where
+  `HEAD` equals both upstream and reviewed evidence, no merge, rebase, cherry-pick,
+  or revert is in progress, and no staged or tracked changes exist; unrelated
+  untracked paths are allowed;
 - active version-1 ownership matches the exact source, operation, Episode,
   worktree identity/path, branch, and optional Orca resources; the recorded
   runtime route must either remain exact or be absent while one sole idle

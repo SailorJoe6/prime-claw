@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
@@ -215,13 +215,42 @@ test("guarded transition requires explicit readiness, exact owner, and exact bin
   const headDrift = transitionFixture();
   assert.throws(() => transition(headDrift, { expectedEpisodeHead: headDrift.baseRef }), /Episode HEAD or upstream drifted/);
   assert.deepEqual(readEpisodeOwnership(headDrift.root), headDrift.legacy);
+
+  const mainHeadMismatch = transitionFixture();
+  assert.throws(() => transition(mainHeadMismatch, { expectedMainHead: mainHeadMismatch.baseRef }), /Canonical main HEAD or upstream drifted/);
+  assert.deepEqual(readEpisodeOwnership(mainHeadMismatch.root), mainHeadMismatch.legacy);
+
+  const upstreamMismatch = transitionFixture();
+  const baseGit = new CliLegacyTaskOwnershipTransitionGit();
+  const gitProxy = new Proxy(baseGit, { get(target, property) {
+    if (property === "upstreamHead") return (repo) => repo === upstreamMismatch.root ? upstreamMismatch.baseRef : target.upstreamHead(repo);
+    const value = target[property];
+    return typeof value === "function" ? value.bind(target) : value;
+  } });
+  assert.throws(() => transition(upstreamMismatch, {}, { git: gitProxy }), /Canonical main HEAD or upstream drifted/);
+  assert.deepEqual(readEpisodeOwnership(upstreamMismatch.root), upstreamMismatch.legacy);
 });
 
-test("guarded transition fails closed on dirty state, missing evidence, and unsafe ancestry", () => {
-  const dirtyMain = transitionFixture();
-  writeFileSync(join(dirtyMain.root, "dirty.txt"), "dirty\n");
-  assert.throws(() => transition(dirtyMain), /Canonical main is dirty/);
-  assert.deepEqual(readEpisodeOwnership(dirtyMain.root), dirtyMain.legacy);
+test("guarded transition allows unrelated untracked canonical-main paths", () => {
+  const f = transitionFixture();
+  writeFileSync(join(f.root, "unrelated-untracked.txt"), "unrelated\n");
+  assert.match(new CliLegacyTaskOwnershipTransitionGit().status(f.root), /\?\? unrelated-untracked\.txt/);
+  const result = transition(f);
+  assert.equal(result.record.version, 2);
+  assert.equal(result.record.taskId, f.selection.taskId);
+});
+
+test("guarded transition fails closed on staged or tracked state, missing evidence, and unsafe ancestry", () => {
+  const trackedMain = transitionFixture();
+  writeFileSync(join(trackedMain.root, trackedMain.relative), "tracked drift\n");
+  assert.throws(() => transition(trackedMain), /staged or tracked working-tree changes/);
+  assert.deepEqual(readEpisodeOwnership(trackedMain.root), trackedMain.legacy);
+
+  const stagedMain = transitionFixture();
+  writeFileSync(join(stagedMain.root, "staged.txt"), "staged\n");
+  git(stagedMain.root, "add", "staged.txt");
+  assert.throws(() => transition(stagedMain), /staged or tracked working-tree changes/);
+  assert.deepEqual(readEpisodeOwnership(stagedMain.root), stagedMain.legacy);
 
   const dirtyEpisode = transitionFixture();
   writeFileSync(join(dirtyEpisode.episodeRoot, "dirty.txt"), "dirty\n");
@@ -244,6 +273,19 @@ test("guarded transition fails closed on dirty state, missing evidence, and unsa
   assert.deepEqual(readEpisodeOwnership(unsafe.root), unsafe.legacy);
 });
 
+test("guarded transition rejects merge, rebase, cherry-pick, and revert state", () => {
+  for (const marker of ["MERGE_HEAD", "rebase-merge", "CHERRY_PICK_HEAD", "REVERT_HEAD", "sequencer"]) {
+    const f = transitionFixture();
+    const markerPath = resolve(f.root, git(f.root, "rev-parse", "--git-path", marker));
+    if (marker.startsWith("rebase-") || marker === "sequencer") mkdirSync(markerPath, { recursive: true });
+    else writeFileSync(markerPath, `${f.mainHead}\n`);
+    const adapter = new CliLegacyTaskOwnershipTransitionGit();
+    assert.equal(adapter.operationInProgress(f.root), true, marker);
+    assert.throws(() => transition(f), /merge, rebase, cherry-pick, or revert in progress/, marker);
+    assert.deepEqual(readEpisodeOwnership(f.root), f.legacy, marker);
+  }
+});
+
 test("guarded transition requires the complete task plan to equal the active execution plan", () => {
   const f = transitionFixture();
   assert.throws(() => transition(f, {}, { taskResolver: () => ({ ...f.selection, implementationPlan: "stale partial plan" }) }), /does not exactly match/);
@@ -258,6 +300,24 @@ test("guarded transition detects ownership drift before its sole write", () => {
     write() { writes += 1; },
   };
   assert.throws(() => transition(f, {}, { ownership }), /changed during transition validation/);
+  assert.equal(writes, 0);
+});
+
+test("guarded transition rechecks operation state before its sole write", () => {
+  const f = transitionFixture();
+  const baseGit = new CliLegacyTaskOwnershipTransitionGit();
+  let operationChecks = 0, writes = 0;
+  const gitProxy = new Proxy(baseGit, { get(target, property) {
+    if (property === "operationInProgress") return () => ++operationChecks === 2;
+    const value = target[property];
+    return typeof value === "function" ? value.bind(target) : value;
+  } });
+  const ownership = {
+    read() { return structuredClone(f.legacy); },
+    write() { writes += 1; },
+  };
+  assert.throws(() => transition(f, {}, { git: gitProxy, ownership }), /Git state changed during ownership transition validation/);
+  assert.equal(operationChecks, 2);
   assert.equal(writes, 0);
 });
 

@@ -55,8 +55,7 @@ and prove the loaded generation by UAT.
 
 The owning top-level Conversation passes the exact retained source, canonical
 `In Progress` task ID, reviewed pushed Episode head, activated pushed main head,
-and readiness confirmation. The host then proves exact upstream Git state and ancestry, no canonical-main
-dirt except the required untracked ownership record, a wholly clean Episode,
+and readiness confirmation. The host then proves canonical `HEAD` equals both its upstream and the reviewed main head, no merge, rebase, cherry-pick, or revert is in progress, no staged or tracked canonical-main changes exist (unrelated untracked paths are allowed), exact ancestry, a wholly clean Episode,
 complete task/active-plan equality, live owner and resource
 identity, and an idle exact-CWD durable session. For Orca it also proves the
 same setup, worktree identity, path, branch, head, and connected writable
