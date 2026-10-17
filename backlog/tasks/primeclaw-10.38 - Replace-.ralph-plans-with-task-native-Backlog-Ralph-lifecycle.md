@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-10.38
 title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
-status: Ready for Merge
+status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-17 17:51'
+updated_date: '2026-10-17 22:33'
 labels:
   - backlog-md
   - episode-loop
