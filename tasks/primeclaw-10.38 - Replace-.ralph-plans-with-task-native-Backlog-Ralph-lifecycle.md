@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-17 22:34'
+updated_date: '2026-10-17 23:00'
 labels:
   - backlog-md
   - episode-loop
@@ -48,6 +48,8 @@ references:
     superseded-by=PRIMECLAW-10.38
   - >-
     docs/evidence/task-native-backlog-cutover/2026-10-17-step-7-plan-tree-deletion.json
+  - >-
+    docs/evidence/task-native-backlog-cutover/2026-10-18-step-8-least-technology-simplification.md
 documentation:
   - AGENTS.md
   - README.md
@@ -73,6 +75,9 @@ documentation:
     docs/evidence/task-native-backlog-cutover/2026-10-14-step-6-status-migration.json
   - >-
     docs/evidence/task-native-backlog-cutover/2026-10-17-step-7-plan-tree-deletion.json
+  - docs/user-stories/README.md
+  - >-
+    docs/evidence/task-native-backlog-cutover/2026-10-18-step-8-least-technology-simplification.md
 modified_files:
   - .ralph/.env.example
   - .ralph/README.md
@@ -135,13 +140,32 @@ modified_files:
   - bin/prime-claw
   - docs/README.md
   - docs/backlog.md
+  - docs/conversation-driven-episode-oversight.md
   - >-
     docs/evidence/task-native-backlog-cutover/2026-10-17-step-7-plan-tree-deletion.json
+  - >-
+    docs/evidence/task-native-backlog-cutover/2026-10-18-step-8-least-technology-simplification.md
   - docs/future-specification-bundles.md
+  - docs/handoff-chain.md
   - docs/user-stories/C-specification.md
   - docs/user-stories/D-planning.md
+  - docs/user-stories/F-episode-execution.md
+  - docs/user-stories/G-oversight-and-review.md
+  - docs/user-stories/H-handoff-and-continuation.md
+  - docs/user-stories/I-episode-finalization.md
+  - docs/user-stories/README.md
+  - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - tests/reviewed_plan_extension.test.mjs
+  - tests/spec_episode_extension.test.mjs
   - tests/test_backlog_workflow.py
+  - tests/test_oversee_episode_skill.py
   - tests/test_project_initialization.py
+  - tests/test_reviewed_plan_extension.py
   - tests/test_role_kernel.py
 parent_task_id: PRIMECLAW-10
 priority: p1
@@ -162,7 +186,7 @@ Keep the established Conversation, operator, Episode, and Expert authority bound
 
 ## Task-native workflow
 
-This repository's task-native workflow uses these ordered statuses:
+This repository retains these configured Backlog statuses:
 
 1. `In Design`
 2. `In Planning`
@@ -171,13 +195,13 @@ This repository's task-native workflow uses these ordered statuses:
 5. `Ready for Merge`
 6. `Done`
 
-`Done` is the successful terminal status. Confirmed abandonment uses Backlog soft deletion and never marks the task `Done`. New ordinary tasks default to `In Design`; this repository removes active `To Do` guidance only after its data migration is proven.
+The prompt-led task-native lifecycle does not require `Ready for Merge` as a handshake. Work remains `In Progress` through review and explicit operator authorization; `Done` is the successful terminal status after an ordinary fast-forward merge. Confirmed abandonment uses Backlog soft deletion and never marks the task `Done`. New ordinary tasks default to `In Design`; this repository removes active `To Do` guidance only after its data migration is proven.
 
 `/design` and `/spec-it-out` create or revise `In Design` tasks. `/plan TASK-ID` accepts only `In Design` or `In Planning`, writes the native Implementation Plan, and leaves the task `In Planning`. `/implement-task TASK-ID` is the task-native workflow's new-Episode admission command. It accepts only an `In Planning` task with a meaningful native plan and preserves the proportional structural and semantic readiness gate.
 
 After readiness succeeds, the Conversation changes the exact task on main to `In Progress` and commits that exact path before creating Episode resources. The Episode branch starts at that commit. A proven-clean failure returns the task to `In Planning`; uncertain or partial creation publishes `Blocked` with the exact recovery condition and is not retried as a new Episode.
 
-During a task-native Episode, the Episode owns task content on its branch and never changes lifecycle status. The Conversation owns lifecycle status on main. The same task and ownership record span execute, handoff, compaction, review, blocked/resume, and revision passes. Candidate acceptance publishes `Ready for Merge` on main before integration and merge authorization. After verified merge, the Conversation publishes `Done`; ownership and resources remain until separately authorized finalization and cleanup. Confirmed abandonment imports only the bound Episode task content, preserves Conversation-owned status and invariant identity/hierarchy metadata, archives without `Done`, verifies the archival commit, and only then permits cleanup.
+During a task-native Episode, the Episode owns task content on its branch and never changes lifecycle status. The Conversation owns lifecycle status on main. The same task and ownership record span execute, handoff, compaction, review, blocked/resume, and revision passes. Review and operator decisions are prompt-led. Merge uses a fresh exact `(taskId, mainHead, candidateHead)` preflight followed by ordinary `git merge --ff-only`, a supported Backlog `Done` edit, an exact task-only commit, and push. Confirmed abandonment selects only the bound pushed task content, records a truthful Final Summary, archives without `Done`, commits only the task move, and pushes. Ownership and resources remain until a separate explicit cleanup decision. The cleanup-only stable host boundary durably binds the exact pushed Episode head, verifies the terminal state, removes runtime, worktree, and branch in order, and closes ownership last.
 
 ## Legacy workflow preserved by the generic plugin
 
@@ -217,7 +241,7 @@ Every durable historical bundle has one Backlog epic. Exact owners were reused w
 - Preserve operator authority over scope, admission, merge, delay, abandonment, finalization, and destructive cleanup.
 - Use supported Backlog and Prime Agent interfaces. Prime Agent remains an upstream dependency.
 - Do not add a pickup surface, make every task require an Episode, split one Episode per execute pass, or add task reparenting.
-- Do not add cross-checkout task wrappers, branch projections, status-sync protocols, approval blobs or tags, replacement digests, transaction journals, custom merge drivers, or another tracker abstraction.
+- Do not add cross-checkout task wrappers, branch projections, status-sync protocols, approval blobs or tags, task-native content digests, lifecycle receipts/progress objects, transaction journals, custom merge/archive recovery, custom merge drivers, or another tracker abstraction.
 - Do not infer workflow selection from tracker choice, archive-only bundles, active plan placement alone, or missing prompt tags when ownership exists.
 - Validate plugin-source changes only through the Docker-isolated candidate path. Never apply a candidate to the installed user-global plugin.
 - This specification reconciliation changes no code, asset, template, test, status, configuration, plan placement, or cutover state.
@@ -236,9 +260,9 @@ The pre-cutover source tree remains available at `6d11d9c2797cea54ecd07171e8a5b2
 - [x] #5 Admission tests prove semantic readiness precedes an exact main-task `In Progress` commit; the Episode branch starts from that committed SHA; prompt push failure alone does not block local creation; a proven-clean creation failure returns the task to `In Planning`; and uncertain partial creation marks main `Blocked` without retry.
 - [x] #6 End-to-end evidence proves one task spans one Episode across multiple execute, handoff, compaction, review, and revision iterations and retains exact task, owner, branch, worktree, and session identity.
 - [x] #7 Ownership tests prove the Episode alone mutates task content on its branch, the Conversation alone mutates lifecycle status on main, the Episode never independently changes status, and ordinary execution performs no cross-checkout content copy, mirroring, or dual write.
-- [x] #8 Blocked/resume tests prove an Episode records blocker content on its branch through existing reporting, the Conversation publishes `Blocked` and resumed `In Progress` on main through exact commits, and the same Episode resumes without a new task or admission.
-- [x] #9 Final-review tests prove Expert or Conversation findings can revise the same Episode; final Conversation acceptance publishes `Ready for Merge` on main before merge authorization; the Episode integrates current main and preserves Episode content plus Conversation status; and the Conversation verifies the refreshed candidate before requesting user authorization.
-- [x] #10 Operator-decision tests prove delay retains `Ready for Merge` and all Episode resources, requested changes return main to `In Progress` and resume the same Episode, and authorized merge is verified before the Conversation immediately commits the exact main task as `Done`; ownership records and resources remain until separately authorized finalization/cleanup; `backlog task complete` is not invoked per Episode.
+- [x] #8 Blocked/resume evidence proves an Episode records blocker content on its branch through existing reporting, the Conversation uses the supported Backlog CLI and exact task-only commits to publish `Blocked` and resumed `In Progress` on main, and the same Episode resumes through ordinary handoff without a new task, admission, or custom block/resume action.
+- [x] #9 Final-review evidence proves Expert or Conversation findings can revise the same Episode; Delay is a no-op; Request Changes records a concrete accepted in-scope finding and resumes through ordinary handoff; and immediately before merge the Conversation revalidates an exact `(taskId, mainHead, candidateHead)` tuple. No `Ready for Merge` publication, lifecycle receipt, task-native content digest, or custom reconciliation transaction is required.
+- [x] #10 Operator-decision evidence proves authorized merge uses ordinary canonical-main `git merge --ff-only`, a supported Backlog edit to `Done`, an exact task-only commit, and push; Git and Backlog report intermediate failures directly; ownership records and resources remain until a separate explicit cleanup decision; and `backlog task complete` is not invoked per Episode.
 - [x] #11 Confirmed-abandonment tests prove strong confirmation precedes mutation; only the exact bound Episode task blob is selected; the effective main diff imports Episode-owned content while preserving Conversation-owned status plus invariant identity/hierarchy metadata; no candidate code is merged; an abandonment Final Summary is recorded; the task is archived without being marked `Done`; and exact archival state is committed and pushed before destructive Episode cleanup.
 - [x] #12 Task-native commands, tools, skills, managed templates, initialization/reconciliation assets, ownership version 2 records, docs, recovery, review, handoff, finalization, and tests use exact Backlog task identity and supported fields instead of `.ralph/plans` location or file movement as task-native lifecycle authority.
 - [x] #13 A task-status migration fixture proves every pre-cutover `To Do` task with a meaningful Implementation Plan becomes `In Planning`, every `To Do` task without one becomes `In Design`, and existing active, blocked, ready, and done work retains truthful semantics.
@@ -246,8 +270,8 @@ The pre-cutover source tree remains available at `6d11d9c2797cea54ecd07171e8a5b2
 - [x] #15 A representative terminal-history fixture proves completed and accepted-historical bundles become truthful `Done` epics, the superseded incomplete Phase 3a bundle remains explicitly partial with evidence-based unchecked criteria and bidirectional replacement references, one-time successful history may enter `backlog/completed/`, and no existing bundle enters `backlog/archive/`.
 - [x] #16 Repository-wide acceptance proves task-native surfaces and this repository's current task-native guidance do not treat `.ralph/plans` as authoritative. Historical provenance remains truthful, and retained legacy workflow surfaces may continue to use legacy bundles where that workflow requires them.
 - [x] #17 This repository's final candidate tree contains its completed state migration and task-native workflow and no `.ralph/plans` directory. That repository-local deletion does not retire generic legacy workflow compatibility, assets, commands, tools, ownership parsing, or another initialized repository's bundles.
-- [x] #18 Existing tests plus focused Docker-isolated plugin acceptance prove Conversation, operator, Episode, and Expert authority; exact ownership; isolated code worktrees; iteration handoff; recovery; review; post-merge `Done` before separately authorized finalization/cleanup; final bookkeeping; and cleanup boundaries remain intact apart from the specified task-native lifecycle.
-- [x] #19 Static and behavioral acceptance proves no pickup surface, Backlog reparenting feature, cross-checkout Backlog wrapper, branch-projection rule, approval commit/blob/tag scheme, replacement digest protocol, bespoke transaction journal, Prime Agent patch, or other unapproved scope expansion is introduced.
+- [x] #18 Existing tests plus focused Docker-isolated plugin acceptance prove Conversation, operator, Episode, and Expert authority; exact ownership; isolated code worktrees; iteration handoff; recovery; review; prompt-led terminal Git/Backlog actions; post-merge `Done`; and separately authorized exact-resource cleanup remain intact apart from the specified simplification.
+- [x] #19 Static and behavioral acceptance proves no pickup surface, Backlog reparenting feature, cross-checkout Backlog wrapper, branch-projection rule, approval commit/blob/tag scheme, task-native content digest, lifecycle receipt/progress/replay protocol, bespoke merge/archive coordinator, transaction journal, Prime Agent patch, or other unapproved scope expansion is introduced.
 - [x] #20 The generic plugin retains the project-local legacy workflow assets `project-workflow-plan-prep`, `project-workflow-plan-spec`, `project-workflow-implement-prep`, and `project-workflow-implement-spec`; initialization, reconciliation, inventory, and tests preserve customized instances correctly.
 - [x] #21 The legacy workflow retains `/plan-spec`, `/implement-spec`, `plan_spec`, `create_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`, with tests covering their current authority and operator gates.
 - [x] #22 Compatibility tests retain ownership version 1 parsing and the legacy workflow promotion, recovery, handoff, review, finalization, and cleanup behavior required by existing Episodes.
@@ -2106,6 +2130,14 @@ Prefer instructions in the existing Conversation, Episode, Expert, blocked, exec
 Replace custom merge orchestration with a straightforward exact-candidate preflight, ordinary `git merge --ff-only`, supported Backlog status update to `Done`, exact task commit, and push; let Git report merge safety. Keep ownership/resource cleanup separate and operator-gated. Do not use ignore/config tricks or touch the protected untracked canonical-main `.ralph/plans/archive/replace-beads/` content.
 
 Record a clear before/after machinery inventory and focused evidence that the simpler prompt-led flow satisfies the observable contract.
+
+## Step 8 — least-technology task-native lifecycle completed
+
+Removed the task-native review/outcome coordinator and replaced it with prompt-led Conversation decisions, ordinary Git, and supported Backlog operations. The public task-native host surface now covers only creation, same-Episode handoff, and separately authorized exact-resource cleanup. Merge uses fresh exact-candidate preflight, `git merge --ff-only`, `Done`, an exact task-only commit, and push. Abandonment uses exact task-only selection, truthful Final Summary/archive operations, an exact move commit, and push. Cleanup durably binds one exact pushed Episode head, removes runtime/worktree/branch in order, and closes ownership last.
+
+Retained exact task selection, version-2 ownership reservation/allocation, one reusable Episode, generic version-1 compatibility and bundle digest, operator authority, and the no-Prime-Agent-patch boundary. Removed Ready receipts, multi-phase progress/replay objects, task-native content digests, custom merge/Done recovery, custom abandonment/archive recovery, and machinery-only tests/docs. The before/after inventory is `docs/evidence/task-native-backlog-cutover/2026-10-18-step-8-least-technology-simplification.md`.
+
+This is a clean candidate only. It does not publish a lifecycle transition, merge to canonical main, abandon the task, clean Episode resources, apply user-global assets, or touch the protected canonical-main archive.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -2745,10 +2777,42 @@ Post-repair focused receipt, project-state, inventory, and frozen-provenance val
 ## Accepted operator revision — least-technology task-native lifecycle
 
 After the clean pushed Step 7 candidate `1deeb26136efb22f60a16ab626f6e8446ecea0ac`, the operator directed the next execute pass to simplify the complete task-native lifecycle rather than patch the immediate untracked-file failure. Step 8 in the Implementation Plan is the durable scope for that pass. It preserves the protected untracked archive, generic legacy compatibility, exact task/Episode ownership, Conversation and operator authority boundaries, supported public interfaces, and the no-Prime-Agent-patch constraint while deleting unnecessary custom machinery. No lifecycle status, ownership/resource state, merge, cleanup, or global activation changed in this handoff.
+
+## Step 8 simplification evidence
+
+The accepted operator revision supersedes earlier task notes and acceptance evidence that described the removed Ready-for-Merge handshake, digest, receipt, and custom terminal coordinator. Those entries remain historical records of prior candidates, not the current task-native contract.
+
+Implementation:
+- collapsed `finalize_task_episode` to the cleanup-only `(taskId, episodeHead, outcome, confirmed)` boundary;
+- added durable optional `cleanupHead` to version-2 ownership and kept version-1 `bundleDigest` unchanged;
+- retained exact owner/task/worktree/session validation and ordered runtime → worktree → branch deletion, with canonical-main terminal-state verification and ownership closure last;
+- moved Block/Resume, Delay, Request Changes, Merge, and Abandonment to the existing Conversation oversight instructions using ordinary Git and supported Backlog commands;
+- deleted the task-native lifecycle status publisher, Ready publication/integration/verification, content digests, multi-phase receipts/progress/replay, custom merge/Done recovery, custom abandonment/archive recovery, and their machinery-only tests;
+- rewrote user stories, handoff/oversight docs, traceability, and focused tests around the observable contract.
+
+Validation:
+- focused host-safe policy/workflow checks: 49 passed, 5 skipped;
+- isolated Docker reviewed-plan and Episode behavior suites: 2 passed at `.test-results/20261017T224746Z-48221-ff5a38af/tier1`;
+- broad host-safe suite: 663 passed, 1 skipped, 65 deselected, and 75 subtests passed; only the four accepted unrelated topology/template-pin/vendor-pin failures remained;
+- Docker Tier 1 source-mode offline probe passed at `.test-results/20261017T224940Z-52575-28e2f8e3/tier1`;
+- `git diff --check` passed;
+- the protected canonical-main archive pair remains byte-identical and this Episode still has zero tracked `.ralph/plans` paths.
+
+No lifecycle status change, merge, abandonment, cleanup, user-global activation, Prime Agent source change, ignore workaround, or generic version-1 retirement occurred.
+
+## Independent review repair — cleanup-compatible canonical main
+
+Independent GPT-6 Astra review of exact candidate `a2842dbe5066cc47158f8de34a64d94d0e44e228` reproduced one material defect: the cleanup canonical-main guard rejected all untracked paths, including required `.prime-claw/ownership.json` and the protected untracked archive pair, so authorized cleanup would stop before resource removal.
+
+The repair makes canonical-main cleanliness mean no staged or tracked changes. It allows untracked state without an ignore rule or path-specific exception, keeps the Episode worktree fully clean, and aligns Merge/Abandon prompt wording with the same approved distinction. A real-Git regression writes valid active version-2 ownership plus the protected archive pair and proves they pass, while both unstaged tracked drift and staged drift fail closed. No receipt, digest, lifecycle coordinator, or custom recovery was restored.
+
+Post-repair focused host checks passed 49 with 5 skips. The isolated reviewed-plan and Episode behavior suites passed at `.test-results/20261017T225626Z-67704-a2ecdbca/tier1`. Final Docker Tier 1 source-mode probing passed at `.test-results/20261017T225826Z-72047-42eaff0a/tier1`. `git diff --check` passed. The protected canonical archive hashes and zero tracked `.ralph/plans` paths remain unchanged.
+
+No lifecycle transition, merge, abandonment, cleanup, global activation, ignore workaround, Prime Agent source change, or generic version-1 retirement occurred.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Completed the repository-local task-native cutover candidate. All 43 tracked `.ralph/plans` paths were revalidated against frozen Git provenance and 16 durable Backlog owners, then deleted. Current project guidance and tests now require the builder repository to have no local plan tree, while generic version-1 folder compatibility remains unchanged for initialized projects that retain it. The protected untracked canonical-main `replace-beads` archive remains byte-identical. Validation and the complete mapping are recorded in the Step 7 deletion receipt. The task remains `In Progress` for Conversation review; no merge, lifecycle publication, finalization, cleanup, or global asset application occurred.
+Implemented the approved least-technology task-native lifecycle candidate. Removed the custom review/outcome state machine, receipts, task-native digests, custom merge/Done recovery, and custom abandonment/archive recovery. Conversation prompts now use ordinary Git and supported Backlog operations; native code remains for exact ownership, Episode creation/handoff, and separately authorized cleanup. Independent review found and the candidate repaired one cleanup guard defect: canonical main now permits required untracked ownership/protected archive state while still rejecting staged or tracked drift, with a real-Git regression. Focused host and isolated Docker behavior suites pass, Docker Tier 1 passes, and the broad host suite has only the four accepted unrelated failures. The candidate is not merged, activated, abandoned, finalized, or cleaned up.
 <!-- SECTION:FINAL_SUMMARY:END -->
