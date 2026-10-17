@@ -18,12 +18,41 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     for phrase in [
         "name: prime-claw-oversee-episode",
         "one active Episode owned by this Conversation",
+        "Inspect persisted `.prime-claw/ownership.json` from the canonical primary checkout before prompt tags",
+        "Version 1 selects retained folder oversight; version 2 selects task-native oversight",
+        "For version 2 task-native ownership",
+        "exact Backlog task ID and project-relative task path",
+        "sole durable product and execution contract",
+        "Never consult `.ralph/plans` in this mode",
+        "The Episode owns task content on its branch; the Conversation owns lifecycle status on main",
+        "For retained version 1 folder ownership",
+        "Placement alone is not live Episode identity",
+        "Keep that pair active through blocking, candidate review, and revision",
+        "exact operator-authorized version-1 recovery",
+        "never live and never switches modes",
+        "exceptional `transition_spec_episode_to_task` cutover surface",
+        "An exact same-binding replay is the only idempotent replay",
+        "plan deletion remains a separate reviewed step",
         "one reported slice at a time",
         "Accept and advance",
         "Request an in-scope revision",
         "Pause",
         "Consult the operator",
         "canonical handoff",
+        "remaining lifecycle and cleanup flow applies only to version 2 task-native ownership",
+        "ordinary Git and the supported Backlog CLI",
+        "Do not create lifecycle receipts",
+        "Delay is a strict no-op",
+        "Before **Merge**, preflight and show the operator `(taskId, mainHead, candidateHead)`",
+        "no staged or tracked changes",
+        "git merge --ff-only candidateHead",
+        "set the exact task to `Done` through Backlog",
+        "Apply **Abandon** only after explicit operator confirmation",
+        "cleanup needs separate authority",
+        "cleanup-only `finalize_task_episode`",
+        "durably binds that head",
+        "removes exact idle runtime, worktree, and branch",
+        "Same-head retry is idempotent",
         "Review conclusions are evidence",
         "concrete material contract defect",
         "Speculative hardening",
@@ -33,59 +62,6 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "bounded goal",
         "one exact heartbeat",
         "operator alone decides scope",
-        "For version 2 task-native ownership",
-        "exact Backlog task ID and project-relative task path",
-        "sole durable product and execution contract",
-        "Never consult `.ralph/plans` in this mode",
-        "The Episode owns task content on its branch; the Conversation owns lifecycle status on main",
-        "exceptional `transition_spec_episode_to_task` cutover surface",
-        "reviewed, merged to canonical primary `main`, activated user-globally",
-        "An exact same-binding replay is the only idempotent replay",
-        "plan deletion remains a separate reviewed step",
-        "For retained version 1 folder ownership",
-        "Inspect persisted `.prime-claw/ownership.json` from the canonical primary checkout before prompt tags",
-        "Version 1 selects retained folder oversight; version 2 selects task-native oversight",
-        "A task tag is only a candidate when ownership does not decide",
-        "Placement alone is not live Episode identity",
-        "Keep that pair active through blocking, candidate review, and revision",
-        "missing pair uses only exact operator-authorized version-1 recovery",
-        "never live and never switches modes",
-        "Use only legacy `handoff_spec_episode` and `finalize_spec_episode` paths",
-        "never claim or mutate task-native Backlog status, completion, archival, finalization, or cleanup authority",
-        "old in-place work, not an Episode",
-        "remaining outcome and cleanup flow applies only to version 2 task-native ownership",
-        "do not edit, copy, or mirror Episode-owned task content",
-        "never hand off or request merge from that head",
-        "publish `Ready for Merge`",
-        "preserve task content and parent identity",
-        "push a two-parent candidate",
-        "Only then request the operator's merge decision",
-        "Delay** needs an explicit operator choice",
-        "strict no-op, never abandonment",
-        "Request Changes** only after the operator explicitly chooses it",
-        "Publish exact-task-only `In Progress`",
-        "Retry failed integration from its returned receipt",
-        "Apply **Merge** only when the operator explicitly authorizes the exact verified",
-        "Fast-forward only to that candidate; never force",
-        "Immediately publish `Done` through Backlog",
-        "local `Done` commit is authoritative",
-        "Keep active ownership",
-        "Apply **Abandon** only after explicit operator confirmation",
-        "candidate/main relationship",
-        "Reject any archive destination tracked at the bound main head",
-        "inbound task links before mutation",
-        "Select only that task blob",
-        "Reapply captured status through Backlog",
-        "archive without `Done`",
-        "cleanup needs separate authority",
-        "Use `finalize_task_episode` as the sole task-native lifecycle coordinator",
-        "Retain every returned Ready, phased-progress, and terminal receipt exactly",
-        "Cleanup** through that tool only after separate explicit operator authority",
-        "The host rebinds owner, Episode, and all resources",
-        "reverifies pushed terminal evidence",
-        "removes exact idle runtime, worktree, and branch",
-        "Keep ownership active through interruption",
-        "close only after all resources are absent",
     ]:
         assert phrase in text
     assert "Bead chronology" not in raw
@@ -150,7 +126,7 @@ def test_current_docs_lead_with_task_native_and_label_folder_compatibility():
     for surface in ("/plan TASK-ID", "/implement-task TASK-ID", "create_task_episode", "finalize_task_episode", "transition_spec_episode_to_task"):
         assert surface in current + future
 
-def test_current_docs_distinguish_episode_edit_scope_status_and_action_receipts():
+def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
     future = " ".join(FUTURE_DOC.read_text().split())
     current = " ".join(DOC.read_text().split())
 
@@ -161,15 +137,10 @@ def test_current_docs_distinguish_episode_edit_scope_status_and_action_receipts(
     ) in future
     assert "The Episode edits only its bound task content" not in future
 
-    assert (
-        "The strict ownership record persists lifecycle state plus durable owner, authority, "
-        "placement, and resource bindings. It does not store Ready, phased-progress, or terminal "
-        "action receipts."
-    ) in current
-    assert (
-        "`finalize_task_episode` returns those exact receipts to the owning Conversation, which "
-        "retains them for later authorized outcomes or bounded retries."
-    ) in current
+    assert "stores no review, progress, merge, or abandonment receipts" in current
+    assert "optional `cleanupHead`" in current
+    assert "cleanup-only `finalize_task_episode`" in current
+    assert "ordinary Git and the supported Backlog CLI" in current
     assert "placement, and task-native lifecycle receipts" not in current
 
     traceability = " ".join(TRACEABILITY.read_text().split())
@@ -180,6 +151,4 @@ def test_current_docs_distinguish_episode_edit_scope_status_and_action_receipts(
     ) in traceability
     assert "A task-bound Episode edits only its exact Backlog task content" not in traceability
     assert "retained version-1 compatibility folder Episodes keep their plan workflow" in traceability
-    assert (
-        "`PRIMECLAW-10.15`, `PRIMECLAW-10.24`, and `PRIMECLAW-10.26`"
-    ) in traceability
+    assert "`PRIMECLAW-10.15`, `PRIMECLAW-10.24`, and `PRIMECLAW-10.26`" in traceability

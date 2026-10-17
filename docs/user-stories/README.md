@@ -73,8 +73,9 @@ These mechanisms support the stories but are not user outcomes by themselves:
 
 Likewise, command and tool variants are usually two interfaces to one story.
 The primary task-native lifecycle uses `/plan` with `plan_task`,
-`/implement-task` with `create_task_episode`, `handoff_task_episode`, and the
-guarded `finalize_task_episode` coordinator. Retained version-1 compatibility
+`/implement-task` with `create_task_episode`, and `handoff_task_episode`.
+Conversation review and outcomes use ordinary Git plus the supported Backlog CLI;
+the cleanup-only `finalize_task_episode` remains the narrow resource boundary. Retained version-1 compatibility
 keeps `/plan-spec` with `plan_spec`, `/implement-spec` with
 `create_spec_episode`, exact blocked recovery with
 `restore_blocked_spec_episode`, `handoff_spec_episode`, and
@@ -97,8 +98,8 @@ underlying story:
 4. Slash commands and tools duplicate adapter surfaces over shared operations.
 5. Planning and implementation-readiness judgment is repeated across several
    Markdown assets and must remain proportional to the actual work.
-6. Path, ownership, and Episode-state invariants are checked in several
-   lifecycle operations.
+6. Path, ownership, and Episode-state checks still overlap across admission,
+   handoff, and cleanup and should remain proportional to each resource boundary.
 7. Preferred Orca creation and narrow local fallback maintain parallel
    provisioning and recovery paths.
 8. Template comparison uses a substantial state machine for a temporary diff.

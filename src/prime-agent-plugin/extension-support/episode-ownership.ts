@@ -45,6 +45,8 @@ export interface TaskEpisodeOwnershipRecord extends EpisodeOwnershipBase {
   version: 2;
   taskId: string;
   taskPath: string;
+  /** Exact terminal Episode head bound before separately authorized resource cleanup. */
+  cleanupHead?: string;
 }
 
 export type EpisodeOwnershipRecord = LegacyEpisodeOwnershipRecord | TaskEpisodeOwnershipRecord;
@@ -64,7 +66,7 @@ const COMMON_RECORD_FIELDS = new Set<string>([
   "version", "status", "engine", "terminalHandles", ...COMMON_STRING_FIELDS, ...OPTIONAL_STRING_FIELDS,
 ]);
 const LEGACY_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "sourceLocation", "slug", "bundleDigest"]);
-const TASK_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "taskId", "taskPath"]);
+const TASK_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "taskId", "taskPath", "cleanupHead"]);
 
 function hasOnlyFields(item: Record<string, unknown>, allowed: Set<string>): boolean {
   return Object.keys(item).every((field) => allowed.has(field));
@@ -120,6 +122,7 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
     const task = canonicalTaskId(item.taskId)
       && safeTaskPath(item.taskPath)
       && GIT_OID.test(String(item.baseRef))
+      && (item.cleanupHead === undefined || GIT_OID.test(String(item.cleanupHead)))
       && hasOnlyFields(item, TASK_RECORD_FIELDS);
     if (!task) throw new Error(`Episode ownership has an unsupported shape: ${path}`);
   }

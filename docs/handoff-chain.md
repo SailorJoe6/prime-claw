@@ -64,71 +64,11 @@ worktree before any message is sent. The exact main task path must match committ
 `HEAD` before the task is resolved, while unrelated dirty main paths remain
 allowed; uncommitted task bytes cannot spoof a resumed lifecycle status.
 
-The task-native handoff policy reloads that same task in the Episode worktree,
-keeps lifecycle status Conversation-owned, and permits only supported task
-content updates followed by a committed and pushed checkpoint. An internal
-status seam binds an accepted report to the exact pushed Episode head and proves
-that the Episode task path has committed post-admission evidence while its
-status remains `In Progress`. Only the exact owning top-level Conversation in
-canonical primary `main` may commit the clean exact main task path as `Blocked`
-and later back to `In Progress`; unrelated main dirt is allowed and each push is
-best-effort evidence after the local commit. No Episode-owned bytes cross
-checkouts. A task still `Blocked` on main cannot hand off. After the resumed
-status commit, ordinary handoff revalidates main `HEAD` and continues the same
-ownership, worktree, and session without creating or assigning anything.
-`Ready for Merge` is never smuggled through this ordinary `In Progress`
-continuation seam. The `finalize_task_episode` review handshake instead proves the accepted
-pushed head, publishes an exact-task-only main status commit, requires the same
-durable Episode to be idle, and integrates current main in its existing
-worktree. Only the task conflict is tolerated: the accepted Episode task is
-restored locally, Backlog applies `Ready for Merge`, all other Episode-owned
-fields and parent identity must retain the accepted digest, and the exact
-two-parent refreshed candidate must be pushed. The Conversation then verifies
-that current main and the refreshed upstream head still match before asking the
-operator for merge authority. Delay re-verifies and retains that exact state
-without transport. Explicit Request Changes publishes main `In Progress`,
-integrates that status commit in the same Episode with the same constrained
-reconciliation, pushes and verifies a second refreshed candidate, and only then
-uses ordinary task handoff. Publication, integration, verification, and resume
-are separate retryable phases: an integration failure cannot cause another
-status transition or a duplicate admission. Explicit Merge is not handoff: the
-guarded terminal action binds the operator decision to the exact verified
-task/main/candidate, requires clean canonical main and exact main/candidate
-upstream heads, fast-forwards only to that reviewed candidate, and immediately
-commits only the exact task as `Done`. A retry recognizes only exact pre-merge,
-post-fast-forward, exact-task dirty/staged `Done`, or one-task `Done`-child
-state. It finishes the commit or transport without duplicating merge or
-lifecycle mutation. It also re-proves the Ready publication commit in main
-history, direct candidate ancestry, merged code, content digest,
-path, hierarchy, and status. Push or remote-verification failure is returned
-without invalidating the local `Done` commit. Ownership and every idle Episode
-resource remain active until separate finalization or cleanup authority. Task-native lifecycle and terminal actions are exposed only through `finalize_task_episode`; ordinary continuation remains `handoff_task_episode`.
+The task-native handoff policy reloads that same task in the Episode worktree, keeps lifecycle status Conversation-owned, and permits only supported task content updates followed by a committed and pushed checkpoint. A task still `Blocked` on main cannot hand off. The Conversation publishes Blocked or resumed `In Progress` directly with the supported Backlog CLI, verifies and commits only the bound task path, pushes, and then uses ordinary handoff. No Episode-owned content is mirrored by a plugin transaction.
 
-Confirmed abandonment is also not handoff. The guarded Abandon action binds the
-operator decision to the exact owner, task path, current main head/status,
-pushed Episode head, candidate/main relationship, parent, Episode-content
-digest, and abandonment Final Summary. It first rejects an archive destination
-already tracked at the bound main head, so Backlog ID reuse cannot replace
-historical archive bytes. A structured active/completed-record scan also rejects
-inbound links that Backlog archive would otherwise clean from another task. It
-selects only the Episode task blob, reapplies the captured
-Conversation lifecycle status through Backlog, proves no
-code or unrelated path entered main, and archives without `Done`. Its direct
-archival child is verified and pushed. Retry recognizes only exact task
-preparation, archival move/stage, or archival-child state. Ownership and every
-Episode resource remain active because cleanup needs separate authority.
+Candidate review, Delay, Request Changes, Merge, and Abandonment are not handoff. Delay is a no-op. Request Changes records a concrete accepted finding and resumes the same Episode; current main is integrated with ordinary Git before a new candidate when necessary. Merge requires fresh exact main/candidate preflight and explicit operator authority, then ordinary canonical-main `git merge --ff-only`, supported Backlog `Done`, an exact task-only commit, and push. Abandonment requires separate explicit confirmation, exact task-only selection from the pushed Episode, supported Backlog Final Summary/archive operations, an exact move commit, and push. There are no Ready receipts, phased progress objects, content digests, custom merge/archive recovery, or replay protocol.
 
-Cleanup is likewise not handoff. The separately confirmed Cleanup action requires a new
-explicit Cleanup decision bound to the exact task, owner, Episode head, branch,
-worktree, durable session/route, and all optional resource identities. The
-terminal Episode head must descend from the admission base and, rather than the
-stale allocation head, is the branch/worktree head authorized for cleanup. It
-re-verifies the pushed Merge/`Done` or Abandon/archive terminal child before
-mutation, then removes only the exact idle runtime, worktree, and branch in a
-verified monotonic sequence. Ownership stays active through interruption and
-becomes inactive only after all resources are absent. Exact partial-prefix retry
-and inactive replay are idempotent. The coordinator rejects busy, dirty,
-foreign, mixed-outcome, unpushed, and out-of-order states and is exposed only through `finalize_task_episode`.
+Cleanup is likewise not handoff. After terminal main is pushed and separately authorized, cleanup-only `finalize_task_episode` durably binds the exact terminal Episode head, verifies the exact idle resources, removes runtime, worktree, and branch, verifies absence, and closes ownership. It performs no review or Git/Backlog lifecycle outcome. Same-head retry is idempotent; different or unsafe state blocks.
 
 The initial Episode creation is different: it starts a fresh session with one
 fixed execute assignment after bundle promotion. It does **not** run handoff.

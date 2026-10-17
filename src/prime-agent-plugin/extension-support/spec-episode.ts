@@ -9,7 +9,7 @@ import {
   lstatSync,
   readFileSync,
 } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { createConnection, type Socket } from "node:net";
@@ -231,206 +231,20 @@ export interface TaskEpisodeCreationDependencies extends EpisodeDependencies {
   reservationOperationId?: string;
   now?: () => string;
 }
-export interface TaskEpisodeLifecycleGit extends TaskEpisodeAdmissionGit {
-  upstreamHead(worktree: string): string;
-  pathChangedBetween(worktree: string, fromRef: string, toRef: string, path: string): boolean;
-}
-export interface TaskEpisodeReviewGit extends TaskEpisodeLifecycleGit {
+export interface TaskEpisodeCleanupGit {
+  repositoryRoot(cwd: string): string;
+  branch(repo: string): string;
+  head(repo: string): string;
+  upstreamHead(repo: string): string;
+  branchUpstreamHead(repo: string, branch: string): string;
+  assertCleanWorktree(repo: string): void;
   isAncestor(repo: string, ancestor: string, descendant: string): boolean;
-  mergeMain(worktree: string, mainHead: string, taskPath: string): void;
-  restoreTaskFromHead(worktree: string, taskPath: string): void;
-  stagePath(worktree: string, taskPath: string): void;
-  commitMerge(worktree: string, message: string): string;
-  abortMerge(worktree: string): void;
-  parents(repo: string, ref: string): string[];
-}
-export type GitWorktreeChange = { status: string; path: string };
-export interface TaskEpisodeMergeGit extends TaskEpisodeReviewGit {
-  fastForward(repo: string, candidateHead: string): void;
-  worktreeChanges(repo: string): GitWorktreeChange[];
-}
-export interface TaskEpisodeAbandonmentGit extends TaskEpisodeMergeGit {
   pathTrackedAtRef(repo: string, ref: string, path: string): boolean;
-  restorePathFromRef(repo: string, ref: string, path: string): void;
-  commitOnlyPaths(repo: string, paths: string[], message: string): string;
 }
-export type TaskReviewSnapshot = {
-  taskId: string;
-  taskPath: string;
-  parentTaskId: string | null;
-  status: string;
-  implementationPlan: string | null;
-  contentDigest: string;
-};
-export interface TaskEpisodeLifecycleDependencies extends TaskEpisodeHandoffDependencies {
-  lifecycleGit?: TaskEpisodeLifecycleGit;
-  lifecycleRunner?: CommandRunner;
-}
-export interface TaskEpisodeReadyForMergeDependencies extends TaskEpisodeLifecycleDependencies {
-  reviewGit?: TaskEpisodeReviewGit;
-  mergeGit?: TaskEpisodeMergeGit;
-  taskSnapshotResolver?: (cwd: string, taskId: string) => TaskReviewSnapshot;
-}
-export type TaskAbandonmentSnapshot = TaskReviewSnapshot & {
-  finalSummary: string | null;
-  abandonmentContentDigest: string;
-};
-export type TaskAbandonmentFileSnapshot = {
-  status: string;
-  finalSummary: string | null;
-  contentDigest: string;
-};
-export interface TaskEpisodeAbandonmentDependencies extends TaskEpisodeReadyForMergeDependencies {
-  abandonmentGit?: TaskEpisodeAbandonmentGit;
-  abandonmentSnapshotResolver?: (cwd: string, taskId: string) => TaskAbandonmentSnapshot;
-  abandonmentFileSnapshotResolver?: (cwd: string, taskPath: string) => TaskAbandonmentFileSnapshot;
-  assertNoArchiveCleanupTargets?: (cwd: string, taskId: string, taskPath: string) => void;
-}
-export type TaskEpisodeLifecycleResult = {
-  taskId: string;
-  status: "Blocked" | "In Progress" | "Ready for Merge";
-  commit: string;
-  episodeHead: string;
-  pushError?: string;
-};
-export type TaskEpisodeReadyPublicationResult = TaskEpisodeLifecycleResult & {
-  status: "Ready for Merge";
-  parentTaskId: string | null;
-  episodeTaskContentDigest: string;
-};
-export type TaskEpisodeReadyIntegrationResult = {
-  taskId: string;
-  readyCommit: string;
-  acceptedEpisodeHead: string;
-  integratedMainHead: string;
-  refreshedEpisodeHead: string;
-  parentTaskId: string | null;
-  episodeTaskContentDigest: string;
-  pushError?: string;
-};
-export type TaskEpisodeReadyVerificationResult = {
-  verified: true;
-  taskId: string;
-  mainHead: string;
-  refreshedEpisodeHead: string;
-};
-export type TaskEpisodeReadyHandshakeEvidence = {
-  publication: TaskEpisodeReadyPublicationResult;
-  integration: TaskEpisodeReadyIntegrationResult;
-  verification: TaskEpisodeReadyVerificationResult;
-};
-export type TaskEpisodeDelayResult = TaskEpisodeReadyVerificationResult & {
-  outcome: "delayed";
-};
-export type TaskEpisodeChangesPublicationResult = TaskEpisodeLifecycleResult & {
-  status: "In Progress";
-  parentTaskId: string | null;
-  episodeTaskContentDigest: string;
-};
-export type TaskEpisodeChangesIntegrationResult = {
-  taskId: string;
-  changesCommit: string;
-  previousRefreshedEpisodeHead: string;
-  integratedMainHead: string;
-  refreshedEpisodeHead: string;
-  parentTaskId: string | null;
-  episodeTaskContentDigest: string;
-  pushError?: string;
-};
-export type TaskEpisodeChangesVerificationResult = {
-  verified: true;
-  taskId: string;
-  mainHead: string;
-  refreshedEpisodeHead: string;
-  status: "In Progress";
-};
-export type TaskEpisodeChangesResumeResult = {
-  verification: TaskEpisodeChangesVerificationResult;
-  handoff: TaskEpisodeHandoffResult;
-};
-export type TaskEpisodeMergeDecision = {
-  operatorDecision: "merge";
-  taskId: string;
-  mainHead: string;
-  refreshedEpisodeHead: string;
-};
-export type TaskEpisodeMergeResult = {
-  verified: true;
-  outcome: "merged";
-  taskId: string;
-  status: "Done";
-  priorMainHead: string;
-  mergedHead: string;
-  doneCommit: string;
-  parentTaskId: string | null;
-  episodeTaskContentDigest: string;
-  pushError?: string;
-};
-export type TaskEpisodeAbandonmentDecision = {
-  operatorDecision: "abandon";
-  taskId: string;
-  taskPath: string;
-  mainHead: string;
-  episodeHead: string;
-  mainStatus: string;
-  candidateMainRelationship: "same" | "main-ancestor" | "episode-ancestor" | "diverged";
-  parentTaskId: string | null;
-  episodeTaskContentDigest: string;
-  finalSummary: string;
-};
-export type TaskEpisodeAbandonmentResult = {
-  verified: true;
-  outcome: "abandoned";
-  taskId: string;
-  status: string;
-  priorMainHead: string;
-  episodeHead: string;
-  archiveCommit: string;
-  archivedTaskPath: string;
-  parentTaskId: string | null;
-  episodeTaskContentDigest: string;
-  archivedTaskFileDigest: string;
-  resourcesRetained: true;
-  pushError?: string;
-};
-export type TaskEpisodeCleanupResourceIdentity = {
-  engine: "orca" | "local";
-  worktree: string;
-  branch: string;
-  head: string;
-  episodeId: string;
-  episodeSessionFile: string;
-  episodeActiveSessionId: string;
-  projectSetupId?: string;
-  routingEnvironmentId?: string;
-  worktreeId?: string;
-  worktreeIdentity?: string;
-  terminalHandle?: string;
-  terminalHandles?: string[];
-  worktreeName?: string;
-  launchAutomationName?: string;
-  launchAutomationId?: string;
-  launchRunId?: string;
-};
-export type TaskEpisodeCleanupDecision = {
-  operatorDecision: "cleanup";
-  taskId: string;
-  taskPath: string;
-  ownerSessionId: string;
-  episodeHead: string;
-  terminalOutcome: "merged" | "abandoned";
-  terminalCommit: string;
-  resources: TaskEpisodeCleanupResourceIdentity;
-};
-export type TaskEpisodeTerminalEvidence =
-  | { outcome: "merged"; result: TaskEpisodeMergeResult }
-  | { outcome: "abandoned"; decision: TaskEpisodeAbandonmentDecision; result: TaskEpisodeAbandonmentResult };
+
+export type TaskEpisodeCleanupOutcome = "merged" | "abandoned";
 export type TaskEpisodeCleanupSnapshot = {
-  runtime?: {
-    resources: TaskEpisodeCleanupResourceIdentity;
-    cwd: string;
-    idle: boolean;
-  };
+  runtime?: { cwd: string; idle: boolean };
   worktree?: { path: string; branch: string; head: string; clean: boolean };
   branch?: { name: string; head: string };
 };
@@ -440,22 +254,23 @@ export interface TaskEpisodeCleanupAdapter {
   removeWorktree(record: TaskEpisodeOwnershipRecord): Promise<void>;
   removeBranch(record: TaskEpisodeOwnershipRecord): Promise<void>;
 }
-export interface TaskEpisodeFinalizationDependencies extends TaskEpisodeAbandonmentDependencies {
+export interface TaskEpisodeCleanupDependencies {
+  ownership?: EpisodeOwnershipStore;
+  cleanupGit?: TaskEpisodeCleanupGit;
   cleanup: TaskEpisodeCleanupAdapter;
+  taskRunner?: CommandRunner;
+  taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
   now?: () => string;
 }
-export type TaskEpisodeFinalizationResult = {
+export type TaskEpisodeCleanupResult = {
   verified: true;
-  outcome: "merged" | "abandoned";
+  outcome: TaskEpisodeCleanupOutcome;
   taskId: string;
-  terminalCommit: string;
+  episodeHead: string;
   resourcesRemoved: true;
   ownershipStatus: "inactive";
   reused: boolean;
 };
-export type TaskEpisodeOperatorDecision =
-  | { operatorDecision: "delay" }
-  | { operatorDecision: "request-changes" };
 
 function runGitRaw(cwd: string, args: string[]): string {
   return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -510,73 +325,28 @@ export class CliTaskEpisodeAdmissionGit implements TaskEpisodeAdmissionGit {
     return this.head(repo);
   }
   push(repo: string): void { runGit(repo, ["push"]); }
-  upstreamHead(worktree: string): string { return runGit(worktree, ["rev-parse", "@{upstream}"]); }
-  pathChangedBetween(worktree: string, fromRef: string, toRef: string, path: string): boolean {
-    const output = runGit(worktree, ["diff", "--name-only", `${fromRef}..${toRef}`, "--", path]);
-    return output.split(/\r?\n/).filter(Boolean).includes(path);
+}
+
+export class CliTaskEpisodeCleanupGit implements TaskEpisodeCleanupGit {
+  repositoryRoot(cwd: string): string { return realpathSync(runGit(cwd, ["rev-parse", "--show-toplevel"])); }
+  branch(repo: string): string { return runGit(repo, ["symbolic-ref", "--short", "HEAD"]); }
+  head(repo: string): string { return runGit(repo, ["rev-parse", "HEAD"]); }
+  upstreamHead(repo: string): string { return runGit(repo, ["rev-parse", "@{upstream}"]); }
+  branchUpstreamHead(repo: string, branch: string): string {
+    return runGit(repo, ["rev-parse", `${branch}@{upstream}`]);
+  }
+  assertCleanWorktree(repo: string): void {
+    if (runGitRaw(repo, ["status", "--porcelain=v1", "--untracked-files=no"]).trim()) {
+      throw new Error("Task Episode cleanup requires canonical main without staged or tracked changes");
+    }
   }
   isAncestor(repo: string, ancestor: string, descendant: string): boolean {
     try { runGit(repo, ["merge-base", "--is-ancestor", ancestor, descendant]); return true; }
     catch { return false; }
   }
-  mergeMain(worktree: string, mainHead: string, taskPath: string): void {
-    try { runGit(worktree, ["merge", "--no-ff", "--no-commit", mainHead]); }
-    catch (error) {
-      const conflicts = runGit(worktree, ["diff", "--name-only", "--diff-filter=U", "--"])
-        .split(/\r?\n/).filter(Boolean);
-      if (conflicts.length === 1 && conflicts[0] === taskPath) return;
-      throw new Error(`Task-native review integration has conflicts outside ${taskPath}: ${conflicts.join(", ") || "unknown merge failure"}`, { cause: error });
-    }
-  }
-  restoreTaskFromHead(worktree: string, taskPath: string): void {
-    runGit(worktree, ["checkout", "HEAD", "--", taskPath]);
-  }
-  stagePath(worktree: string, taskPath: string): void { runGit(worktree, ["add", "--", taskPath]); }
-  commitMerge(worktree: string, message: string): string {
-    runGit(worktree, ["commit", "-m", message]);
-    return this.head(worktree);
-  }
-  abortMerge(worktree: string): void { runGit(worktree, ["merge", "--abort"]); }
-  parents(repo: string, ref: string): string[] {
-    const values = runGit(repo, ["rev-list", "--parents", "-n", "1", ref]).split(/\s+/).filter(Boolean);
-    return values.slice(1);
-  }
-  fastForward(repo: string, candidateHead: string): void {
-    runGit(repo, ["merge", "--ff-only", candidateHead]);
-  }
   pathTrackedAtRef(repo: string, ref: string, path: string): boolean {
-    const output = runGitRaw(repo, ["ls-tree", "-z", "--name-only", ref, "--", path]);
-    return output.split("\0").filter(Boolean).includes(path);
-  }
-  restorePathFromRef(repo: string, ref: string, path: string): void {
-    runGit(repo, ["restore", `--source=${ref}`, "--worktree", "--", path]);
-  }
-  commitOnlyPaths(repo: string, paths: string[], message: string): string {
-    if (paths.length < 2) throw new Error("Archival commit requires distinct active and archive paths");
-    const parts = paths.map((path) => path.split("/").filter(Boolean));
-    let shared = 0;
-    while (parts.every((value) => value[shared] !== undefined && value[shared] === parts[0][shared])) shared += 1;
-    const boundary = parts[0].slice(0, shared).join("/");
-    if (!boundary) throw new Error("Archival paths do not share a project-relative boundary");
-    runGit(repo, ["add", "-A", "--", boundary]);
-    runGit(repo, ["commit", "-m", message]);
-    return this.head(repo);
-  }
-  worktreeChanges(repo: string): GitWorktreeChange[] {
-    const values = runGitRaw(repo, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])
-      .split("\0").filter(Boolean);
-    const changes: GitWorktreeChange[] = [];
-    for (let index = 0; index < values.length; index += 1) {
-      const value = values[index];
-      const status = value.slice(0, 2);
-      const path = value.slice(3);
-      if (status.includes("R") || status.includes("C")) {
-        const destination = values[index + 1] ?? "";
-        changes.push({ status, path: `${path} -> ${destination}` });
-        index += 1;
-      } else changes.push({ status, path });
-    }
-    return changes;
+    return runGitRaw(repo, ["ls-tree", "-z", "--name-only", ref, "--", path])
+      .split("\0").filter(Boolean).includes(path);
   }
 }
 
@@ -1881,198 +1651,11 @@ function exactAdmissionTask(
   return selection;
 }
 
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map((item) => stableJson(item)).join(",")}]`;
-  if (value && typeof value === "object") {
-    const object = value as Record<string, unknown>;
-    return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function resolveTaskViewObject(
-  cwd: string,
-  taskId: string,
-  runner: CommandRunner,
-): Record<string, unknown> {
-  const result = runner.run("backlog", ["task", "view", "--json", "--", taskId], { cwd });
-  let parsed: unknown;
-  try { parsed = JSON.parse(result.stdout); }
-  catch (error) { throw new Error(`Backlog task ${taskId} returned invalid review JSON`, { cause: error }); }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`Backlog task ${taskId} returned invalid review payload`);
-  }
-  const task = (parsed as Record<string, unknown>).task;
-  if (!task || typeof task !== "object" || Array.isArray(task)) {
-    throw new Error(`Backlog task ${taskId} review payload has no task object`);
-  }
-  const object = task as Record<string, unknown>;
-  if (object.id !== taskId || typeof object.path !== "string" || !object.path
-    || typeof object.status !== "string") {
-    throw new Error(`Backlog task ${taskId} review identity is invalid`);
-  }
-  if (object.parentTaskId !== null && object.parentTaskId !== undefined
-    && typeof object.parentTaskId !== "string") {
-    throw new Error(`Backlog task ${taskId} review parent identity is invalid`);
-  }
-  if (object.implementationPlan !== null && object.implementationPlan !== undefined
-    && typeof object.implementationPlan !== "string") {
-    throw new Error(`Backlog task ${taskId} review plan is invalid`);
-  }
-  if (object.finalSummary !== null && object.finalSummary !== undefined
-    && typeof object.finalSummary !== "string") {
-    throw new Error(`Backlog task ${taskId} final summary is invalid`);
-  }
-  return object;
-}
-
-function taskContentObject(object: Record<string, unknown>): Record<string, unknown> {
-  const episodeOwned = { ...object };
-  delete episodeOwned.status;
-  delete episodeOwned.updatedAt;
-  for (const derived of [
-    "isReady", "readiness", "dependencyGraph", "subtasks",
-    "acceptanceCriteriaCompleted", "acceptanceCriteriaCount",
-  ]) delete episodeOwned[derived];
-  return episodeOwned;
-}
-
-export function resolveTaskReviewSnapshot(
-  cwd: string,
-  taskId: string,
-  runner: CommandRunner = new ProcessCommandRunner(),
-): TaskReviewSnapshot {
-  const object = resolveTaskViewObject(cwd, taskId, runner);
-  const episodeOwned = taskContentObject(object);
-  return {
-    taskId,
-    taskPath: object.path as string,
-    parentTaskId: typeof object.parentTaskId === "string" ? object.parentTaskId : null,
-    status: object.status as string,
-    implementationPlan: typeof object.implementationPlan === "string" ? object.implementationPlan : null,
-    contentDigest: createHash("sha256").update(stableJson(episodeOwned)).digest("hex"),
-  };
-}
-
-export function resolveTaskAbandonmentSnapshot(
-  cwd: string,
-  taskId: string,
-  runner: CommandRunner = new ProcessCommandRunner(),
-): TaskAbandonmentSnapshot {
-  const object = resolveTaskViewObject(cwd, taskId, runner);
-  const episodeOwned = taskContentObject(object);
-  delete episodeOwned.finalSummary;
-  delete episodeOwned.path;
-  return {
-    taskId,
-    taskPath: object.path as string,
-    parentTaskId: typeof object.parentTaskId === "string" ? object.parentTaskId : null,
-    status: object.status as string,
-    implementationPlan: typeof object.implementationPlan === "string" ? object.implementationPlan : null,
-    contentDigest: createHash("sha256").update(stableJson(taskContentObject(object))).digest("hex"),
-    finalSummary: typeof object.finalSummary === "string" ? object.finalSummary : null,
-    abandonmentContentDigest: createHash("sha256").update(stableJson(episodeOwned)).digest("hex"),
-  };
-}
-
-function unquoteBacklogScalar(value: string): string {
-  const trimmed = value.trim();
-  if ((trimmed.startsWith("'") && trimmed.endsWith("'"))
-    || (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
-    return trimmed.slice(1, -1);
-  }
-  return trimmed;
-}
-
-export function resolveTaskAbandonmentFileSnapshot(
-  cwd: string,
-  taskPath: string,
-): TaskAbandonmentFileSnapshot {
-  const absolute = resolve(cwd, taskPath);
-  const root = realpathSync(cwd);
-  const parent = realpathSync(dirname(absolute));
-  const info = lstatSync(absolute);
-  const realFile = realpathSync(absolute);
-  if ((!samePath(parent, root) && !parent.startsWith(`${root}/`))
-    || (!samePath(realFile, root) && !realFile.startsWith(`${root}/`))
-    || !info.isFile() || info.isSymbolicLink()) {
-    throw new Error("Abandonment task file is not a regular project file");
-  }
-  const raw = readFileSync(absolute, "utf8");
-  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw)?.[1];
-  if (frontmatter === undefined) throw new Error("Abandonment task file has no Backlog frontmatter");
-  const statusValue = /^status:\s*(.+)$/m.exec(frontmatter)?.[1];
-  if (statusValue === undefined) throw new Error("Abandonment task file has no lifecycle status");
-  const summaryMatch = /<!-- SECTION:FINAL_SUMMARY:BEGIN -->\r?\n([\s\S]*?)\r?\n<!-- SECTION:FINAL_SUMMARY:END -->/.exec(raw);
-  const normalized = `${raw
-    .replace(/^(status:)\s*.*$/m, "$1 <lifecycle-status>")
-    .replace(/^updated_date:\s*.*(?:\r?\n)?/m, "")
-    .replace(/\r?\n## Final Summary\r?\n\r?\n<!-- SECTION:FINAL_SUMMARY:BEGIN -->[\s\S]*?<!-- SECTION:FINAL_SUMMARY:END -->(?:\r?\n)?/, "\n")
-    .trimEnd()}\n`;
-  return {
-    status: unquoteBacklogScalar(statusValue),
-    finalSummary: summaryMatch ? summaryMatch[1].trim() : null,
-    contentDigest: createHash("sha256").update(normalized).digest("hex"),
-  };
-}
-
-function sameBacklogTaskIdentity(value: string, taskId: string, requirePrefix: boolean): boolean {
-  const target = /^([a-z]+)-([0-9]+(?:\.[0-9]+)*)$/i.exec(taskId.trim());
-  const candidate = /^(?:([a-z]+)-)?([0-9]+(?:\.[0-9]+)*)$/i.exec(value.trim());
-  if (!target || !candidate || (requirePrefix && !candidate[1])) return false;
-  if (candidate[1] && candidate[1].toLowerCase() !== target[1].toLowerCase()) return false;
-  const canonical = (body: string) => body.split(".")
-    .map((part) => part.replace(/^0+/, "") || "0").join(".");
-  return canonical(candidate[2]) === canonical(target[2]);
-}
-
-export function assertNoTaskArchiveCleanupTargets(
-  cwd: string,
-  taskId: string,
-  taskPath: string,
-  runner: CommandRunner,
-): void {
-  const backlogRoot = dirname(dirname(resolve(cwd, taskPath)));
-  const target = taskId.toUpperCase();
-  for (const directory of [join(backlogRoot, "tasks"), join(backlogRoot, "completed")]) {
-    if (!existsSync(directory)) continue;
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
-      const absolute = join(directory, entry.name);
-      const info = lstatSync(absolute);
-      if (!info.isFile() || info.isSymbolicLink()) {
-        throw new Error("Abandonment preflight rejects non-regular Backlog task records");
-      }
-      const raw = readFileSync(absolute, "utf8");
-      const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw)?.[1];
-      const idValue = frontmatter ? /^id:\s*(.+)$/m.exec(frontmatter)?.[1] : undefined;
-      if (!idValue) throw new Error(`Abandonment preflight could not identify ${entry.name}`);
-      const id = unquoteBacklogScalar(idValue);
-      if (id.toUpperCase() === target) continue;
-      const object = resolveTaskViewObject(cwd, id, runner);
-      const expectedPath = relative(cwd, absolute).split("\\").join("/");
-      if (object.path !== expectedPath) {
-        throw new Error(`Abandonment preflight found ambiguous Backlog identity ${id}`);
-      }
-      for (const field of ["dependencies", "references"] as const) {
-        const values = object[field];
-        if (!Array.isArray(values) || values.some((value) => typeof value !== "string")) {
-          throw new Error(`Abandonment preflight found invalid ${field} on ${id}`);
-        }
-        const requirePrefix = field === "references";
-        if ((values as string[]).some((value) => sameBacklogTaskIdentity(value, taskId, requirePrefix))) {
-          throw new Error(`Abandonment would rewrite ${field} on ${id}; remove that inbound link first`);
-        }
-      }
-    }
-  }
-}
-
 function commitConversationTaskStatus(options: {
   taskId: string;
   projectRoot: string;
   taskPath: string;
-  status: "In Progress" | "In Planning" | "Blocked" | "Ready for Merge" | "Done";
+  status: "In Progress" | "In Planning" | "Blocked";
   message: string;
   note?: string;
   runner: CommandRunner;
@@ -2108,1102 +1691,30 @@ function bestEffortTaskPush(git: TaskEpisodeAdmissionGit, projectRoot: string): 
   catch (error) { return taskAdmissionError(error); }
 }
 
-type TaskEpisodeLifecycleTransition = {
-  expectedMainStatus: "In Progress" | "Blocked" | "Ready for Merge";
-  expectedEpisodeStatus?: "In Progress" | "Ready for Merge";
-  expectedMainHead?: string;
-  targetStatus: "Blocked" | "In Progress" | "Ready for Merge";
-  message: string;
-};
-
-function publishTaskEpisodeLifecycleStatus(
-  rawTaskId: string,
-  rawEpisodeHead: string,
-  ctx: ExtensionContext,
-  transition: TaskEpisodeLifecycleTransition,
-  dependencies: TaskEpisodeLifecycleDependencies = {},
-): TaskEpisodeLifecycleResult {
-  const git = dependencies.git ?? new CliGitAdapter();
-  const lifecycleGit = dependencies.lifecycleGit ?? new CliTaskEpisodeAdmissionGit();
-  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
-  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
-  const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, taskId: string) => resolveBacklogTask(cwd, taskId, runner));
-  const authority = resolveBlockedWorkflowAuthority(rawTaskId, ctx, {
-    git,
-    ownership: store,
-    taskRunner: runner,
-  });
-  if (authority.mode !== "task") {
-    throw new Error("Task-native lifecycle publication requires task-bound blocked-workflow authority");
-  }
-  const taskId = authority.taskId;
-  const projectRoot = authority.projectRoot;
-  const episodeHead = rawEpisodeHead.trim();
-  if (!/^[0-9a-f]{40,64}$/.test(episodeHead)) {
-    throw new Error("Task-native lifecycle publication requires the exact reported Episode commit");
-  }
-  if (!samePath(lifecycleGit.repositoryRoot(ctx.cwd), projectRoot)
-    || lifecycleGit.branch(projectRoot) !== "main") {
-    throw new Error("Task-native lifecycle publication status boundary does not match canonical primary main");
-  }
-  const record = store.read(projectRoot);
-  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
-  exactOwnedTaskRecord(record, taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active") {
-    throw new Error(`Episode ownership is ${record.status}; inspect it before lifecycle publication`);
-  }
-  validateWorktreeRecord(record, git, filesystem, projectRoot);
-  git.assertCleanWorktree(record.worktree!);
-
-  const mainTask = exactAdmissionTask(
-    resolveTask(projectRoot, taskId), taskId, projectRoot, record.taskPath,
-  );
-  if (lifecycleGit.pathStatus(projectRoot, record.taskPath) !== "") {
-    throw new Error("Task-native lifecycle publication requires the exact main task path to match committed HEAD");
-  }
-  if (transition.expectedMainHead && lifecycleGit.head(projectRoot) !== transition.expectedMainHead) {
-    throw new Error("Task-native lifecycle publication requires the previously verified exact main head");
-  }
-  if (mainTask.status !== transition.expectedMainStatus) {
-    throw new Error(`Task-native lifecycle publication requires main task status ${transition.expectedMainStatus}; found ${mainTask.status}`);
-  }
-  if (!meaningfulTaskImplementationPlan(mainTask.implementationPlan)) {
-    throw new Error("Task-native lifecycle publication requires a meaningful main-task Implementation Plan");
-  }
-
-  const episodeTask = exactAdmissionTask(
-    resolveTask(record.worktree!, taskId), taskId, record.worktree!, record.taskPath,
-  );
-  const expectedEpisodeStatus = transition.expectedEpisodeStatus ?? "In Progress";
-  if (episodeTask.status !== expectedEpisodeStatus) {
-    throw new Error(`Task-native lifecycle publication requires Episode task status ${expectedEpisodeStatus}; found ${episodeTask.status}`);
-  }
-  if (!meaningfulTaskImplementationPlan(episodeTask.implementationPlan)) {
-    throw new Error("Task-native lifecycle publication requires a meaningful Episode Implementation Plan");
-  }
-  if (lifecycleGit.pathStatus(record.worktree!, record.taskPath) !== "") {
-    throw new Error("Task-native lifecycle publication requires committed Episode task content");
-  }
-  if (lifecycleGit.head(record.worktree!) !== episodeHead) {
-    throw new Error("Task-native lifecycle publication does not match the exact reported Episode commit");
-  }
-  let upstreamHead: string;
-  try { upstreamHead = lifecycleGit.upstreamHead(record.worktree!); }
-  catch (error) {
-    throw new Error("Task-native lifecycle publication requires the reported Episode commit to be pushed upstream", { cause: error });
-  }
-  if (upstreamHead !== episodeHead) {
-    throw new Error("Task-native lifecycle publication requires upstream to contain the exact reported Episode commit");
-  }
-  if (!lifecycleGit.pathChangedBetween(record.worktree!, record.baseRef, episodeHead, record.taskPath)) {
-    throw new Error("Task-native lifecycle publication requires committed Episode-owned task evidence after admission");
-  }
-
-  const published = commitConversationTaskStatus({
-    taskId,
-    projectRoot,
-    taskPath: record.taskPath,
-    status: transition.targetStatus,
-    message: transition.message,
-    runner,
-    git: lifecycleGit,
-    resolveTask,
-  });
-  const pushError = bestEffortTaskPush(lifecycleGit, projectRoot);
-  return {
-    taskId,
-    status: transition.targetStatus,
-    commit: published.commit,
-    episodeHead,
-    ...(pushError ? { pushError } : {}),
-  };
-}
-
-/** Publish an accepted blocker report without copying Episode-owned task content. */
-export function publishTaskEpisodeBlocked(
-  taskId: string,
-  episodeHead: string,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeLifecycleDependencies = {},
-): TaskEpisodeLifecycleResult {
-  return publishTaskEpisodeLifecycleStatus(taskId, episodeHead, ctx, {
-    expectedMainStatus: "In Progress",
-    targetStatus: "Blocked",
-    message: `chore: block ${taskId.trim()} episode`,
-  }, dependencies);
-}
-
-/** Publish an accepted unblock decision before continuing the same Episode. */
-export function publishTaskEpisodeResumed(
-  taskId: string,
-  episodeHead: string,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeLifecycleDependencies = {},
-): TaskEpisodeLifecycleResult {
-  return publishTaskEpisodeLifecycleStatus(taskId, episodeHead, ctx, {
-    expectedMainStatus: "Blocked",
-    targetStatus: "In Progress",
-    message: `chore: resume ${taskId.trim()} episode`,
-  }, dependencies);
-}
-
-/** Publish the accepted exact candidate as Ready for Merge on main. */
-export function publishTaskEpisodeReadyForMerge(
-  taskId: string,
-  episodeHead: string,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies = {},
-): TaskEpisodeReadyPublicationResult {
-  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
-  const authority = resolveBlockedWorkflowAuthority(taskId, ctx, {
-    git: dependencies.git,
-    ownership: store,
-    taskRunner: runner,
-  });
-  if (authority.mode !== "task") throw new Error("Ready-for-Merge publication requires task-native owner authority");
-  const record = store.read(authority.projectRoot);
-  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
-  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
-  const resolveSnapshot = dependencies.taskSnapshotResolver ?? ((cwd, id) => resolveTaskReviewSnapshot(cwd, id, runner));
-  const mainSnapshot = resolveSnapshot(authority.projectRoot, authority.taskId);
-  const snapshot = resolveSnapshot(record.worktree!, authority.taskId);
-  if (snapshot.taskId !== authority.taskId || snapshot.taskPath !== record.taskPath
-    || mainSnapshot.taskId !== authority.taskId || mainSnapshot.taskPath !== record.taskPath
-    || mainSnapshot.parentTaskId !== snapshot.parentTaskId) {
-    throw new Error("Ready-for-Merge publication does not match the exact task identity, path, and hierarchy in both checkouts");
-  }
-  if (snapshot.status !== "In Progress" || !meaningfulTaskImplementationPlan(snapshot.implementationPlan)) {
-    throw new Error("Ready-for-Merge publication requires the complete Episode task to remain In Progress with a meaningful plan");
-  }
-  const published = publishTaskEpisodeLifecycleStatus(taskId, episodeHead, ctx, {
-    expectedMainStatus: "In Progress",
-    targetStatus: "Ready for Merge",
-    message: `chore: mark ${taskId.trim()} ready for merge`,
-  }, dependencies);
-  return {
-    ...published,
-    status: "Ready for Merge",
-    parentTaskId: snapshot.parentTaskId,
-    episodeTaskContentDigest: snapshot.contentDigest,
-  };
-}
-
-async function assertReadyIntegrationEpisodeIdle(
-  record: TaskEpisodeOwnershipRecord,
-  dependencies: TaskEpisodeReadyForMergeDependencies,
-): Promise<void> {
-  const publisher = dependencies.publisher ?? new PrimeSessionPublisher();
-  const orca = dependencies.orca ?? new CliOrcaAdapter();
-  try {
-    if (record.engine === "orca") {
-      const current = await orca.showWorktree(record.worktreeId!, record.routingEnvironmentId);
-      if (current.identity !== record.worktreeIdentity || !samePath(current.path, record.worktree!)) {
-        throw new Error("Ready-for-Merge integration Orca worktree identity no longer matches ownership");
-      }
-    }
-    const session = await durableSession(record, publisher);
-    if (!session.cwd || !samePath(session.cwd, record.worktree!)) {
-      throw new Error("Ready-for-Merge integration durable session is not rooted at the owned worktree");
-    }
-    if (sessionIsBusy(session)) throw new Error("Ready-for-Merge integration requires the owned Episode to be idle");
-    if (session.activeSessionId) {
-      const state = await publisher.getState(session.activeSessionId);
-      assertIdleEpisodeState(state, record, session.activeSessionId);
-    }
-  } finally { try { publisher.close(); } catch { /* do not mask integration preflight */ } }
-}
-
-/**
- * Merge current main into the same owned Episode worktree. The exact Episode
- * task is restored from the accepted candidate and only its Conversation-owned
- * lifecycle status is changed through Backlog before the merge commit.
- */
-type TaskEpisodeReviewTransition = {
-  label: "Ready-for-Merge" | "Request-Changes";
-  taskId: string;
-  statusCommit: string;
-  baseEpisodeHead: string;
-  expectedMainStatus: "Ready for Merge" | "In Progress";
-  expectedEpisodeStatus: "In Progress" | "Ready for Merge";
-  targetEpisodeStatus: "Ready for Merge" | "In Progress";
-  parentTaskId: string | null;
-  episodeTaskContentDigest: string;
-  mergeMessage: string;
-};
-type TaskEpisodeReviewTransitionIntegration = {
-  taskId: string;
-  statusCommit: string;
-  baseEpisodeHead: string;
-  integratedMainHead: string;
-  refreshedEpisodeHead: string;
-  parentTaskId: string | null;
-  episodeTaskContentDigest: string;
-  pushError?: string;
-};
-
-async function integrateTaskEpisodeReviewTransition(
-  transition: TaskEpisodeReviewTransition,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies,
-): Promise<TaskEpisodeReviewTransitionIntegration> {
-  const git = dependencies.git ?? new CliGitAdapter();
-  const reviewGit = dependencies.reviewGit ?? new CliTaskEpisodeAdmissionGit();
-  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
-  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
-  const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
-  const resolveSnapshot = dependencies.taskSnapshotResolver
-    ?? ((cwd: string, id: string) => resolveTaskReviewSnapshot(cwd, id, runner));
-  const authority = resolveBlockedWorkflowAuthority(transition.taskId, ctx, { git, ownership: store, taskRunner: runner });
-  if (authority.mode !== "task") throw new Error(`${transition.label} integration requires task-native owner authority`);
-  const projectRoot = authority.projectRoot;
-  if (!samePath(reviewGit.repositoryRoot(ctx.cwd), projectRoot) || reviewGit.branch(projectRoot) !== "main") {
-    throw new Error(`${transition.label} integration status boundary does not match canonical primary main`);
-  }
-  const record = store.read(projectRoot);
-  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
-  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before review integration`);
-  validateWorktreeRecord(record, git, filesystem, projectRoot);
-  await assertReadyIntegrationEpisodeIdle(record, dependencies);
-  git.assertCleanWorktree(record.worktree!);
-  if (reviewGit.pathStatus(projectRoot, record.taskPath) !== "") {
-    throw new Error(`${transition.label} integration requires the exact main task path to match committed HEAD`);
-  }
-  const mainTask = exactAdmissionTask(resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath);
-  const mainSnapshot = resolveSnapshot(projectRoot, authority.taskId);
-  if (mainSnapshot.taskPath !== record.taskPath || mainSnapshot.parentTaskId !== transition.parentTaskId) {
-    throw new Error(`${transition.label} integration main task identity or hierarchy changed after publication`);
-  }
-  if (mainTask.status !== transition.expectedMainStatus || mainSnapshot.status !== transition.expectedMainStatus) {
-    throw new Error(`${transition.label} integration requires main task status ${transition.expectedMainStatus}; found ${mainTask.status}`);
-  }
-  const publicationPaths = reviewGit.commitPaths(projectRoot, transition.statusCommit);
-  if (publicationPaths.length !== 1 || publicationPaths[0] !== record.taskPath) {
-    throw new Error(`${transition.label} publication commit must contain only the exact task path`);
-  }
-  const mainHead = reviewGit.head(projectRoot);
-  if (!reviewGit.isAncestor(projectRoot, transition.statusCommit, mainHead)) {
-    throw new Error(`${transition.label} publication commit is not contained in current main`);
-  }
-  const episodeHead = reviewGit.head(record.worktree!);
-  const upstreamHead = reviewGit.upstreamHead(record.worktree!);
-  if (reviewGit.pathStatus(record.worktree!, record.taskPath) !== "") {
-    throw new Error(`${transition.label} integration requires committed Episode task content`);
-  }
-  const episodeTask = exactAdmissionTask(
-    resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
-  );
-  const before = resolveSnapshot(record.worktree!, authority.taskId);
-
-  if (episodeHead !== transition.baseEpisodeHead) {
-    const parents = reviewGit.parents(record.worktree!, episodeHead);
-    if (parents.length !== 2 || parents[0] !== transition.baseEpisodeHead || parents[1] !== mainHead
-      || episodeTask.status !== transition.targetEpisodeStatus
-      || before.status !== transition.targetEpisodeStatus
-      || before.taskPath !== record.taskPath
-      || before.parentTaskId !== transition.parentTaskId
-      || before.contentDigest !== transition.episodeTaskContentDigest) {
-      throw new Error(`${transition.label} integration local head is not the exact retryable two-parent candidate`);
-    }
-    if (upstreamHead !== transition.baseEpisodeHead && upstreamHead !== episodeHead) {
-      throw new Error(`${transition.label} integration upstream head is neither the prior nor exact refreshed candidate`);
-    }
-    const pushError = upstreamHead === episodeHead ? undefined : bestEffortTaskPush(reviewGit, record.worktree!);
-    return {
-      taskId: authority.taskId,
-      statusCommit: transition.statusCommit,
-      baseEpisodeHead: transition.baseEpisodeHead,
-      integratedMainHead: mainHead,
-      refreshedEpisodeHead: episodeHead,
-      parentTaskId: before.parentTaskId,
-      episodeTaskContentDigest: before.contentDigest,
-      ...(pushError ? { pushError } : {}),
-    };
-  }
-  if (upstreamHead !== transition.baseEpisodeHead) {
-    throw new Error(`${transition.label} integration requires the prior Episode candidate to remain exact and pushed`);
-  }
-  if (episodeTask.status !== transition.expectedEpisodeStatus) {
-    throw new Error(`${transition.label} integration requires Episode status ${transition.expectedEpisodeStatus}; found ${episodeTask.status}`);
-  }
-  if (before.taskPath !== record.taskPath || before.parentTaskId !== transition.parentTaskId
-    || before.contentDigest !== transition.episodeTaskContentDigest) {
-    throw new Error(`${transition.label} integration candidate content or invariant identity changed after status publication`);
-  }
-
-  let mergeStarted = false;
-  try {
-    mergeStarted = true;
-    reviewGit.mergeMain(record.worktree!, mainHead, record.taskPath);
-    reviewGit.restoreTaskFromHead(record.worktree!, record.taskPath);
-    runner.run("backlog", ["task", "edit", "--status", transition.targetEpisodeStatus, "--plain", "--", authority.taskId], { cwd: record.worktree! });
-    const mergedTask = exactAdmissionTask(
-      resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
-    );
-    const after = resolveSnapshot(record.worktree!, authority.taskId);
-    if (mergedTask.status !== transition.targetEpisodeStatus || after.status !== transition.targetEpisodeStatus) {
-      throw new Error(`${transition.label} integration did not retain the Conversation-owned lifecycle status`);
-    }
-    if (after.parentTaskId !== before.parentTaskId || after.contentDigest !== before.contentDigest) {
-      throw new Error(`${transition.label} integration changed Episode-owned task content or hierarchy`);
-    }
-    reviewGit.stagePath(record.worktree!, record.taskPath);
-    const refreshedEpisodeHead = reviewGit.commitMerge(record.worktree!, transition.mergeMessage);
-    mergeStarted = false;
-    const parents = reviewGit.parents(record.worktree!, refreshedEpisodeHead);
-    if (parents.length !== 2 || parents[0] !== transition.baseEpisodeHead || parents[1] !== mainHead) {
-      throw new Error(`${transition.label} integration did not create the exact two-parent refreshed candidate`);
-    }
-    git.assertCleanWorktree(record.worktree!);
-    const pushError = bestEffortTaskPush(reviewGit, record.worktree!);
-    return {
-      taskId: authority.taskId,
-      statusCommit: transition.statusCommit,
-      baseEpisodeHead: transition.baseEpisodeHead,
-      integratedMainHead: mainHead,
-      refreshedEpisodeHead,
-      parentTaskId: after.parentTaskId,
-      episodeTaskContentDigest: after.contentDigest,
-      ...(pushError ? { pushError } : {}),
-    };
-  } catch (error) {
-    if (mergeStarted) { try { reviewGit.abortMerge(record.worktree!); } catch { /* preserve original integration failure */ } }
-    throw error;
-  }
-}
-
-export async function integrateTaskEpisodeReadyForMerge(
-  publication: TaskEpisodeReadyPublicationResult,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies = {},
-): Promise<TaskEpisodeReadyIntegrationResult> {
-  if (publication.status !== "Ready for Merge") throw new Error("Ready-for-Merge integration requires its exact publication result");
-  const integrated = await integrateTaskEpisodeReviewTransition({
-    label: "Ready-for-Merge",
-    taskId: publication.taskId,
-    statusCommit: publication.commit,
-    baseEpisodeHead: publication.episodeHead,
-    expectedMainStatus: "Ready for Merge",
-    expectedEpisodeStatus: "In Progress",
-    targetEpisodeStatus: "Ready for Merge",
-    parentTaskId: publication.parentTaskId,
-    episodeTaskContentDigest: publication.episodeTaskContentDigest,
-    mergeMessage: `chore: integrate main for ${publication.taskId} review`,
-  }, ctx, dependencies);
-  return {
-    taskId: integrated.taskId,
-    readyCommit: integrated.statusCommit,
-    acceptedEpisodeHead: integrated.baseEpisodeHead,
-    integratedMainHead: integrated.integratedMainHead,
-    refreshedEpisodeHead: integrated.refreshedEpisodeHead,
-    parentTaskId: integrated.parentTaskId,
-    episodeTaskContentDigest: integrated.episodeTaskContentDigest,
-    ...(integrated.pushError ? { pushError: integrated.pushError } : {}),
-  };
-}
-
-/** Verify the pushed refreshed candidate before any operator merge decision. */
-export function verifyTaskEpisodeReadyForMerge(
-  publication: TaskEpisodeReadyPublicationResult,
-  integration: TaskEpisodeReadyIntegrationResult,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies = {},
-): TaskEpisodeReadyVerificationResult {
-  const git = dependencies.git ?? new CliGitAdapter();
-  const reviewGit = dependencies.reviewGit ?? new CliTaskEpisodeAdmissionGit();
-  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
-  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
-  const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
-  const resolveSnapshot = dependencies.taskSnapshotResolver
-    ?? ((cwd: string, id: string) => resolveTaskReviewSnapshot(cwd, id, runner));
-  if (integration.taskId !== publication.taskId
-    || integration.readyCommit !== publication.commit
-    || integration.acceptedEpisodeHead !== publication.episodeHead
-    || integration.parentTaskId !== publication.parentTaskId
-    || integration.episodeTaskContentDigest !== publication.episodeTaskContentDigest) {
-    throw new Error("Ready-for-Merge verification inputs do not describe one exact handshake");
-  }
-  const authority = resolveBlockedWorkflowAuthority(publication.taskId, ctx, { git, ownership: store, taskRunner: runner });
-  if (authority.mode !== "task") throw new Error("Ready-for-Merge verification requires task-native owner authority");
-  const projectRoot = authority.projectRoot;
-  const record = store.read(projectRoot);
-  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
-  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before review verification`);
-  validateWorktreeRecord(record, git, filesystem, projectRoot);
-  if (reviewGit.head(projectRoot) !== integration.integratedMainHead) {
-    throw new Error("Ready-for-Merge verification requires a refreshed candidate against current main");
-  }
-  if (reviewGit.pathStatus(projectRoot, record.taskPath) !== "") {
-    throw new Error("Ready-for-Merge verification requires committed main task content");
-  }
-  const mainTask = exactAdmissionTask(resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath);
-  const mainSnapshot = resolveSnapshot(projectRoot, authority.taskId);
-  if (mainTask.status !== "Ready for Merge" || mainSnapshot.status !== "Ready for Merge") {
-    throw new Error(`Ready-for-Merge verification requires main status Ready for Merge; found ${mainTask.status}`);
-  }
-  if (mainSnapshot.taskPath !== record.taskPath || mainSnapshot.parentTaskId !== publication.parentTaskId) {
-    throw new Error("Ready-for-Merge verification found changed main task identity or hierarchy");
-  }
-  if (reviewGit.head(record.worktree!) !== integration.refreshedEpisodeHead
-    || reviewGit.upstreamHead(record.worktree!) !== integration.refreshedEpisodeHead) {
-    throw new Error("Ready-for-Merge verification requires the exact refreshed Episode candidate to be pushed");
-  }
-  git.assertCleanWorktree(record.worktree!);
-  const episodeTask = exactAdmissionTask(
-    resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
-  );
-  const snapshot = resolveSnapshot(record.worktree!, authority.taskId);
-  if (episodeTask.status !== "Ready for Merge" || snapshot.status !== "Ready for Merge"
-    || snapshot.parentTaskId !== publication.parentTaskId
-    || snapshot.contentDigest !== publication.episodeTaskContentDigest) {
-    throw new Error("Ready-for-Merge refreshed candidate does not preserve exact task content, hierarchy, and status");
-  }
-  const parents = reviewGit.parents(record.worktree!, integration.refreshedEpisodeHead);
-  if (parents.length !== 2 || parents[0] !== publication.episodeHead || parents[1] !== integration.integratedMainHead
-    || !reviewGit.isAncestor(projectRoot, publication.commit, integration.integratedMainHead)
-    || !reviewGit.isAncestor(record.worktree!, integration.integratedMainHead, integration.refreshedEpisodeHead)) {
-    throw new Error("Ready-for-Merge refreshed candidate does not contain the exact accepted candidate and current main");
-  }
-  return {
-    verified: true,
-    taskId: authority.taskId,
-    mainHead: integration.integratedMainHead,
-    refreshedEpisodeHead: integration.refreshedEpisodeHead,
-  };
-}
-
-async function verifyReadyOperatorDecision(
-  evidence: TaskEpisodeReadyHandshakeEvidence,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies,
-): Promise<TaskEpisodeReadyVerificationResult> {
-  const current = verifyTaskEpisodeReadyForMerge(evidence.publication, evidence.integration, ctx, dependencies);
-  if (!evidence.verification.verified
-    || evidence.verification.taskId !== current.taskId
-    || evidence.verification.mainHead !== current.mainHead
-    || evidence.verification.refreshedEpisodeHead !== current.refreshedEpisodeHead) {
-    throw new Error("Operator outcome requires the previously verified exact refreshed candidate and current main");
-  }
-  const git = dependencies.git ?? new CliGitAdapter();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
-  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
-  const authority = resolveBlockedWorkflowAuthority(current.taskId, ctx, { git, ownership: store, taskRunner: runner });
-  if (authority.mode !== "task") throw new Error("Operator outcome requires task-native owner authority");
-  const record = store.read(authority.projectRoot);
-  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
-  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before an operator outcome`);
-  await assertReadyIntegrationEpisodeIdle(record, dependencies);
-  return current;
-}
-
-/** Record the reversible Delay decision without mutating or transporting any state. */
-export async function delayTaskEpisodeReadyForMerge(
-  evidence: TaskEpisodeReadyHandshakeEvidence,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies = {},
-  decision: TaskEpisodeOperatorDecision,
-): Promise<TaskEpisodeDelayResult> {
-  if (decision.operatorDecision !== "delay") {
-    throw new Error("Delay requires the explicit operator Delay decision");
-  }
-  const verified = await verifyReadyOperatorDecision(evidence, ctx, dependencies);
-  return { ...verified, outcome: "delayed" };
-}
-
-/** Merge only an explicitly authorized exact candidate, then publish exact-task Done. */
-export async function mergeTaskEpisodeReadyForMerge(
-  evidence: TaskEpisodeReadyHandshakeEvidence,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies = {},
-  decision: TaskEpisodeMergeDecision,
-): Promise<TaskEpisodeMergeResult> {
-  if (decision.operatorDecision !== "merge") {
-    throw new Error("Merge requires the explicit operator Merge decision");
-  }
-  const { publication, integration, verification } = evidence;
-  if (publication.status !== "Ready for Merge"
-    || integration.taskId !== publication.taskId
-    || integration.readyCommit !== publication.commit
-    || integration.acceptedEpisodeHead !== publication.episodeHead
-    || integration.parentTaskId !== publication.parentTaskId
-    || integration.episodeTaskContentDigest !== publication.episodeTaskContentDigest
-    || !verification.verified
-    || verification.taskId !== publication.taskId
-    || verification.mainHead !== integration.integratedMainHead
-    || verification.refreshedEpisodeHead !== integration.refreshedEpisodeHead) {
-    throw new Error("Merge requires one exact previously verified Ready-for-Merge handshake");
-  }
-  if (decision.taskId !== verification.taskId
-    || decision.mainHead !== verification.mainHead
-    || decision.refreshedEpisodeHead !== verification.refreshedEpisodeHead) {
-    throw new Error("Merge authority does not bind the exact verified task, main, and refreshed candidate");
-  }
-  const mergeGit = dependencies.mergeGit
-    ?? (dependencies.reviewGit as TaskEpisodeMergeGit | undefined)
-    ?? new CliTaskEpisodeAdmissionGit();
-  if (typeof mergeGit.fastForward !== "function") {
-    throw new Error("Task-native merge requires an exact fast-forward Git adapter");
-  }
-  const git = dependencies.git ?? new CliGitAdapter();
-  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
-  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
-  const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
-  const resolveSnapshot = dependencies.taskSnapshotResolver
-    ?? ((cwd: string, id: string) => resolveTaskReviewSnapshot(cwd, id, runner));
-  const authority = resolveBlockedWorkflowAuthority(verification.taskId, ctx, {
-    git, ownership: store, taskRunner: runner,
-  });
-  if (authority.mode !== "task") throw new Error("Merge requires task-native owner authority");
-  const projectRoot = authority.projectRoot;
-  const record = store.read(projectRoot);
-  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
-  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before merge`);
-  validateWorktreeRecord(record, git, filesystem, projectRoot);
-  await assertReadyIntegrationEpisodeIdle(record, { ...dependencies, reviewGit: mergeGit });
-  const retainedOwnership = stableJson(record);
-
-  git.assertCleanWorktree(record.worktree!);
-  if (mergeGit.head(record.worktree!) !== verification.refreshedEpisodeHead
-    || mergeGit.upstreamHead(record.worktree!) !== verification.refreshedEpisodeHead) {
-    throw new Error("Merge requires the exact refreshed Episode candidate to remain pushed");
-  }
-  const episodeTask = exactAdmissionTask(
-    resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
-  );
-  const episodeSnapshot = resolveSnapshot(record.worktree!, authority.taskId);
-  if (episodeTask.status !== "Ready for Merge" || episodeSnapshot.status !== "Ready for Merge"
-    || episodeSnapshot.taskPath !== record.taskPath
-    || episodeSnapshot.parentTaskId !== publication.parentTaskId
-    || episodeSnapshot.contentDigest !== publication.episodeTaskContentDigest) {
-    throw new Error("Merge candidate no longer preserves the exact reviewed task content, hierarchy, and status");
-  }
-  const candidateParents = mergeGit.parents(record.worktree!, verification.refreshedEpisodeHead);
-  if (candidateParents.length !== 2
-    || candidateParents[0] !== publication.episodeHead
-    || candidateParents[1] !== verification.mainHead
-    || !mergeGit.isAncestor(projectRoot, publication.commit, verification.mainHead)
-    || !mergeGit.isAncestor(record.worktree!, verification.mainHead, verification.refreshedEpisodeHead)) {
-    throw new Error("Merge candidate no longer has the exact reviewed ancestry");
-  }
-
-  let mainHead = mergeGit.head(projectRoot);
-  let mainChanges = mergeGit.worktreeChanges(projectRoot);
-  let recoverDirtyDone = false;
-  if (mainChanges.length > 0) {
-    const onlyTaskModification = mainHead === verification.refreshedEpisodeHead
-      && mainChanges.length === 1
-      && mainChanges[0].path === record.taskPath
-      && /^[ M]{2}$/.test(mainChanges[0].status)
-      && mainChanges[0].status.includes("M");
-    if (!onlyTaskModification) {
-      throw new Error("Merge recovery rejects canonical-main changes outside the exact modified task");
-    }
-    const partialTask = exactAdmissionTask(
-      resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath,
-    );
-    const partialSnapshot = resolveSnapshot(projectRoot, authority.taskId);
-    if (partialTask.status !== "Done" || partialSnapshot.status !== "Done"
-      || partialSnapshot.taskPath !== record.taskPath
-      || partialSnapshot.parentTaskId !== publication.parentTaskId
-      || partialSnapshot.contentDigest !== publication.episodeTaskContentDigest) {
-      throw new Error("Dirty Done recovery does not preserve the exact task content, identity, and hierarchy");
-    }
-    recoverDirtyDone = true;
-  } else git.assertCleanWorktree(projectRoot);
-
-  let doneCommit: string | undefined;
-  if (mainHead === verification.mainHead) {
-    if (recoverDirtyDone || mergeGit.upstreamHead(projectRoot) !== verification.mainHead) {
-      throw new Error("Merge requires canonical main and its upstream to remain at the exact verified head");
-    }
-    const mainTask = exactAdmissionTask(
-      resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath,
-    );
-    const mainSnapshot = resolveSnapshot(projectRoot, authority.taskId);
-    if (mainTask.status !== "Ready for Merge" || mainSnapshot.status !== "Ready for Merge"
-      || mainSnapshot.taskPath !== record.taskPath
-      || mainSnapshot.parentTaskId !== publication.parentTaskId) {
-      throw new Error("Merge requires the exact current Ready-for-Merge task on canonical main");
-    }
-    mergeGit.fastForward(projectRoot, verification.refreshedEpisodeHead);
-    mainHead = mergeGit.head(projectRoot);
-    if (mainHead !== verification.refreshedEpisodeHead) {
-      throw new Error("Canonical main did not reach the exact reviewed candidate");
-    }
-    mainChanges = mergeGit.worktreeChanges(projectRoot);
-    if (mainChanges.length > 0) {
-      throw new Error("Canonical main became dirty after the exact candidate fast-forward");
-    }
-    git.assertCleanWorktree(projectRoot);
-  }
-
-  if (mainHead === verification.refreshedEpisodeHead) {
-    const upstream = mergeGit.upstreamHead(projectRoot);
-    if (upstream !== verification.mainHead && upstream !== verification.refreshedEpisodeHead) {
-      throw new Error("Merged candidate recovery requires canonical main upstream at the prior main or exact candidate");
-    }
-    if (recoverDirtyDone) {
-      doneCommit = mergeGit.commitOnlyPath(
-        projectRoot, record.taskPath, `chore: complete ${authority.taskId}`,
-      );
-      mainHead = doneCommit;
-    } else {
-      const mergedTask = exactAdmissionTask(
-        resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath,
-      );
-      const mergedSnapshot = resolveSnapshot(projectRoot, authority.taskId);
-      if (mergedTask.status !== "Ready for Merge" || mergedSnapshot.status !== "Ready for Merge"
-        || mergedSnapshot.taskPath !== record.taskPath
-        || mergedSnapshot.parentTaskId !== publication.parentTaskId
-        || mergedSnapshot.contentDigest !== publication.episodeTaskContentDigest) {
-        throw new Error("Merged candidate does not preserve the exact reviewed task content, hierarchy, and status");
-      }
-      const done = commitConversationTaskStatus({
-        taskId: authority.taskId,
-        projectRoot,
-        taskPath: record.taskPath,
-        status: "Done",
-        message: `chore: complete ${authority.taskId}`,
-        runner,
-        git: mergeGit,
-        resolveTask,
-      });
-      doneCommit = done.commit;
-      mainHead = done.commit;
-    }
-  } else {
-    if (recoverDirtyDone) {
-      throw new Error("Dirty Done recovery requires canonical main at the exact merged candidate");
-    }
-    const parents = mergeGit.parents(projectRoot, mainHead);
-    const paths = mergeGit.commitPaths(projectRoot, mainHead);
-    if (parents.length !== 1 || parents[0] !== verification.refreshedEpisodeHead
-      || paths.length !== 1 || paths[0] !== record.taskPath) {
-      throw new Error("Canonical main is neither the verified pre-merge head, exact candidate, nor exact Done child");
-    }
-    doneCommit = mainHead;
-  }
-
-  const doneParents = mergeGit.parents(projectRoot, doneCommit);
-  const donePaths = mergeGit.commitPaths(projectRoot, doneCommit);
-  if (mergeGit.head(projectRoot) !== doneCommit
-    || doneParents.length !== 1 || doneParents[0] !== verification.refreshedEpisodeHead
-    || donePaths.length !== 1 || donePaths[0] !== record.taskPath) {
-    throw new Error("Done publication does not directly follow the exact merged candidate as a one-task commit");
-  }
-  const doneTask = exactAdmissionTask(
-    resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath,
-  );
-  const doneSnapshot = resolveSnapshot(projectRoot, authority.taskId);
-  if (doneTask.status !== "Done" || doneSnapshot.status !== "Done"
-    || doneSnapshot.taskPath !== record.taskPath
-    || doneSnapshot.parentTaskId !== publication.parentTaskId
-    || doneSnapshot.contentDigest !== publication.episodeTaskContentDigest) {
-    throw new Error("Done publication changed the exact task content, identity, or hierarchy");
-  }
-  git.assertCleanWorktree(projectRoot);
-  const retained = store.read(projectRoot);
-  if (!retained) throw new Error("Task-native ownership disappeared after merge");
-  exactOwnedTaskRecord(retained, authority.taskId, ctx.sessionManager.getSessionId());
-  if (retained.status !== "active" || stableJson(retained) !== retainedOwnership) {
-    throw new Error("Merge and Done publication must retain the exact active Episode ownership and resources");
-  }
-
-  let pushError = bestEffortTaskPush(mergeGit, projectRoot);
-  if (!pushError) {
-    try {
-      const observed = mergeGit.upstreamHead(projectRoot);
-      if (observed !== doneCommit) {
-        pushError = `Done push verification expected ${doneCommit} but observed ${observed}`;
-      }
-    } catch (error) {
-      pushError = `Done push verification failed: ${taskAdmissionError(error)}`;
-    }
-  }
-  return {
-    verified: true,
-    outcome: "merged",
-    taskId: authority.taskId,
-    status: "Done",
-    priorMainHead: verification.mainHead,
-    mergedHead: verification.refreshedEpisodeHead,
-    doneCommit,
-    parentTaskId: doneSnapshot.parentTaskId,
-    episodeTaskContentDigest: doneSnapshot.contentDigest,
-    ...(pushError ? { pushError } : {}),
-  };
-}
-
 function expectedArchivedTaskPath(taskPath: string): string {
   const activeDirectory = dirname(taskPath);
   if (basename(activeDirectory) !== "tasks") {
-    throw new Error("Task abandonment requires the canonical Backlog active-task path");
+    throw new Error("Task abandonment must archive the canonical Backlog active-task path");
   }
   return join(dirname(activeDirectory), "archive", "tasks", basename(taskPath));
 }
 
-export function assertNoHistoricalTaskArchiveCollision(
-  repo: string,
-  boundMainHead: string,
-  archivePath: string,
-  git: Pick<TaskEpisodeAbandonmentGit, "pathTrackedAtRef">,
-): void {
-  if (git.pathTrackedAtRef(repo, boundMainHead, archivePath)) {
-    throw new Error(`Abandonment archive destination already exists in bound main history: ${archivePath}`);
-  }
-}
-
-function exactPathSet(actual: string[], expected: string[]): boolean {
-  return actual.length === expected.length
-    && [...actual].sort().every((value, index) => value === [...expected].sort()[index]);
-}
-
-function exactArchiveMoveChanges(
-  changes: GitWorktreeChange[],
-  activePath: string,
-  archivePath: string,
-): boolean {
-  if (changes.length === 1 && changes[0].status.includes("R")) {
-    const names = changes[0].path.split(" -> ");
-    return exactPathSet(names, [activePath, archivePath]);
-  }
-  if (changes.length !== 2) return false;
-  const active = changes.find((change) => change.path === activePath);
-  const archived = changes.find((change) => change.path === archivePath);
-  return Boolean(active && archived
-    && active.status.includes("D")
-    && (archived.status === "??" || archived.status.includes("A")));
-}
-
-export function prepareTaskEpisodeAbandonmentDecision(
-  taskId: string,
-  episodeHead: string,
-  finalSummary: string,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeAbandonmentDependencies = {},
-): TaskEpisodeAbandonmentDecision {
-  if (!finalSummary.trim() || finalSummary !== finalSummary.trim()) {
-    throw new Error("Task abandonment requires one normalized truthful non-empty Final Summary");
-  }
-  const git = dependencies.git ?? new CliGitAdapter();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
-  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
-  const abandonmentGit = dependencies.abandonmentGit
-    ?? (dependencies.mergeGit as TaskEpisodeAbandonmentGit | undefined)
-    ?? new CliTaskEpisodeAdmissionGit();
-  const resolveAbandonment = dependencies.abandonmentSnapshotResolver
-    ?? ((cwd: string, id: string) => resolveTaskAbandonmentSnapshot(cwd, id, runner));
-  const authority = resolveBlockedWorkflowAuthority(taskId, ctx, {
-    git, ownership: store, taskRunner: runner,
-  });
-  if (authority.mode !== "task") throw new Error("Task abandonment requires task-native owner authority");
-  const record = store.read(authority.projectRoot);
-  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
-  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before abandonment`);
-  const mainHead = abandonmentGit.head(authority.projectRoot);
-  const mainSnapshot = resolveAbandonment(authority.projectRoot, authority.taskId);
-  const episodeSnapshot = resolveAbandonment(record.worktree!, authority.taskId);
-  const relationship = mainHead === episodeHead
-    ? "same"
-    : abandonmentGit.isAncestor(authority.projectRoot, mainHead, episodeHead)
-      ? "main-ancestor"
-      : abandonmentGit.isAncestor(authority.projectRoot, episodeHead, mainHead)
-        ? "episode-ancestor"
-        : "diverged";
-  return {
-    operatorDecision: "abandon",
-    taskId: authority.taskId,
-    taskPath: record.taskPath,
-    mainHead,
-    episodeHead,
-    mainStatus: mainSnapshot.status,
-    candidateMainRelationship: relationship,
-    parentTaskId: episodeSnapshot.parentTaskId,
-    episodeTaskContentDigest: episodeSnapshot.abandonmentContentDigest,
-    finalSummary,
-  };
-}
-
-export async function abandonTaskEpisode(
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeAbandonmentDependencies = {},
-  decision: TaskEpisodeAbandonmentDecision,
-): Promise<TaskEpisodeAbandonmentResult> {
-  if (decision.operatorDecision !== "abandon") {
-    throw new Error("Task abandonment requires the explicit operator Abandon decision");
-  }
-  if (!decision.finalSummary.trim() || decision.finalSummary !== decision.finalSummary.trim()) {
-    throw new Error("Task abandonment requires one normalized truthful non-empty Final Summary");
-  }
-  if (decision.mainStatus === "Done") {
-    throw new Error("Task abandonment archives without publishing Done");
-  }
-  const git = dependencies.git ?? new CliGitAdapter();
-  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
-  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
-  const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
-  const resolveAbandonment = dependencies.abandonmentSnapshotResolver
-    ?? ((cwd: string, id: string) => resolveTaskAbandonmentSnapshot(cwd, id, runner));
-  const resolveFile = dependencies.abandonmentFileSnapshotResolver
-    ?? ((cwd: string, path: string) => resolveTaskAbandonmentFileSnapshot(cwd, path));
-  const assertNoCleanupTargets = dependencies.assertNoArchiveCleanupTargets
-    ?? ((cwd: string, id: string, path: string) => assertNoTaskArchiveCleanupTargets(cwd, id, path, runner));
-  const abandonmentGit = dependencies.abandonmentGit
-    ?? (dependencies.mergeGit as TaskEpisodeAbandonmentGit | undefined)
-    ?? new CliTaskEpisodeAdmissionGit();
-  if (typeof abandonmentGit.pathTrackedAtRef !== "function"
-    || typeof abandonmentGit.restorePathFromRef !== "function"
-    || typeof abandonmentGit.commitOnlyPaths !== "function") {
-    throw new Error("Task abandonment requires exact task-blob selection and archival Git support");
-  }
-
-  const authority = resolveBlockedWorkflowAuthority(decision.taskId, ctx, {
-    git, ownership: store, taskRunner: runner,
-  });
-  if (authority.mode !== "task") throw new Error("Task abandonment requires task-native owner authority");
-  const projectRoot = authority.projectRoot;
-  const record = store.read(projectRoot);
-  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
-  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before abandonment`);
-  if (decision.taskPath !== record.taskPath || decision.parentTaskId === undefined) {
-    throw new Error("Abandonment authority does not bind the exact owned task path and parent identity");
-  }
-  validateWorktreeRecord(record, git, filesystem, projectRoot);
-  await assertReadyIntegrationEpisodeIdle(record, { ...dependencies, reviewGit: abandonmentGit });
-  const retainedOwnership = stableJson(record);
-
-  git.assertCleanWorktree(record.worktree!);
-  if (abandonmentGit.head(record.worktree!) !== decision.episodeHead
-    || abandonmentGit.upstreamHead(record.worktree!) !== decision.episodeHead) {
-    throw new Error("Abandonment requires the exact Episode head to remain pushed");
-  }
-  const candidateMainRelationship = decision.mainHead === decision.episodeHead
-    ? "same"
-    : abandonmentGit.isAncestor(projectRoot, decision.mainHead, decision.episodeHead)
-      ? "main-ancestor"
-      : abandonmentGit.isAncestor(projectRoot, decision.episodeHead, decision.mainHead)
-        ? "episode-ancestor"
-        : "diverged";
-  if (candidateMainRelationship !== decision.candidateMainRelationship) {
-    throw new Error("Abandonment candidate/main relationship no longer matches the explicit authority");
-  }
-  const episodeTask = exactAdmissionTask(
-    resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
-  );
-  const episodeSnapshot = resolveAbandonment(record.worktree!, authority.taskId);
-  const episodeFile = resolveFile(record.worktree!, record.taskPath);
-  if (episodeTask.status === "Done" || episodeSnapshot.status === "Done" || episodeFile.status === "Done"
-    || episodeSnapshot.taskPath !== record.taskPath
-    || episodeSnapshot.parentTaskId !== decision.parentTaskId
-    || episodeSnapshot.abandonmentContentDigest !== decision.episodeTaskContentDigest) {
-    throw new Error("Abandonment Episode head does not preserve the exact bound task content and hierarchy");
-  }
-
-  const archivePath = expectedArchivedTaskPath(record.taskPath);
-  assertNoHistoricalTaskArchiveCollision(projectRoot, decision.mainHead, archivePath, abandonmentGit);
-  assertNoCleanupTargets(projectRoot, authority.taskId, record.taskPath);
-  let mainHead = abandonmentGit.head(projectRoot);
-  let changes = abandonmentGit.worktreeChanges(projectRoot);
-  let archiveCommit: string | undefined;
-
-  if (mainHead === decision.mainHead) {
-    if (abandonmentGit.upstreamHead(projectRoot) !== decision.mainHead) {
-      throw new Error("Abandonment requires canonical main and upstream at the exact bound head");
-    }
-    const alreadyArchived = exactArchiveMoveChanges(changes, record.taskPath, archivePath);
-    if (!alreadyArchived) {
-      const mainTask = exactAdmissionTask(
-        resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath,
-      );
-      const mainSnapshot = resolveAbandonment(projectRoot, authority.taskId);
-      if (mainTask.status === "Done" || mainSnapshot.status === "Done"
-        || mainSnapshot.taskPath !== record.taskPath
-        || mainSnapshot.parentTaskId !== decision.parentTaskId) {
-        throw new Error("Abandonment main task changed identity, path, status, or parent");
-      }
-      if (changes.length === 0) {
-        if (mainSnapshot.status !== decision.mainStatus) {
-          throw new Error("Abandonment main status no longer matches the captured lifecycle status");
-        }
-        abandonmentGit.restorePathFromRef(projectRoot, decision.episodeHead, record.taskPath);
-      } else {
-        const exactTaskChange = changes.length === 1
-          && changes[0].path === record.taskPath
-          && /^[ M]{2}$/.test(changes[0].status)
-          && changes[0].status.includes("M");
-        if (!exactTaskChange || mainSnapshot.abandonmentContentDigest !== decision.episodeTaskContentDigest) {
-          throw new Error("Abandonment recovery rejects dirty canonical-main content outside the exact Episode task blob");
-        }
-      }
-      runner.run("backlog", [
-        "task", "edit", "--status", decision.mainStatus,
-        "--final-summary", decision.finalSummary, "--plain", "--", authority.taskId,
-      ], { cwd: projectRoot });
-      const prepared = resolveAbandonment(projectRoot, authority.taskId);
-      const preparedFile = resolveFile(projectRoot, record.taskPath);
-      if (prepared.taskPath !== record.taskPath || prepared.status !== decision.mainStatus
-        || prepared.parentTaskId !== decision.parentTaskId
-        || prepared.abandonmentContentDigest !== decision.episodeTaskContentDigest
-        || prepared.finalSummary !== decision.finalSummary
-        || preparedFile.status !== decision.mainStatus
-        || preparedFile.finalSummary !== decision.finalSummary
-        || preparedFile.contentDigest !== episodeFile.contentDigest) {
-        throw new Error("Abandonment task preparation did not preserve Episode content and captured lifecycle state");
-      }
-      changes = abandonmentGit.worktreeChanges(projectRoot);
-      const exactPreparedChange = changes.length === 0
-        || (changes.length === 1 && changes[0].path === record.taskPath
-          && /^[ M]{2}$/.test(changes[0].status) && changes[0].status.includes("M"));
-      if (!exactPreparedChange) {
-        throw new Error("Abandonment task preparation changed paths outside the exact task");
-      }
-      mkdirSync(join(projectRoot, dirname(archivePath)), { recursive: true });
-      runner.run("backlog", ["task", "archive", "--", authority.taskId], { cwd: projectRoot });
-      changes = abandonmentGit.worktreeChanges(projectRoot);
-    }
-    if (!exactArchiveMoveChanges(changes, record.taskPath, archivePath)) {
-      throw new Error("Abandonment archive must move only the exact task into Backlog archive");
-    }
-    const archivedFile = resolveFile(projectRoot, archivePath);
-    if (archivedFile.status !== decision.mainStatus || archivedFile.status === "Done"
-      || archivedFile.finalSummary !== decision.finalSummary
-      || archivedFile.contentDigest !== episodeFile.contentDigest) {
-      throw new Error("Archived abandonment task does not preserve the authorized content and lifecycle state");
-    }
-    archiveCommit = abandonmentGit.commitOnlyPaths(
-      projectRoot, [record.taskPath, archivePath], `chore: abandon ${authority.taskId}`,
-    );
-    mainHead = archiveCommit;
-  } else {
-    if (changes.length !== 0) {
-      throw new Error("Abandonment recovery rejects a dirty committed archival state");
-    }
-    const parents = abandonmentGit.parents(projectRoot, mainHead);
-    const paths = abandonmentGit.commitPaths(projectRoot, mainHead);
-    if (parents.length !== 1 || parents[0] !== decision.mainHead
-      || !exactPathSet(paths, [record.taskPath, archivePath])) {
-      throw new Error("Canonical main is neither the bound pre-abandonment head nor its exact archival child");
-    }
-    archiveCommit = mainHead;
-  }
-
-  const archiveParents = abandonmentGit.parents(projectRoot, archiveCommit);
-  const archivePaths = abandonmentGit.commitPaths(projectRoot, archiveCommit);
-  if (abandonmentGit.head(projectRoot) !== archiveCommit
-    || archiveParents.length !== 1 || archiveParents[0] !== decision.mainHead
-    || !exactPathSet(archivePaths, [record.taskPath, archivePath])) {
-    throw new Error("Abandonment commit must directly archive only the exact bound task");
-  }
-  const archivedFile = resolveFile(projectRoot, archivePath);
-  if (archivedFile.status !== decision.mainStatus || archivedFile.status === "Done"
-    || archivedFile.finalSummary !== decision.finalSummary
-    || archivedFile.contentDigest !== episodeFile.contentDigest) {
-    throw new Error("Abandonment verification failed exact task content, lifecycle status, or summary");
-  }
-  git.assertCleanWorktree(projectRoot);
-  const retained = store.read(projectRoot);
-  if (!retained) throw new Error("Task-native ownership disappeared after abandonment");
-  exactOwnedTaskRecord(retained, authority.taskId, ctx.sessionManager.getSessionId());
-  if (retained.status !== "active" || stableJson(retained) !== retainedOwnership) {
-    throw new Error("Abandonment must retain exact Episode ownership and every resource pending cleanup authority");
-  }
-
-  let pushError = bestEffortTaskPush(abandonmentGit, projectRoot);
-  if (!pushError) {
-    try {
-      const observed = abandonmentGit.upstreamHead(projectRoot);
-      if (observed !== archiveCommit) {
-        pushError = `Abandonment push verification expected ${archiveCommit} but observed ${observed}`;
-      }
-    } catch (error) {
-      pushError = `Abandonment push verification failed: ${taskAdmissionError(error)}`;
-    }
-  }
-  return {
-    verified: true,
-    outcome: "abandoned",
-    taskId: authority.taskId,
-    status: decision.mainStatus,
-    priorMainHead: decision.mainHead,
-    episodeHead: decision.episodeHead,
-    archiveCommit,
-    archivedTaskPath: archivePath,
-    parentTaskId: decision.parentTaskId,
-    episodeTaskContentDigest: decision.episodeTaskContentDigest,
-    archivedTaskFileDigest: archivedFile.contentDigest,
-    resourcesRetained: true,
-    ...(pushError ? { pushError } : {}),
-  };
-}
-
-
-export function taskEpisodeCleanupResourceIdentity(
-  record: TaskEpisodeOwnershipRecord,
-  episodeHead: string,
-): TaskEpisodeCleanupResourceIdentity {
-  if (!record.worktree || !record.branch || !record.episodeId
-    || !record.episodeSessionFile || !record.episodeActiveSessionId
-    || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(episodeHead)) {
-    throw new Error("Task Episode cleanup requires every exact core resource binding");
-  }
-  return {
-    engine: record.engine,
-    worktree: record.worktree,
-    branch: record.branch,
-    head: episodeHead,
-    episodeId: record.episodeId,
-    episodeSessionFile: record.episodeSessionFile,
-    episodeActiveSessionId: record.episodeActiveSessionId,
-    ...(record.projectSetupId ? { projectSetupId: record.projectSetupId } : {}),
-    ...(record.routingEnvironmentId ? { routingEnvironmentId: record.routingEnvironmentId } : {}),
-    ...(record.worktreeId ? { worktreeId: record.worktreeId } : {}),
-    ...(record.worktreeIdentity ? { worktreeIdentity: record.worktreeIdentity } : {}),
-    ...(record.terminalHandle ? { terminalHandle: record.terminalHandle } : {}),
-    ...(record.terminalHandles ? { terminalHandles: [...record.terminalHandles] } : {}),
-    ...(record.worktreeName ? { worktreeName: record.worktreeName } : {}),
-    ...(record.launchAutomationName ? { launchAutomationName: record.launchAutomationName } : {}),
-    ...(record.launchAutomationId ? { launchAutomationId: record.launchAutomationId } : {}),
-    ...(record.launchRunId ? { launchRunId: record.launchRunId } : {}),
-  };
-}
-
 function taskCleanupStage(
   snapshot: TaskEpisodeCleanupSnapshot,
-  resources: TaskEpisodeCleanupResourceIdentity,
+  record: TaskEpisodeOwnershipRecord,
+  episodeHead: string,
 ): number {
-  if (snapshot.runtime) {
-    if (stableJson(snapshot.runtime.resources) !== stableJson(resources)
-      || !samePath(snapshot.runtime.cwd, resources.worktree)
-      || !snapshot.runtime.idle) {
-      throw new Error("Task Episode cleanup runtime is busy, foreign, or no longer exact");
-    }
+  if (snapshot.runtime && (!samePath(snapshot.runtime.cwd, record.worktree!) || !snapshot.runtime.idle)) {
+    throw new Error("Task Episode cleanup runtime is busy or no longer exact");
   }
-  if (snapshot.worktree
-    && (!samePath(snapshot.worktree.path, resources.worktree)
-      || snapshot.worktree.branch !== resources.branch
-      || snapshot.worktree.head !== resources.head
-      || !snapshot.worktree.clean)) {
-    throw new Error("Task Episode cleanup worktree is dirty, foreign, or no longer exact");
+  if (snapshot.worktree && (!samePath(snapshot.worktree.path, record.worktree!)
+    || snapshot.worktree.branch !== record.branch
+    || snapshot.worktree.head !== episodeHead
+    || !snapshot.worktree.clean)) {
+    throw new Error("Task Episode cleanup worktree is dirty or no longer exact");
   }
-  if (snapshot.branch
-    && (snapshot.branch.name !== resources.branch || snapshot.branch.head !== resources.head)) {
-    throw new Error("Task Episode cleanup branch is foreign or no longer exact");
+  if (snapshot.branch && (snapshot.branch.name !== record.branch || snapshot.branch.head !== episodeHead)) {
+    throw new Error("Task Episode cleanup branch is no longer exact");
   }
   const present = [Boolean(snapshot.runtime), Boolean(snapshot.worktree), Boolean(snapshot.branch)];
   if (present.every(Boolean)) return 0;
@@ -3213,199 +1724,120 @@ function taskCleanupStage(
   throw new Error("Task Episode cleanup resources are missing in an unsafe order");
 }
 
-function taskFinalizationTerminalCommit(evidence: TaskEpisodeTerminalEvidence): string {
-  return evidence.outcome === "merged" ? evidence.result.doneCommit : evidence.result.archiveCommit;
+function verifyTaskEpisodeTerminalState(
+  projectRoot: string,
+  record: TaskEpisodeOwnershipRecord,
+  episodeHead: string,
+  outcome: TaskEpisodeCleanupOutcome,
+  git: TaskEpisodeCleanupGit,
+  resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null,
+): void {
+  const mainHead = git.head(projectRoot);
+  if (git.upstreamHead(projectRoot) !== mainHead) {
+    throw new Error("Task Episode cleanup requires pushed canonical main");
+  }
+  if (outcome === "merged") {
+    const task = exactAdmissionTask(resolveTask(projectRoot, record.taskId), record.taskId, projectRoot, record.taskPath);
+    if (task.status !== "Done") throw new Error(`Task Episode cleanup requires ${record.taskId} to be Done after merge`);
+    if (!git.isAncestor(projectRoot, episodeHead, mainHead)) {
+      throw new Error("Task Episode cleanup requires the exact Episode candidate in canonical main history");
+    }
+    return;
+  }
+  const archivePath = expectedArchivedTaskPath(record.taskPath);
+  if (git.pathTrackedAtRef(projectRoot, mainHead, record.taskPath)
+    || !git.pathTrackedAtRef(projectRoot, mainHead, archivePath)) {
+    throw new Error("Task Episode cleanup requires the exact task to be archived after abandonment");
+  }
+  if (git.isAncestor(projectRoot, episodeHead, mainHead)) {
+    throw new Error("Task Episode cleanup found abandoned Episode code in canonical main history");
+  }
 }
 
-function taskFinalizationEpisodeHead(evidence: TaskEpisodeTerminalEvidence): string {
-  return evidence.outcome === "merged" ? evidence.result.mergedHead : evidence.result.episodeHead;
-}
-
-export function prepareTaskEpisodeCleanupDecision(
-  taskId: string,
-  evidence: TaskEpisodeTerminalEvidence,
+export async function finalizeTaskEpisodeCleanup(
+  rawTaskId: string,
+  rawEpisodeHead: string,
+  outcome: TaskEpisodeCleanupOutcome,
   ctx: ExtensionContext,
-  dependencies: Pick<TaskEpisodeFinalizationDependencies, "git" | "ownership"> = {},
-): TaskEpisodeCleanupDecision {
-  const git = dependencies.git ?? new CliGitAdapter();
+  dependencies: TaskEpisodeCleanupDependencies,
+): Promise<TaskEpisodeCleanupResult> {
+  const taskId = rawTaskId.trim();
+  const episodeHead = rawEpisodeHead.trim();
+  if (!taskId || /\s/.test(taskId) || taskId.startsWith("-")) {
+    throw new Error("Task Episode cleanup requires one exact canonical Backlog task ID");
+  }
+  if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(episodeHead)) {
+    throw new Error("Task Episode cleanup requires the exact pushed Episode head");
+  }
+  if (outcome !== "merged" && outcome !== "abandoned") {
+    throw new Error("Task Episode cleanup requires the exact terminal outcome");
+  }
+  if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0 || !ctx.sessionManager.getSessionFile()) {
+    throw new Error("Task Episode cleanup is available only to the persisted top-level owning Conversation");
+  }
+  const git = dependencies.cleanupGit ?? new CliTaskEpisodeCleanupGit();
   const store = dependencies.ownership ?? defaultOwnershipStore;
+  const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
+  const resolveTask = dependencies.taskResolver
+    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
   const projectRoot = git.repositoryRoot(ctx.cwd);
-  const record = store.read(projectRoot);
+  if (!samePath(projectRoot, ctx.cwd) || git.branch(projectRoot) !== "main") {
+    throw new Error("Task Episode cleanup must run from the canonical primary main checkout");
+  }
+  let record = store.read(projectRoot);
   if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
   exactOwnedTaskRecord(record, taskId, ctx.sessionManager.getSessionId());
   if (record.status !== "active" && record.status !== "inactive") {
     throw new Error(`Task Episode cleanup cannot finalize ${record.status} ownership`);
   }
-  const episodeHead = taskFinalizationEpisodeHead(evidence);
-  return {
-    operatorDecision: "cleanup",
-    taskId: record.taskId,
-    taskPath: record.taskPath,
-    ownerSessionId: record.ownerSessionId,
-    episodeHead,
-    terminalOutcome: evidence.outcome,
-    terminalCommit: taskFinalizationTerminalCommit(evidence),
-    resources: taskEpisodeCleanupResourceIdentity(record, episodeHead),
-  };
-}
-
-function verifyTaskEpisodeTerminalEvidence(
-  projectRoot: string,
-  record: TaskEpisodeOwnershipRecord,
-  episodeHead: string,
-  evidence: TaskEpisodeTerminalEvidence,
-  git: TaskEpisodeAbandonmentGit,
-  resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null,
-  resolveSnapshot: (cwd: string, taskId: string) => TaskReviewSnapshot,
-  resolveFile: (cwd: string, taskPath: string) => TaskAbandonmentFileSnapshot,
-): void {
-  const currentHead = git.head(projectRoot);
-  if (git.upstreamHead(projectRoot) !== currentHead) {
-    throw new Error("Task Episode cleanup requires canonical main terminal work to be pushed and exact");
-  }
-  if (evidence.outcome === "merged") {
-    const result = evidence.result;
-    if (!result.verified || result.outcome !== "merged" || result.pushError
-      || result.taskId !== record.taskId || result.status !== "Done"
-      || result.mergedHead !== episodeHead) {
-      throw new Error("Task Episode cleanup merge evidence does not bind the exact owned Episode");
-    }
-    if (!git.isAncestor(projectRoot, result.doneCommit, currentHead)
-      || !exactPathSet(git.parents(projectRoot, result.doneCommit), [result.mergedHead])
-      || !exactPathSet(git.commitPaths(projectRoot, result.doneCommit), [record.taskPath])) {
-      throw new Error("Task Episode cleanup merge terminal commit is not the verified exact task child");
-    }
-    const task = exactAdmissionTask(resolveTask(projectRoot, record.taskId), record.taskId, projectRoot, record.taskPath);
-    const snapshot = resolveSnapshot(projectRoot, record.taskId);
-    if (task.status !== "Done" || snapshot.status !== "Done"
-      || snapshot.taskPath !== record.taskPath
-      || snapshot.parentTaskId !== result.parentTaskId
-      || snapshot.contentDigest !== result.episodeTaskContentDigest) {
-      throw new Error("Task Episode cleanup merge terminal task changed identity, hierarchy, status, or content");
-    }
-    return;
-  }
-
-  const { decision, result } = evidence;
-  if (!result.verified || result.outcome !== "abandoned" || result.pushError
-    || result.resourcesRetained !== true || decision.operatorDecision !== "abandon"
-    || result.taskId !== record.taskId || decision.taskId !== record.taskId
-    || decision.taskPath !== record.taskPath || result.episodeHead !== episodeHead
-    || decision.episodeHead !== episodeHead || result.status !== decision.mainStatus
-    || result.priorMainHead !== decision.mainHead
-    || result.parentTaskId !== decision.parentTaskId
-    || result.episodeTaskContentDigest !== decision.episodeTaskContentDigest) {
-    throw new Error("Task Episode cleanup abandonment evidence does not bind the exact owned Episode");
-  }
-  const archivePath = expectedArchivedTaskPath(record.taskPath);
-  if (result.archivedTaskPath !== archivePath
-    || !git.isAncestor(projectRoot, result.archiveCommit, currentHead)
-    || !exactPathSet(git.parents(projectRoot, result.archiveCommit), [decision.mainHead])
-    || !exactPathSet(git.commitPaths(projectRoot, result.archiveCommit), [record.taskPath, archivePath])) {
-    throw new Error("Task Episode cleanup abandonment terminal commit is not the verified exact archive child");
-  }
-  if (resolveTask(projectRoot, record.taskId) !== null) {
-    throw new Error("Task Episode cleanup abandonment evidence conflicts with an active task");
-  }
-  const archived = resolveFile(projectRoot, archivePath);
-  if (archived.status !== decision.mainStatus || archived.status === "Done"
-    || archived.finalSummary !== decision.finalSummary
-    || archived.contentDigest !== result.archivedTaskFileDigest) {
-    throw new Error("Task Episode cleanup archived task changed status, summary, or content");
-  }
-}
-
-export async function finalizeTaskEpisodeCleanup(
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeFinalizationDependencies,
-  decision: TaskEpisodeCleanupDecision,
-  terminalEvidence: TaskEpisodeTerminalEvidence,
-): Promise<TaskEpisodeFinalizationResult> {
-  if (decision.operatorDecision !== "cleanup") {
-    throw new Error("Task Episode cleanup requires separate explicit operator cleanup authority");
-  }
-  if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
-    throw new Error("Task Episode cleanup is available only to the top-level owning Conversation");
-  }
-  if (!ctx.sessionManager.getSessionFile()) {
-    throw new Error("Task Episode cleanup requires a persisted owning Conversation session");
-  }
-  const git = dependencies.git ?? new CliGitAdapter();
-  const terminalGit = dependencies.abandonmentGit
-    ?? (dependencies.mergeGit as TaskEpisodeAbandonmentGit | undefined)
-    ?? new CliTaskEpisodeAdmissionGit();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
-  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
-  const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
-  const resolveSnapshot = dependencies.taskSnapshotResolver
-    ?? ((cwd: string, id: string) => resolveTaskReviewSnapshot(cwd, id, runner));
-  const resolveFile = dependencies.abandonmentFileSnapshotResolver
-    ?? ((cwd: string, path: string) => resolveTaskAbandonmentFileSnapshot(cwd, path));
-  const projectRoot = git.repositoryRoot(ctx.cwd);
-  if (!samePath(projectRoot, ctx.cwd) || git.branch(projectRoot) !== "main") {
-    throw new Error("Task Episode cleanup must run from the canonical primary main checkout");
-  }
-  const record = store.read(projectRoot);
-  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${decision.taskId}`);
-  exactOwnedTaskRecord(record, decision.taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active" && record.status !== "inactive") {
-    throw new Error(`Task Episode cleanup cannot finalize ${record.status} ownership`);
-  }
-  if (decision.ownerSessionId !== record.ownerSessionId || decision.taskPath !== record.taskPath) {
-    throw new Error("Task Episode cleanup authority does not bind the exact owner and task path");
-  }
-  const episodeHead = taskFinalizationEpisodeHead(terminalEvidence);
-  if (!terminalEvidence.result || terminalEvidence.result.taskId !== decision.taskId
-    || terminalEvidence.outcome !== decision.terminalOutcome
-    || taskFinalizationTerminalCommit(terminalEvidence) !== decision.terminalCommit
-    || episodeHead !== decision.episodeHead) {
-    throw new Error("Task Episode cleanup terminal evidence does not match the explicit cleanup authority");
-  }
-  const resources = taskEpisodeCleanupResourceIdentity(record, episodeHead);
-  if (stableJson(decision.resources) !== stableJson(resources)) {
-    throw new Error("Task Episode cleanup authority does not bind every exact Episode resource");
+  if (record.cleanupHead && record.cleanupHead !== episodeHead) {
+    throw new Error("Task Episode cleanup head differs from the durable cleanup binding");
   }
   let snapshot = await dependencies.cleanup.inspect(record);
-  let stage = taskCleanupStage(snapshot, resources);
-  if (stage !== 3 && !terminalGit.isAncestor(projectRoot, record.baseRef, episodeHead)) {
-    throw new Error("Task Episode cleanup terminal head is not descended from the owned Episode base");
+  let stage = taskCleanupStage(snapshot, record, episodeHead);
+  if (stage !== 3) {
+    if (!git.isAncestor(projectRoot, record.baseRef, episodeHead)) {
+      throw new Error("Task Episode cleanup head is not descended from the owned Episode base");
+    }
+    if (git.branchUpstreamHead(projectRoot, record.branch!) !== episodeHead) {
+      throw new Error("Task Episode cleanup requires the exact Episode head to be pushed");
+    }
   }
   git.assertCleanWorktree(projectRoot);
-  verifyTaskEpisodeTerminalEvidence(
-    projectRoot, record, episodeHead, terminalEvidence, terminalGit, resolveTask, resolveSnapshot, resolveFile,
-  );
+  verifyTaskEpisodeTerminalState(projectRoot, record, episodeHead, outcome, git, resolveTask);
+  if (!record.cleanupHead) {
+    const bound: TaskEpisodeOwnershipRecord = {
+      ...record,
+      cleanupHead: episodeHead,
+      updatedAt: dependencies.now?.() ?? new Date().toISOString(),
+    };
+    store.write(projectRoot, bound);
+    const verifiedBinding = store.read(projectRoot);
+    if (!verifiedBinding || !isTaskEpisodeOwnership(verifiedBinding)
+      || JSON.stringify(verifiedBinding) !== JSON.stringify(bound)) {
+      throw new Error("Task Episode cleanup could not persist the exact cleanup head");
+    }
+    record = bound;
+  }
 
   if (record.status === "inactive") {
     if (stage !== 3) throw new Error("Inactive task Episode ownership still has retained resources");
-    return {
-      verified: true,
-      outcome: terminalEvidence.outcome,
-      taskId: record.taskId,
-      terminalCommit: taskFinalizationTerminalCommit(terminalEvidence),
-      resourcesRemoved: true,
-      ownershipStatus: "inactive",
-      reused: true,
-    };
+    return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipStatus: "inactive", reused: true };
   }
 
-  const advance = async (
-    remove: () => Promise<void>,
-    label: string,
-    expectedStages: number[],
-  ): Promise<void> => {
+  const advance = async (remove: () => Promise<void>, expectedStages: number[]): Promise<void> => {
     await remove();
     snapshot = await dependencies.cleanup.inspect(record);
-    stage = taskCleanupStage(snapshot, resources);
-    if (!expectedStages.includes(stage)) throw new Error(`Task Episode cleanup ${label} was not verified exactly`);
+    stage = taskCleanupStage(snapshot, record, episodeHead);
+    if (!expectedStages.includes(stage)) throw new Error("Task Episode cleanup removal was not verified exactly");
   };
-  if (stage === 0) await advance(() => dependencies.cleanup.removeRuntime(record), "runtime removal", [1]);
-  if (stage === 1) await advance(() => dependencies.cleanup.removeWorktree(record), "worktree removal", [2, 3]);
-  if (stage === 2) await advance(() => dependencies.cleanup.removeBranch(record), "branch removal", [3]);
+  if (stage === 0) await advance(() => dependencies.cleanup.removeRuntime(record), [1]);
+  if (stage === 1) await advance(() => dependencies.cleanup.removeWorktree(record), [2, 3]);
+  if (stage === 2) await advance(() => dependencies.cleanup.removeBranch(record), [3]);
   if (stage !== 3) throw new Error("Task Episode cleanup did not remove every exact resource");
 
   const retained = store.read(projectRoot);
-  if (!retained || stableJson(retained) !== stableJson(record)) {
+  if (!retained || JSON.stringify(retained) !== JSON.stringify(record)) {
     throw new Error("Task Episode ownership changed during authorized cleanup");
   }
   const closed: TaskEpisodeOwnershipRecord = {
@@ -3415,175 +1847,12 @@ export async function finalizeTaskEpisodeCleanup(
   };
   store.write(projectRoot, closed);
   const verified = store.read(projectRoot);
-  if (!verified || !isTaskEpisodeOwnership(verified) || verified.status !== "inactive"
-    || stableJson(verified) !== stableJson(closed)) {
+  if (!verified || !isTaskEpisodeOwnership(verified) || JSON.stringify(verified) !== JSON.stringify(closed)) {
     throw new Error("Task Episode cleanup could not verify inactive ownership bookkeeping");
   }
-  return {
-    verified: true,
-    outcome: terminalEvidence.outcome,
-    taskId: record.taskId,
-    terminalCommit: taskFinalizationTerminalCommit(terminalEvidence),
-    resourcesRemoved: true,
-    ownershipStatus: "inactive",
-    reused: false,
-  };
+  return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipStatus: "inactive", reused: false };
 }
 
-export function verifyTaskEpisodeChangesRequested(
-  publication: TaskEpisodeChangesPublicationResult,
-  integration: TaskEpisodeChangesIntegrationResult,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies,
-): TaskEpisodeChangesVerificationResult {
-  const git = dependencies.git ?? new CliGitAdapter();
-  const reviewGit = dependencies.reviewGit ?? new CliTaskEpisodeAdmissionGit();
-  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
-  const runner = dependencies.lifecycleRunner ?? dependencies.taskRunner ?? new ProcessCommandRunner();
-  const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
-  const resolveSnapshot = dependencies.taskSnapshotResolver
-    ?? ((cwd: string, id: string) => resolveTaskReviewSnapshot(cwd, id, runner));
-  if (publication.status !== "In Progress"
-    || integration.taskId !== publication.taskId
-    || integration.changesCommit !== publication.commit
-    || integration.previousRefreshedEpisodeHead !== publication.episodeHead
-    || integration.parentTaskId !== publication.parentTaskId
-    || integration.episodeTaskContentDigest !== publication.episodeTaskContentDigest) {
-    throw new Error("Request-Changes verification inputs do not describe one exact handshake");
-  }
-  const authority = resolveBlockedWorkflowAuthority(publication.taskId, ctx, { git, ownership: store, taskRunner: runner });
-  if (authority.mode !== "task") throw new Error("Request-Changes verification requires task-native owner authority");
-  const projectRoot = authority.projectRoot;
-  const record = store.read(projectRoot);
-  if (!record) throw new Error(`No durable task-native Episode ownership exists for ${authority.taskId}`);
-  exactOwnedTaskRecord(record, authority.taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before change verification`);
-  validateWorktreeRecord(record, git, filesystem, projectRoot);
-  if (reviewGit.head(projectRoot) !== integration.integratedMainHead) {
-    throw new Error("Request-Changes verification requires a refreshed candidate against current main");
-  }
-  if (reviewGit.pathStatus(projectRoot, record.taskPath) !== "") {
-    throw new Error("Request-Changes verification requires committed main task content");
-  }
-  const mainTask = exactAdmissionTask(resolveTask(projectRoot, authority.taskId), authority.taskId, projectRoot, record.taskPath);
-  const mainSnapshot = resolveSnapshot(projectRoot, authority.taskId);
-  if (mainTask.status !== "In Progress" || mainSnapshot.status !== "In Progress") {
-    throw new Error(`Request-Changes verification requires main status In Progress; found ${mainTask.status}`);
-  }
-  if (mainSnapshot.taskPath !== record.taskPath || mainSnapshot.parentTaskId !== publication.parentTaskId) {
-    throw new Error("Request-Changes verification found changed main task identity or hierarchy");
-  }
-  if (reviewGit.head(record.worktree!) !== integration.refreshedEpisodeHead
-    || reviewGit.upstreamHead(record.worktree!) !== integration.refreshedEpisodeHead) {
-    throw new Error("Request-Changes verification requires the exact refreshed Episode candidate to be pushed");
-  }
-  git.assertCleanWorktree(record.worktree!);
-  const episodeTask = exactAdmissionTask(
-    resolveTask(record.worktree!, authority.taskId), authority.taskId, record.worktree!, record.taskPath,
-  );
-  const snapshot = resolveSnapshot(record.worktree!, authority.taskId);
-  if (episodeTask.status !== "In Progress" || snapshot.status !== "In Progress"
-    || snapshot.parentTaskId !== publication.parentTaskId
-    || snapshot.contentDigest !== publication.episodeTaskContentDigest) {
-    throw new Error("Request-Changes refreshed candidate does not preserve exact task content, hierarchy, and status");
-  }
-  const parents = reviewGit.parents(record.worktree!, integration.refreshedEpisodeHead);
-  if (parents.length !== 2
-    || parents[0] !== integration.previousRefreshedEpisodeHead
-    || parents[1] !== integration.integratedMainHead
-    || !reviewGit.isAncestor(projectRoot, publication.commit, integration.integratedMainHead)
-    || !reviewGit.isAncestor(record.worktree!, integration.previousRefreshedEpisodeHead, integration.refreshedEpisodeHead)) {
-    throw new Error("Request-Changes refreshed candidate does not contain the exact verified candidate and current main");
-  }
-  return {
-    verified: true,
-    taskId: authority.taskId,
-    mainHead: integration.integratedMainHead,
-    refreshedEpisodeHead: integration.refreshedEpisodeHead,
-    status: "In Progress",
-  };
-}
-
-/** Publish an explicit Request Changes decision against exact verified review evidence. */
-export async function publishTaskEpisodeChangesRequested(
-  evidence: TaskEpisodeReadyHandshakeEvidence,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies = {},
-  decision: TaskEpisodeOperatorDecision,
-): Promise<TaskEpisodeChangesPublicationResult> {
-  if (decision.operatorDecision !== "request-changes") {
-    throw new Error("Request Changes requires explicit operator authority");
-  }
-  const prior = await verifyReadyOperatorDecision(evidence, ctx, dependencies);
-  const reversed = publishTaskEpisodeLifecycleStatus(prior.taskId, prior.refreshedEpisodeHead, ctx, {
-    expectedMainStatus: "Ready for Merge",
-    expectedEpisodeStatus: "Ready for Merge",
-    expectedMainHead: prior.mainHead,
-    targetStatus: "In Progress",
-    message: `chore: request changes for ${prior.taskId}`,
-  }, dependencies);
-  return {
-    ...reversed,
-    status: "In Progress",
-    parentTaskId: evidence.publication.parentTaskId,
-    episodeTaskContentDigest: evidence.publication.episodeTaskContentDigest,
-  };
-}
-
-/** Refresh the same Episode against the accepted Request Changes publication. */
-export async function integrateTaskEpisodeChangesRequested(
-  publication: TaskEpisodeChangesPublicationResult,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies = {},
-): Promise<TaskEpisodeChangesIntegrationResult> {
-  if (publication.status !== "In Progress") {
-    throw new Error("Request-Changes integration requires its exact In Progress publication result");
-  }
-  const integrated = await integrateTaskEpisodeReviewTransition({
-    label: "Request-Changes",
-    taskId: publication.taskId,
-    statusCommit: publication.commit,
-    baseEpisodeHead: publication.episodeHead,
-    expectedMainStatus: "In Progress",
-    expectedEpisodeStatus: "Ready for Merge",
-    targetEpisodeStatus: "In Progress",
-    parentTaskId: publication.parentTaskId,
-    episodeTaskContentDigest: publication.episodeTaskContentDigest,
-    mergeMessage: `chore: integrate requested changes for ${publication.taskId}`,
-  }, ctx, dependencies);
-  return {
-    taskId: integrated.taskId,
-    changesCommit: integrated.statusCommit,
-    previousRefreshedEpisodeHead: integrated.baseEpisodeHead,
-    integratedMainHead: integrated.integratedMainHead,
-    refreshedEpisodeHead: integrated.refreshedEpisodeHead,
-    parentTaskId: integrated.parentTaskId,
-    episodeTaskContentDigest: integrated.episodeTaskContentDigest,
-    ...(integrated.pushError ? { pushError: integrated.pushError } : {}),
-  };
-}
-
-/** Verify the pushed revision candidate, then resume only through canonical handoff. */
-export async function resumeTaskEpisodeChangesRequested(
-  publication: TaskEpisodeChangesPublicationResult,
-  integration: TaskEpisodeChangesIntegrationResult,
-  guidance: string,
-  ctx: ExtensionContext,
-  dependencies: TaskEpisodeReadyForMergeDependencies = {},
-): Promise<TaskEpisodeChangesResumeResult> {
-  const verification = verifyTaskEpisodeChangesRequested(publication, integration, ctx, dependencies);
-  const handoff = await handoffTaskEpisode(publication.taskId, guidance, ctx, dependencies);
-  return { verification, handoff };
-}
-
-/**
- * Execute the trusted task-native admission transaction without exposing a
- * public command: exact status commit, durable reservation, then allocation.
- * Clean pre-reservation failures roll back; any recorded or uncertain mutation
- * is published as Blocked and cannot be replayed as fresh creation.
- */
 export async function createTaskEpisode(
   rawTaskId: string,
   _toolCallId: string,

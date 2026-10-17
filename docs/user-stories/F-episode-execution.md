@@ -30,51 +30,17 @@ do not become scope, and status-only churn is not progress.
 **As an Episode implementer, I want blockers and completion reflected in durable
 project artifacts, so that the next actor does not depend on transcript memory.**
 
-In task-native mode, blocked work records the exact blocker, attempts, evidence,
-and unblock condition in the bound task's Implementation Notes, commits and
-pushes that Episode branch while status remains `In Progress`, reports through
-the existing Episode-to-Conversation channel, and stops. The public Conversation lifecycle coordinator verifies the exact owner, active ownership, canonical primary
-`main`, committed main task bytes, exact pushed Episode head, post-admission task
-evidence, and unchanged Episode status before committing only main's task path
-as `Blocked`. A later accepted unblock commits only that main task path back to
-`In Progress`; the existing exact handoff then resumes the same worktree and
-session without admission or resource creation. Main push failure is returned as
-evidence but does not invalidate a successful local status commit. Completed
-candidate work records its plan, notes, acceptance evidence, references, and
-Final Summary while leaving status unchanged for Conversation review. After
-acceptance, the separate review-integration action—not ordinary execute or handoff—merges current main in the same idle Episode worktree, preserves that
-accepted task content, applies main's `Ready for Merge` status through Backlog,
-and pushes a refreshed candidate for Conversation verification. If the operator
-then requests changes, the Conversation alone reverses main to `In Progress`;
-the same Episode receives that status only through constrained integration and
-is resumed only after the new pushed candidate verifies. Delay does not wake or
-change the Episode. If the operator instead authorizes the exact verified merge,
-the Conversation fast-forwards clean canonical main only to that pushed
-candidate, immediately publishes only the exact task as `Done`, and verifies
-merged code plus task content, path, parent, and status. The Episode does not
-perform this merge or status change. Its ownership and all idle resources remain
-until separate finalization or cleanup authority.
+In task-native mode, blocked work records the exact blocker, attempts, evidence, and unblock condition in the bound task's Implementation Notes, commits and pushes that Episode branch while status remains `In Progress`, reports through the existing Episode-to-Conversation channel, and stops. The Conversation may then publish `Blocked` on canonical main with the supported Backlog CLI, verify and commit only the exact bound task path, and push. After the operator accepts the unblock condition, the Conversation publishes `In Progress` the same way and resumes the same Episode through `handoff_task_episode`.
 
-If the operator instead confirms abandonment, the separate guarded Conversation action first rejects an archive destination already tracked at the bound main head,
-then imports only the pushed Episode task content into the exact bound main task,
-restores main's captured non-`Done` lifecycle status, writes a truthful
-abandonment Final Summary, proves that no Episode code entered main, and archives
-the task. The Episode performs none of these lifecycle operations and all of its
-resources remain retained for separately authorized cleanup.
+Completed candidate work records its plan, notes, acceptance evidence, references, and Final Summary while leaving status unchanged for Conversation review. The Conversation verifies the exact pushed head, worktree, task identity, diff, tests, and review. Request Changes records a concrete in-scope finding and resumes the same Episode. Delay changes nothing.
 
-Only a later explicit Cleanup decision can remove them. The cleanup action binds that decision to the exact task, owner, Episode head, branch, worktree,
-durable session/route, and optional local or Orca resource identities. It first
-re-verifies the pushed exact Merge/`Done` or Abandon/archive result, then removes
-only the idle runtime, worktree, and branch. Ownership remains active until all
-three are verified absent, including across an interrupted exact-prefix retry;
-only then does it become inactive. The Episode cannot authorize or perform this
-cleanup itself, and cleanup is exposed only behind separate explicit confirmation in `finalize_task_episode`.
+After explicit operator Merge authority binds the exact task, current main head, and accepted pushed candidate, the Conversation runs ordinary `git merge --ff-only` on pushed canonical main with no staged or tracked changes. Git rejects a stale or diverged candidate. The Conversation then uses the supported Backlog CLI to set only the exact task to `Done`, commits only that task path, pushes, and verifies main/upstream, ancestry, identity, parent, and status. No Episode action performs this merge or status change. Ownership and resources remain until a separate Cleanup decision.
 
-A persisted active version-1 Episode records blockers in its active execution
-plan and keeps both files active through blocked, candidate-review, and revision
-states. It does not archive the pair until ownership is terminal, and it never
-mutates related Backlog lifecycle state. The separate no-ownership old in-place
-folder workflow retains its existing blocked-folder and archive transitions.
+After explicit operator abandonment confirmation, the Conversation selects only the bound task file from the exact pushed Episode head, records a truthful non-success Final Summary through Backlog, archives the task with the supported CLI, verifies that the effective diff is only the exact active/archive move and no Episode code entered main, commits, and pushes. Ownership and resources again remain until separately authorized Cleanup.
+
+`finalize_task_episode` is cleanup-only. With separate explicit operator authority it durably binds the exact terminal Episode head, verifies pushed terminal main state and the exact idle resources, removes runtime, worktree, and branch, then marks ownership inactive. It performs no review, lifecycle status edit, merge, abandonment, archive, or push. Same-head retry is idempotent; changed identity or unsafe state fails closed without a receipt protocol.
+
+A persisted active version-1 Episode records blockers in its active execution plan and keeps both files active through blocked, candidate-review, and revision states. It does not archive the pair until ownership is terminal, and it never mutates related Backlog lifecycle state. The separate no-ownership old in-place folder workflow retains its existing blocked-folder and archive transitions.
 
 ## Primary implementation surfaces
 

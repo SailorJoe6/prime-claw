@@ -82,6 +82,9 @@ prime-claw builds on four prior projects. Read these before designing:
 - [evidence/task-native-backlog-cutover/2026-10-17-step-7-plan-tree-deletion.json](evidence/task-native-backlog-cutover/2026-10-17-step-7-plan-tree-deletion.json)
   — the 43-path durability, frozen-provenance, Backlog-owner, and active-root
   handoff proof recorded before this repository removed its plan tree.
+- [evidence/task-native-backlog-cutover/2026-10-18-step-8-least-technology-simplification.md](evidence/task-native-backlog-cutover/2026-10-18-step-8-least-technology-simplification.md)
+  — the before/after machinery inventory for the prompt-led Git/Backlog lifecycle
+  and cleanup-only native resource boundary.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)

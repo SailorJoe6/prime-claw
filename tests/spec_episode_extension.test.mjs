@@ -6,22 +6,13 @@ import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
-  CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit, PrimeSessionPublisher,
+  CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit, CliTaskEpisodeCleanupGit, PrimeSessionPublisher,
   EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
   allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
   restoreBlockedSpecEpisode, transitionSpecEpisodeToTaskOwnership,
-  handoffTaskEpisode, publishTaskEpisodeBlocked, publishTaskEpisodeResumed,
-  publishTaskEpisodeReadyForMerge, integrateTaskEpisodeReadyForMerge,
-  verifyTaskEpisodeReadyForMerge, delayTaskEpisodeReadyForMerge,
-  mergeTaskEpisodeReadyForMerge, abandonTaskEpisode,
-  publishTaskEpisodeChangesRequested, integrateTaskEpisodeChangesRequested,
-  verifyTaskEpisodeChangesRequested, resumeTaskEpisodeChangesRequested,
-  resolveBlockedWorkflowAuthority, resolveTaskReviewSnapshot, resolveTaskAbandonmentSnapshot,
-  resolveTaskAbandonmentFileSnapshot, assertNoTaskArchiveCleanupTargets,
-  assertNoHistoricalTaskArchiveCollision, finalizeTaskEpisodeCleanup,
-  taskEpisodeCleanupResourceIdentity,
+  handoffTaskEpisode, resolveBlockedWorkflowAuthority, finalizeTaskEpisodeCleanup,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
-import { parseEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
+import { parseEpisodeOwnership, writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import { CliTaskEpisodeCleanupAdapter } from "../src/prime-agent-plugin/extension-support/task-episode-cleanup.ts";
 
 const LOCATION = ".ralph/plans/future/alpha";
@@ -634,342 +625,6 @@ test("task-native handoff continues the exact idle Episode with task-bound hando
   assert.equal(f.calls.some((value) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(value[0])), false);
 });
 
-function taskLifecycleHarness(options = {}) {
-  const f = harness({ list: (_count, session) => [session] });
-  f.ownership.write(f.root, activeTaskRecord(f, options.orcaEngine ? {
-    engine: "orca",
-    worktreeId: f.wt.id,
-    worktreeIdentity: f.wt.identity,
-    projectSetupId: f.wt.projectSetupId,
-  } : {}));
-  f.calls.length = 0;
-  let mainStatus = options.mainStatus ?? "In Progress";
-  let episodeStatus = options.episodeStatus ?? "In Progress";
-  let mainHead = "1".repeat(40);
-  let mainUpstream = mainHead;
-  let pushCount = 0;
-  let fastForwardFailed = false;
-  let doneSnapshotFailed = false;
-  let doneEditFailed = false;
-  let doneMutationInterrupted = false;
-  let doneCommitInterrupted = false;
-  let mainChanges = [];
-  let mainCommitCount = 0;
-  let publicationAncestor = options.publicationAncestor ?? true;
-  let episodeHead = options.episodeHead ?? "b".repeat(40);
-  let episodeUpstream = options.upstreamHead ?? episodeHead;
-  const acceptedEpisodeHead = episodeHead;
-  const mergeParents = new Map();
-  const runner = {
-    run(command, args, runOptions = {}) {
-      if (command === "backlog") {
-        const statusIndex = args.indexOf("--status");
-        assert.notEqual(statusIndex, -1);
-        const nextStatus = args[statusIndex + 1];
-        if (runOptions.cwd !== f.worktree && nextStatus === "Done"
-          && options.doneEditFailsOnce && !doneEditFailed) {
-          doneEditFailed = true;
-          throw new Error("Done edit interrupted");
-        }
-        if (runOptions.cwd === f.worktree) episodeStatus = nextStatus;
-        else {
-          mainStatus = nextStatus;
-          mainChanges = [{ status: " M", path: "backlog/tasks/primeclaw-10.38.md" }];
-          if (nextStatus === "Done" && options.interruptAfterDoneMutationOnce && !doneMutationInterrupted) {
-            doneMutationInterrupted = true;
-            throw new Error("interrupted after Done mutation");
-          }
-        }
-        f.calls.push(["backlog-status", nextStatus, runOptions.cwd]);
-        return { stdout: "", stderr: "", status: 0 };
-      }
-      try {
-        const stdout = execFileSync(command, args, { cwd: runOptions.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-        return { stdout, stderr: "", status: 0 };
-      } catch (error) {
-        if (!runOptions.allowFailure) throw error;
-        return { stdout: error.stdout?.toString() ?? "", stderr: error.stderr?.toString() ?? "", status: error.status ?? 1 };
-      }
-    },
-  };
-  f.git.assertCleanWorktree = (cwd) => {
-    f.calls.push(["clean", cwd]);
-    if (cwd === f.root && (options.mainDirty || mainChanges.length > 0)) throw new Error("canonical main is dirty");
-  };
-  const lifecycleGit = {
-    repositoryRoot: () => f.root,
-    branch: () => options.branch ?? "main",
-    head: (cwd) => cwd === f.worktree ? episodeHead : mainHead,
-    commitPaths: () => options.commitPaths ?? ["backlog/tasks/primeclaw-10.38.md"],
-    pathStatus: (cwd) => cwd === f.root
-      ? (options.mainPathStatus ?? (mainChanges.length > 0 ? `${mainChanges[0].status} ${mainChanges[0].path}` : ""))
-      : (options.episodePathStatus ?? ""),
-    commitOnlyPath(_repo, path, message) {
-      f.calls.push(["status-commit", path, message]);
-      if (options.interruptAfterDoneStageOnce && mainStatus === "Done" && !doneCommitInterrupted) {
-        doneCommitInterrupted = true;
-        mainChanges = [{ status: "M ", path }];
-        throw new Error("interrupted after Done staging");
-      }
-      const previousMainHead = mainHead;
-      mainHead = mainHead === "1".repeat(40) ? "2".repeat(40) : "3".repeat(40);
-      mergeParents.set(mainHead, [previousMainHead]);
-      mainChanges = [];
-      mainCommitCount += 1;
-      return mainHead;
-    },
-    push(cwd) {
-      pushCount += 1;
-      f.calls.push(["status-push", pushCount, cwd]);
-      if (options.firstPushFails && pushCount === 1) throw new Error("offline");
-      if ((options.episodePushFails || options.failEpisodePushNumber === pushCount
-        || (options.failEpisodePushFrom && pushCount >= options.failEpisodePushFrom)) && cwd === f.worktree) {
-        throw new Error("episode push offline");
-      }
-      if (cwd === f.worktree) episodeUpstream = episodeHead;
-      else {
-        if (options.finalPushFails && mainStatus === "Done") throw new Error("main push offline");
-        mainUpstream = options.upstreamMismatchAfterDone && mainStatus === "Done"
-          ? "8".repeat(40) : mainHead;
-      }
-    },
-    upstreamHead: (cwd) => {
-      if (cwd !== f.worktree && options.upstreamLookupFailsAfterDone && mainStatus === "Done") {
-        throw new Error("upstream unavailable");
-      }
-      return cwd === f.worktree ? episodeUpstream : mainUpstream;
-    },
-    pathChangedBetween: () => options.pathChanged ?? true,
-    isAncestor: (_repo, ancestor, descendant) => {
-      if (!publicationAncestor
-        && ancestor === "2".repeat(40) && descendant === "2".repeat(40)) return false;
-      return options.isAncestor ?? true;
-    },
-    mergeMain(worktree, mergedMain, taskPath) { f.calls.push(["merge-main", worktree, mergedMain, taskPath]); if (options.mergeError) throw options.mergeError; },
-    restoreTaskFromHead(worktree, taskPath) { f.calls.push(["restore-task", worktree, taskPath]); },
-    stagePath(worktree, taskPath) { f.calls.push(["stage-task", worktree, taskPath]); },
-    commitMerge(worktree, message) {
-      f.calls.push(["merge-commit", worktree, message]);
-      const previousEpisodeHead = episodeHead;
-      const refreshed = episodeHead === acceptedEpisodeHead ? "c".repeat(40) : "d".repeat(40);
-      mergeParents.set(refreshed, [previousEpisodeHead, mainHead]);
-      episodeHead = refreshed;
-      return refreshed;
-    },
-    abortMerge(worktree) { f.calls.push(["merge-abort", worktree]); },
-    parents(_cwd, ref) { return options.parents ?? mergeParents.get(ref) ?? []; },
-    fastForward(repo, candidateHead) {
-      f.calls.push(["fast-forward", repo, candidateHead]);
-      if (options.fastForwardError) throw options.fastForwardError;
-      mainHead = candidateHead;
-      if (options.failFastForwardAfterMutationOnce && !fastForwardFailed) {
-        fastForwardFailed = true;
-        throw new Error("interrupted after fast-forward");
-      }
-    },
-    worktreeChanges(cwd) {
-      if (cwd === f.root && options.mainDirty) return [{ status: "??", path: "unrelated.txt" }];
-      return cwd === f.root ? structuredClone(mainChanges) : [];
-    },
-  };
-  const taskResolver = (cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? mainStatus : episodeStatus });
-  const taskSnapshotResolver = (cwd) => {
-    if (cwd === f.root && mainStatus === "Done" && options.failDoneSnapshotOnce && !doneSnapshotFailed) {
-      doneSnapshotFailed = true;
-      throw new Error("interrupted after Done commit");
-    }
-    return {
-      taskId: "PRIMECLAW-10.38",
-      taskPath: "backlog/tasks/primeclaw-10.38.md",
-      parentTaskId: options.parentTaskId ?? "PRIMECLAW-10",
-      status: cwd === f.root ? mainStatus : episodeStatus,
-      implementationPlan: "Implement one bounded lifecycle slice.",
-      contentDigest: options.contentDigest ?? "d".repeat(64),
-    };
-  };
-  return {
-    f, get episodeHead() { return episodeHead; }, acceptedEpisodeHead, lifecycleGit, runner, taskResolver, taskSnapshotResolver,
-    deps: { ...f.deps, lifecycleGit, reviewGit: lifecycleGit, mergeGit: lifecycleGit, lifecycleRunner: runner, taskResolver, taskSnapshotResolver },
-    get mainStatus() { return mainStatus; }, get episodeStatus() { return episodeStatus; }, get mainHead() { return mainHead; },
-    get mainCommitCount() { return mainCommitCount; },
-    advanceMain() { mainHead = "4".repeat(40); },
-    divergeMainUpstream() { mainUpstream = "9".repeat(40); },
-    setEpisodeUpstream(value) { episodeUpstream = value; },
-    setParents(ref, parents) { mergeParents.set(ref, parents); },
-    addMainChange(change) { mainChanges.push(change); },
-    setMainStatus(value) { mainStatus = value; },
-    setPublicationAncestor(value) { publicationAncestor = value; },
-  };
-}
-
-function taskAbandonmentHarness(options = {}) {
-  const f = harness({ list: (_count, session) => [session] });
-  f.ownership.write(f.root, activeTaskRecord(f));
-  f.calls.length = 0;
-  const activePath = "backlog/tasks/primeclaw-10.38.md";
-  const archivePath = "backlog/archive/tasks/primeclaw-10.38.md";
-  const episodeHead = "b".repeat(40);
-  const priorMainHead = "1".repeat(40);
-  const archiveHead = "a".repeat(40);
-  const episodeDigest = "e".repeat(64);
-  let mainHead = priorMainHead;
-  let mainUpstream = priorMainHead;
-  let mainPath = activePath;
-  let mainStatus = options.mainStatus ?? "Blocked";
-  let mainDigest = "m".repeat(64);
-  let finalSummary = null;
-  let changes = options.mainChanges ? structuredClone(options.mainChanges) : [];
-  let restoreInterrupted = false;
-  let archiveInterrupted = false;
-  let stageInterrupted = false;
-  let verifyInterrupted = false;
-  let pushCount = 0;
-  const parents = new Map([[archiveHead, [priorMainHead]]]);
-  const paths = new Map([[archiveHead, [activePath, archivePath]]]);
-
-  f.git.assertCleanWorktree = (cwd) => {
-    f.calls.push(["clean", cwd]);
-    if (cwd === f.root && changes.length) throw new Error("canonical main is dirty");
-  };
-  const runner = {
-    run(command, args, runOptions = {}) {
-      if (command !== "backlog") {
-        try {
-          const stdout = execFileSync(command, args, { cwd: runOptions.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-          return { stdout, stderr: "", status: 0 };
-        } catch (error) {
-          if (!runOptions.allowFailure) throw error;
-          return { stdout: error.stdout?.toString() ?? "", stderr: error.stderr?.toString() ?? "", status: error.status ?? 1 };
-        }
-      }
-      if (args[1] === "edit") {
-        const statusIndex = args.indexOf("--status");
-        const summaryIndex = args.indexOf("--final-summary");
-        mainStatus = args[statusIndex + 1];
-        finalSummary = args[summaryIndex + 1];
-        changes = [{ status: " M", path: activePath }];
-        f.calls.push(["abandon-edit", mainStatus, finalSummary]);
-        return { stdout: "", stderr: "", status: 0 };
-      }
-      if (args[1] === "archive") {
-        mainPath = archivePath;
-        changes = [
-          { status: " D", path: activePath },
-          { status: "??", path: archivePath },
-        ];
-        f.calls.push(["abandon-archive", args.at(-1)]);
-        if (options.interruptAfterArchive && !archiveInterrupted) {
-          archiveInterrupted = true;
-          throw new Error("interrupted after archive move");
-        }
-        return { stdout: "Archived task", stderr: "", status: 0 };
-      }
-      throw new Error(`unexpected Backlog arguments ${args.join(" ")}`);
-    },
-  };
-  const abandonmentGit = {
-    repositoryRoot: () => f.root,
-    branch: () => "main",
-    head: (cwd) => cwd === f.worktree ? episodeHead : mainHead,
-    upstreamHead: (cwd) => cwd === f.worktree ? episodeHead : mainUpstream,
-    worktreeChanges: (cwd) => cwd === f.root ? structuredClone(changes) : [],
-    isAncestor: () => options.related !== false,
-    pathTrackedAtRef(_repo, ref, path) {
-      f.calls.push(["tracked-at-ref", ref, path]);
-      return options.historicalArchive === true && ref === priorMainHead && path === archivePath;
-    },
-    restorePathFromRef(_repo, ref, path) {
-      assert.equal(ref, episodeHead); assert.equal(path, activePath);
-      mainDigest = episodeDigest;
-      changes = [{ status: " M", path: activePath }];
-      f.calls.push(["select-task-blob", ref, path]);
-      if (options.interruptAfterRestore && !restoreInterrupted) {
-        restoreInterrupted = true;
-        throw new Error("interrupted after task blob selection");
-      }
-    },
-    commitOnlyPaths(_repo, commitPaths, message) {
-      f.calls.push(["archive-commit", [...commitPaths], message]);
-      if (options.interruptAfterStage && !stageInterrupted) {
-        stageInterrupted = true;
-        changes = [{ status: "R ", path: `${archivePath} -> ${activePath}` }];
-        throw new Error("interrupted after archive staging");
-      }
-      mainHead = archiveHead;
-      changes = [];
-      return archiveHead;
-    },
-    parents: (_repo, ref) => parents.get(ref) ?? [],
-    commitPaths: (_repo, ref) => paths.get(ref) ?? [],
-    pathStatus: () => "",
-    commitOnlyPath: () => { throw new Error("single-path commit is not allowed"); },
-    push() {
-      pushCount += 1;
-      f.calls.push(["archive-push", pushCount]);
-      if (options.pushFails) throw new Error("archive push offline");
-      mainUpstream = mainHead;
-    },
-  };
-  const taskResolver = (cwd) => taskSelection(f, {
-    projectRoot: cwd,
-    status: cwd === f.worktree ? (options.episodeStatus ?? "In Progress") : mainStatus,
-    taskPathRelative: cwd === f.worktree ? activePath : mainPath,
-    taskPath: join(cwd, cwd === f.worktree ? activePath : mainPath),
-  });
-  const abandonmentSnapshotResolver = (cwd) => {
-    const episode = cwd === f.worktree;
-    return {
-      taskId: "PRIMECLAW-10.38",
-      taskPath: episode ? activePath : mainPath,
-      parentTaskId: options.parentTaskId ?? "PRIMECLAW-10",
-      status: episode ? (options.episodeStatus ?? "In Progress") : mainStatus,
-      implementationPlan: "Implement exact abandonment.",
-      contentDigest: episode ? episodeDigest : mainDigest,
-      abandonmentContentDigest: episode ? episodeDigest : mainDigest,
-      finalSummary: episode ? null : finalSummary,
-    };
-  };
-  const abandonmentFileSnapshotResolver = (cwd) => {
-    if (cwd === f.root && mainHead === archiveHead && options.interruptAfterCommit
-      && !verifyInterrupted) {
-      verifyInterrupted = true;
-      throw new Error("interrupted after archive commit");
-    }
-    return {
-      status: cwd === f.worktree ? (options.episodeStatus ?? "In Progress") : mainStatus,
-      finalSummary: cwd === f.worktree ? null : finalSummary,
-      contentDigest: "f".repeat(64),
-    };
-  };
-  const deps = {
-    ...f.deps,
-    lifecycleRunner: runner,
-    taskResolver,
-    abandonmentSnapshotResolver,
-    abandonmentFileSnapshotResolver,
-    abandonmentGit,
-  };
-  const decision = {
-    operatorDecision: "abandon",
-    taskId: "PRIMECLAW-10.38",
-    taskPath: activePath,
-    mainHead: priorMainHead,
-    episodeHead,
-    mainStatus: options.mainStatus ?? "Blocked",
-    candidateMainRelationship: "main-ancestor",
-    parentTaskId: options.decisionParentTaskId ?? "PRIMECLAW-10",
-    episodeTaskContentDigest: options.decisionDigest ?? episodeDigest,
-    finalSummary: "Operator confirmed abandonment; Episode code was not merged and resources remain retained.",
-  };
-  return {
-    f, deps, decision, activePath, archivePath, episodeHead, priorMainHead, archiveHead,
-    get mainHead() { return mainHead; }, get mainPath() { return mainPath; },
-    get mainStatus() { return mainStatus; }, get changes() { return changes; },
-    setChanges(value) { changes = structuredClone(value); },
-    advanceMain() { mainHead = "9".repeat(40); },
-  };
-}
-
 test("blocked workflow authority routes owner Conversation to task mode and never falls back from version 2", () => {
   const f = harness();
   f.ownership.write(f.root, activeTaskRecord(f));
@@ -1017,1225 +672,146 @@ test("blocked workflow authority routes owner Conversation to task mode and neve
   );
 });
 
-test("Conversation publishes Blocked then resumes the same pushed task Episode before handoff", async () => {
-  const h = taskLifecycleHarness({ firstPushFails: true });
-  const blocked = publishTaskEpisodeBlocked("PRIMECLAW-10.38", h.episodeHead, h.f.ctx, h.deps);
-  assert.equal(blocked.status, "Blocked");
-  assert.match(blocked.pushError, /offline/);
-  assert.equal(h.mainStatus, "Blocked");
-  assert.deepEqual(h.f.calls.filter((call) => call[0] === "backlog-status").map((call) => call[1]), ["Blocked"]);
-  assert.equal(h.f.calls.filter((call) => call[0] === "ownership").length, 0);
-  assert.equal(h.f.calls.some((call) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(call[0])), false);
-
-  const resumed = publishTaskEpisodeResumed("PRIMECLAW-10.38", h.episodeHead, h.f.ctx, h.deps);
-  assert.equal(resumed.status, "In Progress");
-  assert.equal(resumed.pushError, undefined);
-  assert.equal(h.mainStatus, "In Progress");
-  assert.deepEqual(h.f.calls.filter((call) => call[0] === "status-commit").map((call) => call[1]), [
-    "backlog/tasks/primeclaw-10.38.md", "backlog/tasks/primeclaw-10.38.md",
-  ]);
-
-  const handoff = await handoffTaskEpisode(
-    "PRIMECLAW-10.38", "resume after accepted unblock", h.f.ctx,
-    { ...h.f.deps, taskResolver: h.taskResolver },
-  );
-  assert.equal(handoff.episodeId, "episode");
-  assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 1);
-  assert.equal(h.f.calls.some((call) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(call[0])), false);
-});
-
-test("Ready-for-Merge handshake publishes, integrates current main in the same Episode, and verifies the pushed refreshed candidate", async () => {
-  const h = taskLifecycleHarness({ firstPushFails: true });
-  const publication = publishTaskEpisodeReadyForMerge(
-    "PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps,
-  );
-  assert.equal(publication.status, "Ready for Merge");
-  assert.match(publication.pushError, /offline/);
-  assert.equal(h.mainStatus, "Ready for Merge");
-  assert.equal(publication.episodeTaskContentDigest, "d".repeat(64));
-  assert.deepEqual(h.f.calls.filter((call) => call[0] === "status-commit").map((call) => call[1]), [
-    "backlog/tasks/primeclaw-10.38.md",
-  ]);
-
-  const integration = await integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps);
-  assert.equal(integration.acceptedEpisodeHead, h.acceptedEpisodeHead);
-  assert.equal(integration.integratedMainHead, publication.commit);
-  assert.equal(integration.refreshedEpisodeHead, "c".repeat(40));
-  assert.equal(integration.pushError, undefined);
-  assert.equal(h.episodeStatus, "Ready for Merge");
-  const names = h.f.calls.map((call) => call[0]);
-  assert.ok(names.indexOf("merge-main") < names.indexOf("restore-task"));
-  assert.ok(names.indexOf("restore-task") < names.lastIndexOf("backlog-status"));
-  assert.ok(names.lastIndexOf("backlog-status") < names.indexOf("stage-task"));
-  assert.ok(names.indexOf("stage-task") < names.indexOf("merge-commit"));
-  assert.equal(names.includes("handoff"), false);
-  assert.equal(names.some((name) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(name)), false);
-
-  const verified = verifyTaskEpisodeReadyForMerge(publication, integration, h.f.ctx, h.deps);
-  assert.deepEqual(verified, {
-    verified: true,
-    taskId: "PRIMECLAW-10.38",
-    mainHead: publication.commit,
-    refreshedEpisodeHead: "c".repeat(40),
-  });
-});
-
-async function completeReadyHandshake(h) {
-  const publication = publishTaskEpisodeReadyForMerge(
-    "PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps,
-  );
-  const integration = await integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps);
-  const verification = verifyTaskEpisodeReadyForMerge(publication, integration, h.f.ctx, h.deps);
-  return { publication, integration, verification };
-}
-
-test("Delay preserves the exact verified Ready-for-Merge state without transport", async () => {
-  const h = taskLifecycleHarness();
-  const evidence = await completeReadyHandshake(h);
-  const transportNames = new Set(["backlog-status", "status-commit", "status-push", "merge-main", "merge-commit", "handoff"]);
-  const before = h.f.calls.filter((call) => transportNames.has(call[0])).map((call) => structuredClone(call));
-  const delayed = await delayTaskEpisodeReadyForMerge(
-    evidence, h.f.ctx, h.deps, { operatorDecision: "delay" },
-  );
-  assert.deepEqual(delayed, { ...evidence.verification, outcome: "delayed" });
-  assert.equal(h.mainStatus, "Ready for Merge");
-  assert.equal(h.episodeStatus, "Ready for Merge");
-  assert.equal(h.episodeHead, evidence.verification.refreshedEpisodeHead);
-  assert.deepEqual(
-    h.f.calls.filter((call) => transportNames.has(call[0])),
-    before,
-  );
-  assert.equal(h.f.calls.filter((call) => call[0] === "ownership").length, 0);
-});
-
-test("explicit Merge fast-forwards exact candidate, publishes only task Done, and retains Episode resources", async () => {
-  const h = taskLifecycleHarness({ orcaEngine: true });
-  const evidence = await completeReadyHandshake(h);
-  const ownershipBefore = structuredClone(h.f.record);
-  const result = await mergeTaskEpisodeReadyForMerge(
-    evidence, h.f.ctx, h.deps,
-    {
-      operatorDecision: "merge",
-      taskId: evidence.verification.taskId,
-      mainHead: evidence.verification.mainHead,
-      refreshedEpisodeHead: evidence.verification.refreshedEpisodeHead,
-    },
-  );
-  assert.deepEqual(result, {
-    verified: true,
-    outcome: "merged",
-    taskId: "PRIMECLAW-10.38",
-    status: "Done",
-    priorMainHead: evidence.verification.mainHead,
-    mergedHead: evidence.verification.refreshedEpisodeHead,
-    doneCommit: "3".repeat(40),
-    parentTaskId: "PRIMECLAW-10",
-    episodeTaskContentDigest: "d".repeat(64),
-  });
-  assert.equal(h.mainStatus, "Done");
-  assert.equal(h.episodeStatus, "Ready for Merge");
-  assert.equal(h.mainHead, result.doneCommit);
-  assert.deepEqual(h.f.record, ownershipBefore);
-  assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
-  assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
-  assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 0);
-  assert.equal(h.f.calls.filter((call) => call[0] === "ownership").length, 0);
-  assert.equal(h.f.calls.some((call) => ["fresh", "execute", "promote", "local-create", "orca-create", "auto-remove"].includes(call[0])), false);
-  const sessions = await h.f.publisher.list();
-  const session = sessions.find((entry) => entry.sessionId === ownershipBefore.episodeId);
-  assert.equal(session.cwd, ownershipBefore.worktree);
-  const orcaWorktree = await h.f.orca.showWorktree(ownershipBefore.worktreeId);
-  assert.equal(orcaWorktree.identity, ownershipBefore.worktreeIdentity);
-  assert.equal(orcaWorktree.path, ownershipBefore.worktree);
-});
-
-test("confirmed abandonment imports only task content, preserves status, archives without Done, and retains resources", async () => {
-  const h = taskAbandonmentHarness();
-  const ownershipBefore = structuredClone(h.f.record);
-  const result = await abandonTaskEpisode(h.f.ctx, h.deps, h.decision);
-  assert.deepEqual(result, {
-    verified: true,
-    outcome: "abandoned",
-    taskId: "PRIMECLAW-10.38",
-    status: "Blocked",
-    priorMainHead: h.priorMainHead,
-    episodeHead: h.episodeHead,
-    archiveCommit: h.archiveHead,
-    archivedTaskPath: h.archivePath,
-    parentTaskId: "PRIMECLAW-10",
-    episodeTaskContentDigest: "e".repeat(64),
-    archivedTaskFileDigest: "f".repeat(64),
-    resourcesRetained: true,
-  });
-  assert.equal(h.mainStatus, "Blocked");
-  assert.equal(h.mainPath, h.archivePath);
-  assert.deepEqual(h.f.record, ownershipBefore);
-  assert.equal(h.f.calls.filter((call) => call[0] === "select-task-blob").length, 1);
-  assert.equal(h.f.calls.filter((call) => call[0] === "abandon-edit").length, 1);
-  assert.equal(h.f.calls.filter((call) => call[0] === "abandon-archive").length, 1);
-  assert.equal(h.f.calls.filter((call) => call[0] === "archive-commit").length, 1);
-  assert.ok(
-    h.f.calls.findIndex((call) => call[0] === "tracked-at-ref")
-      < h.f.calls.findIndex((call) => call[0] === "select-task-blob"),
-  );
-  assert.equal(h.f.calls.some((call) => ["fast-forward", "status-commit", "auto-remove"].includes(call[0])), false);
-});
-
-test("abandonment recovery resumes exact task-only partial states without duplicate archival mutation", async (t) => {
-  for (const [name, options, error] of [
-    ["selected task blob", { interruptAfterRestore: true }, /interrupted after task blob selection/],
-    ["archived move", { interruptAfterArchive: true }, /interrupted after archive move/],
-    ["staged archive", { interruptAfterStage: true }, /interrupted after archive staging/],
-    ["committed archive", { interruptAfterCommit: true }, /interrupted after archive commit/],
-  ]) {
-    await t.test(name, async () => {
-      const h = taskAbandonmentHarness(options);
-      await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), error);
-      const result = await abandonTaskEpisode(h.f.ctx, h.deps, h.decision);
-      assert.equal(result.archiveCommit, h.archiveHead);
-      assert.equal(h.f.calls.filter((call) => call[0] === "select-task-blob").length, 1);
-      assert.equal(h.f.calls.filter((call) => call[0] === "abandon-archive").length, 1);
-      assert.equal(
-        h.f.calls.filter((call) => call[0] === "archive-commit").length,
-        options.interruptAfterStage ? 2 : 1,
-      );
+test("canonical-main cleanup guard allows required untracked state but rejects tracked drift", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-cleanup-main-")));
+  try {
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
+    writeFileSync(join(root, "tracked.txt"), "clean\n");
+    execFileSync("git", ["add", "tracked.txt"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "base"], { cwd: root });
+    const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    writeEpisodeOwnership(root, {
+      version: 2, status: "active", operationId: "op", engine: "local", ownerSessionId: "owner",
+      taskId: "PRIMECLAW-10.38", taskPath: "backlog/tasks/primeclaw-10.38.md", baseRef: head,
+      createdAt: "2026-10-18T00:00:00.000Z", updatedAt: "2026-10-18T00:00:00.000Z",
+      worktree: join(root, "episode"), branch: "episode", head, episodeId: "episode",
+      episodeSessionFile: join(root, "episode.jsonl"), episodeActiveSessionId: "route",
     });
+    mkdirSync(join(root, ".ralph", "plans", "archive", "replace-beads"), { recursive: true });
+    writeFileSync(join(root, ".ralph", "plans", "archive", "replace-beads", "SPECIFICATION.md"), "protected spec\n");
+    writeFileSync(join(root, ".ralph", "plans", "archive", "replace-beads", "EXECUTION_PLAN.md"), "protected plan\n");
+    const guard = new CliTaskEpisodeCleanupGit();
+    assert.doesNotThrow(() => guard.assertCleanWorktree(root));
+
+    writeFileSync(join(root, "tracked.txt"), "dirty\n");
+    assert.throws(() => guard.assertCleanWorktree(root), /without staged or tracked changes/);
+    execFileSync("git", ["checkout", "--", "tracked.txt"], { cwd: root });
+    writeFileSync(join(root, "tracked.txt"), "staged\n");
+    execFileSync("git", ["add", "tracked.txt"], { cwd: root });
+    assert.throws(() => guard.assertCleanWorktree(root), /without staged or tracked changes/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("abandonment fails closed on stale, dirty, cross-path, hierarchy, relationship, and Done state", async (t) => {
-  await t.test("historical archive destination collision", async () => {
-    const h = taskAbandonmentHarness({ historicalArchive: true });
-    await assert.rejects(
-      abandonTaskEpisode(h.f.ctx, h.deps, h.decision),
-      /archive destination already exists in bound main history/,
-    );
-    assert.equal(h.mainPath, h.activePath);
-    assert.deepEqual(h.changes, []);
-    assert.equal(h.f.calls.filter((call) => call[0] === "tracked-at-ref").length, 1);
-    assert.equal(
-      h.f.calls.some((call) => ["select-task-blob", "abandon-edit", "abandon-archive", "archive-commit"].includes(call[0])),
-      false,
-    );
-  });
-  await t.test("unrelated canonical-main path", async () => {
-    const h = taskAbandonmentHarness({ mainChanges: [{ status: "??", path: "src/code.ts" }] });
-    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /outside the exact Episode task blob/);
-  });
-  await t.test("stale main", async () => {
-    const h = taskAbandonmentHarness(); h.advanceMain();
-    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /neither the bound pre-abandonment head nor its exact archival child/);
-  });
-  await t.test("wrong bound path", async () => {
-    const h = taskAbandonmentHarness(); h.decision.taskPath = "backlog/tasks/other.md";
-    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /exact owned task path/);
-  });
-  await t.test("parent mismatch", async () => {
-    const h = taskAbandonmentHarness({ parentTaskId: "OTHER-1" });
-    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /exact bound task content and hierarchy/);
-  });
-  await t.test("candidate not descended from main", async () => {
-    const h = taskAbandonmentHarness({ related: false });
-    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /candidate\/main relationship/);
-  });
-  await t.test("Done cannot be abandoned", async () => {
-    const h = taskAbandonmentHarness({ mainStatus: "Done" });
-    await assert.rejects(abandonTaskEpisode(h.f.ctx, h.deps, h.decision), /without publishing Done/);
-  });
-});
-
-
-function taskCleanupHarness(outcome = "merged", options = {}) {
-  const f = harness();
-  const taskPath = "backlog/tasks/primeclaw-10.38.md";
+function cleanupHarness(outcome = "merged", options = {}) {
+  const f = harness({ list: (_count, session) => [session] });
   const episodeHead = "b".repeat(40);
-  const terminalCommit = outcome === "merged" ? "d".repeat(40) : "a".repeat(40);
-  const priorMainHead = "1".repeat(40);
-  const archivePath = "backlog/archive/tasks/primeclaw-10.38.md";
-  f.ownership.write(f.root, activeTaskRecord(f));
-  f.calls.length = 0;
-  const resources = taskEpisodeCleanupResourceIdentity(f.record, episodeHead);
-  const initialStage = options.stage ?? 0;
-  let runtimePresent = initialStage < 1;
-  let worktreePresent = initialStage < 2;
-  let branchPresent = initialStage < 3;
-  if (options.unsafeGap) { runtimePresent = false; worktreePresent = true; branchPresent = false; }
-  let failRuntime = Boolean(options.failRuntimeOnce);
-  const snapshot = () => ({
-    ...(runtimePresent ? { runtime: { resources: structuredClone(resources), cwd: f.worktree, idle: options.busy !== true } } : {}),
-    ...(worktreePresent ? { worktree: { path: f.worktree, branch: f.record.branch, head: episodeHead, clean: true } } : {}),
-    ...(branchPresent ? { branch: { name: f.record.branch, head: episodeHead } } : {}),
+  const mainHead = "c".repeat(40);
+  let record = activeTaskRecord(f, options.record ?? {});
+  const calls = [];
+  let stage = options.stage ?? 0;
+  const ownership = {
+    read: () => structuredClone(record),
+    write(_root, value) { record = structuredClone(value); calls.push(["ownership", value.status, value.cleanupHead]); },
+  };
+  const cleanupGit = {
+    repositoryRoot: () => f.root,
+    branch: () => "main",
+    head: () => mainHead,
+    upstreamHead: () => options.unpushed ? "d".repeat(40) : mainHead,
+    branchUpstreamHead: () => options.unpushedEpisode ? "d".repeat(40) : episodeHead,
+    assertCleanWorktree() { calls.push(["clean"]); if (options.dirty) throw new Error("dirty main"); },
+    isAncestor(_repo, ancestor, descendant) {
+      if (ancestor === TASK_BASE && descendant === episodeHead) return true;
+      if (ancestor === episodeHead && descendant === mainHead) return outcome === "merged";
+      return false;
+    },
+    pathTrackedAtRef(_repo, ref, path) {
+      assert.equal(ref, mainHead);
+      if (outcome !== "abandoned") return path === "backlog/tasks/primeclaw-10.38.md";
+      return path === "backlog/archive/tasks/primeclaw-10.38.md";
+    },
+  };
+  const snapshots = () => ({
+    ...(stage === 0 ? { runtime: { cwd: f.worktree, idle: !options.busy } } : {}),
+    ...(stage <= 1 ? { worktree: { path: f.worktree, branch: f.wt.branch, head: episodeHead, clean: !options.dirtyEpisode } } : {}),
+    ...(stage <= 2 ? { branch: { name: f.wt.branch, head: episodeHead } } : {}),
   });
   const cleanup = {
-    async inspect() { f.calls.push(["cleanup-inspect"]); return snapshot(); },
-    async removeRuntime() {
-      f.calls.push(["remove-runtime", f.record.status]);
-      runtimePresent = false;
-      if (options.runtimeRemovesWorktree) worktreePresent = false;
-      if (failRuntime) { failRuntime = false; throw new Error("runtime removal interrupted"); }
-    },
-    async removeWorktree() {
-      f.calls.push(["remove-worktree", f.record.status]);
-      worktreePresent = false;
-      if (options.worktreeRemovesBranch) branchPresent = false;
-    },
-    async removeBranch() { f.calls.push(["remove-branch", f.record.status]); branchPresent = false; },
+    async inspect() { calls.push(["inspect", stage]); return snapshots(); },
+    async removeRuntime() { calls.push(["remove-runtime"]); stage = 1; },
+    async removeWorktree() { calls.push(["remove-worktree"]); stage = 2; },
+    async removeBranch() { calls.push(["remove-branch"]); stage = 3; },
   };
-  const terminalGit = {
-    head: () => terminalCommit,
-    upstreamHead: () => terminalCommit,
-    isAncestor: (_repo, ancestor, descendant) => (
-      (ancestor === terminalCommit && descendant === terminalCommit)
-      || (ancestor === TASK_BASE && descendant === episodeHead && (worktreePresent || branchPresent))
-    ),
-    parents: (_repo, ref) => ref === terminalCommit
-      ? [outcome === "merged" ? episodeHead : priorMainHead] : [],
-    commitPaths: (_repo, ref) => ref === terminalCommit
-      ? (outcome === "merged" ? [taskPath] : [taskPath, archivePath]) : [],
-  };
-  const mergedResult = {
-    verified: true,
-    outcome: "merged",
-    taskId: "PRIMECLAW-10.38",
-    status: "Done",
-    priorMainHead,
-    mergedHead: episodeHead,
-    doneCommit: terminalCommit,
-    parentTaskId: "PRIMECLAW-10",
-    episodeTaskContentDigest: "e".repeat(64),
-  };
-  const abandonDecision = {
-    operatorDecision: "abandon",
-    taskId: "PRIMECLAW-10.38",
-    taskPath,
-    mainHead: priorMainHead,
-    episodeHead,
-    mainStatus: "Blocked",
-    candidateMainRelationship: "main-ancestor",
-    parentTaskId: "PRIMECLAW-10",
-    episodeTaskContentDigest: "e".repeat(64),
-    finalSummary: "Operator confirmed abandonment; no candidate code was merged.",
-  };
-  const abandonedResult = {
-    verified: true,
-    outcome: "abandoned",
-    taskId: "PRIMECLAW-10.38",
-    status: "Blocked",
-    priorMainHead,
-    episodeHead,
-    archiveCommit: terminalCommit,
-    archivedTaskPath: archivePath,
-    parentTaskId: "PRIMECLAW-10",
-    episodeTaskContentDigest: "e".repeat(64),
-    archivedTaskFileDigest: "f".repeat(64),
-    resourcesRetained: true,
-  };
-  const evidence = outcome === "merged"
-    ? { outcome: "merged", result: mergedResult }
-    : { outcome: "abandoned", decision: abandonDecision, result: abandonedResult };
-  const decision = {
-    operatorDecision: "cleanup",
-    taskId: "PRIMECLAW-10.38",
-    taskPath,
-    ownerSessionId: "owner",
-    episodeHead,
-    terminalOutcome: outcome,
-    terminalCommit,
-    resources: structuredClone(resources),
-  };
-  const deps = {
-    ...f.deps,
-    cleanup,
-    abandonmentGit: terminalGit,
-    taskResolver: (cwd) => outcome === "merged" ? taskSelection(f, {
-      projectRoot: cwd, status: "Done", taskPathRelative: taskPath, taskPath: join(cwd, taskPath),
-    }) : null,
-    taskSnapshotResolver: () => ({
-      taskId: "PRIMECLAW-10.38", taskPath, parentTaskId: "PRIMECLAW-10",
-      status: "Done", implementationPlan: "Plan", contentDigest: "e".repeat(64),
-    }),
-    abandonmentFileSnapshotResolver: () => ({
-      status: "Blocked", finalSummary: abandonDecision.finalSummary, contentDigest: "f".repeat(64),
-    }),
-    now: () => "2026-10-13T15:00:00.000Z",
-  };
+  const taskResolver = (cwd) => taskSelection(f, { projectRoot: cwd, status: "Done" });
   return {
-    f, deps, decision, evidence, mergedResult, abandonedResult, abandonDecision,
-    snapshot, get runtimePresent() { return runtimePresent; },
-    get worktreePresent() { return worktreePresent; }, get branchPresent() { return branchPresent; },
+    f, episodeHead, calls, ownership, cleanupGit, cleanup, taskResolver,
+    get record() { return record; },
+    deps: { ownership, cleanupGit, cleanup, taskResolver, now: () => "2026-10-18T00:00:00.000Z" },
   };
 }
 
-test("authorized merged-task cleanup removes exact resources in order before closing ownership", async () => {
-  const h = taskCleanupHarness("merged");
-  assert.equal(h.f.record.head, TASK_BASE);
-  assert.notEqual(h.f.record.head, h.decision.episodeHead);
-  const result = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
-  assert.deepEqual(result, {
-    verified: true, outcome: "merged", taskId: "PRIMECLAW-10.38",
-    terminalCommit: "d".repeat(40), resourcesRemoved: true, ownershipStatus: "inactive", reused: false,
-  });
-  assert.deepEqual(
-    h.f.calls.filter((call) => call[0].startsWith("remove-")),
-    [["remove-runtime", "active"], ["remove-worktree", "active"], ["remove-branch", "active"]],
-  );
-  assert.equal(h.f.record.status, "inactive");
-  assert.equal(h.runtimePresent || h.worktreePresent || h.branchPresent, false);
-  const replay = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
-  assert.equal(replay.reused, true);
+test("cleanup-only task finalization binds one head, removes exact resources, and closes ownership", async () => {
+  const h = cleanupHarness("merged");
+  const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps);
+  assert.equal(result.resourcesRemoved, true);
+  assert.equal(result.ownershipStatus, "inactive");
+  assert.equal(result.reused, false);
+  assert.equal(h.record.cleanupHead, h.episodeHead);
+  assert.equal(h.record.status, "inactive");
+  assert.deepEqual(h.calls.filter((call) => call[0].startsWith("remove-")), [
+    ["remove-runtime"], ["remove-worktree"], ["remove-branch"],
+  ]);
+  assert.ok(h.calls.findIndex((call) => call[0] === "ownership" && call[1] === "active")
+    < h.calls.findIndex((call) => call[0] === "remove-runtime"));
 });
 
-test("authorized abandonment cleanup verifies archived non-Done evidence before resource removal", async () => {
-  const h = taskCleanupHarness("abandoned", { worktreeRemovesBranch: true });
-  const result = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
-  assert.equal(result.outcome, "abandoned");
-  assert.equal(result.terminalCommit, "a".repeat(40));
-  assert.deepEqual(
-    h.f.calls.filter((call) => call[0].startsWith("remove-")),
-    [["remove-runtime", "active"], ["remove-worktree", "active"]],
-  );
-  assert.equal(h.f.record.status, "inactive");
-  const replay = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
+test("cleanup-only task finalization supports abandonment and same-head idempotence", async () => {
+  const h = cleanupHarness("abandoned");
+  await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);
+  const replay = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);
   assert.equal(replay.reused, true);
+  assert.equal(h.record.status, "inactive");
 });
 
-test("cleanup rejects missing authority, foreign resources, mixed terminal evidence, and busy runtime before mutation", async (t) => {
-  await t.test("missing cleanup decision", async () => {
-    const h = taskCleanupHarness("merged"); h.decision.operatorDecision = "delay";
-    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /separate explicit operator cleanup authority/);
-    assert.equal(h.f.record.status, "active");
-  });
-  await t.test("foreign resource binding", async () => {
-    const h = taskCleanupHarness("merged"); h.decision.resources.episodeId = "foreign";
-    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /every exact Episode resource/);
-    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
-  });
-  await t.test("mixed terminal boundary", async () => {
-    const h = taskCleanupHarness("abandoned");
-    const mixed = { outcome: "merged", result: h.abandonedResult };
-    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, mixed), /does not match the explicit cleanup authority/);
-    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
-  });
-  await t.test("unverified transport", async () => {
-    const h = taskCleanupHarness("merged"); h.evidence.result.pushError = "offline";
-    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /merge evidence/);
-    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
+test("cleanup-only task finalization resumes from branch-only partial cleanup", async () => {
+  const h = cleanupHarness("merged", { stage: 2 });
+  const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps);
+  assert.equal(result.ownershipStatus, "inactive");
+  assert.deepEqual(h.calls.filter((call) => call[0].startsWith("remove-")), [["remove-branch"]]);
+});
+
+test("cleanup-only task finalization rejects a different durable head and unsafe live resources", async (t) => {
+  await t.test("different head", async () => {
+    const h = cleanupHarness("merged", { record: { cleanupHead: "d".repeat(40) } });
+    await assert.rejects(
+      finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps),
+      /differs from the durable cleanup binding/,
+    );
   });
   await t.test("busy runtime", async () => {
-    const h = taskCleanupHarness("merged", { busy: true });
-    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /runtime is busy/);
-    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
-  });
-  await t.test("unsafe missing-resource order", async () => {
-    const h = taskCleanupHarness("merged", { unsafeGap: true });
-    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /missing in an unsafe order/);
-    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
-  });
-  await t.test("runtime removal crosses its exact boundary", async () => {
-    const h = taskCleanupHarness("merged", { runtimeRemovesWorktree: true });
-    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /runtime removal was not verified exactly/);
-    assert.equal(h.f.record.status, "active");
-  });
-  await t.test("uncertain ownership", async () => {
-    const h = taskCleanupHarness("merged");
-    h.f.ownership.write(h.f.root, { ...h.f.record, status: "uncertain" });
-    await assert.rejects(finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence), /cannot finalize uncertain ownership/);
-    assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
-  });
-});
-
-test("all-absent abandonment retry closes ownership without requiring the deleted Episode ref", async () => {
-  const h = taskCleanupHarness("abandoned", { stage: 3 });
-  assert.equal(h.f.record.status, "active");
-  const result = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
-  assert.equal(result.reused, false);
-  assert.equal(h.f.record.status, "inactive");
-  assert.equal(h.f.calls.some((call) => call[0].startsWith("remove-")), false);
-});
-
-test("interrupted cleanup retains active ownership and resumes only the exact monotonic prefix", async () => {
-  const h = taskCleanupHarness("merged", { failRuntimeOnce: true });
-  await assert.rejects(
-    finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence),
-    /runtime removal interrupted/,
-  );
-  assert.equal(h.f.record.status, "active");
-  assert.equal(h.runtimePresent, false);
-  const result = await finalizeTaskEpisodeCleanup(h.f.ctx, h.deps, h.decision, h.evidence);
-  assert.equal(result.reused, false);
-  assert.deepEqual(
-    h.f.calls.filter((call) => call[0] === "remove-runtime"),
-    [["remove-runtime", "active"]],
-  );
-  assert.equal(h.f.record.status, "inactive");
-});
-
-test("verified local abandonment remains authoritative when its final push fails", async () => {
-  const h = taskAbandonmentHarness({ pushFails: true });
-  const result = await abandonTaskEpisode(h.f.ctx, h.deps, h.decision);
-  assert.equal(result.archiveCommit, h.archiveHead);
-  assert.match(result.pushError, /archive push offline/);
-  assert.equal(h.mainPath, h.archivePath);
-  assert.deepEqual(h.changes, []);
-});
-
-test("successful local Done remains authoritative when its final push fails", async () => {
-  const h = taskLifecycleHarness({ finalPushFails: true });
-  const evidence = await completeReadyHandshake(h);
-  const result = await mergeTaskEpisodeReadyForMerge(
-    evidence, h.f.ctx, h.deps,
-    {
-      operatorDecision: "merge",
-      taskId: evidence.verification.taskId,
-      mainHead: evidence.verification.mainHead,
-      refreshedEpisodeHead: evidence.verification.refreshedEpisodeHead,
-    },
-  );
-  assert.equal(result.status, "Done");
-  assert.equal(h.mainStatus, "Done");
-  assert.equal(h.mainHead, result.doneCommit);
-  assert.match(result.pushError, /main push offline/);
-});
-
-test("Merge recovery resumes exact partial states without duplicate mutation", async (t) => {
-  const decisionFor = (evidence) => ({
-    operatorDecision: "merge",
-    taskId: evidence.verification.taskId,
-    mainHead: evidence.verification.mainHead,
-    refreshedEpisodeHead: evidence.verification.refreshedEpisodeHead,
-  });
-  await t.test("interruption immediately after fast-forward resumes at Done", async () => {
-    const h = taskLifecycleHarness({ failFastForwardAfterMutationOnce: true });
-    const evidence = await completeReadyHandshake(h);
+    const h = cleanupHarness("merged", { busy: true });
     await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /interrupted after fast-forward/,
+      finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps),
+      /runtime is busy/,
     );
-    const result = await mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence));
-    assert.equal(result.status, "Done");
-    assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
   });
-  await t.test("interruption before Done edit resumes from exact candidate", async () => {
-    const h = taskLifecycleHarness({ doneEditFailsOnce: true });
-    const evidence = await completeReadyHandshake(h);
+  await t.test("unpushed main", async () => {
+    const h = cleanupHarness("merged", { unpushed: true });
     await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /Done edit interrupted/,
+      finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps),
+      /pushed canonical main/,
     );
-    const result = await mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence));
-    assert.equal(result.status, "Done");
-    assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
   });
-  await t.test("interruption after Done mutation commits the exact dirty task once", async () => {
-    const h = taskLifecycleHarness({ interruptAfterDoneMutationOnce: true });
-    const evidence = await completeReadyHandshake(h);
+  await t.test("unpushed Episode", async () => {
+    const h = cleanupHarness("merged", { unpushedEpisode: true });
     await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /interrupted after Done mutation/,
+      finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps),
+      /exact Episode head to be pushed/,
     );
-    const result = await mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence));
-    assert.equal(result.status, "Done");
-    assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
-    assert.equal(h.mainCommitCount, 2);
-  });
-  await t.test("interruption after Done staging commits the exact staged task once", async () => {
-    const h = taskLifecycleHarness({ interruptAfterDoneStageOnce: true });
-    const evidence = await completeReadyHandshake(h);
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /interrupted after Done staging/,
-    );
-    const result = await mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence));
-    assert.equal(result.status, "Done");
-    assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
-    assert.equal(h.mainCommitCount, 2);
-  });
-  await t.test("dirty Done recovery rejects an extra changed path", async () => {
-    const h = taskLifecycleHarness({ interruptAfterDoneMutationOnce: true });
-    const evidence = await completeReadyHandshake(h);
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /interrupted after Done mutation/,
-    );
-    h.addMainChange({ status: "??", path: "unrelated.txt" });
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /rejects canonical-main changes outside the exact modified task/,
-    );
-    assert.equal(h.mainCommitCount, 1);
-  });
-  await t.test("dirty recovery rejects a non-Done task", async () => {
-    const h = taskLifecycleHarness({ interruptAfterDoneMutationOnce: true });
-    const evidence = await completeReadyHandshake(h);
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /interrupted after Done mutation/,
-    );
-    h.setMainStatus("Ready for Merge");
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /Dirty Done recovery does not preserve/,
-    );
-    assert.equal(h.mainCommitCount, 1);
-  });
-  await t.test("interruption after Done commit verifies and pushes the exact existing child", async () => {
-    const h = taskLifecycleHarness({ failDoneSnapshotOnce: true });
-    const evidence = await completeReadyHandshake(h);
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /interrupted after Done commit/,
-    );
-    const result = await mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence));
-    assert.equal(result.status, "Done");
-    assert.equal(h.f.calls.filter((call) => call[0] === "fast-forward").length, 1);
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
-  });
-  await t.test("mismatched existing Done child fails closed", async () => {
-    const h = taskLifecycleHarness({ failDoneSnapshotOnce: true });
-    const evidence = await completeReadyHandshake(h);
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /interrupted after Done commit/,
-    );
-    h.setParents(h.mainHead, ["e".repeat(40)]);
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /neither the verified pre-merge head, exact candidate, nor exact Done child/,
-    );
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
-  });
-});
-
-test("post-Done remote verification remains best-effort evidence", async (t) => {
-  for (const scenario of [
-    { name: "upstream lookup error", options: { upstreamLookupFailsAfterDone: true }, pattern: /upstream unavailable/ },
-    { name: "observed upstream mismatch", options: { upstreamMismatchAfterDone: true }, pattern: /expected .* but observed/ },
-  ]) await t.test(scenario.name, async () => {
-    const h = taskLifecycleHarness(scenario.options);
-    const evidence = await completeReadyHandshake(h);
-    const result = await mergeTaskEpisodeReadyForMerge(
-      evidence, h.f.ctx, h.deps,
-      {
-        operatorDecision: "merge",
-        taskId: evidence.verification.taskId,
-        mainHead: evidence.verification.mainHead,
-        refreshedEpisodeHead: evidence.verification.refreshedEpisodeHead,
-      },
-    );
-    assert.equal(result.status, "Done");
-    assert.equal(h.mainStatus, "Done");
-    assert.equal(h.mainHead, result.doneCommit);
-    assert.match(result.pushError, scenario.pattern);
-  });
-});
-
-test("Merge and Done fail closed before canonical-main mutation", async (t) => {
-  const decisionFor = (evidence, overrides = {}) => ({
-    operatorDecision: "merge",
-    taskId: evidence.verification.taskId,
-    mainHead: evidence.verification.mainHead,
-    refreshedEpisodeHead: evidence.verification.refreshedEpisodeHead,
-    ...overrides,
-  });
-  await t.test("wrong operator outcome is not merge authority", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, { operatorDecision: "delay" }),
-      /explicit operator Merge decision/,
-    );
-    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
-  });
-  await t.test("authority must bind exact task, main, and candidate", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(
-        evidence, h.f.ctx, h.deps, decisionFor(evidence, { refreshedEpisodeHead: "e".repeat(40) }),
-      ),
-      /does not bind the exact verified task, main, and refreshed candidate/,
-    );
-    assert.equal(h.mainStatus, "Ready for Merge");
-    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
-  });
-  await t.test("Ready publication commit must remain in verified main history", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    h.setPublicationAncestor(false);
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /exact reviewed ancestry/,
-    );
-    assert.equal(h.mainStatus, "Ready for Merge");
-    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
-  });
-  await t.test("dirty canonical main blocks merge", async () => {
-    const h = taskLifecycleHarness({ mainDirty: true });
-    const evidence = await completeReadyHandshake(h);
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /rejects canonical-main changes outside the exact modified task/,
-    );
-    assert.equal(h.mainStatus, "Ready for Merge");
-    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
-  });
-  await t.test("diverged canonical-main upstream blocks merge", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    h.divergeMainUpstream();
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /canonical main and its upstream to remain at the exact verified head/,
-    );
-    assert.equal(h.mainStatus, "Ready for Merge");
-    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
-  });
-  await t.test("unpushed refreshed candidate blocks merge", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    h.setEpisodeUpstream("e".repeat(40));
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /exact refreshed Episode candidate to remain pushed/,
-    );
-    assert.equal(h.mainStatus, "Ready for Merge");
-    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
-  });
-  await t.test("stale main blocks merge", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    h.advanceMain();
-    await assert.rejects(
-      mergeTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, decisionFor(evidence)),
-      /neither the verified pre-merge head, exact candidate, nor exact Done child/,
-    );
-    assert.equal(h.mainStatus, "Ready for Merge");
-    assert.equal(h.f.calls.some((call) => call[0] === "fast-forward"), false);
-  });
-});
-
-test("Request Changes reverses status, refreshes the same Episode, verifies, then hands off once", async () => {
-  const h = taskLifecycleHarness();
-  const evidence = await completeReadyHandshake(h);
-  const publication = await publishTaskEpisodeChangesRequested(
-    evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" },
-  );
-  const integration = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
-  const verified = verifyTaskEpisodeChangesRequested(publication, integration, h.f.ctx, h.deps);
-  assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
-  const result = await resumeTaskEpisodeChangesRequested(
-    publication, integration, "repair only the accepted findings", h.f.ctx, h.deps,
-  );
-  assert.equal(publication.status, "In Progress");
-  assert.equal(publication.episodeHead, evidence.verification.refreshedEpisodeHead);
-  assert.equal(integration.previousRefreshedEpisodeHead, evidence.verification.refreshedEpisodeHead);
-  assert.equal(integration.refreshedEpisodeHead, "d".repeat(40));
-  assert.equal(verified.status, "In Progress");
-  assert.equal(verified.refreshedEpisodeHead, "d".repeat(40));
-  assert.deepEqual(result.verification, verified);
-  assert.equal(result.handoff.taskId, "PRIMECLAW-10.38");
-  assert.equal(h.mainStatus, "In Progress");
-  assert.equal(h.episodeStatus, "In Progress");
-  assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
-  assert.equal(h.f.calls.filter((call) => call[0] === "merge-commit").length, 2);
-  assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 1);
-  assert.equal(h.f.calls.filter((call) => call[0] === "ownership").length, 0);
-  assert.equal(h.f.calls.some((call) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(call[0])), false);
-});
-
-test("reversible operator outcomes fail closed before mutation or handoff", async (t) => {
-  await t.test("wrong decision cannot authorize Delay", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    const statusCommits = h.f.calls.filter((call) => call[0] === "status-commit").length;
-    await assert.rejects(
-      delayTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" }),
-      /explicit operator Delay decision/,
-    );
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, statusCommits);
-    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
-  });
-  await t.test("wrong decision cannot authorize Request Changes", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    const statusCommits = h.f.calls.filter((call) => call[0] === "status-commit").length;
-    await assert.rejects(
-      publishTaskEpisodeChangesRequested(evidence, h.f.ctx, h.deps, { operatorDecision: "delay" }),
-      /explicit operator authority/,
-    );
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, statusCommits);
-    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
-  });
-  await t.test("stale verified main cannot be reversed", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    h.advanceMain();
-    await assert.rejects(
-      publishTaskEpisodeChangesRequested(evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" }),
-      /refreshed candidate against current main/,
-    );
-    assert.equal(h.mainStatus, "Ready for Merge");
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 1);
-    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
-  });
-  await t.test("published reversal can retry integration without another status mutation", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    h.lifecycleGit.mergeMain = () => { throw new Error("conflict outside task"); };
-    const publication = await publishTaskEpisodeChangesRequested(
-      evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" },
-    );
-    const statusCommits = h.f.calls.filter((call) => call[0] === "status-commit").length;
-    await assert.rejects(
-      integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps),
-      /conflict outside task/,
-    );
-    assert.equal(h.mainStatus, "In Progress");
-    assert.equal(h.episodeStatus, "Ready for Merge");
-    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
-    h.lifecycleGit.mergeMain = (worktree, mergedMain, taskPath) => {
-      h.f.calls.push(["merge-main", worktree, mergedMain, taskPath]);
-    };
-    const integration = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
-    const resumed = await resumeTaskEpisodeChangesRequested(publication, integration, "retry accepted integration", h.f.ctx, h.deps);
-    assert.equal(resumed.verification.status, "In Progress");
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, statusCommits);
-    assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 1);
-  });
-  await t.test("transient candidate push retries the exact existing merge before handoff", async () => {
-    const h = taskLifecycleHarness({ failEpisodePushNumber: 4 });
-    const evidence = await completeReadyHandshake(h);
-    const publication = await publishTaskEpisodeChangesRequested(
-      evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" },
-    );
-    const first = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
-    assert.match(first.pushError, /episode push offline/);
-    const statusCommits = h.f.calls.filter((call) => call[0] === "status-commit").length;
-    const mergeCommits = h.f.calls.filter((call) => call[0] === "merge-commit").length;
-    const retried = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
-    assert.equal(retried.pushError, undefined);
-    assert.equal(retried.refreshedEpisodeHead, first.refreshedEpisodeHead);
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, statusCommits);
-    assert.equal(h.f.calls.filter((call) => call[0] === "merge-commit").length, mergeCommits);
-    const resumed = await resumeTaskEpisodeChangesRequested(publication, retried, "retry push", h.f.ctx, h.deps);
-    assert.equal(resumed.verification.status, "In Progress");
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, 2);
-    assert.equal(h.f.calls.filter((call) => call[0] === "merge-commit").length, 2);
-    assert.equal(h.f.calls.filter((call) => call[0] === "handoff").length, 1);
-  });
-  await t.test("persistently unpushable requested-changes candidate is never handed off", async () => {
-    const h = taskLifecycleHarness({ failEpisodePushFrom: 4 });
-    const evidence = await completeReadyHandshake(h);
-    const publication = await publishTaskEpisodeChangesRequested(
-      evidence, h.f.ctx, h.deps, { operatorDecision: "request-changes" },
-    );
-    const first = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
-    const retried = await integrateTaskEpisodeChangesRequested(publication, h.f.ctx, h.deps);
-    assert.match(first.pushError, /episode push offline/);
-    assert.match(retried.pushError, /episode push offline/);
-    await assert.rejects(
-      resumeTaskEpisodeChangesRequested(publication, retried, "", h.f.ctx, h.deps),
-      /exact refreshed Episode candidate to be pushed/,
-    );
-    assert.equal(h.mainStatus, "In Progress");
-    assert.equal(h.episodeStatus, "In Progress");
-    assert.equal(h.f.calls.filter((call) => call[0] === "merge-commit").length, 2);
-    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
-  });
-  await t.test("busy Episode blocks Delay without transport", async () => {
-    const h = taskLifecycleHarness();
-    const evidence = await completeReadyHandshake(h);
-    h.f.publisher.getState = async () => ({
-      activeSessionId: "route", sessionId: "episode", sessionFile: join(h.f.root, "episode.jsonl"),
-      cwd: h.f.worktree, isSessionActive: true, isStreaming: true, isCompacting: false,
-      isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false,
-      unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: {} },
-    });
-    const before = h.f.calls.filter((call) => call[0] === "status-commit").length;
-    await assert.rejects(
-      delayTaskEpisodeReadyForMerge(evidence, h.f.ctx, h.deps, { operatorDecision: "delay" }),
-      /not quiescent|idle Episode|must be idle|busy/,
-    );
-    assert.equal(h.f.calls.filter((call) => call[0] === "status-commit").length, before);
-    assert.equal(h.f.calls.some((call) => call[0] === "handoff"), false);
-  });
-});
-
-test("Ready-for-Merge handshake fails closed on changed content, unsafe merge, stale main, and unpushed refreshed candidate", async (t) => {
-  await t.test("owned Episode must be idle before worktree mutation", async () => {
-    const h = taskLifecycleHarness();
-    const publication = publishTaskEpisodeReadyForMerge("PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps);
-    h.f.publisher.getState = async () => ({
-      activeSessionId: "route", sessionId: "episode", sessionFile: join(h.f.root, "episode.jsonl"),
-      cwd: h.f.worktree, isSessionActive: true, isStreaming: true, isCompacting: false,
-      isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false,
-      unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: {} },
-    });
-    await assert.rejects(
-      integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps),
-      /not quiescent|idle Episode|must be idle|busy/,
-    );
-    assert.equal(h.f.calls.some((call) => call[0] === "merge-main"), false);
-  });
-  await t.test("candidate content changed after publication", async () => {
-    const h = taskLifecycleHarness();
-    const publication = publishTaskEpisodeReadyForMerge("PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps);
-    const snapshots = (cwd, id) => ({ ...h.taskSnapshotResolver(cwd, id), contentDigest: "e".repeat(64) });
-    await assert.rejects(
-      integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, { ...h.deps, taskSnapshotResolver: snapshots }),
-      /candidate content or invariant identity changed/,
-    );
-    assert.equal(h.f.calls.some((call) => call[0] === "merge-main"), false);
-  });
-  await t.test("merge conflict outside the task aborts without a refreshed commit", async () => {
-    const h = taskLifecycleHarness({ mergeError: new Error("conflict outside task") });
-    const publication = publishTaskEpisodeReadyForMerge("PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps);
-    await assert.rejects(integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps), /conflict outside task/);
-    assert.equal(h.f.calls.filter((call) => call[0] === "merge-abort").length, 1);
-    assert.equal(h.f.calls.some((call) => call[0] === "merge-commit"), false);
-    assert.equal(h.episodeStatus, "In Progress");
-  });
-  await t.test("refreshed candidate must be pushed", async () => {
-    const h = taskLifecycleHarness({ episodePushFails: true });
-    const publication = publishTaskEpisodeReadyForMerge("PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps);
-    const integration = await integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps);
-    assert.match(integration.pushError, /episode push offline/);
-    assert.throws(
-      () => verifyTaskEpisodeReadyForMerge(publication, integration, h.f.ctx, h.deps),
-      /exact refreshed Episode candidate to be pushed/,
-    );
-  });
-  await t.test("main advancing after integration makes the refreshed candidate stale", async () => {
-    const h = taskLifecycleHarness();
-    const publication = publishTaskEpisodeReadyForMerge("PRIMECLAW-10.38", h.acceptedEpisodeHead, h.f.ctx, h.deps);
-    const integration = await integrateTaskEpisodeReadyForMerge(publication, h.f.ctx, h.deps);
-    h.advanceMain();
-    assert.throws(
-      () => verifyTaskEpisodeReadyForMerge(publication, integration, h.f.ctx, h.deps),
-      /refreshed candidate against current main/,
-    );
-  });
-});
-
-test("review snapshot digest excludes lifecycle metadata while retaining hierarchy and task content", () => {
-  const baseTask = {
-    id: "PRIMECLAW-10.38",
-    path: "backlog/tasks/primeclaw-10.38.md",
-    parentTaskId: "PRIMECLAW-10",
-    status: "In Progress",
-    updatedAt: "2026-10-13T00:00:00Z",
-    title: "Task",
-    implementationPlan: "Implement exact integration.",
-    implementationNotes: "Episode-owned evidence",
-    acceptanceCriteria: [{ id: 1, checked: true, text: "works" }],
-  };
-  const runnerFor = (task) => ({ run: () => ({ stdout: JSON.stringify({ schemaVersion: 1, kind: "task-view", task }), stderr: "", status: 0 }) });
-  const before = resolveTaskReviewSnapshot("/repo", baseTask.id, runnerFor(baseTask));
-  const lifecycleOnly = resolveTaskReviewSnapshot("/repo", baseTask.id, runnerFor({
-    ...baseTask,
-    status: "Ready for Merge",
-    updatedAt: "2026-10-13T01:00:00Z",
-    isReady: false,
-    readiness: { ready: false, blockers: ["OTHER-2"] },
-    dependencyGraph: { blockedBy: ["OTHER-2"] },
-    subtasks: [{ id: "OTHER-3" }],
-    acceptanceCriteriaCompleted: 1,
-    acceptanceCriteriaCount: 1,
-  }));
-  assert.equal(before.contentDigest, lifecycleOnly.contentDigest);
-  assert.equal(before.parentTaskId, "PRIMECLAW-10");
-  const changed = resolveTaskReviewSnapshot("/repo", baseTask.id, runnerFor({
-    ...baseTask, implementationNotes: "different Episode content",
-  }));
-  assert.notEqual(before.contentDigest, changed.contentDigest);
-  const abandonmentBefore = resolveTaskAbandonmentSnapshot("/repo", baseTask.id, runnerFor(baseTask));
-  const abandonmentTerminal = resolveTaskAbandonmentSnapshot("/repo", baseTask.id, runnerFor({
-    ...baseTask, path: "backlog/archive/tasks/primeclaw-10.38.md",
-    status: "Blocked", finalSummary: "Operator confirmed abandonment.",
-  }));
-  assert.equal(abandonmentBefore.abandonmentContentDigest, abandonmentTerminal.abandonmentContentDigest);
-  assert.equal(abandonmentTerminal.finalSummary, "Operator confirmed abandonment.");
-});
-
-test("vendored Backlog abandonment fixtures expose archive visibility and reject inbound cleanup", () => {
-  const backlog = resolve("deps/backlog/dist/backlog");
-  const config = readFileSync(resolve("backlog/config.yml"), "utf8");
-  const makeProject = () => {
-    const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-abandon-backlog-")));
-    mkdirSync(join(root, "backlog"), { recursive: true });
-    writeFileSync(join(root, "backlog", "config.yml"), config);
-    execFileSync("git", ["-C", root, "init", "-q", "-b", "main"]);
-    return root;
-  };
-  const run = (root, args, allowFailure = false) => {
-    try {
-      const stdout = execFileSync(backlog, args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-      return { stdout, stderr: "", status: 0 };
-    } catch (error) {
-      if (!allowFailure) throw error;
-      return { stdout: error.stdout?.toString() ?? "", stderr: error.stderr?.toString() ?? "", status: error.status ?? 1 };
-    }
-  };
-  const runner = { run(command, args, options = {}) {
-    assert.equal(command, "backlog");
-    return run(options.cwd, args, options.allowFailure ?? false);
-  } };
-
-  const exact = makeProject();
-  run(exact, ["task", "create", "Archive target", "--status", "Blocked", "--plan", "Plan", "--plain"]);
-  const active = JSON.parse(run(exact, ["task", "view", "--json", "--", "PRIMECLAW-1"]).stdout).task.path;
-  const episodeFile = resolveTaskAbandonmentFileSnapshot(exact, active);
-  run(exact, ["task", "edit", "--status", "Blocked", "--final-summary", "Operator abandoned", "--plain", "--", "PRIMECLAW-1"]);
-  const preparedFile = resolveTaskAbandonmentFileSnapshot(exact, active);
-  assert.equal(preparedFile.contentDigest, episodeFile.contentDigest);
-  assert.equal(preparedFile.finalSummary, "Operator abandoned");
-  const archive = active.replace("/tasks/", "/archive/tasks/");
-  assert.doesNotThrow(() => assertNoTaskArchiveCleanupTargets(exact, "PRIMECLAW-1", active, runner));
-  const before = readFileSync(join(exact, active));
-  assert.equal(run(exact, ["task", "archive", "--", "PRIMECLAW-1"], true).status, 1);
-  mkdirSync(dirname(join(exact, archive)), { recursive: true });
-  run(exact, ["task", "archive", "--", "PRIMECLAW-1"]);
-  assert.equal(existsSync(join(exact, active)), false);
-  assert.deepEqual(readFileSync(join(exact, archive)), before);
-  assert.equal(run(exact, ["task", "view", "--json", "--", "PRIMECLAW-1"], true).status, 1);
-
-  const collision = makeProject();
-  const collisionGit = (...args) => execFileSync(
-    "git", ["-C", collision, ...args], { encoding: "utf8" },
-  ).trim();
-  collisionGit("config", "user.name", "Prime Claw Test");
-  collisionGit("config", "user.email", "test@example.invalid");
-  run(collision, ["task", "create", "Reusable Café", "--status", "Blocked", "--plan", "Historical plan", "--plain"]);
-  const historicalActive = JSON.parse(
-    run(collision, ["task", "view", "--json", "--", "PRIMECLAW-1"]).stdout,
-  ).task.path;
-  const historicalArchive = historicalActive.replace("/tasks/", "/archive/tasks/");
-  mkdirSync(dirname(join(collision, historicalArchive)), { recursive: true });
-  run(collision, ["task", "archive", "--", "PRIMECLAW-1"]);
-  const historicalBytes = readFileSync(join(collision, historicalArchive));
-  collisionGit("add", "-A");
-  collisionGit("commit", "-q", "-m", "historical archive");
-  run(collision, ["task", "create", "Reusable Café", "--status", "Blocked", "--plan", "Current plan", "--plain"]);
-  const reused = JSON.parse(
-    run(collision, ["task", "view", "--json", "--", "PRIMECLAW-1"]).stdout,
-  ).task;
-  assert.equal(reused.path, historicalActive);
-  collisionGit("add", "-A");
-  collisionGit("commit", "-q", "-m", "reused active id");
-  const collisionHead = collisionGit("rev-parse", "HEAD");
-  const collisionAdapter = new CliTaskEpisodeAdmissionGit();
-  assert.equal(collisionAdapter.pathTrackedAtRef(collision, collisionHead, historicalArchive), true);
-  assert.throws(
-    () => assertNoHistoricalTaskArchiveCollision(
-      collision, collisionHead, historicalArchive, collisionAdapter,
-    ),
-    /archive destination already exists in bound main history/,
-  );
-  assert.deepEqual(readFileSync(join(collision, historicalArchive)), historicalBytes);
-  assert.equal(existsSync(join(collision, historicalActive)), true);
-  assert.equal(collisionGit("status", "--porcelain"), "");
-
-  const activeInbound = makeProject();
-  run(activeInbound, ["task", "create", "Target", "--status", "Blocked", "--plan", "Plan", "--plain"]);
-  run(activeInbound, ["task", "create", "Dependent", "--status", "Blocked", "--plan", "Plan", "--depends-on", "PRIMECLAW-1", "--plain"]);
-  assert.throws(
-    () => assertNoTaskArchiveCleanupTargets(activeInbound, "PRIMECLAW-1", "backlog/tasks/primeclaw-1 - Target.md", runner),
-    /would rewrite dependencies/,
-  );
-
-  for (const reference of ["PRIMECLAW-01", "primeclaw-1", "  PRIMECLAW-1  "]) {
-    const aliasInbound = makeProject();
-    run(aliasInbound, ["task", "create", "Target", "--status", "Blocked", "--plan", "Plan", "--plain"]);
-    run(aliasInbound, ["task", "create", "Alias reference", "--status", "Blocked", "--plan", "Plan", "--ref", reference, "--plain"]);
-    assert.throws(
-      () => assertNoTaskArchiveCleanupTargets(aliasInbound, "PRIMECLAW-1", "backlog/tasks/target.md", runner),
-      /would rewrite references/,
-      reference,
-    );
-  }
-
-  const completedInbound = makeProject();
-  run(completedInbound, ["task", "create", "Target", "--status", "Blocked", "--plan", "Plan", "--plain"]);
-  run(completedInbound, ["task", "create", "Historical reference", "--status", "Done", "--final-summary", "Done", "--ref", "PRIMECLAW-1", "--plain"]);
-  mkdirSync(join(completedInbound, "backlog", "completed"), { recursive: true });
-  run(completedInbound, ["task", "complete", "PRIMECLAW-2"]);
-  assert.throws(
-    () => assertNoTaskArchiveCleanupTargets(completedInbound, "PRIMECLAW-1", "backlog/tasks/primeclaw-1 - Target.md", runner),
-    /would rewrite references/,
-  );
-});
-
-test("abandonment file digest excludes only lifecycle metadata and Final Summary", () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-abandon-digest-")));
-  const activePath = "backlog/tasks/primeclaw-10.38.md";
-  const archivePath = "backlog/archive/tasks/primeclaw-10.38.md";
-  mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
-  mkdirSync(join(root, "backlog", "archive", "tasks"), { recursive: true });
-  writeFileSync(join(root, activePath), `---\nid: PRIMECLAW-10.38\nstatus: In Progress\nupdated_date: '2026-10-13 12:00'\nparent_task_id: PRIMECLAW-10\n---\n\n## Implementation Notes\n\nEpisode content\n`);
-  writeFileSync(join(root, archivePath), `---\nid: PRIMECLAW-10.38\nstatus: Blocked\nupdated_date: '2026-10-13 13:00'\nparent_task_id: PRIMECLAW-10\n---\n\n## Implementation Notes\n\nEpisode content\n\n## Final Summary\n\n<!-- SECTION:FINAL_SUMMARY:BEGIN -->\nOperator confirmed abandonment.\n<!-- SECTION:FINAL_SUMMARY:END -->\n`);
-  const active = resolveTaskAbandonmentFileSnapshot(root, activePath);
-  const archived = resolveTaskAbandonmentFileSnapshot(root, archivePath);
-  assert.equal(active.status, "In Progress");
-  assert.equal(active.finalSummary, null);
-  assert.equal(archived.status, "Blocked");
-  assert.equal(archived.finalSummary, "Operator confirmed abandonment.");
-  assert.equal(active.contentDigest, archived.contentDigest);
-  writeFileSync(join(root, archivePath), readFileSync(join(root, archivePath), "utf8").replace("Episode content", "changed content"));
-  assert.notEqual(active.contentDigest, resolveTaskAbandonmentFileSnapshot(root, archivePath).contentDigest);
-});
-
-test("CLI review integration merges current main, restores the Episode task, and rejects conflicts outside it", () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-ready-merge-")));
-  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
-  git("init", "-q", "-b", "main");
-  git("config", "user.name", "Prime Claw Test");
-  git("config", "user.email", "test@example.invalid");
-  mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
-  const taskPath = "backlog/tasks/primeclaw-10.38.md";
-  writeFileSync(join(root, taskPath), "---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\nbase\n");
-  writeFileSync(join(root, "landed.txt"), "base\n");
-  writeFileSync(join(root, "shared.txt"), "base\n");
-  git("add", "-A"); git("commit", "-q", "-m", "base");
-  git("checkout", "-q", "-b", "episode");
-  writeFileSync(join(root, taskPath), "---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\nbase\nepisode evidence\n");
-  writeFileSync(join(root, "shared.txt"), "episode\n");
-  git("add", "-A"); git("commit", "-q", "-m", "episode candidate");
-  const episodeHead = git("rev-parse", "HEAD");
-  git("checkout", "-q", "main");
-  writeFileSync(join(root, taskPath), "---\nid: PRIMECLAW-10.38\nstatus: Ready for Merge\n---\nbase\n");
-  writeFileSync(join(root, "landed.txt"), "landed on main\n");
-  writeFileSync(join(root, "shared.txt"), "main\n");
-  git("add", "-A"); git("commit", "-q", "-m", "main ready");
-  const mainHead = git("rev-parse", "HEAD");
-  git("checkout", "-q", "episode");
-  const adapter = new CliTaskEpisodeAdmissionGit();
-  assert.throws(() => adapter.mergeMain(root, mainHead, taskPath), /conflicts outside/);
-  adapter.abortMerge(root);
-
-  writeFileSync(join(root, "shared.txt"), "base\n");
-  git("add", "shared.txt"); git("commit", "-q", "-m", "avoid unrelated conflict");
-  const acceptedHead = git("rev-parse", "HEAD");
-  adapter.mergeMain(root, mainHead, taskPath);
-  adapter.restoreTaskFromHead(root, taskPath);
-  assert.match(readFileSync(join(root, taskPath), "utf8"), /status: In Progress[\s\S]*episode evidence/);
-  assert.equal(readFileSync(join(root, "landed.txt"), "utf8"), "landed on main\n");
-  adapter.stagePath(root, taskPath);
-  const refreshed = adapter.commitMerge(root, "integrate main");
-  assert.deepEqual(adapter.parents(root, refreshed), [acceptedHead, mainHead]);
-  assert.equal(adapter.isAncestor(root, mainHead, refreshed), true);
-  assert.notEqual(refreshed, episodeHead);
-
-  git("checkout", "-q", "main");
-  adapter.fastForward(root, refreshed);
-  assert.equal(git("rev-parse", "HEAD"), refreshed);
-  assert.match(readFileSync(join(root, taskPath), "utf8"), /status: In Progress[\s\S]*episode evidence/);
-
-  git("checkout", "-q", "main");
-  writeFileSync(join(root, taskPath), "---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\nbase\n");
-  writeFileSync(join(root, "revision.txt"), "request changes\n");
-  git("add", "-A"); git("commit", "-q", "-m", "request changes");
-  const changesMainHead = git("rev-parse", "HEAD");
-  git("checkout", "-q", "episode");
-  adapter.mergeMain(root, changesMainHead, taskPath);
-  adapter.restoreTaskFromHead(root, taskPath);
-  assert.match(readFileSync(join(root, taskPath), "utf8"), /status: In Progress[\s\S]*episode evidence/);
-  assert.equal(readFileSync(join(root, "revision.txt"), "utf8"), "request changes\n");
-  adapter.stagePath(root, taskPath);
-  const revisionCandidate = adapter.commitMerge(root, "integrate request changes");
-  assert.deepEqual(adapter.parents(root, revisionCandidate), [refreshed, changesMainHead]);
-  assert.equal(adapter.isAncestor(root, refreshed, revisionCandidate), true);
-  assert.equal(adapter.isAncestor(root, changesMainHead, revisionCandidate), true);
-});
-
-test("CLI merge adapter reports clean, modified, staged, extra, untracked, and renamed paths", () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-merge-status-")));
-  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
-  git("init", "-q", "-b", "main");
-  git("config", "user.name", "Prime Claw Test");
-  git("config", "user.email", "test@example.invalid");
-  mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
-  const taskPath = "backlog/tasks/primeclaw-10.38.md";
-  writeFileSync(join(root, taskPath), "status: Ready for Merge\n");
-  writeFileSync(join(root, "other.txt"), "base\n");
-  git("add", "-A"); git("commit", "-q", "-m", "base");
-  const adapter = new CliTaskEpisodeAdmissionGit();
-  assert.deepEqual(adapter.worktreeChanges(root), []);
-
-  writeFileSync(join(root, taskPath), "status: Done\n");
-  assert.deepEqual(adapter.worktreeChanges(root), [{ status: " M", path: taskPath }]);
-  git("add", "--", taskPath);
-  assert.deepEqual(adapter.worktreeChanges(root), [{ status: "M ", path: taskPath }]);
-  writeFileSync(join(root, taskPath), "status: Done\nfinal summary: recorded\n");
-  assert.deepEqual(adapter.worktreeChanges(root), [{ status: "MM", path: taskPath }]);
-  git("add", "--", taskPath);
-  git("commit", "-q", "-m", "done task");
-
-  writeFileSync(join(root, "other.txt"), "changed\n");
-  writeFileSync(join(root, "untracked.txt"), "new\n");
-  assert.deepEqual(adapter.worktreeChanges(root), [
-    { status: " M", path: "other.txt" },
-    { status: "??", path: "untracked.txt" },
-  ]);
-  git("add", "-A"); git("commit", "-q", "-m", "other changes");
-  git("mv", "other.txt", "renamed.txt");
-  const renamed = adapter.worktreeChanges(root);
-  assert.equal(renamed.length, 1);
-  assert.match(renamed[0].status, /R/);
-  assert.match(renamed[0].path, /other\.txt|renamed\.txt/);
-  assert.match(renamed[0].path, / -> /);
-});
-
-test("CLI abandonment adapter selects only the Episode task blob and commits only its archive move", () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-abandon-adapter-")));
-  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
-  git("init", "-q", "-b", "main");
-  git("config", "user.name", "Prime Claw Test");
-  git("config", "user.email", "test@example.invalid");
-  const taskPath = "backlog/tasks/primeclaw-10.38.md";
-  const archivePath = "backlog/archive/tasks/primeclaw-10.38.md";
-  mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
-  writeFileSync(join(root, taskPath), "main task\\n");
-  writeFileSync(join(root, "code.ts"), "main code\\n");
-  git("add", "-A"); git("commit", "-q", "-m", "main");
-  git("checkout", "-q", "-b", "episode");
-  writeFileSync(join(root, taskPath), "episode task\\n");
-  writeFileSync(join(root, "code.ts"), "episode code\\n");
-  git("add", "-A"); git("commit", "-q", "-m", "episode candidate");
-  const episodeHead = git("rev-parse", "HEAD");
-  git("checkout", "-q", "main");
-
-  const adapter = new CliTaskEpisodeAdmissionGit();
-  adapter.restorePathFromRef(root, episodeHead, taskPath);
-  assert.equal(readFileSync(join(root, taskPath), "utf8"), "episode task\\n");
-  assert.equal(readFileSync(join(root, "code.ts"), "utf8"), "main code\\n");
-  assert.deepEqual(adapter.worktreeChanges(root), [{ status: " M", path: taskPath }]);
-
-  mkdirSync(join(root, "backlog", "archive", "tasks"), { recursive: true });
-  git("mv", taskPath, archivePath);
-  const commit = adapter.commitOnlyPaths(root, [taskPath, archivePath], "archive task");
-  assert.deepEqual(adapter.commitPaths(root, commit).sort(), [archivePath, taskPath].sort());
-  assert.deepEqual(adapter.worktreeChanges(root), []);
-  assert.equal(readFileSync(join(root, "code.ts"), "utf8"), "main code\\n");
-});
-
-test("task lifecycle publication fails closed before status mutation", async (t) => {
-  for (const scenario of [
-    { name: "uncommitted Episode task content", options: { episodePathStatus: " M backlog/tasks/primeclaw-10.38.md" }, pattern: /committed Episode task content/ },
-    { name: "reported Episode commit is not local HEAD", options: { episodeHead: "b".repeat(40), upstreamHead: "b".repeat(40) }, reported: "c".repeat(40), pattern: /exact reported Episode commit/ },
-    { name: "reported Episode commit is not pushed", options: { upstreamHead: "a".repeat(40) }, pattern: /upstream to contain/ },
-    { name: "Episode task has no post-admission evidence", options: { pathChanged: false }, pattern: /Episode-owned task evidence/ },
-    { name: "main task bytes are dirty", options: { mainPathStatus: " M backlog/tasks/primeclaw-10.38.md" }, pattern: /main task path to match committed HEAD/ },
-    { name: "Episode changed lifecycle status", options: { episodeStatus: "Blocked" }, pattern: /Episode task status In Progress/ },
-  ]) await t.test(scenario.name, () => {
-    const h = taskLifecycleHarness(scenario.options);
-    assert.throws(
-      () => publishTaskEpisodeBlocked("PRIMECLAW-10.38", scenario.reported ?? h.episodeHead, h.f.ctx, h.deps),
-      scenario.pattern,
-    );
-    assert.equal(h.mainStatus, "In Progress");
-    assert.equal(h.f.calls.some((call) => call[0] === "backlog-status" || call[0] === "status-commit"), false);
   });
 });
 
@@ -2397,8 +973,12 @@ test("task-native handoff rejects changed task state and foreign durable session
   });
 });
 
-test("ownership parser requires active durable and Orca bindings", () => {
+test("ownership parser requires active durable bindings and validates cleanupHead", () => {
   assert.throws(() => parseEpisodeOwnership({ version: 1, status: "active", engine: "orca" }), /unsupported shape/);
+  const f = harness();
+  const record = activeTaskRecord(f, { cleanupHead: "b".repeat(40) });
+  assert.equal(record.cleanupHead, "b".repeat(40));
+  assert.throws(() => parseEpisodeOwnership({ ...record, cleanupHead: "not-a-head" }), /unsupported shape/);
 });
 
 test("bundle bytes are bound before any ownership or external mutation", async () => {
@@ -2673,7 +1253,7 @@ test("production local cleanup adapter proves exact idle runtime, worktree, and 
   stateCwd = worktree;
   let snapshot = await adapter.inspect(record);
   assert.equal(snapshot.runtime.idle, true);
-  assert.equal(snapshot.runtime.resources.head, terminalHead);
+  assert.equal(snapshot.runtime.cwd, worktree);
   assert.equal(snapshot.worktree.head, terminalHead);
   assert.equal(snapshot.branch.head, terminalHead);
   await assert.rejects(adapter.removeRuntime(record), /synthetic uncertain delete/);

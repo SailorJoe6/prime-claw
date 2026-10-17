@@ -271,3 +271,65 @@ def test_repository_status_migration_receipt_and_live_data_are_consistent() -> N
     for row in receipt["migrations"] + receipt["preserved"]:
         assert row["id"] in records
         assert records[row["id"]].get("parent_task_id") == row["parentTaskId"]
+
+
+def test_prompt_led_merge_uses_ff_only_then_exact_backlog_done_commit(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    remote = tmp_path / "remote.git"
+    episode = tmp_path / "episode"
+    stale = tmp_path / "stale"
+    cli = ROOT / "deps/backlog/dist/backlog"
+
+    def run(*args: str, cwd: Path = repo, check: bool = True) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(args, cwd=cwd, check=check, capture_output=True, text=True)
+
+    run("git", "init", "-q", "--bare", str(remote), cwd=tmp_path)
+    run("git", "init", "-q", "-b", "main", str(repo), cwd=tmp_path)
+    run("git", "config", "user.name", "Prime Claw Test")
+    run("git", "config", "user.email", "test@example.invalid")
+    run("git", "remote", "add", "origin", str(remote))
+    (repo / "backlog").mkdir()
+    (repo / "backlog/config.yml").write_text((ROOT / "backlog/config.yml").read_text())
+    run(str(cli), "task", "create", "Prompt led lifecycle", "--status", "In Progress",
+        "--description", "Prove ordinary Git and Backlog.", "--type", "task", "--priority", "P2", "--plain")
+    task = json.loads(run(str(cli), "task", "view", "--json", "--", "PRIMECLAW-1").stdout)["task"]
+    task_path = task["path"]
+    run("git", "add", "--", "backlog")
+    run("git", "commit", "-qm", "admit task")
+    base = run("git", "rev-parse", "HEAD").stdout.strip()
+    run("git", "push", "-u", "origin", "main")
+
+    run("git", "worktree", "add", "-q", "-b", "episode", str(episode), "main")
+    run("git", "config", "user.name", "Prime Claw Test", cwd=episode)
+    run("git", "config", "user.email", "test@example.invalid", cwd=episode)
+    run(str(cli), "task", "edit", "PRIMECLAW-1", "--append-notes", "Candidate evidence.", "--plain", cwd=episode)
+    (episode / "feature.txt").write_text("candidate\n")
+    run("git", "add", "--", task_path, "feature.txt", cwd=episode)
+    run("git", "commit", "-qm", "candidate", cwd=episode)
+    run("git", "push", "-u", "origin", "episode", cwd=episode)
+    candidate = run("git", "rev-parse", "HEAD", cwd=episode).stdout.strip()
+
+    assert run("git", "rev-parse", "HEAD").stdout.strip() == run("git", "rev-parse", "@{upstream}").stdout.strip()
+    assert run("git", "rev-parse", "HEAD", cwd=episode).stdout.strip() == run("git", "rev-parse", "@{upstream}", cwd=episode).stdout.strip()
+    run("git", "merge-base", "--is-ancestor", "main", candidate)
+    run("git", "merge", "--ff-only", candidate)
+
+    run(str(cli), "task", "edit", "PRIMECLAW-1", "--status", "Done", "--plain")
+    changed = [entry for entry in run("git", "status", "--porcelain=v1", "-z").stdout.split("\0") if entry]
+    assert changed == [f" M {task_path}"]
+    run("git", "add", "--", task_path)
+    run("git", "commit", "--only", "-qm", "complete exact task", "--", task_path)
+    run("git", "push")
+    done = json.loads(run(str(cli), "task", "view", "--json", "--", "PRIMECLAW-1").stdout)["task"]
+    assert done["status"] == "Done"
+    assert run("git", "rev-parse", "HEAD").stdout.strip() == run("git", "rev-parse", "@{upstream}").stdout.strip()
+    run("git", "merge-base", "--is-ancestor", candidate, "HEAD")
+
+    run("git", "worktree", "add", "-q", "-b", "stale", str(stale), base)
+    run("git", "config", "user.name", "Prime Claw Test", cwd=stale)
+    run("git", "config", "user.email", "test@example.invalid", cwd=stale)
+    (stale / "stale.txt").write_text("stale\n")
+    run("git", "add", "stale.txt", cwd=stale)
+    run("git", "commit", "-qm", "stale candidate", cwd=stale)
+    rejected = run("git", "merge", "--ff-only", "stale", check=False)
+    assert rejected.returncode != 0

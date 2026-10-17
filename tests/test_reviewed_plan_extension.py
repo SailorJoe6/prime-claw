@@ -110,6 +110,24 @@ export default function probe(pi){pi.on("session_start",()=>{const names=pi.getA
         assert name in tools
 
 
+
+def test_task_finalization_surface_is_cleanup_only() -> None:
+    extension = EXTENSION.read_text()
+    support = EPISODE_EXTENSION.read_text()
+    for removed in (
+        "readyReceipt", "readyProgress", "changesProgress", "terminalEvidence",
+        "publishTaskEpisodeReadyForMerge", "mergeTaskEpisodeReadyForMerge",
+        "abandonTaskEpisode", "TaskEpisodeReadyHandshakeEvidence",
+    ):
+        assert removed not in extension
+        assert removed not in support
+    assert 'name: "finalize_task_episode"' in extension
+    assert 'enum: ["merged", "abandoned"]' in extension
+    assert 'required: ["taskId", "episodeHead", "outcome", "confirmed"]' in extension
+    assert "cleanupHead" in support
+    assert 'runGit(repo, ["merge", "--ff-only"' not in support
+
+
 def test_repository_status_cutover_uses_task_native_order_without_to_do() -> None:
     config = yaml.safe_load((REPO / "backlog/config.yml").read_text())
     assert config["default_status"] == "In Design"
@@ -221,5 +239,6 @@ def test_traceability_covers_both_episode_schemas_at_creation_recovery_and_finis
     assert "public admission replay fails closed" in rows["US-16"]
 
     assert "finalize_task_episode" in rows["US-24"]
-    assert "separate operator decision" in rows["US-24"]
+    assert "separately confirmed" in rows["US-24"]
+    assert "exact idle resources" in rows["US-24"]
     assert "finalize_spec_episode" in rows["US-24"]

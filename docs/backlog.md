@@ -92,9 +92,10 @@ consume that bound approval once. Trusted admission commits only the task's
 `In Progress` transition before version-2 ownership and resource allocation.
 The resulting Episode uses the exact task as its sole durable authority, skips
 bundle copy and promotion, and leaves every later lifecycle status transition
-to the owning Conversation. Continuation uses `handoff_task_episode`; guarded
-review, reversible outcomes, merge or abandonment, and separately confirmed
-cleanup use `finalize_task_episode` without weakening operator authority.
+to the owning Conversation. Continuation uses `handoff_task_episode`. Review,
+status changes, merge, and abandonment use prompt instructions, ordinary Git,
+and the supported Backlog CLI. Cleanup alone uses `finalize_task_episode` as the
+separately confirmed exact-resource boundary.
 
 ## Retained version-1 compatibility
 
@@ -135,8 +136,8 @@ the intended authoring state is visible even though it is now the project defaul
 Use `/design` or `/spec-it-out` for specification authoring, `/plan TASK-ID` for
 native planning, and `/implement-task TASK-ID` for approved admission. There is
 no generic claim edit: implementation admission and later `Blocked`, resumed
-`In Progress`, `Ready for Merge`, and terminal `Done` transitions remain under
-the reviewed Conversation lifecycle. `backlog task complete` is reserved for
+`In Progress`, and terminal `Done` transitions remain explicit Conversation
+work through the supported Backlog CLI. `backlog task complete` is reserved for
 explicit one-time history cleanup, not ordinary Episode completion.
 
 For an explicitly approved history migration, `backlog task restore TASK-ID`

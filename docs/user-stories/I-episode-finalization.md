@@ -8,22 +8,9 @@ Episode cannot silently merge, abandon, delete, or stop the wrong work.**
 
 ### Primary task-native lifecycle
 
-`finalize_task_episode` is the guarded coordinator for version-2 ownership. Its
-`accept-candidate` final-review action accepts only an exact pushed candidate,
-publishes the task-only `Ready for Merge` transition, refreshes the same Episode
-against current main, verifies the resulting exact handshake, and then waits for
-the operator. Delay changes nothing.
-Request Changes publishes `In Progress`, refreshes and verifies the same
-Episode, and resumes it through canonical handoff. Merge and abandonment are
-separate explicit operator outcomes with exact task, parent, commit, ancestry,
-and content checks.
+Review and terminal Git/Backlog work are Conversation instructions, not a plugin state machine. The Conversation verifies one exact pushed candidate. Delay is a no-op; Request Changes resumes the same Episode with a recorded in-scope finding. Merge requires explicit operator authority for the exact task/main/candidate tuple, ordinary `git merge --ff-only`, a supported Backlog update to `Done`, an exact task-only commit, and push. Abandonment requires separate explicit confirmation, exact task-only selection from the pushed Episode, a truthful Backlog Final Summary, supported task archive, an exact move commit, and push. Ownership and resources remain active after either outcome.
 
-Cleanup is another separate explicit operator decision after verified merge or
-abandonment. It removes only the bound idle session, retained Orca terminals,
-worktree, and branch through supported interfaces. Exact completed prefixes are
-retryable, but ownership remains active until every recorded resource is absent
-and closes last. No review, delay, revision, merge, or abandonment action
-implicitly performs cleanup.
+`finalize_task_episode` is the cleanup-only stable host boundary for version-2 ownership. It accepts only the exact task ID, terminal Episode head, truthful `merged` or `abandoned` outcome, and separate explicit Cleanup confirmation. It binds the cleanup head durably, verifies pushed terminal main plus the exact idle clean resources, removes runtime, worktree, and branch in order, verifies absence, and marks ownership inactive last. It performs no candidate acceptance, delay, revision, merge, abandonment, task mutation, archive, or push. Same-head retry is idempotent; different evidence or unsafe resources fail closed without caller-held receipts.
 
 ### Retained version-1 compatibility
 

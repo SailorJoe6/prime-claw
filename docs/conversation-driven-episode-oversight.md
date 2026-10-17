@@ -88,11 +88,10 @@ schemas are strict and disjoint:
   status: `provisioning`, `active`, `uncertain`, or `inactive`.
 
 The strict ownership record persists lifecycle state plus durable owner,
-authority, placement, and resource bindings. It does not store Ready,
-phased-progress, or terminal action receipts. `finalize_task_episode` returns
-those exact receipts to the owning Conversation, which retains them for later
-authorized outcomes or bounded retries. The receipts are request/response
-evidence, not ownership fields or event-journal entries.
+authority, placement, and resource bindings. It is not an event journal and
+stores no review, progress, merge, or abandonment receipts. Version 2 adds only
+an optional `cleanupHead`, bound immediately before separately authorized
+resource deletion so same-head cleanup can resume safely.
 
 The record is written before external mutation. It is updated at genuine
 external boundaries, but it is not an event journal. Active and inactive state
@@ -267,152 +266,19 @@ through. The tool admits ordinary canonical handoff and queues canonical
 execute as its sole follow-up. Admission is not completion and uncertain
 transport is never retried blindly.
 
-Version-2 ownership exposes Conversation-owned blocker and resume actions through `finalize_task_episode`. `publishTaskEpisodeBlocked` and
-`publishTaskEpisodeResumed` run only for the exact top-level owner in canonical
-primary `main`, require active version-2 ownership and a clean owned worktree,
-and bind the accepted report to the exact local and upstream Episode head. The
-Episode task must remain `In Progress`, have a meaningful plan, and contain
-committed post-admission task evidence. Main must expose the expected committed
-status (`In Progress` before blocking, `Blocked` before resuming) with a clean
-exact task path; unrelated main dirt is allowed. Each transition uses Backlog,
-commits only that task path, and best-effort pushes. It never reads or copies
-Episode-owned content into main. Local commit success remains authoritative and
-a push failure is returned as evidence. The dual-mode blocked skill selects the durable ownership record before prompt
-text: active version-2 ownership forces task mode for the exact owner
-Conversation even without a task block, while an Episode or foreign owner fails
-closed and can never enter folder fallback. A task block is only a candidate
-binding that must match ownership. Task mode uses the accepted report and never
-falls back to `.ralph/plans`.
+Version-2 blocker and resume publication are prompt-led Conversation work. After accepting an exact pushed blocker report, the Conversation runs supported `backlog task edit` on canonical main, verifies the bound ID/path and a one-path diff, commits only that task as `Blocked`, and pushes. After the operator accepts the unblock condition, it performs the same exact-task operation to restore `In Progress`, then uses `handoff_task_episode`. The dual-mode blocked skill still selects durable ownership before prompt text; active version-2 ownership forces task mode and never falls back to `.ralph/plans`.
 
-Persisted active version-1 ownership keeps its specification/plan pair active
-while blocked and throughout candidate review or revision. An older blocked
-snapshot with no active pair is not live: only after an explicit operator
-unblock decision may the blocked skill call `restore_blocked_spec_episode` for
-the exact owned future folder. The tool restores the exact readable pair from
-the recorded worktree with no clobber or mode fallback and revalidates the same
-active identity before continuation. No-ownership old in-place blocking
-remains a separate legacy behavior.
+Persisted active version-1 ownership keeps its specification/plan pair active while blocked and throughout candidate review or revision. An older blocked snapshot with no active pair is not live: only after an explicit operator unblock decision may the blocked skill call `restore_blocked_spec_episode` for the exact owned future folder. The tool restores the exact readable pair without clobber or mode fallback and revalidates the same active identity. No-ownership old in-place blocking remains separate.
 
-After resumed `In Progress` publication, `finalize_task_episode` invokes the same guarded task handoff transport for ordinary continuation.
-Before delivery it proves canonical primary-main caller context, exact owner and
-task/path in main and the Episode worktree, a main task path that matches
-committed `HEAD` even when unrelated main paths are dirty, meaningful plans,
-clean owned worktree, exact Git/Orca and durable-session CWD identity, and
-quiescence. It binds both prompts to the exact task. It rejects `Blocked` until the
-Conversation publishes a resumed `In Progress` state and always rejects `Ready
-for Merge` because ordinary continuation ends at review.
+`handoff_task_episode` proves canonical primary-main caller context, exact owner/task/path in main and the Episode worktree, committed `In Progress` status, meaningful plans, clean owned worktree, exact Git/Orca and durable-session CWD identity, and quiescence. It binds both prompts to the exact task and reuses the same resources. It does not perform status, review, or terminal work.
 
-The `finalize_task_episode` final-review handshake starts only from an accepted exact pushed candidate. `publishTaskEpisodeReadyForMerge` reuses the
-exact owner/status guard and commits only main's task path as `Ready for Merge`;
-push remains best-effort evidence after the authoritative local commit.
-`integrateTaskEpisodeReadyForMerge` then proves the same durable Episode and
-worktree are active, exact, clean, and idle, proves current main contains the
-status commit, and accepts no merge conflict outside the bound task. Inside that
-Episode worktree it restores the accepted task from the Episode parent, changes
-only status through Backlog, and compares the supported task-view digest with
-status/update time and derived cross-task projections excluded. Task content,
-exact path, and parent identity must
-remain unchanged. All current-main changes and this reconciliation become one
-exact two-parent merge commit and the Episode branch is pushed.
-`verifyTaskEpisodeReadyForMerge` finally requires current main not to have
-advanced, the exact refreshed local/upstream head, clean worktree, both parents,
-main ancestry, and the same task digest, hierarchy, and `Ready for Merge`
-status. Only that verified refreshed candidate may be described to the operator
-as ready or used to request the separate merge decision.
+Candidate review is evidence-led. Delay changes nothing. Request Changes requires an explicit operator decision and a concrete accepted in-scope finding, then resumes the same Episode through handoff. If main advanced, the Episode integrates it with ordinary Git and pushes a new review candidate. There is no custom Ready publication, two-parent reconciliation transaction, content digest, progress receipt, or replay protocol.
 
-Two reversible operator outcomes are exposed through the same guarded `finalize_task_episode` boundary.
-`delayTaskEpisodeReadyForMerge` re-verifies the exact current handshake and idle
-Episode, then returns `delayed` without status mutation, merge, push, handoff, or
-other transport. It does not mean abandonment. For an explicit Request Changes
-decision, `publishTaskEpisodeChangesRequested` re-verifies the exact current
-handshake and commits only the main task back to `In Progress`; main push is
-best-effort evidence. `integrateTaskEpisodeChangesRequested` merges that current
-main into the same idle Episode, restores all Episode-owned task content, applies
-only `In Progress` through Backlog, and pushes another exact two-parent
-candidate. `verifyTaskEpisodeChangesRequested` requires its main/head/ancestry,
-task digest, hierarchy, and status to remain exact. Only
-`resumeTaskEpisodeChangesRequested` then invokes canonical task handoff. These
-phases preserve the successful status publication across a retryable integration
-failure without a journal, duplicate status transition, new admission, or new
-resource. An integration receipt carrying `pushError` is replayed through the
-same integration helper so only its exact existing merge head is pushed again.
-A handoff whose first message was admitted but whose follow-up is rejected is
-reported as transport-uncertain and is never exposed as retryable.
+Immediately before Merge, the Conversation re-reads ownership and preflights `(taskId, mainHead, candidateHead)`: canonical main has no staged or tracked changes, is operation-free, and equals upstream; the exact idle Episode worktree is clean; branch, local head, and upstream all equal the reviewed candidate; the task ID/path remain bound and `In Progress`; and the candidate descends current main. Only explicit operator authority for that tuple permits ordinary `git merge --ff-only candidateHead`. Git rejects drift. The Conversation then uses Backlog to set the exact task to `Done`, verifies a one-path diff, commits only that path, pushes, and rechecks main/upstream, ancestry, identity, parent, and status. A push failure is ordinary transport recovery, not lifecycle replay. Ownership and resources remain active.
 
-The guarded terminal Merge action accepts only an explicit operator Merge
-decision bound to the still-current exact task, canonical-main head, and pushed
-refreshed candidate. It re-runs the review verification, requires the whole
-canonical main checkout clean and its upstream exact, requires the candidate to
-remain pushed with the reviewed two-parent ancestry, and performs only an exact
-fast-forward. It never forces, rebases, or creates a substitute merge. A replay
-accepts only the original verified main with `Ready for Merge`, the exact
-candidate with `Ready for Merge`, that candidate plus only the exact dirty or
-staged task already at `Done`, or one exact task-only `Done` child. It can finish
-the one-path commit, verification, or transport without a second fast-forward
-or lifecycle mutation and rejects every other intermediate state. Candidate
-preflight also re-proves that the exact Ready publication commit remains in the
-verified main history. After main reaches
-the candidate, Backlog immediately changes only the exact task to `Done`; the
-resulting one-path commit must directly parent the candidate and preserve the
-supported content digest, path, parent identity, and merged code. A successful
-local `Done` commit remains authoritative. Push failure, upstream lookup error,
-or an observed remote mismatch is returned as best-effort transport evidence
-rather than invalidating that local result. Final verification leaves active
-ownership and the idle Episode branch, worktree, durable session, and resources
-unchanged for a separately authorized finalization or cleanup decision. Public task-native admission, lifecycle, integration, handoff, merge, and cleanup are active through `/implement-task`, `create_task_episode`, `handoff_task_episode`, and `finalize_task_episode`.
+Confirmed abandonment is also prompt-led. From clean pushed canonical main, after explicit operator confirmation, the Conversation selects only the bound task file from the exact pushed Episode head, reapplies the non-`Done` status and truthful Final Summary with Backlog, archives the task, verifies only the exact active/archive move and no Episode code, commits, and pushes. Git and Backlog report unsafe intermediate state directly. Ownership and resources remain active.
 
-Confirmed abandonment uses the separate guarded Abandon action of `finalize_task_episode`, never handoff. `abandonTaskEpisode` requires explicit operator authority bound
-to the exact owner, active task path, main head and captured non-`Done` status,
-Episode head, candidate/main relationship, invariant parent, Episode-content
-digest, and truthful Final Summary. The idle Episode head must remain pushed.
-Canonical main and its upstream must remain at the bound head. Before mutation,
-the exact canonical archive destination is computed and rejected if it is
-already tracked at the bound main head; a reused Backlog ID must never replace
-historical archive bytes. A supported structured scan of active and completed
-Backlog records also rejects any inbound dependency or exact task reference
-whose archive cleanup would change a second task. Git selects only
-the Episode task blob; Backlog reapplies the captured main status and Final
-Summary, then archives that task without `Done`. Before commit, the effective
-diff must contain only the task preparation and its exact active-to-archive
-move, so no Episode code or unrelated path can enter main. The direct archival
-child is verified and pushed best-effort. Retry accepts only exact selected-task,
-archival-move/stage, or committed archival-child states. Backlog structured data
-verifies identity, parent, status, and summary before archive; afterward a
-normalized exact file digest and Git blob/move evidence verify unchanged content
-without pretending archived tasks remain viewable. Path, ancestry relationship,
-and ownership are also rechecked. An archival child with `pushError` can be
-replayed only from its exact returned decision and terminal evidence; the
-archive mutation is not prepared or repeated.
-The branch, worktree, durable session, and every resource remain active; any
-finalization or destructive cleanup needs separate operator authority.
-
-The task-native Cleanup action accepts only a separate explicit
-Cleanup decision that binds the exact task/path, owning Conversation, Episode
-head/branch/worktree, durable session/route, and every optional local or Orca
-resource recorded in ownership. The authorized terminal Episode head must
-descend from the owned admission base; resource inspection binds that terminal
-head rather than the allocation-time ownership head. Before deletion it
-re-verifies either the pushed one-task `Done` child from Merge or the pushed
-exact non-`Done` archival child from Abandon. Mixed outcomes, transport errors, changed task or archive
-content, a busy runtime, dirty or foreign worktree, changed branch head, and
-unsafe resource gaps reject without deletion. Authorized cleanup removes the
-exact idle runtime first, then its worktree, then its branch. Each absence is
-verified. A host cleanup that also removes the exact branch may advance that
-monotonic sequence, but no out-of-order gap is accepted. Ownership remains
-`active` across an interruption or uncertain removal and changes to `inactive`
-only after every bound resource is proven absent. Local removal rechecks the
-registered path, branch, terminal head, and cleanliness at the mutation edge.
-Task-native Orca activation inventories every terminal retained in its newly
-created worktree, including the default/fallback terminal and the primary Prime
-terminal. Cleanup rejects any later unbound handle and uses one exact non-force
-worktree removal so Orca itself must prove all bound terminals stopped before it
-can retire the worktree; no tab-wide, workspace-wide, or forced terminal command
-is used. The production-owned Prime daemon client is closed after each action.
-Once all resources are absent,
-retry and inactive replay do not require the deliberately deleted Episode ref;
-the pushed terminal main evidence remains authoritative. Exact partial-prefix
-retry and inactive replay are idempotent; provisioning and uncertain ownership cannot be
-cleaned. `finalize_task_episode` invokes the production host adapter only for this separately confirmed action; all other lifecycle actions retain resources.
+Cleanup alone remains a native destructive resource boundary. After the terminal main state is pushed and the operator separately authorizes Cleanup, `finalize_task_episode` receives the exact task, terminal Episode head, truthful merged/abandoned outcome, and confirmation. It durably records `cleanupHead`, verifies terminal main plus exact idle clean resources, removes runtime, worktree, and branch, verifies absence, and marks ownership inactive last. Same-head partial retry is idempotent. A different head, unpushed main, changed task/archive state, busy or foreign runtime, dirty or changed worktree, unsafe resource gap, provisioning, or uncertain ownership fails closed. The tool performs no review, task status edit, merge, abandonment, archive, or push.
 
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and
@@ -429,20 +295,7 @@ authority.
 
 ## Task-native terminal outcomes and cleanup
 
-For primary version-2 ownership, `finalize_task_episode` is the guarded
-Conversation coordinator. Its `accept-candidate` final-review action verifies an
-exact pushed candidate and
-refreshes it against current main before any operator outcome. Delay preserves
-that state. Request Changes publishes only the task's `In Progress` transition,
-refreshes the same Episode, and resumes through canonical task handoff. Merge or
-abandonment occurs only after the matching explicit operator decision and exact
-reverification.
-
-Destructive cleanup is a separate explicit decision after verified terminal
-work. It stops and removes only the recorded idle session, Orca terminals and
-worktree, and branch through supported interfaces. Interrupted exact-prefix
-cleanup is retryable; ownership remains active until every bound resource is
-proven absent and closes last. No other action implies cleanup.
+Version-2 review, Blocked/Resume, Delay, Request Changes, Merge, and Abandonment are Conversation instructions implemented with ordinary Git and the supported Backlog CLI. The only native terminal tool is cleanup-only `finalize_task_episode`, because exact session/worktree/branch removal and ownership closure require a stable host boundary. Cleanup remains a separate explicit operator decision and closes ownership only after every bound resource is absent.
 
 ## Retained version-1 compatibility finalization
 

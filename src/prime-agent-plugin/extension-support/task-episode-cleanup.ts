@@ -10,7 +10,6 @@ import {
   type SessionPublisher,
   type TaskEpisodeCleanupAdapter,
   type TaskEpisodeCleanupSnapshot,
-  type TaskEpisodeCleanupResourceIdentity,
 } from "./spec-episode.ts";
 import type { TaskEpisodeOwnershipRecord } from "./task-episode-ownership.ts";
 
@@ -23,28 +22,6 @@ function samePath(a: string | undefined, b: string): boolean {
 function object(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} is malformed`);
   return value as Record<string, unknown>;
-}
-
-function exactResources(record: TaskEpisodeOwnershipRecord, head: string): TaskEpisodeCleanupResourceIdentity {
-  return {
-    engine: record.engine,
-    worktree: record.worktree!,
-    branch: record.branch!,
-    head,
-    episodeId: record.episodeId!,
-    episodeSessionFile: record.episodeSessionFile!,
-    episodeActiveSessionId: record.episodeActiveSessionId!,
-    ...(record.projectSetupId ? { projectSetupId: record.projectSetupId } : {}),
-    ...(record.routingEnvironmentId ? { routingEnvironmentId: record.routingEnvironmentId } : {}),
-    ...(record.worktreeId ? { worktreeId: record.worktreeId } : {}),
-    ...(record.worktreeIdentity ? { worktreeIdentity: record.worktreeIdentity } : {}),
-    ...(record.terminalHandle ? { terminalHandle: record.terminalHandle } : {}),
-    ...(record.terminalHandles ? { terminalHandles: [...record.terminalHandles] } : {}),
-    ...(record.worktreeName ? { worktreeName: record.worktreeName } : {}),
-    ...(record.launchAutomationName ? { launchAutomationName: record.launchAutomationName } : {}),
-    ...(record.launchAutomationId ? { launchAutomationId: record.launchAutomationId } : {}),
-    ...(record.launchRunId ? { launchRunId: record.launchRunId } : {}),
-  };
 }
 
 function idleState(state: EpisodeSessionState, record: TaskEpisodeOwnershipRecord): boolean {
@@ -172,10 +149,9 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
     if (runtimePresent && !head) {
       throw new Error("Task Episode cleanup found runtime state after both worktree and branch disappeared");
     }
-    const resources = head ? exactResources(record, head) : undefined;
     return {
       ...(runtimePresent ? {
-        runtime: { resources: resources!, cwd: record.worktree, idle: sessionIdle },
+        runtime: { cwd: record.worktree, idle: sessionIdle },
       } : {}),
       ...(gitWorktree ? {
         worktree: {

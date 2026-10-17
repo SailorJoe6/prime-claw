@@ -18,60 +18,15 @@ request an in-scope revision, pause, or consult the operator. Repeated
 speculative or adversarial review must stop rather than grow new requirements or
 implementation machinery.
 
-When a task-native candidate is accepted with no fixes remaining, the
-Conversation does not ask for merge authority from that stale candidate. The public review handshake first commits only the exact main task as `Ready for
-Merge`, then integrates current main in the same idle owned Episode worktree.
-It restores the accepted Episode task, reapplies only the Conversation-owned
-status through Backlog, preserves task content and parent identity, creates and
-pushes one exact two-parent refreshed candidate, and verifies that candidate is
-still based on current main. Only a successful verification permits an operator
-merge request. Ordinary handoff is not used at this status.
+When a task-native candidate is accepted with no fixes remaining, the Conversation revalidates the exact ownership, task ID/path, idle clean Episode worktree, pushed branch/head, diff, tests, and review. Delay is a no-op. Request Changes requires an explicit operator decision and a concrete in-scope finding; the same Episode continues through `handoff_task_episode`. If main advanced, the Episode first uses ordinary Git to integrate it and pushes a new review candidate.
 
-If the operator chooses Delay, the Conversation re-verifies that exact
-handshake and idle Episode but changes nothing and sends no transport. Delay is
-not abandonment. If the operator explicitly requests changes, the guarded outcome phases publish only the main task back to `In Progress`, integrate that
-commit in the same Episode while preserving task content and parent identity,
-push and verify a new exact two-parent candidate, and only then resume through
-canonical task handoff. A failed integration can retry from its already-returned
-publication without repeating the status transition, admission, allocation, or
-assignment.
+Immediately before requesting or applying Merge, the Conversation preflights an explicit `(taskId, mainHead, candidateHead)` tuple. Canonical primary `main` must have no staged or tracked changes, must be free of an in-progress Git operation, and must equal upstream. The candidate branch, worktree `HEAD`, and upstream must all equal the reviewed head, and that head must descend current main. The exact task remains `In Progress` at the bound path. These checks are readable prompt policy, not a custom transaction or receipt.
 
-If the operator explicitly chooses Merge, the decision must name that exact
-verified task, current main, and pushed refreshed candidate. The guarded abandonment action
-requires clean canonical main and exact upstream state, fast-forwards only to
-the reviewed candidate, then immediately changes only the task to `Done` through
-Backlog and creates a direct one-path commit. A retry accepts only the exact
-pre-merge head, candidate, candidate plus its sole dirty/staged `Done` task, or
-one-task `Done` child. It can finish the commit without repeating a successful
-fast-forward or lifecycle mutation. It re-proves the Ready publication commit in
-main history and verifies candidate ancestry, merged code, content digest, path,
-parent identity, and status. A successful local
-`Done` commit remains authoritative when push or remote verification fails.
-Ownership and the idle Episode resources remain active for separate finalization
-or cleanup.
+If the operator explicitly authorizes that tuple, the Conversation runs ordinary `git merge --ff-only candidateHead`; Git reports drift or unsafe ancestry. It then changes the exact task to `Done` through the supported Backlog CLI, verifies that only its path changed, commits exactly that path, pushes, and rechecks main/upstream, ancestry, task identity/path/parent/status, and cleanliness. A failed push is resumed as ordinary transport work, without replaying merge or task mutation. Ownership and resources remain active.
 
-If the operator explicitly confirms abandonment instead, the authority binds the
-exact owner, active path, main head and captured non-`Done` status, pushed
-Episode head, candidate/main relationship, invariant parent, Episode-content
-digest, and Final Summary. It first rejects an archive destination already
-tracked at the bound main head, preserving historical bytes across task-ID reuse,
-and rejects any active or completed inbound link whose supported archive cleanup
-would modify another task. The guarded abandonment action selects only the task blob, reapplies the Conversation-owned status through
-Backlog, verifies a task-only effective
-diff, and archives without `Done`. It accepts only exact task-preparation,
-archival-move/stage, or direct archival-child recovery states. The verified local
-archive remains authoritative when final transport fails. Ownership and every
-Episode resource stay active until separately authorized cleanup.
+If the operator explicitly confirms abandonment, the Conversation works from clean pushed canonical main, selects only the bound task from the exact pushed Episode head, uses Backlog to preserve the non-`Done` status and record a truthful Final Summary, archives the task, and verifies that the effective diff is only the exact active/archive move. No Episode code enters main. It commits and pushes with ordinary Git. Ownership and resources remain active.
 
-A later Cleanup decision is independently explicit and binds every exact owner,
-task, Episode, session, worktree, branch, and optional Orca identity. Before any
-deletion, the Conversation must reverify the pushed exact `Done` child or exact
-non-`Done` archival child and a clean idle resource set. Cleanup removes runtime,
-worktree, and branch only in a verified monotonic sequence. An interrupted
-prefix retains active ownership for exact retry; inactive bookkeeping is written
-only after all resources are absent. Mixed terminal evidence, failed transport,
-identity drift, busy or dirty resources, unsafe gaps, provisioning, and
-uncertain ownership fail closed. The coordinator is exposed only as the separately confirmed cleanup action of `finalize_task_episode`.
+Cleanup is independently explicit. The cleanup-only `finalize_task_episode` call binds the exact task, owner, terminal Episode head, and truthful merged/abandoned outcome; verifies pushed terminal main plus clean idle bound resources; removes only runtime, worktree, and branch; verifies absence; and closes ownership last. It performs no review, status change, merge, abandonment, archive, or push. The durable cleanup head makes same-argument retry idempotent without caller-held receipts.
 
 Product, scope, merge, abandonment, remote transport, and destructive cleanup
 remain operator decisions.

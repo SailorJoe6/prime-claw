@@ -182,8 +182,9 @@ builder repository removes its own tree at the final task-native cutover.
 - **4b — episode mechanics.** `/implement-task TASK-ID` now creates a
   worktree-rooted Episode from one meaningful native Implementation Plan and
   exact-task ownership. `handoff_task_episode` continues that exact durable
-  session, while `finalize_task_episode` coordinates review, operator outcomes,
-  retained receipts, and separately authorized host cleanup. Generic
+  session. Conversation instructions use ordinary Git and Backlog for review
+  outcomes; cleanup-only `finalize_task_episode` handles separately authorized
+  exact resource removal. Generic
   `/implement-spec <future-folder>` mechanics remain active for retained bundles
   in initialized version-1 projects; they are not this builder
   repository's workflow authority.

@@ -19,9 +19,10 @@ operator review without planning or Episode admission.
    copies no bundle and creates no `.ralph/plans` promotion commit.
 5. The Episode implements approved code, documentation, and tests in its
    isolated worktree and exclusively owns the bound task's content there. The
-   Conversation exclusively owns lifecycle status on main, review,
-   `handoff_task_episode` continuation, and the guarded
-   `finalize_task_episode` actions.
+   Conversation exclusively owns lifecycle status on main and review.
+   It uses `handoff_task_episode` for continuation, ordinary Git and Backlog
+   for terminal outcomes, and cleanup-only `finalize_task_episode` for exact
+   resource removal.
 6. Merge or abandonment requires an explicit operator decision. Destructive
    cleanup requires a separate explicit decision and closes ownership only
    after the exact resources are absent.
