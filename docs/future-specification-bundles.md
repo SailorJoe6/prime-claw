@@ -31,9 +31,9 @@ this path. Task-native code never falls back to a folder specification.
 
 ## Retained version-1 compatibility
 
-Existing future bundles remain operational during the ordered migration. This
-retained version-1 compatibility surface lets a Conversation finish work
-already stored at:
+Existing future bundles remain operational in initialized projects that still
+use the ordered version-1 migration path. This retained compatibility surface
+lets a Conversation finish work already stored at:
 
 ```text
 .ralph/plans/future/<slug>/
@@ -87,9 +87,11 @@ later separately reviewed data-cutover step, not part of the bridge.
 6. The host promotes the exact bundle in a fresh isolated Episode and admits
    one fixed execute assignment.
 
-`.ralph/plans/future`, `.ralph/plans/archive`, and `.ralph/plans/blocked` remain
-reserved lifecycle directories until the final cutover. Bundle contents may not
-collide with those names when promoted.
+For a project still using version 1, `.ralph/plans/future`,
+`.ralph/plans/archive`, and `.ralph/plans/blocked` remain reserved lifecycle
+directories until that project's final cutover. Bundle contents may not collide
+with those names when promoted. This task-native builder repository no longer
+retains those directories.
 
 ## Retained version-1 planning surface
 

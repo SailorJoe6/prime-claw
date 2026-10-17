@@ -98,11 +98,13 @@ cleanup use `finalize_task_episode` without weakening operator authority.
 
 ## Retained version-1 compatibility
 
-Existing future folders remain available only through `/plan-spec`, `plan_spec`,
-`/implement-spec`, and their folder ownership mechanics during the ordered
-migration. Those procedures remain operational and are documented in
+The generic plugin keeps existing future folders available only through
+`/plan-spec`, `plan_spec`, `/implement-spec`, and their folder ownership
+mechanics for initialized projects still using version 1. Those procedures
+remain operational and are documented in
 [`future-specification-bundles.md`](future-specification-bundles.md); they are
-not the authority for a task-native Episode.
+not the authority for a task-native Episode, and this builder repository no
+longer stores a local `.ralph/plans` tree.
 
 This repository's ordered statuses are configured in `backlog/config.yml` as
 `In Design`, `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, and

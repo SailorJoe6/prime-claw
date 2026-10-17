@@ -163,9 +163,10 @@ installation is active. The final sandbox uses the same
 environment-global placement inside its isolated home. In both stages the universal agent ensures every managed project has Backlog
 state, regular customizable skills under `.agents/skills/`, and lifecycle-only
 customizable workflows under `.prime-claw/workflows/`, reconciled without
-overwriting project changes. Existing `.ralph/plans/` trees remain available
-only through the ordered migration and are removed at the final task-native
-cutover.
+overwriting project changes. The generic plugin keeps existing `.ralph/plans/`
+trees available only to initialized projects still using the ordered version-1
+migration path. This
+builder repository removes its own tree at the final task-native cutover.
 
 - **4a — phase skills and proven transitions.** Discoverable project skills
   under `.agents/skills/` and internal workflows under `.prime-claw/workflows/`
@@ -173,25 +174,27 @@ cutover.
   rather than duplicating workflow policy. Dogfooding established one stable
   transition, implemented and regression-tested as native `/handoff` → focused
   compaction → execute; see [docs/handoff-chain.md](docs/handoff-chain.md).
-  Folder-based `/plan-spec` was delivered first. The active migration has now
-  made `/design` and `/spec-it-out` author or revise an exact `In Design`
-  Backlog task and has added `/plan TASK-ID`; retained folders stay live for
-  compatibility until final migration.
+  Folder-based `/plan-spec` was delivered first. `/design` and `/spec-it-out` now
+  author or revise an exact `In Design` Backlog task and `/plan TASK-ID` plans
+  it. The generic plugin retains folder compatibility for initialized projects
+  that still use version 1; this builder repository no longer carries a local
+  plan tree.
 - **4b — episode mechanics.** `/implement-task TASK-ID` now creates a
   worktree-rooted Episode from one meaningful native Implementation Plan and
   exact-task ownership. `handoff_task_episode` continues that exact durable
   session, while `finalize_task_episode` coordinates review, operator outcomes,
-  retained receipts, and separately authorized host cleanup. Existing
+  retained receipts, and separately authorized host cleanup. Generic
   `/implement-spec <future-folder>` mechanics remain active for retained bundles
-  until final migration.
+  in initialized version-1 projects; they are not this builder
+  repository's workflow authority.
 - **4c — reviewed conversation → episode workflow.** `/design` and
   `/spec-it-out` retain different customizable starting assumptions but share
   one exact-task specification contract and stop for operator review. The
   operator invokes `/plan TASK-ID` for a second review gate. Only the explicit
   `/implement-task TASK-ID` boundary may authorize and create the
-  worktree-rooted Episode. Existing `/plan-spec` and `/implement-spec` remain a
-  bounded compatibility route for already-created future bundles during this
-  conversion. Manual proof must show that one task and owner identity survive
+  worktree-rooted Episode. `/plan-spec` and `/implement-spec` remain a bounded
+  generic compatibility route for already-created future bundles in projects
+  that retain them. Manual proof must show that one task and owner identity survive
   execute/handoff iterations, useful EXPERT reviews, candidate revision,
   merge or abandonment decisions, and separately authorized cleanup.
 - **4d — `upgrade-this-to-prime-agent` command.** Convert a Ralph
@@ -203,8 +206,8 @@ through `/design` or `/spec-it-out`, received operator specification approval,
 written and reviewed its native Implementation Plan through `/plan TASK-ID`,
 and promoted it through `/implement-task TASK-ID` into a worktree-rooted Episode
 that shipped a real feature through bounded execute/handoff iterations, merge,
-and safe cleanup. The final candidate removes `.ralph/plans`; the
-customizable-policy versus deterministic-mechanics boundary, context crossing,
+and safe cleanup. The task-native cutover candidate removes this builder
+repository's `.ralph/plans` tree; the customizable-policy versus deterministic-mechanics boundary, context crossing,
 ownership, and review gates are documented and proven by manual dogfood before
 wider orchestration.
 

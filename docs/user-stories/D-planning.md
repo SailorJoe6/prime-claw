@@ -17,10 +17,12 @@ authorizing implementation.**
 6. commit only that exact task path, attempt a prompt push, and stop for
    operator review.
 
-During the bounded migration, `/plan-spec .ralph/plans/future/<slug>` and
-`plan_spec(location=...)` retain the established folder workflow. They validate
-one exact folder, produce `EXECUTION_PLAN.md` beside the specification, and stop
-for the same separate operator review.
+In initialized projects that still retain version-1 bundles, `/plan-spec
+.ralph/plans/future/<slug>` and `plan_spec(location=...)` keep the established
+folder workflow. They validate one exact folder, produce `EXECUTION_PLAN.md`
+beside the specification, and stop for the same separate operator review. This
+builder repository has completed its local task-native cutover and carries no
+such folder.
 
 The plan is concise and actionable at the level of detail the work needs. It
 records relevant implementation steps or slices, tests, documentation,

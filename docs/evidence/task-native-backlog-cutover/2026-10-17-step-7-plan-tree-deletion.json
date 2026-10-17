@@ -1,0 +1,652 @@
+{
+  "schemaVersion": 1,
+  "taskId": "PRIMECLAW-10.38",
+  "preDeletionCommit": "cbd7b4f0b794f0b9520deb8f5d8b32f775559318",
+  "frozenProvenanceCommit": "6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+  "trackedPlanPathCount": 43,
+  "ownedPathCount": 42,
+  "sharedIndexPath": ".ralph/plans/archive/README.md",
+  "bundleOwnerCount": 16,
+  "ownership": {
+    "version": 2,
+    "status": "active",
+    "taskId": "PRIMECLAW-10.38",
+    "taskPath": "backlog/tasks/primeclaw-10.38 - Replace-.ralph-plans-with-task-native-Backlog-Ralph-lifecycle.md",
+    "episodeId": "01a133c6-0834-7465-8597-91cf46c0b19e",
+    "episodeActiveSessionId": "a70b200f031a"
+  },
+  "activeRoot": {
+    "specification": {
+      "path": ".ralph/plans/SPECIFICATION.md",
+      "sha256": "8d454959c47fd3102ab54d185e27ebd4f7e972ea6d5bc2b65a8d45d8e08ef0b0",
+      "durability": "pointer only; authoritative specification is the task Description and Acceptance Criteria"
+    },
+    "executionPlan": {
+      "path": ".ralph/plans/EXECUTION_PLAN.md",
+      "sha256": "66e9384b4f0b6b49fa72c40fd83aeb21d1127717613f7eaba10e48cb51d44a0c",
+      "taskImplementationPlanSha256": "7e12a4f5788e8e03140991941b283aad8e446087a0db04f7f874c32e9dc51967",
+      "normalizedTrailingNewlineOnly": true
+    },
+    "ownerTaskPath": "backlog/tasks/primeclaw-10.38 - Replace-.ralph-plans-with-task-native-Backlog-Ralph-lifecycle.md",
+    "ownerTaskStatus": "In Progress",
+    "ownerTaskParent": "PRIMECLAW-10"
+  },
+  "checks": {
+    "allTrackedPathsExistAtFrozenCommit": true,
+    "everyOwnedPathHasPinnedTaskReferenceOrImportedBody": true,
+    "sharedArchiveIndexPinnedByEveryOwner": true,
+    "activeSpecificationDefinesNoIndependentScope": true,
+    "completeActivePlanStoredInTask": true,
+    "taskNativeOwnershipActive": true
+  },
+  "owners": [
+    {
+      "bundle": "active-root",
+      "taskId": "PRIMECLAW-10.38",
+      "status": "In Progress",
+      "parentTaskId": "PRIMECLAW-10",
+      "taskPath": "backlog/tasks/primeclaw-10.38 - Replace-.ralph-plans-with-task-native-Backlog-Ralph-lifecycle.md",
+      "sourcePaths": [
+        ".ralph/plans/EXECUTION_PLAN.md",
+        ".ralph/plans/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/compaction-first-phase-transitions",
+      "taskId": "PRIMECLAW-39",
+      "status": "Done",
+      "parentTaskId": null,
+      "taskPath": "backlog/completed/primeclaw-39 - Historical-Compaction-first-phase-transitions.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/compaction-first-phase-transitions/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/compaction-first-phase-transitions/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/conversation-driven-episode-oversight",
+      "taskId": "PRIMECLAW-10.26",
+      "status": "Done",
+      "parentTaskId": "PRIMECLAW-10",
+      "taskPath": "backlog/completed/primeclaw-10.26 - Implement-conversation-driven-episode-oversight-plugin.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/conversation-driven-episode-oversight/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/conversation-driven-episode-oversight/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/conversational-ralph-command-routing",
+      "taskId": "PRIMECLAW-38",
+      "status": "Done",
+      "parentTaskId": null,
+      "taskPath": "backlog/completed/primeclaw-38 - Historical-Conversational-Ralph-command-routing.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/conversational-ralph-command-routing/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/conversational-ralph-command-routing/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/goal-heartbeat-work-control",
+      "taskId": "PRIMECLAW-10.28",
+      "status": "Done",
+      "parentTaskId": "PRIMECLAW-10",
+      "taskPath": "backlog/completed/primeclaw-10.28 - Implement-plugin-global-goal-and-heartbeat-work-control.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/goal-heartbeat-work-control/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/goal-heartbeat-work-control/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/handoff-continuation-resilience",
+      "taskId": "PRIMECLAW-10.15",
+      "status": "Done",
+      "parentTaskId": "PRIMECLAW-10",
+      "taskPath": "backlog/completed/primeclaw-10.15 - POC-conversation-owned-episode-for-resilient-conversational-handoff.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/handoff-continuation-resilience/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/handoff-continuation-resilience/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/official-lean-compatibility-cleanup",
+      "taskId": "PRIMECLAW-10.34",
+      "status": "Done",
+      "parentTaskId": "PRIMECLAW-10",
+      "taskPath": "backlog/completed/primeclaw-10.34 - Complete-official-lean-role-protocol-and-remove-compatibility.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/official-lean-compatibility-cleanup/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/official-lean-session-protocol",
+      "taskId": "PRIMECLAW-40",
+      "status": "Done",
+      "parentTaskId": null,
+      "taskPath": "backlog/completed/primeclaw-40 - Historical-Official-lean-session-protocol.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/official-lean-session-protocol/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/official-lean-session-protocol/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/phase1-derisk-gate",
+      "taskId": "PRIMECLAW-36",
+      "status": "Done",
+      "parentTaskId": null,
+      "taskPath": "backlog/completed/primeclaw-36 - Historical-Phase-1-de-risk-gate.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/phase1-derisk-gate/DECISIONS.md",
+        ".ralph/plans/archive/phase1-derisk-gate/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
+        ".ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/phase2-runtime",
+      "taskId": "PRIMECLAW-6",
+      "status": "Done",
+      "parentTaskId": null,
+      "taskPath": "backlog/completed/primeclaw-6 - Phase-2-sandbox-runtime-foundation-prime-agent-in-OpenShell.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/phase2-runtime/DECISIONS.md",
+        ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/phase2-runtime/REQUIREMENTS.md",
+        ".ralph/plans/archive/phase2-runtime/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/phase3a-bufd-superseded-incomplete",
+      "taskId": "PRIMECLAW-41",
+      "status": "Done",
+      "parentTaskId": null,
+      "taskPath": "backlog/completed/primeclaw-41 - Historical-Superseded-incomplete-Phase-3a-brain-hosting-BUFD.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/DECISIONS.md",
+        ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/REQUIREMENTS.md",
+        ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/plugin-test-container",
+      "taskId": "PRIMECLAW-19",
+      "status": "Done",
+      "parentTaskId": null,
+      "taskPath": "backlog/completed/primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/plugin-test-container/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md",
+        ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-2666843-expert-pass.md",
+        ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-47d2830-expert-block.md",
+        ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-d8dbc5d-expert-block.md",
+        ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice2-470be98-expert-block.md",
+        ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice2-bc00cba-expert-pass.md"
+      ]
+    },
+    {
+      "bundle": "archive/project-wide-testing-strategy",
+      "taskId": "PRIMECLAW-20",
+      "status": "Done",
+      "parentTaskId": null,
+      "taskPath": "backlog/completed/primeclaw-20 - Project-wide-testing-strategy-specification-planning-only.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "archive/worktree-isolated-specification-episodes",
+      "taskId": "PRIMECLAW-37",
+      "status": "Done",
+      "parentTaskId": null,
+      "taskPath": "backlog/completed/primeclaw-37 - Historical-Reviewed-future-plans-and-worktree-isolated-specification-episodes.md",
+      "sourcePaths": [
+        ".ralph/plans/archive/worktree-isolated-specification-episodes/EXECUTION_PLAN.md",
+        ".ralph/plans/archive/worktree-isolated-specification-episodes/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "future/delivery-manager-episode-supervision",
+      "taskId": "PRIMECLAW-42",
+      "status": "In Design",
+      "parentTaskId": null,
+      "taskPath": "backlog/tasks/primeclaw-42 - Design-delivery-manager-episode-supervision.md",
+      "sourcePaths": [
+        ".ralph/plans/future/delivery-manager-episode-supervision/SPECIFICATION.md"
+      ]
+    },
+    {
+      "bundle": "future/phase3a-brain-hosting-completion",
+      "taskId": "PRIMECLAW-7",
+      "status": "Blocked",
+      "parentTaskId": null,
+      "taskPath": "backlog/tasks/primeclaw-7 - Phase-3-tracer-bullet-end-to-end-working-claw.md",
+      "sourcePaths": [
+        ".ralph/plans/future/phase3a-brain-hosting-completion/EXECUTION_PLAN.md",
+        ".ralph/plans/future/phase3a-brain-hosting-completion/SPECIFICATION.md"
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "path": ".ralph/plans/EXECUTION_PLAN.md",
+      "bundle": "active-root",
+      "owner": "PRIMECLAW-10.38",
+      "ownerPath": "backlog/tasks/primeclaw-10.38 - Replace-.ralph-plans-with-task-native-Backlog-Ralph-lifecycle.md",
+      "status": "In Progress",
+      "pinnedReference": ".ralph/plans/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/SPECIFICATION.md",
+      "bundle": "active-root",
+      "owner": "PRIMECLAW-10.38",
+      "ownerPath": "backlog/tasks/primeclaw-10.38 - Replace-.ralph-plans-with-task-native-Backlog-Ralph-lifecycle.md",
+      "status": "In Progress",
+      "pinnedReference": ".ralph/plans/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/compaction-first-phase-transitions/EXECUTION_PLAN.md",
+      "bundle": "archive/compaction-first-phase-transitions",
+      "owner": "PRIMECLAW-39",
+      "ownerPath": "backlog/completed/primeclaw-39 - Historical-Compaction-first-phase-transitions.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/compaction-first-phase-transitions/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/compaction-first-phase-transitions/SPECIFICATION.md",
+      "bundle": "archive/compaction-first-phase-transitions",
+      "owner": "PRIMECLAW-39",
+      "ownerPath": "backlog/completed/primeclaw-39 - Historical-Compaction-first-phase-transitions.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/compaction-first-phase-transitions/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/conversation-driven-episode-oversight/EXECUTION_PLAN.md",
+      "bundle": "archive/conversation-driven-episode-oversight",
+      "owner": "PRIMECLAW-10.26",
+      "ownerPath": "backlog/completed/primeclaw-10.26 - Implement-conversation-driven-episode-oversight-plugin.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/conversation-driven-episode-oversight/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/conversation-driven-episode-oversight/SPECIFICATION.md",
+      "bundle": "archive/conversation-driven-episode-oversight",
+      "owner": "PRIMECLAW-10.26",
+      "ownerPath": "backlog/completed/primeclaw-10.26 - Implement-conversation-driven-episode-oversight-plugin.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/conversation-driven-episode-oversight/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/conversational-ralph-command-routing/EXECUTION_PLAN.md",
+      "bundle": "archive/conversational-ralph-command-routing",
+      "owner": "PRIMECLAW-38",
+      "ownerPath": "backlog/completed/primeclaw-38 - Historical-Conversational-Ralph-command-routing.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/conversational-ralph-command-routing/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/conversational-ralph-command-routing/SPECIFICATION.md",
+      "bundle": "archive/conversational-ralph-command-routing",
+      "owner": "PRIMECLAW-38",
+      "ownerPath": "backlog/completed/primeclaw-38 - Historical-Conversational-Ralph-command-routing.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/conversational-ralph-command-routing/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/goal-heartbeat-work-control/EXECUTION_PLAN.md",
+      "bundle": "archive/goal-heartbeat-work-control",
+      "owner": "PRIMECLAW-10.28",
+      "ownerPath": "backlog/completed/primeclaw-10.28 - Implement-plugin-global-goal-and-heartbeat-work-control.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/goal-heartbeat-work-control/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/goal-heartbeat-work-control/SPECIFICATION.md",
+      "bundle": "archive/goal-heartbeat-work-control",
+      "owner": "PRIMECLAW-10.28",
+      "ownerPath": "backlog/completed/primeclaw-10.28 - Implement-plugin-global-goal-and-heartbeat-work-control.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/goal-heartbeat-work-control/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/handoff-continuation-resilience/EXECUTION_PLAN.md",
+      "bundle": "archive/handoff-continuation-resilience",
+      "owner": "PRIMECLAW-10.15",
+      "ownerPath": "backlog/completed/primeclaw-10.15 - POC-conversation-owned-episode-for-resilient-conversational-handoff.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/handoff-continuation-resilience/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/handoff-continuation-resilience/SPECIFICATION.md",
+      "bundle": "archive/handoff-continuation-resilience",
+      "owner": "PRIMECLAW-10.15",
+      "ownerPath": "backlog/completed/primeclaw-10.15 - POC-conversation-owned-episode-for-resilient-conversational-handoff.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/handoff-continuation-resilience/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md",
+      "bundle": "archive/official-lean-compatibility-cleanup",
+      "owner": "PRIMECLAW-10.34",
+      "ownerPath": "backlog/completed/primeclaw-10.34 - Complete-official-lean-role-protocol-and-remove-compatibility.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/official-lean-compatibility-cleanup/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/official-lean-compatibility-cleanup/SPECIFICATION.md",
+      "bundle": "archive/official-lean-compatibility-cleanup",
+      "owner": "PRIMECLAW-10.34",
+      "ownerPath": "backlog/completed/primeclaw-10.34 - Complete-official-lean-role-protocol-and-remove-compatibility.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/official-lean-compatibility-cleanup/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/official-lean-session-protocol/EXECUTION_PLAN.md",
+      "bundle": "archive/official-lean-session-protocol",
+      "owner": "PRIMECLAW-40",
+      "ownerPath": "backlog/completed/primeclaw-40 - Historical-Official-lean-session-protocol.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/official-lean-session-protocol/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/official-lean-session-protocol/SPECIFICATION.md",
+      "bundle": "archive/official-lean-session-protocol",
+      "owner": "PRIMECLAW-40",
+      "ownerPath": "backlog/completed/primeclaw-40 - Historical-Official-lean-session-protocol.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/official-lean-session-protocol/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase1-derisk-gate/DECISIONS.md",
+      "bundle": "archive/phase1-derisk-gate",
+      "owner": "PRIMECLAW-36",
+      "ownerPath": "backlog/completed/primeclaw-36 - Historical-Phase-1-de-risk-gate.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase1-derisk-gate/DECISIONS.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase1-derisk-gate/EXECUTION_PLAN.md",
+      "bundle": "archive/phase1-derisk-gate",
+      "owner": "PRIMECLAW-36",
+      "ownerPath": "backlog/completed/primeclaw-36 - Historical-Phase-1-de-risk-gate.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase1-derisk-gate/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md",
+      "bundle": "archive/phase1-derisk-gate",
+      "owner": "PRIMECLAW-36",
+      "ownerPath": "backlog/completed/primeclaw-36 - Historical-Phase-1-de-risk-gate.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase1-derisk-gate/REQUIREMENTS.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md",
+      "bundle": "archive/phase1-derisk-gate",
+      "owner": "PRIMECLAW-36",
+      "ownerPath": "backlog/completed/primeclaw-36 - Historical-Phase-1-de-risk-gate.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase1-derisk-gate/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase2-runtime/DECISIONS.md",
+      "bundle": "archive/phase2-runtime",
+      "owner": "PRIMECLAW-6",
+      "ownerPath": "backlog/completed/primeclaw-6 - Phase-2-sandbox-runtime-foundation-prime-agent-in-OpenShell.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase2-runtime/DECISIONS.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md",
+      "bundle": "archive/phase2-runtime",
+      "owner": "PRIMECLAW-6",
+      "ownerPath": "backlog/completed/primeclaw-6 - Phase-2-sandbox-runtime-foundation-prime-agent-in-OpenShell.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase2-runtime/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase2-runtime/REQUIREMENTS.md",
+      "bundle": "archive/phase2-runtime",
+      "owner": "PRIMECLAW-6",
+      "ownerPath": "backlog/completed/primeclaw-6 - Phase-2-sandbox-runtime-foundation-prime-agent-in-OpenShell.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase2-runtime/REQUIREMENTS.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase2-runtime/SPECIFICATION.md",
+      "bundle": "archive/phase2-runtime",
+      "owner": "PRIMECLAW-6",
+      "ownerPath": "backlog/completed/primeclaw-6 - Phase-2-sandbox-runtime-foundation-prime-agent-in-OpenShell.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase2-runtime/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/DECISIONS.md",
+      "bundle": "archive/phase3a-bufd-superseded-incomplete",
+      "owner": "PRIMECLAW-41",
+      "ownerPath": "backlog/completed/primeclaw-41 - Historical-Superseded-incomplete-Phase-3a-brain-hosting-BUFD.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/DECISIONS.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/EXECUTION_PLAN.md",
+      "bundle": "archive/phase3a-bufd-superseded-incomplete",
+      "owner": "PRIMECLAW-41",
+      "ownerPath": "backlog/completed/primeclaw-41 - Historical-Superseded-incomplete-Phase-3a-brain-hosting-BUFD.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/REQUIREMENTS.md",
+      "bundle": "archive/phase3a-bufd-superseded-incomplete",
+      "owner": "PRIMECLAW-41",
+      "ownerPath": "backlog/completed/primeclaw-41 - Historical-Superseded-incomplete-Phase-3a-brain-hosting-BUFD.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/REQUIREMENTS.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/SPECIFICATION.md",
+      "bundle": "archive/phase3a-bufd-superseded-incomplete",
+      "owner": "PRIMECLAW-41",
+      "ownerPath": "backlog/completed/primeclaw-41 - Historical-Superseded-incomplete-Phase-3a-brain-hosting-BUFD.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/phase3a-bufd-superseded-incomplete/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/plugin-test-container/EXECUTION_PLAN.md",
+      "bundle": "archive/plugin-test-container",
+      "owner": "PRIMECLAW-19",
+      "ownerPath": "backlog/completed/primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/plugin-test-container/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md",
+      "bundle": "archive/plugin-test-container",
+      "owner": "PRIMECLAW-19",
+      "ownerPath": "backlog/completed/primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/plugin-test-container/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-2666843-expert-pass.md",
+      "bundle": "archive/plugin-test-container",
+      "owner": "PRIMECLAW-19",
+      "ownerPath": "backlog/completed/primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-2666843-expert-pass.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-47d2830-expert-block.md",
+      "bundle": "archive/plugin-test-container",
+      "owner": "PRIMECLAW-19",
+      "ownerPath": "backlog/completed/primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-47d2830-expert-block.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-d8dbc5d-expert-block.md",
+      "bundle": "archive/plugin-test-container",
+      "owner": "PRIMECLAW-19",
+      "ownerPath": "backlog/completed/primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice1-d8dbc5d-expert-block.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice2-470be98-expert-block.md",
+      "bundle": "archive/plugin-test-container",
+      "owner": "PRIMECLAW-19",
+      "ownerPath": "backlog/completed/primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice2-470be98-expert-block.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice2-bc00cba-expert-pass.md",
+      "bundle": "archive/plugin-test-container",
+      "owner": "PRIMECLAW-19",
+      "ownerPath": "backlog/completed/primeclaw-19 - Test-tier-architecture-tier-1-plugin-test-container.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/plugin-test-container/reviews/2026-09-30-slice2-bc00cba-expert-pass.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md",
+      "bundle": "archive/project-wide-testing-strategy",
+      "owner": "PRIMECLAW-20",
+      "ownerPath": "backlog/completed/primeclaw-20 - Project-wide-testing-strategy-specification-planning-only.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/project-wide-testing-strategy/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md",
+      "bundle": "archive/project-wide-testing-strategy",
+      "owner": "PRIMECLAW-20",
+      "ownerPath": "backlog/completed/primeclaw-20 - Project-wide-testing-strategy-specification-planning-only.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/project-wide-testing-strategy/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/worktree-isolated-specification-episodes/EXECUTION_PLAN.md",
+      "bundle": "archive/worktree-isolated-specification-episodes",
+      "owner": "PRIMECLAW-37",
+      "ownerPath": "backlog/completed/primeclaw-37 - Historical-Reviewed-future-plans-and-worktree-isolated-specification-episodes.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/worktree-isolated-specification-episodes/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/archive/worktree-isolated-specification-episodes/SPECIFICATION.md",
+      "bundle": "archive/worktree-isolated-specification-episodes",
+      "owner": "PRIMECLAW-37",
+      "ownerPath": "backlog/completed/primeclaw-37 - Historical-Reviewed-future-plans-and-worktree-isolated-specification-episodes.md",
+      "status": "Done",
+      "pinnedReference": ".ralph/plans/archive/worktree-isolated-specification-episodes/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/future/delivery-manager-episode-supervision/SPECIFICATION.md",
+      "bundle": "future/delivery-manager-episode-supervision",
+      "owner": "PRIMECLAW-42",
+      "ownerPath": "backlog/tasks/primeclaw-42 - Design-delivery-manager-episode-supervision.md",
+      "status": "In Design",
+      "pinnedReference": ".ralph/plans/future/delivery-manager-episode-supervision/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/future/phase3a-brain-hosting-completion/EXECUTION_PLAN.md",
+      "bundle": "future/phase3a-brain-hosting-completion",
+      "owner": "PRIMECLAW-7",
+      "ownerPath": "backlog/tasks/primeclaw-7 - Phase-3-tracer-bullet-end-to-end-working-claw.md",
+      "status": "Blocked",
+      "pinnedReference": ".ralph/plans/future/phase3a-brain-hosting-completion/EXECUTION_PLAN.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    },
+    {
+      "path": ".ralph/plans/future/phase3a-brain-hosting-completion/SPECIFICATION.md",
+      "bundle": "future/phase3a-brain-hosting-completion",
+      "owner": "PRIMECLAW-7",
+      "ownerPath": "backlog/tasks/primeclaw-7 - Phase-3-tracer-bullet-end-to-end-working-claw.md",
+      "status": "Blocked",
+      "pinnedReference": ".ralph/plans/future/phase3a-brain-hosting-completion/SPECIFICATION.md @ 6d11d9c2797cea54ecd07171e8a5b2019d6ee530",
+      "presentInReferences": true,
+      "presentInTaskBody": true
+    }
+  ]
+}

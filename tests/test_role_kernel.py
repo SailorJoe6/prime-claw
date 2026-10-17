@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -35,15 +36,29 @@ def test_delivery_manifest_selects_the_single_role_kernel() -> None:
     assert [(asset["source"], asset["id"]) for asset in selected] == [("ROLE_KERNEL.md", "global-role-kernel")]
 
 
+def _frozen_plan_bytes(relative_path: str) -> bytes:
+    result = subprocess.run(
+        [
+            "git", "-C", REPO, "show",
+            f"4a40a0832d561e380da32099f07d3ea2195e7e65:{relative_path}",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return result.stdout
+
+
 def test_predecessor_archive_matches_recorded_hashes() -> None:
-    archive = REPO / ".ralph/plans/archive/official-lean-session-protocol"
     expected = {
         "SPECIFICATION.md": "09cce8ae0898da292fb34f843b3e99b3a5144898934c7e13408a29e76ae2802a",
         "EXECUTION_PLAN.md": "cf9a75e45d4ccabb42e3c36feed05ef9678227bc58d9e8514aea99145cabe888",
     }
-    assert {path.name for path in archive.iterdir()} == set(expected)
     for name, sha256 in expected.items():
-        assert hashlib.sha256((archive / name).read_bytes()).hexdigest() == sha256
-        assert (archive / name).read_bytes() != (
-            REPO / ".ralph/plans/archive/official-lean-compatibility-cleanup" / name
-        ).read_bytes()
+        predecessor = _frozen_plan_bytes(
+            f".ralph/plans/archive/official-lean-session-protocol/{name}"
+        )
+        replacement = _frozen_plan_bytes(
+            f".ralph/plans/archive/official-lean-compatibility-cleanup/{name}"
+        )
+        assert hashlib.sha256(predecessor).hexdigest() == sha256
+        assert predecessor != replacement

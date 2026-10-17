@@ -79,6 +79,9 @@ prime-claw builds on four prior projects. Read these before designing:
 - [evidence/task-native-backlog-cutover/2026-10-14-step-6-status-migration.json](evidence/task-native-backlog-cutover/2026-10-14-step-6-status-migration.json)
   — the repository-local pre/post status, identity, parent, and configuration
   receipt for the one-time `PRIMECLAW-10.38` Step 6 cutover.
+- [evidence/task-native-backlog-cutover/2026-10-17-step-7-plan-tree-deletion.json](evidence/task-native-backlog-cutover/2026-10-17-step-7-plan-tree-deletion.json)
+  — the 43-path durability, frozen-provenance, Backlog-owner, and active-root
+  handoff proof recorded before this repository removed its plan tree.
 
 (Capability design docs land here as the builder grows, one per capability,
 following the openclaw-setup pattern.)

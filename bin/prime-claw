@@ -3090,7 +3090,7 @@ def cmd_recover(cfg, args) -> int:
 
 def _not_implemented(verb):
     def _run(cfg, args):
-        print(f"prime-claw {verb}: not yet implemented (see EXECUTION_PLAN.md).", file=sys.stderr)
+        print(f"prime-claw {verb}: not yet implemented (see the project Backlog and documentation).", file=sys.stderr)
         if args.dry_run:
             print(f"dry_run: would run stage(s) for `{verb}` against sandbox "
                   f"{cfg['sandbox_name']!r} (image {cfg['image']}).")

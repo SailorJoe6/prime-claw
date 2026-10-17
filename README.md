@@ -1,7 +1,7 @@
 # prime-claw
 
-**Builder repo** for the prime-claw sandbox: the scripts, docs, plans, and
-tooling used to construct and iterate on a **persistent virtual personal
+**Builder repo** for the prime-claw sandbox: the scripts, docs, and tooling
+used to construct and iterate on a **persistent virtual personal
 assistant** built on the prime-agent harness.
 
 prime-claw is a claw for any thought worker who runs multiple parallel
@@ -38,8 +38,10 @@ full phase status and blockers.
 - [Task-native specification authoring and retained bundle compatibility](docs/future-specification-bundles.md)
   — author or revise one exact `In Design` task with `/skill:design` or
   `/skill:spec-it-out`, then use `/plan TASK-ID` for separate plan review.
-  Use `/implement-task TASK-ID` for new task-native Episodes. Existing future
-  bundles retain `/plan-spec` and `/implement-spec` until final migration.
+  Use `/implement-task TASK-ID` for new task-native Episodes. The generic plugin
+  retains `/plan-spec` and `/implement-spec` for initialized projects that still
+  have version-1 bundles; this builder repository no longer stores a local
+  `.ralph/plans` tree.
 - [Native handoff chain](docs/handoff-chain.md) — update durable records and
   continue an approved episode iteration through focused compaction and the
   canonical execute workflow.

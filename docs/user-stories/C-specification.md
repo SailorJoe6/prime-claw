@@ -23,7 +23,7 @@ Both paths store the living product contract in supported Backlog fields:
 Description, native Acceptance Criteria, References, and Documentation. They
 reject `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, and `Done`
 without mutation. New tasks spell out `In Design` rather than relying on the
-temporary project default. After a verified task-only commit and prompt push
+configured project default. After a verified task-only commit and prompt push
 attempt, both stop for operator review. Neither writes an Implementation Plan,
 allocates an Episode, or authorizes implementation.
 

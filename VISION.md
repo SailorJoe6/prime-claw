@@ -195,10 +195,12 @@ whose sole durable authority is that task. Planning approval never implicitly
 authorizes implementation, and the Conversation retains lifecycle status while
 the Episode owns task content on its branch.
 
-Already-created `.ralph/plans/future/<slug>` bundles remain operational through
-the retained version-1 compatibility path: `/plan-spec`, `/implement-spec`, and
-the existing folder-based Episode mechanics. New `/design` and `/spec-it-out`
-invocations do not create those folders.
+Already-created `.ralph/plans/future/<slug>` bundles in initialized projects
+remain operational through the retained version-1 compatibility path:
+`/plan-spec`, `/implement-spec`, and the existing folder-based Episode
+mechanics. New `/design` and `/spec-it-out` invocations do not create those
+folders, and this task-native builder repository no longer stores a local
+`.ralph/plans` tree.
 
 A task-native Episode remains available through bounded execute and handoff
 iterations, independent review, refreshed-candidate verification, and explicit
@@ -253,9 +255,10 @@ project-local plugin copy while that global installation is active because
 cross-scope discovery can prevent Prime Agent startup. In both stages, each
 managed project keeps regular customizable skills under `.agents/skills/` and
 lifecycle-only workflows under `.prime-claw/workflows/`. Projects with retained
-version-1 compatibility work also keep their existing `.ralph/plans/` tree until
-the explicit final cutover; task-native authority does not create or consult
-that tree. The reconciler installs independently safe template updates and
+version-1 compatibility work may keep their existing `.ralph/plans/` tree until
+their explicit final cutover. Task-native authority
+does not create or consult that tree, and this builder repository has completed
+its repository-local cutover. The reconciler installs independently safe template updates and
 preserves customization.
 
 ## The builder repo

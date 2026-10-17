@@ -1,6 +1,7 @@
 from collections import Counter
 import json
 from pathlib import Path
+import subprocess
 
 import yaml
 
@@ -183,6 +184,39 @@ def test_synthetic_status_migration_classifies_to_do_and_preserves_stronger_stat
         )
     for task_id in ("SYNTHETIC-3", "SYNTHETIC-4", "SYNTHETIC-5", "SYNTHETIC-6"):
         assert after[task_id] == before[task_id]
+
+
+def test_plan_tree_deletion_receipt_proves_durable_task_owners() -> None:
+    receipt = json.loads((
+        ROOT / "docs/evidence/task-native-backlog-cutover/2026-10-17-step-7-plan-tree-deletion.json"
+    ).read_text())
+    assert receipt["preDeletionCommit"] == "cbd7b4f0b794f0b9520deb8f5d8b32f775559318"
+    assert receipt["frozenProvenanceCommit"] == "6d11d9c2797cea54ecd07171e8a5b2019d6ee530"
+    assert receipt["trackedPlanPathCount"] == receipt["ownedPathCount"] + 1 == 43
+    assert receipt["bundleOwnerCount"] == 16
+    assert receipt["sharedIndexPath"] == ".ralph/plans/archive/README.md"
+    assert all(receipt["checks"].values())
+    assert receipt["ownership"]["version"] == 2
+    assert receipt["ownership"]["status"] == "active"
+    assert receipt["ownership"]["taskId"] == "PRIMECLAW-10.38"
+    assert receipt["activeRoot"]["ownerTaskStatus"] == "In Progress"
+    assert receipt["activeRoot"]["ownerTaskParent"] == "PRIMECLAW-10"
+    assert receipt["activeRoot"]["executionPlan"]["normalizedTrailingNewlineOnly"] is True
+    assert Counter(row["status"] for row in receipt["owners"]) == {
+        "Done": 13, "In Progress": 1, "In Design": 1, "Blocked": 1,
+    }
+    assert len({row["path"] for row in receipt["paths"]}) == 42
+    assert all(
+        row["presentInReferences"] or row["presentInTaskBody"]
+        for row in receipt["paths"]
+    )
+    tracked_plans = subprocess.run(
+        ["git", "-C", ROOT, "ls-files", "--", ".ralph/plans"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    assert tracked_plans == []
 
 
 def test_repository_status_migration_receipt_and_live_data_are_consistent() -> None:

@@ -80,7 +80,11 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
             assert installed["state"]=="managed"
             assert hashlib.sha256(destination.read_bytes()).hexdigest()==installed["installedSha256"]
     assert not (ROOT/".ralph/skills").exists()
-    assert (ROOT/".ralph/plans").is_dir()
+    tracked_plans=subprocess.run(
+        ["git","-C",ROOT,"ls-files","--",".ralph/plans"],
+        check=True,capture_output=True,text=True,
+    ).stdout.splitlines()
+    assert tracked_plans==[]
     for name in ("design-legacy", "spec-it-out-legacy"):
         assert (ROOT/".agents/skills"/name/"SKILL.md").is_file()
     prepare_state=manifest["assets"]["project-skill-prepare"]

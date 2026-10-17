@@ -1,16 +1,16 @@
-# .ralph — prime-claw planning layout
+# `.ralph` — retained runtime configuration
 
-This directory holds the Ralph-style planning artifacts used by Prime Claw.
-Project skills and lifecycle workflows now live outside `.ralph`.
+This builder repository uses Backlog tasks as its specification, planning,
+progress, blocker, and outcome authority. Its repository-local `.ralph/plans`
+tree was removed after the tracked content was migrated and pinned to durable
+Backlog owners and Git provenance.
 
-- `skills/` is retired. Project initialization migrates recognized legacy
-  files to regular customizable `.agents/skills/` files and lifecycle-only
-  `.prime-claw/workflows/` files without moving `plans/`.
-- `plans/` — created on demand by the design/plan skills. The design and
-  spec-it-out skills produce one `SPECIFICATION.md`; the plan skill produces
-  `EXECUTION_PLAN.md`; finished work archives to `plans/archive/`; blocked work
-  moves to `plans/blocked/`.
+Project skills and lifecycle workflows live outside `.ralph`:
 
-Provenance note: the migrated project assets remain Prime-Agent-native and are
-canonical under `src/prime-agent-plugin/`. Installed project copies can diverge
-safely under the tracked template manifest.
+- regular customizable skills live under `.agents/skills/`;
+- lifecycle-only workflows live under `.prime-claw/workflows/`; and
+- the retired `.ralph/skills/` layout is migrated by project initialization.
+
+The generic Prime Claw plugin still supports `.ralph/plans` for initialized
+projects that retain version-1 folder workflows. That compatibility does not
+make this builder repository's `.ralph` directory a planning authority.
