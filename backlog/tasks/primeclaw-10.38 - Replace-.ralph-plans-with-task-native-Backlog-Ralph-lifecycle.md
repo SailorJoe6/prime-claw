@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-17 23:06'
+updated_date: '2026-10-17 23:15'
 labels:
   - backlog-md
   - episode-loop
@@ -195,13 +195,13 @@ This repository retains these configured Backlog statuses:
 5. `Ready for Merge`
 6. `Done`
 
-The prompt-led task-native lifecycle does not require `Ready for Merge` as a handshake. Work remains `In Progress` through review and explicit operator authorization; `Done` is the successful terminal status after an ordinary fast-forward merge. Confirmed abandonment uses Backlog soft deletion and never marks the task `Done`. New ordinary tasks default to `In Design`; this repository removes active `To Do` guidance only after its data migration is proven.
+The prompt-led task-native lifecycle keeps `Ready for Merge` as an observable status gate without a custom handshake, coordinator, or receipt. Work remains `In Progress` through review. After accepting an exact pushed candidate, the Conversation sets only the bound main task to `Ready for Merge`, verifies and commits only that path, and pushes. It then uses ordinary Git in the idle Episode to integrate current main while preserving Episode-owned task content and applying only the authorized status, pushes and verifies the refreshed candidate, and shows the operator the exact `(taskId, mainHead, candidateHead)`. `Done` is the successful terminal status after an ordinary fast-forward merge. Confirmed abandonment uses Backlog soft deletion and never marks the task `Done`. New ordinary tasks default to `In Design`; this repository removes active `To Do` guidance only after its data migration is proven.
 
 `/design` and `/spec-it-out` create or revise `In Design` tasks. `/plan TASK-ID` accepts only `In Design` or `In Planning`, writes the native Implementation Plan, and leaves the task `In Planning`. `/implement-task TASK-ID` is the task-native workflow's new-Episode admission command. It accepts only an `In Planning` task with a meaningful native plan and preserves the proportional structural and semantic readiness gate.
 
 After readiness succeeds, the Conversation changes the exact task on main to `In Progress` and commits that exact path before creating Episode resources. The Episode branch starts at that commit. A proven-clean failure returns the task to `In Planning`; uncertain or partial creation publishes `Blocked` with the exact recovery condition and is not retried as a new Episode.
 
-During a task-native Episode, the Episode owns task content on its branch and never changes lifecycle status. The Conversation owns lifecycle status on main. The same task and ownership record span execute, handoff, compaction, review, blocked/resume, and revision passes. Review and operator decisions are prompt-led. Merge uses a fresh exact `(taskId, mainHead, candidateHead)` preflight followed by ordinary `git merge --ff-only`, a supported Backlog `Done` edit, an exact task-only commit, and push. Confirmed abandonment selects only the bound pushed task content, records a truthful Final Summary, archives without `Done`, commits only the task move, and pushes. Ownership and resources remain until a separate explicit cleanup decision. The cleanup-only stable host boundary durably binds the exact pushed Episode head, verifies the terminal state, removes runtime, worktree, and branch in order, and closes ownership last.
+During a task-native Episode, the Episode owns task content on its branch and never independently changes lifecycle status. The Conversation owns lifecycle status on main and applies the accepted `Ready for Merge` or requested-revision `In Progress` status during its ordinary same-Episode Git integration. The same task and ownership record span execute, handoff, compaction, review, blocked/resume, Ready publication, and revision passes. Review and operator decisions are prompt-led. Delay is a no-op. Request Changes returns only the bound main task to `In Progress`, commits and pushes that path, integrates current main into the same Episode as needed while preserving its task content and applying the authorized status, then uses existing handoff. Merge uses a fresh exact `(taskId, mainHead, candidateHead)` preflight followed by ordinary `git merge --ff-only`, a supported Backlog `Done` edit, an exact task-only commit, and push. Confirmed abandonment selects only the bound pushed task content, records a truthful Final Summary, archives without `Done`, commits only the task move, and pushes. Ownership and resources remain until a separate explicit cleanup decision. The cleanup-only stable host boundary durably binds the exact pushed Episode head, verifies the terminal state, removes runtime, worktree, and branch in order, and closes ownership last.
 
 ## Legacy workflow preserved by the generic plugin
 
@@ -261,7 +261,7 @@ The pre-cutover source tree remains available at `6d11d9c2797cea54ecd07171e8a5b2
 - [x] #6 End-to-end evidence proves one task spans one Episode across multiple execute, handoff, compaction, review, and revision iterations and retains exact task, owner, branch, worktree, and session identity.
 - [x] #7 Ownership tests prove the Episode alone mutates task content on its branch, the Conversation alone mutates lifecycle status on main, the Episode never independently changes status, and ordinary execution performs no cross-checkout content copy, mirroring, or dual write.
 - [x] #8 Blocked/resume evidence proves an Episode records blocker content on its branch through existing reporting, the Conversation uses the supported Backlog CLI and exact task-only commits to publish `Blocked` and resumed `In Progress` on main, and the same Episode resumes through ordinary handoff without a new task, admission, or custom block/resume action.
-- [x] #9 Final-review evidence proves Expert or Conversation findings can revise the same Episode; Delay is a no-op; Request Changes records a concrete accepted in-scope finding and resumes through ordinary handoff; and immediately before merge the Conversation revalidates an exact `(taskId, mainHead, candidateHead)` tuple. No `Ready for Merge` publication, lifecycle receipt, task-native content digest, or custom reconciliation transaction is required.
+- [x] #9 Final-review evidence proves Expert or Conversation findings can revise the same Episode; after exact pushed candidate acceptance, the Conversation publishes only the bound main task as `Ready for Merge` in an exact task-only commit and push, then uses ordinary Git in the idle Episode to integrate current main while preserving Episode-owned task content and applying that authorized status, pushes and verifies the refreshed candidate, and shows the operator the exact `(taskId, mainHead, candidateHead)`. Delay is a no-op. Request Changes publishes only the bound main task back to `In Progress`, integrates current main into the same Episode as needed, and resumes through ordinary handoff. Immediately before merge the Conversation freshly revalidates the displayed tuple. No lifecycle receipt, task-native content digest, custom status publisher, or reconciliation transaction is required.
 - [x] #10 Operator-decision evidence proves authorized merge uses ordinary canonical-main `git merge --ff-only`, a supported Backlog edit to `Done`, an exact task-only commit, and push; Git and Backlog report intermediate failures directly; ownership records and resources remain until a separate explicit cleanup decision; and `backlog task complete` is not invoked per Episode.
 - [x] #11 Confirmed-abandonment tests prove strong confirmation precedes mutation; only the exact bound Episode task blob is selected; the effective main diff imports Episode-owned content while preserving Conversation-owned status plus invariant identity/hierarchy metadata; no candidate code is merged; an abandonment Final Summary is recorded; the task is archived without being marked `Done`; and exact archival state is committed and pushed before destructive Episode cleanup.
 - [x] #12 Task-native commands, tools, skills, managed templates, initialization/reconciliation assets, ownership version 2 records, docs, recovery, review, handoff, finalization, and tests use exact Backlog task identity and supported fields instead of `.ralph/plans` location or file movement as task-native lifecycle authority.
@@ -2153,6 +2153,12 @@ Restore only that observable gate using the existing Conversation guide, ordinar
 6. Authorized Merge remains ordinary `git merge --ff-only`, followed by supported Backlog `Done`, an exact task-only commit, and push.
 
 Update the task Description/AC #9 and directly relevant prompts, docs, and prompt/static tests. Do not restore any lifecycle tool/coordinator, Ready receipt, progress/replay object, task-native digest, custom merge/Done recovery, or custom abandonment/archive recovery. Preserve the pushed simplification, cleanup-only tool, generic version-1 compatibility, exact Episode resources, zero tracked `.ralph/plans`, and the protected canonical-main archive. Produce one clean validated independently reviewed pushed correction candidate, notify the owning Conversation and Ralph PVA, and stop. Do not merge, change lifecycle status live, clean resources, or apply user-global assets.
+
+## Step 9 — observable Ready for Merge gate restored
+
+Restored the required status gate entirely through the existing Conversation guide, ordinary Git, and the supported Backlog CLI. Candidate acceptance now publishes an exact main-task-only `Ready for Merge` commit, integrates that main head into the idle Episode with ordinary `git merge --no-edit` while preserving pre-merge Episode task content and applying only the authorized status, pushes and verifies the refreshed candidate, and shows the operator `(taskId, mainHead, candidateHead)`. Delay remains a no-op. Request Changes publishes only `In Progress`, performs the same bounded ordinary-Git integration as needed, and resumes through existing handoff. Merge remains fresh tuple preflight, `git merge --ff-only`, supported Backlog `Done`, exact task-only commit, and push.
+
+No lifecycle coordinator, status publisher, receipt/progress/replay object, task-native digest, custom merge/Done recovery, or custom abandonment/archive recovery was restored.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -2828,10 +2834,25 @@ No lifecycle transition, merge, abandonment, cleanup, global activation, ignore 
 ## Operator correction accepted — Ready for Merge remains observable
 
 The operator accepted a bounded correction after reviewing pushed Step 8. The least-technology deletion remains accepted, including removal of coordinator/receipt/progress/replay/digest/custom terminal machinery. The defect is only that the prompt-led contract must still publish the approved observable `Ready for Merge` status gate and carry it through ordinary same-Episode Git integration before operator choice. Step 9 in the Implementation Plan is the sole next execute scope. No lifecycle status or resource state changed in this handoff.
+
+## Step 9 implementation and validation (2026-10-17)
+
+Repaired the operator-identified contract defect in pushed simplification `0930622f9be8ff015c0a03a79dbf5cdc1dce8431`.
+
+Changed only the task contract, the existing `prime-claw-oversee-episode` Conversation guide, directly relevant lifecycle documentation/user stories/traceability, the Step 8 before/after evidence table, and prompt/static assertions. The guide now gives an actionable ordinary-Git conflict path: merge the published main head, restore pre-merge Episode task content if that path conflicts, apply only the Conversation-authorized status through Backlog, and let Git block unrelated conflicts.
+
+Validation before independent review:
+
+- Focused prompt/lifecycle/inventory suites: `70 passed, 7 skipped`.
+- Broad host suite: `663 passed, 66 skipped, 75 subtests passed`; only the four previously documented unrelated failures remained (`test_mocked_runtime_tests_are_host_safe_tier0`, `test_every_node_suite_has_a_pytest_bridge`, `test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree`, and `test_backlog_source_identity_matches_pin`).
+- Docker Tier 1 source-mode offline probe passed with immutable image, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261017T231329Z-7558-67f49071/tier1`.
+- `git diff --check` passed.
+
+The task remains `In Progress`. This candidate performs no live `Ready for Merge` publication, Request Changes transition, merge, abandonment, cleanup, global activation, protected-archive mutation, or Prime Agent source change.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Step 8 least-technology simplification is pushed at `0930622f9be8ff015c0a03a79dbf5cdc1dce8431`, but the operator identified one in-scope contract defect: the required observable `Ready for Merge` status transition must be restored through prompts, ordinary Git, and supported Backlog operations only. Step 9 is pending. No lifecycle coordinator, receipt/progress/replay machinery, task-native digest, custom terminal recovery, merge, cleanup, or global activation is authorized.
+Step 9 restores the required observable `Ready for Merge` status gate without restoring task-native lifecycle machinery. The existing Conversation guide now directs exact task-only main status commits, ordinary same-Episode Git integration that preserves Episode-owned task content while applying the Conversation-authorized status, refreshed candidate push/verification, and presentation of `(taskId, mainHead, candidateHead)`. Delay is a no-op; Request Changes returns only the main task to `In Progress`, integrates current main as needed, and uses existing handoff; authorized Merge remains `git merge --ff-only`, supported Backlog `Done`, exact task-only commit, and push. Focused tests, the broad baseline suite, and Docker Tier 1 passed within the documented baseline. The task remains `In Progress`; no live lifecycle transition, merge, cleanup, global activation, protected-archive mutation, or Prime Agent source change occurred.
 <!-- SECTION:FINAL_SUMMARY:END -->

@@ -25,8 +25,9 @@ The removed production surface included more than twenty task-specific review, m
 | One reusable Episode | Existing version-2 ownership reservation/allocation and durable worktree/session identity |
 | Continuation | Existing `handoff_task_episode` exact-owner transport |
 | Blocked/resumed status | Conversation instructions plus supported `backlog task edit`, exact task-only commit, and push |
-| Delay / Request Changes | No-op or recorded in-scope guidance followed by existing handoff |
-| Merge | Fresh exact `(taskId, mainHead, candidateHead)` preflight; ordinary `git merge --ff-only`; supported Backlog `Done`; exact task-only commit; push |
+| Candidate acceptance | Conversation publishes only the bound main task as `Ready for Merge`; ordinary Git integrates that main head into the idle Episode while preserving Episode-owned task content and applying the authorized status; the refreshed candidate is pushed and verified before showing `(taskId, mainHead, candidateHead)` |
+| Delay / Request Changes | Delay is a no-op; Request Changes publishes only the bound main task as `In Progress`, integrates current main into the same Episode with ordinary Git as needed, and uses existing handoff |
+| Merge | Fresh preflight of the displayed `(taskId, mainHead, candidateHead)`; ordinary `git merge --ff-only`; supported Backlog `Done`; exact task-only commit; push |
 | Abandonment | Explicit operator confirmation; exact task-only Git selection; supported Backlog Final Summary/archive; exact move commit; push |
 | Cleanup | Cleanup-only `finalize_task_episode(taskId, episodeHead, outcome, confirmed)`; durable `cleanupHead`; exact idle runtime/worktree/branch removal; ownership closes last |
 | Version-1 compatibility | Existing folder admission, handoff, blocked recovery, bridge, and bookkeeping finalization unchanged |
