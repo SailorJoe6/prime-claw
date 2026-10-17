@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-17 23:00'
+updated_date: '2026-10-17 23:06'
 labels:
   - backlog-md
   - episode-loop
@@ -2138,6 +2138,21 @@ Removed the task-native review/outcome coordinator and replaced it with prompt-l
 Retained exact task selection, version-2 ownership reservation/allocation, one reusable Episode, generic version-1 compatibility and bundle digest, operator authority, and the no-Prime-Agent-patch boundary. Removed Ready receipts, multi-phase progress/replay objects, task-native content digests, custom merge/Done recovery, custom abandonment/archive recovery, and machinery-only tests/docs. The before/after inventory is `docs/evidence/task-native-backlog-cutover/2026-10-18-step-8-least-technology-simplification.md`.
 
 This is a clean candidate only. It does not publish a lifecycle transition, merge to canonical main, abandon the task, clean Episode resources, apply user-global assets, or touch the protected canonical-main archive.
+
+## Step 9 — restore observable Ready for Merge status gate with prompts only
+
+The operator identified one in-scope contract defect in pushed simplification candidate `0930622f9be8ff015c0a03a79dbf5cdc1dce8431`: it removed the required observable `Ready for Merge` status transition and rewrote AC #9 instead of satisfying the approved contract through instructions.
+
+Restore only that observable gate using the existing Conversation guide, ordinary Git, and the supported Backlog CLI:
+
+1. After accepting an exact pushed candidate, the Conversation sets only the bound main task to `Ready for Merge`, verifies and commits only that path, and pushes.
+2. In the exact idle Episode worktree, integrate current main with ordinary Git while preserving Episode-owned task content and applying the Conversation-authorized `Ready for Merge` status. Push and verify the refreshed exact candidate.
+3. Show the operator the exact `(taskId, mainHead, candidateHead)` before a terminal choice.
+4. Delay is a no-op.
+5. Request Changes sets only the bound main task back to `In Progress`, commits/pushes that path, integrates current main in the same Episode with ordinary Git as needed, then uses existing task handoff.
+6. Authorized Merge remains ordinary `git merge --ff-only`, followed by supported Backlog `Done`, an exact task-only commit, and push.
+
+Update the task Description/AC #9 and directly relevant prompts, docs, and prompt/static tests. Do not restore any lifecycle tool/coordinator, Ready receipt, progress/replay object, task-native digest, custom merge/Done recovery, or custom abandonment/archive recovery. Preserve the pushed simplification, cleanup-only tool, generic version-1 compatibility, exact Episode resources, zero tracked `.ralph/plans`, and the protected canonical-main archive. Produce one clean validated independently reviewed pushed correction candidate, notify the owning Conversation and Ralph PVA, and stop. Do not merge, change lifecycle status live, clean resources, or apply user-global assets.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -2809,10 +2824,14 @@ The repair makes canonical-main cleanliness mean no staged or tracked changes. I
 Post-repair focused host checks passed 49 with 5 skips. The isolated reviewed-plan and Episode behavior suites passed at `.test-results/20261017T225626Z-67704-a2ecdbca/tier1`. Final Docker Tier 1 source-mode probing passed at `.test-results/20261017T225826Z-72047-42eaff0a/tier1`. `git diff --check` passed. The protected canonical archive hashes and zero tracked `.ralph/plans` paths remain unchanged.
 
 No lifecycle transition, merge, abandonment, cleanup, global activation, ignore workaround, Prime Agent source change, or generic version-1 retirement occurred.
+
+## Operator correction accepted — Ready for Merge remains observable
+
+The operator accepted a bounded correction after reviewing pushed Step 8. The least-technology deletion remains accepted, including removal of coordinator/receipt/progress/replay/digest/custom terminal machinery. The defect is only that the prompt-led contract must still publish the approved observable `Ready for Merge` status gate and carry it through ordinary same-Episode Git integration before operator choice. Step 9 in the Implementation Plan is the sole next execute scope. No lifecycle status or resource state changed in this handoff.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Implemented the approved least-technology task-native lifecycle candidate. Removed the custom review/outcome state machine, receipts, task-native digests, custom merge/Done recovery, and custom abandonment/archive recovery. Conversation prompts now use ordinary Git and supported Backlog operations; native code remains for exact ownership, Episode creation/handoff, and separately authorized cleanup. Independent review found and the candidate repaired one cleanup guard defect: canonical main now permits required untracked ownership/protected archive state while still rejecting staged or tracked drift, with a real-Git regression. Focused host and isolated Docker behavior suites pass, Docker Tier 1 passes, and the broad host suite has only the four accepted unrelated failures. The candidate is not merged, activated, abandoned, finalized, or cleaned up.
+Step 8 least-technology simplification is pushed at `0930622f9be8ff015c0a03a79dbf5cdc1dce8431`, but the operator identified one in-scope contract defect: the required observable `Ready for Merge` status transition must be restored through prompts, ordinary Git, and supported Backlog operations only. Step 9 is pending. No lifecycle coordinator, receipt/progress/replay machinery, task-native digest, custom terminal recovery, merge, cleanup, or global activation is authorized.
 <!-- SECTION:FINAL_SUMMARY:END -->
