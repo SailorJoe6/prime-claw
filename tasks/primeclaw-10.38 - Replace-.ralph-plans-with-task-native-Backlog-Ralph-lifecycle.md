@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-16 14:46'
+updated_date: '2026-10-17 17:31'
 labels:
   - backlog-md
   - episode-loop
@@ -2615,4 +2615,10 @@ GPT-6 Astra reproduced one material defect in `b39900a1574bb070cacb8b17d69dddde3
 Replay semantics were clarified without adding forbidden receipt or ownership fields: same-binding means the same durable owner/Episode/task/resource binding, with fresh validation of current pushed heads, plan/task identity, source reference, active pair, session, and resources. The reviewer accepted this as consistent with the approved contract.
 
 Post-repair focused Node validation passed 51/51. Exact-current-source Docker Tier-1 passed at `.test-results/20261014T172001Z-94283-f4b0ce0a/tier1`. No live transition or lifecycle/resource mutation occurred.
+
+## Version-2 Step 7 continuation checkpoint
+
+Canonical ownership is now active version 2 for this exact Episode and binds `PRIMECLAW-10.38`; the post-restart route is `a70b200f031a`. The next execute pass is authorized only for already-approved Step 7 in this task's Implementation Plan: confirm durable task/documentation coverage, delete only this repository's tracked `.ralph/plans` tree, preserve generic legacy compatibility and the protected untracked canonical-main `.ralph/plans/archive/replace-beads/`, run the specified validation, and update only this task through the supported Backlog CLI while keeping it `In Progress`. Produce one clean pushed candidate and report it.
+
+Do not publish `Ready for Merge`, merge, finalize, clean resources, apply global assets, alter lifecycle status, or reopen accepted Step 5/6 work.
 <!-- SECTION:NOTES:END -->
