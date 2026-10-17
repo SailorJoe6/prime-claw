@@ -35,18 +35,9 @@ responsible for the complete semantic readiness decision.
 
 ## Standard compaction request
 
-If the sniff passes, construct `focus_hint` from this fixed text, substituting
-only the returned canonical task ID where indicated:
-
-> You are about to plan the reviewed specification in exact Backlog task
-> `<task-id>`. Preserve its desired outcome, operator review decisions,
-> constraints, material non-goals, acceptance criteria, references,
-> documentation, and exact task identity. If the operator later approves
-> implementation admission, this same conversation will own and supervise the
-> resulting implementation Episode to completion. Retain the
-> Conversation-to-Episode authority and oversight boundaries needed for that
-> upcoming role. The queued `plan-task` workflow must perform its own
-> preparation and semantic readiness review on the compacted context.
+If the sniff passes, reason from your current conversation context and compose a
+concise `focus_hint` that best prepares you to plan the selected task.
+Use your judgment to decide what context will be most useful for that mission.
 
 Then call exactly once:
 

@@ -28,18 +28,9 @@ readiness decision.
 
 ## Standard compaction request
 
-If the sniff passes, construct `focus_hint` from this fixed text, substituting
-only the exact selected folder where indicated:
-
-> You are about to plan the reviewed specification in the exact
-> operator-selected future folder `<selected-folder>`. Preserve its desired
-> outcome, operator review decisions, constraints, material non-goals, durable artifact and bead references,
-> and exact folder location. If the operator later approves implementation
-> promotion, this same conversation will own and supervise the resulting
-> implementation episode to completion. Retain the conversation-to-episode
-> authority and oversight boundaries needed for that upcoming role. The queued
-> `plan` workflow must perform its own preparation and semantic readiness review
-> on the compacted context.
+If the sniff passes, reason from your current conversation context and compose a
+concise `focus_hint` that best prepares you to plan the selected specification.
+Use your judgment to decide what context will be most useful for that mission.
 
 Then call exactly once:
 
