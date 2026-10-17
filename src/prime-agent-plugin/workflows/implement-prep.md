@@ -27,18 +27,10 @@ responsible for the complete semantic readiness decision.
 
 ## Standard compaction request
 
-If the sniff passes, construct `focus_hint` from this fixed text, substituting
-only the exact selected folder where indicated:
-
-> You are about to review and promote the operator-approved specification and
-> execution plan in the exact operator-selected future folder
-> `<selected-folder>`. Preserve its desired outcome, operator review decisions,
-> constraints, material non-goals, durable artifact and bead references, and
-> exact folder location. If the bundle is implementation-ready, create its isolated implementation episode,
-> then retain the owner-supervision role that
-> reviews each delivered slice and supervises the episode to completion.
-> Preserve the conversation-to-episode authority and oversight boundaries
-> needed for that role.
+If the sniff passes, reason from your current conversation context and compose a
+concise `focus_hint` that best prepares you to review the selected bundle for
+implementation promotion and supervise the resulting Episode. Use your judgment
+to decide what context will be most useful for that mission.
 
 Then call exactly once:
 
