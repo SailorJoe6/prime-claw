@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-17 22:33'
+updated_date: '2026-10-17 22:34'
 labels:
   - backlog-md
   - episode-loop
@@ -2096,6 +2096,16 @@ Completed the approved final data-cutover slice from pushed task-native checkpoi
 - Recorded the complete durability and deletion receipt in `docs/evidence/task-native-backlog-cutover/2026-10-17-step-7-plan-tree-deletion.json`.
 
 This candidate leaves `PRIMECLAW-10.38` `In Progress`. Ready-for-Merge publication, merge, finalization, cleanup, and user-global activation remain separate Conversation/operator actions.
+
+## Step 8 — operator-directed least-technology simplification
+
+Audit the full task-native implementation for deletion opportunities and produce one coherent clean pushed candidate. Preserve only the observable contract: exact task selection, one reusable Episode, Conversation-owned lifecycle decisions, explicit operator authority for merge, abandonment, and cleanup, generic version-1 compatibility, and no Prime Agent patch.
+
+Prefer instructions in the existing Conversation, Episode, Expert, blocked, execute, and handoff prompts plus ordinary Git and the supported Backlog CLI. Remove custom state machines, multi-phase receipts/progress/replay machinery, content digests, redundant invariant layers, custom merge/recovery logic, and tests or documentation whose only purpose is that machinery unless a small code boundary is strictly required for durable resource ownership or a stable public tool surface.
+
+Replace custom merge orchestration with a straightforward exact-candidate preflight, ordinary `git merge --ff-only`, supported Backlog status update to `Done`, exact task commit, and push; let Git report merge safety. Keep ownership/resource cleanup separate and operator-gated. Do not use ignore/config tricks or touch the protected untracked canonical-main `.ralph/plans/archive/replace-beads/` content.
+
+Record a clear before/after machinery inventory and focused evidence that the simpler prompt-led flow satisfies the observable contract.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -2731,6 +2741,10 @@ Independent GPT-6 Astra review of candidate `ffe246be6e740833e9097a61af71b868210
 The repair changes only those assertions. `tests/test_backlog_workflow.py` and `tests/test_project_initialization.py` now run path-scoped `git ls-files -- .ralph/plans` and require zero tracked plan paths. They do not require physical directory absence and therefore preserve the approved tracked-versus-untracked boundary. The canonical protected pair remains byte-identical and is not part of the candidate.
 
 Post-repair focused receipt, project-state, inventory, and frozen-provenance validation passed 22 tests with 4 unrelated cases deselected; `git diff --check` passed. Plugin source and generic compatibility assets remain unchanged, so the already-passed exact-candidate Docker Tier-1 gate remains applicable.
+
+## Accepted operator revision — least-technology task-native lifecycle
+
+After the clean pushed Step 7 candidate `1deeb26136efb22f60a16ab626f6e8446ecea0ac`, the operator directed the next execute pass to simplify the complete task-native lifecycle rather than patch the immediate untracked-file failure. Step 8 in the Implementation Plan is the durable scope for that pass. It preserves the protected untracked archive, generic legacy compatibility, exact task/Episode ownership, Conversation and operator authority boundaries, supported public interfaces, and the no-Prime-Agent-patch constraint while deleting unnecessary custom machinery. No lifecycle status, ownership/resource state, merge, cleanup, or global activation changed in this handoff.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
