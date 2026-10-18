@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 20:02'
+updated_date: '2026-10-18 20:26'
 labels: []
 dependencies: []
 references:
@@ -242,7 +242,7 @@ Pre-existing main-branch test drift observed (NOT from this slice, reproduced on
 
 Remaining for later sub-slices of plan slice 1: route existing lifecycle call sites (`resolveBacklogTask`, task admission status mutations) through provider-aware resolution, live-provider gating at lifecycle boundaries, and plugin-managed `.backlog/` defaulting in project initialization. Workspace preparation (orphan task branch + nested clones), revision evidence, and sync/publication remain plan slices 2+.
 
-2026-10-18 Conversation review of slice 1a (6c9878a): candidate ACCEPTED with three recorded in-scope defects; repair the pushed candidate before advancing to lifecycle routing.
+2026-10-18 Conversation review of slice 1a (6c9878a): Conversation review requested a revision for three accepted in-scope findings; repair the pushed candidate before advancing to lifecycle routing.
 
 Accepted repair scope (exact):
 1. Root `backlog.config.yml` branch without `backlog_directory`: match native Backlog store selection — prefer a built-in directory carrying folder configuration BEFORE falling back to a bare built-in directory (current code takes the first existing bare `backlog/` over `.backlog/config.yml`). Parity fixture: empty `backlog/` plus `.backlog/config.yml` must select `.backlog`.
@@ -272,4 +272,17 @@ NEXT bounded sub-slice (plan slice 1, approved scope — exact):
 Notes correction required during this pass (operator instruction): the earlier sentence "candidate ACCEPTED with three recorded in-scope defects" is inaccurate — Conversation review actually REQUESTED A REVISION for three accepted findings. Fix that one sentence using supported `backlog task edit --notes` (full corrected notes text); do not otherwise rewrite history.
 
 Do not touch the separately reported pre-existing main failures.
+
+2026-10-18 Episode sub-slice (plan slice 1, second sub-slice): routed existing lifecycle call sites through the provider seam and added `.backlog/` defaulting at project initialization.
+
+What changed:
+- `task-providers.ts`: new `resolveProviderTask(cwd, taskId, runner)` — detect live provider + capability gate, then native read (`backlog task view --json` via the existing exact parser; `bd show <id> --json` with schema validation), canonical status via `BEADS_STATUS_MAP` reversed (unmapped status fails closed), exact task-ID re-verification, and provider identity on the selection (`taskPath`/`taskPathRelative` null for Beads). New `mutateProviderTaskStatus({projectRoot, taskId, status, note?, runner?})` — native mutation (`backlog task edit --status [--append-notes]` / `bd update --status <mapped> [--append-notes] --json`) followed by native re-read proving the exact task reached the exact canonical status. Both fail closed on none/dual/malformed evidence and unavailable provider executables.
+- Call-site routing (Backlog behavior byte-identical; `resolveBacklogTask` remains the exported Backlog primitive): `prep-chain.ts` default resolver, `spec-episode.ts` four admission/lifecycle resolver defaults, `task-episode-ownership.ts` reservation/transition resolver defaults, `extensions/reviewed-plan.ts` `create_task_episode` tool resolver — all now provider-aware, narrowed to the existing Backlog selection contract; a Beads store resolves the task but these file-bound paths reject it explicitly until their own provider slices land (sync/publication, archive, and git-commit choreography are plan slices 2/3). `commitConversationTaskStatus` now mutates through `mutateProviderTaskStatus`.
+- `project-initialization.ts`: `reconcilePrimeClawProject` now runs one exact native `backlog init --defaults --backlog-dir .backlog --config-location folder --integration-mode none` ONLY when `detectTaskProvider` returns none; existing Backlog/Beads evidence is preserved untouched (selected), dual/malformed evidence blocks with exact remediation, init failure surfaces as `taskProvider.status: failed` evidence without failing asset reconciliation, and active/uncertain Episode worktrees skip the seam entirely. Upstream direct `backlog init` behavior preserved (native flags only; verified live against pinned v1.53.0: produces `.backlog/config.yml` with folder layout, no commit). Result carries the new `taskProvider` field; the tool summary prints `provider=...`.
+
+Evidence: host Node suite 288/288 (41 task-providers incl. 11 new contract tests; 37 project-initialization incl. 5 new provider-defaulting tests; reviewed_plan/task_episode_ownership/spec_episode/task_episode_admission suites unchanged and green). Live smoke: this repo resolves PRIMECLAW-43 through the provider seam (backlog, In Progress, exact path); real scratch bd 1.1.2 store resolves `in_design` -> `In Design` and `mutateProviderTaskStatus` round-trips In Planning -> In Design through native `bd update --status` with re-read verification; unmapped `open` status fails closed. Docker tier-1 result recorded in the commit message.
+
+Boundary kept: no abstract class, registry, universal task model, public tracker CLI, selection file, mirror, persistent state, semantic classifier, diff/merge layer, or lifecycle matrix. Workspace/orphan-branch/Dolt sync, receipts/revisions, migration, and remaining lifecycle call sites (handoff, oversight, finalization, cleanup UX) stay in their planned slices. Pre-existing main failures untouched.
+
+Also corrected the historical sentence about the slice 1a review: it requested a revision for three accepted findings (was inaccurately recorded as an acceptance with defects).
 <!-- SECTION:NOTES:END -->
