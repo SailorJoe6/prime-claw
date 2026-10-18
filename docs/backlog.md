@@ -313,3 +313,62 @@ tracked `backlog/` directory is canonical task state, while normal repository
 instructions retain Git commit, pull, and push authority. Durable repository
 knowledge belongs in the existing tracked documentation rather than a
 tracker-specific memory command.
+
+## Slice 2B: Episode-worktree workspace preparation and guarded nested-store cleanup
+
+Direct ordinary-Git/Backlog seams for one canonical primary checkout plus one
+exact target linked Episode code worktree, added to
+`src/prime-agent-plugin/extension-support/task-history-workspace.ts`. This is
+Git identity/containment and ordinary clone/cleanup only — no ownership
+fields, no lifecycle wiring, no per-task mutation loop.
+
+### `prepareEpisodeTaskHistoryWorkspace({ primaryRoot, targetWorktree })`
+
+- **Identity/containment (Git only):** the target must be a REGISTERED linked
+  worktree of the SAME Git common repository as the canonical primary —
+  proven by `git rev-parse --git-common-dir` equality plus
+  `git worktree list --porcelain`. The primary itself, an arbitrary directory,
+  or a foreign repository blocks (`not-linked-worktree` /
+  `common-repo-mismatch`). No ownership fields or lifecycle wiring.
+- **Derived from the prepared primary:** the selected remote, transport URL,
+  published `refs/heads/prime-claw/tasks` authority, and built-in store
+  location come from `prepareTaskHistoryWorkspace(primaryRoot)`, so the
+  primary must be valid under the accepted slice-2A checks (root/custom-layout
+  blocks are preserved).
+- **Pre-existing effective ignore required:** the store path must be directly
+  contained and non-symlinked, and native `git check-ignore` must prove it is
+  already ignored BEFORE anything is created. The target code worktree is
+  never edited or staged to establish ignore; an unsafe ignore blocks
+  (`not-ignored`). The ignore lives on the target branch's own committed
+  `.gitignore` (a worktree-creation/operator responsibility, not this seam's).
+- **Independent nested clone:** an ordinary-Git clone from the remote URL on
+  `prime-claw/tasks` at the exact remote head — never a nested linked
+  worktree, submodule, alternate index, same-root custom work tree,
+  local-filesystem authority clone, or force update. On reuse it verifies the
+  exact `.git` directory form, remote name+URL, branch, remote/current head,
+  effective native lifecycle/default/autoCommit, clean status, and no
+  unpublished commits; drift or divergence blocks with exact remediation.
+  Effective native configuration is validated from the target root on every
+  path (the accepted slice-2A native validation), before the final
+  cleanliness/published-head proofs.
+
+### `cleanupEpisodeTaskHistoryStore({ primaryRoot, targetWorktree })`
+
+One guarded cleanup seam for that exact nested clone. Before removal it
+freshly proves the direct remote task ref (`git ls-remote`), the exact clone
+identity/URL/branch, a clean worktree/index, and HEAD equal to the
+authoritative remote head. It refuses unchanged — never deleting — on dirty,
+untracked, local-ahead/unpublished, remote-ahead/diverged, unavailable
+remote, wrong URL/branch, symlink, gitfile/linked-worktree form,
+non-repository content, or containment/identity mismatch. It removes ONLY the
+proven nested store directory, never the target code branch/index/tracked
+files or the primary store. This is the plan's clean/published cleanup GUARD,
+not operator-facing lifecycle cleanup authority.
+
+### Boundary
+
+Out of scope for 2B: the per-task fetch/reconcile/native-mutate/commit/push
+loop, actual Episode admission/finalization/cleanup wiring, Beads server/Dolt
+transport, provider-neutral framework, ownership/receipt fields, lifecycle UX
+routing, migration/cutover, PRIMECLAW-43.1, and changes to the accepted
+non-empty-folder-store ordering.

@@ -19,6 +19,8 @@ import {
   selectTaskHistoryRemote,
   ensureTaskHistoryBranch,
   prepareTaskHistoryWorkspace,
+  prepareEpisodeTaskHistoryWorkspace,
+  cleanupEpisodeTaskHistoryStore,
 } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 
 const FULL_CANONICAL_CONFIG = [
@@ -569,4 +571,123 @@ test("canonical statuses with a wrong effective default status blocks", (t) => {
   assert.equal(ws.status, "blocked");
   assert.equal(ws.code, "backlog-cli");
   assert.match(ws.detail, /default status/i);
+});
+
+
+// ==================== Slice 2B: Episode-worktree preparation + guarded cleanup ====================
+
+/**
+ * A primary repository whose task-history workspace is prepared (the nested
+ * store ignored via the per-worktree exclude, mirroring slice 2A), plus a
+ * registered linked Episode code worktree on its own branch. Returns both
+ * roots and the remote. The target worktree's store ignore is controlled by
+ * `ignoreTarget` (a committed .gitignore on the target branch).
+ */
+function episodeFixture({ ignoreTarget = true, publishConfig = true } = {}) {
+  const { dir, root, remote } = fixtureRepo();
+  // Ensure the primary's store location is ignored without a code mutation:
+  // slice-2A writes the ignore to .git/info/exclude for the primary.
+  if (publishConfig) publishTaskBranch(remote, { "TASKS.md": "history\n", "config.yml": FULL_CANONICAL_CONFIG });
+  const ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  if (ws.status !== "prepared") throw new Error(`fixture primary not prepared: ${ws.detail}`);
+  // A registered linked Episode worktree on its own branch.
+  const target = join(dir, "episode");
+  git(root, "branch", "episode", "main");
+  git(root, "worktree", "add", "-q", target, "episode");
+  if (ignoreTarget) {
+    // The Episode worktree's OWN checked-out branch carries the store ignore
+    // (the operator/worktree-creation responsibility; preparation never
+    // edits the target code worktree to establish it).
+    writeFileSync(join(target, ".gitignore"), "/.backlog/\n");
+    git(target, "add", ".gitignore");
+    git(target, "-c", "user.email=t@e.st", "-c", "user.name=t", "commit", "-qm", "ignore task store");
+  }
+  return { dir, root, remote, target, primaryHead: ws.head, storeDir: join(target, ".backlog") };
+}
+
+test("a registered linked Episode worktree gets an independent clean clone with zero primary/target code mutations", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote, target, primaryHead, storeDir } = episodeFixture();
+  const primaryBefore = primarySnapshot(root);
+  const targetStatusBefore = git(target, "status", "--porcelain");
+  const res = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(res.status, "prepared");
+  assert.equal(res.storeDir, storeDir);
+  assert.equal(res.head, primaryHead);
+  // An independent ordinary-Git clone: a real .git directory, origin remote,
+  // on the task branch, at the exact published head.
+  assert.ok(existsSync(join(storeDir, ".git")), "nested clone exists");
+  assert.equal(git(storeDir, "rev-parse", "--git-dir"), ".git");
+  assert.equal(git(storeDir, "remote", "get-url", "origin"), remote);
+  assert.equal(git(storeDir, "rev-parse", "--abbrev-ref", "HEAD"), "prime-claw/tasks");
+  assert.equal(git(storeDir, "status", "--porcelain"), "");
+  assert.equal(git(storeDir, "rev-parse", "HEAD"), primaryHead);
+  // Zero primary and zero target code mutations.
+  assert.deepEqual(primarySnapshot(root), primaryBefore);
+  assert.equal(git(target, "status", "--porcelain"), targetStatusBefore);
+});
+
+test("a foreign (unregistered) target directory blocks before any write", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, target, storeDir } = episodeFixture();
+  // A sibling directory that is NOT a registered worktree of the common repo.
+  const foreign = realpathSync(mkdtempSync(join(tmpdir(), "thw-foreign-")));
+  const res = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: foreign });
+  assert.equal(res.status, "blocked");
+  assert.equal(res.code, "not-linked-worktree");
+  assert.ok(!existsSync(join(foreign, ".backlog")), "no store created in the foreign dir");
+  // And a directory that merely shares a common dir but is not registered.
+  const unreg = join(root, "scratch-unregistered");
+  mkdirSync(unreg, { recursive: true });
+  const res2 = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: unreg });
+  assert.equal(res2.status, "blocked");
+  assert.equal(res2.code, "not-linked-worktree");
+});
+
+test("a registered worktree whose store is not ignored blocks before creating it", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  // ignoreTarget: false -> the target branch has NO ignore rule for .backlog/.
+  const { root, target, storeDir } = episodeFixture({ ignoreTarget: false });
+  const res = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(res.status, "blocked");
+  assert.equal(res.code, "not-ignored");
+  assert.match(res.detail, /not ignored|check-ignore/);
+  assert.ok(!existsSync(storeDir), "no nested clone was created");
+});
+
+test("reuse with a wrong remote URL or dirt blocks", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, target, storeDir } = episodeFixture();
+  const ok = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(ok.status, "prepared");
+  // Wrong remote URL on reuse.
+  git(storeDir, "remote", "set-url", "origin", "https://example.invalid/other.git");
+  const res = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(res.status, "blocked");
+  assert.equal(res.code, "unsafe-store-location");
+  assert.match(res.detail, /origin URL/);
+  git(storeDir, "remote", "set-url", "origin", git(root, "remote", "get-url", "origin"));
+  // Dirt on reuse.
+  writeFileSync(join(storeDir, "dirty.md"), "x\n");
+  const res2 = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(res2.status, "blocked");
+  assert.equal(res2.code, "uncommitted-task-content");
+});
+
+test("cleanup removes one exact clean published clone and refuses foreign/dirty without deletion", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, target, storeDir } = episodeFixture();
+  assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+  // Dirty content -> refuse without deletion.
+  writeFileSync(join(storeDir, "dirty.md"), "x\n");
+  const dirty = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  assert.equal(dirty.status, "refused");
+  assert.equal(dirty.code, "uncommitted-task-content");
+  assert.ok(existsSync(storeDir), "dirty clone left in place");
+  rmSync(join(storeDir, "dirty.md"));
+  // Clean published clone -> removed, target code untouched.
+  const clean = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  assert.equal(clean.status, "cleaned");
+  assert.ok(!existsSync(storeDir), "proven clone removed");
+  assert.equal(git(target, "status", "--porcelain"), "", "target code worktree untouched");
 });
