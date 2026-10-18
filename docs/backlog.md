@@ -182,8 +182,40 @@ is a no-op. Existing Backlog or Beads evidence is preserved untouched; dual,
 malformed, or uncertain evidence blocks with exact remediation; and a blocked
 or failed provider setup counts as a reconcile conflict and surfaces its exact
 detail/remediation in command, tool, and startup summaries without failing
-asset reconciliation. Later slices add provider-native workspace preparation,
-revision evidence, and the remaining lifecycle call sites.
+asset reconciliation.
+
+### Task-history workspace foundation (slice 2A)
+
+`extension-support/task-history-workspace.ts` is the direct, Backlog-specific
+ordinary-Git preparation seam for the provider-native workspace:
+
+- **Remote selection** (`selectTaskHistoryRemote`): the canonical primary code
+  branch's upstream wins; otherwise the sole repository remote. No remote or
+  ambiguous remotes block with exact remediation; the seam never guesses.
+- **Disconnected history** (`ensureTaskHistoryBranch`): creates or verifies
+  `refs/heads/prime-claw/tasks` with ordinary Git. Creation uses
+  `git switch --orphan` plus an ordinary initial commit, then restores the
+  code branch. An existing branch is verified, never recreated; shared code
+  ancestry is never accepted as task authority; a remote ref ahead of the
+  local branch blocks rather than force-overwriting.
+- **Nested clone** (`prepareTaskHistoryWorkspace`): the primary checkout's
+  ignored, independent nested Backlog clone at the validated built-in
+  task-store location (`backlog/` or `.backlog/` only), checked out on the
+  task-history branch. An existing live store directory without `.git` is
+  adopted onto the branch with ordinary Git (content never discarded);
+  anything else non-empty blocks. No submodules, linked nested worktrees,
+  alternate indexes, same-root custom Git work trees, separate hosted repo,
+  or coordinator. The store is added to the primary checkout's `.gitignore`.
+- **Auto-commit disabled**: `backlog config set autoCommit false` on the
+  nested clone, proven by `backlog config get autoCommit`. The primary
+  checkout's root/folder configuration evidence is preserved into the clone
+  (the root configuration itself is never modified).
+
+This foundation serves only the canonical primary checkout (a linked worktree
+blocks with exact remediation). Episode-worktree preparation, the
+fetch/reconcile/commit/push mutation loop, Beads server/Dolt transport,
+ownership and receipt fields, remaining lifecycle UX routing, and task-data
+migration are later slices.
 
 ## Project task workflow
 

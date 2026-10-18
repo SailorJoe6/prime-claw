@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 21:29'
+updated_date: '2026-10-18 22:11'
 labels: []
 dependencies: []
 references:
@@ -314,4 +314,16 @@ Next sub-slice approved (plan slice 2, sub-slice 2A — Backlog provider-native 
 - preserving root/folder configuration evidence needed by that prepared clone — NO submodules, linked nested worktrees, alternate indexes, same-root custom Git work trees, separate hosted repo, or new coordinator/service.
 
 Explicitly out of scope for 2A: Episode-worktree preparation/cleanup wiring, the general fetch/reconcile/commit/push mutation loop, Beads server/Dolt transport, ownership/receipt fields, remaining lifecycle UX routing, any task-data migration, this repository's cutover (PRIMECLAW-43.1 owns it), and PRIMECLAW-43.1 itself. Do not mutate or normalize this repository's existing live Backlog store while building fixtures. One direct Backlog-specific implementation path (no provider abstraction/universal workspace model); one focused contract fixture per new seam plus representative real ordinary-Git coverage (no provider/lifecycle matrix); Docker tier-1 after plugin-source changes; update docs/task notes; one clean commit; stop for review.
+
+2026-10-18 Episode — plan slice 2A (Backlog provider-native workspace FOUNDATION) implemented. New direct seam `src/prime-agent-plugin/extension-support/task-history-workspace.ts` (ordinary Git only, no provider abstraction):
+
+- `selectTaskHistoryRemote`: canonical primary code branch's upstream wins; else the sole repository remote; no-remote and ambiguous-remotes block with exact remediation.
+- `ensureTaskHistoryBranch`: creates or verifies disconnected `refs/heads/prime-claw/tasks` via ordinary Git. Creation = `git switch --orphan` + empty index (`git rm -rf --cached`) + ordinary initial commit (`TASKS.md`), then restores the code branch. Existing branch verified, never recreated; shared code ancestry blocks (`shared-ancestry`); remote ref ahead of local blocks (`remote-advanced`, never force). Adoption of an existing remote task branch is by `git branch --track`. Caught and fixed a real logic inversion (remote-ahead guard), proven by the remote-advance test.
+- `prepareTaskHistoryWorkspace`: serves only the canonical primary checkout (linked worktree blocks `not-primary-checkout` via git-dir vs common-dir). Selects the validated built-in store location (`backlog/` or `.backlog/`, preferring existing live folder evidence; custom dir blocks `unsafe-store-location`); blocks tracked code-repo task content (`uncommitted-task-content`). Creates the ignored independent nested clone via `git clone --no-checkout` + `git switch`; an existing live store directory WITHOUT `.git` is ADOPTED (init + remote add + fetch + symbolic-ref + `read-tree --empty`) — content never discarded, index empty for the later mutation loop. No submodules/nested worktrees/alternate indexes/custom work trees/hosted repo/service. Adds the store to `.gitignore` (idempotent). Disables auto-commit natively (`backlog config set autoCommit false`, proven by `config get autoCommit` = false). Preserves root/folder config evidence (copies an existing folder config into the clone; root config never modified). Idempotent: second run verifies.
+
+Tests: `tests/task_history_workspace.test.mjs` — 18 tests, real ordinary-Git disposable repos (fixtures init -b main, bare remote, push -u). 4 contract fixtures for remote selection; 6 for branch create/verify/adopt/block; 8 for workspace prep incl. idempotency, folder-config preservation, custom-dir block, tracked-content block, adoption, linked-worktree block, no-remote block, Beads-provider block. The 3 tests invoking the real backlog CLI skip when the executable is absent (tier-1 image ships no backlog binary; host runs the repository dist). Python bridge `tests/test_task_history_workspace.py` (tier-1 node suite + inventory contract). Registered the new module in `asset-inventory.json` and `EXPECTED_TYPESCRIPT`. Full host Node suite green; tier-1 bridges green.
+
+INCIDENT (self-caught, resolved): during development a debug script emptied this Episode worktree's index (493 files staged as deletions, worktree intact, HEAD correct). Recovered with `git reset --mixed HEAD`; verified exactly the 5 intended changed files remained. No committed history was affected.
+
+Docs: `docs/backlog.md` gained a slice-2A section. Boundary kept: no Episode-worktree prep/cleanup wiring, no fetch/reconcile/commit/push mutation loop, no Beads transport, no ownership/receipt fields, no lifecycle UX routing, no task-data migration, no cutover (PRIMECLAW-43.1 owns it). This repo's live Backlog store untouched. Status unchanged: In Progress.
 <!-- SECTION:NOTES:END -->
