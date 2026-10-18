@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-18 16:43'
+updated_date: '2026-10-18 17:04'
 labels:
   - backlog-md
   - episode-loop
@@ -2944,6 +2944,12 @@ Post-repair validation:
 - `git diff --check` passed.
 
 The repair performed no live lifecycle transition, merge, abandonment, cleanup, global activation, protected-archive mutation, blocked-UAT-session contact, or Prime Agent source change.
+
+## Exact repaired-candidate rereview — one accepted recovery-lock finding (2026-10-18)
+
+Independent GPT-6 Astra rereview of exact candidate `bc79e2e7a9bbcb81fd878e22ec54debfbeec4cdf` confirmed the three prior repairs and reproduced their paused-push/mixed-mode coverage. It found one remaining instance of the same approved concurrency defect: the automatic `Blocked` publication after recorded/uncertain allocation failure and the proven-clean `In Planning` rollback still call `commitConversationTaskStatus` outside the short Episode-admission lock.
+
+A separate-process Docker reproduction showed owner A entering allocation failure while owner B held its own status-commit-to-reservation boundary. A's unlocked `Blocked` recovery advanced main, B's reservation rejected the changed HEAD, and B rolled back to `In Planning`. The sole next execute scope is to use the same admission lock around each recovery edit+task-only commit, re-resolve/revalidate the exact task inside the lock as needed, keep recovery pushes outside, and add the deterministic allocation-failure race regression. Preserve existing truthful Blocked/rollback semantics and add no coordinator, receipt, or lifecycle machinery. No live lifecycle or blocked-UAT-session action occurred in this handoff.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -2954,4 +2960,6 @@ Steps 1–10 are implemented. The release-blocking Step 10 repair replaces repos
 Independent review reproduced three bounded defects: cross-process task admission interference, retained promotion rejecting unrelated task-only main advancement, and missing owner-key context in fresh Episode prompts. The candidate now serializes only status commit plus reservation, binds the exact admission commit, permits safe unrelated main advancement while revalidating the approved bundle digest, and carries the owning Conversation key in initial and continuation prompts. Focused suites, the broad baseline apart from four documented unrelated failures, Docker Tier 1, and `git diff --check` validate the repairs.
 
 The task remains `In Progress` for the owning Conversation's later lifecycle decision. No live transition, merge, abandonment, cleanup, user-global activation, protected-archive mutation, blocked-UAT-session contact, or Prime Agent source change occurred.
+
+Exact rereview confirmed the three recorded repairs and accepted one final bounded follow-up: automatic `Blocked` and `In Planning` recovery commits must use the same short admission lock so they cannot interrupt another owner's commit-to-reservation boundary. That recovery-lock repair and its separate-process regression are the sole next execute scope; the task remains `In Progress`.
 <!-- SECTION:FINAL_SUMMARY:END -->
