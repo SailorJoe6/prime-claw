@@ -53,12 +53,10 @@ const deps = { ownership, git, filesystem, publisher, guideRoot: __GUIDE__ };
 export default function wrapper(pi) {
   createReviewedPlanExtension(deps)(pi);
   pi.on("tool_execution_end", (event) => {
-    appendFileSync(reportPath, JSON.stringify({ marker: "tool-end", name: event.toolName, isError: event.isError }) + "\n");
-    if (event.toolName !== "handoff_spec_episode" || event.isError) return;
-    let compactResult;
-    try { compactResult = holder.session.handleCompactHostRequest("compact.run", { instructions: "PROBE_COMPACT_HINT" }); }
-    catch (error) { compactResult = { threw: String(error) }; }
-    appendFileSync(reportPath, JSON.stringify({ toolResult: event.result, compactResult }) + "\n");
+    appendFileSync(reportPath, JSON.stringify({ marker: "tool-end", name: event.toolName, isError: event.isError, text: JSON.stringify(event.result ?? null) }) + "\n");
+  });
+  pi.on("session_compact", (event) => {
+    appendFileSync(reportPath, JSON.stringify({ marker: "session_compact", fromExtension: event.fromExtension === true, hasEntry: !!event.compactionEntry }) + "\n");
   });
 }
 """
@@ -91,25 +89,43 @@ PROVIDER_PROBE_TEMPLATE = r"""import { appendFileSync } from "node:fs";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 const p = __RECORDS__;
 let handoffCalls = 0;
+let compactCalls = 0;
+const COMPACT_CODE = "probe_compact_result = await compact.run('PROBE_COMPACT_HINT'); print('PROBE_COMPACT_RESULT', probe_compact_result)";
 export default function x(pi) { pi.registerProvider("poc", { baseUrl: "x", apiKey: "x", api: "poc", streamSimple(model, context) {
   const messages = context.messages ?? [], all = JSON.stringify(messages);
   const toolResults = messages.filter((m) => m.role === "toolResult");
-  const called = toolResults.length > 0;
+  const handoffResults = toolResults.filter((m) => m.toolName === "handoff_spec_episode").length;
+  const ipythonResults = toolResults.filter((m) => m.toolName === "ipython").length;
   const triggers = messages.filter((m) => m.role === "user" && JSON.stringify(m).includes("HANDOFF_TRIGGER")).length;
   const check = all.includes("POST_COMPACT_CHECK");
-  // High utilization (90%) only inside the first handoff tool execution; the
-  // continuation of that turn and every later turn report 10% so no native
-  // auto-compaction fires and exactly one compaction cycle occurs.
-  const high = !called && triggers === 1 && handoffCalls === 0;
+  const sawSteer = all.includes("AFTER-HANDOFF POLICY");
+  const sawCompactResult = all.includes("PROBE_COMPACT_RESULT");
+  // High utilization (95%) only inside the first handoff tool execution so the
+  // post-admission check steers; every other call reports low usage so no
+  // native auto-compaction fires and exactly one compaction cycle occurs.
+  const high = handoffResults === 0 && triggers === 1 && handoffCalls === 0;
   const inputTokens = high ? 190000 : 100;
-  appendFileSync(p, JSON.stringify({ called, sawSteer: all.includes("AFTER-HANDOFF POLICY"), guideCopies: messages.filter((m) => JSON.stringify(m).includes("PROBE GUIDE MARKER")).length, bytes: all.length, check, high }) + "\n");
+  appendFileSync(p, JSON.stringify({ handoffResults, ipythonResults, sawSteer, sawCompactResult, guideCopies: (all.match(/# Oversee one owned episode/g) || []).length, bytes: all.length, check, high }) + "\n");
   const s = createAssistantMessageEventStream();
   queueMicrotask(() => {
     const usage = { input: inputTokens, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: inputTokens + 1, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
     let m;
-    if (triggers > handoffCalls && toolResults.length === handoffCalls) {
+    if (triggers > 0 && handoffResults === handoffCalls && handoffCalls === 0) {
       handoffCalls += 1;
-      const tc = { type: "toolCall", id: "tc" + handoffCalls, name: "handoff_spec_episode", arguments: { location: ".ralph/plans/future/alpha" } };
+      const tc = { type: "toolCall", id: "tc-handoff", name: "handoff_spec_episode", arguments: { location: ".ralph/plans/future/alpha" } };
+      m = { role: "assistant", content: [tc], api: model.api, provider: model.provider, model: model.id, usage, stopReason: "toolUse", timestamp: Date.now() };
+      s.push({ type: "start", partial: m });
+      s.push({ type: "toolcall_start", contentIndex: 0, partial: m });
+      s.push({ type: "toolcall_end", contentIndex: 0, toolCall: tc, partial: m });
+      s.push({ type: "done", reason: "toolUse", message: m });
+    } else if (handoffResults > 0 && sawSteer && ipythonResults === compactCalls && compactCalls === 0 && !check) {
+      // Model-side compact.run: after observing the steered workflow
+      // instructions, the assistant invokes the installed compact skill
+      // through a real ipython tool call, the same kernel path a real model
+      // uses. The kernel host bridge converts compact.run into the session
+      // host request while the turn is still active.
+      compactCalls += 1;
+      const tc = { type: "toolCall", id: "tc-compact", name: "ipython", arguments: { code: COMPACT_CODE } };
       m = { role: "assistant", content: [tc], api: model.api, provider: model.provider, model: model.id, usage, stopReason: "toolUse", timestamp: Date.now() };
       s.push({ type: "start", partial: m });
       s.push({ type: "toolcall_start", contentIndex: 0, partial: m });
@@ -126,11 +142,20 @@ export default function x(pi) { pi.registerProvider("poc", { baseUrl: "x", apiKe
 }, models: [{ id: "m", name: "M", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 1000 }] }); }
 """
 
-DRIVER_PROBE_TEMPLATE = r"""import { writeFileSync } from "node:fs";
+DRIVER_PROBE_TEMPLATE = r"""import { existsSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { join } from "node:path";
 import { createAgentSessionServices, createAgentSessionFromServices, SessionManager } from "@earendil-works/pi-coding-agent";
 const cwd = __CWD__, agentDir = __AGENT__, provider = __PROVIDER__, setup = __SETUP__, depsExt = __DEPS__, result = __RESULT__;
+// The bundled compact skill must be model- and kernel-visible even with
+// noSkills:true so the provider can invoke the real `compact` python module
+// through the ipython tool (the model-side compact.run path).
+const globalRoot = execFileSync("npm", ["root", "-g"], { encoding: "utf8" }).trim();
+const compactCandidates = [join(globalRoot, "prime-agent", "dist", "skills", "compact"), join(globalRoot, "prime-agent", "skills", "compact")];
+const compactSkillDir = compactCandidates.find((p) => existsSync(join(p, "SKILL.md")));
+if (!compactSkillDir) throw new Error("bundled compact skill not found under " + globalRoot);
 export default function d(pi) { pi.on("session_start", async () => { let session; try {
-  const services = await createAgentSessionServices({ cwd, agentDir, noBuiltinHerdrReporter: true, telemetryDisabled: true, resourceLoaderOptions: { additionalExtensionPaths: [provider, setup, depsExt], noExtensions: true, noSkills: true, noPromptTemplates: true, noContextFiles: true, noThemes: true } });
+  const services = await createAgentSessionServices({ cwd, agentDir, noBuiltinHerdrReporter: true, telemetryDisabled: true, resourceLoaderOptions: { additionalExtensionPaths: [provider, setup, depsExt], additionalSkillPaths: [compactSkillDir], noExtensions: true, noSkills: true, noPromptTemplates: true, noContextFiles: true, noThemes: true } });
   const rl = services.resourceLoader;
   const loaded = rl.getExtensions();
   const model = services.modelRegistry.find("poc", "m");
@@ -180,11 +205,14 @@ def test_native_handoff_compaction_end_to_end(tier1_container, ctmp):
     a genuine turn. The deps-injected extension performs its real
     post-admission compaction check against real ctx.getContextUsage() (the
     provider reports 190000 tokens against a 200000-token window (95%),
-    strictly above the fixture's 50% threshold) and steers the real project workflow. The
-    probe's tool_execution_end hook then calls the exact kernel host-bridge
-    entrypoint for compact.run (AgentSession.handleCompactHostRequest) while
-    the turn is still active, and the native session performs the real
-    turn-boundary compaction that fires the unchanged oversight hook.
+    strictly above the fixture's 50% threshold) and steers the real project
+    workflow. The scripted provider then plays the model-side path: after
+    observing the steered workflow instructions in context, it emits a real
+    ipython tool call that awaits compact.run from the installed compact
+    skill (the same kernel host-bridge path a real model uses), the session
+    accepts the request while the turn is still active, and the native
+    session performs the real turn-boundary compaction that fires the
+    unchanged oversight hook.
     """
     project = ctmp / "project"
     project.mkdir()
@@ -244,32 +272,56 @@ def test_native_handoff_compaction_end_to_end(tier1_container, ctmp):
     # steered the workflow into the SAME tool turn: the provider's next call
     # observed the tool result AND the steered policy before the turn ended.
     rows = [json.loads(line) for line in records.read_text().splitlines()]
-    after_tool_index = next(i for i, row in enumerate(rows) if row["called"])
-    assert rows[after_tool_index]["sawSteer"] is True, rows
+    after_handoff_index = next(i for i, row in enumerate(rows) if row["handoffResults"] > 0)
+    assert rows[after_handoff_index]["sawSteer"] is True, rows
 
-    # The model-side compact.run host request was accepted while the turn was
-    # still active. scheduled:true is only a request, not confirmation; the
-    # compaction proof comes from the observed compaction below.
     entries = [json.loads(line) for line in report.read_text().splitlines()]
-    # Exactly one handoff tool execution ran: one dispatch, no retry.
-    tool_ends = [entry for entry in entries if entry.get("marker") == "tool-end" and entry.get("name") == "handoff_spec_episode"]
-    assert len(tool_ends) == 1, entries
-    payloads = [entry for entry in entries if "toolResult" in entry]
-    assert len(payloads) == 1, entries
-    tool_result = payloads[0]["toolResult"]
-    assert "Episode handoff admitted" in json.dumps(tool_result), tool_result
-    compaction_details = tool_result["details"]["conversationCompaction"]
-    assert compaction_details["outcome"] == "prompt-delivered", tool_result
-    assert payloads[0]["compactResult"].get("scheduled") is True, entries
+    # Exactly one handoff tool execution ran: one dispatch, no retry. Its
+    # details record the prompt-delivered compaction workflow outcome.
+    tool_ends = [entry for entry in entries if entry.get("marker") == "tool-end"]
+    handoff_ends = [entry for entry in tool_ends if entry.get("name") == "handoff_spec_episode"]
+    assert len(handoff_ends) == 1, entries
+    handoff_result = json.loads(handoff_ends[0]["text"])
+    assert "Episode handoff admitted" in handoff_ends[0]["text"], handoff_ends
+    compaction_details = handoff_result["details"]["conversationCompaction"]
+    assert compaction_details["outcome"] == "prompt-delivered", handoff_result
 
-    # The requested compaction actually ran at the turn boundary: a later
-    # provider call observed the smaller summarized post-compaction context.
+    # Model-side compact.run: exactly one ipython tool execution ran, and its
+    # result records that the installed compact skill's host request was
+    # accepted mid-turn (scheduled: true is a request, not confirmation).
+    ipython_ends = [entry for entry in tool_ends if entry.get("name") == "ipython"]
+    assert len(ipython_ends) == 1, entries
+    assert ipython_ends[0]["isError"] is False, ipython_ends
+    assert "'scheduled': True" in ipython_ends[0]["text"] or '"scheduled": true' in ipython_ends[0]["text"], ipython_ends
+    # The provider's next call observed the compact.run result in context.
+    assert any(row["sawCompactResult"] for row in rows[after_handoff_index + 1:]), rows
+
+    # Compaction actually ran: session_compact fired once per turn boundary
+    # where compaction was due (native auto-compaction fires at the handoff
+    # boundary because the feature requires 95% reported usage there; the
+    # model-side compact.run request above was accepted before the tool-turn
+    # boundary and produced the second). Assert at least the two expected
+    # real compactions, and that a later provider call observed the smaller
+    # summarized post-compaction context.
+    compact_events = [entry for entry in entries if entry.get("marker") == "session_compact"]
+    assert len(compact_events) >= 2, entries
+    assert all(event["hasEntry"] for event in compact_events), entries
     trigger_index = next(i for i, row in enumerate(rows) if row.get("high"))
     post_compaction = [row for row in rows[trigger_index + 1:] if row["bytes"] < 40000]
     assert post_compaction, rows
 
-    # Unchanged same-Episode oversight restoration: the final ordinary prompt
-    # after the settled compaction sees exactly one reinjected full guide for
-    # the exact active owner.
+    # Unchanged same-Episode oversight restoration: the pre-compaction
+    # continuation carried exactly one guide reference (the active pointer);
+    # every post-compaction call carries exactly one MORE - the single fresh
+    # reinjection for the exact active owner, riding alongside the one pointer
+    # the compaction summary retained. No accumulation across later prompts.
+    pre_compact = rows[after_handoff_index]
+    assert pre_compact["guideCopies"] == 1, rows
+    post_rows = [row for row in rows[after_handoff_index + 1:] if row["handoffResults"] > 0]
+    assert post_rows, rows
+    assert all(row["guideCopies"] == pre_compact["guideCopies"] + 1 for row in post_rows), rows
+    # The final ordinary check prompt after the settled compactions still sees
+    # exactly one fresh reinjected guide alongside the summary-retained
+    # pointer, with no accumulation across prompts.
     final_check = [row for row in rows if row["check"]]
-    assert final_check and final_check[-1]["guideCopies"] == 1, rows
+    assert final_check and final_check[-1]["guideCopies"] == pre_compact["guideCopies"] + 1, rows
