@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 19:58'
+updated_date: '2026-10-18 20:02'
 labels: []
 dependencies: []
 references:
@@ -260,4 +260,16 @@ Boundary: least-technology only — no framework, registry, state, semantic mach
 Evidence: host Node suite 31/31 (`node --experimental-strip-types --test tests/task_providers.test.mjs`); live smoke against this repo (backlog selected) and real scratch bd stores (beads selected + capabilities pass; quoted no-db true blocks). Docker tier-1 bridge rerun recorded in the commit message.
 
 Boundary kept: no framework, registry, selection file, or matrix expansion. Lifecycle call-site routing and later slices remain untouched; pre-existing main failures remain with the Conversation.
+
+2026-10-18 Conversation accepted the slice 1a repair candidate (6cdfbaf): all three recorded discovery defects closed; head/upstream match; worktree clean; Conversation reruns passed 31/31 Node tests and 2/2 non-container Python checks; Docker tier-1 bridge reported passing.
+
+NEXT bounded sub-slice (plan slice 1, approved scope — exact):
+1. Route the existing exact task-resolution and task-admission status-mutation call sites through direct selected-provider functions, starting with the current `resolveBacklogTask` and admission transition paths. Native `backlog`/`bd` reads and mutations underneath. Preserve exact selected task identity; fail closed on none/dual/malformed/unavailable provider evidence.
+2. Add Prime Claw's `.backlog/` default only at the existing project-initialization path when no live provider evidence exists; preserve upstream direct `backlog` init behavior and explicit supported Beads selection.
+3. Keep the seam direct and narrow: NO abstract provider class, registry, universal task model, public tracker CLI, selection file, mirror, persistent state, semantic classifier, custom diff/merge layer, or provider-by-lifecycle matrix. Workspace/orphan-branch/Dolt sync, receipts/revisions, migration, and other lifecycle call sites stay in their planned later slices.
+4. Only focused contract tests for the touched call sites + representative Backlog/Beads behavior. Docker-only plugin validation after source changes. Update living task notes and relevant docs; commit and push one clean candidate; stop and report.
+
+Notes correction required during this pass (operator instruction): the earlier sentence "candidate ACCEPTED with three recorded in-scope defects" is inaccurate — Conversation review actually REQUESTED A REVISION for three accepted findings. Fix that one sentence using supported `backlog task edit --notes` (full corrected notes text); do not otherwise rewrite history.
+
+Do not touch the separately reported pre-existing main failures.
 <!-- SECTION:NOTES:END -->
