@@ -64,6 +64,26 @@ test("each qualifying compact appends one full non-turn guide message", async ()
   }
 });
 
+test("compaction selects only the exact Conversation's registry record", async () => {
+  const f = fixture({ taskNative: true });
+  const otherWorktree=join(f.root,"other-wt");mkdirSync(otherWorktree,{recursive:true});
+  writeEpisodeOwnership(f.root, {
+    version:2,status:"active",operationId:"other-op",engine:"local",ownerSessionId:"other-owner",
+    taskId:"PRIMECLAW-10.39",taskPath:"backlog/tasks/other.md",baseRef:"b".repeat(40),
+    createdAt:"2026-01-01T00:00:00Z",updatedAt:"2026-01-01T00:00:00Z",
+    worktree:otherWorktree,branch:"other-branch",head:"other-head",episodeId:"other-episode",
+    episodeSessionFile:join(f.root,"other.jsonl"),episodeActiveSessionId:"other-route",
+  });
+  const compact=f.events.get("session_compact");
+  await compact({type:"session_compact",compactionEntry:{id:"owner"}},f.ctx);
+  await compact({type:"session_compact",compactionEntry:{id:"other"}},{...f.ctx,sessionManager:{getSessionId:()=>"other-owner"}});
+  assert.deepEqual(f.sent.map(({message})=>message.details),[
+    {taskId:"PRIMECLAW-10.38",episodeId:"episode"},
+    {taskId:"PRIMECLAW-10.39",episodeId:"other-episode"},
+  ]);
+});
+
+
 for (const [name, status, owner] of [
   ["no owner", null, "owner"], ["inactive", "inactive", "owner"], ["foreign owner", "active", "other"],
 ]) test(`compact injects nothing for ${name}`, async () => {
@@ -106,10 +126,12 @@ test("ordinary guide loading ignores project skill collisions", async () => {
 `);
 });
 
-test("promotion preflight allows only terminal or exact-owner state", () => {
+test("promotion preflight scopes non-terminal ownership to the exact Conversation", () => {
   const f = fixture();
   assert.doesNotThrow(() => assertConversationPromotionReady(f.ctx, ".ralph/plans/future/alpha"));
   assert.throws(() => assertConversationPromotionReady(f.ctx, ".ralph/plans/future/beta"), /already has non-terminal/);
+  const foreign = fixture({ owner: "other-owner" });
+  assert.doesNotThrow(() => assertConversationPromotionReady(foreign.ctx, ".ralph/plans/future/alpha"));
 });
 
 

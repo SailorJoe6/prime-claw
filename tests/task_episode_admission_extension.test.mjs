@@ -3,12 +3,14 @@ import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpat
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
   CliOrcaAdapter,
   CliTaskEpisodeAdmissionGit,
+  bundleContentDigest,
+  createSpecEpisode,
   createTaskEpisode,
   OrcaUnavailableError,
   resolveTaskEpisodePlacement,
@@ -16,6 +18,11 @@ import {
 import {
   resolveBacklogTask,
 } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
+import {
+  readAllEpisodeOwnership,
+  readEpisodeOwnership,
+  writeEpisodeOwnership,
+} from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
 const ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const BACKLOG = join(ROOT, "deps", "backlog", "dist", "backlog");
@@ -74,11 +81,15 @@ function fixture() {
   git(root, "commit", "-q", "--only", "-m", "plan exact task", "--", task.path);
   writeFileSync(join(root, "unrelated.txt"), "unrelated working change\n");
 
-  let record = null;
+  const records = new Map();
   const events = [];
   const ownership = {
-    read() { events.push(["ownership-read", record?.status ?? null]); return record; },
-    write(_projectRoot, value) { record = value; events.push(["ownership-write", value.status]); },
+    read(_projectRoot, ownerSessionId) {
+      const record = ownerSessionId ? records.get(ownerSessionId) ?? null : (records.size <= 1 ? [...records.values()][0] ?? null : null);
+      events.push(["ownership-read", record?.status ?? null]);
+      return record;
+    },
+    write(_projectRoot, value) { records.set(value.ownerSessionId, value); events.push(["ownership-write", value.status]); },
   };
   const runner = new FixtureRunner();
   const taskResolver = (cwd, taskId) => resolveBacklogTask(cwd, taskId, runner);
@@ -99,7 +110,7 @@ function fixture() {
     reservationOperationId: "operation-1234",
     now: () => "2026-10-13T09:00:00.000Z",
   };
-  return { root, task, ctx, dependencies, ownership, events, get record() { return record; } };
+  return { root, task, ctx, dependencies, ownership, events, get record() { return records.get("owner-session") ?? null; } };
 }
 
 function commitPaths(root, ref = "HEAD") {
@@ -273,7 +284,7 @@ test("task admission preflight rejects unclean task and nonterminal ownership wi
 
   const owned = fixture();
   owned.ownership.write(owned.root, {
-    version: 1, status: "provisioning", operationId: "other", engine: "local", ownerSessionId: "other-owner",
+    version: 1, status: "provisioning", operationId: "other", engine: "local", ownerSessionId: "owner-session",
     sourceLocation: ".ralph/plans/future/other", slug: "other", baseRef: "base", bundleDigest: "0".repeat(64),
     createdAt: "x", updatedAt: "x",
   });
@@ -284,6 +295,272 @@ test("task admission preflight rejects unclean task and nonterminal ownership wi
   );
   assert.equal(git(owned.root, "rev-parse", "HEAD"), ownedHead);
   assert.equal(view(owned.root).status, "In Planning");
+});
+
+
+test("task admission ignores another Conversation's independent ownership", async () => {
+  const f = fixture();
+  const foreign = {
+    version: 1, status: "provisioning", operationId: "foreign", engine: "local", ownerSessionId: "foreign-owner",
+    sourceLocation: ".ralph/plans/future/foreign", slug: "foreign", baseRef: "base", bundleDigest: "0".repeat(64),
+    createdAt: "x", updatedAt: "x",
+  };
+  f.ownership.write(f.root, foreign);
+
+  const result = await createTaskEpisode("PRIMECLAW-1", "tool-call", f.ctx, {
+    ...f.dependencies,
+    allocateTaskEpisode: async () => {
+      const active = {
+        ...f.record,
+        status: "active",
+        worktreeName: "prime-claw-primeclaw-1-episode-operation",
+        worktree: join(f.root, "episode-worktree"),
+        branch: "episode/primeclaw-1-operation",
+        head: f.record.baseRef,
+        episodeId: "episode-session",
+        episodeSessionFile: join(f.root, "episode.jsonl"),
+        episodeActiveSessionId: "active-route",
+      };
+      f.ownership.write(f.root, active);
+      return { ...active, reused: false };
+    },
+  }, { engine: "local" });
+
+  assert.equal(result.ownerSessionId, "owner-session");
+  assert.deepEqual(f.ownership.read(f.root, "foreign-owner"), foreign);
+});
+
+
+test("different Conversations create different task Episodes without repository cardinality", async () => {
+  const f = fixture();
+  const created = execFileSync(BACKLOG, [
+    "task", "create", "Second task-native admission fixture",
+    "--status", "In Planning",
+    "--description", "Create another exact Episode",
+    "--plan", "1. Create the second bounded resource.\n2. Verify exact identity.",
+    "--plain",
+  ], { cwd: f.root, encoding: "utf8" });
+  const secondId = created.match(/PRIMECLAW-[0-9.]+/)?.[0];
+  assert.ok(secondId);
+  const secondTask = view(f.root, secondId);
+  git(f.root, "add", "--", secondTask.path);
+  git(f.root, "commit", "-q", "--only", "-m", "plan second exact task", "--", secondTask.path);
+
+  const productionDependencies = {
+    admissionGit: f.dependencies.admissionGit,
+    admissionRunner: f.dependencies.admissionRunner,
+    taskResolver: f.dependencies.taskResolver,
+    now: f.dependencies.now,
+    allocateTaskEpisode: async (_taskId, ctx) => {
+      const ownerSessionId = ctx.sessionManager.getSessionId();
+      const reserved = readEpisodeOwnership(f.root, ownerSessionId);
+      assert.equal(reserved.status, "provisioning");
+      const active = {
+        ...reserved,
+        status: "active",
+        worktreeName: `worktree-${ownerSessionId}`,
+        worktree: join(f.root, `worktree-${ownerSessionId}`),
+        branch: `episode/${ownerSessionId}`,
+        head: reserved.baseRef,
+        episodeId: `episode-${ownerSessionId}`,
+        episodeSessionFile: join(f.root, `${ownerSessionId}.jsonl`),
+        episodeActiveSessionId: `route-${ownerSessionId}`,
+      };
+      writeEpisodeOwnership(f.root, active);
+      return { ...active, reused: false };
+    },
+  };
+  const secondCtx = {
+    ...f.ctx,
+    sessionManager: {
+      ...f.ctx.sessionManager,
+      getSessionId: () => "second-owner",
+      getSessionFile: () => join(f.root, "second-owner.jsonl"),
+    },
+  };
+
+  const [first, second] = await Promise.all([
+    createTaskEpisode("PRIMECLAW-1", "tool-call-one", f.ctx, {
+      ...productionDependencies, reservationOperationId: "operation-first",
+    }, { engine: "local" }),
+    createTaskEpisode(secondId, "tool-call-two", secondCtx, {
+      ...productionDependencies, reservationOperationId: "operation-second",
+    }, { engine: "local" }),
+  ]);
+
+  assert.deepEqual(new Set([first.ownerSessionId, second.ownerSessionId]), new Set(["owner-session", "second-owner"]));
+  assert.deepEqual(readAllEpisodeOwnership(f.root).map((record) => record.ownerSessionId), ["owner-session", "second-owner"]);
+  assert.equal(view(f.root, "PRIMECLAW-1").status, "In Progress");
+  assert.equal(view(f.root, secondId).status, "In Progress");
+});
+
+
+test("separate processes serialize task status commit and reservation before slow push", async () => {
+  const f = fixture();
+  const created = execFileSync(BACKLOG, [
+    "task", "create", "Second process admission fixture",
+    "--status", "In Planning",
+    "--description", "Create an independently owned Episode",
+    "--plan", "1. Create the bounded resource.\n2. Verify exact identity.",
+    "--plain",
+  ], { cwd: f.root, encoding: "utf8" });
+  const secondId = created.match(/PRIMECLAW-[0-9.]+/)?.[0];
+  assert.ok(secondId);
+  const secondTask = view(f.root, secondId);
+  git(f.root, "add", "--", secondTask.path);
+  git(f.root, "commit", "-q", "--only", "-m", "plan second process task", "--", secondTask.path);
+
+  const worker = join(f.root, "admission-worker.mjs");
+  const specUrl = new URL("../src/prime-agent-plugin/extension-support/spec-episode.ts", import.meta.url).href;
+  const ownershipUrl = new URL("../src/prime-agent-plugin/extension-support/episode-ownership.ts", import.meta.url).href;
+  const resolverUrl = new URL("../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts", import.meta.url).href;
+  writeFileSync(worker, `
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { CliTaskEpisodeAdmissionGit, createTaskEpisode } from ${JSON.stringify(specUrl)};
+import { readEpisodeOwnership, writeEpisodeOwnership } from ${JSON.stringify(ownershipUrl)};
+import { resolveBacklogTask } from ${JSON.stringify(resolverUrl)};
+const [root, taskId, ownerSessionId, barrier, backlog] = process.argv.slice(2);
+class Runner {
+  run(command, args, options = {}) {
+    const result = spawnSync(command === "backlog" ? backlog : command, args, { cwd: options.cwd, encoding: "utf8" });
+    if (result.status !== 0 && !options.allowFailure) throw new Error(result.stderr || result.stdout);
+    return { stdout: result.stdout || "", stderr: result.stderr || "", status: result.status ?? 1 };
+  }
+}
+class AdmissionGit extends CliTaskEpisodeAdmissionGit {
+  push() {
+    if (ownerSessionId === "owner-first") {
+      process.stdout.write("READY_IN_PUSH\\n");
+      readFileSync(barrier);
+    }
+  }
+}
+const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
+  getSessionId: () => ownerSessionId, getSessionFile: () => join(root, ownerSessionId + ".jsonl"), getHeader: () => ({ rlmDepth: 0 }),
+} };
+const dependencies = {
+  admissionGit: new AdmissionGit(), admissionRunner: new Runner(), taskResolver: resolveBacklogTask,
+  allocateTaskEpisode: async () => {
+    const reserved = readEpisodeOwnership(root, ownerSessionId);
+    const active = { ...reserved, status: "active", worktree: join(root, ownerSessionId + "-worktree"), branch: "episode/" + ownerSessionId,
+      head: reserved.baseRef, episodeId: "episode-" + ownerSessionId, episodeSessionFile: join(root, "episode-" + ownerSessionId + ".jsonl"), episodeActiveSessionId: "route-" + ownerSessionId };
+    writeEpisodeOwnership(root, active);
+    return { ...active, reused: false };
+  },
+};
+try {
+  const result = await createTaskEpisode(taskId, "call-" + ownerSessionId, ctx, dependencies, { engine: "local" });
+  process.stdout.write(JSON.stringify({ outcome: "created", taskId: result.taskId, baseRef: result.baseRef }) + "\\n");
+} catch (error) {
+  process.stdout.write(JSON.stringify({ outcome: "failed", error: String(error) }) + "\\n");
+}
+`);
+  const barrier = join(f.root, "release.fifo");
+  execFileSync("mkfifo", [barrier]);
+  const run = (taskId, ownerSessionId) => {
+    const child = spawn(process.execPath, ["--experimental-strip-types", worker, f.root, taskId, ownerSessionId, barrier, BACKLOG], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "", stderr = "", readyResolve;
+    const ready = new Promise((resolveReady) => { readyResolve = resolveReady; });
+    child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; if (stdout.includes("READY_IN_PUSH")) readyResolve(); });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    const done = new Promise((resolve, reject) => {
+      child.on("error", reject);
+      child.on("close", (code) => code === 0 ? resolve({ stdout, stderr }) : reject(new Error(stderr)));
+    });
+    return { child, done, ready };
+  };
+
+  const first = run("PRIMECLAW-1", "owner-first");
+  await first.ready;
+  const second = run(secondId, "owner-second");
+  const secondResult = await second.done;
+  writeFileSync(barrier, "release");
+  const firstResult = await first.done;
+
+  assert.match(firstResult.stdout, /"outcome":"created"/);
+  assert.match(secondResult.stdout, /"outcome":"created"/);
+  assert.equal(view(f.root, "PRIMECLAW-1").status, "In Progress");
+  assert.equal(view(f.root, secondId).status, "In Progress");
+  assert.deepEqual(readAllEpisodeOwnership(f.root).map((record) => record.ownerSessionId), ["owner-first", "owner-second"]);
+});
+
+
+test("retained promotion tolerates an unrelated task admission while selecting its captured base", async () => {
+  const f = fixture();
+  const location = ".ralph/plans/future/alpha";
+  mkdirSync(join(f.root, location), { recursive: true });
+  writeFileSync(join(f.root, location, "SPECIFICATION.md"), "Bounded retained specification.\n");
+  writeFileSync(join(f.root, location, "IMPLEMENTATION_PLAN.md"), "1. Promote exact source.\n2. Verify it.\n");
+  mkdirSync(join(f.root, ".agents", "skills", "execute"), { recursive: true });
+  writeFileSync(join(f.root, ".agents", "skills", "execute", "SKILL.md"), "Retained execute fixture.\n");
+  git(f.root, "add", "--", location, ".agents/skills/execute/SKILL.md");
+  git(f.root, "commit", "-q", "-m", "add retained source");
+  const capturedBase = git(f.root, "rev-parse", "HEAD");
+  const digest = bundleContentDigest(join(f.root, location));
+  let enteredResolve, releaseResolve;
+  const entered = new Promise((resolveEntered) => { enteredResolve = resolveEntered; });
+  const release = new Promise((resolveRelease) => { releaseResolve = resolveRelease; });
+  const legacyCtx = {
+    ...f.ctx,
+    sessionManager: {
+      ...f.ctx.sessionManager,
+      getSessionId: () => "owner-legacy",
+      getSessionFile: () => join(f.root, "owner-legacy.jsonl"),
+    },
+  };
+  const publisher = {
+    async createFresh(options) {
+      const identity = { sessionId: "legacy-episode", sessionFile: join(f.root, "legacy-episode.jsonl") };
+      writeFileSync(identity.sessionFile, "{}\n");
+      await options.onAllocated?.(identity);
+      return { ...identity, activeSessionId: "legacy-route" };
+    },
+    async deliverExecute() {},
+    close() {},
+  };
+  const legacyPromise = createSpecEpisode(location, "legacy-call", legacyCtx, {
+    orca: {
+      async listReadySetups() {
+        enteredResolve();
+        await release;
+        throw new OrcaUnavailableError("deliberate local fallback");
+      },
+    },
+    publisher,
+  }, { approvedBundleDigest: digest });
+  await entered;
+
+  const productionDependencies = {
+    admissionGit: f.dependencies.admissionGit,
+    admissionRunner: f.dependencies.admissionRunner,
+    taskResolver: f.dependencies.taskResolver,
+    now: f.dependencies.now,
+    reservationOperationId: "mixed-mode-task-operation",
+    allocateTaskEpisode: async () => {
+      const reserved = readEpisodeOwnership(f.root, "owner-session");
+      const active = {
+        ...reserved, status: "active", worktree: join(f.root, "task-worktree"), branch: "episode/task",
+        head: reserved.baseRef, episodeId: "task-episode", episodeSessionFile: join(f.root, "task-episode.jsonl"), episodeActiveSessionId: "task-route",
+      };
+      writeEpisodeOwnership(f.root, active);
+      return { ...active, reused: false };
+    },
+  };
+  const task = await createTaskEpisode("PRIMECLAW-1", "task-call", f.ctx, productionDependencies, { engine: "local" });
+  releaseResolve();
+  const legacy = await legacyPromise;
+
+  assert.equal(task.status, "active");
+  assert.equal(legacy.status, "active");
+  assert.equal(legacy.baseRef, capturedBase);
+  assert.notEqual(git(f.root, "rev-parse", "HEAD"), capturedBase);
+  assert.equal(bundleContentDigest(join(f.root, location)), digest);
+  assert.deepEqual(readAllEpisodeOwnership(f.root).map((record) => record.ownerSessionId), ["owner-legacy", "owner-session"]);
 });
 
 

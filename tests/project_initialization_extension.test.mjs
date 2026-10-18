@@ -18,12 +18,24 @@ import {
 } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { createProjectInitializationExtension } from "../src/prime-agent-plugin/extensions/project-initialization.ts";
 import { startTemplateReview } from "../src/prime-agent-plugin/extension-support/template-review.ts";
+import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
 const PLUGIN = resolve("src/prime-agent-plugin");
 function git(cwd, ...args) { return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }); }
 function repo(t, parent = mkdtempSync(join(tmpdir(), "pc-init-"))) {
   const root = join(parent, "repo"); mkdirSync(root, { recursive: true }); git(root, "init", "-q", "-b", "main"); git(root,"config","user.name","Test"); git(root,"config","user.email","test@example.invalid"); writeFileSync(join(root,"README.md"),"fixture\n"); git(root,"add","README.md"); git(root,"commit","-qm","fixture"); t.after(()=>{}); return root;
 }
+function activeOwnership(ownerSessionId, worktree, overrides = {}) {
+  return {
+    version: 2, status: "active", operationId: `operation-${ownerSessionId}`, engine: "local", ownerSessionId,
+    taskId: `TASK-${ownerSessionId}`, taskPath: `backlog/tasks/${ownerSessionId}.md`, baseRef: "a".repeat(40),
+    createdAt: "2026-10-18T12:00:00.000Z", updatedAt: "2026-10-18T12:00:00.000Z",
+    worktree, branch: `episode/${ownerSessionId}`, head: "b".repeat(40), episodeId: `episode-${ownerSessionId}`,
+    episodeSessionFile: join(worktree, `${ownerSessionId}.jsonl`), episodeActiveSessionId: `route-${ownerSessionId}`,
+    ...overrides,
+  };
+}
+
 class Runner {
   constructor(registrations = []) { this.registrations = registrations; this.adds = 0; this.diffs = 0; this.orcaError = null; }
   run(command,args,options={}) {
@@ -187,7 +199,7 @@ test("one owner-worktree record protects the linked Episode snapshot", (t) => {
   git(root,"worktree","add","-q","-b","episode/test",worktree);
   t.after(()=>{try{git(root,"worktree","remove","--force",worktree)}catch{};rmSync(worktree,{recursive:true,force:true})});
   const ownership=join(root,".prime-claw/ownership.json");mkdirSync(dirname(ownership),{recursive:true});
-  writeFileSync(ownership,JSON.stringify({status:"active",worktree}));
+  writeEpisodeOwnership(root,activeOwnership("owner",worktree));
   const result=reconcilePrimeClawProject({cwd:worktree,pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()});
   assert.equal(result.skippedActiveEpisode,true);
   assert.equal(existsSync(join(worktree,".prime-claw/templates.json")),false);
@@ -195,6 +207,21 @@ test("one owner-worktree record protects the linked Episode snapshot", (t) => {
   assert.throws(()=>resetProjectAsset(worktree,"project-skill-prepare",{pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()}),/active or uncertain Episode/);
   assert.throws(()=>startTemplateReview(worktree,"project-skill-prepare",true,{pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()}),/active or uncertain Episode/);
 });
+
+test("multi-record ownership detects each exact active worktree", (t) => {
+  const root=repo(t), first=join(dirname(root),"episode-first"), second=join(dirname(root),"episode-second");
+  git(root,"worktree","add","-q","-b","episode/first",first);
+  git(root,"worktree","add","-q","-b","episode/second",second);
+  t.after(()=>{
+    for (const worktree of [first,second]) { try{git(root,"worktree","remove","--force",worktree)}catch{};rmSync(worktree,{recursive:true,force:true}); }
+  });
+  writeEpisodeOwnership(root,activeOwnership("first",first));
+  writeEpisodeOwnership(root,activeOwnership("second",second));
+  assert.equal(episodeWorktreeActivity(first,"linked-worktree",new Runner()),"active");
+  assert.equal(episodeWorktreeActivity(second,"linked-worktree",new Runner()),"active");
+  assert.equal(episodeWorktreeActivity(root,"repository",new Runner()),"inactive");
+});
+
 
 test("legacy Episode identity requires version-one ownership plus active worktree files", (t) => {
   const root=repo(t), worktree=join(dirname(root),"legacy-episode-worktree");
@@ -205,7 +232,13 @@ test("legacy Episode identity requires version-one ownership plus active worktre
   assert.equal(episodeWorktreeActivity(root,"repository",new Runner()),"inactive");
 
   const ownership=join(root,".prime-claw/ownership.json");mkdirSync(dirname(ownership),{recursive:true});
-  writeFileSync(ownership,JSON.stringify({version:1,status:"active",worktree}));
+  writeEpisodeOwnership(root,{
+    version:1,status:"active",operationId:"legacy-operation",engine:"local",ownerSessionId:"legacy-owner",
+    sourceLocation:".ralph/plans/future/legacy",slug:"legacy",baseRef:"main",bundleDigest:"0".repeat(64),
+    createdAt:"2026-10-18T12:00:00.000Z",updatedAt:"2026-10-18T12:00:00.000Z",
+    worktree,branch:"episode/legacy",head:"legacy-head",episodeId:"legacy-episode",
+    episodeSessionFile:join(worktree,"legacy.jsonl"),episodeActiveSessionId:"legacy-route",
+  });
   assert.equal(episodeWorktreeActivity(root,"repository",new Runner()),"inactive");
   assert.equal(hasActiveLegacyPlanFiles(worktree),false);
   assert.equal(episodeWorktreeActivity(worktree,"linked-worktree",new Runner()),"uncertain");

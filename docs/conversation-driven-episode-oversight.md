@@ -72,10 +72,22 @@ version-1 folder approval guard exists only to bind the current owner session,
 selected folder, and optional setup ID across the two-turn compact-first chain.
 It is not a second approval UX.
 
-## One durable ownership record
+## One durable Conversation-keyed ownership registry
 
-`.prime-claw/ownership.json` is the sole durable lifecycle record. Its two
-schemas are strict and disjoint:
+`.prime-claw/ownership.json` is the sole durable lifecycle registry. It is a
+small human-readable object keyed by exact `ownerSessionId`; the former direct
+record remains valid migration input and is converted on the next mutation:
+
+```json
+{
+  "schemaVersion": 1,
+  "owners": {
+    "<ownerSessionId>": { "version": 2, "ownerSessionId": "<ownerSessionId>", "...": "..." }
+  }
+}
+```
+
+Each entry uses one of two strict, disjoint schemas:
 
 - primary version 2 binds the owner Conversation, canonical Backlog task ID and
   project-relative path, project root, exact task-only `In Progress` `baseRef`,
@@ -87,25 +99,34 @@ schemas are strict and disjoint:
   Episode session ID/file and refreshable route, terminal handles, and lifecycle
   status: `provisioning`, `active`, `uncertain`, or `inactive`.
 
-The strict ownership record persists lifecycle state plus durable owner,
-authority, placement, and resource bindings. It is not an event journal and
+Cardinality is one active Episode per Conversation, not one per repository.
+Different Conversations can reserve and own independent Episodes concurrently.
+Active task IDs/paths and retained source locations remain unique across all
+entries. Owner-facing reads and updates select the exact `ownerSessionId`; only
+binding-collision and worktree-activity checks inspect all entries. Registry
+read-modify-write mutations use an inter-process lock plus atomic rename so a
+concurrent reservation cannot overwrite another Conversation's entry.
+
+Each strict entry persists lifecycle state plus durable owner, authority,
+placement, and resource bindings. The registry is not an event journal and
 stores no review, progress, merge, or abandonment receipts. Version 2 adds only
 an optional `cleanupHead`, bound immediately before separately authorized
 resource deletion so same-head cleanup can resume safely.
 
-The record is written before external mutation. It is updated at genuine
-external boundaries, but it is not an event journal. Active and inactive state
-retain exact bindings needed for restart recovery and idempotent final
-bookkeeping. The former per-slug identity directory and transcript oversight
-markers are retired.
+An entry is written before its external mutation and updated at genuine external
+boundaries. Active and inactive entries retain exact bindings needed for restart
+recovery and idempotent final bookkeeping. The former per-slug identity
+directory and transcript oversight markers are retired.
 
-For primary version-2 ownership, the task-native reservation seam re-resolves
-the exact task, verifies the exact task-only `In Progress` status commit and a
-clean task, then writes `provisioning` before any branch, worktree, session, or
-assignment identity. Its allocator consumes only that reservation, creates the
-selected local or Orca worktree from `baseRef`, skips bundle promotion, binds
-one durable exact-CWD session, and sends one execute assignment carrying the
-task ID. The active execute policy treats that task as the sole durable
+For primary version-2 ownership, a short inter-process admission lock serializes
+only the exact Backlog status edit, task-only commit, and durable reservation.
+The reservation seam re-resolves the exact task, verifies the caller-supplied
+admission commit and a clean task, then writes `provisioning` before releasing
+the lock or starting push, branch, worktree, session, or assignment work. Its
+allocator consumes only that reservation, creates the selected local or Orca
+worktree from `baseRef`, skips bundle promotion, binds one durable exact-CWD
+session, and sends one execute assignment carrying both the task ID and exact
+owning Conversation registry key. The active execute policy treats that task as the sole durable
 authority, permits only Episode-owned content edits through Backlog in the
 Episode worktree, verifies status remains `In Progress`, and reserves every
 lifecycle transition on main for the Conversation.
@@ -120,8 +141,9 @@ lifecycle surfaces. Partial provisioning or allocation failure becomes
 transaction first proves it is at the repository root of the primary Git
 worktree on `main`; linked worktrees and other branches fail before any task,
 Git, ownership, or allocator mutation. It then commits the exact clean `In
-Planning` task as `In Progress`, best-effort pushes, reserves and allocates from
-that SHA, and verifies durable active identity. Proven-clean pre-ownership
+Planning` task as `In Progress`, reserves from that exact SHA while holding the
+short admission lock, releases the lock before best-effort push and allocation,
+and verifies durable active identity. Proven-clean pre-ownership
 failure commits the task back to `In Planning`; any recorded or uncertain
 mutation commits `Blocked` with its exact recovery condition while retaining
 evidence. Folder admission and close operations explicitly reject version 2;
@@ -188,8 +210,8 @@ For a ready local project-host setup, Episode creation is ordered as follows:
    returned path, stable identity, generated branch, and head.
 4. Revalidate the approved source digest, overlay the exact bundle into active
    `.ralph/plans`, verify the copied and promoted bytes plus canonical source,
-   verify the canonical checkout head did not change, and commit the promotion
-   in the Episode worktree.
+   and commit the promotion in the Episode worktree. Unrelated safe canonical-main
+   advancement may proceed while the worktree remains bound to its captured base.
 5. Create one disabled existing-workspace automation using provider
    `prime-agent`, `reuseSession: true`, and the fixed execute assignment. Run it
    manually.
@@ -201,8 +223,10 @@ For a ready local project-host setup, Episode creation is ordered as follows:
    visible, connected, writable, and provider-ready.
    Transition ownership to `active`.
 
-The Episode inherits no Conversation transcript. It receives exactly one fixed
-execute assignment after promotion. Creation sends no initial handoff and no
+The Episode inherits no Conversation transcript. Its fixed execute assignment
+carries the exact owning Conversation registry key; the Episode uses that key,
+not its own session ID, and verifies the persisted worktree/session binding. It
+receives exactly one execute assignment after promotion. Creation sends no initial handoff and no
 second daemon prompt. `pi` remains Orca's distinct TUI agent ID; the native
 provider is `prime-agent`.
 

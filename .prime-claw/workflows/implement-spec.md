@@ -52,7 +52,7 @@ parameter. A native `--host id:<project-host-setup-id>` bypass, when the operato
 provided one, is already bound privately to this preparation. Otherwise the
 trusted host selects the sole ready local setup or presents the native picker.
 
-The capability first persists one provisioning ownership record, creates the
+The capability first persists one provisioning ownership record under this Conversation's exact registry key, creates the
 background worktree without an agent, prompt, or activation, promotes and
 commits the exact bundle, and then launches one fresh native `prime-agent`
 session with one fixed execute assignment. It does not inherit this

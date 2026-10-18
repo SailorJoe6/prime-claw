@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -50,6 +50,17 @@ export interface TaskEpisodeOwnershipRecord extends EpisodeOwnershipBase {
 }
 
 export type EpisodeOwnershipRecord = LegacyEpisodeOwnershipRecord | TaskEpisodeOwnershipRecord;
+
+/** Human-readable repository registry keyed by the exact owning Conversation. */
+export interface EpisodeOwnershipRegistry {
+  schemaVersion: 1;
+  owners: Record<string, EpisodeOwnershipRecord>;
+}
+
+export type EpisodeOwnershipMutation = (
+  current: EpisodeOwnershipRecord | null,
+  allRecords: readonly EpisodeOwnershipRecord[],
+) => EpisodeOwnershipRecord | null;
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DIGEST = /^[0-9a-f]{64}$/;
@@ -150,22 +161,159 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
   return item as unknown as EpisodeOwnershipRecord;
 }
 
-export function readEpisodeOwnership(projectRoot: string): EpisodeOwnershipRecord | null {
+export function parseEpisodeOwnershipRegistry(value: unknown, path = "episode ownership"): EpisodeOwnershipRegistry {
+  if (value && typeof value === "object" && !Array.isArray(value)
+    && (value as Record<string, unknown>).schemaVersion === 1) {
+    const item = value as Record<string, unknown>;
+    if (Object.keys(item).some((field) => !["schemaVersion", "owners"].includes(field))
+      || !item.owners || typeof item.owners !== "object" || Array.isArray(item.owners)) {
+      throw new Error(`Episode ownership registry has an unsupported shape: ${path}`);
+    }
+    const owners: Record<string, EpisodeOwnershipRecord> = {};
+    for (const [ownerSessionId, rawRecord] of Object.entries(item.owners as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) {
+      if (!ownerSessionId) throw new Error(`Episode ownership registry has an empty owner key: ${path}`);
+      const record = parseEpisodeOwnership(rawRecord, `${path} owner ${ownerSessionId}`);
+      if (record.ownerSessionId !== ownerSessionId) {
+        throw new Error(`Episode ownership registry owner key does not match its record: ${path} owner ${ownerSessionId}`);
+      }
+      owners[ownerSessionId] = record;
+    }
+    const registry: EpisodeOwnershipRegistry = { schemaVersion: 1, owners };
+    validateActiveBindingUniqueness(registry);
+    return registry;
+  }
+
+  // A pre-registry direct record is valid migration input. The next mutation
+  // persists the equivalent Conversation-keyed registry without changing it.
+  const record = parseEpisodeOwnership(value, path);
+  return { schemaVersion: 1, owners: { [record.ownerSessionId]: record } };
+}
+
+function readOwnershipValue(projectRoot: string): unknown | null {
   const path = episodeOwnershipPath(projectRoot);
   if (!existsSync(path)) return null;
   const stat = lstatSync(path);
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Episode ownership path is not a regular file: ${path}`);
-  let value: unknown;
-  try { value = JSON.parse(readFileSync(path, "utf8")); }
+  try { return JSON.parse(readFileSync(path, "utf8")); }
   catch (error) { throw new Error(`Episode ownership is unreadable: ${path}: ${String(error)}`); }
-  return parseEpisodeOwnership(value, path);
+}
+
+export function readEpisodeOwnershipRegistry(projectRoot: string): EpisodeOwnershipRegistry {
+  const value = readOwnershipValue(projectRoot);
+  return value === null
+    ? { schemaVersion: 1, owners: {} }
+    : parseEpisodeOwnershipRegistry(value, episodeOwnershipPath(projectRoot));
+}
+
+export function readAllEpisodeOwnership(projectRoot: string): EpisodeOwnershipRecord[] {
+  return Object.values(readEpisodeOwnershipRegistry(projectRoot).owners);
+}
+
+export function readEpisodeOwnership(projectRoot: string, ownerSessionId?: string): EpisodeOwnershipRecord | null {
+  const registry = readEpisodeOwnershipRegistry(projectRoot);
+  if (ownerSessionId !== undefined) return registry.owners[ownerSessionId] ?? null;
+  const records = Object.values(registry.owners);
+  if (records.length <= 1) return records[0] ?? null;
+  throw new Error(`Episode ownership has multiple Conversation records; exact ownerSessionId is required: ${episodeOwnershipPath(projectRoot)}`);
+}
+
+function active(record: EpisodeOwnershipRecord): boolean {
+  return record.status !== "inactive";
+}
+
+function sameEpisodeBinding(left: EpisodeOwnershipRecord, right: EpisodeOwnershipRecord): boolean {
+  if (left.version === 1 && right.version === 1) return left.sourceLocation === right.sourceLocation;
+  if (left.version === 2 && right.version === 2) return left.taskId === right.taskId && left.taskPath === right.taskPath;
+  return Boolean(left.episodeId && right.episodeId
+    && left.episodeId === right.episodeId
+    && left.worktree && left.worktree === right.worktree
+    && left.branch && left.branch === right.branch);
+}
+
+function validateActiveBindingUniqueness(registry: EpisodeOwnershipRegistry): void {
+  const records = Object.values(registry.owners).filter(active);
+  for (let index = 0; index < records.length; index += 1) {
+    for (let otherIndex = index + 1; otherIndex < records.length; otherIndex += 1) {
+      const left = records[index];
+      const right = records[otherIndex];
+      if (left.version === 2 && right.version === 2
+        && (left.taskId === right.taskId || left.taskPath === right.taskPath)) {
+        throw new Error(`Active task Episode binding collides across Conversations: ${left.taskId} / ${right.taskId}`);
+      }
+      if (left.version === 1 && right.version === 1 && left.sourceLocation === right.sourceLocation) {
+        throw new Error(`Active retained source binding collides across Conversations: ${left.sourceLocation}`);
+      }
+    }
+  }
+}
+
+function orderedRegistry(registry: EpisodeOwnershipRegistry): EpisodeOwnershipRegistry {
+  return {
+    schemaVersion: 1,
+    owners: Object.fromEntries(Object.entries(registry.owners).sort(([a], [b]) => a.localeCompare(b))),
+  };
+}
+
+function persistOwnershipRegistry(projectRoot: string, registry: EpisodeOwnershipRegistry): void {
+  validateActiveBindingUniqueness(registry);
+  const path = episodeOwnershipPath(projectRoot);
+  mkdirSync(dirname(path), { recursive: true });
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(orderedRegistry(registry), null, 2)}\n`, { mode: 0o600 });
+  renameSync(temporary, path);
+}
+
+function withDirectoryLock<T>(lockPath: string, timeoutMs: number, label: string, operation: () => T): T {
+  mkdirSync(dirname(lockPath), { recursive: true });
+  const deadline = Date.now() + timeoutMs;
+  while (true) {
+    try {
+      mkdirSync(lockPath);
+      break;
+    } catch (error) {
+      if ((error as { code?: string }).code !== "EEXIST") throw error;
+      if (Date.now() >= deadline) throw new Error(`Timed out waiting for ${label} lock: ${lockPath}`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+  }
+  try { return operation(); }
+  finally { rmSync(lockPath, { recursive: true, force: true }); }
+}
+
+function withOwnershipLock<T>(projectRoot: string, operation: () => T): T {
+  return withDirectoryLock(`${episodeOwnershipPath(projectRoot)}.lock`, 5_000, "Episode ownership registry", operation);
+}
+
+/** Serialize only the canonical-main status commit plus durable reservation. */
+export function withEpisodeAdmissionLock<T>(projectRoot: string, operation: () => T): T {
+  return withDirectoryLock(join(projectRoot, ".prime-claw", "episode-admission.lock"), 30_000, "Episode admission", operation);
+}
+
+export function mutateEpisodeOwnership(
+  projectRoot: string,
+  ownerSessionId: string,
+  mutation: EpisodeOwnershipMutation,
+): EpisodeOwnershipRecord | null {
+  if (!ownerSessionId) throw new Error("Episode ownership mutation requires an exact ownerSessionId");
+  return withOwnershipLock(projectRoot, () => {
+    const registry = readEpisodeOwnershipRegistry(projectRoot);
+    const current = registry.owners[ownerSessionId] ?? null;
+    const next = mutation(current, Object.values(registry.owners));
+    if (next === null) delete registry.owners[ownerSessionId];
+    else {
+      parseEpisodeOwnership(next);
+      if (next.ownerSessionId !== ownerSessionId) throw new Error("Episode ownership mutation cannot change its ownerSessionId");
+      if (current && active(current) && active(next) && !sameEpisodeBinding(current, next)) {
+        throw new Error(`Conversation ${ownerSessionId} already owns a different active Episode`);
+      }
+      registry.owners[ownerSessionId] = next;
+    }
+    persistOwnershipRegistry(projectRoot, registry);
+    return next;
+  });
 }
 
 export function writeEpisodeOwnership(projectRoot: string, record: EpisodeOwnershipRecord): void {
   parseEpisodeOwnership(record);
-  const path = episodeOwnershipPath(projectRoot);
-  mkdirSync(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
-  writeFileSync(temporary, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
-  renameSync(temporary, path);
+  mutateEpisodeOwnership(projectRoot, record.ownerSessionId, () => record);
 }

@@ -230,7 +230,8 @@ def test_traceability_covers_both_episode_schemas_at_creation_recovery_and_finis
         assert "retained version-1 compatibility" in rows[story]
 
     assert "no bundle copy" in rows["US-14"]
-    assert "public task-native admission replay fails closed on existing non-terminal ownership" in rows["US-14"]
+    assert "public task-native admission replay fails closed on that conversation's existing non-terminal ownership" in rows["US-14"]
+    assert "different conversations can reserve and create independent episodes concurrently" in rows["US-14"]
     assert "retained version-1 compatibility promotes and commits the exact approved bundle, and `create_spec_episode` may return" in rows["US-14"]
 
     assert "primary task-native recovery returns the exact task to `in planning` after a proven clean failure before ownership/resource mutation" in rows["US-16"]

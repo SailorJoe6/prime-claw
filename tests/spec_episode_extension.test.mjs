@@ -54,7 +54,8 @@ function setup(id = "setup-local", hostId = "local", route) {
   return { id, projectId: "project", hostId, path: "/project", displayName: "prime-claw", environmentLabel: hostId, ...(route ? { routingEnvironmentId: route } : {}) };
 }
 function harness(options = {}) {
-  const disk = diskFixture(); const calls = []; let record = options.record ?? null;
+  const disk = diskFixture(); const calls = []; const records = new Map();
+  if (options.record) records.set(options.record.ownerSessionId, structuredClone(options.record));
   const wt = { id: `repo::${disk.worktree}`, identity: "wt2:local:one", path: disk.worktree, branch: "JLanders/generated", head: "base", projectSetupId: "setup-local" };
   const git = {
     entries: [{ path: disk.root, branch: "main" }, { path: disk.worktree, branch: wt.branch }],
@@ -66,7 +67,10 @@ function harness(options = {}) {
     commitPromotion(path) { calls.push(["commit", path]); return "promoted"; },
   };
   const filesystem = { exists: (path) => options.unavailable ? !String(path).includes("-alpha-episode-") : true, hasActiveLegacyPlanFiles: () => options.legacyPlanFiles !== false, promoteBundle(path) { calls.push(["promote", path]); } };
-  const ownership = { read: () => record, write(_root, value) { record = structuredClone(value); calls.push(["ownership", value.status]); } };
+  const ownership = {
+    read(_root, ownerSessionId) { return ownerSessionId ? records.get(ownerSessionId) ?? null : (records.size <= 1 ? [...records.values()][0] ?? null : null); },
+    write(_root, value) { records.set(value.ownerSessionId, structuredClone(value)); calls.push(["ownership", value.status]); },
+  };
   const published = { activeSessionId: "route", sessionId: "episode", sessionFile: join(disk.root, "episode.jsonl") };
   let listCount = 0;
   const session = { ...published, cwd: disk.worktree, sessionName: "alpha-episode", isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 };
@@ -96,7 +100,7 @@ function harness(options = {}) {
     sessionManager: { getSessionId: () => "owner", getSessionFile: () => join(disk.root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }) },
     model: { provider: "provider", id: "model" },
   };
-  return { ...disk, wt, calls, git, filesystem, ownership, publisher, orca, ctx, deps: { git, filesystem, ownership, publisher, orca, wait: async () => {}, bindingAttempts: 1 }, get record() { return record; } };
+  return { ...disk, wt, calls, git, filesystem, ownership, publisher, orca, ctx, deps: { git, filesystem, ownership, publisher, orca, wait: async () => {}, bindingAttempts: 1 }, get record() { return records.get("owner") ?? null; } };
 }
 function createApproved(f, options = {}) {
   const approvedBundleDigest = bundleContentDigest(join(f.root, ".ralph", "plans", "future", "alpha"));
@@ -308,7 +312,7 @@ test("ownership bridge preflight rejects busy, foreign-terminal, and non-owner r
   foreign.publisher.list = async () => [transitionSession(foreign)];
   await assert.rejects(transitionSpecEpisodeToTaskOwnership(LOCATION, "PRIMECLAW-10.38", foreign.wt.head, "f".repeat(40), true, foreign.ctx, {
     ...foreign.deps, transitionOwnership() { transitions += 1; throw new Error("must not run"); },
-  }), /exact owner Conversation/);
+  }), /ownership is missing/);
   assert.equal(transitions, 0);
 });
 
@@ -327,9 +331,11 @@ test("Orca creation promotes before exactly one native execute assignment and re
   assert.equal(f.record.terminalHandle, "terminal");
 });
 
-test("single ready setup bypasses picker", async () => {
+test("single ready setup bypasses picker and passes the owning Conversation key", async () => {
   const f = harness(); await createApproved(f);
   assert.equal(f.calls.some((call) => call[0] === "picker"), false);
+  const prompt = f.calls.find((call) => call[0] === "auto-create")[1].prompt;
+  assert.match(prompt, /<operator-episode-owner-session>\s*owner\s*<\/operator-episode-owner-session>/);
 });
 
 test("multiple setups use stable labeled picker and selected local id", async () => {
@@ -451,6 +457,8 @@ test("handoff uses exact active ownership and queues canonical execute only afte
   const result = await handoffSpecEpisode(LOCATION, "fix accepted defect", f.ctx, f.deps);
   assert.equal(result.handoffDelivery, "prompt"); assert.equal(result.executeDelivery, "followUp");
   const call = f.calls.find((value) => value[0] === "handoff"); assert.match(call[1], /fix accepted defect/); assert.match(call[2], /EXECUTE POLICY/);
+  assert.match(call[1], /<operator-episode-owner-session>\s*owner\s*<\/operator-episode-owner-session>/);
+  assert.match(call[2], /<operator-episode-owner-session>\s*owner\s*<\/operator-episode-owner-session>/);
 });
 
 test("retained handoff uses exact ownership when the obsolete promoted source folder is absent", async () => {
@@ -559,8 +567,9 @@ test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, 
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/task-native episode ownership conflicts/);
   });
   await t.test("foreign owner and inactive ownership fail closed",async()=>{
-    const foreign=harness();await createApproved(foreign);useDiskLegacyGate(foreign);writeBlockedLegacyPair(foreign);foreign.ownership.write(foreign.root,{...foreign.record,ownerSessionId:"other"});
-    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,foreign.ctx,foreign.deps),/ownerSessionId/);
+    const foreign=harness();await createApproved(foreign);useDiskLegacyGate(foreign);writeBlockedLegacyPair(foreign);
+    foreign.ctx.sessionManager.getSessionId=()=>"other";
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,foreign.ctx,foreign.deps),/No durable episode ownership/);
     const inactive=harness();await createApproved(inactive);useDiskLegacyGate(inactive);writeBlockedLegacyPair(inactive);inactive.ownership.write(inactive.root,{...inactive.record,status:"inactive"});
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,inactive.ctx,inactive.deps),/requires active version-1 ownership/);
   });
@@ -607,6 +616,11 @@ test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, 
 test("task-native handoff continues the exact idle Episode with task-bound handoff and execute", async () => {
   const f = harness({ list: (_count, session) => [session] });
   f.ownership.write(f.root, activeTaskRecord(f));
+  f.ownership.write(f.root, activeTaskRecord(f, {
+    ownerSessionId: "other-owner", taskId: "PRIMECLAW-10.39", taskPath: "backlog/tasks/primeclaw-10.39.md",
+    operationId: "other-operation", worktree: join(f.root, "other-worktree"), branch: "other-branch",
+    episodeId: "other-episode", episodeSessionFile: join(f.root, "other.jsonl"), episodeActiveSessionId: "other-route",
+  }));
   const result = await handoffTaskEpisode(
     "PRIMECLAW-10.38",
     "resume the accepted in-scope revision",
@@ -620,6 +634,8 @@ test("task-native handoff continues the exact idle Episode with task-bound hando
   assert.match(call[1], /resume the accepted in-scope revision/);
   assert.match(call[1], /<operator-episode-task>\s*PRIMECLAW-10\.38\s*<\/operator-episode-task>/);
   assert.match(call[2], /<operator-episode-task>\s*PRIMECLAW-10\.38\s*<\/operator-episode-task>/);
+  assert.match(call[1], /<operator-episode-owner-session>\s*owner\s*<\/operator-episode-owner-session>/);
+  assert.match(call[2], /<operator-episode-owner-session>\s*owner\s*<\/operator-episode-owner-session>/);
   assert.match(call[2], /EXECUTE POLICY/);
   assert.doesNotMatch(call[2], /resume the accepted in-scope revision/);
   assert.equal(f.calls.some((value) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(value[0])), false);
@@ -642,14 +658,18 @@ test("blocked workflow authority routes owner Conversation to task mode and neve
     () => resolveBlockedWorkflowAuthority("OTHER-1", f.ctx, f.deps),
     /does not match the exact owned Backlog task/,
   );
+  f.ownership.write(f.root, activeTaskRecord(f, {
+    ownerSessionId: "foreign", taskId: "PRIMECLAW-10.39", taskPath: "backlog/tasks/primeclaw-10.39.md",
+    operationId: "foreign-operation", worktree: join(f.root, "foreign-worktree"), branch: "foreign-branch",
+    episodeId: "foreign-episode", episodeSessionFile: join(f.root, "foreign.jsonl"), episodeActiveSessionId: "foreign-route",
+  }));
   const foreign = {
     ...f.ctx,
     sessionManager: { ...f.ctx.sessionManager, getSessionId: () => "foreign" },
   };
-  assert.throws(
-    () => resolveBlockedWorkflowAuthority(undefined, foreign, f.deps),
-    /ownerSessionId/,
-  );
+  assert.deepEqual(resolveBlockedWorkflowAuthority(undefined, foreign, f.deps), {
+    mode: "task", taskId: "PRIMECLAW-10.39", taskPath: "backlog/tasks/primeclaw-10.39.md", projectRoot: f.root,
+  });
   const episode = { ...f.ctx, cwd: f.worktree };
   assert.throws(
     () => resolveBlockedWorkflowAuthority("PRIMECLAW-10.38", episode, f.deps),
@@ -662,7 +682,13 @@ test("blocked workflow authority routes owner Conversation to task mode and neve
     () => resolveBlockedWorkflowAuthority("PRIMECLAW-10.38", noTaskOwnership.ctx, noTaskOwnership.deps),
     /requires active version-2 Episode ownership/,
   );
-  const legacyOwnership = harness({ record: { version: 1, status: "active", worktree: "/legacy" } });
+  const legacyOwnership = harness();
+  legacyOwnership.ownership.write(legacyOwnership.root, parseEpisodeOwnership({
+    version:1,status:"active",operationId:"legacy",engine:"local",ownerSessionId:"owner",
+    sourceLocation:LOCATION,slug:"alpha",baseRef:"base",bundleDigest:"0".repeat(64),
+    createdAt:"x",updatedAt:"x",worktree:legacyOwnership.worktree,branch:legacyOwnership.wt.branch,head:"head",
+    episodeId:"legacy-episode",episodeSessionFile:join(legacyOwnership.root,"legacy.jsonl"),episodeActiveSessionId:"legacy-route",
+  }));
   assert.equal(resolveBlockedWorkflowAuthority("not a canonical task id", legacyOwnership.ctx, legacyOwnership.deps).mode,"folder");
 
   const provisioning = harness({ record: taskReservation() });
@@ -710,12 +736,18 @@ function cleanupHarness(outcome = "merged", options = {}) {
   const f = harness({ list: (_count, session) => [session] });
   const episodeHead = "b".repeat(40);
   const mainHead = "c".repeat(40);
-  let record = activeTaskRecord(f, options.record ?? {});
+  const record = activeTaskRecord(f, options.record ?? {});
+  const foreign = activeTaskRecord(f, {
+    ownerSessionId: "foreign-owner", taskId: "PRIMECLAW-10.39", taskPath: "backlog/tasks/primeclaw-10.39.md",
+    operationId: "foreign-operation", worktree: join(f.root, "foreign-worktree"), branch: "foreign-branch",
+    episodeId: "foreign-episode", episodeSessionFile: join(f.root, "foreign.jsonl"), episodeActiveSessionId: "foreign-route",
+  });
+  const records = new Map([[record.ownerSessionId, record], [foreign.ownerSessionId, foreign]]);
   const calls = [];
   let stage = options.stage ?? 0;
   const ownership = {
-    read: () => structuredClone(record),
-    write(_root, value) { record = structuredClone(value); calls.push(["ownership", value.status, value.cleanupHead]); },
+    read(_root, ownerSessionId) { return structuredClone(records.get(ownerSessionId) ?? null); },
+    write(_root, value) { records.set(value.ownerSessionId, structuredClone(value)); calls.push(["ownership", value.status, value.cleanupHead]); },
   };
   const cleanupGit = {
     repositoryRoot: () => f.root,
@@ -749,7 +781,8 @@ function cleanupHarness(outcome = "merged", options = {}) {
   const taskResolver = (cwd) => taskSelection(f, { projectRoot: cwd, status: "Done" });
   return {
     f, episodeHead, calls, ownership, cleanupGit, cleanup, taskResolver,
-    get record() { return record; },
+    get record() { return records.get("owner"); },
+    get foreignRecord() { return records.get("foreign-owner"); },
     deps: { ownership, cleanupGit, cleanup, taskResolver, now: () => "2026-10-18T00:00:00.000Z" },
   };
 }
@@ -762,6 +795,7 @@ test("cleanup-only task finalization binds one head, removes exact resources, an
   assert.equal(result.reused, false);
   assert.equal(h.record.cleanupHead, h.episodeHead);
   assert.equal(h.record.status, "inactive");
+  assert.equal(h.foreignRecord.status, "active");
   assert.deepEqual(h.calls.filter((call) => call[0].startsWith("remove-")), [
     ["remove-runtime"], ["remove-worktree"], ["remove-branch"],
   ]);
@@ -1072,6 +1106,9 @@ test("reserved task allocates a local worktree from the status commit and assign
   assert.equal(names.includes("commit"), false);
   const execute = f.calls.find((call) => call[0] === "execute");
   assert.match(execute[1], /<operator-episode-task>\s*PRIMECLAW-10\.38\s*<\/operator-episode-task>/);
+  assert.match(execute[1], /<operator-episode-owner-session>\s*owner\s*<\/operator-episode-owner-session>/);
+  assert.match(execute[1], /exact owning Conversation registry key/);
+  assert.match(execute[1], /never substitute the current session ID/);
 });
 
 test("reserved task allocates through exact Orca placement without bundle promotion", async () => {
@@ -1096,6 +1133,7 @@ test("reserved task allocates through exact Orca placement without bundle promot
   assert.deepEqual(names.filter((name) => name === "auto-run"), ["auto-run"]);
   const automation = f.calls.find((call) => call[0] === "auto-create")[1];
   assert.match(automation.prompt, /<operator-episode-task>\s*PRIMECLAW-10\.38\s*<\/operator-episode-task>/);
+  assert.match(automation.prompt, /<operator-episode-owner-session>\s*owner\s*<\/operator-episode-owner-session>/);
 });
 
 
@@ -1177,7 +1215,7 @@ test("task-native allocation rejects mismatched ownership before resource mutati
   f.ctx.sessionManager.getSessionId = () => "foreign-owner";
   await assert.rejects(
     allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps),
-    /conflicts on ownerSessionId/,
+    /No durable task-native Episode reservation/,
   );
   assert.equal(f.record.status, "provisioning");
   assert.equal(f.calls.some((call) => ["ownership", "orca-create", "local-create", "fresh", "execute"].includes(call[0])), false);

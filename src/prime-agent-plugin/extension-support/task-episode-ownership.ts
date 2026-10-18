@@ -26,7 +26,7 @@ export interface TaskEpisodeReservationGit {
 }
 
 export interface TaskEpisodeReservationStore {
-  read(projectRoot: string): EpisodeOwnershipRecord | null;
+  read(projectRoot: string, ownerSessionId?: string): EpisodeOwnershipRecord | null;
   write(projectRoot: string, record: EpisodeOwnershipRecord): void;
 }
 
@@ -38,6 +38,8 @@ export interface TaskEpisodeReservationInput {
   projectSetupId?: string;
   routingEnvironmentId?: string;
   operationId?: string;
+  /** Exact verified In Progress admission commit supplied by the public admission boundary. */
+  baseRef?: string;
 }
 
 export interface TaskEpisodeReservationDependencies {
@@ -313,7 +315,7 @@ export function transitionLegacyEpisodeOwnershipToTask(
   if (!canonicalMainStatusIsSafe(git.status(root))) throw new Error("Canonical main has staged or tracked working-tree changes; ownership transition made no change");
 
   const { selection, taskPath } = exactTransitionTask(root, input, resolver);
-  const initial = ownership.read(root);
+  const initial = ownership.read(root, input.ownerSessionId);
   if (!initial) throw new Error("Exact Episode ownership is missing before ownership transition");
   if (initial.status !== "active") throw new Error(`Ownership transition requires active ownership; found ${initial.status}`);
   if (initial.ownerSessionId !== input.ownerSessionId) throw new Error("Ownership transition requires the exact owner Conversation");
@@ -402,18 +404,18 @@ export function transitionLegacyEpisodeOwnershipToTask(
     || git.upstreamHead(episodeRoot) !== input.expectedEpisodeHead || git.status(episodeRoot) !== "") {
     throw new Error("Git state changed during ownership transition validation");
   }
-  const beforeWrite = ownership.read(root);
+  const beforeWrite = ownership.read(root, input.ownerSessionId);
   if (!sameOwnership(beforeWrite, initial)) throw new Error("Episode ownership changed during transition validation");
 
   try { ownership.write(root, target); }
   catch (error) {
     let afterFailure: EpisodeOwnershipRecord | null = null;
-    try { afterFailure = ownership.read(root); } catch { /* fail closed below */ }
+    try { afterFailure = ownership.read(root, input.ownerSessionId); } catch { /* fail closed below */ }
     if (!sameOwnership(afterFailure, target)) {
       throw new Error(`Ownership transition write did not complete atomically: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  const stored = ownership.read(root);
+  const stored = ownership.read(root, input.ownerSessionId);
   if (!sameOwnership(stored, target)) throw new Error("Ownership transition could not verify the exact completed binding");
   return { record: target, reused: false, mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead, ...plans };
 }
@@ -451,8 +453,11 @@ export function reserveTaskEpisodeOwnership(
   const taskPathRelative = portableRelativePath(projectRoot, taskPath);
   if (taskPathRelative !== selection.taskPathRelative) throw new Error("Task-native Episode reservation task path changed after Backlog resolution");
 
-  const baseRef = git.head(projectRoot);
+  const baseRef = input.baseRef ?? git.head(projectRoot);
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(baseRef)) throw new Error("Task-native Episode reservation requires an exact Git status-commit SHA");
+  if (input.baseRef && git.head(projectRoot) !== baseRef) {
+    throw new Error("Canonical main changed before the exact task-native Episode reservation");
+  }
   const committedPaths = git.commitPaths(projectRoot, baseRef);
   if (committedPaths.length !== 1 || committedPaths[0] !== taskPathRelative) {
     throw new Error("Task-native Episode status commit must contain only the exact Backlog task path");
@@ -461,7 +466,7 @@ export function reserveTaskEpisodeOwnership(
     throw new Error("Task-native Episode task changed after its status commit");
   }
 
-  const existing = ownership.read(projectRoot);
+  const existing = ownership.read(projectRoot, input.ownerSessionId);
   if (existing && existing.status !== "inactive") {
     const identity = existing.version === 2 ? existing.taskId : existing.sourceLocation;
     throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of reserving again`);

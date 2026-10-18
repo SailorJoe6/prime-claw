@@ -2,14 +2,17 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import test from "node:test";
 
 import {
   isLegacyEpisodeOwnership,
   isTaskEpisodeOwnership,
   parseEpisodeOwnership,
+  parseEpisodeOwnershipRegistry,
+  readAllEpisodeOwnership,
   readEpisodeOwnership,
+  readEpisodeOwnershipRegistry,
   writeEpisodeOwnership,
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import {
@@ -67,6 +70,38 @@ function reserve(f, overrides = {}, dependencies = {}) {
     taskResolver: () => resolved,
     now: () => "2026-10-13T08:00:00.000Z",
     ...dependencies,
+  });
+}
+
+function taskOwnership(ownerSessionId, taskId, taskPath = `backlog/tasks/${taskId}.md`) {
+  return parseEpisodeOwnership({
+    version: 2,
+    status: "provisioning",
+    operationId: `operation-${ownerSessionId}`,
+    engine: "local",
+    ownerSessionId,
+    taskId,
+    taskPath,
+    baseRef: "a".repeat(40),
+    createdAt: "2026-10-18T12:00:00.000Z",
+    updatedAt: "2026-10-18T12:00:00.000Z",
+  });
+}
+
+function legacyOwnership(ownerSessionId, sourceLocation) {
+  const slug = sourceLocation.split("/").at(-1);
+  return parseEpisodeOwnership({
+    version: 1,
+    status: "provisioning",
+    operationId: `operation-${ownerSessionId}`,
+    engine: "local",
+    ownerSessionId,
+    sourceLocation,
+    slug,
+    bundleDigest: "b".repeat(64),
+    baseRef: "main",
+    createdAt: "2026-10-18T12:00:00.000Z",
+    updatedAt: "2026-10-18T12:00:00.000Z",
   });
 }
 
@@ -150,8 +185,10 @@ function transition(f, overrides = {}, dependencies = {}) {
   });
 }
 
-test("guarded transition atomically replaces only legacy authority and preserves exact resources", () => {
+test("guarded transition replaces only the exact owner's legacy authority and preserves other owners", () => {
   const f = transitionFixture();
+  const other = taskOwnership("other-owner", "PRIMECLAW-10.39");
+  writeEpisodeOwnership(f.root, other);
   assert.equal(new CliLegacyTaskOwnershipTransitionGit().status(f.root), "?? .prime-claw/ownership.json");
   assert.throws(() => execFileSync("git", ["-C", f.root, "merge-base", "--is-ancestor", f.legacyHead, f.episodeHead], { stdio: "ignore" }));
   const result = transition(f);
@@ -169,7 +206,8 @@ test("guarded transition atomically replaces only legacy authority and preserves
     "status", "operationId", "engine", "ownerSessionId", "baseRef", "createdAt", "worktreeName",
     "worktree", "branch", "head", "episodeId", "episodeSessionFile", "episodeActiveSessionId",
   ]) assert.deepEqual(result.record[preserved], f.legacy[preserved]);
-  assert.deepEqual(readEpisodeOwnership(f.root), result.record);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), result.record);
+  assert.deepEqual(readEpisodeOwnership(f.root, "other-owner"), other);
 
   const replay = transition(f);
   assert.equal(replay.reused, true);
@@ -205,7 +243,7 @@ test("guarded transition requires explicit readiness, exact owner, and exact bin
   assert.deepEqual(readEpisodeOwnership(unconfirmed.root), unconfirmed.legacy);
 
   const foreign = transitionFixture();
-  assert.throws(() => transition(foreign, { ownerSessionId: "foreign-owner" }), /exact owner Conversation/);
+  assert.throws(() => transition(foreign, { ownerSessionId: "foreign-owner" }), /ownership is missing/);
   assert.deepEqual(readEpisodeOwnership(foreign.root), foreign.legacy);
 
   const sourceDrift = transitionFixture();
@@ -358,8 +396,86 @@ test("exact status commit becomes one durable task-native provisioning reservati
     "episodeId", "episodeSessionFile", "episodeActiveSessionId", "terminalHandle",
     "launchAutomationName", "launchAutomationId", "launchRunId",
   ]) assert.equal(record[futureResource], undefined);
-  assert.deepEqual(readEpisodeOwnership(f.root), record);
-  assert.equal(isTaskEpisodeOwnership(parseEpisodeOwnership(JSON.parse(readFileSync(join(f.root, ".prime-claw", "ownership.json"), "utf8")))), true);
+  assert.deepEqual(readEpisodeOwnership(f.root, "owner-session"), record);
+  const registry = parseEpisodeOwnershipRegistry(JSON.parse(readFileSync(join(f.root, ".prime-claw", "ownership.json"), "utf8")));
+  assert.equal(isTaskEpisodeOwnership(registry.owners["owner-session"]), true);
+});
+
+
+test("legacy direct ownership is migration input and the next write preserves it in the registry", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-ownership-migration-"));
+  const legacy = legacyOwnership("legacy-owner", ".ralph/plans/future/legacy-source");
+  mkdirSync(join(root, ".prime-claw"), { recursive: true });
+  writeFileSync(join(root, ".prime-claw", "ownership.json"), `${JSON.stringify(legacy, null, 2)}
+`);
+
+  assert.deepEqual(readEpisodeOwnership(root, "legacy-owner"), legacy);
+  const task = taskOwnership("task-owner", "PRIMECLAW-43");
+  writeEpisodeOwnership(root, task);
+
+  const raw = JSON.parse(readFileSync(join(root, ".prime-claw", "ownership.json"), "utf8"));
+  assert.equal(raw.schemaVersion, 1);
+  assert.deepEqual(Object.keys(raw.owners), ["legacy-owner", "task-owner"]);
+  assert.deepEqual(readEpisodeOwnership(root, "legacy-owner"), legacy);
+  assert.deepEqual(readEpisodeOwnership(root, "task-owner"), task);
+  assert.throws(() => readEpisodeOwnership(root), /exact ownerSessionId is required/);
+});
+
+test("one Conversation cannot replace a different active Episode", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-owner-cardinality-"));
+  const first = taskOwnership("same-owner", "PRIMECLAW-43");
+  writeEpisodeOwnership(root, first);
+  assert.throws(
+    () => writeEpisodeOwnership(root, taskOwnership("same-owner", "PRIMECLAW-10.39")),
+    /already owns a different active Episode/,
+  );
+  assert.deepEqual(readEpisodeOwnership(root, "same-owner"), first);
+});
+
+test("active task and retained-source bindings stay unique across Conversations", () => {
+  const taskRoot = mkdtempSync(join(tmpdir(), "prime-claw-task-collision-"));
+  writeEpisodeOwnership(taskRoot, taskOwnership("owner-a", "PRIMECLAW-43", "backlog/tasks/43.md"));
+  assert.throws(
+    () => writeEpisodeOwnership(taskRoot, taskOwnership("owner-b", "PRIMECLAW-43", "backlog/tasks/other.md")),
+    /task Episode binding collides/,
+  );
+  assert.throws(
+    () => writeEpisodeOwnership(taskRoot, taskOwnership("owner-b", "PRIMECLAW-99", "backlog/tasks/43.md")),
+    /task Episode binding collides/,
+  );
+
+  const sourceRoot = mkdtempSync(join(tmpdir(), "prime-claw-source-collision-"));
+  const location = ".ralph/plans/future/shared-source";
+  writeEpisodeOwnership(sourceRoot, legacyOwnership("owner-a", location));
+  assert.throws(
+    () => writeEpisodeOwnership(sourceRoot, legacyOwnership("owner-b", location)),
+    /retained source binding collides/,
+  );
+});
+
+test("serialized different-Conversation writes retain both reservations", async () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-ownership-concurrency-"));
+  const moduleUrl = new URL("../src/prime-agent-plugin/extension-support/episode-ownership.ts", import.meta.url).href;
+  const records = [
+    taskOwnership("owner-a", "PRIMECLAW-43"),
+    taskOwnership("owner-b", "PRIMECLAW-10.39"),
+  ];
+  const runWriter = (record) => new Promise((resolvePromise, rejectPromise) => {
+    const code = `import { writeEpisodeOwnership } from ${JSON.stringify(moduleUrl)}; writeEpisodeOwnership(${JSON.stringify(root)}, ${JSON.stringify(record)});`;
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "--eval", code], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.once("error", rejectPromise);
+    child.once("exit", (codeValue) => codeValue === 0 ? resolvePromise() : rejectPromise(new Error(stderr)));
+  });
+
+  await Promise.all(records.map(runWriter));
+  assert.deepEqual(readAllEpisodeOwnership(root).map((record) => record.ownerSessionId), ["owner-a", "owner-b"]);
+  assert.deepEqual(readEpisodeOwnershipRegistry(root).owners["owner-a"], records[0]);
+  assert.deepEqual(readEpisodeOwnershipRegistry(root).owners["owner-b"], records[1]);
 });
 
 
@@ -424,6 +540,38 @@ test("task mutation after status commit cannot reserve ownership", () => {
   writeFileSync(f.taskPath, "status: Blocked\nplan: changed after commit\n");
   assert.throws(() => reserve(f), /changed after its status commit/);
   assert.equal(readEpisodeOwnership(f.root), null);
+});
+
+test("different Conversations reserve different tasks in one repository", () => {
+  const f = fixture();
+  const first = reserve(f, { ownerSessionId: "owner-a" });
+
+  const secondId = "PRIMECLAW-10.39";
+  const secondRelative = "backlog/tasks/primeclaw-10.39 - Second fixture.md";
+  const secondPath = join(f.root, secondRelative);
+  writeFileSync(secondPath, "status: In Planning\nplan: implement the second bounded change\n");
+  git(f.root, "add", "--", secondRelative);
+  git(f.root, "commit", "-q", "-m", "seed second task");
+  writeFileSync(secondPath, "status: In Progress\nplan: implement the second bounded change\n");
+  git(f.root, "add", "--", secondRelative);
+  git(f.root, "commit", "-q", "-m", "admit second task");
+  const secondSelection = {
+    ...f.selection,
+    taskId: secondId,
+    title: "Second task-native fixture",
+    taskPath: secondPath,
+    taskPathRelative: secondRelative,
+  };
+  const second = reserve(f, {
+    taskId: secondId,
+    ownerSessionId: "owner-b",
+    selection: secondSelection,
+    operationId: "operation-second",
+  });
+
+  assert.equal(first.ownerSessionId, "owner-a");
+  assert.equal(second.ownerSessionId, "owner-b");
+  assert.deepEqual(readAllEpisodeOwnership(f.root).map((record) => record.taskId), ["PRIMECLAW-10.38", "PRIMECLAW-10.39"]);
 });
 
 test("non-terminal ownership blocks replay before a second reservation write", () => {

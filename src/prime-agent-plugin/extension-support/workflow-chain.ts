@@ -6,6 +6,7 @@ export interface CanonicalWorkflowPromptOptions {
   guidance?: string;
   legacySnapshot?: boolean;
   location?: { tag: string; value: string };
+  ownerSessionId?: string;
 }
 // Legacy lookup is limited to handoff/execute so active old-layout Episodes
 // can finish from their unchanged snapshots without reviving old plan flows.
@@ -34,6 +35,14 @@ ${readFileSync(path, "utf8")}
 <${tag}>
 ${value}
 </${tag}>`;
+  }
+  if (options.ownerSessionId) {
+    prompt += `
+
+<operator-episode-owner-session>
+${options.ownerSessionId}
+</operator-episode-owner-session>
+The value above is the exact owning Conversation registry key for this managed Episode. It intentionally differs from the Episode session ID; use it to select the persisted ownership entry and never substitute the current session ID.`;
   }
   if (options.guidance) {
     prompt += `

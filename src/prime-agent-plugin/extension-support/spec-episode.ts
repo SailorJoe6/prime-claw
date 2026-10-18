@@ -24,6 +24,7 @@ import {
   isTaskEpisodeOwnership,
   parseEpisodeOwnership,
   readEpisodeOwnership,
+  withEpisodeAdmissionLock,
   writeEpisodeOwnership,
   type EpisodeOwnershipRecord,
   type LegacyEpisodeOwnershipRecord,
@@ -143,7 +144,7 @@ export interface FilesystemAdapter {
   promoteBundle(worktree: string, slug: string, canonicalFolder: string, expectedDigest: string): void;
 }
 export interface EpisodeOwnershipStore {
-  read(projectRoot: string): EpisodeOwnershipRecord | null;
+  read(projectRoot: string, ownerSessionId?: string): EpisodeOwnershipRecord | null;
   write(projectRoot: string, record: EpisodeOwnershipRecord): void;
 }
 export interface SessionPublisher {
@@ -851,7 +852,7 @@ export function resolveBlockedWorkflowAuthority(
   const store = dependencies.ownership ?? defaultOwnershipStore;
   const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
   const projectRoot = git.repositoryRoot(ctx.cwd);
-  const record = store.read(projectRoot);
+  const record = store.read(projectRoot, ctx.sessionManager.getSessionId());
   // Persisted ownership decides before prompt text. A version-1 record keeps
   // the retained folder workflow even if a stale or conflicting task tag is
   // present; the tag is not parsed as a binding in that mode.
@@ -1157,11 +1158,13 @@ async function deliverOwnedEpisodeHandoff(
     guidance: guidance.trim(),
     legacySnapshot: promptIdentity.legacySnapshot,
     location,
+    ownerSessionId: record.ownerSessionId,
   });
   if (!handoffPrompt) throw new Error("Episode worktree is missing .prime-claw/workflows/handoff.md");
   const executePrompt = canonicalWorkflowPrompt(record.worktree!, "execute", {
     legacySnapshot: promptIdentity.legacySnapshot,
     location,
+    ownerSessionId: record.ownerSessionId,
   });
   if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
   const route = await reopenIfNeeded(record, session, ctx, publisher, store, repo);
@@ -1191,7 +1194,7 @@ export async function restoreBlockedSpecEpisode(
   if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
     throw new Error("Blocked legacy recovery is available only from a top-level project Conversation");
   }
-  const record = store.read(repo);
+  const record = store.read(repo, ctx.sessionManager.getSessionId());
   if (!record) throw new Error(`No durable episode ownership exists for ${selected.location}`);
   exactOwnedRecord(record, selected.location, ctx.sessionManager.getSessionId());
   if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; blocked recovery requires active version-1 ownership`);
@@ -1208,7 +1211,7 @@ export async function restoreBlockedSpecEpisode(
 
   const exactRecord = JSON.stringify(record);
   const restored = restoreBlockedLegacyPlanFiles(record.worktree!);
-  const reloaded = store.read(repo);
+  const reloaded = store.read(repo, ctx.sessionManager.getSessionId());
   if (!reloaded) throw new Error("Episode ownership disappeared during blocked recovery");
   exactOwnedRecord(reloaded, selected.location, ctx.sessionManager.getSessionId());
   if (JSON.stringify(reloaded) !== exactRecord) throw new Error("Episode ownership changed during blocked recovery");
@@ -1246,7 +1249,7 @@ export async function handoffSpecEpisode(
     const repo = git.repositoryRoot(selected.projectRoot);
     if (resolve(repo) !== resolve(selected.projectRoot)) throw new Error("The operation must run from the repository root");
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) throw new Error("Episode handoff is available only from a top-level project Conversation");
-    const record = store.read(repo);
+    const record = store.read(repo, ctx.sessionManager.getSessionId());
     if (!record) throw new Error(`No durable episode ownership exists for ${selected.location}`);
     exactOwnedRecord(record, selected.location, ctx.sessionManager.getSessionId());
     publisher ??= new PrimeSessionPublisher();
@@ -1296,7 +1299,7 @@ export async function transitionSpecEpisodeToTaskOwnership(
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
       throw new Error("Ownership transition is available only from the top-level owning Conversation");
     }
-    const record = store.read(repo);
+    const record = store.read(repo, ctx.sessionManager.getSessionId());
     if (!record) throw new Error("Exact Episode ownership is missing before ownership transition");
     if (record.status !== "active") throw new Error(`Ownership transition requires active ownership; found ${record.status}`);
     if (record.ownerSessionId !== ctx.sessionManager.getSessionId()) {
@@ -1400,7 +1403,7 @@ export async function handoffTaskEpisode(
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
       throw new Error("Episode handoff is available only from a top-level project Conversation");
     }
-    const record = store.read(repo);
+    const record = store.read(repo, ctx.sessionManager.getSessionId());
     if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
     exactOwnedTaskRecord(record, taskId, ctx.sessionManager.getSessionId());
     if (record.status !== "active") {
@@ -1482,7 +1485,7 @@ export async function allocateReservedTaskEpisode(
     const ownerSessionId = ctx.sessionManager.getSessionId();
     publisher ??= new PrimeSessionPublisher(undefined, runtimeSessionManagerClass(ctx.sessionManager));
 
-    const existing = store.read(repo);
+    const existing = store.read(repo, ownerSessionId);
     if (!existing) throw new Error(`No durable task-native Episode reservation exists for ${rawTaskId}`);
     exactOwnedTaskRecord(existing, rawTaskId, ownerSessionId);
     if (existing.status === "active") {
@@ -1512,6 +1515,7 @@ export async function allocateReservedTaskEpisode(
     const worktreeName = `${basename(repo)}-${taskLabel}-episode-${record.operationId.slice(0, 8)}`;
     const executePromptAtRoot = canonicalWorkflowPrompt(repo, "execute", {
       location: { tag: "operator-episode-task", value: record.taskId },
+      ownerSessionId: record.ownerSessionId,
     });
     if (!executePromptAtRoot) throw new Error("Project is missing .agents/skills/execute/SKILL.md");
 
@@ -1528,6 +1532,7 @@ export async function allocateReservedTaskEpisode(
       if (git.head(worktree) !== record.baseRef) throw new EpisodeStateUncertainError("Local task-native Episode did not start at the reserved status commit");
       const executePrompt = canonicalWorkflowPrompt(worktree, "execute", {
         location: { tag: "operator-episode-task", value: record.taskId },
+        ownerSessionId: record.ownerSessionId,
       });
       if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
       const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
@@ -1568,6 +1573,7 @@ export async function allocateReservedTaskEpisode(
     git.assertCleanWorktree(worktree.path);
     const executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", {
       location: { tag: "operator-episode-task", value: record.taskId },
+      ownerSessionId: record.ownerSessionId,
     });
     if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
     const before = new Set((await publisher.list()).map((session) => session.sessionId).filter((value): value is string => Boolean(value)));
@@ -1784,7 +1790,7 @@ export async function finalizeTaskEpisodeCleanup(
   if (!samePath(projectRoot, ctx.cwd) || git.branch(projectRoot) !== "main") {
     throw new Error("Task Episode cleanup must run from the canonical primary main checkout");
   }
-  let record = store.read(projectRoot);
+  let record = store.read(projectRoot, ctx.sessionManager.getSessionId());
   if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
   exactOwnedTaskRecord(record, taskId, ctx.sessionManager.getSessionId());
   if (record.status !== "active" && record.status !== "inactive") {
@@ -1812,7 +1818,7 @@ export async function finalizeTaskEpisodeCleanup(
       updatedAt: dependencies.now?.() ?? new Date().toISOString(),
     };
     store.write(projectRoot, bound);
-    const verifiedBinding = store.read(projectRoot);
+    const verifiedBinding = store.read(projectRoot, ctx.sessionManager.getSessionId());
     if (!verifiedBinding || !isTaskEpisodeOwnership(verifiedBinding)
       || JSON.stringify(verifiedBinding) !== JSON.stringify(bound)) {
       throw new Error("Task Episode cleanup could not persist the exact cleanup head");
@@ -1836,7 +1842,7 @@ export async function finalizeTaskEpisodeCleanup(
   if (stage === 2) await advance(() => dependencies.cleanup.removeBranch(record), [3]);
   if (stage !== 3) throw new Error("Task Episode cleanup did not remove every exact resource");
 
-  const retained = store.read(projectRoot);
+  const retained = store.read(projectRoot, ctx.sessionManager.getSessionId());
   if (!retained || JSON.stringify(retained) !== JSON.stringify(record)) {
     throw new Error("Task Episode ownership changed during authorized cleanup");
   }
@@ -1846,7 +1852,7 @@ export async function finalizeTaskEpisodeCleanup(
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
   };
   store.write(projectRoot, closed);
-  const verified = store.read(projectRoot);
+  const verified = store.read(projectRoot, ctx.sessionManager.getSessionId());
   if (!verified || !isTaskEpisodeOwnership(verified) || JSON.stringify(verified) !== JSON.stringify(closed)) {
     throw new Error("Task Episode cleanup could not verify inactive ownership bookkeeping");
   }
@@ -1912,46 +1918,66 @@ export async function createTaskEpisode(
     if (git.pathStatus(projectRoot, taskPath) !== "") {
       throw new Error("Task-native Episode creation requires the exact task path to be clean before status mutation");
     }
-    const existing = store.read(projectRoot);
+    const existing = store.read(projectRoot, ctx.sessionManager.getSessionId());
     if (existing && existing.status !== "inactive") {
       const identity = isTaskEpisodeOwnership(existing) ? existing.taskId : existing.sourceLocation;
       throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
     }
     preAdmissionHead = git.head(projectRoot);
 
-    statusMutationStarted = true;
-    const admitted = commitConversationTaskStatus({
-      taskId,
-      projectRoot,
-      taskPath,
-      status: "In Progress",
-      message: `chore: admit ${taskId} episode`,
-      runner,
-      git,
-      resolveTask,
+    const admission = withEpisodeAdmissionLock(projectRoot, () => {
+      const lockedTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
+      if (lockedTask.status !== "In Planning") {
+        throw new Error("Task-native Episode creation requires the exact task to remain In Planning at the serialized admission boundary");
+      }
+      if (!meaningfulTaskImplementationPlan(lockedTask.implementationPlan)) {
+        throw new Error("Task-native Episode creation requires a meaningful Implementation Plan at the serialized admission boundary");
+      }
+      if (git.pathStatus(projectRoot, taskPath) !== "") {
+        throw new Error("Task-native Episode creation requires the exact task path to remain clean at the serialized admission boundary");
+      }
+      const lockedExisting = store.read(projectRoot, ctx.sessionManager.getSessionId());
+      if (lockedExisting && lockedExisting.status !== "inactive") {
+        const identity = isTaskEpisodeOwnership(lockedExisting) ? lockedExisting.taskId : lockedExisting.sourceLocation;
+        throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
+      }
+      statusMutationStarted = true;
+      const admitted = commitConversationTaskStatus({
+        taskId,
+        projectRoot,
+        taskPath,
+        status: "In Progress",
+        message: `chore: admit ${taskId} episode`,
+        runner,
+        git,
+        resolveTask,
+      });
+      const reservationInput: TaskEpisodeReservationInput = {
+        projectRoot,
+        taskId,
+        ownerSessionId: ctx.sessionManager.getSessionId(),
+        engine: options.engine,
+        baseRef: admitted.commit,
+        ...(options.projectSetupId ? { projectSetupId: options.projectSetupId } : {}),
+        ...(options.routingEnvironmentId ? { routingEnvironmentId: options.routingEnvironmentId } : {}),
+        ...(dependencies.reservationOperationId ? { operationId: dependencies.reservationOperationId } : {}),
+      };
+      const reservation = reserve(reservationInput, {
+        git,
+        ownership: store,
+        taskResolver: resolveTask,
+        now: dependencies.now,
+      });
+      if (reservation.baseRef !== admitted.commit) {
+        throw new Error("Task-native Episode reservation did not bind the exact In Progress status commit");
+      }
+      return { admitted, reservation };
     });
+    const { admitted, reservation } = admission;
     admissionPushError = bestEffortTaskPush(git, projectRoot);
 
-    const reservationInput: TaskEpisodeReservationInput = {
-      projectRoot,
-      taskId,
-      ownerSessionId: ctx.sessionManager.getSessionId(),
-      engine: options.engine,
-      ...(options.projectSetupId ? { projectSetupId: options.projectSetupId } : {}),
-      ...(options.routingEnvironmentId ? { routingEnvironmentId: options.routingEnvironmentId } : {}),
-      ...(dependencies.reservationOperationId ? { operationId: dependencies.reservationOperationId } : {}),
-    };
-    const reservation = reserve(reservationInput, {
-      git,
-      ownership: store,
-      taskResolver: resolveTask,
-      now: dependencies.now,
-    });
-    if (reservation.baseRef !== admitted.commit) {
-      throw new Error("Task-native Episode reservation did not bind the exact In Progress status commit");
-    }
     const result = await allocate(taskId, ctx, dependencies);
-    const storedActive = store.read(projectRoot);
+    const storedActive = store.read(projectRoot, ctx.sessionManager.getSessionId());
     if (!storedActive) throw new Error("Task-native Episode allocation returned without durable ownership");
     const active = parseEpisodeOwnership(storedActive, "task-native Episode admission result");
     exactOwnedTaskRecord(active, taskId, ctx.sessionManager.getSessionId());
@@ -1959,7 +1985,7 @@ export async function createTaskEpisode(
       throw new Error("Task-native Episode allocation returned without the exact active reservation identity");
     }
     const finalTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
-    if (finalTask.status !== "In Progress" || git.head(projectRoot) !== admitted.commit || git.pathStatus(projectRoot, taskPath) !== "") {
+    if (finalTask.status !== "In Progress" || git.pathStatus(projectRoot, taskPath) !== "") {
       throw new Error("Task-native Episode allocation did not preserve the exact committed In Progress task state");
     }
     return { ...active, reused: result.reused, ...(admissionPushError ? { admissionPushError } : {}) };
@@ -1968,7 +1994,7 @@ export async function createTaskEpisode(
     const cause = taskAdmissionError(error);
     let ownership: EpisodeOwnershipRecord | null = null;
     let ownershipUncertain = false;
-    try { ownership = store.read(projectRoot); }
+    try { ownership = store.read(projectRoot, ctx.sessionManager.getSessionId()); }
     catch { ownershipUncertain = true; }
     const recordedMutation = ownershipUncertain || Boolean(ownership && ownership.status !== "inactive");
 
@@ -2046,7 +2072,7 @@ export async function createSpecEpisode(
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) throw new Error("Episode creation is available only from a top-level project Conversation");
     const ownerSessionId = ctx.sessionManager.getSessionId();
     publisher ??= new PrimeSessionPublisher(undefined, runtimeSessionManagerClass(ctx.sessionManager));
-    const existing = store.read(repo);
+    const existing = store.read(repo, ownerSessionId);
     if (existing && existing.status !== "inactive") {
       exactOwnedRecord(existing, selected.location, ownerSessionId);
       if (existing.status !== "active") throw new EpisodeStateUncertainError(`Existing Episode ownership is ${existing.status}; inspect exact resources before continuing. No assignment was replayed.`);
@@ -2065,7 +2091,7 @@ export async function createSpecEpisode(
     const baseRef = git.head(repo);
     const operationId = randomUUID();
     const worktreeName = `${basename(repo)}-${selected.slug}-episode-${operationId.slice(0, 8)}`;
-    const executePromptAtRoot = canonicalWorkflowPrompt(repo, "execute", { location: { tag: "operator-episode-source", value: selected.location } });
+    const executePromptAtRoot = canonicalWorkflowPrompt(repo, "execute", { location: { tag: "operator-episode-source", value: selected.location }, ownerSessionId });
     if (!executePromptAtRoot) throw new Error("Project is missing .agents/skills/execute/SKILL.md");
 
     let setups: OrcaProjectSetup[];
@@ -2086,8 +2112,10 @@ export async function createSpecEpisode(
       filesystem.promoteBundle(worktree, selected.slug, selected.folder, approvedBundleDigest);
       if (!filesystem.hasActiveLegacyPlanFiles(worktree)) throw new Error("Promoted legacy Episode is missing its active specification and implementation plan");
       const head = git.commitPromotion(worktree, selected.slug);
-      if (git.head(repo) !== baseRef) throw new EpisodeStateUncertainError("Canonical checkout changed during local Episode promotion");
-      const executePrompt = canonicalWorkflowPrompt(worktree, "execute", { location: { tag: "operator-episode-source", value: selected.location } });
+      if (bundleContentDigest(selected.folder) !== approvedBundleDigest) {
+        throw new EpisodeStateUncertainError("Approved bundle changed after local Episode promotion");
+      }
+      const executePrompt = canonicalWorkflowPrompt(worktree, "execute", { location: { tag: "operator-episode-source", value: selected.location }, ownerSessionId });
       if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
       const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
       const published = await publisher.createFresh({
@@ -2118,9 +2146,11 @@ export async function createSpecEpisode(
     filesystem.promoteBundle(worktree.path, selected.slug, selected.folder, approvedBundleDigest);
     if (!filesystem.hasActiveLegacyPlanFiles(worktree.path)) throw new Error("Promoted legacy Episode is missing its active specification and implementation plan");
     const promotedHead = git.commitPromotion(worktree.path, selected.slug);
-    if (git.head(repo) !== baseRef) throw new EpisodeStateUncertainError("Canonical checkout changed during Orca Episode promotion");
+    if (bundleContentDigest(selected.folder) !== approvedBundleDigest) {
+      throw new EpisodeStateUncertainError("Approved bundle changed after Orca Episode promotion");
+    }
     record = updated(record, { head: promotedHead }); store.write(repo, record);
-    const executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", { location: { tag: "operator-episode-source", value: selected.location } });
+    const executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", { location: { tag: "operator-episode-source", value: selected.location }, ownerSessionId });
     if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
     const before = new Set((await publisher.list()).map((session) => session.sessionId).filter((value): value is string => Boolean(value)));
     const launchAutomationName = `prime-claw-launch-${operationId}`;

@@ -7,11 +7,18 @@ First, run through the "prepare" skill.
 
 ## Select the durable authority before fallback
 
-Inspect persisted `.prime-claw/ownership.json` from the canonical primary
-checkout before choosing a mode. In a linked worktree, use Git worktree metadata
-to locate that checkout. An `<operator-episode-task>` block is only a candidate
-binding when ownership does not decide; prompt text alone never grants owner or
-lifecycle authority.
+If this is a managed Episode, use the exact owning Conversation key carried by
+`<operator-episode-owner-session>`; it intentionally differs from the Episode's
+own session ID. A top-level owning Conversation without that tag uses its own
+exact session ID. Inspect `.prime-claw/ownership.json` from the canonical primary
+checkout and select only that exact `ownerSessionId` registry entry before
+choosing a mode. Require a managed Episode's recorded worktree/session identity
+to match the current Episode. An existing direct record is valid migration input.
+Other Conversations' entries do not select this workflow. In a linked worktree,
+use Git worktree metadata to locate the canonical checkout. An
+`<operator-episode-task>` block is only a candidate binding when the selected
+owner's record does not decide; prompt text alone never grants owner or lifecycle
+authority.
 
 A valid version-1 record selects retained folder mode even when a task block is
 present. Live version-1 Episode identity additionally requires readable,
@@ -26,7 +33,7 @@ repository root of the canonical primary `main` checkout, and the record's exact
 task ID and project-relative task path. If a task block is present, require its
 entire trimmed value to equal that task ID. If any owner, depth, checkout,
 status, identity, or optional task-block check fails, stop. Never fall back to
-folder mode while any version-2 ownership record exists. A task-bound Episode
+folder mode while this Conversation has a version-2 ownership record. A task-bound Episode
 session follows its execute policy for blocker recording; it cannot acquire
 Conversation status authority by invoking this skill.
 

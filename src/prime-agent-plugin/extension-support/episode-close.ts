@@ -25,7 +25,7 @@ export function closeEpisodeOwnership(
   const match = SAFE_LOCATION.exec(sourceLocation);
   if (!match) throw new Error("Episode bookkeeping location is invalid");
   const root = resolveNearestProjectRoot(ctx.cwd).root;
-  const record = readEpisodeOwnership(root);
+  const record = readEpisodeOwnership(root, ctx.sessionManager.getSessionId());
   if (!record) throw new Error("Exact episode ownership is missing before bookkeeping close");
   if (!isLegacyEpisodeOwnership(record)) throw new Error("Episode bookkeeping location does not match task-native ownership state");
   if (record.slug !== match[1] || record.sourceLocation !== sourceLocation) {

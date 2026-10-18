@@ -25,7 +25,10 @@ outside the canonical checkout.**
 
 The primary `create_task_episode(taskId=...)` transaction commits the exact
 task's `In Progress` transition, persists version-2 ownership, and creates one
-matching Episode only when no non-terminal ownership exists. Public admission
+matching Episode only when that Conversation has no non-terminal ownership and
+no other owner holds the same task binding. A short cross-process lock covers
+the status edit, exact task-only commit, and reservation; push and allocation
+run after the lock is released. Public admission
 replay fails closed rather than returning or duplicating an existing Episode; an
 owner inspects or continues that exact Episode through its lifecycle surfaces. A
 fresh task-native Episode receives:
@@ -34,13 +37,17 @@ fresh task-native Episode receives:
 - no bundle copy or `.ralph/plans` promotion commit;
 - a fresh durable Prime Agent session rooted at that worktree;
 - a visible writable Orca Prime Agent tab when Orca placement is selected;
-- exactly one fixed execute assignment bound to the task ID; and
-- durable ownership by the originating Conversation.
+- exactly one fixed execute assignment bound to the task ID and carrying the
+  originating Conversation's exact registry key; and
+- durable ownership by that originating Conversation, which the Episode resolves
+  by the supplied key rather than its own session ID.
 
 For retained version-1 compatibility, `create_spec_episode(location=...)`
 creates or returns the matching folder Episode. That path promotes the approved
-bundle into active `.ralph/plans` and records its promotion commit before the
-same fresh-session and one-assignment boundary. Neither schema inherits the
+bundle into active `.ralph/plans` from its captured base and records its
+promotion commit before the same fresh-session and one-assignment boundary.
+Unrelated task-only main advancement does not invalidate that promotion while
+the approved bundle digest and exact worktree binding remain unchanged. Neither schema inherits the
 Conversation transcript or receives an initial handoff.
 
 A separately reviewed migration may move that same live retained Episode to
@@ -81,7 +88,7 @@ uncertain ownership/resource mutation instead publishes `Blocked` with exact
 recovery evidence; public admission replay fails closed and never creates or
 assigns a duplicate Episode.
 
-For retained version-1 compatibility, the project ownership record can be
+For retained version-1 compatibility, this Conversation's project-registry ownership entry can be
 `provisioning`, `active`, `uncertain`, or `inactive`. Partial provisioning or
 allocation preserves exact evidence as `uncertain`; replay does not recreate or
 reassign those resources. Direct local fallback exists only after definitive

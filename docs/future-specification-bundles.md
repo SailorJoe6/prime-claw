@@ -136,18 +136,21 @@ never falls back locally.
 
 A deterministic recursive content digest binds the exact approved bundle at
 implementation admission. It is rechecked before mutation, after the isolated
-copy, in active `.ralph/plans`, and against the canonical source. The one
-project-level `.prime-claw/ownership.json` record persists that digest before
-external mutation. Orca then creates a background worktree without an agent,
+copy, in active `.ralph/plans`, and against the canonical source. This
+Conversation's exact entry in the project-level `.prime-claw/ownership.json`
+registry persists that digest before external mutation; independent owners may
+hold different retained sources concurrently. Orca then creates a background worktree without an agent,
 prompt, or activation. Prime Claw copies the approved folder into that
-worktree's active `.ralph/plans`, verifies the canonical checkout is unchanged,
-and commits the promotion.
+worktree's active `.ralph/plans`, revalidates the approved source digest, and
+commits the promotion. Unrelated safe canonical-main advancement may proceed
+while the Episode stays bound to its captured base.
 
 Only after that commit does a disabled, manually-run, existing-workspace Orca
 automation launch provider `prime-agent` with `reuseSession: true` and the fixed
 execute assignment. Prime Claw binds the exact fresh durable session and a visibly laid-out,
 provider-ready background tab, removes the automation, and proves the same tab
-and pane remain connected and writable.
+and pane remain connected and writable. The assignment carries the exact owning
+Conversation registry key; the Episode never substitutes its own session ID.
 The Conversation stays selected.
 
 The Episode does not inherit Conversation history. Creation does not run an

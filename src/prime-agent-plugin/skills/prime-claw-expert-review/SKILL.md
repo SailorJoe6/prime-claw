@@ -25,11 +25,14 @@ not require active-episode ownership, a particular worktree or branch, push
 state, a fixed packet object, or repository snapshot hashes. If information
 needed for a bounded review is unclear, ask the caller instead of guessing.
 
-Select the candidate's durable authority explicitly. Inspect persisted
-`.prime-claw/ownership.json` from the canonical primary checkout before prompt
-tags or candidate prose. Version 1 selects the retained folder contract;
-version 2 selects the exact task contract. A task tag is only a candidate when
-ownership does not decide and never overrides either record. With no ownership,
+Select the candidate's durable authority explicitly. Inspect
+`.prime-claw/ownership.json` from the canonical primary checkout and select the
+exact `ownerSessionId` entry identified by the requesting Conversation before
+prompt tags or candidate prose. The file is a Conversation-keyed registry and an
+existing direct record is valid migration input; never infer one entry from a
+multi-record file. Version 1 selects the retained folder contract; version 2
+selects the exact task contract. A task tag is only a candidate when the exact
+owner has no record and never overrides a selected record. With no ownership,
 a complete active legacy `SPECIFICATION.md` plus `IMPLEMENTATION_PLAN.md` pair
 on canonical main (including the retained `EXECUTION_PLAN.md` spelling) selects
 old in-place folder review without creating live Episode identity. A live

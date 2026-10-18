@@ -22,10 +22,25 @@ function fixture(overrides = {}) {
   return { root, record, ctx };
 }
 
-test("close changes only exact ownership bookkeeping to inactive", () => {
-  const f = fixture(); const result = closeEpisodeOwnership(f.record.sourceLocation, f.ctx);
+test("close changes only the exact owner's bookkeeping to inactive", () => {
+  const f = fixture();
+  const other = {
+    ...f.record,
+    ownerSessionId: "other-owner",
+    operationId: "other-operation",
+    sourceLocation: ".ralph/plans/future/beta",
+    slug: "beta",
+    worktree: join(f.root, "other-wt"),
+    branch: "other-branch",
+    episodeId: "other-episode",
+    episodeSessionFile: join(f.root, "other-episode.jsonl"),
+  };
+  writeEpisodeOwnership(f.root, other);
+  const result = closeEpisodeOwnership(f.record.sourceLocation, f.ctx);
   assert.equal(result.reused, false); assert.equal(result.record.status, "inactive");
-  assert.equal(readEpisodeOwnership(f.root).episodeId, "episode");
+  assert.equal(readEpisodeOwnership(f.root, "owner").episodeId, "episode");
+  assert.equal(readEpisodeOwnership(f.root, "owner").status, "inactive");
+  assert.equal(readEpisodeOwnership(f.root, "other-owner").status, "active");
 });
 
 test("identical close replay is idempotent", () => {
@@ -37,7 +52,7 @@ test("close rejects owner and location mismatches", () => {
   const f = fixture();
   assert.throws(() => closeEpisodeOwnership(".ralph/plans/future/beta", f.ctx), /location does not match/);
   f.ctx.sessionManager.getSessionId = () => "other";
-  assert.throws(() => closeEpisodeOwnership(f.record.sourceLocation, f.ctx), /owner mismatch/);
+  assert.throws(() => closeEpisodeOwnership(f.record.sourceLocation, f.ctx), /ownership is missing/);
 });
 
 test("close refuses provisioning or uncertain state", () => {

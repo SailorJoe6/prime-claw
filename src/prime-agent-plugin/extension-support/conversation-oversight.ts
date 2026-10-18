@@ -30,8 +30,8 @@ export function currentConversationOwnership(ctx: ExtensionContext): EpisodeOwne
   let root: string;
   try { root = resolveNearestProjectRoot(ctx.cwd).root; }
   catch { return null; }
-  const record = readEpisodeOwnership(root);
-  if (!record || record.ownerSessionId !== ctx.sessionManager.getSessionId()) return null;
+  const record = readEpisodeOwnership(root, ctx.sessionManager.getSessionId());
+  if (!record) return null;
   if (isLegacyEpisodeOwnership(record) && record.status === "active") {
     try { assertLiveLegacyEpisodeFiles(record, "Conversation oversight"); }
     catch { return null; }
@@ -45,11 +45,10 @@ function ownershipIdentity(record: EpisodeOwnershipRecord): string {
 }
 
 export function assertConversationPromotionReady(ctx: ExtensionContext, requestedLocation?: string): void {
-  const record = readEpisodeOwnership(resolveNearestProjectRoot(ctx.cwd).root);
+  const record = readEpisodeOwnership(resolveNearestProjectRoot(ctx.cwd).root, ctx.sessionManager.getSessionId());
   if (!record || record.status === "inactive") return;
-  const exactOwner = record.ownerSessionId === ctx.sessionManager.getSessionId();
   const exactLocation = !requestedLocation || (isLegacyEpisodeOwnership(record) && record.sourceLocation === requestedLocation);
-  if (exactOwner && exactLocation) return;
+  if (exactLocation) return;
   throw new Error(`Conversation already has non-terminal episode ownership for ${ownershipIdentity(record)}`);
 }
 

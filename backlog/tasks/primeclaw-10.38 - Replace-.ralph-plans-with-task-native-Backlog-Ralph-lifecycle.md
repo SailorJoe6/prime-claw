@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-18 15:59'
+updated_date: '2026-10-18 16:43'
 labels:
   - backlog-md
   - episode-loop
@@ -79,6 +79,12 @@ documentation:
   - >-
     docs/evidence/task-native-backlog-cutover/2026-10-18-step-8-least-technology-simplification.md
 modified_files:
+  - .agents/skills/blocked/SKILL.md
+  - .agents/skills/execute/SKILL.md
+  - .prime-claw/templates.json
+  - .prime-claw/workflows/handoff.md
+  - .prime-claw/workflows/implement-spec.md
+  - .prime-claw/workflows/implement-task.md
   - .ralph/.env.example
   - .ralph/README.md
   - .ralph/plans/EXECUTION_PLAN.md
@@ -149,21 +155,43 @@ modified_files:
   - docs/handoff-chain.md
   - docs/user-stories/C-specification.md
   - docs/user-stories/D-planning.md
+  - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/F-episode-execution.md
   - docs/user-stories/G-oversight-and-review.md
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/I-episode-finalization.md
   - docs/user-stories/README.md
   - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/extension-support/conversation-oversight.ts
+  - src/prime-agent-plugin/extension-support/episode-close.ts
   - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/project-initialization.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
+  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/workflow-chain.ts
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
   - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - src/prime-agent-plugin/workflows/handoff.md
+  - src/prime-agent-plugin/workflows/implement-spec.md
+  - src/prime-agent-plugin/workflows/implement-task.md
+  - tests/episode_close_extension.test.mjs
+  - tests/project_conversation_extension.test.mjs
+  - tests/project_initialization_extension.test.mjs
   - tests/reviewed_plan_extension.test.mjs
   - tests/spec_episode_extension.test.mjs
+  - tests/task_episode_admission_extension.test.mjs
+  - tests/task_episode_ownership_extension.test.mjs
   - tests/test_backlog_workflow.py
+  - tests/test_blocked_skill.py
+  - tests/test_execute_skill.py
+  - tests/test_expert_review_skill.py
+  - tests/test_handoff_chain_extension.py
   - tests/test_oversee_episode_skill.py
+  - tests/test_project_conversation_extension.py
   - tests/test_project_initialization.py
   - tests/test_reviewed_plan_extension.py
   - tests/test_role_kernel.py
@@ -284,7 +312,7 @@ The pre-cutover source tree remains available at `6d11d9c2797cea54ecd07171e8a5b2
 - [x] #27 Separately named project-local `design-legacy` and `spec-it-out-legacy` assets preserve current-main legacy authoring without mechanically duplicating neutral or shared Markdown.
 - [x] #28 Workflow selection remains orthogonal to tracker migration and specification storage: Backlog tracking may coexist with legacy bundles, Beads migration is optional and separate, Beads-only repositories initialize the task-native workflow, and archive-only bundles do not force the legacy workflow.
 - [x] #29 Project-local `.prime-claw/workflows` files are tested as runtime surfaces while plugin-root copies remain delivery sources installed or reconciled into projects.
-- [ ] #30 Ownership-registry evidence proves Episode cardinality is one active Episode per exact Conversation: two Conversations can reserve and create different tasks concurrently without lost updates; the same Conversation is blocked from a second active Episode; active task IDs/paths and retained source bindings remain unique across Conversations; a legacy direct-record file migrates without losing identity; owner-facing compaction, handoff, blocked recovery, cleanup, finalization, and version transition select only the exact `ownerSessionId`; all-record inspection supports only collision and multi-worktree activity checks; serialized mutations prevent overwrite; and strict version-1/version-2 separation, same-Episode reuse, exact resources, cleanup-only finalization, and generic legacy compatibility remain intact.
+- [x] #30 Ownership-registry evidence proves Episode cardinality is one active Episode per exact Conversation: two Conversations can reserve and create different tasks concurrently without lost updates; the same Conversation is blocked from a second active Episode; active task IDs/paths and retained source bindings remain unique across Conversations; a legacy direct-record file migrates without losing identity; owner-facing compaction, handoff, blocked recovery, cleanup, finalization, and version transition select only the exact `ownerSessionId`; all-record inspection supports only collision and multi-worktree activity checks; serialized mutations prevent overwrite; and strict version-1/version-2 separation, same-Episode reuse, exact resources, cleanup-only finalization, and generic legacy compatibility remain intact.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -2872,10 +2900,58 @@ The task remains `In Progress`. This candidate performs no live `Ready for Merge
 ## Release-blocking UAT repair accepted — ownership cardinality
 
 The operator accepted one bounded follow-up after `PRIMECLAW-10.38` was reopened to `In Progress`. Root cause is confirmed in `createTaskEpisode()` plus the singleton read/write API in `episode-ownership.ts`; conversation oversight, handoff, cleanup, blocked recovery, allocation, transition, and project worktree detection share the singleton assumption. The next execute pass must implement only Step 10 and must not touch or message the blocked `PRIMECLAW-43` or `PRIMECLAW-10.39` UAT Conversations/sessions. This handoff changes no ownership representation or lifecycle state beyond recording the approved contract.
+
+## Step 10 implementation and validation (2026-10-18)
+
+Replaced repository-wide singleton ownership with a serialized, human-readable registry at `.prime-claw/ownership.json`:
+
+- registry shape is `{ "schemaVersion": 1, "owners": { "<ownerSessionId>": <record> } }`, ordered by owner key;
+- a legacy direct ownership record remains valid input and migrates on the next mutation without identity loss;
+- exact-owner reads now drive creation, oversight/compaction, handoff, blocked recovery, allocation, transition, finalization, and cleanup;
+- non-inactive task IDs/paths and retained source locations remain globally unique across Conversations;
+- one Conversation cannot replace a different non-inactive Episode, while distinct Conversations can reserve and create different Episodes in the same repository;
+- lock-directory serialization plus atomic rename prevents read-modify-write lost updates;
+- all-record reads are limited to collision validation and multi-worktree activity detection;
+- managed workflows, skills, documentation, template hashes, and owner-facing tests now describe the Conversation-keyed boundary.
+
+Behavioral evidence includes direct-record migration, same-owner rejection, duplicate task/source collision, separate-process serialized writes, different-owner reservation, concurrent different-owner task creation, owner-specific compaction/handoff/blocked recovery/cleanup/finalization/transition, and multi-record worktree activity.
+
+Validation:
+
+- focused Node suites: 219 passed across ownership, admission, Episode lifecycle, close, Conversation/project activity, reviewed-plan, handoff, and session-protocol coverage;
+- focused host policy suites: 37 passed, 9 skipped;
+- broad host baseline: 663 passed, 66 skipped, and 75 subtests passed; only the four pre-recorded unrelated topology/template/vendor-pin failures remained;
+- Docker Tier 1 source-mode offline probe passed immutable-image launch, network absence, plugin checks, RPC probing, teardown, and manifest publication at `.test-results/20261018T161852Z-55433-1c750614/tier1`;
+- `git diff --check` passed;
+- the protected canonical archive hashes remain `SPECIFICATION.md` `1d587130ff368ba190ab8b987267bce73bee5c5342ef23b56da7814b15e4cfad` and `EXECUTION_PLAN.md` `68f6a8cfd297f3c5bd46d5a4551cedaca4707ef865b351af790459e684339f13`, with zero tracked `.ralph/plans` paths.
+
+This correction did not interact with either blocked UAT Conversation/session and performed no live lifecycle transition, merge, abandonment, cleanup, global activation, protected-archive mutation, or Prime Agent source change.
+
+## Independent review repair — concurrent admission and owner context (2026-10-18)
+
+Independent GPT-6 Astra review of exact candidate `9dfff66191b134dbbba4cbcded49ff04de3dc9d0` reproduced three material Step 10 defects. All three were accepted and repaired without widening scope:
+
+1. Task admissions now hold a short inter-process lock only across the supported `In Progress` edit, exact task-only commit, and durable reservation. The reservation binds the verified admission commit supplied by the caller. The lock is released before slow push and allocation. A separate-process regression pauses the first push, admits a second task, and proves both owners/tasks remain active with both registry entries.
+2. Retained local/Orca promotion no longer requires repository-global main HEAD equality after worktree creation. It remains bound to the captured base and revalidates the exact approved source digest after the promotion commit, so unrelated task-only main advancement is safe while source drift still fails closed. A mixed retained/task regression proves both Episodes become active.
+3. Initial execute and later handoff/execute prompts now carry `<operator-episode-owner-session>` with the exact owning Conversation key plus explicit guidance that it differs from the Episode session ID. Execute, blocked, and handoff policies select that key and verify the persisted worktree/session binding rather than scanning owners or inferring from placement.
+
+Post-repair validation:
+
+- focused Node suites: 221 passed across ownership, separate-process admission, mixed-mode creation, Episode lifecycle, prompt routing, close, project activity, reviewed-plan, handoff, and session-protocol coverage;
+- focused host policy suites: 37 passed, 9 skipped;
+- broad host baseline: 663 passed, 66 skipped, and 75 subtests passed; only the same four pre-recorded unrelated topology/template/vendor-pin failures remained;
+- Docker Tier 1 source-mode offline probe passed immutable-image launch, network absence, plugin checks, RPC probing, teardown, and manifest publication at `.test-results/20261018T164056Z-90461-5988a97a/tier1`;
+- `git diff --check` passed.
+
+The repair performed no live lifecycle transition, merge, abandonment, cleanup, global activation, protected-archive mutation, blocked-UAT-session contact, or Prime Agent source change.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Steps 1–9 are complete. The operator reopened `PRIMECLAW-10.38` for one release-blocking UAT repair: replace repository-singleton Episode ownership with a serialized, Conversation-keyed `.prime-claw/ownership.json` registry. Step 10 is pending. It must allow independent Conversations to own concurrent Episodes while enforcing one active Episode per owner and globally unique active task/source bindings, migrate the existing direct record, preserve strict version-1/version-2 and exact-resource boundaries, and add focused behavioral/Docker evidence. No registry implementation, lifecycle transition, merge, cleanup, global activation, or blocked-UAT-session contact occurred in this handoff.
+Steps 1–10 are implemented. The release-blocking Step 10 repair replaces repository-singleton Episode ownership with a serialized Conversation-keyed registry while preserving direct-record migration, one active Episode per owner, globally unique non-inactive task/source bindings, strict version-1/version-2 separation, exact-resource reuse and cleanup, and prompt-led lifecycle authority.
+
+Independent review reproduced three bounded defects: cross-process task admission interference, retained promotion rejecting unrelated task-only main advancement, and missing owner-key context in fresh Episode prompts. The candidate now serializes only status commit plus reservation, binds the exact admission commit, permits safe unrelated main advancement while revalidating the approved bundle digest, and carries the owning Conversation key in initial and continuation prompts. Focused suites, the broad baseline apart from four documented unrelated failures, Docker Tier 1, and `git diff --check` validate the repairs.
+
+The task remains `In Progress` for the owning Conversation's later lifecycle decision. No live transition, merge, abandonment, cleanup, user-global activation, protected-archive mutation, blocked-UAT-session contact, or Prime Agent source change occurred.
 <!-- SECTION:FINAL_SUMMARY:END -->

@@ -17,8 +17,8 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
-        "one active Episode owned by this Conversation",
-        "Inspect persisted `.prime-claw/ownership.json` from the canonical primary checkout before prompt tags",
+        "this Conversation's active Episode",
+        "select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`",
         "Version 1 selects retained folder oversight; version 2 selects task-native oversight",
         "For version 2 task-native ownership",
         "exact Backlog task ID and project-relative task path",
@@ -26,7 +26,6 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Never consult `.ralph/plans` in this mode",
         "The Episode owns task content on its branch; the Conversation owns lifecycle status on main",
         "For retained version 1 folder ownership",
-        "Placement alone is not live Episode identity",
         "Keep that pair active through blocking, candidate review, and revision",
         "exact operator-authorized version-1 recovery",
         "never live and never switches modes",
@@ -79,7 +78,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         assert phrase in text
     assert "Bead chronology" not in raw
     for forbidden in [
-        "ownerSessionId", "episodeId", "toolCallId", "rlm.find_models",
+        "episodeId", "toolCallId", "rlm.find_models",
         "openai-codex/", "prime-claw-h6w", "15-minute", "delete worktree",
         "PRIME_CLAW_ROLE_KERNEL_V1",
     ]:
@@ -93,13 +92,14 @@ def test_managed_conversation_guide_has_no_authentication_metadata_or_policy_cop
         assert obsolete not in source
 
 
-def test_current_docs_describe_ordinary_guide_and_single_record_boundary():
+def test_current_docs_describe_ordinary_guide_and_registry_boundary():
     text = " ".join(DOC.read_text().split())
     for phrase in (
         "Universal → Project → Conversation → Episode",
         "complete ordinary `prime-claw-oversee-episode` guidance",
         "There is no guide activation, disclosure, hash, version, receipt",
-        "`.prime-claw/ownership.json` is the sole durable lifecycle record",
+        "`.prime-claw/ownership.json` is the sole durable lifecycle registry",
+        "one active Episode per Conversation",
         "one full `prime-claw-oversee-episode` custom message",
         "operator alone decides product direction",
         "Guarded version-1 to version-2 ownership bridge",

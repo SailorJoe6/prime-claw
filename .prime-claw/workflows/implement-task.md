@@ -61,7 +61,7 @@ selects the sole ready local setup or presents the native picker.
 The trusted capability must re-resolve the exact task and readiness state,
 change only that main task from `In Planning` to `In Progress` through Backlog,
 and commit and verify that exact task path. After that verified status commit,
-it must first persist one `provisioning` ownership record bound to the canonical
+it must first persist one `provisioning` ownership record under this Conversation's exact registry key, bound to the canonical
 task and status-commit SHA, before creating any branch, worktree, or session.
 It then creates the Episode branch and worktree from that recorded SHA. A prompt
 push is attempted when a remote exists, but transport failure alone does not

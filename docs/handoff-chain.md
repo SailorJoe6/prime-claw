@@ -22,6 +22,15 @@ normal queue lifecycle.
 
 ## Owned Episode continuation
 
+Each managed handoff and execute prompt carries
+`<operator-episode-owner-session>` with the exact owning Conversation's
+`ownerSessionId`. The Episode selects that key in the canonical checkout's
+`.prime-claw/ownership.json` registry, does not substitute its own session ID,
+and verifies the selected entry's recorded worktree/session identity. Another
+Conversation's Episode neither selects nor blocks this handoff. The old direct
+record is accepted as migration input, and all-record inspection is reserved for
+binding collisions and worktree activity.
+
 The retained `handoff_spec_episode(location, guidance?)` surface remains
 available only to the exact owner of one active version-1 folder Episode.
 Persisted ownership decides before any prompt tag, and live version-1 identity
@@ -58,8 +67,9 @@ The public `handoff_task_episode(taskId, guidance?)` tool seam stages the equiva
 for version-2 task ownership. It additionally requires the canonical primary
 checkout on `main`, the exact owner and active ownership record, the bound task
 ID and path, and main status `In Progress`. Both canonical prompts carry the
-same `<operator-episode-task>` binding, so handoff and execute cannot fall back
-to folder authority. The durable session must be rooted at the exact owned
+same `<operator-episode-task>` and `<operator-episode-owner-session>` bindings,
+so handoff and execute cannot fall back to folder authority or infer an owner
+from placement. The durable session must be rooted at the exact owned
 worktree before any message is sent. The exact main task path must match committed
 `HEAD` before the task is resolved, while unrelated dirty main paths remain
 allowed; uncommitted task bytes cannot spoof a resumed lifecycle status.
@@ -71,7 +81,8 @@ Candidate review, Delay, Request Changes, Merge, and Abandonment are not handoff
 Cleanup is likewise not handoff. After terminal main is pushed and separately authorized, cleanup-only `finalize_task_episode` durably binds the exact terminal Episode head, verifies the exact idle resources, removes runtime, worktree, and branch, verifies absence, and closes ownership. It performs no review or Git/Backlog lifecycle outcome. Same-head retry is idempotent; different or unsafe state blocks.
 
 The initial Episode creation is different: it starts a fresh session with one
-fixed execute assignment after bundle promotion. It does **not** run handoff.
+fixed execute assignment after bundle promotion. That assignment carries the
+exact owning Conversation registry key. It does **not** run handoff.
 Handoff begins only with later owner-supervised continuation.
 
 ## Authority

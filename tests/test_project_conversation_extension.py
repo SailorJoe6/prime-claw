@@ -17,7 +17,7 @@ def test_final_source_uses_neutral_kernel_and_one_managed_conversation_guide():
     guide = " ".join(MANAGED_GUIDE.read_text().split())
     for phrase in ("PRIME_CLAW_ROLE_KERNEL_V1", "CONVERSATION supervises", "EPISODE implements", "EXPERT reviews", "Roles are skill-based responsibilities"):
         assert phrase in kernel
-    for phrase in ("one active Episode owned by this Conversation", "one reported slice at a time", "Accept and advance", "Consult the operator"):
+    for phrase in ("this Conversation's active Episode", "one reported slice at a time", "Accept and advance", "Consult the operator"):
         assert phrase in guide
     assert not (REPO / "src/prime-agent-plugin/APPEND_SYSTEM.md").exists()
     assert not (REPO / ".ralph/skills/oversee-episode").exists()

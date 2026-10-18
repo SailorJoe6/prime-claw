@@ -91,7 +91,11 @@ def test_task_native_execute_retains_folder_episode_compatibility() -> None:
     text = " ".join(EXECUTE_SKILL.read_text().split())
 
     for fragment in (
-        "persisted `.prime-claw/ownership.json` record",
+        "Conversation-keyed registry",
+        "`<operator-episode-owner-session>`",
+        "owning Conversation's registry key",
+        "intentionally differs from the Episode's own session ID",
+        "exact `ownerSessionId` entry",
         "version-1 ownership record selects **retained folder-plan mode**",
         "version-2 ownership record selects **task-native Episode mode**",
         "A prompt tag never overrides persisted ownership",
