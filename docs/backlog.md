@@ -195,18 +195,27 @@ checkout is never switched, staged, or written:
   branch's upstream wins; otherwise the sole repository remote. The selection
   carries the remote's transport URL. No remote or ambiguous remotes block with
   exact remediation; the seam never guesses.
-- **Remote-bound branch authority** (`ensureTaskHistoryBranch`): the exact
-  `refs/heads/prime-claw/tasks` is probed and fetched from the selected remote
-  before any decision — an unreachable remote fails closed, never deciding on
-  stale or absent evidence. An existing published branch is verified and
-  adopted locally by tracking; a local branch ahead of the remote blocks
-  (`local-ahead`, never published implicitly or called verified); a remote
-  ahead blocks (`remote-advanced`, never force); shared code ancestry blocks. A
-  new disconnected history is bootstrapped in a disposable temporary
-  ordinary-Git repository (an orphan commit of only `TASKS.md`), published with
-  an ordinary non-force push, proven from a fresh fetch, then adopted by
-  tracking. The primary checkout's branch, index, worktree, and untracked files
-  are byte-for-byte unchanged by bootstrap.
+- **Direct remote evidence is authoritative** (`ensureTaskHistoryBranch`): the
+  exact task ref is read with `git ls-remote --heads <transport>
+  refs/heads/prime-claw/tasks` and parsed as either absent or one well-formed
+  OID/ref line — a cached remote-tracking ref is never authority on its own.
+  When the direct response says ABSENT, any stale cached ref is removed and a
+  local branch is treated as unpublished (`local-ahead`, blocked). When present,
+  the exact ref is fetched (result-checked) and the refreshed local ref must
+  EQUAL the direct OID; a failed refresh or a direct/fetched mismatch blocks.
+  An unreachable remote fails closed (`remote-unavailable`), never deciding on
+  stale or absent evidence. An existing published branch is verified and adopted
+  locally by tracking; a remote ahead blocks (`remote-advanced`, never force);
+  shared code ancestry blocks. A new disconnected history is bootstrapped in a
+  disposable temporary ordinary-Git repository and published with an ordinary
+  non-force push, then proven from a fresh fetch. The primary checkout's branch,
+  index, worktree, and untracked files are byte-for-byte unchanged by bootstrap.
+- **Lifecycle-ready bootstrap publication**: the bootstrap commits both
+  `TASKS.md` and a full canonical `config.yml` (the exact six ordered lifecycle
+  statuses, default `In Design`, `auto_commit: false`) to the task-history
+  branch. The store is therefore lifecycle-ready from the first published
+  commit; the seam never returns `prepared` with an untracked, unpublished, or
+  non-lifecycle-ready local config write.
 - **Nested clone from the remote URL** (`prepareTaskHistoryWorkspace`): the
   primary checkout's ignored, independent nested Backlog clone is cloned from
   the selected remote's transport URL — never the primary filesystem path —
@@ -217,8 +226,9 @@ checkout is never switched, staged, or written:
   branch, and head — never recreated. An existing non-empty store without
   `.git` blocks before mutation (adopting it is the deferred migration/cutover
   slice), leaving content untouched. The clone's cached diff against the
-  published head is empty — the published tree is materialized and tracked,
-  never staged for deletion. No submodules, linked nested worktrees, alternate
+  published head is empty and its `git status` is clean — the published tree is
+  materialized and tracked, never staged for deletion, with no uncommitted or
+  unpublished config. No submodules, linked nested worktrees, alternate
   indexes, same-root custom Git work trees, separate hosted repo, or
   coordinator.
 - **Containment before mutation**: the store target is proven directly inside
@@ -230,14 +240,21 @@ checkout is never switched, staged, or written:
   ineffective result blocks with exact remediation. `git check-ignore` must
   succeed so an ordinary `git add .` can never stage the nested repository as a
   forbidden gitlink.
-- **Exact config preservation + auto-commit**: discovery's selected native
-  configuration is used as-is. When the task-history branch carries no folder
-  config but an existing root/folder config does, preparation blocks rather
-  than shadow or rewrite it (publishing the store's config is part of the
-  deferred cutover). With no prior evidence, the minimal valid folder config
-  (the native default; upstream autoCommit already false) is established.
-  Auto-commit is disabled natively (`backlog config set autoCommit false`)
-  against the intended config and proven by `backlog config get autoCommit`.
+- **Root-config layouts block before any native config write**: when discovery
+  selects a root `backlog.config.yml`, preparation blocks
+  (`config-not-preserved`) before any ignore/branch/clone/config mutation.
+  Backlog's native config discovery walks UP from the nested store and resolves
+  the root config, so any `backlog config` write from the nested clone would
+  rewrite the PRIMARY root configuration while the published folder config
+  stays unchanged; mere folder-config existence is not preservation. Relocating
+  that authority is the deferred cutover (PRIMECLAW-43.1). A published folder
+  config is used as-is and never modified or shadowed.
+- **Auto-commit proven without a native write**: `backlog config get` from the
+  nested store normalizes `config.yml` in place, so this seam reads
+  `auto_commit` directly from the published config bytes (bootstrap publishes
+  `false`; upstream's default is `false` when absent) and never issues
+  `backlog config set`. The existing capability gate (`checkBacklogCapabilities`
+  from the primary root) proves lifecycle-readiness for an existing live store.
 
 This foundation serves only the canonical primary checkout (a linked worktree
 blocks with exact remediation). Episode-worktree preparation, the per-task

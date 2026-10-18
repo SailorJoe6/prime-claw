@@ -33,7 +33,7 @@ import {
   type CommandRunner,
   ProcessCommandRunner,
 } from "./project-initialization.ts";
-import { detectTaskProvider } from "./task-providers.ts";
+import { checkBacklogCapabilities, detectTaskProvider } from "./task-providers.ts";
 
 /** The disconnected task-history branch Prime Claw manages. */
 export const TASK_HISTORY_REF = "refs/heads/prime-claw/tasks";
@@ -43,6 +43,41 @@ const BUILT_IN_TASK_STORE_DIRS = [".backlog", "backlog"] as const;
 const INITIAL_COMMIT_MESSAGE = "prime-claw: initialize task history";
 const INITIAL_FILE = "TASKS.md";
 const INITIAL_FILE_CONTENT = "# Prime Claw task history\n\nThis disconnected branch carries the provider-native Backlog task store.\n";
+/** The exact ordered canonical lifecycle the capability gate requires. */
+const CANONICAL_STATUSES = ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"] as const;
+
+/**
+ * The lifecycle-ready folder configuration the bootstrap publishes (the same
+ * content the accepted native initializer establishes): the exact six ordered
+ * canonical statuses, default `In Design`, and `auto_commit: false`. The store
+ * is therefore lifecycle-ready from the first published commit and never
+ * returned as an untracked/unpublished local config write.
+ */
+function initialTaskStoreConfig(projectName: string): string {
+  const statuses = CANONICAL_STATUSES.map((status) => `"${status}"`).join(", ");
+  // The full canonical default configuration (the same keys upstream's
+  // `backlog init` writes) with the exact ordered lifecycle and
+  // auto_commit: false — so the published store is already normalized and
+  // native commands never rewrite it in place.
+  return [
+    `project_name: "${projectName}"`,
+    `default_status: "In Design"`,
+    `statuses: [${statuses}]`,
+    `labels: []`,
+    `date_format: yyyy-mm-dd`,
+    `max_column_width: 20`,
+    `auto_open_browser: true`,
+    `default_port: 6420`,
+    `remote_operations: true`,
+    `auto_commit: false`,
+    `filesystem_only: false`,
+    `bypass_git_hooks: false`,
+    `check_active_branches: true`,
+    `active_branch_days: 30`,
+    `task_prefix: "task"`,
+    ``,
+  ].join("\n");
+}
 
 export interface TaskHistoryWorkspaceInput {
   /** Absolute path of the canonical primary checkout (never an Episode worktree). */
@@ -211,28 +246,66 @@ export function ensureTaskHistoryBranch(
   // failed-closed: without current remote evidence this seam cannot decide
   // absent/equal/ahead and never acts on stale knowledge.
   const remoteRef = `refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`;
-  // Probe the remote directly: an answering remote with no task branch means
-  // the branch is absent (a fetch of it fails with "couldn't find remote
-  // ref"); a remote that cannot be reached at all fails closed rather than
-  // deciding on stale or absent evidence.
-  const probe = runGit(runner, primaryRoot, ["ls-remote", remote, remoteUrl, TASK_HISTORY_REF]);
+  // Direct remote evidence is the SOLE authority: parse the exact
+  // `git ls-remote --heads <transport> refs/heads/prime-claw/tasks` result as
+  // either absent or one well-formed OID/ref line. A cached remote-tracking
+  // ref is never read as authority on its own.
+  const probe = runGit(runner, primaryRoot, ["ls-remote", "--heads", remoteUrl, TASK_HISTORY_REF]);
   const probeOut = probe.stdout.trim();
   const probeErr = (probe.stderr || "").trim();
-  const unreachable = probe.status !== 0 && probeOut === "" && !/couldn't find remote ref/.test(probeErr);
-  if (unreachable) {
+  let remoteOid: string | null;
+  if (probe.status !== 0) {
     return {
       status: "blocked",
       code: "remote-unavailable",
-      detail: `the selected remote ${remote} could not be reached (ls-remote: ${probeErr || `exit ${probe.status}`})`,
+      detail: `the selected remote ${remote} (${remoteUrl}) could not be reached: ${probeErr || `exit ${probe.status}`}`,
       remediation: "restore connectivity or credentials for the task-history remote and re-run preparation; this seam never decides on stale or absent remote evidence",
     };
+  } else if (probeOut === "") {
+    remoteOid = null; // the remote answers and has no task branch: ABSENT
+  } else {
+    const probeLines = probeOut.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const probeMatch = probeLines.length === 1 ? probeLines[0].match(/^([0-9a-f]{40})\trefs\/heads\/prime-claw\/tasks$/) : null;
+    if (!probeMatch) {
+      return {
+        status: "blocked",
+        code: "unreadable",
+        detail: `\`git ls-remote --heads ${remoteUrl} ${TASK_HISTORY_REF}\` returned an unexpected result: ${JSON.stringify(probeOut)}`,
+        remediation: "inspect the task-history remote; the task ref must be absent or exactly one well-formed OID/ref line",
+      };
+    }
+    remoteOid = probeMatch[1];
   }
-  // Refresh the exact task ref into the primary's remote-tracking namespace
-  // (no-op when absent). The fetched ref below is the only authority for
-  // absent/equal/ahead — never a stale cached ref.
-  runGit(runner, primaryRoot, ["fetch", "-q", remote, `${TASK_HISTORY_REF}:${remoteRef}`]);
 
-  const remoteHead = refHead(runner, primaryRoot, remoteRef);
+  // Refresh the primary's remote-tracking namespace and PROVE it equals the
+  // direct evidence. When the direct response says ABSENT, never read a stale
+  // cached ref: remove that cache and treat any local branch as unpublished.
+  // A failed refresh or a direct/fetched mismatch blocks.
+  let remoteHead: string | null = null;
+  if (remoteOid === null) {
+    runGit(runner, primaryRoot, ["update-ref", "-d", remoteRef]);
+  } else {
+    const fetch = runGit(runner, primaryRoot, ["fetch", "-q", remote, `${TASK_HISTORY_REF}:${remoteRef}`]);
+    if (fetch.status !== 0) {
+      return {
+        status: "blocked",
+        code: "remote-unavailable",
+        detail: `refreshing ${remoteRef} from ${remote} failed after the remote answered: ${fetch.stderr.trim() || `exit ${fetch.status}`}`,
+        remediation: "restore connectivity for the task-history remote and re-run preparation; this seam never decides on a failed refresh",
+      };
+    }
+    const fetched = refHead(runner, primaryRoot, remoteRef);
+    if (fetched !== remoteOid) {
+      return {
+        status: "blocked",
+        code: "unreadable",
+        detail: `the refreshed ${remoteRef} (${fetched ?? "unreadable"}) does not equal the direct remote evidence (${remoteOid}); the remote may have moved between probe and fetch`,
+        remediation: "re-run preparation so a single consistent remote state is observed; never force or guess",
+      };
+    }
+    remoteHead = fetched;
+  }
+
   const localHead = refHead(runner, primaryRoot, TASK_HISTORY_REF);
 
   if (remoteHead) {
@@ -273,14 +346,15 @@ export function ensureTaskHistoryBranch(
     return { status: "verified", head: remoteHead };
   }
 
-  // No remote task branch: it must be bootstrapped and published. A
-  // local-only branch has no authority and blocks rather than being pushed
-  // silently — a local branch is never the source of a new task history.
+  // Direct remote evidence says the task branch is ABSENT (any stale cached
+  // ref was removed above): the branch must be bootstrapped and published. A
+  // local-only branch is unpublished local history with no authority and
+  // blocks rather than being pushed silently.
   if (localHead) {
     return {
       status: "blocked",
       code: "local-ahead",
-      detail: `the local ${TASK_HISTORY_BRANCH} exists (${localHead.slice(0, 12)}) but the selected remote ${remote} has no task branch; unpublished local task history is never published implicitly`,
+      detail: `the selected remote ${remote} has no task branch but the local ${TASK_HISTORY_BRANCH} exists (${localHead.slice(0, 12)}); unpublished local task history is never published implicitly or called verified`,
       remediation: `publish it explicitly (\`git -C ${primaryRoot} push ${remote} ${TASK_HISTORY_BRANCH}\`) or discard it (\`git -C ${primaryRoot} branch -D ${TASK_HISTORY_BRANCH}\`) so preparation can bootstrap the disconnected history`,
     };
   }
@@ -294,7 +368,8 @@ export function ensureTaskHistoryBranch(
     gitOk(runner, temp, ["init", "-q", "-b", TASK_HISTORY_BRANCH], "initialize the disposable bootstrap repository");
     gitOk(runner, temp, ["remote", "add", "origin", remoteUrl], "point the bootstrap repository at the selected remote");
     writeFileSync(join(temp, INITIAL_FILE), INITIAL_FILE_CONTENT);
-    gitOk(runner, temp, ["add", INITIAL_FILE], "stage the task-history marker");
+    writeFileSync(join(temp, "config.yml"), initialTaskStoreConfig(basename(primaryRoot)));
+    gitOk(runner, temp, ["add", INITIAL_FILE, "config.yml"], "stage the task-history marker and lifecycle-ready config");
     gitOk(runner, temp, ["-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-q", "-m", INITIAL_COMMIT_MESSAGE], "create the initial task-history commit");
     const push = runGit(runner, temp, ["push", "origin", `${TASK_HISTORY_REF}:${TASK_HISTORY_REF}`]);
     if (push.status !== 0) {
@@ -458,34 +533,6 @@ function ensureIgnored(
   return null;
 }
 
-/** The exact native Backlog configuration that discovery selected, if any. */
-function findNativeConfig(
-  primaryRoot: string,
-  storeDir: string,
-  detection: ReturnType<typeof detectTaskProvider>,
-): { path: string; source: "root" | "folder" } | { blocked: TaskHistoryWorkspace & { status: "blocked" } } | null {
-  if (detection.kind !== "selected" || detection.evidence.provider !== "backlog") return null;
-  const evidence = detection.evidence;
-  if (evidence.configSource === "root") {
-    const layout = evidence.storeDir && relative(primaryRoot, evidence.storeDir).split(sep)[0];
-    const isBuiltIn = layout !== undefined && (BUILT_IN_TASK_STORE_DIRS as readonly string[]).includes(layout);
-    if (evidence.storeDir === null || isBuiltIn) {
-      return { path: evidence.configPath, source: "root" };
-    }
-    // A root configuration governing a custom directory: the live store
-    // location was already blocked by selectStoreLocation; this path is
-    // unreachable but stays defensive.
-    return {
-      blocked: {
-        status: "blocked", code: "config-not-preserved",
-        detail: `the root configuration ${evidence.configPath} selects a non-built-in store directory; preserving it requires migration`,
-        remediation: "migrate the store to a built-in location (task-data migration is a later slice) and re-run preparation",
-      },
-    };
-  }
-  return { path: evidence.configPath, source: "folder" };
-}
-
 /**
  * Prepare the primary checkout's ignored independent nested Backlog clone at
  * the validated built-in task-store location, checked out on the published
@@ -528,6 +575,21 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
       status: "blocked", code: "provider-not-backlog",
       detail: "the selected provider is Beads; the Backlog workspace seam does not prepare a task store for it",
       remediation: "the Beads workspace transport is a later slice; no Backlog clone is prepared",
+    };
+  }
+
+  // Root-config layouts block BEFORE any ignore/branch/clone/config mutation.
+  // Backlog's native config discovery walks UP from the nested store directory
+  // and resolves the primary's root backlog.config.yml; any native
+  // `backlog config` write from the nested clone would rewrite the PRIMARY
+  // root configuration while the published folder config stays unchanged —
+  // and mere folder-config existence is not preservation. Moving that
+  // authority is the deferred cutover (PRIMECLAW-43.1).
+  if (detection!.kind === "selected" && detection!.evidence.provider === "backlog" && detection!.evidence.configSource === "root") {
+    return {
+      status: "blocked", code: "config-not-preserved",
+      detail: `the repository's Backlog authority is the root configuration ${detection!.evidence.configPath}; native config resolution from the nested store would rewrite that root config, so preparation refuses to proceed`,
+      remediation: "root-config authority relocation is part of the deferred cutover (PRIMECLAW-43.1); re-run preparation after it lands",
     };
   }
 
@@ -594,9 +656,9 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
         remediation: `switch the nested clone to ${TASK_HISTORY_BRANCH} (\`git -C ${storeDir} switch ${TASK_HISTORY_BRANCH}\`) or remove ${storeDir} and re-run preparation`,
       };
     }
-    // Refresh from the selected remote and fast-forward only; a divergence
-    // blocks rather than being overwritten.
-    gitOk(runner, storeDir, ["fetch", "-q", remote, TASK_HISTORY_BRANCH], "refresh the nested clone task branch");
+    // Refresh from the selected remote (result-checked) into the tracking
+    // namespace; a divergence blocks rather than being overwritten.
+    gitOk(runner, storeDir, ["fetch", "-q", remote, `${TASK_HISTORY_REF}:refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`], "refresh the nested clone task branch");
     const innerRemoteHead = refHead(runner, storeDir, `refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`);
     const innerHead = refHead(runner, storeDir, "HEAD");
     if (!innerHead || !innerRemoteHead) {
@@ -660,56 +722,73 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     }
   }
 
-  // Preserve the EXACT native configuration discovery selected. A folder
-  // config materialized with the clone (checked out from the task branch) is
-  // already the intended config. When the branch carries no folder config,
-  // the clone needs one for the native `backlog config` surface; with no
-  // prior provider evidence the minimal valid folder config (the native
-  // default for a fresh store, autoCommit already false upstream) is
-  // established, and an existing root or folder configuration is never
-  // modified or shadowed.
-  const configInfo = findNativeConfig(primaryRoot, storeDir, detection!);
-  if (configInfo && "blocked" in configInfo) return configInfo.blocked;
-  const configSource: "root" | "folder" | "none" = configInfo ? configInfo.source : "none";
+  // The folder configuration lives ON the published task-history branch (the
+  // bootstrap publishes the exact lifecycle-ready config). The nested clone
+  // checks it out tracked; this seam NEVER writes an untracked, unpublished,
+  // or non-lifecycle-ready local config.
   const nestedConfigCandidates = [join(storeDir, "config.yml"), join(storeDir, "config.yaml")];
-  if (!nestedConfigCandidates.some((p) => existsSync(p))) {
-    if (configInfo !== null) {
-      // The clone needs a folder configuration for the native
-      // `backlog config` surface, but the task-history branch carries none
-      // (the published bootstrap holds only the task marker). Materializing
-      // a folder config inside a built-in store directory would take native
-      // precedence over the existing root/folder config, silently changing
-      // which settings govern the store — so this blocks rather than shadow
-      // or rewrite the operator's configuration. Publishing the task store's
-      // configuration is part of the deferred cutover.
-      return {
-        status: "blocked", code: "config-not-preserved",
-        detail: `the existing ${configInfo.source} configuration ${configInfo.path} is not on the task-history branch, and materializing a folder config in ${storeDir} would shadow it (native precedence); this seam never rewrites or shadows operator configuration`,
-        remediation: "publishing the task store's own configuration is part of the deferred cutover (PRIMECLAW-43.1); re-run preparation after it lands",
-      };
-    }
-    // No prior provider evidence: establish the minimal valid folder config
-    // (the native default for a fresh store; upstream autoCommit is already
-    // false) so the native configuration surface works.
-    writeFileSync(join(storeDir, "config.yml"), `project_name: "${basename(primaryRoot)}"\n`);
-  }
-
-  // Disable Backlog code-repository auto-commit through the supported native
-  // configuration surface against the intended config, then prove it.
-  const setResult = runner.run("backlog", ["config", "set", "autoCommit", "false"], { cwd: storeDir, allowFailure: true });
-  if (setResult.status !== 0) {
+  if (!nestedConfigCandidates.some((path) => existsSync(path))) {
     return {
-      status: "blocked", code: "backlog-cli",
-      detail: `\`backlog config set autoCommit false\` failed in ${storeDir}: ${setResult.stderr.trim() || setResult.stdout.trim() || `exit ${setResult.status}`}`,
-      remediation: "repair the managed Backlog executable or the nested clone configuration and re-run preparation",
+      status: "blocked", code: "config-not-preserved",
+      detail: `the published task-history branch carries no folder configuration in ${storeDir}; establishing one locally would be an untracked, unpublished, non-lifecycle-ready config, which this seam never returns as prepared`,
+      remediation: "publish the lifecycle-ready task store config (the deferred cutover PRIMECLAW-43.1 owns existing stores), then re-run preparation",
     };
   }
-  const getResult = runner.run("backlog", ["config", "get", "autoCommit"], { cwd: storeDir, allowFailure: true });
-  if (getResult.status !== 0 || getResult.stdout.trim() !== "false") {
+  const configSource: "root" | "folder" | "none" =
+    detection!.kind === "selected" && detection!.evidence.provider === "backlog" ? detection!.evidence.configSource : "none";
+
+  // Prove code-repository auto-commit is disabled WITHOUT a native write:
+  // `backlog config get` from the nested store normalizes config.yml in place
+  // (an untracked, unpublished write), so this seam reads auto_commit
+  // directly from the published config bytes. The bootstrap publishes
+  // auto_commit: false and upstream's native default is false when the key is
+  // absent, so a true value here is a published-config change — the deferred
+  // mutation/cutover, never a local edit.
+  const nestedConfigPath = nestedConfigCandidates.find((path) => existsSync(path))!;
+  const autoCommitLine = readFileSync(nestedConfigPath, "utf8").match(/^auto_commit:\s*(\S+)\s*$/m);
+  if (autoCommitLine && autoCommitLine[1] !== "false") {
     return {
       status: "blocked", code: "backlog-cli",
-      detail: `the nested clone did not record autoCommit=false (\`backlog config get autoCommit\` returned ${JSON.stringify(getResult.stdout.trim())})`,
-      remediation: `set the value manually in ${storeDir} (\`backlog config set autoCommit false\`) and re-run preparation`,
+      detail: `the published task-store config ${nestedConfigPath} has auto_commit: ${autoCommitLine[1]}; code-repository auto-commit must be disabled`,
+      remediation: "disabling auto-commit in the published task-store config is part of the deferred mutation/cutover; this seam never writes the config locally",
+    };
+  }
+
+  // Prove lifecycle-readiness through the existing capability gate when the
+  // primary checkout already has live Backlog evidence (an existing nested
+  // store): native discovery resolves that store from the primary root and
+  // the gate confirms the exact ordered canonical lifecycle. The fresh
+  // no-evidence bootstrap is proven by its exact published config above plus
+  // clone cleanliness below — running the native gate from the nested store
+  // would itself rewrite config.yml, so it is not used as a write.
+  if (detection!.kind === "selected" && detection!.evidence.provider === "backlog") {
+    try {
+      checkBacklogCapabilities(primaryRoot, runner);
+    } catch (error) {
+      return {
+        status: "blocked", code: "backlog-cli",
+        detail: `the existing task store is not lifecycle-ready: ${error instanceof Error ? error.message : String(error)}`,
+        remediation: "the task-store config must carry the exact ordered canonical lifecycle; correct it and re-run preparation",
+      };
+    }
+  }
+
+  // Prove the nested clone is clean: no uncommitted and no unpublished config
+  // or task content.
+  const dirty = gitOk(runner, storeDir, ["status", "--porcelain"], "verify the nested clone is clean");
+  if (dirty.trim() !== "") {
+    return {
+      status: "blocked", code: "uncommitted-task-content",
+      detail: `the nested clone ${storeDir} has uncommitted changes after preparation: ${dirty.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
+      remediation: "the nested clone must be clean; inspect it and re-run preparation",
+    };
+  }
+  const unpublishedCheck = refHead(runner, storeDir, "HEAD");
+  if (unpublishedCheck !== branchState.head) {
+    return {
+      status: "blocked", code: "local-ahead",
+      detail: `the nested clone HEAD (${unpublishedCheck ?? "unreadable"}) does not equal the published task-history head (${branchState.head}); unpublished task content is never returned as prepared`,
+      remediation: "publish the nested clone's commits (the deferred mutation loop) or re-run preparation",
     };
   }
 

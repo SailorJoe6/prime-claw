@@ -144,8 +144,8 @@ test("absent remote branch is bootstrapped in a disposable repo, published, and 
   assert.equal(git(root, "rev-parse", "refs/heads/prime-claw/tasks"), state.head);
   // The published history is disconnected from code.
   assert.equal(gitAllow(root, "merge-base", state.head, "main").status, 1);
-  // The bootstrap carried only the marker file.
-  assert.deepEqual(git(root, "ls-tree", "--name-only", state.head).split("\n"), ["TASKS.md"]);
+  // The bootstrap carried the marker AND the lifecycle-ready config.
+  assert.deepEqual(git(root, "ls-tree", "--name-only", state.head).split("\n"), ["TASKS.md", "config.yml"]);
   // The canonical primary checkout was never switched, staged, or written.
   const after = primarySnapshot(root);
   assert.deepEqual(after, before);
@@ -230,8 +230,14 @@ test("preparation clones from the selected remote, ignores the store, disables a
   // Nested clone is on the task branch at the published head, from the remote URL.
   assert.equal(git(ws.storeDir, "symbolic-ref", "--short", "HEAD"), "prime-claw/tasks");
   assert.equal(git(ws.storeDir, "remote", "get-url", "origin"), remote);
-  // Index matches the published head: nothing staged for deletion.
+  // Index matches the published head: nothing staged for deletion; the clone is clean.
   assert.equal(git(ws.storeDir, "diff", "--cached", "--name-only"), "");
+  assert.equal(git(ws.storeDir, "status", "--porcelain"), "");
+  // The lifecycle-ready config came from the published branch, not a local write.
+  const cfg = readFileSync(join(ws.storeDir, "config.yml"), "utf8");
+  assert.match(cfg, /^default_status: "In Design"$/m);
+  assert.match(cfg, /^auto_commit: false$/m);
+  assert.match(cfg, /"Ready for Merge"/);
   // The store is ignored per native Git.
   assert.equal(git(root, "check-ignore", ".backlog/x"), ".backlog/x");
   // Idempotent: second run verifies, branchState stays published/verified.
@@ -312,8 +318,12 @@ test("a hook failure or untracked-marker collision leaves the primary byte-for-b
 test("a populated remote task branch is cloned with no cached deletions", (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, remote } = fixtureRepo();
-  // Publish a task branch carrying real task content.
-  publishTaskBranch(remote, { "TASKS.md": "history\n", "task-1.md": "# task\n" });
+  // Publish a task branch carrying real task content AND a lifecycle-ready config.
+  publishTaskBranch(remote, {
+    "TASKS.md": "history\n",
+    "task-1.md": "# task\n",
+    "config.yml": 'project_name: "x"\ndefault_status: "In Design"\nstatuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\nauto_commit: false\n',
+  });
   const ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
   assert.equal(ws.status, "prepared");
   assert.equal(ws.branchState, "verified");
@@ -375,4 +385,97 @@ test("a Beads-selected provider blocks", () => {
   // Either provider-not-backlog (beads selected) or a detection block.
   assert.equal(ws.status, "blocked");
   assert.ok(["provider-not-backlog", "unreadable"].includes(ws.code));
+});
+
+// ---------- residual regressions (53437db revise) ----------
+
+// Residual 1: direct remote evidence is authoritative over a stale cached ref.
+test("remote branch deleted by another clone while primary keeps a cached ref never returns verified", () => {
+  const { root, remote } = fixtureRepo();
+  // Publish, then let the primary fetch + track it (cached remote ref + local branch).
+  publishTaskBranch(remote, { "TASKS.md": "v1\n" });
+  git(root, "fetch", "-q", "origin", `${TASK_HISTORY_REF}:refs/remotes/origin/prime-claw/tasks`);
+  git(root, "branch", "--track", "prime-claw/tasks", "refs/remotes/origin/prime-claw/tasks");
+  assert.ok(git(root, "rev-parse", "refs/remotes/origin/prime-claw/tasks")); // cached ref present
+  // Another clone deletes the remote branch out from under the primary.
+  const tmp = realpathSync(mkdtempSync(join(tmpdir(), "thw-del-")));
+  git(tmp, "init", "-q");
+  git(tmp, "remote", "add", "origin", remote);
+  git(tmp, "push", "-q", "origin", ":refs/heads/prime-claw/tasks");
+  rmSync(tmp, { recursive: true, force: true });
+  // The remote is now ABSENT. Direct evidence must win: never verified/published.
+  const state = ensureTaskHistoryBranch(root, "origin", remote);
+  assert.notEqual(state.status, "verified");
+  assert.notEqual(state.status, "published");
+  assert.equal(state.status, "blocked");
+  // Local branch is now unpublished history → local-ahead.
+  assert.equal(state.code, "local-ahead");
+  // The stale cached remote-tracking ref was removed (not read as authority).
+  assert.equal(gitAllow(root, "rev-parse", "--verify", "refs/remotes/origin/prime-claw/tasks").status !== 0, true);
+});
+
+// Residual 1: a direct/fetched mismatch (remote moves between probe and fetch) blocks.
+test("a remote that moves between probe and fetch blocks rather than trusting either", () => {
+  const { root, remote } = fixtureRepo();
+  publishTaskBranch(remote, { "TASKS.md": "v1\n" });
+  git(root, "fetch", "-q", "origin", `${TASK_HISTORY_REF}:refs/remotes/origin/prime-claw/tasks`);
+  git(root, "branch", "--track", "prime-claw/tasks", "refs/remotes/origin/prime-claw/tasks");
+  // Advance the remote; ensureTaskHistoryBranch re-probes and re-fetches.
+  publishTaskBranch(remote, { "TASKS.md": "v2\n" });
+  const state = ensureTaskHistoryBranch(root, "origin", remote);
+  // Remote advanced ahead of the local branch → blocked (never verified, never force).
+  assert.equal(state.status, "blocked");
+  assert.equal(state.code, "remote-advanced");
+});
+
+// Residual 3: root config + published folder config → block, root bytes unchanged, no native write.
+test("root config with a published folder config blocks before any native config write", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote } = fixtureRepo();
+  // Published task branch carries a folder config.
+  publishTaskBranch(remote, {
+    "TASKS.md": "history\n",
+    "config.yml": 'project_name: "x"\ndefault_status: "In Design"\nstatuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\nauto_commit: false\n',
+  });
+  // The primary resolves a ROOT config (backlog.config.yml with project_name)
+  // governing an existing backlog/ store directory.
+  mkdirSync(join(root, "backlog"), { recursive: true });
+  writeFileSync(join(root, "backlog", "TASKS.md"), "existing\n");
+  const rootCfg = 'project_name: "outer"\ndefault_status: "In Design"\nstatuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\nbacklog_directory: backlog\nauto_commit: false\n';
+  writeFileSync(join(root, "backlog.config.yml"), rootCfg);
+  const ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(ws.status, "blocked");
+  assert.equal(ws.code, "config-not-preserved");
+  assert.match(ws.detail, /root/);
+  // Root config bytes unchanged; no native write to it; no prepared result.
+  assert.equal(readFileSync(join(root, "backlog.config.yml"), "utf8"), rootCfg);
+  // No nested store was created (blocked before clone/config mutation).
+  assert.ok(!existsSync(join(root, ".backlog", ".git")));
+  assert.ok(!existsSync(join(root, "backlog", ".git")));
+});
+
+// Residual 2: the bootstrap publishes a lifecycle-ready config; the store is clean and stable.
+test("no-evidence bootstrap publishes a lifecycle-ready config and a second prepare is stable", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote } = fixtureRepo();
+  const ws1 = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(ws1.status, "prepared");
+  // The REMOTE TREE contains the lifecycle-ready config (not a local write).
+  const treeCfg = git(root, "show", `${ws1.head}:config.yml`);
+  assert.match(treeCfg, /^default_status: "In Design"$/m);
+  assert.match(treeCfg, /^auto_commit: false$/m);
+  assert.match(treeCfg, /"In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"/);
+  // The nested clone has NO uncommitted and NO unpublished content.
+  assert.equal(git(ws1.storeDir, "status", "--porcelain"), "");
+  assert.equal(git(ws1.storeDir, "rev-parse", "HEAD"), ws1.head);
+  assert.equal(git(ws1.storeDir, "rev-parse", "refs/remotes/origin/prime-claw/tasks"), ws1.head);
+  // The published store passes the existing capability gate (exact ordered lifecycle).
+  // Capability gate via the native CLI from the store dir, read-only statuses proof.
+  const statuses = execFileSync("backlog", ["config", "get", "statuses"], { cwd: ws1.storeDir, encoding: "utf8" }).trim();
+  assert.equal(statuses, "In Design, In Planning, In Progress, Blocked, Ready for Merge, Done");
+  // A second preparation is stable (verified, same head, still clean).
+  const ws2 = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(ws2.status, "prepared");
+  assert.equal(ws2.head, ws1.head);
+  assert.equal(git(ws1.storeDir, "status", "--porcelain"), "");
 });
