@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 23:32'
+updated_date: '2026-10-18 23:39'
 labels: []
 dependencies: []
 references:
@@ -396,4 +396,19 @@ Fix 2 — removed the custom auto_commit byte-regex: it disagreed with native Ba
 Ordering: the native reads (capability gate + defaultStatus + autoCommit, all from primaryRoot which resolves the nested clone via upward discovery) run BEFORE the final nested `git status` clean + published-HEAD equality proofs — so any native normalization/write BLOCKS (`uncommitted-task-content` / `local-ahead`) instead of being certified clean. The canonical bootstrap emits ALL canonical default keys, so native reads never dirty it (verified: the no-evidence bootstrap test stays stable and clean).
 
 Focused real-Git regressions added (only these): (a) fresh primary adopting a pre-existing remote branch with generic three-status/default-To-Do config blocks, never prepared; (b) otherwise-canonical pre-existing remote config with native-valid `auto_commit : true` blocks; (c) canonical statuses with wrong default (`To Do`) blocks on the exact native default proof. Seam suite 28/28 (was 25); host Node 323/323 (was 320); Docker tier-1 bridge 1/1. Did NOT promote the pre-existing non-empty-folder-store bootstrap/ignore ordering into a blocker (reviewer: non-blocking, predates candidate). docs/backlog.md slice-2A section updated. Status unchanged: In Progress. Boundary kept: no Episode wiring, no per-task mutation loop, no Beads transport, no ownership/receipt fields, no lifecycle UX routing, no migration/cutover, no PRIMECLAW-43.1; live store untouched.
+
+2026-10-18 Conversation review of candidate 9e5c544: ACCEPTED as the completed slice-2A repair. It closes residual B (effective native statuses/default/autoCommit validation on every materialized-store path), preserves accepted residuals A/C and the five earlier repairs, is clean and upstream-equal, and passed focused 28/28, full host Node 323/323, direct real-Git reproductions, and serial Docker tier 1. Slice 2A (task-history workspace foundation) is complete. Do not revise accepted slice-2A behavior.
+
+ADVANCE to plan slice 2B: Backlog Episode-worktree workspace preparation and guarded nested-store cleanup seams only. Direct ordinary-Git/Backlog code in the existing `extension-support/task-history-workspace.ts` module unless ordinary file size alone warrants a split.
+
+Scope (least-technology direct seams for one canonical primary checkout plus one exact target linked code worktree):
+- Verify the primary is the canonical primary checkout and the target is an actual REGISTERED LINKED WORKTREE of the SAME Git common repository — not the primary, an arbitrary directory, or a foreign repo. Git identity/containment only; NO ownership fields or lifecycle wiring yet.
+- Derive the same selected remote, transport URL, published refs/heads/prime-claw/tasks authority, and built-in store location from the prepared primary. Require the primary workspace/config valid under accepted slice-2A checks; preserve root/custom-layout blocks until the deferred cutover.
+- In the target worktree: store path directly contained + non-symlinked, and native `git check-ignore` must prove it already ignored BEFORE creating anything. Do NOT edit/stage the target code worktree merely to establish ignore.
+- Materialize an INDEPENDENT nested ordinary-Git clone from the selected remote URL on prime-claw/tasks at the exact remote head. Never a nested linked worktree, submodule, alternate index, same-root custom work tree, local-filesystem authority clone, or force update. On reuse, verify exact .git directory form, remote name+URL, branch, remote/current head, effective native Backlog lifecycle/default/autoCommit, clean status, no unpublished commits; block drift/divergence with exact remediation.
+- Add ONE guarded cleanup seam for that exact nested clone. Before removal, freshly prove direct remote task ref, exact clone identity/URL/branch, clean worktree/index, and HEAD == authoritative remote head. Refuse cleanup unchanged on dirty, untracked, local-ahead/unpublished, remote-ahead/diverged, unavailable remote, wrong URL/branch, symlink, gitfile/linked-worktree form, non-repository content, or containment/identity mismatch. Remove only the proven nested store dir; never touch target code branch/index/tracked files or the primary store. This is the plan's clean/published cleanup guard, NOT operator-facing lifecycle cleanup authority.
+
+Fixtures (representative real-Git, no Cartesian matrix): successful linked-worktree prep proves independent clean clone from remote + zero primary/target code mutations; foreign/unregistered target and unsafe/ineffective-ignore paths block before writes; reuse with wrong remote/branch or dirt blocks; cleanup succeeds for one exact clean published clone and refuses dirty/untracked, unpublished/local-ahead, remote unavailable/advanced, foreign identity without deletion.
+
+Explicitly OUT of scope for 2B: per-task fetch/reconcile/native-mutate/commit/push loop; actual Episode admission/finalization/cleanup wiring; Beads server/Dolt transport; provider-neutral framework; ownership/receipt fields; lifecycle UX routing; migration/cutover; PRIMECLAW-43.1; changes to the accepted non-empty-folder-store ordering. Update focused docs/task notes, focused host tests + full Node + Docker-only tier 1, one clean commit, push, stop for review. Status unchanged: In Progress.
 <!-- SECTION:NOTES:END -->
