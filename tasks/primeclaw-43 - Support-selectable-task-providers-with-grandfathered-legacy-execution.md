@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 20:26'
+updated_date: '2026-10-18 20:45'
 labels: []
 dependencies: []
 references:
@@ -285,4 +285,14 @@ Evidence: host Node suite 288/288 (41 task-providers incl. 11 new contract tests
 Boundary kept: no abstract class, registry, universal task model, public tracker CLI, selection file, mirror, persistent state, semantic classifier, diff/merge layer, or lifecycle matrix. Workspace/orphan-branch/Dolt sync, receipts/revisions, migration, and remaining lifecycle call sites (handoff, oversight, finalization, cleanup UX) stay in their planned slices. Pre-existing main failures untouched.
 
 Also corrected the historical sentence about the slice 1a review: it requested a revision for three accepted findings (was inaccurately recorded as an acceptance with defects).
+
+2026-10-18 Conversation review of candidate ccc9ce5 requested a revision for four accepted, reproducible defects; repair this pushed candidate before advancing to workspace/synchronization or later lifecycle slices.
+
+Accepted repair scope (exact):
+1. Fresh `.backlog/` initialization must work with the real managed Backlog CLI, not only stubs: pass a deterministic supported positional project name (repo basename), keep the accepted `.backlog`/folder/no-integration flags, then use supported native configuration commands to establish the exact six ordered lifecycle statuses plus an appropriate canonical default so the new store passes the existing capability gate. Verify exact ignored-stdin non-interactive argv against the repository-built executable; prove `.backlog/config.yml` exists and is lifecycle-ready; prove a second reconcile is a no-op. Partial/native failure returns exact failed evidence, never claims initialization.
+2. Remove the forbidden provider-neutral content object `ProviderTaskSelection` (normalized title/status/plan/references/paths with invented null Beads plan/paths contradicts the approved plan). Replace with direct provider-specific operations or a discriminated native result: preserve the existing BacklogTaskSelection on the Backlog branch, a validated native Beads issue/view on the Beads branch. No new normalized/universal task shape. Canonical status mapping stays a small conversion only at the exact use boundary. File-bound call sites may explicitly reject the Beads native branch until their planned support lands.
+3. Prove exact provider/task identity before ANY mutation: resolve natively first, require the raw requested ID to equal the provider's canonical ID (Beads shorthand resolving to a longer canonical ID rejects with zero writes), only then run native status/note mutation plus the existing post-write proof. Add a real or faithful native shorthand regression asserting no update call/status/note change occurs.
+4. Make provider setup failures visible through the existing reconciliation/reporting path: count taskProvider blocked/failed in the existing warning/conflict decision (no new state); include exact failed detail and blocked detail/remediation in command/tool/startup summaries; prove a converged registered project with missing Backlog plus dual/malformed evidence emits an actionable warning rather than zero notifications or bare `provider=failed`.
+
+Boundary: least-technology only — no abstract provider framework, registry, universal task model, persistent state, custom semantic/diff machinery, or lifecycle matrix. Focused tests incl. the real managed Backlog init command and native/faithful Beads shorthand behavior; Docker-only plugin validation; truthful task notes/docs; one clean repair commit; stop for review. Deferred slices and pre-existing main failures untouched.
 <!-- SECTION:NOTES:END -->
