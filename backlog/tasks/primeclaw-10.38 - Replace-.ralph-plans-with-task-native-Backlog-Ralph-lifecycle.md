@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-18 17:04'
+updated_date: '2026-10-18 17:09'
 labels:
   - backlog-md
   - episode-loop
@@ -2950,6 +2950,12 @@ The repair performed no live lifecycle transition, merge, abandonment, cleanup, 
 Independent GPT-6 Astra rereview of exact candidate `bc79e2e7a9bbcb81fd878e22ec54debfbeec4cdf` confirmed the three prior repairs and reproduced their paused-push/mixed-mode coverage. It found one remaining instance of the same approved concurrency defect: the automatic `Blocked` publication after recorded/uncertain allocation failure and the proven-clean `In Planning` rollback still call `commitConversationTaskStatus` outside the short Episode-admission lock.
 
 A separate-process Docker reproduction showed owner A entering allocation failure while owner B held its own status-commit-to-reservation boundary. A's unlocked `Blocked` recovery advanced main, B's reservation rejected the changed HEAD, and B rolled back to `In Planning`. The sole next execute scope is to use the same admission lock around each recovery edit+task-only commit, re-resolve/revalidate the exact task inside the lock as needed, keep recovery pushes outside, and add the deterministic allocation-failure race regression. Preserve existing truthful Blocked/rollback semantics and add no coordinator, receipt, or lifecycle machinery. No live lifecycle or blocked-UAT-session action occurred in this handoff.
+
+## Approved live-upgrade bootstrap compatibility revision (2026-10-18)
+
+The owning Conversation explicitly accepted one additional in-scope Step 10 compatibility repair after the first queued execute prompt correctly stopped without an owner tag. Canonical main still holds the approved pre-upgrade direct ownership record rather than registry form. For direct-record form only, the record's embedded `ownerSessionId` is self-identifying after exact validation of the current worktree, durable Episode ID and session file, bound task/source identity, and non-inactive status. Registry form continues to require the exact `<operator-episode-owner-session>` key and must never scan or infer among owners.
+
+This Episode validated the bootstrap preconditions before handoff: direct-record form, active status, exact recorded worktree and branch, exact durable Episode ID `01a133c6-0834-7465-8597-91cf46c0b19e`, readable matching session file, exact `PRIMECLAW-10.38` task ID/path, parent `PRIMECLAW-10`, and `In Progress` status. The next execute pass must update source and project execute/handoff policy plus focused tests for only this direct-record fallback, then complete the already accepted recovery-lock repair and deterministic separate-process recovery race. Registry selection remains tag-only.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -2962,4 +2968,6 @@ Independent review reproduced three bounded defects: cross-process task admissio
 The task remains `In Progress` for the owning Conversation's later lifecycle decision. No live transition, merge, abandonment, cleanup, user-global activation, protected-archive mutation, blocked-UAT-session contact, or Prime Agent source change occurred.
 
 Exact rereview confirmed the three recorded repairs and accepted one final bounded follow-up: automatic `Blocked` and `In Planning` recovery commits must use the same short admission lock so they cannot interrupt another owner's commit-to-reservation boundary. That recovery-lock repair and its separate-process regression are the sole next execute scope; the task remains `In Progress`.
+
+The owning Conversation also approved a one-time live-upgrade bootstrap rule: only a pre-upgrade direct record may use its embedded owner key without a prompt tag after exact current worktree, Episode session/file, binding, and active-status validation. Registry form remains tag-required. This compatibility repair and the recovery-lock repair are the sole next execute scope.
 <!-- SECTION:FINAL_SUMMARY:END -->
