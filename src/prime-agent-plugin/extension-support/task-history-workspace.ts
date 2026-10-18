@@ -737,50 +737,54 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   const configSource: "root" | "folder" | "none" =
     detection!.kind === "selected" && detection!.evidence.provider === "backlog" ? detection!.evidence.configSource : "none";
 
-  // Prove code-repository auto-commit is disabled WITHOUT a native write:
-  // `backlog config get` from the nested store normalizes config.yml in place
-  // (an untracked, unpublished write), so this seam reads auto_commit
-  // directly from the published config bytes. The bootstrap publishes
-  // auto_commit: false and upstream's native default is false when the key is
-  // absent, so a true value here is a published-config change — the deferred
-  // mutation/cutover, never a local edit.
-  const nestedConfigPath = nestedConfigCandidates.find((path) => existsSync(path))!;
-  const autoCommitLine = readFileSync(nestedConfigPath, "utf8").match(/^auto_commit:\s*(\S+)\s*$/m);
-  if (autoCommitLine && autoCommitLine[1] !== "false") {
+  // Validate the prepared store's EFFECTIVE native Backlog configuration from
+  // the canonical primary root on every path — regardless of the pre-clone
+  // provider detection result and regardless of whether the task branch was
+  // newly bootstrapped or pre-existing. Native config discovery walks up from
+  // the nested store, so `primaryRoot` resolves the materialized nested clone.
+  // These are the managed native CLI reads, not a custom byte parse.
+  //
+  // The existing capability gate proves the exact ordered canonical lifecycle
+  // statuses; a pre-existing remote branch with generic statuses cannot pass.
+  try {
+    checkBacklogCapabilities(primaryRoot, runner);
+  } catch (error) {
     return {
       status: "blocked", code: "backlog-cli",
-      detail: `the published task-store config ${nestedConfigPath} has auto_commit: ${autoCommitLine[1]}; code-repository auto-commit must be disabled`,
+      detail: `the task store's effective native configuration is not lifecycle-ready: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: "the published task-store config must carry the exact ordered canonical lifecycle; this seam never rewrites a published config (remote mutation is deferred)",
+    };
+  }
+  // Prove the effective native default status is exactly "In Design"; do not
+  // rely only on generated config bytes.
+  const defaultStatus = runner.run("backlog", ["config", "get", "defaultStatus"], { cwd: primaryRoot, allowFailure: true });
+  if (defaultStatus.status !== 0 || defaultStatus.stdout.trim() !== "In Design") {
+    return {
+      status: "blocked", code: "backlog-cli",
+      detail: `the task store's effective native default status is ${JSON.stringify(defaultStatus.stdout.trim())} (exit ${defaultStatus.status}), not exactly "In Design"`,
+      remediation: "the published task-store config must set default_status to In Design; this seam never rewrites a published config (remote mutation is deferred)",
+    };
+  }
+  // Read the effective auto_commit value natively; require the exact false
+  // result. Never `config set` or locally rewrite the published config.
+  const autoCommit = runner.run("backlog", ["config", "get", "autoCommit"], { cwd: primaryRoot, allowFailure: true });
+  if (autoCommit.status !== 0 || autoCommit.stdout.trim() !== "false") {
+    return {
+      status: "blocked", code: "backlog-cli",
+      detail: `the task store's effective native auto_commit is ${JSON.stringify(autoCommit.stdout.trim())} (exit ${autoCommit.status}), not exactly "false"; code-repository auto-commit must be disabled`,
       remediation: "disabling auto-commit in the published task-store config is part of the deferred mutation/cutover; this seam never writes the config locally",
     };
   }
 
-  // Prove lifecycle-readiness through the existing capability gate when the
-  // primary checkout already has live Backlog evidence (an existing nested
-  // store): native discovery resolves that store from the primary root and
-  // the gate confirms the exact ordered canonical lifecycle. The fresh
-  // no-evidence bootstrap is proven by its exact published config above plus
-  // clone cleanliness below — running the native gate from the nested store
-  // would itself rewrite config.yml, so it is not used as a write.
-  if (detection!.kind === "selected" && detection!.evidence.provider === "backlog") {
-    try {
-      checkBacklogCapabilities(primaryRoot, runner);
-    } catch (error) {
-      return {
-        status: "blocked", code: "backlog-cli",
-        detail: `the existing task store is not lifecycle-ready: ${error instanceof Error ? error.message : String(error)}`,
-        remediation: "the task-store config must carry the exact ordered canonical lifecycle; correct it and re-run preparation",
-      };
-    }
-  }
-
-  // Prove the nested clone is clean: no uncommitted and no unpublished config
-  // or task content.
+  // Prove the nested clone is clean and exactly at the published head AFTER
+  // the native reads above: any native normalization or write they performed
+  // is caught here and BLOCKS rather than being certified clean.
   const dirty = gitOk(runner, storeDir, ["status", "--porcelain"], "verify the nested clone is clean");
   if (dirty.trim() !== "") {
     return {
       status: "blocked", code: "uncommitted-task-content",
-      detail: `the nested clone ${storeDir} has uncommitted changes after preparation: ${dirty.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
-      remediation: "the nested clone must be clean; inspect it and re-run preparation",
+      detail: `the nested clone ${storeDir} has uncommitted changes after preparation (native config reads may have normalized it): ${dirty.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
+      remediation: "the nested clone must be clean; the published config must already be canonical so native reads never rewrite it; inspect and re-run preparation",
     };
   }
   const unpublishedCheck = refHead(runner, storeDir, "HEAD");
@@ -791,7 +795,6 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
       remediation: "publish the nested clone's commits (the deferred mutation loop) or re-run preparation",
     };
   }
-
   return {
     status: "prepared",
     remote,

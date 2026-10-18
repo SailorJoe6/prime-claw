@@ -21,6 +21,26 @@ import {
   prepareTaskHistoryWorkspace,
 } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 
+const FULL_CANONICAL_CONFIG = [
+  'project_name: "x"',
+  'default_status: "In Design"',
+  'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]',
+  "labels: []",
+  "date_format: yyyy-mm-dd",
+  "max_column_width: 20",
+  "auto_open_browser: true",
+  "default_port: 6420",
+  "remote_operations: true",
+  "auto_commit: false",
+  "filesystem_only: false",
+  "bypass_git_hooks: false",
+  "check_active_branches: true",
+  "active_branch_days: 30",
+  'task_prefix: "task"',
+  "",
+].join("\n");
+
+
 /** Run a real git command; fail loudly. */
 function git(cwd, ...args) {
   return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -322,7 +342,7 @@ test("a populated remote task branch is cloned with no cached deletions", (t) =>
   publishTaskBranch(remote, {
     "TASKS.md": "history\n",
     "task-1.md": "# task\n",
-    "config.yml": 'project_name: "x"\ndefault_status: "In Design"\nstatuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\nauto_commit: false\n',
+    "config.yml": FULL_CANONICAL_CONFIG,
   });
   const ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
   assert.equal(ws.status, "prepared");
@@ -435,7 +455,7 @@ test("root config with a published folder config blocks before any native config
   // Published task branch carries a folder config.
   publishTaskBranch(remote, {
     "TASKS.md": "history\n",
-    "config.yml": 'project_name: "x"\ndefault_status: "In Design"\nstatuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\nauto_commit: false\n',
+    "config.yml": FULL_CANONICAL_CONFIG,
   });
   // The primary resolves a ROOT config (backlog.config.yml with project_name)
   // governing an existing backlog/ store directory.
@@ -478,4 +498,75 @@ test("no-evidence bootstrap publishes a lifecycle-ready config and a second prep
   assert.equal(ws2.status, "prepared");
   assert.equal(ws2.head, ws1.head);
   assert.equal(git(ws1.storeDir, "status", "--porcelain"), "");
+});
+
+// ---------- residual B regressions (1c598e0 revise pass 3) ----------
+
+// Residual B(1): a fresh primary adopting a PRE-EXISTING remote branch whose
+// effective native config is generic (three statuses, default To Do) must
+// block and never return prepared — the always-on capability gate catches it.
+test("a pre-existing remote branch with generic statuses and default To Do blocks, never prepared", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote } = fixtureRepo();
+  // Publish an upstream-style generic config (native-valid but not canonical).
+  publishTaskBranch(remote, {
+    "TASKS.md": "history\n",
+    "config.yml": [
+      'project_name: "x"',
+      'default_status: "To Do"',
+      'statuses: ["To Do", "In Progress", "Done"]',
+      "labels: []",
+      "date_format: yyyy-mm-dd",
+      "max_column_width: 20",
+      "auto_open_browser: true",
+      "default_port: 6420",
+      "remote_operations: true",
+      "auto_commit: false",
+      "filesystem_only: false",
+      "bypass_git_hooks: false",
+      "check_active_branches: true",
+      "active_branch_days: 30",
+      'task_prefix: "task"',
+      "",
+    ].join("\n"),
+  });
+  const ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(ws.status, "blocked");
+  assert.equal(ws.code, "backlog-cli");
+  assert.match(ws.detail, /lifecycle|statuses/i);
+  // Never returned prepared, and the materialized clone is not silently
+  // rewritten (the incompatible published config stays as published).
+  assert.notEqual(ws.status, "prepared");
+});
+
+// Residual B(2): an otherwise-canonical pre-existing remote config using the
+// native-valid `auto_commit : true` (spaces) must block on the effective native
+// read, never be silently treated as an absent key returning prepared.
+test("an otherwise-canonical pre-existing remote config with auto_commit : true blocks", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote } = fixtureRepo();
+  publishTaskBranch(remote, {
+    "TASKS.md": "history\n",
+    "config.yml": FULL_CANONICAL_CONFIG.replace("auto_commit: false", "auto_commit : true"),
+  });
+  const ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(ws.status, "blocked");
+  assert.equal(ws.code, "backlog-cli");
+  assert.match(ws.detail, /auto_commit/i);
+  assert.notEqual(ws.status, "prepared");
+});
+
+// Residual B(1) companion: canonical statuses but a WRONG default must block on
+// the exact native default proof (compact fixture).
+test("canonical statuses with a wrong effective default status blocks", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote } = fixtureRepo();
+  publishTaskBranch(remote, {
+    "TASKS.md": "history\n",
+    "config.yml": FULL_CANONICAL_CONFIG.replace('default_status: "In Design"', 'default_status: "To Do"'),
+  });
+  const ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(ws.status, "blocked");
+  assert.equal(ws.code, "backlog-cli");
+  assert.match(ws.detail, /default status/i);
 });

@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 23:22'
+updated_date: '2026-10-18 23:32'
 labels: []
 dependencies: []
 references:
@@ -386,4 +386,14 @@ Only focused real-Git regressions: (a) fresh primary adopting a pre-existing rem
 Do NOT promote the pre-existing non-empty-folder-store bootstrap/ignore ordering into another blocker this pass (independent reviewer: non-blocking, predates this candidate). No parsing machinery — use the managed native Backlog CLI and the existing capability gate. Preserve the slice-2A boundary: no Episode wiring, per-task mutation loop, Beads transport, receipts, lifecycle UX, migration/cutover, or PRIMECLAW-43.1. Update task notes/docs truthfully; focused suite + full host Node suite + Docker-only tier 1; one clean repair candidate; stop for review.
 
 Review evidence for 1c598e0: focused 25/25, host Node 320/320, serial Docker tier 1 passed — but both configuration defects reproduced independently with real Git + the repository-built Backlog executable.
+
+2026-10-18 Episode — slice-2A revise pass 3 (repair candidate, residual B only). Closed the two remaining configuration-validation defects from 1c598e0 in `extension-support/task-history-workspace.ts` + `tests/task_history_workspace.test.mjs`. Residual A (direct ls-remote authority), residual C (root-config preflight), and the five earlier repairs are PRESERVED and untouched.
+
+Fix 1 — effective native config validated from primaryRoot on EVERY path: after the nested store is materialized/verified, the seam now unconditionally runs the existing `checkBacklogCapabilities(primaryRoot, runner)` (exact ordered canonical lifecycle) and proves `backlog config get defaultStatus` === exactly `In Design` — on every path regardless of the pre-clone detection result and regardless of bootstrap vs pre-existing branch. An incompatible published remote config (e.g. generic statuses [To Do, In Progress, Done] / default To Do) now BLOCKS (`backlog-cli`) with exact remediation and is never rewritten or silently repaired (remote mutation deferred).
+
+Fix 2 — removed the custom auto_commit byte-regex: it disagreed with native Backlog syntax (native-valid `auto_commit : true` was treated as an absent key → wrongly prepared with autoCommit:false). The effective value is now read NATIVELY via `backlog config get autoCommit` from primaryRoot, requiring the exact `false` result; never `config set`, never a local rewrite of the published config.
+
+Ordering: the native reads (capability gate + defaultStatus + autoCommit, all from primaryRoot which resolves the nested clone via upward discovery) run BEFORE the final nested `git status` clean + published-HEAD equality proofs — so any native normalization/write BLOCKS (`uncommitted-task-content` / `local-ahead`) instead of being certified clean. The canonical bootstrap emits ALL canonical default keys, so native reads never dirty it (verified: the no-evidence bootstrap test stays stable and clean).
+
+Focused real-Git regressions added (only these): (a) fresh primary adopting a pre-existing remote branch with generic three-status/default-To-Do config blocks, never prepared; (b) otherwise-canonical pre-existing remote config with native-valid `auto_commit : true` blocks; (c) canonical statuses with wrong default (`To Do`) blocks on the exact native default proof. Seam suite 28/28 (was 25); host Node 323/323 (was 320); Docker tier-1 bridge 1/1. Did NOT promote the pre-existing non-empty-folder-store bootstrap/ignore ordering into a blocker (reviewer: non-blocking, predates candidate). docs/backlog.md slice-2A section updated. Status unchanged: In Progress. Boundary kept: no Episode wiring, no per-task mutation loop, no Beads transport, no ownership/receipt fields, no lifecycle UX routing, no migration/cutover, no PRIMECLAW-43.1; live store untouched.
 <!-- SECTION:NOTES:END -->

@@ -249,12 +249,25 @@ checkout is never switched, staged, or written:
   stays unchanged; mere folder-config existence is not preservation. Relocating
   that authority is the deferred cutover (PRIMECLAW-43.1). A published folder
   config is used as-is and never modified or shadowed.
-- **Auto-commit proven without a native write**: `backlog config get` from the
-  nested store normalizes `config.yml` in place, so this seam reads
-  `auto_commit` directly from the published config bytes (bootstrap publishes
-  `false`; upstream's default is `false` when absent) and never issues
-  `backlog config set`. The existing capability gate (`checkBacklogCapabilities`
-  from the primary root) proves lifecycle-readiness for an existing live store.
+- **Effective native configuration proven on every path**: after the nested
+  store is materialized or verified, its effective Backlog configuration is
+  validated from the canonical primary root on every path — regardless of the
+  pre-clone provider detection result and regardless of whether the branch was
+  newly bootstrapped or pre-existing. The existing capability gate
+  (`checkBacklogCapabilities`) proves the exact ordered canonical lifecycle;
+  `backlog config get defaultStatus` proves the effective default is exactly
+  `In Design`; and `backlog config get autoCommit` proves code-repository
+  auto-commit is disabled. These are the managed native CLI reads, never
+  `config set` or a custom byte parse. An incompatible published remote config
+  (generic three-status/default-To-Do, or native-valid `auto_commit : true`)
+  blocks with exact remediation and is never rewritten or silently repaired —
+  remote mutation remains deferred.
+- **Native reads precede the cleanliness proof**: native `backlog config get`
+  can normalize a minimal `config.yml` in place, so the nested clone's clean
+  `git status` and published-HEAD equality are proven AFTER those reads — any
+  native normalization or write blocks instead of being certified clean. The
+  canonical bootstrap publishes every default key so native reads never dirty
+  it.
 
 This foundation serves only the canonical primary checkout (a linked worktree
 blocks with exact remediation). Episode-worktree preparation, the per-task
