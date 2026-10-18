@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 22:43'
+updated_date: '2026-10-18 22:51'
 labels: []
 dependencies: []
 references:
@@ -354,4 +354,14 @@ Least technology: ordinary Git + native Backlog, direct Backlog-specific functio
 Evidence: host Node suite 316/316 (was 313); tier-1 bridge tests/test_task_history_workspace.py 1/1. The 5 tests invoking the real backlog CLI skip when the executable is absent (tier-1 image ships no backlog binary; host runs the repository dist v1.53.0). docs/backlog.md slice-2A section rewritten for the remote-authority behavior.
 
 Boundary kept: no Episode-worktree wiring, no per-task mutation loop, no Beads transport, no ownership/receipt fields, no lifecycle UX routing, no task-data migration, no cutover (PRIMECLAW-43.1). This repo's live store untouched. Status unchanged: In Progress.
+
+2026-10-18 Conversation review of repair candidate 53437db: REVISED, not accepted. Five repairs confirmed closed (primary checkout isolation, no non-empty adoption deletion, .backlog/ path selection, symlink containment, effective-ignore rejection) — PRESERVE them. Fix only these three confirmed slice-2A residuals; do not broaden scope:
+
+1. DIRECT remote evidence must be authoritative even when a cached remote-tracking ref exists. Parse exact `git ls-remote --heads <selected-transport> refs/heads/prime-claw/tasks` as absent or one well-formed OID/ref. Check every subsequent fetch result; prove any refreshed local probe/ref EQUALS that OID. If the direct response says ABSENT, never read a stale cached ref as authority — remove/ignore that cache and treat any local branch as unpublished/local-ahead. A direct/fetched mismatch or failed refresh must BLOCK. Add the real regression where another clone deletes the remote branch while the primary retains its cached ref — it must never return verified. Keep non-force publication.
+
+2. Never return `prepared` with an untracked, unpublished, non-lifecycle-ready fresh config. Current no-evidence path publishes only TASKS.md, then writes local config.yml; native status is 'To Do, In Progress, Done', default empty, and the accepted initializer will skip because live evidence now exists. Choose the smallest correct path: (a) block on provider `none` BEFORE branch/store/ignore mutation and direct through the accepted lifecycle-ready initializer, or (b) include the exact six ordered statuses, default In Design, autoCommit=false in the bounded bootstrap publication, then prove the remote tree contains the config, the nested clone has no uncommitted/unpublished config, the capability gate passes, and a second preparation is stable. This is bootstrap integrity, not the deferred per-task mutation loop.
+
+3. Root-config layouts must block BEFORE native config writes until the deferred cutover moves their authority. The current guard can fall through when the published branch already contains config.yml|yaml; running `backlog config set` from the nested dir then rewrites the PRIMARY backlog.config.yml while the published folder config stays unchanged. For any selected configSource:root, block before ignore/branch/clone/config mutation (or prove exact authority relocation — deferred); mere folder-config existence is not preservation. Add the exact root-config + published-folder-config fixture and assert root bytes unchanged, no native write to it, no prepared result.
+
+Only focused real-Git/provider regressions for these three; do not broaden the test matrix. Keep the direct Backlog/Git implementation and existing slice-2A boundary: no Episode workspace wiring, no general task mutation loop, no Beads transport, no ownership/receipt fields, no lifecycle UX routing, no migration/cutover, no PRIMECLAW-43.1 changes. No provider/workspace framework, persistent recovery state, or custom merge machinery. Update task notes/docs truthfully, focused host tests + Docker-only tier 1, one clean residual-repair candidate, then stop for review.
 <!-- SECTION:NOTES:END -->
