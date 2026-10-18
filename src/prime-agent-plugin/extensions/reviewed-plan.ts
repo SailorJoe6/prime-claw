@@ -1,3 +1,7 @@
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
@@ -249,6 +253,133 @@ function registerPrepChainCommand(
   });
 }
 
+const CONVERSATION_AFTER_HANDOFF_NAME = "conversation-after-handoff";
+const CONVERSATION_AFTER_HANDOFF_DEFAULT_THRESHOLD = 0.6;
+const CONVERSATION_AFTER_HANDOFF_MIN_THRESHOLD = 0.1;
+
+export type ConversationAfterHandoffResult =
+  | { outcome: "prompt-delivered"; threshold: number; usagePercent: number }
+  | { outcome: "skipped"; reason: string };
+
+export type ConversationAfterHandoffHook = (
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+) => Promise<ConversationAfterHandoffResult>;
+
+function boundedCompactionReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.length > 200 ? `${message.slice(0, 197)}...` : message;
+}
+
+/**
+ * Normalize one configured threshold_percent value to the internal 0-1 scale.
+ * Bare numbers in [0, 1] are ratios; bare numbers above 1 are percentages; a
+ * percent suffix always means a percentage. Zero disables the feature;
+ * anything else must normalize to [0.1, 1] inclusive.
+ */
+export function normalizeConversationCompactionThreshold(
+  raw: unknown,
+): { ok: true; value: number } | { ok: false; error: string } {
+  if (typeof raw !== "number" && typeof raw !== "string") {
+    return { ok: false, error: "threshold_percent must be a numeric scalar" };
+  }
+  const text = (typeof raw === "number" ? String(raw) : raw).trim();
+  if (!text) return { ok: false, error: "threshold_percent is empty" };
+  const percentSuffixed = text.endsWith("%");
+  const numericText = (percentSuffixed ? text.slice(0, -1) : text).trim();
+  if (!numericText) return { ok: false, error: "threshold_percent has no numeric value" };
+  const value = Number(numericText);
+  if (!Number.isFinite(value)) {
+    return { ok: false, error: `threshold_percent is not a finite number: ${JSON.stringify(text)}` };
+  }
+  if (value < 0) return { ok: false, error: "threshold_percent must not be negative" };
+  const normalized = percentSuffixed ? value / 100 : value <= 1 ? value : value / 100;
+  if (normalized === 0) return { ok: true, value: 0 };
+  if (normalized < CONVERSATION_AFTER_HANDOFF_MIN_THRESHOLD || normalized > 1) {
+    return { ok: false, error: `threshold_percent ${JSON.stringify(text)} normalizes outside the 10-100% range` };
+  }
+  return { ok: true, value: normalized };
+}
+
+/**
+ * Best-effort Conversation compaction trigger after one successful canonical
+ * Episode handoff dispatch. Reads the project-local managed workflow once for
+ * both policy and prompt, validates its threshold_percent setting, compares
+ * current context utilization strictly above the threshold, and steers the
+ * workflow prompt. Every failure or skip is a bounded result, never a throw:
+ * a compaction-side problem must not reverse or repeat the admitted handoff.
+ */
+export async function maybeDeliverConversationAfterHandoff(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): Promise<ConversationAfterHandoffResult> {
+  const workflowPath = join(ctx.cwd, ".prime-claw", "workflows", `${CONVERSATION_AFTER_HANDOFF_NAME}.md`);
+  let content: string;
+  try {
+    if (!existsSync(workflowPath) || !statSync(workflowPath).isFile()) {
+      return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow is not installed at .prime-claw/workflows/${CONVERSATION_AFTER_HANDOFF_NAME}.md` };
+    }
+    content = readFileSync(workflowPath, "utf8");
+  } catch (error) {
+    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow is unreadable: ${boundedCompactionReason(error)}` };
+  }
+  const normalizedContent = content.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (normalizedContent.startsWith("---") && normalizedContent.indexOf("\n---", 3) === -1) {
+    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow has an unterminated frontmatter header` };
+  }
+  let frontmatter: Record<string, unknown>;
+  try {
+    const parsed = parseFrontmatter<Record<string, unknown>>(content);
+    if (!parsed.frontmatter || typeof parsed.frontmatter !== "object" || Array.isArray(parsed.frontmatter)) {
+      return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow frontmatter is not a mapping` };
+    }
+    frontmatter = parsed.frontmatter;
+  } catch (error) {
+    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow frontmatter is invalid: ${boundedCompactionReason(error)}` };
+  }
+  let threshold = CONVERSATION_AFTER_HANDOFF_DEFAULT_THRESHOLD;
+  if ("threshold_percent" in frontmatter) {
+    const configured = normalizeConversationCompactionThreshold(frontmatter.threshold_percent);
+    if (!configured.ok) return { outcome: "skipped", reason: configured.error };
+    threshold = configured.value;
+  }
+  if (threshold === 0) {
+    return { outcome: "skipped", reason: "Conversation after-handoff compaction is disabled (threshold_percent: 0)" };
+  }
+  const usage = ctx.getContextUsage();
+  const percent = usage?.percent;
+  if (typeof percent !== "number" || !Number.isFinite(percent)) {
+    return { outcome: "skipped", reason: "Conversation context utilization is unknown" };
+  }
+  if (!(percent / 100 > threshold)) {
+    return { outcome: "skipped", reason: `Conversation context utilization ${percent}% is at or below the ${threshold * 100}% threshold` };
+  }
+  const prompt = `<skill name="${CONVERSATION_AFTER_HANDOFF_NAME}" location="${workflowPath}">
+References are relative to ${dirname(workflowPath)}.
+
+${content}
+</skill>`;
+  try {
+    await pi.sendUserMessage(prompt, { deliverAs: "steer" });
+  } catch (error) {
+    return { outcome: "skipped", reason: `Conversation compaction prompt delivery failed: ${boundedCompactionReason(error)}` };
+  }
+  return { outcome: "prompt-delivered", threshold, usagePercent: percent };
+}
+
+async function runConversationAfterHandoff(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  dependencies: ReviewedPlanDependencies | undefined,
+): Promise<ConversationAfterHandoffResult> {
+  const hook = dependencies?.conversationAfterHandoff ?? maybeDeliverConversationAfterHandoff;
+  try {
+    return await hook(pi, ctx);
+  } catch (error) {
+    return { outcome: "skipped", reason: `Conversation compaction check failed: ${boundedCompactionReason(error)}` };
+  }
+}
+
 type TaskEpisodePublicActions = {
   create: typeof createTaskEpisode;
   handoff: typeof handoffTaskEpisode;
@@ -272,6 +403,7 @@ type ReviewedPlanDependencies = EpisodeDependencies & EpisodeOwnershipTransition
   taskActions?: Partial<TaskEpisodePublicActions>;
   taskCleanup?: TaskEpisodeCleanupDependencies["cleanup"];
   taskCleanupGit?: TaskEpisodeCleanupDependencies["cleanupGit"];
+  conversationAfterHandoff?: ConversationAfterHandoffHook;
 };
 
 type TaskEpisodeCleanupParams = {
@@ -746,9 +878,10 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         try {
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
           const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, dependencies);
+          const conversationCompaction = await runConversationAfterHandoff(pi, ctx, dependencies);
           return {
             content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.` }],
-            details: result,
+            details: { ...result, conversationCompaction },
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -830,12 +963,13 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             ctx,
             dependencies,
           );
+          const conversationCompaction = await runConversationAfterHandoff(pi, ctx, dependencies);
           return {
             content: [{
               type: "text",
               text: `Episode handoff admitted for ${result.sourceLocation}: canonical handoff was admitted as an ordinary prompt and canonical execute was queued as the sole follow-up. Admission may be immediate or queued; inspect the episode Status/Evidence output before claiming either workflow completed.`,
             }],
-            details: result,
+            details: { ...result, conversationCompaction },
           };
         } catch (error) {
           return {

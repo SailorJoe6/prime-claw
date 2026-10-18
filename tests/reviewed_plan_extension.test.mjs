@@ -8,11 +8,13 @@ import test from "node:test";
 import {
   admitTaskImplementationPrepChain,
   createReviewedPlanExtension,
+  maybeDeliverConversationAfterHandoff,
+  normalizeConversationCompactionThreshold,
   TaskImplementationApprovalStore,
 } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 import { resolveBacklogTask } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
 
-function fixture({ throwOnSend = 0, taskStatus = "In Design" } = {}) {
+function fixture({ throwOnSend = 0, taskStatus = "In Design", usage = null } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-reviewed-")); execFileSync("git", ["init", "-q", root]);
   for (const slug of ["alpha", "beta"]) mkdirSync(join(root, ".ralph", "plans", "future", slug), { recursive: true });
   mkdirSync(join(root, ".prime-claw", "workflows"), { recursive: true });
@@ -21,13 +23,19 @@ name: ${name}
 ---
 ${name.toUpperCase()} POLICY
 `);
+  writeFileSync(join(root, ".prime-claw", "workflows", "conversation-after-handoff.md"), `---
+name: conversation-after-handoff
+threshold_percent: 60
+---
+AFTER-HANDOFF POLICY
+`);
   mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true }); writeFileSync(join(root, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE POLICY");
   const guideRoot = join(root, "plugin"); mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true }); writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), `FULL OVERSIGHT GUIDE
 `);
   const commands = new Map(), tools = new Map(), events = new Map(), sent = [], created = [], restored = [], transitioned = [], resolved = [], taskCalls = [];
   let sendCount = 0;
   const pi = { registerCommand(name, value) { commands.set(name, value); }, registerTool(tool) { tools.set(tool.name, tool); }, on(name, handler) { events.set(name, handler); }, sendUserMessage(message, options) { sendCount += 1; if (sendCount === throwOnSend) throw new Error("synthetic send failure"); sent.push({ message, options }); }, async sendMessage() {} };
-  const ctx = { cwd: root, hasUI: true, ui: { notify(message, level) { sent.push({ notify: message, level }); } }, sessionManager: { getSessionId: () => "owner", getSessionFile: () => join(root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }) } };
+  const ctx = { cwd: root, hasUI: true, ui: { notify(message, level) { sent.push({ notify: message, level }); } }, sessionManager: { getSessionId: () => "owner", getSessionFile: () => join(root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }) }, getContextUsage: () => usage == null ? undefined : { tokens: 1, contextWindow: 100, percent: usage } };
   const episode = { version: 1, status: "active", operationId: "op", engine: "local", ownerSessionId: "owner", sourceLocation: ".ralph/plans/future/alpha", slug: "alpha", baseRef: "base", bundleDigest: "0".repeat(64), createdAt: "x", updatedAt: "x", worktree: join(root, "wt"), branch: "branch", head: "head", episodeId: "episode", episodeSessionFile: join(root, "episode.jsonl"), episodeActiveSessionId: "route", reused: false };
   const taskImplementationApprovals = new TaskImplementationApprovalStore();
   const taskActions = {
@@ -37,7 +45,7 @@ ${name.toUpperCase()} POLICY
   };
   const deps = { guideRoot, taskImplementationApprovals, taskActions, taskCleanup: {}, taskCleanupGit: { repositoryRoot: () => root }, taskResolver(cwd, rawTaskId) { resolved.push({ cwd, rawTaskId }); if (rawTaskId.trim() === "missing") return null; return { taskId: "PRIMECLAW-10.38", title: "Planning fixture", status: taskStatus, implementationPlan: taskStatus === "In Planning" ? "Implement exact fixture" : null, projectRoot: root, taskPath: join(root, "task.md"), taskPathRelative: "task.md" }; }, async placementResolver() { return { engine: "local" }; }, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async restoreBlockedEpisode(location, confirmedUnblocked) { restored.push({location,confirmedUnblocked}); return { restored:true, sourceLocation:episode.sourceLocation, episodeId:"episode", worktree:episode.worktree, specification:join(episode.worktree,".ralph/plans/SPECIFICATION.md"), implementation:join(episode.worktree,".ralph/plans/EXECUTION_PLAN.md") }; }, transitionLegacyOwnership(location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies) { transitioned.push({ location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies }); return { record: { ...episode, version: 2, taskId, taskPath: "task.md" }, reused: false, mainHead, episodeHead, activeSpecification: { path: ".ralph/plans/SPECIFICATION.md", blob: "a".repeat(40) }, activeImplementationPlan: { path: ".ralph/plans/EXECUTION_PLAN.md", blob: "b".repeat(40) } }; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
   createReviewedPlanExtension(deps)(pi);
-  return { root, commands, tools, events, sent, created, restored, transitioned, resolved, taskCalls, ctx, episode, deps, taskImplementationApprovals, pi };
+  return { root, commands, tools, events, sent, created, restored, transitioned, resolved, taskCalls, ctx, episode, deps, taskImplementationApprovals, pi, afterHandoffPath: join(root, ".prime-claw", "workflows", "conversation-after-handoff.md") };
 }
 
 test("registers complete task lifecycle beside retained folder compatibility", () => {
@@ -415,4 +423,200 @@ test("inactive task approval fails closed on identity drift and clears at phase 
   await f.events.get("agent_end")({}, f.ctx);
   await f.events.get("session_shutdown")({}, f.ctx);
   assert.equal(f.taskImplementationApprovals.consume(f.ctx, task), null);
+});
+
+
+test("conversation compaction threshold normalization accepts documented equivalent forms", () => {
+  const valid = [
+    [".6", 0.6], ["60", 0.6], ["60%", 0.6], [60, 0.6], [0.6, 0.6],
+    ["1", 1], ["100", 1], ["100%", 1], [1, 1], [100, 1],
+    [".1", 0.1], ["10", 0.1], ["10%", 0.1],
+    ["0", 0], ["0%", 0], [0, 0], ["0.5", 0.5], [" 60% ", 0.6],
+  ];
+  for (const [input, expected] of valid) {
+    const result = normalizeConversationCompactionThreshold(input);
+    assert.equal(result.ok, true, `expected ${JSON.stringify(input)} to normalize`);
+    assert.ok(Math.abs(result.value - expected) < 1e-12, `expected ${JSON.stringify(input)} -> ${expected}, got ${result.value}`);
+  }
+});
+
+test("conversation compaction threshold normalization rejects invalid values", () => {
+  for (const input of [".6%", ".06", "6", "6%", "1%", "9.9%", "-1", "-0.5%", "101", "150%", "", "abc", "60x", "NaN", "Infinity", true, false, null, [], {}, Number.NaN, Number.POSITIVE_INFINITY]) {
+    const result = normalizeConversationCompactionThreshold(input);
+    assert.equal(result.ok, false, `expected ${JSON.stringify(input)} to be rejected`);
+  }
+});
+
+test("successful task handoff steers the after-handoff prompt exactly once above threshold", async () => {
+  const f = fixture({ taskStatus: "In Progress", usage: 61 });
+  const result = await f.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(f.taskCalls, [["handoff", "PRIMECLAW-10.38", ""]]);
+  assert.equal(f.sent.length, 1);
+  assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
+  assert.ok(f.sent[0].message.includes('<skill name="conversation-after-handoff"'));
+  assert.ok(f.sent[0].message.includes("AFTER-HANDOFF POLICY"));
+  assert.equal(result.details.conversationCompaction.outcome, "prompt-delivered");
+  assert.equal(result.details.conversationCompaction.threshold, 0.6);
+  assert.equal(result.details.conversationCompaction.usagePercent, 61);
+});
+
+test("successful spec handoff steers the after-handoff prompt exactly once above threshold", async () => {
+  const f = fixture({ usage: 75 });
+  const result = await f.tools.get("handoff_spec_episode").execute("handoff", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined);
+  assert.equal(f.sent.length, 1);
+  assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
+  assert.ok(f.sent[0].message.includes("AFTER-HANDOFF POLICY"));
+  assert.equal(result.details.conversationCompaction.outcome, "prompt-delivered");
+  assert.equal(result.details.conversationCompaction.usagePercent, 75);
+});
+
+test("at-threshold, below-threshold, and unknown utilization skip the after-handoff prompt", async () => {
+  for (const usage of [60, 30]) {
+    const f = fixture({ taskStatus: "In Progress", usage });
+    const result = await f.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
+    assert.equal(result.isError, undefined);
+    assert.equal(f.sent.length, 0);
+    assert.equal(result.details.conversationCompaction.outcome, "skipped");
+    assert.match(result.details.conversationCompaction.reason, /at or below/);
+  }
+  const unknown = fixture({ taskStatus: "In Progress" });
+  const unknownResult = await unknown.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, unknown.ctx);
+  assert.equal(unknownResult.isError, undefined);
+  assert.equal(unknown.sent.length, 0);
+  assert.match(unknownResult.details.conversationCompaction.reason, /utilization is unknown/);
+  const nullPercent = fixture({ taskStatus: "In Progress" });
+  nullPercent.ctx.getContextUsage = () => ({ tokens: null, contextWindow: 100, percent: null });
+  const nullResult = await nullPercent.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, nullPercent.ctx);
+  assert.equal(nullResult.isError, undefined);
+  assert.equal(nullPercent.sent.length, 0);
+  assert.match(nullResult.details.conversationCompaction.reason, /utilization is unknown/);
+});
+
+test("omitted threshold_percent defaults to 60 and zero disables without a separate key", async () => {
+  const omitted = fixture({ taskStatus: "In Progress", usage: 61 });
+  writeFileSync(omitted.afterHandoffPath, "---\nname: conversation-after-handoff\n---\nCUSTOM DEFAULT POLICY\n");
+  const omittedResult = await omitted.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, omitted.ctx);
+  assert.equal(omittedResult.details.conversationCompaction.outcome, "prompt-delivered");
+  assert.equal(omittedResult.details.conversationCompaction.threshold, 0.6);
+  assert.ok(omitted.sent[0].message.includes("CUSTOM DEFAULT POLICY"));
+
+  for (const zero of ["0", "0%"]) {
+    const disabled = fixture({ taskStatus: "In Progress", usage: 100 });
+    writeFileSync(disabled.afterHandoffPath, `---\nname: conversation-after-handoff\nthreshold_percent: ${zero}\n---\nDISABLED POLICY\n`);
+    const disabledResult = await disabled.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, disabled.ctx);
+    assert.equal(disabledResult.isError, undefined);
+    assert.equal(disabled.sent.length, 0);
+    assert.match(disabledResult.details.conversationCompaction.reason, /disabled/);
+  }
+});
+
+test("customized project threshold and prompt load from the same workflow file", async () => {
+  const f = fixture({ taskStatus: "In Progress", usage: 41 });
+  writeFileSync(f.afterHandoffPath, "---\nname: conversation-after-handoff\nthreshold_percent: \"40%\"\n---\nPROJECT CUSTOMIZED AFTER-HANDOFF\n");
+  const result = await f.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
+  assert.equal(result.details.conversationCompaction.outcome, "prompt-delivered");
+  assert.equal(result.details.conversationCompaction.threshold, 0.4);
+  assert.ok(f.sent[0].message.includes("PROJECT CUSTOMIZED AFTER-HANDOFF"));
+  assert.ok(f.sent[0].message.includes(f.afterHandoffPath));
+
+  const below = fixture({ taskStatus: "In Progress", usage: 40 });
+  writeFileSync(below.afterHandoffPath, "---\nname: conversation-after-handoff\nthreshold_percent: 40\n---\nPROJECT CUSTOMIZED AFTER-HANDOFF\n");
+  const belowResult = await below.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, below.ctx);
+  assert.equal(below.sent.length, 0);
+  assert.equal(belowResult.details.conversationCompaction.outcome, "skipped");
+});
+
+test("invalid workflow configuration is a bounded skip, never a failed handoff", async () => {
+  const cases = [
+    ["---\nname: conversation-after-handoff\nthreshold_percent: 6%\n---\nBODY\n", /10-100% range/],
+    ["---\nname: conversation-after-handoff\nthreshold_percent: true\n---\nBODY\n", /numeric scalar/],
+    ["---\nname: conversation-after-handoff\nthreshold_percent:\n---\nBODY\n", /numeric scalar/],
+    ["---\nname: conversation-after-handoff\nthreshold_percent: [60]\n---\nBODY\n", /numeric scalar/],
+    ["---\nname: conversation-after-handoff\nthreshold_percent: 60\n", /unterminated frontmatter/],
+    ["---\n- just\n- a\n- list\n---\nBODY\n", /not a mapping/],
+    ["---\nname: a\nname: b\n---\nBODY\n", /frontmatter is invalid/],
+  ];
+  for (const [content, pattern] of cases) {
+    const f = fixture({ taskStatus: "In Progress", usage: 100 });
+    writeFileSync(f.afterHandoffPath, content);
+    const result = await f.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
+    assert.equal(result.isError, undefined, `handoff must survive ${pattern}`);
+    assert.equal(f.sent.length, 0);
+    assert.equal(result.details.conversationCompaction.outcome, "skipped");
+    assert.match(result.details.conversationCompaction.reason, pattern);
+  }
+  const missing = fixture({ taskStatus: "In Progress", usage: 100 });
+  unlinkSync(missing.afterHandoffPath);
+  const missingResult = await missing.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, missing.ctx);
+  assert.equal(missingResult.isError, undefined);
+  assert.equal(missing.sent.length, 0);
+  assert.match(missingResult.details.conversationCompaction.reason, /not installed/);
+});
+
+test("compaction delivery failure preserves the successful handoff receipt without retry", async () => {
+  const f = fixture({ taskStatus: "In Progress", usage: 100, throwOnSend: 1 });
+  const result = await f.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined);
+  assert.match(result.content[0].text, /Task Episode handoff admitted/);
+  assert.deepEqual(f.taskCalls, [["handoff", "PRIMECLAW-10.38", ""]]);
+  assert.equal(result.details.conversationCompaction.outcome, "skipped");
+  assert.match(result.details.conversationCompaction.reason, /delivery failed/);
+});
+
+test("both canonical handoff adapters invoke the compaction check exactly once per success", async () => {
+  const f = fixture({ taskStatus: "In Progress" });
+  const calls = [];
+  f.deps.conversationAfterHandoff = async (pi, ctx) => { calls.push({ pi, ctx }); return { outcome: "skipped", reason: "spy" }; };
+  const taskResult = await f.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
+  const specResult = await f.tools.get("handoff_spec_episode").execute("handoff", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+  assert.equal(taskResult.isError, undefined);
+  assert.equal(specResult.isError, undefined);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].ctx, f.ctx);
+  assert.equal(taskResult.details.conversationCompaction.reason, "spy");
+  assert.equal(specResult.details.conversationCompaction.reason, "spy");
+});
+
+test("failed, partial, or unrelated dispatches never invoke the compaction check", async () => {
+  const f = fixture({ taskStatus: "In Progress" });
+  const calls = [];
+  f.deps.conversationAfterHandoff = async () => { calls.push("called"); return { outcome: "skipped", reason: "spy" }; };
+  f.deps.taskActions.handoff = async () => { throw new Error("uncertain task handoff admission"); };
+  f.deps.handoffEpisode = async () => { throw new Error("uncertain spec handoff admission"); };
+  const taskResult = await f.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
+  assert.equal(taskResult.isError, true);
+  assert.match(taskResult.content[0].text, /uncertain task handoff admission/);
+  const specResult = await f.tools.get("handoff_spec_episode").execute("handoff", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+  assert.equal(specResult.isError, true);
+  assert.match(specResult.content[0].text, /uncertain spec handoff admission/);
+  const planned = await f.tools.get("plan_spec").execute("tool", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+  assert.equal(planned.details.admitted, true);
+  const created = await f.tools.get("create_task_episode").execute("create", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
+  const cleaned = await f.tools.get("finalize_task_episode").execute("cleanup", {
+    taskId: "PRIMECLAW-10.38", episodeHead: "e".repeat(40), outcome: "merged", confirmed: true,
+  }, undefined, undefined, f.ctx);
+  assert.equal(cleaned.isError, undefined);
+  assert.equal(calls.length, 0);
+  assert.equal(created.isError, true); // no admission approval in this fixture; still no compaction check
+});
+
+test("a throwing compaction hook is contained as a bounded skip on the successful receipt", async () => {
+  const f = fixture({ taskStatus: "In Progress" });
+  f.deps.conversationAfterHandoff = async () => { throw new Error("synthetic hook failure"); };
+  const result = await f.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined);
+  assert.match(result.content[0].text, /Task Episode handoff admitted/);
+  assert.equal(result.details.conversationCompaction.outcome, "skipped");
+  assert.match(result.details.conversationCompaction.reason, /compaction check failed/);
+});
+
+test("after-handoff helper delivers the project workflow through steer transport", async () => {
+  const f = fixture({ usage: 90 });
+  const direct = await maybeDeliverConversationAfterHandoff(f.pi, f.ctx);
+  assert.equal(direct.outcome, "prompt-delivered");
+  assert.equal(f.sent.length, 1);
+  assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
+  assert.ok(f.sent[0].message.includes("AFTER-HANDOFF POLICY"));
 });

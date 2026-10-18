@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-15 05:15'
-updated_date: '2026-10-18 19:10'
+updated_date: '2026-10-18 19:40'
 labels:
   - episode-loop
   - phase4
@@ -117,3 +117,9 @@ Add failing regressions before fixing behavior, then run focused suites through 
 
 Run `git diff --check`, verify the task's native acceptance criteria against evidence, and keep implementation notes current through supported Backlog edits on the Episode branch without taking Conversation-owned lifecycle status. Commit/push the scoped implementation candidate for independent review. Do not activate/check/probe a candidate user-globally, create a second host Prime Agent instance, or change upstream source. A later operator-approved merge/global refresh, coordinated full restart, and owner/Episode UAT remain separate from this implementation plan; keep resources required by the loaded generation intact until that cutover is proven.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Slice 1 (2026-10-18, episode worktree): core trigger + packaging.\n\nImplemented:\n- workflows/conversation-after-handoff.md: new managed workflow (threshold_percent: 60 frontmatter; prompt instructs one compact.run() with model-composed focus hint, bounded result reporting, no retry/re-dispatch).\n- reviewed-plan.ts: parseFrontmatter runtime import (supported public API); normalizeConversationCompactionThreshold (ratio/percent normalization, 0 disables, [10,100]% bounds, rejects negative/malformed/non-finite); maybeDeliverConversationAfterHandoff (single read of project-local workflow for policy+prompt, unterminated-header and non-mapping structure checks, unknown-usage skip, strict > comparison, steer delivery, fully contained errors); wired after successful handoff_task_episode and handoff_spec_episode adapters only, with conversationAfterHandoff DI hook and outcome recorded in tool details as conversationCompaction.\n- asset-inventory.json: registered project-workflow-conversation-after-handoff (plugin-root-exact + project-customizable .prime-claw/workflows/conversation-after-handoff.md, internal, lifecycleTrigger conversation-after-handoff). Builder repo .prime-claw copy + templates.json managed entry added.\n- Tests: 13 new cases in reviewed_plan_extension.test.mjs (normalization matrix incl. .6/60/60% equivalence, 1/100/100%, inclusive 10% endpoints, zero/0% disable, rejects .6%/.06/6/6%/1%/negatives/>100%/malformed/non-finite; both adapters steer exactly once above threshold; at/below/unknown skip; default-60; customized file; invalid config bounded skip incl. unterminated header, duplicate keys, non-mapping; delivery failure preserves receipt; DI spy proves exactly-once per success and no invocation on failed/unrelated dispatches). project_initialization_extension.test.mjs counts 16->17. docs/project-initialization.md lists the new workflow. Container bridge links the installed prime-agent package as @earendil-works/pi-coding-agent at /node_modules for plain-node resolution.\n\nEvidence: host node suite 40/40 pass. Host-safe pytest: 665 passed; 3 failures pre-existing on canonical main (backlog submodule pin drift vs build-backlog.sh COMMIT, container_helpers_static docstring/bridge conventions) and 1 pre-existing templates.json hash drift for customized skills design/spec-it-out - all unrelated to this change.\n\nDeferred to later slices: docs/handoff-chain.md + US-21 user-story/traceability updates (plan step 5), native Docker RPC probe proof of steer delivery + compact.run + post-compaction oversight resume (plan step 4 last bullet), final full tier-1 gate.\n
+<!-- SECTION:NOTES:END -->

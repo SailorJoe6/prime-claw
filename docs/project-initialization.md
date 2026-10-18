@@ -23,6 +23,7 @@ plain `.md` filenames, so installing the plugin cannot expose them as global
 An initialized project contains these regular customizable files:
 
 - `.agents/skills/{blocked,design,design-legacy,execute,prepare,spec-it-out,spec-it-out-legacy}/SKILL.md`
+- `.prime-claw/workflows/conversation-after-handoff.md`
 - `.prime-claw/workflows/handoff.md`
 - `.prime-claw/workflows/implement-prep.md`
 - `.prime-claw/workflows/implement-spec.md`
