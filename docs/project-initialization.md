@@ -42,6 +42,26 @@ assets continue to serve existing future-folder bundles during the migration.
 The legacy `.ralph/skills` tree and `.agents/skills` symlinks are migrated away.
 `.ralph/plans` is never moved or interpreted as template content.
 
+`conversation-after-handoff.md` is the one project-customizable policy read at
+runtime rather than only at lifecycle admission. After a successful
+`handoff_spec_episode` or `handoff_task_episode` admission, the plugin loads
+this exact project file (never a plugin-template fallback) from the owning
+Conversation's project, so reconciling it preserves the project's customized
+policy and prompt. Its single configuration key, `threshold_percent`, is
+normalized from equivalent forms: `.6`, `60`, and `60%` all mean 60%; bare
+values at or below 1 are ratios, bare values above 1 are percentages, and a
+percent suffix always divides by 100. Omitting the key defaults to 60. `0` or
+`0%` disables the automatic post-handoff compaction; enabled values must fall
+within 10-100% inclusive (normalized 0.1-1), and negatives, values above 100%,
+and malformed entries are rejected. The trigger is a strict comparison:
+utilization must exceed the threshold, and unknown utilization skips the
+attempt. Configuration or delivery trouble produces only a bounded warning on
+the otherwise successful handoff receipt; it never fails a handoff, retries,
+or re-dispatches the Episode. Deployment and UAT of a refreshed generation
+remain a later explicitly approved cutover (user-global refresh, coordinated
+full restart, resumed owner/Episode proof), not something copying the file
+into a project proves.
+
 This builder repository intentionally records `prepare`, `design`, and
 `spec-it-out` as project customizations. Its authoring copies state the
 repository-local task-native default after data cutover, while the plugin-root

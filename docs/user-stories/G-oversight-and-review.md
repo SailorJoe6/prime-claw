@@ -49,14 +49,27 @@ teaming unless the operator explicitly requests it. Speculative hardening and
 reviewer-invented requirements are non-blocking. Its report is evidence, not
 authority.
 
-## US-21 — Restore oversight after compaction
+## US-21 — Compact and restore oversight after Episode handoff
 
-**As an owning Conversation, I want the full oversight guidance restored after
-compaction, so that long-running supervision does not lose its authority
-boundaries.**
+**As an owning Conversation, I want my context compacted automatically after a
+successful Episode handoff when utilization is high, and the full oversight
+guidance restored afterward, so that long-running supervision keeps enough
+context without losing its authority boundaries.**
 
-The compaction hook reinjects one full non-turn guide only for the exact active
-owner. Episode, foreign, inactive, and ordinary sessions receive none.
+A successful `handoff_spec_episode` or `handoff_task_episode` admission checks
+current utilization against the project's
+`.prime-claw/workflows/conversation-after-handoff.md` policy. Utilization must
+strictly exceed `threshold_percent` (default 60; `0`/`0%` disables; valid
+enabled range 10-100%). Unknown utilization, disabled policy, failed or
+partial dispatches, and non-handoff actions skip the check. Resume and Request
+Changes continuations reach the same task-handoff trigger after their ordinary
+Git/Backlog steps. Above the threshold the Conversation receives the workflow
+through steer transport, composes its own hint, and calls `compact.run` once;
+configuration or delivery trouble surfaces as a bounded warning on the
+successful receipt, never a failed handoff or a retry.
+
+The compaction hook then reinjects one full non-turn guide only for the exact
+active owner. Episode, foreign, inactive, and ordinary sessions receive none.
 
 ## Primary implementation surfaces
 

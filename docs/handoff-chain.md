@@ -85,6 +85,53 @@ fixed execute assignment after bundle promotion. That assignment carries the
 exact owning Conversation registry key. It does **not** run handoff.
 Handoff begins only with later owner-supervised continuation.
 
+## Post-handoff Conversation compaction
+
+A successful `handoff_spec_episode` or `handoff_task_episode` admission can
+trigger a best-effort compaction of the owning Conversation's own context.
+Resume and Request Changes continuations are covered by the same
+`handoff_task_episode` adapter after their ordinary Git/Backlog status steps,
+so no separate trigger exists for them. Creation, blocking, candidate
+acceptance, delay, merge, abandonment, cleanup, ordinary `/handoff`, and
+heartbeat ticks never trigger it.
+
+After the admitted handoff result is returned, the plugin loads
+`.prime-claw/workflows/conversation-after-handoff.md` from the owning
+Conversation's project (not the Episode worktree), reads current context
+utilization, and only then delivers the workflow to the Conversation through
+the supported steer transport. The prompt instructs the model to compose its
+own mission-focused hint and call `compact.run(focus_hint)` exactly once.
+Prompt delivery is an attempt, not proof that compaction ran; the existing
+post-compaction restoration hook re-primes the owner if compaction executes.
+A `scheduled: true` result is a request, not confirmation of completion.
+
+Trigger conditions:
+
+- The comparison is strict: utilization must **exceed** the threshold, not
+  match it.
+- Unknown, absent, or non-finite utilization skips the prompt.
+- `finalize_task_episode` and failed, partial, or uncertain handoff
+  dispatches never invoke the check.
+
+Configuration lives in the workflow file's `threshold_percent` frontmatter
+key. Omitting it defaults to 60. Equivalent forms are normalized: `.6`, `60`,
+and `60%` all mean 60%; bare values at or below 1 are ratios and bare values
+above 1 are percentages; a percent suffix always divides by 100. `0` or `0%`
+disables the automatic compaction. Valid enabled bounds are 0.1 through 1
+(10% through 100%) inclusive; negatives and values above 100% are rejected.
+
+Compaction trouble never fails a handoff. An invalid configuration, a missing
+or unreadable workflow, a delivery failure, or a hook error produces a bounded
+warning sentence on the otherwise successful handoff receipt and is recorded
+in the tool's details; ordinary skips (disabled, at or below threshold,
+unknown utilization) stay silent in content. There is no retry and no second
+Episode dispatch.
+
+Deployment and UAT of this behavior are a later explicitly approved cutover:
+a user-global refresh, one coordinated full restart, and resumed owner and
+Episode proof. Copying files or requesting compaction is not proof.
+
+
 ## Authority
 
 The Conversation may use Episode handoff after accepting an in-scope candidate
