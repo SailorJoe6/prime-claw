@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 23:11'
+updated_date: '2026-10-18 23:22'
 labels: []
 dependencies: []
 references:
@@ -374,4 +374,16 @@ Only focused real-Git/provider regressions for these three; do not broaden the t
 3. Root-config layouts block BEFORE any mutation: any selected configSource:root now blocks (`config-not-preserved`) before ignore/branch/clone/config mutation, because native config discovery walks UP from the nested store to the primary's root backlog.config.yml and any `backlog config` write would rewrite the PRIMARY root config while the published folder config stays unchanged (verified empirically: `config set maxColumnWidth 25` from the nested dir changed root bytes, not the folder config). Relocation is the deferred cutover. New fixture: root config + published folder config → blocked, root bytes unchanged, no nested clone created.
 
 Evidence: host Node suite 320/320 (was 316); tier-1 bridge 1/1. Focused regressions added only for the three residuals (25 tests in the seam suite). docs/backlog.md slice-2A section updated. Boundary kept: no Episode-workspace wiring, no per-task mutation loop, no Beads transport, no ownership/receipt fields, no lifecycle UX routing, no migration/cutover, no PRIMECLAW-43.1. This repo's live store untouched. Status unchanged: In Progress.
+
+2026-10-18 Conversation review of candidate 1c598e0: REVISED, not accepted. Residual A (direct remote evidence) and residual C (root-config preflight) ACCEPTED; the five earlier repairs remain closed — PRESERVE all. Fix only the remaining provider-native configuration validation gap (residual B), two parts:
+
+1. After the nested task store is materialized/verified, validate its EFFECTIVE native Backlog configuration from `primaryRoot` on EVERY path — regardless of the pre-clone provider detection result and regardless of whether the branch was newly bootstrapped or pre-existing. Invoke the existing `checkBacklogCapabilities(primaryRoot, runner)` so a pre-existing remote branch with generic `statuses: [To Do, In Progress, Done]` cannot return `prepared`. ALSO prove the effective native default is exactly `In Design` via `backlog config get defaultStatus`; do not rely only on generated config bytes. An incompatible published remote config BLOCKS with exact remediation and is never rewritten or silently repaired (remote mutation deferred).
+
+2. Remove the custom auto_commit byte-regex inference — it disagrees with native Backlog syntax (a native-valid `auto_commit : true` line is accepted by Backlog but 1c598e0 treats the nonmatching line as an absent key and returns prepared with autoCommit:false). Read the effective value NATIVELY from `primaryRoot` via `backlog config get autoCommit` and require the exact false result. Do NOT issue `config set` or locally rewrite the published config. Keep the final nested `git status` + published-HEAD equality proofs AFTER these native reads, so any native normalization/write BLOCKS instead of being certified clean.
+
+Only focused real-Git regressions: (a) fresh primary adopting a pre-existing remote branch with generic three-status/default-To-Do config blocks, never prepared; (b) an otherwise canonical pre-existing remote config using native-valid `auto_commit : true` blocks; prove the exact native default In Design (a compact canonical-status/wrong-default fixture acceptable). Keep the accepted canonical bootstrap stable and clean under these native reads.
+
+Do NOT promote the pre-existing non-empty-folder-store bootstrap/ignore ordering into another blocker this pass (independent reviewer: non-blocking, predates this candidate). No parsing machinery — use the managed native Backlog CLI and the existing capability gate. Preserve the slice-2A boundary: no Episode wiring, per-task mutation loop, Beads transport, receipts, lifecycle UX, migration/cutover, or PRIMECLAW-43.1. Update task notes/docs truthfully; focused suite + full host Node suite + Docker-only tier 1; one clean repair candidate; stop for review.
+
+Review evidence for 1c598e0: focused 25/25, host Node 320/320, serial Docker tier 1 passed — but both configuration defects reproduced independently with real Git + the repository-built Backlog executable.
 <!-- SECTION:NOTES:END -->
