@@ -14,9 +14,27 @@ import {
   type TaskEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 import {
-  resolveBacklogTask,
   type BacklogTaskSelection,
 } from "./reviewed-plan-support.ts";
+import { resolveProviderTask } from "./task-providers.ts";
+
+/**
+ * Default resolver: provider-aware task resolution narrowed to the existing
+ * Backlog selection contract these ownership paths still require. A Beads
+ * store resolves the task with no Markdown path, so these file-bound paths
+ * reject it explicitly until their own provider slice lands.
+ */
+function defaultOwnershipTaskResolver(cwd: string, rawTaskId: string): BacklogTaskSelection | null {
+  const selection = resolveProviderTask(cwd, rawTaskId);
+  if (!selection) return null;
+  if (selection.provider !== "backlog") {
+    throw new Error(
+      `task ${selection.taskId} resolves through Beads; this Episode ownership path still `
+      + "requires the Backlog task-file contract until its provider slice lands",
+    );
+  }
+  return selection as BacklogTaskSelection;
+}
 
 export interface TaskEpisodeReservationGit {
   repositoryRoot(cwd: string): string;
@@ -296,7 +314,7 @@ export function transitionLegacyEpisodeOwnershipToTask(
 
   const git = dependencies.git ?? new CliLegacyTaskOwnershipTransitionGit();
   const ownership = dependencies.ownership ?? defaultOwnership;
-  const resolver = dependencies.taskResolver ?? resolveBacklogTask;
+  const resolver = dependencies.taskResolver ?? defaultOwnershipTaskResolver;
   const requestedRoot = realpathSync(input.projectRoot);
   const root = git.repositoryRoot(requestedRoot);
   if (root !== requestedRoot) throw new Error("Ownership transition must run from the repository root");
@@ -434,7 +452,7 @@ export function reserveTaskEpisodeOwnership(
     throw new Error("Task-native Episode reservation requires a canonical Backlog task ID");
   }
   const requestedRoot = realpathSync(input.projectRoot);
-  const selection = (dependencies.taskResolver ?? resolveBacklogTask)(requestedRoot, input.taskId);
+  const selection = (dependencies.taskResolver ?? defaultOwnershipTaskResolver)(requestedRoot, input.taskId);
   if (!selection) throw new Error(`Backlog task ${input.taskId} is unavailable for Episode reservation`);
   if (selection.taskId !== input.taskId) throw new Error("Task-native Episode reservation requires the exact canonical Backlog task ID");
   const projectRoot = realpathSync(selection.projectRoot);

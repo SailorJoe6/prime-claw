@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
@@ -13,6 +13,8 @@ import {
   checkBeadsCapabilities,
   checkSelectedProviderCapabilities,
   detectTaskProvider,
+  mutateProviderTaskStatus,
+  resolveProviderTask,
 } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 
 const CANONICAL = [...CANONICAL_LIFECYCLE_STATUSES];
@@ -419,4 +421,169 @@ test("the beads status map covers every canonical lifecycle state exactly once",
     const mapping = BEADS_STATUS_MAP[status];
     assert.ok(mapping.name && mapping.category);
   }
+});
+
+function writeBacklogTaskFile(root, relative) {
+  const path = join(root, relative);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, "---\nid: TST-1\nstatus: In Planning\n---\nfixture task\n");
+  return path;
+}
+
+function backlogTaskView(id = "TST-1", status = "In Planning", path = "backlog/tasks/tst-1.md") {
+  return JSON.stringify({
+    schemaVersion: 1, kind: "task-view",
+    task: { id, title: "Fixture task", status, implementationPlan: "One meaningful step", path },
+  });
+}
+
+test("provider task resolution routes a Backlog repo through the native backlog read", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  writeBacklogTaskFile(root, "backlog/tasks/tst-1.md");
+  const runner = detectionRunner({
+    ...BACKLOG_OK,
+    ["backlog\0task\0view\0--json\0--\0TST-1"]: { stdout: backlogTaskView() + "\n", stderr: "", status: 0 },
+  });
+  const selection = resolveProviderTask(root, "TST-1", runner);
+  assert.equal(selection.provider, "backlog");
+  assert.equal(selection.taskId, "TST-1");
+  assert.equal(selection.status, "In Planning");
+  assert.equal(selection.implementationPlan, "One meaningful step");
+  assert.equal(selection.taskPathRelative, "backlog/tasks/tst-1.md");
+  assert.equal(selection.taskPath, realpathSync(join(root, "backlog/tasks/tst-1.md")));
+});
+
+test("provider task resolution routes a Beads repo through the native bd read with canonical status", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root);
+  const runner = detectionRunner({
+    ...BEADS_OK,
+    ["bd\0show\0TST-1\0--json"]: { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status: "in_design" }]) + "\n", stderr: "", status: 0 },
+  });
+  const selection = resolveProviderTask(root, "TST-1", runner);
+  assert.equal(selection.provider, "beads");
+  assert.equal(selection.taskId, "TST-1");
+  assert.equal(selection.status, "In Design");
+  assert.equal(selection.taskPath, null);
+  assert.equal(selection.taskPathRelative, null);
+});
+
+test("provider task resolution fails closed on a Beads task with an unmapped status", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root);
+  const runner = detectionRunner({
+    ...BEADS_OK,
+    ["bd\0show\0TST-1\0--json"]: { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status: "open" }]) + "\n", stderr: "", status: 0 },
+  });
+  assert.throws(() => resolveProviderTask(root, "TST-1", runner), /unmapped status open/);
+});
+
+test("provider task resolution fails closed when no live provider evidence exists", () => {
+  const root = fixtureRoot();
+  assert.throws(() => resolveProviderTask(root, "TST-1", detectionRunner()), /no live task provider evidence/);
+});
+
+test("provider task resolution fails closed on dual live evidence", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  writeBeadsStore(root);
+  assert.throws(() => resolveProviderTask(root, "TST-1", detectionRunner()), /blocked \(dual-providers\)/);
+});
+
+test("provider task resolution fails closed on malformed evidence with remediation", () => {
+  const root = fixtureRoot();
+  const dir = join(root, ".beads");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "config.yaml"), "# partial\n");
+  assert.throws(() => resolveProviderTask(root, "TST-1", detectionRunner()), /blocked \(malformed-evidence\)[\s\S]*bd bootstrap/);
+});
+
+test("provider task resolution fails closed when the selected provider executable is unavailable", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  writeBacklogTaskFile(root, "backlog/tasks/tst-1.md");
+  const runner = detectionRunner({
+    ["backlog\0--version"]: { stdout: "", stderr: "command not found", status: 127 },
+  });
+  assert.throws(() => resolveProviderTask(root, "TST-1", runner), /executable is unavailable/);
+});
+
+test("provider status mutation edits the Backlog task natively and proves the new status", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  writeBacklogTaskFile(root, "backlog/tasks/tst-1.md");
+  let status = "In Planning";
+  const real = new ProcessCommandRunner();
+  const calls = [];
+  const runner = { run(command, args, options = {}) {
+    const key = [command, ...args].join("\0");
+    calls.push(key);
+    const canned = {
+      ...BACKLOG_OK,
+      ["backlog\0task\0edit\0--status\0In Progress\0--append-notes\0admit\0--plain\0--\0TST-1"]: { stdout: "", stderr: "", status: 0 },
+    }[key];
+    if (canned) {
+      if (key.startsWith("backlog\0task\0edit")) status = "In Progress";
+      return canned;
+    }
+    if (key === "backlog\0task\0view\0--json\0--\0TST-1") {
+      return { stdout: backlogTaskView("TST-1", status) + "\n", stderr: "", status: 0 };
+    }
+    return real.run(command, args, options);
+  } };
+  const resolved = mutateProviderTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", note: "admit", runner });
+  assert.equal(resolved.provider, "backlog");
+  assert.equal(resolved.status, "In Progress");
+  assert.ok(calls.includes("backlog\0task\0edit\0--status\0In Progress\0--append-notes\0admit\0--plain\0--\0TST-1"));
+});
+
+test("provider status mutation updates the Beads store natively with the mapped status", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root);
+  let status = "in_design";
+  const real = new ProcessCommandRunner();
+  const calls = [];
+  const runner = { run(command, args, options = {}) {
+    const key = [command, ...args].join("\0");
+    calls.push(key);
+    const canned = {
+      ...BEADS_OK,
+      ...BD_NO_DB_FALSE,
+      ["bd\0update\0TST-1\0--status\0in_progress\0--json"]: { stdout: "", stderr: "", status: 0 },
+    }[key];
+    if (canned) {
+      if (key.startsWith("bd\0update")) status = "in_progress";
+      return canned;
+    }
+    if (key === "bd\0show\0TST-1\0--json") {
+      return { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status }]) + "\n", stderr: "", status: 0 };
+    }
+    return real.run(command, args, options);
+  } };
+  const resolved = mutateProviderTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
+  assert.equal(resolved.provider, "beads");
+  assert.equal(resolved.status, "In Progress");
+  assert.ok(calls.includes("bd\0update\0TST-1\0--status\0in_progress\0--json"));
+});
+
+test("provider status mutation fails closed when the re-read task never reaches the status", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  writeBacklogTaskFile(root, "backlog/tasks/tst-1.md");
+  const real = new ProcessCommandRunner();
+  const runner = { run(command, args, options = {}) {
+    const key = [command, ...args].join("\0");
+    const canned = {
+      ...BACKLOG_OK,
+      ["backlog\0task\0edit\0--status\0Blocked\0--plain\0--\0TST-1"]: { stdout: "", stderr: "", status: 0 },
+      ["backlog\0task\0view\0--json\0--\0TST-1"]: { stdout: backlogTaskView("TST-1", "In Planning") + "\n", stderr: "", status: 0 },
+    }[key];
+    if (canned) return canned;
+    return real.run(command, args, options);
+  } };
+  assert.throws(
+    () => mutateProviderTaskStatus({ projectRoot: root, taskId: "TST-1", status: "Blocked", runner }),
+    /did not reach Blocked/,
+  );
 });

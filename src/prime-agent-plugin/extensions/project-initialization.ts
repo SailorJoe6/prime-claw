@@ -30,7 +30,16 @@ function summarize(result: ReconcileResult, detailed = false): string {
   const registration = result.registration.status === "unavailable"
     ? `orca=degraded(${result.registration.error ?? "unavailable"})`
     : `orca=${result.registration.status}${result.registration.id ? `:${result.registration.id}` : ""}`;
-  const base = `Prime Claw project ${result.project.root} (${result.project.kind}): ${actions || "no-assets"} conflicts=${result.conflicts} ${registration}`;
+  const provider = result.taskProvider.status === "initialized"
+    ? `provider=initialized(${result.taskProvider.provider})`
+    : result.taskProvider.status === "selected"
+      ? `provider=selected(${result.taskProvider.provider})`
+      : result.taskProvider.status === "blocked"
+        ? `provider=blocked(${result.taskProvider.code})`
+        : result.taskProvider.status === "failed"
+          ? `provider=failed`
+          : "provider=not-run";
+  const base = `Prime Claw project ${result.project.root} (${result.project.kind}): ${actions || "no-assets"} conflicts=${result.conflicts} ${registration} ${provider}`;
   if (!detailed || result.conflicts === 0) return base;
   const unresolved = result.items.filter((item) => item.action === "preserved" || item.action === "blocked").slice(0, 8);
   const lines = unresolved.map((item) => item.action === "preserved"

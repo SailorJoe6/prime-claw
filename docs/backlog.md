@@ -146,8 +146,27 @@ category (`in_design:active`, `in_planning:active`, built-in `in_progress` and
 smoke-checks the exact Backlog version; these runtime gates are behavioral
 capability checks, not version assertions.
 
-Later slices route the existing lifecycle call sites through this seam and add
-provider-native workspace preparation. Current call-site behavior is unchanged.
+The existing exact task-resolution call sites (`/plan` admission, task
+Episode creation and ownership reservation/transition) resolve through
+`resolveProviderTask`: detection plus capability gate first, then the native
+read (`backlog task view --json`; `bd show <id> --json`), with Beads statuses
+mapped onto the canonical lifecycle and unmapped statuses refused. The
+Conversation task-admission status transition mutates through
+`mutateProviderTaskStatus` (`backlog task edit --status`; `bd update --status`
+with the mapped status) and proves the exact target status by native re-read.
+These file-bound lifecycle paths still require the Backlog task-file contract
+and reject a Beads-resolved task explicitly until their sync, publication, and
+archive behavior lands in the later workspace slices; a Backlog repository's
+behavior is unchanged.
+
+Project initialization (`initialize_prime_claw` reconcile) guarantees exactly
+one live provider: with no live evidence it runs the pinned managed
+`backlog init --defaults --backlog-dir .backlog --config-location folder
+--integration-mode none` once; existing Backlog or Beads evidence is preserved
+untouched; dual, malformed, or uncertain evidence blocks with exact
+remediation; and an initialization failure is reported on the result without
+failing asset reconciliation. Later slices add provider-native workspace
+preparation, revision evidence, and the remaining lifecycle call sites.
 
 ## Project task workflow
 

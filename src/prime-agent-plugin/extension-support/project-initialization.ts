@@ -22,6 +22,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { activeLegacyPlanFiles } from "./legacy-workflow.ts";
 import { readAllEpisodeOwnership } from "./episode-ownership.ts";
+import { detectTaskProvider } from "./task-providers.ts";
 
 export const TEMPLATE_MANIFEST = ".prime-claw/templates.json";
 export const TEMPLATE_REVIEW_STATE = ".prime-claw/template-review.json";
@@ -104,6 +105,13 @@ export interface ReconcileOptions {
   isActiveEpisode?: (projectRoot: string) => boolean;
 }
 
+export type TaskProviderSetup =
+  | { status: "not-run"; reason: string }
+  | { status: "initialized"; provider: "backlog"; storeDir: string }
+  | { status: "selected"; provider: "backlog" | "beads" }
+  | { status: "blocked"; code: "dual-providers" | "malformed-evidence"; detail: string; remediation: string }
+  | { status: "failed"; detail: string };
+
 export interface ReconcileResult {
   project: ProjectRoot;
   registration: { status: "reused" | "added" | "unavailable" | "not-requested"; id?: string; error?: string };
@@ -114,6 +122,7 @@ export interface ReconcileResult {
   legacyRemaining: string[];
   skippedActiveEpisode: boolean;
   skipReason?: "active-episode" | "uncertain-episode-activity";
+  taskProvider: TaskProviderSetup;
 }
 
 export class ProcessCommandRunner implements CommandRunner {
@@ -612,6 +621,39 @@ export function isActiveEpisodeWorktree(root: string, runner: CommandRunner = ne
   return episodeWorktreeActivity(root, kind, runner) !== "inactive";
 }
 
+/**
+ * Ensure exactly one live task provider for the project. With no live
+ * provider evidence, run the pinned managed Backlog's native initialization
+ * once, selecting the `.backlog/` layout and folder configuration; existing
+ * valid Backlog or Beads evidence is preserved untouched, and dual,
+ * malformed, or uncertain evidence blocks with exact remediation instead of
+ * initializing. Initialization failures never fail asset reconciliation;
+ * they surface as exact evidence on the result.
+ */
+function ensureProjectTaskProvider(projectRoot: string, runner: CommandRunner): TaskProviderSetup {
+  let detection;
+  try {
+    detection = detectTaskProvider(projectRoot, runner);
+  } catch (error) {
+    return { status: "not-run", reason: `provider detection unavailable: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  if (detection.kind === "selected") return { status: "selected", provider: detection.evidence.provider };
+  if (detection.kind === "blocked") return { status: "blocked", code: detection.code, detail: detection.detail, remediation: detection.remediation };
+  const init = runner.run(
+    "backlog",
+    ["init", "--defaults", "--backlog-dir", ".backlog", "--config-location", "folder", "--integration-mode", "none"],
+    { cwd: projectRoot, allowFailure: true },
+  );
+  if (init.status !== 0) {
+    return { status: "failed", detail: init.stderr.trim() || init.stdout.trim() || `exit ${init.status}` };
+  }
+  const after = detectTaskProvider(projectRoot, runner);
+  if (after.kind !== "selected" || after.evidence.provider !== "backlog") {
+    return { status: "failed", detail: "backlog init completed but native provider discovery did not select the new Backlog store" };
+  }
+  return { status: "initialized", provider: "backlog", storeDir: join(projectRoot, ".backlog") };
+}
+
 export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileResult {
   const runner = options.runner ?? new ProcessCommandRunner();
   const pluginRoot = options.pluginRoot ? realpathSync(options.pluginRoot) : pluginRootFromModule();
@@ -630,6 +672,7 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
       legacyRemaining: [],
       skippedActiveEpisode: true,
       skipReason: activity === "active" ? "active-episode" : "uncertain-episode-activity",
+      taskProvider: { status: "not-run", reason: "episode-activity" },
     };
   }
   const inventory = loadAssetInventory(pluginRoot);
@@ -753,8 +796,9 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
         registration = found ? { status: "reused", id: found.id } : { status: "unavailable", error: "project is not registered with Orca" };
       } catch (error) { registration = { status: "unavailable", error: error instanceof Error ? error.message : String(error) }; }
     }
+    const taskProvider = ensureProjectTaskProvider(project.root, runner);
     const conflicts = items.filter((item) => item.action === "preserved" || item.action === "blocked").length + remaining.length + (registration.status === "unavailable" ? 1 : 0);
-    return { project, registration, items, manifestWritten, changed: manifestWritten || items.some((item) => ["created", "migrated", "updated", "recovered", "retired"].includes(item.action)), conflicts, legacyRemaining: remaining, skippedActiveEpisode: false };
+    return { project, registration, items, manifestWritten, changed: manifestWritten || items.some((item) => ["created", "migrated", "updated", "recovered", "retired"].includes(item.action)) || taskProvider.status === "initialized", conflicts, legacyRemaining: remaining, skippedActiveEpisode: false, taskProvider };
   } finally { release(); }
 }
 

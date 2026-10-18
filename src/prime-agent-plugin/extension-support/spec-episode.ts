@@ -31,11 +31,11 @@ import {
   type TaskEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 import {
-  resolveBacklogTask,
   resolveFutureLocationSyntax,
   validateFutureLocation,
   type BacklogTaskSelection,
 } from "./reviewed-plan-support.ts";
+import { resolveProviderTask, mutateProviderTaskStatus } from "./task-providers.ts";
 import {
   ProcessCommandRunner,
   resolveNearestProjectRoot,
@@ -50,6 +50,28 @@ import {
   type LegacyTaskOwnershipTransitionResult,
   type TaskEpisodeReservationInput,
 } from "./task-episode-ownership.ts";
+
+/**
+ * Default task resolver for the Episode lifecycle paths in this module:
+ * provider-aware resolution narrowed to the existing Backlog selection
+ * contract these paths still require. A Beads store resolves the task with
+ * no Markdown path, so the file-bound admission/cleanup choreography here
+ * rejects it explicitly until its own provider slice lands; task resolution
+ * and status mutation themselves already run through the selected provider.
+ */
+function defaultEpisodeTaskResolver(runner: CommandRunner) {
+  return (cwd: string, exactTaskId: string): BacklogTaskSelection | null => {
+    const selection = resolveProviderTask(cwd, exactTaskId, runner);
+    if (!selection) return null;
+    if (selection.provider !== "backlog") {
+      throw new Error(
+        `task ${selection.taskId} resolves through Beads; this Episode lifecycle path still `
+        + "requires the Backlog task-file contract until its provider slice lands",
+      );
+    }
+    return selection as BacklogTaskSelection;
+  };
+}
 
 const PROTOCOL_NAME = "prime-agent.daemon";
 const MAX_PROTOCOL_VERSION = 7;
@@ -1287,7 +1309,7 @@ export async function transitionSpecEpisodeToTaskOwnership(
   const orca = dependencies.orca ?? new CliOrcaAdapter();
   const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
   const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, exactTaskId: string) => resolveBacklogTask(cwd, exactTaskId, runner));
+    ?? defaultEpisodeTaskResolver(runner);
   let publisher = dependencies.publisher;
   try {
     const repo = git.repositoryRoot(ctx.cwd);
@@ -1385,7 +1407,7 @@ export async function handoffTaskEpisode(
   const orca = dependencies.orca ?? new CliOrcaAdapter();
   const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
   const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, taskId: string) => resolveBacklogTask(cwd, taskId, runner));
+    ?? defaultEpisodeTaskResolver(runner);
   let publisher = dependencies.publisher;
   try {
     const taskId = rawTaskId.trim();
@@ -1668,10 +1690,17 @@ function commitConversationTaskStatus(options: {
   git: TaskEpisodeAdmissionGit;
   resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null;
 }): { selection: BacklogTaskSelection; commit: string } {
-  const args = ["task", "edit", "--status", options.status];
-  if (options.note) args.push("--append-notes", options.note);
-  args.push("--plain", "--", options.taskId);
-  options.runner.run("backlog", args, { cwd: options.projectRoot });
+  // Route the status mutation through the selected provider's native
+  // interface (Backlog `task edit --status` today; Beads `update --status`
+  // once these file-bound admission paths support it) and prove the exact
+  // task reached the status by native re-read inside the provider seam.
+  mutateProviderTaskStatus({
+    projectRoot: options.projectRoot,
+    taskId: options.taskId,
+    status: options.status,
+    ...(options.note ? { note: options.note } : {}),
+    runner: options.runner,
+  });
   const selection = exactAdmissionTask(
     options.resolveTask(options.projectRoot, options.taskId),
     options.taskId,
@@ -1785,7 +1814,7 @@ export async function finalizeTaskEpisodeCleanup(
   const store = dependencies.ownership ?? defaultOwnershipStore;
   const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
   const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
+    ?? defaultEpisodeTaskResolver(runner);
   const projectRoot = git.repositoryRoot(ctx.cwd);
   if (!samePath(projectRoot, ctx.cwd) || git.branch(projectRoot) !== "main") {
     throw new Error("Task Episode cleanup must run from the canonical primary main checkout");
@@ -1870,7 +1899,7 @@ export async function createTaskEpisode(
   const git = dependencies.admissionGit ?? new CliTaskEpisodeAdmissionGit();
   const store = dependencies.ownership ?? defaultOwnershipStore;
   const resolveTask = dependencies.taskResolver
-    ?? ((cwd: string, taskId: string) => resolveBacklogTask(cwd, taskId, runner));
+    ?? defaultEpisodeTaskResolver(runner);
   const reserve = dependencies.reserveTaskOwnership ?? reserveTaskEpisodeOwnership;
   const allocate = dependencies.allocateTaskEpisode ?? allocateReservedTaskEpisode;
   const taskId = rawTaskId.trim();

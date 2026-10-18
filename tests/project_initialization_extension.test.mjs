@@ -43,6 +43,11 @@ class Runner {
       try { return {stdout:execFileSync(command,args,{cwd:options.cwd,encoding:"utf8",stdio:["ignore","pipe","pipe"]}),stderr:"",status:0}; }
       catch(e) { const r={stdout:String(e.stdout??""),stderr:String(e.stderr??e.message),status:Number.isInteger(e.status)?e.status:1}; if(!options.allowFailure) throw e; return r; }
     }
+    if (command === "bd") return { stdout: "", stderr: "no beads fixture", status: 1 };
+    if (command === "backlog") {
+      if (args[0] === "init") { mkdirSync(join(options.cwd, ".backlog"), { recursive: true }); writeFileSync(join(options.cwd, ".backlog", "config.yml"), "project_name: fixture\n"); this.providerInits = (this.providerInits ?? 0) + 1; return { stdout: "initialized\n", stderr: "", status: 0 }; }
+      return { stdout: "", stderr: "no backlog fixture", status: 1 };
+    }
     if (command !== "orca") throw Error(`unexpected ${command}`);
     if (this.orcaError) return {stdout:"",stderr:this.orcaError,status:1};
     if (args[0] === "repo" && args[1] === "list") return {stdout:JSON.stringify({result:{repos:this.registrations}}),stderr:"",status:0};
@@ -435,4 +440,75 @@ test("pending reset recovery refuses a linked destination directory without touc
 test("linked .ralph ancestor preserves the full shared legacy tree during cleanup", (t) => {
   const root=repo(t),outside=mkdtempSync(join(tmpdir(),"pc-shared-ralph-"));t.after(()=>rmSync(outside,{recursive:true,force:true}));const shared=join(outside,"skills/prepare/SKILL.md"),empty=join(outside,"skills/empty/nested");mkdirSync(dirname(shared),{recursive:true});mkdirSync(empty,{recursive:true});writeFileSync(shared,"shared ancestor policy\n");symlinkSync(outside,join(root,".ralph"));
   const result=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()});assert.equal(result.items.find(row=>row.assetId==="project-skill-prepare").action,"blocked");assert.equal(result.items.find(row=>row.assetId==="project-skill-design").action,"created");assert.equal(readFileSync(shared,"utf8"),"shared ancestor policy\n");assert.equal(lstatSync(empty).isDirectory(),true);assert.equal(lstatSync(join(root,".ralph")).isSymbolicLink(),true);assert.ok(result.legacyRemaining.includes(".ralph/skills"));
+});
+
+test("reconcile initializes the .backlog default only when no live provider evidence exists",t=>{
+  const root=repo(t), runner=new Runner();
+  const first=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
+  assert.deepEqual(first.taskProvider,{status:"initialized",provider:"backlog",storeDir:join(realpathSync(root),".backlog")});
+  assert.equal(runner.providerInits,1);
+  assert.equal(existsSync(join(root,".backlog","config.yml")),true);
+  const second=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
+  assert.deepEqual(second.taskProvider,{status:"selected",provider:"backlog"});
+  assert.equal(runner.providerInits,1);
+  assert.equal(second.changed,false);
+});
+
+test("reconcile preserves an existing Beads store without initializing Backlog",t=>{
+  const root=repo(t), runner=new Runner();
+  const origRun=runner.run.bind(runner);
+  runner.run=(command,args,options={})=>{
+    if(command==="bd"&&args.join(" ")==="config get no-db")return{stdout:"false\n",stderr:"",status:0};
+    return origRun(command,args,options);
+  };
+  mkdirSync(join(root,".beads"),{recursive:true});
+  writeFileSync(join(root,".beads","config.yaml"),"# beads\n");
+  writeFileSync(join(root,".beads","metadata.json"),JSON.stringify({database:"dolt",backend:"dolt",dolt_mode:"embedded",dolt_database:"db"}));
+  const result=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
+  assert.deepEqual(result.taskProvider,{status:"selected",provider:"beads"});
+  assert.equal(runner.providerInits??0,0);
+});
+
+test("reconcile blocks dual provider evidence with exact remediation instead of initializing",t=>{
+  const root=repo(t), runner=new Runner();
+  const origRun=runner.run.bind(runner);
+  runner.run=(command,args,options={})=>{
+    if(command==="bd"&&args.join(" ")==="config get no-db")return{stdout:"false\n",stderr:"",status:0};
+    return origRun(command,args,options);
+  };
+  mkdirSync(join(root,"backlog"),{recursive:true});
+  writeFileSync(join(root,"backlog","config.yml"),"project_name: fixture\n");
+  mkdirSync(join(root,".beads"),{recursive:true});
+  writeFileSync(join(root,".beads","config.yaml"),"# beads\n");
+  writeFileSync(join(root,".beads","metadata.json"),JSON.stringify({database:"dolt",backend:"dolt",dolt_mode:"embedded",dolt_database:"db"}));
+  const result=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
+  assert.equal(result.taskProvider.status,"blocked");
+  assert.equal(result.taskProvider.code,"dual-providers");
+  assert.match(result.taskProvider.remediation,/exactly one live store/);
+  assert.equal(runner.providerInits??0,0);
+  assert.equal(existsSync(join(root,".backlog")),false);
+});
+
+test("reconcile reports backlog init failure without failing asset reconciliation",t=>{
+  const root=repo(t), runner=new Runner();
+  const orig=runner.run.bind(runner);
+  runner.run=(command,args,options={})=>{
+    if(command==="backlog"&&args[0]==="init")return{stdout:"",stderr:"disk full",status:1};
+    return orig(command,args,options);
+  };
+  const result=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
+  assert.equal(result.taskProvider.status,"failed");
+  assert.match(result.taskProvider.detail,/disk full/);
+  assert.equal(result.skippedActiveEpisode,false);
+  assert.ok(result.items.length>0);
+});
+
+test("reconcile does not touch the provider seam for an active Episode worktree",t=>{
+  const root=repo(t), runner=new Runner();
+  writeEpisodeOwnership(root,activeOwnership("owner",join(root,"wt")));
+  const episode=join(root,"episode-wt"); mkdirSync(episode,{recursive:true});
+  const result=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner,isActiveEpisode:()=>true});
+  assert.equal(result.skippedActiveEpisode,true);
+  assert.deepEqual(result.taskProvider,{status:"not-run",reason:"episode-activity"});
+  assert.equal(runner.providerInits??0,0);
 });
