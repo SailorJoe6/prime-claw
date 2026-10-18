@@ -2,10 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { appendFileSync, chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, lstatSync, renameSync, symlinkSync, unlinkSync, realpathSync, cpSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname, resolve } from "node:path";
+import { basename, join, dirname, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  ProcessCommandRunner,
   acceptProjectOverride,
   loadAssetInventory,
   reconcilePrimeClawProject,
@@ -16,7 +17,7 @@ import {
   episodeWorktreeActivity,
   hasActiveLegacyPlanFiles,
 } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
-import { createProjectInitializationExtension } from "../src/prime-agent-plugin/extensions/project-initialization.ts";
+import { createProjectInitializationExtension, summarizeReconcile } from "../src/prime-agent-plugin/extensions/project-initialization.ts";
 import { startTemplateReview } from "../src/prime-agent-plugin/extension-support/template-review.ts";
 import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
@@ -45,7 +46,29 @@ class Runner {
     }
     if (command === "bd") return { stdout: "", stderr: "no beads fixture", status: 1 };
     if (command === "backlog") {
-      if (args[0] === "init") { mkdirSync(join(options.cwd, ".backlog"), { recursive: true }); writeFileSync(join(options.cwd, ".backlog", "config.yml"), "project_name: fixture\n"); this.providerInits = (this.providerInits ?? 0) + 1; return { stdout: "initialized\n", stderr: "", status: 0 }; }
+      if (args[0] === "init") {
+        this.providerInitArgs = this.providerInitArgs ?? [];
+        this.providerInitArgs.push(args);
+        mkdirSync(join(options.cwd, ".backlog"), { recursive: true });
+        writeFileSync(join(options.cwd, ".backlog", "config.yml"), [
+          `project_name: "${args[1]}"`,
+          'default_status: "To Do"',
+          'statuses: ["To Do", "In Progress", "Done"]',
+          "remote_operations: true",
+          "",
+        ].join("\n"));
+        this.providerInits = (this.providerInits ?? 0) + 1;
+        return { stdout: "initialized\n", stderr: "", status: 0 };
+      }
+      if (args[0] === "--version") return { stdout: "1.53.0\n", stderr: "", status: 0 };
+      if (args.join(" ") === "config get statuses") {
+        try {
+          const config = readFileSync(join(options.cwd, ".backlog", "config.yml"), "utf8");
+          const match = config.match(/^statuses: \[(.*)\]$/m);
+          if (match) return { stdout: match[1].split(",").map((entry) => entry.trim().replace(/^"|"$/g, "")).join(", ") + "\n", stderr: "", status: 0 };
+        } catch {}
+        return { stdout: "", stderr: "no statuses", status: 1 };
+      }
       return { stdout: "", stderr: "no backlog fixture", status: 1 };
     }
     if (command !== "orca") throw Error(`unexpected ${command}`);
@@ -447,11 +470,67 @@ test("reconcile initializes the .backlog default only when no live provider evid
   const first=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
   assert.deepEqual(first.taskProvider,{status:"initialized",provider:"backlog",storeDir:join(realpathSync(root),".backlog")});
   assert.equal(runner.providerInits,1);
-  assert.equal(existsSync(join(root,".backlog","config.yml")),true);
+  // Exact non-interactive argv: deterministic positional project name (repo basename),
+  // then the accepted .backlog/folder/no-integration flags.
+  assert.deepEqual(runner.providerInitArgs[0],["init",basename(root),"--defaults","--backlog-dir",".backlog","--config-location","folder","--integration-mode","none"]);
+  // The initialized store is lifecycle-ready: exact ordered canonical statuses + canonical default.
+  const config=readFileSync(join(root,".backlog","config.yml"),"utf8");
+  assert.match(config,/^statuses: \["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"\]$/m);
+  assert.match(config,/^default_status: "In Design"$/m);
+  assert.equal(first.conflicts,0);
   const second=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
   assert.deepEqual(second.taskProvider,{status:"selected",provider:"backlog"});
   assert.equal(runner.providerInits,1);
   assert.equal(second.changed,false);
+});
+
+test("reconcile with the real managed Backlog CLI initializes a lifecycle-ready .backlog store",t=>{
+  const root=repo(t);
+  const distBacklog=resolve("deps/backlog/dist/backlog");
+  let backlog=distBacklog;
+  if(!existsSync(distBacklog)){
+    try{backlog=execFileSync("which",["backlog"],{encoding:"utf8"}).trim().split("\n")[0];}catch{backlog="";}
+  }
+  if(!backlog||!existsSync(backlog)){
+    t.skip("managed backlog executable unavailable in this environment (tier-1 container image ships none; host runs the repository dist)");
+    return;
+  }
+  const runner={run(command,args,options={}){
+    if(command==="backlog"){
+      try{return{stdout:execFileSync(backlog,args,{cwd:options.cwd,encoding:"utf8",stdio:["ignore","pipe","pipe"]}),stderr:"",status:0};}
+      catch(error){return{stdout:String(error?.stdout??""),stderr:String(error?.stderr??""),status:Number.isInteger(error?.status)?error.status:1};}
+    }
+    return new ProcessCommandRunner().run(command,args,options);
+  }};
+  const first=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
+  assert.deepEqual(first.taskProvider,{status:"initialized",provider:"backlog",storeDir:join(realpathSync(root),".backlog")});
+  const config=readFileSync(join(root,".backlog","config.yml"),"utf8");
+  assert.match(config,new RegExp(`^project_name: "${basename(root)}"$`,"m"));
+  assert.match(config,/^statuses: \["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"\]$/m);
+  assert.match(config,/^default_status: "In Design"$/m);
+  // The native capability gate passes against the real executable.
+  assert.equal(execFileSync(backlog,["config","get","statuses"],{cwd:root,encoding:"utf8"}).trim(),"In Design, In Planning, In Progress, Blocked, Ready for Merge, Done");
+  // A second reconcile is a no-op: provider selected, nothing changed.
+  const second=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
+  assert.deepEqual(second.taskProvider,{status:"selected",provider:"backlog"});
+  assert.equal(second.changed,false);
+});
+
+test("reconcile returns exact failed evidence when the initialized store is not lifecycle-ready",t=>{
+  const root=repo(t), runner=new Runner();
+  const orig=runner.run.bind(runner);
+  runner.run=(command,args,options={})=>{
+    if(command==="backlog"&&args[0]==="init"){
+      mkdirSync(join(options.cwd,".backlog"),{recursive:true});
+      writeFileSync(join(options.cwd,".backlog","config.yml"),'project_name: "fixture"\n');
+      return{stdout:"initialized\n",stderr:"",status:0};
+    }
+    return orig(command,args,options);
+  };
+  const result=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
+  assert.equal(result.taskProvider.status,"failed");
+  assert.match(result.taskProvider.detail,/no recognizable statuses/);
+  assert.equal(result.conflicts,1);
 });
 
 test("reconcile preserves an existing Beads store without initializing Backlog",t=>{
@@ -487,6 +566,12 @@ test("reconcile blocks dual provider evidence with exact remediation instead of 
   assert.match(result.taskProvider.remediation,/exactly one live store/);
   assert.equal(runner.providerInits??0,0);
   assert.equal(existsSync(join(root,".backlog")),false);
+  // Blocked provider evidence is a surfaced conflict with actionable detail (defect 4).
+  assert.equal(result.conflicts,1);
+  const summary=summarizeReconcile(result, true);
+  assert.match(summary,/conflicts=1/);
+  assert.match(summary,/provider=blocked\(dual-providers: /);
+  assert.match(summary,/exactly one live store/);
 });
 
 test("reconcile reports backlog init failure without failing asset reconciliation",t=>{
@@ -501,6 +586,11 @@ test("reconcile reports backlog init failure without failing asset reconciliatio
   assert.match(result.taskProvider.detail,/disk full/);
   assert.equal(result.skippedActiveEpisode,false);
   assert.ok(result.items.length>0);
+  // Failed provider setup is a surfaced conflict carrying the exact cause (defect 4).
+  assert.equal(result.conflicts,1);
+  const summary=summarizeReconcile(result, true);
+  assert.match(summary,/conflicts=1/);
+  assert.match(summary,/provider=failed\(.*disk full/);
 });
 
 test("reconcile does not touch the provider seam for an active Episode worktree",t=>{

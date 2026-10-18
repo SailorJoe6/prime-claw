@@ -26,7 +26,7 @@ import {
   ProcessCommandRunner,
   resolveNearestProjectRoot,
 } from "./project-initialization.ts";
-import { resolveBacklogTask } from "./reviewed-plan-support.ts";
+import { resolveBacklogTask, type BacklogTaskSelection } from "./reviewed-plan-support.ts";
 
 /** The exact ordered lifecycle both providers map onto. */
 export const CANONICAL_LIFECYCLE_STATUSES = [
@@ -555,24 +555,15 @@ export function checkSelectedProviderCapabilities(
 }
 
 /**
- * One provider-resolved task, shaped like the existing Backlog selection so
- * the reviewed-plan and Episode admission call sites consume it unchanged.
- * For Beads there is no task Markdown file: `taskPath` is null and the
- * selection carries the exact store identity instead.
+ * The provider-resolved task, as a discriminated native result: the Backlog
+ * branch IS the existing BacklogTaskSelection plus its provider identity;
+ * the Beads branch carries the validated native `bd show --json` issue view
+ * (id/title/status; Beads stores no task Markdown, plan field, or references,
+ * so none are invented). No provider-neutral normalized task shape exists.
  */
-export interface ProviderTaskSelection {
-  provider: TaskProviderId;
-  taskId: string;
-  title: string;
-  status: string;
-  implementationPlan: string | null;
-  references?: string[];
-  projectRoot: string;
-  /** Absolute task Markdown path for Backlog; null for Beads. */
-  taskPath: string | null;
-  /** Project-relative task path for Backlog; null for Beads. */
-  taskPathRelative: string | null;
-}
+export type ProviderTaskResolution =
+  | ({ provider: "backlog" } & BacklogTaskSelection)
+  | { provider: "beads"; taskId: string; title: string; status: string; projectRoot: string };
 
 function requireLiveProvider(cwd: string, runner: CommandRunner): Extract<TaskProviderDetection, { kind: "selected" }> {
   const detection = detectTaskProvider(cwd, runner);
@@ -590,8 +581,8 @@ function requireLiveProvider(cwd: string, runner: CommandRunner): Extract<TaskPr
   return detection;
 }
 
-/** Parse `bd show <id> --json` output into the shared selection shape. */
-function parseBeadsTaskView(stdout: string, selectedTaskId: string, projectRoot: string): ProviderTaskSelection {
+/** Parse `bd show <id> --json` output into the validated native issue view. */
+function parseBeadsIssueView(stdout: string, selectedTaskId: string): { taskId: string; title: string; status: string } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(stdout);
@@ -611,25 +602,15 @@ function parseBeadsTaskView(stdout: string, selectedTaskId: string, projectRoot:
   if (typeof issue.status !== "string" || !issue.status.trim()) {
     throw new Error(`Beads task ${selectedTaskId} has no status`);
   }
-  // `bd show` has no implementation-plan field; semantic planning content
-  // lives in the task body, which managed instructions read natively.
-  return {
-    provider: "beads",
-    taskId: issue.id,
-    title: issue.title,
-    status: issue.status,
-    implementationPlan: null,
-    projectRoot,
-    taskPath: null,
-    taskPathRelative: null,
-  };
+  return { taskId: issue.id, title: issue.title, status: issue.status };
 }
 
-function resolveBeadsTask(
+/** Read one Beads issue natively, with no canonical-status conversion. */
+function readBeadsIssue(
   projectRoot: string,
   selectedTaskId: string,
   runner: CommandRunner,
-): ProviderTaskSelection {
+): { taskId: string; title: string; status: string } {
   const result = runner.run("bd", ["show", selectedTaskId, "--json"], {
     cwd: projectRoot,
     allowFailure: true,
@@ -638,25 +619,32 @@ function resolveBeadsTask(
     const detail = result.stderr.trim() || result.stdout.trim() || `exit ${result.status}`;
     throw new Error(`Beads could not resolve ${selectedTaskId}: ${detail}`);
   }
-  const selection = parseBeadsTaskView(result.stdout, selectedTaskId, projectRoot);
-  if (selection.taskId !== selectedTaskId) {
-    throw new Error(`Beads resolved ${selectedTaskId} to a different task ID ${selection.taskId}`);
+  return parseBeadsIssueView(result.stdout, selectedTaskId);
+}
+
+/** Canonical lifecycle status for a Beads issue, at the exact use boundary. */
+function beadsCanonicalStatus(taskId: string, nativeStatus: string): CanonicalLifecycleStatus {
+  const canonical = Object.entries(BEADS_STATUS_MAP).find(([, mapping]) => mapping.name === nativeStatus)?.[0];
+  if (!canonical) {
+    throw new Error(`Beads task ${taskId} carries unmapped status ${nativeStatus}`);
   }
-  return selection;
+  return canonical as CanonicalLifecycleStatus;
 }
 
 /**
  * Resolve one explicit task through the repository's sole live provider.
  * Detection and the capability gate run before the native read; none, dual,
- * malformed, or unavailable provider evidence fails closed. The returned
- * status is always the canonical lifecycle status (Backlog statuses are
- * already canonical; Beads statuses map through BEADS_STATUS_MAP reversed).
+ * malformed, or unavailable provider evidence fails closed. The result is
+ * discriminated by provider: the Backlog branch is the existing
+ * BacklogTaskSelection, and the Beads branch carries the native issue view
+ * with its status mapped to the canonical lifecycle (unmapped statuses fail
+ * closed).
  */
 export function resolveProviderTask(
   cwd: string,
   rawTaskId: string,
   runner: CommandRunner = new ProcessCommandRunner(),
-): ProviderTaskSelection | null {
+): ProviderTaskResolution | null {
   const selectedTaskId = rawTaskId.trim();
   if (!selectedTaskId || /\s/.test(selectedTaskId) || selectedTaskId.startsWith("-")) return null;
 
@@ -667,20 +655,28 @@ export function resolveProviderTask(
     if (!selection) return null;
     return { provider: "backlog", ...selection };
   }
-  const selection = resolveBeadsTask(detection.projectRoot, selectedTaskId, runner);
-  const canonical = Object.entries(BEADS_STATUS_MAP).find(([, mapping]) => mapping.name === selection.status)?.[0];
-  if (!canonical) {
-    throw new Error(`Beads task ${selection.taskId} carries unmapped status ${selection.status}`);
+  const issue = readBeadsIssue(detection.projectRoot, selectedTaskId, runner);
+  if (issue.taskId !== selectedTaskId) {
+    throw new Error(`Beads resolved ${selectedTaskId} to a different task ID ${issue.taskId}`);
   }
-  return { ...selection, status: canonical };
+  return {
+    provider: "beads",
+    taskId: issue.taskId,
+    title: issue.title,
+    status: beadsCanonicalStatus(issue.taskId, issue.status),
+    projectRoot: detection.projectRoot,
+  };
 }
 
 /**
  * Apply one canonical lifecycle status transition through the selected
  * provider's native mutation, then prove the exact task reached it by
- * re-reading natively. Backlog mutates its tracked Markdown task file;
- * Beads mutates the Dolt store (no task file exists). Returns the canonical
- * status exactly as the provider recorded it.
+ * re-reading natively. Identity is proven BEFORE any mutation: the task is
+ * resolved natively first and the raw requested ID must equal the provider's
+ * canonical ID exactly; a Beads shorthand that resolves to a different
+ * (longer) canonical ID rejects with zero writes. Backlog mutates its
+ * tracked Markdown task file; Beads mutates the Dolt store (no task file
+ * exists). Returns the discriminated provider result exactly as re-read.
  */
 export function mutateProviderTaskStatus(options: {
   projectRoot: string;
@@ -688,10 +684,33 @@ export function mutateProviderTaskStatus(options: {
   status: CanonicalLifecycleStatus;
   note?: string;
   runner?: CommandRunner;
-}): ProviderTaskSelection {
+}): ProviderTaskResolution {
   const runner = options.runner ?? new ProcessCommandRunner();
   const detection = requireLiveProvider(options.projectRoot, runner);
   checkSelectedProviderCapabilities(detection, runner);
+
+  // Identity proof before mutation: resolve natively and require the raw
+  // requested ID to equal the provider canonical ID exactly.
+  const before = detection.evidence.provider === "backlog"
+    ? resolveBacklogTask(detection.projectRoot, options.taskId, runner)
+    : null;
+  if (detection.evidence.provider === "backlog") {
+    if (!before) {
+      throw new Error(`Backlog could not resolve ${options.taskId} before mutation; no writes were attempted`);
+    }
+    if (before.taskId !== options.taskId) {
+      throw new Error(
+        `refusing to mutate: requested ${options.taskId} but Backlog resolved canonical ID ${before.taskId}; no writes were attempted`,
+      );
+    }
+  } else {
+    const issue = readBeadsIssue(detection.projectRoot, options.taskId, runner);
+    if (issue.taskId !== options.taskId) {
+      throw new Error(
+        `refusing to mutate: requested ${options.taskId} but Beads resolved canonical ID ${issue.taskId}; no writes were attempted`,
+      );
+    }
+  }
 
   if (detection.evidence.provider === "backlog") {
     const args = ["task", "edit", "--status", options.status];
@@ -714,4 +733,24 @@ export function mutateProviderTaskStatus(options: {
     throw new Error(`task ${options.taskId} did not reach ${options.status}`);
   }
   return resolved;
+}
+
+/**
+ * Narrow a provider resolution to the existing Backlog task-file contract.
+ * File-bound lifecycle paths call this at their use boundary: a Backlog
+ * result passes through unchanged, and a Beads result rejects explicitly
+ * until that path's planned provider slice lands.
+ */
+export function requireBacklogTaskSelection(
+  resolution: ProviderTaskResolution | null,
+  context: string,
+): BacklogTaskSelection | null {
+  if (!resolution) return null;
+  if (resolution.provider !== "backlog") {
+    throw new Error(
+      `task ${resolution.taskId} resolves through Beads; ${context} still requires `
+      + "the Backlog task-file contract until its provider slice lands",
+    );
+  }
+  return resolution;
 }

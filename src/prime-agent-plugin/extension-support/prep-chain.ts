@@ -4,7 +4,7 @@ import {
   type BacklogTaskSelection,
   validateFutureLocation,
 } from "./reviewed-plan-support.ts";
-import { resolveProviderTask } from "./task-providers.ts";
+import { requireBacklogTaskSelection, resolveProviderTask } from "./task-providers.ts";
 import {
   admitWorkflowChain,
   canonicalWorkflowPrompt,
@@ -32,22 +32,16 @@ export type TaskPrepChainAdmissionResult =
 type BacklogTaskResolver = (cwd: string, rawTaskId: string) => BacklogTaskSelection | null;
 
 /**
- * Default task resolver: provider-aware resolution narrowed to the existing
- * Backlog selection shape the planning chain consumes. A Beads store resolves
- * the task (provider + canonical status) with no task Markdown path; the
- * planning preflights that require a Backlog task file reject it explicitly.
+ * Default task resolver: provider-aware resolution narrowed at the use
+ * boundary to the existing Backlog selection the planning chain consumes.
+ * A Beads store resolves the task natively; the file-bound planning
+ * preflights reject it explicitly until their provider slice lands.
  */
-const defaultTaskResolver: BacklogTaskResolver = (cwd, rawTaskId) => {
-  const selection = resolveProviderTask(cwd, rawTaskId);
-  if (!selection) return null;
-  if (selection.provider !== "backlog") {
-    throw new Error(
-      `task ${selection.taskId} resolves through Beads; task-native planning chain admission `
-      + "still requires the Backlog task-file contract until its provider slice lands",
-    );
-  }
-  return selection as BacklogTaskSelection;
-};
+const defaultTaskResolver: BacklogTaskResolver = (cwd, rawTaskId) =>
+  requireBacklogTaskSelection(
+    resolveProviderTask(cwd, rawTaskId),
+    "task-native planning chain admission",
+  );
 type TaskPrepChainPreflight = (
   ctx: ExtensionContext,
   selection: BacklogTaskSelection,

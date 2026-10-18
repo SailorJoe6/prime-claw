@@ -16,7 +16,7 @@ import {
 import {
   type BacklogTaskSelection,
 } from "./reviewed-plan-support.ts";
-import { resolveProviderTask } from "./task-providers.ts";
+import { requireBacklogTaskSelection, resolveProviderTask } from "./task-providers.ts";
 
 /**
  * Default resolver: provider-aware task resolution narrowed to the existing
@@ -25,15 +25,10 @@ import { resolveProviderTask } from "./task-providers.ts";
  * reject it explicitly until their own provider slice lands.
  */
 function defaultOwnershipTaskResolver(cwd: string, rawTaskId: string): BacklogTaskSelection | null {
-  const selection = resolveProviderTask(cwd, rawTaskId);
-  if (!selection) return null;
-  if (selection.provider !== "backlog") {
-    throw new Error(
-      `task ${selection.taskId} resolves through Beads; this Episode ownership path still `
-      + "requires the Backlog task-file contract until its provider slice lands",
-    );
-  }
-  return selection as BacklogTaskSelection;
+  return requireBacklogTaskSelection(
+    resolveProviderTask(cwd, rawTaskId),
+    "this Episode ownership path",
+  );
 }
 
 export interface TaskEpisodeReservationGit {

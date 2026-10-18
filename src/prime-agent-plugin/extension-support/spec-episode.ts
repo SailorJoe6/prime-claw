@@ -35,7 +35,7 @@ import {
   validateFutureLocation,
   type BacklogTaskSelection,
 } from "./reviewed-plan-support.ts";
-import { resolveProviderTask, mutateProviderTaskStatus } from "./task-providers.ts";
+import { mutateProviderTaskStatus, requireBacklogTaskSelection, resolveProviderTask } from "./task-providers.ts";
 import {
   ProcessCommandRunner,
   resolveNearestProjectRoot,
@@ -60,17 +60,11 @@ import {
  * and status mutation themselves already run through the selected provider.
  */
 function defaultEpisodeTaskResolver(runner: CommandRunner) {
-  return (cwd: string, exactTaskId: string): BacklogTaskSelection | null => {
-    const selection = resolveProviderTask(cwd, exactTaskId, runner);
-    if (!selection) return null;
-    if (selection.provider !== "backlog") {
-      throw new Error(
-        `task ${selection.taskId} resolves through Beads; this Episode lifecycle path still `
-        + "requires the Backlog task-file contract until its provider slice lands",
-      );
-    }
-    return selection as BacklogTaskSelection;
-  };
+  return (cwd: string, exactTaskId: string): BacklogTaskSelection | null =>
+    requireBacklogTaskSelection(
+      resolveProviderTask(cwd, exactTaskId, runner),
+      "this Episode lifecycle path",
+    );
 }
 
 const PROTOCOL_NAME = "prime-agent.daemon";

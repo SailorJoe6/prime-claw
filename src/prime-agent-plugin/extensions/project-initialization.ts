@@ -18,7 +18,7 @@ import {
 
 type Action = "reconcile" | "accept-override" | "reset" | "review-request" | "review-start" | "review-complete" | "review-cancel" | "review-restore" | "review-keep";
 
-function summarize(result: ReconcileResult, detailed = false): string {
+export function summarizeReconcile(result: ReconcileResult, detailed = false): string {
   if (result.skippedActiveEpisode) {
     return result.skipReason === "uncertain-episode-activity"
       ? `Prime Claw reconciliation skipped ${result.project.root}: Episode activity could not be proven inactive`
@@ -35,9 +35,9 @@ function summarize(result: ReconcileResult, detailed = false): string {
     : result.taskProvider.status === "selected"
       ? `provider=selected(${result.taskProvider.provider})`
       : result.taskProvider.status === "blocked"
-        ? `provider=blocked(${result.taskProvider.code})`
+        ? `provider=blocked(${result.taskProvider.code}: ${result.taskProvider.detail} ${result.taskProvider.remediation})`
         : result.taskProvider.status === "failed"
-          ? `provider=failed`
+          ? `provider=failed(${result.taskProvider.detail})`
           : "provider=not-run";
   const base = `Prime Claw project ${result.project.root} (${result.project.kind}): ${actions || "no-assets"} conflicts=${result.conflicts} ${registration} ${provider}`;
   if (!detailed || result.conflicts === 0) return base;
@@ -50,7 +50,7 @@ function summarize(result: ReconcileResult, detailed = false): string {
 }
 
 function actionSummary(value: unknown, detailed = true): string {
-  if (value && typeof value === "object" && "items" in value) return summarize(value as ReconcileResult, detailed);
+  if (value && typeof value === "object" && "items" in value) return summarizeReconcile(value as ReconcileResult, detailed);
   if (value && typeof value === "object" && typeof (value as any).message === "string") return (value as any).message;
   if (value && typeof value === "object" && (value as any).fallback) {
     const diff = typeof (value as any).diff === "string" && (value as any).diff.trim() ? (value as any).diff.trimEnd() : "(no textual differences)";
@@ -172,9 +172,9 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
           .filter((item) => ["created", "migrated", "updated", "recovered"].includes(item.action) && item.destination.startsWith(".agents/skills/") && item.destination.endsWith("/SKILL.md"))
           .map((item) => join(result.project.root, item.destination));
         if (result.skipReason === "uncertain-episode-activity") {
-          ctx.ui.notify(summarize(result), "warning");
+          ctx.ui.notify(summarizeReconcile(result), "warning");
         } else if (result.changed || result.conflicts > 0 || result.registration.status === "unavailable") {
-          ctx.ui.notify(summarize(result), result.conflicts > 0 ? "warning" : "info");
+          ctx.ui.notify(summarizeReconcile(result), result.conflicts > 0 ? "warning" : "info");
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

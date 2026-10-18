@@ -14,6 +14,7 @@ import {
   checkSelectedProviderCapabilities,
   detectTaskProvider,
   mutateProviderTaskStatus,
+  requireBacklogTaskSelection,
   resolveProviderTask,
 } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 
@@ -462,11 +463,18 @@ test("provider task resolution routes a Beads repo through the native bd read wi
     ["bd\0show\0TST-1\0--json"]: { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status: "in_design" }]) + "\n", stderr: "", status: 0 },
   });
   const selection = resolveProviderTask(root, "TST-1", runner);
-  assert.equal(selection.provider, "beads");
-  assert.equal(selection.taskId, "TST-1");
-  assert.equal(selection.status, "In Design");
-  assert.equal(selection.taskPath, null);
-  assert.equal(selection.taskPathRelative, null);
+  assert.deepEqual(selection, {
+    provider: "beads",
+    taskId: "TST-1",
+    title: "Fixture task",
+    status: "In Design",
+    projectRoot: root,
+  });
+  // No provider-neutral normalization: no invented plan/path/reference fields.
+  assert.equal("taskPath" in selection, false);
+  assert.equal("taskPathRelative" in selection, false);
+  assert.equal("implementationPlan" in selection, false);
+  assert.equal("references" in selection, false);
 });
 
 test("provider task resolution fails closed on a Beads task with an unmapped status", () => {
@@ -586,4 +594,119 @@ test("provider status mutation fails closed when the re-read task never reaches 
     () => mutateProviderTaskStatus({ projectRoot: root, taskId: "TST-1", status: "Blocked", runner }),
     /did not reach Blocked/,
   );
+});
+
+test("provider task resolution keeps the Backlog branch as the exact existing selection plus provider identity", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  writeBacklogTaskFile(root, "backlog/tasks/tst-1.md");
+  const runner = detectionRunner({
+    ...BACKLOG_OK,
+    ["backlog\0task\0view\0--json\0--\0TST-1"]: { stdout: backlogTaskView() + "\n", stderr: "", status: 0 },
+  });
+  const selection = resolveProviderTask(root, "TST-1", runner);
+  assert.deepEqual(selection, {
+    provider: "backlog",
+    taskId: "TST-1",
+    title: "Fixture task",
+    status: "In Planning",
+    implementationPlan: "One meaningful step",
+    projectRoot: root,
+    taskPath: realpathSync(join(root, "backlog/tasks/tst-1.md")),
+    taskPathRelative: "backlog/tasks/tst-1.md",
+  });
+});
+
+test("requireBacklogTaskSelection passes Backlog through and rejects the Beads branch at the boundary", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  writeBacklogTaskFile(root, "backlog/tasks/tst-1.md");
+  const backlogRunner = detectionRunner({
+    ...BACKLOG_OK,
+    ["backlog\0task\0view\0--json\0--\0TST-1"]: { stdout: backlogTaskView() + "\n", stderr: "", status: 0 },
+  });
+  const backlogSelection = requireBacklogTaskSelection(resolveProviderTask(root, "TST-1", backlogRunner), "test path");
+  assert.equal(backlogSelection.taskPathRelative, "backlog/tasks/tst-1.md");
+
+  const beadsRoot = fixtureRoot();
+  writeBeadsStore(beadsRoot);
+  const beadsRunner = detectionRunner({
+    ...BEADS_OK,
+    ["bd\0show\0TST-1\0--json"]: { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status: "in_design" }]) + "\n", stderr: "", status: 0 },
+  });
+  assert.throws(
+    () => requireBacklogTaskSelection(resolveProviderTask(beadsRoot, "TST-1", beadsRunner), "test path"),
+    /resolves through Beads; test path still requires the Backlog task-file contract/,
+  );
+  assert.equal(requireBacklogTaskSelection(null, "test path"), null);
+});
+
+test("provider status mutation rejects Beads shorthand with zero writes before any mutation", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root);
+  const real = new ProcessCommandRunner();
+  const calls = [];
+  const runner = { run(command, args, options = {}) {
+    const key = [command, ...args].join("\0");
+    calls.push(key);
+    const canned = {
+      ...BEADS_OK,
+      ...BD_NO_DB_FALSE,
+      // Native shorthand: requested tst-pyb resolves to the longer canonical ID.
+      ["bd\0show\0tst-pyb\0--json"]: { stdout: JSON.stringify([{ id: "tst-pyb-full-9f2c", title: "Fixture task", status: "in_design" }]) + "\n", stderr: "", status: 0 },
+    }[key];
+    if (canned) return canned;
+    return real.run(command, args, options);
+  } };
+  assert.throws(
+    () => mutateProviderTaskStatus({ projectRoot: root, taskId: "tst-pyb", status: "In Progress", runner }),
+    /refusing to mutate: requested tst-pyb but Beads resolved canonical ID tst-pyb-full-9f2c; no writes were attempted/,
+  );
+  assert.equal(calls.some((key) => key.startsWith("bd\0update")), false);
+});
+
+test("provider status mutation rejects a Backlog ID that resolves to a different canonical ID with zero writes", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  writeBacklogTaskFile(root, "backlog/tasks/tst-1.md");
+  const real = new ProcessCommandRunner();
+  const calls = [];
+  const runner = { run(command, args, options = {}) {
+    const key = [command, ...args].join("\0");
+    calls.push(key);
+    const canned = {
+      ...BACKLOG_OK,
+      ["backlog\0task\0view\0--json\0--\0TST-1"]: { stdout: backlogTaskView("TST-9", "In Planning") + "\n", stderr: "", status: 0 },
+    }[key];
+    if (canned) return canned;
+    return real.run(command, args, options);
+  } };
+  assert.throws(
+    () => mutateProviderTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner }),
+    /refusing to mutate: requested TST-1 but Backlog resolved canonical ID TST-9; no writes were attempted/,
+  );
+  assert.equal(calls.some((key) => key.startsWith("backlog\0task\0edit")), false);
+});
+
+test("provider status mutation fails closed when the task cannot be resolved before mutation", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root);
+  const real = new ProcessCommandRunner();
+  const calls = [];
+  const runner = { run(command, args, options = {}) {
+    const key = [command, ...args].join("\0");
+    calls.push(key);
+    const canned = {
+      ...BEADS_OK,
+      ...BD_NO_DB_FALSE,
+      ["bd\0show\0GHOST-1\0--json"]: { stdout: "", stderr: "issue not found", status: 1 },
+    }[key];
+    if (canned) return canned;
+    return real.run(command, args, options);
+  } };
+  assert.throws(
+    () => mutateProviderTaskStatus({ projectRoot: root, taskId: "GHOST-1", status: "In Progress", runner }),
+    /Beads could not resolve GHOST-1/,
+  );
+  assert.equal(calls.some((key) => key.startsWith("bd\0update")), false);
 });

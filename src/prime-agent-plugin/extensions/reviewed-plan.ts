@@ -38,7 +38,7 @@ import {
   validateFutureLocation,
   type BacklogTaskSelection,
 } from "../extension-support/reviewed-plan-support.ts";
-import { resolveProviderTask } from "../extension-support/task-providers.ts";
+import { requireBacklogTaskSelection, resolveProviderTask } from "../extension-support/task-providers.ts";
 
 /**
  * Default tool-boundary resolver: provider-aware task resolution narrowed to
@@ -47,15 +47,10 @@ import { resolveProviderTask } from "../extension-support/task-providers.ts";
  * path rejects it explicitly until its own provider slice lands.
  */
 function defaultToolTaskResolver(cwd: string, rawTaskId: string): BacklogTaskSelection | null {
-  const selection = resolveProviderTask(cwd, rawTaskId);
-  if (!selection) return null;
-  if (selection.provider !== "backlog") {
-    throw new Error(
-      `task ${selection.taskId} resolves through Beads; create_task_episode still requires `
-      + "the Backlog task-file contract until its provider slice lands",
-    );
-  }
-  return selection as BacklogTaskSelection;
+  return requireBacklogTaskSelection(
+    resolveProviderTask(cwd, rawTaskId),
+    "create_task_episode",
+  );
 }
 
 /**

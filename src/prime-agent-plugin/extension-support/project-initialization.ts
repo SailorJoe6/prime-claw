@@ -18,11 +18,11 @@ import {
 } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { activeLegacyPlanFiles } from "./legacy-workflow.ts";
 import { readAllEpisodeOwnership } from "./episode-ownership.ts";
-import { detectTaskProvider } from "./task-providers.ts";
+import { CANONICAL_LIFECYCLE_STATUSES, checkBacklogCapabilities, detectTaskProvider } from "./task-providers.ts";
 
 export const TEMPLATE_MANIFEST = ".prime-claw/templates.json";
 export const TEMPLATE_REVIEW_STATE = ".prime-claw/template-review.json";
@@ -639,19 +639,82 @@ function ensureProjectTaskProvider(projectRoot: string, runner: CommandRunner): 
   }
   if (detection.kind === "selected") return { status: "selected", provider: detection.evidence.provider };
   if (detection.kind === "blocked") return { status: "blocked", code: detection.code, detail: detection.detail, remediation: detection.remediation };
+  // Native initialization: the real managed Backlog executable, invoked
+  // non-interactively with the deterministic project name (the repository
+  // basename) as the supported positional argument. Upstream writes the
+  // generic To Do/In Progress/Done statuses, which cannot pass the existing
+  // capability gate; `backlog config set` has no `statuses` key, so the exact
+  // ordered canonical lifecycle is established through the supported native
+  // configuration file update that upstream documents (`backlog config` edits
+  // the folder configuration file), then proven by the native capability gate.
   const init = runner.run(
     "backlog",
-    ["init", "--defaults", "--backlog-dir", ".backlog", "--config-location", "folder", "--integration-mode", "none"],
+    ["init", basename(projectRoot), "--defaults", "--backlog-dir", ".backlog", "--config-location", "folder", "--integration-mode", "none"],
     { cwd: projectRoot, allowFailure: true },
   );
   if (init.status !== 0) {
-    return { status: "failed", detail: init.stderr.trim() || init.stdout.trim() || `exit ${init.status}` };
+    return { status: "failed", detail: `backlog init failed: ${init.stderr.trim() || init.stdout.trim() || `exit ${init.status}`}` };
+  }
+  const configPath = join(projectRoot, ".backlog", "config.yml");
+  if (!existsSync(configPath) || !statSync(configPath).isFile()) {
+    return { status: "failed", detail: `backlog init completed but ${configPath} does not exist` };
+  }
+  try {
+    establishCanonicalBacklogLifecycle(configPath);
+  } catch (error) {
+    return { status: "failed", detail: error instanceof Error ? error.message : String(error) };
   }
   const after = detectTaskProvider(projectRoot, runner);
   if (after.kind !== "selected" || after.evidence.provider !== "backlog") {
     return { status: "failed", detail: "backlog init completed but native provider discovery did not select the new Backlog store" };
   }
+  try {
+    checkBacklogCapabilities(projectRoot, runner);
+  } catch (error) {
+    return { status: "failed", detail: `the new Backlog store is not lifecycle-ready: ${error instanceof Error ? error.message : String(error)}` };
+  }
   return { status: "initialized", provider: "backlog", storeDir: join(projectRoot, ".backlog") };
+}
+
+/**
+ * Establish the exact ordered canonical lifecycle in a freshly initialized
+ * Backlog folder configuration. Upstream `backlog init` hardcodes the generic
+ * To Do/In Progress/Done statuses and its supported customization surface for
+ * them is the configuration file (`backlog config` wizard, Web UI, or editing
+ * `config.yml`); `backlog config set` exposes no `statuses` key. This performs
+ * the narrow, idempotent native-format update: replace only the `statuses:`
+ * and `default_status:` lines the initializer wrote, preserving every other
+ * native value byte-for-byte, and verify the exact result before returning.
+ */
+function establishCanonicalBacklogLifecycle(configPath: string): void {
+  const content = readFileSync(configPath, "utf8");
+  const lines = content.split("\n");
+  const statusesLine = lines.findIndex((line) => /^statuses:/.test(line));
+  const defaultLine = lines.findIndex((line) => /^default_status:/.test(line));
+  if (statusesLine < 0 || defaultLine < 0) {
+    throw new Error(
+      `the initialized ${configPath} has no recognizable statuses:/default_status: lines; `
+      + "refusing to guess the configuration format",
+    );
+  }
+  lines[statusesLine] = `statuses: [${CANONICAL_LIFECYCLE_STATUSES.map((status) => `"${status}"`).join(", ")}]`;
+  lines[defaultLine] = `default_status: "${CANONICAL_LIFECYCLE_STATUSES[0]}"`;
+  const updated = lines.join("\n");
+  if (updated === content) {
+    throw new Error(`the initialized ${configPath} could not be updated to the canonical lifecycle`);
+  }
+  writeFileSync(configPath, updated);
+  // Prove the exact native result was written.
+  const written = readFileSync(configPath, "utf8");
+  const writtenStatuses = written.match(/^statuses: \[(.*)\]$/m);
+  const writtenDefault = written.match(/^default_status: "(.*)"$/m);
+  const expectedStatuses = CANONICAL_LIFECYCLE_STATUSES.map((status) => `"${status}"`).join(", ");
+  if (!writtenStatuses || writtenStatuses[1] !== expectedStatuses) {
+    throw new Error(`the initialized ${configPath} did not record the exact ordered canonical lifecycle`);
+  }
+  if (!writtenDefault || writtenDefault[1] !== CANONICAL_LIFECYCLE_STATUSES[0]) {
+    throw new Error(`the initialized ${configPath} did not record canonical default status ${CANONICAL_LIFECYCLE_STATUSES[0]}`);
+  }
 }
 
 export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileResult {
@@ -797,7 +860,10 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
       } catch (error) { registration = { status: "unavailable", error: error instanceof Error ? error.message : String(error) }; }
     }
     const taskProvider = ensureProjectTaskProvider(project.root, runner);
-    const conflicts = items.filter((item) => item.action === "preserved" || item.action === "blocked").length + remaining.length + (registration.status === "unavailable" ? 1 : 0);
+    // Provider setup failures and blocked evidence count in the existing
+    // conflict decision so command/tool/startup summaries surface them.
+    const providerConflicts = taskProvider.status === "blocked" || taskProvider.status === "failed" ? 1 : 0;
+    const conflicts = items.filter((item) => item.action === "preserved" || item.action === "blocked").length + remaining.length + (registration.status === "unavailable" ? 1 : 0) + providerConflicts;
     return { project, registration, items, manifestWritten, changed: manifestWritten || items.some((item) => ["created", "migrated", "updated", "recovered", "retired"].includes(item.action)) || taskProvider.status === "initialized", conflicts, legacyRemaining: remaining, skippedActiveEpisode: false, taskProvider };
   } finally { release(); }
 }

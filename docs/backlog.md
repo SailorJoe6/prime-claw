@@ -148,25 +148,42 @@ capability checks, not version assertions.
 
 The existing exact task-resolution call sites (`/plan` admission, task
 Episode creation and ownership reservation/transition) resolve through
-`resolveProviderTask`: detection plus capability gate first, then the native
-read (`backlog task view --json`; `bd show <id> --json`), with Beads statuses
-mapped onto the canonical lifecycle and unmapped statuses refused. The
-Conversation task-admission status transition mutates through
-`mutateProviderTaskStatus` (`backlog task edit --status`; `bd update --status`
-with the mapped status) and proves the exact target status by native re-read.
-These file-bound lifecycle paths still require the Backlog task-file contract
-and reject a Beads-resolved task explicitly until their sync, publication, and
-archive behavior lands in the later workspace slices; a Backlog repository's
-behavior is unchanged.
+`resolveProviderTask`, which returns a discriminated native result: the
+Backlog branch is the existing `BacklogTaskSelection` plus provider identity,
+and the Beads branch is the validated native `bd show --json` issue view
+(id/title/status; no task file, plan, or references are invented — Beads
+stores none). Detection plus the capability gate run first; none, dual,
+malformed, or unavailable evidence fails closed, and Beads statuses map onto
+the canonical lifecycle only at the use boundary with unmapped statuses
+refused. These file-bound lifecycle paths narrow the result through
+`requireBacklogTaskSelection` and reject a Beads-resolved task explicitly
+until their sync, publication, and archive behavior lands in the later
+workspace slices; a Backlog repository's behavior is unchanged.
+
+The Conversation task-admission status transition mutates through
+`mutateProviderTaskStatus`. It proves exact provider/task identity BEFORE any
+write: the task is resolved natively first and the raw requested ID must equal
+the provider's canonical ID exactly, so a Beads shorthand that resolves to a
+longer canonical ID rejects with zero writes. Only then does the native
+mutation run (`backlog task edit --status`; `bd update --status` with the
+mapped status), followed by a native re-read proving the exact task reached
+the exact target status.
 
 Project initialization (`initialize_prime_claw` reconcile) guarantees exactly
-one live provider: with no live evidence it runs the pinned managed
-`backlog init --defaults --backlog-dir .backlog --config-location folder
---integration-mode none` once; existing Backlog or Beads evidence is preserved
-untouched; dual, malformed, or uncertain evidence blocks with exact
-remediation; and an initialization failure is reported on the result without
-failing asset reconciliation. Later slices add provider-native workspace
-preparation, revision evidence, and the remaining lifecycle call sites.
+one live provider: with no live evidence it runs the real pinned managed
+`backlog init <repo-basename> --defaults --backlog-dir .backlog
+--config-location folder --integration-mode none` once, then establishes the
+exact ordered canonical lifecycle (`statuses:` + `default_status:`) in the
+native folder configuration — upstream hardcodes generic statuses and
+`backlog config set` exposes no `statuses` key, so the supported native
+configuration-file update is the only non-interactive surface — and proves the
+store lifecycle-ready through the existing capability gate. A second reconcile
+is a no-op. Existing Backlog or Beads evidence is preserved untouched; dual,
+malformed, or uncertain evidence blocks with exact remediation; and a blocked
+or failed provider setup counts as a reconcile conflict and surfaces its exact
+detail/remediation in command, tool, and startup summaries without failing
+asset reconciliation. Later slices add provider-native workspace preparation,
+revision evidence, and the remaining lifecycle call sites.
 
 ## Project task workflow
 
