@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 19:38'
+updated_date: '2026-10-18 19:51'
 labels: []
 dependencies: []
 references:
@@ -241,4 +241,13 @@ Managed Markdown instructions receive content review, reconciliation checks, and
 Pre-existing main-branch test drift observed (NOT from this slice, reproduced on canonical main): `test_runtime_image.py::test_backlog_source_identity_matches_pin` (deps/backlog submodule is at 5d556c19 = v1.53.0-1-g5d556c19 after the `task restore` fork commit, but `scripts/build-backlog.sh`, `docker/runtime.Dockerfile`, and `tests/test_backlog_build.py` still pin fd20f714), `test_project_initialization.py::test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree` (templates.json manifest not re-reconciled after 7afcf67 changed design/spec-it-out template sources), `test_container_helpers_static.py` (two failures: unbridged task_episode_admission suite; runtime-connect host-safe sentinel). Reported to the owning Conversation for triage; left untouched as out of scope.
 
 Remaining for later sub-slices of plan slice 1: route existing lifecycle call sites (`resolveBacklogTask`, task admission status mutations) through provider-aware resolution, live-provider gating at lifecycle boundaries, and plugin-managed `.backlog/` defaulting in project initialization. Workspace preparation (orphan task branch + nested clones), revision evidence, and sync/publication remain plan slices 2+.
+
+2026-10-18 Conversation review of slice 1a (6c9878a): candidate ACCEPTED with three recorded in-scope defects; repair the pushed candidate before advancing to lifecycle routing.
+
+Accepted repair scope (exact):
+1. Root `backlog.config.yml` branch without `backlog_directory`: match native Backlog store selection — prefer a built-in directory carrying folder configuration BEFORE falling back to a bare built-in directory (current code takes the first existing bare `backlog/` over `.backlog/config.yml`). Parity fixture: empty `backlog/` plus `.backlog/config.yml` must select `.backlog`.
+2. Export-only/non-initialized `.beads/` residue (e.g. only `issues.jsonl`) is NO live Beads evidence (not malformed): export-only alone yields `none`; valid Backlog plus export-only Beads still selects Backlog. Genuine partial native initialization (e.g. config.yaml present, metadata.json missing/invalid) keeps blocking.
+3. Replace the literal YAML regex for `no-db` with the supported native effective-config read (`bd config get no-db`) once native Beads store evidence exists; block when the effective value is true OR unreadable/uncertain, with exact remediation. Regression: quoted `no-db: "true"` (native bd reports true) must block.
+
+Boundary: least-technology only — no framework, registry, state, semantic machinery, or test-matrix expansion. Re-run focused host tests + Docker tier-1 bridge, update notes/docs only as needed, commit and push one clean repair candidate, stop and report. Pre-existing main failures and later slices stay untouched.
 <!-- SECTION:NOTES:END -->
