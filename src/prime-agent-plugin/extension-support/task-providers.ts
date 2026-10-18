@@ -97,7 +97,6 @@ const BACKLOG_ROOT_CONFIG = "backlog.config.yml";
 const BACKLOG_FOLDER_CONFIGS = ["config.yml", "config.yaml"] as const;
 const BACKLOG_BUILT_IN_DIRS = ["backlog", ".backlog"] as const;
 const BEADS_DIR = ".beads";
-const BEADS_NO_DB_RE = /^\s*no-db:\s*true\s*(?:#.*)?$/m;
 
 function isFile(path: string): boolean {
   try {
@@ -232,9 +231,14 @@ function scanBacklog(projectRoot: string): ScanResult {
         },
       };
     }
+    // Mirror upstream built-in selection: a built-in directory carrying
+    // folder configuration wins over a bare built-in directory, and
+    // `backlog/` then `.backlog/` breaks ties among each class.
+    let firstBareDirName: (typeof BACKLOG_BUILT_IN_DIRS)[number] | null = null;
     for (const dirName of BACKLOG_BUILT_IN_DIRS) {
       const storePath = join(projectRoot, dirName);
-      if (isDirectory(storePath)) {
+      if (!isDirectory(storePath)) continue;
+      if (folderConfigPath(storePath)) {
         return {
           evidence: {
             provider: "backlog",
@@ -245,6 +249,18 @@ function scanBacklog(projectRoot: string): ScanResult {
           },
         };
       }
+      if (firstBareDirName === null) firstBareDirName = dirName;
+    }
+    if (firstBareDirName !== null) {
+      return {
+        evidence: {
+          provider: "backlog",
+          configPath: rootConfigPath,
+          configSource: "root",
+          storeDir: join(projectRoot, firstBareDirName),
+          layout: firstBareDirName === ".backlog" ? ".backlog" : "backlog",
+        },
+      };
     }
     return {
       evidence: {
@@ -279,7 +295,7 @@ function scanBacklog(projectRoot: string): ScanResult {
   return null;
 }
 
-function scanBeads(projectRoot: string): ScanResult {
+function scanBeads(projectRoot: string, runner: CommandRunner): ScanResult {
   const beadsPath = join(projectRoot, BEADS_DIR);
   if (!isDirectory(beadsPath)) {
     try {
@@ -297,6 +313,11 @@ function scanBeads(projectRoot: string): ScanResult {
   }
   const configPath = join(beadsPath, "config.yaml");
   const metadataPath = join(beadsPath, "metadata.json");
+  if (!isFile(configPath) && !isFile(metadataPath)) {
+    // Export residue (for example only issues.jsonl) or an empty directory is
+    // not live evidence and not partial initialization: ignore it.
+    return null;
+  }
   if (!isFile(configPath) || !isFile(metadataPath)) {
     return {
       blocked: {
@@ -329,19 +350,22 @@ function scanBeads(projectRoot: string): ScanResult {
       },
     };
   }
-  let configText = "";
-  try {
-    configText = readFileSync(configPath, "utf8");
-  } catch (error) {
+  // Probe the native effective no-db mode instead of parsing config.yaml
+  // text: quoted or relocated values must resolve exactly the way `bd`
+  // resolves them. A failed or ambiguous probe blocks because JSONL-only
+  // authority cannot be ruled out.
+  const noDbResult = runner.run("bd", ["config", "get", "no-db"], { cwd: projectRoot, allowFailure: true });
+  const noDbValue = noDbResult.stdout.trim();
+  if (noDbResult.status !== 0 || (noDbValue !== "true" && noDbValue !== "false")) {
     return {
       blocked: {
         code: "malformed-evidence",
-        detail: `${BEADS_DIR}/config.yaml is unreadable: ${error instanceof Error ? error.message : String(error)}`,
-        remediation: `Repair the Beads configuration or remove the incomplete ${BEADS_DIR} store`,
+        detail: `the effective Beads no-db mode is unreadable or uncertain: ${commandFailure("bd config get no-db", noDbResult)}`,
+        remediation: `Repair the Beads installation so \`bd config get no-db\` reports true or false, or remove the ${BEADS_DIR} store`,
       },
     };
   }
-  if (BEADS_NO_DB_RE.test(configText)) {
+  if (noDbValue === "true") {
     return {
       blocked: {
         code: "malformed-evidence",
@@ -375,7 +399,7 @@ export function detectTaskProvider(
   const projectRoot = resolveNearestProjectRoot(cwd, process.env.HOME ?? "", runner).root;
   const backlog = scanBacklog(projectRoot);
   if (backlog && "blocked" in backlog) return { kind: "blocked", projectRoot, ...backlog.blocked };
-  const beads = scanBeads(projectRoot);
+  const beads = scanBeads(projectRoot, runner);
   if (beads && "blocked" in beads) return { kind: "blocked", projectRoot, ...beads.blocked };
   if (backlog && beads) {
     const backlogPath = (backlog.evidence as BacklogProviderEvidence).configPath;

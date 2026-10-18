@@ -126,8 +126,11 @@ provider-selection file or shadow record:
   existing custom directory), otherwise `backlog/config.yml|yaml` or
   `.backlog/config.yml|yaml` selects that built-in store;
 - valid Beads evidence is a `.beads/` store with a coherent Dolt
-  `metadata.json` and `config.yaml` (`no-db` JSONL-only mode is unsupported;
-  `.beads/issues.jsonl` is export data, never live authority);
+  `metadata.json` and `config.yaml`; the effective `no-db` mode is read
+  natively (`bd config get no-db`) once store evidence exists, and enabled or
+  unreadable/uncertain mode blocks because `.beads/issues.jsonl` is export
+  data, never live authority. Export-only residue (a `.beads/` directory
+  without `config.yaml` and `metadata.json`) is ignored, not malformed;
 - malformed or uncertain evidence blocks with exact remediation, simultaneous
   Backlog and Beads evidence blocks as an incomplete migration, and no live
   evidence returns `none` so initialization can default to `.backlog/` unless

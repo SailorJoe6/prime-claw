@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import {
   BEADS_STATUS_MAP,
   CANONICAL_LIFECYCLE_STATUSES,
@@ -90,6 +91,24 @@ const BEADS_OK = {
   ["bd\0statuses\0--json"]: { stdout: BEADS_STATUSES_JSON + "\n", stderr: "", status: 0 },
 };
 
+const BD_NO_DB_FALSE = { ["bd\0config\0get\0no-db"]: { stdout: "false\n", stderr: "", status: 0 } };
+
+/**
+ * Runner for detection tests: fake the recorded `bd` probes and delegate
+ * everything else (Git project-root discovery) to the real process runner.
+ */
+function detectionRunner(extra = {}) {
+  const responses = { ...BD_NO_DB_FALSE, ...extra };
+  const real = new ProcessCommandRunner();
+  return {
+    run(command, args, options = {}) {
+      const key = [command, ...args].join("\0");
+      if (key in responses) return responses[key];
+      return real.run(command, args, options);
+    },
+  };
+}
+
 test("no live evidence returns none so initialization can default to .backlog", () => {
   const root = fixtureRoot();
   const detection = detectTaskProvider(root);
@@ -137,6 +156,57 @@ test("root backlog.config.yml takes precedence over folder configuration", () =>
   assert.equal(detection.evidence.configSource, "root");
   assert.equal(detection.evidence.configPath, configPath);
   assert.equal(detection.evidence.layout, "backlog");
+});
+
+test("root config without backlog_directory prefers the configured built-in directory over a bare one", () => {
+  const root = fixtureRoot();
+  writeRootConfig(root);
+  mkdirSync(join(root, "backlog"), { recursive: true });
+  const hiddenConfig = writeBacklogFolderConfig(root, ".backlog");
+  const detection = detectTaskProvider(root);
+  assert.equal(detection.kind, "selected");
+  assert.equal(detection.evidence.configSource, "root");
+  assert.equal(detection.evidence.storeDir, join(root, ".backlog"));
+  assert.equal(detection.evidence.layout, ".backlog");
+  assert.ok(hiddenConfig.startsWith(join(root, ".backlog")));
+});
+
+test("root config without backlog_directory falls back to a bare built-in directory", () => {
+  const root = fixtureRoot();
+  writeRootConfig(root);
+  mkdirSync(join(root, ".backlog"), { recursive: true });
+  const detection = detectTaskProvider(root);
+  assert.equal(detection.kind, "selected");
+  assert.equal(detection.evidence.configSource, "root");
+  assert.equal(detection.evidence.storeDir, join(root, ".backlog"));
+  assert.equal(detection.evidence.layout, ".backlog");
+});
+
+test("export-only .beads residue alone is not live evidence", () => {
+  const root = fixtureRoot();
+  const dir = join(root, ".beads");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "issues.jsonl"), "{\"id\":\"tst-1\"}\n");
+  const detection = detectTaskProvider(root);
+  assert.equal(detection.kind, "none");
+});
+
+test("valid backlog plus export-only .beads residue still selects backlog", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  const dir = join(root, ".beads");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "issues.jsonl"), "{\"id\":\"tst-1\"}\n");
+  const detection = detectTaskProvider(root);
+  assert.equal(detection.kind, "selected");
+  assert.equal(detection.evidence.provider, "backlog");
+});
+
+test("an empty .beads directory alone is not live evidence", () => {
+  const root = fixtureRoot();
+  mkdirSync(join(root, ".beads"), { recursive: true });
+  const detection = detectTaskProvider(root);
+  assert.equal(detection.kind, "none");
 });
 
 test("root config without a materialized store directory is valid evidence with a null store", () => {
@@ -188,7 +258,7 @@ test("root config with an escaping backlog_directory blocks as malformed", () =>
 test("a valid beads store selects beads with exact dolt metadata", () => {
   const root = fixtureRoot();
   const storeDir = writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const detection = detectTaskProvider(root);
+  const detection = detectTaskProvider(root, detectionRunner());
   assert.equal(detection.kind, "selected");
   assert.deepEqual(detection.evidence, {
     provider: "beads",
@@ -215,32 +285,52 @@ test("an incomplete beads store blocks with exact remediation", () => {
 test("a beads store without a dolt backend blocks as malformed", () => {
   const root = fixtureRoot();
   writeBeadsStore(root, { metadataOverrides: { backend: "sqlite" } });
-  const detection = detectTaskProvider(root);
+  const detection = detectTaskProvider(root, detectionRunner());
   assert.equal(detection.kind, "blocked");
   assert.match(detection.detail, /Dolt backend/);
 });
 
 test("beads no-db JSONL-only mode is never live authority", () => {
   const root = fixtureRoot();
-  writeBeadsStore(root, { configText: "# comment mentioning no-db: false\nno-db: true\n" });
-  const detection = detectTaskProvider(root);
+  writeBeadsStore(root);
+  const detection = detectTaskProvider(root, detectionRunner({
+    ["bd\0config\0get\0no-db"]: { stdout: "true\n", stderr: "", status: 0 },
+  }));
   assert.equal(detection.kind, "blocked");
   assert.match(detection.detail, /no-db/);
   assert.match(detection.detail, /issues\.jsonl/);
 });
 
-test("beads config comment text mentioning no-db is not misread as enabled", () => {
+test("a native quoted no-db true value blocks exactly like bd resolves it", () => {
   const root = fixtureRoot();
-  writeBeadsStore(root, { configText: "# Use no-db mode: JSONL-only\n# no-db: false\n" });
-  const detection = detectTaskProvider(root);
-  assert.equal(detection.kind, "selected");
+  writeBeadsStore(root, { configText: '# beads config\nno-db: "true"\n' });
+  const detection = detectTaskProvider(root, detectionRunner({
+    ["bd\0config\0get\0no-db"]: { stdout: "true\n", stderr: "", status: 0 },
+  }));
+  assert.equal(detection.kind, "blocked");
+  assert.match(detection.detail, /no-db/);
+});
+
+test("an unreadable or uncertain effective no-db mode blocks", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root);
+  for (const result of [
+    { stdout: "", stderr: "bd: executable unavailable", status: 127 },
+    { stdout: "no-db (not set)\n", stderr: "", status: 0 },
+  ]) {
+    const detection = detectTaskProvider(root, detectionRunner({
+      ["bd\0config\0get\0no-db"]: result,
+    }));
+    assert.equal(detection.kind, "blocked");
+    assert.match(detection.detail, /no-db mode is unreadable or uncertain/);
+  }
 });
 
 test("simultaneous valid backlog and beads evidence blocks as an incomplete migration", () => {
   const root = fixtureRoot();
   writeBacklogFolderConfig(root);
   writeBeadsStore(root);
-  const detection = detectTaskProvider(root);
+  const detection = detectTaskProvider(root, detectionRunner());
   assert.equal(detection.kind, "blocked");
   assert.equal(detection.code, "dual-providers");
   assert.match(detection.detail, /incomplete migration/);
