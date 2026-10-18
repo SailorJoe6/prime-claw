@@ -8,19 +8,31 @@ conversation was recently compacted, nothing is fresh.
 
 ## Select the bound authority
 
-A managed Episode prompt carries `<operator-episode-owner-session>`. Its exact
-value is the owning Conversation's registry key and intentionally differs from
-the Episode's own session ID. Inspect `.prime-claw/ownership.json` from the
-canonical primary checkout and select only that exact `ownerSessionId` entry
-before interpreting task/source tags. Require its recorded worktree and Episode
-session identity to match the current Episode. If a claimed live Episode lacks
-this owner tag or exact binding, stop for recovery; never scan all owners or infer
-the key from task/source placement. The file is a Conversation-keyed registry;
-an existing direct record is valid migration input. Other Conversations' entries
-never select or block this Episode, though repository-wide task/source collision
-checks inspect all non-inactive entries. In a linked Episode worktree, locate the
-canonical checkout through Git worktree metadata; a missing worktree-local file
-does not mean the tagged owner's entry is absent.
+A managed Episode prompt normally carries `<operator-episode-owner-session>`.
+Its exact value is the owning Conversation's registry key and intentionally
+differs from the Episode's own session ID. Inspect `.prime-claw/ownership.json`
+from the canonical primary checkout before interpreting task/source tags. When
+the file is a Conversation-keyed registry, require the tag and select only that
+exact `ownerSessionId` entry. If the tag or exact registry binding is missing,
+stop for recovery; never scan all owners or infer the key from task/source
+placement.
+
+One live-upgrade bootstrap exception applies only when the canonical file is the
+pre-upgrade direct record, not registry form. With no owner tag, its embedded
+`ownerSessionId` is self-identifying only after its non-inactive status, exact
+recorded current worktree, durable Episode ID, readable matching Episode session
+file, and exact prompt task/source binding all match this Episode. If a tag is
+present, it must match the embedded owner. Any failed or ambiguous check stops
+for recovery. The direct record remains valid migration input; this exception
+never applies to a registry and never authorizes scanning or choosing among
+owners.
+
+Require the selected record's worktree and Episode session identity to match the
+current Episode. Other Conversations' entries never select or block this
+Episode, though repository-wide task/source collision checks inspect all
+non-inactive entries. In a linked Episode worktree, locate the canonical checkout
+through Git worktree metadata; a missing worktree-local file does not mean the
+tagged owner's entry is absent.
 
 A valid version-1 ownership record selects **retained folder-plan mode**. A live
 version-1 Episode requires that record plus readable, non-empty active

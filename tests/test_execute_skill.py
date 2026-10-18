@@ -56,6 +56,26 @@ def test_agent_execute_skill_uses_canonical_definition() -> None:
     assert (AGENT_SKILL / "SKILL.md").read_bytes() == EXECUTE_SKILL.read_bytes()
 
 
+def test_execute_skill_bootstraps_only_an_exact_pre_upgrade_direct_owner() -> None:
+    text = " ".join(EXECUTE_SKILL.read_text().split())
+
+    for fragment in (
+        "When the file is a Conversation-keyed registry, require the tag",
+        "If the tag or exact registry binding is missing, stop for recovery",
+        "One live-upgrade bootstrap exception applies only when the canonical file is the pre-upgrade direct record, not registry form",
+        "its embedded `ownerSessionId` is self-identifying only after its non-inactive status",
+        "exact recorded current worktree",
+        "durable Episode ID",
+        "readable matching Episode session file",
+        "exact prompt task/source binding",
+        "If a tag is present, it must match the embedded owner",
+        "Any failed or ambiguous check stops for recovery",
+        "this exception never applies to a registry",
+        "never authorizes scanning or choosing among owners",
+    ):
+        assert fragment in text
+
+
 def test_task_native_execute_binds_exact_task_and_preserves_status_authority() -> None:
     text = " ".join(EXECUTE_SKILL.read_text().split())
 

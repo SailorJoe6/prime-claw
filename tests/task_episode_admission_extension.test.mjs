@@ -490,6 +490,180 @@ try {
 });
 
 
+test("separate-process recovery waits for another owner's admission reservation boundary", async (t) => {
+  for (const recoveryMode of ["blocked", "rollback"]) {
+    await t.test(recoveryMode, async () => {
+      const f = fixture();
+      const created = execFileSync(BACKLOG, [
+        "task", "create", `Second ${recoveryMode} recovery-race task`,
+        "--status", "In Planning",
+        "--description", "Create an independently owned Episode",
+        "--plan", "1. Create the bounded resource.\n2. Verify exact identity.",
+        "--plain",
+      ], { cwd: f.root, encoding: "utf8" });
+      const secondId = created.match(/PRIMECLAW-[0-9.]+/)?.[0];
+      assert.ok(secondId);
+      const secondTask = view(f.root, secondId);
+      git(f.root, "add", "--", secondTask.path);
+      git(f.root, "commit", "-q", "--only", "-m", "plan recovery-race task", "--", secondTask.path);
+
+      const worker = join(f.root, `recovery-${recoveryMode}-worker.mjs`);
+      const specUrl = new URL("../src/prime-agent-plugin/extension-support/spec-episode.ts", import.meta.url).href;
+      const ownershipUrl = new URL("../src/prime-agent-plugin/extension-support/episode-ownership.ts", import.meta.url).href;
+      const resolverUrl = new URL("../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts", import.meta.url).href;
+      writeFileSync(worker, `
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { CliTaskEpisodeAdmissionGit, createTaskEpisode } from ${JSON.stringify(specUrl)};
+import { readEpisodeOwnership, writeEpisodeOwnership } from ${JSON.stringify(ownershipUrl)};
+import { resolveBacklogTask } from ${JSON.stringify(resolverUrl)};
+const [root, taskId, owner, recoveryMode, barrier, backlog] = process.argv.slice(2);
+const nativeAtomicsWait = Atomics.wait.bind(Atomics);
+let admissionWaitSignaled = false;
+Atomics.wait = (...args) => {
+  if (owner === "owner-a" && !admissionWaitSignaled) {
+    admissionWaitSignaled = true;
+    process.stdout.write("A_WAITING_ON_ADMISSION_LOCK\\n");
+  }
+  return nativeAtomicsWait(...args);
+};
+class Runner {
+  run(command, args, options = {}) {
+    const result = spawnSync(command === "backlog" ? backlog : command, args, { cwd: options.cwd, encoding: "utf8" });
+    if (result.status !== 0 && !options.allowFailure) throw new Error(result.stderr || result.stdout);
+    return { stdout: result.stdout || "", stderr: result.stderr || "", status: result.status ?? 1 };
+  }
+}
+class AdmissionGit extends CliTaskEpisodeAdmissionGit {
+  push() {}
+  commitOnlyPath(root, path, message) {
+    const commit = super.commitOnlyPath(root, path, message);
+    if (owner === "owner-b" && message.startsWith("chore: admit")) {
+      process.stdout.write("B_COMMITTED\\n");
+      readFileSync(barrier);
+    }
+    return commit;
+  }
+}
+const runner = new Runner();
+const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
+  getSessionId: () => owner,
+  getSessionFile: () => join(root, owner + ".jsonl"),
+  getHeader: () => ({ rlmDepth: 0 }),
+} };
+const dependencies = {
+  admissionGit: new AdmissionGit(),
+  admissionRunner: runner,
+  taskResolver: (cwd, id) => resolveBacklogTask(cwd, id, runner),
+  allocateTaskEpisode: async () => {
+    const reserved = readEpisodeOwnership(root, owner);
+    if (owner === "owner-a" && recoveryMode === "blocked") {
+      writeEpisodeOwnership(root, { ...reserved, status: "uncertain", uncertaintyReason: "simulated session publication failure" });
+      process.stdout.write("A_RECOVERY_READY\\n");
+      readFileSync(barrier);
+      throw new Error("simulated session publication failure");
+    }
+    const active = { ...reserved, status: "active", worktree: join(root, owner + "-worktree"), branch: "episode/" + owner,
+      head: reserved.baseRef, episodeId: "episode-" + owner, episodeSessionFile: join(root, "episode-" + owner + ".jsonl"), episodeActiveSessionId: "route-" + owner };
+    writeEpisodeOwnership(root, active);
+    return { ...active, reused: false };
+  },
+};
+if (owner === "owner-a" && recoveryMode === "rollback") {
+  dependencies.reserveTaskOwnership = () => {
+    throw { toString() {
+      process.stdout.write("A_RECOVERY_READY\\n");
+      readFileSync(barrier);
+      return "reservation rejected before write";
+    } };
+  };
+}
+try {
+  const result = await createTaskEpisode(taskId, "call-" + owner, ctx, dependencies, { engine: "local" });
+  process.stdout.write(JSON.stringify({ owner, outcome: "created", taskId: result.taskId }) + "\\n");
+} catch (error) {
+  process.stdout.write(JSON.stringify({ owner, outcome: "failed", error: String(error) }) + "\\n");
+}
+`);
+      const aBarrier = join(f.root, `a-${recoveryMode}.fifo`);
+      const bBarrier = join(f.root, `b-${recoveryMode}.fifo`);
+      execFileSync("mkfifo", [aBarrier, bBarrier]);
+      const run = (taskId, owner, barrier, readyText) => {
+        const child = spawn(process.execPath, [
+          "--experimental-strip-types", worker, f.root, taskId, owner, recoveryMode, barrier, BACKLOG,
+        ], { stdio: ["ignore", "pipe", "pipe"] });
+        let stdout = "", stderr = "", readyResolve, readyReject, contentionResolve, contentionReject;
+        const ready = new Promise((resolveReady, rejectReady) => { readyResolve = resolveReady; readyReject = rejectReady; });
+        const contention = new Promise((resolveContention, rejectContention) => {
+          contentionResolve = resolveContention;
+          contentionReject = rejectContention;
+        });
+        child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
+        child.stdout.on("data", (chunk) => {
+          stdout += chunk;
+          if (stdout.includes(readyText)) readyResolve();
+          if (stdout.includes("A_WAITING_ON_ADMISSION_LOCK")) contentionResolve();
+        });
+        child.stderr.on("data", (chunk) => { stderr += chunk; });
+        const done = new Promise((resolveDone, rejectDone) => {
+          child.on("error", (error) => { readyReject(error); contentionReject(error); rejectDone(error); });
+          child.on("close", (code) => {
+            if (!stdout.includes(readyText)) readyReject(new Error(stdout + stderr));
+            if (owner === "owner-a" && !stdout.includes("A_WAITING_ON_ADMISSION_LOCK")) {
+              contentionReject(new Error(`owner-a exited before contending on the admission lock: ${stdout}${stderr}`));
+            }
+            if (code === 0) resolveDone({ stdout, stderr });
+            else rejectDone(new Error(stdout + stderr));
+          });
+        });
+        return { child, ready, contention, done };
+      };
+
+      const first = run("PRIMECLAW-1", "owner-a", aBarrier, "A_RECOVERY_READY");
+      await first.ready;
+      const second = run(secondId, "owner-b", bBarrier, "B_COMMITTED");
+      await second.ready;
+      writeFileSync(aBarrier, "enter recovery");
+      let contentionFailure;
+      try {
+        await new Promise((resolveContention, rejectContention) => {
+          const timeout = setTimeout(
+            () => rejectContention(new Error("owner-a did not contend on the held admission lock")),
+            5_000,
+          );
+          first.contention.then(
+            () => { clearTimeout(timeout); resolveContention(); },
+            (error) => { clearTimeout(timeout); rejectContention(error); },
+          );
+        });
+      } catch (error) {
+        contentionFailure = error;
+      }
+      const recoveryExitedWhileAdmissionHeld = first.child.exitCode !== null;
+      writeFileSync(bBarrier, "finish reservation");
+      const [firstResult, secondResult] = await Promise.all([first.done, second.done]);
+
+      if (contentionFailure) throw contentionFailure;
+      assert.equal(recoveryExitedWhileAdmissionHeld, false, "recovery must wait for the other owner's reservation boundary");
+      assert.match(secondResult.stdout, /"outcome":"created"/);
+      assert.equal(view(f.root, secondId).status, "In Progress");
+      const records = readAllEpisodeOwnership(f.root);
+      assert.equal(records.find((record) => record.ownerSessionId === "owner-b")?.status, "active");
+      if (recoveryMode === "blocked") {
+        assert.match(firstResult.stdout, /is Blocked and requires exact recovery/);
+        assert.equal(view(f.root).status, "Blocked");
+        assert.equal(records.find((record) => record.ownerSessionId === "owner-a")?.status, "uncertain");
+      } else {
+        assert.match(firstResult.stdout, /was returned to In Planning.*reservation rejected before write/);
+        assert.equal(view(f.root).status, "In Planning");
+        assert.equal(records.some((record) => record.ownerSessionId === "owner-a"), false);
+      }
+    });
+  }
+});
+
+
 test("retained promotion tolerates an unrelated task admission while selecting its captured base", async () => {
   const f = fixture();
   const location = ".ralph/plans/future/alpha";

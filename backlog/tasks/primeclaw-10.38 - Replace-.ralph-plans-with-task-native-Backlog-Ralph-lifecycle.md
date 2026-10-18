@@ -4,7 +4,7 @@ title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
 status: In Progress
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-18 17:09'
+updated_date: '2026-10-18 17:33'
 labels:
   - backlog-md
   - episode-loop
@@ -2956,18 +2956,46 @@ A separate-process Docker reproduction showed owner A entering allocation failur
 The owning Conversation explicitly accepted one additional in-scope Step 10 compatibility repair after the first queued execute prompt correctly stopped without an owner tag. Canonical main still holds the approved pre-upgrade direct ownership record rather than registry form. For direct-record form only, the record's embedded `ownerSessionId` is self-identifying after exact validation of the current worktree, durable Episode ID and session file, bound task/source identity, and non-inactive status. Registry form continues to require the exact `<operator-episode-owner-session>` key and must never scan or infer among owners.
 
 This Episode validated the bootstrap preconditions before handoff: direct-record form, active status, exact recorded worktree and branch, exact durable Episode ID `01a133c6-0834-7465-8597-91cf46c0b19e`, readable matching session file, exact `PRIMECLAW-10.38` task ID/path, parent `PRIMECLAW-10`, and `In Progress` status. The next execute pass must update source and project execute/handoff policy plus focused tests for only this direct-record fallback, then complete the already accepted recovery-lock repair and deterministic separate-process recovery race. Registry selection remains tag-only.
+
+## Final approved direct-bootstrap and recovery-lock repair evidence (2026-10-18)
+
+Implemented the two owner-approved Step 10 repairs from pushed checkpoint `439dd253f784b5a642f9c0a85a2dfda7161d0d53`:
+
+- Execute and handoff policy now permit missing `<operator-episode-owner-session>` only for canonical pre-upgrade direct-record ownership after non-inactive status, exact current worktree, durable Episode ID, readable matching Episode session file, and exact task/source binding all match. A present tag must match the embedded owner. Registry form remains exact-tag-only and never scans or infers among owners. Source and project copies are byte-identical and `.prime-claw/templates.json` carries their exact hashes.
+- `createTaskEpisode()` now runs both automatic recovery edit+task-only-commit sections under the existing short `withEpisodeAdmissionLock()`: truthful `Blocked` publication for durable/uncertain mutation and proven-clean `In Planning` rollback. Each path re-resolves the exact task under the lock. Both best-effort recovery pushes remain outside the lock, and existing publication/rollback error semantics remain intact.
+- The separate-process regression covers both recovery modes. Owner A enters either allocation-failure `Blocked` recovery or pre-reservation rollback while owner B is paused after its own In Progress commit and before reservation. A waits; B completes an active reservation; then A publishes its own truthful recovery state. Neither owner cancels the other.
+
+Validation evidence:
+
+- Focused Node: 146 passed across task admission, task ownership, specification Episode, and handoff suites. The new recovery race passed in both `blocked` and `rollback` modes.
+- Focused static policy/manifest: 13 passed, 2 container-only checks skipped.
+- Docker Tier 1 with offline RPC probe: passed; evidence `.test-results/20261018T171918Z-15531-aa5a1ccf/tier1`.
+- Broad non-container baseline: 665 passed, 1 skipped, 65 deselected, 75 subtests passed; only the four previously documented unrelated failures remained (`test_mocked_runtime_tests_are_host_safe_tier0`, `test_every_node_suite_has_a_pytest_bridge`, `test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree`, `test_backlog_source_identity_matches_pin`).
+- `git diff --check` is clean. Zero tracked `.ralph/plans` paths remain. Protected canonical archive SHA-256 values remain `1d587130ff368ba190ab8b987267bce73bee5c5342ef23b56da7814b15e4cfad` for `SPECIFICATION.md` and `68f6a8cfd297f3c5bd46d5a4551cedaca4707ef865b351af790459e684339f13` for `EXECUTION_PLAN.md`.
+
+No live lifecycle transition, merge, abandonment, cleanup, global activation, protected-archive mutation, blocked-UAT-session contact, or Prime Agent source change occurred.
+
+## Exact-rereview validation repair — actual lock contention synchronization (2026-10-18)
+
+Independent exact-commit rereview of `677b5a069a34186c05d2a43f95f7750105716cbb` found no production defect in either approved repair, but proved the first race regression's 200 ms delay was not deterministic: both modes also passed with pre-fix `spec-episode.ts` because owner A had not necessarily reached recovery before owner B was released.
+
+The regression now instruments only its generated worker's global `Atomics.wait`, the primitive used by the existing directory-lock retry loop. Owner A emits `A_WAITING_ON_ADMISSION_LOCK` only after its recovery actually observes the admission lock held by owner B. The parent has a bounded five-second failure timeout, always releases B for clean process teardown, and then verifies both final task/ownership outcomes. No production code or contract changed.
+
+Red/green evidence on the same supported Linux arm64 image and repository-built Linux Backlog artifact:
+
+- Candidate production repair: `blocked` and `rollback` both passed (3/3 tests).
+- Pre-fix `spec-episode.ts` from `439dd253f784b5a642f9c0a85a2dfda7161d0d53` overlaid read-only: both modes failed because owner A exited before contending on the admission lock (0/3 tests passed).
+- Full focused Docker suite with explicit project Backlog CLI on `PATH`: 146 passed, 0 failed or cancelled.
+
+This closes only the accepted deterministic-test gap. Production recovery locks, direct-record bootstrap policy, task lifecycle state, ownership, and blocked UAT sessions remain unchanged.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Steps 1–10 are implemented. The release-blocking Step 10 repair replaces repository-singleton Episode ownership with a serialized Conversation-keyed registry while preserving direct-record migration, one active Episode per owner, globally unique non-inactive task/source bindings, strict version-1/version-2 separation, exact-resource reuse and cleanup, and prompt-led lifecycle authority.
+Steps 1–10 are implemented. Step 10 replaces repository-singleton Episode ownership with a serialized Conversation-keyed registry while preserving direct-record migration, one active Episode per owner, globally unique non-inactive task/source bindings, strict version-1/version-2 separation, exact-resource reuse and cleanup, and prompt-led lifecycle authority.
 
-Independent review reproduced three bounded defects: cross-process task admission interference, retained promotion rejecting unrelated task-only main advancement, and missing owner-key context in fresh Episode prompts. The candidate now serializes only status commit plus reservation, binds the exact admission commit, permits safe unrelated main advancement while revalidating the approved bundle digest, and carries the owning Conversation key in initial and continuation prompts. Focused suites, the broad baseline apart from four documented unrelated failures, Docker Tier 1, and `git diff --check` validate the repairs.
+The final approved repairs are complete. Execute/handoff can bootstrap only from a fully matching pre-upgrade direct ownership record when the owner tag is absent; registry form remains exact-tag-only. Normal admission and both automatic recovery task mutations use the same short cross-process admission lock, while slow pushes remain outside. Deterministic separate-process coverage proves both Blocked publication and clean rollback cannot interrupt another owner's status-commit-to-reservation boundary.
 
-The task remains `In Progress` for the owning Conversation's later lifecycle decision. No live transition, merge, abandonment, cleanup, user-global activation, protected-archive mutation, blocked-UAT-session contact, or Prime Agent source change occurred.
-
-Exact rereview confirmed the three recorded repairs and accepted one final bounded follow-up: automatic `Blocked` and `In Planning` recovery commits must use the same short admission lock so they cannot interrupt another owner's commit-to-reservation boundary. That recovery-lock repair and its separate-process regression are the sole next execute scope; the task remains `In Progress`.
-
-The owning Conversation also approved a one-time live-upgrade bootstrap rule: only a pre-upgrade direct record may use its embedded owner key without a prompt tag after exact current worktree, Episode session/file, binding, and active-status validation. Registry form remains tag-required. This compatibility repair and the recovery-lock repair are the sole next execute scope.
+Focused suites, the broad baseline apart from four documented unrelated failures, Docker Tier 1 with offline RPC probe, and `git diff --check` validate the candidate. The task remains `In Progress` for exact-candidate independent rereview and the owning Conversation's later lifecycle decision. No live transition, merge, abandonment, cleanup, user-global activation, protected-archive mutation, blocked-UAT-session contact, or Prime Agent source change occurred.
 <!-- SECTION:FINAL_SUMMARY:END -->

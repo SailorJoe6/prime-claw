@@ -96,6 +96,27 @@ def test_handoff_skill_reports_compaction_without_owning_execute_admission():
     assert "invoke execute yourself" in skill
 
 
+def test_handoff_skill_bootstraps_only_an_exact_pre_upgrade_direct_owner():
+    skill = " ".join(
+        (REPO / ".prime-claw" / "workflows" / "handoff.md").read_text().split()
+    )
+    for fragment in (
+        "When the file is a Conversation-keyed registry, require the tag",
+        "If the tag or exact registry binding is missing, stop for recovery",
+        "One live-upgrade bootstrap exception applies only when the canonical file is the pre-upgrade direct record, not registry form",
+        "its embedded `ownerSessionId` is self-identifying only after its non-inactive status",
+        "exact recorded current worktree",
+        "durable Episode ID",
+        "readable matching Episode session file",
+        "exact prompt task/source binding",
+        "If a tag is present, it must match the embedded owner",
+        "Any failed or ambiguous check stops for recovery",
+        "this exception never applies to a registry",
+        "never authorizes scanning or choosing among owners",
+    ):
+        assert fragment in skill
+
+
 def test_handoff_skill_keeps_task_native_and_folder_authorities_disjoint():
     skill = " ".join(
         (REPO / ".prime-claw" / "workflows" / "handoff.md").read_text().split()

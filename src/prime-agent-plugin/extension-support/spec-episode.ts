@@ -2005,16 +2005,22 @@ export async function createTaskEpisode(
         `Cause: ${cause}`,
       ].join("\n");
       try {
-        commitConversationTaskStatus({
-          taskId,
-          projectRoot,
-          taskPath,
-          status: "Blocked",
-          message: `chore: block ${taskId} episode admission`,
-          note,
-          runner,
-          git,
-          resolveTask,
+        withEpisodeAdmissionLock(projectRoot, () => {
+          const lockedTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
+          if (lockedTask.status !== "In Progress") {
+            throw new Error(`Backlog task ${taskId} is not the In Progress admission being recovered`);
+          }
+          commitConversationTaskStatus({
+            taskId,
+            projectRoot,
+            taskPath,
+            status: "Blocked",
+            message: `chore: block ${taskId} episode admission`,
+            note,
+            runner,
+            git,
+            resolveTask,
+          });
         });
       } catch (recoveryError) {
         throw new Error(`Task-native Episode creation failed after durable or uncertain mutation, and Blocked publication failed. Preserve all evidence and recover ${taskId} manually. Cause: ${cause}. Publication failure: ${taskAdmissionError(recoveryError)}`);
@@ -2023,27 +2029,33 @@ export async function createTaskEpisode(
       throw new Error(`Task-native Episode creation failed after durable or uncertain mutation; ${taskId} is Blocked and requires exact recovery before retry. Cause: ${cause}${recoveryPushError ? ` Push also failed: ${recoveryPushError}` : ""}`);
     }
 
-    let current: BacklogTaskSelection | null = null;
-    try { current = resolveTask(projectRoot, taskId); } catch { /* handled below */ }
-    const unchanged = current?.taskId === taskId
-      && current.status === "In Planning"
-      && git.head(projectRoot) === preAdmissionHead
-      && git.pathStatus(projectRoot, taskPath) === "";
-    if (unchanged) throw error;
+    let rollbackCommitted = false;
     try {
-      commitConversationTaskStatus({
-        taskId,
-        projectRoot,
-        taskPath,
-        status: "In Planning",
-        message: `chore: roll back ${taskId} episode admission`,
-        runner,
-        git,
-        resolveTask,
+      rollbackCommitted = withEpisodeAdmissionLock(projectRoot, () => {
+        const lockedTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
+        const unchanged = lockedTask.status === "In Planning"
+          && git.head(projectRoot) === preAdmissionHead
+          && git.pathStatus(projectRoot, taskPath) === "";
+        if (unchanged) return false;
+        if (lockedTask.status !== "In Progress") {
+          throw new Error(`Backlog task ${taskId} is not the In Progress admission being rolled back`);
+        }
+        commitConversationTaskStatus({
+          taskId,
+          projectRoot,
+          taskPath,
+          status: "In Planning",
+          message: `chore: roll back ${taskId} episode admission`,
+          runner,
+          git,
+          resolveTask,
+        });
+        return true;
       });
     } catch (recoveryError) {
       throw new Error(`Task-native Episode creation failed before ownership or resource mutation, and clean rollback failed. Preserve the checkout and recover ${taskId} manually. Cause: ${cause}. Rollback failure: ${taskAdmissionError(recoveryError)}`);
     }
+    if (!rollbackCommitted) throw error;
     const recoveryPushError = bestEffortTaskPush(git, projectRoot);
     throw new Error(`Task-native Episode creation failed before ownership or resource mutation; ${taskId} was returned to In Planning. Cause: ${cause}${recoveryPushError ? ` Push also failed: ${recoveryPushError}` : ""}`);
   }

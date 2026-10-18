@@ -5,18 +5,30 @@ description: Use for Ralph's handoff phase to update durable task or plan contex
 
 ## Select the bound authority
 
-A managed Episode handoff prompt carries `<operator-episode-owner-session>`.
-Its exact value is the owning Conversation's registry key and intentionally
-differs from the Episode's own session ID. Inspect `.prime-claw/ownership.json`
-from the canonical primary checkout and select only that exact `ownerSessionId`
-entry before interpreting task/source tags. Require its recorded worktree and
-Episode session identity to match the current Episode. If the tag or exact binding
-is missing, stop for recovery; never scan all owners or infer the key from
-placement. The file is a Conversation-keyed registry; an existing direct record
-is valid migration input. Other Conversations' entries do not select or block
-this handoff. In a linked Episode worktree, locate the canonical checkout through
-Git worktree metadata; a missing worktree-local file does not prove that the
-tagged owner's entry is absent.
+A managed Episode handoff prompt normally carries
+`<operator-episode-owner-session>`. Its exact value is the owning Conversation's
+registry key and intentionally differs from the Episode's own session ID.
+Inspect `.prime-claw/ownership.json` from the canonical primary checkout before
+interpreting task/source tags. When the file is a Conversation-keyed registry,
+require the tag and select only that exact `ownerSessionId` entry. If the tag or
+exact registry binding is missing, stop for recovery; never scan all owners or
+infer the key from placement.
+
+One live-upgrade bootstrap exception applies only when the canonical file is the
+pre-upgrade direct record, not registry form. With no owner tag, its embedded
+`ownerSessionId` is self-identifying only after its non-inactive status, exact
+recorded current worktree, durable Episode ID, readable matching Episode session
+file, and exact prompt task/source binding all match this Episode. If a tag is
+present, it must match the embedded owner. Any failed or ambiguous check stops
+for recovery. The direct record remains valid migration input; this exception
+never applies to a registry and never authorizes scanning or choosing among
+owners.
+
+Require the selected record's worktree and Episode session identity to match the
+current Episode. Other Conversations' entries do not select or block this
+handoff. In a linked Episode worktree, locate the canonical checkout through Git
+worktree metadata; a missing worktree-local file does not prove that the tagged
+owner's entry is absent.
 
 Version-1 ownership selects retained folder-plan handoff. Require readable,
 non-empty active `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files in the
