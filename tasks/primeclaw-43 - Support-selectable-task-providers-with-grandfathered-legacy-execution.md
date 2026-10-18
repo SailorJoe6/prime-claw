@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 19:51'
+updated_date: '2026-10-18 19:58'
 labels: []
 dependencies: []
 references:
@@ -250,4 +250,14 @@ Accepted repair scope (exact):
 3. Replace the literal YAML regex for `no-db` with the supported native effective-config read (`bd config get no-db`) once native Beads store evidence exists; block when the effective value is true OR unreadable/uncertain, with exact remediation. Regression: quoted `no-db: "true"` (native bd reports true) must block.
 
 Boundary: least-technology only — no framework, registry, state, semantic machinery, or test-matrix expansion. Re-run focused host tests + Docker tier-1 bridge, update notes/docs only as needed, commit and push one clean repair candidate, stop and report. Pre-existing main failures and later slices stay untouched.
+
+2026-10-18 Episode slice 1a repair pass (accepted review defects fixed on top of 6c9878a):
+
+1. Root `backlog.config.yml` without `backlog_directory` now mirrors upstream `resolveBuiltInBacklogDirectory` exactly: a built-in directory carrying folder configuration wins over a bare built-in directory, `backlog/` then `.backlog/` breaks ties within each class. Parity fixture proves empty `backlog/` + `.backlog/config.yml` selects `.backlog`.
+2. Export-only/non-initialized `.beads/` residue (no `config.yaml` and no `metadata.json`, e.g. only `issues.jsonl`) is no live evidence: alone it returns `none`, and valid Backlog plus export-only Beads selects Backlog. Genuine partial initialization (exactly one of the two files present) still blocks.
+3. The literal `no-db` YAML regex is replaced by the native effective-config read `bd config get no-db` once Beads store evidence exists; enabled (`true`) or unreadable/uncertain probe output (non-zero exit, or anything other than exactly `true`/`false`) blocks with exact remediation. Regression covers the quoted `no-db: "true"` case, verified live against bd 1.1.2 (native resolves it to `true`; the regex would have missed it).
+
+Evidence: host Node suite 31/31 (`node --experimental-strip-types --test tests/task_providers.test.mjs`); live smoke against this repo (backlog selected) and real scratch bd stores (beads selected + capabilities pass; quoted no-db true blocks). Docker tier-1 bridge rerun recorded in the commit message.
+
+Boundary kept: no framework, registry, selection file, or matrix expansion. Lifecycle call-site routing and later slices remain untouched; pre-existing main failures remain with the Conversation.
 <!-- SECTION:NOTES:END -->
