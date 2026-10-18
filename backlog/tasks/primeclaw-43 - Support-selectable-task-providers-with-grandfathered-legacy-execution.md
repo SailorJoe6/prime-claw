@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-43
 title: Support selectable task providers with grandfathered legacy execution
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 00:09'
+updated_date: '2026-10-18 15:19'
 labels: []
 dependencies: []
 references:
@@ -170,3 +170,58 @@ Managed Markdown instructions receive content review, reconciliation checks, and
 - [ ] #19 Cutover verification binds exact source and destination revisions, complete counts and digests, ID mappings, ownership transitions, actor, and timestamp. Any pre-cutover failure keeps the source intact and authoritative; only complete verification and ownership transition activate the destination and immediately delete the source store.
 - [ ] #20 Automated tests cover deterministic discovery, capability gates, workspaces, synchronization, optimistic concurrency, revision and diff transport, ownership, transitions, complete migration, recovery, and destructive cutover guards. Managed prose receives content review, reconciliation checks, and representative UAT instead of artificial behavioral unit tests.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+## Guardrails and sequencing
+
+- Recheck that `PRIMECLAW-10.38` is terminal before the first implementation change. It is currently `Done`. This task builds provider support only; `PRIMECLAW-43.1` performs this repository's later data cutover.
+- For every slice, use native `backlog`, Git, `bd`, and Dolt behavior first; use managed Markdown instructions for semantic judgment; add TypeScript only for deterministic identity, integrity, transport, and lifecycle authority.
+- Do not add a public tracker CLI, provider-selection file, mirror, lock service, semantic merge engine, workflow state machine, submodule, alternate index, linked nested worktree, or dual-write path.
+- Add no new mutable coordinator state. The only durable additions allowed are fields on the existing version-2 ownership/receipt records required by AC 9/14/17, the grandfathered-work inventory required by AC 16, and the final migration receipt required by AC 18/19. Keep the migration receipt in destination-native history/provenance; if a provider cannot hold the exact receipt, stop for plan review rather than inventing a sidecar authority.
+
+## Implementation slices
+
+1. **Introduce one narrow provider seam and deterministic discovery.** Replace Backlog-specific resolution at the lifecycle boundary with a small internal `TaskProvider` contract covering only capability validation, exact task read/mutation, sync/publish, workspace preparation, store revision, and task-scoped evidence. Keep the two native CLI implementations thin and in one module until size proves a split necessary. Detect valid Backlog or Beads initialization directly from native configuration/store evidence, reject malformed or dual evidence, and default Prime Claw initialization to `.backlog/` while allowing explicit supported Beads selection. Preserve the pinned managed Backlog build and upstream direct-init behavior. Update the plugin asset inventory for any new managed source. **[AC 1, 3, 4, 6, 7]**
+
+2. **Implement provider-native workspace behavior without new coordination services.**
+   - For Backlog, use ordinary Git to create/verify disconnected `refs/heads/prime-claw/tasks`, select the primary branch upstream or sole remote, and materialize an ignored independent nested clone in the configured directory for the primary checkout and each Episode worktree. Preserve root/folder configuration rules, offer `.backlog/` normalization, validate the retained custom-directory relative symlink, disable Backlog auto-commit, and use fetch/reconcile/commit/push with stale-push rejection and no force overwrite. Refuse cleanup when the nested checkout is dirty or unpublished.
+   - For Beads, validate the installed `bd` version, lifecycle statuses, category-aware readiness, native per-project server mode, and supported auto-start or operator-managed server configuration. Use supported Dolt synchronization and `refs/dolt/data` transport; never use JSONL as authority or race raw Dolt writes against the server.
+   Wire workspace preparation and cleanup into existing project initialization and Episode allocation/cleanup paths rather than adding a daemon. **[AC 4, 5, 6, 10, 11, 12, 13]**
+
+3. **Route the existing task-native UX through the selected provider.** Generalize the reviewed-plan resolver, prep-chain admission, task Episode admission/status changes, handoff, oversight, finalization, and cleanup to the provider-neutral identity while leaving version-1 folder routes intact. Revise the managed `design`, `spec-it-out`, `plan-task`, `implement-task`, `execute`, `blocked`, handoff, expert-review, and Conversation oversight instructions to call the selected provider's native CLI and accept only one exact task ID or one exact grandfathered path. Put compatible-edit, living-plan, and semantic-conflict decisions in those managed instructions, not code. Reconcile project-customizable copies through the existing template mechanism. **[AC 7, 8, 15]**
+
+4. **Generalize ownership and revision evidence in place.** Extend version-2 ownership and lifecycle receipts with provider, canonical task ID, published provider revision, task-scoped evidence, and exact Episode code HEAD; retain Backlog path data only as provider-specific evidence. Safely recognize existing version-2 Backlog records only when live evidence corroborates them; do not create version 3 or another authority file. At every boundary run `sync → read → native mutate → publish → record revision`. Advance receipts after owner-authored task/plan changes, ignore unrelated-task store advances, and present exact outside same-task changes to the Episode or Conversation prompt. Deterministic code must only prevent silent overwrite and prove publication. **[AC 9, 12, 14, 15]**
+
+5. **Preserve grandfathered version-1 work with one simple inventory.** During upgrade, record only the exact unfinished legacy locations and accepted specification digests. Keep their specifications frozen, plans living, archive-only history excluded, and pure legacy execution provider-independent. Reject new or materially revised legacy specifications. Adapt the existing reviewed legacy-to-task transition so it creates the selected-provider task, preserves all content/provenance and the same active Episode/session/worktree/branch/code identity, switches to one authority only after successful publication, and leaves version-1 recovery unchanged on failure. **[AC 16, 17]**
+
+6. **Add one explicit, bounded provider-migration operation.** Extend project initialization/upgrade with an operator-confirmed provider switch rather than a general tracker command. Quiesce provider mutations, capture one exact source revision, migrate every open and closed task plus all fields, comments, hierarchy, dependencies, status, history, and provenance using native commands, preserve safe IDs or record immutable mappings, and verify counts and normalized digests. Transition active ownership only after verification, activate the destination, write the exact receipt to destination-native history/provenance, then delete the source initialization/store and resume mutations. Before cutover, any failure leaves the source intact and authoritative and reports one exact recovery condition; never dual-write or retry into another destination copy. **[AC 18, 19]**
+
+7. **Validate behavior at the right boundary and update product documentation.** Reuse the existing Node lifecycle fixtures and Python asset/skill checks; add focused provider fixtures for discovery, capabilities, status mapping, Backlog nested-clone Git concurrency, Beads server/Dolt synchronization, workspace cleanup, ownership revisions, exact diff delivery, legacy transition, full migration verification, failure recovery, and source-deletion guards. Keep semantic reconciliation out of fake unit tests: review the managed prompts and run representative task-edit UAT for compatible and conflicting changes. Update `docs/backlog.md`, the lifecycle user stories and traceability matrix, installation/upgrade guidance, and architecture notes. After each plugin-source change run Docker-only tier 1; finish with the relevant Node/Python suites and `scripts/test-all.sh`. Do not apply the candidate user-globally during implementation. **[AC 20]**
+
+## Acceptance-to-mechanism check
+
+| AC | Least-technology mechanism |
+|---|---|
+| 1 | These guardrails plus review of every slice; native behavior and prompts precede code. |
+| 2 | One structured prerequisite check with recorded evidence before implementation; `PRIMECLAW-10.38` is already `Done`, so no permanent runtime gate is added. |
+| 3 | Native live-store evidence inspected by the small discovery function; no selection record. |
+| 4 | Existing pinned Backlog build plus explicit `.backlog/` argument only in Prime Claw initialization. |
+| 5 | Backlog's own config discovery and one validated relative symlink only for retained custom layout. |
+| 6 | Provider capability/status fixtures against native CLI output. |
+| 7 | One internal lifecycle seam; native CLIs remain the user/agent interfaces. |
+| 8 | Existing managed skills and prep chains with provider-aware instructions and exact input validation. |
+| 9 | Additional fields on the existing version-2 ownership/receipt schema, not another store. |
+| 10 | Ordinary orphan branch plus independent nested clones. |
+| 11 | Ordinary Git upstream/remote discovery and clean/published checks. |
+| 12 | Ordinary fetch, reconcile, commit, and push; no lock service. |
+| 13 | Native Beads per-project server and Dolt transport. |
+| 14 | Native optimistic concurrency plus exact diff delivery to the LLM. |
+| 15 | Managed Episode/Conversation prompts and representative UAT. |
+| 16 | One exact grandfather manifest because a durable allowlist/digest is required to reject new legacy work. |
+| 17 | The existing ownership-transition path generalized to the selected provider. |
+| 18 | One maintenance-window migration using native export/read/create/history operations and normalized verification. |
+| 19 | One destination-native immutable receipt and a final verified source deletion gate. |
+| 20 | Deterministic automated tests plus prompt review and real UAT for semantic behavior. |
+<!-- SECTION:PLAN:END -->
