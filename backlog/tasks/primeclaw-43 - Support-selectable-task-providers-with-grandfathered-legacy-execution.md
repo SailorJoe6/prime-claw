@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 21:16'
+updated_date: '2026-10-18 21:29'
 labels: []
 dependencies: []
 references:
@@ -304,4 +304,14 @@ Boundary: least-technology only — no abstract provider framework, registry, un
 4. Provider setup failures now count in the existing reconcile conflict decision (blocked/failed add 1 to `conflicts`; no new state) and the exact failed detail / blocked detail+remediation are included inline in the command/tool/startup summary (`provider=blocked(code: detail remediation)` / `provider=failed(detail)`), proven by tests asserting conflicts=1 and summary content for dual-evidence and init-failure scenarios. `summarizeReconcile` is exported for tests.
 
 Evidence: host Node suite 295/295 (task-providers 46, project-initialization 39 incl. real-managed-CLI init + warning-surface tests). Live smokes: real `backlog init` reconcile in a scratch git repo produces a lifecycle-ready `.backlog/` (capability gate passes, second reconcile no-op); real bd store shorthand rejection + exact-ID mutation round-trip. Docker tier-1: task_providers + project_initialization bridges 4/4 (the real-CLI test skips in the container because the tier-1 image ships no backlog binary; the host run exercises the repository-built executable). Full container suite result recorded in the commit message. Boundary kept: no abstract provider framework, registry, universal task model, persistent state, semantic/diff machinery, or lifecycle matrix. Deferred slices and pre-existing main failures untouched.
+
+2026-10-18 Conversation review of repair candidate 0b9f8b4: ACCEPTED. The four recorded defects in ccc9ce5 are closed: real non-interactive lifecycle-ready `.backlog/` initialization works and is natively proven; the forbidden normalized ProviderTaskSelection is gone; exact identity precedes every provider mutation with shorthand zero-write proof; provider setup failures reach existing warnings/summaries with exact remediation. Evidence: Conversation targeted tests 251/251, Episode full Node 295/295, Docker bridges 4/4, independent GPT-6 Astra review found no material findings.
+
+Next sub-slice approved (plan slice 2, sub-slice 2A — Backlog provider-native workspace FOUNDATION only). Build the direct ordinary-Git preparation seam + representative disposable-repository fixtures for:
+- selecting the task-history remote from the canonical primary code branch's upstream, or the sole repository remote when no upstream exists; no remote or ambiguous remotes BLOCK with exact remediation;
+- creating or verifying the disconnected `refs/heads/prime-claw/tasks` history using ordinary Git — no force overwrite, no shared code ancestry accepted as task authority;
+- preparing the primary checkout's ignored independent nested Backlog clone at an explicit validated built-in task-store location, checked out on that task branch, with Backlog code-repository auto-commit disabled through supported native behavior;
+- preserving root/folder configuration evidence needed by that prepared clone — NO submodules, linked nested worktrees, alternate indexes, same-root custom Git work trees, separate hosted repo, or new coordinator/service.
+
+Explicitly out of scope for 2A: Episode-worktree preparation/cleanup wiring, the general fetch/reconcile/commit/push mutation loop, Beads server/Dolt transport, ownership/receipt fields, remaining lifecycle UX routing, any task-data migration, this repository's cutover (PRIMECLAW-43.1 owns it), and PRIMECLAW-43.1 itself. Do not mutate or normalize this repository's existing live Backlog store while building fixtures. One direct Backlog-specific implementation path (no provider abstraction/universal workspace model); one focused contract fixture per new seam plus representative real ordinary-Git coverage (no provider/lifecycle matrix); Docker tier-1 after plugin-source changes; update docs/task notes; one clean commit; stop for review.
 <!-- SECTION:NOTES:END -->
