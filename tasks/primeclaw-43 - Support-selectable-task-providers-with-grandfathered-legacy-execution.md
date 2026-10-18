@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Design
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-15 22:00'
+updated_date: '2026-10-18 00:09'
 labels: []
 dependencies: []
 references:
@@ -37,151 +37,136 @@ ordinal: 125000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 ## Outcome
 
-Prime Claw supports one repository-selected task provider—Backlog.md or Beads—behind the same task-native design, planning, Episode, review, recovery, and terminal lifecycle. Task state has one canonical history independent of code branches. Grandfathered `.ralph/plans` work remains plan-able, implementable, completable, or explicitly migratable, while no new legacy specification can be created or revised.
+Prime Claw supports exactly one live task provider per repository—Backlog.md or Beads—behind the same task-native design, planning, Episode, review, recovery, and terminal lifecycle. Task history is canonical and independent of code branches. Exactly grandfathered `.ralph/plans` work may finish or migrate, but no new legacy specification may be created or revised.
 
-This work supersedes the Backlog-only and branch-local assumptions that remain in `PRIMECLAW-10.38`; it does not invalidate that task’s landed compatibility work or authorize changes to its active implementation without a separate reviewed relationship.
+This work supersedes the Backlog-only and branch-local assumptions in `PRIMECLAW-10.38`. Its already admitted Episode may finish under its current authority. Implementation of this task and the repository cutover in `PRIMECLAW-43.1` must wait until `PRIMECLAW-10.38` reaches a terminal decision.
 
-## Required design and rationale
+## Governing implementation rule: least technology
 
-This specification selects the least-technology design that meets the coordination requirements. These are requirements, not interchangeable examples:
+Implement the smallest design that satisfies these requirements. The required order of preference is:
 
-- Beads keeps its native shared Dolt task store and synchronization model.
-- Backlog uses one ordinary orphan task branch in the same Git repository and remote, materialized as an ignored nested checkout in every code worktree.
-- Task writers use tracker-native mutations plus standard optimistic Git or Dolt concurrency.
-- Semantic single-writer authority and exact revision handoffs prevent same-task ambiguity without a persistent Prime Claw lock.
-- Prime Claw exposes one lifecycle through existing skills and canonical tools, backed by a narrow internal provider contract rather than a new public tracker CLI.
-- Retained legacy authority stays independent of task-provider choice until an explicit migration.
+1. use the provider's supported native command, configuration, Git, or Dolt behavior;
+2. express semantic judgment as concise managed instructions to the responsible LLM role;
+3. add only the narrow deterministic adapter code needed for integrity or transport; and
+4. introduce new persistent state or a custom state machine only when the first three cannot meet a named acceptance criterion and the implementation plan proves why.
 
-The design rejects branch-local Backlog snapshots, redirecting every actor to one primary-worktree folder, persistent application-level task/store locks, alternate Git indexes, linked nested worktrees, submodules, a separately hosted Backlog repository, tracker mirroring, and a general Prime Claw task CLI. Those alternatives add stale-state, path, cleanup, locking, or duplicated-authority complexity without improving the required user experience.
+Do not encode LLM-suitable judgment as workflow machinery. In particular, the Episode or supervising Conversation reasons about newly discovered implementation facts, compatible task edits, living-plan revisions, and semantic conflicts. Code only synchronizes exact data, reports exact changes, preserves identity and revisions, enforces authority boundaries, and prevents silent loss. Do not build a replacement tracker, speculative abstraction framework, task mirror, persistent lock service, or parallel migration ledger.
 
-## Provider capability, discovery, and selection
+## Authority, discovery, and provider selection
 
-Prime Claw distributes and installs one pinned, supported Backlog executable as a managed runtime dependency. This is the dependable default and may carry Prime Claw’s maintained fork changes as it diverges from upstream. Prime Claw does not copy Backlog source into each managed project. Initialization verifies the exact managed executable and required capabilities before using it.
+The live stores themselves select authority; there is no separate provider-selection file or shadow record.
 
-Installed executables are capabilities, not repository authority. Repository initialization evidence and explicit Prime Claw project configuration determine authority:
+- One valid Backlog store and no valid Beads store selects Backlog.
+- One valid Beads store and no valid Backlog store selects Beads.
+- No live provider evidence causes Prime Claw initialization to recommend and create `.backlog/` unless the operator explicitly selects supported Beads.
+- Simultaneous valid Backlog and Beads evidence is an incomplete migration and blocks task lifecycle mutation.
+- Malformed, unavailable, or uncertain evidence blocks with exact remediation. Exports, archives, and stray directories are not live evidence.
 
-1. Existing Backlog initialization evidence alone selects Backlog after capability validation.
-2. Existing Beads initialization evidence alone selects Beads after capability validation, even when the managed Backlog executable is available.
-3. With neither provider initialized, Prime Claw initializes Backlog by default. The operator may explicitly select Beads instead when a supported `bd` installation passes capability checks.
-4. Evidence that both providers are initialized is an unconditional blocker. It means a provider migration has not completed and must be resolved before design, planning, task admission, or provider mutation continues.
-5. An explicit provider change requires a reviewed migration of every nonterminal authoritative task before selection changes. The destination must be complete and verified, and the source provider’s active initialization evidence must be retired before the migration is complete.
+Prime Claw supplies one pinned managed Backlog executable and capability-checks it. Direct use of that executable retains upstream's `backlog/` initialization default; Prime Claw initialization and migration explicitly choose `.backlog/`. A valid existing `backlog/` or custom layout remains supported when the operator elects to retain it.
 
-Closed or historical source-provider data may remain only as explicitly archived, read-only provenance that is not discoverable as another initialized live provider. Legacy specifications that merely reference Beads or Backlog tasks do not count as provider initialization and do not force provider selection.
+Backlog discovery preserves native configuration behavior: root `backlog.config.yml` takes precedence, otherwise `backlog/config.yml` or `.backlog/config.yml` is valid, and a root configuration may select a custom directory. During nested-checkout migration, folder-local configuration moves with its store. Root configuration moves into the task checkout. A retained custom directory uses a validated relative root `backlog.config.yml` symlink to the checkout configuration and receives a brittleness warning; normalization to `.backlog/` is offered instead.
 
-If an existing sole provider is unavailable or unsupported, initialization stops with an exact remediation requirement. It never silently initializes the other provider, falls back to legacy-only authoring, or creates a second live task store. Once selected, explicit project configuration records the provider, and each active task-native Episode pins that provider at admission.
+A supported existing Beads store selects Beads even though managed Backlog is installed. Prime Claw validates the installed `bd` capabilities and required configuration rather than treating executable presence as authority.
 
-## Lifecycle and native field mapping
+## Common lifecycle and narrow provider boundary
 
-Both providers expose the same conceptual lifecycle:
+Both providers map their native fields to:
 
 1. `In Design`
 2. `In Planning`
 3. `In Progress`
 4. `Blocked`
 5. `Ready for Merge`
-6. successful terminal `Done`
+6. `Done`
 
-This lifecycle is implemented through each tracker’s supported configurable status mechanism, not labels, comments, event beads, or inferred file placement.
+Backlog defines those exact ordered statuses. Beads uses `in_design:active`, `in_planning:active`, `ready_for_merge:wip`, and `done:done`, plus compatible built-in `in_progress` and `blocked`. Capability checks include category-aware readiness.
 
-Backlog configuration defines the six exact status names and their ordering. Beads configuration uses `status.custom` for `in_design:active`, `in_planning:active`, `ready_for_merge:wip`, and `done:done`, while using the compatible built-in `in_progress` and `blocked` states. Provider presentation maps those native values to the common Prime Claw names. Prime Claw must capability-test the installed versions, including category-aware ready behavior, rather than assuming status support from executable presence.
+Existing skills and canonical lifecycle tools remain the UX. A narrow internal provider adapter covers only exact identity, reads, native mutations, transitions, workspace preparation, synchronization, publication, revision evidence, and exact change presentation. Native `backlog` and `bd` commands remain underneath it. A Backlog path is provider detail, not universal identity.
 
-Each provider maps the living specification, acceptance criteria, implementation plan, execution notes, references, documentation, modified files, and final summary to supported native fields. Implementation plans remain living documents that the authorized Episode may refine as implementation reveals facts; approval does not make a plan immutable. Lifecycle authority is defined per transition rather than assigning every field or transition wholesale to the Conversation or Episode.
+Living specifications, acceptance criteria, plans, execution notes, references, documentation, modified files, comments, and final summaries use supported provider-native fields. Implementation plans remain living documents. An authorized Episode may revise its task and plan as implementation uncovers in-scope facts.
 
-## Internal provider boundary
+## Backlog topology
 
-Prime Claw uses a narrow internal provider contract only for lifecycle invariants: exact task identity, supported reads and mutations, transitions, workspace preparation, publication, and opaque revision evidence. Existing Prime Claw skills and canonical lifecycle tools remain the operator and agent interface. Native `backlog` and `bd` commands remain the underlying tracker interfaces.
+Backlog task history uses the ordinary orphan branch `refs/heads/prime-claw/tasks` in the existing repository remote. Its DAG is disconnected from code history. Every code checkout or worktree gets an ignored independent nested clone at the configured Backlog directory, checked out on that branch. It is not a submodule, linked worktree, alternate-index view, same-root custom Git work tree, or separate hosted repository.
 
-Generalized version-2 ownership records the selected provider, canonical task ID, and provider-specific opaque revision or workspace evidence. A Backlog Markdown path is provider detail, not universal task identity. Once ownership exists, it outranks prompt tags, provider discovery, and current filesystem placement.
+The remote is selected from the primary code branch's upstream. If none exists, the sole repository remote is used. No remote permits explicitly unpublished local-only task history. Ambiguous multiple remotes block for operator selection.
 
-## Backlog provider: required Git topology
+Prime Claw creates or verifies the task branch and primary nested checkout, prepares one in each Episode worktree before session start, repairs a missing checkout on preparation or first access, and refuses parent-worktree cleanup while the nested checkout is dirty or unpublished.
 
-Backlog task data lives on the reserved ordinary orphan branch `refs/heads/prime-claw/tasks` in the same Git repository and remote as the code. Its commit DAG is disconnected from the code DAG. The configured Backlog directory is ignored by every code branch and is materialized as an independent nested Git clone checked out on that same task branch. It is not a linked worktree, submodule, alternate-index view, or separate hosted repository.
+Backlog's code-repository auto-commit behavior is disabled. Prime Claw runs supported Backlog mutations, then ordinary Git commit and push inside the nested clone. Reads fetch and reconcile first. Stale pushes are rejected; force overwrite is forbidden. Different-task changes reconcile through normal Git behavior.
 
-The primary code checkout and every linked code worktree receive the same configured ignored Backlog directory with their own local nested checkout. Code branch switching leaves that nested checkout and task state unchanged. Each nested checkout has its own ordinary Git index and local task branch while sharing the same remote task history.
+## Beads topology
 
-Prime Claw tooling owns the setup lifecycle:
+Beads keeps its repository-associated canonical Dolt database. Supported multi-agent use requires native per-project server mode. Prime Claw validates and configures supported `bd` auto-start/lifecycle or a validated operator-managed external server; it does not build another server manager or require the machine-global shared-server mode under `~/.beads/`.
 
-- project initialization or upgrade creates or verifies the orphan task branch, configures the code-tree ignore and Backlog project path, and materializes the primary task checkout;
-- every Prime Claw-created Episode worktree materializes and validates its task checkout before the Episode session begins;
-- preparation or first provider access idempotently repairs a missing checkout in an existing or manually created code worktree; and
-- worktree cleanup requires the nested task checkout to be clean and fully published before its parent code worktree is removed.
+Dolt history remains independent of the code DAG and is synchronized through supported Dolt operations, including `refs/dolt/data` transport through the repository remote when configured. `.beads/issues.jsonl` is export, interchange, or backup data, never live authority. Raw Dolt operations do not race an active server.
 
-Backlog’s code-repository auto-commit behavior is disabled in this mode. Prime Claw invokes the supported Backlog CLI for task mutations, then commits and pushes inside the nested task checkout. Reads refresh first. A handoff or candidate publishes its task-data commit before authority moves, and the receiver refreshes to that exact revision before writing.
+## Revisions, iteration, and concurrent edits
 
-Concurrency uses ordinary Git behavior. A concurrent remote advance rejects the stale push. The writer fetches and rebases or merges, then retries. Different-task file changes should reconcile normally; same-task conflicts stop for explicit review. Prime Claw never force-overwrites the task branch and does not add a persistent locking protocol.
+Revision evidence records facts; it does not freeze development.
 
-## Beads provider: required native topology
+Each ownership and lifecycle receipt binds the provider, canonical task ID, exact Episode code HEAD, the provider's published store revision, and task-scoped evidence. Backlog uses ordinary task-branch Git evidence. Beads uses the Dolt revision plus a normalized task view because its row `revision` alone does not cover every label, dependency, comment, rename, or related write.
 
-Beads uses its canonical Dolt database rather than projecting issue Markdown into code branches. Supported local Git worktrees discover and share the repository-associated Beads database. Concurrent-agent operation uses a supported Beads server or concurrency mode and fails clearly when the installed version or configuration lacks the required semantics.
+An unrelated task update never blocks an Episode merely because the store revision advanced. Owner-authored task or plan updates are normal iterative development: publish them and advance the receipt. When an outside writer changes the owned task, deterministic code synchronizes and presents the exact change; it does not decide semantic compatibility. Managed Episode or Conversation instructions require the LLM to incorporate compatible in-scope changes and continue, while escalating only genuine semantic conflicts, authority changes, or product/scope decisions to Conversation oversight and, when required, the operator.
 
-Dolt task history remains distinct from the code Git DAG. The same code remote may carry Dolt storage through `refs/dolt/data`; DoltHub or another separately visible repository is not required. Supported Dolt push/pull or equivalent synchronization publishes exact task history. `.beads/issues.jsonl` remains export, interchange, or backup material and never becomes a competing live authority.
+Automated tests prove change detection, exact diff delivery, revision transport, publication, and no-silent-overwrite behavior. Prompt review and representative UAT prove the LLM reconciliation policy. Do not implement a semantic merge state machine.
 
-## Task-native and retained command routing
+## Command routing and grandfathered legacy work
 
-`/design` and `/spec-it-out` are Markdown policy skills. Their managed content directs new or revised specifications only to an exact `In Design` task in the selected provider and never to `.ralph/plans`. Acceptance relies on content review, reconciliation checks, and representative provider UAT rather than pretending unit tests can prove an agent obeys prose.
+`/design` and `/spec-it-out` author only exact `In Design` tasks in the selected provider. They never create or revise `.ralph/plans`.
 
-`/plan` accepts one explicit, syntactically unambiguous target:
+`/plan` and `/implement-task` accept either one exact selected-provider task ID or one exact grandfathered `.ralph/plans/future/<slug>` path. They never search for or invent a target. Version-2 ownership binds provider plus canonical task identity; version-1 ownership retains the exact legacy source and mechanics.
 
-- a canonical selected-provider task ID selects task-native planning; or
-- an exact grandfathered `.ralph/plans/future/<slug>` path selects retained legacy planning.
+Upgrade records the exact unfinished grandfathered inventory and accepted specification digest for each source. Archive-only history does not qualify or trigger reminders. A grandfathered specification is frozen; its plan remains living. Pure legacy work neither requires nor mutates a provider task. New follow-up work uses the selected provider. A material product-contract change migrates the legacy work instead of revising the legacy specification.
 
-`/implement-task` likewise admits either one exact implementation-ready selected-provider task or one exact implementation-ready grandfathered source. Compatibility aliases may remain during upgrade, but routing never searches for or guesses another target.
+Legacy-to-task migration is explicit, reviewed, one-way, and lossless. It preserves source location, content, provenance, criteria, execution history, exact revisions, and—when active—the same Episode, session, worktree, branch, and reviewed code identity. It establishes one task authority before retiring legacy authority and never leaves two writable sources.
 
-Version-1 ownership continues to select retained legacy files and mechanics. Version-2 ownership selects one provider task. Every blocker, handoff, reviewable candidate, revision, and terminal receipt binds both ledgers: the exact Episode code HEAD and the exact provider task revision. Backlog revisions are task-branch Git commits; Beads revisions are exact supported Dolt/task revisions or digests.
+## Complete provider migration and cutover
 
-## Grandfathered legacy behavior
+A provider switch migrates every task, including all closed work, with all content, hierarchy, dependencies, comments, lifecycle state, history, and provenance. Nothing is deliberately omitted; data without an equivalent destination field is preserved losslessly in destination-supported metadata or provenance. Preserve source IDs when the destination safely supports them; otherwise allocate provider-native IDs and retain immutable source-to-destination mappings in the migration receipt.
 
-Upgrade records an exact inventory of unfinished legacy sources and the accepted specification digest for each. Archive-only history does not enter that inventory or trigger reminders. Newly created or materially changed legacy specifications are rejected after cutover, including manually added folders that were not grandfathered.
+Migration uses a bounded repository-wide maintenance window. Provider mutations are quiesced; the exact source revision is captured; everything is migrated and verified; active ownership is transitioned; the destination is activated; and only then is the source store deleted. Prime Claw does not build online change capture or dual-write synchronization.
 
-A grandfathered specification remains the frozen product contract. Its implementation plan is living and may be created or refined during planning and execution. If implementation reveals a material product-contract change, the work migrates to one task in the selected provider rather than reopening legacy specification authoring.
-
-Pure legacy planning and execution do not require or mutate a provider task. Related tracker entries are references, not lifecycle authority. New follow-up work discovered from a legacy Episode is created in the selected provider. Provider choice affects the migration destination but does not change active version-1 identity or mechanics.
-
-Legacy-to-task migration is optional, explicit, reviewed, and one-way. It preserves source location, specification and plan content, provenance, criteria, execution history, and exact revision evidence. It establishes one selected-provider task before retiring legacy authority and never leaves both as writable sources of truth. Migration of an active Episode preserves its Episode, session, worktree, branch, and reviewed code identity unless an independently approved migration contract requires otherwise.
-
-## Migration, failure, and recovery
-
-Project initialization and upgrade explain provider evidence, capabilities, unfinished grandfathered work, active ownership, and conflicting authorities before mutation. Existing task data moves only through an isolated, reviewed, lossless migration with verifiable source and destination revisions. The migration is incomplete while both providers retain live initialization evidence.
-
-A failed or uncertain migration preserves the source authority and reports an exact recovery condition. It never creates another destination task, silently selects a provider, force-pushes task history, deletes source data, or resumes lifecycle work against ambiguous authority.
-
-New sessions remind the operator while unfinished grandfathered work remains. Reminders distinguish finishing from migrating and disappear when only archive history remains.
+The migration receipt binds exact source and destination revisions, complete counts and digests, ID mappings, verification evidence, ownership transitions, actor, and timestamp. Any failure or uncertainty before verified cutover leaves the source intact and authoritative, blocks lifecycle mutation with an exact recovery condition, and never creates another destination copy or force-selects a provider. After complete verification, ownership transition, and cutover, source deletion is immediate; no source-provider archive remains.
 
 ## Validation boundary
 
-Automated tests cover deterministic code: provider discovery and capability gates, task-workspace creation and cleanup, Git and Dolt synchronization, optimistic-concurrency rejection and retry, ownership, revision receipts, lifecycle transitions, migration, and recovery. Managed Markdown skills receive content and reconciliation checks plus representative UAT; they do not gain artificial unit-test plumbing that claims to prove model compliance.
+Automated tests cover only deterministic behavior: provider evidence and capability gates, workspace setup and cleanup, native synchronization, optimistic concurrency, ownership and receipts, exact change delivery, lifecycle transitions, complete migration, verification, failure recovery, and destructive cutover guards.
+
+Managed Markdown instructions receive content review, reconciliation checks, and representative UAT. Tests must not pretend to prove semantic LLM behavior. The implementation plan must identify the smallest mechanism for each acceptance criterion and explicitly reject unnecessary persistent state or state-machine machinery.
 
 ## Non-goals
 
 - Do not patch or fork Prime Agent.
-- Do not maintain two initialized live task providers or mirror tasks between Backlog and Beads.
-- Do not require DoltHub, a separate Backlog repository, Git submodules, alternate indexes, linked nested worktrees, or a new public tracker CLI.
-- Do not add persistent Prime Claw task/store locks or silently force-resolve same-task conflicts.
-- Do not make code branches or code worktrees the source of provider task identity.
-- Do not infer a live Episode from active plan-file placement alone.
-- Do not retire version-1 recovery, review, finalization, or cleanup while grandfathered active work remains.
-- Do not implement, migrate data, change provider selection, or alter active Episode ownership as part of specification authoring.
+- Do not create a provider-selection file, shadow task model, general Prime Claw tracker CLI, mirror, or dual-write path.
+- Do not add persistent Prime Claw task/store locks.
+- Do not use submodules, alternate Git indexes, linked nested worktrees, same-root custom Git work trees, or a separate hosted Backlog repository.
+- Do not require DoltHub or Beads machine-global shared-server mode.
+- Do not turn semantic task reconciliation or iterative plan refinement into deterministic workflow code.
+- Do not create or revise legacy specifications after cutover.
+- Do not implement, migrate data, change provider authority, or alter active Episode ownership merely by authoring this specification.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Prime Claw distribution and initialization evidence prove one exact pinned supported Backlog executable is installed as a managed runtime dependency, capability-checked before use, and not copied as source into each project; an unsupported existing provider blocks rather than silently falling back.
-- [ ] #2 Provider-discovery acceptance proves installed executables do not select authority: sole Backlog initialization selects Backlog, sole Beads initialization selects Beads, neither defaults to managed Backlog unless the operator explicitly selects supported Beads, and simultaneous Backlog and Beads initialization evidence blocks all task lifecycle mutation as an incomplete migration.
-- [ ] #3 Provider-switch acceptance proves every nonterminal authoritative source task is migrated and verified before selection changes, the source provider’s live initialization evidence is retired before completion, and any retained closed history is explicitly archived and cannot be rediscovered as another initialized provider.
-- [ ] #4 Provider fixtures prove Backlog’s configured status schema and Beads `status.custom` plus compatible built-ins implement the common lifecycle `In Design`, `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, and `Done`; unsupported custom-status or category-aware-ready capability fails before mutation.
-- [ ] #5 Managed `/design` and `/spec-it-out` content, reconciliation checks, and representative UAT show that new and revised specifications target only an exact `In Design` task in the selected provider and never create or modify `.ralph/plans`, without adding artificial unit tests that claim to prove compliance with prose.
-- [ ] #6 `/plan` routing deterministically distinguishes an exact selected-provider task ID from an exact grandfathered future-folder path, rejects missing or ambiguous targets without search or substitution, writes the plan only to the selected authority, and authorizes no implementation.
-- [ ] #7 `/implement-task` routing deterministically distinguishes one implementation-ready selected-provider task from one implementation-ready grandfathered source; task-native admission creates generalized version-2 ownership and legacy admission creates version-1 ownership without cross-authority mutation.
-- [ ] #8 Generalized version-2 ownership and all task-native admission, execute, handoff, review, blocked/resume, terminal, and cleanup paths bind an explicit provider, canonical task ID, and opaque provider revision evidence without treating a Backlog Markdown path as universal identity.
-- [ ] #9 Backlog provider acceptance proves task data lives on the ordinary orphan `refs/heads/prime-claw/tasks` branch in the same repository and remote, with a DAG disconnected from code history, and appears at the configured Backlog path only through an ignored independent nested clone rather than a submodule, linked worktree, alternate index, or separate hosted repository.
-- [ ] #10 Workspace lifecycle acceptance proves initialization or upgrade creates the task branch and primary checkout; every Prime Claw-created Episode worktree receives a validated task checkout before session start; preparation repairs missing checkouts in existing worktrees; code branch switching leaves task state unchanged; and cleanup refuses an unclean or unpublished nested checkout.
-- [ ] #11 Backlog synchronization tests prove reads refresh the nested task checkout, supported Backlog mutations are committed there rather than to the code branch, different-task changes reconcile through standard Git operations, stale pushes are rejected, same-task conflicts stop for review, force overwrite is prohibited, and no persistent Prime Claw task/store lock is required.
-- [ ] #12 Beads provider acceptance proves supported worktrees observe one canonical local Dolt task store, required custom lifecycle statuses and ready behavior work, concurrent-agent mode is validated, and supported Dolt synchronization preserves exact task history independently of code branches without treating `.beads/issues.jsonl` as live authority.
-- [ ] #13 Provider integration keeps existing Prime Claw skills and canonical lifecycle tools as the common UX, uses native `backlog` and `bd` interfaces underneath a narrow internal lifecycle contract, and introduces no general public Prime Claw tracker CLI or shadow task model.
-- [ ] #14 Candidate, blocker, resume, revision, handoff, and terminal receipts bind the exact Episode code HEAD to the exact provider task revision and reject identity, provider, ancestry, or revision drift before lifecycle mutation.
-- [ ] #15 Upgrade records the exact unfinished grandfathered source set and accepted specification digests; manually added or materially revised legacy specifications are rejected; archive-only history neither qualifies nor triggers reminders; and sessions continue to remind while unfinished grandfathered work remains.
-- [ ] #16 Legacy planning and execution acceptance proves version-1 authority is provider-independent, the frozen specification is not revised, the living implementation plan may be refined, tracker references do not select a provider or become authority, and pure legacy work does not require or mutate a provider task.
-- [ ] #17 Legacy migration acceptance proves migration targets only the selected provider, preserves source content and provenance, receives independent review, establishes one exact task authority, and retires legacy authority without writable dual authority or hidden mirroring.
-- [ ] #18 An active legacy-to-task transition preserves the exact Episode, session, worktree, branch, code identity, and reviewed evidence when valid, while a failed or uncertain transition leaves version-1 authority recoverable and reports an exact unblock condition.
-- [ ] #19 Automated tests cover deterministic provider discovery, capability gates, workspace setup and cleanup, synchronization, optimistic concurrency, ownership, revision receipts, lifecycle transitions, migration, and recovery; documentation and UAT cover provider selection, worktree UX, grandfathered reminders, finish-versus-migrate choices, and the prohibition on new legacy authoring.
+- [ ] #1 The implementation plan maps every acceptance criterion to the least-technology mechanism in this order: provider-native behavior, managed LLM instruction, then narrow deterministic adapter code; it justifies any new persistent state or state machine, and review rejects semantic workflow machinery that a prompt can perform.
+- [ ] #2 Sequencing gates prove the admitted PRIMECLAW-10.38 Episode may finish under existing authority while implementation of PRIMECLAW-43 and PRIMECLAW-43.1 remains blocked until PRIMECLAW-10.38 reaches a terminal decision.
+- [ ] #3 Provider discovery recognizes only valid live initialization evidence, selects the sole Backlog or Beads store, defaults new Prime Claw initialization to `.backlog/` unless supported Beads is explicitly selected, blocks malformed or dual live evidence, and creates no provider-selection file or shadow authority.
+- [ ] #4 Prime Claw supplies and capability-checks one pinned managed Backlog executable while preserving upstream direct-init `backlog/` behavior; Prime Claw initialization recommends `.backlog/`, and valid retained `backlog/` or custom layouts remain supported by explicit operator choice.
+- [ ] #5 Backlog configuration and migration acceptance preserves native root and folder discovery, moves configuration with the nested task checkout, offers custom-layout normalization, and uses only a validated relative root symlink when an operator retains a custom directory.
+- [ ] #6 Provider fixtures prove Backlog statuses and Beads custom plus built-in statuses map exactly to In Design, In Planning, In Progress, Blocked, Ready for Merge, and Done, including category-aware readiness capability checks before mutation.
+- [ ] #7 Existing skills and canonical tools remain the UX over a narrow provider adapter for identity, native reads and writes, workspace preparation, synchronization, publication, revisions, and exact change presentation; native `backlog` and `bd` interfaces remain underneath, with no general replacement tracker CLI.
+- [ ] #8 Managed `/design` and `/spec-it-out` content, reconciliation, and UAT target only exact selected-provider In Design tasks and never create or revise `.ralph/plans`; `/plan` and `/implement-task` deterministically accept only one exact provider task ID or grandfathered path without search or substitution.
+- [ ] #9 Generalized version-2 ownership and all task-native lifecycle receipts bind provider, canonical task ID, exact Episode code HEAD, published store revision, and task-scoped evidence without treating a Backlog path as universal identity.
+- [ ] #10 Backlog acceptance proves task history uses disconnected ordinary orphan branch `refs/heads/prime-claw/tasks` in the selected existing remote and an ignored independent nested clone per code worktree, never a submodule, linked worktree, alternate index, same-root custom work tree, or separate hosted repository.
+- [ ] #11 Backlog remote selection uses the primary code branch upstream, otherwise the sole remote; no remote permits explicit local-only unpublished history, while ambiguous remotes block. Workspace setup creates, validates, or repairs each nested checkout and cleanup refuses dirty or unpublished state.
+- [ ] #12 Backlog synchronization disables tracker auto-commit, commits supported native mutations in the nested clone, refreshes before reads and writes, rejects stale pushes and force overwrite, and reconciles unrelated-task changes through ordinary Git behavior without persistent locks.
+- [ ] #13 Beads acceptance uses one repository-associated Dolt store in native per-project server mode, validates supported `bd` auto-start/lifecycle or an operator-managed external server, rejects unsupported concurrency, uses supported Dolt transport including `refs/dolt/data` when configured, and never treats `.beads/issues.jsonl` as authority.
+- [ ] #14 Revision acceptance proves unrelated-task advances and owner-authored iterative task or living-plan updates do not block; receipts advance after publication, and outside same-task changes are synchronized and delivered as exact evidence to the responsible LLM rather than decided by a deterministic semantic merge state machine.
+- [ ] #15 Managed Episode and Conversation instructions require LLM reasoning to incorporate compatible in-scope task changes, keep the task and plan current, and escalate only genuine semantic conflicts, authority changes, or product/scope decisions; representative UAT covers this behavior while automated tests cover only deterministic transport and integrity.
+- [ ] #16 Upgrade records the exact unfinished grandfathered set and accepted specification digests, rejects new or materially revised legacy specifications, excludes archive-only history from reminders, and preserves provider-independent version-1 planning, execution, review, recovery, and finalization with frozen specifications and living plans.
+- [ ] #17 Legacy-to-task migration is explicit, reviewed, one-way, and lossless; it targets the selected provider, preserves provenance and exact active Episode identity, establishes one task authority before retiring legacy authority, and leaves version-1 recovery intact on failure.
+- [ ] #18 Provider-switch acceptance uses a bounded mutation-free maintenance window and migrates every open and closed task with all fields, relationships, comments, lifecycle state, history, and provenance, preserving any non-native value losslessly in destination-supported metadata or provenance; IDs are preserved when safely supported and otherwise receive immutable source-to-destination mappings.
+- [ ] #19 Cutover verification binds exact source and destination revisions, complete counts and digests, ID mappings, ownership transitions, actor, and timestamp. Any pre-cutover failure keeps the source intact and authoritative; only complete verification and ownership transition activate the destination and immediately delete the source store.
+- [ ] #20 Automated tests cover deterministic discovery, capability gates, workspaces, synchronization, optimistic concurrency, revision and diff transport, ownership, transitions, complete migration, recovery, and destructive cutover guards. Managed prose receives content review, reconciliation checks, and representative UAT instead of artificial behavioral unit tests.
 <!-- AC:END -->
