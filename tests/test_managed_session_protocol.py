@@ -29,6 +29,7 @@ EXPECTED_TYPESCRIPT = {
     "extension-support/prep-chain.ts",
     "extension-support/reviewed-plan-support.ts",
     "extension-support/spec-episode.ts",
+    "extension-support/task-providers.ts",
     "extension-support/task-episode-cleanup.ts",
     "extension-support/task-episode-ownership.ts",
 }

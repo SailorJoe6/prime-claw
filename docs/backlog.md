@@ -114,6 +114,38 @@ one-time migration removed active `To Do` only after every former item was
 classified from its native Implementation Plan while preserving stronger
 states, IDs, and parents.
 
+## Provider discovery and capability seam
+
+`extension-support/task-providers.ts` is the narrow deterministic seam for the
+selectable task-provider contract (PRIMECLAW-43). It selects exactly one live
+provider per repository from native store evidence; there is no
+provider-selection file or shadow record:
+
+- valid Backlog evidence follows native configuration discovery: a root
+  `backlog.config.yml` with `project_name` takes precedence (and may select an
+  existing custom directory), otherwise `backlog/config.yml|yaml` or
+  `.backlog/config.yml|yaml` selects that built-in store;
+- valid Beads evidence is a `.beads/` store with a coherent Dolt
+  `metadata.json` and `config.yaml` (`no-db` JSONL-only mode is unsupported;
+  `.beads/issues.jsonl` is export data, never live authority);
+- malformed or uncertain evidence blocks with exact remediation, simultaneous
+  Backlog and Beads evidence blocks as an incomplete migration, and no live
+  evidence returns `none` so initialization can default to `.backlog/` unless
+  the operator explicitly selects a supported Beads store.
+
+`checkBacklogCapabilities` proves the pinned managed `backlog` executable
+responds and the resolved configuration carries the exact ordered lifecycle
+statuses before any task mutation. `checkBeadsCapabilities` proves the `bd`
+executable responds and `bd statuses --json` maps every canonical lifecycle
+state to an exact custom or built-in status with the required readiness
+category (`in_design:active`, `in_planning:active`, built-in `in_progress` and
+`blocked`, `ready_for_merge:wip`, `done:done`). The build pipeline pins and
+smoke-checks the exact Backlog version; these runtime gates are behavioral
+capability checks, not version assertions.
+
+Later slices route the existing lifecycle call sites through this seam and add
+provider-native workspace preparation. Current call-site behavior is unchanged.
+
 ## Project task workflow
 
 Backlog.md is the repository's sole active task tracker. Until the accepted host

@@ -21,6 +21,7 @@
     {"id":"plugin-extension-support-project-initialization-ts","source":"extension-support/project-initialization.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/project-initialization.ts"}]},
     {"id":"plugin-extension-support-reviewed-plan-support-ts","source":"extension-support/reviewed-plan-support.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/reviewed-plan-support.ts"}]},
     {"id":"plugin-extension-support-spec-episode-ts","source":"extension-support/spec-episode.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/spec-episode.ts"}]},
+    {"id":"plugin-extension-support-task-providers-ts","source":"extension-support/task-providers.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/task-providers.ts"}]},
     {"id":"plugin-extension-support-task-episode-cleanup-ts","source":"extension-support/task-episode-cleanup.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/task-episode-cleanup.ts"}]},
     {"id":"plugin-extension-support-task-episode-ownership-ts","source":"extension-support/task-episode-ownership.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/task-episode-ownership.ts"}]},
     {"id":"plugin-extension-support-template-review-ts","source":"extension-support/template-review.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/template-review.ts"}]},

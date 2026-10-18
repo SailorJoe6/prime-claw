@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 19:09'
+updated_date: '2026-10-18 19:38'
 labels: []
 dependencies: []
 references:
@@ -225,3 +225,20 @@ Managed Markdown instructions receive content review, reconciliation checks, and
 | 19 | One destination-native immutable receipt and a final verified source deletion gate. |
 | 20 | One contract fixture per new seam, a few representative end-to-end paths, prompt review, and real semantic UAT. |
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-18 Episode slice 1a (provider discovery + capability gates, first sub-slice of plan slice 1):
+
+- Added `src/prime-agent-plugin/extension-support/task-providers.ts`: `detectTaskProvider` selects the sole live provider from native store evidence (Backlog: root `backlog.config.yml` precedence mirroring upstream `resolveBacklogDirectory`, else config-bearing `backlog/` or `.backlog/` folder, custom directory via root config; Beads: `.beads/` with coherent Dolt `metadata.json` + `config.yaml`, `no-db` mode rejected since JSONL is never authority). Malformed evidence and dual live evidence block with exact remediation; stray directories and exports are not evidence; no evidence returns `none` so initialization can default to `.backlog/`. No provider-selection file or shadow state.
+- Added `checkBacklogCapabilities` (pinned executable responds; `backlog config get statuses` matches the exact ordered canonical lifecycle) and `checkBeadsCapabilities` (`bd --version`; `bd statuses --json` proves `in_design:active`, `in_planning:active`, built-in `in_progress`/`blocked` as wip, `ready_for_merge:wip`, `done:done`). Capability checks are behavioral; the exact Backlog version pin is enforced at image build time (Dockerfile ARG + smoke), not duplicated in plugin source.
+- `BEADS_STATUS_MAP` exported as the single exact mapping table. Verified live against real stores: this repo (Backlog, folder config) and a scratch `bd init` store (Beads 1.1.2, embedded mode).
+- Tests: new `tests/task_providers.test.mjs` (25 cases: selection, precedence, custom dirs, malformed/dual blocking, no-db rejection, capability pass/fail) + `tests/test_task_providers.py` bridge (tier-1 node suite + tier-0 static contract). Asset inventory gained `plugin-extension-support-task-providers-ts`; `EXPECTED_TYPESCRIPT` updated.
+- Docs: `docs/backlog.md` gained a "Provider discovery and capability seam" section.
+- AC progress (partial, none complete yet): AC 3 discovery core and AC 6 status-mapping checks implemented for both providers; AC 1 mechanism ordering preserved (native CLI + FS evidence only, zero new persistent state).
+
+Pre-existing main-branch test drift observed (NOT from this slice, reproduced on canonical main): `test_runtime_image.py::test_backlog_source_identity_matches_pin` (deps/backlog submodule is at 5d556c19 = v1.53.0-1-g5d556c19 after the `task restore` fork commit, but `scripts/build-backlog.sh`, `docker/runtime.Dockerfile`, and `tests/test_backlog_build.py` still pin fd20f714), `test_project_initialization.py::test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree` (templates.json manifest not re-reconciled after 7afcf67 changed design/spec-it-out template sources), `test_container_helpers_static.py` (two failures: unbridged task_episode_admission suite; runtime-connect host-safe sentinel). Reported to the owning Conversation for triage; left untouched as out of scope.
+
+Remaining for later sub-slices of plan slice 1: route existing lifecycle call sites (`resolveBacklogTask`, task admission status mutations) through provider-aware resolution, live-provider gating at lifecycle boundaries, and plugin-managed `.backlog/` defaulting in project initialization. Workspace preparation (orphan task branch + nested clones), revision evidence, and sync/publication remain plan slices 2+.
+<!-- SECTION:NOTES:END -->
