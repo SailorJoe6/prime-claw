@@ -92,14 +92,19 @@ export type TaskEpisodeResult = TaskEpisodeOwnershipRecord & { reused: boolean }
 
 export interface SessionSummary {
   activeSessionId?: string; id?: string; sessionId?: string; sessionFile?: string;
-  sessionName?: string; cwd?: string; isSessionActive?: boolean; isStreaming?: boolean;
-  isCompacting?: boolean; queuedCount?: number;
-}
-export interface EpisodeSessionState extends SessionSummary {
+  sessionName?: string; cwd?: string; lifecycle?: "draft" | "live" | "archived";
+  activity?: "working" | "idle"; runtimeKind?: "top-level" | "subagent"; rlmDepth?: number;
+  isSessionActive?: boolean; isStreaming?: boolean; isCompacting?: boolean;
   isBashRunning?: boolean; isRunningTools?: boolean; hasRunningRlmChildren?: boolean;
-  unfinishedActionCount?: number;
+  hasActiveHeartbeat?: boolean; hasRegisteredHeartbeat?: boolean; hasRegisteredCronJob?: boolean;
+  attachedClients?: number; directAttachedClients?: number; unfinishedActionCount?: number;
+  queuedCount?: number;
   sessionActions?: { queuedCount?: number; steering?: unknown[]; followUps?: unknown[]; active?: unknown };
+  parentActiveSessionId?: string; parentSessionId?: string; parentSessionPath?: string;
+  rlmChildId?: string; workerState?: "starting" | "ready" | "recovering" | "stopping" | "failed";
+  statusLabel?: "queued" | "recovering" | "failed";
 }
+export interface EpisodeSessionState extends SessionSummary {}
 export interface EpisodeHandoffResult {
   admitted: true; sourceLocation: string; episodeId: string; episodeActiveSessionId: string;
   handoffDelivery: "prompt"; executeDelivery: "followUp";

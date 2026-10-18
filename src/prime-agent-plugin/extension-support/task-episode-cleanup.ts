@@ -6,8 +6,8 @@ import { ProcessCommandRunner } from "./project-initialization.ts";
 import {
   CliGitAdapter,
   PrimeSessionPublisher,
-  type EpisodeSessionState,
   type SessionPublisher,
+  type SessionSummary,
   type TaskEpisodeCleanupAdapter,
   type TaskEpisodeCleanupSnapshot,
 } from "./spec-episode.ts";
@@ -24,20 +24,39 @@ function object(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function idleState(state: EpisodeSessionState, record: TaskEpisodeOwnershipRecord): boolean {
+function quiescentState(state: SessionSummary): boolean {
   const actions = state.sessionActions;
-  const exact = state.activeSessionId === record.episodeActiveSessionId
-    && state.sessionId === record.episodeId
-    && samePath(state.sessionFile, record.episodeSessionFile!)
-    && samePath(state.cwd, record.worktree!);
-  return exact && state.isSessionActive === false && state.isStreaming === false
-    && state.isCompacting === false && state.isBashRunning === false
-    && state.isRunningTools === false && state.hasRunningRlmChildren === false
-    && state.unfinishedActionCount === 0 && actions?.queuedCount === 0
+  return state.isSessionActive === false
+    && state.activity !== "working"
+    && state.isStreaming === false
+    && state.isCompacting === false
+    && state.isBashRunning !== true
+    && state.isRunningTools !== true
+    && state.hasRunningRlmChildren !== true
+    && state.hasActiveHeartbeat !== true
+    && state.hasRegisteredHeartbeat !== true
+    && state.hasRegisteredCronJob !== true
+    && (state.attachedClients ?? 0) === 0
+    && (state.directAttachedClients ?? 0) === 0
+    && (state.unfinishedActionCount ?? 0) === 0
+    && (state.queuedCount ?? 0) === 0
+    && actions?.queuedCount === 0
     && Array.isArray(actions.steering) && actions.steering.length === 0
     && Array.isArray(actions.followUps) && actions.followUps.length === 0
-    && actions.active == null;
+    && actions.active == null
+    && state.lifecycle !== "draft"
+    && state.statusLabel === undefined
+    && !["starting", "recovering", "stopping", "failed"].includes(state.workerState ?? "ready");
 }
+
+function rosterScheduleQuiescent(summary: SessionSummary): boolean {
+  return summary.hasActiveHeartbeat !== true
+    && summary.hasRegisteredHeartbeat !== true
+    && summary.hasRegisteredCronJob !== true;
+}
+
+type OwnedEpisodeSession = { summary: SessionSummary; depth: number };
+type EpisodeSessionTree = { root: OwnedEpisodeSession; descendants: OwnedEpisodeSession[]; idle: boolean };
 
 type OrcaWorktreeSnapshot = {
   id: string; identity: string; path: string; branch: string; head: string; projectSetupId: string;
@@ -68,6 +87,156 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
     this.sessions = options.sessions ?? new PrimeSessionPublisher();
     this.runner = options.runner ?? new ProcessCommandRunner();
     this.git = options.git ?? new CliGitAdapter();
+  }
+
+  private exactSession(summary: SessionSummary, expected: SessionSummary): boolean {
+    return summary.sessionId === expected.sessionId
+      && typeof summary.sessionFile === "string"
+      && typeof expected.sessionFile === "string"
+      && samePath(summary.sessionFile, expected.sessionFile)
+      && typeof summary.cwd === "string"
+      && typeof expected.cwd === "string"
+      && samePath(summary.cwd, expected.cwd)
+      && summary.activeSessionId === expected.activeSessionId
+      && summary.parentSessionId === expected.parentSessionId
+      && ((summary.parentSessionPath === undefined && expected.parentSessionPath === undefined)
+        || (typeof summary.parentSessionPath === "string" && typeof expected.parentSessionPath === "string"
+          && samePath(summary.parentSessionPath, expected.parentSessionPath)));
+  }
+
+  private validateSessionIdentity(summary: SessionSummary, record: TaskEpisodeOwnershipRecord, child: boolean): void {
+    if (!summary.sessionId || !summary.sessionFile || !summary.cwd || !existsSync(summary.sessionFile)) {
+      throw new Error("Task Episode cleanup found a malformed or missing Prime Agent session identity");
+    }
+    if (!samePath(summary.cwd, record.worktree!)) {
+      throw new Error("Task Episode cleanup found a descendant outside the owned worktree");
+    }
+    if (child && (summary.runtimeKind !== "subagent" || !summary.rlmChildId
+      || !summary.parentSessionId || !summary.parentSessionPath)) {
+      throw new Error("Task Episode cleanup found a malformed Prime Agent descendant identity");
+    }
+    if (!child && (summary.runtimeKind === "subagent" || (summary.rlmDepth !== undefined && summary.rlmDepth !== 0))) {
+      throw new Error("Task Episode cleanup found a malformed Prime Agent root identity");
+    }
+  }
+
+  private async sessionTree(record: TaskEpisodeOwnershipRecord, sessions: SessionSummary[]): Promise<EpisodeSessionTree | null> {
+    const rootRows = sessions.filter((entry) => entry.sessionId === record.episodeId
+      && samePath(entry.sessionFile, record.episodeSessionFile!)
+      && samePath(entry.cwd, record.worktree!));
+    if (rootRows.length > 1) {
+      throw new Error("Task Episode cleanup found a foreign or duplicate Prime Agent session identity");
+    }
+    const root = rootRows[0];
+    if (!root) {
+      const collision = sessions.find((entry) => entry.activeSessionId === record.episodeActiveSessionId
+        || entry.sessionId === record.episodeId
+        || samePath(entry.sessionFile, record.episodeSessionFile!)
+        || samePath(entry.cwd, record.worktree!));
+      if (collision) throw new Error("Task Episode cleanup found a foreign or duplicate Prime Agent session identity");
+      if (existsSync(record.episodeSessionFile!)) {
+        throw new Error("Task Episode cleanup found an untracked saved-session file");
+      }
+      return null;
+    }
+    this.validateSessionIdentity(root, record, false);
+    if (root.activeSessionId !== undefined && root.activeSessionId !== record.episodeActiveSessionId) {
+      throw new Error("Task Episode cleanup found a changed Prime Agent routing identity");
+    }
+
+    const owned = new Set<SessionSummary>([root]);
+    const nodes: OwnedEpisodeSession[] = [{ summary: root, depth: 0 }];
+    const childEdges = new Set<string>();
+    for (let index = 0; index < nodes.length; index += 1) {
+      const parent = nodes[index]!;
+      const parentId = parent.summary.sessionId!;
+      const parentFile = parent.summary.sessionFile!;
+      for (const candidate of sessions) {
+        if (owned.has(candidate)) continue;
+        const idMatch = candidate.parentSessionId === parentId;
+        const pathMatch = samePath(candidate.parentSessionPath, parentFile);
+        if (!idMatch && !pathMatch) continue;
+        if (!idMatch || !pathMatch) {
+          throw new Error("Task Episode cleanup found an ambiguous Prime Agent descendant parent chain");
+        }
+        this.validateSessionIdentity(candidate, record, true);
+        const edge = `${parentId}\0${resolve(parentFile)}\0${candidate.rlmChildId}`;
+        if (childEdges.has(edge)) {
+          throw new Error("Task Episode cleanup found a duplicate Prime Agent descendant identity");
+        }
+        childEdges.add(edge);
+        owned.add(candidate);
+        nodes.push({ summary: candidate, depth: parent.depth + 1 });
+      }
+    }
+
+    const identities = nodes.map((node) => node.summary);
+    for (const summary of identities) {
+      const duplicates = sessions.filter((candidate) => candidate.sessionId === summary.sessionId
+        || samePath(candidate.sessionFile, summary.sessionFile!)
+        || (summary.activeSessionId !== undefined && candidate.activeSessionId === summary.activeSessionId));
+      if (duplicates.some((candidate) => !owned.has(candidate)) || duplicates.length > 1) {
+        throw new Error("Task Episode cleanup found a foreign or duplicate Prime Agent session identity");
+      }
+    }
+    const foreign = sessions.find((candidate) => !owned.has(candidate) && (
+      samePath(candidate.cwd, record.worktree!)
+      || identities.some((summary) => candidate.parentSessionId === summary.sessionId
+        || samePath(candidate.parentSessionPath, summary.sessionFile!))
+    ));
+    if (foreign) {
+      throw new Error("Task Episode cleanup found a foreign or duplicate Prime Agent session identity");
+    }
+
+    let idle = true;
+    for (const node of nodes) {
+      let state: SessionSummary = node.summary;
+      if (node.summary.activeSessionId) {
+        state = await this.sessions.getState(node.summary.activeSessionId);
+        if (!this.exactSession(state, node.summary)) {
+          throw new Error("Task Episode cleanup found changed Prime Agent session identity during state inspection");
+        }
+      }
+      if (!quiescentState(state) || !rosterScheduleQuiescent(node.summary)) idle = false;
+    }
+    return { root: nodes[0]!, descendants: nodes.slice(1), idle };
+  }
+
+  private async removeSession(summary: SessionSummary): Promise<void> {
+    const sessionId = summary.sessionId!;
+    const sessionFile = summary.sessionFile!;
+    const activeSessionId = summary.activeSessionId;
+    if (activeSessionId) {
+      const listedRows = (await this.sessions.list()).filter((entry) => entry.sessionId === sessionId
+        || samePath(entry.sessionFile, sessionFile)
+        || entry.activeSessionId === activeSessionId);
+      const listed = listedRows[0];
+      const state = await this.sessions.getState(activeSessionId);
+      if (listedRows.length !== 1 || !listed || !this.exactSession(listed, summary)
+        || !rosterScheduleQuiescent(listed)
+        || !this.exactSession(state, summary) || !quiescentState(state)) {
+        throw new Error("Task Episode cleanup refuses to remove a changed or busy Prime Agent session");
+      }
+      if (!this.sessions.kill) throw new Error("Prime Agent runtime does not support exact session kill");
+      await this.sessions.kill(activeSessionId);
+      const afterKill = await this.sessions.list();
+      if (afterKill.some((entry) => entry.activeSessionId === activeSessionId)) {
+        throw new Error("Prime Agent did not confirm exact Episode session termination");
+      }
+    }
+    const beforeDelete = await this.sessions.list();
+    const savedPresent = existsSync(sessionFile) || beforeDelete.some((entry) => entry.sessionId === sessionId
+      || samePath(entry.sessionFile, sessionFile));
+    if (savedPresent) {
+      if (!this.sessions.deleteSaved) throw new Error("Prime Agent runtime does not support saved-session deletion");
+      await this.sessions.deleteSaved(sessionFile);
+    }
+    const afterDelete = await this.sessions.list();
+    if (existsSync(sessionFile) || afterDelete.some((entry) => entry.sessionId === sessionId
+      || samePath(entry.sessionFile, sessionFile)
+      || (activeSessionId !== undefined && entry.activeSessionId === activeSessionId))) {
+      throw new Error("Prime Agent did not confirm exact saved-session deletion");
+    }
   }
 
   async inspect(record: TaskEpisodeOwnershipRecord): Promise<TaskEpisodeCleanupSnapshot> {
@@ -101,29 +270,8 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
       throw new Error("Task Episode cleanup found a changed terminal worktree or branch head");
     }
     const sessions = await this.sessions.list();
-    const exactSessions = sessions.filter((entry) => entry.sessionId === record.episodeId
-      && samePath(entry.sessionFile, record.episodeSessionFile!)
-      && samePath(entry.cwd, record.worktree!));
-    const boundCollision = sessions.find((entry) => (
-      entry.activeSessionId === record.episodeActiveSessionId
-      || entry.sessionId === record.episodeId
-      || samePath(entry.sessionFile, record.episodeSessionFile!)
-      || samePath(entry.cwd, record.worktree!)
-    ) && !exactSessions.includes(entry));
-    if (boundCollision || exactSessions.length > 1) {
-      throw new Error("Task Episode cleanup found a foreign or duplicate Prime Agent session identity");
-    }
-    const session = exactSessions[0];
-    if (!session && existsSync(record.episodeSessionFile)) {
-      throw new Error("Task Episode cleanup found an untracked saved-session file");
-    }
-    let sessionIdle = true;
-    if (session?.activeSessionId) {
-      if (session.activeSessionId !== record.episodeActiveSessionId) {
-        throw new Error("Task Episode cleanup found a changed Prime Agent routing identity");
-      }
-      sessionIdle = idleState(await this.sessions.getState(session.activeSessionId), record);
-    }
+    const sessionTree = await this.sessionTree(record, sessions);
+    const sessionIdle = sessionTree?.idle ?? true;
 
     let exactTerminal: OrcaTerminalSnapshot | undefined;
     if (record.engine === "orca" && orcaWorktree) {
@@ -144,7 +292,7 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
     // Orca owns terminal teardown as part of its exact non-force worktree removal.
     // Keeping the pane out of the Prime runtime stage avoids retiring its durable
     // surface before Orca has proved the PTY stopped.
-    const runtimePresent = Boolean(session || existsSync(record.episodeSessionFile));
+    const runtimePresent = Boolean(sessionTree || existsSync(record.episodeSessionFile));
     const head = worktreeHead ?? branch?.head;
     if (runtimePresent && !head) {
       throw new Error("Task Episode cleanup found runtime state after both worktree and branch disappeared");
@@ -168,44 +316,26 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
   async removeRuntime(record: TaskEpisodeOwnershipRecord): Promise<void> {
     const before = await this.inspect(record);
     if (!before.runtime || !before.runtime.idle) throw new Error("Task Episode cleanup runtime removal requires the exact idle runtime");
-    const sessions = await this.sessions.list();
-    const exact = sessions.filter((entry) => entry.sessionId === record.episodeId
-      && samePath(entry.sessionFile, record.episodeSessionFile!)
-      && samePath(entry.cwd, record.worktree!));
-    const collision = sessions.find((entry) => (
-      entry.activeSessionId === record.episodeActiveSessionId
-      || entry.sessionId === record.episodeId
-      || samePath(entry.sessionFile, record.episodeSessionFile!)
-      || samePath(entry.cwd, record.worktree!)
-    ) && !exact.includes(entry));
-    if (collision || exact.length > 1) throw new Error("Task Episode cleanup found foreign or duplicate Prime Agent sessions");
-    if (exact.length === 0 && existsSync(record.episodeSessionFile!)) {
-      throw new Error("Task Episode cleanup refuses an untracked saved-session file");
+    const initial = await this.sessionTree(record, await this.sessions.list());
+    if (!initial || !initial.idle) throw new Error("Task Episode cleanup runtime changed before removal");
+    const plannedDescendants = [...initial.descendants].sort((left, right) =>
+      right.depth - left.depth || left.summary.sessionFile!.localeCompare(right.summary.sessionFile!),
+    );
+    for (const planned of plannedDescendants) {
+      const fresh = await this.sessionTree(record, await this.sessions.list());
+      if (!fresh || !fresh.idle) throw new Error("Task Episode cleanup session tree changed or became busy during removal");
+      const current = fresh.descendants.find((node) => node.summary.sessionId === planned.summary.sessionId
+        && samePath(node.summary.sessionFile, planned.summary.sessionFile!));
+      if (!current) continue;
+      await this.removeSession(current.summary);
     }
-    const session = exact[0];
-    if (session?.activeSessionId) {
-      if (session.activeSessionId !== record.episodeActiveSessionId) {
-        throw new Error("Task Episode cleanup refuses to kill a changed Prime Agent route");
-      }
-      if (!idleState(await this.sessions.getState(session.activeSessionId), record)) {
-        throw new Error("Task Episode cleanup refuses to kill a busy Prime Agent session");
-      }
-      if (!this.sessions.kill) throw new Error("Prime Agent runtime does not support exact session kill");
-      await this.sessions.kill(session.activeSessionId);
-      const afterKill = await this.sessions.list();
-      if (afterKill.some((entry) => entry.activeSessionId === session.activeSessionId)) {
-        throw new Error("Prime Agent did not confirm exact Episode session termination");
-      }
+    const beforeRoot = await this.sessionTree(record, await this.sessions.list());
+    if (!beforeRoot || !beforeRoot.idle || beforeRoot.descendants.length !== 0) {
+      throw new Error("Task Episode cleanup found changed descendants before parent runtime removal");
     }
-    if (existsSync(record.episodeSessionFile!) || exact.length > 0) {
-      if (!this.sessions.deleteSaved) throw new Error("Prime Agent runtime does not support saved-session deletion");
-      await this.sessions.deleteSaved(record.episodeSessionFile!);
-      const afterDelete = await this.sessions.list();
-      if (existsSync(record.episodeSessionFile!) || afterDelete.some((entry) => entry.sessionId === record.episodeId
-        || samePath(entry.sessionFile, record.episodeSessionFile!))) {
-        throw new Error("Prime Agent did not confirm exact saved-session deletion");
-      }
-    }
+    await this.removeSession(beforeRoot.root.summary);
+    const after = await this.sessionTree(record, await this.sessions.list());
+    if (after) throw new Error("Task Episode cleanup did not remove the exact Episode session tree");
   }
 
   async removeWorktree(record: TaskEpisodeOwnershipRecord): Promise<void> {
