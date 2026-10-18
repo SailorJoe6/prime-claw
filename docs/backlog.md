@@ -187,32 +187,60 @@ asset reconciliation.
 ### Task-history workspace foundation (slice 2A)
 
 `extension-support/task-history-workspace.ts` is the direct, Backlog-specific
-ordinary-Git preparation seam for the provider-native workspace:
+ordinary-Git preparation seam for the provider-native workspace. The selected
+repository **remote** is the task-history authority, and the canonical primary
+checkout is never switched, staged, or written:
 
 - **Remote selection** (`selectTaskHistoryRemote`): the canonical primary code
-  branch's upstream wins; otherwise the sole repository remote. No remote or
-  ambiguous remotes block with exact remediation; the seam never guesses.
-- **Disconnected history** (`ensureTaskHistoryBranch`): creates or verifies
-  `refs/heads/prime-claw/tasks` with ordinary Git. Creation uses
-  `git switch --orphan` plus an ordinary initial commit, then restores the
-  code branch. An existing branch is verified, never recreated; shared code
-  ancestry is never accepted as task authority; a remote ref ahead of the
-  local branch blocks rather than force-overwriting.
-- **Nested clone** (`prepareTaskHistoryWorkspace`): the primary checkout's
-  ignored, independent nested Backlog clone at the validated built-in
-  task-store location (`backlog/` or `.backlog/` only), checked out on the
-  task-history branch. An existing live store directory without `.git` is
-  adopted onto the branch with ordinary Git (content never discarded);
-  anything else non-empty blocks. No submodules, linked nested worktrees,
-  alternate indexes, same-root custom Git work trees, separate hosted repo,
-  or coordinator. The store is added to the primary checkout's `.gitignore`.
-- **Auto-commit disabled**: `backlog config set autoCommit false` on the
-  nested clone, proven by `backlog config get autoCommit`. The primary
-  checkout's root/folder configuration evidence is preserved into the clone
-  (the root configuration itself is never modified).
+  branch's upstream wins; otherwise the sole repository remote. The selection
+  carries the remote's transport URL. No remote or ambiguous remotes block with
+  exact remediation; the seam never guesses.
+- **Remote-bound branch authority** (`ensureTaskHistoryBranch`): the exact
+  `refs/heads/prime-claw/tasks` is probed and fetched from the selected remote
+  before any decision — an unreachable remote fails closed, never deciding on
+  stale or absent evidence. An existing published branch is verified and
+  adopted locally by tracking; a local branch ahead of the remote blocks
+  (`local-ahead`, never published implicitly or called verified); a remote
+  ahead blocks (`remote-advanced`, never force); shared code ancestry blocks. A
+  new disconnected history is bootstrapped in a disposable temporary
+  ordinary-Git repository (an orphan commit of only `TASKS.md`), published with
+  an ordinary non-force push, proven from a fresh fetch, then adopted by
+  tracking. The primary checkout's branch, index, worktree, and untracked files
+  are byte-for-byte unchanged by bootstrap.
+- **Nested clone from the remote URL** (`prepareTaskHistoryWorkspace`): the
+  primary checkout's ignored, independent nested Backlog clone is cloned from
+  the selected remote's transport URL — never the primary filesystem path —
+  onto the published task branch, at the validated built-in task-store
+  location. The default with no live provider evidence is `.backlog/` (never
+  `backlog/`); an explicitly selected existing `backlog/` store is preserved.
+  An existing nested clone is verified exactly — remote name AND canonical URL,
+  branch, and head — never recreated. An existing non-empty store without
+  `.git` blocks before mutation (adopting it is the deferred migration/cutover
+  slice), leaving content untouched. The clone's cached diff against the
+  published head is empty — the published tree is materialized and tracked,
+  never staged for deletion. No submodules, linked nested worktrees, alternate
+  indexes, same-root custom Git work trees, separate hosted repo, or
+  coordinator.
+- **Containment before mutation**: the store target is proven directly inside
+  the canonical primary root and no path component (target or ancestor) may be
+  a symlink; a symlinked store or escape blocks before any branch or store
+  mutation.
+- **Ignore proven with native Git**: the store is ignored by appending a final
+  anchored rule only when absent; an explicit negation (`!/.backlog/`) or any
+  ineffective result blocks with exact remediation. `git check-ignore` must
+  succeed so an ordinary `git add .` can never stage the nested repository as a
+  forbidden gitlink.
+- **Exact config preservation + auto-commit**: discovery's selected native
+  configuration is used as-is. When the task-history branch carries no folder
+  config but an existing root/folder config does, preparation blocks rather
+  than shadow or rewrite it (publishing the store's config is part of the
+  deferred cutover). With no prior evidence, the minimal valid folder config
+  (the native default; upstream autoCommit already false) is established.
+  Auto-commit is disabled natively (`backlog config set autoCommit false`)
+  against the intended config and proven by `backlog config get autoCommit`.
 
 This foundation serves only the canonical primary checkout (a linked worktree
-blocks with exact remediation). Episode-worktree preparation, the
+blocks with exact remediation). Episode-worktree preparation, the per-task
 fetch/reconcile/commit/push mutation loop, Beads server/Dolt transport,
 ownership and receipt fields, remaining lifecycle UX routing, and task-data
 migration are later slices.

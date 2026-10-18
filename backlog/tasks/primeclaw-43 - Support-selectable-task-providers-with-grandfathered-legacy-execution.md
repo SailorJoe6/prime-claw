@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 22:25'
+updated_date: '2026-10-18 22:43'
 labels: []
 dependencies: []
 references:
@@ -339,4 +339,19 @@ Docs: `docs/backlog.md` gained a slice-2A section. Boundary kept: no Episode-wor
 8. Add focused real-Git regressions: published bootstrap + selected remote URL; stale/unseen remote branch refresh; local-ahead rejection; unrelated existing nested remote rejection; hook failure and untracked-marker ZERO primary mutations; populated remote adoption with no cached deletions (or an unchanged pre-mutation block); no-evidence .backlog; exact .yaml/root config preservation or explicit block; symlink escape zero writes; ignore negation. Replace the misleading empty-index assertion with cached-diff/content assertions.
 
 Least technology: ordinary Git + native Backlog, direct Backlog-specific functions; no provider/workspace framework, coordinator, checkpoint state, custom merge engine, or lifecycle matrix. Do NOT wire Episode worktrees/cleanup, implement the general fetch/reconcile/commit/push task mutation loop, implement Beads transport, add ownership/receipt fields, route remaining lifecycle UX, migrate/cut over this repo, or touch PRIMECLAW-43.1. Keep this repo's live store untouched. Update task notes/docs truthfully, run focused real-Git tests + Docker-only tier 1, one clean repair candidate, then stop for review.
+
+2026-10-18 Episode — slice-2A candidate 9e2f5e2 REVISED per the 8 accepted findings; repair candidate pushed. All eight closed in `extension-support/task-history-workspace.ts` + `tests/task_history_workspace.test.mjs` (rewritten):
+
+1. Remote-bound authority: `selectTaskHistoryRemote` now returns the remote's transport URL. `ensureTaskHistoryBranch` probes `git ls-remote <name> <url> <ref>` first — unreachable remote fails closed (`remote-unavailable`), never deciding on stale/absent evidence — then fetches the exact ref into the remote-tracking namespace. New history is published with an ordinary non-force push and PROVEN from a fresh fetch. A local branch ahead of the remote blocks (`local-ahead`; never called verified, never published implicitly); remote ahead blocks (`remote-advanced`).
+2. No primary-worktree bootstrap: the orphan commit now happens in a disposable temp `git init -b prime-claw/tasks` repo (init + remote add + add TASKS.md + commit + push), then the temp is removed. The primary checkout is never switched/staged/written — proven by a snapshot test (branch, index, status incl. an untracked user TASKS.md, byte-for-byte unchanged).
+3. `read-tree --empty` adoption removed. Fresh nested clones `git clone --origin <remote> --branch prime-claw/tasks <remoteUrl>`, which materializes+tracks the published tree; a cached-diff-empty assertion proves nothing is staged for deletion. A non-empty store without .git now BLOCKS before mutation (`uncommitted-task-content`, pointing at deferred PRIMECLAW-43.1 cutover) instead of the unsafe adoption; content untouched.
+4. No-evidence default is `.backlog/` (never `backlog/`); an explicitly selected existing `backlog/` store is preserved (blocked, not recreated).
+5. Exact config preservation: discovery's selected config used as-is; when the task branch carries no folder config but an existing root/folder config does, preparation BLOCKS (`config-not-preserved`) rather than shadow/rewrite it (publishing the store config is deferred cutover). With no prior evidence, the minimal valid folder config (native default; upstream autoCommit already false) is established. autoCommit disabled natively against the intended config and proven by `config get`.
+6. Containment validated before ANY branch/store mutation: target resolved directly inside primary root; no target/ancestor component may be a symlink (symlink escape blocks with zero writes).
+7. Ignore proven with native Git: `git check-ignore` must pass; an explicit `!/.backlog/` negation or any ineffective result BLOCKS (`not-ignored`) with exact remediation; a final anchored rule is appended only when absent. Nested repo created only after the ignore is proven, so `git add .` can never stage a forbidden gitlink.
+8. Real-Git regressions per finding (21 tests, all real disposable repos/bare remotes): published bootstrap + selected-URL provenance; stale remote refresh; local-ahead rejection; unreachable-remote fail-closed; shared-ancestry; unrelated-URL nested clone rejection; hook/untracked-marker zero primary mutations; populated remote adoption with empty cached diff; no-evidence `.backlog`; explicit `backlog/` preservation; symlink escape zero writes; ignore negation block; idempotent verify; linked-worktree; Beads provider. Empty-index assertion replaced by cached-diff + content assertions.
+
+Evidence: host Node suite 316/316 (was 313); tier-1 bridge tests/test_task_history_workspace.py 1/1. The 5 tests invoking the real backlog CLI skip when the executable is absent (tier-1 image ships no backlog binary; host runs the repository dist v1.53.0). docs/backlog.md slice-2A section rewritten for the remote-authority behavior.
+
+Boundary kept: no Episode-worktree wiring, no per-task mutation loop, no Beads transport, no ownership/receipt fields, no lifecycle UX routing, no task-data migration, no cutover (PRIMECLAW-43.1). This repo's live store untouched. Status unchanged: In Progress.
 <!-- SECTION:NOTES:END -->
