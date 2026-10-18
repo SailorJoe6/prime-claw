@@ -459,6 +459,7 @@ test("successful task handoff steers the after-handoff prompt exactly once above
   assert.equal(result.details.conversationCompaction.outcome, "prompt-delivered");
   assert.equal(result.details.conversationCompaction.threshold, 0.6);
   assert.equal(result.details.conversationCompaction.usagePercent, 61);
+  assert.doesNotMatch(result.content[0].text, /Warning:/);
 });
 
 test("successful spec handoff steers the after-handoff prompt exactly once above threshold", async () => {
@@ -470,6 +471,7 @@ test("successful spec handoff steers the after-handoff prompt exactly once above
   assert.ok(f.sent[0].message.includes("AFTER-HANDOFF POLICY"));
   assert.equal(result.details.conversationCompaction.outcome, "prompt-delivered");
   assert.equal(result.details.conversationCompaction.usagePercent, 75);
+  assert.doesNotMatch(result.content[0].text, /Warning:/);
 });
 
 test("at-threshold, below-threshold, and unknown utilization skip the after-handoff prompt", async () => {
@@ -480,18 +482,21 @@ test("at-threshold, below-threshold, and unknown utilization skip the after-hand
     assert.equal(f.sent.length, 0);
     assert.equal(result.details.conversationCompaction.outcome, "skipped");
     assert.match(result.details.conversationCompaction.reason, /at or below/);
+    assert.doesNotMatch(result.content[0].text, /Warning:/);
   }
   const unknown = fixture({ taskStatus: "In Progress" });
   const unknownResult = await unknown.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, unknown.ctx);
   assert.equal(unknownResult.isError, undefined);
   assert.equal(unknown.sent.length, 0);
   assert.match(unknownResult.details.conversationCompaction.reason, /utilization is unknown/);
+  assert.doesNotMatch(unknownResult.content[0].text, /Warning:/);
   const nullPercent = fixture({ taskStatus: "In Progress" });
   nullPercent.ctx.getContextUsage = () => ({ tokens: null, contextWindow: 100, percent: null });
   const nullResult = await nullPercent.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, nullPercent.ctx);
   assert.equal(nullResult.isError, undefined);
   assert.equal(nullPercent.sent.length, 0);
   assert.match(nullResult.details.conversationCompaction.reason, /utilization is unknown/);
+  assert.doesNotMatch(nullResult.content[0].text, /Warning:/);
 });
 
 test("omitted threshold_percent defaults to 60 and zero disables without a separate key", async () => {
@@ -509,6 +514,7 @@ test("omitted threshold_percent defaults to 60 and zero disables without a separ
     assert.equal(disabledResult.isError, undefined);
     assert.equal(disabled.sent.length, 0);
     assert.match(disabledResult.details.conversationCompaction.reason, /disabled/);
+    assert.doesNotMatch(disabledResult.content[0].text, /Warning:/);
   }
 });
 
@@ -545,7 +551,11 @@ test("invalid workflow configuration is a bounded skip, never a failed handoff",
     assert.equal(result.isError, undefined, `handoff must survive ${pattern}`);
     assert.equal(f.sent.length, 0);
     assert.equal(result.details.conversationCompaction.outcome, "skipped");
+    assert.equal(result.details.conversationCompaction.error, true);
     assert.match(result.details.conversationCompaction.reason, pattern);
+    assert.match(result.content[0].text, /Task Episode handoff admitted/);
+    assert.match(result.content[0].text, /Warning: Conversation after-handoff compaction was skipped/);
+    assert.match(result.content[0].text, pattern);
   }
   const missing = fixture({ taskStatus: "In Progress", usage: 100 });
   unlinkSync(missing.afterHandoffPath);
@@ -553,6 +563,13 @@ test("invalid workflow configuration is a bounded skip, never a failed handoff",
   assert.equal(missingResult.isError, undefined);
   assert.equal(missing.sent.length, 0);
   assert.match(missingResult.details.conversationCompaction.reason, /not installed/);
+  assert.match(missingResult.content[0].text, /Warning: Conversation after-handoff compaction was skipped/);
+  assert.match(missingResult.content[0].text, /not installed/);
+  const missingSpecResult = await missing.tools.get("handoff_spec_episode").execute("handoff", { location: ".ralph/plans/future/alpha" }, undefined, undefined, missing.ctx);
+  assert.equal(missingSpecResult.isError, undefined);
+  assert.match(missingSpecResult.content[0].text, /Episode handoff admitted/);
+  assert.match(missingSpecResult.content[0].text, /Warning: Conversation after-handoff compaction was skipped/);
+  assert.match(missingSpecResult.content[0].text, /not installed/);
 });
 
 test("compaction delivery failure preserves the successful handoff receipt without retry", async () => {
@@ -560,8 +577,11 @@ test("compaction delivery failure preserves the successful handoff receipt witho
   const result = await f.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
   assert.equal(result.isError, undefined);
   assert.match(result.content[0].text, /Task Episode handoff admitted/);
+  assert.match(result.content[0].text, /Warning: Conversation after-handoff compaction was skipped/);
+  assert.match(result.content[0].text, /delivery failed/);
   assert.deepEqual(f.taskCalls, [["handoff", "PRIMECLAW-10.38", ""]]);
   assert.equal(result.details.conversationCompaction.outcome, "skipped");
+  assert.equal(result.details.conversationCompaction.error, true);
   assert.match(result.details.conversationCompaction.reason, /delivery failed/);
 });
 
@@ -577,6 +597,8 @@ test("both canonical handoff adapters invoke the compaction check exactly once p
   assert.equal(calls[0].ctx, f.ctx);
   assert.equal(taskResult.details.conversationCompaction.reason, "spy");
   assert.equal(specResult.details.conversationCompaction.reason, "spy");
+  assert.doesNotMatch(taskResult.content[0].text, /Warning:/);
+  assert.doesNotMatch(specResult.content[0].text, /Warning:/);
 });
 
 test("failed, partial, or unrelated dispatches never invoke the compaction check", async () => {
@@ -608,7 +630,10 @@ test("a throwing compaction hook is contained as a bounded skip on the successfu
   const result = await f.tools.get("handoff_task_episode").execute("handoff", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
   assert.equal(result.isError, undefined);
   assert.match(result.content[0].text, /Task Episode handoff admitted/);
+  assert.match(result.content[0].text, /Warning: Conversation after-handoff compaction was skipped/);
+  assert.match(result.content[0].text, /compaction check failed/);
   assert.equal(result.details.conversationCompaction.outcome, "skipped");
+  assert.equal(result.details.conversationCompaction.error, true);
   assert.match(result.details.conversationCompaction.reason, /compaction check failed/);
 });
 

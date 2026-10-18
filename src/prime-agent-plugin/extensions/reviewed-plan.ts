@@ -259,7 +259,7 @@ const CONVERSATION_AFTER_HANDOFF_MIN_THRESHOLD = 0.1;
 
 export type ConversationAfterHandoffResult =
   | { outcome: "prompt-delivered"; threshold: number; usagePercent: number }
-  | { outcome: "skipped"; reason: string };
+  | { outcome: "skipped"; reason: string; error?: boolean };
 
 export type ConversationAfterHandoffHook = (
   pi: ExtensionAPI,
@@ -317,30 +317,30 @@ export async function maybeDeliverConversationAfterHandoff(
   let content: string;
   try {
     if (!existsSync(workflowPath) || !statSync(workflowPath).isFile()) {
-      return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow is not installed at .prime-claw/workflows/${CONVERSATION_AFTER_HANDOFF_NAME}.md` };
+      return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow is not installed at .prime-claw/workflows/${CONVERSATION_AFTER_HANDOFF_NAME}.md`, error: true };
     }
     content = readFileSync(workflowPath, "utf8");
   } catch (error) {
-    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow is unreadable: ${boundedCompactionReason(error)}` };
+    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow is unreadable: ${boundedCompactionReason(error)}`, error: true };
   }
   const normalizedContent = content.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   if (normalizedContent.startsWith("---") && normalizedContent.indexOf("\n---", 3) === -1) {
-    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow has an unterminated frontmatter header` };
+    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow has an unterminated frontmatter header`, error: true };
   }
   let frontmatter: Record<string, unknown>;
   try {
     const parsed = parseFrontmatter<Record<string, unknown>>(content);
     if (!parsed.frontmatter || typeof parsed.frontmatter !== "object" || Array.isArray(parsed.frontmatter)) {
-      return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow frontmatter is not a mapping` };
+      return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow frontmatter is not a mapping`, error: true };
     }
     frontmatter = parsed.frontmatter;
   } catch (error) {
-    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow frontmatter is invalid: ${boundedCompactionReason(error)}` };
+    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow frontmatter is invalid: ${boundedCompactionReason(error)}`, error: true };
   }
   let threshold = CONVERSATION_AFTER_HANDOFF_DEFAULT_THRESHOLD;
   if ("threshold_percent" in frontmatter) {
     const configured = normalizeConversationCompactionThreshold(frontmatter.threshold_percent);
-    if (!configured.ok) return { outcome: "skipped", reason: configured.error };
+    if (!configured.ok) return { outcome: "skipped", reason: configured.error, error: true };
     threshold = configured.value;
   }
   if (threshold === 0) {
@@ -362,7 +362,7 @@ ${content}
   try {
     await pi.sendUserMessage(prompt, { deliverAs: "steer" });
   } catch (error) {
-    return { outcome: "skipped", reason: `Conversation compaction prompt delivery failed: ${boundedCompactionReason(error)}` };
+    return { outcome: "skipped", reason: `Conversation compaction prompt delivery failed: ${boundedCompactionReason(error)}`, error: true };
   }
   return { outcome: "prompt-delivered", threshold, usagePercent: percent };
 }
@@ -376,8 +376,27 @@ async function runConversationAfterHandoff(
   try {
     return await hook(pi, ctx);
   } catch (error) {
-    return { outcome: "skipped", reason: `Conversation compaction check failed: ${boundedCompactionReason(error)}` };
+    return { outcome: "skipped", reason: `Conversation compaction check failed: ${boundedCompactionReason(error)}`, error: true };
   }
+}
+
+const CONVERSATION_COMPACTION_WARNING_LIMIT = 320;
+
+/**
+ * Bounded model-visible warning appended to an otherwise successful handoff
+ * receipt when the after-handoff compaction attempt was skipped for an
+ * error-class reason (invalid configuration, missing or unreadable workflow,
+ * delivery failure, hook throw). Ordinary skips (disabled, at or below the
+ * threshold, unknown utilization) stay silent in content and remain recorded
+ * in details. The warning never changes the receipt: no isError, no retry,
+ * and the admitted handoff is unaffected.
+ */
+function conversationCompactionWarning(result: ConversationAfterHandoffResult): string {
+  if (result.outcome !== "skipped" || !result.error) return "";
+  const warning = ` Warning: Conversation after-handoff compaction was skipped: ${result.reason}`;
+  return warning.length > CONVERSATION_COMPACTION_WARNING_LIMIT
+    ? `${warning.slice(0, CONVERSATION_COMPACTION_WARNING_LIMIT - 3)}...`
+    : warning;
 }
 
 type TaskEpisodePublicActions = {
@@ -880,7 +899,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, dependencies);
           const conversationCompaction = await runConversationAfterHandoff(pi, ctx, dependencies);
           return {
-            content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.` }],
+            content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.${conversationCompactionWarning(conversationCompaction)}` }],
             details: { ...result, conversationCompaction },
           };
         } catch (error) {
@@ -967,7 +986,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           return {
             content: [{
               type: "text",
-              text: `Episode handoff admitted for ${result.sourceLocation}: canonical handoff was admitted as an ordinary prompt and canonical execute was queued as the sole follow-up. Admission may be immediate or queued; inspect the episode Status/Evidence output before claiming either workflow completed.`,
+              text: `Episode handoff admitted for ${result.sourceLocation}: canonical handoff was admitted as an ordinary prompt and canonical execute was queued as the sole follow-up. Admission may be immediate or queued; inspect the episode Status/Evidence output before claiming either workflow completed.${conversationCompactionWarning(conversationCompaction)}`,
             }],
             details: { ...result, conversationCompaction },
           };
