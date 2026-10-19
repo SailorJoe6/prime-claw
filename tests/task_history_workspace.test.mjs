@@ -11,7 +11,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync, readdirSync, realpathSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync, readdirSync, realpathSync, renameSync, lstatSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -583,26 +583,28 @@ test("canonical statuses with a wrong effective default status blocks", (t) => {
  * roots and the remote. The target worktree's store ignore is controlled by
  * `ignoreTarget` (a committed .gitignore on the target branch).
  */
-function episodeFixture({ ignoreTarget = true, publishConfig = true } = {}) {
+function episodeFixture({ ignoreTarget = true, publishConfig = true, storeName = ".backlog", remoteName = "origin" } = {}) {
   const { dir, root, remote } = fixtureRepo();
-  // Ensure the primary's store location is ignored without a code mutation:
-  // slice-2A writes the ignore to .git/info/exclude for the primary.
+  if (remoteName !== "origin") git(root, "remote", "rename", "origin", remoteName);
   if (publishConfig) publishTaskBranch(remote, { "TASKS.md": "history\n", "config.yml": FULL_CANONICAL_CONFIG });
-  const ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  let ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
   if (ws.status !== "prepared") throw new Error(`fixture primary not prepared: ${ws.detail}`);
-  // A registered linked Episode worktree on its own branch.
+  if (storeName === "backlog") {
+    // Retain a real built-in `backlog/` store, then re-run slice 2A so its
+    // native provider evidence is the prepared-primary authority.
+    renameSync(ws.storeDir, join(root, "backlog"));
+    ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
+    if (ws.status !== "prepared") throw new Error(`fixture backlog/ primary not prepared: ${ws.detail}`);
+  }
   const target = join(dir, "episode");
   git(root, "branch", "episode", "main");
   git(root, "worktree", "add", "-q", target, "episode");
   if (ignoreTarget) {
-    // The Episode worktree's OWN checked-out branch carries the store ignore
-    // (the operator/worktree-creation responsibility; preparation never
-    // edits the target code worktree to establish it).
-    writeFileSync(join(target, ".gitignore"), "/.backlog/\n");
+    writeFileSync(join(target, ".gitignore"), `/${storeName}/\n`);
     git(target, "add", ".gitignore");
     git(target, "-c", "user.email=t@e.st", "-c", "user.name=t", "commit", "-qm", "ignore task store");
   }
-  return { dir, root, remote, target, primaryHead: ws.head, storeDir: join(target, ".backlog") };
+  return { dir, root, remote, remoteName, target, primaryHead: ws.head, primaryStoreDir: ws.storeDir, storeDir: join(target, storeName), storeName };
 }
 
 test("a registered linked Episode worktree gets an independent clean clone with zero primary/target code mutations", (t) => {
@@ -690,4 +692,180 @@ test("cleanup removes one exact clean published clone and refuses foreign/dirty 
   assert.equal(clean.status, "cleaned");
   assert.ok(!existsSync(storeDir), "proven clone removed");
   assert.equal(git(target, "status", "--porcelain"), "", "target code worktree untouched");
+});
+
+test("retained backlog/ and a selected non-origin remote stay exact through prepare, reuse, and cleanup", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote, target, storeDir } = episodeFixture({ storeName: "backlog", remoteName: "upstream" });
+  const prepared = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(prepared.status, "prepared");
+  assert.equal(prepared.storeDir, storeDir);
+  assert.equal(prepared.remote, "upstream");
+  assert.ok(!existsSync(join(target, ".backlog")), "never hardcodes a sibling .backlog store");
+  assert.equal(git(storeDir, "remote"), "upstream");
+  assert.equal(git(storeDir, "remote", "get-url", "upstream"), remote);
+  const reused = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(reused.status, "prepared");
+  assert.equal(reused.storeDir, storeDir);
+  const cleaned = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  assert.deepEqual(cleaned, { status: "cleaned", storeDir });
+  assert.ok(!existsSync(storeDir));
+  assert.ok(!existsSync(join(target, ".backlog")));
+});
+
+test("conflicting target root authority blocks before clone and blocks later reuse/cleanup", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, target, storeDir } = episodeFixture();
+  const rootConfig = join(target, "backlog.config.yml");
+  const otherStore = join(target, "other-store");
+  mkdirSync(otherStore);
+  writeFileSync(rootConfig, 'project_name: "other"\nbacklog_directory: "other-store"\n');
+  const before = primarySnapshot(root);
+  const blocked = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(blocked.status, "blocked");
+  assert.equal(blocked.code, "unsafe-store-location");
+  assert.match(blocked.detail, /not the exact derived store|authority resolves/i);
+  assert.ok(!existsSync(storeDir), "conflict blocks before nested clone write");
+  assert.deepEqual(primarySnapshot(root), before);
+
+  rmSync(rootConfig);
+  rmSync(otherStore, { recursive: true, force: true });
+  assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+  mkdirSync(otherStore);
+  writeFileSync(rootConfig, 'project_name: "other"\nbacklog_directory: "other-store"\n');
+  const reuse = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(reuse.status, "blocked");
+  assert.equal(reuse.code, "unsafe-store-location");
+  const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  assert.equal(cleanup.status, "refused");
+  assert.ok(existsSync(storeDir), "authority conflict leaves clone unchanged");
+});
+
+test("cleanup treats a failed cleanliness proof as unreadable and retains all content", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, target, storeDir } = episodeFixture();
+  assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+  const sentinel = join(storeDir, "unpublished-sentinel.md");
+  writeFileSync(sentinel, "must survive\n");
+  writeFileSync(join(storeDir, ".git", "index"), "");
+  const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  assert.equal(cleanup.status, "refused");
+  assert.equal(cleanup.code, "unreadable");
+  assert.match(cleanup.detail, /cleanliness proof failed/i);
+  assert.ok(existsSync(sentinel), "empty stdout from failed status is never clean");
+  assert.ok(existsSync(storeDir));
+});
+
+test("symlinked .git and custom core.worktree identities are refused before reuse or deletion", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  {
+    const { root, target, storeDir } = episodeFixture();
+    assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+    renameSync(join(storeDir, ".git"), join(storeDir, ".git-real"));
+    symlinkSync(".git-real", join(storeDir, ".git"), "dir");
+    const reuse = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+    assert.equal(reuse.status, "blocked");
+    assert.equal(reuse.code, "unsafe-store-location");
+    const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+    assert.equal(cleanup.status, "refused");
+    assert.equal(cleanup.code, "unsafe-store-location");
+    assert.ok(existsSync(join(storeDir, ".git-real")));
+  }
+  {
+    const { dir, root, target, storeDir } = episodeFixture();
+    assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+    const outside = join(dir, "outside-worktree");
+    mkdirSync(outside);
+    const outsideMarker = join(outside, "outside-marker.md");
+    writeFileSync(outsideMarker, "must survive\n");
+    git(storeDir, "config", "core.worktree", outside);
+    const reuse = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+    assert.equal(reuse.status, "blocked");
+    assert.equal(reuse.code, "unsafe-store-location");
+    const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+    assert.equal(cleanup.status, "refused");
+    assert.equal(cleanup.code, "unsafe-store-location");
+    assert.ok(existsSync(storeDir));
+    assert.equal(readFileSync(outsideMarker, "utf8"), "must survive\n");
+  }
+});
+
+test("cleanup with an absent primary store never recreates it or mutates primary state", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, target, primaryStoreDir, storeDir } = episodeFixture();
+  assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+  rmSync(primaryStoreDir, { recursive: true, force: true });
+  const ignorePath = join(root, ".gitignore");
+  const before = {
+    snapshot: primarySnapshot(root),
+    ignore: readFileSync(ignorePath, "utf8"),
+    refs: git(root, "for-each-ref", "--format=%(refname) %(objectname)"),
+  };
+  const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  assert.deepEqual(cleanup, { status: "cleaned", storeDir });
+  assert.ok(!existsSync(storeDir));
+  assert.ok(!existsSync(primaryStoreDir), "cleanup does not recreate the primary store");
+  assert.equal(readFileSync(ignorePath, "utf8"), before.ignore);
+  assert.deepEqual(primarySnapshot(root), before.snapshot);
+  assert.equal(git(root, "for-each-ref", "--format=%(refname) %(objectname)"), before.refs);
+});
+
+test("cleanup refuses clean local-ahead, remote-advanced, and unavailable-remote stores", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  {
+    const { root, target, storeDir } = episodeFixture();
+    assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+    writeFileSync(join(storeDir, "local.md"), "local\n");
+    git(storeDir, "add", "local.md");
+    git(storeDir, "-c", "user.email=t@e.st", "-c", "user.name=t", "commit", "-qm", "local ahead");
+    assert.equal(git(storeDir, "status", "--porcelain"), "");
+    const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+    assert.equal(cleanup.status, "refused");
+    assert.equal(cleanup.code, "local-ahead");
+    assert.ok(existsSync(storeDir));
+  }
+  {
+    const { root, remote, target, storeDir } = episodeFixture();
+    assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+    publishTaskBranch(remote, { "remote-advance.md": "advanced\n" });
+    const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+    assert.equal(cleanup.status, "refused");
+    assert.equal(cleanup.code, "remote-advanced");
+    assert.ok(existsSync(storeDir));
+  }
+  {
+    const { dir, root, remote, target, storeDir } = episodeFixture();
+    assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+    renameSync(remote, join(dir, "remote-unavailable.git"));
+    const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+    assert.equal(cleanup.status, "refused");
+    assert.equal(cleanup.code, "remote-unavailable");
+    assert.ok(existsSync(storeDir));
+  }
+});
+
+test("cleanup refuses dangling target-store symlinks and external primary work-tree identity", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  {
+    const { root, target, storeDir } = episodeFixture();
+    symlinkSync("missing-task-store", storeDir, "dir");
+    const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+    assert.equal(cleanup.status, "refused");
+    assert.equal(cleanup.code, "unsafe-store-location");
+    assert.ok(lstatSync(storeDir).isSymbolicLink(), "dangling symlink is retained, never called absent/cleaned");
+  }
+  {
+    const { dir, root, target, storeDir } = episodeFixture();
+    assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+    const outside = join(dir, "primary-external-worktree");
+    mkdirSync(outside);
+    const marker = join(outside, "outside-marker.md");
+    writeFileSync(marker, "must survive\n");
+    git(root, "config", "core.worktree", outside);
+    const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+    assert.equal(cleanup.status, "refused");
+    assert.ok(["unsafe-store-location", "not-linked-worktree", "unreadable"].includes(cleanup.code));
+    assert.ok(existsSync(storeDir), "target store remains when primary project-root identity drifts");
+    assert.equal(readFileSync(marker, "utf8"), "must survive\n");
+  }
 });

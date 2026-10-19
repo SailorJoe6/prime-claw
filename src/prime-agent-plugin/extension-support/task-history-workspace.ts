@@ -939,6 +939,311 @@ function verifyLinkedWorktree(
   return null;
 }
 
+type EpisodeAuthorityBlocked = EpisodeTaskHistoryWorkspace & { status: "blocked" };
+
+type NonMutatingPrimaryTaskAuthority =
+  | {
+      status: "ready";
+      primaryRoot: string;
+      storeDir: string;
+      storeName: (typeof BUILT_IN_TASK_STORE_DIRS)[number];
+      remote: string;
+      remoteUrl: string;
+      head: string;
+    }
+  | EpisodeAuthorityBlocked;
+
+/** Derive one exact built-in target store from the prepared primary result. */
+function deriveTargetStore(
+  primaryRoot: string,
+  targetWorktree: string,
+  primaryStoreDir: string,
+): { storeDir: string; storeName: (typeof BUILT_IN_TASK_STORE_DIRS)[number] } | { blocked: EpisodeAuthorityBlocked } {
+  const primaryReal = realpathSync(primaryRoot);
+  const rel = relative(primaryReal, resolve(primaryStoreDir));
+  if (isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`) || rel.includes(sep)
+      || !(BUILT_IN_TASK_STORE_DIRS as readonly string[]).includes(rel)) {
+    return {
+      blocked: {
+        status: "blocked", code: "unsafe-store-location",
+        detail: `the prepared primary store ${primaryStoreDir} is not one exact built-in store directly under ${primaryReal}`,
+        remediation: "repair the primary Backlog store so it resolves to exactly .backlog/ or backlog/ before preparing an Episode workspace",
+      },
+    };
+  }
+  const storeName = rel as (typeof BUILT_IN_TASK_STORE_DIRS)[number];
+  return { storeName, storeDir: join(targetWorktree, storeName) };
+}
+
+/** Distinguish an absent path from any real filesystem entry (including a dangling symlink). */
+function lstatIfPresent(path: string): ReturnType<typeof lstatSync> | null {
+  try {
+    return lstatSync(path);
+  } catch (error) {
+    if ((error as { code?: string }).code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+/**
+ * Prove provider discovery from the target root resolves to the exact nested
+ * Backlog store. Before a fresh clone, no provider evidence is also safe; any
+ * evidence selecting another provider/store blocks before the clone write.
+ */
+function verifyTargetBacklogAuthority(
+  targetWorktree: string,
+  storeDir: string,
+  runner: CommandRunner,
+  allowNone: boolean,
+): EpisodeAuthorityBlocked | null {
+  let detection: ReturnType<typeof detectTaskProvider>;
+  try {
+    detection = detectTaskProvider(targetWorktree, runner);
+  } catch (error) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: `target-native provider detection failed: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: "repair the target worktree provider evidence before preparing or reusing its task-history store",
+    };
+  }
+  if (detection.kind === "blocked") {
+    return {
+      status: "blocked", code: detection.code === "dual-providers" ? "dual-providers" : "unsafe-store-location",
+      detail: `target-native provider authority is ambiguous or malformed: ${detection.detail}`,
+      remediation: detection.remediation,
+    };
+  }
+  let targetReal: string;
+  let projectReal: string;
+  try {
+    targetReal = realpathSync(targetWorktree);
+    projectReal = realpathSync(detection.projectRoot);
+  } catch (error) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: `target-native project-root identity could not be resolved: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: "repair the target worktree identity before preparing or cleaning its nested task store",
+    };
+  }
+  if (projectReal !== targetReal) {
+    return {
+      status: "blocked", code: "unsafe-store-location",
+      detail: `target-native provider discovery resolved project root ${projectReal}, not the exact target worktree ${targetReal}`,
+      remediation: "pass the exact registered target worktree root; provider authority from an ancestor or another checkout is refused",
+    };
+  }
+  if (detection.kind === "none") {
+    if (allowNone) return null;
+    return {
+      status: "blocked", code: "provider-not-backlog",
+      detail: `target-native provider discovery found no Backlog authority at the derived store ${storeDir}`,
+      remediation: "the materialized nested store must contain its published folder configuration so native Backlog discovery selects that exact store",
+    };
+  }
+  if (detection.evidence.provider !== "backlog") {
+    return {
+      status: "blocked", code: "provider-not-backlog",
+      detail: `target-native provider discovery selects Beads at ${detection.evidence.storeDir}, not the derived Backlog store ${storeDir}`,
+      remediation: "complete or remove the conflicting target provider evidence before preparing the Backlog Episode workspace",
+    };
+  }
+  const selectedStore = detection.evidence.storeDir;
+  let exactStore = false;
+  if (selectedStore) {
+    try {
+      exactStore = realpathSync(selectedStore) === realpathSync(storeDir);
+    } catch {
+      exactStore = false;
+    }
+  }
+  if (!selectedStore || !exactStore) {
+    return {
+      status: "blocked", code: "unsafe-store-location",
+      detail: `target-native Backlog authority resolves to ${selectedStore ?? "no materialized store"}, not the exact derived store ${storeDir}`,
+      remediation: "remove or repair the conflicting target root/folder configuration so native Backlog discovery selects the derived nested store",
+    };
+  }
+  return null;
+}
+
+/**
+ * Prove an existing store is one exact independent ordinary clone. The `.git`
+ * entry itself must be a real directory (never a symlink/gitfile), Git's
+ * canonical top level must be the store, and both Git directory identities
+ * must be the real contained `<store>/.git`.
+ */
+function verifyIndependentTaskClone(
+  storeDir: string,
+  runner: CommandRunner,
+): { status: "verified" } | EpisodeAuthorityBlocked {
+  let storeStat: ReturnType<typeof lstatSync>;
+  let dotGitStat: ReturnType<typeof lstatSync>;
+  const dotGit = join(storeDir, ".git");
+  try {
+    storeStat = lstatSync(storeDir);
+    dotGitStat = lstatSync(dotGit);
+  } catch (error) {
+    return {
+      status: "blocked", code: "unsafe-store-location",
+      detail: `the nested task store clone identity is incomplete: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: "remove the incomplete/foreign store and re-run preparation; only an independent ordinary-Git clone is accepted",
+    };
+  }
+  if (!storeStat.isDirectory() || storeStat.isSymbolicLink() || !dotGitStat.isDirectory() || dotGitStat.isSymbolicLink()) {
+    return {
+      status: "blocked", code: "unsafe-store-location",
+      detail: `${storeDir} is not an independent ordinary-Git clone with a real contained .git directory (symlinks, gitfiles, and linked worktrees are refused)`,
+      remediation: "remove the foreign store and re-run preparation; never reuse a symlinked .git, gitfile, linked worktree, or non-directory store",
+    };
+  }
+  const top = runGit(runner, storeDir, ["rev-parse", "--show-toplevel"]);
+  const gitDir = runGit(runner, storeDir, ["rev-parse", "--git-dir"]);
+  const commonDir = runGit(runner, storeDir, ["rev-parse", "--git-common-dir"]);
+  for (const [label, result] of [["top level", top], ["Git directory", gitDir], ["common Git directory", commonDir]] as const) {
+    if (result.status !== 0 || result.stdout.trim() === "") {
+      return {
+        status: "blocked", code: "unreadable",
+        detail: `the nested clone's ${label} proof failed: ${result.stderr.trim() || result.stdout.trim() || `exit ${result.status}`}`,
+        remediation: "repair or remove the unreadable/foreign nested repository; its identity must be proved before reuse or cleanup",
+      };
+    }
+  }
+  try {
+    const storeReal = realpathSync(storeDir);
+    const expectedGitReal = realpathSync(dotGit);
+    const topReal = realpathSync(resolve(storeDir, top.stdout.trim()));
+    const gitDirReal = realpathSync(resolve(storeDir, gitDir.stdout.trim()));
+    const commonDirReal = realpathSync(resolve(storeDir, commonDir.stdout.trim()));
+    if (expectedGitReal !== join(storeReal, ".git") || topReal !== storeReal || gitDirReal !== expectedGitReal || commonDirReal !== expectedGitReal) {
+      return {
+        status: "blocked", code: "unsafe-store-location",
+        detail: `the nested clone has foreign/custom Git identity (top ${topReal}, git dir ${gitDirReal}, common dir ${commonDirReal}; expected top ${storeReal} and contained ${join(storeReal, ".git")})`,
+        remediation: "remove the foreign/custom-work-tree store and re-run preparation; cleanup never follows external Git identity",
+      };
+    }
+  } catch (error) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: `the nested clone's canonical identity could not be resolved: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: "repair or remove the unreadable nested repository; its canonical top/Git/common directories must be proved",
+    };
+  }
+  return { status: "verified" };
+}
+
+/** Read the one exact published task ref directly, without fetch/update-ref. */
+function readDirectTaskHead(
+  primaryRoot: string,
+  remote: string,
+  remoteUrl: string,
+  runner: CommandRunner,
+): { status: "found"; head: string } | EpisodeAuthorityBlocked {
+  const probe = runGit(runner, primaryRoot, ["ls-remote", "--heads", remoteUrl, TASK_HISTORY_REF]);
+  if (probe.status !== 0) {
+    return {
+      status: "blocked", code: "remote-unavailable",
+      detail: `the selected remote ${remote} (${remoteUrl}) could not be read directly: ${probe.stderr.trim() || probe.stdout.trim() || `exit ${probe.status}`}`,
+      remediation: "restore connectivity/credentials and retry; cleanup never relies on stale local remote-tracking state",
+    };
+  }
+  const lines = probe.stdout.trim().split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const match = lines.length === 1 ? lines[0].match(/^([0-9a-f]{40})\trefs\/heads\/prime-claw\/tasks$/) : null;
+  if (!match) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: `the selected remote ${remote} did not return one exact published ${TASK_HISTORY_REF} record: ${JSON.stringify(probe.stdout.trim())}`,
+      remediation: `publish exactly ${TASK_HISTORY_REF} on the selected remote before cleanup; absent or malformed authority is never guessed`,
+    };
+  }
+  return { status: "found", head: match[1] };
+}
+
+/**
+ * Non-mutating primary authority proof for cleanup. Unlike primary preparation,
+ * this never writes ignore rules, creates/clones a primary store, fetches, or
+ * updates refs.
+ */
+function inspectPrimaryTaskAuthority(
+  primaryRootInput: string,
+  runner: CommandRunner,
+): NonMutatingPrimaryTaskAuthority {
+  const primaryRoot = realpathSync(resolve(primaryRootInput));
+  const gitDir = gitOk(runner, primaryRoot, ["rev-parse", "--git-dir"], "read the primary Git directory");
+  const commonDir = gitOk(runner, primaryRoot, ["rev-parse", "--git-common-dir"], "read the primary common Git directory");
+  if (realpathSync(resolve(primaryRoot, gitDir)) !== realpathSync(resolve(primaryRoot, commonDir))) {
+    return {
+      status: "blocked", code: "not-primary-checkout",
+      detail: `${primaryRoot} is a linked worktree; cleanup authority must come from the canonical primary checkout`,
+      remediation: "pass the canonical primary checkout recorded for this Episode",
+    };
+  }
+  const selected = selectTaskHistoryRemote(primaryRoot, runner);
+  if (selected.status === "blocked") return { status: "blocked", code: selected.code, detail: selected.detail, remediation: selected.remediation };
+
+  let detection: ReturnType<typeof detectTaskProvider>;
+  try {
+    detection = detectTaskProvider(primaryRoot, runner);
+  } catch (error) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: `primary provider detection unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: "repair the primary provider evidence before retrying cleanup",
+    };
+  }
+  if (detection.kind === "blocked") {
+    return { status: "blocked", code: detection.code === "dual-providers" ? "dual-providers" : "unsafe-store-location", detail: detection.detail, remediation: detection.remediation };
+  }
+  let detectedRoot: string;
+  try {
+    detectedRoot = realpathSync(detection.projectRoot);
+  } catch (error) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: `the primary provider project root could not be resolved: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: "repair the primary Git work-tree identity before retrying cleanup",
+    };
+  }
+  if (detectedRoot !== primaryRoot) {
+    return {
+      status: "blocked", code: "unsafe-store-location",
+      detail: `primary provider discovery resolved project root ${detectedRoot}, not the exact canonical primary ${primaryRoot}`,
+      remediation: "remove the custom/external primary work-tree identity; cleanup accepts authority only from the exact canonical primary root",
+    };
+  }
+  if (detection.kind === "selected" && detection.evidence.provider !== "backlog") {
+    return {
+      status: "blocked", code: "provider-not-backlog",
+      detail: "the primary checkout selects Beads; the Backlog cleanup seam has no authority over it",
+      remediation: "use the future provider-specific cleanup path; this seam removes only Backlog task-history clones",
+    };
+  }
+  if (detection.kind === "selected" && detection.evidence.provider === "backlog" && detection.evidence.configSource === "root") {
+    return {
+      status: "blocked", code: "config-not-preserved",
+      detail: `the primary Backlog authority is root configuration ${detection.evidence.configPath}; slice-2A blocks this unpreserved layout`,
+      remediation: "root-config authority relocation remains deferred to PRIMECLAW-43.1",
+    };
+  }
+  const location = selectStoreLocation(primaryRoot, detection);
+  if ("blocked" in location) return location.blocked;
+  const containment = validateContainment(primaryRoot, location.storeDir);
+  if (containment) return containment;
+  const derived = deriveTargetStore(primaryRoot, primaryRoot, location.storeDir);
+  if ("blocked" in derived) return derived.blocked;
+  const direct = readDirectTaskHead(primaryRoot, selected.name, selected.url, runner);
+  if (direct.status === "blocked") return direct;
+  return {
+    status: "ready",
+    primaryRoot,
+    storeDir: location.storeDir,
+    storeName: derived.storeName,
+    remote: selected.name,
+    remoteUrl: selected.url,
+    head: direct.head,
+  };
+}
+
+
 /**
  * Prepare the Backlog task-history workspace inside one exact target linked
  * Episode code worktree: an independent nested ordinary-Git clone of the
@@ -947,15 +1252,11 @@ function verifyLinkedWorktree(
  */
 export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWorkspaceInput): EpisodeTaskHistoryWorkspace {
   const runner = input.runner ?? new ProcessCommandRunner();
-  // (1) Git identity/containment: primary is canonical, target is a registered
-  // linked worktree of the SAME common repository.
   const identity = verifyLinkedWorktree(input.primaryRoot, input.targetWorktree, runner);
   if (identity) return identity;
 
-  // (2) Derive the selected remote / transport URL / published task-history
-  // authority / built-in store location from the prepared primary. This
-  // requires the primary workspace/config valid under the accepted slice-2A
-  // checks and preserves root/custom-layout blocks.
+  // Derive remote, URL, published head, and — critically — the exact built-in
+  // store name from the prepared primary result. Never assume `.backlog`.
   const prepared = prepareTaskHistoryWorkspace({ primaryRoot: input.primaryRoot, runner });
   if (prepared.status === "blocked") {
     return {
@@ -965,93 +1266,124 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
     };
   }
   const { remote, remoteUrl, head } = prepared;
+  const derived = deriveTargetStore(input.primaryRoot, input.targetWorktree, prepared.storeDir);
+  if ("blocked" in derived) return derived.blocked;
+  const { storeDir } = derived;
 
-  // (3) In the target worktree, the store path must be directly contained and
-  // non-symlinked, and native `git check-ignore` must prove it is ALREADY
-  // ignored before creating anything. Never edit/stage the target code
-  // worktree merely to establish ignore behavior.
-  const storeDir = join(input.targetWorktree, BUILT_IN_TASK_STORE_DIRS[0]);
+  // Containment/ignore and target-native authority are preflighted before the
+  // nested clone write. Existing evidence may select this exact store; no
+  // evidence is valid for a fresh store; another provider/store always blocks.
+  const storeEntry = lstatIfPresent(storeDir);
+  if (storeEntry?.isSymbolicLink()) {
+    return {
+      status: "blocked", code: "unsafe-store-location",
+      detail: `the derived target store ${storeDir} is a symlink (including a dangling symlink); preparation never follows or overwrites it`,
+      remediation: "inspect and remove the foreign symlink before preparing the exact nested store",
+    };
+  }
   const containment = validateContainment(input.targetWorktree, storeDir);
   if (containment) return { status: "blocked", code: containment.code, detail: containment.detail, remediation: containment.remediation };
+  const targetAuthorityBefore = verifyTargetBacklogAuthority(input.targetWorktree, storeDir, runner, storeEntry === null);
+  if (targetAuthorityBefore) return targetAuthorityBefore;
   const storeRel = relative(input.targetWorktree, storeDir).split(sep).join("/");
   const ignore = runGit(runner, input.targetWorktree, ["check-ignore", "-q", "--", `${storeRel}/x`]);
   if (ignore.status !== 0) {
     return {
       status: "blocked", code: "not-ignored",
       detail: `the target worktree task-store path ${storeDir} is not ignored by the target code worktree (git check-ignore exit ${ignore.status}); preparation refuses to create it`,
-      remediation: "the Episode worktree must already ignore the built-in task-store location; do not edit the target code worktree to establish ignore — repair the repository's ignore rules and re-run",
+      remediation: `the Episode worktree must already ignore /${storeRel}/; do not edit the target code worktree to establish ignore — repair the repository's ignore rules and re-run`,
     };
   }
 
-  // (4) Materialize an independent nested ordinary-Git clone from the remote
-  // URL on the task branch at the exact remote head, or verify reuse.
-  if (!existsSync(storeDir)) {
-    const clone = runner.run("git", ["clone", "--quiet", "--branch", TASK_HISTORY_BRANCH, "--", remoteUrl, storeDir], { cwd: input.targetWorktree, allowFailure: true });
+  if (storeEntry === null) {
+    // Preserve the selected remote's identity, not merely its transport URL.
+    const clone = runner.run(
+      "git",
+      ["clone", "--quiet", "--origin", remote, "--branch", TASK_HISTORY_BRANCH, "--", remoteUrl, storeDir],
+      { cwd: input.targetWorktree, allowFailure: true },
+    );
     if (clone.status !== 0) {
       return {
         status: "blocked", code: "remote-unavailable",
-        detail: `cloning the published task-history branch from ${remoteUrl} into ${storeDir} failed: ${clone.stderr.trim() || clone.stdout.trim()}`,
-        remediation: "the selected remote must be reachable and publish refs/heads/prime-claw/tasks; prepare the primary workspace first",
-      };
-    }
-  } else {
-    // Reuse: the existing store must be an exact independent ordinary-Git clone
-    // of the published branch — exact `.git` directory form (never a gitfile /
-    // linked-worktree form), remote name+URL, branch, head, effective native
-    // lifecycle/default/autoCommit, clean status, no unpublished commits.
-    const dotGit = join(storeDir, ".git");
-    if (!existsSync(dotGit) || !statSync(dotGit).isDirectory()) {
-      return {
-        status: "blocked", code: "unsafe-store-location",
-        detail: `the existing task store ${storeDir} is not an independent ordinary-Git clone (its .git entry is not a directory); a gitfile/linked-worktree or foreign store is never reused`,
-        remediation: "remove the foreign task-store directory and re-run preparation, or repair it to be an independent ordinary-Git clone",
-      };
-    }
-    const cloneRemote = gitOk(runner, storeDir, ["remote"], "read the nested clone's remotes");
-    if (cloneRemote.trim() !== "origin") {
-      return {
-        status: "blocked", code: "unsafe-store-location",
-        detail: `the nested clone's remotes are ${JSON.stringify(cloneRemote)}, not exactly "origin"`,
-        remediation: "the nested task-history clone must be a plain origin clone of the published branch; remove and re-run preparation",
-      };
-    }
-    const cloneUrl = gitOk(runner, storeDir, ["remote", "get-url", "origin"], "read the nested clone's remote URL");
-    if (cloneUrl !== remoteUrl) {
-      return {
-        status: "blocked", code: "unsafe-store-location",
-        detail: `the nested clone's origin URL ${cloneUrl} does not match the selected transport URL ${remoteUrl}`,
-        remediation: "the nested task-history clone must track the selected remote URL; remove and re-run preparation",
-      };
-    }
-    const cloneBranch = gitOk(runner, storeDir, ["rev-parse", "--abbrev-ref", "HEAD"], "read the nested clone's branch");
-    if (cloneBranch !== TASK_HISTORY_BRANCH) {
-      return {
-        status: "blocked", code: "unsafe-store-location",
-        detail: `the nested clone is on branch ${cloneBranch}, not ${TASK_HISTORY_BRANCH}`,
-        remediation: "the nested task-history clone must be checked out on the published task-history branch; remove and re-run preparation",
-      };
-    }
-    const cloneHead = refHead(runner, storeDir, "HEAD");
-    if (cloneHead !== head) {
-      return {
-        status: "blocked", code: "local-ahead",
-        detail: `the nested clone HEAD (${cloneHead ?? "unreadable"}) does not equal the published task-history head (${head}); drift or unpublished task content is never reused as prepared`,
-        remediation: "publish the clone's commits (the deferred mutation loop) or remove the clone and re-run preparation",
-      };
-    }
-    const dirty = gitOk(runner, storeDir, ["status", "--porcelain"], "verify the nested clone is clean");
-    if (dirty.trim() !== "") {
-      return {
-        status: "blocked", code: "uncommitted-task-content",
-        detail: `the nested clone ${storeDir} has uncommitted changes: ${dirty.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
-        remediation: "the nested clone must be clean; inspect it and re-run preparation",
+        detail: `cloning ${remote}/${TASK_HISTORY_BRANCH} from ${remoteUrl} into ${storeDir} failed: ${clone.stderr.trim() || clone.stdout.trim() || `exit ${clone.status}`}`,
+        remediation: `the selected remote ${remote} must be reachable and publish ${TASK_HISTORY_REF}; prepare the primary workspace first`,
       };
     }
   }
 
-  // Effective native lifecycle/default/autoCommit for the target's nested
-  // store, proven from the target root on every path (same accepted slice-2A
-  // native validation, resolved from the target worktree root).
+  // Fresh and reused stores must both prove exact independent-clone identity.
+  const cloneIdentity = verifyIndependentTaskClone(storeDir, runner);
+  if (cloneIdentity.status === "blocked") return cloneIdentity;
+
+  const remotes = runGit(runner, storeDir, ["remote"]);
+  if (remotes.status !== 0) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: `reading the nested clone's remotes failed: ${remotes.stderr.trim() || remotes.stdout.trim() || `exit ${remotes.status}`}`,
+      remediation: "repair or remove the unreadable nested clone and re-run preparation",
+    };
+  }
+  const remoteNames = remotes.stdout.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+  if (remoteNames.length !== 1 || remoteNames[0] !== remote) {
+    return {
+      status: "blocked", code: "unsafe-store-location",
+      detail: `the nested clone's remotes are ${JSON.stringify(remoteNames)}, not exactly the selected remote ${JSON.stringify(remote)}`,
+      remediation: `the nested clone must contain only the selected remote ${remote}; remove the foreign clone and re-run preparation`,
+    };
+  }
+  const cloneUrls = runGit(runner, storeDir, ["remote", "get-url", "--all", remote]);
+  const urls = cloneUrls.stdout.split(/\r?\n/).map((url) => url.trim()).filter(Boolean);
+  if (cloneUrls.status !== 0 || urls.length !== 1 || urls[0] !== remoteUrl) {
+    return {
+      status: "blocked", code: "unsafe-store-location",
+      detail: `the nested clone's ${remote} URL proof is ${cloneUrls.status === 0 ? JSON.stringify(urls) : `unreadable (exit ${cloneUrls.status})`}, not exactly ${JSON.stringify(remoteUrl)}`,
+      remediation: `the nested clone must track exactly ${remote} at the selected transport URL; remove the foreign clone and re-run preparation`,
+    };
+  }
+  const branchResult = runGit(runner, storeDir, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (branchResult.status !== 0 || branchResult.stdout.trim() !== TASK_HISTORY_BRANCH) {
+    return {
+      status: "blocked", code: branchResult.status === 0 ? "unsafe-store-location" : "unreadable",
+      detail: `the nested clone branch proof is ${branchResult.status === 0 ? JSON.stringify(branchResult.stdout.trim()) : `unreadable (exit ${branchResult.status})`}; expected ${TASK_HISTORY_BRANCH}`,
+      remediation: "remove the drifted/unreadable clone and re-run preparation on the published task-history branch",
+    };
+  }
+  const headResult = runGit(runner, storeDir, ["rev-parse", "--verify", "HEAD"]);
+  const cloneHead = headResult.stdout.trim();
+  if (headResult.status !== 0 || !/^[0-9a-f]{40}$/.test(cloneHead)) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: `the nested clone HEAD proof failed: ${headResult.stderr.trim() || headResult.stdout.trim() || `exit ${headResult.status}`}`,
+      remediation: "repair or remove the unreadable nested clone and re-run preparation",
+    };
+  }
+  if (cloneHead !== head) {
+    return {
+      status: "blocked", code: "local-ahead",
+      detail: `the nested clone HEAD (${cloneHead}) does not equal the published task-history head (${head}); drift or unpublished task content is never reused as prepared`,
+      remediation: "publish the clone's commits (the deferred mutation loop) or remove the clone and re-run preparation",
+    };
+  }
+  const dirty = runGit(runner, storeDir, ["status", "--porcelain"]);
+  if (dirty.status !== 0) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: `the nested clone cleanliness proof failed: ${dirty.stderr.trim() || dirty.stdout.trim() || `exit ${dirty.status}`}`,
+      remediation: "repair or remove the unreadable nested clone; a failed status command is never treated as clean",
+    };
+  }
+  if (dirty.stdout.trim() !== "") {
+    return {
+      status: "blocked", code: "uncommitted-task-content",
+      detail: `the nested clone ${storeDir} has uncommitted changes: ${dirty.stdout.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
+      remediation: "the nested clone must be clean; inspect it and re-run preparation",
+    };
+  }
+
+  // After materialization/reuse, native provider discovery must resolve to the
+  // exact derived store before lifecycle/default/autoCommit reads are trusted.
+  const targetAuthorityAfter = verifyTargetBacklogAuthority(input.targetWorktree, storeDir, runner, false);
+  if (targetAuthorityAfter) return targetAuthorityAfter;
   try {
     checkBacklogCapabilities(input.targetWorktree, runner);
   } catch (error) {
@@ -1065,7 +1397,7 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
   if (defaultStatus.status !== 0 || defaultStatus.stdout.trim() !== "In Design") {
     return {
       status: "blocked", code: "backlog-cli",
-      detail: `the Episode-worktree task store's effective native default status is ${JSON.stringify(defaultStatus.stdout.trim())}, not exactly "In Design"`,
+      detail: `the Episode-worktree task store's effective native default status is ${JSON.stringify(defaultStatus.stdout.trim())} (exit ${defaultStatus.status}), not exactly "In Design"`,
       remediation: "the published task-store config must set default_status to In Design; this seam never rewrites a published config (remote mutation is deferred)",
     };
   }
@@ -1073,25 +1405,40 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
   if (autoCommit.status !== 0 || autoCommit.stdout.trim() !== "false") {
     return {
       status: "blocked", code: "backlog-cli",
-      detail: `the Episode-worktree task store's effective native auto_commit is ${JSON.stringify(autoCommit.stdout.trim())}, not exactly "false"`,
+      detail: `the Episode-worktree task store's effective native auto_commit is ${JSON.stringify(autoCommit.stdout.trim())} (exit ${autoCommit.status}), not exactly "false"`,
       remediation: "disabling auto-commit in the published task-store config is part of the deferred mutation/cutover; this seam never writes the config locally",
     };
   }
 
-  // Final cleanliness + published-head equality AFTER native reads.
-  const finalDirty = gitOk(runner, storeDir, ["status", "--porcelain"], "verify the nested clone is clean");
-  if (finalDirty.trim() !== "") {
+  // Re-prove clean/published after native reads; every Git proof must succeed.
+  const finalDirty = runGit(runner, storeDir, ["status", "--porcelain"]);
+  if (finalDirty.status !== 0) {
     return {
-      status: "blocked", code: "uncommitted-task-content",
-      detail: `the nested clone ${storeDir} has uncommitted changes after preparation (native config reads may have normalized it): ${finalDirty.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
-      remediation: "the nested clone must be clean; the published config must already be canonical so native reads never rewrite it; inspect and re-run preparation",
+      status: "blocked", code: "unreadable",
+      detail: `the final nested clone cleanliness proof failed: ${finalDirty.stderr.trim() || finalDirty.stdout.trim() || `exit ${finalDirty.status}`}`,
+      remediation: "repair or remove the unreadable nested clone; a failed status command is never treated as clean",
     };
   }
-  const finalHead = refHead(runner, storeDir, "HEAD");
+  if (finalDirty.stdout.trim() !== "") {
+    return {
+      status: "blocked", code: "uncommitted-task-content",
+      detail: `the nested clone ${storeDir} has uncommitted changes after native reads: ${finalDirty.stdout.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
+      remediation: "the nested clone must be clean; inspect it and re-run preparation",
+    };
+  }
+  const finalHeadResult = runGit(runner, storeDir, ["rev-parse", "--verify", "HEAD"]);
+  const finalHead = finalHeadResult.stdout.trim();
+  if (finalHeadResult.status !== 0 || !/^[0-9a-f]{40}$/.test(finalHead)) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: `the final nested clone HEAD proof failed: ${finalHeadResult.stderr.trim() || finalHeadResult.stdout.trim() || `exit ${finalHeadResult.status}`}`,
+      remediation: "repair or remove the unreadable nested clone and re-run preparation",
+    };
+  }
   if (finalHead !== head) {
     return {
       status: "blocked", code: "local-ahead",
-      detail: `the nested clone HEAD (${finalHead ?? "unreadable"}) does not equal the published task-history head (${head}); unpublished task content is never returned as prepared`,
+      detail: `the nested clone HEAD (${finalHead}) does not equal the published task-history head (${head}); unpublished task content is never returned as prepared`,
       remediation: "publish the nested clone's commits (the deferred mutation loop) or re-run preparation",
     };
   }
@@ -1111,67 +1458,181 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
  */
 export function cleanupEpisodeTaskHistoryStore(input: EpisodeTaskHistoryWorkspaceInput): EpisodeTaskHistoryCleanup {
   const runner = input.runner ?? new ProcessCommandRunner();
-  const identity = verifyLinkedWorktree(input.primaryRoot, input.targetWorktree, runner);
-  if (identity) return { status: "refused", code: identity.code === "not-primary-checkout" ? "not-linked-worktree" : identity.code, detail: identity.detail, remediation: identity.remediation } as EpisodeTaskHistoryCleanup;
+  let storeToRemove: string | null = null;
+  type CleanupRefusal = Extract<EpisodeTaskHistoryCleanup, { status: "refused" }>;
+  const refuse = (blocked: EpisodeAuthorityBlocked): EpisodeTaskHistoryCleanup => {
+    const code: CleanupRefusal["code"] =
+      blocked.code === "not-linked-worktree" || blocked.code === "common-repo-mismatch" || blocked.code === "remote-unavailable"
+        || blocked.code === "uncommitted-task-content" || blocked.code === "local-ahead" || blocked.code === "remote-advanced"
+        || blocked.code === "unreadable" || blocked.code === "unsafe-store-location"
+        ? blocked.code
+        : "identity-mismatch";
+    return { status: "refused", code, detail: blocked.detail, remediation: blocked.remediation };
+  };
 
-  const storeDir = join(input.targetWorktree, BUILT_IN_TASK_STORE_DIRS[0]);
-  if (!existsSync(storeDir)) {
-    return { status: "cleaned", storeDir };
-  }
-  // Containment + non-symlink, and never touch a non-repository directory.
-  const rel = relative(input.targetWorktree, storeDir);
-  if (isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`) || rel === "" || rel.includes(sep) || lstatSync(storeDir).isSymbolicLink()) {
-    return {
-      status: "refused", code: "unsafe-store-location",
-      detail: `the task-store path ${storeDir} is not a directly-contained real directory inside the target worktree`,
-      remediation: "inspect the store location; cleanup never follows symlinks or escapes the target worktree",
-    };
-  }
-  const dotGit = join(storeDir, ".git");
-  if (!existsSync(dotGit) || !statSync(dotGit).isDirectory()) {
-    return {
-      status: "refused", code: "not-a-repository",
-      detail: `${storeDir} is not an independent ordinary-Git clone (its .git entry is not a directory); cleanup refuses to remove non-repository or gitfile/linked-worktree content`,
-      remediation: "inspect the directory; cleanup removes only a proven nested ordinary-Git clone of the task-history branch",
-    };
-  }
-  // Fresh direct remote task-ref authority.
-  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: input.primaryRoot, runner });
-  if (prepared.status === "blocked") {
-    return { status: "refused", code: "remote-unavailable", detail: `cannot prove the authoritative remote task ref from the primary checkout: ${prepared.detail}`, remediation: prepared.remediation };
-  }
-  const { remoteUrl, head } = prepared;
+  try {
+    const identity = verifyLinkedWorktree(input.primaryRoot, input.targetWorktree, runner);
+    if (identity) return refuse(identity);
 
-  // Exact clone identity/URL/branch.
-  const cloneUrl = runGit(runner, storeDir, ["remote", "get-url", "origin"]).stdout.trim();
-  const cloneBranch = runGit(runner, storeDir, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.trim();
-  if (cloneUrl !== remoteUrl || cloneBranch !== TASK_HISTORY_BRANCH) {
+    // Pure authority inspection only: no primary preparation, ignore write,
+    // clone, fetch, update-ref, or local ref creation is permitted in cleanup.
+    const authority = inspectPrimaryTaskAuthority(input.primaryRoot, runner);
+    if (authority.status === "blocked") return refuse(authority);
+    const storeDir = join(input.targetWorktree, authority.storeName);
+    const storeEntry = lstatIfPresent(storeDir);
+    if (storeEntry?.isSymbolicLink()) {
+      return {
+        status: "refused", code: "unsafe-store-location",
+        detail: `the derived target store ${storeDir} is a symlink (including a dangling symlink); cleanup never follows or calls it absent`,
+        remediation: "inspect the foreign symlink; cleanup removes only a proven real nested clone",
+      };
+    }
+    const containment = validateContainment(input.targetWorktree, storeDir);
+    if (containment) return refuse(containment);
+
+    // Conflicting target provider/root evidence is never treated as an absent
+    // clean store. When no evidence and no exact store exist, cleanup is an
+    // idempotent no-op at the derived path.
+    const targetAuthority = verifyTargetBacklogAuthority(input.targetWorktree, storeDir, runner, storeEntry === null);
+    if (targetAuthority) return refuse(targetAuthority);
+    if (storeEntry === null) return { status: "cleaned", storeDir };
+
+    const cloneIdentity = verifyIndependentTaskClone(storeDir, runner);
+    if (cloneIdentity.status === "blocked") return refuse(cloneIdentity);
+
+    // Exact selected remote NAME and URL. Every Git read is result-checked;
+    // failed proofs refuse unchanged and empty stdout is never interpreted.
+    const remotes = runGit(runner, storeDir, ["remote"]);
+    if (remotes.status !== 0) {
+      return {
+        status: "refused", code: "unreadable",
+        detail: `the nested clone remote-name proof failed: ${remotes.stderr.trim() || remotes.stdout.trim() || `exit ${remotes.status}`}`,
+        remediation: "repair the nested repository; cleanup leaves it unchanged until its exact remote identity can be proved",
+      };
+    }
+    const names = remotes.stdout.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+    if (names.length !== 1 || names[0] !== authority.remote) {
+      return {
+        status: "refused", code: "identity-mismatch",
+        detail: `the nested clone remotes ${JSON.stringify(names)} do not equal the one selected primary remote ${JSON.stringify(authority.remote)}`,
+        remediation: "cleanup removes only the exact selected-remote clone; leave this foreign/drifted store in place",
+      };
+    }
+    const urlsResult = runGit(runner, storeDir, ["remote", "get-url", "--all", authority.remote]);
+    const urls = urlsResult.stdout.split(/\r?\n/).map((url) => url.trim()).filter(Boolean);
+    if (urlsResult.status !== 0) {
+      return {
+        status: "refused", code: "unreadable",
+        detail: `the nested clone URL proof failed: ${urlsResult.stderr.trim() || urlsResult.stdout.trim() || `exit ${urlsResult.status}`}`,
+        remediation: "repair the nested repository; cleanup leaves it unchanged until its exact URL can be proved",
+      };
+    }
+    if (urls.length !== 1 || urls[0] !== authority.remoteUrl) {
+      return {
+        status: "refused", code: "identity-mismatch",
+        detail: `the nested clone ${authority.remote} URLs ${JSON.stringify(urls)} do not equal the selected transport URL ${JSON.stringify(authority.remoteUrl)}`,
+        remediation: "cleanup removes only the exact selected-remote clone; leave this foreign/drifted store in place",
+      };
+    }
+    const branch = runGit(runner, storeDir, ["rev-parse", "--abbrev-ref", "HEAD"]);
+    if (branch.status !== 0) {
+      return {
+        status: "refused", code: "unreadable",
+        detail: `the nested clone branch proof failed: ${branch.stderr.trim() || branch.stdout.trim() || `exit ${branch.status}`}`,
+        remediation: "repair the nested repository; cleanup leaves it unchanged until branch identity can be proved",
+      };
+    }
+    if (branch.stdout.trim() !== TASK_HISTORY_BRANCH) {
+      return {
+        status: "refused", code: "identity-mismatch",
+        detail: `the nested clone branch ${JSON.stringify(branch.stdout.trim())} is not ${TASK_HISTORY_BRANCH}`,
+        remediation: "cleanup removes only the exact published task-history branch clone; leave this store in place",
+      };
+    }
+
+    const dirty = runGit(runner, storeDir, ["--no-optional-locks", "status", "--porcelain"]);
+    if (dirty.status !== 0) {
+      return {
+        status: "refused", code: "unreadable",
+        detail: `the nested clone cleanliness proof failed: ${dirty.stderr.trim() || dirty.stdout.trim() || `exit ${dirty.status}`}`,
+        remediation: "repair or inspect the nested repository; failed status proof is never clean and cleanup leaves all content unchanged",
+      };
+    }
+    if (dirty.stdout.trim() !== "") {
+      return {
+        status: "refused", code: "uncommitted-task-content",
+        detail: `the nested clone has uncommitted/untracked changes: ${dirty.stdout.trim().split(/\r?\n/).slice(0, 5).join(", ")}; cleanup never deletes unpublished or dirty task content`,
+        remediation: "commit and publish the clone's changes (the deferred mutation loop) or inspect them; cleanup leaves the directory unchanged",
+      };
+    }
+
+    const headResult = runGit(runner, storeDir, ["rev-parse", "--verify", "HEAD"]);
+    const cloneHead = headResult.stdout.trim();
+    if (headResult.status !== 0 || !/^[0-9a-f]{40}$/.test(cloneHead)) {
+      return {
+        status: "refused", code: "unreadable",
+        detail: `the nested clone HEAD proof failed: ${headResult.stderr.trim() || headResult.stdout.trim() || `exit ${headResult.status}`}`,
+        remediation: "repair the nested repository; cleanup leaves it unchanged until its exact HEAD can be proved",
+      };
+    }
+    if (cloneHead !== authority.head) {
+      // Classify without fetching/mutating: the clone-created tracking ref
+      // records whether local HEAD moved or the direct remote moved.
+      const trackingResult = runGit(runner, storeDir, ["rev-parse", "--verify", `refs/remotes/${authority.remote}/${TASK_HISTORY_BRANCH}`]);
+      const trackingHead = trackingResult.stdout.trim();
+      if (trackingResult.status !== 0 || !/^[0-9a-f]{40}$/.test(trackingHead)) {
+        return {
+          status: "refused", code: "unreadable",
+          detail: `the nested clone tracking-head proof failed while classifying divergence: ${trackingResult.stderr.trim() || trackingResult.stdout.trim() || `exit ${trackingResult.status}`}`,
+          remediation: "repair the nested repository; cleanup leaves it unchanged until local and remote heads can be proved",
+        };
+      }
+      if (trackingHead === authority.head) {
+        return {
+          status: "refused", code: "local-ahead",
+          detail: `the clean nested clone HEAD ${cloneHead} is ahead of/drifted from published head ${authority.head}; cleanup never deletes unpublished commits`,
+          remediation: "publish or explicitly reconcile the local commits through the deferred mutation loop; cleanup leaves the store unchanged",
+        };
+      }
+      if (trackingHead === cloneHead) {
+        return {
+          status: "refused", code: "remote-advanced",
+          detail: `the selected remote advanced from the clone's recorded head ${cloneHead} to ${authority.head}; cleanup never deletes a stale clone without reconciliation`,
+          remediation: "reconcile the clone with the remote through the deferred mutation loop; cleanup leaves the store unchanged",
+        };
+      }
+      return {
+        status: "refused", code: "identity-mismatch",
+        detail: `the nested clone HEAD ${cloneHead}, recorded tracking head ${trackingHead}, and published head ${authority.head} diverge`,
+        remediation: "inspect and reconcile the diverged clone; cleanup leaves the store unchanged",
+      };
+    }
+
+    // Exit the proof-only region before beginning the first mutation.
+    storeToRemove = storeDir;
+  } catch (error) {
     return {
-      status: "refused", code: "identity-mismatch",
-      detail: `the nested clone identity does not match the task-history authority (url ${cloneUrl}, branch ${cloneBranch}; expected ${remoteUrl} on ${TASK_HISTORY_BRANCH})`,
-      remediation: "cleanup removes only the exact proven task-history clone; this content is foreign — leave it in place",
-    };
-  }
-  // Clean worktree/index.
-  const dirty = runGit(runner, storeDir, ["status", "--porcelain"]).stdout;
-  if (dirty.trim() !== "") {
-    return {
-      status: "refused", code: "uncommitted-task-content",
-      detail: `the nested clone has uncommitted/untracked changes: ${dirty.trim().split(/\r?\n/).slice(0, 5).join(", ")}; cleanup never deletes unpublished or dirty task content`,
-      remediation: "commit and publish the clone's changes (the deferred mutation loop) or inspect them; cleanup leaves the directory unchanged",
-    };
-  }
-  // HEAD equal to the authoritative remote head (no local-ahead/unpublished,
-  // no remote-ahead/diverged — the direct remote ref is the authority).
-  const cloneHead = refHead(runner, storeDir, "HEAD");
-  if (cloneHead !== head) {
-    return {
-      status: "refused", code: "identity-mismatch",
-      detail: `the nested clone HEAD (${cloneHead ?? "unreadable"}) does not equal the authoritative remote task head (${head}); cleanup never deletes unpublished or diverged task content`,
-      remediation: "publish the clone's commits or reconcile divergence (the deferred mutation loop); cleanup leaves the directory unchanged",
+      status: "refused", code: "unreadable",
+      detail: `cleanup proof failed before removal began: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: "repair the unreadable identity/authority evidence and retry; no removal was attempted",
     };
   }
 
-  rmSync(storeDir, { recursive: true, force: true });
-  return { status: "cleaned", storeDir };
+  if (!storeToRemove) {
+    return {
+      status: "refused", code: "unreadable",
+      detail: "cleanup reached removal without an exact proven target store",
+      remediation: "retry after inspecting the cleanup authority; no removal was attempted",
+    };
+  }
+  try {
+    rmSync(storeToRemove, { recursive: true, force: true });
+    return { status: "cleaned", storeDir: storeToRemove };
+  } catch (error) {
+    return {
+      status: "refused", code: "unreadable",
+      detail: `final removal of the proven store failed and may be partial: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: `inspect ${storeToRemove} before retrying; cleanup does not claim unchanged state after removal begins`,
+    };
+  }
 }

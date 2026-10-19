@@ -330,40 +330,50 @@ fields, no lifecycle wiring, no per-task mutation loop.
   `git worktree list --porcelain`. The primary itself, an arbitrary directory,
   or a foreign repository blocks (`not-linked-worktree` /
   `common-repo-mismatch`). No ownership fields or lifecycle wiring.
-- **Derived from the prepared primary:** the selected remote, transport URL,
-  published `refs/heads/prime-claw/tasks` authority, and built-in store
-  location come from `prepareTaskHistoryWorkspace(primaryRoot)`, so the
-  primary must be valid under the accepted slice-2A checks (root/custom-layout
-  blocks are preserved).
+- **Derived from the prepared primary:** the selected remote name, exact
+  transport URL, published `refs/heads/prime-claw/tasks` authority, and exact
+  one-segment built-in store location come from
+  `prepareTaskHistoryWorkspace(primaryRoot)`. A prepared `backlog/` primary
+  therefore maps only to target `backlog/`; `.backlog` is never hardcoded.
+  Root/custom-layout blocks from accepted slice 2A are preserved.
 - **Pre-existing effective ignore required:** the store path must be directly
   contained and non-symlinked, and native `git check-ignore` must prove it is
   already ignored BEFORE anything is created. The target code worktree is
   never edited or staged to establish ignore; an unsafe ignore blocks
   (`not-ignored`). The ignore lives on the target branch's own committed
   `.gitignore` (a worktree-creation/operator responsibility, not this seam's).
-- **Independent nested clone:** an ordinary-Git clone from the remote URL on
-  `prime-claw/tasks` at the exact remote head — never a nested linked
-  worktree, submodule, alternate index, same-root custom work tree,
-  local-filesystem authority clone, or force update. On reuse it verifies the
-  exact `.git` directory form, remote name+URL, branch, remote/current head,
-  effective native lifecycle/default/autoCommit, clean status, and no
-  unpublished commits; drift or divergence blocks with exact remediation.
-  Effective native configuration is validated from the target root on every
-  path (the accepted slice-2A native validation), before the final
-  cleanliness/published-head proofs.
+- **Exact target-native authority:** before the clone write, target provider
+  discovery may be absent or may select only the exact derived Backlog store;
+  another provider, root configuration, or store blocks. After creation or
+  reuse, discovery must select that exact store before the existing native
+  lifecycle/default/autoCommit reads are trusted.
+- **Independent nested clone:** an ordinary-Git clone uses both the selected
+  remote name (`--origin <selected>`) and exact URL on `prime-claw/tasks` at
+  the exact remote head — never a nested linked worktree, submodule,
+  alternate index, same-root custom work tree, local-filesystem authority
+  clone, or force update. Fresh and reused clones must have a real,
+  non-symlink `.git` directory; canonical top level equal to the store; and
+  Git/common directories equal to the contained `<store>/.git`. Reuse also
+  verifies the exact sole remote name+URL, branch/head, clean status, native
+  lifecycle/default/autoCommit, and no unpublished commits.
 
 ### `cleanupEpisodeTaskHistoryStore({ primaryRoot, targetWorktree })`
 
-One guarded cleanup seam for that exact nested clone. Before removal it
-freshly proves the direct remote task ref (`git ls-remote`), the exact clone
-identity/URL/branch, a clean worktree/index, and HEAD equal to the
-authoritative remote head. It refuses unchanged — never deleting — on dirty,
-untracked, local-ahead/unpublished, remote-ahead/diverged, unavailable
-remote, wrong URL/branch, symlink, gitfile/linked-worktree form,
-non-repository content, or containment/identity mismatch. It removes ONLY the
-proven nested store directory, never the target code branch/index/tracked
-files or the primary store. This is the plan's clean/published cleanup GUARD,
-not operator-facing lifecycle cleanup authority.
+One guarded cleanup seam for that exact derived nested clone. Cleanup never
+calls primary preparation: it non-mutatingly derives primary store authority,
+selects the exact remote name+URL, and reads the fresh direct task ref with
+`git ls-remote`. It then proves target-native authority, strict independent
+clone identity, exact sole remote/URL/branch, successful read-only clean
+status, and HEAD equal to the authoritative remote head. Every Git inspection
+must exit zero before its output is interpreted; an empty stdout from a failed
+status/read is never accepted. Dirty/untracked, clean local-ahead,
+remote-advanced/diverged, unavailable remote, wrong identity, a dangling
+store symlink, symlinked `.git`, and external nested or primary
+`core.worktree` cases refuse unchanged. No primary store, ignore rule, fetch,
+or ref is created or changed; the first mutation is final removal of ONLY the
+proven target store. If that final removal fails, cleanup reports that state
+may be partial rather than claiming unchanged content. This is the plan's
+clean/published cleanup GUARD, not operator-facing lifecycle cleanup authority.
 
 ### Boundary
 

@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-19 14:44'
+updated_date: '2026-10-19 15:16'
 labels: []
 dependencies: []
 references:
@@ -434,4 +434,17 @@ Representative real-Git fixtures (no Cartesian matrix): (a) registered linked Ep
 6. Make cleanup read-only until final exact target-store removal. Do not call mutating `prepareTaskHistoryWorkspace` from cleanup. Directly and non-mutatingly prove selected remote name+URL, fresh direct task-ref head, derived primary/store authority, exact target identity, clean status, and equal published head; refuse truthfully on unavailable/drifted proof. With the primary store absent, cleanup currently recreates primary `.backlog` (and can write `.gitignore`) before success/refusal, violating no-primary-mutation.
 
 Add bounded representative real-Git regressions (no framework or Cartesian matrix): retained `backlog/`; selected non-`origin` remote; conflicting target root config; failed cleanliness proof; `.git` symlink/custom `core.worktree`; cleanup primary no-mutation; representative clean local-ahead, remote-advanced, and unavailable-remote refusal. Update task notes/docs truthfully; run focused + full Node + Docker tier 1; one clean repair commit; push; stop for review. Keep PRIMECLAW-43 In Progress. Later mutation/lifecycle/Beads/ownership/migration work and PRIMECLAW-43.1 remain out of scope.
+
+2026-10-19 Episode — slice-2B revision completed for review (repairs candidate f6d985b; accepted slice 2A unchanged). Implemented only the six recorded defects including three directly related manifestations of the same cleanup safety defects found by independent read-only review:
+
+1. The target store is derived as the exact one-segment built-in path from prepared-primary `storeDir`; `.backlog` is no longer hardcoded. Preparation, reuse, absent-store cleanup, and final removal use the same `.backlog/` or `backlog/` path.
+2. The selected remote name and URL are both identity. Fresh clones use ordinary Git `--origin <selected remote>`; preparation/reuse/cleanup require exactly one matching remote name and exact URL. A selected `upstream` remains `upstream`.
+3. Target-native provider discovery is proved against the exact target project root and derived nested Backlog store before clone writes (none or exact store only) and after materialization/reuse (exact store required) before lifecycle/default/autoCommit reads. Conflicting root/provider/store evidence blocks.
+4. Every cleanup Git identity/remote/branch/status/head/tracking proof is result-checked before output interpretation. Cleanup uses read-only `git --no-optional-locks status --porcelain`; exit 128/empty stdout refuses `unreadable` and retains content.
+5. Fresh/reused/deleted stores require strict independent-clone identity: real non-symlink store and `.git` directories, canonical Git top level equal to the store, and Git/common dirs equal to the real contained `<store>/.git`. Symlinked `.git`, dangling store symlinks, and external/custom nested `core.worktree` refuse before status/deletion.
+6. Cleanup no longer calls mutating primary preparation. It read-only proves exact canonical primary project-root/provider/store authority, selected remote name+URL, fresh direct task-ref head, target authority/clone identity, clean status, and equal published head. It performs no fetch/ref/ignore/primary-store/Backlog mutation. Final target-store removal is outside the proof catch; removal failure reports possible partial state rather than claiming unchanged content.
+
+Bounded real-Git regressions added: retained `backlog/` + selected `upstream` through prepare/reuse/cleanup; conflicting target root authority before and after materialization; failed status proof with truncated index + unpublished sentinel; symlinked `.git`; nested and primary external `core.worktree`; dangling target-store symlink; absent-primary-store cleanup with unchanged `.gitignore`/code/index/refs; and clean local-ahead, remote-advanced, unavailable-remote refusals. Existing positive clean deletion and prior linked-worktree/ignore/native-config tests remain. Documentation updated in `docs/backlog.md`.
+
+Evidence: focused task-history suite 40/40. Full host Node 335/335. Docker tier-1 bridge 1 passed, 1 deselected.. Modified files: `src/prime-agent-plugin/extension-support/task-history-workspace.ts`, `tests/task_history_workspace.test.mjs`, `docs/backlog.md`, and this task via supported CLI. Status remains In Progress. Boundaries preserved: no per-task mutation loop, Episode admission/finalization/lifecycle cleanup wiring, Beads/Dolt transport, provider-neutral framework, ownership/receipt fields, lifecycle UX routing, migration/cutover, PRIMECLAW-43.1, or accepted non-empty-folder-store ordering; live store untouched.
 <!-- SECTION:NOTES:END -->
