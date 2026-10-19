@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 23:56'
+updated_date: '2026-10-19 14:44'
 labels: []
 dependencies: []
 references:
@@ -418,4 +418,20 @@ Explicitly OUT of scope for 2B: per-task fetch/reconcile/native-mutate/commit/pu
 - `cleanupEpisodeTaskHistoryStore({ primaryRoot, targetWorktree })`: guarded cleanup. Before removal it freshly proves the direct remote task ref (ls-remote), exact clone identity/URL/branch, clean worktree/index, and HEAD == authoritative remote head; refuses unchanged (never deletes) on dirty/untracked/local-ahead/remote-ahead/diverged/unavailable-remote/wrong-URL-branch/symlink/gitfile/linked-worktree/non-repo/containment mismatch; removes ONLY the proven nested store dir. This is the plan's clean/published cleanup GUARD, not operator-facing lifecycle cleanup authority.
 
 Representative real-Git fixtures (no Cartesian matrix): (a) registered linked Episode worktree gets an independent clean clone with zero primary/target code mutations; (b) foreign/unregistered target blocks before any write; (c) registered worktree with unsafe/ineffective ignore blocks before creating the store; (d) reuse with wrong remote URL or dirt blocks; (e) cleanup removes one exact clean published clone and refuses dirty/foreign without deletion. Seam suite 33/33 (was 28); host Node 328/328 (was 323); Docker tier-1 bridge 1/1. docs/backlog.md gained a slice-2B section. Status unchanged: In Progress. Boundary kept: no per-task mutation loop, no Episode admission/finalization/cleanup wiring, no Beads transport, no provider-neutral framework, no ownership/receipt fields, no lifecycle UX routing, no migration/cutover, no PRIMECLAW-43.1; live store untouched.
+
+2026-10-19 Conversation review of slice-2B candidate f6d985b: REVISE, not accepted. Preserve accepted slice 2A and these slice-2B behaviors: current linked-worktree checks, ignore-before-write behavior, independent remote clone model, lifecycle/default/autoCommit validation, and every explicit scope exclusion. Repair ONLY the six confirmed defects below with the least technology:
+
+1. Derive the exact target-relative built-in store path from the prepared primary `storeDir`; do not hardcode `.backlog`. Use it consistently in preparation and cleanup, including absent-store handling. A valid primary at `backlog/` currently blocks target preparation or lets cleanup report the wrong path cleaned while the real store remains.
+
+2. Preserve the exact selected remote name and URL. Clone with the selected name (ordinary Git `--origin <remote>`) and verify that exact name+URL on reuse and cleanup. A selected `upstream` currently becomes `origin` despite the result reporting `upstream`.
+
+3. Prove target-native Backlog authority resolves to the exact derived nested store. Before writes, reject target root/provider evidence selecting another provider or store. After materialization/reuse, require native provider resolution plus lifecycle/default/autoCommit validation to refer to that derived store. A target root config selecting another directory currently lets `.backlog` clone and return prepared while native commands use the other store.
+
+4. Treat every cleanup Git inspection as a proof that must succeed. Require `git status --porcelain` and all identity/head reads to exit 0 before interpreting output. With a truncated/unreadable nested index, status currently exits 128 with empty stdout; cleanup returns cleaned and deletes an untracked unpublished file. Refuse unchanged when cleanliness or identity cannot be proved.
+
+5. Prove exact independent-clone identity before reuse or deletion. Reject a symlinked `.git` and custom/separate Git work-tree identity; prove canonical Git top level equals the store and Git/common dir is the real contained `<store>/.git`. Current checks follow a `.git` symlink, and `core.worktree` elsewhere makes cleanup inspect another checkout then delete unpublished content in the actual nested store.
+
+6. Make cleanup read-only until final exact target-store removal. Do not call mutating `prepareTaskHistoryWorkspace` from cleanup. Directly and non-mutatingly prove selected remote name+URL, fresh direct task-ref head, derived primary/store authority, exact target identity, clean status, and equal published head; refuse truthfully on unavailable/drifted proof. With the primary store absent, cleanup currently recreates primary `.backlog` (and can write `.gitignore`) before success/refusal, violating no-primary-mutation.
+
+Add bounded representative real-Git regressions (no framework or Cartesian matrix): retained `backlog/`; selected non-`origin` remote; conflicting target root config; failed cleanliness proof; `.git` symlink/custom `core.worktree`; cleanup primary no-mutation; representative clean local-ahead, remote-advanced, and unavailable-remote refusal. Update task notes/docs truthfully; run focused + full Node + Docker tier 1; one clean repair commit; push; stop for review. Keep PRIMECLAW-43 In Progress. Later mutation/lifecycle/Beads/ownership/migration work and PRIMECLAW-43.1 remain out of scope.
 <!-- SECTION:NOTES:END -->
