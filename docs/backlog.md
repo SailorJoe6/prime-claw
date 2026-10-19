@@ -437,7 +437,43 @@ never decides semantic compatibility or forces/rewrites remote history. Native
 mutation, commit, fetch, merge, push, or direct-proof failure leaves
 recoverable local work in the nested clone and never calls it published.
 
-Still out of scope: Episode admission/finalization/cleanup wiring,
-ownership/receipt fields, provider-neutral UX, managed semantic decisions,
-Beads/Dolt transport, legacy transition, migration/cutover, PRIMECLAW-43.1,
-and any coordinator, lock, checkpoint, framework, or persistent state.
+### Beads workspace and transport foundation (slice 2D)
+
+`prepareBeadsWorkspaceTransport` is the direct Beads-specific readiness seam.
+It prepares no shadow state and performs no task mutation or publication. It
+uses supported native reads in one fail-closed sequence:
+
+- provider discovery and the existing `bd` capability/status gate select the
+  sole live Beads authority;
+- `bd context --json` must bind the exact repository, `.beads` store, installed
+  `bd` version, Dolt database, and native `server` mode;
+- `bd config get dolt.auto-start --json`, `bd dolt show --json`, and
+  `bd dolt status --json` distinguish a running bd-managed per-project server
+  from an explicitly operator-managed external server. Embedded, proxied,
+  machine-global shared, unreachable, or ambiguous server evidence blocks;
+- read-only SQL through `bd` proves the exact database, active branch, 32-character
+  Dolt revision, installed/server Dolt version parity, and an empty
+  `dolt_status` working set. A dirty working set has no complete revision
+  authority and blocks with native commit remediation;
+- `bd config get sync.remote --json` and `bd dolt remote list --json` must select
+  one healthy Git-backed Dolt remote matching one repository Git remote.
+  Direct `git ls-remote --refs` must expose exactly one `refs/dolt/data` ref;
+  then a disposable isolated `dolt clone --ref refs/dolt/data` must report the
+  same native branch and revision as the live server. A final direct ref read
+  must equal the initial Git object ID so a concurrent publication cannot be
+  called ready. The Git object ID for the ref and the Dolt revision are retained
+  as different evidence; neither is mistaken for the other.
+
+The only direct `dolt` operations are executable version discovery and
+read-only inspection of the disposable remote clone. They never point at the
+live `.beads` data directory or race the server. `.beads/issues.jsonl` never
+participates. Missing capabilities, lifecycle evidence, clean revision,
+remote, credentials, ref, or exact published revision returns bounded native
+remediation; no force push, daemon, sidecar, mirror, registry, lock, protocol,
+or persistent Prime Claw state is introduced.
+
+Still out of scope: Beads per-task mutation/publication/reconciliation,
+Episode admission/finalization/cleanup wiring, ownership/receipt fields,
+provider-neutral UX, managed semantic decisions, legacy transition,
+migration/cutover, PRIMECLAW-43.1, and any coordinator, lock, checkpoint,
+framework, or persistent state.

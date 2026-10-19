@@ -7,6 +7,7 @@ import test from "node:test";
 
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import {
+  BEADS_DOLT_DATA_REF,
   BEADS_STATUS_MAP,
   CANONICAL_LIFECYCLE_STATUSES,
   checkBacklogCapabilities,
@@ -14,6 +15,7 @@ import {
   checkSelectedProviderCapabilities,
   detectTaskProvider,
   mutateProviderTaskStatus,
+  prepareBeadsWorkspaceTransport,
   requireBacklogTaskSelection,
   resolveProviderTask,
 } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
@@ -108,6 +110,110 @@ function detectionRunner(extra = {}) {
       const key = [command, ...args].join("\0");
       if (key in responses) return responses[key];
       return real.run(command, args, options);
+    },
+  };
+}
+
+const DOLT_REVISION = "a".repeat(32);
+const DOLT_DATA_HEAD = "b".repeat(40);
+const DOLT_REMOTE_URL = "git+https://example.invalid/org/repo.git";
+const DOLT_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision, dolt_version() AS dolt_version";
+const DOLT_DIRTY_QUERY = "SELECT table_name, staged, status FROM dolt_status ORDER BY table_name";
+const DOLT_REMOTE_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision";
+
+function beadsWorkspaceResponses(root, { operatorManaged = false } = {}) {
+  const storeDir = join(root, ".beads");
+  return {
+    ...BEADS_OK,
+    ...BD_NO_DB_FALSE,
+    ["bd\0context\0--json"]: { stdout: JSON.stringify({
+      schema_version: 1,
+      backend: "dolt",
+      bd_version: "1.1.2",
+      beads_dir: storeDir,
+      cwd_repo_root: root,
+      repo_root: root,
+      database: "fixture_db",
+      dolt_mode: "server",
+      is_redirected: false,
+      is_worktree: false,
+    }) + "\n", stderr: "", status: 0 },
+    ["bd\0config\0get\0dolt.auto-start\0--json"]: {
+      stdout: JSON.stringify({
+        schema_version: 1, key: "dolt.auto-start", location: "config.yaml", value: operatorManaged ? "false" : "",
+      }) + "\n",
+      stderr: "", status: 0,
+    },
+    ["bd\0dolt\0show\0--json"]: { stdout: JSON.stringify({
+      schema_version: 1,
+      backend: "dolt",
+      connection_ok: true,
+      database: "fixture_db",
+      embedded: false,
+      host: "127.0.0.1",
+      port: 3307,
+      shared_server: false,
+      user: "root",
+    }) + "\n", stderr: "", status: 0 },
+    ["bd\0dolt\0status\0--json"]: { stdout: JSON.stringify(operatorManaged ? {
+      schema_version: 1,
+      mode: "external",
+      running: true,
+      host: "127.0.0.1",
+      port: 3307,
+      database: "fixture_db",
+      user: "root",
+      tls: false,
+    } : {
+      schema_version: 1,
+      running: true,
+      pid: 4242,
+      port: 3307,
+      data_dir: join(storeDir, "dolt"),
+    }) + "\n", stderr: "", status: 0 },
+    ["dolt\0version"]: { stdout: "dolt version 2.2.3\n", stderr: "", status: 0 },
+    [["bd", "--readonly", "sql", "--json", DOLT_IDENTITY_QUERY].join("\0")]: { stdout: JSON.stringify([{
+      database_name: "fixture_db", branch: "main", revision: DOLT_REVISION, dolt_version: "2.2.3",
+    }]) + "\n", stderr: "", status: 0 },
+    [["bd", "--readonly", "sql", "--json", DOLT_DIRTY_QUERY].join("\0")]: { stdout: "[]\n", stderr: "", status: 0 },
+    ["bd\0config\0get\0sync.remote\0--json"]: { stdout: JSON.stringify({
+      schema_version: 1, key: "sync.remote", location: "config.yaml", value: DOLT_REMOTE_URL,
+    }) + "\n", stderr: "", status: 0 },
+    ["bd\0dolt\0remote\0list\0--json"]: { stdout: JSON.stringify([
+      { name: "origin", url: DOLT_REMOTE_URL, sql_url: DOLT_REMOTE_URL, status: "ok" },
+    ]) + "\n", stderr: "", status: 0 },
+    ["git\0remote\0get-url\0--all\0origin"]: { stdout: "https://example.invalid/org/repo.git\n", stderr: "", status: 0 },
+    [`git\0ls-remote\0--exit-code\0--refs\0origin\0${BEADS_DOLT_DATA_REF}`]: {
+      stdout: `${DOLT_DATA_HEAD}\t${BEADS_DOLT_DATA_REF}\n`, stderr: "", status: 0,
+    },
+  };
+}
+
+function beadsTransportRunner(extra = {}, { publishedRevision = DOLT_REVISION } = {}) {
+  const delegate = detectionRunner(extra);
+  return {
+    run(command, args, options = {}) {
+      if (command === "dolt" && args[0] === "clone") {
+        return { stdout: "cloned\n", stderr: "", status: 0 };
+      }
+      if (command === "dolt" && args[0] === "sql" && args.at(-1) === DOLT_REMOTE_IDENTITY_QUERY) {
+        return { stdout: JSON.stringify({ rows: [{
+          database_name: "fixture_db", branch: "main", revision: publishedRevision,
+        }] }) + "\n", stderr: "", status: 0 };
+      }
+      return delegate.run(command, args, options);
+    },
+  };
+}
+
+function recordedDetectionRunner(extra = {}, options = {}) {
+  const delegate = beadsTransportRunner(extra, options);
+  const calls = [];
+  return {
+    calls,
+    run(command, args, commandOptions = {}) {
+      calls.push([command, ...args]);
+      return delegate.run(command, args, commandOptions);
     },
   };
 }
@@ -415,6 +521,151 @@ test("the dispatcher capability-checks the selected provider", () => {
   const caps = checkSelectedProviderCapabilities(detection, fakeRunner({ ...BACKLOG_OK }));
   assert.equal(caps.provider, "backlog");
 });
+
+test("Beads workspace transport proves bd-managed server, native revision, remote, and refs/dolt/data", () => {
+  const root = fixtureRoot();
+  const storeDir = writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const runner = recordedDetectionRunner(beadsWorkspaceResponses(root));
+  const result = prepareBeadsWorkspaceTransport(root, runner);
+  assert.deepEqual(result, {
+    status: "ready",
+    evidence: {
+      provider: "beads",
+      projectRoot: root,
+      storeDir,
+      bdVersion: "1.1.2",
+      doltVersion: "2.2.3",
+      serverAuthority: "bd-auto-start",
+      serverHost: "127.0.0.1",
+      serverPort: 3307,
+      database: "fixture_db",
+      branch: "main",
+      revision: DOLT_REVISION,
+      remoteName: "origin",
+      remoteUrl: DOLT_REMOTE_URL,
+      publicationRef: BEADS_DOLT_DATA_REF,
+      publicationHead: DOLT_DATA_HEAD,
+      publishedRevision: DOLT_REVISION,
+    },
+  });
+  const doltCalls = runner.calls.filter(([command]) => command === "dolt");
+  assert.deepEqual(doltCalls.map(([, subcommand]) => subcommand), ["version", "clone", "sql"]);
+  assert.ok(doltCalls[1].includes(BEADS_DOLT_DATA_REF), "the only raw clone targets isolated refs/dolt/data proof");
+  assert.match(doltCalls[1].at(-1), /prime-claw-beads-remote-proof-/, "the raw clone target is disposable, not the live store");
+  assert.notEqual(doltCalls[1].at(-1), storeDir);
+  assert.equal(runner.calls.some((call) => call.join(" ").includes("issues.jsonl")), false, "JSONL is never authority");
+});
+
+test("Beads workspace transport distinguishes an explicitly operator-managed server", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, {
+    metadataOverrides: { dolt_mode: "server", dolt_server_host: "127.0.0.1", dolt_server_port: 3307 },
+    configText: "dolt.auto-start: false\n",
+  });
+  const result = prepareBeadsWorkspaceTransport(root, beadsTransportRunner(beadsWorkspaceResponses(root, { operatorManaged: true })));
+  assert.equal(result.status, "ready");
+  assert.equal(result.evidence.serverAuthority, "operator-managed");
+  assert.equal(result.evidence.database, "fixture_db");
+});
+
+test("Beads workspace transport fails closed with exact capability, server, revision, remote, and publication remediation", () => {
+  const cases = [
+    {
+      code: "capability",
+      change(responses) { responses["bd\0--version"] = { stdout: "", stderr: "bd unavailable", status: 127 }; },
+      remediation: /pinned supported `bd` executable/,
+    },
+    {
+      code: "server-mode",
+      change(responses) {
+        const view = JSON.parse(responses["bd\0context\0--json"].stdout);
+        view.dolt_mode = "embedded";
+        responses["bd\0context\0--json"] = { stdout: JSON.stringify(view), stderr: "", status: 0 };
+      },
+      remediation: /bd init --server/,
+    },
+    {
+      code: "server-unavailable",
+      change(responses) {
+        responses["bd\0dolt\0status\0--json"] = { stdout: JSON.stringify({ schema_version: 1, running: false, pid: 0 }), stderr: "", status: 0 };
+      },
+      remediation: /bd dolt start/,
+    },
+    {
+      code: "revision",
+      change(responses) {
+        responses[["bd", "--readonly", "sql", "--json", DOLT_IDENTITY_QUERY].join("\0")] = { stdout: JSON.stringify([{
+          database_name: "fixture_db", branch: "main", revision: "ambiguous", dolt_version: "2.2.3",
+        }]), stderr: "", status: 0 };
+      },
+      remediation: /read-only `bd sql` identity query/,
+    },
+    {
+      code: "revision",
+      change(responses) {
+        responses[["bd", "--readonly", "sql", "--json", DOLT_DIRTY_QUERY].join("\0")] = { stdout: JSON.stringify([{
+          table_name: "config", staged: 0, status: "modified",
+        }]), stderr: "", status: 0 };
+      },
+      remediation: /bd dolt commit.*upgrade or repair Beads/,
+    },
+    {
+      code: "remote-transport",
+      change(responses) {
+        responses["bd\0config\0get\0sync.remote\0--json"] = { stdout: "", stderr: "not configured", status: 1 };
+      },
+      remediation: /bd dolt remote add origin/,
+    },
+    {
+      code: "publication-authority",
+      change(responses) {
+        responses[`git\0ls-remote\0--exit-code\0--refs\0origin\0${BEADS_DOLT_DATA_REF}`] = { stdout: "", stderr: "", status: 2 };
+      },
+      remediation: /bd dolt push --remote origin/,
+    },
+    {
+      code: "publication-authority",
+      change() {},
+      runnerOptions: { publishedRevision: "c".repeat(32) },
+      remediation: /bd dolt pull --remote origin/,
+    },
+  ];
+  for (const scenario of cases) {
+    const root = fixtureRoot();
+    writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+    const responses = beadsWorkspaceResponses(root);
+    scenario.change(responses);
+    const result = prepareBeadsWorkspaceTransport(root, beadsTransportRunner(responses, scenario.runnerOptions));
+    assert.equal(result.status, "blocked", scenario.code);
+    assert.equal(result.code, scenario.code);
+    assert.match(result.remediation, scenario.remediation);
+  }
+});
+
+test("Beads workspace transport refuses a refs/dolt/data race during isolated proof", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const delegate = beadsTransportRunner(beadsWorkspaceResponses(root));
+  let publicationReads = 0;
+  const runner = {
+    run(command, args, options = {}) {
+      if (command === "git" && args[0] === "ls-remote") {
+        publicationReads += 1;
+        if (publicationReads === 2) {
+          return { stdout: `${"c".repeat(40)}\t${BEADS_DOLT_DATA_REF}\n`, stderr: "", status: 0 };
+        }
+      }
+      return delegate.run(command, args, options);
+    },
+  };
+  const result = prepareBeadsWorkspaceTransport(root, runner);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "publication-authority");
+  assert.match(result.detail, new RegExp(`${DOLT_DATA_HEAD}.*${"c".repeat(40)}`));
+  assert.match(result.remediation, /bd dolt pull --remote origin/);
+  assert.equal(publicationReads, 2);
+});
+
 
 test("the beads status map covers every canonical lifecycle state exactly once", () => {
   assert.deepEqual(Object.keys(BEADS_STATUS_MAP), CANONICAL);
