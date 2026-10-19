@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-19 15:26'
+updated_date: '2026-10-19 15:42'
 labels: []
 dependencies: []
 references:
@@ -455,4 +455,11 @@ Evidence: focused task-history suite 40/40. Full host Node 335/335. Docker tier-
 2. Treat ignored untracked files as unpublished content. Current result-checked `git status --porcelain` is empty for a file ignored by the published task-store `.gitignore`; with authoritative HEAD and otherwise exact identity, cleanup returns `cleaned` and deletes the ignored unpublished file. Strengthen the existing read-only cleanliness proofs to include ordinary and ignored untracked entries (for reuse/final preparation as well as cleanup), while still requiring command success. Refuse any such entry as uncommitted/unpublished and preserve the store. Add one bounded real-Git regression with a published ignore rule and ignored sentinel: ordinary status is empty, the seam detects it, preparation does not return prepared, cleanup refuses, and sentinel/store remain.
 
 The fetched-but-remote-behind diagnostic was reviewed and is NON-BLOCKING; do not broaden this pass for it. Do not add a framework, persistent state, lifecycle wiring, or unrelated hardening. Update task notes/docs truthfully; run focused + full Node + Docker tier 1; make one clean residual repair commit, push, and stop for review. Keep PRIMECLAW-43 In Progress. All deferred mutation/Beads/ownership/lifecycle/migration work and PRIMECLAW-43.1 remain out of scope.
+
+2026-10-19 Episode — residual slice-2B revision completed for review (repairs e8f4bf0; accepted slice 2A unchanged). Implemented exactly the two independently reproduced blockers recorded at checkpoint 203a095:
+
+1. Shared `verifyTargetBacklogAuthority` now rejects every target Backlog authority with `configSource === "root"` before native lifecycle/default/autoCommit reads and before cleanup, including a root `backlog.config.yml` that selects the SAME derived nested store. The remediation keeps root-authority relocation deferred to PRIMECLAW-43.1. Direct real-Git regression starts with ordinary target preparation, commits a lifecycle-ready same-store root config, snapshots exact bytes/status, and proves reuse plus cleanup refuse while bytes/status and the nested store remain unchanged.
+2. All three existing slice-2B read-only cleanliness proofs—reuse, final preparation, and cleanup—now require successful `git --no-optional-locks status --porcelain --ignored --untracked-files=all`. Ordinary and ignored untracked entries are therefore uncommitted/unpublished content. Direct real-Git regression publishes an ignore rule, creates an ignored sentinel for which ordinary porcelain is empty, and proves preparation and cleanup refuse while sentinel/store remain.
+
+Documentation updated in `docs/backlog.md`. Verification: targeted residual checks 3/3; focused task-history suite 42/42; full host Node 337/337; Docker tier-1 bridge 1 passed, 1 deselected; `git diff --check` clean. Modified files: `src/prime-agent-plugin/extension-support/task-history-workspace.ts`, `tests/task_history_workspace.test.mjs`, `docs/backlog.md`, and this task via supported CLI. Candidate preserves all six prior slice-2B repairs and every prior regression. The fetched-but-remote-behind diagnostic is unchanged and non-blocking. Status remains In Progress. No framework, persistent state, per-task mutation loop, Episode admission/finalization/lifecycle cleanup wiring, Beads/Dolt transport, provider-neutral work, ownership/receipt fields, lifecycle UX routing, migration/cutover, PRIMECLAW-43.1, or unrelated hardening was added; live store untouched.
 <!-- SECTION:NOTES:END -->
