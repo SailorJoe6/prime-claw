@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-19 15:42'
+updated_date: '2026-10-19 15:49'
 labels: []
 dependencies: []
 references:
@@ -462,4 +462,25 @@ The fetched-but-remote-behind diagnostic was reviewed and is NON-BLOCKING; do no
 2. All three existing slice-2B read-only cleanliness proofs—reuse, final preparation, and cleanup—now require successful `git --no-optional-locks status --porcelain --ignored --untracked-files=all`. Ordinary and ignored untracked entries are therefore uncommitted/unpublished content. Direct real-Git regression publishes an ignore rule, creates an ignored sentinel for which ordinary porcelain is empty, and proves preparation and cleanup refuse while sentinel/store remain.
 
 Documentation updated in `docs/backlog.md`. Verification: targeted residual checks 3/3; focused task-history suite 42/42; full host Node 337/337; Docker tier-1 bridge 1 passed, 1 deselected; `git diff --check` clean. Modified files: `src/prime-agent-plugin/extension-support/task-history-workspace.ts`, `tests/task_history_workspace.test.mjs`, `docs/backlog.md`, and this task via supported CLI. Candidate preserves all six prior slice-2B repairs and every prior regression. The fetched-but-remote-behind diagnostic is unchanged and non-blocking. Status remains In Progress. No framework, persistent state, per-task mutation loop, Episode admission/finalization/lifecycle cleanup wiring, Beads/Dolt transport, provider-neutral work, ownership/receipt fields, lifecycle UX routing, migration/cutover, PRIMECLAW-43.1, or unrelated hardening was added; live store untouched.
+
+2026-10-19 Conversation review: ACCEPT slice 2B at `759a5bb6153106d626b4e3865ba71899f5db3287` as complete. Preserve accepted slices 1, 2A, and 2B plus all least-technology and scope guardrails.
+
+ADVANCE only to Backlog sub-slice 2C: implement the direct per-task task-history sync → native mutate → ordinary commit → non-force publish seam, with exact change evidence. Do not wire it into Episode admission/finalization or lifecycle tools yet.
+
+Required behavior:
+- Use the existing selected remote, authoritative `refs/heads/prime-claw/tasks`, and prepared independent nested clone.
+- Before every read or write, freshly read/fetch the direct remote ref, require exact independent clone identity and clean/no-unpublished state, and reconcile a clean stale clone with ordinary fast-forward Git.
+- Resolve one exact canonical Backlog task ID natively before mutation. Run only a supported native Backlog CLI mutation with autoCommit disabled, re-resolve the same exact ID afterward, commit the resulting task-history change in the nested clone, push without force, and prove the direct remote head equals the published commit.
+- Return narrow factual evidence only: base head, published head, exact task ID/path, native before/after views, and provider-native Git diff needed by later managed reconciliation. Do not add a normalized task model, custom patch, semantic classifier, receipt, lock, checkpoint, or coordinator.
+
+Prevent silent overwrite:
+- If the remote advances before mutation, fast-forward and re-read.
+- If it advances between local commit and push, let the ordinary non-force push reject.
+- Automatically reconcile/retry only when exact task-scoped evidence proves the remote advance is unrelated to the owned task; preserve both histories with ordinary Git.
+- If the same task changed, or identity/path evidence is ambiguous, stop with exact remote/local heads, native task views, and ordinary Git diff for later managed LLM judgment. Do not decide semantic compatibility and never force/rewrite remote history.
+- Failed native mutation, commit, fetch, reconcile, or push must report actionable evidence and preserve recoverable unpublished local work rather than deleting it or calling it published.
+
+Representative real-Git tests, not a matrix: successful exact native mutation/commit/direct-head publication; pre-read remote fast-forward; unrelated-task remote advance during publication preserved by ordinary Git; same-task advance blocks with exact evidence and no overwrite; stale/non-force push failure and remote-unavailable failure preserve local evidence. Prove unrelated task advances do not block and owner-authored iterative updates can publish sequentially. Use the repo-built managed Backlog executable on host and Docker bridge coverage.
+
+Explicitly out of scope: actual lifecycle/admission/finalization/cleanup wiring; ownership/receipt schema changes; provider-neutral UX routing; managed semantic decisions; Beads/Dolt transport; legacy inventory/transition; migration/cutover; PRIMECLAW-43.1; any framework or persistent state. Update task notes/docs truthfully, run focused + full Node + Docker tier 1, make one clean candidate, push, and stop for review. Keep PRIMECLAW-43 In Progress.
 <!-- SECTION:NOTES:END -->
