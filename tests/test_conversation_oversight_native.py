@@ -225,8 +225,12 @@ def test_native_handoff_compaction_end_to_end(tier1_container, ctmp):
     result = ctmp / "result.json"
 
     # Fixture policy: 0.5 (50%) threshold; the provider reports 190000/200000
-    # (95%) during the handoff turn, strictly exceeding it, while real message
-    # sizes stay far below native auto-compaction territory.
+    # (95%) during the handoff turn, strictly exceeding it. The scripted usage
+    # report also trips NATIVE auto-compaction at that turn boundary, so this
+    # fixture legitimately produces two compactions: the native one at the
+    # handoff-turn boundary, plus the requested compact.run at the tool-turn
+    # boundary. Real message sizes stay small, so no unintended compaction
+    # fires during the padding prompts.
     workflow_dir = project / ".prime-claw" / "workflows"
     workflow_dir.mkdir(parents=True)
     (workflow_dir / "conversation-after-handoff.md").write_text(
@@ -311,17 +315,18 @@ def test_native_handoff_compaction_end_to_end(tier1_container, ctmp):
     assert post_compaction, rows
 
     # Unchanged same-Episode oversight restoration: the pre-compaction
-    # continuation carried exactly one guide reference (the active pointer);
-    # every post-compaction call carries exactly one MORE - the single fresh
-    # reinjection for the exact active owner, riding alongside the one pointer
-    # the compaction summary retained. No accumulation across later prompts.
+    # continuation carried exactly one guide-title occurrence; every
+    # post-compaction call carries exactly one MORE - the single fresh
+    # reinjection for the exact active owner. The counts alone do not
+    # identify what the pre-existing occurrence is; only the +1 delta and
+    # its stability are asserted. No accumulation across later prompts.
     pre_compact = rows[after_handoff_index]
     assert pre_compact["guideCopies"] == 1, rows
     post_rows = [row for row in rows[after_handoff_index + 1:] if row["handoffResults"] > 0]
     assert post_rows, rows
     assert all(row["guideCopies"] == pre_compact["guideCopies"] + 1 for row in post_rows), rows
-    # The final ordinary check prompt after the settled compactions still sees
-    # exactly one fresh reinjected guide alongside the summary-retained
-    # pointer, with no accumulation across prompts.
+    # The final ordinary check prompt after the settled compactions still
+    # carries exactly the pre-compaction count plus one fresh reinjection,
+    # with no accumulation across prompts.
     final_check = [row for row in rows if row["check"]]
     assert final_check and final_check[-1]["guideCopies"] == pre_compact["guideCopies"] + 1, rows
